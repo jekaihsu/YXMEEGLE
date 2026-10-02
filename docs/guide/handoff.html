@@ -1,0 +1,477 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>系統交接與資料流向</title><style>
+:root{--ink:#203448;--muted:#5d6e7e;--line:#dce5eb;--brand:#126485;--paper:#fff;--bg:#f3f6f8}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.85 "Microsoft JhengHei","Noto Sans TC",sans-serif}a{color:var(--brand);text-underline-offset:3px}header{background:#16384a;color:white;padding:34px max(24px,calc((100vw - 1260px)/2));}header p{margin:0;font-size:13px;letter-spacing:.08em}header nav{display:flex;flex-wrap:wrap;gap:12px;margin-top:15px}header a{color:white;font-size:14px}main{max-width:1280px;margin:30px auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:24px;padding:0 22px}aside{position:sticky;top:20px;align-self:start;max-height:90vh;overflow:auto;padding:16px;background:white;border:1px solid var(--line);border-radius:10px;font-size:13px}aside ul{list-style:none;padding-left:12px}aside>div>ul{padding:0}aside li{margin:6px 0}article{min-width:0;background:white;padding:42px;border:1px solid var(--line);border-radius:12px}h1{font-size:32px;line-height:1.4;margin:0 0 22px}h2{font-size:23px;margin:45px 0 18px;border-top:1px solid var(--line);padding-top:24px;scroll-margin-top:20px}h3{font-size:18px;margin-top:28px}p,li{overflow-wrap:anywhere}table{width:100%;border-collapse:collapse;font-size:14px;line-height:1.7;margin:22px 0;table-layout:fixed}th{background:#eaf2f5;text-align:left}td,th{border:1px solid var(--line);padding:10px;vertical-align:top;overflow-wrap:anywhere}pre{padding:18px;border-radius:7px;background:#eef2f5;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}code{font-family:Consolas,monospace;background:#eef2f5;padding:2px 4px;font-size:.9em}pre code{padding:0}img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:6px}figure{margin:24px 0}figcaption{font-size:13px;color:var(--muted)}blockquote{border-left:4px solid var(--brand);margin:20px 0;padding:8px 18px;background:#edf5f7}footer{max-width:1260px;margin:20px auto;padding:24px;color:var(--muted);font-size:13px}.print{border:1px solid white;background:transparent;color:white;padding:6px 14px;cursor:pointer;border-radius:5px}.frontnote{font-size:13px;color:var(--muted);padding-bottom:18px;border-bottom:1px solid var(--line)}@media(max-width:850px){main{display:block;padding:0 12px}aside{position:static;max-height:none;margin-bottom:18px}article{padding:22px}h1{font-size:27px}table{font-size:12px}td,th{padding:6px}header{padding:24px}}
+@media print{@page{size:A4;margin:15mm 13mm}body{background:white;font-size:10pt;line-height:1.65}header,aside,footer,.print{display:none}main{display:block;margin:0;padding:0;max-width:none}article{border:0;padding:0}h1{font-size:24pt}h2{font-size:16pt;margin-top:20pt;padding-top:12pt;break-after:avoid}h3{font-size:12pt;break-after:avoid}table{font-size:8pt;line-height:1.5;table-layout:fixed}th,td{padding:5px}tr{break-inside:avoid}thead{display:table-header-group}img{max-height:220mm;object-fit:contain;display:block;margin:auto}figure{break-inside:avoid}pre{font-size:8pt;break-inside:avoid}a{color:inherit}p{orphans:3;widows:3}}
+</style></head><body><header><p>詠翔專案工作台 · 2026-10-03 · 文件與程式版本分開核對</p><nav><a href="index.html">文件入口</a><a href="user-manual.html">使用說明</a><a href="handoff.html">系統交接</a><a href="code-review.html">審查報告</a><a href="dataflow.html">資料流圖</a><button class="print" onclick="window.print()">列印／另存 PDF</button></nav></header><main><aside aria-label="本頁目錄"><div class="toc">
+<ul>
+<li><a href="#_2">接手時先掌握的狀態</a></li>
+<li><a href="#_3">全貌：兩條資料路徑</a><ul>
+<li><a href="#_4">每種資料的來源、處理與去向</a></li>
+</ul>
+</li>
+<li><a href="#_5">程式與部署位置</a></li>
+<li><a href="#_6">資料庫與檔案的分工</a></li>
+<li><a href="#_7">啟動、設定與版本交付</a></li>
+<li><a href="#_8">常見故障怎麼接手</a></li>
+<li><a href="#_9">備份與恢復交接</a></li>
+<li><a href="#_10">更新順序與責任交接</a></li>
+<li><a href="#_11">依據與延伸閱讀</a></li>
+</ul>
+</div>
+</aside><article><p class="frontnote">程式審查基準 e66c626｜示範截圖非正式驗收｜本輪未部署業務修正</p><h1 id="_1">系統交接與資料流向</h1>
+<p>更新：2026-10-03（台灣）。適用程式基準：<code>e66c626</code>。本輪更新文件與審查追蹤，沒有部署新業務程式，也沒有把待修問題標為完成。</p>
+<p>接手者請先讀本頁，再看<a href="user-manual.html">使用說明</a>及<a href="code-review.html">Code Review 報告</a>。舊部署文件保留原始日期；與本頁的最新業主決策衝突時，以最新決策為準。</p>
+<h2 id="_2">接手時先掌握的狀態</h2>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>已有證據</th>
+<th>尚待處理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>V4／報價來源</td>
+<td>10/01 正式同步 9 表、2,605 列，290 筆案件可見</td>
+<td>不是今日即時數量；同號來源整理仍待雅雯回覆</td>
+</tr>
+<tr>
+<td>歷史日報</td>
+<td>業主確認未配對的一批是舊系統移轉資料</td>
+<td>免逐筆核對、免補配對，不列上線門檻；舊畫面提示尚未更新</td>
+</tr>
+<tr>
+<td>案件執行</td>
+<td>全部核定來源可見，含已結案；保留執行歸屬</td>
+<td>可見不等於可派工。10/01 驗收仍保留 pending 執行歸屬</td>
+</tr>
+<tr>
+<td>真實登入</td>
+<td>管理帳號已正式 OAuth 驗收；一般角色有合成測試</td>
+<td>普通同事本人登入、案件權限及交付仍需驗收</td>
+</tr>
+<tr>
+<td>原生審批</td>
+<td>定義、綁定與 QA 已有歷史證據</td>
+<td>兩位指定本人共同核准及查回仍未完成；不可代按或拿 QA 結果套用正式案</td>
+</tr>
+<tr>
+<td>備份</td>
+<td>曾完成異地密文往返及獨立 PostgreSQL 還原</td>
+<td>金鑰分離保管、常態排程、同版 24 小時觀察尚未完成</td>
+</tr>
+<tr>
+<td>本輪完整測試</td>
+<td>1,368 passed、1 failed，402.35 秒</td>
+<td>失敗是收集時產生未來時間的測試；不能寫成全綠</td>
+</tr>
+<tr>
+<td>Code Review</td>
+<td>既有 10 項＋本輪新增項目有獨立追蹤</td>
+<td>修正、重驗與部署分開，不因文件完成而結案</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_3">全貌：兩條資料路徑</h2>
+<figure><img alt="資料來源與輸出路徑" src="assets/dataflow.png" /><figcaption>資料來源與輸出路徑</figcaption></figure>
+<p><a href="dataflow.html">開啟可互動資料流圖</a>。圖中文字為繁體中文；圖檢視器內建控制介面使用英文。</p>
+<p>上排是「讀入來源並呈現」；下排是「同事操作後保存與外送」。圖中箭頭表示資料傳遞，不表示所有外部能力都已完成正式驗收。原生審批及備份另有下述流程。</p>
+<h3 id="_4">每種資料的來源、處理與去向</h3>
+<table>
+<thead>
+<tr>
+<th>資料</th>
+<th>從哪裡來</th>
+<th>系統如何處理</th>
+<th>保存／最後去向</th>
+<th>成功依據</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>報價、確認單、工項</td>
+<td>核定 Lark 報價總表及 V4 共 9 張來源表</td>
+<td>完整分頁、Base＋table＋record 三元組識別、確認单關聯、保留手動操作值</td>
+<td>source_caches 原始快照；business_records 的案件及來源集合；前端公開投影</td>
+<td>表格 ready、last_sync、來源身分一致；不是只看 HTTP 200</td>
+</tr>
+<tr>
+<td>歷史日報</td>
+<td>V4 外業／內業工作與成本關聯</td>
+<td>匯入可辨識日期、組別、案件證據；不自動完成任務</td>
+<td>daily_reports／daily_unmatched</td>
+<td>舊移轉未配對資料免人工核對；新資料另按有效來源規則处理</td>
+</tr>
+<tr>
+<td>同事名冊</td>
+<td>核定名冊來源</td>
+<td>application 身分唯讀、在職及身分檢核</td>
+<td>company_people＋名冊同步狀態</td>
+<td>新鮮成功讀取時間及個別員工准入，不用 worker 心跳代替</td>
+</tr>
+<tr>
+<td>OAuth 身分</td>
+<td>使用者在 Lark 本人登入</td>
+<td>state、租戶、應用、在職名冊驗證；由伺服器計算管理授權</td>
+<td>auth_sessions 暫時 session；company_people 身分證據；簽章 Cookie</td>
+<td>/api/session 與 /api/workspace 均成功，角色及 namespace 正確</td>
+</tr>
+<tr>
+<td>任務、排程、成果</td>
+<td>同事在工作台明確操作</td>
+<td>案件可執行、角色、SOP、版本與審核條件</td>
+<td>business_records，workspaces.version，action_audit；瀏覽器重新取得公開資料</td>
+<td>新版本及對應成果／確認狀態，不以本機草稿代替</td>
+</tr>
+<tr>
+<td>Input 登錄</td>
+<td>節點中的 Input 表單</td>
+<td>固定 request_id、目的表白名單、追加計畫、Worker 寫入後讀回</td>
+<td>本地 input_revisions／jobs；核定專用 Lark 登錄表</td>
+<td>succeeded＋讀回欄位與計畫一致。不是回寫報價、V4 原始表或薪資 Base</td>
+</tr>
+<tr>
+<td>附件</td>
+<td>同事上傳檔案或提供來源連結</td>
+<td>分類、版本、用途、20 MB 上限、角色與案件檢核</td>
+<td>本機持久化 /data/uploads；metadata＋file job；核定 Drive 根目錄</td>
+<td>本機保存與 Drive remote_status=verified 分開確認</td>
+</tr>
+<tr>
+<td>提醒通知</td>
+<td>@ 提及、確認單、摘要等明確動作</td>
+<td>收件人、案件與外送政策驗證</td>
+<td>jobs／steps／receipt；Lark IM</td>
+<td>遠端 message_id 及本地回執。queued 不代表送達</td>
+</tr>
+<tr>
+<td>原生審批</td>
+<td>變更、展延、跳過或重大財務草稿</td>
+<td>prepare 綁定案件版本、定義、席次與證據；submit 固定 UUID；poll 查回</td>
+<td>本地申請、native_binding／native_receipt；Lark 原生審批实例</td>
+<td>binding_verified 與有效核准席次；業務套用仍須另過驗證</td>
+</tr>
+<tr>
+<td>備份</td>
+<td>正式 DB 快照與已提交附件</td>
+<td>一致性快照、SHA256、加密分塊、異地讀回</td>
+<td>本機備份目錄；獨立備份應用的 Drive；空白隔離還原目標</td>
+<td>密文往返、資料列及附件 hash 一致；排程與金鑰保管另驗收</td>
+</tr>
+</tbody>
+</table>
+<p>來源表可見與財務／個資公開是不同議題。已知同步 POST 原始回應及人員事件有投影缺陷，見既有 #33、#34；目前不能把「設計有投影」描述成所有出口都已安全覆蓋。</p>
+<h2 id="_5">程式與部署位置</h2>
+<table>
+<thead>
+<tr>
+<th>路徑</th>
+<th>負責內容</th>
+<th>修改後至少檢查</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>frontend/src/App.tsx、Operations.tsx</td>
+<td>頁面、角色操作、任務與管理介面</td>
+<td>build、桌面／手機、真實流程按鈕、錯誤恢復</td>
+</tr>
+<tr>
+<td>frontend/src/api.ts、drafts.ts</td>
+<td>HTTP、登入過期、分頁草稿</td>
+<td>非 JSON 回應、401/403、案件與使用者切換</td>
+</tr>
+<tr>
+<td>backend/app.py</td>
+<td>API、OAuth、session、交易、附件</td>
+<td>權限撤銷、JSON 型別、版本衝突、回應投影</td>
+</tr>
+<tr>
+<td>backend/workflow.py、operations.py、policy.py</td>
+<td>任務、交接、SOP、業務動作</td>
+<td>角色矩陣、節點條件、歷史狀態、動作冪等</td>
+</tr>
+<tr>
+<td>backend/sources.py、v4_sources.py、source_sync.py</td>
+<td>來源讀取、映射、同步</td>
+<td>完整分頁、身分衝突、重複同步、来源刪除與手動值保護</td>
+</tr>
+<tr>
+<td>backend/production_access.py、people_directory.py</td>
+<td>准入、名冊、管理授權</td>
+<td>租戶／應用一致、名冊時效、停權與降權</td>
+</tr>
+<tr>
+<td>backend/native_approval.py、native_routes.py、native_poller.py</td>
+<td>原生送審、查回與綁定</td>
+<td>UUID 不重送、未知狀態、共同核准、輪詢公平性</td>
+</tr>
+<tr>
+<td>backend/jobs.py、lark_adapter.py、remote_policy.py</td>
+<td>外送及遠端目的政策</td>
+<td>每個遠端呼叫前重驗、回執保存失败、目的變更</td>
+</tr>
+<tr>
+<td>backend/storage.py、audit.py</td>
+<td>正規化業務資料及稽核</td>
+<td>重複 ID、交易回滾、查詢資料量</td>
+</tr>
+<tr>
+<td>scripts/run_service.py、run_worker.py</td>
+<td>容器內 web／worker／backup 監督</td>
+<td>子程序失敗處理、UID10001、心跳与名冊健康</td>
+</tr>
+<tr>
+<td>scripts/backup_restore.py、backup_schedule.py、backup_offsite.py</td>
+<td>備份、排程、加密與恢復</td>
+<td>空目標還原、附件校驗、失败可重試、未知遠端結果</td>
+</tr>
+<tr>
+<td>Dockerfile、deployment/source-tables.json</td>
+<td>映像與來源清單</td>
+<td>Node22／Python3.12、鎖檔、來源白名單、volume</td>
+</tr>
+</tbody>
+</table>
+<p>正式容器以 FastAPI 提供前端 build，不以 Vite dev server 對外服務。run_service 監督 web、worker；有 BACKUP_DIR 才啟動 backup 子程序。任一非預期子程序結束會使整組退出，交由主機平台重啟。系統使用 DB 中的 jobs，沒有另外部署 Redis／Celery。</p>
+<h2 id="_6">資料庫與檔案的分工</h2>
+<table>
+<thead>
+<tr>
+<th>儲存位置</th>
+<th>內容</th>
+<th>交接注意</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>workspaces</td>
+<td>namespace、版本及工作區 metadata</td>
+<td>demo、test-lark、lark 正式區不可混用</td>
+</tr>
+<tr>
+<td>business_records</td>
+<td>kind／entity_id／parent_id 對應案件、節點、任務與各業務集合</td>
+<td>不是一個任意 JSON 檔可直接覆蓋；由 storage 在同一交易保存</td>
+</tr>
+<tr>
+<td>company_people</td>
+<td>公司正式人員及測試區覆蓋資料</td>
+<td>身分與業務角色不同；系統管理員不自動取得財務核准席次</td>
+</tr>
+<tr>
+<td>auth_sessions</td>
+<td>OAuth nonce、暫時登入資料</td>
+<td>portable backup 排除；還原後重新登入</td>
+</tr>
+<tr>
+<td>receipts</td>
+<td>操作 request_id 與 fingerprint</td>
+<td>重送須沿用識別且內容相同；不可手動刪掉來迫使重送</td>
+</tr>
+<tr>
+<td>source_caches</td>
+<td>私有原始來源快照與同步狀態</td>
+<td>不公開上 GitHub；公開 API 必須投影</td>
+</tr>
+<tr>
+<td>action_audit</td>
+<td>操作人、結果、版本、實體差異</td>
+<td>目前分頁仍全量掃描，歷史量增大需優化</td>
+</tr>
+<tr>
+<td>/data/uploads</td>
+<td>依 workspace hash 分隔的不可變附件</td>
+<td>必須持久化 volume；DB metadata 不等於檔案已在 Drive</td>
+</tr>
+<tr>
+<td>BACKUP_DIR</td>
+<td>daily、monthly zip 及排程／異地狀態</td>
+<td>與 uploads 分開；容量、保留與加密狀態需監控</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_7">啟動、設定與版本交付</h2>
+<p>本機示範用 SQLite；正式用 PostgreSQL。不要把本機 SQLite 測試結果當成正式交易與部署驗收。</p>
+<pre><code class="language-powershell"># 在專案根目錄；使用獨立 Python 環境
+python -m pip install -r backend/requirements.txt
+Set-Location frontend
+npm.cmd ci
+npm.cmd run build
+Set-Location ..
+.\scripts\start_local.ps1 -Port 8000
+</code></pre>
+<p>上列 requirements.txt 是範圍依賴，適合開發啟動；正式 Docker 安裝 backend/requirements.lock 並驗證 hashes。本輪機器的 Python3.11／SQLAlchemy1.4 與正式 Python3.12／SQLAlchemy2 不同，發布前要在鎖定映像再跑一次完整測試。不要直接將目前機器的 pip freeze 覆蓋正式鎖檔。</p>
+<table>
+<thead>
+<tr>
+<th>設定群組</th>
+<th>用途</th>
+<th>保管方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>APP_ENV、DEMO_MODE、PUBLIC_ORIGIN</td>
+<td>環境與 HTTPS 網域</td>
+<td>正式關閉 Demo；變更留版本回執</td>
+</tr>
+<tr>
+<td>DATABASE_URL、SESSION_SECRET、UPLOAD_DIR</td>
+<td>DB、簽章、附件磁碟</td>
+<td>由部署秘密設定提供，文件只寫名稱</td>
+</tr>
+<tr>
+<td>LARK_APP_ID／SECRET／REDIRECT_URI／ALLOWED_TENANTS</td>
+<td>OAuth 與專用應用</td>
+<td>保留正確應用和公司，不借用 CLI 憑證</td>
+</tr>
+<tr>
+<td>LARK_WORKER_ORGANIZATION／IDENTITY</td>
+<td>來源背景讀取身分</td>
+<td>來源為核定 application 身分；不是最後登入主管的 token</td>
+</tr>
+<tr>
+<td>LARK_SOURCE_TABLES_JSON／V4_BASE_TOKEN／QUOTE_BASE_TOKEN</td>
+<td>核定來源</td>
+<td>以目前部署與 source-tables.json 核對，不貼私有快照</td>
+</tr>
+<tr>
+<td>LARK_DRIVE_ROOT、Input 專用目的設定</td>
+<td>外部寫入目的</td>
+<td>分開正式與測試；Drive 根目錄仍有 #35 待補防護</td>
+</tr>
+<tr>
+<td>原生審批定義及啟用設定</td>
+<td>定義驗證與正式送件</td>
+<td>沿用現有 QA instance，不因交接重新建單</td>
+</tr>
+<tr>
+<td>BACKUP_*</td>
+<td>排程、加密、獨立異地身分</td>
+<td>金鑰與密文分開保管；不把整個 env map 放公開文件</td>
+</tr>
+</tbody>
+</table>
+<p>.env.example 是範本，程式不會自動讀 .env。更新部署變數須先讀取最新完整設定，合併指定變更、比對、讀回；不得用舊設定檔整份覆蓋。</p>
+<p>發布流程：固定 commit → 全測試與 build → 封裝 smoke → 確認可還原備份 → staging 與角色驗收 → 正式發布 → 核對版本／UID／volume／健康 → 同版 24 小時觀察。GitHub push 只更新版本庫，不表示 Zeabur 已部署。</p>
+<h2 id="_8">常見故障怎麼接手</h2>
+<table>
+<thead>
+<tr>
+<th>現象</th>
+<th>先看什麼</th>
+<th>正確處理</th>
+<th>不要做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>登入後被拒絕</td>
+<td>/api/session、名冊成功時間、tenant/app、active</td>
+<td>查名冊及員工准入；由核定維修入口恢復</td>
+<td>用名字猜 open_id、直接開 manager 或放寬 tenant</td>
+</tr>
+<tr>
+<td>來源頁顯示歷史日報待核對</td>
+<td>是否為業主已確認的旧移轉批次</td>
+<td>按最新決策免核對，保留紀錄，追蹤提示更新</td>
+<td>要求雅雯補全部舊日報，或假裝配對成功</td>
+</tr>
+<tr>
+<td>案件只能查看</td>
+<td>execution_system、source_reference、角色</td>
+<td>依核定流程確認案件執行歸屬</td>
+<td>因看得到就直接改 DB 啟用</td>
+</tr>
+<tr>
+<td>409 版本衝突</td>
+<td>最新 workspace/project version</td>
+<td>保留文字，重讀、比對後再操作</td>
+<td>改 request_id 連點重送外部副作用</td>
+</tr>
+<tr>
+<td>Input／通知／上傳 outcome_unknown</td>
+<td>同一 UUID、job、遠端回執</td>
+<td>先只讀查回，確認原請求結果</td>
+<td>直接重送；#37 通知回執缺陷未修時尤其注意</td>
+</tr>
+<tr>
+<td>附件 queued／blocked</td>
+<td>worker、目的目錄、角色、回執</td>
+<td>區分本機已保存與遠端未驗證</td>
+<td>把 queued 截圖當作交付成功</td>
+</tr>
+<tr>
+<td>審批一直 PENDING</td>
+<td>Lark 原始实例、綁定、本人席次、poll 時間</td>
+<td>查回同一实例；大量歷史案注意輪詢飢餓問題</td>
+<td>重建審批或代替本人核准</td>
+</tr>
+<tr>
+<td>備份狀態異常</td>
+<td>status.json、磁碟容量、密文讀回、key custody</td>
+<td>保存錯誤與未知 bundle，隔離恢復核驗</td>
+<td>刪未知回執、把備份與金鑰放同一共享位置</td>
+</tr>
+</tbody>
+</table>
+<p>/api/health 只證明 web 能連 DB。管理員的 /api/admin/runtime-health 才包含 worker、名冊、備份等狀態；但顯示健康仍不能代替真人審批或附件真實送達驗收。</p>
+<h2 id="_9">備份與恢復交接</h2>
+<p>portable backup 保存 6 張業務表與已提交的本機附件，排除登入 session。正式 PostgreSQL 快照使用 REPEATABLE READ；附件按 DB 引用及 hash 檢核。異地備份使用獨立應用與密文，不能把應用附件 Drive 和備份目的混為一談。</p>
+<p>恢復必須在停止寫入的隔離服務、空白 DB、空白 uploads 進行。先驗證 manifest/hash，再恢復，逐表及逐檔比對，確認 session 沒被恢復，最後才進行登入與只讀 smoke。具體指令見 <a href="../BACKUP_ACTIVATION_RUNBOOK_20260929.md">備份啟用手冊</a> 與 scripts/backup_restore.py --help。</p>
+<p>目前新發現：如果附件已寫入、DB insert 失敗，回滾只刪檔案而留下空目錄，下次恢復被「目標非空」拒絕。先保存失敗證據，選新的空白隔離目標重驗；不要為了重試對正式 uploads 做遞迴刪除。永久修正應只清理本次新建且仍為空的目錄。</p>
+<h2 id="_10">更新順序與責任交接</h2>
+<ol>
+<li>先修資料投影、附件撤權、遠端目的及未知結果處理；逐項跑負向驗收。</li>
+<li>更新 Vite／esbuild，保留鎖檔，重新 build 與瀏覽器流程測試。官方已修版本及本次 npm audit 詳見審查報告。</li>
+<li>修交接可見性、原生 poller 公平性、備份回滾、API 錯誤處理、草稿隔離及指標。</li>
+<li>落實歷史日報免核對的畫面／指標範圍，保留來源紀錄；同號案件按雅雯的逐組回覆處理。</li>
+<li>統一正式版本的 Python／DB 測試環境、修時間依賴測試、建立持續整合 gate。</li>
+<li>完成真人兩席、普通同事流程、金鑰分離與常態備份，再做同版觀測。</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>需交付的事項</th>
+<th>目前狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>開發維護者</td>
+<td>Issue 修正、測試、版本／部署對照</td>
+<td>待指定實際接手人；不在文件臆造負責人</td>
+</tr>
+<tr>
+<td>業務資料核對</td>
+<td>34 組歷史同編號案件的保留／關聯決定</td>
+<td>已傳朱雅雯私有核對文件，尚未收到核對結果</td>
+</tr>
+<tr>
+<td>部署／維運</td>
+<td>volume、告警、同版觀察、部署回滾</td>
+<td>待交接並留驗收回執</td>
+</tr>
+<tr>
+<td>備份保管人</td>
+<td>獨立金鑰保管、常態排程與還原演練</td>
+<td>custody 尚待確認</td>
+</tr>
+<tr>
+<td>本人驗收者</td>
+<td>原生審批兩席、一般同事登入及交付</td>
+<td>需本人執行，不由代理代按</td>
+</tr>
+</tbody>
+</table>
+<p>公開版本庫只保存去識別化文件、示範截圖及程式。雅雯核對文件、公司快照、CLI/session 設定、.runtime、金鑰與真實案件名稱均不納入本套公開交接附件。</p>
+<h2 id="_11">依據與延伸閱讀</h2>
+<ul>
+<li><a href="../COMPANY_COCKPIT_RELEASE_20261001.md">10/01 正式來源與駕駛艙紀錄</a>：正式歷史證據與限制。</li>
+<li><a href="../SOURCE_VISIBILITY_DECISION_20260930.md">來源可見性決策</a>：全部來源可見與業務執行分開。</li>
+<li><a href="../RELEASE_HANDOFF_20260930_LATEST.md">前版交接</a>：保留回執歷史，不當作今天即時狀態。</li>
+<li><a href="code-review.html">Code Review 報告</a>：本次證據、優先序與未修項目。</li>
+<li><a href="https://github.com/jekaihsu/YXMEEGLE/issues/32">GitHub 既有追蹤總覽</a>、<a href="https://github.com/jekaihsu/YXMEEGLE/issues/43">第一輪審查</a>。</li>
+</ul></article></main><footer>維護來源：docs/guide/handoff.md。圖片為本機隔離示範；公司私有快照及憑證未包含於文件。</footer></body></html>

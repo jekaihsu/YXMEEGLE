@@ -1,8 +1,19 @@
 # 詠翔專案管理 prototype
 
+## 最新圖文文件（2026-10-03）
+
+- [文件入口](docs/guide/index.html)：離線 HTML、可列印 PDF、圖文操作說明。
+- [使用說明書](docs/guide/user-manual.md)：登入、案件、任務、Input、附件、交付與錯誤恢復。
+- [系統交接與資料流向](docs/guide/handoff.md)：每種資料從哪裡來、如何處理、保存與外送目的、維運及驗收。
+- [第二輪深入 Code Review](docs/guide/code-review.md)：新增 8 項確認發現；[GitHub #52](https://github.com/jekaihsu/YXMEEGLE/issues/52)。上輪 10 項尚未修復。
+
+最新業主決策：從舊系統搬入、無法配對案件的歷史日報免逐筆核對，不列上線阻擋。歷史同編號案件另由雅雯核對，私有明細不放公開 Repo。系統舊的待核對提示尚未隨此決策修改。
+
+10/01 正式驗收曾成功同步 9 表、2,605 列、290 筆可見案件；這是歷史回執，不是今日即時數量。可見與可執行分開，普通同事本人操作、原生審批雙席及常態備份仍有驗收待辦。下方早期文件保留作歷史參考，以新版交接為入口。
+
 最新範圍裁示：[暫停訓練／能力／考評及薪水 Base 回寫](docs/LEARNING_DISABLED_DECISION_20260927.md)。班表、報價認定與人員名冊唯讀同步保留；舊文中的完整學習流程暫不啟用。
 
-2026-09-27 接續入口：[核定決策與交接](docs/HANDOFF_20260927.md)、[來源真實驗收](docs/LARK_SOURCE_ACCEPTANCE_20260927.md)、[備份與遷移](docs/CLOUD_BACKUP_EVIDENCE_20260927.md)。目前九張來源表已可讀，重複同步不增案測試通過，日報仍有待配對資料。使用者已要求[首頁與案件頁明顯視覺改版](docs/VISUAL_REDESIGN_DECISION_20260927.md)，正在本機實作；舊雲端部署回執不代表本輪已上線。
+2026-09-27 歷史參考：[核定決策與交接](docs/HANDOFF_20260927.md)、[來源真實驗收](docs/LARK_SOURCE_ACCEPTANCE_20260927.md)、[備份與遷移](docs/CLOUD_BACKUP_EVIDENCE_20260927.md)。後續來源可見性、公司駕駛艙及最新驗收請看新版交接，不沿用當時的待辦狀態。
 
 獨立 Web 工作台，採 React／TypeScript＋FastAPI，提供九大節點、SOP 子任務、排程、組日、日報證據、文件、留言，以及展延和設計變更示範流程。UI 參考 Meego，資料目標前接報價、後接 V4 日報。
 
@@ -34,7 +45,7 @@ Set-Location ..
 ## 測試與文件
 
 ```powershell
-python -m pytest backend/test_backend.py -q
+python -m pytest backend -q
 ```
 
 前端型別及正式建置檢查使用 `frontend` 內的 `npm.cmd run build`。Word PRD 可執行 `python scripts/generate_prd.py` 重建，另需 `python-docx`。
@@ -49,7 +60,7 @@ python -m pytest backend/test_backend.py -q
 
 ## Lark 與示範界線
 
-真實登入需設定公司 OAuth 應用、回呼網址、tenant 白名單及角色對應，來源查詢使用登入者的 user access token，不能直接沿用本機 CLI 登入。來源設定範例見 `deployment/source-tables.json`；目前列報價與 V4 表，V3 用於既有填報參考，不納入新工作區的正式匯入清單。
+真實登入需設定公司 OAuth 應用、回呼網址、tenant 白名單及角色對應。公司來源同步使用核定的 application 身分，前台操作者仍須驗證權限；不能直接沿用本機 CLI 登入。來源設定範例見 `deployment/source-tables.json`；目前列報價與 V4 表，V3 用於既有填報參考，不納入新工作區的正式匯入清單。
 
 來源同步唯讀 Lark，可在隔離的公司工作區帶入案件及工項，不改正式 Base。日報只提供案號與日期的作業證據，不直接完成 SOP。正式審批送出目前未接實際提交 adapter 時會阻擋；讀取既有 Lark 審批的外部狀態，不等於已驗證案件和影響範圍，也不自動授權執行。
 

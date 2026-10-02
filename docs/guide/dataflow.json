@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "資料從哪裡來、到哪裡去",
+    "quality_profile": "showcase",
+    "viewBox": [
+      900,
+      520
+    ]
+  },
+  "stages": [
+    {
+      "label": "資料來源"
+    },
+    {
+      "label": "讀取與檢核"
+    },
+    {
+      "label": "系統保存"
+    },
+    {
+      "label": "使用與交付"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "base",
+      "type": "external",
+      "label": "報價總表＋V4",
+      "sublabel": "案件、工項與歷史日報",
+      "stage": 0,
+      "row": 0,
+      "width": 145,
+      "height": 70
+    },
+    {
+      "id": "source",
+      "type": "backend",
+      "label": "來源同步",
+      "sublabel": "唯讀、分頁與身分配對",
+      "stage": 1,
+      "row": 0,
+      "width": 145,
+      "height": 70
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "快取、案件、任務、回執",
+      "stage": 2,
+      "row": 0,
+      "width": 145,
+      "height": 70
+    },
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "工作台與駕駛艙",
+      "sublabel": "依角色操作、查閱來源",
+      "stage": 3,
+      "row": 0,
+      "width": 145,
+      "height": 70
+    },
+    {
+      "id": "staff",
+      "type": "external",
+      "label": "公司同事",
+      "sublabel": "任務、佐證與附件",
+      "stage": 0,
+      "row": 2,
+      "width": 145,
+      "height": 70
+    },
+    {
+      "id": "api",
+      "type": "security",
+      "label": "API 權限與版本檢核",
+      "sublabel": "OAuth、名冊、案件資格",
+      "stage": 1,
+      "row": 2,
+      "width": 145,
+      "height": 70
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "背景工作與本機附件",
+      "sublabel": "資料庫佇列＋持久化磁碟",
+      "stage": 2,
+      "row": 2,
+      "width": 145,
+      "height": 70
+    },
+    {
+      "id": "remote",
+      "type": "external",
+      "label": "核定 Lark 目的地",
+      "sublabel": "Drive／Input／通知",
+      "stage": 3,
+      "row": 2,
+      "width": 145,
+      "height": 70
+    }
+  ],
+  "flows": [
+    {
+      "from": "base",
+      "to": "source",
+      "label": "唯讀資料",
+      "variant": "emphasis"
+    },
+    {
+      "from": "source",
+      "to": "db",
+      "label": "保存快照",
+      "variant": "emphasis"
+    },
+    {
+      "from": "db",
+      "to": "ui",
+      "label": "公開投影",
+      "variant": "emphasis"
+    },
+    {
+      "from": "staff",
+      "to": "api",
+      "label": "明確操作",
+      "variant": "security"
+    },
+    {
+      "from": "api",
+      "to": "queue",
+      "label": "驗證後保存",
+      "variant": "security"
+    },
+    {
+      "from": "queue",
+      "to": "remote",
+      "label": "授權後執行",
+      "variant": "default"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "來源與工作進度分開",
+      "items": [
+        "V4 同步不回寫來源表；來源結案不自動完成任務。",
+        "舊移轉日報免人工配對；歷史同號案件由雅雯核對。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "外部操作另有准入條件",
+      "items": [
+        "Input、檔案與通知由 Worker 執行並保存回執。",
+        "原生審批另走專用送件與查回流程，見交接文件。"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "目前仍有待修項目",
+      "items": [
+        "同步回應投影與通知回執失敗處理已列 Issue。",
+        "本圖說明路徑，不代表全部正式功能已驗收。"
+      ]
+    }
+  ]
+}

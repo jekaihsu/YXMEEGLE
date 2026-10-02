@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-03",
+  "type": "dataflow",
+  "artifact": "dataflow.html",
+  "specification": "dataflow.json",
+  "validation": "9 artifact checks passed; 0 warnings",
+  "browser": "light/dark checks passed at 1440, 1600, 1920, 2048 px",
+  "manualReview": "dataflow and all 30 PDF pages visually inspected",
+  "htmlGuides": "1440px and 390px: no missing images or horizontal overflow",
+  "sha256": {
+    "dataflow.json": "2dfa2f143456aacd29d18db1119e92f861b608dbba1cae0d5622d8bfb1284f3d",
+    "dataflow.html": "2eac334b848d7ab68266e3e04309d2bb1fb5ea0ac19babf8dee7d6ac3469f8c9"
+  }
+}
