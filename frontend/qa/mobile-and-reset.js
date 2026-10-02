@@ -1,0 +1,33 @@
+async (page) => {
+  await page.reload();
+  await page.getByRole('heading', { name: '公司駕駛艙', exact: true }).waitFor();
+  await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== 'running'));
+  const size = await page.evaluate(() => ({width:innerWidth,scroll:document.documentElement.scrollWidth}));
+  if (size.scroll > size.width + 1) throw new Error(`Mobile dashboard overflow: ${JSON.stringify(size)}`);
+  await page.screenshot({path:'output/playwright/meegle-dashboard-mobile.png',fullPage:true});
+  await page.getByRole('button', {name:'開啟導覽',exact:true}).click();
+  await page.getByRole('button', {name:'C115236 桃園捷運綠線控制點測量',exact:true}).click();
+  await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== 'running'));
+  if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw new Error('Mobile project overflow');
+  await page.screenshot({path:'output/playwright/meegle-project-mobile.png',fullPage:true});
+  await page.getByRole('row').filter({hasText:'檢查坐標與精度'}).click();
+  await page.getByRole('dialog',{name:'檢查坐標與精度'}).waitFor();
+  await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== 'running'));
+  if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw new Error('Mobile inspector overflow');
+  await page.screenshot({path:'output/playwright/meegle-inspector-mobile.png'});
+  await page.getByRole('button',{name:'關閉任務',exact:true}).click();
+  await page.setViewportSize({width:1440,height:1000});
+  await page.getByRole('button',{name:'資料來源',exact:true}).click();
+  await page.getByRole('heading',{name:'資料來源',exact:true}).waitFor();
+  await page.getByRole('button',{name:'重設示範資料',exact:true}).click();
+  await page.getByRole('button',{name:'確認重設',exact:true}).click();
+  await page.getByRole('dialog',{name:'重設示範工作區？'}).waitFor({state:'hidden'});
+  const ws = await page.evaluate(async () => (await fetch('/api/workspace')).json());
+  if (ws.approvals.length || ws.projects.some(p=>p.files.length) || ws.projects[0].revision!==1) throw new Error('Demo reset incomplete');
+  await page.locator('.user-button').click();
+  await page.getByRole('button',{name:'育寬 林育寬 專案管理 · 專案經理',exact:true}).click();
+  await page.getByRole('button',{name:'公司駕駛艙',exact:true}).click();
+  await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== 'running'));
+  await page.screenshot({path:'output/playwright/meegle-dashboard-desktop.png',fullPage:true});
+  console.log('PASS: 390px dashboard/project/inspector layouts; demo data restored; no production data touched.');
+}

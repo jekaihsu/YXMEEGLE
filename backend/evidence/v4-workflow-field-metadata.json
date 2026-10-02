@@ -1,0 +1,241 @@
+{
+  "checked_at": "2026-09-25",
+  "base_token": "H7W6b0PFWaVF1BsgqXJj3pQ9pXb",
+  "method": "lark-cli base +field-list --as user --limit 200; metadata only",
+  "tables": [
+    {
+      "table_id": "tblKwSDRg6WaGHYr",
+      "total": 42,
+      "fields": [
+        {
+          "default_value": {
+            "$slot": "record_created_time"
+          },
+          "id": "fldNI9iVge",
+          "name": "工作日期",
+          "style": {
+            "format": "yyyy-MM-dd"
+          },
+          "type": "datetime"
+        },
+        {
+          "description": "由填報人關聯至人員名單，自動帶入所屬組別。",
+          "expression": "[填報人].[所屬組別].UNIQUE().ARRAYJOIN(\",\")",
+          "id": "fldflw3AQx",
+          "name": "所屬組別",
+          "type": "formula"
+        },
+        {
+          "bidirectional": false,
+          "id": "fldWnwDWp0",
+          "link_table": "tblfaCO2xPUNptQH",
+          "name": "填報人",
+          "type": "link"
+        },
+        {
+          "default_value": [
+            "控制"
+          ],
+          "id": "fldBZ6taq6",
+          "multiple": false,
+          "name": "內業組別",
+          "options": [
+            {
+              "hue": "Orange",
+              "lightness": "Lighter",
+              "name": "控制"
+            },
+            {
+              "hue": "Purple",
+              "lightness": "Lighter",
+              "name": "圖報A"
+            },
+            {
+              "hue": "Wathet",
+              "lightness": "Lighter",
+              "name": "圖報B"
+            },
+            {
+              "hue": "Blue",
+              "lightness": "Lighter",
+              "name": "經理"
+            },
+            {
+              "hue": "Yellow",
+              "lightness": "Lighter",
+              "name": ""
+            }
+          ],
+          "type": "select"
+        },
+        {
+          "id": "fldoEvsuL5",
+          "name": "填報帳號",
+          "type": "created_by"
+        },
+        {
+          "expression": "[組長backup].[所屬組別]",
+          "id": "fldTUVjWVo",
+          "name": "組別",
+          "type": "formula"
+        },
+        {
+          "id": "fldECc1GDy",
+          "name": "填報時間",
+          "style": {
+            "format": "yyyy-MM-dd HH:mm"
+          },
+          "type": "created_at"
+        }
+      ]
+    },
+    {
+      "table_id": "tbl5zPLS0ExWNEty",
+      "total": 131,
+      "fields": [
+        {
+          "description": "由外業成本單帶入；車程津貼依此工作日期月份結算。",
+          "expression": "IFERROR(FIRST([所屬成本單].[工作日期]),\"\")",
+          "id": "fldmgCAW7E",
+          "name": "工作日期-薪資",
+          "type": "formula"
+        },
+        {
+          "expression": "[所屬成本單].[組別]",
+          "id": "fldyP0mn4F",
+          "name": "組別",
+          "type": "formula"
+        },
+        {
+          "expression": "IFERROR(FIRST([所屬案件].[所屬案件]),\"\")",
+          "id": "fld7FB7oaW",
+          "name": "案件編號",
+          "type": "formula"
+        },
+        {
+          "bidirectional": true,
+          "bidirectional_link_field_id": "flddfFq9zI",
+          "description": "必填",
+          "id": "fldfpNpQiE",
+          "link_table": "tblmSQrcCs9vPQZx",
+          "name": "所屬案件",
+          "type": "link"
+        },
+        {
+          "bidirectional": true,
+          "bidirectional_link_field_id": "fldWSg0f8f",
+          "description": "可請款案件必掛；計價數量金額由此來",
+          "id": "flduIbW1xZ",
+          "link_table": "tblwQPYk3c9RvCU7",
+          "name": "合約工項",
+          "type": "link"
+        },
+        {
+          "expression": "IFERROR(FIRST([合約工項].[所屬案件]),\"\")",
+          "id": "fld2zDDAYc",
+          "name": "明細所屬案件編號",
+          "type": "formula"
+        },
+        {
+          "bidirectional": true,
+          "bidirectional_link_field_id": "fldPqgElTB",
+          "description": "必填；在成本單內按＋新增時自動帶（必填屬性 CLI 無法設，請於表單／流程自律）",
+          "id": "fldRekgGob",
+          "link_table": "tbl8wRYCUCvbSoJG",
+          "name": "所屬成本單",
+          "type": "link"
+        },
+        {
+          "default_value": null,
+          "description": "由成本單自動帶入，供津貼明細展開。",
+          "id": "fldnCPisZ5",
+          "multiple": true,
+          "name": "組員帳號-津貼自動化",
+          "type": "user"
+        },
+        {
+          "default_value": null,
+          "description": "由成本單自動帶入，供津貼明細展開。",
+          "id": "fldJs4RTUm",
+          "multiple": false,
+          "name": "組長帳號-津貼自動化",
+          "type": "user"
+        },
+        {
+          "description": "外業營業額唯一口徑：只取人工填寫的「營業額點數」；空白視為0，不採用手動點數舊欄或公式點數。",
+          "expression": "IFBLANK([營業額點數],0)",
+          "id": "fldG4Cupcc",
+          "name": "最終營業額點數",
+          "type": "formula"
+        }
+      ]
+    },
+    {
+      "table_id": "tblrCo8KeZiuJUNh",
+      "total": 53,
+      "fields": [
+        {
+          "bidirectional": false,
+          "description": "正式新來源；合約明細與各業工項標準已整合至合約填報工項。",
+          "id": "fldJwsE5yG",
+          "link_table": "tblwQPYk3c9RvCU7",
+          "name": "內業工項",
+          "type": "link"
+        },
+        {
+          "description": "內業營業額手填口徑：優先取「營業額點數」；該欄空白時取「手動點數」；兩者皆空白為0，不採用公式點數。",
+          "expression": "IF(NOT(ISBLANK([營業額點數])),[營業額點數],IFBLANK([手動點數],0))",
+          "id": "fldtIz2VNl",
+          "name": "最終營業額點數",
+          "type": "formula"
+        },
+        {
+          "expression": "[所屬成本單].[填報人]",
+          "id": "fldWL8MTTZ",
+          "name": "姓名",
+          "type": "formula"
+        },
+        {
+          "bidirectional": false,
+          "description": "選擇工程確認單；取代舊案件表關聯。",
+          "id": "fld9yB8pCo",
+          "link_table": "tblmSQrcCs9vPQZx",
+          "name": "所屬案件",
+          "type": "link"
+        },
+        {
+          "expression": "IFERROR(FIRST([所屬案件].[所屬案件]),\"\")",
+          "id": "fldMx2QEOd",
+          "name": "案件編號",
+          "type": "formula"
+        },
+        {
+          "default_value": {
+            "$slot": "record_created_time"
+          },
+          "id": "fldpdkNpJE",
+          "name": "填報時間",
+          "style": {
+            "format": "yyyy/MM/dd HH:mm"
+          },
+          "type": "datetime"
+        },
+        {
+          "bidirectional": true,
+          "bidirectional_link_field_id": "fldhRlBkuF",
+          "id": "fldcnIsIhT",
+          "link_table": "tblKwSDRg6WaGHYr",
+          "name": "所屬成本單",
+          "type": "link"
+        },
+        {
+          "description": "所選內業工項的計價權重為0時警告。",
+          "expression": "IF(AND(NOT(ISBLANK([內業工項])),IFBLANK(FIRST([內業工項].[計價權重]),0)<0.001),\"⚠組別權重=0\",\"\")",
+          "id": "fldRUpemtS",
+          "name": "⚠組別權重=0",
+          "type": "formula"
+        }
+      ]
+    }
+  ]
+}

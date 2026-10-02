@@ -1,0 +1,97 @@
+[
+  {
+    "name": "報價總表",
+    "base_token": "JoOqbggsVar0ATsVgbcjh6IIp1g",
+    "table_id": "tblENZvYAya93Twa",
+    "kind": "quote"
+  },
+  {
+    "name": "報價總表工程確認單",
+    "base_token": "JoOqbggsVar0ATsVgbcjh6IIp1g",
+    "table_id": "tblvV4X1kNVQisVj",
+    "kind": "quote_confirmation"
+  },
+  {
+    "name": "工程確認單",
+    "base_token": "H7W6b0PFWaVF1BsgqXJj3pQ9pXb",
+    "table_id": "tblmSQrcCs9vPQZx",
+    "kind": "confirmation"
+  },
+  {
+    "name": "合約明細工項",
+    "base_token": "H7W6b0PFWaVF1BsgqXJj3pQ9pXb",
+    "table_id": "tblobs4qPy2w9MZ6",
+    "kind": "contract"
+  },
+  {
+    "name": "合約填報工項",
+    "base_token": "H7W6b0PFWaVF1BsgqXJj3pQ9pXb",
+    "table_id": "tblwQPYk3c9RvCU7",
+    "kind": "reporting"
+  },
+  {
+    "name": "外業成本單",
+    "base_token": "H7W6b0PFWaVF1BsgqXJj3pQ9pXb",
+    "table_id": "tbl8wRYCUCvbSoJG",
+    "kind": "cost",
+    "department": "外業組",
+    "field_names": [
+      "工作日期",
+      "組別",
+      "組長帳號-津貼自動化",
+      "組員帳號-津貼自動化"
+    ]
+  },
+  {
+    "name": "內業成本單",
+    "base_token": "H7W6b0PFWaVF1BsgqXJj3pQ9pXb",
+    "table_id": "tblKwSDRg6WaGHYr",
+    "kind": "cost",
+    "field_names": [
+      "工作日期",
+      "內業組別",
+      "所屬組別",
+      "填報帳號"
+    ]
+  },
+  {
+    "name": "外業工作單",
+    "base_token": "H7W6b0PFWaVF1BsgqXJj3pQ9pXb",
+    "table_id": "tbl5zPLS0ExWNEty",
+    "kind": "daily",
+    "department": "外業組",
+    "cost_table_id": "tbl8wRYCUCvbSoJG",
+    "field_names": [
+      "工作日期-薪資",
+      "組別",
+      "案件編號",
+      "所屬案件",
+      "合約工項",
+      "所屬成本單",
+      "營業額點數",
+      "最終營業額點數",
+      "備註",
+      "組長帳號-津貼自動化",
+      "組員帳號-津貼自動化",
+      "可能確認單工作編號"
+    ]
+  },
+  {
+    "name": "內業工作單",
+    "base_token": "H7W6b0PFWaVF1BsgqXJj3pQ9pXb",
+    "table_id": "tblrCo8KeZiuJUNh",
+    "kind": "daily",
+    "cost_table_id": "tblKwSDRg6WaGHYr",
+    "field_names": [
+      "案件編號",
+      "所屬案件",
+      "所屬成本單",
+      "姓名",
+      "內業工項",
+      "本明細適用工項",
+      "營業額點數",
+      "最終營業額點數",
+      "可能的確認單工編(若暫無確認單才需填寫)"
+    ]
+  }
+]

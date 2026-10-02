@@ -1,0 +1,38 @@
+async (page) => {
+  const results = [];
+  const ws = await page.evaluate(async () => (await fetch('/api/workspace')).json());
+  const p = ws.projects.find(p => p.id === 'p1');
+  const uploaded = p.files.find(f => f.name === 'fixture.txt');
+  const response = await page.request.get(`http://127.0.0.1:8000/api/files/${uploaded.id}/download`);
+  if (response.status() !== 200 || !(await response.text()).includes('Prototype QA fixture')) throw new Error('Authenticated download failed');
+  const change = ws.approvals.find(a => a.title === 'QA 控制工項新版');
+  if (change.status !== 'executed') throw new Error('Change flow did not finish');
+  results.push('Change revisions and file upload/link/download verified');
+  await page.getByRole('button', { name: '流程與任務', exact: true }).click();
+  await page.screenshot({ path: 'output/playwright/meegle-project-desktop.png', fullPage: true });
+  await page.getByRole('button', { name: '日報紀錄', exact: true }).click();
+  await page.getByText('尚未查到作業紀錄', { exact: true }).waitFor();
+  results.push('Daily report matcher shows missing activity without declaring incomplete');
+  await page.getByRole('button', { name: '排程與人力', exact: true }).click();
+  await page.getByRole('heading', { name: '排程與人力', exact: true }).waitFor();
+  await page.screenshot({ path: 'output/playwright/meegle-schedule-desktop.png' });
+  await page.getByRole('button', { name: '人員負荷', exact: true }).click();
+  await page.locator('.resource-table').waitFor();
+  results.push('Week schedule and resource table render');
+  await page.getByRole('button', { name: '案件總覽', exact: true }).click();
+  await page.getByRole('textbox', { name: '搜尋案件', exact: true }).fill('C115238');
+  if (await page.locator('.projects-table tbody tr').count() !== 1) throw new Error('Search filter incorrect');
+  await page.getByRole('combobox', { name: '案件排序', exact: true }).selectOption('progress');
+  await page.getByRole('textbox', { name: '搜尋案件', exact: true }).fill('');
+  results.push('Project search and sort work');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: 'output/playwright/meegle-projects-mobile.png' });
+  if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw new Error('Mobile page horizontal overflow');
+  await page.getByRole('button', { name: '開啟導覽', exact: true }).click();
+  await page.getByRole('button', { name: '公司駕駛艙', exact: true }).click();
+  await page.getByRole('heading', { name: '公司駕駛艙', exact: true }).waitFor();
+  await page.screenshot({ path: 'output/playwright/meegle-dashboard-mobile.png', fullPage: true });
+  if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw new Error('Mobile dashboard horizontal overflow');
+  results.push('390px mobile navigation and constrained horizontal scroll verified');
+  console.log(JSON.stringify(results));
+}

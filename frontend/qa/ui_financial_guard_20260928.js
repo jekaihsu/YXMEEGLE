@@ -1,0 +1,10 @@
+async page=>{
+ const origin='http://127.0.0.1:8793';await page.unrouteAll({behavior:'wait'});const checks={};const w=await(await page.request.get(origin+'/api/workspace')).json(),p=w.projects.find(p=>p.id==='p1'),n=p.nodes.find(n=>n.key==='settlement');
+ w.environment='production';w.financial_requests=[{id:'fixture-financial',project_id:p.id,node_id:n.id,status:'approved',reason:'fixture 原生核准',native_receipt:{approved:true,binding_verified:true,simulated:false},native_binding:{status:'approved'}}];
+ await page.route('**/api/session',r=>r.fulfill({json:{user:w.users.find(u=>u.id===p.pm_id),users:w.users,mode:'lark',environment:'production',workspace_id:w.workspace_id,auth_configured:true}}));await page.route('**/api/workspace',r=>r.fulfill({json:w}));
+ let submitted;await page.route('**/api/actions',r=>{submitted=r.request().postDataJSON();return r.fulfill({json:{...w,version:w.version+1}})});
+ await page.goto(origin+`/#view=project&project=p1&node=${n.id}&tab=approvals`);await page.reload();const finalize=page.getByRole('button',{name:'核實條件並完成財務節點'});await finalize.waitFor();checks.approvedProofOffersExplicitFinalization=await finalize.isEnabled();await finalize.click();await page.waitForTimeout(200);checks.finalizeUsesCorrectAction=submitted?.action==='financial_finalize'&&submitted.node_id===n.id;checks.noAmountFieldsSent=!('amount' in (submitted?.payload||{}));
+ w.financial_requests[0].native_binding.verification_failed_at='2026-09-28';await page.reload();await finalize.waitFor();checks.failedPollDisablesFinalization=await finalize.isDisabled();checks.failedPollExplained=await page.getByText('最近查回失敗，待核對；完成查回前不能套用新核准。').isVisible();
+ await page.route('**/api/daily-reports?*',r=>r.fulfill({status:401,json:{detail:'登入已失效'}}));await page.goto(origin+'/#view=project&project=p1&tab=daily');await page.locator('.login-page').waitFor();checks.childApiExpiryClearsCase=await page.locator('.project-title').count()===0;
+ await page.unrouteAll({behavior:'wait'});await page.reload();const failed=Object.entries(checks).filter(([,v])=>!v);if(failed.length)throw Error(JSON.stringify({checks,failed}));return {fixtureOnly:true,checks};
+}

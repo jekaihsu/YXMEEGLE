@@ -1,0 +1,34 @@
+async page=>{
+ const origin='http://127.0.0.1:8793',checks={};
+ await page.unrouteAll({behavior:'wait'});await page.context().clearCookies();await page.request.get(origin+'/api/session');await page.setViewportSize({width:1440,height:1000});
+ let w=await(await page.request.get(origin+'/api/workspace')).json();const p=w.projects.find(x=>x.id==='p1'),n=p.nodes.find(x=>x.key==='control');
+ await page.request.post(origin+'/api/demo/session',{data:{user_id:n.tasks[0].owner_id}});
+ await page.goto(origin+`/#view=project&project=${p.id}&node=${n.id}&tab=flow`);await page.reload();await page.locator('.batch-completion').waitFor();
+ await page.locator('.batch-completion>button').click();await page.locator('.batch-item input').first().check();
+ const output=page.locator('.batch-item textarea').first();await output.fill('隔離驗收：本人一次確認成果，不對正式來源寫入');
+ await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.waitForTimeout(300);
+ checks.focusRefreshKeepsDraft=await output.inputValue()==='隔離驗收：本人一次確認成果，不對正式來源寫入';
+ await page.reload();await page.locator('.batch-completion>button').click();await page.locator('.batch-item input').first().check();
+ checks.reloadKeepsDraft=await page.locator('.batch-item textarea').first().inputValue()==='隔離驗收：本人一次確認成果，不對正式來源寫入';
+ const action=page.waitForResponse(r=>r.url().endsWith('/api/actions')&&r.request().postDataJSON().action==='task_batch_complete');
+ await page.getByRole('button',{name:'確認這 1 項成果',exact:true}).click();const done=await action;checks.realBatchSucceeded=done.ok();
+ await page.getByText('已確認 1 項本人工作。節點依 SOP 繼續確認。').waitFor();checks.batchFeedback=await page.getByText('已確認 1 項本人工作。節點依 SOP 繼續確認。').isVisible();
+ checks.noFalseNodeCelebration=await page.locator('.node-celebration').count()===0;
+ await page.goto(origin+`/#view=project&project=${p.id}&node=${n.id}&tab=files`);await page.getByRole('button',{name:'加入來源連結',exact:true}).click();
+ const dialog=page.getByRole('dialog');await dialog.getByRole('combobox',{name:'檔案類別',exact:true}).selectOption('report');await dialog.getByRole('combobox',{name:'用途',exact:true}).selectOption('output');
+ await dialog.getByRole('textbox',{name:'文件名稱',exact:true}).fill('隔離驗收成果連結');await dialog.getByRole('textbox',{name:'來源網址',exact:true}).fill('https://example.com/ui-review-20260928');
+ await dialog.getByRole('button',{name:'儲存連結',exact:true}).click();await dialog.waitFor({state:'hidden'});checks.realFileLink=await page.locator('.file-groups').getByText('隔離驗收成果連結',{exact:true}).isVisible();
+ await page.getByRole('button',{name:'加入來源連結',exact:true}).click();await dialog.getByRole('combobox',{name:'版本歸屬',exact:true}).selectOption({label:'隔離驗收成果連結 · 上傳新版'});
+ checks.versionInheritsCategory=await dialog.getByRole('combobox',{name:'檔案類別',exact:true}).inputValue()==='report';checks.versionInheritsDirection=await dialog.getByRole('combobox',{name:'用途',exact:true}).inputValue()==='output';
+ await dialog.getByRole('textbox',{name:'文件名稱',exact:true}).fill('隔離驗收成果連結第二版');await dialog.getByRole('textbox',{name:'來源網址',exact:true}).fill('https://example.com/ui-review-20260928-v2');await dialog.getByRole('button',{name:'儲存連結',exact:true}).click();await dialog.waitFor({state:'hidden'});
+ checks.realVersionGrouped=await page.locator('.file-groups article').filter({hasText:'隔離驗收成果連結第二版'}).locator('.file-version').count()===2;
+ await page.goto(origin+`/#view=project&project=${p.id}&node=${n.id}&tab=flow`);const composer=page.getByRole('textbox',{name:'新增評論'});await composer.fill('隔離留言草稿 @');
+ checks.atOpensPicker=await page.locator('.mention-picker').isVisible();await page.keyboard.press('Escape');checks.mentionEscapeOnlyPicker=await page.locator('.mention-picker').count()===0&&await composer.inputValue()==='隔離留言草稿 @';
+ await page.reload();checks.commentReloadDraft=await composer.inputValue()==='隔離留言草稿 @';await composer.fill('隔離驗收留言，測試通知狀態');
+ const form=composer.locator('..');const commentResponse=page.waitForResponse(r=>r.url().endsWith('/api/actions')&&r.request().postDataJSON().action==='comment_add');await form.getByRole('button',{name:'送出',exact:true}).click();await commentResponse;await page.waitForFunction(()=>document.querySelector('[aria-label="新增評論"]')?.value==='');await page.waitForTimeout(150);checks.commentClearsAfterSuccess=await composer.inputValue()==='';checks.commentFocusReturns=await composer.evaluate(el=>el===document.activeElement);
+ await page.goto(origin+`/#view=project&project=${p.id}&tab=logs`);await page.locator('.audit-trail').waitFor();checks.auditRealEndpoint=(await page.request.get(origin+`/api/audit?project_id=${p.id}`)).ok();
+ await page.goto(origin+`/#view=project&project=${p.id}&tab=daily`);await page.locator('.daily-records').waitFor();await page.getByRole('combobox',{name:'查看範圍'}).selectOption('unmatched');checks.dailyRealEndpoint=(await page.request.get(origin+'/api/daily-reports?status=unmatched&limit=30')).ok();
+ checks.dailyUnmatchedVisible=await page.getByRole('combobox',{name:'查看範圍'}).inputValue()==='unmatched';
+ await page.screenshot({path:'output/playwright/company-daily-20260928.png',fullPage:true});
+ const failed=Object.entries(checks).filter(([,v])=>!v);if(failed.length)throw Error(JSON.stringify({checks,failed}));return checks;
+}

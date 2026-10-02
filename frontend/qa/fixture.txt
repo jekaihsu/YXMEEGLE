@@ -1,0 +1,1 @@
+Prototype QA fixture: control survey output. Demonstration data only.

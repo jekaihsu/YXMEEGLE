@@ -1,0 +1,476 @@
+{
+  "status": "saved_template_inventory_not_published",
+  "template_id": 566082,
+  "version": 2,
+  "name": "詠翔SOP精簡版",
+  "source_file": ".runtime/meegle-template566082-detail-20260929.json",
+  "sha256": "dc8ed1088b045f14583d9dd91bb624be97df2181f924e4cf59760acdce4f6f90",
+  "source_scope": "template configuration, not imported historical work items",
+  "counts": {
+    "nodes_including_start": 7,
+    "tasks": 0,
+    "connections": 6,
+    "conditional_visibility_nodes": 0
+  },
+  "roles": [
+    {
+      "key": "role_fb35f4",
+      "label": "總經理",
+      "belong_to": "flow_role"
+    },
+    {
+      "key": "role_d7a322",
+      "label": "副總經理",
+      "belong_to": "flow_role"
+    },
+    {
+      "key": "role_58b0eb",
+      "label": "專案經理",
+      "belong_to": "flow_role"
+    },
+    {
+      "key": "role_7b0f44",
+      "label": "專案助理",
+      "belong_to": "flow_role"
+    },
+    {
+      "label": "業務經理",
+      "belong_to": "flow_role",
+      "key": "role_356d6f"
+    },
+    {
+      "key": "role_acb7ac",
+      "label": "行政經理",
+      "belong_to": "flow_role"
+    },
+    {
+      "key": "role_05be24",
+      "label": "外業經理",
+      "belong_to": "flow_role"
+    },
+    {
+      "belong_to": "flow_role",
+      "key": "role_d8939d",
+      "label": "外業組長"
+    },
+    {
+      "label": "內業經理",
+      "belong_to": "flow_role",
+      "key": "role_2d25e3"
+    },
+    {
+      "belong_to": "flow_role",
+      "key": "role_531f78",
+      "label": "內業組長"
+    }
+  ],
+  "connections": [
+    {
+      "start": "started",
+      "end": "state_0"
+    },
+    {
+      "start": "state_0",
+      "end": "state_1"
+    },
+    {
+      "start": "state_1",
+      "end": "state_2"
+    },
+    {
+      "start": "state_2",
+      "end": "state_3"
+    },
+    {
+      "start": "state_3",
+      "end": "state_4"
+    },
+    {
+      "start": "state_4",
+      "end": "state_5"
+    }
+  ],
+  "nodes": [
+    {
+      "key": "started",
+      "name": "業務接案",
+      "type": "normal",
+      "start_mode": "pre_node_all_done",
+      "pass_mode": "auto_pass",
+      "owner_rule": {
+        "usage_mode": "",
+        "value": null,
+        "condition_group": {
+          "conjunction": ""
+        }
+      },
+      "visibility_rule": {
+        "usage_mode": "custom",
+        "value": true,
+        "condition_group": {
+          "conjunction": ""
+        }
+      },
+      "transition_rule": {
+        "usage_mode": "none",
+        "current_instance_check": {
+          "verification_required_key": null,
+          "verification_required": null,
+          "verification_timing": null,
+          "failed_message": null,
+          "failed_message_transition": null,
+          "failed_message_unique_key": null
+        }
+      },
+      "required_fields": null,
+      "form_items": [],
+      "done_roles": [
+        "_node_owner",
+        "_space_manager",
+        "_creator"
+      ],
+      "tasks": []
+    },
+    {
+      "key": "state_0",
+      "name": "確認單開立",
+      "type": "normal",
+      "start_mode": "pre_node_all_done",
+      "pass_mode": "single_user_confirm",
+      "owner_rule": {
+        "usage_mode": "none",
+        "value": [],
+        "condition_group": {
+          "conjunction": "AND"
+        }
+      },
+      "visibility_rule": {
+        "usage_mode": "none",
+        "value": true,
+        "condition_group": {
+          "conjunction": "AND"
+        }
+      },
+      "transition_rule": {
+        "usage_mode": "none",
+        "current_instance_check": {
+          "failed_message_transition": null,
+          "failed_message_unique_key": "i18n_bits_page_item_name_69d92a061543d1dedeb3c91d:69da47b0b775f6135d0aa7f8:69d92a061543d1dedeb3c91d_template_1788338234095080841:state_0:node_transition_requirement_v2:current_instance_check:1788340260028194981",
+          "verification_required_key": null,
+          "verification_required": {
+            "value_translations": null,
+            "bql_key": "",
+            "bql_name": "",
+            "bql_type": "",
+            "biz_params": null,
+            "project_key": "",
+            "updated_at": 0,
+            "work_item_type_key": "",
+            "formula_expression": "",
+            "condition_group": {
+              "conjunction": ""
+            },
+            "usage_mode": "conditional",
+            "value": null,
+            "id": 0,
+            "value_unique_key": ""
+          },
+          "verification_timing": null,
+          "failed_message": ""
+        }
+      },
+      "required_fields": null,
+      "form_items": [],
+      "done_roles": [
+        "_node_owner",
+        "_space_manager"
+      ],
+      "tasks": []
+    },
+    {
+      "key": "state_1",
+      "name": "外業出工",
+      "type": "normal",
+      "start_mode": "pre_node_all_done",
+      "pass_mode": "single_user_confirm",
+      "owner_rule": {
+        "usage_mode": "none",
+        "value": [],
+        "condition_group": {
+          "conjunction": "AND"
+        }
+      },
+      "visibility_rule": {
+        "usage_mode": "none",
+        "value": true,
+        "condition_group": {
+          "conjunction": "AND"
+        }
+      },
+      "transition_rule": {
+        "usage_mode": "none",
+        "current_instance_check": {
+          "verification_required_key": null,
+          "verification_required": {
+            "bql_name": "",
+            "usage_mode": "conditional",
+            "condition_group": {
+              "conjunction": ""
+            },
+            "id": 0,
+            "bql_key": "",
+            "project_key": "",
+            "formula_expression": "",
+            "updated_at": 0,
+            "biz_params": null,
+            "value_unique_key": "",
+            "value_translations": null,
+            "bql_type": "",
+            "value": null,
+            "work_item_type_key": ""
+          },
+          "verification_timing": null,
+          "failed_message": "",
+          "failed_message_transition": null,
+          "failed_message_unique_key": "i18n_bits_page_item_name_69d92a061543d1dedeb3c91d:69da47b0b775f6135d0aa7f8:69d92a061543d1dedeb3c91d_template_1788338234095080841:state_1:node_transition_requirement_v2:current_instance_check:1788340260020645045"
+        }
+      },
+      "required_fields": null,
+      "form_items": [],
+      "done_roles": [
+        "_node_owner",
+        "_space_manager"
+      ],
+      "tasks": []
+    },
+    {
+      "key": "state_2",
+      "name": "控制",
+      "type": "normal",
+      "start_mode": "pre_node_all_done",
+      "pass_mode": "single_user_confirm",
+      "owner_rule": {
+        "usage_mode": "none",
+        "value": [],
+        "condition_group": {
+          "conjunction": "AND"
+        }
+      },
+      "visibility_rule": {
+        "usage_mode": "none",
+        "value": true,
+        "condition_group": {
+          "conjunction": "AND"
+        }
+      },
+      "transition_rule": {
+        "usage_mode": "none",
+        "current_instance_check": {
+          "verification_required": {
+            "id": 0,
+            "bql_key": "",
+            "condition_group": {
+              "conjunction": ""
+            },
+            "usage_mode": "conditional",
+            "updated_at": 0,
+            "biz_params": null,
+            "bql_name": "",
+            "value_unique_key": "",
+            "value_translations": null,
+            "project_key": "",
+            "formula_expression": "",
+            "bql_type": "",
+            "value": null,
+            "work_item_type_key": ""
+          },
+          "verification_timing": null,
+          "failed_message": "",
+          "failed_message_transition": null,
+          "failed_message_unique_key": "i18n_bits_page_item_name_69d92a061543d1dedeb3c91d:69da47b0b775f6135d0aa7f8:69d92a061543d1dedeb3c91d_template_1788338234095080841:state_2:node_transition_requirement_v2:current_instance_check:1788340260030515139",
+          "verification_required_key": null
+        }
+      },
+      "required_fields": null,
+      "form_items": [],
+      "done_roles": [
+        "_node_owner",
+        "_space_manager"
+      ],
+      "tasks": []
+    },
+    {
+      "key": "state_3",
+      "name": "圖資",
+      "type": "normal",
+      "start_mode": "pre_node_all_done",
+      "pass_mode": "single_user_confirm",
+      "owner_rule": {
+        "usage_mode": "none",
+        "value": [],
+        "condition_group": {
+          "conjunction": "AND"
+        }
+      },
+      "visibility_rule": {
+        "usage_mode": "none",
+        "value": true,
+        "condition_group": {
+          "conjunction": "AND"
+        }
+      },
+      "transition_rule": {
+        "usage_mode": "none",
+        "current_instance_check": {
+          "verification_timing": null,
+          "failed_message": "",
+          "failed_message_transition": null,
+          "failed_message_unique_key": "i18n_bits_page_item_name_69d92a061543d1dedeb3c91d:69da47b0b775f6135d0aa7f8:69d92a061543d1dedeb3c91d_template_1788338234095080841:state_3:node_transition_requirement_v2:current_instance_check:1788340260028562722",
+          "verification_required_key": null,
+          "verification_required": {
+            "formula_expression": "",
+            "value_unique_key": "",
+            "biz_params": null,
+            "bql_name": "",
+            "usage_mode": "conditional",
+            "value": null,
+            "value_translations": null,
+            "id": 0,
+            "project_key": "",
+            "bql_type": "",
+            "work_item_type_key": "",
+            "bql_key": "",
+            "condition_group": {
+              "conjunction": ""
+            },
+            "updated_at": 0
+          }
+        }
+      },
+      "required_fields": null,
+      "form_items": [],
+      "done_roles": [
+        "_node_owner",
+        "_space_manager"
+      ],
+      "tasks": []
+    },
+    {
+      "key": "state_4",
+      "name": "報告",
+      "type": "normal",
+      "start_mode": "pre_node_all_done",
+      "pass_mode": "single_user_confirm",
+      "owner_rule": {
+        "usage_mode": "none",
+        "value": [],
+        "condition_group": {
+          "conjunction": "AND"
+        }
+      },
+      "visibility_rule": {
+        "usage_mode": "none",
+        "value": true,
+        "condition_group": {
+          "conjunction": "AND"
+        }
+      },
+      "transition_rule": {
+        "usage_mode": "none",
+        "current_instance_check": {
+          "failed_message_unique_key": "i18n_bits_page_item_name_69d92a061543d1dedeb3c91d:69da47b0b775f6135d0aa7f8:69d92a061543d1dedeb3c91d_template_1788338234095080841:state_4:node_transition_requirement_v2:current_instance_check:1788340260097219770",
+          "verification_required_key": null,
+          "verification_required": {
+            "updated_at": 0,
+            "usage_mode": "conditional",
+            "value": null,
+            "biz_params": null,
+            "value_unique_key": "",
+            "bql_type": "",
+            "condition_group": {
+              "conjunction": ""
+            },
+            "work_item_type_key": "",
+            "bql_name": "",
+            "bql_key": "",
+            "project_key": "",
+            "formula_expression": "",
+            "value_translations": null,
+            "id": 0
+          },
+          "verification_timing": null,
+          "failed_message": "",
+          "failed_message_transition": null
+        }
+      },
+      "required_fields": null,
+      "form_items": [],
+      "done_roles": [
+        "_node_owner",
+        "_space_manager"
+      ],
+      "tasks": []
+    },
+    {
+      "key": "state_5",
+      "name": "未命名节点",
+      "type": "normal",
+      "start_mode": "pre_node_all_done",
+      "pass_mode": "single_user_confirm",
+      "owner_rule": {
+        "usage_mode": "none",
+        "value": [],
+        "condition_group": {
+          "conjunction": "AND"
+        }
+      },
+      "visibility_rule": {
+        "usage_mode": "none",
+        "value": true,
+        "condition_group": {
+          "conjunction": "AND"
+        }
+      },
+      "transition_rule": {
+        "usage_mode": "none",
+        "current_instance_check": {
+          "verification_timing": null,
+          "failed_message": "",
+          "failed_message_transition": null,
+          "failed_message_unique_key": "i18n_bits_page_item_name_69d92a061543d1dedeb3c91d:69da47b0b775f6135d0aa7f8:69d92a061543d1dedeb3c91d_template_1788338234095080841:state_5:node_transition_requirement_v2:current_instance_check:1788340260013777673",
+          "verification_required_key": null,
+          "verification_required": {
+            "value": null,
+            "id": 0,
+            "usage_mode": "conditional",
+            "biz_params": null,
+            "value_unique_key": "",
+            "value_translations": null,
+            "bql_name": "",
+            "formula_expression": "",
+            "condition_group": {
+              "conjunction": ""
+            },
+            "bql_type": "",
+            "updated_at": 0,
+            "bql_key": "",
+            "project_key": "",
+            "work_item_type_key": ""
+          }
+        }
+      },
+      "required_fields": null,
+      "form_items": [],
+      "done_roles": [
+        "_node_owner",
+        "_space_manager"
+      ],
+      "tasks": []
+    }
+  ],
+  "unverified": [
+    "field-specific attachment required conditions resolved against complete field metadata",
+    "runtime mapping and migration of every stable node/task key",
+    "conditional graph and parallel flows executable equivalence"
+  ]
+}

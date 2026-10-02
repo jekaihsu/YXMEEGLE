@@ -1,0 +1,83 @@
+{
+  "checked_at": "2026-09-25",
+  "base_token": "H7W6b0PFWaVF1BsgqXJj3pQ9pXb",
+  "table_id": "tbl8wRYCUCvbSoJG",
+  "total": 83,
+  "fields": [
+    {
+      "default_value": null,
+      "description": "夜測跨午夜記下班那天（簽呈）",
+      "id": "fldQh6cdMp",
+      "name": "工作日期",
+      "style": {
+        "format": "yyyy/MM/dd"
+      },
+      "type": "datetime"
+    },
+    {
+      "default_value": null,
+      "description": "供津貼明細自動化展開使用，來源為組長人員名單。",
+      "id": "fldmKXjb3n",
+      "multiple": false,
+      "name": "組長帳號-津貼自動化",
+      "type": "user"
+    },
+    {
+      "default_value": null,
+      "id": "fldTOvCoDN",
+      "multiple": false,
+      "name": "組別",
+      "options": [
+        {
+          "hue": "Red",
+          "lightness": "Lighter",
+          "name": "點工B"
+        },
+        {
+          "hue": "Blue",
+          "lightness": "Lighter",
+          "name": "水深A"
+        },
+        {
+          "hue": "Orange",
+          "lightness": "Lighter",
+          "name": "水深B"
+        },
+        {
+          "hue": "Wathet",
+          "lightness": "Lighter",
+          "name": "水深C"
+        },
+        {
+          "hue": "Yellow",
+          "lightness": "Lighter",
+          "name": "水深D"
+        },
+        {
+          "hue": "Red",
+          "lightness": "Lighter",
+          "name": "地形A"
+        },
+        {
+          "hue": "Turquoise",
+          "lightness": "Lighter",
+          "name": "地形C"
+        },
+        {
+          "hue": "Wathet",
+          "lightness": "Lighter",
+          "name": "地形E"
+        }
+      ],
+      "type": "select"
+    },
+    {
+      "default_value": null,
+      "description": "供津貼明細自動化展開使用，來源為組員人員名單。",
+      "id": "fldInZXtcI",
+      "multiple": true,
+      "name": "組員帳號-津貼自動化",
+      "type": "user"
+    }
+  ]
+}

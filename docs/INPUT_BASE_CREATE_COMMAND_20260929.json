@@ -1,0 +1,18 @@
+{
+  "execution_status": "prepared_only_not_executed",
+  "required_app_id": "cli_aa3cab98b2789e17",
+  "name": "詠翔專案工作台作業資料登錄",
+  "table_name": "作業資料登錄",
+  "fields": [
+    {"name": "登錄識別", "type": "text"},
+    {"name": "工作區識別", "type": "text"},
+    {"name": "案件識別", "type": "text"},
+    {"name": "節點識別", "type": "text"},
+    {"name": "修訂識別", "type": "text"},
+    {"name": "提交人識別", "type": "text"},
+    {"name": "提交時間", "type": "text"},
+    {"name": "登錄內容", "type": "text"},
+    {"name": "內容雜湊", "type": "text"}
+  ],
+  "argv_template": ["lark-cli.cmd", "base", "+base-create", "--as", "bot", "--name", "詠翔專案工作台作業資料登錄", "--table-name", "作業資料登錄", "--time-zone", "Asia/Taipei", "--fields", "JSON_SERIALIZE(fields)", "--json", "--dry-run"]
+}

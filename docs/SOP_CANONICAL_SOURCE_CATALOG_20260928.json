@@ -1,0 +1,2559 @@
+{
+  "schema_version": 1,
+  "catalog_version": "pdf20250826-reviewed-20260928",
+  "runtime_enabled": false,
+  "purpose": "source evidence catalog; not imported historical cases and not a published workflow migration",
+  "sources": {
+    "intake": {
+      "file": "專案經理接案SOP20250826(1).pdf",
+      "pages": 1,
+      "sha256": "b3b4cc4e192a881ffd979066e9e988919b09b5d95e5f91a75f480a885ee27fe2",
+      "review": "text extraction plus rendered full-page visual inspection"
+    },
+    "execution": {
+      "file": "專案經理案件執行SOP20250826(1).pdf",
+      "pages": 1,
+      "sha256": "e226dabf3c00684e0798f6018419c2fa97a27918f14f1e6c6ae58d4addfe72d2",
+      "review": "text extraction plus rendered full-page visual inspection"
+    },
+    "team": {
+      "file": "內外業經理案件執行SOP20250826.pdf",
+      "pages": 1,
+      "sha256": "64496b1c199ee4997f43431f3230933b25800e1767ef75e8fd715d07eb374d80",
+      "review": "text extraction plus rendered full-page visual inspection"
+    },
+    "training": {
+      "file": "內外業經理教育訓練SOP20250826.pdf",
+      "pages": 1,
+      "sha256": "369dfa263beca2a98215a212ba40df7dcf35717ff6750754abba97313833ceb2",
+      "review": "text extraction plus rendered full-page visual inspection"
+    }
+  },
+  "nodes": [
+    {
+      "id": "pdf20250826.intake.demand",
+      "document": "intake",
+      "page": 1,
+      "key": "demand",
+      "title": "業主提出報價需求",
+      "kind": "activity",
+      "source_roles": [
+        "業主"
+      ],
+      "execution_unit": "quotation",
+      "inputs": [
+        "業主需求"
+      ],
+      "outputs": [
+        "業主往來紀錄表"
+      ],
+      "observed_meegle_node_ids": [
+        "state_14"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.intake.number",
+      "document": "intake",
+      "page": 1,
+      "key": "number",
+      "title": "建立報價編號",
+      "kind": "activity",
+      "source_roles": [
+        "報價組"
+      ],
+      "execution_unit": "quotation",
+      "inputs": [
+        "業主需求"
+      ],
+      "outputs": [
+        "報價編號",
+        "報價案件管制表"
+      ],
+      "observed_meegle_node_ids": [
+        "state_26"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "event": "報價需求",
+        "offset_days": 0
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.intake.contact",
+      "document": "intake",
+      "page": 1,
+      "key": "contact",
+      "title": "通知業主報價成立",
+      "kind": "activity",
+      "source_roles": [
+        "專案經理"
+      ],
+      "execution_unit": "quotation",
+      "inputs": [
+        "業主需求"
+      ],
+      "outputs": [
+        "聯絡人及需求期程紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_28"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "圖中位於提出報價之前；同名 Meegle 節點不能據名稱認為是回簽後通知。",
+      "source_deadline": {
+        "event": "報價需求",
+        "offset_days": 1
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.intake.subcontract_decision",
+      "document": "intake",
+      "page": 1,
+      "key": "subcontract_decision",
+      "title": "是否有下包需求",
+      "kind": "decision",
+      "source_roles": [
+        "專案經理"
+      ],
+      "execution_unit": "quotation",
+      "inputs": [
+        "案件需求"
+      ],
+      "outputs": [
+        "下包需求決定"
+      ],
+      "observed_meegle_node_ids": [
+        "state_29"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.intake.subcontract_quote",
+      "document": "intake",
+      "page": 1,
+      "key": "subcontract_quote",
+      "title": "下包提出報價",
+      "kind": "activity",
+      "source_roles": [
+        "下包廠商"
+      ],
+      "execution_unit": "subcontract_quote",
+      "inputs": [
+        "下包需求"
+      ],
+      "outputs": [
+        "下包詢價紀錄與簽呈"
+      ],
+      "observed_meegle_node_ids": [
+        "state_35"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.intake.offer",
+      "document": "intake",
+      "page": 1,
+      "key": "offer",
+      "title": "提出報價，同時通知業主已提供報價",
+      "kind": "activity",
+      "source_roles": [
+        "報價組"
+      ],
+      "execution_unit": "quotation",
+      "inputs": [
+        "需求",
+        "適用下包報價"
+      ],
+      "outputs": [
+        "報價單",
+        "通知紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_15"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "event": "報價需求",
+        "offset_days": 3
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.intake.returned",
+      "document": "intake",
+      "page": 1,
+      "key": "returned",
+      "title": "報價單是否回傳",
+      "kind": "decision",
+      "source_roles": [
+        "報價組"
+      ],
+      "execution_unit": "quotation",
+      "inputs": [
+        "報價單"
+      ],
+      "outputs": [
+        "回傳狀態"
+      ],
+      "observed_meegle_node_ids": [
+        "state_16"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.intake.followup",
+      "document": "intake",
+      "page": 1,
+      "key": "followup",
+      "title": "追蹤報價狀況",
+      "kind": "activity",
+      "source_roles": [
+        "報價組"
+      ],
+      "execution_unit": "quotation",
+      "inputs": [
+        "報價單"
+      ],
+      "outputs": [
+        "追蹤紀錄"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": {
+        "event": "提出報價",
+        "offset_days": 10
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.intake.lost_or_expired",
+      "document": "intake",
+      "page": 1,
+      "key": "lost_or_expired",
+      "title": "業主告知未得標／報價單有效期限到期",
+      "kind": "condition",
+      "source_roles": [],
+      "execution_unit": "quotation",
+      "inputs": [
+        "未得標通知或報價期限"
+      ],
+      "outputs": [
+        "報價失效原因"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.intake.quote_end",
+      "document": "intake",
+      "page": 1,
+      "key": "quote_end",
+      "title": "本報價工作結束",
+      "kind": "terminal",
+      "source_roles": [],
+      "execution_unit": "quotation",
+      "inputs": [
+        "未得標或到期"
+      ],
+      "outputs": [
+        "報價結束紀錄"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "只結束報價，不是正式案件結案。",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.intake.signed",
+      "document": "intake",
+      "page": 1,
+      "key": "signed",
+      "title": "收到回傳單，合約成立",
+      "kind": "activity",
+      "source_roles": [
+        "報價組"
+      ],
+      "execution_unit": "quotation",
+      "inputs": [
+        "回簽報價單或合約"
+      ],
+      "outputs": [
+        "收到回簽日期",
+        "回簽合約"
+      ],
+      "observed_meegle_node_ids": [
+        "state_25"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.intake.case_identity",
+      "document": "intake",
+      "page": 1,
+      "key": "case_identity",
+      "title": "建立案件編號、製作案件回傳本",
+      "kind": "activity",
+      "source_roles": [
+        "行政"
+      ],
+      "execution_unit": "case",
+      "inputs": [
+        "回簽合約"
+      ],
+      "outputs": [
+        "工程確認單編號",
+        "案件回傳本"
+      ],
+      "observed_meegle_node_ids": [
+        "state_27"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "event": "回簽合約",
+        "offset_days": 1
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.intake.award_contact",
+      "document": "intake",
+      "page": 1,
+      "key": "award_contact",
+      "title": "得標後聯絡業主",
+      "kind": "activity",
+      "source_roles": [
+        "專案經理"
+      ],
+      "execution_unit": "case",
+      "inputs": [
+        "回簽合約"
+      ],
+      "outputs": [
+        "案件聯絡人",
+        "進場條件",
+        "工作期程",
+        "成果繳交日期形式內容"
+      ],
+      "observed_meegle_node_ids": [
+        "state_17"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "event": "回簽合約",
+        "offset_days": 2
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.intake.confirmation",
+      "document": "intake",
+      "page": 1,
+      "key": "confirmation",
+      "title": "確認單製作並將確認單傳遞至各單位",
+      "kind": "activity",
+      "source_roles": [
+        "專案經理",
+        "報價組"
+      ],
+      "execution_unit": "confirmation_version",
+      "inputs": [
+        "案件資料",
+        "成果範圍"
+      ],
+      "outputs": [
+        "確認單",
+        "各單位傳遞紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_4",
+        "state_83"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "event": "回簽合約",
+        "offset_days": 5
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.intake.permits",
+      "document": "intake",
+      "page": 1,
+      "key": "permits",
+      "title": "執行工務確認單",
+      "kind": "activity",
+      "source_roles": [
+        "行政",
+        "工務行政"
+      ],
+      "execution_unit": "dispatch",
+      "inputs": [
+        "進場及工務需求"
+      ],
+      "outputs": [
+        "保險",
+        "出入場申請",
+        "履約保證金",
+        "航拍申請"
+      ],
+      "observed_meegle_node_ids": [
+        "state_2"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "依適用工務條件逐項；不將公務、計價、結算合併成一個行政完成。",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.confirmation",
+      "document": "execution",
+      "page": 1,
+      "key": "confirmation",
+      "title": "確認單製作並將確認單傳遞至各單位",
+      "kind": "activity",
+      "source_roles": [
+        "專案經理",
+        "報價組"
+      ],
+      "execution_unit": "confirmation_version",
+      "inputs": [
+        "回簽合約"
+      ],
+      "outputs": [
+        "確認單",
+        "傳遞紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_4",
+        "state_83"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "event": "回簽合約",
+        "offset_days": 5
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.permits",
+      "document": "execution",
+      "page": 1,
+      "key": "permits",
+      "title": "執行工務確認單",
+      "kind": "activity",
+      "source_roles": [
+        "行政",
+        "工務行政"
+      ],
+      "execution_unit": "dispatch",
+      "inputs": [
+        "適用進場條件"
+      ],
+      "outputs": [
+        "工務行政證明"
+      ],
+      "observed_meegle_node_ids": [
+        "state_2"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.field_accept",
+      "document": "execution",
+      "page": 1,
+      "key": "field_accept",
+      "title": "外業確認單確認",
+      "kind": "activity",
+      "source_roles": [
+        "外業經理"
+      ],
+      "execution_unit": "confirmation_version",
+      "inputs": [
+        "確認單"
+      ],
+      "outputs": [
+        "外業確認紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_39"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.field_contact",
+      "document": "execution",
+      "page": 1,
+      "key": "field_contact",
+      "title": "外業派工前聯繫",
+      "kind": "activity",
+      "source_roles": [
+        "專案經理",
+        "外業組長"
+      ],
+      "execution_unit": "dispatch",
+      "inputs": [
+        "派工期程"
+      ],
+      "outputs": [
+        "業主往來紀錄表",
+        "Mail或Line聯絡佐證"
+      ],
+      "observed_meegle_node_ids": [
+        "state_40"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "event": "外業派工",
+        "offset_days": -3
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.revision",
+      "document": "execution",
+      "page": 1,
+      "key": "revision",
+      "title": "確認單修正",
+      "kind": "activity",
+      "source_roles": [],
+      "execution_unit": "confirmation_version",
+      "inputs": [
+        "確認意見"
+      ],
+      "outputs": [
+        "新版確認單"
+      ],
+      "observed_meegle_node_ids": [
+        "state_41"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "重大範圍/期限變更依後續核定 Lark 原生程序，PDF未列核准席位。",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.field_work",
+      "document": "execution",
+      "page": 1,
+      "key": "field_work",
+      "title": "外業作業",
+      "kind": "activity",
+      "source_roles": [
+        "外業組"
+      ],
+      "execution_unit": "dispatch",
+      "inputs": [
+        "工務證明",
+        "派工",
+        "確認單"
+      ],
+      "outputs": [
+        "外業成果"
+      ],
+      "observed_meegle_node_ids": [
+        "state_78",
+        "state_42"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.field_tracking",
+      "document": "execution",
+      "page": 1,
+      "key": "field_tracking",
+      "title": "外業節點追蹤",
+      "kind": "activity",
+      "source_roles": [
+        "行政",
+        "外業經理"
+      ],
+      "execution_unit": "dispatch",
+      "inputs": [
+        "工作進度"
+      ],
+      "outputs": [
+        "節點追蹤紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_43"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.field_delivery",
+      "document": "execution",
+      "page": 1,
+      "key": "field_delivery",
+      "title": "外業完工或階段性通知",
+      "kind": "activity",
+      "source_roles": [
+        "專案經理"
+      ],
+      "execution_unit": "delivery_batch",
+      "inputs": [
+        "外業成果"
+      ],
+      "outputs": [
+        "完工或階段性通知",
+        "長期案件定期通知"
+      ],
+      "observed_meegle_node_ids": [
+        "state_44"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "event": "外業完工",
+        "offset_days": 2
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.indoor_work",
+      "document": "execution",
+      "page": 1,
+      "key": "indoor_work",
+      "title": "內業作業",
+      "kind": "activity",
+      "source_roles": [
+        "內業組"
+      ],
+      "execution_unit": "contract_item_assignment",
+      "inputs": [
+        "確認單",
+        "適用外業成果"
+      ],
+      "outputs": [
+        "內業成果"
+      ],
+      "observed_meegle_node_ids": [
+        "state_45"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.indoor_tracking",
+      "document": "execution",
+      "page": 1,
+      "key": "indoor_tracking",
+      "title": "內業節點追蹤",
+      "kind": "activity",
+      "source_roles": [
+        "行政",
+        "內業經理"
+      ],
+      "execution_unit": "contract_item_assignment",
+      "inputs": [
+        "內業進度"
+      ],
+      "outputs": [
+        "節點追蹤紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_46"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.indoor_accept",
+      "document": "execution",
+      "page": 1,
+      "key": "indoor_accept",
+      "title": "內業確認單確認",
+      "kind": "activity",
+      "source_roles": [
+        "內業經理"
+      ],
+      "execution_unit": "confirmation_version",
+      "inputs": [
+        "確認單"
+      ],
+      "outputs": [
+        "內業確認紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_38"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.delivery",
+      "document": "execution",
+      "page": 1,
+      "key": "delivery",
+      "title": "提交成果及計價數量",
+      "kind": "activity",
+      "source_roles": [
+        "工務助理"
+      ],
+      "execution_unit": "delivery_batch",
+      "inputs": [
+        "本批成果"
+      ],
+      "outputs": [
+        "成果",
+        "計價數量",
+        "成果繳交日期"
+      ],
+      "observed_meegle_node_ids": [
+        "state_47"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "後續核定由控制/圖資/報告各組提交，再交行政計價。",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.client_accept",
+      "document": "execution",
+      "page": 1,
+      "key": "client_accept",
+      "title": "通知業主成果已繳交、業主確認計價單內容",
+      "kind": "activity",
+      "source_roles": [
+        "工務助理"
+      ],
+      "execution_unit": "delivery_batch",
+      "inputs": [
+        "本批成果與計價數量"
+      ],
+      "outputs": [
+        "通知佐證",
+        "業主確認紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_48"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "event": "成果繳交",
+        "offset_days": 0
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.correction",
+      "document": "execution",
+      "page": 1,
+      "key": "correction",
+      "title": "成果是否需補充修改",
+      "kind": "decision",
+      "source_roles": [
+        "工務助理"
+      ],
+      "execution_unit": "delivery_batch",
+      "inputs": [
+        "業主意見",
+        "本批成果"
+      ],
+      "outputs": [
+        "補正需求或無需補正紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_49"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "event": "提交成果",
+        "repeat_days": 5
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.billing_condition",
+      "document": "execution",
+      "page": 1,
+      "key": "billing_condition",
+      "title": "是否達成請款條件",
+      "kind": "decision",
+      "source_roles": [
+        "專案經理"
+      ],
+      "execution_unit": "payment_batch",
+      "inputs": [
+        "合約請款條件",
+        "本批交付"
+      ],
+      "outputs": [
+        "條件檢核證據"
+      ],
+      "observed_meegle_node_ids": [
+        "state_56",
+        "state_74"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.pricing",
+      "document": "execution",
+      "page": 1,
+      "key": "pricing",
+      "title": "繳交計價單",
+      "kind": "activity",
+      "source_roles": [
+        "專案經理"
+      ],
+      "execution_unit": "payment_batch",
+      "inputs": [
+        "合格請款條件",
+        "本批計價數量"
+      ],
+      "outputs": [
+        "計價單"
+      ],
+      "observed_meegle_node_ids": [
+        "state_55"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "event": "達成計價條件",
+        "offset_days": 3
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.invoice",
+      "document": "execution",
+      "page": 1,
+      "key": "invoice",
+      "title": "案件請款、進行客戶滿意度調查",
+      "kind": "activity",
+      "source_roles": [
+        "行政"
+      ],
+      "execution_unit": "payment_batch",
+      "inputs": [
+        "計價單"
+      ],
+      "outputs": [
+        "請款證明",
+        "滿意度調查發送與回覆狀態"
+      ],
+      "observed_meegle_node_ids": [
+        "state_59"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.received",
+      "document": "execution",
+      "page": 1,
+      "key": "received",
+      "title": "是否入帳",
+      "kind": "decision",
+      "source_roles": [
+        "行政"
+      ],
+      "execution_unit": "payment_batch",
+      "inputs": [
+        "應收資料",
+        "實收證明"
+      ],
+      "outputs": [
+        "入帳核對紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_60",
+        "state_72"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "回執/共同核准不是實收付證據；不得用來源狀態或空列表推論已結清。",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.receivable_tracking",
+      "document": "execution",
+      "page": 1,
+      "key": "receivable_tracking",
+      "title": "請款情況追蹤",
+      "kind": "activity",
+      "source_roles": [
+        "行政"
+      ],
+      "execution_unit": "payment_batch",
+      "inputs": [
+        "未入帳請款"
+      ],
+      "outputs": [
+        "追蹤紀錄"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": {
+        "event": "請款",
+        "repeat_days": 5
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.subcontract_decision",
+      "document": "execution",
+      "page": 1,
+      "key": "subcontract_decision",
+      "title": "是否有下包",
+      "kind": "decision",
+      "source_roles": [
+        "行政"
+      ],
+      "execution_unit": "case",
+      "inputs": [
+        "下包範圍",
+        "交付資料"
+      ],
+      "outputs": [
+        "適用下包清單"
+      ],
+      "observed_meegle_node_ids": [
+        "state_61"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.subcontract_payment",
+      "document": "execution",
+      "page": 1,
+      "key": "subcontract_payment",
+      "title": "通知下包廠商請款及撥款",
+      "kind": "activity",
+      "source_roles": [
+        "行政"
+      ],
+      "execution_unit": "subcontract_payment_batch",
+      "inputs": [
+        "下包成果及請款"
+      ],
+      "outputs": [
+        "核准",
+        "付款證明"
+      ],
+      "observed_meegle_node_ids": [
+        "state_68"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.subcontract_tracking",
+      "document": "execution",
+      "page": 1,
+      "key": "subcontract_tracking",
+      "title": "下包入帳追蹤",
+      "kind": "decision",
+      "source_roles": [
+        "行政"
+      ],
+      "execution_unit": "subcontract_payment_batch",
+      "inputs": [
+        "下包請款"
+      ],
+      "outputs": [
+        "下包實收/付款證據",
+        "追蹤紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_71"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "event": "下包請款",
+        "repeat_days": 5
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.settlement",
+      "document": "execution",
+      "page": 1,
+      "key": "settlement",
+      "title": "案件結算表製作",
+      "kind": "activity",
+      "source_roles": [
+        "副總",
+        "專案經理",
+        "工務助理"
+      ],
+      "execution_unit": "case_closure",
+      "inputs": [
+        "實收核對",
+        "適用下包結清"
+      ],
+      "outputs": [
+        "案件結算表"
+      ],
+      "observed_meegle_node_ids": [
+        "state_69"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "後續核定 PM＋行政共同確認；原PDF沒有指定某個Base/table/field。",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.close",
+      "document": "execution",
+      "page": 1,
+      "key": "close",
+      "title": "案件結束",
+      "kind": "terminal",
+      "source_roles": [],
+      "execution_unit": "case_closure",
+      "inputs": [
+        "有效結算表",
+        "財務結清",
+        "交付完成"
+      ],
+      "outputs": [
+        "結案證明"
+      ],
+      "observed_meegle_node_ids": [
+        "state_70"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.client_contact",
+      "document": "execution",
+      "page": 1,
+      "key": "client_contact",
+      "title": "執行中業主聯繫",
+      "kind": "activity",
+      "source_roles": [
+        "專案經理"
+      ],
+      "execution_unit": "recurring",
+      "inputs": [
+        "執行中案件"
+      ],
+      "outputs": [
+        "業主往來紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_50"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "event": "工作期間",
+        "repeat_days": 5
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.weekly_field",
+      "document": "execution",
+      "page": 1,
+      "key": "weekly_field",
+      "title": "節點檢討與紀錄（工程）",
+      "kind": "activity",
+      "source_roles": [
+        "行政"
+      ],
+      "execution_unit": "recurring",
+      "inputs": [
+        "外內業進度"
+      ],
+      "outputs": [
+        "節點檢討紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_51"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "repeat": "weekly"
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.weekly_pricing",
+      "document": "execution",
+      "page": 1,
+      "key": "weekly_pricing",
+      "title": "節點檢討與紀錄（計價）",
+      "kind": "activity",
+      "source_roles": [
+        "行政"
+      ],
+      "execution_unit": "recurring",
+      "inputs": [
+        "計價進度"
+      ],
+      "outputs": [
+        "節點檢討紀錄"
+      ],
+      "observed_meegle_node_ids": [
+        "state_57"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": {
+        "repeat": "weekly"
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.execution.assessment_field",
+      "document": "execution",
+      "page": 1,
+      "key": "assessment_field",
+      "title": "考評與結算計算（工程）",
+      "kind": "assessment",
+      "source_roles": [
+        "行政"
+      ],
+      "execution_unit": "assessment",
+      "inputs": [
+        "節點檢討"
+      ],
+      "outputs": [
+        "月考評與結算表"
+      ],
+      "observed_meegle_node_ids": [
+        "state_52"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "依最新裁示停用考評，不移除獨立案件結算。",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "learning and salary evaluation disabled by owner"
+    },
+    {
+      "id": "pdf20250826.execution.assessment_pricing",
+      "document": "execution",
+      "page": 1,
+      "key": "assessment_pricing",
+      "title": "考評與結算計算（計價）",
+      "kind": "assessment",
+      "source_roles": [
+        "行政"
+      ],
+      "execution_unit": "assessment",
+      "inputs": [
+        "節點檢討"
+      ],
+      "outputs": [
+        "月考評與結算表"
+      ],
+      "observed_meegle_node_ids": [
+        "state_58"
+      ],
+      "meegle_match_basis": "single-case title correspondence, not template topology",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "learning and salary evaluation disabled by owner"
+    },
+    {
+      "id": "pdf20250826.team.confirmation",
+      "document": "team",
+      "page": 1,
+      "key": "confirmation",
+      "title": "確認單",
+      "kind": "activity",
+      "source_roles": [
+        "專案經理"
+      ],
+      "execution_unit": "confirmation_version",
+      "inputs": [
+        "專案經理簽核"
+      ],
+      "outputs": [
+        "確認單"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.team.worklist",
+      "document": "team",
+      "page": 1,
+      "key": "worklist",
+      "title": "建立工作總表",
+      "kind": "activity",
+      "source_roles": [
+        "內業經理",
+        "外業經理"
+      ],
+      "execution_unit": "confirmation_version",
+      "inputs": [
+        "確認單"
+      ],
+      "outputs": [
+        "內外業工作總表",
+        "傳遞資訊查核"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": {
+        "event": "收到確認單",
+        "offset_days": 1
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.team.dispatch",
+      "document": "team",
+      "page": 1,
+      "key": "dispatch",
+      "title": "工作分派後傳遞給各組長",
+      "kind": "activity",
+      "source_roles": [
+        "內業經理",
+        "外業經理"
+      ],
+      "execution_unit": "dispatch",
+      "inputs": [
+        "工作總表"
+      ],
+      "outputs": [
+        "組長收件與工作分派"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.team.schedule",
+      "document": "team",
+      "page": 1,
+      "key": "schedule",
+      "title": "工作預排總表",
+      "kind": "activity",
+      "source_roles": [
+        "組長"
+      ],
+      "execution_unit": "schedule_week",
+      "inputs": [
+        "工作分派"
+      ],
+      "outputs": [
+        "預排表",
+        "預排及實際節點表"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": {
+        "field": "週三正常班表下班",
+        "indoor": "週四正常班表下班"
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.team.progress",
+      "document": "team",
+      "page": 1,
+      "key": "progress",
+      "title": "工作進度管控",
+      "kind": "activity",
+      "source_roles": [
+        "內業經理",
+        "外業經理"
+      ],
+      "execution_unit": "recurring",
+      "inputs": [
+        "工作總表",
+        "預排表"
+      ],
+      "outputs": [
+        "工進",
+        "人力車輛儀器配置",
+        "衝突排除"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": {
+        "repeat": "daily"
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.team.review",
+      "document": "team",
+      "page": 1,
+      "key": "review",
+      "title": "檢討目前工進及工作情況",
+      "kind": "decision",
+      "source_roles": [
+        "內業經理",
+        "外業經理"
+      ],
+      "execution_unit": "dispatch",
+      "inputs": [
+        "工進"
+      ],
+      "outputs": [
+        "檢討紀錄",
+        "缺失單"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.team.reschedule",
+      "document": "team",
+      "page": 1,
+      "key": "reschedule",
+      "title": "工作預排需調整",
+      "kind": "activity",
+      "source_roles": [
+        "專案經理"
+      ],
+      "execution_unit": "schedule_version",
+      "inputs": [
+        "預排調整需求"
+      ],
+      "outputs": [
+        "新版預排"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.team.done",
+      "document": "team",
+      "page": 1,
+      "key": "done",
+      "title": "工作完成",
+      "kind": "milestone",
+      "source_roles": [
+        "組長"
+      ],
+      "execution_unit": "delivery_batch",
+      "inputs": [
+        "本批工作成果"
+      ],
+      "outputs": [
+        "完工資料"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.team.signoff",
+      "document": "team",
+      "page": 1,
+      "key": "signoff",
+      "title": "簽核確認單",
+      "kind": "activity",
+      "source_roles": [
+        "組長",
+        "專案經理"
+      ],
+      "execution_unit": "delivery_batch",
+      "inputs": [
+        "組長提交完工資料"
+      ],
+      "outputs": [
+        "專案經理簽核確認單"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": {
+        "event": "工作完成",
+        "offset_days": 3
+      },
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.team.group_settlement",
+      "document": "team",
+      "page": 1,
+      "key": "group_settlement",
+      "title": "進行各組案件結算表／阿米巴計算表",
+      "kind": "assessment",
+      "source_roles": [
+        "內業經理",
+        "外業經理"
+      ],
+      "execution_unit": "salary_assessment",
+      "inputs": [
+        "各組工作成果"
+      ],
+      "outputs": [
+        "各組案件結算表",
+        "阿米巴計算成果"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "涉及薪資/配點，保留原文盤點但不啟用、不回寫；不混成財務結案。",
+      "source_deadline": {
+        "repeat": "monthly"
+      },
+      "enabled": false,
+      "disable_reason": "learning and salary evaluation disabled by owner"
+    },
+    {
+      "id": "pdf20250826.team.node_review",
+      "document": "team",
+      "page": 1,
+      "key": "node_review",
+      "title": "節點檢討與紀錄",
+      "kind": "activity",
+      "source_roles": [
+        "行政"
+      ],
+      "execution_unit": "recurring",
+      "inputs": [
+        "工作進度"
+      ],
+      "outputs": [
+        "節點紀錄"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "source catalog; runtime migration and full template verification pending"
+    },
+    {
+      "id": "pdf20250826.team.monthly_assessment",
+      "document": "team",
+      "page": 1,
+      "key": "monthly_assessment",
+      "title": "考評與結算計算",
+      "kind": "assessment",
+      "source_roles": [
+        "行政"
+      ],
+      "execution_unit": "assessment",
+      "inputs": [
+        "節點檢討"
+      ],
+      "outputs": [
+        "月考評與結算表"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "learning and salary evaluation disabled by owner"
+    },
+    {
+      "id": "pdf20250826.training.demand",
+      "document": "training",
+      "page": 1,
+      "key": "demand",
+      "title": "教育訓練需求表",
+      "kind": "activity",
+      "source_roles": [
+        "專案經理"
+      ],
+      "execution_unit": "disabled_learning",
+      "inputs": [],
+      "outputs": [
+        "需求表"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "learning and salary evaluation disabled by owner"
+    },
+    {
+      "id": "pdf20250826.training.plan",
+      "document": "training",
+      "page": 1,
+      "key": "plan",
+      "title": "教育訓練計畫總表",
+      "kind": "activity",
+      "source_roles": [],
+      "execution_unit": "disabled_learning",
+      "inputs": [
+        "需求表",
+        "能力地圖"
+      ],
+      "outputs": [
+        "計畫總表"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "learning and salary evaluation disabled by owner"
+    },
+    {
+      "id": "pdf20250826.training.capacity",
+      "document": "training",
+      "page": 1,
+      "key": "capacity",
+      "title": "能力地圖",
+      "kind": "activity",
+      "source_roles": [],
+      "execution_unit": "disabled_learning",
+      "inputs": [
+        "能力資料"
+      ],
+      "outputs": [
+        "能力地圖"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "learning and salary evaluation disabled by owner"
+    },
+    {
+      "id": "pdf20250826.training.progress",
+      "document": "training",
+      "page": 1,
+      "key": "progress",
+      "title": "檢討目前工進及工作情況",
+      "kind": "decision",
+      "source_roles": [],
+      "execution_unit": "disabled_learning",
+      "inputs": [
+        "工作進度"
+      ],
+      "outputs": [
+        "工作空檔"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "learning and salary evaluation disabled by owner"
+    },
+    {
+      "id": "pdf20250826.training.delegate",
+      "document": "training",
+      "page": 1,
+      "key": "delegate",
+      "title": "代理人設定",
+      "kind": "activity",
+      "source_roles": [],
+      "execution_unit": "disabled_learning",
+      "inputs": [
+        "代理人候選"
+      ],
+      "outputs": [
+        "代理設定"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "learning and salary evaluation disabled by owner"
+    },
+    {
+      "id": "pdf20250826.training.training",
+      "document": "training",
+      "page": 1,
+      "key": "training",
+      "title": "安排教育訓練",
+      "kind": "activity",
+      "source_roles": [],
+      "execution_unit": "disabled_learning",
+      "inputs": [
+        "計畫總表",
+        "工作空檔"
+      ],
+      "outputs": [
+        "教育執行紀錄"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "learning and salary evaluation disabled by owner"
+    },
+    {
+      "id": "pdf20250826.training.outcome",
+      "document": "training",
+      "page": 1,
+      "key": "outcome",
+      "title": "檢討教育訓練成果及生存線狀況",
+      "kind": "decision",
+      "source_roles": [],
+      "execution_unit": "disabled_learning",
+      "inputs": [
+        "教育執行紀錄"
+      ],
+      "outputs": [
+        "計畫更新",
+        "能力地圖與生存線差異"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "learning and salary evaluation disabled by owner"
+    },
+    {
+      "id": "pdf20250826.training.qualified",
+      "document": "training",
+      "page": 1,
+      "key": "qualified",
+      "title": "檢視代理人能力是否合乎要求",
+      "kind": "decision",
+      "source_roles": [],
+      "execution_unit": "disabled_learning",
+      "inputs": [
+        "代理設定",
+        "能力地圖"
+      ],
+      "outputs": [
+        "資格檢核"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "learning and salary evaluation disabled by owner"
+    },
+    {
+      "id": "pdf20250826.training.accepted",
+      "document": "training",
+      "page": 1,
+      "key": "accepted",
+      "title": "合格代理人",
+      "kind": "activity",
+      "source_roles": [],
+      "execution_unit": "disabled_learning",
+      "inputs": [
+        "資格通過"
+      ],
+      "outputs": [
+        "合格代理人"
+      ],
+      "observed_meegle_node_ids": [],
+      "meegle_match_basis": "not observed",
+      "source_note": "",
+      "source_deadline": null,
+      "enabled": false,
+      "disable_reason": "learning and salary evaluation disabled by owner"
+    }
+  ],
+  "edges": [
+    {
+      "source": "pdf20250826.intake.demand",
+      "target": "pdf20250826.intake.number",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.intake.number",
+      "target": "pdf20250826.intake.contact",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.intake.contact",
+      "target": "pdf20250826.intake.subcontract_decision",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.intake.subcontract_quote",
+      "target": "pdf20250826.intake.offer",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.intake.offer",
+      "target": "pdf20250826.intake.returned",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.intake.followup",
+      "target": "pdf20250826.intake.lost_or_expired",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.intake.lost_or_expired",
+      "target": "pdf20250826.intake.quote_end",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.intake.signed",
+      "target": "pdf20250826.intake.case_identity",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.intake.case_identity",
+      "target": "pdf20250826.intake.award_contact",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.intake.award_contact",
+      "target": "pdf20250826.intake.confirmation",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.intake.subcontract_decision",
+      "target": "pdf20250826.intake.subcontract_quote",
+      "condition": "有",
+      "kind": "sequence",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.intake.subcontract_decision",
+      "target": "pdf20250826.intake.offer",
+      "condition": "無",
+      "kind": "sequence",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.intake.returned",
+      "target": "pdf20250826.intake.signed",
+      "condition": "有",
+      "kind": "sequence",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.intake.returned",
+      "target": "pdf20250826.intake.followup",
+      "condition": "無",
+      "kind": "sequence",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.intake.confirmation",
+      "target": "pdf20250826.intake.permits",
+      "condition": null,
+      "kind": "parallel_branch",
+      "evidence": "專案經理接案SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.confirmation",
+      "target": "pdf20250826.execution.field_contact",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.field_contact",
+      "target": "pdf20250826.execution.revision",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.revision",
+      "target": "pdf20250826.execution.field_work",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.field_work",
+      "target": "pdf20250826.execution.field_tracking",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.field_tracking",
+      "target": "pdf20250826.execution.field_delivery",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.field_delivery",
+      "target": "pdf20250826.execution.indoor_work",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.indoor_work",
+      "target": "pdf20250826.execution.indoor_tracking",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.indoor_tracking",
+      "target": "pdf20250826.execution.delivery",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.delivery",
+      "target": "pdf20250826.execution.client_accept",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.client_accept",
+      "target": "pdf20250826.execution.correction",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.pricing",
+      "target": "pdf20250826.execution.invoice",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.invoice",
+      "target": "pdf20250826.execution.received",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.receivable_tracking",
+      "target": "pdf20250826.execution.received",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.settlement",
+      "target": "pdf20250826.execution.close",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.weekly_field",
+      "target": "pdf20250826.execution.assessment_field",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.weekly_pricing",
+      "target": "pdf20250826.execution.assessment_pricing",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.confirmation",
+      "target": "pdf20250826.execution.permits",
+      "condition": null,
+      "kind": "parallel_branch",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.confirmation",
+      "target": "pdf20250826.execution.field_accept",
+      "condition": null,
+      "kind": "parallel_branch",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.confirmation",
+      "target": "pdf20250826.execution.indoor_accept",
+      "condition": null,
+      "kind": "parallel_branch",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.confirmation",
+      "target": "pdf20250826.execution.client_contact",
+      "condition": null,
+      "kind": "parallel_branch",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.field_tracking",
+      "target": "pdf20250826.execution.weekly_field",
+      "condition": null,
+      "kind": "parallel_branch",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.indoor_tracking",
+      "target": "pdf20250826.execution.weekly_field",
+      "condition": null,
+      "kind": "parallel_branch",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.pricing",
+      "target": "pdf20250826.execution.weekly_pricing",
+      "condition": null,
+      "kind": "parallel_branch",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.correction",
+      "target": "pdf20250826.execution.client_accept",
+      "condition": "是，補正後重新確認",
+      "kind": "loop",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.correction",
+      "target": "pdf20250826.execution.pricing",
+      "condition": "否；並須請款條件達成",
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.billing_condition",
+      "target": "pdf20250826.execution.pricing",
+      "condition": "是",
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.received",
+      "target": "pdf20250826.execution.receivable_tracking",
+      "condition": "否",
+      "kind": "loop",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.received",
+      "target": "pdf20250826.execution.subcontract_decision",
+      "condition": "是",
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.subcontract_decision",
+      "target": "pdf20250826.execution.settlement",
+      "condition": "無",
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.subcontract_decision",
+      "target": "pdf20250826.execution.subcontract_payment",
+      "condition": "有",
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.subcontract_payment",
+      "target": "pdf20250826.execution.subcontract_tracking",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.subcontract_tracking",
+      "target": "pdf20250826.execution.settlement",
+      "condition": "入帳",
+      "kind": "sequence",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.execution.subcontract_tracking",
+      "target": "pdf20250826.execution.subcontract_payment",
+      "condition": "未入帳",
+      "kind": "loop",
+      "evidence": "專案經理案件執行SOP20250826(1).pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.team.confirmation",
+      "target": "pdf20250826.team.worklist",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理案件執行SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.team.worklist",
+      "target": "pdf20250826.team.dispatch",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理案件執行SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.team.dispatch",
+      "target": "pdf20250826.team.schedule",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理案件執行SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.team.schedule",
+      "target": "pdf20250826.team.progress",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理案件執行SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.team.progress",
+      "target": "pdf20250826.team.review",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理案件執行SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.team.reschedule",
+      "target": "pdf20250826.team.review",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理案件執行SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.team.done",
+      "target": "pdf20250826.team.signoff",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理案件執行SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.team.signoff",
+      "target": "pdf20250826.team.group_settlement",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理案件執行SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.team.node_review",
+      "target": "pdf20250826.team.monthly_assessment",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理案件執行SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.team.review",
+      "target": "pdf20250826.team.done",
+      "condition": "完成",
+      "kind": "sequence",
+      "evidence": "內外業經理案件執行SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.team.progress",
+      "target": "pdf20250826.team.node_review",
+      "condition": null,
+      "kind": "parallel_branch",
+      "evidence": "內外業經理案件執行SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.training.demand",
+      "target": "pdf20250826.training.plan",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理教育訓練SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.training.capacity",
+      "target": "pdf20250826.training.plan",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理教育訓練SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.training.plan",
+      "target": "pdf20250826.training.training",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理教育訓練SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.training.delegate",
+      "target": "pdf20250826.training.training",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理教育訓練SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.training.training",
+      "target": "pdf20250826.training.outcome",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理教育訓練SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.training.outcome",
+      "target": "pdf20250826.training.plan",
+      "condition": null,
+      "kind": "sequence",
+      "evidence": "內外業經理教育訓練SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.training.progress",
+      "target": "pdf20250826.training.training",
+      "condition": "工作空檔",
+      "kind": "sequence",
+      "evidence": "內外業經理教育訓練SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.training.qualified",
+      "target": "pdf20250826.training.accepted",
+      "condition": "合格",
+      "kind": "sequence",
+      "evidence": "內外業經理教育訓練SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.training.qualified",
+      "target": "pdf20250826.training.training",
+      "condition": "持續訓練",
+      "kind": "loop",
+      "evidence": "內外業經理教育訓練SOP20250826.pdf page 1 visible arrow"
+    },
+    {
+      "source": "pdf20250826.training.qualified",
+      "target": "pdf20250826.training.delegate",
+      "condition": "變更代理人",
+      "kind": "loop",
+      "evidence": "內外業經理教育訓練SOP20250826.pdf page 1 visible arrow"
+    }
+  ],
+  "artifacts": {
+    "intake": [
+      "業主往來紀錄表",
+      "報價案件管制表",
+      "工務確認單",
+      "下包詢價紀錄與簽呈"
+    ],
+    "team": [
+      "內外業工作總表(含節點)",
+      "內外業預排(含完成節點與檢討)",
+      "預排調整與節點控管",
+      "人力車輛儀器配置",
+      "工進掌握與工作衝突排除",
+      "完工確認單",
+      "阿米巴計算成果"
+    ],
+    "training": [
+      "教育訓練計畫總表",
+      "教育執行紀錄",
+      "各組教育訓練目標",
+      "各組教育訓練執行紀錄",
+      "能力地圖與生存線差異"
+    ]
+  },
+  "disabled_assessment_metrics": [
+    "報價逾期次數",
+    "違反SOP次數",
+    "案件逾期次數",
+    "客戶滿意度評分",
+    "總營業額達成率",
+    "預排確認",
+    "繳交資料完整率",
+    "工作良率",
+    "教育訓練執行次數",
+    "能力地圖達成率"
+  ],
+  "overrides": [
+    "learning/training/capability/salary assessment disabled",
+    "normal shift end replaces fixed 17:00",
+    "ordinary deliverables confirmed locally; major approvals use native Lark",
+    "structured Input remains Base; files remain Drive",
+    "PM and designated admin jointly verify financial stages"
+  ],
+  "completion_scopes": {
+    "quotation": "a quote outcome, not case closure",
+    "dispatch": "one scheduled assignment",
+    "delivery_batch": "one immutable set of task/material snapshots; additional batch does not erase prior approval",
+    "payment_batch": "one claim and its receipts; approval does not equal payment",
+    "case_closure": "all applicable delivery obligations and authoritative financial closure plus required confirmations"
+  },
+  "templates": [
+    {
+      "id": "334662",
+      "status": "one case inventory only",
+      "sample_workitem": "24602542",
+      "observed_nodes": 52,
+      "observed_subtasks": 51
+    },
+    {
+      "id": "566082",
+      "status": "not read; CLI login pending"
+    }
+  ],
+  "finance_schema_candidates": [
+    {
+      "kind": "quote",
+      "table_id": "tblENZvYAya93Twa",
+      "fields": [
+        {
+          "name": "此報價之合約明細",
+          "id": "fldy7tUAZV",
+          "type": 21
+        },
+        {
+          "name": "契約價格(未稅)",
+          "id": "fldwVrBNAU",
+          "type": 2
+        },
+        {
+          "name": "契約價格(含稅)",
+          "id": "fldQZ5jOt1",
+          "type": 2
+        },
+        {
+          "name": "付款條件",
+          "id": "fldnGpdqo5",
+          "type": 1
+        },
+        {
+          "name": "合約開始日期",
+          "id": "fldzeVwAEI",
+          "type": 5
+        },
+        {
+          "name": "合約結束日期",
+          "id": "fldraj8V4q",
+          "type": 1
+        },
+        {
+          "name": "PM告知可請款日期",
+          "id": "flddQ6W9ZO",
+          "type": 5
+        },
+        {
+          "name": "合約金額",
+          "id": "fldCu9XlS4",
+          "type": 2
+        },
+        {
+          "name": "實際合約金額",
+          "id": "flddOinCwN",
+          "type": 2
+        },
+        {
+          "name": "預期合約金額",
+          "id": "fldNbG472f",
+          "type": 2
+        },
+        {
+          "name": "案件可請款總額",
+          "id": "fldwezJJv1",
+          "type": 2
+        },
+        {
+          "name": "此報價之合約工項明細（關聯）",
+          "id": "fldqFj2Nka",
+          "type": 18
+        },
+        {
+          "name": "案件已入帳",
+          "id": "fldsNfwmyt",
+          "type": 7
+        },
+        {
+          "name": "累計已入帳",
+          "id": "fldiOwKGwS",
+          "type": 2
+        },
+        {
+          "name": "入帳資料檢核",
+          "id": "fldWr6xUbF",
+          "type": 1
+        },
+        {
+          "name": "入帳日期",
+          "id": "fldxbmj00D",
+          "type": 5
+        },
+        {
+          "name": "可請款未請",
+          "id": "fldtEWtCNn",
+          "type": 2
+        },
+        {
+          "name": "累計已請款",
+          "id": "fldk5O8UGS",
+          "type": 2
+        }
+      ]
+    },
+    {
+      "kind": "quote_confirmation",
+      "table_id": "tblvV4X1kNVQisVj",
+      "fields": [
+        {
+          "name": "預估總成本",
+          "id": "fldYHsdCb4",
+          "type": 20
+        },
+        {
+          "name": "實際總成本",
+          "id": "fldkQ2mPeh",
+          "type": 20
+        },
+        {
+          "name": "合約總額",
+          "id": "fldL1p4PJ3",
+          "type": 20
+        },
+        {
+          "name": "C｜合約製作處理(件)",
+          "id": "fldnEs3Q6W",
+          "type": 2
+        },
+        {
+          "name": "C｜合約製作處理標準工天",
+          "id": "fldCIYCY81",
+          "type": 2
+        },
+        {
+          "name": "C｜合約製作處理成本",
+          "id": "flduGJcFsI",
+          "type": 20
+        }
+      ]
+    },
+    {
+      "kind": "confirmation",
+      "table_id": "tblmSQrcCs9vPQZx",
+      "fields": [
+        {
+          "name": "預估總成本",
+          "id": "fld9D5axRy",
+          "type": 2
+        },
+        {
+          "name": "實際總成本",
+          "id": "fld3V18TG9",
+          "type": 2
+        },
+        {
+          "name": "合約總額",
+          "id": "fld6kfMbzi",
+          "type": 2
+        },
+        {
+          "name": "C｜合約製作處理(件)",
+          "id": "fldzeiUPtI",
+          "type": 2
+        },
+        {
+          "name": "C｜合約製作處理標準工天",
+          "id": "fldp9LC05g",
+          "type": 2
+        },
+        {
+          "name": "C｜合約製作處理成本",
+          "id": "fldwygsWTL",
+          "type": 2
+        },
+        {
+          "name": "合約明細（日報關聯）",
+          "id": "fldLPbaPPp",
+          "type": 21
+        },
+        {
+          "name": "入帳日期",
+          "id": "fldhm8DmyB",
+          "type": 5
+        },
+        {
+          "name": "案件已入帳",
+          "id": "fld23o35Gy",
+          "type": 7
+        }
+      ]
+    },
+    {
+      "kind": "contract",
+      "table_id": "tblobs4qPy2w9MZ6",
+      "fields": [
+        {
+          "name": "合約項次",
+          "id": "fldzO2VJf2",
+          "type": 2
+        },
+        {
+          "name": "合約工作項目",
+          "id": "fldtcpzZhU",
+          "type": 1
+        },
+        {
+          "name": "合約單位",
+          "id": "fldaZT1XhI",
+          "type": 1
+        },
+        {
+          "name": "合約數量",
+          "id": "fldsvpePFm",
+          "type": 2
+        },
+        {
+          "name": "合約金額(原始)",
+          "id": "fldu2crhv6",
+          "type": 2
+        },
+        {
+          "name": "合約填報工項（日報關聯）",
+          "id": "fldOFyOZgb",
+          "type": 21
+        },
+        {
+          "name": "合約金額(報出)",
+          "id": "fldhLB4nL2",
+          "type": 2
+        }
+      ]
+    }
+  ],
+  "unresolved": [
+    "Both full native template definitions/edges/required Input fields",
+    "PDF day offsets calendar/workday semantics follow separately approved policy; original PDF does not specify",
+    "Exact full node arrow joining/branch predicates where crossing lines lack junction markers",
+    "Payment ledger and settlement source table/field mapping is not specified in the four PDFs",
+    "Satisfaction unanswered allowed per later decision, never fabricate rating",
+    "No source/API entitlement can be inferred from a PDF artifact name"
+  ]
+}
