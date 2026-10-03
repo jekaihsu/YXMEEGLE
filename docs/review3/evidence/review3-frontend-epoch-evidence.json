@@ -1,0 +1,7 @@
+{
+  "proof": "old mutation accepted after session epoch change",
+  "actor": "ACTOR_B",
+  "oldCaseHiddenBeforeRelease": true,
+  "oldCaseVisibleAfterRelease": "PRIVATE_CASE_A",
+  "toast": "已儲存，工作台已更新"
+}

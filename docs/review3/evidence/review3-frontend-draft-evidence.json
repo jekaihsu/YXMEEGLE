@@ -1,0 +1,21 @@
+{
+  "proof": "DraftForm cross-record collision",
+  "keys": [
+    {
+      "key": "yx:draft:v1:synthetic:form:::記錄本次執行",
+      "value": {
+        "value": {
+          "evidence": [
+            "B_DIFFERENT_DRAFT"
+          ]
+        },
+        "at": 1790962144254
+      }
+    }
+  ],
+  "restored": "B_DIFFERENT_DRAFT",
+  "submitted": {
+    "record": "RECORD_A",
+    "evidence": "B_DIFFERENT_DRAFT"
+  }
+}

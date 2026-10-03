@@ -1,0 +1,15 @@
+{
+  "proof": "additional impact of known #41 draft identity bug",
+  "carried": "PRIVATE_A_COMMENT",
+  "submitted": {
+    "action": "comment_add",
+    "version": 1,
+    "request_id": "485d7886-f480-4a22-b294-554add906219",
+    "project_id": "pB",
+    "project_versions": {},
+    "payload": {
+      "body": "PRIVATE_A_COMMENT",
+      "mentions": []
+    }
+  }
+}

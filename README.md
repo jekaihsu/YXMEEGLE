@@ -2,6 +2,7 @@
 
 ## 最新圖文文件（2026-10-03）
 
+- [第三輪逐行 Code Review](docs/review3/README.md)：4 位 agent 完整靜態閱讀 160 檔／17,244 行，新增 15 項確認問題（2 P1、12 P2、1 P3），附逐檔清單、可執行重現及合成截圖；尚未修復。
 - [文件入口](docs/guide/index.html)：離線 HTML、可列印 PDF、圖文操作說明。
 - [使用說明書](docs/guide/user-manual.md)：登入、案件、任務、Input、附件、交付與錯誤恢復。
 - [系統交接與資料流向](docs/guide/handoff.md)：每種資料從哪裡來、如何處理、保存與外送目的、維運及驗收。

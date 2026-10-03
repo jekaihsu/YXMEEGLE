@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-03",
+  "baseline": "32caa8009e966d03574fa2f69a04a29653f333b7",
+  "status": "review_only_no_business_code_changes",
+  "environment": {
+    "python": "3.11.5",
+    "sqlalchemy": "1.4.39",
+    "database": "isolated SQLite",
+    "browser": "real React components, synthetic fake fetch; CSS omitted"
+  },
+  "combined_run": {
+    "passed": 155,
+    "failed": 0,
+    "pytest_seconds": 109.68,
+    "new_defect_tests": 7,
+    "existing_tests": 148,
+    "modules": [
+      "test_core.py",
+      "test_permissions.py",
+      "backend/test_operations.py",
+      "backend/test_scope_delivery_identity.py",
+      "backend/test_public_case_http_boundaries.py",
+      "backend/test_company_admin_admission.py",
+      "backend/test_project_concurrency.py",
+      "backend/test_worker_reliability.py",
+      "backend/test_source_identity.py",
+      "backend/test_sop_contract_integration.py"
+    ]
+  },
+  "additional_jobs_run": {
+    "passed": 4,
+    "failed": 0,
+    "pytest_seconds": 10.69,
+    "file": "reproductions/test_jobs.py"
+  },
+  "unique_pytest_cases": 159,
+  "public_packaging_check": {
+    "passed": 11,
+    "failed": 0,
+    "pytest_seconds": 3.37,
+    "command": "python -X utf8 docs/review3/run_reproductions.py",
+    "counted_again_in_unique_total": false
+  },
+  "browser_scenarios": {
+    "new_findings": 5,
+    "existing_issue_41_additional_case": 1,
+    "scripts": 5
+  },
+  "limitations": [
+    "New defect tests pass when the current bug is present; these are not fix regression passes.",
+    "No PostgreSQL restoration, live OAuth, real Lark delivery, or cloud deployment was executed.",
+    "Public browser package compiled successfully; browser observations were collected from the original equivalent fixture on port 8793.",
+    "Historical full backend suite and frontend production build were not rerun this round."
+  ]
+}

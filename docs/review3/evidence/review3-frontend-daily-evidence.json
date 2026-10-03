@@ -1,0 +1,15 @@
+{
+  "provenance": "Recorded successful output of daily-proof.js on the original synthetic browser fixture (port 8793); this JSON is an observation transcript, not raw browser telemetry.",
+  "statusContractProof": [
+    "2026-10-03 · demosynthetic\n\n待檢核\n\nSYNTHETIC原日報檢核待查證",
+    "2026-10-03 · demosynthetic\n\n已退回\n\nSYNTHETIC原日報檢核待查證",
+    "2026-10-03 · demosynthetic\n\n已通過\n\nSYNTHETIC原日報檢核待查證"
+  ],
+  "pagingProof": {
+    "project": "pB",
+    "status": "共 1 筆符合條件 · 第 1／1 頁",
+    "cards": 0,
+    "previousDisabled": true,
+    "nextDisabled": true
+  }
+}

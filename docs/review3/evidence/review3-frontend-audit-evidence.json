@@ -1,0 +1,6 @@
+{
+  "proof": "AuditTrail stale record under different project",
+  "currentProject": "pB",
+  "error": "synthetic B failed",
+  "visibleOldRecord": "PRIVATE_AUDIT_AACTOR_A\n2026-10-03"
+}
