@@ -471,14 +471,14 @@ def create_app(overrides=None):
     async def upload(request:Request,file:UploadFile=File(...),project_id:str=Form(...),node_id:str=Form(''),direction:str=Form(...),version:int=Form(...),category_id:str=Form('other'),file_key:str=Form(''),project_version:int|None=Form(None)):
         data,user=identity(request); require(direction in ('input','output','evidence'),'文件用途錯誤',400)
         from .case_cutover import require_execution
-        def authorize_upload(ws):
+        def authorize_upload(ws,actor):
             p=find(ws['projects'],project_id,'案件'); n=find(p['nodes'],node_id,'節點') if node_id else None
             require_execution(ws,p)
-            require(is_pm(user,p) or (n and (n['owner_id']==user['id'] or any(is_owner(user,t,ws) for t in n['tasks']))))
+            require(is_pm(actor,p) or (n and (n['owner_id']==actor['id'] or any(is_owner(actor,t,ws) for t in n['tasks']))))
             validate_category(ws,category_id)
             return p,n
         # Check before writing any uploaded bytes, then repeat under the mutation lock.
-        with sessions() as db:authorize_upload(load(db,db.get(WorkspaceRow,data['wid'])))
+        with sessions() as db:authorize_upload(load(db,db.get(WorkspaceRow,data['wid'])),user)
         from .upload_policy import attachment_name
         safe_name=attachment_name(file.filename)
         ident=uid(); folder=upload_dir/hashlib.sha256(data['wid'].encode()).hexdigest(); folder.mkdir(exist_ok=True); target=folder/ident
@@ -488,18 +488,26 @@ def create_app(overrides=None):
                 while chunk:=await file.read(1024*1024):
                     size+=len(chunk); require(size<=20*1024*1024,'附件不得超過 20 MB（Lark 保存上限）',413); handle.write(chunk);content_digest.update(chunk)
             def mutate(ws):
-                p,n=authorize_upload(ws)
+                # The uploader's role/capabilities may have changed while the
+                # request body was being read. Authorize and attribute the
+                # durable mutation using the profile reloaded under the lock.
+                actor=find(ws['users'],data['uid'],'登入人員')
+                require(actor.get('active',True),'帳號已停權',403)
+                if data.get('mode')=='lark' and admission_required:
+                    require_access(actor,cfg.get('LARK_APP_ID'),cfg=cfg,
+                                   tenant=data['wid'].removeprefix('test-').removeprefix('lark-'))
+                p,n=authorize_upload(ws,actor)
                 related=[x for x in p['files'] if x.get('file_key',x['id'])==file_key] if file_key else []
                 if file_key:
                     require(bool(related),'原文件不存在，不能新增版本',404)
                     require(all(x.get('node_id')==(node_id or None) and x.get('category_id','other')==category_id and x['direction']==direction for x in related),'新版本須維持原文件節點、分類及用途',409)
                 key=file_key or ident
                 number=1+max((int(x.get('version',1)) for x in related),default=0)
-                p['files'].append(dict(id=ident,file_key=key,category_id=category_id,name=safe_name,node_id=node_id or None,direction=direction,version=str(number),uploaded_by=user['id'],created_at=now(),size=size,sha256=content_digest.hexdigest(),url=f'/api/files/{ident}/download',storage='local'))
+                p['files'].append(dict(id=ident,file_key=key,category_id=category_id,name=safe_name,node_id=node_id or None,direction=direction,version=str(number),uploaded_by=actor['id'],created_at=now(),size=size,sha256=content_digest.hexdigest(),url=f'/api/files/{ident}/download',storage='local'))
                 from .operations import queue
-                queue(ws,'file',user,{'project_id':project_id,'file_id':ident},'file:'+ident)
+                queue(ws,'file',actor,{'project_id':project_id,'file_id':ident},'file:'+ident)
                 p['files'][-1].update(remote_status='queued',auto_store_requested=True)
-                event(ws,user,'file_upload',project_id,node_id,message=f'上傳 {safe_name}')
+                event(ws,actor,'file_upload',project_id,node_id,message=f'上傳 {safe_name}')
             return persist_mutation(data['wid'],version,mutate,actor_id=user['id'],action_name='file_upload',project_versions={project_id:project_version} if project_version is not None else None)
         except Exception:
             target.unlink(missing_ok=True); raise
