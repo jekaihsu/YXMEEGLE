@@ -107,14 +107,16 @@ def test_oauth_does_not_reactivate_or_remap_unverified_staff(staff, patch):
 
 
 @pytest.mark.parametrize('stamp',[
-    (datetime.now(timezone.utc)-timedelta(seconds=901)).isoformat(),
-    (datetime.now(timezone.utc)+timedelta(minutes=5)).isoformat(),
+    timedelta(seconds=-901),
+    timedelta(minutes=5),
     'invalid',None,
 ])
 def test_oauth_rejects_stale_proof_before_creating_session(staff,stamp):
     from sqlalchemy import select
     from .app import AuthRow
     app,client,login,change=staff
+    if isinstance(stamp,timedelta):
+        stamp=(datetime.now(timezone.utc)+stamp).isoformat()
     change({'directory_last_seen_at':stamp})
     response=login()
     assert response.status_code==403

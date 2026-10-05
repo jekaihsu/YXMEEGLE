@@ -1,8 +1,8 @@
 export class ApiError extends Error {constructor(public status:number,message:string){super(message)}}
-export async function api<T>(url:string,init?:RequestInit):Promise<T>{
+export async function api<T>(url:string,init?:RequestInit,isCurrent:()=>boolean=()=>true):Promise<T>{
   const response=await fetch(url,{credentials:'same-origin',...init,headers:{...(init?.body instanceof FormData?{}:{'Content-Type':'application/json'}),...init?.headers}});
   const data=await response.json().catch(()=>({detail:'服務回應格式不正確，請稍後再試。'}));
-  if(response.status===401)window.dispatchEvent(new Event('yx:session-expired'));
+  if(response.status===401&&isCurrent())window.dispatchEvent(new Event('yx:session-expired'));
   if(!response.ok)throw new ApiError(response.status,typeof data.detail==='string'?data.detail:JSON.stringify(data.detail||'操作未完成'));
   return data;
 }

@@ -65,6 +65,17 @@ def queue(ws,kind,actor,payload,key):
 def evidence_for(p,n,key):
     return next((e for e in reversed(p['evidence']) if e['node_id']==n['id'] and e['key']==key and not e.get('withdrawn') and not e.get('superseded_for_current')),None)
 
+def confirmation_current(p,n,issue):
+    evidence=evidence_for(p,n,'confirmation')
+    # Evidence IDs identify immutable submissions; replacements receive a new ID.
+    if not issue or not evidence or evidence.get('status')!='accepted': return False
+    recipients=issue.get('recipients'); version=issue.get('version')
+    if not isinstance(recipients,list) or not version: return False
+    return bool(issue.get('evidence_id')==evidence.get('id')
+                and issue.get('pm_id')==p['pm_id']
+                and issue.get('fingerprint')==digest({'version':version,
+                    'evidence':evidence.get('id'),'pm':p['pm_id'],'recipients':recipients}))
+
 
 def daily_evidence_current(p,e):
     if not e.get('daily_id'): return True
@@ -212,7 +223,7 @@ def missing(p,n,ws):
     if any(x['project_id']==p['id'] and x.get('node_id')==n['id'] and x['status']!='succeeded' for x in ws['input_revisions'] if not x.get('superseded')): issues.append('Input 尚未核實存回 Lark')
     if n['key']=='confirmation':
         issue=p['confirmation_issues'][-1] if p['confirmation_issues'] else None
-        if not issue or issue['status'] not in ('issued','simulated'): issues.append('確認單尚未取得全部發出回執')
+        if not confirmation_current(p,n,issue) or issue['status'] not in ('issued','simulated'): issues.append('確認單尚未取得全部發出回執')
         elif set(issue['recipients'])!={a['user_id'] for a in issue.get('acknowledgments',[])}: issues.append('各組尚未確認此版本確認單')
     if n['key']=='settlement':
         from .node_skip import valid_waiver
@@ -832,11 +843,13 @@ def apply_operation(ws,user,body,demo=False):
             queue(ws,'confirmation',user,{'project_id':p['id'],'issue_id':issue['id'],'recipients':recipients,'text':f"確認單 {p['code']} {p['name']} v{version} 已正式發出。PM：{active_user(ws,p['pm_id'])['name']}。請至工作台確認。"},'confirmation:'+issue['id'])
     elif action=='confirmation_ack':
         require(p is not None,'請指定案件',422); issue=find(p['confirmation_issues'],data.get('id'))
+        node=next(x for x in p['nodes'] if x['key']=='confirmation')
+        require(confirmation_current(p,node,issue),'確認單資料或發出範圍已變更，請重新發出',409)
         require(issue['status'] in ('issued','simulated'),'確認單尚未成功發出',409)
         require(user['id'] in issue['recipients'],'只能由指定收件人確認')
         require(str(data.get('evidence','')).strip(),'需填寫組別確認紀錄',422)
         issue['acknowledgments']=[a for a in issue.get('acknowledgments',[]) if a['user_id']!=user['id']]+[dict(user_id=user['id'],evidence=data['evidence'],at=now())]
-        node=next(x for x in p['nodes'] if x['key']=='confirmation'); invalidate(node,'收件組別確認更新')
+        invalidate(node,'收件組別確認更新')
     elif action=='input_mapping':
         require(capable(user,'manage_sources')); require(p and n,'請指定案件與節點',422)
         if ws.get('environment')=='production':

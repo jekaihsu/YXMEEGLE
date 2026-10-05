@@ -51,6 +51,26 @@ python -m pytest backend -q
 
 前端型別及正式建置檢查使用 `frontend` 內的 `npm.cmd run build`。Word PRD 可執行 `python scripts/generate_prd.py` 重建，另需 `python-docx`。
 
+### Local pre-push gate（macOS／Linux）
+
+本專案不使用 GitHub Actions。啟用 repository-local `pre-push` hook 後，每次 push 前會以 Python 3.12 執行後端測試，並以 Node.js 22+ 安裝鎖定套件、執行前端回歸檢查及正式建置；任何一步失敗都會阻擋 push。
+
+首次設定：建立 Python 3.12 虛擬環境、安裝 hash-locked 後端依賴，然後啟用 hook：
+
+```bash
+python3.12 -m venv .venv
+.venv/bin/python -m pip install --require-hashes -r backend/requirements.lock
+bash scripts/install_local_hooks.sh
+```
+
+可在 push 前手動執行完整檢查：
+
+```bash
+bash scripts/local_ci.sh
+```
+
+Git hooks 是本機保護，不會隨 clone 自動啟用，也可被 `git push --no-verify` 略過；新 checkout 需再次執行安裝命令。
+
 - [PRD v0.4](docs/PRD_v0.4.md)：需求與驗收規格。
 - [Word PRD](output/doc/詠翔專案管理系統_PRD_v0.4.docx)：可分享文件，原 v0.3 保留。
 - [技術實作計畫](docs/IMPLEMENTATION_PLAN.md)：狀態、資料及驗收設計。
