@@ -136,3 +136,39 @@ def test_pg_drill_rejects_production_alias_and_unsafe_targets(target):
 
 def test_pg_drill_accepts_separately_named_postgresql_database():
     validate_target('postgresql://user@host/company','postgresql+psycopg://user@host/yx_restore_20260928')
+
+
+def test_restore_db_failure_rolls_back_new_directories_and_allows_retry(tmp_path):
+    engine,uploads=source(tmp_path)
+    target=tmp_path/'backup.zip'; br.backup(engine,uploads,target)
+    bad=tmp_path/'bad.zip'
+    with ZipFile(target) as archive:
+        entries={name:archive.read(name) for name in archive.namelist()}
+    rows=json.loads(entries['database.json'])
+    rows['workspaces']*=2  # duplicate primary key forces the DB insert to fail after files are written
+    entries['database.json']=json.dumps(rows).encode()
+    manifest=json.loads(entries['manifest.json'])
+    manifest['sha256']['database.json']=hashlib.sha256(entries['database.json']).hexdigest()
+    entries['manifest.json']=json.dumps(manifest).encode()
+    with ZipFile(bad,'w') as archive:
+        for name,data in entries.items(): archive.writestr(name,data)
+    restored=create_engine('sqlite:///'+str(tmp_path/'restored.db'))
+    output=tmp_path/'restored-uploads'
+    with pytest.raises(Exception):
+        br.restore(restored,output,bad)
+    assert not output.exists()
+    with restored.connect() as db: assert db.execute(select(br.TABLES[0].c.id)).first() is None
+    assert br.restore(restored,output,target)['files']==1
+    assert next(output.rglob('file_one')).read_bytes()==b'company evidence'
+
+
+def test_restore_failure_keeps_preexisting_empty_upload_directory(tmp_path):
+    engine,uploads=source(tmp_path)
+    target=tmp_path/'backup.zip'; br.backup(engine,uploads,target)
+    restored=create_engine('sqlite:///'+str(tmp_path/'restored.db'))
+    br.META.create_all(restored)
+    output=tmp_path/'restored-uploads'; output.mkdir()
+    with restored.begin() as db: db.execute(br.TABLES[0].insert(),{'id':'x','version':1,'data':{}})
+    with pytest.raises(ValueError,match='must be empty'):
+        br.restore(restored,output,target)
+    assert output.is_dir()
