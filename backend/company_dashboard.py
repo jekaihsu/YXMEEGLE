@@ -3,6 +3,7 @@ from collections import Counter,defaultdict
 from datetime import date,datetime,timezone
 from zoneinfo import ZoneInfo
 from .source_lifecycle import declared
+from .case_cutover import admission_fields
 
 GROUPS={'field':'外業組','control':'控制組','mapping':'圖資組','report':'報告組'}
 
@@ -94,6 +95,7 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
         totals.update(counts)
         rows.append({'id':p['id'],'code':p.get('code',''),'name':p.get('name',''),'case_type':p.get('case_type','unknown'),'group':'、'.join(sorted(project_groups)) or '未分組',
                      'groups':sorted(project_groups),'source_status':status,'source_lifecycle':entry,'execution_status':execution,
+                     **admission_fields(p,runnable),
                      'workbench_execution_enabled':runnable,**dict(counts)})
     filtered=[r for r in rows if (not q or q.casefold() in (r['code']+' '+r['name']).casefold())
         and (not group or group in r['groups'] or group=='未分組' and not r['groups'])
