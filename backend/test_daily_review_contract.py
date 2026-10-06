@@ -16,8 +16,9 @@ def test_source_status_maps_to_api_enum(raw,expected):
     assert daily_review(record(raw),[])['status']==expected
 
 
-def test_projection_returns_review_status_unchanged():
+@pytest.mark.parametrize('matched',[True,False])
+def test_projection_returns_review_status_unchanged(matched):
     entries=[{'id':f'd{i}','date':'2026-10-01','review':daily_review(record(raw),[])} for i,(raw,_) in enumerate(CASES)]
-    state={'projects':[{'id':'p1','code':'SYN','daily_reports':entries}],'daily_unmatched':[]}
+    state={'projects':[{'id':'p1','code':'SYN','daily_reports':entries if matched else []}],'daily_unmatched':[] if matched else entries}
     items={r['id']:r['review']['status'] for r in daily_index(state)['items']}
     assert items=={f'd{i}':expected for i,(_,expected) in enumerate(CASES)}
