@@ -4,6 +4,15 @@ from .lark_adapter import RemoteFailure
 FORMAL_BASES=frozenset({'JoOqbggsVar0ATsVgbcjh6IIp1g','H7W6b0PFWaVF1BsgqXJj3pQ9pXb','VwAsbezz9app3YsramgjduLYp2U','Sdw1bG1djaHsVGsRPvmjyVWipgg'})
 
 
+def approved_drive_root(root,cfg):
+    """Production file destination: must equal the server-approved root and never the isolated test root."""
+    approved=cfg.get('LARK_DRIVE_ROOT')
+    if not isinstance(root,str) or not root.strip() or not approved or root!=approved:
+        raise RemoteFailure('正式 Drive 根目錄未核定於伺服器，或工作區設定不符','blocked')
+    if root==cfg.get('LARK_TEST_DRIVE_ROOT'): raise RemoteFailure('正式 Drive 不得使用隔離測試目錄','blocked')
+    return root
+
+
 def connection_policy(wid,state,cfg,kind,for_verification=False):
     from .capability_write_policy import PAUSED_MESSAGE
     if kind in ('capability','training_record') and not for_verification:
@@ -39,7 +48,7 @@ def connection_policy(wid,state,cfg,kind,for_verification=False):
         return result
     org=cfg.get('LARK_WORKER_ORGANIZATION')
     if not org or wid!='lark-'+org or not for_verification and settings.get('external_enabled') is not True: raise RemoteFailure('正式外部連線未啟用或組織不符','blocked')
-    result={'mode':'production','simulated':False,'base_token':None,'drive_root':settings.get('drive_root') if kind=='file' else None}
+    result={'mode':'production','simulated':False,'base_token':None,'drive_root':approved_drive_root(settings.get('drive_root'),cfg) if kind=='file' else None}
     if kind=='input':
         target=settings.get('input_base');table=settings.get('input_table')
         protected=FORMAL_BASES | {settings.get(k) for k in ('v4_base','quote_base','capability_base')} | {cfg.get(k) for k in ('LARK_V4_BASE_TOKEN','LARK_QUOTE_BASE_TOKEN','LARK_CAPABILITY_BASE_TOKEN')}

@@ -356,7 +356,7 @@ def vote(ws,user,p,n,data):
         if all(x['status']=='completed' for x in p['nodes'] if x['key'] in TECHNICAL): p['execution_status']='engineering_complete'
         if n['key']=='settlement': p['execution_status']='completed'
 
-def apply_operation(ws,user,body,demo=False):
+def apply_operation(ws,user,body,demo=False,cfg=None):
     from .input_validation import validate_action
     validate_action(body)
     """Returns False for legacy task actions, True for handled actions."""
@@ -430,6 +430,11 @@ def apply_operation(ws,user,body,demo=False):
         require(not proposed.get('input_base') or proposed['input_base'] not in (proposed['v4_base'],proposed['quote_base'],proposed['capability_base'],proposed['test_base']),'Input 登錄 Base 不可指向來源或測試 Base',422)
         require(not proposed.get('test_input_table') or proposed['test_input_table']!=proposed.get('input_table'),'隔離測試 Input 表不可混用正式表',422)
         require(not proposed['test_drive_root'] or proposed['test_drive_root']!=proposed['drive_root'],'測試目錄不可指向正式目錄',422)
+        if cfg is not None and ws.get('environment')=='production' and proposed.get('drive_root'):
+            from .remote_policy import approved_drive_root
+            from .lark_adapter import RemoteFailure
+            try: approved_drive_root(proposed['drive_root'],cfg)
+            except RemoteFailure: require(False,'正式 Drive 根目錄須與伺服器核定目錄一致，且不可為測試目錄',422)
         ws['settings']=proposed
     elif action=='sop_draft':
         require(capable(user,'edit_sop'))
