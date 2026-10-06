@@ -167,8 +167,13 @@ def filter_private_workspace(state, user):
     if not may_manage:
         state['delegations'] = [item for item in state.get('delegations', [])
             if ident in (item.get('principal_id'), item.get('delegate_id'))]
+        # Handover rows use from_id/to_id (operations.handover_request); delegations
+        # use principal_id/delegate_id. The project's PM/supervisor may also see them.
+        leads = {project.get('id'): (project.get('pm_id'), project.get('supervisor_id'))
+                 for project in state.get('projects', [])}
         state['handover_requests'] = [item for item in state.get('handover_requests', [])
-            if ident in (item.get('principal_id'), item.get('delegate_id'), item.get('requested_by'))]
+            if ident and (ident in (item.get('from_id'), item.get('to_id'), item.get('requested_by'))
+                          or ident in leads.get(item.get('project_id'), ()))]
     if not actor or actor.get('role')!='manager':
         state.pop('source_case_review',None)
     # Background snapshots and source payloads are operational, not public case
