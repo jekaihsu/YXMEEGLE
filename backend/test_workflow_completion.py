@@ -119,8 +119,9 @@ def test_supervisor_handover_updates_only_matching_node_review_seats(state):
     assert unrelated['supervisor_id']=='u-control'
     assert prior_cycle['seats']['supervisor']=='u-field'
     action(state,'review_submit',{},user='u-pm',key='control')
-    assert prior_cycle['status']=='invalidated'
-    assert n['review_cycles'][-1]['content_hash']!=prior_cycle['content_hash']
+    assert prior_cycle['status']=='pending'
+    assert n['review_cycles'][-1] is prior_cycle
+    action(state,'review_vote',{'cycle_id':prior_cycle['id'],'seat':'supervisor','result':'approved'},user='u-field',key='control')
 
 
 def test_one_delivery_can_be_billed_while_other_is_returned(state):

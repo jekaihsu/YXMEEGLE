@@ -840,6 +840,7 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         h=find(ws['handover_requests'],data.get('id')); require(h['to_id']==user['id'],'需接手人接受'); require(h['status']=='awaiting_acceptance','交接尚未核准',409); p=find(ws['projects'],h['project_id'])
         active_user(ws,h['to_id']); prior=h['from_id']; replacement=h['to_id']
         require(not (p['pm_id']==prior and p['admin_id']==replacement or p['admin_id']==prior and p['pm_id']==replacement),'交接會造成PM與行政同人',409)
+        previous_hashes={node['id']:review_hash(p,node) for node in p['nodes']}
         for key in ('pm_id','admin_id','supervisor_id'):
             if p[key]==prior: p[key]=replacement
         for node in p['nodes']:
@@ -851,11 +852,16 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
                 if t['owner_id']==prior and t['status'] not in ('completed','superseded'): t['owner_id']=replacement
             for c in node['review_cycles']:
                 if c['status']=='pending':
-                    for seat,ident in list(c['seats'].items()):
-                        if ident==prior:
-                            c['seats'][seat]=replacement
-                            for v in c['votes']:
-                                if v['seat']==seat: v['invalidated']='職責交接'
+                    targets=seats(p,node)
+                    fingerprint=review_hash(p,node)
+                    if targets==c['seats'] and fingerprint==previous_hashes[node['id']]: continue
+                    for v in c['votes']:
+                        if targets.get(v['seat'])!=c['seats'].get(v['seat']): v['invalidated']='職責交接'
+                    c['seats']=targets
+                    if c['content_hash']==previous_hashes[node['id']]:
+                        c['content_hash']=fingerprint
+                    else:
+                        c.update(status='invalidated',invalidated_reason='交接前內容已改版，請重新送審')
         for r in ws['recurring']:
             if r['project_id']==p['id'] and r['owner_id']==prior and r['status']=='active': r['owner_id']=replacement
         h.update(status='accepted',accepted_at=now()); p['handoffs'].append(deepcopy(h))
