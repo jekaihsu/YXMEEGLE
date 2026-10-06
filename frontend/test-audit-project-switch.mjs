@@ -17,7 +17,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 let calls=[];
 globalThis.fetch=(url,init)=>new Promise(resolve=>{
  const call={url:String(url),pid:new URL(String(url),'http://x').searchParams.get('project_id'),offset:new URL(String(url),'http://x').searchParams.get('offset'),
-  reply:(status,body)=>resolve({ok:status<400,status,json:async()=>body}),aborted:false};
+  reply:(status,body)=>resolve({ok:status<400,status,text:async()=>JSON.stringify(body)}),aborted:false};
  // Deliberately allow replies after abort to exercise the component's stale-response guard.
  init?.signal?.addEventListener('abort',()=>{call.aborted=true});
  calls.push(call)});
