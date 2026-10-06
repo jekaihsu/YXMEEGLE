@@ -11,6 +11,11 @@ import re
 import secrets
 import shutil
 
+try:
+    from .stage_inventory import inventory_digest
+except ImportError:
+    from stage_inventory import inventory_digest
+
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = ROOT / '.runtime'
 PROJECT = '6ab61680a4c05a5bcb57ace9'
@@ -154,7 +159,7 @@ def staging():
     except ImportError:
         from verify_stage_package import verify_stage
     smoke = verify_stage(folder)
-    write(folder.name + '-smoke.json', dict(smoke, stage=str(folder)))
+    write(folder.name + '-smoke.json', dict(smoke, stage=str(folder), inventory_sha256=inventory_digest(manifest)))
     if not smoke.get('ok'):
         raise SystemExit('Deployment package verification failed: ' + smoke.get('reason', 'unknown'))
     print(json.dumps({'staging_directory': str(folder), 'files': len(manifest), 'bytes': sum(f['size'] for f in manifest), 'runtime_smoke_passed': True}))

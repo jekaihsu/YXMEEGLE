@@ -13,6 +13,10 @@ import secrets
 import subprocess
 import sys
 import httpx
+try:
+    from .stage_inventory import verify_stage_inventory
+except ImportError:
+    from stage_inventory import verify_stage_inventory
 import yaml
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -107,12 +111,10 @@ def deploy(rows):
     stage=Path(manifest['directory']).resolve()
     if not stage.is_relative_to((ROOT/'.runtime').resolve()) or not stage.name.startswith('zeabur-stage-'):
         raise RuntimeError('Unapproved deployment directory')
-    for entry in manifest['files']:
-        path=(stage/entry['path']).resolve()
-        if not path.is_relative_to(stage) or hashlib.sha256(path.read_bytes()).hexdigest()!=entry['sha256']:
-            raise RuntimeError('Deployment snapshot changed')
+    inventory_hash=verify_stage_inventory(stage,manifest['files'])
     receipt=json.loads((ROOT/'.runtime'/(stage.name+'-smoke.json')).read_text(encoding='utf-8'))
-    if not receipt.get('ok'):raise RuntimeError('Package smoke missing or failed')
+    if not receipt.get('ok') or receipt.get('inventory_sha256')!=inventory_hash:
+        raise RuntimeError('Package smoke missing, stale, or bound to a different inventory')
     command=['zeabur.cmd','deploy','--project-id',PROJECT,'--environment-id',ENV,'--service-id',app['_id'],'--interactive=false']
     result=subprocess.run(command,cwd=stage,capture_output=True,text=True,encoding='utf-8',errors='replace')
     save('deployment.json',{'stage':stage.name,'service_id':app['_id'],'exit_code':result.returncode})

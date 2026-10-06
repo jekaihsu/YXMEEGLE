@@ -6,7 +6,12 @@ from pathlib import Path
 import subprocess
 import sys
 from datetime import datetime, timezone
-from workbench_login_cutover import environment
+try:
+    from .workbench_login_cutover import environment
+    from .stage_inventory import verify_stage_inventory
+except ImportError:
+    from workbench_login_cutover import environment
+    from stage_inventory import verify_stage_inventory
 
 ROOT=Path(__file__).resolve().parents[1]
 STAGE='zeabur-stage-ced7de7d'
@@ -25,11 +30,10 @@ def run():
     manifest=read('.runtime/'+STAGE+'-manifest.json')
     stage=(ROOT/'.runtime'/STAGE).resolve()
     if Path(manifest['directory']).resolve()!=stage:raise RuntimeError('Stage path mismatch')
-    for entry in manifest['files']:
-        path=(stage/entry['path']).resolve()
-        if not path.is_relative_to(stage) or path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest()!=entry['sha256']:
-            raise RuntimeError('Frozen package mismatch')
-    if not read('.runtime/'+STAGE+'-smoke.json').get('ok'):raise RuntimeError('Package smoke unavailable')
+    inventory_hash=verify_stage_inventory(stage,manifest['files'])
+    smoke=read('.runtime/'+STAGE+'-smoke.json')
+    if not smoke.get('ok') or smoke.get('inventory_sha256')!=inventory_hash:
+        raise RuntimeError('Package smoke missing, stale, or bound to a different inventory')
     proof=read('.runtime/release-source-staging-ced7de7d.json')
     if not proof.get('ok') or not proof.get('runtime_uid_10001_verified') or proof.get('stage')!=STAGE:
         raise RuntimeError('Staging source or UID verification missing')

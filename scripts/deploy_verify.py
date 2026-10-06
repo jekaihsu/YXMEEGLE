@@ -13,6 +13,11 @@ RUNTIME = ROOT / '.runtime'
 URL = 'https://yongxiang-projects-20260925.zeabur.app'
 
 
+def verification_passed(result):
+    checks = result.get('checks')
+    return isinstance(checks, dict) and bool(checks) and all(value is True for value in checks.values())
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('phase', choices=['before', 'after', 'config', 'assets'])
@@ -33,8 +38,13 @@ def main():
             result['assets'] = actual
             result['expected_assets'] = expected
             result['checks']['latest_frontend_assets'] = bool(expected) and actual == expected
+            downloads_ok = False
             if result['checks']['latest_frontend_assets']:
-                result['checks']['asset_downloads'] = all(client.get(URL + asset).status_code == 200 for asset in actual)
+                try:
+                    downloads_ok = all(client.get(URL + asset).status_code == 200 for asset in actual)
+                except httpx.HTTPError:
+                    downloads_ok = False
+            result['checks']['asset_downloads'] = downloads_ok
         elif args.phase == 'config':
             session = client.get(URL + '/api/session')
             session.raise_for_status()
@@ -85,8 +95,12 @@ def main():
             file.raise_for_status()
             assert hashlib.sha256(file.content).hexdigest() == state['sha256']
             result['checks'].update({'same_session_after_restart': True, 'database_record_retained': True, 'attachment_bytes_retained': True})
+    result['ok'] = verification_passed(result)
+    RUNTIME.mkdir(parents=True, exist_ok=True)
     (RUNTIME / ('zeabur-verification-' + args.phase + '.json')).write_text(json.dumps(result, indent=2), encoding='utf-8')
     print(json.dumps(result))
+    if not result['ok']:
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':
