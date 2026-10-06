@@ -99,7 +99,7 @@ def test_delivery_reassignment_requires_current_supervisor_review(state):
     from .operations import delivery_current
     assert item['required_reviewer_ids']==['u-field']
     assert [vote['actor_id'] for vote in item['approvals']]==['u-field']
-    assert delivery_current(p,item)
+    assert delivery_current(p,item,state)
 
 
 def test_supervisor_handover_updates_only_matching_node_review_seats(state):
@@ -138,14 +138,14 @@ def test_new_batch_evidence_preserves_approved_delivery_but_revision_invalidates
     prior_proof=next(e for e in p['evidence'] if e['id']==first['evidence_ids'][0])
     n['status']='completed';n['review_cycles']=[{'id':'previous','status':'approved'}]
     action(state,'evidence_submit',{'key':'deliverable','note':'第二批成果','url':'https://example.com/batch2','new_batch':True},user='u-pm',key='control')
-    assert delivery_current(p,first) and first['status']=='approved'
+    assert delivery_current(p,first,state) and first['status']=='approved'
     assert prior_proof['superseded_for_current'] and not prior_proof.get('withdrawn')
     assert n['review_cycles'][0]['status']=='approved' and n['review_cycles'][0]['historical_scope']
     assert n['status']=='in_progress'
     action(state,'evidence_submit',{'key':'deliverable','note':'修訂第二批，不影響第一批','url':'https://example.com/correction2'},user='u-pm',key='control')
-    assert delivery_current(p,first)
+    assert delivery_current(p,first,state)
     action(state,'evidence_submit',{'key':'deliverable','note':'第一批原成果有誤，明確修訂','url':'https://example.com/correction1','replaces_evidence_id':prior_proof['id']},user='u-pm',key='control')
-    assert not delivery_current(p,first) and first['status']=='invalidated'
+    assert not delivery_current(p,first,state) and first['status']=='invalidated'
 
 
 def test_delivery_revision_requires_fresh_pair_and_preserves_history(state):

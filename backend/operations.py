@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from .source_lifecycle import declared, needs_review
 from .policy import upgrade, CAPABILITIES, TECHNICAL, FINANCIAL
 from .workflow import require, find, now, uid, event, blocked, all_tasks, valid_date, http_url
+from .delivery_approval import reviewer_seats, active_seats, approved_seats, refresh_reviewers
 from .business_policy import can_business_override
 
 def capable(user, capability):
@@ -101,19 +102,10 @@ def reconcile_daily_evidence(ws):
 def delivery_fingerprint(item):
     return digest({k:item.get(k) for k in ('work_item_ids','quantity','unit','evidence_ids','task_snapshots','version')})
 
-def delivery_reviewer_ids(p,item):
-    selected=set(item.get('work_item_ids',[])); reviewers=[]
-    for node in p['nodes']:
-        if any(task['id'] in selected or task.get('work_item_id') in selected for task in node['tasks']):
-            reviewers.append(node.get('supervisor_id') or p.get('supervisor_id',''))
-    return list(dict.fromkeys(ident for ident in reviewers if ident))
-
-def delivery_current(p,item):
+def delivery_current(p,item,ws):
     if item.get('status')!='approved' or item.get('superseded_by'): return False
     if item.get('content_hash')!=delivery_fingerprint(item): return False
-    current_reviewers=set(delivery_reviewer_ids(p,item))
-    valid_approvals={a.get('actor_id') for a in item.get('approvals',[]) if a.get('content_hash')==item.get('content_hash')}
-    if not current_reviewers or current_reviewers!=set(item.get('required_reviewer_ids',[])) or valid_approvals!=current_reviewers: return False
+    if not approved_seats(ws,p,item): return False
     for ident in item.get('evidence_ids',[]):
         e=next((e for e in p['evidence'] if e['id']==ident),None)
         if not e or e.get('withdrawn') or e.get('status')!='accepted': return False
@@ -123,22 +115,22 @@ def delivery_current(p,item):
         if not task or any(task.get(k)!=snapshot.get(k) for k in ('revision','status','output')): return False
     return True
 
-def payment_delivery_valid(p,batch):
+def payment_delivery_valid(p,batch,ws):
     if batch.get('phase')=='advance' and not batch.get('delivery_references'):
         return bool(str(batch.get('contract_evidence','')).strip() and str(batch.get('claim_evidence','')).strip())
     refs=batch.get('delivery_references',[])
     if not refs: return False
     for ref in refs:
         item=next((x for x in p.get('delivery_batches',[]) if x['id']==ref['id']),None)
-        if not item or not delivery_current(p,item) or item['version']!=ref['version'] or item['content_hash']!=ref['content_hash']: return False
+        if not item or not delivery_current(p,item,ws) or item['version']!=ref['version'] or item['content_hash']!=ref['content_hash']: return False
     return True
 
-def delivery_references(p,identifiers,batch_id=None,kind=None):
+def delivery_references(p,identifiers,ws,batch_id=None,kind=None):
     require(isinstance(identifiers,list) and identifiers and all(isinstance(x,str) and x for x in identifiers) and len(set(identifiers))==len(identifiers),'需指定不重複的已核定交付批次',422)
     refs=[]
     for ident in identifiers:
         item=find(p.get('delivery_batches',[]),ident,'交付批次')
-        require(delivery_current(p,item),'交付批次尚未核定、已換版或證據已失效',409)
+        require(delivery_current(p,item,ws),'交付批次尚未核定、已換版或證據已失效',409)
         for other in p['payment_batches']:
             if other['id']==batch_id or other.get('kind')!=kind or other.get('status')=='cancelled': continue
             used_ids={r['id'] for r in other.get('delivery_references',[])}
@@ -161,7 +153,7 @@ def refresh_payment_status(ws,p,batch):
     batch['recorded_amount']=str(sum((decimal(r['amount']) for r in batch.get('receipts',[])),Decimal(0)))
     batch['verified_amount']=str(verified)
     if batch.get('status') in ('draft','needs_review','cancelled'): return
-    if not payment_delivery_valid(p,batch):
+    if not payment_delivery_valid(p,batch,ws):
         batch['status']='needs_review'; batch['review_reason']='交付批次未綁定或版本已失效'; return
     batch['status']='paid' if verified==decimal(batch['amount']) and verified>0 else 'partially_paid' if verified>0 else 'approved'
 
@@ -170,7 +162,8 @@ def refresh_project_state(p,ws):
     refresh_skips(ws,p)
     p.setdefault('delivery_batches',[])
     for item in p['delivery_batches']:
-        if item['status']=='approved' and not delivery_current(p,item):
+        refresh_reviewers(ws,p,item)
+        if item['status']=='approved' and not delivery_current(p,item,ws):
             item.update(status='invalidated',invalidated_reason='交付成果、文件或工項版本已變更')
     if ws.get('environment')=='production':
         for node in p['nodes']:
@@ -250,7 +243,7 @@ def missing(p,n,ws):
             if not any(v['status']=='approved' for v in p['finance_versions']): issues.append('財務基準尚未核定')
             if not p.get('payment_reconciliation',{}).get('confirmed'): issues.append('收付款總額尚未核對結清')
             if any(b['status']!='paid' for b in p['payment_batches']): issues.append('收付款尚未結清')
-            if any(not payment_delivery_valid(p,b) for b in p['payment_batches']): issues.append('請款交付版本尚未核實')
+            if any(not payment_delivery_valid(p,b,ws) for b in p['payment_batches']): issues.append('請款交付版本尚未核實')
             if any(not r.get('verified') or set(valid_attestations(ws,p,r))!={'pm','admin'} or len(set(valid_attestations(ws,p,r).values()))!=2 for b in p['payment_batches'] for r in b.get('receipts',[])): issues.append('實際收付款尚未完成雙方核對')
     return issues
 
@@ -688,7 +681,8 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
             require(str(data.get('reason','')).strip(),'交付換版需填理由',422)
         ident=uid()
         item=dict(id=ident,lineage_id=previous.get('lineage_id',previous['id']) if previous else ident,version=previous['version']+1 if previous else 1,replaces_id=previous['id'] if previous else None,work_item_ids=selected,quantity=str(quantity),unit=unit,evidence_ids=evidence_ids,status='submitted',task_snapshots=[{k:t.get(k) for k in ('id','revision','status','output')} for t in tasks],required_reviewer_ids=list(dict.fromkeys(node.get('supervisor_id') or p.get('supervisor_id') for node in nodes)),approvals=[],created_by=user['id'],created_at=now(),reason=data.get('reason',''))
-        require(all(item['required_reviewer_ids']),'交付組別主管尚未指定',409)
+        item['required_reviewer_seats']=reviewer_seats(p,item)
+        require(active_seats(ws,item['required_reviewer_seats']),'交付組別主管尚未指定或非在職人員',409)
         item['content_hash']=delivery_fingerprint(item)
         if previous: previous.update(superseded_by=ident,status='superseded')
         p['delivery_batches'].append(item)
@@ -696,18 +690,18 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
     elif action=='delivery_review':
         require(p is not None,'請指定案件',422); item=find(p['delivery_batches'],data.get('id'),'交付批次')
         require(item['status']=='submitted' and not item.get('superseded_by'),'交付批次已核定、退回或換版',409)
-        current_reviewers=delivery_reviewer_ids(p,item)
-        require(current_reviewers and user['id'] in current_reviewers,'需由現任交付組主管核定交付')
-        item['required_reviewer_ids']=current_reviewers
-        item['approvals']=[a for a in item['approvals'] if a.get('actor_id') in current_reviewers and a.get('content_hash')==item['content_hash']]
+        seats=reviewer_seats(p,item)
+        require(user['id'] in seats.values(),'需由現任交付組主管核定交付')
+        require(active_seats(ws,seats),'交付組別主管尚未指定或非在職人員',409)
+        refresh_reviewers(ws,p,item)
         result=data.get('result'); require(result in ('approved','returned'),'交付核定結果錯誤',422)
         if result=='returned':
             require(str(data.get('reason','')).strip(),'退回需填理由',422); item.update(status='returned',returned_by=user['id'],reason=data['reason'])
         else:
-            item['approvals']=[a for a in item['approvals'] if a['actor_id']!=user['id']]+[dict(actor_id=user['id'],at=now(),content_hash=item['content_hash'])]
-            if set(item['required_reviewer_ids'])<={a['actor_id'] for a in item['approvals']}:
+            item['approvals']=[a for a in item['approvals'] if a['actor_id']!=user['id']]+[dict(actor_id=user['id'],at=now(),content_hash=item['content_hash'],node_ids=[ident for ident,reviewer in seats.items() if reviewer==user['id']])]
+            if approved_seats(ws,p,item):
                 item.update(status='approved',approved_at=now())
-                require(delivery_current(p,item),'交付引用資料已變更，請重新提交版本',409)
+                require(delivery_current(p,item,ws),'交付引用資料已變更，請重新提交版本',409)
     elif action=='finance_propose':
         require(p and (operator(user,p) or capable(user,'finance_edit')))
         amount=str(decimal(data.get('contract_amount'))); budget=str(decimal(data.get('budget')))
@@ -753,7 +747,7 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         require(str(data.get('contract_evidence','')).strip() and str(data.get('claim_evidence','')).strip(),'需合約條件及請款證據',422)
         if kind=='subcontract' and phase!='advance': require(data.get('acceptance_evidence'),'成果款需驗收證據',422)
         amount=decimal(data.get('amount')); require(amount>0,'款項金額需大於零',422)
-        refs=delivery_references(p,data.get('delivery_batch_ids',[]),kind=kind) if phase!='advance' or data.get('delivery_batch_ids') else []
+        refs=delivery_references(p,data.get('delivery_batch_ids',[]),ws,kind=kind) if phase!='advance' or data.get('delivery_batch_ids') else []
         p['payment_batches'].append(dict(id=uid(),kind=kind,phase=phase,amount=str(amount),status='draft',contract_evidence=data['contract_evidence'],claim_evidence=data['claim_evidence'],acceptance_evidence=data.get('acceptance_evidence',''),delivery_references=refs,technical_approved_by=None,created_by=user['id'],created_at=now()))
         p['payment_reconciliation']={'confirmed':False}
         for node in p['nodes']:
@@ -764,13 +758,13 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         require(p and operator(user,p)); b=find(p['payment_batches'],data.get('id'))
         require(str(data.get('reason','')).strip(),'款項換版需填理由',422)
         require(b['status']!='cancelled','款項已取消',409)
-        refs=delivery_references(p,data.get('delivery_batch_ids',[]),batch_id=b['id'],kind=b['kind'])
+        refs=delivery_references(p,data.get('delivery_batch_ids',[]),ws,batch_id=b['id'],kind=b['kind'])
         b.setdefault('revision_history',[]).append(dict(delivery_references=deepcopy(b.get('delivery_references',[])),attestations=deepcopy(b.get('attestations',[])),status=b['status'],at=now(),actor_id=user['id'],reason=data['reason']))
         b.update(delivery_references=refs,attestations=[],technical_approved_by=None,status='draft')
         p['payment_reconciliation']={'confirmed':False}
     elif action=='payment_approve':
         require(p and capable(user,'finance_approve')); b=find(p['payment_batches'],data.get('id')); require(b['status']=='draft','款項非草稿',409)
-        require(payment_delivery_valid(p,b),'須綁定有效核定交付版本後重新確認',409)
+        require(payment_delivery_valid(p,b,ws),'須綁定有效核定交付版本後重新確認',409)
         require_financial_pair(ws,p,b)
         require(b['kind']!='subcontract' or b['phase']=='advance' or b['technical_approved_by'],'成果款需組主管驗收',409); b.update(status='approved',approved_by=user['id'],approved_at=now())
         kind='receivable' if b['kind']=='receivable' else 'subcontract_receivable'
@@ -789,7 +783,7 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         receivables=sum((decimal(b['amount']) for b in p['payment_batches'] if b['kind']=='receivable'),Decimal(0))
         require(receivables==decimal(v['contract_amount']) and all(b['status']=='paid' for b in p['payment_batches']),'應收總額與核定合約或實收付尚未結清',409)
         for batch in p['payment_batches']:
-            require(payment_delivery_valid(p,batch),'請款交付版本尚未核實',409)
+            require(payment_delivery_valid(p,batch,ws),'請款交付版本尚未核實',409)
             for receipt in batch.get('receipts',[]): require_financial_pair(ws,p,receipt)
         require(data.get('evidence') and data.get('all_payables_declared') is True,'需確認全部下包應付款已登錄並提供核對證據',422)
         p['payment_reconciliation']=dict(confirmed=True,evidence=data['evidence'],actor_id=user['id'],at=now(),finance_id=v['id'])
