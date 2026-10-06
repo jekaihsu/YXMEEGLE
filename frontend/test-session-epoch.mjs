@@ -16,7 +16,7 @@ const {code}=await transform(dataSource+'\nreturn {a,b,workspace};',{loader:'ts'
 const {a,b,workspace}=new Function(code)();
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json'}});
 let checks=0;
-async function scenario(kind,change,status=200){
+async function scenario(kind,change,status=200,body){
  const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=projects'});
  for(const key of ['window','document','location','history','sessionStorage','FormData','Event'])globalThis[key]=dom.window[key];
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
@@ -35,6 +35,9 @@ async function scenario(kind,change,status=200){
  let pending;await flush(()=>{pending=kind==='run'?window.epochContext.run('task_start',{}, {project_id:'pA',node_id:'nA'}):window.epochContext.upload(new FormData())});
  assert.equal(calls,1);
  const oldRelease=release;
+ const draftKey='yx:draft:v1:'+a.id+':workspace-A:comment:pA:project';
+ const draft=JSON.stringify({value:'unsent text',at:Date.now()});
+ sessionStorage.setItem(draftKey,draft);
  if(change){
   if(change==='logout')await flush(()=>window.epochContext.logout());
   if(change==='expiry')await flush(()=>window.dispatchEvent(new Event('yx:session-expired')));
@@ -61,6 +64,17 @@ async function scenario(kind,change,status=200){
   assert.ok(!document.body.textContent.includes('檔案已上傳'));
   await flush(async()=>{newRelease(json({...current,version:2}));await newer});
   assert.equal(window.epochContext.w.version,2);
+ }else if(body!==undefined){
+  const before=window.epochContext.w;
+  let result;await flush(async()=>{oldRelease(new Response(body,{status}));result=await pending});
+  assert.equal(result,kind==='upload'?false:undefined);
+  assert.equal(window.epochContext.w,before,'invalid response preserves workspace');
+  assert.equal(window.epochContext.s.user.id,a.id);
+  assert.equal(window.epochContext.error,'服務回應格式不正確，請稍後再試。');
+  assert.equal(window.epochContext.completionMoment,null);
+  assert.equal(sessionStorage.getItem(draftKey),draft,'failed mutation preserves draft');
+  assert.ok(!document.body.textContent.includes('已儲存，工作台已更新'));
+  assert.ok(!document.body.textContent.includes('檔案已上傳'));
  }else{
   await flush(async()=>{oldRelease(json({...workspace,version:11}));await pending});
   assert.equal(window.epochContext.w.version,11);
@@ -76,5 +90,6 @@ for(const kind of ['run','upload']){
  for(const change of ['actor','workspace','environment','mode','recovery','logout','expiry'])await scenario(kind,change);
  for(const status of [401,409,500])await scenario(kind,'actor',status);
  await scenario(kind,null);
+ for(const body of ['', '   \n', '<html>proxy fallback</html>', '{"broken":', 'null'])await scenario(kind,null,200,body);
 }
 console.log(`Session epoch: ${checks} App regression scenarios passed`);
