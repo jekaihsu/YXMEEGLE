@@ -70,6 +70,22 @@ def operate(api,op,kind='extension',**body):
     return api.client.post('/api/native-approvals/'+kind+'/request/'+op,json={'project_version':project_version(api),**body})
 
 
+@pytest.mark.parametrize('path', [
+    '/api/native-approvals/definitions/verify',
+    '/api/change-approvals/request/confirm-line',
+    '/api/native-approvals/financial/request',
+    '/api/native-approvals/extension/request/prepare',
+])
+def test_native_routes_reject_invalid_json_objects_before_state_or_remote_changes(api,path):
+    before=deepcopy(api.h.read())
+    for raw in (b'[]',b'null',b'1',b'"x"',b'true',b'{bad',b'',b'\xff',
+                b'['*20000+b']'*20000,b'{"a":'*20000+b'1'+b'}'*20000):
+        response=api.client.post(path,content=raw,headers={'content-type':'application/json'})
+        assert response.status_code==422,(path,raw[:40],response.status_code,response.text)
+        assert api.h.read()==before
+        assert api.calls==[]
+
+
 def test_only_original_applicant_can_request_remote_cancellation(api):
     assert operate(api,'prepare').status_code==200
     assert operate(api,'submit').status_code==200

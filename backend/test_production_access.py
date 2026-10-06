@@ -162,3 +162,48 @@ def test_pilot_copy_rejects_missing_or_corrupt_attachment_without_workspace_chan
     after=c.get('/api/workspace').json()
     assert len(after['projects'])==len(before['projects'])
     assert not (app.state.upload_dir/hashlib.sha256(b'test-lark-company').hexdigest()/'missing-file').exists()
+
+
+def _snapshot(app,c):
+    with app.state.sessions() as db:
+        counts=(len(db.execute(select(AuditRow)).scalars().all()),db.get(AuthRow,'sid').data['wid'],
+                [(r.id,r.version,deepcopy(storage.load(db,BusinessRow,r)))
+                 for r in db.execute(select(WorkspaceRow)).scalars().all()])
+    return counts,c.cookies.get('meegle_session')
+
+
+def test_workspace_switch_and_pilot_copy_reject_non_object_bodies_without_state_change(tmp_path):
+    app,c=company(tmp_path)
+    pid=c.get('/api/workspace').json()['projects'][0]['id']
+    hdr={'content-type':'application/json'}
+    bad=[b'[]',b'null',b'1',b'"x"',b'true',b'false',b'{bad',b'',b'\xff',b'[{"environment":"production"}]']
+    for path in ('/api/workspace/switch','/api/pilot/copy'):
+        for raw in bad:
+            before=_snapshot(app,c)
+            r=c.post(path,content=raw,headers=hdr)
+            assert r.status_code==422,(path,raw,r.status_code,r.text)
+            assert _snapshot(app,c)==before
+    # missing / wrongly typed fields
+    for path,body in (('/api/workspace/switch',{}),('/api/workspace/switch',{'environment':['production']}),
+                      ('/api/workspace/switch',{'environment':'staging'}),('/api/pilot/copy',{}),
+                      ('/api/pilot/copy',{'project_id':['x']}),('/api/pilot/copy',{'project_id':None})):
+        before=_snapshot(app,c)
+        r=c.post(path,json=body)
+        assert 400<=r.status_code<500,(path,body,r.status_code)
+        assert _snapshot(app,c)==before
+    # valid boundary still works
+    assert c.post('/api/pilot/copy',json={'project_id':pid}).status_code==200
+    assert c.post('/api/workspace/switch',json={'environment':'production'}).status_code==200
+
+
+def test_workspace_switch_and_pilot_copy_reject_deeply_nested_json_without_state_change(tmp_path):
+    app,c=company(tmp_path)
+    hdr={'content-type':'application/json'}
+    depth=20000
+    for raw in (b'['*depth+b']'*depth,b'{"a":'*depth+b'1'+b'}'*depth):
+        for path in ('/api/workspace/switch','/api/pilot/copy'):
+            before=_snapshot(app,c)
+            r=c.post(path,content=raw,headers=hdr)
+            assert r.status_code==422,(path,r.status_code)
+            assert r.json()['detail']=='請求內容必須是有效的 JSON'
+            assert _snapshot(app,c)==before

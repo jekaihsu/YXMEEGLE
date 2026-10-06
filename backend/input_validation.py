@@ -27,6 +27,17 @@ def invalid(message='欄位型別或內容格式錯誤', code=422):
     raise HTTPException(code, message)
 
 
+async def json_object(request, code=422):
+    """Parse a request body that must be a JSON object; reject malformed, array, null and scalar bodies."""
+    try:
+        body = await request.json()
+    except (ValueError, UnicodeDecodeError, RecursionError):
+        invalid('請求內容必須是有效的 JSON', code)
+    if not isinstance(body, dict):
+        invalid('請求內容必須是 JSON 物件', code)
+    return body
+
+
 def text(value, field, limit=TEXT_LIMIT, nullable=False):
     if value is None and nullable:
         return value
