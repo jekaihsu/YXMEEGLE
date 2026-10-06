@@ -120,3 +120,23 @@ def test_sop_disabled_tasks_are_excluded_from_current_workload_until_restored():
     project['nodes'][0]['tasks'][0]['sop_disabled']=False
     restored=overview({'projects':[project]},clock=clock)
     assert restored['totals']['tasks_total']==2 and restored['totals']['tasks_overdue']==2
+
+def test_unverified_lifecycle_summaries_never_count_or_filter_as_canonical():
+    def with_lifecycle(ident,summary):
+        p=case(ident);p['source_lifecycle']=summary;return p
+    ok={'relationship':'已關聯確認單','state':'mapped','canonical':'已結案','reasons':[],'quote_workflow':[]}
+    forged={**ok,'reasons':['conflict']}
+    bad={'forged-reasons':forged,'unknown':{**ok,'canonical':'亂填'},'blank':{**ok,'state':'needs_verification','canonical':None,'reasons':['blank']},
+         'unmapped-state':{**ok,'state':'needs_verification'}}
+    projects=[with_lifecycle('ok',ok)]+[with_lifecycle(k,v) for k,v in bad.items()]+[case('missing')]
+    clock=datetime(2026,9,30,tzinfo=timezone.utc)
+    totals=overview({'projects':projects},clock=clock)['totals']
+    assert totals['lifecycle_counts']=={'已結案':1,'待核對':len(bad)+1}
+    assert totals['lifecycle_state_counts']=={'mapped':1,'needs_verification':len(bad)+1}
+    closed=overview({'projects':projects},lifecycle='已結案',clock=clock)['cases']
+    assert [r['id'] for r in closed]==['ok']
+    review=overview({'projects':projects},lifecycle='待核對',clock=clock)['cases']
+    assert len(review)==len(bad)+1
+    forged_row=next(r for r in review if r['id']=='forged-reasons')['source_lifecycle']
+    assert forged_row['canonical'] is None and forged_row['state']=='needs_verification'
+    assert forged_row['reasons']==['conflict'] and forged_row['source_canonical']=='已結案'

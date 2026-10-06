@@ -21,4 +21,14 @@ assert.equal(m.lifecycleGate({source_kind:'lark',source_lifecycle:null}),'來源
 assert.equal(m.lifecycleGate({source_kind:'lark',source_lifecycle:l()}),'');
 assert.equal(m.lifecycleGate({source_kind:'lark',source_lifecycle:l({canonical:'中止'})}),'來源案件已中止');
 assert.equal(m.lifecycleGate({source_kind:'demo'}),'','demo cases have no source lifecycle');
+const rb=await build({entryPoints:['src/ProjectReadiness.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const rpath=new URL('./.readiness-test-bundle.mjs',import.meta.url);
+await fs.writeFile(rpath,rb.outputFiles[0].text);
+let ProjectReadiness,renderToStaticMarkup;try{({ProjectReadiness}=await import(rpath.href));({renderToStaticMarkup}=await import('react-dom/server'))}finally{await fs.unlink(rpath)}
+const html=(lc)=>renderToStaticMarkup(ProjectReadiness({w:{projects:[],policy_summary:[]},p:{id:'p',nodes:[],source_lifecycle:lc}}));
+const forged=html(l({reasons:['conflict']}));
+assert.ok(forged.includes('待核對')&&forged.includes('不一致'),'reason-bearing mapped summary shows 待核對 with its reasons');
+assert.ok(!forged.includes('來源案件狀態：執行中'),'forged canonical is not shown as lifecycle');
+const clean=html(l());
+assert.ok(clean.includes('來源案件狀態：執行中')&&!clean.includes('（'),'verified lifecycle has no reasons suffix');
 console.log('Source lifecycle gate: all checks passed');

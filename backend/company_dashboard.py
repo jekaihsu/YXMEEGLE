@@ -2,6 +2,7 @@
 from collections import Counter,defaultdict
 from datetime import date,datetime,timezone
 from zoneinfo import ZoneInfo
+from .source_lifecycle import declared
 
 GROUPS={'field':'外業組','control':'控制組','mapping':'圖資組','report':'報告組'}
 
@@ -55,9 +56,12 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
         totals['intake_records']+=int(p.get('case_type')=='intake')
         if not p.get('source_status'):missing['source_status']+=1
         raw_lifecycle=p.get('source_lifecycle') or {}
+        verified=declared(p)
+        reasons=list(raw_lifecycle.get('reasons') or [])
         entry={'relationship':raw_lifecycle.get('relationship') or ('待確認單' if p.get('case_type')=='intake' else '已關聯確認單'),
-                   'state':raw_lifecycle.get('state') or 'needs_verification','canonical':raw_lifecycle.get('canonical'),
-                   'reasons':raw_lifecycle.get('reasons') or ['unreviewed']}
+                   'state':'mapped' if verified else 'needs_verification','canonical':verified,
+                   'reasons':reasons if verified is None and reasons else [] if verified else ['unreviewed'],
+                   'source_canonical':raw_lifecycle.get('canonical')}
         entry['quote_workflow']=[{'raw':w.get('raw',''),'kind':w.get('kind','other')} for w in raw_lifecycle.get('quote_workflow') or []]
         lifecycle_state_counts[entry['state']]+=1;lifecycle_counts[entry['canonical'] or UNVERIFIED]+=1
         runnable=p.get('execution_allowed') is True
