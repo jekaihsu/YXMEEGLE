@@ -38,7 +38,7 @@
 
 - `NativeApprovalService` 提供 prepare/submit/poll。authorize 必須每次回傳最新 server context；checkpoint 必須先 durable CAS。context 包含 app_id/tenant/workspace_id/project_id/request_id/version/scope_hash。
 - 設定 `LARK_NATIVE_APPROVAL_MAPPINGS_JSON` 各類實際 approval_code、fields 與節點 seats，未設定或定義漂移一律阻擋。不可由 token/scope/唯讀成功推論可正式送審。
-- `native_routes.register(app, identity, load, persist, sessions, W, cfg)`；POST `/api/native-approvals/{kind}/{request_id}/{prepare|submit|poll}`，body `{version}`，回 workspace。
+- `native_routes.register(app, identity, load, persist, sessions, W, cfg)`；POST `/api/native-approvals/{kind}/{request_id}/{prepare|submit|poll}`，body `{project_version}`（所屬案件目前的 concurrency_version，非工作區 version），回 workspace。
 - prepare 僅讀定義；首次 submit 在 HTTP POST 前保存 UUID/版本與 outcome_unknown，重試只查同 UUID，不重複 POST。設計變更首次 attempted 同交易 freeze_change；prepared 不暫停任務。
 - 實例表單、申請人、UUID、定義、每位指定核准人的 AND task 與 PASS timeline 皆需吻合；同人不得兩票。遠端自動通過、改派／增減核准人及回滾不視為本規則核准。
 - route 保存 native_binding/native_receipt；只有真正查回才有 verified_at。fresh apply 要求 5 分鐘內證據。暫時查詢失敗不延長證據，阻擋新套用；既成 waiver 保留先前真核准歷史並標待核對。確定性內容／定義不符及撤回清除核准效力。已 applied 再查回 APPROVED 不降回 approved。

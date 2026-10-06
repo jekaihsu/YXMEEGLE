@@ -18,7 +18,7 @@
 ## 行為
 
 - 明確拒建：先保存 attempted，再持久化 `creation_outcome=not_created`、code／HTTP／UUID／時間。可在權限與正式送出開關重新核對後，使用同一不可變 payload 與 UUID 重試；不換 UUID 碰運氣。拒絕歷史保留在 `rejection_history`。
-- 原申請人可呼叫 `POST /api/native-approvals/{kind}/{id}/abandon`（body `version`），僅在上述拒建證據完整時結束本地申請、有 audit、不 POST 撤回。未知結果禁止此操作。變更任務仍須另走附理由的 `change_resume`，沒有自動解凍。
+- 原申請人可呼叫 `POST /api/native-approvals/{kind}/{id}/abandon`（body `project_version`，該案件目前的 concurrency_version），僅在上述拒建證據完整時結束本地申請、有 audit、不 POST 撤回。未知結果禁止此操作。變更任務仍須另走附理由的 `change_resume`，沒有自動解凍。
 - 結果未知：再次 submit 只查回原 UUID；不重送。取消結果未知也只 GET，不重複取消。
 - 明確拒絕撤回：保留錯誤、清 `cancel_attempted` 與 `cancel_requested`，修正後可重新請求；每次先查原件仍須 PENDING。原件已 APPROVED／REJECTED／CANCELED／DELETED 時只回真實狀態，零取消 POST；按撤回不再使既有有效核准暫時失效。
 - scope／核准人／定義已改變或申請失效：poll API 與 background poller 仍可查原 UUID。核對原 payload、申請人、表單及 instance_code 後，記錄終態 `remote_resolution`；**不把這個觀察結果當成新範圍核准**。定義不可用或投票證據失效也不遮蔽原件生命週期，但結果維持不可套用。
