@@ -4,7 +4,7 @@ import json
 from copy import deepcopy
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from .source_lifecycle import declared
+from .source_lifecycle import declared, needs_review
 from .policy import upgrade, CAPABILITIES, TECHNICAL, FINANCIAL
 from .workflow import require, find, now, uid, event, blocked, all_tasks, valid_date, http_url
 from .business_policy import can_business_override
@@ -195,7 +195,7 @@ def refresh_project_state(p,ws):
     if settlement and settlement['status']=='completed' and engineering:
         p['execution_status']='completed'
     elif engineering: p['execution_status']='engineering_complete'
-    elif declared(p)=='中止': p['execution_status']='paused'
+    elif needs_review(p) or declared(p)=='中止': p['execution_status']='paused'
     elif p.get('execution_status') in ('in_progress','engineering_complete','completed') or any(n['status'] in ('in_progress','rework','completed') for n in p['nodes']): p['execution_status']='in_progress'
     else: p['execution_status']='pending'
     p['status']=p['execution_status']

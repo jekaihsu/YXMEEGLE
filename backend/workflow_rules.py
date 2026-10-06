@@ -58,7 +58,7 @@ def assign_node(ws,p,n,owner,actor,reason=''):
 def execution_reasons(ws,p,n,t):
     from .sop_contracts import execution_reasons as sop_execution_reasons
     reasons=sop_execution_reasons(p,n,t)
-    if p.get('archived_at') or p.get('migrated_to') or p.get('source_missing') or declared(p)=='中止' or p.get('execution_status')=='completed': reasons.append('案件已暫停、結案或來源待核對')
+    if p.get('archived_at') or p.get('migrated_to') or p.get('source_missing') or needs_review(p) or declared(p)=='中止' or p.get('execution_status')=='completed': reasons.append('案件已暫停、結案或來源待核對')
     if n.get('archived_at') or n.get('status') in ('approved_skipped','archived','superseded'): reasons.append('節點已跳過或封存')
     if t.get('status') in ('paused','superseded','completed') or blocked(ws,p,t): reasons.append('任務已完成、暫停或封存')
     if t.get('source_missing') or t.get('source_change_pending') or t.get('source_reassignment_pending'): reasons.append('來源工項異動待核對')
@@ -95,7 +95,7 @@ def activate_scheduled(ws,clock=None):
     clock=clock or now(); activated=[]
     from .case_cutover import execution_allowed
     for p in ws['projects']:
-        if not execution_allowed(ws,p) or declared(p) in ('已完工','已結案','中止'):continue
+        if not execution_allowed(ws,p) or needs_review(p) or declared(p) in ('已完工','已結案','中止'):continue
         for n,t in all_tasks(p):
             if t['status']!='pending' or activation_reasons(ws,p,n,t,clock): continue
             before={'status':t['status'],'started_at':t.get('started_at')}

@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test:session-epoch": "node test-session-epoch.mjs",
     "test:company-cockpit": "node test-company-cockpit.mjs",
-    "test:daily-records": "node test-daily-records.mjs"
+    "test:daily-records": "node test-daily-records.mjs",
+    "test:source-lifecycle": "node test-source-lifecycle.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",
