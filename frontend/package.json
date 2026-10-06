@@ -16,8 +16,7 @@
     "test:form-draft": "node test-form-draft-identity.mjs && node test-recurring-draft-period.mjs && node test-draft-callsites.mjs",
     "test:company-cockpit": "node test-company-cockpit.mjs",
     "test:source-lifecycle": "node test-source-lifecycle.mjs",
-    "test:execution-admission": "node test-execution-admission.mjs"
-    "test:api-response": "node test-api-response.mjs"
+    "test:execution-admission": "node test-execution-admission.mjs",
     "test:api-response": "node test-api-response.mjs"
   },
   "dependencies": {

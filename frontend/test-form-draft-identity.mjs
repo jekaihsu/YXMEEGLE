@@ -85,6 +85,7 @@ await show({record:'REC',id:'recurring:R1:1'});
 await type('REC','REVISION_ONE');
 await show({record:'REC',id:'recurring:R1:2'});
 assert.equal(button('REC','恢復暫存文字'),undefined,'revision 2 does not offer revision 1 text');
+assert.equal(text('REC').value,'','revision changes reset live fields before submission');
 assert.equal(keys().length,1);
 // A save started on revision 1 that resolves after the form moved to revision 2 clears only revision 1.
 await show({record:'REC',id:'recurring:R1:1'});
@@ -98,6 +99,32 @@ assert.equal(keys().length,1);
 assert.ok(keys()[0].endsWith(encodeURIComponent('recurring:R1:2')),'only the saved revision draft was cleared');
 sessionStorage.clear();
 
+// Switching record identity without a parent remount cannot submit the old live text.
+await show({record:'SLOT',id:'record:A'});
+await type('SLOT','ONLY_A');
+await show({record:'SLOT',id:'record:B'});
+assert.equal(text('SLOT').value,'');
+await submit('SLOT');
+assert.deepEqual(submitted.at(-1),{record:'SLOT',evidence:''});
+await show({record:'SLOT',id:'record:A'});
+await click('SLOT','恢復暫存文字');
+assert.equal(text('SLOT').value,'ONLY_A');
+await act(async()=>root.render(React.createElement(DraftNamespace.Provider,{value:'u2:w2'},form('SLOT','record:A'))));
+assert.equal(text('SLOT').value,'','session changes reset live fields');
+assert.equal(button('SLOT','恢復暫存文字'),undefined);
+sessionStorage.clear();
+
+// Rejected saves retain the original draft for recovery.
+await show('FAILED');
+await type('FAILED','KEEP_ON_ERROR');
+result=Promise.reject(new Error('save failed'));
+await submit('FAILED');
+assert.equal(keys().length,1);
+await hide();await show('FAILED');
+await click('FAILED','恢復暫存文字');
+assert.equal(text('FAILED').value,'KEEP_ON_ERROR');
+result=true;sessionStorage.clear();
+
 // Key separators in title/id cannot make two different forms collide.
 await show({record:'X',id:'a:b'},{record:'Y',id:'a%3Ab'});
 await type('X','X_TEXT');await type('Y','Y_TEXT');
@@ -109,3 +136,14 @@ await show({record:'NOID',id:''});
 await type('NOID','NEVER_STORED');
 assert.equal(keys().length,0);
 console.log('form draft identity: ok');
+
+// Logout removes both hook drafts and the new record-scoped form drafts, preserving unrelated storage.
+const draftBundle=await build({entryPoints:['src/drafts.ts'],bundle:true,write:false,platform:'node',format:'esm',packages:'external'});
+await fs.writeFile(bundlePath,draftBundle.outputFiles[0].text);
+let clearDrafts;try{({clearDrafts}=await import(bundlePath.href+'?logout'))}finally{await fs.unlink(bundlePath)}
+sessionStorage.setItem('yx:draft:v1:legacy','old');
+sessionStorage.setItem('yx:draft:v2:record','new');
+sessionStorage.setItem('unrelated','keep');
+clearDrafts();
+assert.deepEqual(Object.keys(sessionStorage),['unrelated']);
+console.log('draft logout cleanup: ok');
