@@ -8,6 +8,7 @@ from . import native_routes,storage
 from .native_approval import NativeApprovalService
 from .test_source_sync import harness
 from .test_native_approval import fixture
+from .workflow import find
 
 
 @pytest.fixture
@@ -48,8 +49,11 @@ def api(harness,monkeypatch):
     def persist(wid,version,callback,**kwargs):
         with h.sessions.begin() as db:
             row=db.get(h.W,wid)
-            if version!=row.version:raise HTTPException(409,'version')
-            state=load(db,row);callback(state);state['version']=row.version+1
+            state=load(db,row);project_versions=kwargs.get('project_versions')
+            if project_versions:
+                if any(find(state['projects'],k).get('concurrency_version',0)!=v for k,v in project_versions.items()):raise HTTPException(409,'project version')
+            elif version!=row.version:raise HTTPException(409,'version')
+            callback(state);state['version']=row.version+1
             row.version=state['version'];row.data=storage.save(db,h.B,wid,state)
             return deepcopy(state)
     app=FastAPI();native_routes.register(app,identity,load,persist,h.sessions,h.W,h.cfg)
@@ -57,8 +61,12 @@ def api(harness,monkeypatch):
     return SimpleNamespace(h=h,client=client,calls=calls,external=external,actor=actor,pid=p['id'],nid=n['id'],financial_nid=fn['id'],adapter_factory=lambda _:Adapter())
 
 
-def operate(api,op,kind='extension'):
-    return api.client.post('/api/native-approvals/'+kind+'/request/'+op,json={'version':api.h.read()[0]['version']})
+def project_version(api):
+    return find(api.h.read()[0]['projects'],api.pid).get('concurrency_version',0)
+
+
+def operate(api,op,kind='extension',**body):
+    return api.client.post('/api/native-approvals/'+kind+'/request/'+op,json={'project_version':project_version(api),**body})
 
 
 def test_only_original_applicant_can_request_remote_cancellation(api):
@@ -116,7 +124,7 @@ def test_financial_delivery_draft_never_accepts_amount_or_other_case_evidence(ap
     expected['concurrency_version']+=1
     assert state['projects']==before and state['financial_requests'][0]['status']=='draft'
     ident=state['financial_requests'][0]['id']
-    response=api.client.post('/api/native-approvals/financial/'+ident+'/prepare',json={'version':state['version']})
+    response=api.client.post('/api/native-approvals/financial/'+ident+'/prepare',json={'project_version':project_version(api)})
     assert response.status_code==503 and not api.calls
 
 
@@ -160,7 +168,7 @@ def test_financial_two_person_receipt_is_bound_to_source_amount_and_file_version
     assert response.status_code==200
     ident=response.json()['financial_requests'][0]['id']
     def post(operation):return api.client.post('/api/native-approvals/financial/'+ident+'/'+operation,
-                                              json={'version':api.h.read()[0]['version']})
+                                              json={'project_version':project_version(api)})
     assert post('prepare').status_code==200
     before=deepcopy(api.h.read()[0]['projects']);api.external[0]='APPROVED'
     response=post('submit');assert response.status_code==200,response.text
@@ -180,3 +188,18 @@ def test_financial_two_person_receipt_is_bound_to_source_amount_and_file_version
     n['tasks'][0]['output']=before[0]['nodes'][next(i for i,x in enumerate(before[0]['nodes']) if x['id']==api.financial_nid)]['tasks'][0]['output']
     p.setdefault('source_finance',{})['合約總額']=999
     assert not receipt_valid(state,p,n,item)
+
+
+def test_operate_uses_project_version_not_workspace_version(api):
+    # Unrelated workspace-level churn (e.g. roster/health sync) bumps only the workspace version.
+    with api.h.sessions.begin() as db:
+        row=db.get(api.h.W,api.h.wid);row.version+=1
+    assert operate(api,'prepare').status_code==200
+    before=api.h.read()[0];calls=len(api.calls)
+    stale=project_version(api)-1
+    response=operate(api,'submit',project_version=stale)
+    assert response.status_code==409 and len(api.calls)==calls
+    assert api.h.read()[0]==before
+    assert operate(api,'submit',project_version=project_version(api)).status_code==200
+    assert operate(api,'poll',project_version='x').status_code==422
+    assert api.client.post('/api/native-approvals/extension/request/poll',json={'version':api.h.read()[0]['version']}).status_code==422
