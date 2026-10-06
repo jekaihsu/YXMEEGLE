@@ -1,14 +1,15 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {api,ApiError} from './api';
 import {dailyReviewLabel} from './dailyReview';
 import type {Project,Route,Workspace} from './types';
 
 export function DailyRecords({w,p,go}:{w:Workspace;p:Project;go:(r:Route)=>void}){
- const[scope,setScope]=useState('project');const[query,setQuery]=useState('');const[day,setDay]=useState('');const[pg,setPg]=useState({pid:p.id,n:0});const page=pg.pid===p.id?pg.n:0;const setPage=(n:number)=>setPg({pid:p.id,n});
+ const[scope,setScope]=useState('project');const[query,setQuery]=useState('');const[day,setDay]=useState('');const[pg,setPg]=useState({pid:p.id,n:0});if(pg.pid!==p.id)setPg({pid:p.id,n:0});const page=pg.pid===p.id?pg.n:0;const setPage=(n:number)=>setPg({pid:p.id,n});
  const[remote,setRemote]=useState<{key:string;items:any[];total:number;summary:Record<string,number>;last_sync?:string}|null>(null);const[error,setError]=useState('');const[loading,setLoading]=useState(false);const[fallback,setFallback]=useState(false);
  const requestKey=useMemo(()=>{const params=new URLSearchParams({offset:String(page*30),limit:'30',status:scope==='unmatched'?'unmatched':'all'});if(scope==='project')params.set('project_id',p.id);if(query)params.set('q',query);if(day){params.set('date_from',day);params.set('date_to',day)}return params.toString()},[scope,query,day,page,p.id]);
- useEffect(()=>{const controller=new AbortController();setLoading(true);setRemote(null);setFallback(false);setError('');
-  void api<any>('/api/daily-reports?'+requestKey,{signal:controller.signal}).then(result=>{if(!Array.isArray(result.items)||typeof result.total!=='number')throw new Error('日報回應格式不完整');setRemote({...result,key:requestKey});setFallback(false);setError('')}).catch(e=>{if(controller.signal.aborted)return;if(e instanceof ApiError&&e.status===404){setFallback(true);setRemote(null);setError('')}else setError(e.message)}).finally(()=>{if(!controller.signal.aborted)setLoading(false)});return()=>controller.abort();
+ const seq=useRef(0);
+ useEffect(()=>{const controller=new AbortController();const gen=++seq.current;const live=()=>gen===seq.current&&!controller.signal.aborted;setLoading(true);setRemote(null);setFallback(false);setError('');
+  void api<any>('/api/daily-reports?'+requestKey,{signal:controller.signal}).then(result=>{if(!live())return;if(!Array.isArray(result.items)||typeof result.total!=='number')throw new Error('日報回應格式不完整');setRemote({...result,key:requestKey});setFallback(false);setError('')}).catch(e=>{if(!live())return;if(e instanceof ApiError&&e.status===404){setFallback(true);setRemote(null);setError('')}else setError(e.message)}).finally(()=>{if(live())setLoading(false)});return()=>{seq.current++;controller.abort()};
  },[requestKey,w.version]);
  const current=remote&&remote.key===requestKey?remote:null;
  const remotePageCount=current?Math.max(1,Math.ceil(current.total/30)):1;

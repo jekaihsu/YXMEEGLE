@@ -62,4 +62,36 @@ assert.equal(calls.at(-1).offset,'0',`shrink refetches offset 0: ${JSON.stringif
 assert.deepEqual(shown(),['c@0']);assert.match(status(),/共 20 筆.*第 1／1 頁/);
 assert.equal(document.querySelectorAll('button[disabled]').length,2);
 console.log('Daily records: project switch and shrink keep offset, label and items consistent');
+// Case 3: fetch ignores abort and completes out of order; A->B->A must restart at offset 0 and never render stale items.
+const pending=[];
+globalThis.fetch=async(url)=>{const q=new URL(String(url),'http://x').searchParams;calls.push({pid:q.get('project_id'),offset:q.get('offset')});return new Promise(res=>pending.push({pid:q.get('project_id'),offset:q.get('offset'),done:(items,tot)=>res(new Response(JSON.stringify(resp(items,tot)),{status:200,headers:{'content-type':'application/json'}}))}))};
+const tick=()=>act(async()=>{await new Promise(r=>setTimeout(r,20))});
+const rend=async(proj)=>{await act(async()=>{root.render(React.createElement(DailyRecords,{w,p:proj,go:()=>{}}));await new Promise(r=>setTimeout(r,10))})};
+const A={id:'A3',code:'A3',daily_reports:[]},B={id:'B3',code:'B3',daily_reports:[]};
+calls.length=0;
+await rend(A);pending.pop().done(mk('A3',['a0']),100);await tick();
+await click('下一頁');pending.pop().done(mk('A3',['a1']),100);await tick();
+await click('下一頁');
+const stale=pending.pop();assert.equal(stale.offset,'60');
+await rend(B);const bReq=pending.pop();assert.equal(bReq.offset,'0');
+await rend(A);const a2=pending.pop();
+assert.equal(a2.pid,'A3');assert.equal(a2.offset,'0','return to A starts at offset 0');
+stale.done(mk('A3',['STALE-a-page3']),100);await tick();
+assert.ok(!shown().includes('STALE-a-page3'),'late first-visit A/page-3 response must not render');
+assert.match(status(),/正在讀取/);
+bReq.done(mk('B3',['STALE-b']),1);await tick();
+assert.ok(!shown().includes('STALE-b'));
+a2.done(mk('A3',['a-second-visit']),100);await tick();
+assert.deepEqual(shown(),['a-second-visit']);assert.match(status(),/共 100 筆.*第 1／4 頁/);
+// Case 4: with abort-ignoring fetch, total shrink refetch keeps label/items/controls aligned.
+const D={id:'D3',code:'D3',daily_reports:[]};
+await rend(D);pending.pop().done(mk('D3',['d0']),100);await tick();
+await click('下一頁');pending.pop().done(mk('D3',['d1']),100);await tick();
+await click('下一頁');pending.pop().done(mk('D3',['d2']),100);await tick();
+await act(async()=>{root.render(React.createElement(DailyRecords,{w:{...w,version:9},p:D,go:()=>{}}));await new Promise(r=>setTimeout(r,10))});
+const shrink=pending.pop();assert.equal(shrink.offset,'60');shrink.done([],20);await tick();
+const refetch=pending.pop();assert.equal(refetch.offset,'0');refetch.done(mk('D3',['d-shrunk']),20);await tick();
+assert.deepEqual(shown(),['d-shrunk']);assert.match(status(),/共 20 筆.*第 1／1 頁/);
+assert.equal(document.querySelectorAll('button[disabled]').length,2);
+console.log('Daily records: A->B->A resets to offset 0 and abort-ignoring out-of-order responses never render stale items');
 process.exit(0);
