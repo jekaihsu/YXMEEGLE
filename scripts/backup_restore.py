@@ -138,8 +138,9 @@ def restore(engine,uploads,source):
                 raise ValueError('Restore target database must be empty')
             for name,data in validated.items():
                 dest=uploads/name[len('uploads/'):];make_dirs(dest.parent,created)
-                with dest.open('xb') as handle:handle.write(data)
-                written.append(dest)
+                with dest.open('xb') as handle:
+                    written.append(dest)
+                    handle.write(data)
             for table in TABLES:
                 if rows[table.name]:connection.execute(table.insert(),rows[table.name])
     except Exception:
