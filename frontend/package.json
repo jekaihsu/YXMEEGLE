@@ -10,7 +10,8 @@
     "test:session-epoch": "node test-session-epoch.mjs",
     "test:input-recovery": "node test-input-recovery.mjs",
     "test:company-cockpit": "node test-company-cockpit.mjs",
-    "test:source-lifecycle": "node test-source-lifecycle.mjs"
+    "test:source-lifecycle": "node test-source-lifecycle.mjs",
+    "test:execution-admission": "node test-execution-admission.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",
