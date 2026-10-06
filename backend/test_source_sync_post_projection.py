@@ -63,11 +63,26 @@ def test_post_matches_get_projection_and_cache_keeps_raw_fields(api,uid):
     assert PRIVATE in json.dumps(cache,ensure_ascii=False)
 
 
-def test_post_applies_same_case_visibility_as_get(api):
-    app,client=api; c=client('pm')
+@pytest.mark.parametrize('uid',list(ROLES))
+def test_post_applies_same_case_visibility_as_get(api,uid,monkeypatch):
+    app,client=api; c=client(uid)
+    from . import source_case_policy
+    apply_policy=source_case_policy.apply_source_reference_policy
+    def withhold_record(state,snapshot,actor):
+        apply_policy(state,snapshot,actor)
+        # Current policy admits all verified rows. Explicitly withhold one
+        # identity to exercise the response filter independently of that policy.
+        state['source_visible_record_ids'].remove('v4|daily|hidden')
+    monkeypatch.setattr(source_case_policy,'apply_source_reference_policy',withhold_record)
     snap=synthetic_snapshot(); snap['records'].append(dict(base_token='v4',table_id='daily',record_id='hidden',kind='daily',fields={'工程編號':'C999999','日期':'2026-09-27','工作日期-薪資':PRIVATE}))
     app.state.source_sync.fetcher=lambda token:snap
     posted=c.post('/api/sources/sync'); assert posted.status_code==200,posted.text
-    assert posted.json()==c.get('/api/sources').json()
+    fetched=c.get('/api/sources'); assert fetched.status_code==200
+    assert posted.json()==fetched.json()
+    assert {r['record_id'] for r in posted.json()['records']}=={'rec1','recD'}
+    assert PRIVATE not in posted.text and PRIVATE not in fetched.text
+    assert {t['kind']:t['count'] for t in posted.json()['tables']}=={'confirmation':1,'daily':1}
     with app.state.sessions() as db: cache=db.get(CacheRow,'lark-tenant').data
     assert len(cache['records'])==len(snap['records'])
+    hidden=next(r for r in cache['records'] if r['record_id']=='hidden')
+    assert hidden['fields']['工作日期-薪資']==PRIVATE
