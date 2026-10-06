@@ -18,11 +18,15 @@ class InvalidApprovalProof(RemoteFailure):
 
 
 def creation_not_performed(binding):
+    if not isinstance(binding,dict):return False
+    rejection=binding.get('creation_rejection');payload=binding.get('payload')
+    if not isinstance(rejection,dict) or not isinstance(payload,dict):return False
+    code=rejection.get('api_code');uuid=rejection.get('uuid')
     return (binding.get('creation_outcome')=='not_created' and
             binding.get('not_created_proof')=='documented_api_rejection' and
-            binding.get('creation_rejection',{}).get('http_status')==400 and
-            binding.get('creation_rejection',{}).get('api_code') in (1390001,1390015,1390013) and
-            binding.get('creation_rejection',{}).get('uuid')==binding.get('payload',{}).get('uuid'))
+            type(rejection.get('http_status')) is int and rejection['http_status']==400 and
+            type(code) is int and code in (1390001,1390015,1390013) and
+            isinstance(uuid,str) and bool(uuid) and uuid==payload.get('uuid'))
 
 
 def remote_binding_resolved(item):

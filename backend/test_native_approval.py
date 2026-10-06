@@ -297,3 +297,28 @@ def test_sop_apply_still_blocked_by_unresolved_or_invalid_proof(company, mutate)
         _sop_apply(ws, actor, p)
     assert exc.value.status_code == 409
     assert p['sop_version'] == 'older'
+
+
+@pytest.mark.parametrize('mutate', [
+    lambda b, i: b.update(creation_rejection=None),
+    lambda b, i: b.update(creation_rejection='rejected'),
+    lambda b, i: b.update(creation_rejection=[400, 1390001]),
+    lambda b, i: b.update(payload=None),
+    lambda b, i: b['creation_rejection'].update(api_code=[1390001]),
+    lambda b, i: b['creation_rejection'].update(http_status={'code': 400}),
+    lambda b, i: b['creation_rejection'].update(uuid=['x']),
+    lambda b, i: (b['payload'].pop('uuid'), b['creation_rejection'].pop('uuid')),
+])
+def test_sop_apply_malformed_not_created_proof_is_stable_409(company, mutate):
+    ws, p, actor = company
+    p['sop_version'] = 'older'
+    binding = _rejected_binding()
+    item = _blocking_item(p, binding)
+    mutate(binding, item)
+    from .native_approval import creation_not_performed
+    assert creation_not_performed(binding) is False
+    ws.setdefault('approvals', []).append(item)
+    with pytest.raises(HTTPException) as exc:
+        _sop_apply(ws, actor, p)
+    assert exc.value.status_code == 409
+    assert p['sop_version'] == 'older'
