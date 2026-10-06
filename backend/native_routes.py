@@ -5,6 +5,7 @@ from .workflow import require,find,now,uid,event,is_pm
 from .native_approval import NativeApprovalService,creation_not_performed
 from .native_requests import actors,context,native_business_status
 from .lark_adapter import RemoteFailure
+from .input_validation import json_object
 
 
 def register(app,identity,load,persist,sessions,W,cfg):
@@ -31,7 +32,7 @@ def register(app,identity,load,persist,sessions,W,cfg):
         from .approval_capabilities import DEFINITION_KINDS
         from .production_access import require_access
 
-        data,user=formal(request);body=await request.json()
+        data,user=formal(request);body=await json_object(request)
         require(isinstance(body,dict) and set(body)=={'version'} and type(body.get('version')) is int,
                 '請提供目前工作區版本',422)
         policy_keys=('LARK_APP_ID','LARK_WORKER_ORGANIZATION','LARK_WORKER_IDENTITY',
@@ -134,7 +135,7 @@ def register(app,identity,load,persist,sessions,W,cfg):
         from .native_requests import change_evidence,scope_hash,receipt_valid
         from .native_approval import digest
         from .production_access import business_admitted
-        data,user=formal(request);body=await request.json()
+        data,user=formal(request);body=await json_object(request)
         def confirm(state):
             p,n,item=locate(state,'change',request_id)
             from .case_cutover import require_execution
@@ -172,7 +173,7 @@ def register(app,identity,load,persist,sessions,W,cfg):
 
     @app.post('/api/native-approvals/financial/request')
     async def financial_request(request:Request):
-        data,user=formal(request); body=await request.json()
+        data,user=formal(request); body=await json_object(request)
         require(not any(k in body for k in ('amount','contract_amount','paid','received','balance')),
                 '此處僅送交財務證明，不能更改帳務金額',422)
         def create(state):
@@ -207,7 +208,7 @@ def register(app,identity,load,persist,sessions,W,cfg):
     @app.post('/api/native-approvals/{kind}/{request_id}/{operation}')
     async def operate(kind:str,request_id:str,operation:str,request:Request):
         require(operation in ('prepare','submit','poll','cancel','abandon'),'未知審批操作',422)
-        data,user=formal(request);body=await request.json();state=get_state(data['wid'])
+        data,user=formal(request);body=await json_object(request);state=get_state(data['wid'])
         require(body.get('version')==state['version'],'資料已更新，請重新整理',409)
         if operation=='abandon':
             _,_,item=locate(state,kind,request_id)

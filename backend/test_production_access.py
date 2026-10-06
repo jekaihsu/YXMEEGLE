@@ -164,7 +164,8 @@ def test_pilot_copy_rejects_missing_or_corrupt_attachment_without_workspace_chan
 def _snapshot(app,c):
     with app.state.sessions() as db:
         counts=(len(db.execute(select(AuditRow)).scalars().all()),db.get(AuthRow,'sid').data['wid'],
-                [(r.id,r.version) for r in db.execute(select(WorkspaceRow)).scalars().all()])
+                [(r.id,r.version,deepcopy(storage.load(db,BusinessRow,r)))
+                 for r in db.execute(select(WorkspaceRow)).scalars().all()])
     return counts,c.cookies.get('meegle_session')
 
 
@@ -172,7 +173,7 @@ def test_workspace_switch_and_pilot_copy_reject_non_object_bodies_without_state_
     app,c=company(tmp_path)
     pid=c.get('/api/workspace').json()['projects'][0]['id']
     hdr={'content-type':'application/json'}
-    bad=[b'[]',b'null',b'1',b'"x"',b'true',b'{bad',b'',b'[{"environment":"production"}]']
+    bad=[b'[]',b'null',b'1',b'"x"',b'true',b'false',b'{bad',b'',b'\xff',b'[{"environment":"production"}]']
     for path in ('/api/workspace/switch','/api/pilot/copy'):
         for raw in bad:
             before=_snapshot(app,c)
