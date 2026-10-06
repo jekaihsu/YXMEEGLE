@@ -1,6 +1,6 @@
 import {executionAllowed,executionReason} from './ProjectExecution';
 import {draftKey,useDraft} from './drafts';
-import {useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {api,ApiError} from './api';
 import type {Project,Workspace,Session} from './types';
 type Context={w:Workspace;s:Session;busy:boolean;refresh:()=>Promise<void>;run?:(action:string,payload?:Record<string,unknown>,scope?:{project_id?:string;node_id?:string})=>Promise<Workspace|undefined>};
@@ -8,6 +8,24 @@ const terminalLabels:Record<string,string>={rejected:'Lark 已拒絕此申請，
 export function NativeApprovalControls({c,kind,item,canSubmit}:{c:Context;kind:string;item:any;canSubmit:boolean}){
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState('');
+ const [failed,setFailed]=useState(false);
+ const section=useRef<HTMLElement>(null);
+ const heading=useRef<HTMLHeadingElement>(null);
+ const intent=useRef<string|null>(null);
+ const lastFocus=useRef<HTMLElement|null>(null);
+ // Controls unmount as confirm/abandon/cancel/poll/refresh change state; never leave focus on <body>.
+ useEffect(()=>{
+   if(busy)return;
+   const active=document.activeElement;
+   const lost=!active||active===document.body;
+   if(!lost){intent.current=null;return}
+   const gone=lastFocus.current;
+   const action=intent.current||(gone&&!gone.isConnected?gone.dataset.action:null)||null;
+   if(!action)return;
+   intent.current=null;lastFocus.current=null;
+   const enabled=[...(section.current?.querySelectorAll<HTMLButtonElement>('button[data-action]')||[])].filter(b=>!b.disabled);
+   (enabled.find(b=>b.dataset.action===action)||enabled[0]||heading.current)?.focus();
+ });
  if(c.s.mode==='demo'||c.w.environment==='test')return <p className="ops-notice">此為隔離環境，不向正式 Lark 送審。</p>;
  const project=c.w.projects.find(p=>p.id===item.project_id);
  const writable=!!project&&executionAllowed(project,c.w);
@@ -23,7 +41,8 @@ export function NativeApprovalControls({c,kind,item,canSubmit}:{c:Context;kind:s
    !!binding?.payload?.uuid&&binding.creation_rejection.uuid===binding.payload.uuid;
  const cancelRetry=!!binding?.cancel_rejection&&!binding?.cancel_attempted;
  const invoke=async(operation:string)=>{
-   setBusy(true);setMessage('');
+   intent.current=operation;
+   setBusy(true);setMessage('');setFailed(false);
    try{
      await api<Workspace>(`/api/native-approvals/${kind}/${encodeURIComponent(item.id)}/${operation}`,{
        method:'POST',body:JSON.stringify({project_version:project?.concurrency_version})});
@@ -34,7 +53,7 @@ export function NativeApprovalControls({c,kind,item,canSubmit}:{c:Context;kind:s
    }catch(e){
      // A remote failure may have persisted a rejection or unknown-outcome checkpoint.
      if(e instanceof ApiError&&[401,409,503].includes(e.status))await c.refresh();
-     setMessage((e as Error).message);
+     setMessage((e as Error).message);setFailed(true);
    }finally{setBusy(false)}
  };
  const status=terminalLabels[item.status]||(
@@ -47,23 +66,24 @@ export function NativeApprovalControls({c,kind,item,canSubmit}:{c:Context;kind:s
    binding?.status==='outcome_unknown'?'送出結果待核實；查回原申請，不建立第二張。':
    binding?.status==='prepared'?'送審內容已備妥，尚未送出。':
    binding?'已保留送審識別，請查回最新結果。':'尚未核實 Lark 審批單設定。');
- return <section className="native-approval-controls" aria-busy={busy}>
-   <h3>Lark 審批</h3>
+ return <section ref={section} className="native-approval-controls" aria-busy={busy} onFocus={e=>{const t=(e.target as HTMLElement).closest<HTMLElement>('[data-action]');if(t)lastFocus.current=t}}>
+   <h3 ref={heading} tabIndex={-1}>Lark 審批</h3>
    {!writable&&project&&<p>{executionReason(project)}既有審批仍可查回或由原申請人撤回。</p>}
    {!available&&<p>目前未開放新建 Lark 審批，既有申請仍可查回核對。</p>}
    <p>{status}</p>
    <div className="inline-actions">
-     {writable&&!terminal&&!binding&&<button className="button" disabled={busy||c.busy||!canSubmit} onClick={()=>void invoke('prepare')}>核對送審設定</button>}
-     {writable&&!terminal&&(binding?.status==='prepared'||notCreated)&&<button className="button primary" disabled={busy||c.busy||!canSubmit||!available} onClick={()=>void invoke('submit')}>{notCreated?'重試原申請':'送出至 Lark'}</button>}
-     {binding&&binding.status!=='prepared'&&!notCreated&&<button className="button" disabled={busy||c.busy} onClick={()=>void invoke('poll')}>查回原審批結果</button>}
-     {notCreated&&originalApplicant&&!item.executed_at&&!item.applied_at&&!['withdrawn','canceled'].includes(item.status)&&<button className="button" disabled={busy||c.busy} onClick={()=>{
-       if(window.confirm('結束這筆確定未建立的申請？紀錄會保留；已暫停工作不會自動恢復。'))void invoke('abandon')
+     {writable&&!terminal&&!binding&&<button className="button" disabled={busy||c.busy||!canSubmit} data-action="prepare" onClick={()=>void invoke('prepare')}>核對送審設定</button>}
+     {writable&&!terminal&&(binding?.status==='prepared'||notCreated)&&<button className="button primary" disabled={busy||c.busy||!canSubmit||!available} data-action="submit" onClick={()=>void invoke('submit')}>{notCreated?'重試原申請':'送出至 Lark'}</button>}
+     {binding&&binding.status!=='prepared'&&!notCreated&&<button className="button" disabled={busy||c.busy} data-action="poll" onClick={()=>void invoke('poll')}>查回原審批結果</button>}
+     {notCreated&&originalApplicant&&!item.executed_at&&!item.applied_at&&!['withdrawn','canceled'].includes(item.status)&&<button className="button" data-action="abandon" disabled={busy||c.busy} onClick={()=>{
+       if(window.confirm('結束這筆確定未建立的申請？紀錄會保留；已暫停工作不會自動恢復。'))void invoke('abandon');else intent.current='abandon'
      }}>結束未建立的申請</button>}
-     {binding?.attempted&&!notCreated&&!binding.cancel_attempted&&!item.executed_at&&!item.applied_at&&!['withdrawn','canceled','rejected'].includes(item.status)&&(item.can_cancel_native===true||originalApplicant)&&<button className="button" disabled={busy||c.busy} onClick={()=>{
-       if(window.confirm('確定撤回此張 Lark 審批？查回確認前仍會保留原申請紀錄。'))void invoke('cancel')
+     {binding?.attempted&&!notCreated&&!binding.cancel_attempted&&!item.executed_at&&!item.applied_at&&!['withdrawn','canceled','rejected'].includes(item.status)&&(item.can_cancel_native===true||originalApplicant)&&<button className="button" data-action="cancel" disabled={busy||c.busy} onClick={()=>{
+       if(window.confirm('確定撤回此張 Lark 審批？查回確認前仍會保留原申請紀錄。'))void invoke('cancel');else intent.current='cancel'
      }}>{cancelRetry?'重試撤回原審批':'撤回原 Lark 審批'}</button>}
    </div>
-   <p role="status" aria-live="polite">{busy?'正在處理，請稍候…':message}</p>
+   <p role="status" aria-live="polite">{busy?'正在處理，請稍候…':failed?'':message}</p>
+   {!busy&&failed&&message&&<p className="form-error" role="alert">{message}</p>}
  </section>;
 }
 export function FinancialApprovalRequests({c,p}:{c:Context;p:Project}){
