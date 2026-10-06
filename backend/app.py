@@ -32,33 +32,13 @@ from . import audit
 from .input_validation import json_object
 from .file_categories import categories, validate_category, save_category
 
-Base=declarative_base()
-class WorkspaceRow(Base):
-    __tablename__='workspaces'
-    id=Column(String(120),primary_key=True); version=Column(Integer,nullable=False); data=Column(JSON,nullable=False)
-class Receipt(Base):
-    __tablename__='receipts'
-    id=Column(String(300),primary_key=True); fingerprint=Column(String(64)); result=Column(JSON)
-class AuthRow(Base):
-    __tablename__='auth_sessions'
-    id=Column(String(100),primary_key=True); data=Column(JSON)
-class CacheRow(Base):
-    __tablename__='source_caches'
-    id=Column(String(120),primary_key=True); data=Column(JSON)
-class AuditRow(Base):
-    __tablename__='action_audit'
-    id=Column(String(64),primary_key=True)
-    workspace_id=Column(String(120),nullable=False,index=True)
-    actor_id=Column(String(120),nullable=False)
-    action=Column(String(120),nullable=False)
-    created_at=Column(String(64),nullable=False,index=True)
-    data=Column(JSON,nullable=False)
+from .models import Base, WorkspaceRow, Receipt, AuthRow, CacheRow, AuditRow, BusinessRow, PersonRow
+
 class Action(BaseModel):
     action:str; version:int; request_id:str=Field(min_length=1,max_length=120)
     project_id:str|None=None; node_id:str|None=None; task_id:str|None=None; payload:dict=Field(default_factory=dict)
     project_versions:dict[str,int]=Field(default_factory=dict)
 
-BusinessRow,PersonRow=storage.models(Base)
 
 def _copy_local_pilot_attachments(upload_dir,source_wid,target_wid,project):
     """Copy verified local bytes into the test namespace; never mutate source files."""
