@@ -114,3 +114,41 @@ def test_batch_overflow_polls_every_attempted_request_in_bounded_rounds(api,monk
         got=poller.run_due(api.h.wid);assert len(got)<=10
         seen.update(r['id'] for r in got)
     assert seen=={'request'}|{'extra%d'%n for n in range(1,13)}
+
+
+@pytest.mark.parametrize('collection',native_poller.COLLECTIONS)
+@pytest.mark.parametrize('previous',[None,'2026-09-28T11:00:00+08:00'])
+def test_historical_backlog_cannot_starve_new_or_oldest_request(api,monkeypatch,collection,previous):
+    from datetime import datetime,timedelta
+    poller,clock=make(api,monkeypatch)
+    def backlog(state):
+        base=deepcopy(state['approvals'][0])
+        state['approvals']=[dict(deepcopy(base),id='history%d'%n,status='executed',
+            native_poll_status={'last_attempt_at':'2026-09-28T11:55:00+08:00'}) for n in range(100)]
+        target=dict(deepcopy(base),id='target',status='pending')
+        if previous:target['native_poll_status']={'last_attempt_at':previous}
+        else:target.pop('native_poll_status',None)
+        state[collection].append(target)
+    mutate(api,backlog)
+    # Fail remote I/O only: real SQLite claims and error commits must still
+    # advance fairness, across all three collections and poller restarts.
+    def unavailable(cfg):raise TimeoutError('network unavailable')
+    poller.adapter_factory=unavailable
+    first=poller.run_due(api.h.wid)
+    assert first[0]=={'id':'target','status':'error'}
+    assert len(first)==10
+    seen={r['id'] for r in first}
+    start=datetime.fromisoformat(clock[0])
+    for round_number in range(1,11):
+        clock[0]=(start+timedelta(seconds=30*round_number)).isoformat()
+        restarted=NativeApprovalPoller(poller.sessions,poller.W,poller.B,poller.P,poller.cfg,unavailable)
+        result=restarted.run_due(api.h.wid)
+        assert len(result)<=10
+        seen.update(r['id'] for r in result)
+    assert seen=={'target'}|{'history%d'%n for n in range(100)}
+    state,_=api.h.read()
+    assert all(item['status']=='executed' for item in state['approvals'] if item['id'].startswith('history'))
+    target=next(item for item in state[collection] if item['id']=='target')
+    assert target['native_poll_status']['last_attempt_at']==start.isoformat()
+    clock[0]=(start+timedelta(seconds=330)).isoformat()
+    assert {'id':'target','status':'error'} in restarted.run_due(api.h.wid)
