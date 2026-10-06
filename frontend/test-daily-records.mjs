@@ -42,10 +42,10 @@ globalThis.fetch=async(url)=>{const q=new URL(String(url),'http://x').searchPara
 const render=async(proj)=>{await act(async()=>{root.render(React.createElement(DailyRecords,{w,p:proj,go:()=>{}}));await new Promise(r=>setTimeout(r,20))})};
 const resp=(items,total)=>({items,total,offset:0,limit:30,summary:{matched:total,unmatched:0,source_missing:0}});
 // Case 1: A at page 3 -> switch to one-row B resets to offset 0 and shows B's record.
-handler=q=>q.get('project_id')==='A'?resp(mk('A',['a-row']),100):resp(mk('B',['b-only']),1);
+handler=q=>q.get('project_id')==='A'?resp(mk('A',['a-row']),61):resp(mk('B',['b-only']),1);
 await render({id:'A',code:'A',daily_reports:[]});
 await click('下一頁');await click('下一頁');
-assert.equal(calls.at(-1).offset,'60');assert.match(status(),/第 3／4 頁/);
+assert.equal(calls.at(-1).offset,'60');assert.match(status(),/第 3／3 頁/);
 calls.length=0;
 await render({id:'B',code:'B',daily_reports:[]});
 assert.ok(calls.every(c=>c.pid==='B'&&c.offset==='0'),`B requests use offset 0: ${JSON.stringify(calls)}`);
@@ -94,4 +94,20 @@ const refetch=pending.pop();assert.equal(refetch.offset,'0');refetch.done(mk('D3
 assert.deepEqual(shown(),['d-shrunk']);assert.match(status(),/共 20 筆.*第 1／1 頁/);
 assert.equal(document.querySelectorAll('button[disabled]').length,2);
 console.log('Daily records: A->B->A resets to offset 0 and abort-ignoring out-of-order responses never render stale items');
-process.exit(0);
+// Case 5: the 404 workspace fallback must also persist the clamped page.
+const F={id:'F',code:'F',daily_reports:mk('F',Array.from({length:61},(_,i)=>'f'+i))};
+globalThis.fetch=async()=>new Response(JSON.stringify({detail:'unavailable'}),{status:404,headers:{'content-type':'application/json'}});
+const renderFallback=async(project,version)=>{await act(async()=>{root.render(React.createElement(DailyRecords,{w:{version,projects:[project],daily_unmatched:[]},p:project,go:()=>{}}));await new Promise(r=>setTimeout(r,20))});await tick()};
+await renderFallback(F,10);await click('下一頁');await click('下一頁');
+assert.deepEqual(shown(),['f60']);assert.match(status(),/第 3／3 頁/);
+const smallF={...F,daily_reports:mk('F',['f-only'])};
+await renderFallback(smallF,11);
+assert.deepEqual(shown(),['f-only']);assert.match(status(),/共 1 筆.*第 1／1 頁/);
+calls.length=0;
+globalThis.fetch=async(url)=>{const q=new URL(String(url),'http://x').searchParams;calls.push({pid:q.get('project_id'),offset:q.get('offset')});return new Response(JSON.stringify(resp(Number(q.get('offset'))===0?mk('F',['f-restored']):[],1)),{status:200,headers:{'content-type':'application/json'}})};
+await renderFallback(smallF,12);
+assert.equal(calls[0].offset,'0','restored API must use the page displayed by the fallback');
+assert.deepEqual(shown(),['f-restored']);
+console.log('Daily records: fallback shrink persists page 0 when the API becomes available');
+await act(async()=>root.unmount());
+dom.window.close();
