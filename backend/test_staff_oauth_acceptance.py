@@ -9,6 +9,23 @@ from fastapi.testclient import TestClient
 from .app import create_app, PersonRow
 
 
+# Used only to simulate the gap between collection and test execution.
+COLLECTION_TIME = datetime.now(timezone.utc)
+
+
+@pytest.fixture(autouse=True, params=[0, 360], ids=['immediate', 'six-minute-collection-delay'])
+def oauth_clock(request, monkeypatch):
+    clock = COLLECTION_TIME + timedelta(seconds=request.param)
+
+    class FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock.astimezone(tz) if tz else clock.replace(tzinfo=None)
+
+    monkeypatch.setattr(__name__ + '.datetime', FrozenDateTime)
+    monkeypatch.setattr('backend.production_access.datetime', FrozenDateTime)
+
+
 @pytest.fixture
 def staff(tmp_path, monkeypatch):
     app = create_app({'DATABASE_URL': f'sqlite:///{tmp_path}/staff.db',
