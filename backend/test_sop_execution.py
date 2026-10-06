@@ -250,6 +250,17 @@ def test_confirmation_issue_validates_groups_and_preview_does_not_hand_off(compa
     assert p['confirmation_issues'][0]['recipient_groups'] == {'u-field': ['state_39']} and p['handoffs'] == []
 
 
+@pytest.mark.parametrize('bad', [[['u-field']], [{'a': 1}], [None], [1], 'u-field', {'u-field': 1}, 5])
+def test_confirmation_issue_rejects_malformed_recipients_with_422(company, bad):
+    ws, p = company
+    node = next(n for n in p['nodes'] if n['key'] == 'confirmation')
+    p['evidence'].append({'id': 'e1', 'node_id': node['id'], 'key': 'confirmation', 'status': 'accepted'})
+    p['issuer_ids'] = ['u-pm']
+    with pytest.raises(HTTPException) as e:
+        act(company, 'confirmation_issue', {'version': '1', 'recipients': bad})
+    assert e.value.status_code == 422 and p['confirmation_issues'] == []
+
+
 # ---- (5) approval-scoped rounds / scenarios 5-6 ---------------------------------------------
 
 def round_project():

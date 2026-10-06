@@ -861,7 +861,9 @@ def apply_operation(ws,user,body,demo=False):
         h.update(status='accepted',accepted_at=now()); p['handoffs'].append(deepcopy(h))
     elif action=='confirmation_issue':
         require(p and (user['id'] in p['issuer_ids'] or capable(user,'issue_confirmation')),'沒有確認單發出權')
-        active_user(ws,p['pm_id']); version=str(data.get('version','')).strip(); recipients=list(dict.fromkeys(data.get('recipients',[])))
+        active_user(ws,p['pm_id']); version=str(data.get('version','')).strip(); raw_recipients=data.get('recipients',[])
+        require(isinstance(raw_recipients,list) and all(isinstance(x,str) for x in raw_recipients),'收件人格式不正確',422)
+        recipients=list(dict.fromkeys(raw_recipients))
         require(version and recipients,'需版本與收件人',422)
         for ident in recipients: active_user(ws,ident)
         node=next(x for x in p['nodes'] if x['key']=='confirmation'); evidence=evidence_for(p,node,'confirmation')
