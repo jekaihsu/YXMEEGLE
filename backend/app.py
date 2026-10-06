@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 from itsdangerous import URLSafeTimedSerializer, BadSignature
 from pydantic import BaseModel, Field
-from sqlalchemy import create_engine, Column, String, Integer, JSON, select, update
+from sqlalchemy import create_engine, Column, String, Integer, JSON, select, update, cast, or_, and_
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.engine import make_url
@@ -394,6 +394,35 @@ def create_app(overrides=None):
         filter_visible_cases(state);filter_private_workspace(state,user)
         return daily_index(state,project_id=project_id,department=department,actor_id=actor_id,date_from=date_from,date_to=date_to,status=status,q=q,offset=offset,limit=limit)
 
+    AUDIT_BATCH=100
+
+    def audit_page(db,wid,offset,limit,project_id,accept,prefilter=()):
+        """Keyset-scan action_audit newest-first in bounded batches.
+
+        Visibility is decided per row by ``accept`` (never after an unsafe LIMIT): every
+        batch is fully filtered before the next keyset page is read, and the scan stops
+        once the requested page plus one lookahead row is known. Memory and DB reads
+        follow offset+limit, not total history. ``total`` is exact when history is
+        exhausted, otherwise a lower bound (``has_more`` is true).
+        """
+        base=select(AuditRow).where(AuditRow.workspace_id==wid,*prefilter)
+        if project_id:  # conservative superset; exact check stays in ``accept``
+            like=json.dumps(project_id).replace('\\','\\\\').replace('%','\\%').replace('_','\\_')
+            base=base.where(cast(AuditRow.data,String).like('%'+like+'%',escape='\\'))
+        need=offset+limit+1; items=[]; last=None; exhausted=False
+        while len(items)<need:
+            query=base
+            if last: query=query.where(or_(AuditRow.created_at<last[0],and_(AuditRow.created_at==last[0],AuditRow.id<last[1])))
+            rows=list(db.scalars(query.order_by(AuditRow.created_at.desc(),AuditRow.id.desc()).limit(AUDIT_BATCH)))
+            for row in rows:
+                item=accept(row)
+                if item is not None: items.append(item)
+            if len(rows)<AUDIT_BATCH: exhausted=True; break
+            last=(rows[-1].created_at,rows[-1].id)
+        has_more=len(items)>offset+limit
+        total=len(items) if exhausted else need
+        return {'items':items[offset:offset+limit],'total':total,'offset':offset,'limit':limit,'has_more':has_more}
+
     @app.get('/api/audit')
     def action_audit(request:Request,project_id:str='',offset:int=0,limit:int=50):
         data,user=identity(request); require(offset>=0 and 1<=limit<=100,'分頁參數錯誤',422)
@@ -401,21 +430,24 @@ def create_app(overrides=None):
             state=load(db,db.get(WorkspaceRow,data['wid']))
             from .source_case_policy import visible_project
             visible={p['id'] for p in state.get('projects',[]) if visible_project(state,p)}
-            rows=list(db.scalars(select(AuditRow).where(AuditRow.workspace_id==data['wid']).order_by(AuditRow.created_at.desc(),AuditRow.id.desc())))
-            items=[]
-            for row in rows:
+            manager=user.get('role')=='manager'
+            def accept(row):
                 details=deepcopy(row.data)
                 refs={details['project_id']} if details.get('project_id') else set()
                 for change in details.get('changes',[]):
                     if change.get('project_id'):refs.add(change['project_id'])
                     elif change.get('kind')=='project':refs.add(change.get('id'))
-                if refs-visible:continue
-                if user.get('role')!='manager':
-                    if row.action.startswith(('admin_','company_admin_','person','delegation','people_')) and row.actor_id!=user['id']: continue
+                if refs-visible:return None
+                if not manager:
+                    if row.action.startswith(('admin_','company_admin_','person','delegation','people_')) and row.actor_id!=user['id']: return None
                     details['changes']=[c for c in details.get('changes',[]) if c['kind'] not in ('users','delegations') or c['id']==user['id']]
-                if project_id and details.get('project_id')!=project_id and not any(c.get('project_id')==project_id or (c['kind']=='project' and c['id']==project_id) for c in details.get('changes',[])): continue
-                items.append(dict(id=row.id,actor_id=row.actor_id,action=row.action,created_at=row.created_at,**details))
-        return {'items':items[offset:offset+limit],'total':len(items),'offset':offset,'limit':limit}
+                if project_id and details.get('project_id')!=project_id and not any(c.get('project_id')==project_id or (c['kind']=='project' and c['id']==project_id) for c in details.get('changes',[])): return None
+                return dict(id=row.id,actor_id=row.actor_id,action=row.action,created_at=row.created_at,**details)
+            prefilter=()
+            if not manager:  # same rule as ``accept``, pushed into SQL to skip rows early
+                prefilter=(or_(AuditRow.actor_id==user['id'],
+                    and_(*[~AuditRow.action.startswith(x) for x in ('admin_','company_admin_','person','delegation','people_')])),)
+            return audit_page(db,data['wid'],offset,limit,project_id,accept,prefilter)
 
     @app.get('/api/admin/audit/history')
     def historical_action_audit(request:Request,project_id:str='',offset:int=0,limit:int=50):
@@ -424,19 +456,16 @@ def create_app(overrides=None):
         require(offset>=0 and 1<=limit<=100,'分頁參數錯誤',422)
         # This deliberate administrative endpoint exposes metadata, not archived
         # source snapshots, employee fields, comments or approval evidence.
-        items=[]
-        with sessions() as db:
-            rows=db.scalars(select(AuditRow).where(AuditRow.workspace_id==data['wid']).order_by(AuditRow.created_at.desc(),AuditRow.id.desc()))
-            for row in rows:
-                details=row.data or {}; refs={details['project_id']} if details.get('project_id') else set()
-                for change in details.get('changes',[]):
-                    if change.get('project_id'):refs.add(change['project_id'])
-                    elif change.get('kind')=='project':refs.add(change.get('id'))
-                if project_id and project_id not in refs:continue
-                items.append({'id':row.id,'actor_id':row.actor_id,'action':row.action,'created_at':row.created_at,
-                    'result':details.get('result'),'request_id':details.get('request_id'),
-                    'project_ids':sorted(r for r in refs if r),'change_count':len(details.get('changes',[]))})
-        return {'items':items[offset:offset+limit],'total':len(items),'offset':offset,'limit':limit}
+        def accept(row):
+            details=row.data or {}; refs={details['project_id']} if details.get('project_id') else set()
+            for change in details.get('changes',[]):
+                if change.get('project_id'):refs.add(change['project_id'])
+                elif change.get('kind')=='project':refs.add(change.get('id'))
+            if project_id and project_id not in refs:return None
+            return {'id':row.id,'actor_id':row.actor_id,'action':row.action,'created_at':row.created_at,
+                'result':details.get('result'),'request_id':details.get('request_id'),
+                'project_ids':sorted(r for r in refs if r),'change_count':len(details.get('changes',[]))}
+        with sessions() as db: return audit_page(db,data['wid'],offset,limit,project_id,accept)
 
     @app.post('/api/actions')
     def actions(body:Action,request:Request):
