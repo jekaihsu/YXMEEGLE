@@ -18,6 +18,8 @@ const project=id=>({id,pm_id:'u1',admin_id:'u1',supervisor_id:'u1',status:'activ
 const projects={A:project('case-A'),B:project('case-B')};
 const ws=wid=>({workspace_id:wid,environment:'production',version:1,projects:Object.values(projects),financial_requests:[],approval_connection:{}});
 const ctx=(uid,wid)=>({s:{user:{id:uid,can_business_override:true},mode:'lark',environment:'production',workspace_id:wid},w:ws(wid),busy:false,refresh:async()=>{}});
+const submissions=[];
+globalThis.fetch=async(url,options)=>{submissions.push({url,payload:JSON.parse(options.body)});return new Response('{}',{headers:{'content-type':'application/json'}})};
 const root=createRoot(document.getElementById('root'));
 const show=async(uid,wid,p)=>act(async()=>root.render(React.createElement(FinancialApprovalRequests,{c:ctx(uid,wid),p})));
 const setValue=async(el,v)=>act(async()=>{
@@ -44,6 +46,13 @@ assert.equal(box().checked,false);
 assert.match(href(),/project=case-B&node=case-B-pricing/);
 assert.ok(!href().includes('case-A'));
 
+await setValue(reason(),'ONLY_CASE_B_REASON');
+await act(async()=>box().click());
+await act(async()=>document.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+assert.equal(submissions.length,1);
+assert.equal(submissions[0].url,'/api/native-approvals/financial/request');
+assert.deepEqual(submissions[0].payload,{version:1,project_id:'case-B',node_id:'case-B-pricing',evidence_ids:['case-B-ev'],reason:'ONLY_CASE_B_REASON',confirmation_kind:'contract',payables_declaration:'unknown'});
+
 await show('u1','w1',projects.A);
 assert.equal(reason().value,'ONLY_CASE_A_REASON','case-A draft restored');
 assert.equal(payables().value,'unknown','non-persisted state resets; reason restored from storage');
@@ -55,4 +64,5 @@ assert.equal(reason().value,'','other workspace sees no residue');
 await setValue(reason(),'W2_REASON');
 await show('u1','w1',projects.A);
 assert.equal(reason().value,'ONLY_CASE_A_REASON');
-console.log('financial draft scope: ok');
+await act(async()=>root.unmount());dom.window.close();
+console.log('financial draft scope: isolation, restoration, navigation and submission passed');

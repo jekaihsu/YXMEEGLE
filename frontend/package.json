@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test:session-epoch": "node test-session-epoch.mjs",
+    "test:comment-draft": "node test-comment-draft-scope.mjs",
     "test:input-recovery": "node test-input-recovery.mjs",
     "test:native-approval-version": "node test-native-approval-version.mjs",
     "test:native-approval-a11y": "node test-native-approval-a11y.mjs && node test-approval-detail-a11y.mjs",
