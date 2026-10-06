@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "test:audit-project-switch": "node test-audit-project-switch.mjs",
     "test:session-epoch": "node test-session-epoch.mjs",
     "test:financial-draft": "node test-financial-draft-scope.mjs",
     "test:form-draft": "node test-form-draft-identity.mjs && node test-recurring-draft-period.mjs && node test-draft-callsites.mjs"
