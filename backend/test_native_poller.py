@@ -101,3 +101,16 @@ def test_temporary_poll_failure_preserves_historical_receipt_without_refreshing_
     state,_=api.h.read();p=next(p for p in state['projects'] if p['id']==item['project_id'])
     n=next(n for n in p['nodes'] if n['id']==item['node_id'])
     assert not receipt_valid(state,p,n,item,require_fresh=True)
+
+
+def test_batch_overflow_polls_every_attempted_request_in_bounded_rounds(api,monkeypatch):
+    poller,clock=make(api,monkeypatch)
+    def clone(state):
+        base=state['approvals'][0]
+        for n in range(1,13):state['approvals'].append(dict(deepcopy(base),id='extra%d'%n))
+    mutate(api,clone);seen=set()
+    for n in range(3):
+        clock[0]='2026-09-28T12:%02d:00+08:00'%(n*5)
+        got=poller.run_due(api.h.wid);assert len(got)<=10
+        seen.update(r['id'] for r in got)
+    assert seen=={'request'}|{'extra%d'%n for n in range(1,13)}
