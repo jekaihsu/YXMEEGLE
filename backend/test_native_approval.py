@@ -263,17 +263,42 @@ def _sop_apply(ws, actor, p):
 
 
 def _blocking_item(p, binding, **fields):
-    item = dict(id='a1', project_id=p['id'], status='withdrawn', frozen=False, native_binding=binding)
+    item = dict(id='a1', project_id=p['id'], node_id=p['nodes'][0]['id'],
+                status='withdrawn', frozen=False, native_binding=binding)
     item.update(fields)
     return item
 
 
-def test_sop_apply_not_blocked_by_withdrawn_request_with_valid_not_created_proof(company):
+@pytest.mark.parametrize('collection', ['approvals', 'node_skip_requests', 'financial_requests'])
+def test_sop_apply_not_blocked_by_withdrawn_request_with_valid_not_created_proof(company, collection):
     ws, p, actor = company
     p['sop_version'] = 'older'
-    ws.setdefault('approvals', []).append(_blocking_item(p, _rejected_binding()))
+    ws.setdefault(collection, []).append(_blocking_item(p, _rejected_binding()))
     _sop_apply(ws, actor, p)
     assert p['sop_version'] == VERSION
+
+
+@pytest.mark.parametrize('collection', ['approvals', 'node_skip_requests', 'financial_requests'])
+@pytest.mark.parametrize('external_status', ['UNKNOWN', 'PENDING', 'APPROVED'])
+def test_sop_apply_blocks_remote_result_before_business_apply(company, collection, external_status):
+    ws, p, actor = company
+    p['sop_version'] = 'older'
+    *_, binding, _ = fixture()
+    receipt = dict(instance_code='real-instance', external_status=external_status,
+                   binding_verified=True, verified_at='2026-10-06T00:00:00Z')
+    binding.update(attempted=True, instance_code='real-instance',
+                   status=external_status.lower(), receipt=receipt)
+    item = _blocking_item(p, binding, native_receipt=receipt)
+    from .native_approval import remote_binding_resolved
+    assert remote_binding_resolved(item) is (external_status == 'APPROVED')
+    ws.setdefault(collection, []).append(item)
+    with pytest.raises(HTTPException) as exc:
+        _sop_apply(ws, actor, p)
+    assert exc.value.status_code == 409
+    assert '原生審批' in exc.value.detail
+    assert p['sop_version'] == 'older'
+    assert ws['sop_requests'][-1]['status'] == 'pending'
+    assert item['status'] == 'withdrawn'
 
 
 @pytest.mark.parametrize('mutate', [
