@@ -470,8 +470,10 @@ def apply_operation(ws,user,body,demo=False):
         require(lead(user,p)); require(req['status']=='pending' and req['from_version']==p['sop_version'],'申請已失效',409)
         require(not any(c.get('status')=='pending' for node in p['nodes'] for c in node.get('review_cycles',[])),
                 '案件仍有送審中的範圍，請先處理審核再套用 SOP',409)
+        from .native_approval import abandoned_not_created
         require(not any(item.get('project_id')==p['id'] and item.get('native_binding',{}).get('attempted')
                         and item.get('status') not in ('executed','applied')
+                        and not abandoned_not_created(item)
                         and item.get('native_receipt',{}).get('external_status') not in ('REJECTED','CANCELED','DELETED')
                         for collection in ('approvals','node_skip_requests','financial_requests') for item in ws.get(collection,[])),
                 '原生審批仍有未處理的核准或未知結果，請先核實範圍再套用 SOP',409)

@@ -235,3 +235,90 @@ def test_binding_payload_mutation_and_definition_change_block_before_post():
     with pytest.raises(RemoteFailure):
         NativeApprovalAdapter(fake, lambda: None).submit(binding, context, lambda _: None)
     assert all(c[0] == 'GET' for c in fake.calls)
+
+
+# --- #36: withdrawn requests with valid not-created proof must not block SOP apply ---
+from fastapi import HTTPException
+from .test_sop_contracts import company  # noqa: F401  (pytest fixture)
+from .sop_contracts import VERSION
+from .operations import apply_operation
+
+
+def _rejected_binding():
+    *_, binding, _ = fixture()
+    binding.update(attempted=True, status='not_created', creation_outcome='not_created',
+                   not_created_proof='documented_api_rejection',
+                   creation_rejection={'http_status': 400, 'api_code': 1390001,
+                                       'uuid': binding['payload']['uuid']})
+    return binding
+
+
+def _sop_apply(ws, actor, p):
+    next(t for t in ws['sop_templates'] if t['id'] == VERSION)['status'] = 'published'
+    apply_operation(ws, actor, {'action': 'sop_request', 'project_id': p['id'],
+                                'payload': {'id': VERSION, 'reason': 'migration'}}, True)
+    rid = ws['sop_requests'][-1]['id']
+    apply_operation(ws, actor, {'action': 'sop_apply', 'project_id': p['id'],
+                                'payload': {'id': rid}}, True)
+
+
+def _blocking_item(p, binding, **fields):
+    item = dict(id='a1', project_id=p['id'], status='withdrawn', frozen=False, native_binding=binding)
+    item.update(fields)
+    return item
+
+
+def test_sop_apply_not_blocked_by_withdrawn_request_with_valid_not_created_proof(company):
+    ws, p, actor = company
+    p['sop_version'] = 'older'
+    ws.setdefault('approvals', []).append(_blocking_item(p, _rejected_binding()))
+    _sop_apply(ws, actor, p)
+    assert p['sop_version'] == VERSION
+
+
+@pytest.mark.parametrize('mutate', [
+    lambda b, i: i.update(status='pending'),
+    lambda b, i: i.update(status='approved'),
+    lambda b, i: b.update(creation_outcome='unknown', not_created_proof=None),
+    lambda b, i: b['creation_rejection'].update(uuid='other'),
+    lambda b, i: b['creation_rejection'].update(http_status=500),
+    lambda b, i: b['creation_rejection'].update(api_code=1),
+    lambda b, i: b['payload'].update(tampered=True),  # binding hash no longer matches
+    lambda b, i: i.update(frozen=True),
+])
+def test_sop_apply_still_blocked_by_unresolved_or_invalid_proof(company, mutate):
+    ws, p, actor = company
+    p['sop_version'] = 'older'
+    binding = _rejected_binding()
+    item = _blocking_item(p, binding)
+    mutate(binding, item)
+    ws.setdefault('approvals', []).append(item)
+    with pytest.raises(HTTPException) as exc:
+        _sop_apply(ws, actor, p)
+    assert exc.value.status_code == 409
+    assert p['sop_version'] == 'older'
+
+
+@pytest.mark.parametrize('mutate', [
+    lambda b, i: b.update(creation_rejection=None),
+    lambda b, i: b.update(creation_rejection='rejected'),
+    lambda b, i: b.update(creation_rejection=[400, 1390001]),
+    lambda b, i: b.update(payload=None),
+    lambda b, i: b['creation_rejection'].update(api_code=[1390001]),
+    lambda b, i: b['creation_rejection'].update(http_status={'code': 400}),
+    lambda b, i: b['creation_rejection'].update(uuid=['x']),
+    lambda b, i: (b['payload'].pop('uuid'), b['creation_rejection'].pop('uuid')),
+])
+def test_sop_apply_malformed_not_created_proof_is_stable_409(company, mutate):
+    ws, p, actor = company
+    p['sop_version'] = 'older'
+    binding = _rejected_binding()
+    item = _blocking_item(p, binding)
+    mutate(binding, item)
+    from .native_approval import creation_not_performed
+    assert creation_not_performed(binding) is False
+    ws.setdefault('approvals', []).append(item)
+    with pytest.raises(HTTPException) as exc:
+        _sop_apply(ws, actor, p)
+    assert exc.value.status_code == 409
+    assert p['sop_version'] == 'older'
