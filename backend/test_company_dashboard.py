@@ -85,6 +85,14 @@ def test_real_route_includes_closed_lark_reference_without_template_progress(sta
         project=seed()['projects'][0]
         project.update(source_kind='lark',source_status='已結案',case_visibility='source_reference',execution_system='pending')
         old=deepcopy(project);old.update(id='old-meegle',source_kind='meegle',case_visibility='excluded_history')
+        def reid(v):  # child ids must stay unique per kind within a workspace
+            for k,x in v.items():
+                if isinstance(x,list):
+                    for i in x:
+                        if isinstance(i,dict):
+                            if 'id' in i:i['id']='old-'+str(i['id'])
+                            reid(i)
+        reid(old)
         state['projects']=[project,old];row.data=storage.save(db,BusinessRow,row.id,state)
     reply=client.get('/api/company-dashboard').json()
     assert reply['totals']['cases']==1 and reply['totals']['source_status_counts']=={'已結案':1}
