@@ -96,6 +96,13 @@ def assert_empty_database(engine):
             raise ValueError('Restore target database must be empty')
 
 
+def make_dirs(folder,created):
+    """Create folder, recording each directory this call newly creates (outermost first)."""
+    missing=[]
+    while not folder.exists():missing.append(folder);folder=folder.parent
+    for item in reversed(missing):
+        item.mkdir();created.append(item)
+
 def restore(engine,uploads,source):
     uploads=Path(uploads).resolve()
     if uploads.exists() and any(uploads.iterdir()):raise ValueError('Restore upload directory must be empty')
@@ -124,19 +131,23 @@ def restore(engine,uploads,source):
     # included in our portable backup. Run restore with the target app stopped.
     assert_empty_database(engine)
     META.create_all(engine)
-    written=[]
+    written=[];created=[]
     try:
         with engine.begin() as connection:
             if any(connection.execute(select(t).limit(1)).first() for t in TABLES):
                 raise ValueError('Restore target database must be empty')
             for name,data in validated.items():
-                dest=uploads/name[len('uploads/'):];dest.parent.mkdir(parents=True,exist_ok=True)
-                with dest.open('xb') as handle:handle.write(data)
-                written.append(dest)
+                dest=uploads/name[len('uploads/'):];make_dirs(dest.parent,created)
+                with dest.open('xb') as handle:
+                    written.append(dest)
+                    handle.write(data)
             for table in TABLES:
                 if rows[table.name]:connection.execute(table.insert(),rows[table.name])
     except Exception:
         for path in written:path.unlink(missing_ok=True)
+        for folder in reversed(created):
+            try:folder.rmdir()  # only removes directories this restore created and left empty
+            except OSError:pass
         raise
     return {'tables':{k:len(v) for k,v in rows.items()},'files':len(written),'sessions_restored':False}
 
