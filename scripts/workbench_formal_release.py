@@ -8,10 +8,10 @@ import sys
 from datetime import datetime, timezone
 try:
     from .workbench_login_cutover import environment
-    from .stage_inventory import verify_stage_inventory
+    from .stage_inventory import verify_stage_inventory, deployment_snapshot
 except ImportError:
     from workbench_login_cutover import environment
-    from stage_inventory import verify_stage_inventory
+    from stage_inventory import verify_stage_inventory, deployment_snapshot
 
 ROOT=Path(__file__).resolve().parents[1]
 STAGE='zeabur-stage-ced7de7d'
@@ -55,11 +55,12 @@ def run():
         raise RuntimeError('Formal identity or disabled gates changed')
     marker={'stage':STAGE,'service_id':SERVICE,'snapshot_sha256':expected,
             'attempted_at':datetime.now(timezone.utc).isoformat()}
-    with (STATE/'attempt.json').open('x',encoding='utf-8') as out:
-        json.dump(marker,out);out.flush();os.fsync(out.fileno())
-    result=subprocess.run(['zeabur.cmd','deploy','--project-id',PROJECT,'--environment-id',ENV,
-        '--service-id',SERVICE,'--interactive=false'],cwd=stage,capture_output=True,
-        text=True,encoding='utf-8',errors='replace',timeout=240)
+    with deployment_snapshot(stage,manifest['files'],inventory_hash) as snapshot:
+        with (STATE/'attempt.json').open('x',encoding='utf-8') as out:
+            json.dump(marker,out);out.flush();os.fsync(out.fileno())
+        result=subprocess.run(['zeabur.cmd','deploy','--project-id',PROJECT,'--environment-id',ENV,
+            '--service-id',SERVICE,'--interactive=false'],cwd=snapshot,capture_output=True,
+            text=True,encoding='utf-8',errors='replace',timeout=240)
     receipt={**marker,'cli_exit_code':result.returncode,'accepted':result.returncode==0,
              'live_verified':False,'environment_modified':False,'database_restored':False}
     (STATE/'dispatch.json').write_text(json.dumps(receipt,indent=2),encoding='utf-8')

@@ -14,9 +14,9 @@ import subprocess
 import sys
 import httpx
 try:
-    from .stage_inventory import verify_stage_inventory
+    from .stage_inventory import verify_stage_inventory, deployment_snapshot
 except ImportError:
-    from stage_inventory import verify_stage_inventory
+    from stage_inventory import verify_stage_inventory, deployment_snapshot
 import yaml
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -116,7 +116,8 @@ def deploy(rows):
     if not receipt.get('ok') or receipt.get('inventory_sha256')!=inventory_hash:
         raise RuntimeError('Package smoke missing, stale, or bound to a different inventory')
     command=['zeabur.cmd','deploy','--project-id',PROJECT,'--environment-id',ENV,'--service-id',app['_id'],'--interactive=false']
-    result=subprocess.run(command,cwd=stage,capture_output=True,text=True,encoding='utf-8',errors='replace')
+    with deployment_snapshot(stage,manifest['files'],inventory_hash) as snapshot:
+        result=subprocess.run(command,cwd=snapshot,capture_output=True,text=True,encoding='utf-8',errors='replace')
     save('deployment.json',{'stage':stage.name,'service_id':app['_id'],'exit_code':result.returncode})
     if result.returncode:raise RuntimeError('Staging deployment failed')
 

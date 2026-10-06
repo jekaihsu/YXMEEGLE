@@ -67,3 +67,41 @@ def test_stage_inventory_rejects_symlinks_and_unsafe_manifest_paths(tmp_path):
     (stage / 'alias.py').unlink()
     with pytest.raises(ValueError, match='Unsafe'):
         verify_stage_inventory(stage, [{**entry, 'path': '../app.py'}])
+
+
+def test_snapshot_rejects_bytes_changed_during_copy(tmp_path, monkeypatch):
+    from scripts.stage_inventory import deployment_snapshot, inventory_digest
+    stage = tmp_path / 'stage'
+    stage.mkdir()
+    source = stage / 'app.py'
+    source.write_bytes(b'reviewed')
+    entries = [{'path': 'app.py', 'size': 8, 'sha256': hashlib.sha256(b'reviewed').hexdigest()}]
+    original_read = Path.read_bytes
+    reads = 0
+
+    def read(path):
+        nonlocal reads
+        if path == source:
+            reads += 1
+            if reads == 2:
+                source.write_bytes(b'tampered')
+        return original_read(path)
+
+    monkeypatch.setattr(Path, 'read_bytes', read)
+    with pytest.raises(ValueError, match='snapshot changed'):
+        with deployment_snapshot(stage, entries, inventory_digest(entries)):
+            pytest.fail('Changed copy must never reach dispatch')
+
+
+def test_snapshot_cleanup_on_dispatch_failure(tmp_path):
+    from scripts.stage_inventory import deployment_snapshot, inventory_digest
+    stage = tmp_path / 'stage'
+    stage.mkdir()
+    (stage / 'app.py').write_bytes(b'reviewed')
+    entries = [{'path': 'app.py', 'size': 8, 'sha256': hashlib.sha256(b'reviewed').hexdigest()}]
+    with pytest.raises(RuntimeError, match='dispatch failed'):
+        with deployment_snapshot(stage, entries, inventory_digest(entries)) as snapshot:
+            assert snapshot != stage
+            assert (snapshot / 'app.py').read_bytes() == b'reviewed'
+            raise RuntimeError('dispatch failed')
+    assert not snapshot.exists()

@@ -1,6 +1,9 @@
 """Fail-closed verification of an exact deployment stage inventory."""
 from __future__ import annotations
 
+from contextlib import contextmanager
+import tempfile
+
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -57,3 +60,21 @@ def verify_stage_inventory(stage: Path, entries: list[dict]) -> str:
         if len(data) != entry['size'] or hashlib.sha256(data).hexdigest() != entry['sha256']:
             raise ValueError('Deployment snapshot changed')
     return inventory_digest(entries)
+
+
+@contextmanager
+def deployment_snapshot(stage: Path, entries: list[dict], expected_digest: str):
+    """Deploy only manifest bytes from a private copy, independent of the stage."""
+    if verify_stage_inventory(stage, entries) != expected_digest:
+        raise ValueError('Deployment inventory digest changed')
+    with tempfile.TemporaryDirectory(prefix='zeabur-approved-') as directory:
+        snapshot = Path(directory)
+        for entry in entries:
+            relative = PurePosixPath(entry['path'])
+            source = Path(stage).joinpath(*relative.parts)
+            target = snapshot.joinpath(*relative.parts)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(source.read_bytes())
+        # Verify the copied bytes, not just the mutable source we inspected.
+        verify_stage_inventory(snapshot, entries)
+        yield snapshot
