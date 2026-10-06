@@ -689,15 +689,15 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
     elif action=='delivery_review':
         require(p is not None,'請指定案件',422); item=find(p['delivery_batches'],data.get('id'),'交付批次')
         require(item['status']=='submitted' and not item.get('superseded_by'),'交付批次已核定、退回或換版',409)
-        seats=reviewer_seats(p,item)
-        require(user['id'] in seats.values(),'需由現任交付組主管核定交付')
-        require(active_seats(ws,seats),'交付組別主管尚未指定或非在職人員',409)
+        delivery_seats=reviewer_seats(p,item)
+        require(user['id'] in delivery_seats.values(),'需由現任交付組主管核定交付')
+        require(active_seats(ws,delivery_seats),'交付組別主管尚未指定或非在職人員',409)
         refresh_reviewers(ws,p,item)
         result=data.get('result'); require(result in ('approved','returned'),'交付核定結果錯誤',422)
         if result=='returned':
             require(str(data.get('reason','')).strip(),'退回需填理由',422); item.update(status='returned',returned_by=user['id'],reason=data['reason'])
         else:
-            item['approvals']=[a for a in item['approvals'] if a['actor_id']!=user['id']]+[dict(actor_id=user['id'],at=now(),content_hash=item['content_hash'],node_ids=[ident for ident,reviewer in seats.items() if reviewer==user['id']])]
+            item['approvals']=[a for a in item['approvals'] if a['actor_id']!=user['id']]+[dict(actor_id=user['id'],at=now(),content_hash=item['content_hash'],node_ids=[ident for ident,reviewer in delivery_seats.items() if reviewer==user['id']])]
             if approved_seats(ws,p,item):
                 item.update(status='approved',approved_at=now())
                 require(delivery_current(p,item,ws),'交付引用資料已變更，請重新提交版本',409)
