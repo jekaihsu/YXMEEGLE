@@ -549,15 +549,20 @@ def create_app(overrides=None):
         require(path.resolve().is_relative_to(upload_dir) and path.is_file(),'附件檔案不存在',404)
         return FileResponse(path,filename=match['name'],media_type='application/octet-stream',headers={'Content-Disposition':"attachment; filename*=UTF-8''"+__import__('urllib.parse',fromlist=['quote']).quote(match['name'])})
 
+    def public_source_response(state,snapshot,user):
+        # Shared by GET and POST sync: the raw snapshot stays in the internal cache.
+        from .workspace_projection import public_source_cache
+        from .source_case_policy import visible_source_snapshot
+        return public_source_cache(visible_source_snapshot(state,snapshot),user)
+
     @app.get('/api/sources')
     def sources(request:Request):
         data,user=identity(request)
         if data['mode']!='lark' or data['wid'].startswith('test-'): return {'configured':False,'last_sync':None,'status':'requires_login','message':'測試區使用隔離試行案；請切換正式工作區讀取 V4','tables':[],'records':[]}
         with sessions() as db:
             cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']))
-        from .workspace_projection import public_source_cache
-        from .source_case_policy import visible_source_snapshot
-        return public_source_cache(visible_source_snapshot(state,cache.data),user) if cache else {'configured':bool(configuration(cfg)),'last_sync':None,'status':'not_synced','message':'尚未同步來源','tables':[],'records':[]}
+        if cache: return public_source_response(state,cache.data,user)
+        return {'configured':bool(configuration(cfg)),'last_sync':None,'status':'not_synced','message':'尚未同步來源','tables':[],'records':[]}
 
     @app.post('/api/sources/cutover-baseline')
     async def source_case_baseline(request:Request):
@@ -571,7 +576,9 @@ def create_app(overrides=None):
         data,user=identity(request); require(data['mode']=='lark','請使用公司 Lark 登入後同步正式來源',403); require(user['role'] in ('pm','manager') or capable(user,'manage_sources'),'需要來源同步權限',403)
         require(not data['wid'].startswith('test-'),'測試工作區不可直接同步正式 V4；請使用隔離試行複本',403)
         with sessions() as db: auth=db.get(AuthRow,data['sid']); token=auth.data['access_token']
-        return app.state.source_sync.sync(data['wid'],user['id'],token)
+        snapshot=app.state.source_sync.sync(data['wid'],user['id'],token)
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
+        return public_source_response(state,snapshot,user)
 
     @app.post('/api/approvals/{approval_id}/refresh')
     async def refresh_approval(approval_id:str,request:Request):
