@@ -168,7 +168,7 @@ def test_digest_once_daily_with_overdue_escalation_and_stop_rules(ws):
                j['payload']['source_project_ids']==[p['id']] for j in ws['jobs'])
     schedule(ws,'2026-09-28T10:00:00+08:00'); assert len(ws['jobs'])==first
     assert any(j['payload']['recipients']==['u-manager'] for j in ws['jobs'])
-    p['source_status']='中止'; ws['jobs']=[]
+    p['source_status']='中止'; p['source_lifecycle']={'canonical':'中止','state':'mapped'}; ws['jobs']=[]
     schedule(ws,'2026-09-29T09:00:00+08:00'); assert not ws['jobs']
     call(ws,'recurring_create',dict(kind='receivable',owner_id='u-manager',start_date='2026-09-01'))
     schedule(ws,'2026-09-29T09:00:00+08:00'); assert ws['jobs']
@@ -225,8 +225,8 @@ def test_worker_test_workspace_never_calls_remote_and_issue_once(api_app,ws):
     app.state.worker.adapter_factory=lambda cfg:pytest.fail('Test workspace called remote')
     app.state.worker.run_one(wid)
     state=client.get('/api/workspace').json(); issue=state['projects'][0]['confirmation_issues'][0]
-    assert issue['status']=='simulated'; assert len(issue['receipts'])==2; assert len(state['projects'][0]['handoffs'])==1
-    app.state.worker.run_one(wid); state=client.get('/api/workspace').json(); assert len(state['projects'][0]['handoffs'])==1
+    assert issue['status']=='simulated'; assert len(issue['receipts'])==2; assert state['projects'][0]['handoffs']==[]  # preview issuance never hands off PM
+    app.state.worker.run_one(wid); state=client.get('/api/workspace').json(); assert state['projects'][0]['handoffs']==[]  # preview issuance never hands off PM
 
 def test_worker_recovers_only_failed_recipient_without_resend(api_app,ws):
     app,client=api_app; p,n=ready(ws,'confirmation'); call(ws,'confirmation_issue',{'version':'1','recipients':['u-field','u-control']})
@@ -391,7 +391,7 @@ def test_confirmation_receipt_is_bound_to_pm_and_recipient_scope(api_app,ws,chan
     assert error.value.status_code==409
 
 def test_idle_worker_does_not_bump_version_and_serializes_leases(api_app,ws):
-    app,client=api_app; ws['projects'][0]['source_status']='中止'; wid=inject(api_app,ws)
+    app,client=api_app; ws['projects'][0]['source_lifecycle']={'canonical':'中止','state':'mapped'}; wid=inject(api_app,ws)
     before=client.get('/api/workspace').json()['version']; app.state.worker.run_one(wid)
     assert client.get('/api/workspace').json()['version']==before
     actor=ws['users'][0]; first=queue(ws,'digest',actor,dict(recipients=[actor['id']],text='one'),'one'); first.update(status='running',lease_until='2099-01-01T00:00:00+08:00')

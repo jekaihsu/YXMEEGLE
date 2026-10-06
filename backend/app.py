@@ -371,13 +371,13 @@ def create_app(overrides=None):
         with sessions() as db: return public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'])
 
     @app.get('/api/company-dashboard')
-    def company_dashboard(request:Request,offset:int=0,limit:int=100,q:str='',group:str='',source_status:str='',attention:str=''):
+    def company_dashboard(request:Request,offset:int=0,limit:int=100,q:str='',group:str='',source_status:str='',attention:str='',lifecycle:str=''):
         data,user=identity(request)
         require(offset>=0 and 1<=limit<=250 and attention in ('','overdue','review'),'駕駛艙查詢參數錯誤',422)
-        require(len(q)<=240 and len(group)<=120 and len(source_status)<=120,'查詢文字過長',422)
+        require(len(q)<=240 and len(group)<=120 and len(source_status)<=120 and len(lifecycle)<=120,'查詢文字過長',422)
         with sessions() as db: safe=public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'])
         from .company_dashboard import overview
-        return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention)
+        return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle)
 
     @app.get('/api/projects')
     def projects(request:Request,q:str='',status:str='',owner:str='',offset:int=0,limit:int=30):

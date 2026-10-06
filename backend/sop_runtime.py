@@ -82,6 +82,10 @@ def topology_projection(project, *, details=False):
         'source_execution_verified': False,
         'local_completion_is_source_completion': False,
     }
+    from .sop_execution import MAPPING_VERSION, execution_mapping
+    mapping = [e['status'] for e in execution_mapping().values()]
+    result.update(mapping_version=MAPPING_VERSION, mapped_node_count=mapping.count('mapped'),
+                  unmapped_node_count=mapping.count('unmapped'))
     if details:
         result['nodes'] = [{
             'key': key,
