@@ -29,6 +29,7 @@ from .approval_capabilities import approval_connection
 from .workspace_projection import public_copy, filter_private_workspace, public_person
 from .production_access import require_admission, require_access, test_profile,company_admin_grant,set_company_admin_authority
 from . import audit
+from .input_validation import json_object
 from .file_categories import categories, validate_category, save_category
 
 Base=declarative_base()
@@ -712,7 +713,7 @@ def create_app(overrides=None):
     async def switch_workspace(request:Request):
         from fastapi.responses import JSONResponse
         data,user=identity(request); require(data['mode']=='lark','需公司登入',403)
-        body=await request.json(); target=body.get('environment'); require(target in ('test','production'),'工作區錯誤',422)
+        body=await json_object(request); target=body.get('environment'); require(isinstance(target,str) and target in ('test','production'),'工作區錯誤',422)
         wid=('test-' if target=='test' else '')+organization(data); ensure_workspace(wid,True)
         with sessions.begin() as db:
             auth=db.execute(select(AuthRow).where(AuthRow.id==data['sid']).with_for_update()).scalar_one()
@@ -724,7 +725,7 @@ def create_app(overrides=None):
     @app.post('/api/pilot/copy')
     async def copy_pilot(request:Request):
         data,user=identity(request); require(data['mode']=='lark' and user['role']=='manager','需公司管理員',403)
-        body=await request.json(); org=organization(data); wid='test-'+org; ensure_workspace(wid,True)
+        body=await json_object(request); require(isinstance(body.get('project_id'),str),'請提供案件編號',422); org=organization(data); wid='test-'+org; ensure_workspace(wid,True)
         copied_files=[]
         try:
             with sessions.begin() as db:
