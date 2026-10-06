@@ -42,6 +42,14 @@ def remote_binding_resolved(item):
                 and receipt.get('external_status') in ('APPROVED','REJECTED','CANCELED','DELETED'))
 
 
+def abandoned_not_created(item):
+    """Withdrawn request whose binding is intact and provably never created remotely."""
+    binding=item.get('native_binding') or {}
+    if item.get('status')!='withdrawn' or item.get('frozen') or not binding.get('attempted'):return False
+    immutable={k:binding.get(k) for k in ('identity','kind','definition_hash','mapping','approvers','payload')}
+    return digest(immutable)==binding.get('binding_hash') and creation_not_performed(binding)
+
+
 def digest(value):
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True,
                                     separators=(',', ':')).encode()).hexdigest()
