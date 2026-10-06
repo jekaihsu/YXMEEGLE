@@ -1,5 +1,6 @@
 """Response-only privacy projection; authoritative storage remains intact."""
 from copy import deepcopy
+import json
 
 
 def public_person(person, *, include_authority=False):
@@ -12,6 +13,49 @@ def public_person(person, *, include_authority=False):
         from .business_policy import can_business_override
         result['can_business_override'] = can_business_override(person)
     return result
+
+
+PERSON_EVENT_FIELDS = ('name','department','role','active','default_workspace')
+
+
+def person_event_message(person_id, before, after):
+    """Whitelisted audit summary for a person change; never serializes the profile.
+
+    Capability names are authority data visible only to their owner, so the event
+    records that they changed, not which ones. Full diffs live in action receipts.
+    """
+    before, after = before or {}, after or {}
+    changes = {key: {'before': deepcopy(before.get(key)), 'after': deepcopy(after.get(key))}
+               for key in PERSON_EVENT_FIELDS if before.get(key) != after.get(key)}
+    summary = {'person': person_id, 'changes': changes}
+    if sorted(before.get('capabilities') or []) != sorted(after.get('capabilities') or []):
+        summary['capabilities_changed'] = True
+    return json.dumps(summary, ensure_ascii=False)
+
+
+def _sanitize_person_event(event):
+    """Rewrite legacy and current person events to the whitelisted summary."""
+    try:
+        data = json.loads(event.get('message') or '')
+    except (TypeError, ValueError):
+        data = None
+    if not isinstance(data, dict):
+        event['message'] = json.dumps({'person': None, 'changes': {}}, ensure_ascii=False)
+        return
+    if isinstance(data.get('before'), dict) or isinstance(data.get('after'), dict):
+        event['message'] = person_event_message(
+            data.get('person'),
+            data['before'] if isinstance(data.get('before'), dict) else {},
+            data['after'] if isinstance(data.get('after'), dict) else {})
+        return
+    changes = data.get('changes') if isinstance(data.get('changes'), dict) else {}
+    summary = {'person': data.get('person'),
+               'changes': {key: {'before': deepcopy(value.get('before')), 'after': deepcopy(value.get('after'))}
+                           for key, value in changes.items()
+                           if key in PERSON_EVENT_FIELDS and isinstance(value, dict)}}
+    if data.get('capabilities_changed'):
+        summary['capabilities_changed'] = True
+    event['message'] = json.dumps(summary, ensure_ascii=False)
 
 
 def public_source_cache(cache, user=None):
@@ -112,6 +156,9 @@ def filter_private_workspace(state, user):
     for key in ('capability_bindings','capability_awards','training_plans','learning_mappings'):
         state.pop(key, None)
     state.pop('_mention_reservations', None)
+    for item in state.get('events', []):
+        if isinstance(item, dict) and item.get('action') == 'admin_person':
+            _sanitize_person_event(item)
     for person in state.get('users', []):
         safe = public_person(person, include_authority=person.get('id') == ident)
         person.clear()

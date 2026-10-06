@@ -389,6 +389,7 @@ def apply_operation(ws,user,body,demo=False):
         require(not (p.get('migration_review_required') or p.get('migration_conflicts')),'來源案件合併尚待主管核對',409)
         if action!='finance_approve': require(not p.get('migration_finance_reapproval_required'),'合併後財務基準尚未重新共同核定',409)
     if action=='admin_person':
+        from .workspace_projection import person_event_message
         require(capable(user,'manage_people'))
         ident=str(data.get('id','')).strip(); require(bool(ident),'請提供已核對的 Lark open_id 或測試人員識別',422)
         target=next((x for x in ws['users'] if x['id']==ident),None)
@@ -407,7 +408,7 @@ def apply_operation(ws,user,body,demo=False):
         require(target['default_workspace'] in ('test','production'),'預設工作區錯誤',422)
         target['avatar']=target['name'][:1]; target['authz_version']=target.get('authz_version',0)+1
         for project in ws['projects']: refresh_project_state(project,ws)
-        event(ws,user,action,message=json.dumps({'person':ident,'before':previous,'after':target},ensure_ascii=False)); return True
+        event(ws,user,action,message=person_event_message(ident,previous,target)); return True
     if action=='admin_settings':
         require(user['role']=='manager')
         allowed=set(ws['settings'])
