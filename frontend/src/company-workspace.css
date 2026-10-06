@@ -18,3 +18,10 @@
 @media(max-width:760px){.inspector-fields>div{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}.inspector-fields dt{width:auto}.inspector-fields dd{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;flex-wrap:wrap}}
 
 fieldset.node-actions{border:0;padding:0;margin:0;min-width:0}
+
+/* Native approval actions: keep every action reachable at ~390px width and 200% text. */
+.native-approval-controls h3:focus{outline:none}.native-approval-controls h3:focus-visible{outline:3px solid #0c5494;outline-offset:3px}
+.native-approval-controls{min-width:0;overflow-wrap:anywhere}
+.native-approval-controls .inline-actions .button{min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere;height:auto;line-height:1.4}
+.native-approval-controls .form-error{overflow-wrap:anywhere}
+@media(max-width:480px){.native-approval-controls .inline-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}.native-approval-controls .inline-actions .button{width:100%;justify-content:center;text-align:center}}

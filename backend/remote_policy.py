@@ -39,7 +39,12 @@ def connection_policy(wid,state,cfg,kind,for_verification=False):
         return result
     org=cfg.get('LARK_WORKER_ORGANIZATION')
     if not org or wid!='lark-'+org or not for_verification and settings.get('external_enabled') is not True: raise RemoteFailure('正式外部連線未啟用或組織不符','blocked')
-    result={'mode':'production','simulated':False,'base_token':None,'drive_root':settings.get('drive_root') if kind=='file' else None}
+    result={'mode':'production','simulated':False,'base_token':None,'drive_root':None}
+    if kind=='file':
+        root=settings.get('drive_root'); approved=cfg.get('LARK_DRIVE_ROOT')
+        if not root or not approved or root!=approved: raise RemoteFailure('正式 Drive 目錄未同時核定於伺服器與工作區','blocked')
+        if root in {settings.get('test_drive_root'),cfg.get('LARK_TEST_DRIVE_ROOT')}: raise RemoteFailure('正式檔案不得使用隔離測試 Drive 目錄','blocked')
+        result['drive_root']=root
     if kind=='input':
         target=settings.get('input_base');table=settings.get('input_table')
         protected=FORMAL_BASES | {settings.get(k) for k in ('v4_base','quote_base','capability_base')} | {cfg.get(k) for k in ('LARK_V4_BASE_TOKEN','LARK_QUOTE_BASE_TOKEN','LARK_CAPABILITY_BASE_TOKEN')}

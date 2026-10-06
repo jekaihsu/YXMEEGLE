@@ -3,7 +3,7 @@ import type {Project,Node} from './types';
 
 export function ProjectRoleAssignment({c,p,n}:{c:Context;p:Project;n:Node}){
  const manage=c.s.user?.role==='manager'||c.s.user?.capabilities?.includes('manage_roles');
- return <ActionForm key={`${p.id}:${n.id}`} title="指定案件代表與本節點負責人" busy={c.busy} onSubmit={(d,e)=>{
+ return <ActionForm key={`${p.id}:${n.id}`} title="指定案件代表與本節點負責人" draftId={`role-assign:${p.id}:${n.id}`} busy={c.busy} onSubmit={(d,e)=>{
   const form=new FormData(e.currentTarget);
   void c.run('project_roles',{...d,...(manage?{reviewers:form.getAll('reviewers')}:{ }),issuer_ids:form.getAll('issuer_ids')},{project_id:p.id,node_id:n.id});
  }}>

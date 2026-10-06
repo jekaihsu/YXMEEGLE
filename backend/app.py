@@ -476,7 +476,7 @@ def create_app(overrides=None):
             if affected_ids:
                 for project in affected:require_execution(ws,project)
             hashes={n['id']:review_hash(p,n) for p in affected for n in p['nodes']}
-            if not apply_learning(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-')) and not apply_operation(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-')):
+            if not apply_learning(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-')) and not apply_operation(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-'),cfg):
                 apply_action(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-'))
                 for p in affected:
                     for n in p['nodes']:

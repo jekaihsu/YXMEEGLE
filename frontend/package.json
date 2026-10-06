@@ -7,7 +7,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test:session-epoch": "node test-session-epoch.mjs"
+    "test:session-epoch": "node test-session-epoch.mjs",
+    "test:input-recovery": "node test-input-recovery.mjs",
+    "test:native-approval-version": "node test-native-approval-version.mjs",
+    "test:native-approval-a11y": "node test-native-approval-a11y.mjs && node test-approval-detail-a11y.mjs",
+    "test:financial-draft": "node test-financial-draft-scope.mjs",
+    "test:form-draft": "node test-form-draft-identity.mjs && node test-recurring-draft-period.mjs && node test-draft-callsites.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",
