@@ -123,3 +123,35 @@ def test_reassigned_root_record_invalidates_both_cases(app,client):
     change(app,client,lambda s:s['sop_requests'][0].update(project_id='p2'))
     for pid in ('p1','p2'):
         assert request(client,ws,'project_roles',{'quotation_id':'u-pm'},pid=pid).status_code==409
+
+
+def test_sop_apply_route_gates_on_case_version_then_applies(app,client):
+    from sqlalchemy import select
+    from .app import AuditRow
+    def prepare(state):
+        p=state['projects'][0]
+        t=deepcopy(state['sop_templates'][0]);t.update(id='next-template',status='published')
+        state['sop_templates'].append(t)
+        state['sop_requests'].append({'id':'req','project_id':p['id'],'target_id':t['id'],'from_version':p['sop_version'],'status':'pending'})
+    def snapshot():
+        wid=app.state.signer.loads(client.cookies.get('meegle_session'))['wid']
+        with app.state.sessions.begin() as db:
+            row=db.get(WorkspaceRow,wid);state=storage.load(db,BusinessRow,row)
+            rows=db.execute(select(AuditRow).where(AuditRow.action=='sop_apply')).scalars().all()
+            return deepcopy(state),row.version,[(r.id,r.data.get('result')) for r in rows]
+    change(app,client,prepare);stale=workspace(client)
+    change(app,client,lambda s:s['projects'][0].update(name='Changed case'))  # bumps this case's version
+    before_state,before_version,before_audit=snapshot()
+    response=request(client,stale,'sop_apply',{'id':'req'})
+    assert response.status_code==409,response.text
+    after_state,after_version,after_audit=snapshot()
+    assert after_state==before_state and after_version==before_version
+    assert after_state['sop_requests'][0]['status']=='pending'
+    assert after_state['projects'][0]['sop_version']==before_state['projects'][0]['sop_version']
+    assert [a for a in after_audit if a not in before_audit]==[(a[0],'denied') for a in after_audit if a not in before_audit]  # only denial recorded
+    assert not [a for a in after_audit if a[1]!='denied']
+    current=request(client,workspace(client),'sop_apply',{'id':'req'})
+    assert current.status_code==200,current.text
+    final,final_version,final_audit=snapshot()
+    assert final['sop_requests'][0]['status']=='approved' and final['projects'][0]['sop_version']=='next-template'
+    assert final_version==before_version+1 and len([a for a in final_audit if a[1]!='denied'])==1
