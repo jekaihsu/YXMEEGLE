@@ -9,6 +9,7 @@ from .policy import upgrade, CAPABILITIES, TECHNICAL, FINANCIAL
 from .workflow import require, find, now, uid, event, blocked, all_tasks, valid_date, http_url
 from .delivery_approval import reviewer_seats, active_seats, approved_seats, refresh_reviewers
 from .business_policy import can_business_override
+from .quote_review_rules import invalidate_pending_quote_reviews
 
 def capable(user, capability):
     return user.get('active',True) and (user.get('role')=='manager' or capability in user.get('capabilities',[]))
@@ -509,9 +510,7 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
                 if data[key]: active_user(ws,data[key])
                 p[key]=data[key]
         if before_roles.get('pm_id')!=p.get('pm_id') or before_roles.get('sales_id')!=p.get('sales_id'):
-            for review in p.get('quote_reviews',[]):
-                if review.get('status')=='pending':
-                    review.update(status='invalidated',invalidated_at=now(),invalidated_reason='PM 或業務職責已改派，原投票失效')
+            invalidate_pending_quote_reviews(p)
         for node in p['nodes']:
             for task in node['tasks']:
                 role=task.get('sop_owner_role')
@@ -841,6 +840,8 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         active_user(ws,h['to_id']); prior=h['from_id']; replacement=h['to_id']
         require(not (p['pm_id']==prior and p['admin_id']==replacement or p['admin_id']==prior and p['pm_id']==replacement),'交接會造成PM與行政同人',409)
         previous_hashes={node['id']:review_hash(p,node) for node in p['nodes']}
+        if p['pm_id']==prior and prior!=replacement:
+            invalidate_pending_quote_reviews(p)
         for key in ('pm_id','admin_id','supervisor_id'):
             if p[key]==prior: p[key]=replacement
         for node in p['nodes']:

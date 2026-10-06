@@ -35,6 +35,7 @@ def apply_management(ws,user,body):
         fingerprint=digest(quote)
         principals={'pm':p.get('pm_id'),'sales':p.get('sales_id')}
         require(all(principals.values()) and principals['pm']!=principals['sales'],'報價需指定不同的 PM 與業務',409)
+        for ident in principals.values(): active_user(ws,ident)
         for previous in p['quote_reviews']:
             if (previous.get('quote_id')==quote['id'] and previous.get('source_hash')==fingerprint
                     and previous.get('classification')==classification and previous.get('status')=='pending'
