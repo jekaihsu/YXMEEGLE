@@ -12,6 +12,11 @@ for(const f of fs.readdirSync('src').filter(f=>f.endsWith('.tsx')&&f!=='FormDraf
    if(tag==='ActionForm'||tag==='DraftForm'){
     const title=n.attributes.properties.find(a=>ts.isJsxAttribute(a)&&a.name.text==='title');
     const attr=n.attributes.properties.find(a=>ts.isJsxAttribute(a)&&a.name.text==='draftId');
+    const submit=n.attributes.properties.find(a=>ts.isJsxAttribute(a)&&a.name.text==='onSubmit');
+    const handler=submit?.initializer?.expression;
+    assert.ok(handler&&ts.isArrowFunction(handler),`${f}: expected an explicit save callback`);
+    assert.ok(!ts.isVoidExpression(handler.body),`${f}: save callback must return the promise`);
+    if(ts.isBlock(handler.body))assert.ok(handler.body.statements.some(ts.isReturnStatement),`${f}: save callback must return its save result`);
     sites.push({where:`${f}:${sf.getLineAndCharacterOfPosition(n.getStart()).line+1}`,title:title?.initializer?.getText(sf),attr,sf});
    }
   }
