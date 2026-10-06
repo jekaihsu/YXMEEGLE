@@ -12,7 +12,7 @@ import secrets
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 from datetime import datetime, timezone
-from sqlalchemy import create_engine, MetaData, Table, Column, String, Integer, JSON, select, inspect
+from sqlalchemy import create_engine, MetaData, Table, Column, String, Integer, JSON, ForeignKey, select, inspect
 try:
     from .backup_publish import publish
 except ImportError:
@@ -23,7 +23,7 @@ TABLES=[
     Table('workspaces',META,Column('id',String(120),primary_key=True),Column('version',Integer,nullable=False),Column('data',JSON,nullable=False)),
     Table('receipts',META,Column('id',String(300),primary_key=True),Column('fingerprint',String(64)),Column('result',JSON)),
     Table('source_caches',META,Column('id',String(120),primary_key=True),Column('data',JSON)),
-    Table('business_records',META,Column('workspace_id',String(120),primary_key=True),Column('kind',String(60),primary_key=True),Column('entity_id',String(160),primary_key=True),Column('parent_id',String(160),nullable=False,index=True),Column('ordinal',Integer,nullable=False),Column('data',JSON,nullable=False)),
+    Table('business_records',META,Column('workspace_id',String(120),ForeignKey('workspaces.id'),primary_key=True),Column('kind',String(60),primary_key=True),Column('entity_id',String(160),primary_key=True),Column('parent_id',String(160),nullable=False,index=True),Column('ordinal',Integer,nullable=False),Column('data',JSON,nullable=False)),
     Table('company_people',META,Column('organization_id',String(120),primary_key=True),Column('person_id',String(120),primary_key=True),Column('data',JSON,nullable=False)),
     Table('action_audit',META,Column('id',String(64),primary_key=True),Column('workspace_id',String(120),nullable=False,index=True),Column('actor_id',String(120),nullable=False),Column('action',String(120),nullable=False),Column('created_at',String(64),nullable=False,index=True),Column('data',JSON,nullable=False)),
 ]

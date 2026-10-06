@@ -118,3 +118,44 @@ def test_event_history_is_append_only_and_old_ordinals_stay_stable(tmp_path):
         after={r.entity_id:r.ordinal for r in db.scalars(select(BusinessRow).where(BusinessRow.workspace_id=='lark-company',BusinessRow.kind=='events'))}
         assert all(after[k]==v for k,v in ordinals.items())
         assert after['new-event']<min(ordinals.values(),default=0)
+
+
+def test_pilot_copy_copies_verified_attachment_to_isolated_namespace(tmp_path):
+    import hashlib
+    app,c=company(tmp_path)
+    with app.state.sessions.begin() as db:
+        row=db.get(WorkspaceRow,'lark-company'); state=storage.load(db,BusinessRow,row)
+        project=state['projects'][0]; payload=b'formal attachment bytes'
+        file_id='pilot-file'; digest=hashlib.sha256(payload).hexdigest()
+        project['files']=[{'id':file_id,'name':'proof.txt','storage':'local','size':len(payload),'sha256':digest,'url':f'/api/files/{file_id}/download'}]
+        row.data=storage.save(db,BusinessRow,row.id,state)
+    source_dir=app.state.upload_dir/hashlib.sha256(b'lark-company').hexdigest(); source_dir.mkdir()
+    (source_dir/'pilot-file').write_bytes(payload)
+    response=c.post('/api/pilot/copy',json={'project_id':project['id']})
+    assert response.status_code==200,response.text
+    test_dir=app.state.upload_dir/hashlib.sha256(b'test-lark-company').hexdigest()
+    assert (test_dir/'pilot-file').read_bytes()==payload
+    assert (source_dir/'pilot-file').read_bytes()==payload
+    copied=c.get('/api/files/pilot-file/download')
+    assert copied.status_code==200 and copied.content==payload
+    assert c.post('/api/workspace/switch',json={'environment':'production'}).status_code==200
+    formal=c.get('/api/files/pilot-file/download')
+    assert formal.status_code==404
+
+
+def test_pilot_copy_rejects_missing_or_corrupt_attachment_without_workspace_change(tmp_path):
+    import hashlib
+    app,c=company(tmp_path)
+    with app.state.sessions.begin() as db:
+        row=db.get(WorkspaceRow,'lark-company'); state=storage.load(db,BusinessRow,row)
+        project=state['projects'][0]
+        project['files']=[{'id':'missing-file','name':'proof.txt','storage':'local','size':1,'sha256':hashlib.sha256(b'x').hexdigest()}]
+        row.data=storage.save(db,BusinessRow,row.id,state)
+    before=c.get('/api/workspace').json()
+    c.post('/api/workspace/switch',json={'environment':'production'})
+    response=c.post('/api/pilot/copy',json={'project_id':project['id']})
+    assert response.status_code==409
+    c.post('/api/workspace/switch',json={'environment':'test'})
+    after=c.get('/api/workspace').json()
+    assert len(after['projects'])==len(before['projects'])
+    assert not (app.state.upload_dir/hashlib.sha256(b'test-lark-company').hexdigest()/'missing-file').exists()

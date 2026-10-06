@@ -59,6 +59,32 @@ class Action(BaseModel):
 
 BusinessRow,PersonRow=storage.models(Base)
 
+def _copy_local_pilot_attachments(upload_dir,source_wid,target_wid,project):
+    """Copy verified local bytes into the test namespace; never mutate source files."""
+    source_root=Path(upload_dir).resolve()/hashlib.sha256(source_wid.encode()).hexdigest()
+    target_root=Path(upload_dir).resolve()/hashlib.sha256(target_wid.encode()).hexdigest()
+    created=[]; copied={}
+    try:
+        for item in project.get('files',[]):
+            if item.get('storage')!='local': continue
+            ident=item.get('id')
+            require(isinstance(ident,str) and ident and Path(ident).name==ident and ident not in ('.','..'),'附件識別碼錯誤',409)
+            source=(source_root/ident).resolve(); destination=target_root/ident
+            require(source.is_relative_to(source_root) and source.is_file(),'正式附件檔案不存在',409)
+            payload=source.read_bytes(); digest=hashlib.sha256(payload).hexdigest()
+            require(isinstance(item.get('size'),int) and len(payload)==item['size'],'正式附件大小不符',409)
+            require(isinstance(item.get('sha256'),str) and digest==item['sha256'],'正式附件校驗失敗',409)
+            if ident in copied:
+                require(copied[ident]==(len(payload),digest),'附件索引衝突',409)
+                continue
+            target_root.mkdir(parents=True,exist_ok=True)
+            with destination.open('xb') as handle: handle.write(payload)
+            created.append(destination); copied[ident]=(len(payload),digest)
+        return created
+    except Exception:
+        for path in created: path.unlink(missing_ok=True)
+        raise
+
 def create_app(overrides=None):
     cfg=dict(os.environ); cfg.update(overrides or {})
     production=cfg.get('APP_ENV','development')=='production'
@@ -699,21 +725,27 @@ def create_app(overrides=None):
     async def copy_pilot(request:Request):
         data,user=identity(request); require(data['mode']=='lark' and user['role']=='manager','需公司管理員',403)
         body=await request.json(); org=organization(data); wid='test-'+org; ensure_workspace(wid,True)
-        with sessions.begin() as db:
-            source=db.get(WorkspaceRow,org); require(source is not None,'正式工作區尚未建立',409); source_state=load(db,source)
-            p=find(source_state['projects'],body.get('project_id'),'V4案件'); target=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one(); state=load(db,target); expected=target.version
-            require(not any(x.get('pilot_source_id')==p['id'] for x in state['projects']),'此試行案已複製',409)
-            copy=deepcopy(p); copy['pilot_source_id']=p['id']; copy['pilot']=True
-            # Preserve stable IDs in the isolated namespace, not production identities/recipients.
-            copy['pm_id']=user['id']; copy['admin_id']=''; copy['supervisor_id']=''; copy['issuer_ids']=[user['id']]; copy['confirmation_issues']=[]
-            for node in copy['nodes']:
-                node['owner_id']=user['id']; node['supervisor_id']=''; node['reviewers']=[]; node['collaborator_ids']=[]; node['review_cycles']=[]
-                for task in node['tasks']: task['owner_id']=user['id']; task.pop('proxy',None)
-            state['projects'].append(copy); state['environment']='test'; state['version']=expected+1
-            root=storage.save(db,BusinessRow,wid,state)
-            updated=db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==expected).values(version=expected+1,data=root))
-            require(updated.rowcount==1,'工作區已變更，請重新操作',409)
-            db.add(audit.record(AuditRow,wid,user['id'],'pilot_copy',details={'project_id':copy['id'],'source_workspace':org}))
+        copied_files=[]
+        try:
+            with sessions.begin() as db:
+                source=db.get(WorkspaceRow,org); require(source is not None,'正式工作區尚未建立',409); source_state=load(db,source)
+                p=find(source_state['projects'],body.get('project_id'),'V4案件'); target=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one(); state=load(db,target); expected=target.version
+                require(not any(x.get('pilot_source_id')==p['id'] for x in state['projects']),'此試行案已複製',409)
+                copy=deepcopy(p); copy['pilot_source_id']=p['id']; copy['pilot']=True
+                # Preserve stable IDs in the isolated namespace, not production identities/recipients.
+                copy['pm_id']=user['id']; copy['admin_id']=''; copy['supervisor_id']=''; copy['issuer_ids']=[user['id']]; copy['confirmation_issues']=[]
+                for node in copy['nodes']:
+                    node['owner_id']=user['id']; node['supervisor_id']=''; node['reviewers']=[]; node['collaborator_ids']=[]; node['review_cycles']=[]
+                    for task in node['tasks']: task['owner_id']=user['id']; task.pop('proxy',None)
+                copied_files=_copy_local_pilot_attachments(upload_dir,org,wid,copy)
+                state['projects'].append(copy); state['environment']='test'; state['version']=expected+1
+                root=storage.save(db,BusinessRow,wid,state)
+                updated=db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==expected).values(version=expected+1,data=root))
+                require(updated.rowcount==1,'工作區已變更，請重新操作',409)
+                db.add(audit.record(AuditRow,wid,user['id'],'pilot_copy',details={'project_id':copy['id'],'source_workspace':org}))
+        except Exception:
+            for path in copied_files: path.unlink(missing_ok=True)
+            raise
         return {'ok':True,'workspace':'test','project_id':copy['id']}
 
     from .integration_routes import register

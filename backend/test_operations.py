@@ -292,6 +292,8 @@ def test_backup_restore_normalized_rows_and_file_hash(api_app,ws,tmp_path):
     with restored.connect() as conn:
         assert conn.execute(select(BusinessRow).where(BusinessRow.kind=='projects')).first()
         assert conn.execute(select(WorkspaceRow)).first()
+        foreign_keys=conn.exec_driver_sql('PRAGMA foreign_key_list(business_records)').fetchall()
+        assert any(row[2]=='workspaces' and row[3]=='workspace_id' and row[4]=='id' for row in foreign_keys)
     with pytest.raises(ValueError): restore(restored,out,target)
 
 def test_source_configuration_allows_two_sources_and_rejects_wrong_kinds(monkeypatch):
