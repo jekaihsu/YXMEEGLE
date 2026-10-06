@@ -356,7 +356,7 @@ def vote(ws,user,p,n,data):
         if all(x['status']=='completed' for x in p['nodes'] if x['key'] in TECHNICAL): p['execution_status']='engineering_complete'
         if n['key']=='settlement': p['execution_status']='completed'
 
-def apply_operation(ws,user,body,demo=False):
+def apply_operation(ws,user,body,demo=False,cfg=None):
     from .input_validation import validate_action
     validate_action(body)
     """Returns False for legacy task actions, True for handled actions."""
@@ -430,6 +430,11 @@ def apply_operation(ws,user,body,demo=False):
         require(not proposed.get('input_base') or proposed['input_base'] not in (proposed['v4_base'],proposed['quote_base'],proposed['capability_base'],proposed['test_base']),'Input 登錄 Base 不可指向來源或測試 Base',422)
         require(not proposed.get('test_input_table') or proposed['test_input_table']!=proposed.get('input_table'),'隔離測試 Input 表不可混用正式表',422)
         require(not proposed['test_drive_root'] or proposed['test_drive_root']!=proposed['drive_root'],'測試目錄不可指向正式目錄',422)
+        if cfg is not None and ('drive_root' in data or 'test_drive_root' in data):
+            for key in ('drive_root','test_drive_root'): require(isinstance(proposed.get(key),str),'Drive 目錄需為文字',422)
+            approved,test_root=cfg.get('LARK_DRIVE_ROOT'),cfg.get('LARK_TEST_DRIVE_ROOT')
+            require(not proposed['drive_root'] or ws.get('environment')!='production' or (proposed['drive_root']==approved and proposed['drive_root']!=test_root),'正式 Drive 目錄須等同伺服器核定目錄且不得為測試目錄',422)
+            require(not proposed['test_drive_root'] or proposed['test_drive_root']!=approved,'測試目錄不可指向伺服器核定的正式目錄',422)
         ws['settings']=proposed
     elif action=='sop_draft':
         require(capable(user,'edit_sop'))
