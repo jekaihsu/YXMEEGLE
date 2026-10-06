@@ -18,6 +18,7 @@ const cases=[
  ['syn-pending',{status:'pending',source_status:'待檢核'},'原日報待檢核'],
  ['syn-unverified',{status:'unverified',source_status:''},'原日報檢核待查證'],
  ['syn-unknown',{status:'reviewed'},'原日報檢核待查證'],
+ ['syn-conflict',{status:'conflict'},'原日報檢核待查證'],
  ['syn-partial',{status:'partial'},'原日報檢核待查證'],
  ['syn-missing',undefined,'原日報檢核待查證'],
 ];
