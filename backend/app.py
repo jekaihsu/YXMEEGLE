@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 from itsdangerous import URLSafeTimedSerializer, BadSignature
 from pydantic import BaseModel, Field
-from sqlalchemy import create_engine, Column, String, Integer, JSON, select, update, cast, or_, and_
+from sqlalchemy import create_engine, Column, String, Integer, JSON, select, update, cast, or_, and_, func
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.engine import make_url
@@ -401,27 +401,33 @@ def create_app(overrides=None):
 
         Visibility is decided per row by ``accept`` (never after an unsafe LIMIT): every
         batch is fully filtered before the next keyset page is read, and the scan stops
-        once the requested page plus one lookahead row is known. Memory and DB reads
-        follow offset+limit, not total history. ``total`` is exact when history is
+        once the requested page plus one lookahead row is known. Memory is bounded
+        by the page and batch sizes; reads stop after offset+limit+1 accepted
+        rows or exhaustion (sparse visibility can still
+        require scanning the history). ``total`` is exact when history is
         exhausted, otherwise a lower bound (``has_more`` is true).
         """
         base=select(AuditRow).where(AuditRow.workspace_id==wid,*prefilter)
         if project_id:  # conservative superset; exact check stays in ``accept``
-            like=json.dumps(project_id).replace('\\','\\\\').replace('%','\\%').replace('_','\\_')
-            base=base.where(cast(AuditRow.data,String).like('%'+like+'%',escape='\\'))
-        need=offset+limit+1; items=[]; last=None; exhausted=False
-        while len(items)<need:
+            # SQLite JSON can escape Unicode; PostgreSQL JSON casts can retain it.
+            encodings={json.dumps(project_id,ensure_ascii=ascii_only) for ascii_only in (True,False)}
+            patterns=[value.replace('\\','\\\\').replace('%','\\%').replace('_','\\_') for value in encodings]
+            base=base.where(or_(*[cast(AuditRow.data,String).like('%'+pattern+'%',escape='\\') for pattern in patterns]))
+        need=offset+limit+1; items=[]; accepted=0; last=None; exhausted=False
+        while accepted<need:
             query=base
             if last: query=query.where(or_(AuditRow.created_at<last[0],and_(AuditRow.created_at==last[0],AuditRow.id<last[1])))
             rows=list(db.scalars(query.order_by(AuditRow.created_at.desc(),AuditRow.id.desc()).limit(AUDIT_BATCH)))
             for row in rows:
                 item=accept(row)
-                if item is not None: items.append(item)
+                if item is not None:
+                    accepted+=1
+                    if offset<accepted<=need: items.append(item)
             if len(rows)<AUDIT_BATCH: exhausted=True; break
             last=(rows[-1].created_at,rows[-1].id)
-        has_more=len(items)>offset+limit
-        total=len(items) if exhausted else need
-        return {'items':items[offset:offset+limit],'total':total,'offset':offset,'limit':limit,'has_more':has_more}
+        has_more=accepted>offset+limit
+        total=accepted if exhausted else need
+        return {'items':items[:limit],'total':total,'offset':offset,'limit':limit,'has_more':has_more}
 
     @app.get('/api/audit')
     def action_audit(request:Request,project_id:str='',offset:int=0,limit:int=50):
@@ -446,7 +452,7 @@ def create_app(overrides=None):
             prefilter=()
             if not manager:  # same rule as ``accept``, pushed into SQL to skip rows early
                 prefilter=(or_(AuditRow.actor_id==user['id'],
-                    and_(*[~AuditRow.action.startswith(x,autoescape=True) for x in ('admin_','company_admin_','person','delegation','people_')])),)
+                    and_(*[func.substr(AuditRow.action,1,len(x))!=x for x in ('admin_','company_admin_','person','delegation','people_')])),)
             return audit_page(db,data['wid'],offset,limit,project_id,accept,prefilter)
 
     @app.get('/api/admin/audit/history')
