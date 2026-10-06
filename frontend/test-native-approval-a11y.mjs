@@ -76,6 +76,14 @@ await click(btn('cancel'));duringRequest=null;
 item={id:'r1',project_id:'p1',status:'canceled'};
 gate=null;await act(async()=>{hold();await new Promise(r=>setTimeout(r,0))});
 assert.equal(document.activeElement,outside,'focus that left the section stays outside');
+// Later focus loss (outside element blurs) must not resurrect the stale control and pull focus back in.
+document.activeElement.blur();await render();
+assert.equal(document.activeElement,document.body,'stale restoration must not steal focus after it left the section');
+// onBlur alone (no render while focus is outside) must drop the stale target before the control unmounts.
+item={...submitted,native_binding:{...submitted.native_binding}};await render();
+btn('cancel').focus();outside.focus();document.activeElement.blur();
+item={id:'r1',project_id:'p1',status:'canceled'};await render();
+assert.equal(document.activeElement,document.body,'onBlur leaving the section clears stale restoration');
 outside.remove();window.confirm=()=>confirms.shift();
 item={...submitted,native_binding:{...submitted.native_binding}};await render();
 
