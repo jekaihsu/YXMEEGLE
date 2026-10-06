@@ -75,7 +75,8 @@ def confirmation_current(p,n,issue):
     return bool(issue.get('evidence_id')==evidence.get('id')
                 and issue.get('pm_id')==p['pm_id']
                 and issue.get('fingerprint')==digest({'version':version,
-                    'evidence':evidence.get('id'),'pm':p['pm_id'],'recipients':recipients}))
+                    'evidence':evidence.get('id'),'pm':p['pm_id'],'recipients':recipients,
+                    **({'groups':issue['recipient_groups']} if issue.get('recipient_groups') else {})}))
 
 
 def daily_evidence_current(p,e):
@@ -867,7 +868,7 @@ def apply_operation(ws,user,body,demo=False):
         require(evidence and evidence['status']=='accepted','需核定確認單資料',409)
         groups=data.get('recipient_groups') or {}
         from .sop_execution import fan_out_targets
-        require(isinstance(groups,dict) and set(groups)<=set(recipients) and all(isinstance(v,list) and v and set(v)<=set(fan_out_targets()) for v in groups.values()),'收件人組別須屬 state_4 的下游節點',422)
+        require(isinstance(groups,dict) and set(groups)<=set(recipients) and all(isinstance(v,list) and v and all(isinstance(x,str) for x in v) and set(v)<=set(fan_out_targets()) for v in groups.values()),'收件人組別須屬 state_4 的下游節點',422)
         groups={k:sorted(set(v)) for k,v in groups.items()}
         fingerprint=digest({'version':version,'evidence':evidence['id'],'pm':p['pm_id'],'recipients':recipients,**({'groups':groups} if groups else {})})
         prior=next((i for i in p['confirmation_issues'] if i['version']==version),None)

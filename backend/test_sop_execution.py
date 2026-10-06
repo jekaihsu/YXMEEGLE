@@ -339,3 +339,36 @@ def test_all_eight_fixture_scenarios_are_covered_by_name():
                    'revision_rollback', 'no_label_inferred_edge', 'disabled_assessment', 'financial_native_gate'}
     source = Path(__file__).read_text(encoding='utf-8')
     assert all(f'# {name}' in source or f'#  {name}' in source or f'  # {name}' in source for name in ids)
+
+
+def issue_with_groups(company, groups):
+    ws, p = company
+    node = next(n for n in p['nodes'] if n['key'] == 'confirmation')
+    p['evidence'].append({'id': 'e1', 'node_id': node['id'], 'key': 'confirmation', 'status': 'accepted'})
+    p['issuer_ids'] = ['u-pm']
+    act(company, 'confirmation_issue', {'version': '1', 'recipients': ['u-field'], 'recipient_groups': groups})
+    return node, p['confirmation_issues'][0]
+
+
+def test_issue_with_recipient_groups_can_be_acknowledged(company):
+    from .operations import confirmation_current
+    ws, p = company
+    node, issue = issue_with_groups(company, {'u-field': ['state_39']})
+    issue['status'] = 'issued'
+    assert confirmation_current(p, node, issue)
+    act(company, 'confirmation_ack', {'id': issue['id'], 'evidence': '本組確認'}, user='u-field')
+    assert [a['user_id'] for a in issue['acknowledgments']] == ['u-field']
+    issue['recipient_groups'] = {'u-field': ['state_38']}      # tampered scope is still detected
+    assert not confirmation_current(p, node, issue)
+
+
+@pytest.mark.parametrize('groups', [{'u-field': [['state_39']]}, {'u-field': [{'a': 1}]}, {'u-field': 'state_39'},
+                                    {'u-field': []}, {'u-other': ['state_39']}, ['state_39']])
+def test_malformed_recipient_groups_are_client_errors(company, groups):
+    ws, p = company
+    node = next(n for n in p['nodes'] if n['key'] == 'confirmation')
+    p['evidence'].append({'id': 'e1', 'node_id': node['id'], 'key': 'confirmation', 'status': 'accepted'})
+    p['issuer_ids'] = ['u-pm']
+    with pytest.raises(HTTPException) as caught:
+        act(company, 'confirmation_issue', {'version': '1', 'recipients': ['u-field'], 'recipient_groups': groups})
+    assert caught.value.status_code == 422 and p['confirmation_issues'] == []
