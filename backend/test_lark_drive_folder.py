@@ -107,3 +107,46 @@ def test_drive_folder_duplicate_on_same_page_is_rejected():
     with pytest.raises(RemoteFailure,match='重名'):
         adapter.folder('parent','Output')
     assert all(request.method=='GET' for request in requests)
+
+
+@pytest.mark.parametrize('match_page',[None,'next'])
+def test_drive_folder_returns_unique_match_only_after_complete_scan(match_page):
+    match={'name':'Output','type':'folder','token':'unique'}
+    adapter,requests=adapter_with_pages({
+        None:{'files':[match] if match_page is None else [],
+              'has_more':True,'next_page_token':'next'},
+        'next':{'files':[match] if match_page=='next' else [],'has_more':False},
+    })
+    assert adapter.folder('parent','Output')=='unique'
+    assert [request.method for request in requests]==['GET','GET']
+    assert [request.url.params.get('page_token') for request in requests]==[None,'next']
+    assert all(request.url.params['folder_token']=='parent' for request in requests)
+
+
+def test_drive_folder_incomplete_page_after_match_blocks_reuse():
+    adapter,requests=adapter_with_pages({
+        None:{'files':[{'name':'Output','type':'folder','token':'first'}],
+              'has_more':True,'next_page_token':'next'},
+        'next':{},
+    })
+    with pytest.raises(RemoteFailure) as failure:
+        adapter.folder('parent','Output')
+    assert failure.value.status=='blocked'
+    assert [request.method for request in requests]==['GET','GET']
+
+
+@pytest.mark.parametrize('has_match',[False,True])
+def test_drive_folder_page_limit_blocks_reuse_and_creation(has_match):
+    pages={}
+    for index in range(100):
+        pages[None if index==0 else str(index)]={
+            'files':[{'name':'Output','type':'folder','token':'first'}]
+                    if has_match and index==0 else [],
+            'has_more':True,'next_page_token':str(index+1),
+        }
+    adapter,requests=adapter_with_pages(pages)
+    with pytest.raises(RemoteFailure,match='查詢上限') as failure:
+        adapter.folder('parent','Output')
+    assert failure.value.status=='blocked'
+    assert len(requests)==100
+    assert all(request.method=='GET' for request in requests)
