@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select, update
 from . import storage
 from .policy import upgrade
-from .source_lifecycle import declared
+from .source_lifecycle import declared, needs_review
 from .workflow import now, find, require, event
 from .operations import queue, is_workday, next_due, operator, capable, active_user
 from .lark_adapter import application_adapter, RemoteFailure
@@ -58,7 +58,7 @@ def schedule(ws,clock=None):
         if not execution_allowed(ws,p):continue
         if p.get('case_type')=='intake': continue
         if not p.get('pm_id'): continue
-        if declared(p) in ('報價中','已結案','中止') or p.get('execution_status')=='completed': continue
+        if needs_review(p) or declared(p) in ('報價中','已結案','中止') or p.get('execution_status')=='completed': continue
         definitions=[('daily_progress',p['pm_id']),('field_schedule',next((n['owner_id'] for n in p['nodes'] if n['key']=='field'),'')),('indoor_schedule',p['supervisor_id']),('weekly_review',p['pm_id'])]
         if declared(p)=='執行中' or p['execution_status']=='in_progress': definitions.append(('client_contact',p['pm_id']))
         for kind,owner in definitions:
@@ -73,7 +73,7 @@ def schedule(ws,clock=None):
             continue
         if r['status']!='active': continue
         p=next((p for p in ws['projects'] if p['id']==r['project_id']),None); kind=r['kind']
-        if not p or not execution_allowed(ws,p) or p.get('case_type')=='intake':continue
+        if not p or not execution_allowed(ws,p) or p.get('case_type')=='intake' or needs_review(p):continue
         instant=datetime.fromisoformat(clock)
         if instant.tzinfo is None:instant=instant.replace(tzinfo=ZoneInfo('Asia/Taipei'))
         r['deadline']=cutoff(ws,r['owner_id'],r['due_date'],clock=instant)

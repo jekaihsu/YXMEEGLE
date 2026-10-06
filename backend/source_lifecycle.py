@@ -15,13 +15,27 @@ DATE_OPTION = re.compile(r'^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$|^\d{1,2}[-/.]\d{1,2}$
 
 
 def declared(p):
-    """The only lifecycle value workflow behavior may depend on; raw source_status never counts."""
-    return (p.get('source_lifecycle') or {}).get('canonical')
+    """The only lifecycle value workflow behavior may depend on; raw source_status never counts.
+
+    Returns a canonical option only when the summary is fully verified: state is
+    mapped, no review reasons remain and the value is a documented option.
+    Anything else (missing, blank, unknown, conflicting, malformed) is None.
+    """
+    lifecycle = p.get('source_lifecycle')
+    if not isinstance(lifecycle, dict) or lifecycle.get('state') != 'mapped' or lifecycle.get('reasons'):
+        return None
+    canonical = lifecycle.get('canonical')
+    return canonical if canonical in LIFECYCLE else None
+
+
+def governed(p):
+    """Lark-sourced cases (or any carrying a lifecycle summary) are governed by source lifecycle."""
+    return p.get('source_kind') == 'lark' or 'source_lifecycle' in p
 
 
 def needs_review(p):
-    lifecycle = p.get('source_lifecycle')
-    return bool(lifecycle) and lifecycle.get('state') != 'mapped'
+    """Governed cases without a verified canonical lifecycle fail closed (待核對)."""
+    return governed(p) and declared(p) is None
 
 
 def quote_workflow_kind(raw):
@@ -52,7 +66,7 @@ def summarize(confirmations, quotes):
         reasons.append('unknown_option')
     if len(values) > 1:
         reasons.append('conflict')
-    if not values and not reasons:
+    if not lifecycle or any(e['state'] == 'blank' for e in lifecycle):
         reasons.append('blank')
     canonical = next(iter(values)) if len(values) == 1 and not reasons else None
     return {
