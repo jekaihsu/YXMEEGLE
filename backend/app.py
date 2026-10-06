@@ -446,7 +446,7 @@ def create_app(overrides=None):
             prefilter=()
             if not manager:  # same rule as ``accept``, pushed into SQL to skip rows early
                 prefilter=(or_(AuditRow.actor_id==user['id'],
-                    and_(*[~AuditRow.action.startswith(x) for x in ('admin_','company_admin_','person','delegation','people_')])),)
+                    and_(*[~AuditRow.action.startswith(x,autoescape=True) for x in ('admin_','company_admin_','person','delegation','people_')])),)
             return audit_page(db,data['wid'],offset,limit,project_id,accept,prefilter)
 
     @app.get('/api/admin/audit/history')

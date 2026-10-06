@@ -68,3 +68,15 @@ def test_non_manager_restricted_actions_filtered_in_sql_not_after_limit(isolated
     signin('u-pm')
     body=client.get('/api/audit?limit=5').json()
     assert body['items'] and all(not r['action'].startswith('admin_') for r in body['items'])
+
+
+def test_prefix_prefilter_escapes_like_wildcards(isolated_http):
+    app,client,_,signin=isolated_http
+    # 'admin_' / 'people_' contain LIKE wildcards; adminX*/peopleX* are not restricted by Python startswith
+    with app.state.sessions.begin() as db:
+        for i,action in enumerate(('adminXfoo','peopleXbar','admin_real','people_real')):
+            db.add(AuditRow(id=f'wc-{i}',workspace_id=WID,actor_id='u-manager',action=action,
+                created_at=f'2027-02-01T00:00:{i:02d}+00:00',data={'result':'success','changes':[]}))
+    signin('u-pm')
+    ids={r['id'] for r in client.get('/api/audit?limit=100').json()['items']}
+    assert {'wc-0','wc-1'}<=ids and not {'wc-2','wc-3'}&ids
