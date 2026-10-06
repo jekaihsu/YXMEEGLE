@@ -59,10 +59,13 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
             if not runnable:continue
             if name:project_groups.add(name)
             from .policy import FINANCIAL
+            from .sop_contracts import disabled_task
             if node.get('key') not in FINANCIAL:
                 counts['pending_local_reviews']+=sum(c.get('status')=='pending' and not c.get('historical_scope') for c in node.get('review_cycles',[]))
             for task in node.get('tasks',[]):
                 if task.get('status') in ('superseded','not_applicable','skipped','cancelled','canceled'):continue
+                # SOP-disabled tasks stay as history but are not current workload.
+                if disabled_task(task):continue
                 complete=task.get('status')=='completed';due=actual_date(task.get('due_date'))
                 overdue=not complete and due is not None and due<today
                 counts['tasks_total']+=1;counts['tasks_completed']+=int(complete);counts['tasks_overdue']+=int(overdue)

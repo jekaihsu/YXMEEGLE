@@ -107,3 +107,16 @@ def test_output_whitelist_excludes_person_salary_leave_and_financial_payloads():
     result=overview({'projects':[project],'users':[{'email':'secret-user-email'}],
         'approved_leave_delegations':[{'reason':'secret-leave'}]})
     assert 'secret-' not in json.dumps(result)
+
+
+def test_sop_disabled_tasks_are_excluded_from_current_workload_until_restored():
+    project=case()
+    project['nodes'][0]['tasks']=[{'status':'pending','due_date':'2020-01-01','sop_disabled':True,'required':False},
+        {'status':'pending','sop_disabled':True},{'status':'pending','due_date':'2020-01-01'}]
+    clock=datetime(2026,10,2,tzinfo=timezone.utc)
+    result=overview({'projects':[project]},clock=clock)
+    assert result['totals']['tasks_total']==1 and result['totals']['tasks_overdue']==1
+    assert result['missing']['task_due_date']==0
+    project['nodes'][0]['tasks'][0]['sop_disabled']=False
+    restored=overview({'projects':[project]},clock=clock)
+    assert restored['totals']['tasks_total']==2 and restored['totals']['tasks_overdue']==2
