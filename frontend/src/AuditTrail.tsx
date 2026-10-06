@@ -6,6 +6,7 @@ export function AuditTrail({w,p}:{w:Workspace;p:Project}){
  // Every piece of fetched state is tagged with the project (and offset) it was requested for, so a render
  // for another project can never display it, even before an effect has had a chance to clear it.
  const[nav,setNav]=useState({pid:p.id,page:0});const page=nav.pid===p.id?nav.page:0;const setPage=(n:number)=>setNav({pid:p.id,page:n});
+ if(nav.pid!==p.id)setNav({pid:p.id,page:0});
  const requestKey=`${p.id}:${w.version}:${page}`;
  const[loaded,setLoaded]=useState<{key:string;data:{items:any[];total:number}|null;legacy:boolean;error:string}|null>(null);
  useEffect(()=>{const controller=new AbortController();const isCurrent=()=>!controller.signal.aborted;setLoaded(null);void api<any>(`/api/audit?project_id=${encodeURIComponent(p.id)}&offset=${page*30}&limit=30`,{signal:controller.signal}).then(result=>{if(!isCurrent())return;if(!Array.isArray(result.items))throw new Error('操作紀錄格式不完整');setLoaded({key:requestKey,data:result,legacy:false,error:''})}).catch(e=>{if(!isCurrent())return;if(e instanceof ApiError&&e.status===404)setLoaded({key:requestKey,data:null,legacy:true,error:''});else setLoaded({key:requestKey,data:null,legacy:false,error:e.message})});return()=>controller.abort()},[requestKey,p.id,page]);

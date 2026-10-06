@@ -15,10 +15,11 @@ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 
 // Controllable fetch: each call is recorded and settled by the test, in any order.
 let calls=[];
-globalThis.fetch=(url,init)=>new Promise((resolve,reject)=>{
+globalThis.fetch=(url,init)=>new Promise(resolve=>{
  const call={url:String(url),pid:new URL(String(url),'http://x').searchParams.get('project_id'),offset:new URL(String(url),'http://x').searchParams.get('offset'),
   reply:(status,body)=>resolve({ok:status<400,status,json:async()=>body}),aborted:false};
- init?.signal?.addEventListener('abort',()=>{call.aborted=true;reject(Object.assign(new Error('aborted'),{name:'AbortError'}))});
+ // Deliberately allow replies after abort to exercise the component's stale-response guard.
+ init?.signal?.addEventListener('abort',()=>{call.aborted=true});
  calls.push(call)});
 const last=pid=>calls.filter(c=>c.pid===pid).at(-1);
 const w={version:1,users:[],events:[{id:'E1',project_id:'A',message:'LEGACY_A',at:'t'},{id:'E2',project_id:'B',message:'LEGACY_B',at:'t'}]};
@@ -40,8 +41,8 @@ for(const keyed of [false,true]){
   // go to A page 2 so a leaked page would produce offset=30 for B
   await act(async()=>{[...document.querySelectorAll('button')].find(b=>b.textContent==='下一頁').click()});
   assert.equal(last('A').offset,'30');
-  await settle(last('A'),200,rowsOf('AUDIT_A2',5,60));
   const aPage2=last('A');
+  if(mode!=='late-A')await settle(aPage2,200,rowsOf('AUDIT_A2',5,60));
   await show('B');
   noA();assert.ok(!text().includes('AUDIT_A2'));
   assert.equal(last('B').offset,'0','page resets to first on project switch');
@@ -51,13 +52,15 @@ for(const keyed of [false,true]){
   if(mode==='404'){await settle(last('B'),404,{detail:'nf'});noA();assert.ok(text().includes('LEGACY_B'));assert.ok(!text().includes('LEGACY_A'))}
   if(mode==='success'){await settle(last('B'),200,rowsOf('AUDIT_B',2,2));noA();assert.ok(text().includes('AUDIT_B_1'));assert.ok(text().includes('共 2 筆'))}
   if(mode==='late-A'){
-   // A's request was aborted; even if its reply is forced late, and B answered first, nothing from A is applied.
+   // A's still-pending request replies after B, even though its signal was aborted.
+   assert.ok(aPage2.aborted);
    await settle(last('B'),200,rowsOf('AUDIT_B',1,1));
    await settle(aPage2,200,rowsOf('AUDIT_A_LATE',3,3));
    noA();assert.ok(!text().includes('AUDIT_A_LATE'));assert.ok(text().includes('AUDIT_B_0'));
   }
   // switching back to A must not reuse B's data either
   await show('A');assert.ok(!text().includes('AUDIT_B'),'B data leaked under A');
+  assert.equal(last('A').offset,'0','returning to A also resets its page');
  }
 }
 // Request ordering: A->B->A quickly; only the latest request's reply is applied, older ones are aborted.
@@ -68,4 +71,16 @@ assert.ok(a1.aborted&&b1.aborted,'superseded requests are aborted');
 await settle(a2,200,rowsOf('AUDIT_A_NEW',1,1));
 await settle(b1,200,rowsOf('AUDIT_B_STALE',1,1));await settle(a1,200,rowsOf('AUDIT_A_OLD',1,1));
 assert.ok(text().includes('AUDIT_A_NEW')&&!/B_STALE|A_OLD/.test(text()),'only latest request applied: '+text());
+// Legacy fallback and errors belong to the request project, just like API rows.
+for(const status of [404,503]){
+ await act(async()=>root.render(null));calls=[];
+ await show2('A');await settle(last('A'),status,{detail:'PRIVATE_A_ERROR'});
+ assert.ok(text().includes(status===404?'LEGACY_A':'PRIVATE_A_ERROR'));
+ await show2('B');
+ assert.ok(!/LEGACY_A|PRIVATE_A_ERROR|舊版活動紀錄/.test(text()),'A fallback/error leaked under B');
+ await settle(last('B'),200,rowsOf('AUDIT_B',1,1));
+ assert.ok(text().includes('AUDIT_B_0'));
+}
 console.log('audit trail project switch isolation: ok');
+await act(async()=>root.unmount());
+dom.window.close();
