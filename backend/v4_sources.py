@@ -10,6 +10,7 @@ from collections import defaultdict
 from copy import deepcopy
 from urllib.parse import urlparse, parse_qs
 from .sources import text, number, day, source_id, normalized_case, link_ids, new_task, canonical_department, unique_value, PROVISIONAL_CASE_FIELD
+from .source_lifecycle import summarize
 from .seed import STAGES
 from .policy import upgrade, template, TECHNICAL, VERSION
 from .workflow import now, uid
@@ -320,6 +321,7 @@ def import_v4(ws, records, complete_tables=None):
         if '工程名稱' not in conflicts: p['name']=unique_value(text(r['fields'].get('工程名稱')) for r in group) or p['name']
         remote=unique_value(text(r['fields'].get('狀態')) for r in group)
         p['source_status']=remote or '來源狀態待核對'
+        p['source_lifecycle']=lifecycle=summarize(group,linked_quotes[code])
         # Lark's archived/finished label is source information, never a local
         # delivery, payment or closure approval.
         p['status']=p.get('execution_status','pending')
@@ -328,7 +330,8 @@ def import_v4(ws, records, complete_tables=None):
         if sorted(previous_records.get(p['id'],[]),key=lambda r:r['id'])!=sorted(snapshots,key=lambda r:r['id']):
             p['source_changed_at']=now()
         for node in p['nodes']:
-            complete=remote=='已結案' or remote=='已完工' and node['key'] in TECHNICAL|{'sales','confirmation','pm'} or remote=='執行中' and node['key'] in {'sales','confirmation'}
+            declared=lifecycle['canonical']
+            complete=declared=='已結案' or declared=='已完工' and node['key'] in TECHNICAL|{'sales','confirmation','pm'} or declared=='執行中' and node['key'] in {'sales','confirmation'}
             node['source_declared_completed']=complete
             node['source_completed']=False
             node['source_completion_basis']='依 V4 匯入' if complete else None
@@ -359,6 +362,7 @@ def import_v4(ws, records, complete_tables=None):
         p['source_conflicts']={'confirmation':possible} if possible else {}
         p['name']=text(q['fields'].get('工程名稱')) or p['name']
         p['source_status']='待確認單'; p['status']='pending'
+        p['source_lifecycle']=summarize([],[q])
     for r in records:
         if r.get('kind')!='contract': continue
         f=r['fields']; targets,unresolved=native_records(r,'所屬成案確認單（日報關聯）',record_index,{'confirmation','quote_confirmation'})

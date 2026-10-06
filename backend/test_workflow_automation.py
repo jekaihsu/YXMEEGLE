@@ -42,7 +42,7 @@ def test_auto_activation_fails_closed_for_every_gate(setup,reason):
     if reason=='missing_date': t['start_date']=None
     if reason in ('paused','superseded'): t['status']=reason
     if reason=='source_change': t['source_change_pending']=True
-    if reason=='case_stop': p['source_status']='中止'
+    if reason=='case_stop': p['source_lifecycle']={'canonical':'中止','state':'mapped'}
     if reason=='node_skip': n['status']='approved_skipped'
     if reason=='intake': p['case_type']='intake'
     if reason=='completed_node': n['status']='completed'
@@ -237,7 +237,7 @@ def test_title_only_sop_editor_preserves_unique_keys_and_creates_new_identity(se
 
 
 def test_source_closed_does_not_block_authorized_manual_reconciliation_or_auto_restart(setup):
-    ws,p,n,user=setup;p['source_status']='已結案';t=n['tasks'][0]
+    ws,p,n,user=setup;p['source_lifecycle']={'canonical':'已結案','state':'mapped'};t=n['tasks'][0]
     assert any('來源標示結案' in reason for reason in activation_reasons(ws,p,n,t,'2026-09-28T09:00:00+08:00'))
     assert t['id'] not in activate_scheduled(ws,'2026-09-28T09:00:00+08:00')
     apply_action(ws,user,body(p,n,'task_start',t=t),True)
@@ -287,3 +287,13 @@ def test_financial_receipt_is_exact_node_and_completed_refresh_uses_historical_v
     assert financial_confirmation(ws,p,n,False) is item
     n['status']='completed'; refresh_project_state(p,ws)
     assert n['status']=='completed' and calls[-1] is False
+
+
+def test_raw_source_status_and_unverified_lifecycle_do_not_infer_closure(setup):
+    ws,p,n,user=setup;t=n['tasks'][0];clock='2026-09-28T09:00:00+08:00'
+    p['source_status']='已結案'
+    assert not any('來源標示結案' in r or '來源案件狀態待核對' in r for r in activation_reasons(ws,p,n,t,clock))
+    p['source_status']='執行中';p['source_lifecycle']={'canonical':None,'state':'needs_verification','reasons':['blank']}
+    reasons=activation_reasons(ws,p,n,t,clock)
+    assert any('來源案件狀態待核對' in r for r in reasons) and not any('來源標示結案' in r for r in reasons)
+    assert t['id'] not in activate_scheduled(ws,clock)
