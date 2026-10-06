@@ -198,6 +198,69 @@ def test_upload_rechecks_live_manager_authority_after_file_read(tmp_path, monkey
     assert not any(upload_root.rglob('*'))
 
 
+def test_upload_identity_changed_during_uploadfile_read_is_rejected(tmp_path, monkeypatch):
+    import time
+    from datetime import datetime, timezone
+    from pathlib import Path
+    import json
+    from sqlalchemy import select
+    from . import storage
+    from .app import WorkspaceRow, PersonRow, AuthRow, BusinessRow, AuditRow
+    from .test_production_access import company
+
+    app, client = company(tmp_path)
+    app.state.cfg['LARK_COMPANY_ADMIN_GRANTS_JSON']=json.dumps([{
+        'open_id':'u-manager','app_id':'app1','tenant':'company','grant_id':'test-grant',
+        'reason':'regression test','authorized_by':'owner','decision_ref':'test-decision',
+        'authorized_at':datetime.now(timezone.utc).isoformat(),'enabled':True,'role':'manager',
+        'scopes':['company:ordinary_business_backup']}])
+    with app.state.sessions.begin() as db:
+        row=db.get(WorkspaceRow,'test-lark-company')
+        state=storage.load(db,BusinessRow,row)
+        manager=next(u for u in state['users'] if u['id']=='u-manager')
+        manager['role']='manager'
+        manager['oauth_identity']={'source':'oauth_user_info','app_id':'app1','tenant':'company',
+                                   'open_id':'u-manager','verified_at':datetime.now(timezone.utc).isoformat()}
+        manager['directory_last_seen_at']=datetime.now(timezone.utc).isoformat()
+        manager['directory_status']='employed'
+        manager['directory_missing']=False
+        manager['directory_source']={'app_id':'app1','record_id':'manager'}
+        row.data=storage.save(db,BusinessRow,row.id,state)
+        profile=db.get(PersonRow,('lark-company','u-manager'))
+        profile.data={**profile.data,**{k:manager[k] for k in ('role','oauth_identity','directory_last_seen_at','directory_status','directory_missing','directory_source')}}
+        db.add(AuthRow(id='sid-upload',data={'wid':'test-lark-company','expires':time.time()+3600}))
+    client.cookies.set('meegle_session',app.state.signer.dumps(
+        {'mode':'lark','sid':'sid-upload','wid':'test-lark-company','organization':'lark-company','uid':'u-manager'}))
+
+    from starlette.datastructures import UploadFile
+    original_read=UploadFile.read
+    revoked=[]
+    async def read_then_revoke(self,size=-1):
+        data=await original_read(self,size)
+        if not revoked:
+            revoked.append(True)
+            with app.state.sessions.begin() as db:
+                profile=db.get(PersonRow,('lark-company','u-manager'))
+                profile.data={**profile.data,'role':'member','capabilities':[],'manager_revoked':True}
+        return data
+    monkeypatch.setattr(UploadFile,'read',read_then_revoke)
+    before=client.get('/api/workspace').json()
+    project=before['projects'][0]; node=project['nodes'][0]
+    response=client.post('/api/files',data={'project_id':project['id'],'node_id':node['id'],
+        'direction':'input','version':before['version'],'category_id':'evidence'},
+        files={'file':('evidence.txt',b'company evidence','text/plain')})
+    assert revoked and response.status_code==403,response.text
+    with app.state.sessions() as db:
+        row=db.get(WorkspaceRow,'test-lark-company')
+        saved=storage.load(db,BusinessRow,row)
+        audits=list(db.scalars(select(AuditRow).where(AuditRow.workspace_id=='test-lark-company')))
+    assert not any(f.get('name')=='evidence.txt' for p in saved['projects'] for f in p['files'])
+    assert not any(j.get('kind')=='file' for j in saved.get('jobs',[]))
+    assert not any(a.data.get('action')=='file_upload' and a.data.get('result','success')=='success' for a in audits)
+    upload_root=app.state.upload_dir
+    assert not any(x.is_file() for x in upload_root.rglob('*'))
+
+
 @pytest.mark.parametrize('coverage', [None, [], [{'base_token': 'v4', 'table_id': 'daily', 'kind': 'daily', 'status': 'partial', 'count': 0}],
                                     [{'base_token': 'other', 'table_id': 'daily', 'kind': 'daily', 'status': 'ready', 'count': 0}]])
 def test_incremental_or_other_table_absence_does_not_remove_daily(coverage):
