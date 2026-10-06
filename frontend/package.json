@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test:session-epoch": "node test-session-epoch.mjs",
+    "test:comment-draft": "node test-comment-draft-scope.mjs",
     "test:financial-draft": "node test-financial-draft-scope.mjs"
   },
   "dependencies": {
