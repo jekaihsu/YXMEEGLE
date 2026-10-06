@@ -208,7 +208,10 @@ def register(app,identity,load,persist,sessions,W,cfg):
     async def operate(kind:str,request_id:str,operation:str,request:Request):
         require(operation in ('prepare','submit','poll','cancel','abandon'),'未知審批操作',422)
         data,user=formal(request);body=await request.json();state=get_state(data['wid'])
-        require(body.get('version')==state['version'],'資料已更新，請重新整理',409)
+        pv=body.get('project_version')
+        require(type(pv) is int,'缺少案件版本',422)
+        pid=locate(state,kind,request_id)[0]['id']
+        require(find(state['projects'],pid).get('concurrency_version',0)==pv,'此案件已被更新，請核對最新內容後重試',409)
         if operation=='abandon':
             _,_,item=locate(state,kind,request_id)
             original=deepcopy(item.get('native_binding') or {})
@@ -222,7 +225,7 @@ def register(app,identity,load,persist,sessions,W,cfg):
                 target.setdefault('history',[]).append({'action':'native_abandon_uncreated','actor_id':user['id'],
                     'created_at':now(),'message':'依 Lark 明確拒建回執結束本地申請；未向 Lark 撤回','simulated':False})
                 event(s,user,'native_abandon_uncreated',target['project_id'],target.get('node_id'),message='依明確拒建回執結束申請')
-            return persist(data['wid'],body['version'],abandon,actor_id=user['id'],action_name='native_abandon_uncreated')
+            return persist(data['wid'],None,abandon,actor_id=user['id'],action_name='native_abandon_uncreated',project_versions={pid:pv})
         if operation=='cancel':
             p,n,item=locate(state,kind,request_id)
             binding=deepcopy(item.get('native_binding') or {})
@@ -250,7 +253,7 @@ def register(app,identity,load,persist,sessions,W,cfg):
                         target['remote_resolution_required']=False
                         target.update(status='withdrawn',lark_status='canceled',native_receipt=dict(deepcopy(receipt),binding_hash=value['binding_hash'],scope_hash=original_identity['scope_hash']))
                     event(s,user,'native_cancel',target['project_id'],target.get('node_id'),message='已核實 Lark 撤回' if target.get('status')=='withdrawn' else '撤回結果待 Lark 查回')
-                response[0]=persist(data['wid'],latest['version'],save,actor_id=user['id'],action_name='native_cancel')
+                response[0]=persist(data['wid'],None,save,actor_id=user['id'],action_name='native_cancel',project_versions={pid:find(latest['projects'],pid).get('concurrency_version',0)})
                 expected=deepcopy(value)
             try:service.cancel(binding,original_identity,save_cancel,authorize_cancel)
             except RemoteFailure as exc:raise HTTPException(503,str(exc)) from exc
@@ -349,7 +352,7 @@ def register(app,identity,load,persist,sessions,W,cfg):
                     'actor_id':user['id'],'message':'Lark 結果已查回' if receipt else '已保存送審版本，尚未取得遠端結果','simulated':False})
                 event(state,actor,'native_'+operation,fp['id'],fn['id'] if fn else None,
                       message='查回正式審批' if receipt else '保存正式審批送出版本')
-            result[0]=persist(data['wid'],fresh['version'],save,actor_id=user['id'],action_name='native_'+operation)
+            result[0]=persist(data['wid'],None,save,actor_id=user['id'],action_name='native_'+operation,project_versions={pid:find(fresh['projects'],pid).get('concurrency_version',0)})
             expected_binding=deepcopy(binding)
         try:
             if operation=='prepare':

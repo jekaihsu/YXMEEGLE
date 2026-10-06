@@ -26,7 +26,7 @@ export function NativeApprovalControls({c,kind,item,canSubmit}:{c:Context;kind:s
    setBusy(true);setMessage('');
    try{
      await api<Workspace>(`/api/native-approvals/${kind}/${encodeURIComponent(item.id)}/${operation}`,{
-       method:'POST',body:JSON.stringify({version:c.w.version})});
+       method:'POST',body:JSON.stringify({project_version:project?.concurrency_version})});
      await c.refresh();
      setMessage(operation==='prepare'?'已核對並保存送審內容，尚未向 Lark 提單。':
        operation==='abandon'?'已結束這筆未建立的申請並保留紀錄；暫停工作仍須另行確認恢復。':

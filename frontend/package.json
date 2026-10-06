@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test:session-epoch": "node test-session-epoch.mjs"
+    "test:session-epoch": "node test-session-epoch.mjs",
+    "test:native-approval-version": "node test-native-approval-version.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",
