@@ -67,6 +67,10 @@ export function NativeApprovalControls({c,kind,item,canSubmit}:{c:Context;kind:s
  </section>;
 }
 export function FinancialApprovalRequests({c,p}:{c:Context;p:Project}){
+ // Remount per user/workspace/project so node, evidence, kind and payables state never carry over.
+ return <FinancialApprovalForm key={draftKey(c.s,c.w,`financial:${p.id}`)} c={c} p={p}/>;
+}
+function FinancialApprovalForm({c,p}:{c:Context;p:Project}){
  const[reason,setReason]=useDraft(draftKey(c.s,c.w,`financial:${p.id}:reason`),'');const[kind,setKind]=useState('contract');const[payables,setPayables]=useState('unknown');const[node,setNode]=useState(p.nodes.find(n=>['pricing','settlement'].includes(n.key)&&(c.s.user?.can_business_override||[p.pm_id,p.admin_id,n.owner_id].includes(c.s.user?.id||'')))?.id||'');const[evidence,setEvidence]=useState<string[]>([]);const[busy,setBusy]=useState(false);const[error,setError]=useState('');
  const businessLead=c.s.user?.can_business_override===true||c.s.user?.id===p.pm_id;
  const canCreateForNode=(nodeId:string)=>executionAllowed(p,c.w)&&(businessLead||c.s.user?.id===p.admin_id||c.s.user?.id===p.nodes.find(n=>n.id===nodeId)?.owner_id);

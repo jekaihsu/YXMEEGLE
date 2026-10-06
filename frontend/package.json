@@ -8,8 +8,9 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test:session-epoch": "node test-session-epoch.mjs",
-    "test:input-recovery": "node test-input-recovery.mjs"
-    "test:native-approval-version": "node test-native-approval-version.mjs"
+    "test:input-recovery": "node test-input-recovery.mjs",
+    "test:native-approval-version": "node test-native-approval-version.mjs",
+    "test:financial-draft": "node test-financial-draft-scope.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",
