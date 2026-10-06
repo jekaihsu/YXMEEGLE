@@ -48,14 +48,20 @@ def test_policy_accepts_approved_root_and_ignores_it_for_other_kinds():
     assert connection_policy('lark-company',state,cfg,'notification')['drive_root'] is None
 
 
-def test_settings_save_rejects_unapproved_and_test_roots_only_when_checked_against_server(harness):
+@pytest.mark.parametrize('root',['','   ',None,'unapproved-root',TEST_ROOT])
+def test_settings_save_rejects_invalid_production_roots(harness,root):
     h=harness;state,_=h.read();actor=next(u for u in state['users'] if u['role']=='manager')
     cfg={'LARK_DRIVE_ROOT':APPROVED,'LARK_TEST_DRIVE_ROOT':TEST_ROOT}
-    for root in ('unapproved-root',TEST_ROOT):
-        with pytest.raises(HTTPException) as error:
-            apply_operation(state,actor,{'action':'admin_settings','payload':{'drive_root':root}},False,cfg)
-        assert error.value.status_code==422
-        assert state['settings']['drive_root']!=root
+    before=deepcopy(state['settings'])
+    with pytest.raises(HTTPException) as error:
+        apply_operation(state,actor,{'action':'admin_settings','payload':{'drive_root':root}},False,cfg)
+    assert error.value.status_code==422
+    assert state['settings']==before
+
+
+def test_settings_save_accepts_approved_production_root(harness):
+    state,_=harness.read();actor=next(u for u in state['users'] if u['role']=='manager')
+    cfg={'LARK_DRIVE_ROOT':APPROVED,'LARK_TEST_DRIVE_ROOT':TEST_ROOT}
     apply_operation(state,actor,{'action':'admin_settings','payload':{'drive_root':APPROVED}},False,cfg)
     assert state['settings']['drive_root']==APPROVED
 
@@ -101,7 +107,7 @@ def result_of(h,job):
     return next(j for j in h.read()[0]['jobs'] if j['id']==job['id'])
 
 
-@pytest.mark.parametrize('root',['','unapproved-root',TEST_ROOT])
+@pytest.mark.parametrize('root',['','   ',None,'unapproved-root',TEST_ROOT])
 def test_worker_rejects_bad_roots_before_any_remote_io(harness,tmp_path,root):
     h=harness;job=prepare(h,root,tmp_path)
     worker,calls,made=counting_worker(h,tmp_path)

@@ -430,7 +430,7 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         require(not proposed.get('input_base') or proposed['input_base'] not in (proposed['v4_base'],proposed['quote_base'],proposed['capability_base'],proposed['test_base']),'Input 登錄 Base 不可指向來源或測試 Base',422)
         require(not proposed.get('test_input_table') or proposed['test_input_table']!=proposed.get('input_table'),'隔離測試 Input 表不可混用正式表',422)
         require(not proposed['test_drive_root'] or proposed['test_drive_root']!=proposed['drive_root'],'測試目錄不可指向正式目錄',422)
-        if cfg is not None and ws.get('environment')=='production' and proposed.get('drive_root'):
+        if cfg is not None and ws.get('environment')=='production':
             from .remote_policy import approved_drive_root
             from .lark_adapter import RemoteFailure
             try: approved_drive_root(proposed['drive_root'],cfg)
