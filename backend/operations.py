@@ -4,6 +4,7 @@ import json
 from copy import deepcopy
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from .source_lifecycle import declared
 from .policy import upgrade, CAPABILITIES, TECHNICAL, FINANCIAL
 from .workflow import require, find, now, uid, event, blocked, all_tasks, valid_date, http_url
 from .business_policy import can_business_override
@@ -194,7 +195,7 @@ def refresh_project_state(p,ws):
     if settlement and settlement['status']=='completed' and engineering:
         p['execution_status']='completed'
     elif engineering: p['execution_status']='engineering_complete'
-    elif p.get('source_status')=='中止': p['execution_status']='paused'
+    elif declared(p)=='中止': p['execution_status']='paused'
     elif p.get('execution_status') in ('in_progress','engineering_complete','completed') or any(n['status'] in ('in_progress','rework','completed') for n in p['nodes']): p['execution_status']='in_progress'
     else: p['execution_status']='pending'
     p['status']=p['execution_status']
@@ -784,7 +785,7 @@ def apply_operation(ws,user,body,demo=False):
         require(r['status']=='active','此追蹤已結束',409)
         require(data.get('evidence'),'請記錄本次追蹤結果與佐證',422)
         if data.get('finished'):
-            if r['kind']=='client_contact': require(p.get('source_status') in ('已完工','已結案') or p['execution_status'] in ('engineering_complete','completed'),'工程完成前持續聯繫',409)
+            if r['kind']=='client_contact': require(declared(p) in ('已完工','已結案') or p['execution_status'] in ('engineering_complete','completed'),'工程完成前持續聯繫',409)
             elif r['kind'] in ('receivable','subcontract_receivable'):
                 settled=any(b['id']==r.get('batch_id') and b['status']=='paid' for b in p['payment_batches']) if r.get('batch_id') else p.get('payment_reconciliation',{}).get('confirmed')
                 require(settled,'款項尚未核實結清',409)

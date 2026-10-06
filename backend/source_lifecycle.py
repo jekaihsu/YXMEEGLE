@@ -14,6 +14,16 @@ LIFECYCLE = ('報價中', '執行中', '已完工', '已結案', '中止', '內�
 DATE_OPTION = re.compile(r'^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$|^\d{1,2}[-/.]\d{1,2}$')
 
 
+def declared(p):
+    """The only lifecycle value workflow behavior may depend on; raw source_status never counts."""
+    return (p.get('source_lifecycle') or {}).get('canonical')
+
+
+def needs_review(p):
+    lifecycle = p.get('source_lifecycle')
+    return bool(lifecycle) and lifecycle.get('state') != 'mapped'
+
+
 def quote_workflow_kind(raw):
     if not raw:
         return 'blank'

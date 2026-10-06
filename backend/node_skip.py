@@ -2,6 +2,7 @@
 from copy import deepcopy
 
 from .policy import FINANCIAL
+from .source_lifecycle import declared
 from .workflow import require, find, now, uid, event
 
 POLICY = 'node-skip-pm-and-supervisor-20260927'
@@ -57,7 +58,7 @@ def current(ws, p, n, item):
             and n['key'] not in FINANCIAL
             and not p.get('archived_at') and not p.get('migrated_to')
             and not n.get('archived_at') and not n.get('source_completed') and n.get('status') not in ('completed', 'archived', 'superseded')
-            and p.get('source_status') not in ('中止', '已結案'))
+            and declared(p) not in ('中止', '已結案'))
 
 
 def valid_votes(ws, p, n, item):
@@ -129,7 +130,7 @@ def apply_skip(ws, user, body, demo=False):
     require(not p.get('archived_at') and not p.get('migrated_to') and not n.get('archived_at')
             and not n.get('source_completed')
             and p.get('execution_status') != 'completed'
-            and p.get('source_status') not in ('中止', '已結案')
+            and declared(p) not in ('中止', '已結案')
             and n['status'] not in ('completed', 'archived', 'superseded'),
             '已完成、封存或中止的案件／節點不能申請跳過', 409)
     seats = skip_seats(p, n)

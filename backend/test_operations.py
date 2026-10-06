@@ -168,7 +168,7 @@ def test_digest_once_daily_with_overdue_escalation_and_stop_rules(ws):
                j['payload']['source_project_ids']==[p['id']] for j in ws['jobs'])
     schedule(ws,'2026-09-28T10:00:00+08:00'); assert len(ws['jobs'])==first
     assert any(j['payload']['recipients']==['u-manager'] for j in ws['jobs'])
-    p['source_status']='中止'; ws['jobs']=[]
+    p['source_status']='中止'; p['source_lifecycle']={'canonical':'中止','state':'mapped'}; ws['jobs']=[]
     schedule(ws,'2026-09-29T09:00:00+08:00'); assert not ws['jobs']
     call(ws,'recurring_create',dict(kind='receivable',owner_id='u-manager',start_date='2026-09-01'))
     schedule(ws,'2026-09-29T09:00:00+08:00'); assert ws['jobs']
@@ -391,7 +391,7 @@ def test_confirmation_receipt_is_bound_to_pm_and_recipient_scope(api_app,ws,chan
     assert error.value.status_code==409
 
 def test_idle_worker_does_not_bump_version_and_serializes_leases(api_app,ws):
-    app,client=api_app; ws['projects'][0]['source_status']='中止'; wid=inject(api_app,ws)
+    app,client=api_app; ws['projects'][0]['source_lifecycle']={'canonical':'中止','state':'mapped'}; wid=inject(api_app,ws)
     before=client.get('/api/workspace').json()['version']; app.state.worker.run_one(wid)
     assert client.get('/api/workspace').json()['version']==before
     actor=ws['users'][0]; first=queue(ws,'digest',actor,dict(recipients=[actor['id']],text='one'),'one'); first.update(status='running',lease_until='2099-01-01T00:00:00+08:00')

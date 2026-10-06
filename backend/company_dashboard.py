@@ -26,11 +26,14 @@ def actual_date(value):
         return parsed if parsed.isoformat()==value else None
     except ValueError:return None
 
-def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',attention='',clock=None):
+UNVERIFIED='待核對'
+
+
+def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',attention='',lifecycle='',clock=None):
     clock=clock or datetime.now(timezone.utc);today=clock.astimezone(ZoneInfo('Asia/Taipei')).date()
     totals=Counter(cases=0,confirmed_cases=0,intake_records=0,workbench_cases=0,tasks_total=0,tasks_completed=0,tasks_overdue=0,
                    pending_local_reviews=0,pending_native_reviews=0,deliveries_confirmed=0)
-    source_counts=Counter();execution_counts=Counter();lifecycle_counts=Counter();missing=Counter(task_due_date=0,group=0,source_status=0)
+    source_counts=Counter();execution_counts=Counter();lifecycle_state_counts=Counter();lifecycle_counts=Counter();missing=Counter(task_due_date=0,group=0,source_status=0)
     groups=defaultdict(lambda:Counter(cases=0,tasks_total=0,tasks_completed=0,tasks_overdue=0))
     rows=[]
     native=Counter();seen_native=set()
@@ -52,10 +55,11 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
         totals['intake_records']+=int(p.get('case_type')=='intake')
         if not p.get('source_status'):missing['source_status']+=1
         raw_lifecycle=p.get('source_lifecycle') or {}
-        lifecycle={'relationship':raw_lifecycle.get('relationship') or ('待確認單' if p.get('case_type')=='intake' else '已關聯確認單'),
+        entry={'relationship':raw_lifecycle.get('relationship') or ('待確認單' if p.get('case_type')=='intake' else '已關聯確認單'),
                    'state':raw_lifecycle.get('state') or 'needs_verification','canonical':raw_lifecycle.get('canonical'),
                    'reasons':raw_lifecycle.get('reasons') or ['unreviewed']}
-        lifecycle_counts[lifecycle['state']]+=1
+        entry['quote_workflow']=[{'raw':w.get('raw',''),'kind':w.get('kind','other')} for w in raw_lifecycle.get('quote_workflow') or []]
+        lifecycle_state_counts[entry['state']]+=1;lifecycle_counts[entry['canonical'] or UNVERIFIED]+=1
         runnable=p.get('execution_allowed') is True
         totals['workbench_cases']+=int(runnable)
         project_groups=set();counts=Counter(tasks_total=0,tasks_completed=0,tasks_overdue=0,pending_local_reviews=0,deliveries_confirmed=0)
@@ -85,11 +89,12 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
         counts['pending_native_reviews']=native[p['id']]
         totals.update(counts)
         rows.append({'id':p['id'],'code':p.get('code',''),'name':p.get('name',''),'case_type':p.get('case_type','unknown'),'group':'、'.join(sorted(project_groups)) or '未分組',
-                     'groups':sorted(project_groups),'source_status':status,'source_lifecycle':lifecycle,'execution_status':execution,
+                     'groups':sorted(project_groups),'source_status':status,'source_lifecycle':entry,'execution_status':execution,
                      'workbench_execution_enabled':runnable,**dict(counts)})
     filtered=[r for r in rows if (not q or q.casefold() in (r['code']+' '+r['name']).casefold())
         and (not group or group in r['groups'] or group=='未分組' and not r['groups'])
         and (not source_status or r['source_status']==source_status)
+        and (not lifecycle or (r['source_lifecycle']['canonical'] or UNVERIFIED)==lifecycle)
         and (not attention or attention=='overdue' and r['tasks_overdue']>0
              or attention=='review' and r['pending_local_reviews']+r['pending_native_reviews']>0)]
     filtered.sort(key=lambda r:(r['code'],r['id']))
@@ -97,7 +102,7 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
     return {'as_of':today.isoformat(),'checked_at':clock.isoformat(),'date_basis':'Asia/Taipei; actual task due_date only',
         'source':{'status':source.get('status','missing'),'last_success_at':source.get('last_sync'),
                   'mapping_status':source.get('mapping_status','unknown')},
-        'totals':{**dict(totals),'source_status_counts':dict(source_counts),'execution_status_counts':dict(execution_counts),'lifecycle_state_counts':dict(lifecycle_counts)},
+        'totals':{**dict(totals),'source_status_counts':dict(source_counts),'execution_status_counts':dict(execution_counts),'lifecycle_state_counts':dict(lifecycle_state_counts),'lifecycle_counts':dict(lifecycle_counts)},
         'missing':dict(missing),'groups':[{'group':key,**dict(value)} for key,value in sorted(groups.items())],
         'cases':filtered[offset:offset+limit],'pagination':{'offset':offset,'limit':limit,'total':len(filtered),'has_more':offset+limit<len(filtered)},
         'metric_scope':'task progress counts only executable workbench cases; source business status is independent'}

@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select, update
 from . import storage
 from .policy import upgrade
+from .source_lifecycle import declared
 from .workflow import now, find, require, event
 from .operations import queue, is_workday, next_due, operator, capable, active_user
 from .lark_adapter import application_adapter, RemoteFailure
@@ -57,9 +58,9 @@ def schedule(ws,clock=None):
         if not execution_allowed(ws,p):continue
         if p.get('case_type')=='intake': continue
         if not p.get('pm_id'): continue
-        if p.get('source_status') in ('報價中','已結案','中止') or p.get('execution_status')=='completed': continue
+        if declared(p) in ('報價中','已結案','中止') or p.get('execution_status')=='completed': continue
         definitions=[('daily_progress',p['pm_id']),('field_schedule',next((n['owner_id'] for n in p['nodes'] if n['key']=='field'),'')),('indoor_schedule',p['supervisor_id']),('weekly_review',p['pm_id'])]
-        if p.get('source_status')=='執行中' or p['execution_status']=='in_progress': definitions.append(('client_contact',p['pm_id']))
+        if declared(p)=='執行中' or p['execution_status']=='in_progress': definitions.append(('client_contact',p['pm_id']))
         for kind,owner in definitions:
             if not owner or any(r['project_id']==p['id'] and r['kind']==kind for r in ws['recurring']): continue
             ident='routine-'+hashlib.sha256((p['id']+kind).encode()).hexdigest()[:24]
@@ -88,9 +89,9 @@ def schedule(ws,clock=None):
                 r['overdue']=instant>deadline
             except (KeyError,ValueError,TypeError):r['deadline_status']='pending_schedule'
         financial=kind in ('receivable','subcontract_receivable')
-        if kind=='client_contact' and p.get('source_status') in ('已完工','已結案'): continue
-        if p.get('source_status')=='中止' and not financial: continue
-        if p.get('source_status') in ('已完工','已結案') and kind in ('daily_progress','field_schedule','indoor_schedule','weekly_review'): continue
+        if kind=='client_contact' and declared(p) in ('已完工','已結案'): continue
+        if declared(p)=='中止' and not financial: continue
+        if declared(p) in ('已完工','已結案') and kind in ('daily_progress','field_schedule','indoor_schedule','weekly_review'): continue
         if financial and r.get('batch_id') and any(b['id']==r['batch_id'] and b['status']=='paid' for b in p['payment_batches']): continue
         if r['due_date']>today: continue
         targets={r['owner_id']}

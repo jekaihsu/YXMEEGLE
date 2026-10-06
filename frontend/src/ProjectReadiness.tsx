@@ -1,9 +1,10 @@
 import type {Project,Workspace} from './types';
+import {lifecycleLabel,lifecycleReasonLabel,quoteWorkflowLabel} from './sourceLifecycle';
 
 export function ProjectReadiness({w,p}:{w:Workspace;p:Project}){
  const summary=p.policy_summary||(w.policy_summary||[]).find((s:any)=>s.project_id===p.id);const closure=summary?.closure;
  const missing:string[]=closure?.missing||summary?.nodes?.find((n:any)=>n.id===p.nodes.find(n=>n.key==='settlement')?.id)?.missing||[];
- return <section className="project-readiness"><h2>交付進度與結案條件</h2><p>V4 顯示「{p.source_status||'來源待核對'}」僅是來源業務狀態；工作台仍核對技術交付、業務確認與財務條件。</p><strong>{closure?.status==='completed'?'工作台結案條件已完成':closure?.status==='ready'?'結案條件已齊，等待完成流程':closure?'尚有結案條件待處理':'結案條件尚待完整檢核'}</strong>{missing.length>0&&<ul>{missing.map((text,index)=><li key={index}>{text}</li>)}</ul>}{closure?.financial&&<dl><div><dt>收入確認</dt><dd>{closure.financial.incoming?.status==='incoming_settled'?'來源核對已齊':'尚待來源與收款條件核對'}</dd></div><div><dt>支出確認</dt><dd>{['no_payables','all_settled'].includes(closure.financial.payables?.status)?'核准條件已齊':'尚待有效財務確認'}</dd></div></dl>}</section>;
+ return <section className="project-readiness"><h2>交付進度與結案條件</h2><p>來源案件狀態：{lifecycleLabel(p.source_lifecycle)}{!p.source_lifecycle?.canonical&&`（${lifecycleReasonLabel(p.source_lifecycle)}）`} · 報價狀態：{quoteWorkflowLabel(p.source_lifecycle)} · 關聯：{p.source_lifecycle?.relationship||p.source_status||'來源待核對'}。這些僅是來源業務資料；工作台仍核對技術交付、業務確認與財務條件。</p><strong>{closure?.status==='completed'?'工作台結案條件已完成':closure?.status==='ready'?'結案條件已齊，等待完成流程':closure?'尚有結案條件待處理':'結案條件尚待完整檢核'}</strong>{missing.length>0&&<ul>{missing.map((text,index)=><li key={index}>{text}</li>)}</ul>}{closure?.financial&&<dl><div><dt>收入確認</dt><dd>{closure.financial.incoming?.status==='incoming_settled'?'來源核對已齊':'尚待來源與收款條件核對'}</dd></div><div><dt>支出確認</dt><dd>{['no_payables','all_settled'].includes(closure.financial.payables?.status)?'核准條件已齊':'尚待有效財務確認'}</dd></div></dl>}</section>;
 }
 
 export function SourceContractIndex({w,p}:{w:Workspace;p:Project}){

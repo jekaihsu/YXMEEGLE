@@ -20,6 +20,7 @@ import {DailyRecords} from './DailyRecords';
 import {TaskBatchCompletion} from './TaskBatchCompletion';
 import {draftKey,useDraft,clearDrafts} from './drafts';
 import {SourceMappingSummary} from './SourceMappingSummary';
+import {declaredLifecycle} from './sourceLifecycle';
 import {CompletionCelebration,newlyCompletedNodes,type CompletionMoment} from './CompletionCelebration';
 import type { Approval, Node, Project, Route, Session, SourceData, Task, User, Workspace } from './types';
 
@@ -118,7 +119,7 @@ export default function App(){
 function ChevronsIcon(){return <ChevronDown size={15}/>}
 
 function taskReadiness(r:TaskRow,c:Ctx){
- if(r.p.source_status==='中止')return '來源案件已中止';
+ if(declaredLifecycle(r.p)==='中止')return '來源案件已中止';
  if(r.t.status==='paused')return '待設計變更審批';
  if(!isTaskActor(r.t,c))return `待 ${nameOf(c.w,r.t.owner_id)} 處理`;
  if(!['pending','in_progress','rework'].includes(r.t.status))return '查看目前狀態';
@@ -214,7 +215,7 @@ function NodeCompletion({c,p,node,open,onClose,onNavigate}:{c:Ctx;p:Project;node
  const dependencies=current?allTasks(c.w).filter(r=>r.p.id===p.id&&(current.input_task_ids as string[]|undefined)?.includes(r.t.id)&&!(r.t.status==='completed'&&r.t.output)):[];
  const permit=[...(p.evidence||[])].reverse().find((e:{node_id:string;key:string;withdrawn?:boolean})=>e.node_id===node.id&&e.key==='permits'&&!e.withdrawn);
  const permitMissing=node.key==='field'&&(!permit||!['accepted','not_applicable'].includes(permit.status));
- const paused=current?.status==='paused'||p.source_status==='中止';
+ const paused=current?.status==='paused'||declaredLifecycle(p)==='中止';
  const canSubmit=!['pricing','settlement'].includes(node.key)&&(isProjectLead(c.s,p)||c.s.user?.id===p.admin_id||[node.owner_id,node.supervisor_id,...node.collaborator_ids,...node.tasks.map(t=>t.owner_id)].includes(c.s.user?.id||''));
  const stage=(item:string)=>/SOP 期限/.test(item)?'deadlines':/Input/.test(item)?'inputs':/確認單/.test(item)?'issue':/財務|收付款|請款/.test(item)?'finance':'review';
  const complete=async()=>{if(!current)return;setAttempted(true);setNotice('');const result=await c.run('task_complete',{output},{project_id:p.id,node_id:node.id,task_id:current.id});if(!result)return;const updated=result.projects.find(x=>x.id===p.id)?.nodes.find(x=>x.id===node.id);const next=updated?.tasks.filter(t=>t.required&&active(t));const nextTask=next?.find(t=>isTaskActor(t,{...c,w:result})&&t.status!=='paused')||next?.[0];setSelectedId(nextTask?.id||'');setAttempted(false);setNotice(`已完成「${current.title}」${nextTask?'，接著處理下一項。':'，請核對節點交付條件。'}`)};
@@ -224,7 +225,7 @@ function NodeCompletion({c,p,node,open,onClose,onNavigate}:{c:Ctx;p:Project;node
  {!submitted&&<div className="completion-layout"><nav className="completion-tasks" aria-label="逐項完成任務">{required.map((t,i)=><button key={t.id} className={selectedId===t.id?'selected':''} onClick={()=>{chooseTask(t.id);setAttempted(false);setNotice('')}} aria-current={selectedId===t.id?'step':undefined}><span className="completion-number">{t.status==='completed'?<Check size={16}/>:i+1}</span><span><strong>{t.title}</strong><small>{nameOf(c.w,t.owner_id)} · {STATUS[t.status]||t.status}</small></span></button>)}<button className={!selectedId?'selected':''} onClick={()=>{chooseTask('');setAttempted(false)}}><span className="completion-number"><ShieldCheck size={16}/></span><span><strong>節點交付檢核</strong><small>文件、變更與指定確認</small></span></button>{!['pricing','settlement'].includes(node.key)&&<button className={selectedId==='__skip__'?'selected':''} onClick={()=>{chooseTask('__skip__');setAttempted(false)}}><span className="completion-number"><GitBranch size={16}/></span><span><strong>申請跳過此節點</strong><small>PM 與該組主管共同核准</small></span></button>}</nav>
  <section className="completion-editor">{selectedId==='__skip__'?<NodeSkipPanel c={c} p={p} node={node} onNavigate={onNavigate} draft={skipDraft} setDraft={setSkipDraft}/>:current?<><div className="completion-task-heading"><div><span className="section-kicker">任務內容</span><h3>{current.title}</h3>{current.activation_source==='schedule'&&!current.started_at&&<p>已依排程啟用 · 尚未記錄實際開始</p>}</div><Badge status={current.status}/></div><p className="completion-owner">負責人：{nameOf(c.w,current.owner_id)}{canAct&&current.owner_id!==c.s.user?.id?' · 目前以有效代理人處理':''}</p><div className="completion-description"><h4>作業說明</h4><p>{current.description||'依案件 SOP 執行，完成後填寫成果與交接說明。'}</p><h4>作業資料</h4><p>{current.input||'請參考節點檔案及上游交付資料。'}</p></div>
  {!canAct&&<div className="completion-block"><strong>此任務由 {nameOf(c.w,current.owner_id)} 完成</strong><p>你可檢視內容或前往責任與交接，不能代替未授權的負責人完成。</p><button className="text-button" onClick={()=>onNavigate('operations','roles')}>查看責任與交接<ArrowRight size={14}/></button></div>}
- {paused&&<div className="completion-block"><strong>目前暫停作業</strong><p>{p.source_status==='中止'?'來源案件已中止，請先核對案件狀態。':'此任務仍在設計變更範圍內，需先完成審批及版本處理。'}</p><button className="text-button" onClick={()=>onNavigate(p.source_status==='中止'?'basic':'approvals')}>查看{p.source_status==='中止'?'案件狀態':'關聯審批'}<ArrowRight size={14}/></button></div>}
+ {paused&&<div className="completion-block"><strong>目前暫停作業</strong><p>{declaredLifecycle(p)==='中止'?'來源案件已中止，請先核對案件狀態。':'此任務仍在設計變更範圍內，需先完成審批及版本處理。'}</p><button className="text-button" onClick={()=>onNavigate(declaredLifecycle(p)==='中止'?'basic':'approvals')}>查看{declaredLifecycle(p)==='中止'?'案件狀態':'關聯審批'}<ArrowRight size={14}/></button></div>}
  {dependencies.length>0&&<div className="completion-block"><strong>前置成果尚未交付</strong>{dependencies.map(r=><button className="text-button" key={r.t.id} onClick={()=>{onClose();c.go({view:'project',project:p.id,node:r.n.id,task:r.t.id,tab:'flow'})}}>{r.n.name} · {r.t.title}<ArrowUpRight size={14}/></button>)}</div>}
  {permitMissing&&<div className="completion-block"><strong>公務證明尚未核准</strong><button className="text-button" onClick={()=>onNavigate('operations','review')}>提交證明或申請不適用<ArrowRight size={14}/></button></div>}
  <Field label="成果與交接說明" hint="填寫已完成內容、檔案位置與交接事項；完成任務後會保存。"><textarea rows={5} aria-label="逐項成果與交接說明" value={output} onChange={e=>setDrafts(d=>({...d,[current.id]:e.target.value}))} disabled={!canAct||paused} placeholder="請填寫實際成果，不能只用勾選代替交付。"/></Field>

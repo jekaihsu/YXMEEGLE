@@ -3,6 +3,7 @@ from copy import deepcopy
 import hashlib
 import json
 from datetime import date
+from .source_lifecycle import declared, needs_review
 from .workflow import all_tasks, blocked, event, find, now, require
 
 RULE_VERSION = 'workflow-2026-09-28.1'
@@ -57,7 +58,7 @@ def assign_node(ws,p,n,owner,actor,reason=''):
 def execution_reasons(ws,p,n,t):
     from .sop_contracts import execution_reasons as sop_execution_reasons
     reasons=sop_execution_reasons(p,n,t)
-    if p.get('archived_at') or p.get('migrated_to') or p.get('source_missing') or p.get('source_status')=='中止' or p.get('execution_status')=='completed': reasons.append('案件已暫停、結案或來源待核對')
+    if p.get('archived_at') or p.get('migrated_to') or p.get('source_missing') or declared(p)=='中止' or p.get('execution_status')=='completed': reasons.append('案件已暫停、結案或來源待核對')
     if n.get('archived_at') or n.get('status') in ('approved_skipped','archived','superseded'): reasons.append('節點已跳過或封存')
     if t.get('status') in ('paused','superseded','completed') or blocked(ws,p,t): reasons.append('任務已完成、暫停或封存')
     if t.get('source_missing') or t.get('source_change_pending') or t.get('source_reassignment_pending'): reasons.append('來源工項異動待核對')
@@ -80,7 +81,8 @@ def activation_reasons(ws,p,n,t,clock=None):
     if t['status']!='pending': reasons.append('任務不在待啟用狀態')
     if n['status']=='completed': reasons.append('節點已完成')
     if p.get('case_type')=='intake': reasons.append('接案尚未轉正式案件')
-    if p.get('source_status')=='已結案': reasons.append('來源標示結案；工作台待核對，不自動重新啟用工作')
+    if declared(p)=='已結案': reasons.append('來源標示結案；工作台待核對，不自動重新啟用工作')
+    if needs_review(p): reasons.append('來源案件狀態待核對；未確認前不自動啟用工作')
     scheduled=t.get('start_date')
     try:
         if not scheduled: reasons.append('尚未排定開始日期')
@@ -93,7 +95,7 @@ def activate_scheduled(ws,clock=None):
     clock=clock or now(); activated=[]
     from .case_cutover import execution_allowed
     for p in ws['projects']:
-        if not execution_allowed(ws,p) or p.get('source_status') in ('已完工','已結案','中止'):continue
+        if not execution_allowed(ws,p) or declared(p) in ('已完工','已結案','中止'):continue
         for n,t in all_tasks(p):
             if t['status']!='pending' or activation_reasons(ws,p,n,t,clock): continue
             before={'status':t['status'],'started_at':t.get('started_at')}
