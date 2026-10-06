@@ -124,6 +124,9 @@ def test_pilot_copy_copies_verified_attachment_to_isolated_namespace(tmp_path):
     import hashlib
     app,c=company(tmp_path)
     with app.state.sessions.begin() as db:
+        # The isolated namespace starts empty (ensure_workspace); the copy must not collide with a same-id case.
+        test=db.get(WorkspaceRow,'test-lark-company'); tstate=storage.load(db,BusinessRow,test); tstate['projects']=[]
+        test.data=storage.save(db,BusinessRow,test.id,tstate)
         row=db.get(WorkspaceRow,'lark-company'); state=storage.load(db,BusinessRow,row)
         project=state['projects'][0]; payload=b'formal attachment bytes'
         file_id='pilot-file'; digest=hashlib.sha256(payload).hexdigest()

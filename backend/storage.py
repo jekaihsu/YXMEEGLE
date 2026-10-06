@@ -30,12 +30,10 @@ def save(db,model,wid,state):
     """Replace only changed entity rows; preserve one atomic workspace revision."""
     root=deepcopy(state); desired={}
     archive=root.pop('migration_archive',None)
-    if archive is not None:
-        if db.get(model,(wid,'migration_archive','original')) is None:
-            db.add(model(workspace_id=wid,kind='migration_archive',entity_id='original',parent_id='',ordinal=0,data=deepcopy(archive)))
-        root['migration_archive_ref']='original'
+    if archive is not None: root['migration_archive_ref']='original'
     def add(kind,record,parent='',ordinal=0):
         item=deepcopy(record); ident=str(item.get('id') or f'{parent}:{ordinal}')
+        if (kind,ident) in desired: raise ValueError(f'duplicate record id in storage.save: kind={kind} id={ident}')
         desired[(kind,ident)]={'parent_id':parent,'ordinal':ordinal,'data':item}
         return item
     for collection in COLLECTIONS:
@@ -49,6 +47,8 @@ def save(db,model,wid,state):
                     for k,review in enumerate(nr.pop('review_cycles',[])): add('review_cycles',review,node['id'],k)
                 for child in PROJECT_CHILDREN:
                     for j,value in enumerate(row.pop(child,[])): add('project_'+child,value,pid,j)
+    if archive is not None and db.get(model,(wid,'migration_archive','original')) is None:
+        db.add(model(workspace_id=wid,kind='migration_archive',entity_id='original',parent_id='',ordinal=0,data=deepcopy(archive)))
     existing={(r.kind,r.entity_id):r for r in db.scalars(select(model).where(model.workspace_id==wid,model.kind!='migration_archive'))}
     def project_of(key,value):
         kind,ident=key

@@ -23,6 +23,14 @@ def test_production_digest_source_gate(harness,tmp_path,scenario):
     if scenario=='unknown':payload['source_project_ids'].append('unknown-case')
     if scenario=='mixed':
         other=deepcopy(p);other.update(id='historic-other',case_visibility='excluded_history')
+        def reid(v):  # child ids must stay unique per kind within a workspace
+            for k,x in v.items():
+                if isinstance(x,list):
+                    for i in x:
+                        if isinstance(i,dict):
+                            if 'id' in i:i['id']='other-'+str(i['id'])
+                            reid(i)
+        reid(other)
         state['projects'].append(other);payload['source_project_ids'].append(other['id'])
     job=queue(state,'digest',actor,payload,'source-boundary')
     if scenario=='baseline':p['case_visibility']='excluded_history'
