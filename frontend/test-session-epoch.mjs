@@ -41,21 +41,33 @@ async function scenario(kind,change,status=200,body){
  if(change){
   if(change==='logout')await flush(()=>window.epochContext.logout());
   if(change==='expiry')await flush(()=>window.dispatchEvent(new Event('yx:session-expired')));
+  if(change==='logout'||change==='expiry'){
+   assert.equal(window.epochContext.w,undefined,'clearing identity removes workspace');
+   assert.equal(window.epochContext.s.user,null,'identity is cleared before login');
+   assert.ok(!document.body.textContent.includes('PRIVATE_CASE_A'));
+   const signedIn=session;session={...session,user:null,users:[]};
+   await flush(()=>document.querySelector('.login-card button').click());
+   assert.equal(window.epochContext.w,undefined,'anonymous session cannot load workspace');
+   session=signedIn; // Log back into the same identity: the old epoch must stay invalid.
+  }
   if(change==='actor')session={...session,user:b};
   if(change==='workspace')session={...session,workspace_id:'workspace-B'};
-  if(change==='environment')session={...session,environment:'trial'};
+  if(change==='environment')session={...session,environment:'test'};
   if(change==='mode')session={...session,mode:'demo'};
   if(change==='recovery')session={...session,access_mode:'recovery'};
   current={...workspace,workspace_id:session.workspace_id,environment:session.environment,version:1,projects:[]};
-  await flush(()=>window.epochContext.refresh());
+  await flush(()=>document.querySelector(change==='logout'||change==='expiry'?'.login-card button':'button[aria-label="重新整理資料"]').click());
   if(change==='recovery'){assert.equal(window.epochContext.w,undefined);session={...session,access_mode:undefined};await flush(()=>window.epochContext.refresh())}
   assert.equal(window.epochContext.w.version,1,'new epoch accepts lower version');
   assert.equal(window.epochContext.w.projects.length,0);
+  assert.ok(!document.body.textContent.includes('PRIVATE_CASE_A'),'refresh clears previous workspace from screen');
+  if(change==='environment')assert.ok(document.body.textContent.includes('獨立測試區'));
   let newer;await flush(()=>{newer=window.epochContext.upload(new FormData())});
   const newRelease=release;
   let result;await flush(async()=>{oldRelease(json(status===200?{...workspace,version:99,projects:workspace.projects.map(p=>({...p,nodes:p.nodes.map(n=>({...n,status:'completed',tasks:n.tasks.map(t=>({...t,status:'completed'}))}))}))}:{detail:'OLD_ERROR'},status));result=await pending});
   assert.equal(result,kind==='upload'?false:undefined,'stale result is not returned to callers');
   assert.equal(window.epochContext.w.projects.length,0,'old data stays cleared');
+  assert.ok(!document.body.textContent.includes('PRIVATE_CASE_A'),'delayed response cannot revive previous workspace on screen');
   assert.equal(window.epochContext.s.user.id,session.user.id,'stale 401 cannot expire new session');
   assert.equal(window.epochContext.error,'');
   assert.equal(window.epochContext.completionMoment,null);
