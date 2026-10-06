@@ -297,7 +297,7 @@ def register(app,identity,load,persist,sessions,W,cfg):
                                 target['status']={'REJECTED':'rejected','CANCELED':'withdrawn','DELETED':'withdrawn'}.get(receipt['external_status'],'invalidated')
                         event(s,user,'native_original_observed',target['project_id'],target.get('node_id'),
                               message='查回已失效範圍的原審批；結果不套用目前案件')
-                    response[0]=persist(data['wid'],latest['version'],save,actor_id=user['id'],action_name='native_original_observed')
+                    response[0]=persist(data['wid'],None,save,actor_id=user['id'],action_name='native_original_observed',project_versions={pid:find(latest['projects'],pid).get('concurrency_version',0)})
                     expected=deepcopy(value)
                 try:service.observe(original,original['identity'],save_original,authorize_original)
                 except RemoteFailure as exc:raise HTTPException(503,str(exc)) from exc
