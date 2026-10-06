@@ -87,6 +87,33 @@ def mutate_stored(live,callback):
         callback(state);row.data=storage.save(db,BusinessRow,WID,state)
 
 
+def test_health_and_roster_timestamp_sync_keeps_project_version_usable(live):
+    version,pv,_=snapshot(live)
+    with live.app.state.sessions.begin() as db:
+        row=db.get(WorkspaceRow,WID);state=storage.load(db,BusinessRow,row)
+        state.setdefault('source_status',{})['last_attempt_at']='2026-10-06T12:00:00Z'
+        state['users'][0]['directory_last_seen_at']='2026-10-06T12:00:00Z'
+        row.version+=1;state['version']=row.version
+        row.data=storage.save(db,BusinessRow,WID,state)
+    assert snapshot(live)[:2]==(version+1,pv)
+    response=post(live,'prepare',project_version=pv)
+    assert response.status_code==200,response.text
+
+
+def test_revoked_project_role_rejects_submit_after_refresh(live):
+    _,pv,_=snapshot(live)
+    assert post(live,'prepare',project_version=pv).status_code==200
+    mutate_stored(live,lambda state:state['projects'][0].__setitem__('pm_id','ou_sup'))
+    before=snapshot(live);calls=len(live.calls)
+    response=post(live,'submit',project_version=before[1])
+    assert response.status_code==503,response.text
+    assert '案件或責任範圍已改版' in response.json()['detail']
+    item=snapshot(live)[2][0]
+    assert item['native_binding']['status']=='verification_failed'
+    assert not item['native_binding'].get('attempted') and not item['native_receipt']['approved']
+    assert all(method=='GET' for method,_ in live.calls[calls:])
+
+
 def test_project_version_race_before_persist_conflicts_without_mutation(live,monkeypatch):
     """The project changes after the route pre-check but before app.py's persist_mutation CAS."""
     def reject(state):

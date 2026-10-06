@@ -44,9 +44,10 @@ def api(harness,monkeypatch):
     service=NativeApprovalService(h.cfg,lambda _:Adapter())
     monkeypatch.setattr(native_routes,'NativeApprovalService',lambda _:service)
     def load(db,row):return storage.load(db,h.B,row)
-    actor=['ou_pm']
+    actor=['ou_pm'];before_persist=[]
     def identity(_):return {'mode':'lark','wid':h.wid},next(u for u in h.read()[0]['users'] if u['id']==actor[0])
     def persist(wid,version,callback,**kwargs):
+        if before_persist:before_persist.pop(0)()
         with h.sessions.begin() as db:
             row=db.get(h.W,wid)
             state=load(db,row);project_versions=kwargs.get('project_versions')
@@ -58,7 +59,7 @@ def api(harness,monkeypatch):
             return deepcopy(state)
     app=FastAPI();native_routes.register(app,identity,load,persist,h.sessions,h.W,h.cfg)
     client=TestClient(app)
-    return SimpleNamespace(h=h,client=client,calls=calls,external=external,actor=actor,pid=p['id'],nid=n['id'],financial_nid=fn['id'],adapter_factory=lambda _:Adapter())
+    return SimpleNamespace(h=h,client=client,calls=calls,external=external,actor=actor,pid=p['id'],nid=n['id'],financial_nid=fn['id'],adapter_factory=lambda _:Adapter(),before_persist=before_persist)
 
 
 def project_version(api):
