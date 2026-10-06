@@ -141,7 +141,7 @@ def test_recipient_accepts_projected_handover_and_delegations_keep_own_schema():
     act('handover_approve', {'id': hid}, 'u-manager')
     assert hid in _visible(ws, 'u-agent')
     act('handover_accept', {'id': hid}, 'u-agent')
-    assert ws['handover_requests'][0]['status'] != 'awaiting_acceptance'
+    assert ws['handover_requests'][0]['status'] == 'accepted'
     assert hid in _visible(ws, 'u-field') and hid not in _visible(ws, 'u-map')
     # Delegations are principal_id/delegate_id; from_id/to_id must not leak into them.
     ws['delegations'] = [dict(id='d1', principal_id='u-field', delegate_id='u-agent'),
@@ -149,3 +149,37 @@ def test_recipient_accepts_projected_handover_and_delegations_keep_own_schema():
     user = next(u for u in ws['users'] if u['id'] == 'u-agent')
     got = filter_private_workspace(public_copy(ws), user)['delegations']
     assert [d['id'] for d in got] == ['d1']
+
+
+def test_persisted_handover_is_visible_and_acceptable_through_api(setup):
+    app, client, wid, actor = setup
+    ws, act = _handover_state()
+    hid = ws['handover_requests'][0]['id']
+    project_id = ws['projects'][0]['id']
+    act('handover_approve', {'id': hid}, 'u-manager')
+    with app.state.sessions.begin() as db:
+        row = db.get(WorkspaceRow, wid)
+        row.data = storage.save(db, BusinessRow, wid, ws)
+
+    for ident, expected in [('u-field', [hid]), ('u-agent', [hid]),
+                            ('u-pm', [hid]), ('u-manager', [hid]), ('u-map', [])]:
+        actor(ident)
+        response = client.get('/api/workspace')
+        assert response.status_code == 200, response.text
+        assert [h['id'] for h in response.json()['handover_requests']] == expected
+
+    actor('u-agent')
+    current = client.get('/api/workspace').json()
+    assert current['handover_requests'][0]['status'] == 'awaiting_acceptance'
+    response = client.post('/api/actions', json={
+        'action': 'handover_accept', 'project_id': project_id,
+        'version': current['version'], 'request_id': 'accept-persisted-handover',
+        'payload': {'id': hid},
+    })
+    assert response.status_code == 200, response.text
+    assert response.json()['handover_requests'][0]['status'] == 'accepted'
+    assert client.get('/api/workspace').json()['handover_requests'][0]['status'] == 'accepted'
+    with app.state.sessions() as db:
+        saved = storage.load(db, BusinessRow, db.get(WorkspaceRow, wid))
+        assert saved['handover_requests'][0]['status'] == 'accepted'
+        assert saved['projects'][0]['handoffs'][0]['id'] == hid
