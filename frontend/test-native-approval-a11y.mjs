@@ -57,6 +57,28 @@ item={...submitted,native_binding:{...submitted.native_binding}};await render();
 confirms.push(false);await click(btn('cancel'));
 assert.equal(document.activeElement,btn('cancel'));
 
+// Declined confirm after focus moved away must not leave restoration intent: a later render, even
+// one that unmounts the old control, cannot steal focus back from the unrelated element.
+const outside=document.createElement('input');document.body.append(outside);
+for(const [action,exit] of [['cancel',()=>outside.focus()],['cancel',()=>document.activeElement.blur()]]){
+  window.confirm=()=>{exit();return false};
+  await click(btn(action));
+  const parked=document.activeElement;
+  await render({busy:true});await render();
+  assert.equal(document.activeElement,parked,'declined confirm must not steal focus on later renders');
+  outside.focus();
+}
+// Focus leaving the section clears stale restoration state even if the control later unmounts.
+window.confirm=()=>true;
+let hold;gate=new Promise(r=>{hold=r});
+duringRequest=()=>outside.focus();
+await click(btn('cancel'));duringRequest=null;
+item={id:'r1',project_id:'p1',status:'canceled'};
+gate=null;await act(async()=>{hold();await new Promise(r=>setTimeout(r,0))});
+assert.equal(document.activeElement,outside,'focus that left the section stays outside');
+outside.remove();window.confirm=()=>confirms.shift();
+item={...submitted,native_binding:{...submitted.native_binding}};await render();
+
 // Abandon unmounts the focused control: focus must land on a live element, not <body>.
 item=notCreated;await render();
 assert.ok(btn('submit')&&btn('abandon'),'recovery actions available to original applicant');
