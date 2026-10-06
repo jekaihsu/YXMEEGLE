@@ -1,11 +1,13 @@
 """Fresh authority and uncertain remote results must fail closed."""
 from copy import deepcopy
+from datetime import datetime,timezone
 from types import SimpleNamespace
 import pytest
 from . import storage, jobs, learning_sources
 from .jobs import Worker
 from .learning_sources import approval_is_fresh, approval_in_period, leave_refresh_due, LEAVE_DEFINITION, DELEGATE_FIELD
 from .lark_adapter import RemoteFailure
+from .source_case_policy import SOURCE_REFERENCE_POLICY, identity
 from .test_source_sync import harness
 
 
@@ -154,3 +156,94 @@ def test_old_training_or_award_failure_does_not_revert_newer_plan_status(harness
     worker.run_one(h.wid); state,_=h.read()
     assert all(j['status']=='blocked' for j in state['jobs'])
     assert state['training_plans'][0]['record_sync_status']==state['training_plans'][0]['remote_status']=='verified'
+
+
+def notification_job(h,kind):
+    from .operations import queue
+    state,_=h.read();actor=next(u for u in state['users'] if u['id']=='u-manager')
+    app_id=h.cfg['LARK_APP_ID']
+    actor.update(identity_app_id=app_id,directory_status='employed',directory_missing=False,
+        directory_source={'app_id':app_id,'record_id':'manager-roster'},
+        directory_last_seen_at=datetime.now(timezone.utc).isoformat())
+    state['settings']['external_enabled']=True
+    p=state['projects'][0];p.update(execution_system='workbench',case_visibility='new_case')
+    recipients=['u-manager','u-pm']
+    if kind=='confirmation':
+        p['issuer_ids']=[actor['id']]
+        p['evidence'].append({'id':'confirmation-evidence','key':'confirmation','status':'accepted'})
+        issue={'id':'issue-37','version':'1','status':'queued','pm_id':p['pm_id'],
+            'evidence_id':'confirmation-evidence','recipients':recipients,'fingerprint':'fixture'}
+        p['confirmation_issues'].append(issue)
+        payload={'project_id':p['id'],'issue_id':issue['id'],'recipients':recipients,'text':'confirmation'}
+    else:
+        payload={'recipients':recipients,'text':'digest','source_project_ids':[p['id']],'source_scope':'case_digest_v1'}
+    job=queue(state,kind,actor,payload,'issue-37:'+kind)
+    with h.sessions.begin() as db:
+        row=db.get(h.W,h.wid);row.data=storage.save(db,h.B,h.wid,state)
+        db.get(h.P,(h.wid,actor['id'])).data=deepcopy(actor)
+    return job,actor,recipients
+
+
+def notification_worker(h,tmp_path,message):
+    adapter=SimpleNamespace(message=message,client=SimpleNamespace(close=lambda:None))
+    return Worker(h.sessions,h.W,h.B,h.P,h.cfg,tmp_path,adapter_factory=lambda _:adapter)
+
+
+def saved_job(h,job):
+    return next(j for j in h.read()[0]['jobs'] if j['id']==job['id'])
+
+
+@pytest.mark.parametrize('kind',['digest','confirmation'])
+def test_notification_receipt_checkpoint_failure_is_quarantined(harness,tmp_path,monkeypatch,kind):
+    from .operations import apply_operation
+    from fastapi import HTTPException
+    h=harness;job,actor,recipients=notification_job(h,kind);sent=[]
+    worker=notification_worker(h,tmp_path,lambda recipient,*_:sent.append(recipient) or {'message_id':'msg-'+recipient})
+    original=worker.checkpoint;failed=[]
+    def fail_after_remote(*args,**kwargs):
+        if not failed:
+            failed.append(True)
+            raise RuntimeError('checkpoint failed after remote message accepted')
+        return original(*args,**kwargs)
+    monkeypatch.setattr(worker,'checkpoint',fail_after_remote)
+    worker.run_one(h.wid)
+    state,_=h.read();saved=saved_job(h,job)
+    assert sent==[recipients[0]] and saved['status']=='outcome_unknown' and not saved['steps']
+    with pytest.raises(HTTPException) as error:
+        apply_operation(state,actor,{'action':'job_retry','payload':{'id':job['id']}},False)
+    assert error.value.status_code==409
+    # A restarted Worker finds nothing runnable and sends nothing.
+    notification_worker(h,tmp_path,lambda recipient,*_:sent.append(recipient) or {}).run_one(h.wid)
+    assert sent==[recipients[0]] and saved_job(h,job)['status']=='outcome_unknown'
+
+
+@pytest.mark.parametrize('kind',['digest','confirmation'])
+def test_notification_network_exception_after_attempt_is_quarantined(harness,tmp_path,kind):
+    h=harness;job,_,recipients=notification_job(h,kind);calls=[]
+    def message(recipient,*_):
+        calls.append(recipient);raise RuntimeError('connection reset while sending')
+    notification_worker(h,tmp_path,message).run_one(h.wid)
+    saved=saved_job(h,job)
+    assert calls==[recipients[0]] and saved['status']=='outcome_unknown' and not saved['steps'],saved
+    notification_worker(h,tmp_path,message).run_one(h.wid)
+    assert calls==[recipients[0]]
+
+
+@pytest.mark.parametrize('kind',['digest','confirmation'])
+def test_notification_retry_and_restart_resume_only_unreceipted_recipients(harness,tmp_path,kind):
+    from .operations import apply_operation
+    h=harness;job,actor,recipients=notification_job(h,kind);sent=[]
+    def flaky(recipient,*_):
+        if recipient==recipients[1] and sent.count(recipient)==0 and len(sent)==1:
+            sent.append('refused:'+recipient);raise RemoteFailure('remote refused before accepting','failed')
+        sent.append(recipient);return {'message_id':'msg-'+recipient}
+    notification_worker(h,tmp_path,flaky).run_one(h.wid)
+    state,_=h.read();saved=saved_job(h,job)
+    assert saved['status']=='failed' and [s['key'] for s in saved['steps']]==[recipients[0]]
+    apply_operation(state,actor,{'action':'job_retry','payload':{'id':job['id']}},False)
+    with h.sessions.begin() as db:
+        row=db.get(h.W,h.wid);row.data=storage.save(db,h.B,h.wid,state)
+    notification_worker(h,tmp_path,flaky).run_one(h.wid)  # new Worker simulates a restart
+    saved=saved_job(h,job)
+    assert sent==[recipients[0],'refused:'+recipients[1],recipients[1]]
+    assert saved['status']=='succeeded' and [s['key'] for s in saved['steps']]==recipients

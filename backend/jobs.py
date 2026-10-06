@@ -308,8 +308,11 @@ class Worker:
                     self.authorize(wid,jid,token,test,policy)
                     active_user(state,recipient)
                     if any(s['key']==recipient for s in job['steps']): continue
+                    remote_attempted=not test
                     receipt={'recipient':recipient,'message_id':'simulated-'+jid+'-'+recipient,'simulated':True} if test else adapter.message(recipient,payload['text'],hashlib.sha256((jid+recipient).encode()).hexdigest()[:32])
+                    remote_completed=not test
                     self.checkpoint(wid,jid,token,lambda s,j: j['steps'].append({'key':recipient,'receipt':receipt,'at':now()}))
+                    remote_completed=False;remote_attempted=False
                 def finish(s,j):
                     if kind=='confirmation':
                         p=find(s['projects'],payload['project_id']); issue=find(p['confirmation_issues'],payload['issue_id']); issue.update(status='simulated' if test else 'issued',issued_at=now(),receipts=deepcopy(j['steps']))
