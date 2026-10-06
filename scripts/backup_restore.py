@@ -20,11 +20,11 @@ except ImportError:
 
 def _canonical_base():
     try:
-        from backend.app import Base
+        from backend.models import Base
     except ImportError:
         import sys
         sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-        from backend.app import Base
+        from backend.models import Base
     return Base
 
 # The application's SQLAlchemy models are the only schema definition. Login

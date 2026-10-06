@@ -1,10 +1,14 @@
 import hashlib
+import os
+from pathlib import Path
+import subprocess
+import sys
 from zipfile import ZipFile
 
 import pytest
 from sqlalchemy import Column, Integer, JSON, MetaData, String, Table, create_engine, inspect, select
 
-from backend.app import Base, BusinessRow
+from backend.models import Base, BusinessRow
 from scripts import backup_restore as br
 
 PORTABLE={'workspaces','receipts','source_caches','business_records','company_people','action_audit'}
@@ -84,3 +88,14 @@ def test_repeated_restore_and_create_all_do_not_mask_missing_schema(tmp_path):
     with pytest.raises(ValueError,match='must be empty'):
         br.restore(good,tmp_path/'again-uploads',archive)
     assert shape(good,'business_records')==shape(source,'business_records')
+
+
+def test_backup_cli_import_does_not_start_app_or_open_database(tmp_path):
+    env={**os.environ,'APP_ENV':'production','DATABASE_URL':'sqlite:///'+str(tmp_path/'must-not-open.db'),'UPLOAD_DIR':str(tmp_path/'must-not-create')}
+    root=Path(__file__).resolve().parents[1]
+    for command in ([sys.executable,'-c',"from scripts import backup_restore; import sys; assert 'backend.app' not in sys.modules"],
+                    [sys.executable,str(root/'scripts/backup_restore.py'),'--help']):
+        result=subprocess.run(command,cwd=tmp_path,env={**env,'PYTHONPATH':str(root)},capture_output=True,text=True)
+        assert result.returncode==0,result.stderr
+    assert not (tmp_path/'must-not-open.db').exists()
+    assert not (tmp_path/'must-not-create').exists()
