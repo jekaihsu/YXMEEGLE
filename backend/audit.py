@@ -6,7 +6,8 @@ import secrets
 SENSITIVE = {'access_token', 'refresh_token', 'app_secret', 'client_secret',
              'session_secret', 'password', 'migration_archive', 'raw_fields',
              'raw_snapshot', 'snapshot', 'attendance_identity', 'salary',
-             'salary_amount', 'private_notes','oauth_identity'}
+             'salary_amount', 'private_notes','oauth_identity',
+             'company_admin_authorization'}
 
 
 def scrub(value):

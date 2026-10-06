@@ -78,3 +78,41 @@ def test_malformed_or_extended_person_events_fail_closed():
     assert_clean(state)
     assert json.loads(state['events'][0]['message'])['changes'] == {}
     assert list(json.loads(state['events'][1]['message'])['changes']) == ['name']
+
+
+def test_nested_and_non_scalar_values_are_dropped_and_extra_keys_discarded():
+    ws, manager, target = workspace()
+    nested = {'open_id': OAUTH_SENTINEL}
+    ws['events'][:0] = [
+        {'id': 'n1', 'action': 'admin_person', 'actor_id': manager['id'], 'message': json.dumps(
+            {'person': nested, 'changes': {'name': {'before': nested, 'after': [REASON_SENTINEL]}},
+             'before': 'x', 'details': nested, 'extra': REASON_SENTINEL})},
+        {'id': 'n2', 'action': 'admin_person', 'actor_id': manager['id'], 'message': json.dumps(
+            {'person': 'p', 'changes': {'role': {'before': 'a', 'after': 'b' * 5000}}, 'details': nested})},
+        {'id': 'n3', 'action': 'admin_person', 'actor_id': manager['id'], 'message': {'person': nested}},
+        {'id': 'n4', 'action': 'admin_person', 'actor_id': manager['id'], 'message': 12345}]
+    state = member_view(ws)
+    assert_clean(state)
+    first = json.loads(state['events'][0]['message'])
+    assert first == {'person': None, 'changes': {'name': {'before': None, 'after': None}}}
+    second = json.loads(state['events'][1]['message'])
+    assert set(second) == {'person', 'changes'} and len(second['changes']['role']['after']) <= 200
+    for event in state['events'][2:4]:
+        assert json.loads(event['message']) == {'person': None, 'changes': {}}
+
+
+def test_legacy_nested_name_does_not_leak():
+    ws, manager, target = workspace()
+    before = {**target, 'name': {'open_id': OAUTH_SENTINEL}}
+    ws['events'].insert(0, {'id': 'l', 'actor_id': manager['id'], 'action': 'admin_person',
+                            'message': json.dumps({'person': {'x': REASON_SENTINEL}, 'before': before, 'after': target})})
+    state = member_view(ws)
+    assert_clean(state)
+    assert json.loads(state['events'][0]['message'])['person'] is None
+
+
+def test_audit_receipt_redacts_company_admin_authorization():
+    from .audit import scrub
+    grant = {'grant_id': 'g', 'reason': REASON_SENTINEL}
+    out = scrub({'company_admin_authorization': grant, 'ok': 1, 'nested': {'company_admin_authorization': grant}})
+    assert REASON_SENTINEL not in json.dumps(out) and out['ok'] == 1

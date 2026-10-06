@@ -16,6 +16,25 @@ def public_person(person, *, include_authority=False):
 
 
 PERSON_EVENT_FIELDS = ('name','department','role','active','default_workspace')
+PERSON_EVENT_MAX_TEXT = 200
+
+
+def _bounded_scalar(value):
+    """Scalars only: nested containers and oversized text collapse to None."""
+    if isinstance(value, str):
+        return value[:PERSON_EVENT_MAX_TEXT]
+    if isinstance(value, (bool, int)) or value is None:
+        return value
+    if isinstance(value, float) and value == value and value not in (float('inf'), float('-inf')):
+        return value
+    return None
+
+
+def _event_json(person_id, changes, capabilities_changed=False):
+    summary = {'person': _bounded_scalar(person_id), 'changes': changes}
+    if capabilities_changed:
+        summary['capabilities_changed'] = True
+    return json.dumps(summary, ensure_ascii=False)
 
 
 def person_event_message(person_id, before, after):
@@ -25,22 +44,28 @@ def person_event_message(person_id, before, after):
     records that they changed, not which ones. Full diffs live in action receipts.
     """
     before, after = before or {}, after or {}
-    changes = {key: {'before': deepcopy(before.get(key)), 'after': deepcopy(after.get(key))}
+    changes = {key: {'before': _bounded_scalar(before.get(key)), 'after': _bounded_scalar(after.get(key))}
                for key in PERSON_EVENT_FIELDS if before.get(key) != after.get(key)}
-    summary = {'person': person_id, 'changes': changes}
-    if sorted(before.get('capabilities') or []) != sorted(after.get('capabilities') or []):
-        summary['capabilities_changed'] = True
-    return json.dumps(summary, ensure_ascii=False)
+    try:
+        changed = sorted(map(str, before.get('capabilities') or [])) != sorted(map(str, after.get('capabilities') or []))
+    except TypeError:
+        changed = True
+    return _event_json(person_id, changes, changed)
 
 
 def _sanitize_person_event(event):
-    """Rewrite legacy and current person events to the whitelisted summary."""
+    """Rewrite legacy and current person events to the whitelisted summary.
+
+    Only scalar, bounded values of whitelisted fields survive; every other key
+    (including top-level before/details) is discarded.
+    """
+    message = event.get('message')
     try:
-        data = json.loads(event.get('message') or '')
-    except (TypeError, ValueError):
+        data = json.loads(message) if isinstance(message, (str, bytes)) else None
+    except ValueError:
         data = None
     if not isinstance(data, dict):
-        event['message'] = json.dumps({'person': None, 'changes': {}}, ensure_ascii=False)
+        event['message'] = _event_json(None, {})
         return
     if isinstance(data.get('before'), dict) or isinstance(data.get('after'), dict):
         event['message'] = person_event_message(
@@ -49,13 +74,11 @@ def _sanitize_person_event(event):
             data['after'] if isinstance(data.get('after'), dict) else {})
         return
     changes = data.get('changes') if isinstance(data.get('changes'), dict) else {}
-    summary = {'person': data.get('person'),
-               'changes': {key: {'before': deepcopy(value.get('before')), 'after': deepcopy(value.get('after'))}
-                           for key, value in changes.items()
-                           if key in PERSON_EVENT_FIELDS and isinstance(value, dict)}}
-    if data.get('capabilities_changed'):
-        summary['capabilities_changed'] = True
-    event['message'] = json.dumps(summary, ensure_ascii=False)
+    event['message'] = _event_json(
+        data.get('person'),
+        {key: {'before': _bounded_scalar(value.get('before')), 'after': _bounded_scalar(value.get('after'))}
+         for key, value in changes.items() if key in PERSON_EVENT_FIELDS and isinstance(value, dict)},
+        data.get('capabilities_changed') is True)
 
 
 def public_source_cache(cache, user=None):
