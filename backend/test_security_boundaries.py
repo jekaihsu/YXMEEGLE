@@ -131,3 +131,22 @@ def test_explicit_backup_grant_is_recomputed_and_revocable():
     cfg['LARK_COMPANY_ADMIN_GRANTS_JSON']='[]'
     refresh_business_authority(user,cfg)
     assert not can_business_override(user) and not is_pm(user,{'pm_id':'someone-else'})
+
+
+@pytest.mark.parametrize('length,ok', [(120, True), (121, False), (10000, False)])
+def test_action_name_bounded_to_audit_column(length, ok):
+    body = {'action': 'x'*length, 'payload': {}}
+    if ok:
+        assert validate_action(body) is body
+        return
+    with pytest.raises(HTTPException) as error:
+        validate_action(body)
+    assert error.value.status_code == 422
+
+
+def test_audit_record_bounds_action_column():
+    from . import audit
+    class Row:
+        def __init__(self, **kw): self.__dict__.update(kw)
+    row = audit.record(Row, 'w', 'u', 'x'*10000, result='denied')
+    assert len(row.action) == 120 and row.data['action_truncated'] and row.data['action_length'] == 10000

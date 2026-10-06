@@ -54,7 +54,14 @@ def changes(before, state):
     return result
 
 
+ACTION_COLUMN_LIMIT = 120
+
+
 def record(model, wid, actor_id, action, *, result='success', request_id=None, details=None):
+    # Keep the stored column within its varchar bound; retain the original length.
+    if len(action) > ACTION_COLUMN_LIMIT:
+        details = {**(details or {}), 'action_truncated': True, 'action_length': len(action)}
+        action = action[:ACTION_COLUMN_LIMIT]
     return model(id=secrets.token_hex(16), workspace_id=wid, actor_id=actor_id,
                  action=action, created_at=datetime.now(timezone.utc).isoformat(),
                  data={'result': result, 'request_id': request_id, **scrub(details or {})})

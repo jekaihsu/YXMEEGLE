@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 from fastapi import HTTPException
 
 MAX_ACTION_BYTES = 256 * 1024
+MAX_ACTION_NAME = 120  # must not exceed AuditRow.action String(120)
 TEXT_LIMIT = 10000
 TEXT_FIELDS = {'title', 'name', 'body', 'description', 'reason', 'output', 'note',
                'qualification_note', 'source_url', 'reference_url', 'url',
@@ -122,6 +123,9 @@ def _payload_fields(payload):
 def validate_action(body):
     if not isinstance(body, dict) or not isinstance(body.get('action'), str):
         invalid('操作格式錯誤')
+    text(body['action'], 'action', MAX_ACTION_NAME)
+    if not body['action']:
+        invalid('action 不可空白')
     _bounded(body)
     if len(json.dumps(body, ensure_ascii=False, allow_nan=False).encode('utf-8')) > MAX_ACTION_BYTES:
         invalid('操作資料超過 256 KB', 413)
