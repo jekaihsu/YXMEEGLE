@@ -332,6 +332,7 @@ class Worker:
                     from .input_registration import RegistrationAdapter
                     receipt=RegistrationAdapter(adapter).submit(i['registration_plan'],policy)
                     receipt['value']=deepcopy(i['value'])
+                    remote_completed=True
                 receipt.update(simulated=test,remote_mode=policy['mode'],base_token=None if test else policy['base_token'])
                 def finish(s,j):
                     target=find(s['input_revisions'],i['id']); target.update(status='succeeded',receipt=receipt,finished_at=now()); find(s['input_mappings'],m['id'])['remote_value']=receipt['value']; j.update(status='succeeded',finished_at=now(),receipt=receipt,simulated=test,remote_mode=policy['mode'])
