@@ -33,12 +33,20 @@ def apply_management(ws,user,body):
         require(principal and user['id']==principal,'不是此案指定確認者',403)
         classification=data.get('classification'); require(classification in ('effective','duplicate','additional'),'報價認定類型錯誤',422)
         fingerprint=digest(quote)
-        review=next((r for r in p['quote_reviews'] if r['quote_id']==quote['id'] and r['source_hash']==fingerprint and r['classification']==classification and r['status']=='pending'),None)
+        principals={'pm':p.get('pm_id'),'sales':p.get('sales_id')}
+        require(all(principals.values()) and principals['pm']!=principals['sales'],'報價需指定不同的 PM 與業務',409)
+        for previous in p['quote_reviews']:
+            if (previous.get('quote_id')==quote['id'] and previous.get('source_hash')==fingerprint
+                    and previous.get('classification')==classification and previous.get('status')=='pending'
+                    and previous.get('principal_ids')!=principals):
+                previous.update(status='invalidated',invalidated_at=now(),invalidated_reason='PM 或業務職責已改派，原投票失效')
+        review=next((r for r in p['quote_reviews'] if r['quote_id']==quote['id'] and r['source_hash']==fingerprint and r['classification']==classification and r.get('principal_ids')==principals and r['status']=='pending'),None)
         if not review:
-            review=dict(id=uid(),quote_id=quote['id'],source_hash=fingerprint,classification=classification,status='pending',votes=[],created_at=now()); p['quote_reviews'].append(review)
+            review=dict(id=uid(),quote_id=quote['id'],source_hash=fingerprint,classification=classification,principal_ids=principals,status='pending',votes=[],created_at=now()); p['quote_reviews'].append(review)
         require(not any(v['actor_id']==user['id'] and v['seat']!=seat for v in review['votes']),'兩方必須不同人',409)
         review['votes']=[v for v in review['votes'] if v['seat']!=seat]+[{'seat':seat,'actor_id':user['id'],'at':now()}]
-        if {v['seat'] for v in review['votes']}=={'pm','sales'}:
+        if ({v.get('seat'):v.get('actor_id') for v in review['votes']}==principals
+                and len({v.get('actor_id') for v in review['votes']})==2):
             for previous in p['quote_reviews']:
                 if previous['quote_id']==quote['id'] and previous['id']!=review['id'] and previous['status']=='approved': previous['status']='superseded'
             review['status']='approved'

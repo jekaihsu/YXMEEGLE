@@ -198,19 +198,30 @@ class LarkAdapter:
 
     def folder(self,parent,name):
         # A UUID suffix in planned folder names allows reuse after a lost response.
-        cursor=None
+        cursor=None; seen=set(); matches=[]
         for _ in range(100):
             params={'folder_token':parent,'page_size':200}
             if cursor: params['page_token']=cursor
             result=self.request('GET','/drive/v1/files',params=params)
-            matches=[x for x in result.get('files',[]) if x['name']==name and x['type']=='folder']
-            if len(matches)>1: raise RemoteFailure('目的資料夾重名，需管理員核對','blocked')
-            if matches: return matches[0]['token']
-            if not result.get('has_more'): break
+            files=result.get('files'); has_more=result.get('has_more')
+            if not isinstance(files,list) or type(has_more) is not bool:
+                raise RemoteFailure('Drive 目錄回應不完整，停止建立資料夾','blocked')
+            for item in files:
+                if not isinstance(item,dict) or not isinstance(item.get('name'),str) or not isinstance(item.get('type'),str):
+                    raise RemoteFailure('Drive 目錄項目格式不完整，停止建立資料夾','blocked')
+                if item['name']==name and item['type']=='folder':
+                    if not isinstance(item.get('token'),str) or not item['token']:
+                        raise RemoteFailure('目的資料夾缺少識別碼，需管理員核對','blocked')
+                    matches.append(item)
+            if not has_more: break
             next_cursor=result.get('next_page_token')
-            if not next_cursor or next_cursor==cursor: raise RemoteFailure('Drive 目錄分頁不完整','blocked')
+            if not isinstance(next_cursor,str) or not next_cursor or next_cursor in seen:
+                raise RemoteFailure('Drive 目錄分頁不完整','blocked')
+            seen.add(next_cursor)
             cursor=next_cursor
         else: raise RemoteFailure('Drive 目錄超過查詢上限','blocked')
+        if len(matches)>1: raise RemoteFailure('目的資料夾重名，需管理員核對','blocked')
+        if matches: return matches[0]['token']
         result=self.request('POST','/drive/v1/files/create_folder',json={'name':name,'folder_token':parent})
         if not result.get('token'): raise RemoteFailure('資料夾建立結果待核實','outcome_unknown')
         return result['token']

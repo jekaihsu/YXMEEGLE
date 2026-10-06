@@ -7,7 +7,7 @@ from .app import create_app, WorkspaceRow, PersonRow, AuthRow, AuditRow, Busines
 from .seed import seed
 from .policy import upgrade
 from . import storage
-from .production_access import admitted
+from .production_access import admitted, access_mode
 
 
 def company(tmp_path):
@@ -74,6 +74,22 @@ def test_admission_rejects_unknown_left_wrong_app_and_missing():
     for change in ({'active':False},{'directory_missing':True},{'directory_status':'unknown'},
                    {'directory_status':'left'},{'identity_app_id':'other'},{'directory_source':{}}):
         assert not admitted({**person,**change},'app1')
+
+
+def test_demoted_bootstrap_admin_keeps_employee_access_without_manager_recovery():
+    now=datetime.now(timezone.utc)
+    person={'id':'bootstrap','active':True,'bootstrap_admin':True,'role':'member','identity_app_id':'app1',
+            'directory_status':'employed','directory_missing':False,'directory_last_seen_at':now.isoformat(),
+            'directory_source':{'app_id':'app1','record_id':'roster-row'}}
+    assert admitted(person,'app1')
+    assert access_mode(person,'app1',now=now)=='normal'
+
+    stale={**person,'directory_last_seen_at':'2020-01-01T00:00:00+00:00'}
+    assert admitted(stale,'app1')
+    assert access_mode(stale,'app1',now=now)=='denied'
+    manager={**stale,'role':'manager'}
+    assert access_mode(manager,'app1',now=now)=='recovery'
+    assert not admitted({**manager,'manager_revoked':True},'app1')
 
 
 def test_audit_receipt_idempotent_and_denied_is_recorded(tmp_path):

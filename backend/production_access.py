@@ -15,8 +15,8 @@ def admitted(person, app_id):
         return False
     if person.get('identity_app_id') not in (None, '', app_id):
         return False
-    if person.get('bootstrap_admin'):
-        return person.get('role') == 'manager' and not person.get('manager_revoked')
+    if person.get('bootstrap_admin') and person.get('role')=='manager':
+        return not person.get('manager_revoked')
     source = person.get('directory_source') or {}
     return (person.get('directory_status') == 'employed'
             and not person.get('directory_missing', False)

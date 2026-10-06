@@ -99,9 +99,19 @@ def reconcile_daily_evidence(ws):
 def delivery_fingerprint(item):
     return digest({k:item.get(k) for k in ('work_item_ids','quantity','unit','evidence_ids','task_snapshots','version')})
 
+def delivery_reviewer_ids(p,item):
+    selected=set(item.get('work_item_ids',[])); reviewers=[]
+    for node in p['nodes']:
+        if any(task['id'] in selected or task.get('work_item_id') in selected for task in node['tasks']):
+            reviewers.append(node.get('supervisor_id') or p.get('supervisor_id',''))
+    return list(dict.fromkeys(ident for ident in reviewers if ident))
+
 def delivery_current(p,item):
     if item.get('status')!='approved' or item.get('superseded_by'): return False
     if item.get('content_hash')!=delivery_fingerprint(item): return False
+    current_reviewers=set(delivery_reviewer_ids(p,item))
+    valid_approvals={a.get('actor_id') for a in item.get('approvals',[]) if a.get('content_hash')==item.get('content_hash')}
+    if not current_reviewers or current_reviewers!=set(item.get('required_reviewer_ids',[])) or valid_approvals!=current_reviewers: return False
     for ident in item.get('evidence_ids',[]):
         e=next((e for e in p['evidence'] if e['id']==ident),None)
         if not e or e.get('withdrawn') or e.get('status')!='accepted': return False
@@ -487,6 +497,10 @@ def apply_operation(ws,user,body,demo=False):
             if key in data:
                 if data[key]: active_user(ws,data[key])
                 p[key]=data[key]
+        if before_roles.get('pm_id')!=p.get('pm_id') or before_roles.get('sales_id')!=p.get('sales_id'):
+            for review in p.get('quote_reviews',[]):
+                if review.get('status')=='pending':
+                    review.update(status='invalidated',invalidated_at=now(),invalidated_reason='PM 或業務職責已改派，原投票失效')
         for node in p['nodes']:
             for task in node['tasks']:
                 role=task.get('sop_owner_role')
@@ -664,7 +678,10 @@ def apply_operation(ws,user,body,demo=False):
     elif action=='delivery_review':
         require(p is not None,'請指定案件',422); item=find(p['delivery_batches'],data.get('id'),'交付批次')
         require(item['status']=='submitted' and not item.get('superseded_by'),'交付批次已核定、退回或換版',409)
-        require(user['id'] in item['required_reviewer_ids'],'需對應組主管核定交付')
+        current_reviewers=delivery_reviewer_ids(p,item)
+        require(current_reviewers and user['id'] in current_reviewers,'需由現任交付組主管核定交付')
+        item['required_reviewer_ids']=current_reviewers
+        item['approvals']=[a for a in item['approvals'] if a.get('actor_id') in current_reviewers and a.get('content_hash')==item['content_hash']]
         result=data.get('result'); require(result in ('approved','returned'),'交付核定結果錯誤',422)
         if result=='returned':
             require(str(data.get('reason','')).strip(),'退回需填理由',422); item.update(status='returned',returned_by=user['id'],reason=data['reason'])
@@ -815,6 +832,9 @@ def apply_operation(ws,user,body,demo=False):
             if p[key]==prior: p[key]=replacement
         for node in p['nodes']:
             if node['owner_id']==prior: node['owner_id']=replacement
+            if node.get('supervisor_id')==prior: node['supervisor_id']=replacement
+            if prior in node.get('reviewers',[]):
+                node['reviewers']=[replacement if ident==prior else ident for ident in node['reviewers']]
             for t in node['tasks']:
                 if t['owner_id']==prior and t['status'] not in ('completed','superseded'): t['owner_id']=replacement
             for c in node['review_cycles']:

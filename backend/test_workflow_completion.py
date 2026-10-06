@@ -84,6 +84,45 @@ def test_progress_payment_requires_approved_delivery_not_free_text(state):
         payment(state,item)
 
 
+def test_delivery_reassignment_requires_current_supervisor_review(state):
+    p,n=prepared(state,'control')
+    n['supervisor_id']='u-control'
+    evidence=next(e for e in reversed(p['evidence']) if e['node_id']==n['id'] and e['key']=='deliverable')
+    action(state,'delivery_submit',dict(work_item_ids=[n['tasks'][0]['id']],quantity='10',unit='點',evidence_ids=[evidence['id']]))
+    item=p['delivery_batches'][-1]
+    assert item['required_reviewer_ids']==['u-control']
+
+    action(state,'project_roles',{'node_supervisor_id':'u-field'},user='u-manager',key='control')
+    with pytest.raises(HTTPException,match='現任交付組主管'):
+        action(state,'delivery_review',dict(id=item['id'],result='approved'),user='u-control')
+    action(state,'delivery_review',dict(id=item['id'],result='approved'),user='u-field')
+    from .operations import delivery_current
+    assert item['required_reviewer_ids']==['u-field']
+    assert [vote['actor_id'] for vote in item['approvals']]==['u-field']
+    assert delivery_current(p,item)
+
+
+def test_supervisor_handover_updates_only_matching_node_review_seats(state):
+    p,n=prepared(state,'control')
+    unrelated=next(node for node in p['nodes'] if node['key']=='field')
+    unrelated['supervisor_id']='u-control'
+    action(state,'review_submit',{},user='u-pm',key='control')
+    prior_cycle=n['review_cycles'][-1]
+    assert prior_cycle['seats']['supervisor']=='u-manager'
+
+    action(state,'handover_request',{'from_id':'u-manager','to_id':'u-field','reason':'主管交接'},user='u-manager')
+    handover=state['handover_requests'][-1]
+    action(state,'handover_approve',{'id':handover['id']},user='u-manager')
+    action(state,'handover_accept',{'id':handover['id']},user='u-field')
+
+    assert p['supervisor_id']=='u-field' and n['supervisor_id']=='u-field'
+    assert unrelated['supervisor_id']=='u-control'
+    assert prior_cycle['seats']['supervisor']=='u-field'
+    action(state,'review_submit',{},user='u-pm',key='control')
+    assert prior_cycle['status']=='invalidated'
+    assert n['review_cycles'][-1]['content_hash']!=prior_cycle['content_hash']
+
+
 def test_one_delivery_can_be_billed_while_other_is_returned(state):
     first=delivery(state); second=delivery(state)
     second['status']='returned'
