@@ -444,7 +444,7 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         if cfg is not None and ('drive_root' in data or 'test_drive_root' in data):
             for key in ('drive_root','test_drive_root'): require(isinstance(proposed.get(key),str),'Drive 目錄需為文字',422)
             approved,test_root=cfg.get('LARK_DRIVE_ROOT'),cfg.get('LARK_TEST_DRIVE_ROOT')
-            require(not proposed['drive_root'] or ws.get('environment')!='production' or (proposed['drive_root']==approved and proposed['drive_root']!=test_root),'正式 Drive 目錄須等同伺服器核定目錄且不得為測試目錄',422)
+            require(ws.get('environment')!='production' or (bool(proposed['drive_root']) and proposed['drive_root']==approved and proposed['drive_root']!=test_root),'正式 Drive 目錄須等同伺服器核定目錄且不得為測試目錄',422)
             require(not proposed['test_drive_root'] or proposed['test_drive_root']!=approved,'測試目錄不可指向伺服器核定的正式目錄',422)
         ws['settings']=proposed
     elif action=='sop_draft':

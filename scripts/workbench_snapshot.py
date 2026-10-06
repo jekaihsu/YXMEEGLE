@@ -25,7 +25,8 @@ ENVIRONMENT='6ab6168036d2a6cac409f0c6'
 DIRECTORY=ROOT/'.runtime/workbench-snapshot'
 MAX_BYTES=128*1024*1024
 MARKER='YX_WORKBENCH_SNAPSHOT='
-MODULES=('scripts/backup_restore.py','scripts/backup_live_legacy.py','scripts/backup_publish.py')
+MODULES=('scripts/backup_restore.py','scripts/backup_live_legacy.py','scripts/backup_publish.py',
+         'backend/models.py','backend/storage.py')
 
 
 class SnapshotError(Exception):pass
@@ -89,16 +90,18 @@ def execute():
         blob=base64.b64decode(attempt['helper_bundle'],validate=True)
         ensure(hashlib.sha256(blob).hexdigest()==attempt['helper_bundle_sha256'])
         with ZipFile(io.BytesIO(blob)) as bundle:
-            expected=set(attempt['module_hashes'])|{'scripts/__init__.py'}
+            expected=set(attempt['module_hashes'])|{'scripts/__init__.py','backend/__init__.py'}
             ensure(len(bundle.namelist())==len(expected) and set(bundle.namelist())==expected)
             contents={name:bundle.read(name) for name in expected}
         ensure(contents['scripts/__init__.py']==b'')
+        ensure(contents['backend/__init__.py']==b'')
         for name,digest in attempt['module_hashes'].items():
             ensure(hashlib.sha256(contents[name]).hexdigest()==digest)
         ensure(not any(k=='scripts' or k.startswith('scripts.') for k in sys.modules))
         folder.mkdir(mode=0o700)  # Original attempt ID, never overwrite any previous attempt.
         helper=folder/'reviewed-helpers';helper.mkdir(mode=0o700)
         (helper/'scripts').mkdir(mode=0o700)
+        (helper/'backend').mkdir(mode=0o700)
         for name,data in contents.items():
             with (helper/name).open('xb') as out:out.write(data);out.flush();os.fsync(out.fileno())
         sys.dont_write_bytecode=True
@@ -219,6 +222,7 @@ def reviewed_repair_attempt(attempt,directory):
     buffer=io.BytesIO()
     with ZipFile(buffer,'w',ZIP_DEFLATED) as bundle:
         bundle.writestr('scripts/__init__.py',b'')
+        bundle.writestr('backend/__init__.py',b'')
         for name in MODULES:
             data=(ROOT/name).read_bytes()
             check(hashlib.sha256(data).hexdigest()==attempt['module_hashes'][name],'reviewed_helper_changed_since_attempt')

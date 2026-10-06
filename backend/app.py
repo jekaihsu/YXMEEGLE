@@ -40,7 +40,7 @@ class Action(BaseModel):
     project_versions:dict[str,int]=Field(default_factory=dict)
 
 
-def _copy_local_pilot_attachments(upload_dir,source_wid,target_wid,project):
+def _copy_local_pilot_attachments(upload_dir,source_wid,target_wid,project,id_map):
     """Copy verified local bytes into the test namespace; never mutate source files."""
     source_root=Path(upload_dir).resolve()/hashlib.sha256(source_wid.encode()).hexdigest()
     target_root=Path(upload_dir).resolve()/hashlib.sha256(target_wid.encode()).hexdigest()
@@ -49,8 +49,9 @@ def _copy_local_pilot_attachments(upload_dir,source_wid,target_wid,project):
         for item in project.get('files',[]):
             if item.get('storage')!='local': continue
             ident=item.get('id')
+            source_ident=next((old for old,new in id_map.items() if new==ident),ident)
             require(isinstance(ident,str) and ident and Path(ident).name==ident and ident not in ('.','..'),'附件識別碼錯誤',409)
-            source=(source_root/ident).resolve(); destination=target_root/ident
+            source=(source_root/source_ident).resolve(); destination=target_root/ident
             require(source.is_relative_to(source_root) and source.is_file(),'正式附件檔案不存在',409)
             payload=source.read_bytes(); digest=hashlib.sha256(payload).hexdigest()
             require(isinstance(item.get('size'),int) and len(payload)==item['size'],'正式附件大小不符',409)
@@ -65,6 +66,36 @@ def _copy_local_pilot_attachments(upload_dir,source_wid,target_wid,project):
     except Exception:
         for path in created: path.unlink(missing_ok=True)
         raise
+
+def _reidentify_pilot_project(project,occupied_ids=()):
+    """Give an isolated project copy new entity IDs while preserving internal links."""
+    from .workflow import uid
+    copied=deepcopy(project)
+    id_map={};used=set(occupied_ids)
+    def collect(value):
+        if isinstance(value,dict):
+            ident=value.get('id')
+            if isinstance(ident,str) and ident:
+                if ident in used: id_map.setdefault(ident,'pilot-'+uid())
+                used.add(ident)
+            for child in value.values(): collect(child)
+        elif isinstance(value,list):
+            for child in value: collect(child)
+    collect(copied)
+    source_id=copied['id']
+    def rewrite(value):
+        if isinstance(value,dict):
+            for key,child in list(value.items()):
+                if key=='id' and isinstance(child,str): value[key]=id_map.get(child,child)
+                elif isinstance(child,str): value[key]=id_map.get(child,child)
+                else: rewrite(child)
+        elif isinstance(value,list):
+            for index,child in enumerate(value):
+                if isinstance(child,str): value[index]=id_map.get(child,child)
+                else: rewrite(child)
+    rewrite(copied)
+    copied['pilot_source_id']=source_id
+    return copied,id_map
 
 def create_app(overrides=None):
     cfg=dict(os.environ); cfg.update(overrides or {})
@@ -791,13 +822,21 @@ def create_app(overrides=None):
                 source=db.get(WorkspaceRow,org); require(source is not None,'正式工作區尚未建立',409); source_state=load(db,source)
                 p=find(source_state['projects'],body.get('project_id'),'V4案件'); target=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one(); state=load(db,target); expected=target.version
                 require(not any(x.get('pilot_source_id')==p['id'] for x in state['projects']),'此試行案已複製',409)
-                copy=deepcopy(p); copy['pilot_source_id']=p['id']; copy['pilot']=True
+                occupied_ids=set()
+                def collect_ids(value):
+                    if isinstance(value,dict):
+                        if isinstance(value.get('id'),str): occupied_ids.add(value['id'])
+                        for child in value.values(): collect_ids(child)
+                    elif isinstance(value,list):
+                        for child in value: collect_ids(child)
+                collect_ids(state['projects'])
+                copy,id_map=_reidentify_pilot_project(p,occupied_ids); copy['pilot']=True
                 # Preserve stable IDs in the isolated namespace, not production identities/recipients.
                 copy['pm_id']=user['id']; copy['admin_id']=''; copy['supervisor_id']=''; copy['issuer_ids']=[user['id']]; copy['confirmation_issues']=[]
                 for node in copy['nodes']:
                     node['owner_id']=user['id']; node['supervisor_id']=''; node['reviewers']=[]; node['collaborator_ids']=[]; node['review_cycles']=[]
                     for task in node['tasks']: task['owner_id']=user['id']; task.pop('proxy',None)
-                copied_files=_copy_local_pilot_attachments(upload_dir,org,wid,copy)
+                copied_files=_copy_local_pilot_attachments(upload_dir,org,wid,copy,id_map)
                 state['projects'].append(copy); state['environment']='test'; state['version']=expected+1
                 root=storage.save(db,BusinessRow,wid,state)
                 updated=db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==expected).values(version=expected+1,data=root))
