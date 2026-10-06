@@ -106,7 +106,9 @@ def test_formal_release_rejects_before_launch(formal_env, tamper):
 def test_cloud_setup_clean_manifest_dispatches_once(cloud_env):
     stage, _, fake, _ = cloud_env
     deploy_cloud()
-    assert len(fake.calls) == 1 and fake.calls[0][1]['cwd'] == stage
+    assert len(fake.calls) == 1
+    assert fake.calls[0][1]['cwd'] != stage
+    assert not fake.calls[0][1]['cwd'].exists()
 
 
 def test_cloud_setup_rejects_smoke_bound_to_other_inventory(cloud_env):
@@ -132,3 +134,22 @@ def test_formal_release_rejects_smoke_bound_to_other_inventory(formal_env):
     with pytest.raises(RuntimeError, match='bound to a different inventory'):
         formal.run()
     assert fake.calls == []
+
+
+def test_cloud_dispatch_uses_reviewed_copy_when_original_changes(cloud_env, monkeypatch):
+    stage, files, _, _ = cloud_env
+    calls = []
+
+    def run(*args, **kwargs):
+        tamper_extra(stage)
+        tamper_changed(stage)
+        snapshot = kwargs['cwd']
+        assert sorted(p.relative_to(snapshot).as_posix() for p in snapshot.rglob('*') if p.is_file()) == ['backend/app.py']
+        assert hashlib.sha256((snapshot / 'backend/app.py').read_bytes()).hexdigest() == files[0]['sha256']
+        calls.append(snapshot)
+        return type('Result', (), {'returncode': 0})()
+
+    monkeypatch.setattr(cloud.subprocess, 'run', run)
+    deploy_cloud()
+    assert len(calls) == 1
+    assert not calls[0].exists()
