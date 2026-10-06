@@ -317,7 +317,11 @@ class Worker:
                 def finish(s,j):
                     if kind=='confirmation':
                         p=find(s['projects'],payload['project_id']); issue=find(p['confirmation_issues'],payload['issue_id']); issue.update(status='simulated' if test else 'issued',issued_at=now(),receipts=deepcopy(j['steps']))
-                        if not any(h.get('issue_id')==issue['id'] for h in p['handoffs']): p['handoffs'].append({'issue_id':issue['id'],'pm_id':issue['pm_id'],'at':now(),'simulated':test})
+                        from .sop_execution import formal_issue,record_fan_out
+                        # Preview/simulated issuance never hands off or fans out.
+                        if formal_issue(issue) and not any(h.get('issue_id')==issue['id'] or h.get('version')==issue['version'] for h in p['handoffs']):
+                            p['handoffs'].append({'issue_id':issue['id'],'version':issue['version'],'pm_id':issue['pm_id'],'at':now(),'simulated':False})
+                        record_fan_out(p,issue)
                     j.update(status='succeeded',finished_at=now(),simulated=test)
                 self.checkpoint(wid,jid,token,finish)
             elif kind in ('capability','training_record'):

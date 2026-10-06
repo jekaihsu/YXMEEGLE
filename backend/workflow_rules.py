@@ -58,6 +58,8 @@ def assign_node(ws,p,n,owner,actor,reason=''):
 def execution_reasons(ws,p,n,t):
     from .sop_contracts import execution_reasons as sop_execution_reasons
     reasons=sop_execution_reasons(p,n,t)
+    from .sop_execution import gate_reasons
+    reasons.extend(gate_reasons(ws,p,n,t))
     if p.get('archived_at') or p.get('migrated_to') or p.get('source_missing') or needs_review(p) or declared(p)=='中止' or p.get('execution_status')=='completed': reasons.append('案件已暫停、結案或來源待核對')
     if n.get('archived_at') or n.get('status') in ('approved_skipped','archived','superseded'): reasons.append('節點已跳過或封存')
     if t.get('status') in ('paused','superseded','completed') or blocked(ws,p,t): reasons.append('任務已完成、暫停或封存')

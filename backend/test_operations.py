@@ -225,8 +225,8 @@ def test_worker_test_workspace_never_calls_remote_and_issue_once(api_app,ws):
     app.state.worker.adapter_factory=lambda cfg:pytest.fail('Test workspace called remote')
     app.state.worker.run_one(wid)
     state=client.get('/api/workspace').json(); issue=state['projects'][0]['confirmation_issues'][0]
-    assert issue['status']=='simulated'; assert len(issue['receipts'])==2; assert len(state['projects'][0]['handoffs'])==1
-    app.state.worker.run_one(wid); state=client.get('/api/workspace').json(); assert len(state['projects'][0]['handoffs'])==1
+    assert issue['status']=='simulated'; assert len(issue['receipts'])==2; assert state['projects'][0]['handoffs']==[]  # preview issuance never hands off PM
+    app.state.worker.run_one(wid); state=client.get('/api/workspace').json(); assert state['projects'][0]['handoffs']==[]  # preview issuance never hands off PM
 
 def test_worker_recovers_only_failed_recipient_without_resend(api_app,ws):
     app,client=api_app; p,n=ready(ws,'confirmation'); call(ws,'confirmation_issue',{'version':'1','recipients':['u-field','u-control']})

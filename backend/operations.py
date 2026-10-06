@@ -217,6 +217,8 @@ def missing(p,n,ws):
     from .sop_contracts import completion_reasons
     issues=completion_reasons(p,n)
     if any(c['node_id']==n['id'] and c['status']=='pending' for c in p.get('sop_deadline_conflicts',[])): issues.append('SOP 期限異動尚待主管核對')
+    from .sop_execution import node_closure_reasons
+    issues.extend(node_closure_reasons(ws,p,n))
     if n['key'] in FINANCIAL:
         if ws.get('environment')=='production' and not financial_confirmation(ws,p,n): issues.append('此節點尚未取得有效的 Lark 原生財務共同核准')
         if p.get('migration_review_required') or p.get('migration_conflicts'): issues.append('來源案件合併尚待主管核對')
@@ -377,6 +379,12 @@ def apply_operation(ws,user,body,demo=False):
     if action in ('sop_event_record','sop_deadline_resolve','sop_followup_complete'):
         from .sop_deadlines import apply_sop_deadline
         return apply_sop_deadline(ws,user,body)
+    if action in ('sop_condition_propose','sop_condition_confirm'):
+        from .sop_execution import apply_condition
+        return apply_condition(ws,user,body)
+    if action=='sop_round_open':
+        from .sop_execution import apply_round
+        return apply_round(ws,user,body)
     if action in ('sop_applicability_propose','sop_applicability_confirm'):
         from .sop_applicability import apply_applicability
         return apply_applicability(ws,user,body)
@@ -857,11 +865,15 @@ def apply_operation(ws,user,body,demo=False):
         for ident in recipients: active_user(ws,ident)
         node=next(x for x in p['nodes'] if x['key']=='confirmation'); evidence=evidence_for(p,node,'confirmation')
         require(evidence and evidence['status']=='accepted','需核定確認單資料',409)
-        fingerprint=digest({'version':version,'evidence':evidence['id'],'pm':p['pm_id'],'recipients':recipients})
+        groups=data.get('recipient_groups') or {}
+        from .sop_execution import fan_out_targets
+        require(isinstance(groups,dict) and set(groups)<=set(recipients) and all(isinstance(v,list) and v and set(v)<=set(fan_out_targets()) for v in groups.values()),'收件人組別須屬 state_4 的下游節點',422)
+        groups={k:sorted(set(v)) for k,v in groups.items()}
+        fingerprint=digest({'version':version,'evidence':evidence['id'],'pm':p['pm_id'],'recipients':recipients,**({'groups':groups} if groups else {})})
         prior=next((i for i in p['confirmation_issues'] if i['version']==version),None)
         if prior: require(prior['fingerprint']==fingerprint,'同版本發出內容不同，請使用新版本',409)
         else:
-            issue=dict(id=uid(),version=version,status='queued',fingerprint=fingerprint,pm_id=p['pm_id'],recipients=recipients,evidence_id=evidence['id'],issued_by=user['id'],created_at=now())
+            issue=dict(id=uid(),version=version,status='queued',fingerprint=fingerprint,pm_id=p['pm_id'],recipients=recipients,recipient_groups=groups,evidence_id=evidence['id'],issued_by=user['id'],created_at=now())
             p['confirmation_issues'].append(issue)
             queue(ws,'confirmation',user,{'project_id':p['id'],'issue_id':issue['id'],'recipients':recipients,'text':f"確認單 {p['code']} {p['name']} v{version} 已正式發出。PM：{active_user(ws,p['pm_id'])['name']}。請至工作台確認。"},'confirmation:'+issue['id'])
     elif action=='confirmation_ack':
