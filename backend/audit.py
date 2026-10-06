@@ -1,7 +1,10 @@
 """Bounded, credential-free structured diffs for immutable action receipts."""
 from copy import deepcopy
 from datetime import datetime, timezone
+import hashlib
+import re
 import secrets
+import unicodedata
 
 SENSITIVE = {'access_token', 'refresh_token', 'app_secret', 'client_secret',
              'session_secret', 'password', 'migration_archive', 'raw_fields',
@@ -55,7 +58,26 @@ def changes(before, state):
     return result
 
 
+ACTION_COLUMN_LIMIT = 120
+_SAFE_ACTION = re.compile(r'[A-Za-z0-9_.:\-]{1,%d}' % ACTION_COLUMN_LIMIT)
+
+
+def _printable(value):
+    return ''.join(c for c in value if unicodedata.category(c) not in ('Cc', 'Cf', 'Cs', 'Co', 'Cn'))
+
+
 def record(model, wid, actor_id, action, *, result='success', request_id=None, details=None):
+    # Rejected input is untrusted: never store it verbatim. Anything that is not a
+    # plain identifier (oversize, NUL/control/format chars, odd unicode) is replaced
+    # by a fixed-size digest so the varchar column and PostgreSQL text/JSON accept it.
+    details = dict(details or {})
+    if not isinstance(action, str) or not _SAFE_ACTION.fullmatch(action):
+        raw = action if isinstance(action, str) else repr(action)
+        digest = hashlib.sha256(raw.encode('utf-8', 'surrogatepass')).hexdigest()
+        details.update(action_rejected=True, action_length=len(raw), action_sha256=digest)
+        action = 'rejected_action:' + digest[:16]
+    if isinstance(request_id, str):
+        request_id = _printable(request_id)[:ACTION_COLUMN_LIMIT]
     return model(id=secrets.token_hex(16), workspace_id=wid, actor_id=actor_id,
                  action=action, created_at=datetime.now(timezone.utc).isoformat(),
-                 data={'result': result, 'request_id': request_id, **scrub(details or {})})
+                 data={'result': result, 'request_id': request_id, **scrub(details)})

@@ -131,3 +131,48 @@ def test_explicit_backup_grant_is_recomputed_and_revocable():
     cfg['LARK_COMPANY_ADMIN_GRANTS_JSON']='[]'
     refresh_business_authority(user,cfg)
     assert not can_business_override(user) and not is_pm(user,{'pm_id':'someone-else'})
+
+
+@pytest.mark.parametrize('length,ok', [(120, True), (121, False), (10000, False)])
+def test_action_name_bounded_to_audit_column(length, ok):
+    body = {'action': 'x'*length, 'payload': {}}
+    if ok:
+        assert validate_action(body) is body
+        return
+    with pytest.raises(HTTPException) as error:
+        validate_action(body)
+    assert error.value.status_code == 422
+
+
+@pytest.mark.parametrize('action', ['x'*10000, 'task_add\x00evil', 'task\x1b[31m', 'a\u202eb', 'x'*121])
+def test_audit_record_replaces_unsafe_action_with_digest(action):
+    from . import audit
+    class Row:
+        def __init__(self, **kw): self.__dict__.update(kw)
+    row = audit.record(Row, 'w', 'u', action, result='denied', request_id='r\x00id')
+    assert row.action.startswith('rejected_action:') and len(row.action) <= 120
+    assert row.data['action_rejected'] and row.data['action_length'] == len(action)
+    assert row.data['request_id'] == 'rid'
+    assert action not in json.dumps(row.data) and '\x00' not in json.dumps(row.data, ensure_ascii=False)
+
+
+@pytest.mark.parametrize('action', ['x'*10000, 'task_add\x00evil', 'task_add\x1f'])
+def test_actions_endpoint_rejects_hostile_action_with_safe_denied_audit(tmp_path, action):
+    from fastapi.testclient import TestClient
+    from sqlalchemy import select
+    from .app import create_app, AuditRow
+    from .test_backend import workspace
+    app = create_app({'DATABASE_URL': f'sqlite:///{tmp_path}/a.db', 'UPLOAD_DIR': str(tmp_path/'u'),
+                      'SESSION_SECRET': 'test-secret'*5, 'APP_ENV': 'development', 'DEMO_MODE': 'true'})
+    client = TestClient(app); client.get('/api/session')
+    response = client.post('/api/actions', json={'action': action, 'version': workspace(client)['version'],
+                                                 'request_id': 'req\x00-1', 'payload': {}})
+    assert response.status_code == 422
+    with app.state.sessions() as db:
+        rows = [r for r in db.scalars(select(AuditRow)) if r.data.get('result') == 'denied']
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.action.startswith('rejected_action:') and len(row.action) <= 120
+    assert row.data['status'] == 422 and row.data['action_length'] == len(action)
+    assert not any(c in json.dumps(row.data, ensure_ascii=False) for c in ('\x00', '\x1f'))
+    assert action not in json.dumps(row.data)

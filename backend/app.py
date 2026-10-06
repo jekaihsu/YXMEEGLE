@@ -447,7 +447,12 @@ def create_app(overrides=None):
     def actions(body:Action,request:Request):
         data,user=identity(request); raw=body.model_dump()
         from .input_validation import validate_action
-        validate_action(raw)
+        try:validate_action(raw)
+        except HTTPException as exc:
+            with sessions.begin() as db:
+                db.add(audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,
+                                   details={'status':exc.status_code,'reason':'validation'}))
+            raise
         fingerprint=hashlib.sha256(json.dumps({k:v for k,v in raw.items() if k not in ('version','request_id','project_versions')},sort_keys=True).encode()).hexdigest()
         versions=None
         if body.project_versions:
