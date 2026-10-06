@@ -190,3 +190,16 @@ def test_workspace_switch_and_pilot_copy_reject_non_object_bodies_without_state_
     # valid boundary still works
     assert c.post('/api/pilot/copy',json={'project_id':pid}).status_code==200
     assert c.post('/api/workspace/switch',json={'environment':'production'}).status_code==200
+
+
+def test_workspace_switch_and_pilot_copy_reject_deeply_nested_json_without_state_change(tmp_path):
+    app,c=company(tmp_path)
+    hdr={'content-type':'application/json'}
+    depth=20000
+    for raw in (b'['*depth+b']'*depth,b'{"a":'*depth+b'1'+b'}'*depth):
+        for path in ('/api/workspace/switch','/api/pilot/copy'):
+            before=_snapshot(app,c)
+            r=c.post(path,content=raw,headers=hdr)
+            assert r.status_code==422,(path,r.status_code)
+            assert r.json()['detail']=='請求內容必須是有效的 JSON'
+            assert _snapshot(app,c)==before
