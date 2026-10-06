@@ -122,7 +122,12 @@ def create_app(overrides=None):
         from fastapi.responses import JSONResponse
         if request.url.path=='/api/auth/lark/callback' and 'text/html' in request.headers.get('accept',''):
             detail=str(exc.detail)
-            code='provider_unavailable' if exc.status_code>=500 else ('tenant_denied' if '租戶' in detail else 'unverified_directory' if '名冊' in detail else 'inactive' if '停權' in detail else 'expired')
+            code=('provider_unavailable' if exc.status_code>=500 else
+                  'tenant_denied' if '租戶' in detail else
+                  'unverified_directory' if '名冊' in detail else
+                  'inactive' if '停權' in detail else
+                  'app_configuration' if '應用權限' in detail or 'OAuth 應用' in detail else
+                  'authorization_denied' if '使用者拒絕授權' in detail else 'expired')
             response=RedirectResponse('/?auth_error='+code,status_code=303)
             response.delete_cookie('lark_oauth_state'); return response
         return JSONResponse({'detail':exc.detail},status_code=exc.status_code,headers=exc.headers)
@@ -656,7 +661,7 @@ def create_app(overrides=None):
         response.set_cookie('lark_oauth_state',signer.dumps(state),httponly=True,secure=production,samesite='lax',max_age=600); return response
 
     @app.get('/api/auth/lark/callback')
-    def lark_callback(request:Request,code:str='',state:str=''):
+    def lark_callback(request:Request,code:str='',state:str='',error:str='',error_description:str=''):
         require(oauth_configured,'Lark 登入未設定',503)
         try: cookie=signer.loads(request.cookies.get('lark_oauth_state',''),max_age=600)
         except BadSignature: raise HTTPException(400,'OAuth state 驗證失敗')
@@ -665,9 +670,36 @@ def create_app(overrides=None):
             nonce=db.execute(select(AuthRow).where(AuthRow.id=='oauth-'+state).with_for_update()).scalar_one_or_none()
             require(nonce is not None and nonce.data['expires']>datetime.now(timezone.utc).timestamp(),'OAuth state 已失效或已使用',400)
             return_to=nonce.data.get('next','/'); db.delete(nonce)
+        # Authorization servers return OAuth errors on the callback instead of
+        # an authorization code when consent is denied or a scope is invalid.
+        # Never forward provider-supplied descriptions into our URL or UI.
+        if error:
+            provider_errors={
+                'access_denied':'authorization_denied',
+                'invalid_scope':'app_configuration',
+                'unauthorized_client':'app_configuration',
+                'invalid_client':'app_configuration',
+                'temporarily_unavailable':'provider_unavailable',
+                'server_error':'provider_unavailable',
+            }
+            safe_code=provider_errors.get(error,'authorization_failed')
+            response=RedirectResponse('/?auth_error='+safe_code,status_code=303)
+            response.delete_cookie('lark_oauth_state'); return response
         try:
             with httpx.Client(timeout=25) as client:
-                response=client.post(API+'/authen/v2/oauth/token',json={'grant_type':'authorization_code','client_id':cfg['LARK_APP_ID'],'client_secret':cfg['LARK_APP_SECRET'],'code':code,'redirect_uri':cfg['LARK_REDIRECT_URI']}); response.raise_for_status(); token=response.json()
+                response=client.post(API+'/authen/v2/oauth/token',json={'grant_type':'authorization_code','client_id':cfg['LARK_APP_ID'],'client_secret':cfg['LARK_APP_SECRET'],'code':code,'redirect_uri':cfg['LARK_REDIRECT_URI']})
+                if response.status_code>=400:
+                    try: provider_error=response.json().get('error')
+                    except (ValueError,TypeError,AttributeError): provider_error=None
+                    detail=('使用者拒絕授權' if provider_error=='access_denied' else
+                            'OAuth 應用權限設定需管理員檢查' if provider_error in ('invalid_scope','unauthorized_client','invalid_client') else
+                            'Lark 登入服務暫時無法連線')
+                    raise HTTPException(400 if provider_error in ('access_denied','invalid_scope','unauthorized_client','invalid_client') else 502,detail)
+                token=response.json()
+                granted_scope=token.get('scope')
+                if isinstance(granted_scope,str) and granted_scope.strip():
+                    missing_scopes=set(oauth_scopes.split())-set(granted_scope.split())
+                    if missing_scopes: raise HTTPException(403,'OAuth 應用權限未授予：請管理員檢查 Lark 應用權限與發布版本')
                 require(bool(token.get('access_token')),'Lark 授權碼交換失敗',401)
                 response=client.get(API+'/authen/v1/user_info',headers={'Authorization':'Bearer '+token['access_token']}); response.raise_for_status(); info=response.json().get('data',{})
         except httpx.HTTPError: raise HTTPException(502,'Lark 登入服務暫時無法連線')

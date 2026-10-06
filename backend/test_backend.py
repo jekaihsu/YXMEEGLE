@@ -119,6 +119,22 @@ def test_production_config_and_oauth_state(tmp_path):
     assert c.get('/api/auth/lark/callback?state=forged&code=fake').status_code==400
     r=c.get('/api/auth/lark/login',follow_redirects=False); assert 'app_id=test' in r.headers['location']
 
+def test_lark_oauth_denial_returns_safe_actionable_error_redirect(tmp_path):
+    from urllib.parse import parse_qs,urlparse
+    cfg={'DATABASE_URL':f'sqlite:///{tmp_path}/oauth-denial.db','UPLOAD_DIR':str(tmp_path/'u'),
+         'APP_ENV':'development','DEMO_MODE':'false','SESSION_SECRET':'oauth-denial-test'*4,
+         'LARK_APP_ID':'test','LARK_APP_SECRET':'test','LARK_REDIRECT_URI':'https://example.org/api/auth/lark/callback',
+         'LARK_ALLOWED_TENANTS':'tenant'}
+    client=TestClient(create_app(cfg))
+    login=client.get('/api/auth/lark/login',follow_redirects=False)
+    state=parse_qs(urlparse(login.headers['location']).query)['state'][0]
+    denied=client.get('/api/auth/lark/callback',params={'state':state,'error':'access_denied',
+        'error_description':'synthetic private provider detail'},follow_redirects=False)
+    assert denied.status_code==303
+    assert denied.headers['location']=='/?auth_error=authorization_denied'
+    assert 'synthetic' not in denied.headers['location']
+    assert 'lark_oauth_state' in denied.headers.get('set-cookie','')
+
 def test_source_normalization_formula_values_repeated_sync_and_manual_protection():
     ws=seed(True)
     def rec(kind,ident,fields): return {'kind':kind,'base_token':'base','table_id':kind,'record_id':ident,'fields':fields}
