@@ -1,5 +1,5 @@
 // Issue #51: protect patched tooling, including Vite's nested esbuild, and local binding.
-// Run after npm ci and npm run build: node --test test-dev-tooling.mjs
+// Run after npm ci and npm run build: npm run test:dev-tooling
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { isIP } from 'node:net';
@@ -40,6 +40,13 @@ test('manifest and every locked tooling copy use patched, consistent versions', 
   }
 });
 
+test('local CI runs tooling after the build and checks API responses', async () => {
+  assert.equal(pkg.scripts['test:dev-tooling'], 'node --test --test-timeout=30000 test-dev-tooling.mjs');
+  const ci = await readFile(new URL('../scripts/local_ci.sh', import.meta.url), 'utf8');
+  assert.match(ci, /npm run test:api-response/);
+  assert.match(ci, /npm run build[\s\S]*npm run test:dev-tooling/);
+});
+
 function loopback(server) {
   const { address } = server.address();
   assert.ok((isIP(address) === 4 && address.startsWith('127.')) || address === '::1',
@@ -49,11 +56,12 @@ function loopback(server) {
 
 test('default dev server binds locally and transforms the React entry without permissive CORS', async () => {
   assert.equal(pkg.scripts.dev, 'vite', 'network exposure must require an explicit CLI override');
-  const server = await createServer({ root, server: { port: 0 } });
+  // HTTP probes do not crawl imports like a browser; let optimization finish independently.
+  const server = await createServer({ root, server: { port: 0 }, optimizeDeps: { holdUntilCrawlEnd: false, force: true } });
   try {
     await server.listen();
     const origin = loopback(server.httpServer);
-    for (const path of ['/', '/src/main.tsx', '/src/App.tsx']) {
+    for (const path of ['/', '/src/main.tsx', '/src/App.tsx', '/node_modules/.vite/deps/react.js']) {
       const response = await fetch(origin + path, {
         headers: { Origin: 'https://untrusted.invalid' }, signal: AbortSignal.timeout(10000),
       });
