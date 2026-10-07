@@ -20,7 +20,7 @@ for(const key of ['window','document','location','history','sessionStorage','For
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(resolve=>setTimeout(resolve,0))});
 // Stand-in for GET /api/projects?view=overview: same tabs, sorts, facets and paging contract as backend/shell.py.
-let overviewGate=async()=>{};let detailGate=async()=>{};
+let fullGate=async()=>{};let overviewGate=async()=>{};let detailGate=async()=>{};
 // Stand-in for GET /api/projects/{id}: the single project tree plus its own records.
 const detail=async(url)=>{
  const id=decodeURIComponent(url.split('/').pop());await detailGate(id);const project=workspace.projects.find(p=>p.id===id);
@@ -42,7 +42,7 @@ let root;let features;let current=shell;let user=a;let etag='W/"shell-A:1"';let 
 globalThis.fetch=async(url,init)=>{
  requests.push({url,init});
  if(url==='/api/session')return json({user,users:[a,b],mode:'lark',environment:'production',workspace_id:'workspace-A',auth_configured:true,features});
- if(url==='/api/workspace')return json(workspace);
+ if(url==='/api/workspace'){await fullGate();return json({...workspace,version:current.version});}
  if(url.startsWith('/api/projects?view=overview'))return overview(url);
  if(url.startsWith('/api/projects/'))return detail(url);
  if(url==='/api/workspace?scope=shell')return init.headers.get('If-None-Match')===etag?new Response(null,{status:304,headers:{ETag:etag}}):json(current,{ETag:etag});
@@ -155,5 +155,24 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  await flush(()=>window.shellContext.run('case_execution_assign',{execution_system:'workbench'},{project_id:'pA'}));
  assert.equal(window.shellContext.w.scope,undefined,'mutation response is the full workspace');assert.equal(detailUrls().length,reads,'no extra project read after the full workspace arrives');
  assert.ok(document.querySelector('.workspace').textContent.includes('PRIVATE_CASE_A'),'detail keeps rendering from the full workspace');
- console.log('Shell mode: feature gating, server-side paging/filter reset/stale-response guard, lazy single-project detail, summary-only render/filter/sort, badges, 304, identity cache, mutation/upload concurrency and 409 passed');
+
+ // P4-4: screens that need broader data read the full workspace only when opened, behind a loading state, once per shell version.
+ current=shell;etag='W/"shell-A:1"';location.hash='view=dashboard';
+ await mount({workspace_shell:true});
+ const fullReads=()=>requests.filter(r=>r.url==='/api/workspace').length;
+ assert.equal(fullReads(),0,'first paint never reads the full workspace');
+ let openFull;const heldFull=new Promise(resolve=>{openFull=resolve});fullGate=()=>heldFull;
+ await goto('view=work');assert.equal(fullReads(),1);assert.ok(document.querySelector('.workspace [role="status"]').textContent.includes('正在載入完整資料'),'loading state while the full read is pending');
+ assert.ok(document.querySelector('[aria-label="主要導覽"]'),'the shell stays usable while a screen loads');
+ await flush(async()=>{openFull();await heldFull});fullGate=async()=>{};
+ assert.ok(document.querySelector('.workspace').textContent.includes('TASK_A'),'my work renders the loaded task');
+ for(const view of ['approvals','schedule','routines','admin','work'])await goto('view='+view);
+ assert.equal(fullReads(),1,'one full read per shell version, shared by every screen');
+ await goto('view=dashboard');await flush(()=>[...document.querySelectorAll('.today-activity button')].find(b=>b.textContent==='載入近期活動').click());
+ assert.equal(fullReads(),1);assert.ok(document.querySelector('.today-activity').textContent.includes('尚無操作紀錄'));
+ current={...shell,version:5};etag='W/"shell-A:5"';await flush(()=>window.shellContext.refresh());await goto('view=approvals');
+ assert.equal(fullReads(),2,'a newer shell version reads the full workspace again');
+ await flush(()=>window.shellContext.run('case_execution_assign',{execution_system:'workbench'},{project_id:'pA'}));
+ await goto('view=schedule');await goto('view=work');assert.equal(fullReads(),2,'after a mutation the app holds the full workspace and reads nothing');
+ console.log('Shell mode: feature gating, server-side paging/filter reset/stale-response guard, lazy single-project detail, on-demand full workspace, summary-only render/filter/sort, badges, 304, identity cache, mutation/upload concurrency and 409 passed');
 }finally{await flush(()=>root.unmount());dom.window.close()}
