@@ -74,9 +74,9 @@ export function liveRefresh(datasets:import('./types').LiveDataset[],wait=false,
 
 export const perfOn=typeof location!=='undefined'&&new URLSearchParams(location.search).get('perf')==='1';
 export type PerfTrace={id:number;url:string;status?:number;bytes?:number;serverTiming?:string|null;headersMs?:number;parseMs?:number};
-type PerfSummary={requests:PerfTrace[];firstRenderMs?:number};
+type PerfSummary={requests:PerfTrace[];firstRenderMs?:number;marks:Record<string,number>};
 let seq=0,firstFetch:string|undefined;
-const summary:PerfSummary={requests:[]};
+const summary:PerfSummary={requests:[],marks:{}};
 const measure=(name:string,from:string,to:string)=>performance.measure(name,from,to).duration;
 if(perfOn)(window as any).__yxPerf=summary;
 export function perfStart(url:string):PerfTrace|undefined{
@@ -103,5 +103,15 @@ export function perfFirstRender(){
     performance.mark('yx:first-render');
     summary.firstRenderMs=measure('yx:fetch->first-render',firstFetch!,'yx:first-render');
     console.log('[yx-perf] first render',summary.firstRenderMs.toFixed(1),'ms',summary);
+  });
+}
+// Named render marks (?perf=1), e.g. shell-first-render and project-page-render: ms from the first request, recorded once per name.
+export function perfMark(name:string){
+  if(!perfOn||name in summary.marks||!firstFetch)return;
+  summary.marks[name]=-1;
+  requestAnimationFrame(()=>{
+    performance.mark(`yx:${name}`);
+    summary.marks[name]=measure(`yx:fetch->${name}`,firstFetch!,`yx:${name}`);
+    console.log('[yx-perf]',name,summary.marks[name].toFixed(1),'ms');
   });
 }

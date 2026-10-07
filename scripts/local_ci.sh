@@ -41,6 +41,7 @@ npm ci
 npm run test:session-epoch
 npm run test:api-response
 npm run test:perf
+npm run test:shell-mode
 node test-company-route.mjs
 npm run build
 npm run test:dev-tooling
