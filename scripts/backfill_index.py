@@ -1,6 +1,6 @@
 """Populate project_index, task_index and workspace_counters from business_records.
 
-Run: DATABASE_URL=... .venv/bin/python -m scripts.backfill_index [--workspace ID] [--batch 50] [--dry-run]
+Run: DATABASE_URL=... .venv/bin/python scripts/backfill_index.py [--workspace ID] [--batch 50] [--dry-run]
 Idempotent and re-runnable. The workspace is read once in a short read-only
 transaction; rows are written in small batches, each its own transaction that
 re-checks workspaces.version (a concurrent write restarts that workspace, since
@@ -9,6 +9,9 @@ are removed at the end. Locks the main tables only for the batch's index rows.
 """
 import argparse
 import os
+from pathlib import Path
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker

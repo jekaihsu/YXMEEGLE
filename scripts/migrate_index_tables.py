@@ -1,6 +1,6 @@
 """Create the Phase 2 index tables and their indexes on an existing database.
 
-Run: DATABASE_URL=... .venv/bin/python -m scripts.migrate_index_tables
+Run: DATABASE_URL=... .venv/bin/python scripts/migrate_index_tables.py
 Tables are created IF NOT EXISTS (new, empty, so no table rewrite). Each index is
 then built with CREATE INDEX IF NOT EXISTS; PostgreSQL uses CONCURRENTLY outside a
 transaction, allowing writes. SQLite: pause application writes. Safe to repeat; a
@@ -8,7 +8,11 @@ conflicting or invalid index fails verification. If a PostgreSQL build is
 interrupted, drop its invalid index before retrying. Nothing reads these tables
 unless INDEX_TABLES_ENABLED is on; populate them with scripts.backfill_index.
 """
+import argparse
 import os
+from pathlib import Path
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import create_engine, inspect, text
 
@@ -38,6 +42,7 @@ def migrate(engine):
 
 
 def main():
+    argparse.ArgumentParser(description=__doc__.splitlines()[0]).parse_args()
     url=os.getenv('DATABASE_URL')
     if not url:
         raise SystemExit('DATABASE_URL is required')

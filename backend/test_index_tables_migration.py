@@ -38,3 +38,12 @@ def test_migration_upgrades_old_database_idempotently(tmp_path):
     assert EXPECTED.items()<=indexes(engine).items()
     with engine.connect() as db: assert db.exec_driver_sql('SELECT id FROM workspaces').all()==[('w',)]
     engine.dispose()
+
+
+def test_scripts_run_directly_and_honour_help(tmp_path):
+    import subprocess, sys
+    from pathlib import Path
+    root=Path(__file__).resolve().parents[1]
+    for name in ('migrate_index_tables','backfill_index'):
+        done=subprocess.run([sys.executable,str(root/'scripts'/f'{name}.py'),'--help'],cwd=tmp_path,capture_output=True,text=True)
+        assert done.returncode==0 and 'usage' in done.stdout
