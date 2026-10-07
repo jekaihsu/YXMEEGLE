@@ -1,4 +1,6 @@
 """GET /api/workspace?scope=shell: navigation, badges and project cards, no project trees (VCC-98)."""
+import hashlib
+import json
 from datetime import date, timedelta
 from sqlalchemy import select, func, and_, or_, case
 from . import index_tables
@@ -32,6 +34,11 @@ def mine(ti,user,facts):
     """Condition selecting tasks whose can_execute is true for user (owner, valid delegate, or business override)."""
     if facts['override']: return ti.c.assignee_id.in_(facts['active'])
     return or_(and_(ti.c.assignee_id==user['id'],ti.c.assignee_id.in_(facts['active'])),ti.c.task_id.in_(sorted(facts['delegated']) or ['']))
+
+
+def etag(wid,user,version,today,users):
+    key=json.dumps([wid,user['id'],user.get('authz_version',0),user.get('role'),sorted(user.get('capabilities',[])),user.get('active',True),can_business_override(user),version,today,users],sort_keys=True,default=str)
+    return 'W/"shell-'+hashlib.sha256(key.encode()).hexdigest()[:32]+'"'
 
 
 def build(db,model,row,state,user,facts,today,approval_connection):

@@ -422,7 +422,7 @@ def create_app(overrides=None):
 
     def shell_response(request,data,user,coordinator):
         """Slim index-backed workspace; None means the index cannot vouch for it, so the caller serves the full workspace."""
-        from fastapi.responses import JSONResponse
+        from fastapi.responses import JSONResponse, Response
         from . import shell, index_reads
         wid=data['wid']
         with sessions() as db:
@@ -431,11 +431,13 @@ def create_app(overrides=None):
                 if not index_reads.ready(db,BusinessRow,row): return None
                 state=load(db,row,collections=('users','delegations','approved_leave_delegations'))
             today=now()[:10]; facts=shell.prepare(state,user,today)
+            tag=shell.etag(wid,user,row.version,today,state['users'])
+            if tag in [v.strip() for v in request.headers.get('if-none-match','').split(',')]: return Response(status_code=304,headers={'ETag':tag})
             with phase(request,'project'):
                 result=shell.build(db,BusinessRow,row,state,user,facts,today,approval_connection(cfg,simulation_available=(data['mode']=='demo') or wid.startswith('test-'),definition_verification=state.get('native_definition_verification')))
         result['freshness']=coordinator.status(wid)
         as_of=result['freshness']['datasets']['sources']['as_of']
-        return JSONResponse(result,headers={'X-Data-As-Of':as_of} if as_of else {})
+        return JSONResponse(result,headers={'ETag':tag,**({'X-Data-As-Of':as_of} if as_of else {})})
 
     @app.get('/api/workspace')
     def workspace(request:Request,scope:str=''):

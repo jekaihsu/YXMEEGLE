@@ -115,3 +115,52 @@ def test_shell_budget_319(tmp_path):
         # Fixture names are long CJK strings: 319 slim cards alone are ~148 KB. The 150 KB plan target needs P4-2 (server-paged cards).
         # Queries include ~14 from live-read ensure()/status and identity that are outside the shell itself (9).
         assert stats['queries'] <= 24 and raw <= 165_000 and int(response.headers['content-length']) <= 30_000
+
+
+def shell_get(client, tag=None):
+    return client.get('/api/workspace?scope=shell', headers={'If-None-Match': tag} if tag else {})
+
+
+def test_shell_etag_304_and_server_timing(tmp_path):
+    with scaled_client(tmp_path, 6, **ON) as (app, client):
+        switch(client, 'u-pm')
+        first = shell_get(client); tag = first.headers['etag']
+        assert first.status_code == 200 and tag.startswith('W/"shell-') and first.headers['cache-control'] == 'no-store'
+        again = shell_get(client, tag)
+        assert again.status_code == 304 and again.content == b'' and again.headers['etag'] == tag
+        assert shell_get(client, 'W/"other", ' + tag).status_code == 304
+        assert shell_get(client, 'W/"other"').status_code == 200
+        assert 'server-timing' in first.headers and 'server-timing' in again.headers
+
+
+def test_shell_etag_is_per_user_and_never_crosses_users_or_workspaces(tmp_path):
+    with scaled_client(tmp_path, 6, **ON) as (app, client):
+        switch(client, 'u-pm'); pm = shell_get(client).headers['etag']
+        switch(client, 'ou_015'); member = shell_get(client)
+        assert member.headers['etag'] != pm
+        assert shell_get(client, pm).status_code == 200, "another user's ETag must not validate"
+        assert shell_get(client, member.headers['etag']).status_code == 304
+        switch(client, 'u-pm'); assert shell_get(client, member.headers['etag']).status_code == 200
+        from fastapi.testclient import TestClient
+        with TestClient(app) as other:  # a second demo workspace for the same user id
+            other.get('/api/session'); other.post('/api/demo/session', json={'user_id': 'u-pm'})
+            assert shell_get(other, pm).status_code == 200 and shell_get(other).headers['etag'] != pm
+
+
+def test_shell_etag_changes_with_version_authority_and_day(tmp_path, monkeypatch):
+    with scaled_client(tmp_path, 6, **ON) as (app, client):
+        switch(client, 'u-pm')
+        tag = shell_get(client).headers['etag']; version = client.get('/api/workspace?scope=shell').json()['version']
+        assert client.post('/api/actions', json={'action': 'comment_add', 'version': version, 'request_id': 'etag-1',
+                                                 'project_id': 'p001', 'payload': {'body': 'x'}}).status_code == 200
+        after = shell_get(client, tag); assert after.status_code == 200 and after.headers['etag'] != tag
+        tag = after.headers['etag']
+        from . import shell
+        user = {'id': 'u', 'role': 'pm', 'capabilities': [], 'authz_version': 1}
+        base = shell.etag('w', user, 1, '2026-10-08', [])
+        assert shell.etag('w', {**user, 'authz_version': 2}, 1, '2026-10-08', []) != base
+        assert shell.etag('w', {**user, 'capabilities': ['approve_capability']}, 1, '2026-10-08', []) != base
+        assert shell.etag('w', {**user, 'active': False}, 1, '2026-10-08', []) != base
+        assert shell.etag('w2', user, 1, '2026-10-08', []) != base and shell.etag('w', user, 1, '2026-10-09', []) != base
+        monkeypatch.setattr(backend_app, 'now', lambda: '2030-01-01T00:00:00+08:00')
+        assert shell_get(client, tag).status_code == 200
