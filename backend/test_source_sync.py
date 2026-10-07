@@ -254,19 +254,24 @@ def test_older_snapshot_and_configuration_swap_fail_closed(harness):
 
 def test_split_fetch_then_apply_preserves_projection_and_replay_ids(harness):
     h=harness
-    raw=h.service.fetch(h.wid,'u-manager')
     before=h.read()[0]
-    result=h.service.apply_snapshot(h.wid,raw,'u-manager')
+    policy=h.service._policy(h.wid)
+    raw=h.service.fetch(h.wid,'u-manager',expected_policy=policy)
+    result=h.service.apply_snapshot(h.wid,raw,'u-manager',expected_policy=policy,
+        expected_generation=before.get('source_status',{}).get('sync_revision',0))
     state=h.read()[0]
     assert result['mapping']==state['source_status']['mapping']
     assert [p['id'] for p in state['projects']]==[p['id'] for p in before['projects']]
     ids=[(p['id'],[t['id'] for n in p['nodes'] for t in n['tasks']]) for p in state['projects']]
-    h.service.apply_snapshot(h.wid,h.service.fetch(h.wid,'u-manager'),'u-manager')
+    policy=h.service._policy(h.wid)
+    generation=state['source_status']['sync_revision']
+    h.service.apply_snapshot(h.wid,h.service.fetch(h.wid,'u-manager'),'u-manager',
+        expected_policy=policy,expected_generation=generation)
     assert [(p['id'],[t['id'] for n in p['nodes'] for t in n['tasks']]) for p in h.read()[0]['projects']]==ids
 
 
 @pytest.mark.parametrize('actor_id',['u-manager',None])
-def test_environment_changed_during_source_read_is_conflict(harness,actor_id):
+def test_environment_changed_during_source_read_is_denied(harness,actor_id):
     h=harness
     def fetch(token):
         with h.sessions.begin() as db:
@@ -275,7 +280,7 @@ def test_environment_changed_during_source_read_is_conflict(harness,actor_id):
         return snapshot(h.clock[0])
     h.service.fetcher=fetch
     with pytest.raises(HTTPException) as exc:h.service.sync(h.wid,actor_id,skip_unchanged=True)
-    assert exc.value.status_code==409
+    assert exc.value.status_code==403
 
 
 def test_source_timer_disabled_by_live_read(harness):
@@ -306,3 +311,77 @@ def test_legacy_source_timer_defaults_to_300_seconds(harness, flag):
     h.clock[0] = '2026-09-27T10:05:00+08:00'
     assert h.service.run_due(h.wid)['status'] == 'ready'
     assert len(h.fetched) == 1
+
+
+@pytest.mark.parametrize('fails', [False, True])
+def test_null_cache_data_can_refresh_and_record_failure(harness, fails):
+    h = harness
+    # Populate the stamps first so the null cache exercises the skip condition.
+    h.service.sync(h.wid, 'u-manager')
+    with h.sessions.begin() as db:
+        db.get(h.C, h.wid).data = None
+    if fails:
+        def fetch(token):
+            raise OSError('synthetic failure')
+        h.service.fetcher = fetch
+        with pytest.raises(HTTPException) as exc:
+            h.service.sync(h.wid, 'u-manager', skip_unchanged=True)
+        assert exc.value.status_code == 502
+        assert h.read()[1]['status'] == 'error'
+    else:
+        assert h.service.sync(h.wid, 'u-manager', skip_unchanged=True)['status'] == 'ready'
+
+
+def test_direct_apply_requires_fetch_time_fences(harness):
+    h = harness
+    raw = h.service.fetch(h.wid, 'u-manager')
+    with pytest.raises(TypeError):
+        h.service.apply_snapshot(h.wid, raw, 'u-manager')
+    with pytest.raises(HTTPException) as exc:
+        h.service.apply_snapshot(h.wid, raw, 'u-manager',
+                                 expected_policy=None, expected_generation=None)
+    assert exc.value.status_code == 409
+
+
+def test_direct_apply_rejects_a_newer_sync_after_fetch(harness):
+    h = harness
+    policy = h.service._policy(h.wid)
+    generation = h.read()[0]['source_status'].get('sync_revision', 0)
+    raw = h.service.fetch(h.wid, 'u-manager', expected_policy=policy)
+    h.clock[0] = '2026-09-27T10:01:00+08:00'
+    h.service.sync(h.wid, 'u-manager')
+    with pytest.raises(HTTPException) as exc:
+        h.service.apply_snapshot(h.wid, raw, 'u-manager',
+                                 expected_policy=policy, expected_generation=generation)
+    assert exc.value.status_code == 409
+
+
+def test_changed_read_message_is_not_discarded_by_equal_fingerprint(harness):
+    h = harness
+    h.service.sync(h.wid, 'u-manager', skip_unchanged=True)
+    previous, cache = h.read()
+    h.clock[0] = '2026-09-27T10:01:00+08:00'
+    raw = snapshot(h.clock[0])
+    raw['message'] = 'updated read diagnostics'
+    h.service.fetcher = lambda token: raw
+    result = h.service.sync(h.wid, 'u-manager', skip_unchanged=True)
+    assert result['fingerprint'] == cache['fingerprint']
+    assert result['source_message'] == 'updated read diagnostics'
+    assert h.read()[0]['source_status']['sync_revision'] == previous['source_status']['sync_revision'] + 1
+
+
+@pytest.mark.parametrize('environment', ['test', 'demo'])
+def test_direct_apply_denies_environment_flip_with_legacy_403(harness, environment):
+    h = harness
+    policy = h.service._policy(h.wid)
+    generation = h.read()[0]['source_status'].get('sync_revision', 0)
+    raw = h.service.fetch(h.wid, 'u-manager', expected_policy=policy)
+    with h.sessions.begin() as db:
+        row = db.get(h.W, h.wid)
+        state = storage.load(db, h.B, row)
+        state['environment'] = environment
+        row.data = storage.save(db, h.B, h.wid, state)
+    with pytest.raises(HTTPException) as exc:
+        h.service.apply_snapshot(h.wid, raw, 'u-manager',
+                                 expected_policy=policy, expected_generation=generation)
+    assert exc.value.status_code == 403

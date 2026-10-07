@@ -56,12 +56,12 @@ class SourceSyncService:
         require(admitted(actor,self.cfg.get('LARK_APP_ID')),'來源同步操作者尚未核實在職身分',403)
         return actor
 
-    def _authorize(self,wid,actor_id,*,conflict=False):
+    def _authorize(self,wid,actor_id):
         require(wid.startswith('lark-'),'隔離工作區不可直接同步正式來源',403)
         with self.sessions() as db:
             row=db.get(self.W,wid); require(row is not None,'工作區不存在',404)
             state=self._state(db,row)
-            require(state.get('environment') not in ('test','demo'),'隔離工作區不可直接同步正式來源',409 if conflict else 403)
+            require(state.get('environment') not in ('test','demo'),'隔離工作區不可直接同步正式來源',403)
             return self._actor(db,wid,state,actor_id)
 
     def failure(self,wid,message,expected_generation=None):
@@ -76,7 +76,7 @@ class SourceSyncService:
             require(changed.rowcount==1,'來源狀態版本衝突',409)
             cache=db.get(self.C,wid)
             if cache:
-                value=deepcopy(cache.data); value.update(status='error',message=message,last_attempt_at=status['last_attempt_at']); cache.data=value
+                value=deepcopy(cache.data or {}); value.update(status='error',message=message,last_attempt_at=status['last_attempt_at']); cache.data=value
             else:
                 db.add(self.C(id=wid,data={'configured':True,'status':'error','last_sync':status.get('last_sync'),'last_attempt_at':status['last_attempt_at'],'message':message,'tables':[],'records':[]}))
 
@@ -85,7 +85,7 @@ class SourceSyncService:
         policy=expected_policy if expected_policy is not None else self._policy(wid)
         def check():
             require(self._policy(wid)==policy,'來源同步設定已變更，保留原資料',409)
-            self._authorize(wid,actor_id,conflict=True)
+            self._authorize(wid,actor_id)
         check()
         adapter=self.adapter_factory(deepcopy(self.cfg))
         try:
@@ -96,12 +96,11 @@ class SourceSyncService:
         finally:
             adapter.client.close()
 
-    def apply_snapshot(self,wid,snapshot,actor_id=None,*,expected_policy=None,expected_generation=None,skip_unchanged=False):
-        policy=expected_policy if expected_policy is not None else self._policy(wid)
-        if expected_generation is None:
-            with self.sessions() as db:
-                row=db.get(self.W,wid); require(row is not None,'工作區不存在',404)
-                expected_generation=self._state(db,row).get('source_status',{}).get('sync_revision',0)
+    def apply_snapshot(self,wid,snapshot,actor_id=None,*,expected_policy,expected_generation,skip_unchanged=False):
+        # Both fences must be captured before fetch, never reconstructed at apply.
+        require(expected_policy is not None and expected_generation is not None,
+                '來源快照缺少讀取前的同步保護',409)
+        policy=expected_policy
         generation=expected_generation
         require(isinstance(snapshot,dict) and isinstance(snapshot.get('records'),list) and isinstance(snapshot.get('tables'),list) and snapshot.get('last_sync') and snapshot.get('message') is not None,'來源回應不完整；保留上次成功資料',502)
         require(snapshot.get('status')=='ready' and snapshot['tables'] and all(t.get('status')=='ready' for t in snapshot['tables']),'來源分頁不完整；保留上次成功資料',409)
@@ -118,7 +117,7 @@ class SourceSyncService:
             row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update()); require(row is not None,'工作區不存在',404)
             state=self._state(db,row)
             require(self._policy(wid)==policy,'來源同步設定已變更，保留原資料',409)
-            require(state.get('environment') not in ('test','demo'),'工作區環境已變更',409)
+            require(state.get('environment') not in ('test','demo'),'工作區環境已變更',403)
             actor=self._actor(db,wid,state,actor_id)
             require(state.get('source_status',{}).get('sync_revision',0)==generation,'已有較新來源同步完成；保留最新資料',409)
             cache=db.get(self.C,wid)
@@ -134,7 +133,9 @@ class SourceSyncService:
                                 and status.get('projection_version')==SOURCE_PROJECTION_VERSION
                                 and status.get('projection_state_fingerprint')==projection_fingerprint(state))
             if (skip_unchanged and projection_matches and cache
-                    and cache.data.get('status')=='ready' and fingerprint(cache.data)==digest):
+                    and (cache.data or {}).get('status')=='ready'
+                    and cache.data.get('source_message')==snapshot['message']
+                    and fingerprint(cache.data)==digest):
                 value=deepcopy(cache.data)
                 value.update(last_sync=snapshot['last_sync'],as_of=snapshot['last_sync'],
                              last_attempt_at=now(),fingerprint=digest)
@@ -149,7 +150,7 @@ class SourceSyncService:
                                    .values(version=row.version+1,data=root))
                 require(changed.rowcount==1,'來源同步版本衝突，請重試',409)
                 return value
-            snapshot.update(fingerprint=digest,as_of=snapshot['last_sync'])
+            snapshot.update(fingerprint=digest,as_of=snapshot['last_sync'],source_message=snapshot['message'])
             from .source_case_policy import apply_source_reference_policy,visible_project
             admissible=snapshot['records']
             snapshot['mapping']=import_sources(state,admissible,complete_tables=snapshot['tables'])
