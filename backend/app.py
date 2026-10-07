@@ -520,6 +520,34 @@ def create_app(overrides=None):
                     and_(*[func.substr(AuditRow.action,1,len(x))!=x for x in ('admin_','company_admin_','person','delegation','people_')])),)
             return audit_page(db,data['wid'],offset,limit,project_id,accept,prefilter)
 
+    @app.get('/api/admin/index-health')
+    def index_health(request:Request):
+        return index_health_run(request,False)
+
+    @app.post('/api/admin/index-health/repair')
+    def index_health_repair(request:Request):
+        return index_health_run(request,True)
+
+    def index_health_run(request,fix):
+        from . import index_tables
+        data,user=identity(request)
+        require(user.get('active',True) and user.get('role')=='manager','索引健康檢查僅限公司管理員',403)
+        wid=data['wid']
+        with sessions.begin() as db:
+            row=db.get(WorkspaceRow,wid)
+            require(not fix or db.info.get('index_tables'),'索引表未啟用，無法修復',409)
+            if fix:  # serialize with writers while the index is rewritten
+                require(db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==row.version).values(version=row.version)).rowcount==1,'資料版本衝突，請重新操作',409)
+            state=upgrade(storage.load(db,BusinessRow,row)); state['version']=row.version
+            report=index_tables.reconcile(db,BusinessRow,wid,state)
+            report['enabled']=bool(db.info.get('index_tables')); report['repaired']=False
+            if fix and not report['healthy']:
+                index_tables.repair(db,BusinessRow,wid,state,report)
+                db.add(audit.record(AuditRow,wid,user['id'],'admin_index_repair',details={'projects':report['dirty_projects'][:50],'project_count':len(report['dirty_projects']),
+                       'counter_drift':len(report['counters']['drift']),'tasks':{k:len(report['tasks'][k]) for k in ('missing','extra','stale')}}))
+                report['repaired']=True
+        return report
+
     @app.get('/api/admin/audit/history')
     def historical_action_audit(request:Request,project_id:str='',offset:int=0,limit:int=50):
         data,user=identity(request)

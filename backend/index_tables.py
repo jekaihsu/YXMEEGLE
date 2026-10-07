@@ -91,3 +91,39 @@ def replace_counters(db,model,wid,state):
             db.execute(ci.update().where(ci.c.workspace_id==wid,ci.c.key==key[0],ci.c.subject_id==key[1]).values(value=desired[key],source_version=version))
     fresh=[dict(workspace_id=wid,key=k,subject_id=s,value=v,source_version=version) for (k,s),v in desired.items() if (k,s) not in existing]
     if fresh: db.execute(insert(ci),fresh)
+
+
+def _mismatch(rows,expected,key,ignore=('source_version',)):
+    """Compare actual vs expected row dicts keyed by `key`: (missing, extra, stale) key lists."""
+    strip=lambda row:{k:v for k,v in row.items() if k not in ignore}
+    missing=sorted(k for k in expected if k not in rows)
+    extra=sorted(k for k in rows if k not in expected)
+    stale=sorted(k for k in expected if k in rows and strip(rows[k])!=strip(expected[k]))
+    return missing,extra,stale
+
+
+def reconcile(db,model,wid,state):
+    """Diff the index tables against a rebuild from `state` (a full upgraded load)."""
+    pi,ti,ci=tables(model)
+    projects,tasks=project_rows(wid,state)
+    expected_p={r['project_id']:r for r in projects}; expected_t={r['task_id']:r for r in tasks}
+    actual_p={r['project_id']:dict(r) for r in db.execute(select(pi).where(pi.c.workspace_id==wid)).mappings()}
+    actual_t={r['task_id']:dict(r) for r in db.execute(select(ti).where(ti.c.workspace_id==wid)).mappings()}
+    mp,ep,sp=_mismatch(actual_p,expected_p,'project_id')
+    mt,et,st=_mismatch(actual_t,expected_t,'task_id')
+    desired=counter_values(state)
+    actual_c={(r.key,r.subject_id):r.value for r in db.execute(select(ci).where(ci.c.workspace_id==wid))}
+    drift=sorted((k,s,actual_c.get((k,s)),desired.get((k,s))) for k,s in actual_c.keys()|desired.keys() if actual_c.get((k,s))!=desired.get((k,s)))
+    report={'projects':{'expected':len(expected_p),'actual':len(actual_p),'missing':mp,'extra':ep,'stale':sp},
+            'tasks':{'expected':len(expected_t),'actual':len(actual_t),'missing':mt,'extra':et,'stale':st},
+            'counters':{'expected':len(desired),'actual':len(actual_c),'drift':[{'key':k,'subject_id':s,'stored':a,'expected':e} for k,s,a,e in drift]}}
+    task_projects={t['project_id'] for t in tasks if t['task_id'] in set(mt)|set(st)}|{actual_t[t]['project_id'] for t in et}
+    report['dirty_projects']=sorted(set(mp)|set(ep)|set(sp)|task_projects)
+    report['healthy']=not (report['dirty_projects'] or drift)
+    return report
+
+
+def repair(db,model,wid,state,report):
+    """Rewrite only the projects and counters a report flagged."""
+    replace_projects(db,model,wid,state,report['dirty_projects'])
+    replace_counters(db,model,wid,state)
