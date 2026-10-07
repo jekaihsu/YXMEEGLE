@@ -129,6 +129,18 @@ def public_copy(value):
     return deepcopy(value)
 
 
+def strip_migration_archive(value):
+    """In-place twin of public_copy for data the caller owns (a fresh decode nobody else holds)."""
+    if isinstance(value, dict):
+        value.pop('migration_archive', None)
+        for item in value.values():
+            strip_migration_archive(item)
+    elif isinstance(value, list):
+        for item in value:
+            strip_migration_archive(item)
+    return value
+
+
 def filter_private_workspace(state, user):
     """Apply the existing leave-view policy after authoritative policy calculations.
 

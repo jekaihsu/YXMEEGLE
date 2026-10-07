@@ -2,6 +2,8 @@
 
 Legacy behaviour is reproduced by routing ``storage.load_partial`` to the full ``storage.load``.
 """
+import re
+
 import pytest
 
 from . import storage
@@ -61,3 +63,30 @@ def test_audit_matches_full_load(tmp_path, monkeypatch, query):
             assert current.status_code == legacy.status_code == 200
             assert current.content == legacy.content
         assert client.get('/api/audit').json()['items']
+
+
+def test_strip_migration_archive_equals_public_copy():
+    from copy import deepcopy
+    from . import app as app_module
+    from .workspace_projection import public_copy, strip_migration_archive
+    value = {'migration_archive': {'x': 1}, 'a': [{'migration_archive': 1, 'b': {'migration_archive': [], 'c': 2}}, 3, (4,)], 'd': 'e'}
+    expected = public_copy(value)
+    assert strip_migration_archive(deepcopy(value)) == expected
+    assert app_module.strip_migration_archive is strip_migration_archive
+
+
+@pytest.mark.parametrize('path', ['/api/workspace', '/api/company-dashboard'])
+def test_owned_projection_matches_copying_projection(tmp_path, monkeypatch, path):
+    from . import app as app_module
+    from .workspace_projection import public_copy
+    with scaled_client(tmp_path, 12) as (app, client):
+        for uid in USERS:
+            switch(client, uid)
+            current = client.get(path)
+            with monkeypatch.context() as m:
+                m.setattr(app_module, 'strip_migration_archive', public_copy)
+                legacy = client.get(path)
+            assert current.status_code == legacy.status_code == 200
+            # Generated-at stamps carry the request time; scrub them before comparing.
+            scrub = lambda r: re.sub(r'[0-9a-f]{32}', 'ID', re.sub(r'\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?([+-]\d\d:\d\d|Z)?', 'T', r.text))
+            assert scrub(current) == scrub(legacy)

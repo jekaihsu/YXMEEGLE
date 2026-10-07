@@ -28,7 +28,7 @@ from .operations import apply_operation, project_summary, capable, review_hash, 
 from . import storage
 from .learning import apply_learning
 from .approval_capabilities import approval_connection
-from .workspace_projection import public_copy, filter_private_workspace, public_person
+from .workspace_projection import public_copy, strip_migration_archive, filter_private_workspace, public_person
 from .production_access import require_admission, require_access, test_profile,company_admin_grant,set_company_admin_authority
 from . import audit
 from .input_validation import json_object
@@ -316,19 +316,21 @@ def create_app(overrides=None):
                 access=require_access(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'),allow_recovery=(request.method,request.url.path) in recovery_routes)
                 data={**data,'access_mode':access}
         return data,user
-    def public_ws(data,wid,user,mode=None):
-        result=public_copy(data)
+    def public_ws(data,wid,user,mode=None,owned=False):
+        """owned=True: caller passes a fresh load nobody else uses; it is projected in place (no deepcopy)."""
+        file_categories=categories(data); verification=data.get('native_definition_verification')
+        result=strip_migration_archive(data) if owned else public_copy(data)
         from .source_case_policy import filter_visible_cases
         filter_visible_cases(result)
         result['workspace_id']=wid
-        result['file_categories']=categories(data)
+        result['file_categories']=file_categories
         if not result['projects'] or any(p.get('source_kind')=='lark' for p in result['projects']): result['as_of']=now()[:10]
         upgrade(result)
         result['environment']=result.get('environment','demo' if any(p.get('source_kind')=='demo' for p in result['projects']) else 'production')
         result['policy_summary']=[project_summary(result,p) for p in result['projects']]
         # Workspace namespaces are assigned by the server. Match /api/actions:
         # signed demo sessions and test namespaces may simulate, never submit.
-        result['approval_connection']=approval_connection(cfg,simulation_available=(mode=='demo' if mode is not None else wid.startswith('demo-')) or wid.startswith('test-'),definition_verification=data.get('native_definition_verification'))
+        result['approval_connection']=approval_connection(cfg,simulation_available=(mode=='demo' if mode is not None else wid.startswith('demo-')) or wid.startswith('test-'),definition_verification=verification)
         result.pop('native_definition_verification',None)
         from .case_cutover import project_execution_view
         for project in result['projects']:
@@ -422,7 +424,7 @@ def create_app(overrides=None):
         coordinator.ensure(data['wid'],'attendance')
         with sessions() as db:
             with phase(request,'load'): state=load(db,db.get(WorkspaceRow,data['wid']))
-            with phase(request,'project'): result=public_ws(state,data['wid'],user,data['mode'])
+            with phase(request,'project'): result=public_ws(state,data['wid'],user,data['mode'],owned=True)
         result['freshness']=coordinator.status(data['wid'])
         as_of=result['freshness']['datasets']['sources']['as_of']
         from fastapi.responses import JSONResponse
@@ -433,7 +435,7 @@ def create_app(overrides=None):
         data,user=identity(request)
         require(offset>=0 and 1<=limit<=250 and attention in ('','overdue','review'),'駕駛艙查詢參數錯誤',422)
         require(len(q)<=240 and len(group)<=120 and len(source_status)<=120 and len(lifecycle)<=120,'查詢文字過長',422)
-        with sessions() as db: safe=public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'])
+        with sessions() as db: safe=public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'],owned=True)
         from .company_dashboard import overview
         return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle)
 
