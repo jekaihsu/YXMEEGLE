@@ -468,7 +468,12 @@ def create_app(overrides=None):
     @app.get('/api/projects')
     def projects(request:Request,q:str='',status:str='',owner:str='',offset:int=0,limit:int=30):
         data,user=identity(request); require(0<=offset and 1<=limit<=100,'分頁參數錯誤',422)
-        with phase(request,'load'),sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=('projects',))
+        from . import index_reads
+        with phase(request,'load'),sessions() as db:
+            row=db.get(WorkspaceRow,data['wid'])
+            if index_reads.ready(db,BusinessRow,row) and index_reads.casefold_safe(q):
+                return index_reads.project_page(db,BusinessRow,data['wid'],load(db,row,collections=()).get('environment'),q=q,status=status,owner=owner,offset=offset,limit=limit)
+            state=load(db,row,collections=('projects',))
         from .source_case_policy import visible_project
         with phase(request,'project'): items=[p for p in state['projects'] if visible_project(state,p) and (not q or q.casefold() in ' '.join(str(p.get(k,'')) for k in ('code','name','client')).casefold()) and (not status or p['status']==status) and (not owner or p['pm_id']==owner)]
         items.sort(key=lambda p:(p.get('due_date') or '9999',p['id']))

@@ -175,3 +175,26 @@ def test_light_endpoints_budget(tmp_path):
         assert 0 < measured['session'][0] <= SESSION_MAX[0] and measured['session'][1] <= SESSION_MAX[1]
         assert 0 < measured['projects'][0] <= PROJECTS_MAX[0] and measured['projects'][1] <= PROJECTS_MAX[1]
         assert 0 < measured['comment_add'][0] <= COMMENT_MAX[0] and measured['comment_add'][1] <= COMMENT_MAX[1]
+
+
+# Index-backed ceilings (INDEX_TABLES_ENABLED + WORKSPACE_SHELL_ENABLED). Queries include the
+# identity lookup and live-read bookkeeping that every route pays; shell raw bytes are 319 slim cards.
+INDEXED_PROJECTS_MAX = (8, 1_900)  # measured 7: identity 2, row + readiness 3, COUNT, page
+INDEXED_SHELL_MAX = (24, 165_000, 30_000)  # queries, raw bytes, gzip bytes
+
+
+@pytest.mark.perf
+@pytest.mark.skipif(os.environ.get('YX_RUN_PERF') != '1', reason='set YX_RUN_PERF=1 to run company-scale perf checks')
+def test_index_endpoints_budget(tmp_path):
+    with scaled_client(tmp_path, 319, upgraded=True, INDEX_TABLES_ENABLED='true', WORKSPACE_SHELL_ENABLED='true') as (app, client):
+        client.post('/api/demo/session', json={'user_id': 'u-pm'})
+        with count_queries(app.state.engine) as stats:
+            projects = client.get('/api/projects?limit=10')
+        assert projects.status_code == 200 and len(projects.json()['items']) == 10
+        print(f'projects page 1: {stats["queries"]} queries, {len(projects.content)} bytes, {projects.headers["server-timing"]}')
+        assert 0 < stats['queries'] <= INDEXED_PROJECTS_MAX[0] and len(projects.content) <= INDEXED_PROJECTS_MAX[1]
+        with count_queries(app.state.engine) as stats:
+            shell = client.get('/api/workspace?scope=shell', headers={'Accept-Encoding': 'gzip'})
+        raw, wire = len(shell.content), int(shell.headers['content-length'])
+        print(f'shell: {stats["queries"]} queries, {raw} raw, {wire} gzip, {shell.headers["server-timing"]}')
+        assert 0 < stats['queries'] <= INDEXED_SHELL_MAX[0] and raw <= INDEXED_SHELL_MAX[1] and wire <= INDEXED_SHELL_MAX[2]
