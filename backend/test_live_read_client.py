@@ -266,3 +266,52 @@ def test_http_status_handling_does_not_depend_on_body_shape(status):
             client.request('GET', PATH)
         assert client.retries == (0 if status in (401, 403) else 2)
     assert len(calls) == (2 if status in (401, 403) else 4)
+
+
+def test_short_lived_same_token_does_not_trigger_mint_storm():
+    clock, calls = Clock(), []
+    cache = TenantTokenCache(clock=clock)
+    def mint(_):
+        calls.append(clock.now)
+        return {'tenant_access_token': 'same-token', 'expire': 2000}
+    for _ in range(3):
+        assert cache.get(CFG, mint) == 'same-token'
+    assert len(calls) == 1
+    clock.now = 60
+    cache.get(CFG, mint)
+    assert len(calls) == 2
+
+
+def test_invalidation_does_not_discard_a_newer_token():
+    cache = TenantTokenCache()
+    cache.get(CFG, lambda _: {'tenant_access_token': 'fresh', 'expire': 7200})
+    cache.invalidate(CFG, token='old')
+    assert cache.get(CFG, lambda _: pytest.fail('Fresh token discarded')) == 'fresh'
+
+
+def test_unrelated_token_keys_do_not_wait_for_network():
+    from threading import Event
+    entered, release = Event(), Event()
+    cache = TenantTokenCache()
+    def slow(_):
+        entered.set()
+        assert release.wait(2)
+        return {'tenant_access_token': 'slow', 'expire': 7200}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        future = pool.submit(cache.get, CFG, slow)
+        try:
+            assert entered.wait(1)
+            other = pool.submit(cache.get, dict(CFG, LARK_WORKER_ORGANIZATION='other'),
+                                lambda _: {'tenant_access_token': 'fast', 'expire': 7200})
+            assert other.result(timeout=.1) == 'fast'
+        finally:
+            release.set()
+        assert future.result() == 'slow'
+
+
+def test_401_token_expiry_renews_before_permission_classification():
+    _, handler = responses([httpx.Response(401, json={'code': 99991677}),
+                            httpx.Response(200, json={'code': 0})])
+    with make_client(handler) as client:
+        assert client.request('GET', PATH).status_code == 200
+        assert client.retries == 1

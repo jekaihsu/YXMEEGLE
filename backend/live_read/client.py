@@ -82,14 +82,15 @@ class LiveLarkClient:
 
     def _token(self):
         return self.token_cache.get(self.cfg, lambda credentials: self._request(
-            'POST', '/auth/v3/tenant_access_token/internal', auth=False, json=credentials).json())
+            'POST', '/auth/v3/tenant_access_token/internal', auth=False, json=credentials).json(), deadline=self.deadline)
 
     def _request(self, method, path, *, auth=True, **kwargs):
         renewed = False
         for attempt in range(1, RetryPolicy.max_attempts + 1):
             headers = httpx.Headers(kwargs.get('headers', {}))
             if auth:
-                headers['Authorization'] = 'Bearer ' + self._token()
+                token = self._token()
+                headers['Authorization'] = 'Bearer ' + token
             self.bucket.acquire(self.deadline)
             remaining = self.deadline - self.clock()
             if remaining <= 0:
@@ -109,15 +110,15 @@ class LiveLarkClient:
             code = body.get('code', 0) if isinstance(body, dict) else None
             if type(code) is not int:
                 code = None
-            if response.status_code in (401, 403) or code == 1254302:
-                raise ReadBlocked('Lark authorization or resource access denied')
             invalid_token = code in (99991663, 99991677)
             retryable = response.status_code == 429 or response.status_code >= 500 or code in RETRY_CODES
             if auth and invalid_token and not renewed and attempt < RetryPolicy.max_attempts:
-                self.token_cache.invalidate(self.cfg)
+                self.token_cache.invalidate(self.cfg, token=token)
                 renewed = True
                 self.retries += 1
                 continue
+            if code == 1254302 or (response.status_code in (401, 403) and not invalid_token):
+                raise ReadBlocked('Lark authorization or resource access denied')
             if retryable and attempt < RetryPolicy.max_attempts:
                 delay = RetryPolicy.after(response, attempt)
                 if self.clock() + delay >= self.deadline:
