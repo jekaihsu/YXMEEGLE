@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {getSessionEpoch,liveRefresh,liveStatus} from './api';
+import {getSessionEpoch,liveRefresh} from './api';
 import {ageFreshness,datasetNames,retainedAge,failedFreshness} from './freshness';
 import type {Freshness,LiveDataset} from './types';
 
@@ -20,11 +20,9 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
   const [current,setCurrent]=useState(freshness);
   const receivedAt=useRef(Date.now());
   const latestSnapshot=useRef(freshness);
-  const pollBudget=useRef<{started:number;attempts:number;failures:number}|null>(null);
   const manualController=useRef<AbortController>();
   const [now,setNow]=useState(Date.now);
   const [busy,setBusy]=useState(false);
-  const [pollRun,setPollRun]=useState(0);
   const [requestError,setRequestError]=useState('');
   const [errorDatasets,setErrorDatasets]=useState<LiveDataset[]>(['sources','roster','attendance']);
   const changed=useRef<Partial<Record<LiveDataset,number>>|null>(null);
@@ -44,36 +42,6 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
   useEffect(()=>{if(aged&&epoch.current===getSessionEpoch())onFreshness?.(aged,current)},[aged,onFreshness]);
   const active=!!current?.enabled&&!demo;
   const entries=aged?Object.entries(aged.datasets) as [LiveDataset,Freshness['datasets'][LiveDataset]][]:[];
-  const polling=active&&Object.values(current?.datasets||{}).some(d=>d.status==='refreshing');
-
-  useEffect(()=>{
-    if(!active||!polling||epoch.current!==getSessionEpoch()){pollBudget.current=null;return}
-    let stopped=false;
-    let timer:ReturnType<typeof setTimeout>|undefined;
-    let controller:AbortController|undefined;
-    const budget=pollBudget.current??{started:Date.now(),attempts:0,failures:0};pollBudget.current=budget;
-    const capped=()=>Date.now()-budget.started>=300000||budget.attempts>=20;
-    const cap=()=>{clearTimeout(timer);controller?.abort();if(!stopped&&epoch.current===getSessionEpoch()){setErrorDatasets((Object.keys(latestSnapshot.current?.datasets||{}) as LiveDataset[]).filter(key=>latestSnapshot.current?.datasets[key].status==='refreshing'));setRequestError('更新較久，請稍後重試')}};
-    const schedule=()=>{if(stopped||epoch.current!==getSessionEpoch())return;if(capped()){cap();return}if(!document.hidden)timer=setTimeout(poll,Math.min(15000*2**budget.failures*(budget.failures?0.9+Math.random()*0.2:1),120000))};
-    const poll=async()=>{
-      if(stopped||document.hidden||epoch.current!==getSessionEpoch())return;
-      if(capped()){cap();return}
-      budget.attempts++;controller=new AbortController();
-      try{
-        const result=await liveStatus(controller.signal);
-        if(!stopped&&!controller.signal.aborted&&epoch.current===getSessionEpoch()){budget.failures=0;accept(result.freshness)}
-      }catch{
-        if(!stopped&&!controller.signal.aborted&&epoch.current===getSessionEpoch()){budget.failures++;setErrorDatasets((Object.keys(latestSnapshot.current?.datasets||{}) as LiveDataset[]).filter(key=>latestSnapshot.current?.datasets[key].status==='refreshing'));setRequestError('資料狀態暫時無法讀取')}
-      }
-      if(!controller.signal.aborted)schedule();
-    };
-    const visibility=()=>{clearTimeout(timer);if(document.hidden)controller?.abort();else schedule()};
-    document.addEventListener('visibilitychange',visibility);
-    const deadline=setTimeout(cap,Math.max(0,300000-(Date.now()-budget.started)));
-    schedule();
-    return()=>{stopped=true;clearTimeout(timer);clearTimeout(deadline);controller?.abort();document.removeEventListener('visibilitychange',visibility)};
-  },[active,polling,freshness,pollRun]);
-
   useEffect(()=>{
     if(!current||!active)return;
     const latest=Object.fromEntries(Object.entries(current.datasets).map(([key,d])=>[key,d.changed_at?Date.parse(d.changed_at):0])) as Record<LiveDataset,number>;
@@ -90,7 +58,7 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
     if(!active||busy||epoch.current!==getSessionEpoch())return;
     const failed=entries.filter(([,d])=>d.status==='error'||d.status==='blocked').map(([key])=>key);
     const datasets:LiveDataset[]=failed.length?failed:['sources','attendance'];
-    setBusy(true);setRequestError('');pollBudget.current=null;setPollRun(value=>value+1);manualController.current?.abort();manualController.current=new AbortController();
+    setBusy(true);setRequestError('');manualController.current?.abort();manualController.current=new AbortController();
     try{
       const result=await liveRefresh(datasets,false,manualController.current.signal);
       if(mounted.current&&epoch.current===getSessionEpoch())accept(result.freshness);
@@ -118,6 +86,6 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
       {requestError?<span> · {requestError}</span>:null}
     </span>
     {!demo&&active?<details className="freshness-details"><summary>資料讀取詳情</summary><ul>{entries.map(([key,d])=><li key={key}>{names[key]}：{time(d.as_of)} · {d.age_seconds==null?'時間未知':`${Math.floor(d.age_seconds)} 秒前`} · 有效時間 {d.ttl_seconds} 秒 · {statusNames[d.status]}</li>)}</ul></details>:null}
-    {active?<button type="button" className="button" onClick={reread} disabled={busy} aria-busy={busy}>{busy?'讀取中…':state==='error'?'重試':'重新讀取'}</button>:null}
+    {active?<button type="button" className="button" onClick={reread} disabled={busy} aria-busy={busy}>{busy?'讀取中…':state==='error'?'重試':'重新整理'}</button>:null}
   </div>;
 }
