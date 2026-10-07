@@ -2,6 +2,8 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from .config import LiveReadConfig
+
 DATASETS = ('sources', 'roster', 'attendance')
 TAIPEI = ZoneInfo('Asia/Taipei')
 
@@ -15,10 +17,9 @@ def timestamp(value):
 
 
 def ttl_seconds(cfg, dataset):
-    name, default, minimum = {'sources': ('SOURCE', 60, 30),
-                             'roster': ('ROSTER', 60, 30),
-                             'attendance': ('ATTENDANCE', 300, 60)}[dataset]
-    return max(minimum, int(cfg.get(f'LARK_LIVE_READ_{name}_TTL_SECONDS', default)))
+    config = cfg if isinstance(cfg, LiveReadConfig) else LiveReadConfig.from_env(cfg)
+    return getattr(config, {'sources': 'source', 'roster': 'roster',
+                            'attendance': 'attendance'}[dataset] + '_ttl_seconds')
 
 
 def freshness(rows, cfg, now, enabled, workspace_as_of=None):

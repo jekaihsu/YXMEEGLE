@@ -8,6 +8,7 @@ from uuid import uuid4
 from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 
+from .config import LiveReadConfig
 from .status import DATASETS, TAIPEI, freshness, timestamp, ttl_seconds
 
 
@@ -15,12 +16,13 @@ class RefreshCoordinator:
     def __init__(self, Session, CacheRow, refreshers, cfg, executor=None, clock=None):
         self.Session, self.CacheRow = Session, CacheRow
         self.refreshers, self.cfg = refreshers, cfg
+        self.config = LiveReadConfig.from_env(cfg)
         self.executor = executor if executor is not None else ThreadPoolExecutor(max_workers=2)
         self.clock = clock or (lambda: datetime.now(TAIPEI))
         self._lock, self._slots, self._futures = Lock(), BoundedSemaphore(2), {}
 
     def _enabled(self, wid):
-        return (str(self.cfg.get('LARK_LIVE_READ_ENABLED', 'false')).lower() == 'true'
+        return (self.config.enabled
                 and self.cfg.get('LARK_WORKER_IDENTITY') == 'application'
                 and not wid.startswith(('demo-', 'test-')))
 
@@ -43,7 +45,7 @@ class RefreshCoordinator:
             with self.Session() as db:
                 workspace = db.get(WorkspaceRow, wid)
                 workspace_as_of = (workspace.data or {}).get('as_of') if workspace else None
-        return freshness(rows, self.cfg, self._now(), self._enabled(wid), workspace_as_of)
+        return freshness(rows, self.config, self._now(), self._enabled(wid), workspace_as_of)
 
     @property
     def queue_depth(self):
@@ -72,11 +74,11 @@ class RefreshCoordinator:
         if row.get('error_at') and (now-timestamp(row['error_at'])).total_seconds() < 30:
             return None
         if (not force and not row.get('last_error') and row.get('as_of')
-                and (now-timestamp(row['as_of'])).total_seconds() < ttl_seconds(self.cfg, dataset)):
+                and (now-timestamp(row['as_of'])).total_seconds() < ttl_seconds(self.config, dataset)):
             return None
         revision = str(uuid4())
         claimed = dict(row, revision=revision,
-                       lease_until=(now + timedelta(seconds=float(self.cfg.get('LARK_LIVE_READ_LEASE_SECONDS', 120)))).isoformat())
+                       lease_until=(now + timedelta(seconds=self.config.lease_seconds)).isoformat())
         return claimed if self._replace(key, row.get('revision'), claimed) else None
 
     def _refresh(self, wid, dataset, key, claimed, started):
@@ -136,7 +138,7 @@ class RefreshCoordinator:
                 else:
                     self._slots.release()
         if wait:
-            timeout = float(self.cfg.get('LARK_LIVE_READ_BLOCKING_TIMEOUT_SECONDS', 10))
+            timeout = self.config.blocking_timeout_seconds
             if future:
                 try:
                     future.result(timeout=timeout)

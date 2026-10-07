@@ -292,3 +292,24 @@ def test_rejected_executor_records_error_and_releases_capacity(harness):
     assert c.ensure(h.wid, 'roster')['status'] == 'error'
     assert c.ensure(h.wid, 'attendance')['status'] == 'error'
     assert h.calls == []
+
+
+@pytest.mark.parametrize('value,expected', [('60.5', 60.5), ('abc', 60), ('nan', 60), ('inf', 60)])
+def test_config_is_sanitized_before_status_and_ensure(harness, value, expected):
+    h = harness
+    h.cfg.update(LARK_LIVE_READ_SOURCE_TTL_SECONDS=value,
+                 LARK_LIVE_READ_BLOCKING_TIMEOUT_SECONDS=value,
+                 LARK_LIVE_READ_LEASE_SECONDS=value)
+    c = h.make()
+    assert c.status(h.wid)['datasets']['sources']['ttl_seconds'] == expected
+    assert c.ensure(h.wid, 'sources', wait=True)['status'] == 'fresh'
+
+
+def test_negative_lease_has_safe_apply_allowance(harness):
+    h = harness
+    h.cfg['LARK_LIVE_READ_LEASE_SECONDS'] = '-5'
+    c = h.make()
+    now = c._now()
+    claimed = c._claim(c._key(h.wid, 'sources'), now, 'sources', False)
+    from .live_read.status import timestamp
+    assert (timestamp(claimed['lease_until']) - now).total_seconds() >= 60
