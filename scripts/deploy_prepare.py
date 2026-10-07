@@ -134,6 +134,7 @@ def staging():
               'scripts/backup_offsite_acceptance.py','backend/requirements.lock']
     files = [ROOT / x for x in exact]
     files += [p for p in (ROOT/'backend').glob('*.py') if not p.name.startswith('test_')]
+    files += [p for p in (ROOT/'backend'/'live_read').rglob('*.py') if not p.name.startswith('test_')]
     for part in ('frontend/src', 'frontend/public'):
         source = ROOT / part
         if source.exists(): files += [p for p in source.rglob('*') if p.is_file()]

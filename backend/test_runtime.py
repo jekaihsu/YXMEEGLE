@@ -122,3 +122,49 @@ def test_source_table_config_rejects_credential_keys_without_echoing_value(tmp_p
     path.write_text(json.dumps([dict(base_token='resource',table_id='table',kind='daily',access_token=secret)]))
     with pytest.raises(SystemExit) as exc: deploy_prepare.validate_source_tables(path)
     assert secret not in str(exc.value)
+
+
+@pytest.mark.parametrize('enabled',[True,False])
+def test_worker_once_gates_dataset_timers_but_keeps_jobs_and_heartbeat(tmp_path,monkeypatch,enabled):
+    from types import SimpleNamespace
+    from backend.app import create_app, WorkspaceRow, CacheRow
+    from backend.seed import seed
+    from scripts import run_worker
+    app=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/worker.db','UPLOAD_DIR':str(tmp_path/'uploads'),
+                    'DEMO_MODE':'true','LARK_LIVE_READ_ENABLED':str(enabled).lower()})
+    with app.state.sessions.begin() as db: db.add(WorkspaceRow(id='demo-worker',version=1,data=seed()))
+    calls=[]
+    def service(name,method): return SimpleNamespace(**{method:lambda wid:calls.append((name,wid))})
+    app.state.native_poller=service('native','run_due')
+    app.state.worker=service('jobs','run_one')
+    app.state.people_directory=service('roster','run_due')
+    app.state.attendance_schedule=service('attendance','run_due')
+    app.state.source_sync=service('sources','run_due')
+    monkeypatch.setattr(run_worker,'app',app)
+    monkeypatch.setattr(sys,'argv',['run_worker.py','--once'])
+    run_worker.main()
+    names=[name for name,wid in calls]
+    assert names==(['native','jobs'] if enabled else ['native','roster','attendance','sources','jobs'])
+    with app.state.sessions() as db:
+        heartbeat=db.get(CacheRow,'runtime:worker').data
+    assert heartbeat['status']=='ok' and heartbeat['stage']=='cycle_complete'
+    assert heartbeat['last_success_at']==heartbeat['at']
+
+
+@pytest.mark.parametrize('age,status,blocking',[(30,'ok',False),(650,'warning',False),(900,'warning',False),(901,'stale',True)])
+def test_runtime_health_uses_live_roster_and_preserves_hard_limit(age,status,blocking):
+    from contextlib import contextmanager
+    from datetime import datetime,timedelta,timezone
+    from types import SimpleNamespace
+    from backend.runtime_health import snapshot
+    now=datetime(2026,10,7,tzinfo=timezone.utc)
+    @contextmanager
+    def sessions(): yield SimpleNamespace(get=lambda model,key:None)
+    live={'enabled':True,'datasets':{'roster':{'as_of':(now-timedelta(seconds=age)).isoformat(),'status':'fresh'}}}
+    coordinator=SimpleNamespace(status=lambda wid:live,queue_depth=2)
+    result=snapshot(sessions,object,{'LARK_WORKER_ORGANIZATION':'company'},now=now,coordinator=coordinator)
+    assert result['directory']['status']==status
+    assert result['directory']['blocking'] is blocking
+    assert result['directory']['max_age_seconds']==900
+    assert result['live_read']['queue_depth']==2
+    assert result['external_integrations_verified'] is False

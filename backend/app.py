@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.engine import make_url
 from .seed import seed, USERS
 from .workflow import apply_action, require, find, event, now, uid, is_pm, is_owner
-from .sources import API, configuration, fetch_sources, import_sources
+from .sources import API, configuration, import_sources
 from .policy import upgrade, CAPABILITIES, MANAGER_CAPABILITIES
 from .operations import apply_operation, project_summary, capable, review_hash, invalidate
 from . import storage
@@ -273,6 +273,15 @@ def create_app(overrides=None):
                 profile=db.get(PersonRow,(organization(data),data['uid']))
                 user=deepcopy(profile.data) if profile else find(load(db,row)['users'],data['uid'],'登入人員')
             else: user=find(load(db,row)['users'],data['uid'],'登入人員')
+            if (data.get('mode')=='lark' and not data['wid'].startswith('test-')
+                    and request.url.path != '/api/live/status'):
+                from .live_read.admission import ensure_roster_for_admission
+                # End the DB read transaction before a blocking roster refresh.
+                db.rollback()
+                ensure_roster_for_admission(app.state.live_read,organization(data),user)
+                db.expire_all()
+                profile=db.get(PersonRow,(organization(data),data['uid']))
+                if profile: user=deepcopy(profile.data)
             user=person_identity(db,data,user)
             require(user.get('active',True),'帳號已停權',403)
             if data.get('mode')=='lark' and admission_required:
@@ -383,7 +392,14 @@ def create_app(overrides=None):
     @app.get('/api/workspace')
     def workspace(request:Request):
         data,user=identity(request)
-        with sessions() as db: return public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'])
+        coordinator=app.state.live_read
+        coordinator.ensure(data['wid'],'sources')
+        coordinator.ensure(data['wid'],'attendance')
+        with sessions() as db: result=public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'])
+        result['freshness']=coordinator.status(data['wid'])
+        as_of=result['freshness']['datasets']['sources']['as_of']
+        from fastapi.responses import JSONResponse
+        return JSONResponse(result,headers={'X-Data-As-Of':as_of} if as_of else {})
 
     @app.get('/api/company-dashboard')
     def company_dashboard(request:Request,offset:int=0,limit:int=100,q:str='',group:str='',source_status:str='',attention:str='',lifecycle:str=''):
@@ -618,11 +634,15 @@ def create_app(overrides=None):
     @app.get('/api/sources')
     def sources(request:Request):
         data,user=identity(request)
-        if data['mode']!='lark' or data['wid'].startswith('test-'): return {'configured':False,'last_sync':None,'status':'requires_login','message':'測試區使用隔離試行案；請切換正式工作區讀取 V4','tables':[],'records':[]}
-        with sessions() as db:
-            cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']))
-        if cache: return public_source_response(state,cache.data,user)
-        return {'configured':bool(configuration(cfg)),'last_sync':None,'status':'not_synced','message':'尚未同步來源','tables':[],'records':[]}
+        app.state.live_read.ensure(data['wid'],'sources')
+        freshness=app.state.live_read.status(data['wid'])
+        if data['mode']!='lark' or data['wid'].startswith('test-'):
+            result={'configured':False,'last_sync':None,'status':'requires_login','message':'測試區使用隔離試行案；請切換正式工作區讀取 V4','tables':[],'records':[]}
+        else:
+            with sessions() as db:
+                cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']))
+            result=public_source_response(state,cache.data,user) if cache else {'configured':bool(configuration(cfg)),'last_sync':None,'status':'never','message':'尚未同步來源','tables':[],'records':[]}
+        return {**result,'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
 
     @app.post('/api/sources/cutover-baseline')
     async def source_case_baseline(request:Request):
@@ -635,10 +655,19 @@ def create_app(overrides=None):
     def sync(request:Request):
         data,user=identity(request); require(data['mode']=='lark','請使用公司 Lark 登入後同步正式來源',403); require(user['role'] in ('pm','manager') or capable(user,'manage_sources'),'需要來源同步權限',403)
         require(not data['wid'].startswith('test-'),'測試工作區不可直接同步正式 V4；請使用隔離試行複本',403)
+        if live_enabled(data['wid']):
+            authorize_live(data['wid'],'sources',user)
+            response=manual_live(data['wid'],'sources',user)
+            if response: return response
+            with sessions() as db:
+                cache=db.get(CacheRow,data['wid']); state=load(db,db.get(WorkspaceRow,data['wid']))
+            freshness=app.state.live_read.status(data['wid'])
+            return {**public_source_response(state,cache.data,user),'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
         with sessions() as db: auth=db.get(AuthRow,data['sid']); token=auth.data['access_token']
         snapshot=app.state.source_sync.sync(data['wid'],user['id'],token)
         with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
-        return public_source_response(state,snapshot,user)
+        freshness=app.state.live_read.status(data['wid'])
+        return {**public_source_response(state,snapshot,user),'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
 
     @app.post('/api/approvals/{approval_id}/refresh')
     async def refresh_approval(approval_id:str,request:Request):
@@ -691,7 +720,13 @@ def create_app(overrides=None):
         require(data['mode']=='lark','公司名冊同步需使用公司 Lark 身分',403)
         target=organization(data) if data.get('access_mode')=='recovery' else data['wid']
         if data.get('access_mode')=='recovery':ensure_workspace(target,True)
-        return app.state.people_directory.sync(target,user['id'])
+        if live_enabled(target):
+            authorize_live(target,'roster',user)
+            response=manual_live(target,'roster',user)
+            if response: return response
+            with sessions() as db: state=load(db,db.get(WorkspaceRow,target))
+            return {**state['people_directory_status'],'freshness':app.state.live_read.status(target)}
+        return {**app.state.people_directory.sync(target,user['id']),'freshness':app.state.live_read.status(target)}
 
     @app.post('/api/delegations/verify-approval')
     async def verify_delegation(request:Request):
@@ -773,6 +808,12 @@ def create_app(overrides=None):
         oid=info.get('open_id'); require(bool(oid),'Lark 未返回有效使用者身分',401)
         role=role_map.get(oid,'member')
         org='lark-'+tenant; user={'id':oid,'identity_app_id':cfg['LARK_APP_ID'],'name':info.get('name') or oid,'role':role,'department':'公司成員','avatar':(info.get('name') or '?')[:1],'active':True,'capabilities':initial_capabilities(oid,role),'default_workspace':'production'}
+        from .live_read.admission import ensure_roster_for_admission
+        with sessions() as db:
+            existing=db.get(PersonRow,(org,oid))
+            admission_person=deepcopy(existing.data) if existing else user
+        require(ensure_roster_for_admission(app.state.live_read,org,admission_person,callback=True),
+                '公司名冊無法重新核實，請稍後再登入',403)
         with sessions.begin() as db:
             profile=db.execute(select(PersonRow).where(PersonRow.organization_id==org,PersonRow.person_id==oid).with_for_update()).scalar_one_or_none()
             if profile:
@@ -861,19 +902,59 @@ def create_app(overrides=None):
     from .native_poller import NativeApprovalPoller
     app.state.native_poller=NativeApprovalPoller(sessions,WorkspaceRow,BusinessRow,PersonRow,cfg)
     from .source_sync import SourceSyncService
-    app.state.source_sync=SourceSyncService(sessions,WorkspaceRow,BusinessRow,PersonRow,AuthRow,CacheRow,cfg,fetcher=lambda token:fetch_sources(token,cfg=cfg))
+    app.state.source_sync=SourceSyncService(sessions,WorkspaceRow,BusinessRow,PersonRow,AuthRow,CacheRow,cfg)
     from .people_directory import PeopleDirectoryService
     app.state.people_directory=PeopleDirectoryService(sessions,WorkspaceRow,BusinessRow,PersonRow,cfg)
     from .attendance_service import AttendanceScheduleService
     app.state.attendance_schedule=AttendanceScheduleService(sessions,WorkspaceRow,BusinessRow,PersonRow,cfg)
+    from .live_read.coordinator import RefreshCoordinator
+    from .live_read.datasets import build_refreshers
+    from .live_read.routes import register as register_live, refresh as live_refresh
+    app.state.live_read=RefreshCoordinator(sessions,CacheRow,build_refreshers(
+        app.state.source_sync,app.state.people_directory,app.state.attendance_schedule),cfg)
+
+    def live_enabled(wid):
+        return app.state.live_read.status(wid)['enabled']
+
+    def authorize_live(wid,dataset,user):
+        if dataset=='sources':
+            app.state.source_sync._authorize(wid,user['id'])
+        else:
+            service=app.state.people_directory if dataset=='roster' else app.state.attendance_schedule
+            with sessions() as db:
+                row=db.get(WorkspaceRow,wid)
+                require(row is not None,'工作區不存在',404)
+                service._actor(service._state(db,row),user['id'])
+
+    def manual_live(wid,dataset,user):
+        response=live_refresh(app.state.live_read,wid,[dataset],wait=True,force=True)
+        if response.status_code!=200: return response
+        action={'sources':'source_sync','roster':'people_directory_sync','attendance':'attendance_schedule_sync'}[dataset]
+        with sessions.begin() as db:
+            db.add(audit.record(AuditRow,wid,user['id'],action,details={'live_read':True}))
+        return None
+
+    register_live(app,identity,app.state.live_read,authorize=authorize_live)
     from .runtime_health import register as register_runtime_health
-    register_runtime_health(app,identity,sessions,CacheRow,cfg,workspace_model=WorkspaceRow)
+    register_runtime_health(app,identity,sessions,CacheRow,cfg,workspace_model=WorkspaceRow,coordinator=app.state.live_read)
 
     @app.post('/api/attendance/sync')
     async def sync_attendance(request:Request):
         data,user=identity(request)
         body=await json_object(request)
-        return app.state.attendance_schedule.sync(data['wid'],user['id'],body.get('date_from'),body.get('date_to'))
+        if live_enabled(data['wid']):
+            from datetime import timedelta
+            from zoneinfo import ZoneInfo
+            start=datetime.now(ZoneInfo('Asia/Taipei')).date()
+            require(body.get('date_from') in (None,'',start.isoformat())
+                    and body.get('date_to') in (None,'',(start+timedelta(days=13)).isoformat()),
+                    '即時讀取使用今天起14天班表，請使用預設日期區間',422)
+            authorize_live(data['wid'],'attendance',user)
+            response=manual_live(data['wid'],'attendance',user)
+            if response: return response
+            with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
+            return {**state['attendance_schedule_status'],'freshness':app.state.live_read.status(data['wid'])}
+        return {**app.state.attendance_schedule.sync(data['wid'],user['id'],body.get('date_from'),body.get('date_to')),'freshness':app.state.live_read.status(data['wid'])}
 
     frontend=Path(cfg.get('FRONTEND_DIST',str(Path(__file__).resolve().parents[1]/'frontend'/'dist')))
     if frontend.is_dir():

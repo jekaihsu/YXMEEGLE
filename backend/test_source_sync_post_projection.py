@@ -37,6 +37,8 @@ def api(tmp_path,monkeypatch):
                SESSION_SECRET='post-projection'*4,LARK_APP_SECRET='test',LARK_REDIRECT_URI='https://example.test/api/auth/lark/callback',
                LARK_WORKER_IDENTITY='application')
     app=create_app(cfg)
+    checked_at=datetime.now(timezone.utc)
+    app.state.live_read.clock=lambda:checked_at
     monkeypatch.setattr(source_sync,'application_adapter',lambda config:SimpleNamespace(token='application-token',client=SimpleNamespace(close=lambda:None)))
     app.state.source_sync.fetcher=lambda token:synthetic_snapshot()
     state=seed(); state.update(environment='production',version=1,users=[person(k,*v) for k,v in ROLES.items()],source_status={'sync_revision':0})

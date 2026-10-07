@@ -7,6 +7,7 @@ from datetime import datetime,timezone
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from sqlalchemy import select
+from backend.live_read.config import LiveReadConfig
 from backend.app import app, WorkspaceRow, CacheRow
 
 
@@ -37,18 +38,19 @@ def main():
                 app.state.native_poller.run_due(wid)
             except Exception as exc:
                 failed=True; print(json.dumps({'component':'approval_poll','error_type':type(exc).__name__}),flush=True)
-            try:
-                app.state.people_directory.run_due(wid)
-            except Exception as exc:
-                failed=True; print(json.dumps({'component':'people','error_type':type(exc).__name__}),flush=True)
-            try:
-                app.state.attendance_schedule.run_due(wid)
-            except Exception as exc:
-                failed=True; print(json.dumps({'component':'attendance','error_type':type(exc).__name__}),flush=True)
-            try:
-                app.state.source_sync.run_due(wid)
-            except Exception as exc:
-                failed=True; print(json.dumps({'component':'source','error_type':type(exc).__name__}),flush=True)
+            if not LiveReadConfig.from_env(app.state.cfg).enabled:
+                try:
+                    app.state.people_directory.run_due(wid)
+                except Exception as exc:
+                    failed=True; print(json.dumps({'component':'people','error_type':type(exc).__name__}),flush=True)
+                try:
+                    app.state.attendance_schedule.run_due(wid)
+                except Exception as exc:
+                    failed=True; print(json.dumps({'component':'attendance','error_type':type(exc).__name__}),flush=True)
+                try:
+                    app.state.source_sync.run_due(wid)
+                except Exception as exc:
+                    failed=True; print(json.dumps({'component':'source','error_type':type(exc).__name__}),flush=True)
             try:
                 app.state.worker.run_one(wid)
             except Exception as exc:

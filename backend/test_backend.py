@@ -440,6 +440,8 @@ def test_gzip_large_workspace_and_authenticated_sources_preserves_json_and_acces
     from . import workflow
     # Compare transport encodings at the same authorization observation time.
     checked_at=workflow.now(); monkeypatch.setattr(workflow,'now',lambda:checked_at)
+    from datetime import datetime
+    app.state.live_read.clock=lambda:datetime.fromisoformat(checked_at)
     from .app import CacheRow
     compressed=client.get('/api/workspace',headers={'Accept-Encoding':'gzip'})
     plain=client.get('/api/workspace',headers={'Accept-Encoding':'identity'})
@@ -461,5 +463,8 @@ def test_gzip_large_workspace_and_authenticated_sources_preserves_json_and_acces
     assert compressed.status_code==200 and compressed.headers.get('content-encoding')=='gzip'
     from .source_case_policy import visible_source_snapshot
     from .workspace_projection import public_source_cache
-    assert compressed.json()==plain.json()==public_source_cache(visible_source_snapshot(state,cache))
+    freshness=app.state.live_read.status('lark-compression')
+    expected={**public_source_cache(visible_source_snapshot(state,cache)),
+              'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
+    assert compressed.json()==plain.json()==expected
     assert client.get('/api/sources',headers={'Accept-Encoding':'gzip'}).json()['records']==[]
