@@ -151,3 +151,33 @@ def test_isolated_workspace_never_creates_live_transport(harness,wid):
         for dataset in refreshers:
             assert coordinator.ensure(wid,dataset,wait=True)['status']=='unconfigured'
     finally:coordinator.executor.shutdown()
+
+
+def test_real_source_service_cannot_commit_an_expired_refresh_owner(harness):
+    from concurrent.futures import ThreadPoolExecutor
+    from .live_read.coordinator import LeaseLost
+    h = harness
+    h.cfg['LARK_LIVE_READ_ENABLED'] = 'true'
+    create, _ = factory(h)
+    clock = [datetime.fromisoformat(h.clock[0])]
+    coordinator = RefreshCoordinator(h.sessions, h.C, {'sources': SourcesRefresher(h.service, create)},
+                                     h.cfg, clock=lambda: clock[0])
+    before, cached = h.read()
+    def fetch(token):
+        clock[0] += timedelta(seconds=120)
+        h.clock[0] = clock[0].isoformat()
+        with ThreadPoolExecutor(max_workers=1) as other:
+            assert other.submit(coordinator._claim, coordinator._key(h.wid, 'sources'),
+                                clock[0], 'sources', True).result()
+        changed = records()
+        changed[0]['fields']['備註'] = 'stale fetched value'
+        return snapshot(h.clock[0], changed)
+    h.service.fetcher = fetch
+    try:
+        with pytest.raises(LeaseLost):
+            coordinator.ensure(h.wid, 'sources', wait=True)
+        after, current = h.read()
+        assert after == before
+        assert current == cached
+    finally:
+        coordinator.close()

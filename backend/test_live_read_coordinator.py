@@ -188,7 +188,9 @@ def test_lease_expiry_and_late_owner_is_fenced(harness):
         assert b.ensure(h.wid, 'sources', wait=True)['fingerprint'] == 'new-owner'
     finally:
         release.set()
-    a._futures[a._key(h.wid, 'sources')].result(timeout=2)
+    from .live_read.coordinator import LeaseLost
+    with pytest.raises(LeaseLost):
+        a._futures[a._key(h.wid, 'sources')].result(timeout=2)
     assert a.status(h.wid)['datasets']['sources']['fingerprint'] == 'new-owner'
 
 
@@ -435,3 +437,65 @@ def test_force_reports_already_running(harness):
         assert c.ensure(h.wid, 'sources', force=True)['status'] == 'already_running'
     finally:
         release.set()
+
+
+def test_expired_owner_cannot_apply_with_transactional_fence(harness):
+    h = harness
+    c = h.make()
+    key = c._key(h.wid, 'sources')
+    now = c._now()
+    claimed = c._claim(key, now, 'sources', False)
+    h.clock[0] += timedelta(seconds=120)
+    newer = c._claim(key, c._now(), 'sources', True)
+    assert newer
+    def stale(wid, *, fence):
+        with h.sessions.begin() as db:
+            fence(db)
+            db.add(WorkspaceRow(id=wid, version=1, data={'snapshot': 'stale'}))
+        return {'fingerprint': 'stale'}
+    h.readers['sources'] = stale
+    with pytest.raises(RuntimeError, match='lease ownership lost'):
+        c._refresh(h.wid, 'sources', key, claimed, now)
+    with h.sessions() as db:
+        assert db.get(WorkspaceRow, h.wid) is None
+    assert c._read(key)['revision'] == newer['revision']
+
+
+def test_fence_renews_lease_inside_workspace_transaction(harness):
+    h = harness
+    c = h.make()
+    def apply(wid, *, fence):
+        h.clock[0] += timedelta(seconds=30)
+        with h.sessions.begin() as db:
+            fence(db)
+            cache = db.get(CacheRow, c._key(wid, 'sources'))
+            from .live_read.status import timestamp
+            assert (timestamp(cache.data['lease_until'])-h.clock[0]).total_seconds() == 120
+            db.add(WorkspaceRow(id=wid, version=1, data={'snapshot': 'new'}))
+        return {'fingerprint': 'new'}
+    h.readers['sources'] = apply
+    assert c.ensure(h.wid, 'sources', wait=True)['fingerprint'] == 'new'
+    with h.sessions() as db:
+        assert db.get(WorkspaceRow, h.wid).data['snapshot'] == 'new'
+
+
+def test_legacy_bulk_apply_rolls_back_when_lease_is_lost(harness):
+    from sqlalchemy import update
+    h = harness
+    c = h.make()
+    with h.sessions.begin() as db:
+        db.add(WorkspaceRow(id=h.wid, version=1, data={'snapshot': 'newer'}))
+    key, now = c._key(h.wid, 'sources'), c._now()
+    claimed = c._claim(key, now, 'sources', False)
+    def stale(wid):
+        h.clock[0] += timedelta(seconds=120)
+        with ThreadPoolExecutor(max_workers=1) as owners:
+            assert owners.submit(c._claim, key, c._now(), 'sources', True).result()
+        with h.sessions.begin() as db:
+            db.execute(update(WorkspaceRow).where(WorkspaceRow.id == wid).values(data={'snapshot': 'stale'}))
+        return {'fingerprint': 'stale'}
+    h.readers['sources'] = stale
+    with pytest.raises(RuntimeError, match='lease ownership lost'):
+        c._refresh(h.wid, 'sources', key, claimed, now)
+    with h.sessions() as db:
+        assert db.get(WorkspaceRow, h.wid).data['snapshot'] == 'newer'

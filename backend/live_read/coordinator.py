@@ -1,6 +1,8 @@
 """Demand-driven refreshes with bounded execution and database lease fencing."""
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from datetime import datetime, timedelta
+from contextvars import ContextVar
+from inspect import signature
 from threading import Lock, BoundedSemaphore
 from time import monotonic, sleep
 from uuid import uuid4
@@ -8,7 +10,8 @@ import logging
 
 from fastapi import HTTPException
 
-from sqlalchemy import update
+from sqlalchemy import update, event
+from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import IntegrityError
 
 from .client import ReadBlocked
@@ -17,6 +20,21 @@ from .status import DATASETS, TAIPEI, freshness, timestamp, ttl_seconds
 
 
 logger = logging.getLogger(__name__)
+_active_fence = ContextVar('live_read_transaction_fence', default=None)
+
+
+class LeaseLost(RuntimeError):
+    pass
+
+
+@event.listens_for(SQLAlchemySession, 'before_commit')
+def _fence_refresh_transaction(db):
+    # Existing services use both ORM flushes and bulk SQL writes. Fencing the
+    # commit protects both without changing their callable or service APIs.
+    fence = _active_fence.get()
+    if fence is not None:
+        fence(db)
+
 
 
 class RefreshCoordinator:
@@ -97,10 +115,31 @@ class RefreshCoordinator:
                        lease_until=(now + timedelta(seconds=self.config.lease_seconds)).isoformat())
         return claimed if self._replace(key, row.get('revision'), claimed) else None
 
+    def _fence(self, db, key, claimed):
+        now = self._now()
+        stmt = update(self.CacheRow).where(
+            self.CacheRow.id == key,
+            self.CacheRow.data['revision'].as_string() == claimed['revision'],
+            self.CacheRow.data['lease_until'].as_string() > now.isoformat(),
+        ).values(data=dict(claimed, lease_until=(now + timedelta(
+            seconds=self.config.lease_seconds)).isoformat()))
+        # The update takes the lease-row write lock through the apply commit;
+        # another owner cannot claim between the fence and workspace commit.
+        with db.no_autoflush:
+            if db.execute(stmt).rowcount != 1:
+                raise LeaseLost('Live-read lease ownership lost')
+
     def _refresh(self, wid, dataset, key, claimed, started):
         began = monotonic()
         try:
-            result = self.refreshers[dataset](wid)
+            refresher = self.refreshers[dataset]
+            fence = lambda db: self._fence(db, key, claimed)
+            context = _active_fence.set(fence)
+            try:
+                options = {'fence': fence} if 'fence' in signature(refresher).parameters else {}
+                result = refresher(wid, **options)
+            finally:
+                _active_fence.reset(context)
             finished = self._now().isoformat()
             fingerprint = result['fingerprint']
             changed = fingerprint != claimed.get('fingerprint')
@@ -108,15 +147,18 @@ class RefreshCoordinator:
                         fingerprint=fingerprint, changed_at=finished if changed else claimed.get('changed_at'),
                         lark=result.get('lark') or dict(calls=0, retries=0, duration_ms=int((monotonic()-began)*1000)),
                         last_error=None, error_at=None, error_code=None, lease_until=None, revision=str(uuid4()))
-            self._replace(key, claimed['revision'], data)
+            if not self._replace(key, claimed['revision'], data):
+                raise LeaseLost('Live-read lease ownership lost')
         except Exception as exc:
             blocked = isinstance(exc, ReadBlocked) or (isinstance(exc, HTTPException) and exc.status_code == 403)
             error_code = 'ReadBlocked' if blocked else type(exc).__name__
             logger.warning('Live-read refresh failed: %s duration_ms=%d',
                            error_code, int((monotonic()-began)*1000))
-            self._replace(key, claimed['revision'], dict(claimed, lease_until=None,
-                          revision=str(uuid4()), last_error='Lark refresh failed',
-                          error_code=error_code, error_at=self._now().isoformat()))
+            if not isinstance(exc, LeaseLost):
+                if not self._replace(key, claimed['revision'], dict(claimed, lease_until=None,
+                                    revision=str(uuid4()), last_error='Lark refresh failed',
+                                    error_code=error_code, error_at=self._now().isoformat())):
+                    logger.warning('Live-read lease ownership lost while recording failure')
             raise
 
     def close(self):
