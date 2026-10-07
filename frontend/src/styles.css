@@ -41,3 +41,5 @@
  button:focus-visible,a:focus-visible,summary:focus-visible{outline-color:#282175;outline-width:3px}
 }
 .auth-error-card{margin:18px 0;padding:15px 16px;border:1px solid #efc4c1;border-left:4px solid #bd4b45;border-radius:8px;background:#fff8f7;color:#512b29;text-align:left;line-height:1.65}.auth-error-card strong{display:block;margin-bottom:5px;color:#8f302c}.auth-error-card p{margin:4px 0;color:#603c39}.auth-callback-banner{align-items:flex-start}.auth-callback-banner strong{color:#8f302c}
+
+.table-footer .pager{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
