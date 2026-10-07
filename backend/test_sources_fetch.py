@@ -166,3 +166,36 @@ def test_real_live_client_errors_map_to_http(api, endpoint, failure, http_status
     assert exc.value.status_code == http_status
     if failure == 'blocked':
         assert '1254302' in exc.value.detail
+
+
+@pytest.mark.parametrize('target,key,value', [
+    ('record', 'base_token', 'other-base'),
+    ('record', 'department', 'other-department'),
+    ('record', 'cost_table_id', 'other-cost'),
+    ('record', 'linked_tables', {'link': 'other-table'}),
+    ('table', 'department', 'other-department'),
+    ('table', 'kind', 'quote'),
+    ('table', 'status', 'partial'),
+    ('table', 'count', 99),
+    ('table', 'field_schema', [{'field_name': '工程名稱', 'type': 2}]),
+])
+def test_fingerprint_detects_configuration_schema_and_summary(target, key, value):
+    original, _ = replay('list', fixture('list'))
+    changed = deepcopy(original)
+    changed['records' if target == 'record' else 'tables'][0][key] = value
+    assert fingerprint(changed) != fingerprint(original)
+
+
+def test_attachment_fingerprint_ignores_rotating_urls_but_preserves_file_identity():
+    original = {'records': [{'base_token': 'base', 'table_id': 'table', 'record_id': 'record',
+                            'attachment_fields': ['files'], 'fields': {'files': [
+                                {'file_token': 'file-one', 'name': 'drawing.pdf',
+                                 'tmp_url': 'https://files.example/temporary-one',
+                                 'url': 'https://files.example/file?X-Amz-Signature=one&version=1'}]}}]}
+    changed = deepcopy(original)
+    attachment = changed['records'][0]['fields']['files'][0]
+    attachment.update(tmp_url='https://files.example/temporary-two',
+                      url='https://files.example/file?version=1&X-Amz-Signature=two')
+    assert fingerprint(changed) == fingerprint(original)
+    attachment['file_token'] = 'file-two'
+    assert fingerprint(changed) != fingerprint(original)

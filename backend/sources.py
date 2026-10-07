@@ -73,7 +73,7 @@ def fetch_sources(token,cfg=None,client=None):
                 raise HTTPException(502,'Lark 讀取失敗；保留上次成功資料') from None
         for table in tables:
             params={'page_size':page_size,'user_id_type':'open_id'}; count=0
-            available=set(); linked_tables={}; attachment_fields=[]; schema_params={'page_size':100}; schema_tokens=set()
+            available=set(); linked_tables={}; attachment_fields=[]; field_schema=[]; schema_params={'page_size':100}; schema_tokens=set()
             for _ in range(20):
                 schema=request('GET',f"{API}/bitable/v1/apps/{table['base_token']}/tables/{table['table_id']}/fields",headers={'Authorization':f'Bearer {token}'},params=schema_params)
                 if schema.status_code!=200: raise HTTPException(502,'無法讀取來源欄位設定')
@@ -85,6 +85,7 @@ def fetch_sources(token,cfg=None,client=None):
                 schema_items=metadata.get('items') or []
                 available.update(f['field_name'] for f in schema_items)
                 for field in schema_items:
+                    field_schema.append({key:field.get(key) for key in ('field_id','field_name','type','property')})
                     if field.get('type')==17: attachment_fields.append(field['field_name'])
                     target=(field.get('property') or {}).get('table_id')
                     if target: linked_tables[field['field_name']]=target
@@ -130,7 +131,7 @@ def fetch_sources(token,cfg=None,client=None):
                 if not next_token or next_token in record_tokens: raise HTTPException(502,'Lark 紀錄分頁游標缺漏或重複；保留上次成功資料')
                 record_tokens.add(next_token); params['page_token']=next_token
             table_partial=bool(page.get('has_more')); partial=partial or table_partial
-            summary.append({'name':table.get('name',table['table_id']),'base_token':table['base_token'],'kind':table.get('kind','quote'),'table_id':table['table_id'],'count':count,'status':'partial' if table_partial else 'ready','attachment_fields':attachment_fields,'pages_read':pages_read,'page_limit':max_pages,'record_limit':max_pages*page_size})
+            summary.append({'name':table.get('name',table['table_id']),'base_token':table['base_token'],'kind':table.get('kind','quote'),'table_id':table['table_id'],'count':count,'status':'partial' if table_partial else 'ready','attachment_fields':attachment_fields,'department':table.get('department'),'cost_table_id':table.get('cost_table_id') or linked_tables.get('所屬成本單'),'linked_tables':linked_tables,'field_names':projected,'field_schema':field_schema,'pages_read':pages_read,'page_limit':max_pages,'record_limit':max_pages*page_size})
     return {'configured':True,'last_sync':datetime.now(timezone(timedelta(hours=8))).isoformat(),'status':'partial' if partial else 'ready','message':'已達本次讀取上限；目前為部分資料' if partial else '來源唯讀同步完成；未寫入 Lark','tables':summary,'records':collected}
 
 def text(value):
