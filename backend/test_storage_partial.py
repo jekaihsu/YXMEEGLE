@@ -68,7 +68,9 @@ def test_demo_identity_reads_only_users(tmp_path):
         finally:
             event.remove(app.state.engine, 'before_cursor_execute', capture)
         assert len(statements) == 2
-        assert 'business_records.kind !=' in statements[1][0]
+        # The list endpoint reads only project headers, never the whole workspace.
+        assert 'business_records.kind !=' not in statements[1][0]
+        assert 'projects' in statements[1][1] and 'nodes' not in statements[1][1]
         assert 'business_records.kind IN' in statements[0][0]
         assert 'users' in statements[0][1]
 
