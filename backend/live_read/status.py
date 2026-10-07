@@ -32,7 +32,7 @@ def freshness(rows, cfg, now, enabled, workspace_as_of=None):
         ttl = ttl_seconds(cfg, dataset)
         status = 'never' if as_of is None else ('fresh' if age < ttl else 'stale')
         if row.get('last_error'):
-            status = 'error'
+            status = 'blocked' if row.get('error_code') == 'ReadBlocked' else 'error'
         if row.get('lease_until') and timestamp(row['lease_until']) > now:
             status = 'refreshing'
         if not enabled or dataset not in rows:
@@ -42,6 +42,8 @@ def freshness(rows, cfg, now, enabled, workspace_as_of=None):
                                  fingerprint=row.get('fingerprint'), changed_at=row.get('changed_at'),
                                  last_error=row.get('last_error'),
                                  lark=row.get('lark') or dict(calls=0, retries=0, duration_ms=0))
+        if row.get('error_code'):
+            datasets[dataset]['error_code'] = row['error_code']
         if dataset == 'roster':
             datasets[dataset]['hard_max_age_seconds'] = 900
     return dict(server_time=now.isoformat(), enabled=enabled, datasets=datasets)

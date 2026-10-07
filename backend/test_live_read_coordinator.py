@@ -212,7 +212,7 @@ def test_wait_timeout_local_and_foreign_lease(harness):
     a._futures[a._key(h.wid, 'sources')].result(timeout=2)
 
 
-def test_error_preserves_good_data_and_cooldown_blocks_even_force(harness):
+def test_error_preserves_good_data_and_cooldown_blocks_background(harness):
     h = harness
     c = h.make()
     c.ensure(h.wid, 'sources')
@@ -227,7 +227,7 @@ def test_error_preserves_good_data_and_cooldown_blocks_even_force(harness):
     assert result['fingerprint'] == 'sha256:first'
     assert result['as_of'] == '2026-10-07T10:00:00+08:00'
     assert result['last_error'] == 'Lark refresh failed'
-    c.ensure(h.wid, 'sources', force=True)
+    c.ensure(h.wid, 'sources')
     with pytest.raises(RuntimeError, match='Lark refresh failed'):
         c.ensure(h.wid, 'sources', wait=True)
     assert len(failures) == 1
@@ -387,3 +387,51 @@ def test_fresh_ensure_reads_only_its_dataset_without_lock(harness):
     c._read = read
     assert c.ensure(h.wid, 'sources')['status'] == 'fresh'
     assert keys == [c._key(h.wid, 'sources')]
+
+
+def test_force_bypasses_error_cooldown(harness):
+    h = harness
+    def fail(wid):
+        raise OSError('private detail')
+    h.readers['sources'] = fail
+    c = h.make()
+    assert c.ensure(h.wid, 'sources')['status'] == 'error'
+    h.readers['sources'] = lambda wid: {'fingerprint': 'recovered'}
+    assert c.ensure(h.wid, 'sources', force=True, wait=True)['fingerprint'] == 'recovered'
+
+
+def test_permission_failure_status_and_logs_are_sanitized(harness, caplog):
+    from .live_read.client import ReadBlocked
+    h = harness
+    def denied(wid):
+        raise ReadBlocked('secret-sensitive-details')
+    h.readers['sources'] = denied
+    c = h.make()
+    result = c.ensure(h.wid, 'sources')
+    assert result['status'] == 'blocked'
+    assert result['error_code'] == 'ReadBlocked'
+    assert 'ReadBlocked' in caplog.text
+    assert 'secret-sensitive-details' not in caplog.text
+
+
+def test_status_marks_missing_refresher_unconfigured(harness):
+    h = harness
+    del h.readers['roster']
+    assert h.make().status(h.wid)['datasets']['roster']['status'] == 'unconfigured'
+
+
+def test_force_reports_already_running(harness):
+    h = harness
+    release, entered = Event(), Event()
+    def slow(wid):
+        entered.set()
+        assert release.wait(5)
+        return {'fingerprint': 'running'}
+    h.readers['sources'] = slow
+    c = h.make(ThreadPoolExecutor(max_workers=2))
+    try:
+        c.ensure(h.wid, 'sources')
+        assert entered.wait(1)
+        assert c.ensure(h.wid, 'sources', force=True)['status'] == 'already_running'
+    finally:
+        release.set()

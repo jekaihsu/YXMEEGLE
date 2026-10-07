@@ -4,12 +4,19 @@ from datetime import datetime, timedelta
 from threading import Lock, BoundedSemaphore
 from time import monotonic, sleep
 from uuid import uuid4
+import logging
+
+from fastapi import HTTPException
 
 from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 
+from .client import ReadBlocked
 from .config import LiveReadConfig
 from .status import DATASETS, TAIPEI, freshness, timestamp, ttl_seconds
+
+
+logger = logging.getLogger(__name__)
 
 
 class RefreshCoordinator:
@@ -50,7 +57,11 @@ class RefreshCoordinator:
             with self.Session() as db:
                 workspace = db.get(WorkspaceRow, wid)
                 workspace_as_of = (workspace.data or {}).get('as_of') if workspace else None
-        return freshness(rows, self.config, self._now(), self._enabled(wid), workspace_as_of)
+        result = freshness(rows, self.config, self._now(), self._enabled(wid), workspace_as_of)
+        for dataset in DATASETS:
+            if dataset not in self.refreshers:
+                result['datasets'][dataset]['status'] = 'unconfigured'
+        return result
 
     @property
     def queue_depth(self):
@@ -76,7 +87,7 @@ class RefreshCoordinator:
             row = self._read(key)
         if row.get('lease_until') and timestamp(row['lease_until']) > now:
             return None
-        if row.get('error_at') and (now-timestamp(row['error_at'])).total_seconds() < 30:
+        if not force and row.get('error_at') and (now-timestamp(row['error_at'])).total_seconds() < 30:
             return None
         if (not force and not row.get('last_error') and row.get('as_of')
                 and (now-timestamp(row['as_of'])).total_seconds() < ttl_seconds(self.config, dataset)):
@@ -96,11 +107,16 @@ class RefreshCoordinator:
             data = dict(claimed, as_of=started.isoformat(), fetched_at=result.get('fetched_at', finished),
                         fingerprint=fingerprint, changed_at=finished if changed else claimed.get('changed_at'),
                         lark=result.get('lark') or dict(calls=0, retries=0, duration_ms=int((monotonic()-began)*1000)),
-                        last_error=None, error_at=None, lease_until=None, revision=str(uuid4()))
+                        last_error=None, error_at=None, error_code=None, lease_until=None, revision=str(uuid4()))
             self._replace(key, claimed['revision'], data)
-        except Exception:
+        except Exception as exc:
+            blocked = isinstance(exc, ReadBlocked) or (isinstance(exc, HTTPException) and exc.status_code == 403)
+            error_code = 'ReadBlocked' if blocked else type(exc).__name__
+            logger.warning('Live-read refresh failed: %s duration_ms=%d',
+                           error_code, int((monotonic()-began)*1000))
             self._replace(key, claimed['revision'], dict(claimed, lease_until=None,
-                          revision=str(uuid4()), last_error='Lark refresh failed', error_at=self._now().isoformat()))
+                          revision=str(uuid4()), last_error='Lark refresh failed',
+                          error_code=error_code, error_at=self._now().isoformat()))
             raise
 
     def close(self):
@@ -131,7 +147,9 @@ class RefreshCoordinator:
         if current['status'] == 'fresh' and not force:
             return current
         now = self._now()
-        cooldown = row.get('error_at') and (now-timestamp(row['error_at'])).total_seconds() < 30
+        if force and current['status'] == 'refreshing':
+            return dict(current, status='already_running')
+        cooldown = not force and row.get('error_at') and (now-timestamp(row['error_at'])).total_seconds() < 30
         with self._lock:
             future = self._futures.get(key)
             if future is not None and future.done():
@@ -140,6 +158,8 @@ class RefreshCoordinator:
             start = not pending and future is None and current['status'] != 'refreshing' and not cooldown
             if start:
                 self._pending.add(key)
+        if force and (pending or future is not None):
+            return dict(current, status='already_running')
         if pending:
             # The other local caller is claiming/submitting outside the map lock.
             return dict(current, status='busy' if wait else 'refreshing')
@@ -184,7 +204,10 @@ class RefreshCoordinator:
                     if monotonic() >= deadline:
                         raise TimeoutError('Live-read refresh timed out')
                     sleep(min(0.2, max(0, deadline-monotonic())))
-            if self._dataset_status(dataset, self._read(key))['status'] == 'error':
+            final = self._dataset_status(dataset, self._read(key))
+            if final['status'] == 'blocked':
+                raise ReadBlocked('Lark authorization or resource access denied')
+            if final['status'] == 'error':
                 raise RuntimeError('Lark refresh failed')
         return self._dataset_status(dataset, self._read(key))
 
