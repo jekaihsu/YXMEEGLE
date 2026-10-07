@@ -20,7 +20,13 @@ for(const key of ['window','document','location','history','sessionStorage','For
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(resolve=>setTimeout(resolve,0))});
 // Stand-in for GET /api/projects?view=overview: same tabs, sorts, facets and paging contract as backend/shell.py.
-let overviewGate=async()=>{};
+let overviewGate=async()=>{};let detailGate=async()=>{};
+// Stand-in for GET /api/projects/{id}: the single project tree plus its own records.
+const detail=async(url)=>{
+ const id=decodeURIComponent(url.split('/').pop());await detailGate(id);const project=workspace.projects.find(p=>p.id===id);
+ if(!project)return new Response(JSON.stringify({detail:'找不到這個案件'}),{status:404});
+ return json({scope:'project',version:current.version,project,approvals:[],events:[],policy_summary:[],financial_requests:[],source_quotes:[],source_confirmations:[],contract_items:[],node_skip_requests:[]});
+};
 const pct=p=>p.progress.total_nodes?p.progress.completed_nodes/p.progress.total_nodes:0;
 const overview=async(url)=>{
  const query=new URL(url,'http://x').searchParams;await overviewGate(query);
@@ -38,6 +44,7 @@ globalThis.fetch=async(url,init)=>{
  if(url==='/api/session')return json({user,users:[a,b],mode:'lark',environment:'production',workspace_id:'workspace-A',auth_configured:true,features});
  if(url==='/api/workspace')return json(workspace);
  if(url.startsWith('/api/projects?view=overview'))return overview(url);
+ if(url.startsWith('/api/projects/'))return detail(url);
  if(url==='/api/workspace?scope=shell')return init.headers.get('If-None-Match')===etag?new Response(null,{status:304,headers:{ETag:etag}}):json(current,{ETag:etag});
  if(url==='/api/actions'||url==='/api/files')return failMutation?new Response(JSON.stringify({detail:'conflict'}),{status:409}):json(mutationResponse||{...workspace,version:2});
  throw Error('Unexpected endpoint '+url);
@@ -130,5 +137,23 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  assert.equal(pages().at(-1).get('offset'),'0','returning to an earlier filter starts at page 1');assert.equal(rows().length,10);assert.ok(rows()[0].textContent.includes('CODE_01'));
  await flush(async()=>{release();await slow});assert.equal(rows().length,10);assert.ok(rows()[0].textContent.includes('CODE_01'),'stale intake page did not overwrite formal page');
  overviewGate=async()=>{};
- console.log('Shell mode: feature gating, server-side paging/filter reset/stale-response guard, summary-only render/filter/sort, badges, 304, identity cache, mutation/upload concurrency and 409 passed');
+
+ // P4-3: opening a case reads that one project; tabs are client-side; a mutation hands over to the full workspace.
+ current=shell;etag='W/"shell-A:1"';failMutation=false;mutationResponse=undefined;location.hash='view=project&project=pA';
+ await mount({workspace_shell:true});
+ const goto=async hash=>flush(()=>{location.hash=hash;window.dispatchEvent(new window.Event('hashchange'))});
+ const detailUrls=()=>requests.map(r=>r.url).filter(u=>u.startsWith('/api/projects/'));
+ assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects/pA']);
+ assert.ok(document.querySelector('.workspace').textContent.includes('PRIVATE_CASE_A')&&document.querySelector('.workspace').textContent.includes('TASK_A'),'detail renders the project tree');
+ await goto('view=project&project=pA&tab=flow');await goto('view=project&project=pA&tab=data&section=basic');assert.deepEqual(detailUrls(),['/api/projects/pA'],'tabs do not refetch the project');
+ await goto('view=project&project=pB');assert.deepEqual(detailUrls(),['/api/projects/pA','/api/projects/pB']);assert.ok(document.querySelector('.workspace').textContent.includes('CASE_B'));
+ await goto('view=project&project=zz');assert.ok(document.querySelector('.workspace').textContent.includes('找不到這個案件'));
+ let freeA;const heldA=new Promise(resolve=>{freeA=resolve});detailGate=async id=>{if(id==='pA')await heldA};
+ await goto('view=project&project=pA');await goto('view=project&project=pB');await flush(async()=>{freeA();await heldA});
+ assert.ok(document.querySelector('.workspace').textContent.includes('CASE_B')&&!document.querySelector('.workspace').textContent.includes('PRIVATE_CASE_A'),'a slow earlier project never replaces the one now open');
+ detailGate=async()=>{};await goto('view=project&project=pA');const reads=detailUrls().length;
+ await flush(()=>window.shellContext.run('case_execution_assign',{execution_system:'workbench'},{project_id:'pA'}));
+ assert.equal(window.shellContext.w.scope,undefined,'mutation response is the full workspace');assert.equal(detailUrls().length,reads,'no extra project read after the full workspace arrives');
+ assert.ok(document.querySelector('.workspace').textContent.includes('PRIVATE_CASE_A'),'detail keeps rendering from the full workspace');
+ console.log('Shell mode: feature gating, server-side paging/filter reset/stale-response guard, lazy single-project detail, summary-only render/filter/sort, badges, 304, identity cache, mutation/upload concurrency and 409 passed');
 }finally{await flush(()=>root.unmount());dom.window.close()}
