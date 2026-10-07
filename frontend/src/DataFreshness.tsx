@@ -1,10 +1,11 @@
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {getSessionEpoch,liveRefresh,liveStatus} from './api';
 import {ageFreshness} from './freshness';
 import type {Freshness,LiveDataset} from './types';
 
 export interface DataFreshnessProps {
   freshness?:Freshness;
+  onFreshness?:(freshness:Freshness)=>void;
   demo?:boolean;
   mutationActive?:boolean;
   dirtyDraft?:boolean;
@@ -14,7 +15,7 @@ const names:Record<LiveDataset,string>={sources:'來源',roster:'名冊',attenda
 const priority=['blocked','error','refreshing','never','stale','fresh','unconfigured'] as const;
 const time=(value:string|null)=>value?new Date(value).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'—';
 
-export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDraft=false,refresh}:DataFreshnessProps){
+export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDraft=false,refresh,onFreshness}:DataFreshnessProps){
   const [current,setCurrent]=useState(freshness);
   const receivedAt=useRef(Date.now());
   const [now,setNow]=useState(Date.now);
@@ -24,12 +25,13 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
   const mounted=useRef(true);
   const epoch=useRef(getSessionEpoch());
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false}},[]);
-  useEffect(()=>{receivedAt.current=Date.now();setNow(Date.now());setCurrent(freshness);setRequestError('')},[freshness]);
+  useEffect(()=>{if(current&&freshness&&Date.parse(freshness.server_time)<Date.parse(current.server_time))return;receivedAt.current=Date.now();setNow(Date.now());setCurrent(freshness);setRequestError('')},[freshness]);
   useEffect(()=>{if(demo||!current?.enabled)return;let timer:ReturnType<typeof setTimeout>;const tick=()=>{setNow(Date.now());timer=setTimeout(tick,30000)};timer=setTimeout(tick,30000);return()=>clearTimeout(timer)},[demo,current?.enabled]);
-  const aged=current?ageFreshness(current,receivedAt.current,now):undefined;
+  const aged=useMemo(()=>{if(!current)return;const value=ageFreshness(current,receivedAt.current,now);return requestError?{...value,datasets:Object.fromEntries(Object.entries(value.datasets).map(([key,d])=>[key,{...d,status:d.status==='unconfigured'?d.status:'error'}])) as Freshness['datasets']}:value},[current,now,requestError]);
+  useEffect(()=>{if(aged&&epoch.current===getSessionEpoch())onFreshness?.(aged)},[aged,onFreshness]);
   const active=!!current?.enabled&&!demo;
   const entries=aged?Object.entries(aged.datasets) as [LiveDataset,Freshness['datasets'][LiveDataset]][]:[];
-  const polling=active&&entries.some(([,d])=>d.status==='refreshing');
+  const polling=active&&Object.values(current?.datasets||{}).some(d=>d.status==='refreshing');
 
   useEffect(()=>{
     if(!active||!polling||epoch.current!==getSessionEpoch())return;
@@ -39,7 +41,7 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
       if(epoch.current!==getSessionEpoch())return;
       try{
         const result=await liveStatus();
-        if(!stopped&&epoch.current===getSessionEpoch()){receivedAt.current=Date.now();setNow(Date.now());setCurrent(result.freshness);setRequestError('')}
+        if(!stopped&&epoch.current===getSessionEpoch()){receivedAt.current=Date.now();setNow(Date.now());setCurrent(value=>value&&Date.parse(value.server_time)>Date.parse(result.freshness.server_time)?value:result.freshness);setRequestError('')}
       }catch{
         if(!stopped&&epoch.current===getSessionEpoch())setRequestError('資料狀態暫時無法讀取');
       }
@@ -86,7 +88,7 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
   const details=entries.map(([key,d])=>`${names[key]}：${time(d.as_of)} · ${d.age_seconds??'—'} 秒前 · TTL ${d.ttl_seconds} 秒`).join('\n');
   return <div className={`data-freshness data-freshness-${state}`} data-state={state}>
     <span role="status" aria-live="polite" title={details} style={{color}}>
-      {state==='refreshing'?<span className="spinner" aria-hidden="true">◌ </span>:null}<span aria-hidden="true">{label}</span><span className="sr-only">{state==='fresh'?'Lark 資料已讀取':state==='stale'?'Lark 資料待更新':label}</span>
+      {state==='refreshing'?<span className="spinner" aria-hidden="true">◌ </span>:null}{state==='fresh'||state==='stale'?<><span aria-hidden="true">{label}</span><span className="sr-only">{state==='fresh'?'Lark 資料已讀取':'Lark 資料待更新'}</span></>:label}
       {requestError?<span> · {requestError}</span>:null}
     </span>
     {active?<button type="button" className="button" onClick={reread} disabled={busy} aria-label="立即重新讀取 Lark">{busy?'讀取中…':state==='error'?'重試':'重新讀取'}</button>:null}

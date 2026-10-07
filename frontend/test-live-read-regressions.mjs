@@ -27,5 +27,11 @@ try{
  now+=120000;await tick(30000);
  assert.equal(document.querySelector('.data-freshness').dataset.state,'stale','M1: fresh degrades after TTL without a server request');
  assert.match(document.body.textContent,/132 秒前/,'M1: age advances with time');
+ const published=[];const refreshing=freshness();refreshing.datasets.sources.status='refreshing';
+ await render(refreshing,{onFreshness:f=>published.push(f)});
+ const settled={...freshness(),server_time:'2026-10-07T02:03:23Z'};
+ globalThis.fetch=async()=>new Response(JSON.stringify({freshness:settled}));
+ await tick(15000);
+ assert.equal(published.at(-1)?.datasets.sources.status,'stale','M2: poll results reach shared panel state even without changed_at advancing');
  console.log('Live-read regressions passed');
 }finally{await flush(()=>root.unmount());globalThis.setTimeout=realTimeout;globalThis.clearTimeout=realClear;Date.now=realNow;dom.window.close()}
