@@ -77,6 +77,13 @@ python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
 | LARK_SOURCE_MAX_PAGES | 預設 50，每頁 200；來源上限限制為 1 至 100 頁 |
 | LARK_WORKER_IDENTITY | 需要公司背景真實連線時設 application；不能以本機 CLI 憑證替代 |
 | LARK_WORKER_ORGANIZATION | 精確的公司 tenant_key；背景程序只服務相符公司工作區 |
+| LARK_LIVE_READ_ENABLED | 預設 false；僅字串 true（不分大小寫）開啟按需即時讀取（需 LARK_WORKER_IDENTITY=application）。關閉時 worker 沿用舊的 300 秒計時。回滾＝改回 false 並重啟 |
+| LARK_LIVE_READ_SOURCE_TTL_SECONDS／LARK_LIVE_READ_ROSTER_TTL_SECONDS | 來源／名冊軟 TTL；預設旗標開 60、旗標關 300；下限 30，無上限。旗標關閉時同時是舊 worker 的最短間隔 |
+| LARK_LIVE_READ_ATTENDANCE_TTL_SECONDS | 班表軟 TTL；預設 300；下限 60 |
+| LARK_LIVE_READ_MAX_RPS | 每進程 Lark 請求速率；預設 5；範圍 0.01–10 |
+| LARK_LIVE_READ_BLOCKING_TIMEOUT_SECONDS | 准入與手動等待的最長秒數；預設 10；下限 0.01 |
+| LARK_LIVE_READ_LEASE_SECONDS | 刷新租約秒數；預設 120；下限 60 |
+| LARK_BITABLE_RECORDS_API | list（預設，每頁 200）或 search（每頁 500）；其他值退回 list。須先於 staging 驗證再切換 |
 | LARK_TEST_BASE_TOKEN | 選用，隔離真實 Input 測試專用 Base，須與測試工作區 test_base 一致且不得為正式來源 Base |
 | LARK_INPUT_BASE_TOKEN | 正式 Input 專用登錄 Base，须与工作區 settings.input_base 相同；不得為 V4、報價或薪資 Base |
 | LARK_INPUT_TABLE_ID | 正式 Input 專用登錄表，须与工作區 settings.input_table 相同；缺少或不符時阻擋查證與寫入 |
@@ -123,7 +130,7 @@ V3 僅供對照研究，不在匯入清單；Meegle 舊案件不匯入。來源�
 
 ### 背景同步及持久工作
 
-worker 每 30 秒輪詢各工作區。公司來源保存 `source_connection.enabled`；背景按 300 秒間隔保留執行槽。唯讀同步以明確的公司 application／tenant 授權執行，不依賴最後按同步的人員登入。缺少可用身分時顯示需設定背景連線並保留最後成功資料，不假裝已執行。員工操作另受 15 分鐘人員資料新鮮度限制；指定維運主管於名單過期時僅能使用維修入口，不能讀公司業務內容。
+worker 每 30 秒輪詢各工作區。**旗標 `LARK_LIVE_READ_ENABLED` 關閉（預設）時**，公司來源保存 `source_connection.enabled`；背景按 300 秒（每五分鐘）間隔保留執行槽，名冊與班表同為 300 秒。**旗標開啟時**，來源、名冊、班表三個資料集不再由 worker 計時同步，改由 web 服務在使用者開頁時按需讀取（來源與名冊 TTL 預設 60 秒、班表 300 秒，見 `docs/LIVE_READ_20261007.md`），每個回應附 `freshness`；worker 仍須運行，負責通知、Input、Drive、原生審批輪詢與請假代理刷新。旗標關閉即回到舊計時，詳見該文件的回滾章節。唯讀同步以明確的公司 application／tenant 授權執行，不依賴最後按同步的人員登入。缺少可用身分時顯示需設定背景連線並保留最後成功資料，不假裝已執行。員工操作另受 15 分鐘人員資料新鮮度限制；指定維運主管於名單過期時僅能使用維修入口，不能讀公司業務內容。
 
 來源同步與其他工作各自處理錯誤，來源失敗不應阻斷其他持久工作。Input 只向專用登錄表追加不可變修訂，不改來源儲存格；文件上傳在本地交易內自動排入 Drive 工作。未知遠端結果先讀回核實，不能盲目重送。能力與訓練存回一律禁止，薪資 Base 全域禁止寫入。外部通知與確認單發出另受工作區、角色、tenant、收件人及連線條件限制。
 
@@ -209,7 +216,7 @@ python scripts/restore_drill.py --encrypted-manifest --file /private/backup-mani
 - Lark 回呼精確匹配，允許 tenant 成功、其他 tenant 拒絕；角色來源符合後台設定。
 - 唯讀來源可追溯來源、更新時間及 partial／失敗狀態，沒有遠端寫入。
 - 全量 9 表讀取、案件歸戶及第二次同步不重複建立案件逐項驗收；現有 2,569 筆讀取證據不代表所有案件分類已經完成。
-- web 及 worker 都由監督程序運行；手動成功後的五分鐘同步、失敗保留資料、登入過期與 application fallback 分別驗證。
+- web 及 worker 都由監督程序運行；手動成功後的背景同步（旗標關閉：每五分鐘；旗標開啟：按需讀取與 `freshness`）、失敗保留資料、登入過期與 application fallback 分別驗證。
 - test 的全模擬與隔離真實 Input／文件模式各自驗證；沒有對正式來源表或正式 Drive 試寫。
 - 正常班表來源、請假代理可信查詢各自驗收；能力與訓練停用及薪資 Base 不回寫須測試。打卡、欄位可讀與本機模擬不是完成證據。
 - 變更及展延的示範操作有明確標記；未配置真實提交 adapter 時正式送審被阻擋，不能顯示已成功送出。
