@@ -143,3 +143,26 @@ def test_unknown_records_api_is_configuration_error():
     with pytest.raises(HTTPException) as exc:
         fetch_sources('synthetic-token', config('invalid'), object())
     assert exc.value.status_code == 503
+
+
+@pytest.mark.parametrize('api', ['list', 'search'])
+@pytest.mark.parametrize('endpoint', ['fields', 'records'])
+@pytest.mark.parametrize('failure,http_status', [('blocked', 403), ('rejected', 502), ('budget', 502)])
+def test_real_live_client_errors_map_to_http(api, endpoint, failure, http_status):
+    from .test_live_read_client import CFG, Clock, make_client
+    clock = Clock()
+    payload = fixture(api)
+    def respond(request):
+        if '/auth/' in request.url.path:
+            return httpx.Response(200, json={'code': 0, 'tenant_access_token': 'fake-token', 'expire': 7200})
+        if request.url.path.endswith('/fields') and endpoint == 'records':
+            return httpx.Response(200, json=payload['fields'])
+        if failure == 'budget':
+            clock.now = 46
+        return httpx.Response(200, json={'code': 1254302 if failure == 'blocked' else 12345})
+    with make_client(respond, clock) as client:
+        with pytest.raises(HTTPException) as exc:
+            fetch_sources('unused', dict(config(api), **CFG), client)
+    assert exc.value.status_code == http_status
+    if failure == 'blocked':
+        assert '1254302' in exc.value.detail

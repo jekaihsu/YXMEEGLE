@@ -61,9 +61,16 @@ def fetch_sources(token,cfg=None,client=None):
     collected=[]; summary=[]; partial=False
     with (nullcontext(client) if client is not None else httpx.Client(timeout=30)) as client:
         def request(method,url,**kwargs):
-            # Legacy get-only test clients remain supported; real clients use request.
-            if method=='GET' and not hasattr(client,'request'): return client.get(url,**kwargs)
-            return client.request(method,url,**kwargs)
+            from .live_read.client import ReadBlocked, ReadFailure
+            from .live_read.rate_limit import BudgetExceeded
+            try:
+                # Legacy get-only test clients remain supported.
+                if method=='GET' and not hasattr(client,'request'): return client.get(url,**kwargs)
+                return client.request(method,url,**kwargs)
+            except ReadBlocked:
+                raise HTTPException(403,'目前 Lark 身分沒有這張 Base 的資源存取權限（1254302）；請確認表格分享權限') from None
+            except (ReadFailure, BudgetExceeded):
+                raise HTTPException(502,'Lark 讀取失敗；保留上次成功資料') from None
         for table in tables:
             params={'page_size':page_size,'user_id_type':'open_id'}; count=0
             available=set(); linked_tables={}; attachment_fields=[]; schema_params={'page_size':100}; schema_tokens=set()
