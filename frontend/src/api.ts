@@ -1,24 +1,41 @@
 // Shared with App so every request captures the active session epoch.
 let sessionEpoch=0;
+const etagCache=new Map<string,{etag:string;data:unknown}>();
+export type ApiRequestInit=RequestInit & {etag?:boolean};
 const pendingMutations=new Map<number,number>();
 export const getPendingMutations=()=>pendingMutations.get(sessionEpoch)||0;
 const mutationChanged=()=>{if(typeof window!=='undefined')window.dispatchEvent(new Event('yx:mutation-state'))};
 export const getSessionEpoch=()=>sessionEpoch;
-export const invalidateSessionEpoch=()=>{sessionEpoch++};
+export const invalidateSessionEpoch=()=>{sessionEpoch++;etagCache.clear()};
 export class ApiError extends Error {constructor(public status:number,message:string){super(message)}}
-export async function api<T>(url:string,init?:RequestInit,isCurrent:()=>boolean=()=>true,onResponse?:(status:number)=>void):Promise<T>{
+export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boolean=()=>true,onResponse?:(status:number)=>void):Promise<T>{
   const epoch=getSessionEpoch();
   const mutating=!!init?.method&&!['GET','HEAD'].includes(init.method.toUpperCase());
   if(mutating){pendingMutations.set(epoch,(pendingMutations.get(epoch)||0)+1);mutationChanged()}
   try{
-  const response=await fetch(url,{credentials:'same-origin',...init,headers:{...(init?.body instanceof FormData?{}:{'Content-Type':'application/json'}),...init?.headers}});
+  const {etag,...request}=init||{};
+  const cacheable=etag===true&&!mutating&&(!init?.method||init.method.toUpperCase()==='GET');
+  const cached=cacheable&&init?.cache!=='reload'&&init?.cache!=='no-store'?etagCache.get(url):undefined;
+  const headers=new Headers(init?.headers);
+  if(!(init?.body instanceof FormData)&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
+  if(cached)headers.set('If-None-Match',cached.etag);
+  else if(cacheable)headers.delete('If-None-Match');
+  const response=await fetch(url,{credentials:'same-origin',...request,headers});
   onResponse?.(response.status);
+  if(response.status===304&&cached)return cached.data as T;
   const malformed='服務回應格式不正確，請稍後再試。';
   let data:any;let parsed=true;
   try{data=JSON.parse(await response.text())}catch{data={detail:malformed};parsed=false}
   if(response.status===401&&epoch===getSessionEpoch()&&isCurrent())window.dispatchEvent(new Event('yx:session-expired'));
   if(!response.ok)throw new ApiError(response.status,typeof data?.detail==='string'?data.detail:JSON.stringify(data?.detail||'操作未完成'));
   if(!parsed||data===null||typeof data!=='object')throw new ApiError(response.status,malformed);
+  if(cacheable&&epoch===getSessionEpoch()&&isCurrent()&&!init?.signal?.aborted){
+   const value=response.headers.get('ETag');
+   if(value&&init?.cache!=='no-store'){
+    etagCache.delete(url);etagCache.set(url,{etag:value,data});
+    if(etagCache.size>100)etagCache.delete(etagCache.keys().next().value!);
+   }else etagCache.delete(url);
+  }
   return data;
   }finally{if(mutating){const remaining=(pendingMutations.get(epoch)||1)-1;if(remaining)pendingMutations.set(epoch,remaining);else pendingMutations.delete(epoch);mutationChanged()}}
 }

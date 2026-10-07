@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "test:view-data": "node test-view-data.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
