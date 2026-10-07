@@ -36,16 +36,22 @@ def harness(tmp_path):
         return {'fingerprint': 'sha256:first', 'lark': {'calls': 0, 'retries': 0, 'duration_ms': 0}}
     readers.update(sources=read, roster=read, attendance=read)
     executors = []
+    coordinators = []
     def coordinator(executor=None, Session=None):
         executor = executor or SynchronousExecutor()
         executors.append(executor)
-        return RefreshCoordinator(Session or sessions, CacheRow, readers, cfg,
-                                  executor=executor, clock=lambda: clock[0])
+        instance = RefreshCoordinator(Session or sessions, CacheRow, readers, cfg,
+                                      executor=executor, clock=lambda: clock[0])
+        coordinators.append(instance)
+        return instance
     yield SimpleNamespace(engine=engine, sessions=sessions, clock=clock, cfg=cfg,
                           readers=readers, calls=calls, make=coordinator, wid='lark-tenant')
     for executor in executors:
         if hasattr(executor, 'shutdown'):
             executor.shutdown(wait=True)
+    for instance in coordinators:
+        if instance.roster_executor is not instance.executor:
+            instance.roster_executor.shutdown(wait=True)
     engine.dispose()
 
 
@@ -243,13 +249,13 @@ def test_executor_has_two_slots_and_no_unbounded_queue(harness):
     c = RefreshCoordinator(h.sessions, CacheRow, h.readers, h.cfg, clock=lambda: h.clock[0])
     try:
         c.ensure(h.wid, 'sources')
-        c.ensure(h.wid, 'roster')
-        assert c.ensure(h.wid, 'attendance')['status'] == 'blocked'
+        c.ensure('lark-second', 'sources')
+        assert c.ensure(h.wid, 'attendance')['status'] == 'busy'
         assert c.queue_depth == 2
         assert c._read(c._key(h.wid, 'attendance')) == {}
     finally:
         release.set()
-        c.executor.shutdown(wait=True)
+        c.close()
     assert len(h.calls) == 2
 
 
@@ -313,3 +319,43 @@ def test_negative_lease_has_safe_apply_allowance(harness):
     claimed = c._claim(c._key(h.wid, 'sources'), now, 'sources', False)
     from .live_read.status import timestamp
     assert (timestamp(claimed['lease_until']) - now).total_seconds() >= 60
+
+
+def test_roster_admission_has_capacity_when_background_lanes_are_full(harness):
+    h = harness
+    release = Event()
+    def slow(wid):
+        assert release.wait(5)
+        return {'fingerprint': 'background'}
+    h.readers.update(sources=slow, attendance=slow)
+    c = RefreshCoordinator(h.sessions, CacheRow, h.readers, h.cfg, clock=lambda: h.clock[0])
+    try:
+        c.ensure(h.wid, 'sources')
+        c.ensure(h.wid, 'attendance')
+        assert c.ensure(h.wid, 'roster', wait=True)['status'] == 'fresh'
+    finally:
+        release.set()
+        c.close()
+        if hasattr(c, 'roster_executor'):
+            c.roster_executor.shutdown(wait=True)
+
+
+def test_waiting_caller_waits_for_capacity_without_permission_status(harness):
+    h = harness
+    release, waiting = Event(), Event()
+    h.cfg['LARK_LIVE_READ_BLOCKING_TIMEOUT_SECONDS'] = '.2'
+    def slow(wid):
+        waiting.set()
+        assert release.wait(5)
+        return {'fingerprint': 'done'}
+    h.readers['sources'] = slow
+    c = h.make(ThreadPoolExecutor(max_workers=2))
+    try:
+        c.ensure('lark-one', 'sources')
+        c.ensure('lark-two', 'sources')
+        assert waiting.wait(1)
+        assert c.ensure('lark-three', 'sources')['status'] == 'busy'
+        with pytest.raises(TimeoutError):
+            c.ensure('lark-three', 'sources', wait=True)
+    finally:
+        release.set()

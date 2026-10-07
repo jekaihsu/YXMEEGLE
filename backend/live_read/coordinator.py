@@ -18,6 +18,10 @@ class RefreshCoordinator:
         self.refreshers, self.cfg = refreshers, cfg
         self.config = LiveReadConfig.from_env(cfg)
         self.executor = executor if executor is not None else ThreadPoolExecutor(max_workers=2)
+        self.roster_executor = (ThreadPoolExecutor(max_workers=1)
+                                if executor is None or isinstance(executor, ThreadPoolExecutor)
+                                else executor)
+        self._roster_slots = BoundedSemaphore(1)
         self.clock = clock or (lambda: datetime.now(TAIPEI))
         self._lock, self._slots, self._futures = Lock(), BoundedSemaphore(2), {}
 
@@ -97,14 +101,29 @@ class RefreshCoordinator:
             self._replace(key, claimed['revision'], dict(claimed, lease_until=None,
                           revision=str(uuid4()), last_error='Lark refresh failed', error_at=self._now().isoformat()))
             raise
-        finally:
-            self._slots.release()
+
+    def close(self):
+        self.executor.shutdown(wait=True)
+        if self.roster_executor is not self.executor:
+            self.roster_executor.shutdown(wait=True)
 
     def ensure(self, wid, dataset, *, wait=False, force=False):
+        deadline = monotonic() + self.config.blocking_timeout_seconds
+        while True:
+            result = self._ensure_once(wid, dataset, wait=wait, force=force, deadline=deadline)
+            if not wait or result['status'] != 'busy':
+                return result
+            if monotonic() >= deadline:
+                raise TimeoutError('Live-read refresh timed out')
+            sleep(min(.02, max(0, deadline - monotonic())))
+
+    def _ensure_once(self, wid, dataset, *, wait, force, deadline):
         if dataset not in DATASETS:
             raise ValueError('Unknown live-read dataset')
         if not self._enabled(wid) or dataset not in self.refreshers:
             return dict(self.status(wid)['datasets'][dataset], status='unconfigured')
+        slots = self._roster_slots if dataset == 'roster' else self._slots
+        executor = self.roster_executor if dataset == 'roster' else self.executor
         key, now = self._key(wid, dataset), self._now()
         future = None
         with self._lock:
@@ -116,36 +135,36 @@ class RefreshCoordinator:
             running = current['status'] == 'refreshing'
             cooldown = row.get('error_at') and (now-timestamp(row['error_at'])).total_seconds() < 30
             if not running and not cooldown and (force or current['status'] != 'fresh'):
-                if not self._slots.acquire(blocking=False):
-                    return dict(current, status='blocked')
+                if not slots.acquire(blocking=False):
+                    return dict(current, status='busy')
                 try:
                     claimed = self._claim(key, now, dataset, force)
                 except Exception:
-                    self._slots.release()
+                    slots.release()
                     if wait:
                         raise
                     return dict(current, status='error', last_error='Lark refresh failed')
                 if claimed:
                     try:
-                        future = self.executor.submit(self._refresh, wid, dataset, key, claimed, now)
+                        future = executor.submit(self._refresh, wid, dataset, key, claimed, now)
+                        future.add_done_callback(lambda _: slots.release())
                         self._futures[key] = future
                     except Exception:
-                        self._slots.release()
+                        slots.release()
                         self._replace(key, claimed['revision'], dict(row, revision=str(uuid4()),
                                       last_error='Lark refresh failed', error_at=now.isoformat()))
                         if wait:
                             raise
                 else:
-                    self._slots.release()
+                    slots.release()
         if wait:
-            timeout = self.config.blocking_timeout_seconds
+            timeout = max(0, deadline - monotonic())
             if future:
                 try:
                     future.result(timeout=timeout)
                 except FutureTimeout as exc:
                     raise TimeoutError('Live-read refresh timed out') from exc
             else:
-                deadline = monotonic() + timeout
                 while self.status(wid)['datasets'][dataset]['status'] == 'refreshing':
                     if monotonic() >= deadline:
                         raise TimeoutError('Live-read refresh timed out')
