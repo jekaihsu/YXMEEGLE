@@ -12,7 +12,10 @@ from .config import LiveReadConfig
 from .rate_limit import BudgetExceeded, RETRY_CODES, RetryPolicy, process_bucket
 from .token_cache import TokenError, process_token_cache
 
-ALLOWED_POSTS = (r'/bitable/v1/apps/[^/]+/tables/[^/]+/records/search',)
+ALLOWED_POSTS = (r'/bitable/v1/apps/[^/]+/tables/[^/]+/records/search',
+                 r'/attendance/v1/user_daily_shifts/query')
+ALLOWED_GETS = (r'/bitable/v1/apps/[^/]+(?:/.*)?',
+                r'/contact/v3/users/batch', r'/attendance/v1/shifts/[^/]+')
 
 
 class ReadFailure(RuntimeError):
@@ -66,6 +69,7 @@ class LiveLarkClient:
         clean_path = urlsplit(path).path
         protected = capability_write_policy.protected_request(method, path)
         if (protected or not clean_path.startswith('/') or
+                (method == 'GET' and not any(re.fullmatch(pattern, clean_path) for pattern in ALLOWED_GETS)) or
                 (method != 'GET' and not (method == 'POST' and any(
                     re.fullmatch(pattern, clean_path) for pattern in self.allowed_posts)))):
             raise ReadBlocked('Lark request is outside the read allowlist')
@@ -121,6 +125,9 @@ class LiveLarkClient:
                 raise ReadBlocked('Lark authorization or resource access denied')
             if retryable and attempt < RetryPolicy.max_attempts:
                 delay = RetryPolicy.after(response, attempt)
+                if response.status_code == 429 or code == 99991400:
+                    delay = max(1, delay)
+                    self.bucket.penalize(self.clock() + delay)
                 if self.clock() + delay >= self.deadline:
                     raise BudgetExceeded('Lark read budget exhausted')
                 self.retries += 1

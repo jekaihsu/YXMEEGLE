@@ -20,7 +20,7 @@ class RetryPolicy:
             try:
                 value = float(response.headers[name])
                 if math.isfinite(value) and value >= 0:
-                    return value
+                    return max(1, value) if response.status_code == 429 else value
             except (KeyError, TypeError, ValueError):
                 pass
         return min(30, 2 ** (attempt - 1))
@@ -34,23 +34,51 @@ class TokenBucket:
         self.interval = 1 / min(max_rps, 10)
         self.clock, self.sleep = clock, sleep
         self._next = 0
+        self._penalty = 0
         self._lock = threading.Lock()
 
     def acquire(self, deadline):
         with self._lock:
             now = self.clock()
-            delay = max(0, self._next - now)
-            if now + delay >= deadline:
+            reserved = max(now, self._next, self._penalty)
+            if reserved >= deadline:
                 raise BudgetExceeded('Lark read budget exhausted')
+            self._next = reserved + self.interval
+        while True:
+            delay = max(0, reserved - self.clock())
             if delay:
                 self.sleep(delay)
-            self._next = self.clock() + self.interval
+            with self._lock:
+                if self.clock() >= deadline:
+                    raise BudgetExceeded('Lark read budget exhausted')
+                if self._penalty <= reserved:
+                    return
+                reserved = max(self.clock(), self._next, self._penalty)
+                if reserved >= deadline:
+                    raise BudgetExceeded('Lark read budget exhausted')
+                self._next = reserved + self.interval
+
+    def penalize(self, until):
+        with self._lock:
+            self._penalty = max(self._penalty, until)
+            self._next = max(self._next, until)
+
+    def set_rate(self, max_rps):
+        if not math.isfinite(max_rps) or max_rps <= 0:
+            raise ValueError('max_rps must be positive and finite')
+        with self._lock:
+            self.interval = 1 / min(max_rps, 10)
 
 
-_buckets = {}
+_bucket = None
 _lock = threading.Lock()
 
 
 def process_bucket(max_rps):
+    global _bucket
     with _lock:
-        return _buckets.setdefault(max_rps, TokenBucket(max_rps))
+        if _bucket is None:
+            _bucket = TokenBucket(max_rps)
+        else:
+            _bucket.set_rate(max_rps)
+        return _bucket

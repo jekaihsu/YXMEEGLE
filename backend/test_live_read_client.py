@@ -179,7 +179,7 @@ def test_budget_covers_backoff_rate_wait_and_elapsed_http():
 
 
 @pytest.mark.parametrize('method,path', [('PUT', PATH), ('DELETE', PATH), ('HEAD', PATH),
-    ('POST', PATH), ('POST', '/attendance/v1/user_daily_shifts/query'),
+    ('POST', PATH), ('POST', '/attendance/v1/shifts/create'),
     ('PUT', '/bitable/v1/apps/' + capability_write_policy.CAPABILITY_BASE + '/tables/t/records/r'),
     ('GET', 'https://example.invalid/open-apis/records')])
 def test_disallowed_requests_never_send(method, path):
@@ -315,3 +315,57 @@ def test_401_token_expiry_renews_before_permission_classification():
     with make_client(handler) as client:
         assert client.request('GET', PATH).status_code == 200
         assert client.retries == 1
+
+
+def test_rate_limit_zero_wait_has_one_second_floor():
+    assert RetryPolicy.after(httpx.Response(429, headers={'Retry-After': '0'})) == 1
+    clock = Clock()
+    _, handler = responses([httpx.Response(200, headers={'Retry-After': '0'}, json={'code': 99991400}),
+                            httpx.Response(200, json={'code': 0})])
+    with make_client(handler, clock) as client:
+        client.request('GET', PATH)
+    assert 1 in clock.waits
+
+
+def test_bucket_sleeps_outside_lock_and_checks_waiter_deadline():
+    from threading import Event
+    entered, release = Event(), Event()
+    bucket = TokenBucket(5)
+    bucket.acquire(bucket.clock()+5)
+    def slow_sleep(delay):
+        entered.set()
+        assert release.wait(2)
+    bucket.sleep = slow_sleep
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(bucket.acquire, bucket.clock()+5)
+        try:
+            assert entered.wait(1)
+            assert bucket._lock.acquire(blocking=False), 'Bucket sleeps under lock'
+            bucket._lock.release()
+            with pytest.raises(BudgetExceeded):
+                bucket.acquire(bucket.clock()+.01)
+        finally:
+            release.set()
+        future.result()
+
+
+def test_penalty_is_shared_by_all_bucket_callers():
+    clock = Clock()
+    bucket = TokenBucket(5, clock=clock, sleep=clock.sleep)
+    bucket.penalize(7)
+    bucket.acquire(45)
+    assert clock.now == 7
+
+
+def test_process_bucket_is_not_duplicated_by_rate_changes():
+    from .live_read.rate_limit import process_bucket
+    assert process_bucket(5) is process_bucket(3)
+
+
+def test_get_allowlist_and_attendance_query_are_explicit():
+    _, handler = responses([httpx.Response(200, json={'code': 0})])
+    with make_client(handler) as client:
+        with pytest.raises(ReadBlocked):
+            client.request('GET', '/drive/v1/files/arbitrary/download')
+        assert client.calls == 0
+        assert client.request('POST', '/attendance/v1/user_daily_shifts/query', json={}).status_code == 200
