@@ -839,6 +839,11 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         h=find(ws['handover_requests'],data.get('id')); require(h['to_id']==user['id'],'需接手人接受'); require(h['status']=='awaiting_acceptance','交接尚未核准',409); p=find(ws['projects'],h['project_id'])
         active_user(ws,h['to_id']); prior=h['from_id']; replacement=h['to_id']
         require(not (p['pm_id']==prior and p['admin_id']==replacement or p['admin_id']==prior and p['pm_id']==replacement),'交接會造成PM與行政同人',409)
+        for node in p['nodes']:
+            targets=seats(p,node)
+            if prior in targets.values() and any(c['status']=='pending' for c in node['review_cycles']):
+                targets={f'person:{replacement}' if seat==f'person:{prior}' else seat: replacement if ident==prior else ident for seat,ident in targets.items()}
+                require(len(set(targets.values()))==len(targets),'交接會造成待審節點的不同確認職責由同一人擔任；請先調整確認人分派',409)
         previous_hashes={node['id']:review_hash(p,node) for node in p['nodes']}
         if p['pm_id']==prior and prior!=replacement:
             invalidate_pending_quote_reviews(p)
@@ -848,7 +853,7 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
             if node['owner_id']==prior: node['owner_id']=replacement
             if node.get('supervisor_id')==prior: node['supervisor_id']=replacement
             if prior in node.get('reviewers',[]):
-                node['reviewers']=[replacement if ident==prior else ident for ident in node['reviewers']]
+                node['reviewers']=list(dict.fromkeys(replacement if ident==prior else ident for ident in node['reviewers']))
             for t in node['tasks']:
                 if t['owner_id']==prior and t['status'] not in ('completed','superseded'): t['owner_id']=replacement
             for c in node['review_cycles']:

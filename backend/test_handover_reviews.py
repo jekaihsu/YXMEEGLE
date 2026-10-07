@@ -102,3 +102,57 @@ def test_handover_does_not_refresh_a_stale_content_hash(ws):
     approve(ws, node, 'owner', 'u-pm')
     approve(ws, node, 'supervisor', 'u-field')
     assert node['status'] == 'completed'
+
+
+@pytest.mark.parametrize('collision', ['owner', 'reviewer'])
+def test_supervisor_handover_rejects_pending_review_seat_collision(ws, collision):
+    p, node = ready(ws, 'control')
+    # Keep the financial seats distinct so this exercises the review-seat guard.
+    p['admin_id'] = 'u-agent'
+    if collision == 'owner':
+        node['owner_id'] = 'u-field'
+        owner_seat = 'owner'
+    else:
+        node.update(reviewers=['u-field', 'u-pm'], review_mode='all')
+        owner_seat = 'person:u-field'
+    call(ws, 'review_submit', key='control', user='u-pm')
+    approve(ws, node, owner_seat, 'u-field')
+    call(ws, 'handover_request', {'from_id': 'u-manager', 'to_id': 'u-field',
+                                 'reason': '職責交接'})
+    handover = ws['handover_requests'][-1]
+    call(ws, 'handover_approve', {'id': handover['id']})
+    before = deepcopy(ws)
+
+    with pytest.raises(HTTPException) as error:
+        call(ws, 'handover_accept', {'id': handover['id']}, user='u-field')
+
+    assert error.value.status_code == 409
+    assert error.value.detail == '交接會造成待審節點的不同確認職責由同一人擔任；請先調整確認人分派'
+    assert ws == before
+    assert handover['status'] == 'awaiting_acceptance'
+    cycle = node['review_cycles'][-1]
+    call(ws, 'review_submit', key='control', user='u-pm')
+    assert node['review_cycles'][-1] is cycle
+    if collision == 'reviewer':
+        approve(ws, node, 'person:u-pm', 'u-pm')
+    approve(ws, node, 'supervisor', 'u-manager')
+    assert cycle['status'] == 'approved' and node['status'] == 'completed'
+
+
+def test_reviewer_handover_to_existing_reviewer_deduplicates_and_finishes(ws):
+    p, node = ready(ws, 'sales')
+    node.update(reviewers=['u-manager', 'u-field', 'u-pm'], review_mode='all')
+    call(ws, 'review_submit', key='sales', user='u-pm')
+    approve(ws, node, 'person:u-manager', 'u-manager')
+    approve(ws, node, 'person:u-field', 'u-field')
+    cycle = node['review_cycles'][-1]
+
+    accept(ws)
+
+    assert node['reviewers'] == ['u-field', 'u-pm']
+    assert cycle['seats'] == seats(p, node)
+    assert cycle['content_hash'] == review_hash(p, node)
+    assert cycle['votes'][0]['invalidated'] == '職責交接'
+    assert not cycle['votes'][1].get('invalidated')
+    approve(ws, node, 'person:u-pm', 'u-pm')
+    assert cycle['status'] == 'approved' and node['status'] == 'completed'
