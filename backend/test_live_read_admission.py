@@ -3,6 +3,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timedelta
 import json
 from threading import Event
+from time import monotonic
 from types import SimpleNamespace
 
 import httpx
@@ -73,7 +74,7 @@ def harness(tmp_path):
 
 
 @pytest.mark.parametrize('age,wait', [(59, None), (60, False), (899, False),
-                                    (900, False), (901, True), (None, True)])
+                                    (900, False), (901, False), (None, False)])
 def test_age_bands_refresh_then_reload_before_access(harness, age, wait):
     h = harness
     old = h.store(age)
@@ -131,7 +132,7 @@ def test_lark_429_blocking_failure_denies_stale_employee(harness):
             client.request('GET', '/bitable/v1/apps/fake/tables/roster/records')
 
     h.coordinator.refreshers['roster'] = refresh
-    assert not ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now)
+    assert not ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now, callback=True)
     assert len(requests) == 4  # One fake token call and three rate-limited reads.
     with pytest.raises(HTTPException) as error:
         require_access(h.reload(), 'app1', now=h.now)
@@ -193,7 +194,7 @@ def test_blocking_timeout_returns_failure(harness):
         h.coordinator.executor = executor
         h.coordinator.refreshers['roster'] = slow
         try:
-            assert not ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now)
+            assert not ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now, callback=True)
             assert access_mode(h.reload(), 'app1', now=h.now) == 'denied'
         finally:
             release.set()
@@ -252,7 +253,7 @@ def test_disabled_or_isolated_admission_never_calls_coordinator(harness, wid, en
 def test_incomplete_blocking_result_is_failure(harness, status):
     h = harness
     h.coordinator.ensure = lambda *args, **kwargs: {'status': status}
-    assert not ensure_roster_for_admission(h.coordinator, h.wid, {}, now=h.now)
+    assert not ensure_roster_for_admission(h.coordinator, h.wid, {}, now=h.now, callback=True)
 
 
 @pytest.mark.parametrize('fails', [False, True])
@@ -295,13 +296,13 @@ def test_concurrent_hard_admissions_share_inflight_roster(harness, force):
     h.coordinator.refreshers['roster'] = slow
     with ThreadPoolExecutor(max_workers=2) as refresh_pool, ThreadPoolExecutor(max_workers=2) as requests:
         h.coordinator.roster_executor = refresh_pool
-        first = requests.submit(ensure_roster_for_admission, h.coordinator, h.wid, person, now=h.now)
+        first = requests.submit(ensure_roster_for_admission, h.coordinator, h.wid, person, now=h.now, callback=True)
         assert started.wait(2)
         def second_call():
             joined.set()
             if force:
                 return h.coordinator.ensure(h.wid, 'roster', wait=True, force=True)['status'] == 'fresh'
-            return ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now)
+            return ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now, callback=True)
         second = requests.submit(second_call)
         try:
             assert joined.wait(2)
@@ -325,6 +326,26 @@ def test_stale_admission_honors_error_cooldown(harness):
         raise OSError('outage')
     h.coordinator.refreshers['roster'] = failed
     for _ in range(5):
-        assert not ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now)
+        assert not ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now, callback=True)
         assert access_mode(h.reload(), 'app1', now=h.now) == 'denied'
     assert calls == [h.wid]
+
+
+def test_ordinary_request_never_waits_on_slow_roster(harness):
+    h = harness
+    person = h.store(901)
+    release = Event()
+
+    def slow(wid):
+        assert release.wait(5)
+        return {'fingerprint': 'late'}
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        h.coordinator.roster_executor = executor
+        h.coordinator.refreshers['roster'] = slow
+        try:
+            started = monotonic()
+            assert ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now)
+            assert monotonic() - started < 1
+        finally:
+            release.set()
