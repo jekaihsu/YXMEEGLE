@@ -25,7 +25,7 @@ let overviewGate=async()=>{};let detailGate=async()=>{};
 const detail=async(url)=>{
  const id=decodeURIComponent(url.split('/').pop());await detailGate(id);const project=workspace.projects.find(p=>p.id===id);
  if(!project)return new Response(JSON.stringify({detail:'找不到這個案件'}),{status:404});
- return json({scope:'project',version:current.version,project,approvals:[],events:[],policy_summary:[],financial_requests:[],source_quotes:[],source_confirmations:[],contract_items:[],node_skip_requests:[]});
+ return json({scope:'project',version:current.version,as_of:workspace.as_of,project,settings:{},delegations:[],handover_requests:[],sop_requests:[],sop_templates:[],approved_leave_delegations:[],approvals:[],events:[],policy_summary:[],financial_requests:[],source_quotes:[],source_confirmations:[],contract_items:[],node_skip_requests:[]});
 };
 const pct=p=>p.progress.total_nodes?p.progress.completed_nodes/p.progress.total_nodes:0;
 const overview=async(url)=>{

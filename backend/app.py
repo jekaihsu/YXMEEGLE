@@ -489,19 +489,23 @@ def create_app(overrides=None):
         items.sort(key=lambda p:(p.get('due_date') or '9999',p['id']))
         return {'total':len(items),'offset':offset,'limit':limit,'items':[dict(id=p['id'],code=p['code'],name=p['name'],status=p['status'],source_status=p.get('source_status'),pm_id=p['pm_id'],due_date=p.get('due_date')) for p in items[offset:offset+limit]]}
 
-    PROJECT_SLICE=('approvals','events','financial_requests','source_quotes','source_confirmations','contract_items','node_skip_requests')
+    # Already in the shell, or large and unrelated to one case (the full-workspace screens read them on demand).
+    DETAIL_SKIP=('_partial','projects','users','calendar','source_status','file_categories','approval_connection','freshness','environment','workspace_id','as_of','version','work_schedules','daily_unmatched')
 
     @app.get('/api/projects/{project_id}')
     def project_detail(request:Request,project_id:str):
-        """One project tree and its own records, projected exactly like /api/workspace (same visibility and privacy filters)."""
+        """One project tree and the records of that case, projected exactly like /api/workspace (same visibility and privacy filters).
+
+        Lists keep this case's rows plus global rows without a project_id (templates, catalogues); the rest of the workspace is not sent.
+        """
         data,user=identity(request); require(shell_enabled,'尚未啟用單一案件讀取',404)
         with sessions() as db:
             with phase(request,'load'): state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
             with phase(request,'project'): result=public_ws(state,data['wid'],user,data['mode'],owned=True)
         require(len(result['projects'])==1,'找不到這個案件',404)
-        mine=lambda item:isinstance(item,dict) and item.get('project_id')==project_id
-        return dict(scope='project',version=result['version'],as_of=result['as_of'],project=result['projects'][0],policy_summary=result['policy_summary'],
-                    **{k:[i for i in result.get(k,[]) if mine(i)] for k in PROJECT_SLICE})
+        mine=lambda item:not isinstance(item,dict) or item.get('project_id',project_id)==project_id
+        records={k:[i for i in v if mine(i)] if isinstance(v,list) else v for k,v in result.items() if k not in DETAIL_SKIP}
+        return dict(records,scope='project',version=result['version'],as_of=result['as_of'],project=result['projects'][0])
 
     @app.get('/api/daily-reports')
     def daily_reports(request:Request,project_id:str='',department:str='',actor_id:str='',date_from:str='',date_to:str='',status:str='all',q:str='',offset:int=0,limit:int=50):

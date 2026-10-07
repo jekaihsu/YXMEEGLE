@@ -33,7 +33,7 @@ const CompanyCockpit = lazy(() => import('./CompanyCockpit').then(module => ({de
 type ActionScope={project_id?:string;node_id?:string;task_id?:string};
 type Ctx={w:Workspace;s:Session;busy:boolean;error:string;registerDrafts:(scope:DraftScope|null)=>void;onFreshness?:(freshness:Freshness)=>void;onRefreshError?:(datasets:LiveDataset[])=>void;reloadVersion?:number;route:Route;go:(r:Route)=>void;run:(action:string,payload?:Record<string,unknown>,scope?:ActionScope)=>Promise<Workspace|undefined>;refresh:()=>Promise<void>;notify:(m:string)=>void;upload:(form:FormData)=>Promise<boolean>};
 type ProjectPage={total:number;offset:number;limit:number;facets:{all:number;formal:number;intake:number};items:Project[]};
-type ProjectSlice=Pick<Workspace,'approvals'|'events'|'policy_summary'|'financial_requests'|'source_quotes'|'source_confirmations'|'contract_items'|'node_skip_requests'>&{scope:'project';version:number;project:Project};
+type ProjectSlice={scope:'project';version:number;project:Project;[key:string]:any};
 type TaskRow={p:Project;n:Node;t:Task};
 const STATUS:Record<string,string>={approved_skipped:'核准跳過',engineering_complete:'工程完成、財務待結',internal:'內部案',source_conflict:'來源待核對',pending:'尚未開始',in_progress:'進行中',completed:'已完成',paused:'暫停中',superseded:'舊版留存',rework:'退回修正',draft:'草稿',approved:'已核准',executed:'已套用',rejected:'已駁回',withdrawn:'已撤回',active:'進行中',ongoing:'進行中'};
 const ROLE:Record<string,string>={pm:'專案經理',manager:'系統管理員',member:'組員'};
@@ -233,7 +233,7 @@ function ProjectDetailGate({c}:{c:Ctx}){
  useEffect(()=>{if(shell&&detail.data)perfMark('project-detail-render')},[shell,detail.data]);
  if(!shell)return <ProjectDetail c={c}/>;
  if(!detail.data)return detail.error?<Empty title={detail.error.includes('找不到')?'找不到這個案件':'案件讀取失敗'} detail={detail.error.includes('找不到')?'案件連結可能已失效，請回到案件總覽重新開啟。':detail.error}/>:<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在讀取案件…</p></div>;
- const {scope:_scope,version:_version,project,...records}=detail.data;
+ const {scope:_scope,version:_version,as_of:_asOf,project,...records}=detail.data;
  return <ProjectDetail c={{...c,w:{...c.w,...records,projects:c.w.projects.map(p=>p.id===project.id?project:p)}}}/>;
 }
 function ProjectDetail({c}:{c:Ctx}){

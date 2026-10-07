@@ -4,9 +4,6 @@ from .test_perf_budget import scaled_client
 from .test_shell import ON, switch
 from . import workspace_environment
 
-SLICE = ('approvals', 'events', 'financial_requests', 'source_quotes', 'source_confirmations', 'contract_items', 'node_skip_requests')
-
-
 def test_detail_equals_legacy_projection_for_every_user_and_project(tmp_path):
     with scaled_client(tmp_path, 12, **ON) as (app, client):
         for uid in ('u-manager', 'u-pm', 'ou_020', 'ou_030'):
@@ -19,8 +16,13 @@ def test_detail_equals_legacy_projection_for_every_user_and_project(tmp_path):
                 assert body['scope'] == 'project' and body['version'] == full['version']
                 assert body['project'] == p, (uid, p['id'])
                 assert body['policy_summary'] == [s for s in full['policy_summary'] if s['project_id'] == p['id']]
-                for key in SLICE:
-                    assert body[key] == [i for i in full.get(key, []) if isinstance(i, dict) and i.get('project_id') == p['id']], (uid, key)
+                skipped = {'projects', 'users', 'calendar', 'source_status', 'file_categories', 'approval_connection', 'freshness', 'environment',
+                           'workspace_id', 'as_of', 'version', 'work_schedules', 'daily_unmatched'}
+                assert set(body) == (set(full) - skipped) | {'scope', 'version', 'as_of', 'project'}
+                for key in set(full) - skipped - {'policy_summary', 'task_capabilities_checked_at'}:
+                    expected = [i for i in full[key] if not isinstance(i, dict) or i.get('project_id', p['id']) == p['id']] if isinstance(full[key], list) else full[key]
+                    assert body[key] == expected, (uid, key)
+                assert len(body['policy_summary']) == 1
 
 
 def test_detail_is_gated_unknown_and_hides_invisible_cases(tmp_path, monkeypatch):
