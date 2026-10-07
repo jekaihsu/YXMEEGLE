@@ -14,6 +14,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from backend import index_tables, storage
+from backend.policy import upgrade
 from backend.models import BusinessRow, WorkspaceRow
 
 
@@ -22,7 +23,7 @@ def backfill_workspace(sessions,wid,*,batch=50,dry_run=False,retries=3):
         with sessions() as db:
             row=db.get(WorkspaceRow,wid)
             if row is None: return {'workspace':wid,'missing':True}
-            version=row.version; state=storage.load(db,BusinessRow,row); state['version']=version
+            version=row.version; state=upgrade(storage.load(db,BusinessRow,row)); state['version']=version
         ids=[p['id'] for p in state['projects']]; counts={'workspace':wid,'projects':len(ids),'tasks':sum(len(n['tasks']) for p in state['projects'] for n in p['nodes']),'dry_run':dry_run}
         if dry_run: return counts
         stale=False

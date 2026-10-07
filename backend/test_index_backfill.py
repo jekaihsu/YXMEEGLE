@@ -27,6 +27,7 @@ def test_backfill_populates_and_is_idempotent(tmp_path):
     assert count(sessions,ProjectIndex)==12 and first==sum(len(n['tasks']) for p in state['projects'] for n in p['nodes'])
     with sessions() as db:
         assert db.scalar(select(WorkspaceCounter.value).where(WorkspaceCounter.key=='projects_total'))==12
+    with sessions() as db: assert db.scalar(select(func.count()).select_from(ProjectIndex).where(ProjectIndex.summary.is_(None)))==0
     backfill(engine); assert (count(sessions,ProjectIndex),count(sessions,TaskIndex))==(12,first)
     engine.dispose()
 

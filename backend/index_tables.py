@@ -4,6 +4,7 @@ business_records stays the only source of truth. Rows here are rebuilt from a
 workspace state dict, so a from-scratch rebuild and incremental maintenance share
 one code path. Core statements only: valid on SQLite and PostgreSQL.
 """
+from copy import deepcopy
 from sqlalchemy import select, delete, insert
 
 CLOSED_TASK_STATUSES=('completed','approved_skipped')
@@ -15,7 +16,14 @@ def tables(model):
     return t['project_index'],t['task_index'],t['workspace_counters']
 
 
-def project_rows(wid,state,project_ids=None):
+def project_summary_json(state,project):
+    """Today's project_summary on a copy (it refreshes derived state in place); None if it cannot be computed."""
+    from .operations import project_summary
+    try: return project_summary(state,deepcopy(project))
+    except Exception: return None
+
+
+def project_rows(wid,state,project_ids=None,summaries=True):
     """(project rows, task rows) for the selected projects of a full state."""
     wanted=None if project_ids is None else set(project_ids)
     projects,tasks=[],[]
@@ -35,7 +43,7 @@ def project_rows(wid,state,project_ids=None):
                              source_status=p.get('source_status') or '',execution_system=p.get('execution_system') or '',due_date=p.get('due_date') or '',
                              created_at=p.get('created_at') or '',concurrency_version=p.get('concurrency_version',0),
                              nodes_total=len(nodes),nodes_completed=sum(n.get('status')=='completed' for n in nodes),
-                             tasks_total=task_total,tasks_completed=task_done,summary=None,source_version=state.get('version',0)))
+                             tasks_total=task_total,tasks_completed=task_done,summary=project_summary_json(state,p) if summaries else None,source_version=state.get('version',0)))
     return projects,tasks
 
 
