@@ -122,12 +122,12 @@ def test_first_connection_error_is_visible_without_existing_cache(harness):
     assert cache['status']=='error' and cache['records']==[] and cache['last_attempt_at']==h.clock[0]
 
 
-def test_scheduler_reserves_five_minute_slot_and_skips_test_workspaces(harness):
-    h=harness; h.clock[0]='2026-09-27T10:04:59+08:00'
+def test_scheduler_reserves_configured_slot_and_skips_test_workspaces(harness):
+    h=harness; h.cfg['LARK_LIVE_READ_SOURCE_TTL_SECONDS']='120'; h.clock[0]='2026-09-27T10:01:59+08:00'
     assert h.service.run_due(h.wid) is None and not h.fetched
-    h.clock[0]='2026-09-27T10:05:00+08:00'
+    h.clock[0]='2026-09-27T10:02:00+08:00'
     h.service.run_due(h.wid); assert h.fetched==['application-token']
-    h.clock[0]='2026-09-27T10:05:30+08:00'
+    h.clock[0]='2026-09-27T10:02:30+08:00'
     assert h.service.run_due(h.wid) is None
     h.clock[0]='2026-09-27T10:10:00+08:00'
     h.service.run_due(h.wid); assert h.fetched==['application-token','application-token']
@@ -250,3 +250,47 @@ def test_older_snapshot_and_configuration_swap_fail_closed(harness):
     h.service.fetcher=swap
     with pytest.raises(HTTPException):h.service.sync(h.wid,'u-manager')
     assert h.read()[1]['records']==cache['records']
+
+
+def test_split_fetch_then_apply_preserves_projection_and_replay_ids(harness):
+    h=harness
+    raw=h.service.fetch(h.wid,'u-manager')
+    before=h.read()[0]
+    result=h.service.apply_snapshot(h.wid,raw,'u-manager')
+    state=h.read()[0]
+    assert result['mapping']==state['source_status']['mapping']
+    assert [p['id'] for p in state['projects']]==[p['id'] for p in before['projects']]
+    ids=[(p['id'],[t['id'] for n in p['nodes'] for t in n['tasks']]) for p in state['projects']]
+    h.service.apply_snapshot(h.wid,h.service.fetch(h.wid,'u-manager'),'u-manager')
+    assert [(p['id'],[t['id'] for n in p['nodes'] for t in n['tasks']]) for p in h.read()[0]['projects']]==ids
+
+
+@pytest.mark.parametrize('actor_id',['u-manager',None])
+def test_environment_changed_during_source_read_is_conflict(harness,actor_id):
+    h=harness
+    def fetch(token):
+        with h.sessions.begin() as db:
+            row=db.get(h.W,h.wid);state=storage.load(db,h.B,row)
+            state['environment']='test';row.data=storage.save(db,h.B,h.wid,state)
+        return snapshot(h.clock[0])
+    h.service.fetcher=fetch
+    with pytest.raises(HTTPException) as exc:h.service.sync(h.wid,actor_id,skip_unchanged=True)
+    assert exc.value.status_code==409
+
+
+def test_source_timer_disabled_by_live_read(harness):
+    h=harness;h.cfg['LARK_LIVE_READ_ENABLED']='true';h.clock[0]='2026-09-27T12:00:00+08:00'
+    before=h.read()
+    assert h.service.run_due(h.wid) is None and not h.fetched
+    assert h.read()==before
+
+
+def test_older_read_cannot_overwrite_as_of_after_unchanged_refresh(harness):
+    h=harness;h.clock[0]='2026-09-27T10:02:00+08:00'
+    h.service.sync(h.wid,'u-manager',skip_unchanged=True)
+    assert h.read()[1]['last_sync']==h.clock[0]
+    h.service.fetcher=lambda token:snapshot('2026-09-27T10:01:00+08:00',records('C111111'))
+    with pytest.raises(HTTPException) as exc:h.service.sync(h.wid,'u-manager',skip_unchanged=True)
+    assert exc.value.status_code==409
+    assert h.read()[1]['last_sync']==h.clock[0]
+    assert not any(p['code']=='C111111' for p in h.read()[0]['projects'])

@@ -153,6 +153,9 @@ class AttendanceScheduleService(PeopleDirectoryService):
             if adapter:adapter.client.close()
 
     def run_due(self,wid):
+        from .live_read.config import LiveReadConfig
+        config=LiveReadConfig.from_env(self.cfg)
+        if config.enabled: return None
         if wid!='lark-'+self.cfg.get('LARK_WORKER_ORGANIZATION',''):return None
         with self.sessions.begin() as db:
             row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update())
@@ -162,7 +165,7 @@ class AttendanceScheduleService(PeopleDirectoryService):
             status=state.setdefault('attendance_schedule_status',{});previous=status.get('last_attempt_at')
             if previous:
                 try:
-                    if (datetime.fromisoformat(now())-datetime.fromisoformat(previous)).total_seconds()<300:return None
+                    if (datetime.fromisoformat(now())-datetime.fromisoformat(previous)).total_seconds()<config.attendance_ttl_seconds:return None
                 except (ValueError,TypeError):pass
             status['last_attempt_at']=now();self._save(db,row,state)
         return self.sync(wid,None)

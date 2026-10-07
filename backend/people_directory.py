@@ -247,6 +247,9 @@ class PeopleDirectoryService:
             if adapter: adapter.client.close()
 
     def run_due(self,wid):
+        from .live_read.config import LiveReadConfig
+        config=LiveReadConfig.from_env(self.cfg)
+        if config.enabled: return None
         if not wid.startswith('lark-') or wid!='lark-'+self.cfg.get('LARK_WORKER_ORGANIZATION',''): return None
         with self.sessions.begin() as db:
             row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update())
@@ -257,7 +260,7 @@ class PeopleDirectoryService:
             if previous:
                 try:
                     age=(datetime.fromisoformat(now())-datetime.fromisoformat(previous)).total_seconds()
-                    if age<300: return None
+                    if age<config.roster_ttl_seconds: return None
                 except (ValueError,TypeError): pass
             status['last_attempt_at']=now(); self._save(db,row,state)
         return self.sync(wid,None)

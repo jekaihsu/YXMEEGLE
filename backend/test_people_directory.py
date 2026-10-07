@@ -317,3 +317,19 @@ def test_mentions_validate_ids_preserve_history_and_queue_one_recipient(harness)
     body['payload']['mentions']=['同名文字']
     with pytest.raises(HTTPException): apply_action(ws,user,body,True)
     assert len(p['comments'])==1
+
+
+def test_roster_timer_live_gate_and_configured_interval(harness,monkeypatch):
+    h=harness;clock=['2026-09-27T10:00:00+08:00']
+    monkeypatch.setattr(directory,'now',lambda:clock[0])
+    service=PeopleDirectoryService(h.sessions,h.W,h.B,h.P,h.cfg,
+        fetcher=lambda *args:snapshot(),adapter_factory=h.service.adapter_factory)
+    service.sync(h.wid,'u-manager')
+    h.cfg['LARK_LIVE_READ_ROSTER_TTL_SECONDS']='120'
+    clock[0]='2026-09-27T10:01:59+08:00'
+    assert service.run_due(h.wid) is None
+    clock[0]='2026-09-27T10:02:00+08:00'
+    assert service.run_due(h.wid)['sync_revision']==2
+    h.cfg['LARK_LIVE_READ_ENABLED']='true';clock[0]='2026-09-27T12:00:00+08:00'
+    before=h.read()
+    assert service.run_due(h.wid) is None and h.read()==before
