@@ -86,7 +86,7 @@ def test_age_bands_refresh_then_reload_before_access(harness, age, wait):
 
     h.coordinator.ensure = record
     assert ensure_roster_for_admission(h.coordinator, h.wid, old, now=h.now)
-    assert seen == ([] if wait is None else [{'wait': wait, 'force': wait and age is not None}])
+    assert seen == ([] if wait is None else [{'wait': wait, 'force': False}])
     assert len(h.calls) == (0 if wait is None else 1)
     assert require_access(h.reload(), 'app1', now=h.now) == 'normal'
     if age is None or age > 900:
@@ -199,14 +199,14 @@ def test_blocking_timeout_returns_failure(harness):
             release.set()
 
 
-def test_blocking_admission_reads_even_when_dataset_cache_is_fresh(harness):
+def test_fresh_roster_result_does_not_reverify_missing_person(harness):
     h = harness
     h.store(0)
     h.coordinator.ensure(h.wid, 'roster', wait=True)
     stale = h.store(901)
     assert ensure_roster_for_admission(h.coordinator, h.wid, stale, now=h.now)
-    assert len(h.calls) == 2
-    assert require_access(h.reload(), 'app1', now=h.now) == 'normal'
+    assert len(h.calls) == 1
+    assert access_mode(h.reload(), 'app1', now=h.now) == 'denied'
 
 
 def test_callback_success_still_checks_reloaded_employment(harness):
@@ -280,3 +280,51 @@ def test_unknown_bootstrap_uses_nonblocking_refresh(harness):
     h.coordinator.ensure = lambda *args, **kwargs: seen.append(kwargs) or {'status': 'refreshing'}
     assert ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now)
     assert seen == [{'wait': False, 'force': False}]
+
+
+@pytest.mark.parametrize('force', [False, True])
+def test_concurrent_hard_admissions_share_inflight_roster(harness, force):
+    h = harness
+    person = h.store(901)
+    started, release, joined = Event(), Event(), Event()
+    original = h.coordinator.refreshers['roster']
+    def slow(wid):
+        started.set()
+        assert release.wait(5)
+        return original(wid)
+    h.coordinator.refreshers['roster'] = slow
+    with ThreadPoolExecutor(max_workers=2) as refresh_pool, ThreadPoolExecutor(max_workers=2) as requests:
+        h.coordinator.roster_executor = refresh_pool
+        first = requests.submit(ensure_roster_for_admission, h.coordinator, h.wid, person, now=h.now)
+        assert started.wait(2)
+        def second_call():
+            joined.set()
+            if force:
+                return h.coordinator.ensure(h.wid, 'roster', wait=True, force=True)['status'] == 'fresh'
+            return ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now)
+        second = requests.submit(second_call)
+        try:
+            assert joined.wait(2)
+            from concurrent.futures import TimeoutError
+            with pytest.raises(TimeoutError):
+                second.result(timeout=.1)
+        finally:
+            release.set()
+        assert first.result(timeout=2)
+        assert second.result(timeout=2)
+    assert h.calls == [h.wid]
+    assert require_access(h.reload(), 'app1', now=h.now) == 'normal'
+
+
+def test_stale_admission_honors_error_cooldown(harness):
+    h = harness
+    person = h.store(901)
+    calls = []
+    def failed(wid):
+        calls.append(wid)
+        raise OSError('outage')
+    h.coordinator.refreshers['roster'] = failed
+    for _ in range(5):
+        assert not ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now)
+        assert access_mode(h.reload(), 'app1', now=h.now) == 'denied'
+    assert calls == [h.wid]

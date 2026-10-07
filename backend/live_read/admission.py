@@ -11,6 +11,8 @@ def ensure_roster_for_admission(coordinator, wid, person, *, now=None, callback=
     Ordinary requests use the old roster through the inclusive 900-second
     boundary. OAuth callbacks wait once the soft TTL expires. This result never
     grants admission or replaces company-admin grants and bootstrap recovery.
+    A recent coordinator result also covers people absent from that roster;
+    only require_access on the reloaded person can admit them.
     """
     config = LiveReadConfig.from_env(coordinator.cfg)
     if (not config.enabled or wid.startswith(('demo-', 'test-'))
@@ -26,7 +28,7 @@ def ensure_roster_for_admission(coordinator, wid, person, *, now=None, callback=
                          and (age is None or age > DIRECTORY_MAX_AGE_SECONDS))
     wait = callback or (not recovery_eligible and (age is None or age > DIRECTORY_MAX_AGE_SECONDS))
     try:
-        result = coordinator.ensure(wid, 'roster', wait=wait, force=wait and age is not None)
+        result = coordinator.ensure(wid, 'roster', wait=wait, force=False)
     except Exception:
         return not wait
     return not wait or result.get('status') == 'fresh'

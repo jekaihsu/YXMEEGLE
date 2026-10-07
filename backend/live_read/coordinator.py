@@ -172,6 +172,8 @@ class RefreshCoordinator:
             result = self._ensure_once(wid, dataset, wait=wait, force=force, deadline=deadline)
             if not wait or result['status'] != 'busy':
                 return result
+            # A pending claimant owns this attempt; retries join its result.
+            force = False
             if monotonic() >= deadline:
                 raise TimeoutError('Live-read refresh timed out')
             sleep(min(.02, max(0, deadline - monotonic())))
@@ -189,7 +191,7 @@ class RefreshCoordinator:
         if current['status'] == 'fresh' and not force:
             return current
         now = self._now()
-        if force and current['status'] == 'refreshing':
+        if force and not wait and current['status'] == 'refreshing':
             return dict(current, status='already_running')
         cooldown = not force and row.get('error_at') and (now-timestamp(row['error_at'])).total_seconds() < 30
         with self._lock:
@@ -200,7 +202,7 @@ class RefreshCoordinator:
             start = not pending and future is None and current['status'] != 'refreshing' and not cooldown
             if start:
                 self._pending.add(key)
-        if force and (pending or future is not None):
+        if force and not wait and (pending or future is not None):
             return dict(current, status='already_running')
         if pending:
             # The other local caller is claiming/submitting outside the map lock.
