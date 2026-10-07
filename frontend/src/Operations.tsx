@@ -16,7 +16,7 @@ import type {Workspace, Session, Project, Node} from './types';
 import './operations.css';
 
 type RecordData=Record<string,any>;
-export type Context={w:Workspace;s:Session;busy:boolean;run:(action:string,payload?:Record<string,unknown>,scope?:{project_id?:string;node_id?:string;task_id?:string})=>Promise<Workspace|undefined>;refresh:()=>Promise<void>;error?:string};
+export type Context={onFreshness?:(freshness:import('./types').Freshness)=>void;w:Workspace;s:Session;busy:boolean;run:(action:string,payload?:Record<string,unknown>,scope?:{project_id?:string;node_id?:string;task_id?:string})=>Promise<Workspace|undefined>;refresh:()=>Promise<void>;error?:string};
 const statuses:Record<string,string>={writeback_paused:'回寫暫停（不更新能力地圖或薪資）',draft:'草稿',queued:'待處理',running:'處理中',succeeded:'已核實',submitted:'待覆核',accepted:'已覆核',not_applicable:'不適用',na_requested:'不適用待核准',approved:'已核准',returned:'已退回',invalidated:'已失效',pending:'待確認',active:'執行中',paid:'已結清',partially_paid:'部分收付',failed:'失敗',blocked:'待處理授權或設定',conflict:'來源衝突',outcome_unknown:'結果待核實',issued:'已正式發出',simulated:'測試模擬',verified:'已核實',completed:'已完成',engineering_complete:'工程完成、財務待結',in_progress:'執行中',awaiting_acceptance:'待接手人接受'};
 const routineNames:Record<string,string>={client_contact:'業主聯繫',correction:'成果補正檢查',receivable:'案件收款追蹤',subcontract_receivable:'下包入帳追蹤',daily_progress:'每日進度',field_schedule:'外業預排',indoor_schedule:'內業預排',weekly_review:'每週檢討',monthly:'月考評與結算'};
 const capNames:Record<string,string>={manage_people:'人員授權',publish_sop:'發布 SOP',edit_sop:'編修 SOP',manage_sources:'來源映射',finance_approve:'金額核准',finance_edit:'財務編輯',calendar_edit:'工作日曆',issue_confirmation:'發出確認單',review_mapping:'日報核對',manage_handover:'人員交接'};

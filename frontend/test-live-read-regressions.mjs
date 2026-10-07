@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
-const bundle=await build({stdin:{contents:"export {DataFreshness} from './src/DataFreshness';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external'});
+const bundle=await build({stdin:{contents:"export {DataFreshness} from './src/DataFreshness';export {liveRefresh} from './src/api';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external'});
 const path=new URL('./.live-regression-bundle.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);
 let mod;try{mod=await import(path.href)}finally{await fs.unlink(path)}
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost'});
@@ -39,5 +39,9 @@ try{
  assert.doesNotMatch(document.body.textContent,/0 分鐘前/);
  error.datasets.roster={...dataset('error',20),as_of:'2026-10-07T02:03:04Z'};await render({...error});
  assert.match(document.querySelector('[role="status"]').textContent,/名冊.*秒前/,'M3: sub-minute failures say seconds');
+ globalThis.fetch=async()=>new Response(JSON.stringify({freshness:freshness()}),{status:202});
+ assert.equal((await mod.liveRefresh(['sources'],true)).freshness.datasets.sources.status,'refreshing','M4: HTTP 202 cannot be reported as fresh even with a cached fresh body');
+ globalThis.fetch=async()=>new Response(JSON.stringify({status:'ready'}),{status:202});
+ await assert.rejects(()=>mod.liveRefresh(['sources'],true),/資料讀取結果尚未確認/,'M4: missing freshness status is never accepted as success');
  console.log('Live-read regressions passed');
 }finally{await flush(()=>root.unmount());globalThis.setTimeout=realTimeout;globalThis.clearTimeout=realClear;Date.now=realNow;dom.window.close()}

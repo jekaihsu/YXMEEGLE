@@ -3,9 +3,10 @@ let sessionEpoch=0;
 export const getSessionEpoch=()=>sessionEpoch;
 export const invalidateSessionEpoch=()=>{sessionEpoch++};
 export class ApiError extends Error {constructor(public status:number,message:string){super(message)}}
-export async function api<T>(url:string,init?:RequestInit,isCurrent:()=>boolean=()=>true):Promise<T>{
+export async function api<T>(url:string,init?:RequestInit,isCurrent:()=>boolean=()=>true,onResponse?:(status:number)=>void):Promise<T>{
   const epoch=getSessionEpoch();
   const response=await fetch(url,{credentials:'same-origin',...init,headers:{...(init?.body instanceof FormData?{}:{'Content-Type':'application/json'}),...init?.headers}});
+  onResponse?.(response.status);
   const malformed='服務回應格式不正確，請稍後再試。';
   let data:any;let parsed=true;
   try{data=JSON.parse(await response.text())}catch{data={detail:malformed};parsed=false}
@@ -24,7 +25,22 @@ export function normalizeRoute<T extends {view:string;tab?:string;section?:strin
 }
 export function readRoute(){const p=new URLSearchParams(location.hash.replace(/^#\/?/,''));return normalizeRoute({view:p.get('view')||'dashboard',project:p.get('project')||undefined,node:p.get('node')||undefined,task:p.get('task')||undefined,tab:p.get('tab')||undefined,section:p.get('section')||undefined,completion:p.get('completion')||undefined,focus:p.get('focus')||undefined,comment:p.get('comment')||undefined,approval:p.get('approval')||undefined})}
 
-export function liveStatus(){return api<{freshness:import('./types').Freshness}>('/api/live/status')}
-export function liveRefresh(datasets:import('./types').LiveDataset[],wait=false){
-  return api<{freshness:import('./types').Freshness}>('/api/live/refresh',{method:'POST',body:JSON.stringify({datasets,wait,force:false})});
+type LiveResult={freshness:import('./types').Freshness};
+async function checkedLive(request:Promise<LiveResult>):Promise<LiveResult>{
+ const result=await request;const value=result.freshness;
+ const statuses=['fresh','stale','refreshing','error','blocked','unconfigured','never'];
+ if(!value||!Number.isFinite(Date.parse(value.server_time))||typeof value.enabled!=='boolean'||!['sources','roster','attendance'].every(key=>{
+  const d=value.datasets?.[key as import('./types').LiveDataset];
+  return d&&statuses.includes(d.status)&&Number.isFinite(d.ttl_seconds)&&d.ttl_seconds>0&&(d.age_seconds===null||Number.isFinite(d.age_seconds));
+ }))throw new ApiError(502,'資料讀取結果尚未確認，請稍後重試。');
+ return result;
+}
+export function liveStatus(signal?:AbortSignal){return checkedLive(api<LiveResult>('/api/live/status',{signal}))}
+export function liveRefresh(datasets:import('./types').LiveDataset[],wait=false,signal?:AbortSignal){
+ let status=200;
+ return checkedLive(api<LiveResult>('/api/live/refresh',{signal,method:'POST',body:JSON.stringify({datasets,wait,force:false})},()=>true,value=>{status=value})).then(result=>{
+  if(status!==202)return result;
+  // Accepted work is still in flight, even if the response includes an older fresh snapshot.
+  return {...result,freshness:{...result.freshness,datasets:Object.fromEntries(Object.entries(result.freshness.datasets).map(([key,d])=>[key,{...d,status:datasets.includes(key as import('./types').LiveDataset)&&!['error','blocked','unconfigured'].includes(d.status)?'refreshing':d.status}])) as import('./types').Freshness['datasets']}};
+ });
 }
