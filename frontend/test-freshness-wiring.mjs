@@ -1,5 +1,6 @@
 // Mount real components with synthetic responses; no live source data.
 import assert from 'node:assert/strict';
+import {fakeClock} from './fake-clock-fixture.mjs';
 import fs from 'node:fs/promises';
 import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
@@ -15,11 +16,8 @@ for(const key of ['window','document','location','history','sessionStorage','Eve
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 Object.defineProperty(document,'hidden',{configurable:true,value:false});
 Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});
-const realTimeout=globalThis.setTimeout,realClear=globalThis.clearTimeout;
-const timers=new Map();let timerId=0;
-globalThis.setTimeout=(fn,ms,...args)=>fn.name==='poll'?(timers.set(++timerId,fn),timerId):realTimeout(fn,ms,...args);
-globalThis.clearTimeout=id=>{if(timers.has(id))timers.delete(id);else realClear(id)};
-const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(r=>realTimeout(r,0))});
+const clock=fakeClock(dom.window);
+const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(r=>clock.realTimeout(r,0))});
 const initial='2026-10-07T10:02:11+08:00',later='2026-10-07T10:03:11+08:00';
 const dataset=(state='fresh',changed_at=initial)=>({status:state,as_of:initial,changed_at,age_seconds:12,ttl_seconds:60,fetched_at:initial,fingerprint:'synthetic',last_error:null,lark:{calls:0,retries:0,duration_ms:0}});
 let status={enabled:true,server_time:initial,datasets:{sources:dataset('refreshing'),roster:dataset(),attendance:dataset()}};
@@ -44,31 +42,27 @@ const clickText=text=>flush(()=>[...document.querySelectorAll('button')].find(b=
 try{
  await flush(()=>root.render(React.createElement(components.App)));
  ok(document.querySelector('.topbar .data-freshness'),'authenticated shell mounts the chip');
+ ok(requests.filter(r=>r.url==='/api/workspace').length===1,'page load fetches workspace once');
+ const idleReads=requests.length;
+ await flush(()=>clock.advance(600000));
+ await flush(()=>{window.dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'))});
+ ok(requests.length===idleReads&&clock.intervals===0,'ten idle minutes and focus/visibility do not read data');
  const openDraft=document.createElement('details');openDraft.className='ops-form';openDraft.open=true;openDraft.innerHTML='<form><textarea></textarea></form>';document.body.append(openDraft);
- const beforeOpen=requests.filter(r=>r.url==='/api/workspace').length;
- status={...status,datasets:{...status.datasets,sources:dataset('fresh','2026-10-07T10:02:41+08:00')}};current={...current,freshness:status};
- {const [id,poll]=timers.entries().next().value;timers.delete(id);await flush(poll)}
- ok(requests.filter(r=>r.url==='/api/workspace').length===beforeOpen,'M5: any open DraftForm suppresses automatic reload');
- openDraft.remove();status={...status,datasets:{...status.datasets,sources:dataset('refreshing')}};current={...current,freshness:status};
  await flush(()=>document.querySelector('[aria-label="重新整理資料"]').click());
- const before=requests.filter(r=>r.url==='/api/workspace').length;
+ ok(requests.length===idleReads,'open draft blocks manual reload');openDraft.remove();
  await flush(()=>window.wiringContext.registerDrafts({projectId:'pA',nodeId:'nA',dirty:true}));
- status={...status,datasets:{...status.datasets,sources:dataset('fresh',later)}};current={...current,freshness:status};
- assert.equal(timers.size,1);const[id,poll]=timers.entries().next().value;timers.delete(id);await flush(poll);
- ok(requests.filter(r=>r.url==='/api/workspace').length===before,'dirty draft suppresses automatic reload');
+ await flush(()=>document.querySelector('[aria-label="重新整理資料"]').click());
+ ok(requests.length===idleReads,'registered dirty draft blocks manual reload');
  await flush(()=>window.wiringContext.registerDrafts(null));
- ok(requests.filter(r=>r.url==='/api/workspace').length===before+1,'pending change reloads after guard clears');
- const edited=document.createElement('textarea');document.body.append(edited);
- const beforeEdit=requests.filter(r=>r.url==='/api/workspace').length;
- await flush(()=>{edited.focus();edited.value='unsaved comment';edited.dispatchEvent(new Event('input',{bubbles:true}));edited.blur();window.dispatchEvent(new Event('focus'))});
- ok(requests.filter(r=>r.url==='/api/workspace').length===beforeEdit,'M5: blurred comment drafts suppress focus reload');
- edited.remove();let mutation;
- await flush(()=>{mutation=components.api('/api/test-mutation',{method:'POST'})});
- const beforeMutation=requests.filter(r=>r.url==='/api/workspace').length;
- await flush(()=>window.dispatchEvent(new Event('focus')));
- ok(requests.filter(r=>r.url==='/api/workspace').length===beforeMutation,'M5: panel-local API mutations suppress focus reload');
+ ok(requests.length===idleReads,'clearing a guard never schedules a read');
+ let mutation;await flush(()=>{mutation=components.api('/api/test-mutation',{method:'POST'})});
+ const beforeMutation=requests.length;await flush(()=>document.querySelector('[aria-label="重新整理資料"]').click());
+ ok(requests.length===beforeMutation,'panel-local mutation blocks manual reload');
  await flush(async()=>{resolveMutation();await mutation});
+ status={...status,datasets:{...status.datasets,sources:dataset('fresh',later)}};current={...current,freshness:status};
+ const beforeRefresh=requests.filter(r=>r.url==='/api/workspace').length;
  await flush(()=>document.querySelector('[aria-label="重新整理資料"]').click());liveBody(['sources','attendance'],false);
+ ok(requests.filter(r=>r.url==='/api/workspace').length===beforeRefresh+1,'manual refresh reads workspace once despite newer changed_at');
  location.hash='#view=sources';await flush(()=>window.dispatchEvent(new Event('hashchange')));
  ok(document.querySelector('.topbar .data-freshness'),'Sources keeps the shell chip');
  ok(document.querySelector('.dataset-as-of').textContent.includes('來源資料 as of'),'Sources shows as_of');
@@ -80,9 +74,9 @@ try{
  status={...status,datasets:{...status.datasets,sources:dataset('refreshing')}};liveHttpStatus=202;
  await clickText('立即重新讀取 Lark');
  ok(document.body.textContent.includes('仍在更新中'),'M4: Sources 202 cannot claim successful read');
- ok(timers.size===1,'M4: coalesced Sources refresh keeps polling');
+ const pendingReads=requests.length;await flush(()=>clock.advance(600000));ok(requests.length===pendingReads,'coalesced Sources refresh waits for user read');
  status={...status,server_time:later,datasets:{...status.datasets,sources:dataset('error')}};
- {const [id,poll]=timers.entries().next().value;timers.delete(id);await flush(poll)}
+ liveHttpStatus=200;await clickText('立即重新讀取 Lark');
  ok(document.querySelector('.source-freshness').textContent.includes('暫時無法讀取')&&document.querySelector('.data-freshness').dataset.state==='error','M2: unchanged data finishing in error agrees in chip and Sources');
  status={...status,server_time:initial,datasets:{...status.datasets,sources:dataset('fresh')}};liveHttpStatus=200;
  let panelRefreshes=0;
@@ -111,4 +105,4 @@ try{
  session={...session,mode:'lark',access_mode:'recovery'};await mount(components.App,{});
  ok(document.querySelector('.topbar .data-freshness'),'recovery displays authenticated chip');
  console.log(`Freshness wiring: ${checks} checks passed`);
-}finally{await flush(()=>root.unmount());globalThis.setTimeout=realTimeout;globalThis.clearTimeout=realClear;dom.window.close()}
+}finally{await flush(()=>root.unmount());clock.restore();dom.window.close()}

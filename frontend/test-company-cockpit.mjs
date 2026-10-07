@@ -1,14 +1,16 @@
 // Render the real CompanyCockpit with a synthetic payload; no live or private source data.
 import assert from 'node:assert/strict';
+import {fakeClock} from './fake-clock-fixture.mjs';
 import fs from 'node:fs/promises';
 import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
-const bundle=await build({entryPoints:['src/CompanyCockpit.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+import {Simulate} from 'react-dom/test-utils';
+const bundle=await build({stdin:{contents:"export {CompanyCockpit} from './src/CompanyCockpit';export {RuntimeHealthPanel} from './src/RuntimeHealthPanel';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const bundlePath=new URL('./.cockpit-test-bundle.mjs',import.meta.url);
 await fs.writeFile(bundlePath,bundle.outputFiles[0].text);
-let CompanyCockpit;try{CompanyCockpit=(await import(bundlePath.href)).CompanyCockpit}finally{await fs.unlink(bundlePath)}
+let CompanyCockpit,RuntimeHealthPanel;try{({CompanyCockpit,RuntimeHealthPanel}=await import(bundlePath.href))}finally{await fs.unlink(bundlePath)}
 const lifecycle=(over)=>({relationship:'已關聯確認單',state:'mapped',canonical:'執行中',reasons:[],quote_workflow:[],...over});
 const row=(id,over,lc)=>({case_type:'formal',id,code:id,name:'合成案件 '+id,group:'測試組',source_status:'執行中',source_lifecycle:lifecycle(lc),execution_status:'pending',tasks_total:0,tasks_completed:0,tasks_overdue:0,pending_local_reviews:0,pending_native_reviews:0,...over});
 const cases=[
@@ -27,10 +29,11 @@ const payload={as_of:'2026-10-06',checked_at:'2026-10-06T01:00:00Z',date_basis:'
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=company'});
 for(const key of ['window','document','location','history','sessionStorage','Event'])globalThis[key]=dom.window[key];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const clock=fakeClock(dom.window);
 const urls=[];
 globalThis.fetch=async(url)=>{urls.push(String(url));return new Response(JSON.stringify(payload),{status:200,headers:{'content-type':'application/json'}})};
 const root=createRoot(document.getElementById('root'));
-const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(r=>setTimeout(r,0))});
+const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(r=>clock.realTimeout(r,0))});
 await flush(()=>root.render(React.createElement(CompanyCockpit,{refreshVersion:0})));
 let checks=0;const ok=(cond,msg)=>{assert.ok(cond,msg);checks++};
 const headers=[...document.querySelectorAll('.cockpit-case-table thead th')].map(th=>th.textContent);
@@ -57,5 +60,22 @@ payload.cases=[{...cases[0],source_lifecycle:undefined,source_status:'已結案'
 await flush(()=>document.querySelector('.cockpit-filters .button').click());
 const legacy=document.querySelector('.cockpit-case-table tbody td').textContent;
 ok(legacy.startsWith('待核對')&&!legacy.includes('已結案'),'missing source_lifecycle never falls back to raw source_status');
-console.log(`Company cockpit: ${checks} checks passed`);
-process.exit(0);
+const beforeIdle=urls.length;
+await flush(()=>clock.advance(600000));
+ok(urls.length===beforeIdle&&clock.intervals===0,'cockpit makes no periodic requests in ten minutes');
+await flush(()=>document.querySelector('.cockpit-heading button').click());
+ok(urls.length===beforeIdle+1,'cockpit manual refresh reads once');
+// The search debounce is retained and reads only after the user edits search.
+const input=document.querySelector('input[type=search]');
+await flush(()=>{input.value='SYN';Simulate.change(input)});
+const beforeSearch=urls.length;await flush(()=>clock.advance(249));ok(urls.length===beforeSearch,'search waits for its debounce');
+await flush(()=>clock.advance(1));ok(urls.length===beforeSearch+1&&urls.at(-1).includes('q=SYN'),'user search reads after 250 ms');
+await flush(()=>root.unmount());
+const healthRoot=createRoot(document.getElementById('root'));let healthReads=0;
+globalThis.fetch=async()=>{healthReads++;return new Response(JSON.stringify({checked_at:'2026-10-07T02:00:00Z',status:'ok',worker:{status:'ok'},backup:{status:'ok'},directory:{status:'ok'}}))};
+await flush(()=>healthRoot.render(React.createElement(RuntimeHealthPanel,{w:{environment:'production',workspace_id:'synthetic'},s:{mode:'lark',user:{role:'manager'}}})));
+ok(healthReads===1,'health reads once on view mount');
+await flush(()=>clock.advance(600000));ok(healthReads===1&&clock.intervals===0,'health never schedules an interval or periodic read');
+await flush(()=>document.querySelector('button').click());ok(healthReads===2,'manual health refresh reads once');
+await flush(()=>healthRoot.unmount());clock.restore();dom.window.close();
+console.log(`Company cockpit and runtime health: ${checks} checks passed`);
