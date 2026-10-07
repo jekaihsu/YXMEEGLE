@@ -142,7 +142,7 @@ def test_workspace_first_load_budget(tmp_path):
 
 # (queries, response bytes) ceilings. Measured: session 4 / 9.3 KB, projects 4 / 1.8 KB,
 # comment_add 12 / 14.1 MB (whole workspace returned). Tighten as later phases land.
-SESSION_MAX = (6, 10_500)
+SESSION_MAX = (5, 9_500)
 PROJECTS_MAX = (6, 2_200)
 COMMENT_MAX = (16, 15_000_000)
 

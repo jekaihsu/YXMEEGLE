@@ -392,7 +392,7 @@ def create_app(overrides=None):
         if data.get('access_mode')=='recovery':
             return {'user':public_person(user,include_authority=True),'users':[],'mode':data['mode'],'workspace_id':data['wid'],
                     'environment':'test' if data['wid'].startswith('test-') else 'production','auth_configured':oauth_configured,'access_mode':'recovery'}
-        with phase(request,'load'),sessions() as db: users=load(db,db.get(WorkspaceRow,data['wid']))['users']
+        with phase(request,'load'),sessions() as db: users=load(db,db.get(WorkspaceRow,data['wid']),collections=('users',))['users']
         return {'user':public_person(user,include_authority=True),'users':[public_person(person) for person in users],'mode':data['mode'],'workspace_id':data['wid'],'environment':'test' if data['wid'].startswith('test-') else data['mode'],'auth_configured':oauth_configured,'access_mode':data.get('access_mode','normal')}
 
     @app.post('/api/demo/session')
