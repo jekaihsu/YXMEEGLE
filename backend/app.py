@@ -5,7 +5,8 @@ from pathlib import Path
 import secrets
 import re
 from copy import deepcopy
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
+from time import perf_counter
 from datetime import datetime, timezone
 from urllib.parse import urlencode, urlsplit
 import httpx
@@ -171,8 +172,17 @@ def create_app(overrides=None):
     def initial_capabilities(ident,role):
         return (MANAGER_CAPABILITIES[:] if role=='manager' else [])+(['approve_capability'] if ident in capability_approvers else [])
 
+    TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('POST','/api/actions')}
+    @contextmanager
+    def phase(request,name):
+        started=perf_counter()
+        try: yield
+        finally:
+            phases=request.scope.setdefault('phases',{}); phases[name]=phases.get(name,0)+perf_counter()-started
+
     @app.middleware('http')
     async def origin_guard(request,call_next):
+        started=perf_counter()
         if request.method in ('POST','PUT','PATCH','DELETE'):
             origin=request.headers.get('origin'); expected=cfg.get('PUBLIC_ORIGIN')
             actual=f"{request.url.scheme}://{request.url.netloc}"
@@ -184,6 +194,11 @@ def create_app(overrides=None):
         response.headers['X-Content-Type-Options']='nosniff'
         response.headers['Referrer-Policy']='same-origin'
         if request.url.path.startswith('/api'): response.headers['Cache-Control']='no-store'
+        if (request.method,request.url.path) in TIMED_ROUTES:
+            # Durations only. 'serialize' is the unmeasured remainder (response encoding and framework time).
+            phases=dict(request.scope.get('phases',{})); total=perf_counter()-started
+            phases['serialize']=max(total-sum(phases.values()),0)
+            response.headers['Server-Timing']=', '.join([f'{k};dur={v*1000:.1f}' for k,v in phases.items()]+[f'total;dur={total*1000:.1f}'])
         return response
 
     def read_cookie(request):
@@ -271,6 +286,8 @@ def create_app(overrides=None):
         db.add(PersonRow(organization_id=org,person_id=user['id'],data=result)); db.commit()
         return result
     def identity(request):
+        with phase(request,'identity'): return _identity(request)
+    def _identity(request):
         data=read_cookie(request); require(data is not None,'請先登入',401)
         with sessions() as db:
             if data.get('mode')=='lark':
@@ -375,7 +392,7 @@ def create_app(overrides=None):
         if data.get('access_mode')=='recovery':
             return {'user':public_person(user,include_authority=True),'users':[],'mode':data['mode'],'workspace_id':data['wid'],
                     'environment':'test' if data['wid'].startswith('test-') else 'production','auth_configured':oauth_configured,'access_mode':'recovery'}
-        with sessions() as db: users=load(db,db.get(WorkspaceRow,data['wid']))['users']
+        with phase(request,'load'),sessions() as db: users=load(db,db.get(WorkspaceRow,data['wid']))['users']
         return {'user':public_person(user,include_authority=True),'users':[public_person(person) for person in users],'mode':data['mode'],'workspace_id':data['wid'],'environment':'test' if data['wid'].startswith('test-') else data['mode'],'auth_configured':oauth_configured,'access_mode':data.get('access_mode','normal')}
 
     @app.post('/api/demo/session')
@@ -403,7 +420,9 @@ def create_app(overrides=None):
         coordinator=app.state.live_read
         coordinator.ensure(data['wid'],'sources')
         coordinator.ensure(data['wid'],'attendance')
-        with sessions() as db: result=public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'])
+        with sessions() as db:
+            with phase(request,'load'): state=load(db,db.get(WorkspaceRow,data['wid']))
+            with phase(request,'project'): result=public_ws(state,data['wid'],user,data['mode'])
         result['freshness']=coordinator.status(data['wid'])
         as_of=result['freshness']['datasets']['sources']['as_of']
         from fastapi.responses import JSONResponse
@@ -421,9 +440,9 @@ def create_app(overrides=None):
     @app.get('/api/projects')
     def projects(request:Request,q:str='',status:str='',owner:str='',offset:int=0,limit:int=30):
         data,user=identity(request); require(0<=offset and 1<=limit<=100,'分頁參數錯誤',422)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
+        with phase(request,'load'),sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
         from .source_case_policy import visible_project
-        items=[p for p in state['projects'] if visible_project(state,p) and (not q or q.casefold() in ' '.join(str(p.get(k,'')) for k in ('code','name','client')).casefold()) and (not status or p['status']==status) and (not owner or p['pm_id']==owner)]
+        with phase(request,'project'): items=[p for p in state['projects'] if visible_project(state,p) and (not q or q.casefold() in ' '.join(str(p.get(k,'')) for k in ('code','name','client')).casefold()) and (not status or p['status']==status) and (not owner or p['pm_id']==owner)]
         items.sort(key=lambda p:(p.get('due_date') or '9999',p['id']))
         return {'total':len(items),'offset':offset,'limit':limit,'items':[dict(id=p['id'],code=p['code'],name=p['name'],status=p['status'],source_status=p.get('source_status'),pm_id=p['pm_id'],due_date=p.get('due_date')) for p in items[offset:offset+limit]]}
 
@@ -570,7 +589,7 @@ def create_app(overrides=None):
                         for t in n['tasks']:
                             if t['id']==body.task_id: t['manual_updated']=True
         try:
-            return persist_mutation(data['wid'],body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions)
+            with phase(request,'mutate'): return persist_mutation(data['wid'],body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions)
         except HTTPException as exc:
             with sessions.begin() as db:
                 db.add(audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,
