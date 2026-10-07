@@ -359,3 +359,31 @@ def test_waiting_caller_waits_for_capacity_without_permission_status(harness):
             c.ensure('lark-three', 'sources', wait=True)
     finally:
         release.set()
+
+
+def test_database_round_trips_never_hold_process_lock(harness):
+    h = harness
+    c = h.make()
+    original_read, original_replace = c._read, c._replace
+    def unlocked(operation):
+        def run(*args):
+            assert c._lock.acquire(blocking=False), 'DB call holds process lock'
+            c._lock.release()
+            return operation(*args)
+        return run
+    c._read, c._replace = unlocked(original_read), unlocked(original_replace)
+    assert c.ensure(h.wid, 'sources', wait=True)['status'] == 'fresh'
+
+
+def test_fresh_ensure_reads_only_its_dataset_without_lock(harness):
+    h = harness
+    c = h.make()
+    c.ensure(h.wid, 'sources')
+    keys = []
+    original = c._read
+    def read(key):
+        keys.append(key)
+        return original(key)
+    c._read = read
+    assert c.ensure(h.wid, 'sources')['status'] == 'fresh'
+    assert keys == [c._key(h.wid, 'sources')]

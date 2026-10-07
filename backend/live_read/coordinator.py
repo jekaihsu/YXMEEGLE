@@ -24,6 +24,7 @@ class RefreshCoordinator:
         self._roster_slots = BoundedSemaphore(1)
         self.clock = clock or (lambda: datetime.now(TAIPEI))
         self._lock, self._slots, self._futures = Lock(), BoundedSemaphore(2), {}
+        self._pending = set()
 
     def _enabled(self, wid):
         return (self.config.enabled
@@ -124,20 +125,30 @@ class RefreshCoordinator:
             return dict(self.status(wid)['datasets'][dataset], status='unconfigured')
         slots = self._roster_slots if dataset == 'roster' else self._slots
         executor = self.roster_executor if dataset == 'roster' else self.executor
-        key, now = self._key(wid, dataset), self._now()
-        future = None
+        key = self._key(wid, dataset)
+        row = self._read(key)
+        current = self._dataset_status(dataset, row)
+        if current['status'] == 'fresh' and not force:
+            return current
+        now = self._now()
+        cooldown = row.get('error_at') and (now-timestamp(row['error_at'])).total_seconds() < 30
         with self._lock:
-            row = self._read(key)
-            current = self.status(wid)['datasets'][dataset]
             future = self._futures.get(key)
             if future is not None and future.done():
                 future = None
-            running = current['status'] == 'refreshing'
-            cooldown = row.get('error_at') and (now-timestamp(row['error_at'])).total_seconds() < 30
-            if not running and not cooldown and (force or current['status'] != 'fresh'):
+            pending = key in self._pending
+            start = not pending and future is None and current['status'] != 'refreshing' and not cooldown
+            if start:
+                self._pending.add(key)
+        if pending:
+            # The other local caller is claiming/submitting outside the map lock.
+            return dict(current, status='busy' if wait else 'refreshing')
+        if start:
+            try:
                 if not slots.acquire(blocking=False):
                     return dict(current, status='busy')
                 try:
+                    now = self._now()
                     claimed = self._claim(key, now, dataset, force)
                 except Exception:
                     slots.release()
@@ -148,7 +159,8 @@ class RefreshCoordinator:
                     try:
                         future = executor.submit(self._refresh, wid, dataset, key, claimed, now)
                         future.add_done_callback(lambda _: slots.release())
-                        self._futures[key] = future
+                        with self._lock:
+                            self._futures[key] = future
                     except Exception:
                         slots.release()
                         self._replace(key, claimed['revision'], dict(row, revision=str(uuid4()),
@@ -157,6 +169,9 @@ class RefreshCoordinator:
                             raise
                 else:
                     slots.release()
+            finally:
+                with self._lock:
+                    self._pending.discard(key)
         if wait:
             timeout = max(0, deadline - monotonic())
             if future:
@@ -165,10 +180,13 @@ class RefreshCoordinator:
                 except FutureTimeout as exc:
                     raise TimeoutError('Live-read refresh timed out') from exc
             else:
-                while self.status(wid)['datasets'][dataset]['status'] == 'refreshing':
+                while self._dataset_status(dataset, self._read(key))['status'] == 'refreshing':
                     if monotonic() >= deadline:
                         raise TimeoutError('Live-read refresh timed out')
-                    sleep(min(0.02, max(0, deadline-monotonic())))
-            if self.status(wid)['datasets'][dataset]['status'] == 'error':
+                    sleep(min(0.2, max(0, deadline-monotonic())))
+            if self._dataset_status(dataset, self._read(key))['status'] == 'error':
                 raise RuntimeError('Lark refresh failed')
-        return self.status(wid)['datasets'][dataset]
+        return self._dataset_status(dataset, self._read(key))
+
+    def _dataset_status(self, dataset, row):
+        return freshness({dataset: row}, self.config, self._now(), True)['datasets'][dataset]
