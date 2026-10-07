@@ -37,7 +37,7 @@ const headers=[...document.querySelectorAll('.cockpit-case-table thead th')].map
 ok(document.querySelector('.cockpit-freshness').textContent.includes(new Date(payload.checked_at).toLocaleString('zh-TW',{hour12:false})),'legacy dashboard uses checked_at');
 const sourceAsOf='2026-10-07T10:02:11+08:00';
 await flush(()=>root.render(React.createElement(CompanyCockpit,{refreshVersion:0,freshness:{datasets:{sources:{as_of:sourceAsOf}}}})));
-ok(document.querySelector('.cockpit-freshness').textContent.includes(new Date(sourceAsOf).toLocaleString('zh-TW',{hour12:false})),'dashboard uses sources as_of when available');
+ok(document.querySelector('.cockpit-freshness').textContent.includes(new Date(payload.checked_at).toLocaleString('zh-TW',{hour12:false})),'retained dashboard never claims a newer sources time');
 ok(['案件狀態','報價狀態','關聯'].every(h=>headers.includes(h)),'lifecycle, quote workflow and relationship are separate columns');
 const rows=Object.fromEntries([...document.querySelectorAll('.cockpit-case-table tbody tr')].map(tr=>[tr.querySelector('th small').textContent.split(' · ')[0],[...tr.querySelectorAll('td')].map(td=>td.textContent)]));
 ok(rows['SYN-A'][0].startsWith('待核對')&&rows['SYN-A'][0].includes('尚未填寫案件狀態'),'blank lifecycle is review-required, not the raw 已結案');

@@ -33,5 +33,11 @@ try{
  globalThis.fetch=async()=>new Response(JSON.stringify({freshness:settled}));
  await tick(15000);
  assert.equal(published.at(-1)?.datasets.sources.status,'stale','M2: poll results reach shared panel state even without changed_at advancing');
+ const error=freshness();error.server_time='2026-10-07T02:03:24Z';error.datasets.roster=dataset('error',null);
+ await render(error);
+ assert.match(document.querySelector('[role="status"]').textContent,/名冊.*時間未知/,'M3: unknown roster age never borrows sources age');
+ assert.doesNotMatch(document.body.textContent,/0 分鐘前/);
+ error.datasets.roster={...dataset('error',20),as_of:'2026-10-07T02:03:04Z'};await render({...error});
+ assert.match(document.querySelector('[role="status"]').textContent,/名冊.*秒前/,'M3: sub-minute failures say seconds');
  console.log('Live-read regressions passed');
 }finally{await flush(()=>root.unmount());globalThis.setTimeout=realTimeout;globalThis.clearTimeout=realClear;Date.now=realNow;dom.window.close()}

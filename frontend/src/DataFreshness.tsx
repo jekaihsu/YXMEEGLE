@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {getSessionEpoch,liveRefresh,liveStatus} from './api';
-import {ageFreshness} from './freshness';
+import {ageFreshness,datasetNames,retainedAge} from './freshness';
 import type {Freshness,LiveDataset} from './types';
 
 export interface DataFreshnessProps {
@@ -11,7 +11,7 @@ export interface DataFreshnessProps {
   dirtyDraft?:boolean;
   refresh:()=>void;
 }
-const names:Record<LiveDataset,string>={sources:'來源',roster:'名冊',attendance:'班表'};
+const names=datasetNames;
 const priority=['blocked','error','refreshing','never','stale','fresh','unconfigured'] as const;
 const time=(value:string|null)=>value?new Date(value).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'—';
 
@@ -74,23 +74,25 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
     }finally{if(mounted.current)setBusy(false)}
   };
   const state=active?(priority.find(s=>entries.some(([,d])=>d.status===s))||'unconfigured'):'unconfigured';
-  const source=aged?.datasets.sources;
+  const deciding=entries.filter(([,d])=>d.status===state).sort((a,b)=>(b[1].age_seconds??-1)-(a[1].age_seconds??-1));
+  const source=deciding[0]?.[1];
   const age=source?.age_seconds;
-  const ageText=age==null?'未知時間':`${Math.max(0,Math.floor(age/60))} 分鐘前`;
+  const ageText=retainedAge(age??null);
   let label=`Lark 資料 ${time(source?.as_of||null)}（${age==null?'—':Math.max(0,Math.floor(age))} 秒前）`;
   if(state==='unconfigured')label=demo?'示範資料':'尚未設定';
   if(state==='stale')label+=' · 資料待更新';
   if(state==='refreshing')label='更新中…';
   if(state==='never')label='正在讀取 Lark 來源…';
-  if(state==='error')label=`Lark 暫時無法讀取，顯示 ${ageText}資料`;
+  if(state==='error')label=`${deciding.map(([key])=>names[key]).join('、')}：Lark 暫時無法讀取，${ageText}`;
   if(state==='blocked')label='Lark 權限不足（1254302），請聯絡管理員';
   const color=state==='error'||state==='blocked'?'#b91c1c':state==='stale'?'#92400e':'inherit';
   const details=entries.map(([key,d])=>`${names[key]}：${time(d.as_of)} · ${d.age_seconds??'—'} 秒前 · TTL ${d.ttl_seconds} 秒`).join('\n');
   return <div className={`data-freshness data-freshness-${state}`} data-state={state}>
     <span role="status" aria-live="polite" title={details} style={{color}}>
-      {state==='refreshing'?<span className="spinner" aria-hidden="true">◌ </span>:null}{state==='fresh'||state==='stale'?<><span aria-hidden="true">{label}</span><span className="sr-only">{state==='fresh'?'Lark 資料已讀取':'Lark 資料待更新'}</span></>:label}
+      {state==='refreshing'?<span className="spin" aria-hidden="true">◌ </span>:null}{state==='fresh'||state==='stale'?<><span aria-hidden="true">{label}</span><span className="sr-only">{state==='fresh'?'Lark 資料已讀取':'Lark 資料待更新'}</span></>:label}
       {requestError?<span> · {requestError}</span>:null}
     </span>
-    {active?<button type="button" className="button" onClick={reread} disabled={busy} aria-label="立即重新讀取 Lark">{busy?'讀取中…':state==='error'?'重試':'重新讀取'}</button>:null}
+    {!demo&&active?<details className="freshness-details"><summary>資料讀取詳情</summary><ul>{entries.map(([key,d])=><li key={key}>{names[key]}：{time(d.as_of)} · {d.age_seconds==null?'時間未知':`${Math.floor(d.age_seconds)} 秒前`} · TTL {d.ttl_seconds} 秒 · {d.status}</li>)}</ul></details>:null}
+    {active?<button type="button" className="button" onClick={reread} disabled={busy} aria-busy={busy}>{busy?'讀取中…':state==='error'?'重試':'重新讀取'}</button>:null}
   </div>;
 }

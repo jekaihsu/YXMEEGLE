@@ -1,3 +1,4 @@
+import {datasetNotice} from './freshness';
 import {useState} from 'react';
 import {api,liveRefresh} from './api';
 import type {Context} from './Operations';
@@ -12,7 +13,7 @@ export function PeopleDirectoryPanel({c}:{c:Context}){
  const reasons:Record<string,string>={missing_account:'未填寫可識別的 Lark 人員帳號',multiple_accounts:'同一筆名冊填入多個人員帳號',missing_name:'缺少人員姓名',employment_unknown:'在職狀態未明確',duplicate_account:'同一人員帳號出現在多筆名冊'};
  const sourceUrl=status.base_token&&status.table_id?`https://yong-xiang-survey.jp.larksuite.com/base/${encodeURIComponent(status.base_token)}?table=${encodeURIComponent(status.table_id)}`:'';
  return <section className="ops-input" aria-label="Lark 動態人員名冊"><h2>Lark 動態人員名冊</h2><p>來源為「薪水計算」中的人員名單及資料，只同步必要人員欄位。指派及標註使用同一份名冊。</p>
-  <p className="dataset-as-of" role="status">{c.s.mode==='demo'?'示範資料':`名冊資料 as of ${freshness?.as_of?new Date(freshness.as_of).toLocaleString('zh-TW'):status.last_success_at?new Date(status.last_success_at).toLocaleString('zh-TW'):'尚無讀取紀錄'}`}</p>
+  <p className="dataset-as-of" role="status">{c.s.mode==='demo'?'示範資料':`名冊資料 as of ${freshness?.as_of?new Date(freshness.as_of).toLocaleString('zh-TW'):status.last_success_at?new Date(status.last_success_at).toLocaleString('zh-TW'):'尚無讀取紀錄'}`}</p>{c.s.mode!=='demo'&&freshness&&datasetNotice('roster',freshness)&&<p role="status">{datasetNotice('roster',freshness)}</p>}
   <p><strong>{status.status==='ready'?'名冊已同步':status.status==='review_required'?'名冊已讀取，部分資料待核對':status.status==='error'?'同步失敗，保留上次名冊':'名冊尚未完成真實同步'}</strong>{status.last_success_at&&<> · 上次成功：{new Date(status.last_success_at).toLocaleString('zh-TW')}</>}</p>
   {status.last_success_at&&<p>來源 {status.source_count??'—'} 筆 · 可辨識 {status.valid_people??'—'} 人 · 已關聯 {directoryPeople.length} 人</p>}
   {status.message&&<p>{status.message}</p>}
