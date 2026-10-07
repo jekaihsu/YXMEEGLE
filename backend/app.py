@@ -5,6 +5,7 @@ from pathlib import Path
 import secrets
 import re
 from copy import deepcopy
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from urllib.parse import urlencode, urlsplit
 import httpx
@@ -130,7 +131,14 @@ def create_app(overrides=None):
                 row.data=storage.save(db,BusinessRow,row.id,state)
     signer=URLSafeTimedSerializer(secret,salt='meegle-session-v1')
     upload_dir=Path(cfg.get('UPLOAD_DIR','./backend/uploads')).resolve(); upload_dir.mkdir(parents=True,exist_ok=True)
-    app=FastAPI(title='詠翔專案工作台',docs_url=None if production else '/api/docs'); app.state.engine=engine; app.state.sessions=sessions; app.state.signer=signer
+    @asynccontextmanager
+    async def lifespan(app):
+        try:
+            yield
+        finally:
+            app.state.live_read.close()
+
+    app=FastAPI(title='詠翔專案工作台',docs_url=None if production else '/api/docs',lifespan=lifespan); app.state.engine=engine; app.state.sessions=sessions; app.state.signer=signer
     app.state.cfg=cfg; app.state.upload_dir=upload_dir
     @app.exception_handler(HTTPException)
     async def safe_auth_error(request,exc):

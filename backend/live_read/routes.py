@@ -23,6 +23,9 @@ def refresh(coordinator, wid, datasets, *, wait=False, force=False):
         return JSONResponse({'detail': 'Lark 資料暫時無法讀取',
                              'freshness': coordinator.status(wid)}, status_code=502)
     freshness = coordinator.status(wid)
+    if any(r['status'] == 'already_running' for r in results):
+        return JSONResponse({'detail': '資料正在重新讀取，請稍後再試',
+                             'freshness': freshness}, status_code=409)
     if wait and any(r['status'] != 'fresh' for r in results):
         return JSONResponse({'detail': 'Lark 資料暫時無法讀取',
                              'freshness': freshness}, status_code=502)

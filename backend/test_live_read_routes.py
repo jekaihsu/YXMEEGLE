@@ -311,3 +311,28 @@ def test_nonblocking_new_read_returns_202_even_if_it_completes_immediately(harne
     assert len(calls)==2
     assert client.post('/api/live/refresh',json={'datasets':['sources']}).status_code==200
     assert len(calls)==2
+
+
+@pytest.mark.parametrize('wait', [False, True])
+def test_force_race_maps_coordinator_already_running_to_409(harness, monkeypatch, wait):
+    client, coordinator, calls, _, _ = harness
+    # Another caller starts between the route precheck and coordinator.ensure.
+    monkeypatch.setattr(coordinator, 'ensure', lambda *args, **kwargs: {'status': 'already_running'})
+    response = client.post('/api/live/refresh', json={
+        'datasets': ['sources'], 'force': True, 'wait': wait})
+    assert response.status_code == 409, response.text
+    assert 'freshness' in response.json()
+    assert calls == []
+
+
+def test_app_shutdown_closes_both_coordinator_executors(tmp_path):
+    app = create_app({'DATABASE_URL': f'sqlite:///{tmp_path}/shutdown.db',
+                      'UPLOAD_DIR': str(tmp_path/'uploads'), 'DEMO_MODE': 'true'})
+    coordinator = app.state.live_read
+    with TestClient(app) as client:
+        assert client.get('/api/health').status_code == 200
+        assert coordinator.executor.submit(lambda: True).result()
+        assert coordinator.roster_executor.submit(lambda: True).result()
+    for executor in (coordinator.executor, coordinator.roster_executor):
+        with pytest.raises(RuntimeError, match='shutdown'):
+            executor.submit(lambda: None)
