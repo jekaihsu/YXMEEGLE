@@ -51,6 +51,28 @@ python -m pytest backend -q
 
 前端型別及正式建置檢查使用 `frontend` 內的 `npm.cmd run build`。Word PRD 可執行 `python scripts/generate_prd.py` 重建，另需 `python-docx`。
 
+### PostgreSQL action audit regression（#39，macOS／Linux）
+
+安裝後端依賴，並將 PostgreSQL 的 `initdb`、`pg_ctl` 加入 `PATH` 後，以非 root 使用者執行：
+
+```bash
+.venv/bin/python scripts/test_action_audit_postgres.py
+# 同一個臨時 PostgreSQL 執行完整後端測試：
+.venv/bin/python scripts/test_action_audit_postgres.py backend -q
+```
+
+腳本建立獨立的臨時 cluster、選擇臨時 port，僅開放私有 Unix socket，設定
+`ACTION_AUDIT_TEST_POSTGRES_URL`，並在測試結束（含失敗）後停止 PostgreSQL、刪除臨時資料。
+預設執行 `backend/test_action_audit_database.py` 的 SQLite／PostgreSQL 六組案例：action 長度
+120／121／10000、未知 action、NUL 字元、空字串；檢查穩定 4xx、安全寫入拒絕稽核，且不改動工作區或建立 receipt。
+未設定該環境變數的一般 pytest 會跳過 PostgreSQL 案例；上述腳本不會因缺少 URL 而跳過。
+也可自行將該變數設為獨立測試 PostgreSQL 的 SQLAlchemy URL；測試帳號需有建立／刪除 schema 的權限，各案例使用獨立 schema。
+
+2026-10-07 本機驗證（PostgreSQL 17.11、Python 3.12）：專項 **12 passed、0 skipped**（六組 PostgreSQL + 六組 SQLite）；
+完整 `python -m pytest backend -q`（由上述腳本設定 URL）為 **1815 passed、1 skipped、1 warning，110.71s**。
+唯一 skip 是 macOS 不適用的 Linux／Windows atomic-publication fallback 測試；warning 是既有 Starlette TestClient 的 httpx 棄用提示。
+前端全部 13 個 `npm run test:*` scripts 與 `npm run build` 均 exit 0；刻意指定不存在的測試檔時，腳本仍停止 PostgreSQL，並保留 pytest exit 4。
+
 ### Local pre-push gate（macOS／Linux）
 
 本專案不使用 GitHub Actions。啟用 repository-local `pre-push` hook 後，每次 push 前會以 Python 3.12 執行後端測試，並以 Node.js 22+ 安裝鎖定套件、執行前端回歸檢查及正式建置；任何一步失敗都會阻擋 push。
