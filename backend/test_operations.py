@@ -406,3 +406,12 @@ def test_monthly_submission_waits_for_supervisor(ws):
     with pytest.raises(HTTPException): call(ws,'recurring_review',dict(id=r['id'],entry_id=r['history'][-1]['id'],result='accepted',evidence='核准'),user='u-field')
     call(ws,'recurring_review',dict(id=r['id'],entry_id=r['history'][-1]['id'],result='accepted',evidence='核准'))
     assert r['history'][-1]['status']=='accepted'
+
+
+def test_source_interval_is_server_managed_not_a_fixed_ui_cadence(ws):
+    ws['settings']['source_sync_seconds'] = 120
+    assert call(ws, 'admin_settings', {'digest_time': '10:00'})
+    with pytest.raises(HTTPException) as exc:
+        call(ws, 'admin_settings', {'source_sync_seconds': 300})
+    assert exc.value.status_code == 422
+    assert '伺服器' in exc.value.detail

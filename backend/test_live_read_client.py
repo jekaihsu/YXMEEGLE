@@ -22,7 +22,7 @@ class Clock:
 
 
 def test_config_defaults_and_clamps():
-    assert LiveReadConfig.from_env({}) == LiveReadConfig()
+    assert LiveReadConfig.from_env({}) == LiveReadConfig(source_ttl_seconds=300, roster_ttl_seconds=300)
     cfg = LiveReadConfig.from_env({
         'LARK_LIVE_READ_ENABLED': 'true', 'LARK_LIVE_READ_SOURCE_TTL_SECONDS': '1',
         'LARK_LIVE_READ_ROSTER_TTL_SECONDS': '-1',

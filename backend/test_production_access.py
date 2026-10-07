@@ -1,4 +1,5 @@
 import time
+import pytest
 from datetime import datetime, timezone
 from copy import deepcopy
 from fastapi.testclient import TestClient
@@ -207,3 +208,13 @@ def test_workspace_switch_and_pilot_copy_reject_deeply_nested_json_without_state
             assert r.status_code==422,(path,r.status_code)
             assert r.json()['detail']=='請求內容必須是有效的 JSON'
             assert _snapshot(app,c)==before
+
+
+@pytest.mark.parametrize('enabled,expected', [('false', (300,300,300)), ('true',(60,60,300))])
+def test_readonly_connection_reports_effective_dataset_interval(enabled, expected):
+    from .production_access import readonly_sync_connection
+    cfg = {'LARK_LIVE_READ_ENABLED': enabled}
+    assert tuple(readonly_sync_connection(cfg, 'manager', dataset)['interval_seconds']
+                 for dataset in ('sources', 'roster', 'attendance')) == expected
+    cfg.update(LARK_LIVE_READ_ROSTER_TTL_SECONDS='120')
+    assert readonly_sync_connection(cfg, 'manager', 'roster')['interval_seconds'] == 120

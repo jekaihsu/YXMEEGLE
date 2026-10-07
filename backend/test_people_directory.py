@@ -333,3 +333,16 @@ def test_roster_timer_live_gate_and_configured_interval(harness,monkeypatch):
     h.cfg['LARK_LIVE_READ_ENABLED']='true';clock[0]='2026-09-27T12:00:00+08:00'
     before=h.read()
     assert service.run_due(h.wid) is None and h.read()==before
+
+
+@pytest.mark.parametrize('flag', [None, 'false'])
+def test_legacy_roster_timer_defaults_to_300_seconds(directory_service, flag):
+    h, service, calls = directory_service
+    if flag is not None:
+        h.cfg['LARK_LIVE_READ_ENABLED'] = flag
+    service.sync(h.wid, 'u-manager')
+    h.clock[0] = '2026-09-27T10:04:59+08:00'
+    assert service.run_due(h.wid) is None and len(calls) == 1
+    h.clock[0] = '2026-09-27T10:05:00+08:00'
+    assert service.run_due(h.wid)['sync_revision'] == 2
+    assert len(calls) == 2

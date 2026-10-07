@@ -133,10 +133,13 @@ def readonly_sync_actor(state,cfg,connection_name):
     return {'id':'system:company-readonly','name':'公司唯讀同步','role':'system','active':True,'capabilities':[]}
 
 
-def readonly_sync_connection(cfg,actor_id):
+def readonly_sync_connection(cfg,actor_id,dataset='sources'):
+    from .live_read.config import LiveReadConfig
+    from .live_read.status import ttl_seconds
+    interval=ttl_seconds(LiveReadConfig.from_env(cfg),dataset)
     return {'enabled':True,'authorization':'company_application_readonly','app_id':cfg.get('LARK_APP_ID'),
             'tenant':cfg.get('LARK_WORKER_ORGANIZATION'),'authorized_by':actor_id,
-            'interval_seconds':300}
+            'interval_seconds':interval}
 
 
 def test_profile(formal, overlay):

@@ -28,10 +28,12 @@ class LiveReadConfig:
                 value = default
             return min(maximum, max(minimum, value)) if maximum else max(minimum, value)
 
+        enabled = str(env.get('LARK_LIVE_READ_ENABLED', 'false')).lower() == 'true'
+        legacy_default = 60 if enabled else 300
         return cls(
-            enabled=str(env.get('LARK_LIVE_READ_ENABLED', 'false')).lower() == 'true',
-            source_ttl_seconds=number('SOURCE_TTL_SECONDS', 60, 30),
-            roster_ttl_seconds=number('ROSTER_TTL_SECONDS', 60, 30),
+            enabled=enabled,
+            source_ttl_seconds=number('SOURCE_TTL_SECONDS', legacy_default, 30),
+            roster_ttl_seconds=number('ROSTER_TTL_SECONDS', legacy_default, 30),
             attendance_ttl_seconds=number('ATTENDANCE_TTL_SECONDS', 300, 60),
             max_rps=number('MAX_RPS', 5, .01, 10),
             blocking_timeout_seconds=number('BLOCKING_TIMEOUT_SECONDS', 10, .01),

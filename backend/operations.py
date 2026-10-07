@@ -419,7 +419,8 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         require(set(data)<=allowed,'未知設定',422)
         proposed={**ws['settings'],**data}
         require(proposed.get('deadline_basis')=='scheduled_shift' and proposed.get('cutoff_time') is None,'截止時間必須依個人正常班表，不能改為固定時間',422)
-        require(proposed.get('source_sync_seconds')==300,'來源同步固定每五分鐘',422)
+        require(proposed.get('source_sync_seconds')==ws['settings'].get('source_sync_seconds'),
+                '來源讀取頻率由伺服器環境設定管理',422)
         require(proposed.get('test_connection_mode') in ('simulation','isolated_live'),'測試連線模式錯誤',422)
         from .policy import defaults
         approved=defaults()

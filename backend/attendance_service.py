@@ -135,7 +135,7 @@ class AttendanceScheduleService(PeopleDirectoryService):
                     'message':'已讀取正常班表；未核對的班次保留待確認，人工設定優先'}
                 from .production_access import readonly_sync_connection
                 prior=current.get('attendance_schedule_connection',{})
-                current['attendance_schedule_connection']=readonly_sync_connection(self.cfg,actor_id or prior.get('authorized_by') or prior.get('actor_id'))
+                current['attendance_schedule_connection']=readonly_sync_connection(self.cfg,actor_id or prior.get('authorized_by') or prior.get('actor_id'),dataset='attendance')
                 event(current,actor,'attendance_schedule_sync',message='唯讀更新正常班表，保留人工設定與歷史')
                 self._save(db,row,current)
                 return deepcopy(current['attendance_schedule_status'])

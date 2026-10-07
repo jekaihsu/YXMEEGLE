@@ -294,3 +294,15 @@ def test_older_read_cannot_overwrite_as_of_after_unchanged_refresh(harness):
     assert exc.value.status_code==409
     assert h.read()[1]['last_sync']==h.clock[0]
     assert not any(p['code']=='C111111' for p in h.read()[0]['projects'])
+
+
+@pytest.mark.parametrize('flag', [None, 'false'])
+def test_legacy_source_timer_defaults_to_300_seconds(harness, flag):
+    h = harness
+    if flag is not None:
+        h.cfg['LARK_LIVE_READ_ENABLED'] = flag
+    h.clock[0] = '2026-09-27T10:04:59+08:00'
+    assert h.service.run_due(h.wid) is None and not h.fetched
+    h.clock[0] = '2026-09-27T10:05:00+08:00'
+    assert h.service.run_due(h.wid)['status'] == 'ready'
+    assert len(h.fetched) == 1
