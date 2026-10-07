@@ -23,3 +23,8 @@ export function normalizeRoute<T extends {view:string;tab?:string;section?:strin
  return route;
 }
 export function readRoute(){const p=new URLSearchParams(location.hash.replace(/^#\/?/,''));return normalizeRoute({view:p.get('view')||'dashboard',project:p.get('project')||undefined,node:p.get('node')||undefined,task:p.get('task')||undefined,tab:p.get('tab')||undefined,section:p.get('section')||undefined,completion:p.get('completion')||undefined,focus:p.get('focus')||undefined,comment:p.get('comment')||undefined,approval:p.get('approval')||undefined})}
+
+export function liveStatus(){return api<{freshness:import('./types').Freshness}>('/api/live/status')}
+export function liveRefresh(datasets:import('./types').LiveDataset[],wait=false){
+  return api<{freshness:import('./types').Freshness}>('/api/live/refresh',{method:'POST',body:JSON.stringify({datasets,wait,force:false})});
+}
