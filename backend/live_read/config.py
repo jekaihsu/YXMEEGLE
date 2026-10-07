@@ -13,6 +13,7 @@ class LiveReadConfig:
     max_rps: float = 5
     blocking_timeout_seconds: float = 10
     lease_seconds: float = 120
+    budget_seconds: float = 100
     records_api: str = 'list'
 
     @classmethod
@@ -38,6 +39,7 @@ class LiveReadConfig:
             max_rps=number('MAX_RPS', 5, .01, 10),
             blocking_timeout_seconds=number('BLOCKING_TIMEOUT_SECONDS', 10, .01),
             lease_seconds=number('LEASE_SECONDS', 120, 60),
+            budget_seconds=number('BUDGET_SECONDS', 100, 10),
             records_api=env.get('LARK_BITABLE_RECORDS_API', 'list')
             if env.get('LARK_BITABLE_RECORDS_API', 'list') in ('list', 'search') else 'list',
         )

@@ -60,7 +60,8 @@ from backend.live_read.client import LiveLarkClient, ReadBlocked, ReadFailure
 from backend.live_read.token_cache import TenantTokenCache
 
 CFG = {'LARK_APP_ID': 'fake-app', 'LARK_APP_SECRET': 'fake-secret',
-       'LARK_WORKER_ORGANIZATION': 'fake-tenant', 'LARK_WORKER_IDENTITY': 'application'}
+       'LARK_WORKER_ORGANIZATION': 'fake-tenant', 'LARK_WORKER_IDENTITY': 'application',
+       'LARK_LIVE_READ_BUDGET_SECONDS': '45'}
 PATH = '/bitable/v1/apps/fake-base/tables/fake-table/records'
 
 
@@ -381,3 +382,11 @@ def test_custom_allowlist_cannot_broaden_boundary_or_use_traversal(method, path)
         with pytest.raises(ReadBlocked):
             client.request(method, path)
         assert client.calls == 0
+
+
+@pytest.mark.parametrize('env,expected', [({}, 100), ({'LARK_LIVE_READ_BUDGET_SECONDS': '30'}, 30),
+                                          ({'LARK_LIVE_READ_BUDGET_SECONDS': '500'}, 110),
+                                          ({'LARK_LIVE_READ_BUDGET_SECONDS': '1'}, 10)])
+def test_budget_is_configurable_and_bounded_by_lease(env, expected):
+    with LiveLarkClient(env, transport=httpx.MockTransport(lambda r: httpx.Response(200)), clock=lambda: 0) as client:
+        assert client.deadline == expected

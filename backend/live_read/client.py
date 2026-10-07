@@ -37,7 +37,7 @@ class LiveLarkClient:
         self.allowed_posts = allowed_posts
         self.client = httpx.Client(transport=transport, follow_redirects=False)
         self.started = clock()
-        self.deadline = self.started + RetryPolicy.budget_seconds
+        self.deadline = self.started + min(self.config.budget_seconds, self.config.lease_seconds - 10)
         self.calls = self.retries = 0
         self.duration_ms = 0
         self.deny_network = transport is None and cfg.get(

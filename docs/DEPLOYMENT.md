@@ -83,6 +83,7 @@ python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
 | LARK_LIVE_READ_MAX_RPS | 每進程 Lark 請求速率；預設 5；範圍 0.01–10 |
 | LARK_LIVE_READ_BLOCKING_TIMEOUT_SECONDS | 准入與手動等待的最長秒數；預設 10；下限 0.01 |
 | LARK_LIVE_READ_LEASE_SECONDS | 刷新租約秒數；預設 120；下限 60 |
+| LARK_LIVE_READ_BUDGET_SECONDS | 單次刷新（含 9 張來源表）的 Lark 讀取總預算；預設 100（原固定 45 秒在 Lark 延遲約 3.4 秒/呼叫時讀不完）；下限 10；實際上限為租約秒數減 10，避免讀取中途租約失效 |
 | LARK_BITABLE_RECORDS_API | list（預設，每頁 200）或 search（每頁 500）；其他值退回 list。須先於 staging 驗證再切換 |
 | LARK_TEST_BASE_TOKEN | 選用，隔離真實 Input 測試專用 Base，須與測試工作區 test_base 一致且不得為正式來源 Base |
 | LARK_INPUT_BASE_TOKEN | 正式 Input 專用登錄 Base，须与工作區 settings.input_base 相同；不得為 V4、報價或薪資 Base |

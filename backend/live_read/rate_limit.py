@@ -12,7 +12,6 @@ class BudgetExceeded(RuntimeError):
 
 class RetryPolicy:
     max_attempts = 3
-    budget_seconds = 45
 
     @staticmethod
     def after(response, attempt=1):
