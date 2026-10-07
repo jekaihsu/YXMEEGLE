@@ -2,7 +2,7 @@
 import os
 import re
 import time
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, unquote
 
 import httpx
 
@@ -67,11 +67,17 @@ class LiveLarkClient:
                 raise ReadBlocked('Lark read URL is outside the API origin')
             path = path[len(API):]
         clean_path = urlsplit(path).path
+        decoded = clean_path
+        while unquote(decoded) != decoded:
+            decoded = unquote(decoded)
+        if '\\' in decoded or any(part in ('.', '..') for part in decoded.split('/')):
+            raise ReadBlocked('Lark request is outside the read allowlist')
         protected = capability_write_policy.protected_request(method, path)
         if (protected or not clean_path.startswith('/') or
                 (method == 'GET' and not any(re.fullmatch(pattern, clean_path) for pattern in ALLOWED_GETS)) or
-                (method != 'GET' and not (method == 'POST' and any(
-                    re.fullmatch(pattern, clean_path) for pattern in self.allowed_posts)))):
+                (method != 'GET' and not (method == 'POST'
+                    and any(re.fullmatch(pattern, clean_path) for pattern in ALLOWED_POSTS)
+                    and any(re.fullmatch(pattern, clean_path) for pattern in self.allowed_posts)))):
             raise ReadBlocked('Lark request is outside the read allowlist')
         if self.deny_network:
             raise ReadBlocked('Real Lark transport is disabled')

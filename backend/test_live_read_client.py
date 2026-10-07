@@ -369,3 +369,15 @@ def test_get_allowlist_and_attendance_query_are_explicit():
             client.request('GET', '/drive/v1/files/arbitrary/download')
         assert client.calls == 0
         assert client.request('POST', '/attendance/v1/user_daily_shifts/query', json={}).status_code == 200
+
+
+@pytest.mark.parametrize('method,path', [
+    ('POST', '/drive/v1/files/create'),
+    ('GET', '/bitable/v1/apps/x/../../../../drive/v1/files/download'),
+    ('GET', '/bitable/v1/apps/x/%2e%2e/%2e%2e/drive/v1/files/download'),
+])
+def test_custom_allowlist_cannot_broaden_boundary_or_use_traversal(method, path):
+    with make_client(lambda _: pytest.fail('Unreviewed request sent'), allowed_posts=(r'.*',)) as client:
+        with pytest.raises(ReadBlocked):
+            client.request(method, path)
+        assert client.calls == 0

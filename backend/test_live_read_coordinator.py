@@ -499,3 +499,24 @@ def test_legacy_bulk_apply_rolls_back_when_lease_is_lost(harness):
         c._refresh(h.wid, 'sources', key, claimed, now)
     with h.sessions() as db:
         assert db.get(WorkspaceRow, h.wid).data['snapshot'] == 'newer'
+
+
+def test_cancelled_future_releases_refresh_capacity(harness):
+    from concurrent.futures import Future
+    h = harness
+    class DeferredExecutor:
+        def __init__(self):
+            self.jobs = []
+        def submit(self, *args):
+            future = Future()
+            self.jobs.append(future)
+            return future
+    executor = DeferredExecutor()
+    c = h.make(executor)
+    assert c.ensure('lark-first', 'sources')['status'] == 'refreshing'
+    assert c.ensure('lark-second', 'sources')['status'] == 'refreshing'
+    assert c.ensure('lark-third', 'sources')['status'] == 'busy'
+    assert executor.jobs[0].cancel()
+    assert c.ensure('lark-third', 'sources')['status'] == 'refreshing'
+    for future in executor.jobs:
+        future.cancel()
