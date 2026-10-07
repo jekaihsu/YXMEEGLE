@@ -31,6 +31,17 @@ def require_admission(person, app_id):
 DIRECTORY_MAX_AGE_SECONDS=900
 
 
+def roster_age_seconds(person, now):
+    """Return roster verification age, or None for missing/invalid timestamps."""
+    try:
+        stamp=datetime.fromisoformat(person.get('directory_last_seen_at','').replace('Z','+00:00'))
+        if stamp.tzinfo is None:return None
+        age=(now-stamp).total_seconds()
+        return age if age>=0 else None
+    except (ValueError,TypeError,AttributeError):
+        return None
+
+
 def company_admin_grant(person,cfg,*,tenant=None,now=None):
     """Exact owner-authorized account, independently verified by real OAuth.
 
