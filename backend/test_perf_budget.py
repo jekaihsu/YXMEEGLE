@@ -39,23 +39,26 @@ def count_queries(engine):
 
 
 @contextmanager
-def scaled_client(tmp_path, n_projects):
-    app = create_app({
+def scaled_client(tmp_path, n_projects, upgraded=False, **extra):
+    app = create_app({**{
         'DATABASE_URL': f'sqlite:///{tmp_path}/perf.db',
         'UPLOAD_DIR': str(tmp_path / 'uploads'),
         'SESSION_SECRET': 'fictional-perf-secret' * 3,
         'APP_ENV': 'development', 'DEMO_MODE': 'true',
         'LARK_LIVE_READ_ENABLED': 'false', 'WORKSPACE_SHELL_ENABLED': 'false',
         'LARK_APP_ID': '', 'LARK_APP_SECRET': '', 'LARK_ALLOWED_TENANTS': '',
-    })
+    }, **extra})
     try:
         with TestClient(app) as client:
             assert client.get('/api/session').status_code == 200
             wid = app.state.signer.loads(client.cookies.get('meegle_session'))['wid']
             with app.state.sessions.begin() as db:
                 row = db.get(WorkspaceRow, wid)
-                row.data = storage.save(db, BusinessRow, wid,
-                                        build_scaled_workspace(n_projects))
+                state = build_scaled_workspace(n_projects)
+                if upgraded:  # what persist_mutation saves; lets index summaries be computed
+                    from .policy import upgrade
+                    upgrade(state)
+                row.data = storage.save(db, BusinessRow, wid, state)
             assert client.post('/api/demo/session', json={'user_id': 'u-manager'}).status_code == 200
             yield app, client
     finally:

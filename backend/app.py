@@ -172,6 +172,7 @@ def create_app(overrides=None):
     def initial_capabilities(ident,role):
         return (MANAGER_CAPABILITIES[:] if role=='manager' else [])+(['approve_capability'] if ident in capability_approvers else [])
 
+    shell_enabled=str(cfg.get('WORKSPACE_SHELL_ENABLED','false')).lower()=='true'
     TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('POST','/api/actions')}
     @contextmanager
     def phase(request,name):
@@ -381,13 +382,16 @@ def create_app(overrides=None):
         with engine.connect() as connection: connection.execute(select(1))
         return {'status':'ok','mode':'demo' if demo else 'lark','database':'postgresql' if engine.dialect.name=='postgresql' else 'sqlite'}
 
+    def features():
+        return {'features':{'workspace_shell':True}} if shell_enabled else {}
+
     @app.get('/api/session')
     def get_session(request:Request):
         from fastapi.responses import JSONResponse
         data=read_cookie(request)
         if not data and demo:
             data={'mode':'demo','uid':'u-pm','wid':'demo-'+uid()}; ensure_workspace(data['wid'])
-            response=JSONResponse({'user':USERS[0],'users':USERS,'mode':'demo','auth_configured':oauth_configured}); set_cookie(response,data); return response
+            response=JSONResponse({'user':USERS[0],'users':USERS,'mode':'demo','auth_configured':oauth_configured,**features()}); set_cookie(response,data); return response
         if not data: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured}
         try: data,user=identity(request)
         except HTTPException: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured}
@@ -395,7 +399,7 @@ def create_app(overrides=None):
             return {'user':public_person(user,include_authority=True),'users':[],'mode':data['mode'],'workspace_id':data['wid'],
                     'environment':'test' if data['wid'].startswith('test-') else 'production','auth_configured':oauth_configured,'access_mode':'recovery'}
         with phase(request,'load'),sessions() as db: users=load(db,db.get(WorkspaceRow,data['wid']),collections=('users',))['users']
-        return {'user':public_person(user,include_authority=True),'users':[public_person(person) for person in users],'mode':data['mode'],'workspace_id':data['wid'],'environment':'test' if data['wid'].startswith('test-') else data['mode'],'auth_configured':oauth_configured,'access_mode':data.get('access_mode','normal')}
+        return {'user':public_person(user,include_authority=True),'users':[public_person(person) for person in users],'mode':data['mode'],'workspace_id':data['wid'],'environment':'test' if data['wid'].startswith('test-') else data['mode'],'auth_configured':oauth_configured,'access_mode':data.get('access_mode','normal'),**features()}
 
     @app.post('/api/demo/session')
     async def demo_session(request:Request):
@@ -416,12 +420,32 @@ def create_app(overrides=None):
                 if row: db.delete(row)
         response=JSONResponse({'ok':True}); response.delete_cookie('meegle_session'); return response
 
+    def shell_response(request,data,user,coordinator):
+        """Slim index-backed workspace; None means the index cannot vouch for it, so the caller serves the full workspace."""
+        from fastapi.responses import JSONResponse
+        from . import shell, index_reads
+        wid=data['wid']
+        with sessions() as db:
+            row=db.get(WorkspaceRow,wid)
+            with phase(request,'load'):
+                if not index_reads.ready(db,BusinessRow,row): return None
+                state=load(db,row,collections=('users','delegations','approved_leave_delegations'))
+            today=now()[:10]; facts=shell.prepare(state,user,today)
+            with phase(request,'project'):
+                result=shell.build(db,BusinessRow,row,state,user,facts,today,approval_connection(cfg,simulation_available=(data['mode']=='demo') or wid.startswith('test-'),definition_verification=state.get('native_definition_verification')))
+        result['freshness']=coordinator.status(wid)
+        as_of=result['freshness']['datasets']['sources']['as_of']
+        return JSONResponse(result,headers={'X-Data-As-Of':as_of} if as_of else {})
+
     @app.get('/api/workspace')
-    def workspace(request:Request):
+    def workspace(request:Request,scope:str=''):
         data,user=identity(request)
         coordinator=app.state.live_read
         coordinator.ensure(data['wid'],'sources')
         coordinator.ensure(data['wid'],'attendance')
+        if scope=='shell' and shell_enabled:
+            shell_result=shell_response(request,data,user,coordinator)
+            if shell_result is not None: return shell_result
         with sessions() as db:
             with phase(request,'load'): state=load(db,db.get(WorkspaceRow,data['wid']))
             with phase(request,'project'): result=public_ws(state,data['wid'],user,data['mode'],owned=True)
