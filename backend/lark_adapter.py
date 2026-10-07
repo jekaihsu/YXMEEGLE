@@ -48,17 +48,24 @@ class LarkAdapter:
             operation,codes=rejected[path]
             if isinstance(payload,dict) and type(payload.get('code')) is int and payload['code'] in codes:
                 raise NativeRequestRejected(operation,payload['code'])
+        try: retry_after=max(1,int(response.headers.get('x-ogw-ratelimit-reset',response.headers.get('Retry-After','60'))))
+        except ValueError: retry_after=60
+        retry_codes=(1254290,99991400,1254607)
         if response.status_code==429:
-            try: retry_after=max(1,int(response.headers.get('Retry-After','60')))
-            except ValueError: retry_after=60
             raise RemoteFailure('Lark 限流，稍後重試','retry',retry_after)
         if response.status_code in (401,403): raise RemoteFailure('Lark 授權或資源權限不足','blocked')
         if response.status_code>=500: raise RemoteFailure('Lark 服務暫時不可用','outcome_unknown' if method!='GET' else 'failed')
-        if response.status_code>=400: raise RemoteFailure(f'Lark 請求失敗 HTTP {response.status_code}','blocked')
+        if response.status_code>=400:
+            try: error=response.json()
+            except (ValueError,TypeError): error=None
+            if isinstance(error,dict) and error.get('code') in retry_codes:
+                raise RemoteFailure(f"Lark 拒絕請求（{error['code']}）",'retry',retry_after)
+            raise RemoteFailure(f'Lark 請求失敗 HTTP {response.status_code}','blocked')
         try: result=response.json()
         except (ValueError,TypeError) as exc:
             raise RemoteFailure('Lark 回應無法核實','outcome_unknown' if method!='GET' else 'failed') from exc
         if not isinstance(result,dict): raise RemoteFailure('Lark 回應格式不完整','outcome_unknown' if method!='GET' else 'failed')
+        if result.get('code') in retry_codes: raise RemoteFailure(f"Lark 拒絕請求（{result['code']}）",'retry',retry_after)
         if result.get('code',0)!=0: raise RemoteFailure(f"Lark 拒絕請求（{result.get('code')}）",'blocked')
         data=result.get('data',{})
         if not isinstance(data,dict): raise RemoteFailure('Lark 回應內容無法核實','outcome_unknown' if method!='GET' else 'failed')
