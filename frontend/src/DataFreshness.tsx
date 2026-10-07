@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {getSessionEpoch,liveRefresh,liveStatus} from './api';
+import {ageFreshness} from './freshness';
 import type {Freshness,LiveDataset} from './types';
 
 export interface DataFreshnessProps {
@@ -15,15 +16,19 @@ const time=(value:string|null)=>value?new Date(value).toLocaleTimeString('zh-TW'
 
 export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDraft=false,refresh}:DataFreshnessProps){
   const [current,setCurrent]=useState(freshness);
+  const receivedAt=useRef(Date.now());
+  const [now,setNow]=useState(Date.now);
   const [busy,setBusy]=useState(false);
   const [requestError,setRequestError]=useState('');
   const changed=useRef<Partial<Record<LiveDataset,number>>|null>(null);
   const mounted=useRef(true);
   const epoch=useRef(getSessionEpoch());
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false}},[]);
-  useEffect(()=>{setCurrent(freshness);setRequestError('')},[freshness]);
+  useEffect(()=>{receivedAt.current=Date.now();setNow(Date.now());setCurrent(freshness);setRequestError('')},[freshness]);
+  useEffect(()=>{if(demo||!current?.enabled)return;let timer:ReturnType<typeof setTimeout>;const tick=()=>{setNow(Date.now());timer=setTimeout(tick,30000)};timer=setTimeout(tick,30000);return()=>clearTimeout(timer)},[demo,current?.enabled]);
+  const aged=current?ageFreshness(current,receivedAt.current,now):undefined;
   const active=!!current?.enabled&&!demo;
-  const entries=current?Object.entries(current.datasets) as [LiveDataset,Freshness['datasets'][LiveDataset]][]:[];
+  const entries=aged?Object.entries(aged.datasets) as [LiveDataset,Freshness['datasets'][LiveDataset]][]:[];
   const polling=active&&entries.some(([,d])=>d.status==='refreshing');
 
   useEffect(()=>{
@@ -34,7 +39,7 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
       if(epoch.current!==getSessionEpoch())return;
       try{
         const result=await liveStatus();
-        if(!stopped&&epoch.current===getSessionEpoch()){setCurrent(result.freshness);setRequestError('')}
+        if(!stopped&&epoch.current===getSessionEpoch()){receivedAt.current=Date.now();setNow(Date.now());setCurrent(result.freshness);setRequestError('')}
       }catch{
         if(!stopped&&epoch.current===getSessionEpoch())setRequestError('資料狀態暫時無法讀取');
       }
@@ -61,13 +66,13 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
     setBusy(true);setRequestError('');
     try{
       const result=await liveRefresh(['sources','attendance']);
-      if(mounted.current&&epoch.current===getSessionEpoch())setCurrent(result.freshness);
+      if(mounted.current&&epoch.current===getSessionEpoch()){receivedAt.current=Date.now();setNow(Date.now());setCurrent(result.freshness)};
     }catch{
       if(mounted.current&&epoch.current===getSessionEpoch())setRequestError('Lark 暫時無法讀取，請稍後重試');
     }finally{if(mounted.current)setBusy(false)}
   };
   const state=active?(priority.find(s=>entries.some(([,d])=>d.status===s))||'unconfigured'):'unconfigured';
-  const source=current?.datasets.sources;
+  const source=aged?.datasets.sources;
   const age=source?.age_seconds;
   const ageText=age==null?'未知時間':`${Math.max(0,Math.floor(age/60))} 分鐘前`;
   let label=`Lark 資料 ${time(source?.as_of||null)}（${age==null?'—':Math.max(0,Math.floor(age))} 秒前）`;
@@ -81,7 +86,7 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
   const details=entries.map(([key,d])=>`${names[key]}：${time(d.as_of)} · ${d.age_seconds??'—'} 秒前 · TTL ${d.ttl_seconds} 秒`).join('\n');
   return <div className={`data-freshness data-freshness-${state}`} data-state={state}>
     <span role="status" aria-live="polite" title={details} style={{color}}>
-      {state==='refreshing'?<span className="spinner" aria-hidden="true">◌ </span>:null}{label}
+      {state==='refreshing'?<span className="spinner" aria-hidden="true">◌ </span>:null}<span aria-hidden="true">{label}</span><span className="sr-only">{state==='fresh'?'Lark 資料已讀取':state==='stale'?'Lark 資料待更新':label}</span>
       {requestError?<span> · {requestError}</span>:null}
     </span>
     {active?<button type="button" className="button" onClick={reread} disabled={busy} aria-label="立即重新讀取 Lark">{busy?'讀取中…':state==='error'?'重試':'重新讀取'}</button>:null}
