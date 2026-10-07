@@ -37,7 +37,6 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
     latestSnapshot.current=next;setNow(Date.now());setCurrent(next);setRequestError('');
   };
   useEffect(()=>{accept(freshness)},[freshness]);
-  useEffect(()=>{if(demo||!current?.enabled)return;let timer:ReturnType<typeof setTimeout>;const tick=()=>{setNow(Date.now());timer=setTimeout(tick,30000)};timer=setTimeout(tick,30000);return()=>clearTimeout(timer)},[demo,current?.enabled]);
   const aged=useMemo(()=>{if(!current)return;const value=ageFreshness(current,receivedAt.current,now);return requestError?failedFreshness(value,errorDatasets):value},[current,now,requestError,errorDatasets]);
   useEffect(()=>{if(aged&&epoch.current===getSessionEpoch())onFreshness?.(aged,current)},[aged,onFreshness]);
   const active=!!current?.enabled&&!demo;
@@ -71,7 +70,7 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
   const source=deciding[0]?.[1];
   const age=source?.age_seconds;
   const ageText=retainedAge(age??null);
-  let label=`Lark 資料 ${time(source?.as_of||null)}（${age==null?'—':Math.max(0,Math.floor(age))} 秒前）`;
+  let label=`Lark 資料 ${time(source?.as_of||null)}`;
   if(state==='unconfigured')label=demo?'示範資料':'尚未設定';
   if(state==='stale')label+=' · 資料待更新';
   if(state==='refreshing')label='更新中…';

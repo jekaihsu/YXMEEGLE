@@ -1,6 +1,6 @@
 import type {Freshness,LiveDataset} from './types';
 
-// Age is anchored to the response's server clock, then advances on the client.
+// Recompute age only when a response arrives or the user interacts; no clock timer.
 export function ageFreshness(value:Freshness,receivedAt:number,now:number):Freshness {
  const elapsed=Math.max(0,(now-receivedAt)/1000);
  return {...value,datasets:Object.fromEntries(Object.entries(value.datasets).map(([key,d])=>{
