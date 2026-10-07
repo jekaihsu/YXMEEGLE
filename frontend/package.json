@@ -20,7 +20,8 @@
     "test:company-cockpit": "node test-company-cockpit.mjs",
     "test:source-lifecycle": "node test-source-lifecycle.mjs",
     "test:execution-admission": "node test-execution-admission.mjs",
-    "test:api-response": "node test-api-response.mjs"
+    "test:api-response": "node test-api-response.mjs",
+    "test:dev-tooling": "node --test --test-timeout=30000 test-dev-tooling.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",
