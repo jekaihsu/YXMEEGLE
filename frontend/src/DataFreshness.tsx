@@ -25,8 +25,6 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
   const [busy,setBusy]=useState(false);
   const [requestError,setRequestError]=useState('');
   const [errorDatasets,setErrorDatasets]=useState<LiveDataset[]>(['sources','roster','attendance']);
-  const changed=useRef<Partial<Record<LiveDataset,number>>|null>(null);
-  const reloadPending=useRef(false);
   const mounted=useRef(true);
   const epoch=useRef(getSessionEpoch());
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;manualController.current?.abort()}},[]);
@@ -41,26 +39,15 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
   useEffect(()=>{if(aged&&epoch.current===getSessionEpoch())onFreshness?.(aged,current)},[aged,onFreshness]);
   const active=!!current?.enabled&&!demo;
   const entries=aged?Object.entries(aged.datasets) as [LiveDataset,Freshness['datasets'][LiveDataset]][]:[];
-  useEffect(()=>{
-    if(!current||!active)return;
-    const latest=Object.fromEntries(Object.entries(current.datasets).map(([key,d])=>[key,d.changed_at?Date.parse(d.changed_at):0])) as Record<LiveDataset,number>;
-    if(changed.current===null){changed.current=latest;return}
-    if(mutationActive||dirtyDraft||epoch.current!==getSessionEpoch())return;
-    const advanced=(Object.keys(latest) as LiveDataset[]).some(key=>latest[key]>(changed.current?.[key]||0));
-    if(advanced&&!reloadPending.current){
-      reloadPending.current=true;
-      Promise.resolve(refresh()).then(accepted=>{if(accepted!==false&&mounted.current&&epoch.current===getSessionEpoch())for(const key of Object.keys(latest) as LiveDataset[])changed.current![key]=Math.max(changed.current?.[key]||0,latest[key]||0)}).catch(()=>{}).finally(()=>{reloadPending.current=false});
-    }
-  },[current,active,mutationActive,dirtyDraft,refresh,now]);
-
   const reread=async()=>{
-    if(!active||busy||epoch.current!==getSessionEpoch())return;
+    if(!active||busy||mutationActive||dirtyDraft||epoch.current!==getSessionEpoch())return;
+    setNow(Date.now());
     const failed=entries.filter(([,d])=>d.status==='error'||d.status==='blocked').map(([key])=>key);
     const datasets:LiveDataset[]=failed.length?failed:['sources','attendance'];
     setBusy(true);setRequestError('');manualController.current?.abort();manualController.current=new AbortController();
     try{
       const result=await liveRefresh(datasets,false,manualController.current.signal);
-      if(mounted.current&&epoch.current===getSessionEpoch())accept(result.freshness);
+      if(mounted.current&&epoch.current===getSessionEpoch()){accept(result.freshness);await refresh()}
     }catch{
       if(mounted.current&&epoch.current===getSessionEpoch()){setErrorDatasets(datasets);setRequestError('Lark 暫時無法讀取，請稍後重試')}
     }finally{if(mounted.current)setBusy(false)}
