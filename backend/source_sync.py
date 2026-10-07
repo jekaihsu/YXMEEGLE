@@ -1,6 +1,8 @@
 """Atomic complete-snapshot application shared by manual and scheduled sync."""
 from copy import deepcopy
 from datetime import datetime
+import hashlib
+import json
 from sqlalchemy import select, update
 from fastapi import HTTPException
 from . import storage
@@ -8,6 +10,22 @@ from .sources import fetch_sources, import_sources, configuration, KNOWN_TABLES
 from .workflow import now, event, require
 from .policy import upgrade
 from .lark_adapter import application_adapter
+
+
+# Bump when import_sources or source-reference policy changes its projection.
+SOURCE_PROJECTION_VERSION = 'sources-v1-20261007'
+PROJECTION_FIELDS = ('projects', 'archived_projects', 'source_quotes', 'source_confirmations',
+                     'contract_items', 'daily_unmatched', 'daily_reviews', 'sop_templates',
+                     'users', 'settings', 'source_identity_conflicts', 'source_case_baseline',
+                     'source_case_review', 'source_case_policy_revision', 'source_visible_record_ids')
+
+
+def projection_fingerprint(state):
+    """Conservatively detect edits to projected content and importer/policy inputs."""
+    value = {key: state.get(key) for key in PROJECTION_FIELDS}
+    canonical = json.dumps(value, sort_keys=True, ensure_ascii=False,
+                           separators=(',', ':'), allow_nan=False)
+    return 'sha256:' + hashlib.sha256(canonical.encode('utf-8')).hexdigest()
 
 
 class SourceSyncService:
@@ -111,11 +129,25 @@ class SourceSyncService:
             require(not previous or datetime.fromisoformat(snapshot['last_sync'])>=datetime.fromisoformat(previous),'來源快照早於上次成功資料，保留最新資料',409)
             from .live_read.fingerprint import fingerprint
             digest=fingerprint(snapshot)
-            if skip_unchanged and cache and cache.data.get('status')=='ready' and fingerprint(cache.data)==digest:
+            status=state.get('source_status',{})
+            projection_matches=(status.get('projection_fingerprint')==digest
+                                and status.get('projection_version')==SOURCE_PROJECTION_VERSION
+                                and status.get('projection_state_fingerprint')==projection_fingerprint(state))
+            if (skip_unchanged and projection_matches and cache
+                    and cache.data.get('status')=='ready' and fingerprint(cache.data)==digest):
                 value=deepcopy(cache.data)
                 value.update(last_sync=snapshot['last_sync'],as_of=snapshot['last_sync'],
                              last_attempt_at=now(),fingerprint=digest)
                 cache.data=value
+                # Advance the workspace read metadata without re-importing entities
+                # or incrementing the source generation/event history.
+                status.update(last_sync=value['last_sync'],as_of=value['as_of'],
+                              last_attempt_at=value['last_attempt_at'])
+                root=deepcopy(row.data)
+                root.update(source_status=status,version=row.version+1)
+                changed=db.execute(update(self.W).where(self.W.id==wid,self.W.version==row.version)
+                                   .values(version=row.version+1,data=root))
+                require(changed.rowcount==1,'來源同步版本衝突，請重試',409)
                 return value
             snapshot.update(fingerprint=digest,as_of=snapshot['last_sync'])
             from .source_case_policy import apply_source_reference_policy,visible_project
@@ -148,7 +180,15 @@ class SourceSyncService:
             authorized_by=actor_id or prior_connection.get('authorized_by') or prior_connection.get('actor_id')
             state['source_connection']=readonly_sync_connection(self.cfg,authorized_by)
             state['version']=row.version+1; event(state,actor,'source_sync',message=snapshot['message'])
-            changed=db.execute(update(self.W).where(self.W.id==wid,self.W.version==row.version).values(version=state['version'],data=storage.save(db,self.B,wid,state)))
+            root=storage.save(db,self.B,wid,state)
+            # storage.save assigns entity concurrency versions; stamp that final
+            # representation so a subsequent unchanged read can safely skip.
+            state['source_status'].update(projection_fingerprint=digest,
+                projection_version=SOURCE_PROJECTION_VERSION,
+                projection_state_fingerprint=projection_fingerprint(state))
+            root['source_status']=deepcopy(state['source_status'])
+            changed=db.execute(update(self.W).where(self.W.id==wid,self.W.version==row.version)
+                               .values(version=state['version'],data=root))
             require(changed.rowcount==1,'來源同步版本衝突，請重試',409)
             cache=db.get(self.C,wid)
             if cache: cache.data=snapshot

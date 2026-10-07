@@ -39,7 +39,7 @@ def factory(h, handler=None):
     return create,requests
 
 
-def test_equal_sources_advance_as_of_without_workspace_write(harness):
+def test_equal_sources_advance_metadata_without_reprojecting_entities(harness):
     h=harness;h.cfg['LARK_LIVE_READ_ENABLED']='true';create,_=factory(h)
     refresh=SourcesRefresher(h.service,create)
     clock=[datetime.fromisoformat(h.clock[0])]
@@ -50,7 +50,11 @@ def test_equal_sources_advance_as_of_without_workspace_write(harness):
         h.clock[0]='2026-09-27T10:01:00+08:00';clock[0]+=timedelta(seconds=60)
         second=coordinator.ensure(h.wid,'sources',wait=True)
         after,cache=h.read()
-        assert after==before
+        assert after['version']==before['version']+1
+        assert after['projects']==before['projects'] and after['events']==before['events']
+        assert after['source_status']['sync_revision']==before['source_status']['sync_revision']
+        assert after['source_status']['last_sync']==cache['last_sync']==h.clock[0]
+        assert after['source_status']['last_attempt_at']==cache['last_attempt_at']==h.clock[0]
         assert second['as_of']!=first['as_of'] and cache['as_of']==h.clock[0]
         assert second['changed_at']==first['changed_at']
         assert second['fingerprint']==first['fingerprint']
@@ -181,3 +185,56 @@ def test_real_source_service_cannot_commit_an_expired_refresh_owner(harness):
         assert current == cached
     finally:
         coordinator.close()
+
+
+def test_equal_sources_reproject_after_workspace_diverges_from_cache(harness):
+    h = harness
+    create, _ = factory(h)
+    refresh = SourcesRefresher(h.service, create)
+    first = refresh(h.wid)
+    original, _ = h.read()
+    with h.sessions.begin() as db:
+        row = db.get(h.W, h.wid)
+        state = storage.load(db, h.B, row)
+        state['projects'] = []
+        row.data = storage.save(db, h.B, h.wid, state)
+    assert h.read()[0]['projects'] == []
+    h.clock[0] = '2026-09-27T10:01:00+08:00'
+    second = refresh(h.wid)
+    restored, cache = h.read()
+    assert second['fingerprint'] == first['fingerprint']
+    assert len(restored['projects']) == len(original['projects']) > 0
+    assert restored['source_status']['sync_revision'] == original['source_status']['sync_revision'] + 1
+    assert restored['source_status']['last_sync'] == cache['last_sync'] == h.clock[0]
+
+
+def test_equal_sources_reproject_after_import_version_changes(harness, monkeypatch):
+    h = harness
+    create, _ = factory(h)
+    refresh = SourcesRefresher(h.service, create)
+    refresh(h.wid)
+    original, _ = h.read()
+    monkeypatch.setattr(source_sync, 'SOURCE_PROJECTION_VERSION', 'next-import-version')
+    h.clock[0] = '2026-09-27T10:01:00+08:00'
+    refresh(h.wid)
+    state, _ = h.read()
+    assert state['source_status']['sync_revision'] == original['source_status']['sync_revision'] + 1
+
+
+def test_equal_sources_reproject_after_policy_decision_changes(harness):
+    h = harness
+    create, _ = factory(h)
+    refresh = SourcesRefresher(h.service, create)
+    refresh(h.wid)
+    original, _ = h.read()
+    with h.sessions.begin() as db:
+        row = db.get(h.W, h.wid)
+        state = storage.load(db, h.B, row)
+        state['projects'][0]['case_visibility'] = 'excluded_history'
+        row.data = storage.save(db, h.B, h.wid, state)
+    h.clock[0] = '2026-09-27T10:01:00+08:00'
+    refresh(h.wid)
+    state, _ = h.read()
+    assert state['source_status']['sync_revision'] == original['source_status']['sync_revision'] + 1
+    assert state['projects'][0]['case_visibility'] == 'source_reference'
+    assert state['projects'][0]['id'] == original['projects'][0]['id']
