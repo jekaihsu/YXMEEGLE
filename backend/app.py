@@ -496,7 +496,7 @@ def create_app(overrides=None):
     def action_audit(request:Request,project_id:str='',offset:int=0,limit:int=50):
         data,user=identity(request); require(offset>=0 and 1<=limit<=100,'分頁參數錯誤',422)
         with sessions() as db:
-            state=load(db,db.get(WorkspaceRow,data['wid']))
+            state=load(db,db.get(WorkspaceRow,data['wid']),collections=('projects',))
             from .source_case_policy import visible_project
             visible={p['id'] for p in state.get('projects',[]) if visible_project(state,p)}
             manager=user.get('role')=='manager'

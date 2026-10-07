@@ -45,3 +45,19 @@ def test_projects_matches_full_load(tmp_path, monkeypatch, query):
             legacy, current = legacy_and_current(client, monkeypatch, '/api/projects' + query)
             assert current.status_code == legacy.status_code == 200
             assert current.content == legacy.content
+
+
+@pytest.mark.parametrize('query', ['', '?limit=2', '?offset=1&limit=2', '?project_id=nope'])
+def test_audit_matches_full_load(tmp_path, monkeypatch, query):
+    with scaled_client(tmp_path, 4) as (app, client):
+        version = client.get('/api/workspace').json()['version']
+        for n in range(3):
+            body = {'action': 'comment_add', 'version': version + n, 'request_id': f'audit-{n}',
+                    'project_id': client.get('/api/projects').json()['items'][0]['id'], 'payload': {'body': f'c{n}'}}
+            assert client.post('/api/actions', json=body).status_code == 200
+        for uid in USERS:
+            switch(client, uid)
+            legacy, current = legacy_and_current(client, monkeypatch, '/api/audit' + query)
+            assert current.status_code == legacy.status_code == 200
+            assert current.content == legacy.content
+        assert client.get('/api/audit').json()['items']
