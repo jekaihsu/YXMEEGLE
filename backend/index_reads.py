@@ -34,6 +34,12 @@ def casefold_safe(q):
     return all(ch.isascii() or ch.lower()==ch.upper() for ch in q)
 
 
+def search(pi,q):
+    """Substring match over code, name and client, with LIKE wildcards in q taken literally."""
+    needle=q.lower().replace('\\','\\\\').replace('%','\\%').replace('_','\\_')
+    return func.lower(pi.c.code+' '+pi.c.name+' '+pi.c.client).like('%'+needle+'%',escape='\\')
+
+
 def project_page(db,model,wid,environment,*,q='',status='',owner='',offset=0,limit=30):
     """Legacy /api/projects body: filter, sort (due_date or '9999', id), count and slice in SQL.
 
@@ -43,9 +49,7 @@ def project_page(db,model,wid,environment,*,q='',status='',owner='',offset=0,lim
     where=[pi.c.workspace_id==wid,*visibility(pi,environment)]
     if status: where.append(pi.c.status==status)
     if owner: where.append(pi.c.pm_id==owner)
-    if q:
-        needle=q.lower().replace('\\','\\\\').replace('%','\\%').replace('_','\\_')
-        where.append(func.lower(pi.c.code+' '+pi.c.name+' '+pi.c.client).like('%'+needle+'%',escape='\\'))
+    if q: where.append(search(pi,q))
     total=db.scalar(select(func.count()).select_from(pi).where(*where))
     due=case((pi.c.due_date=='','9999'),else_=pi.c.due_date)
     rows=db.execute(select(pi.c.project_id,pi.c.code,pi.c.name,pi.c.status,pi.c.source_status,pi.c.pm_id,pi.c.due_date).where(*where)

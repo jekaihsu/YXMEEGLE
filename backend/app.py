@@ -466,9 +466,17 @@ def create_app(overrides=None):
         return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle)
 
     @app.get('/api/projects')
-    def projects(request:Request,q:str='',status:str='',owner:str='',offset:int=0,limit:int=30):
+    def projects(request:Request,q:str='',status:str='',owner:str='',offset:int=0,limit:int=30,view:str='',tab:str='formal',sort:str='due',dir:str='asc'):
         data,user=identity(request); require(0<=offset and 1<=limit<=100,'分頁參數錯誤',422)
         from . import index_reads
+        if view:
+            from . import shell
+            require(view=='overview' and shell_enabled,'不支援的清單檢視',422)
+            require(tab in shell.TABS and sort in shell.SORTS and dir in ('asc','desc') and len(q)<=240,'清單查詢參數錯誤',422)
+            with phase(request,'load'),sessions() as db:
+                row=db.get(WorkspaceRow,data['wid'])
+                require(index_reads.ready(db,BusinessRow,row),'案件索引尚未就緒，請稍後重試',503)
+                return shell.overview_page(db,BusinessRow,row,load(db,row,collections=()),now()[:10],q=q,status=status,owner=owner,tab=tab,sort=sort,desc=dir=='desc',offset=offset,limit=limit)
         with phase(request,'load'),sessions() as db:
             row=db.get(WorkspaceRow,data['wid'])
             if index_reads.ready(db,BusinessRow,row) and index_reads.casefold_safe(q):
