@@ -12,14 +12,11 @@ from .operations import capable, queue, operator
 from .lark_adapter import application_adapter, RemoteFailure
 from .jobs import Worker, PermissionCheckedClient
 from .remote_policy import connection_policy, require_same_policy
+from .input_validation import json_object
 
 
 async def input_request_body(request):
-    try:
-        body=await request.json()
-    except (ValueError,TypeError,UnicodeDecodeError,RecursionError):
-        raise HTTPException(422,'Input 請求必須是有效 JSON 物件')
-    require(isinstance(body,dict),'Input 請求必須是 JSON 物件',422)
+    body=await json_object(request)
     require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
     if 'project_version' in body:
         require(type(body['project_version']) is int and body['project_version']>=0,
@@ -198,7 +195,8 @@ def register(app,identity,load,persist,sessions,W,B,P,cfg,uploads):
 
     @app.post('/api/files/{file_id}/store-lark')
     async def store_file(file_id:str,request:Request):
-        data,user=identity(request); body=await request.json()
+        data,user=identity(request); body=await json_object(request)
+        require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
         def mutate(s):
             p=next((p for p in s['projects'] if any(f['id']==file_id for f in p['files'])),None); require(p is not None,'文件不存在',404)
             from .case_cutover import require_execution
@@ -215,7 +213,10 @@ def register(app,identity,load,persist,sessions,W,B,P,cfg,uploads):
         from .features import require_learning
         require_learning()
         data,user=identity(request); require(capable(user,'manage_sources'),'需要來源管理權限',403)
-        body=await request.json(); candidate=body.get('mapping') or {}
+        body=await json_object(request)
+        require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
+        candidate=body.get('mapping') or {}
+        require(isinstance(candidate,dict),'映射必須是 JSON 物件',422)
         mapping={'id':str(candidate.get('id') or uid()),'purpose':'training','base_token':str(candidate.get('base_token','')),'table_id':str(candidate.get('table_id','')),'fields':candidate.get('fields') or {}}
         require(not data['wid'].startswith(('test-','demo-')),'正式訓練映射只能在正式工作區核實',409)
         adapter=None

@@ -362,7 +362,7 @@ def create_app(overrides=None):
     async def demo_session(request:Request):
         from fastapi.responses import JSONResponse
         require(demo,'未啟用示範角色切換',403); data,user=identity(request); require(data['mode']=='demo','正式身分不可切換為示範角色',403)
-        body=await request.json()
+        body=await json_object(request)
         with sessions() as db: users=load(db,db.get(WorkspaceRow,data['wid']))['users']
         user=find(users,body.get('user_id'),'角色'); require(user.get('active',True),'帳號已停權'); data['uid']=user['id']
         response=JSONResponse({'user':user,'users':users,'mode':'demo','auth_configured':oauth_configured}); set_cookie(response,data); return response
@@ -640,7 +640,9 @@ def create_app(overrides=None):
     @app.post('/api/approvals/{approval_id}/refresh')
     async def refresh_approval(approval_id:str,request:Request):
         data,user=identity(request); require(data['mode']=='lark','原生審批查詢需公司 Lark 登入',403)
-        body=await request.json(); instance_code=str(body.get('instance_code','')); require(bool(re.fullmatch(r'[A-Za-z0-9_-]{6,128}',instance_code)),'請提供有效 Lark 審批實例 ID',400)
+        body=await json_object(request)
+        require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
+        instance_code=str(body.get('instance_code','')); require(bool(re.fullmatch(r'[A-Za-z0-9_-]{6,128}',instance_code)),'請提供有效 Lark 審批實例 ID',400)
         with sessions() as db:
             ws=load(db,db.get(WorkspaceRow,data['wid'])); approval=find(ws['approvals'],approval_id,'申請'); p=find(ws['projects'],approval['project_id'],'案件'); require(is_pm(user,p))
             token=db.get(AuthRow,data['sid']).data['access_token']
@@ -657,7 +659,6 @@ def create_app(overrides=None):
             target.update(lark_instance_code=instance_code,lark_external_status=remote.get('status','UNKNOWN'),lark_checked_at=now(),lark_binding_verified=False)
             target['history'].append({'action':'lark_refresh','actor_id':user['id'],'created_at':now(),'message':'唯讀取得原生審批狀態；尚未驗證此實例與案件範圍一致，不自動核准'})
             event(state,user,'approval_refresh',target['project_id'],message='查詢既有 Lark 審批狀態')
-        require(isinstance(body.get('version'),int),'請提供工作區 version',400)
         return persist_mutation(data['wid'],body['version'],mutate,actor_id=user['id'])
 
     @app.post('/api/learning/sync')
@@ -668,7 +669,8 @@ def create_app(overrides=None):
         from .lark_adapter import LarkAdapter, RemoteFailure
         data,user=identity(request); require(data['mode']=='lark' and not data['wid'].startswith('test-'),'能力地圖唯讀同步需公司正式工作區',403)
         require(capable(user,'manage_training') or capable(user,'manage_sources'),'需要訓練或來源管理權限',403)
-        body=await request.json()
+        body=await json_object(request)
+        require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
         with sessions() as db: token=db.get(AuthRow,data['sid']).data['access_token']
         adapter=LarkAdapter(token)
         try: catalog,bindings=read_capabilities(adapter)
@@ -694,7 +696,9 @@ def create_app(overrides=None):
         from .lark_adapter import LarkAdapter, RemoteFailure
         data,user=identity(request); require(data['mode']=='lark' and not data['wid'].startswith('test-'),'請假來源核實需正式公司身分',403)
         require(capable(user,'manage_handover'),'需要交接管理權限',403)
-        body=await request.json(); code=str(body.get('instance_code',''))
+        body=await json_object(request)
+        require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
+        code=str(body.get('instance_code',''))
         require(bool(re.fullmatch(r'[A-Za-z0-9_-]{6,128}',code)),'審批實例編號格式錯誤',422)
         with sessions() as db: token=db.get(AuthRow,data['sid']).data['access_token']
         adapter=LarkAdapter(token)
@@ -865,8 +869,7 @@ def create_app(overrides=None):
     @app.post('/api/attendance/sync')
     async def sync_attendance(request:Request):
         data,user=identity(request)
-        body=await request.json()
-        require(isinstance(body,dict),'請提供班表日期設定',422)
+        body=await json_object(request)
         return app.state.attendance_schedule.sync(data['wid'],user['id'],body.get('date_from'),body.get('date_to'))
 
     frontend=Path(cfg.get('FRONTEND_DIST',str(Path(__file__).resolve().parents[1]/'frontend'/'dist')))
