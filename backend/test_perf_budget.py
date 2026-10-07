@@ -138,3 +138,37 @@ def test_workspace_first_load_budget(tmp_path):
             else:
                 assert 'content-encoding' not in response.headers
                 assert wire_bytes == raw_bytes
+
+
+# (queries, response bytes) ceilings. Measured: session 4 / 9.3 KB, projects 4 / 1.8 KB,
+# comment_add 12 / 14.1 MB (whole workspace returned). Tighten as later phases land.
+SESSION_MAX = (6, 10_500)
+PROJECTS_MAX = (6, 2_200)
+COMMENT_MAX = (16, 15_000_000)
+
+
+@pytest.mark.perf
+@pytest.mark.skipif(os.environ.get('YX_RUN_PERF') != '1', reason='set YX_RUN_PERF=1 to run company-scale perf checks')
+def test_light_endpoints_budget(tmp_path):
+    """Ceilings at today's full-load behaviour; later phases should tighten them."""
+    with scaled_client(tmp_path, 319) as (app, client):
+        version = client.get('/api/workspace').json()['version']
+        requests = {
+            'session': lambda: client.get('/api/session'),
+            'projects': lambda: client.get('/api/projects?limit=10'),
+            'comment_add': lambda: client.post('/api/actions', json={
+                'action': 'comment_add', 'version': version, 'request_id': 'perf-comment-1',
+                'project_id': build_scaled_workspace(1)['projects'][0]['id'], 'payload': {'body': 'perf'}}),
+        }
+        measured = {}
+        for name, send in requests.items():
+            with count_queries(app.state.engine) as stats:
+                response = send()
+            assert response.status_code == 200, (name, response.text[:200])
+            measured[name] = (stats['queries'], len(response.content))
+            print(f'{name}: {stats["queries"]} queries, {len(response.content)} bytes, '
+                  f'{response.headers["server-timing"]}')
+        assert len(client.get('/api/projects?limit=10').json()['items']) == 10
+        assert 0 < measured['session'][0] <= SESSION_MAX[0] and measured['session'][1] <= SESSION_MAX[1]
+        assert 0 < measured['projects'][0] <= PROJECTS_MAX[0] and measured['projects'][1] <= PROJECTS_MAX[1]
+        assert 0 < measured['comment_add'][0] <= COMMENT_MAX[0] and measured['comment_add'][1] <= COMMENT_MAX[1]
