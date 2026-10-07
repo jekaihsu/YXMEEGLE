@@ -228,15 +228,19 @@ def test_test_session_never_calls_roster_even_when_person_is_stale(tmp_path):
     assert app.state.live_read.queue_depth==0
 
 
-@pytest.mark.parametrize('succeeds',[True,False])
-def test_oauth_callback_waits_for_roster_and_denies_failed_read(tmp_path,monkeypatch,succeeds):
+@pytest.mark.parametrize('kind,expected', [('bootstrap', 'recovery'), ('grant', 'normal'), ('member', 'denied')])
+def test_oauth_failed_roster_preserves_access_policy(tmp_path,monkeypatch,kind,expected):
     from urllib.parse import parse_qs,urlparse
     from sqlalchemy import select
     from .app import AuthRow
     app,client=production_client(tmp_path)
     with app.state.sessions.begin() as db:
         p=db.get(PersonRow,('lark-company','u-manager'))
-        p.data={**p.data,'directory_last_seen_at':(datetime.now(timezone.utc)-timedelta(seconds=90)).isoformat()}
+        p.data={**p.data,'role':'member' if kind=='member' else 'manager', 'bootstrap_admin':kind=='bootstrap',
+                'authz_version':1, 'directory_last_seen_at':(datetime.now(timezone.utc)-timedelta(seconds=901)).isoformat()}
+    if kind=='grant':
+        import json
+        app.state.cfg['LARK_COMPANY_ADMIN_GRANTS_JSON']=json.dumps([{'open_id':'u-manager', 'app_id':app.state.cfg['LARK_APP_ID'], 'tenant':'company', 'authorized_at':datetime.now(timezone.utc).isoformat(), 'enabled':True, 'role':'manager', 'grant_id':'test-grant', 'reason':'test', 'authorized_by':'owner', 'decision_ref':'test'}])
     class OAuth:
         def __init__(self,**kwargs): pass
         def __enter__(self): return self
@@ -249,21 +253,19 @@ def test_oauth_callback_waits_for_roster_and_denies_failed_read(tmp_path,monkeyp
     calls=[]
     def roster(wid):
         calls.append(wid)
-        if not succeeds:raise RuntimeError('private-token')
-        with app.state.sessions.begin() as db:
-            p=db.get(PersonRow,(wid,'u-manager'))
-            p.data={**p.data,'directory_last_seen_at':datetime.now(timezone.utc).isoformat()}
-        return {'fingerprint':'verified'}
+        raise RuntimeError('private-token')
     app.state.live_read.refreshers['roster']=roster
     login=client.get('/api/auth/lark/login',follow_redirects=False)
     state=parse_qs(urlparse(login.headers['location']).query)['state'][0]
     with app.state.sessions() as db: before=set(db.scalars(select(AuthRow.id)))
     response=client.get('/api/auth/lark/callback',params={'state':state,'code':'synthetic'},follow_redirects=False)
-    assert response.status_code==(307 if succeeds else 403),response.text
+    assert response.status_code==(403 if expected=='denied' else 307),response.text
     assert calls==['lark-company']
-    if not succeeds:
+    if expected=='denied':
         assert '名冊' in response.json()['detail'] and 'private-token' not in response.text
         with app.state.sessions() as db: assert set(db.scalars(select(AuthRow.id)))<=before
+    else:
+        assert client.get('/api/session').json()['access_mode']==expected
 
 
 @pytest.mark.parametrize('bootstrap',[True,False])

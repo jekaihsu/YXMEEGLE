@@ -820,8 +820,8 @@ def create_app(overrides=None):
         with sessions() as db:
             existing=db.get(PersonRow,(org,oid))
             admission_person=deepcopy(existing.data) if existing else user
-        require(ensure_roster_for_admission(app.state.live_read,org,admission_person,callback=True),
-                '公司名冊無法重新核實，請稍後再登入',403)
+        # The reloaded access policy preserves grants and bootstrap recovery on failure.
+        ensure_roster_for_admission(app.state.live_read,org,admission_person,callback=True)
         with sessions.begin() as db:
             profile=db.execute(select(PersonRow).where(PersonRow.organization_id==org,PersonRow.person_id==oid).with_for_update()).scalar_one_or_none()
             if profile:
