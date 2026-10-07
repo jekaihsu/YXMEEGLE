@@ -160,8 +160,9 @@ class RefreshCoordinator:
         except Exception as exc:
             blocked = isinstance(exc, ReadBlocked) or (isinstance(exc, HTTPException) and exc.status_code == 403)
             error_code = 'ReadBlocked' if blocked else type(exc).__name__
-            logger.warning('Live-read refresh failed: dataset=%s %s status=%s duration_ms=%d',
-                           dataset, error_code, getattr(exc, 'status_code', None),
+            detail = exc.detail if isinstance(exc, HTTPException) and isinstance(exc.detail, str) else ''
+            logger.warning('Live-read refresh failed: dataset=%s %s status=%s detail=%s duration_ms=%d',
+                           dataset, error_code, getattr(exc, 'status_code', None), detail[:160],
                            int((monotonic()-began)*1000))
             if not isinstance(exc, LeaseLost):
                 if not self._replace(key, claimed['revision'], dict(claimed, lease_until=None,
