@@ -205,8 +205,8 @@ def create_app(overrides=None):
                 row=WorkspaceRow(id=wid,version=1,data=data); db.add(row); db.flush()
                 row.data=storage.save(db,BusinessRow,wid,data)
 
-    def load(db,row):
-        state=upgrade(storage.load(db,BusinessRow,row))
+    def load(db,row,*,collections=None):
+        state=upgrade(storage.load(db,BusinessRow,row) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections))
         from .workspace_environment import normalize_environment
         from .case_cutover import initialize_execution_system
         normalize_environment(state,row.id,cfg)
@@ -280,7 +280,7 @@ def create_app(overrides=None):
             if data.get('mode')=='lark':
                 profile=db.get(PersonRow,(organization(data),data['uid']))
                 user=deepcopy(profile.data) if profile else find(load(db,row)['users'],data['uid'],'登入人員')
-            else: user=find(load(db,row)['users'],data['uid'],'登入人員')
+            else: user=find(load(db,row,collections=('users',))['users'],data['uid'],'登入人員')
             if (data.get('mode')=='lark' and not data['wid'].startswith('test-')
                     and request.url.path != '/api/live/status'):
                 from .live_read.admission import ensure_roster_for_admission
