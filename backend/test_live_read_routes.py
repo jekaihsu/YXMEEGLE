@@ -349,7 +349,8 @@ def test_public_freshness_omits_snapshot_and_exception_internals(harness):
     client.post('/api/live/refresh', json={'datasets': ['roster'], 'wait': True})
     response = client.get('/api/live/status')
     for dataset in response.json()['freshness']['datasets'].values():
-        assert not {'error_code', 'fingerprint', 'changed_at'} & dataset.keys()
+        assert not {'error_code', 'fingerprint'} & dataset.keys()
+        assert 'changed_at' in dataset  # the frontend auto-reload keys off it
     assert 'OSError' not in response.text
 
 

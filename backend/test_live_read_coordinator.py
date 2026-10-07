@@ -64,12 +64,12 @@ def test_freshness_snapshot_and_ttl(harness):
         'datasets': {
             'sources': {'as_of': '2026-10-07T10:00:00+08:00',
                         'fetched_at': '2026-10-07T10:00:00+08:00',
-                        'age_seconds': 0, 'ttl_seconds': 60, 'status': 'fresh',
+                        'changed_at': '2026-10-07T10:00:00+08:00', 'age_seconds': 0, 'ttl_seconds': 60, 'status': 'fresh',
                         'last_error': None, 'lark': {'calls': 0, 'retries': 0, 'duration_ms': 0}},
-            'roster': {'as_of': None, 'fetched_at': None, 'age_seconds': None,
+            'roster': {'as_of': None, 'fetched_at': None, 'changed_at': None, 'age_seconds': None,
                        'ttl_seconds': 60, 'status': 'never', 'last_error': None,
                        'lark': {'calls': 0, 'retries': 0, 'duration_ms': 0}, 'hard_max_age_seconds': 900},
-            'attendance': {'as_of': None, 'fetched_at': None, 'age_seconds': None,
+            'attendance': {'as_of': None, 'fetched_at': None, 'changed_at': None, 'age_seconds': None,
                            'ttl_seconds': 300, 'status': 'never', 'last_error': None,
                            'lark': {'calls': 0, 'retries': 0, 'duration_ms': 0}}}}
     c.ensure(h.wid, 'sources')

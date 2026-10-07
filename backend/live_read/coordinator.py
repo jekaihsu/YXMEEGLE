@@ -83,7 +83,7 @@ class RefreshCoordinator:
         result = freshness(rows, self.config, self._now(), self._enabled(wid), workspace_as_of)
         for dataset in DATASETS:
             # Snapshot fingerprints and internal exception classes are not public.
-            for field in ('fingerprint', 'changed_at', 'error_code'):
+            for field in ('fingerprint', 'error_code'):
                 result['datasets'][dataset].pop(field, None)
             if dataset not in self.refreshers:
                 result['datasets'][dataset]['status'] = 'unconfigured'
