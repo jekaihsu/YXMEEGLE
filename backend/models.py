@@ -1,5 +1,5 @@
 """Canonical database schema, importable without starting the application."""
-from sqlalchemy import Column, String, Integer, JSON
+from sqlalchemy import Column, String, Integer, JSON, Index
 from sqlalchemy.orm import declarative_base
 from . import storage
 
@@ -18,6 +18,7 @@ class CacheRow(Base):
     id=Column(String(120),primary_key=True); data=Column(JSON)
 class AuditRow(Base):
     __tablename__='action_audit'
+    __table_args__=(Index('ix_action_audit_workspace_created_id','workspace_id','created_at','id'),)
     id=Column(String(64),primary_key=True)
     workspace_id=Column(String(120),nullable=False,index=True)
     actor_id=Column(String(120),nullable=False)
