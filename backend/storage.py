@@ -5,6 +5,7 @@ business collections are rows with indexed workspace, kind, parent and ordering.
 All materialization happens within the caller's version-checked transaction.
 """
 from copy import deepcopy
+from . import index_tables
 from sqlalchemy import Column, String, Integer, JSON, ForeignKey, UniqueConstraint, select, delete
 
 COLLECTIONS=('users','projects','approvals','events','sop_templates','delegations','jobs','recurring','input_mappings','input_revisions','cost_allocations','daily_unmatched','daily_reviews','handover_requests','sop_requests','training_plans','capability_catalog','capability_awards','learning_standards','work_schedules','approved_leave_delegations','capability_bindings','learning_mappings','financial_requests','source_quotes','source_confirmations','contract_items')
@@ -101,6 +102,15 @@ def save(db,model,wid,state):
     new_events=[key for key in desired if key[0]=='events' and key not in existing]
     for index,key in enumerate(new_events):
         desired[key]['ordinal']=event_ordinal-len(new_events)+index
+    indexed=db.info.get('index_tables')
+    dirty=set(changed_projects)
+    if indexed:
+        # Moves and reorders change index rows without changing entity data.
+        for key,value in desired.items():
+            old=existing.get(key)
+            if old and key[0] in ('projects','nodes','tasks') and (old.parent_id!=value['parent_id'] or old.ordinal!=value['ordinal']):
+                pid=project_of(key,value)
+                if pid: dirty.add(pid)
     for key,value in desired.items():
         old=existing.pop(key,None)
         if old:
@@ -110,6 +120,9 @@ def save(db,model,wid,state):
         else: db.add(model(workspace_id=wid,kind=key[0],entity_id=key[1],**value))
     for row in existing.values():
         if row.kind!='events': db.delete(row)
+    if indexed:
+        index_tables.replace_projects(db,model,wid,state,dirty)
+        index_tables.replace_counters(db,model,wid,state)
     root['storage_schema']=2
     return root
 

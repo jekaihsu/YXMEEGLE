@@ -119,7 +119,7 @@ def create_app(overrides=None):
         database_path=make_url(db_url).database
         if database_path and database_path!=':memory:': Path(database_path).resolve().parent.mkdir(parents=True,exist_ok=True)
     engine=create_engine(db_url,connect_args={'check_same_thread':False,'timeout':20} if db_url.startswith('sqlite') else {},pool_pre_ping=True)
-    Base.metadata.create_all(engine); sessions=sessionmaker(engine,expire_on_commit=False)
+    Base.metadata.create_all(engine); sessions=sessionmaker(engine,expire_on_commit=False,info={'index_tables':str(cfg.get('INDEX_TABLES_ENABLED','false')).lower()=='true'})
     # Migration is reversible: preserve the original JSON before normalizing.
     with sessions.begin() as db:
         for row in db.scalars(select(WorkspaceRow)):
