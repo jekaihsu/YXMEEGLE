@@ -133,11 +133,14 @@ def test_demo_app_pages_include_disabled_freshness_without_network(tmp_path):
     assert client.post('/api/live/refresh',json={'datasets':['sources']}).status_code==403
 
 
-def production_client(tmp_path):
-    app,client=company(tmp_path)
+def production_client(tmp_path, *, enabled=True):
+    # F1 snapshots validated settings at coordinator creation, as production does.
+    app,client=company(tmp_path, {'LARK_LIVE_READ_ENABLED':str(enabled).lower(),
+        'LARK_WORKER_IDENTITY':'application','LARK_LIVE_READ_TRANSPORT':'deny'})
     assert client.post('/api/workspace/switch',json={'environment':'production'}).status_code==200
-    app.state.cfg.update(LARK_LIVE_READ_ENABLED='true',LARK_WORKER_IDENTITY='application',LARK_LIVE_READ_TRANSPORT='deny')
+    app.state.live_read.close()
     app.state.live_read.executor=SynchronousExecutor()
+    app.state.live_read.roster_executor=app.state.live_read.executor
     return app,client
 
 
@@ -212,8 +215,8 @@ def test_manual_sync_delegates_with_same_permissions_and_returns_cached_response
 
 
 def test_test_session_never_calls_roster_even_when_person_is_stale(tmp_path):
-    app,client=company(tmp_path)
-    app.state.cfg.update(LARK_LIVE_READ_ENABLED='true',LARK_WORKER_IDENTITY='application')
+    app,client=company(tmp_path, {'LARK_LIVE_READ_ENABLED':'true',
+        'LARK_WORKER_IDENTITY':'application','LARK_LIVE_READ_TRANSPORT':'deny'})
     with app.state.sessions.begin() as db:
         p=db.get(PersonRow,('lark-company','u-manager'))
         p.data={**p.data,'directory_last_seen_at':(datetime.now(timezone.utc)-timedelta(seconds=90)).isoformat()}
@@ -288,7 +291,7 @@ def test_enabled_attendance_rejects_custom_dates_before_refresh(tmp_path):
 
 
 def test_disabled_attendance_preserves_custom_date_arguments(tmp_path):
-    app,client=production_client(tmp_path);app.state.cfg['LARK_LIVE_READ_ENABLED']='false'
+    app,client=production_client(tmp_path,enabled=False)
     calls=[]
     def sync(wid,actor,date_from,date_to):
         calls.append((wid,actor,date_from,date_to))

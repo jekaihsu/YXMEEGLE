@@ -10,11 +10,11 @@ from . import storage
 from .production_access import admitted, access_mode
 
 
-def company(tmp_path):
+def company(tmp_path, overrides=None):
     app=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/company.db','UPLOAD_DIR':str(tmp_path/'uploads'),
                     'DEMO_MODE':'false','APP_ENV':'development','LARK_APP_ID':'app1','LARK_APP_SECRET':'unused',
                     'LARK_REDIRECT_URI':'https://example.test/api/auth/lark/callback','LARK_ALLOWED_TENANTS':'company',
-                    'LARK_WORKER_ORGANIZATION':'company'})
+                    'LARK_WORKER_ORGANIZATION':'company', **(overrides or {})})
     state=upgrade(seed()); state['environment']='production'
     for u in state['users']:
         u.update(identity_app_id='app1',directory_status='employed',directory_missing=False,directory_last_seen_at=datetime.now(timezone.utc).isoformat(),
