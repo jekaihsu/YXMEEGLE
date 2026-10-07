@@ -86,7 +86,7 @@ def test_age_bands_refresh_then_reload_before_access(harness, age, wait):
 
     h.coordinator.ensure = record
     assert ensure_roster_for_admission(h.coordinator, h.wid, old, now=h.now)
-    assert seen == ([] if wait is None else [{'wait': wait, 'force': wait}])
+    assert seen == ([] if wait is None else [{'wait': wait, 'force': wait and age is not None}])
     assert len(h.calls) == (0 if wait is None else 1)
     assert require_access(h.reload(), 'app1', now=h.now) == 'normal'
     if age is None or age > 900:
@@ -144,7 +144,7 @@ def test_failed_blocking_read_keeps_bootstrap_recovery(harness):
     h.person.update(role='manager', bootstrap_admin=True)
     person = h.store(901)
     h.coordinator.refreshers['roster'] = fail_refresh
-    assert not ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now)
+    assert ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now)
     assert require_access(h.reload(), 'app1', now=h.now, allow_recovery=True) == 'recovery'
 
 
@@ -159,7 +159,7 @@ def test_company_admin_grant_remains_normal_on_failed_read(harness):
         'grant_id': 'grant1', 'reason': 'test', 'authorized_by': 'owner', 'decision_ref': 'test1'}])
     person = h.store(901)
     h.coordinator.refreshers['roster'] = fail_refresh
-    assert not ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now)
+    assert ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now)
     assert require_access(h.reload(), 'app1', now=h.now, cfg=h.cfg, tenant='tenant') == 'normal'
 
 
@@ -253,3 +253,30 @@ def test_incomplete_blocking_result_is_failure(harness, status):
     h = harness
     h.coordinator.ensure = lambda *args, **kwargs: {'status': status}
     assert not ensure_roster_for_admission(h.coordinator, h.wid, {}, now=h.now)
+
+
+@pytest.mark.parametrize('fails', [False, True])
+def test_unknown_age_reuses_roster_result_and_error_cooldown(harness, fails):
+    h = harness
+    person = h.store(None)
+    calls = []
+    def absent(wid):
+        calls.append(wid)
+        if fails:
+            raise OSError('outage')
+        return {'fingerprint': 'absent'}
+    h.coordinator.refreshers['roster'] = absent
+    for _ in range(5):
+        ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now)
+        assert access_mode(h.reload(), 'app1', now=h.now) == 'denied'
+    assert calls == [h.wid]
+
+
+def test_unknown_bootstrap_uses_nonblocking_refresh(harness):
+    h = harness
+    h.person.update(role='manager', bootstrap_admin=True)
+    person = h.store(None)
+    seen = []
+    h.coordinator.ensure = lambda *args, **kwargs: seen.append(kwargs) or {'status': 'refreshing'}
+    assert ensure_roster_for_admission(h.coordinator, h.wid, person, now=h.now)
+    assert seen == [{'wait': False, 'force': False}]
