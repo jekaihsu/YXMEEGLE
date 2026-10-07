@@ -40,6 +40,7 @@ cd "$repo_root/frontend"
 npm ci
 npm run test:session-epoch
 npm run test:api-response
+npm run test:perf
 node test-company-route.mjs
 npm run build
 npm run test:dev-tooling

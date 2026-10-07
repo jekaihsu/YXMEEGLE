@@ -8,7 +8,7 @@ import {projectQuotes} from './sourceQuotes';
 import {ProjectReadiness,SourceContractIndex} from './ProjectReadiness';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useRef, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { Activity, ArrowDown, ArrowRight, ArrowUpRight, BarChart3, Bell, CalendarDays, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Circle, CircleCheck, CircleDot, Clock3, Copy, Download, ExternalLink, File, FileCheck2, FilePlus2, Files, Filter, FolderOpen, GitBranch, LayoutDashboard, Link2, ListTodo, Loader2, Menu, MessageSquare, MoreHorizontal, Network, Pause, Play, Plus, RefreshCw, Search, Send, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, TriangleAlert, Upload, Users, X } from 'lucide-react';
-import { api, ApiError, readRoute, normalizeRoute, getSessionEpoch, invalidateSessionEpoch, liveRefresh } from './api';
+import { api, perfFirstRender, ApiError, readRoute, normalizeRoute, getSessionEpoch, invalidateSessionEpoch, liveRefresh } from './api';
 import { ProjectOperations, Administration, Routines, ActionForm, Field as OpsField } from './Operations';
 import {useDialogFocus} from './useDialogFocus';
 import {MentionComposer,MentionTags,MentionDelivery} from './MentionComposer';
@@ -98,7 +98,7 @@ export default function App(){
   provider_unavailable:{title:'Lark 登入服務暫時無法使用',description:'目前無法向 Lark 完成登入驗證。',next:'稍後重新登入；若持續發生，請聯絡系統管理員。'}
  };const callbackError=authMessages[new URLSearchParams(location.search).get('auth_error')||''];
  // Versions are ordered within a session epoch, never across identities/workspaces.
- const acceptWorkspace=useCallback((next:Workspace,epoch:number)=>{if(epoch!==getSessionEpoch())return false;const previous=workspaceRef.current;if(previous&&next.version<previous.version)return false;workspaceRef.current=next;setW(next);setWorkspaceReload(value=>value+1);return true},[]);
+ const acceptWorkspace=useCallback((next:Workspace,epoch:number)=>{if(epoch!==getSessionEpoch())return false;const previous=workspaceRef.current;if(previous&&next.version<previous.version)return false;workspaceRef.current=next;setW(next);setWorkspaceReload(value=>value+1);perfFirstRender();return true},[]);
  const acceptFreshness=useCallback((next:Freshness)=>{if(liveFreshnessRef.current&&Date.parse(next.server_time)<Date.parse(liveFreshnessRef.current.server_time))return;rawFreshnessRef.current=next;const previous=workspaceRef.current;if(previous){const merged={...previous,freshness:next};workspaceRef.current=merged;setW(merged)}else onFreshness(next,next)},[onFreshness]);
  const onRefreshError=useCallback((datasets:LiveDataset[])=>{if(rawFreshnessRef.current)acceptFreshness(failedFreshness(rawFreshnessRef.current,datasets))},[acceptFreshness]);
  const clearWorkspace=useCallback(()=>{invalidateSessionEpoch();sessionKey.current='';refreshOrder.current++;mutationActive.current=null;setBusy(false);setDirtyDraft(false);dirtyDraftRef.current=false;liveFreshnessRef.current=undefined;rawFreshnessRef.current=undefined;setLiveFreshness(undefined);workspaceRef.current=undefined;setW(undefined);setToast('');setCompletionMoment(null);setSessionOpen(false)},[]);

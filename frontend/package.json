@@ -24,6 +24,7 @@
     "test:source-lifecycle": "node test-source-lifecycle.mjs",
     "test:execution-admission": "node test-execution-admission.mjs",
     "test:api-response": "node test-api-response.mjs",
+    "test:perf": "node test-perf.mjs",
     "test:dev-tooling": "node --test --test-timeout=30000 test-dev-tooling.mjs",
     "test:live-read-regressions": "node test-live-read-regressions.mjs"
   },
