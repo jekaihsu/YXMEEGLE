@@ -17,6 +17,7 @@
     "test:native-approval-a11y": "node test-native-approval-a11y.mjs && node test-approval-detail-a11y.mjs",
     "test:financial-draft": "node test-financial-draft-scope.mjs",
     "test:form-draft": "node test-form-draft-identity.mjs && node test-recurring-draft-period.mjs && node test-draft-callsites.mjs",
+    "test:freshness-wiring": "node test-freshness-wiring.mjs",
     "test:data-freshness": "node test-data-freshness.mjs",
     "test:company-cockpit": "node test-company-cockpit.mjs",
     "test:source-lifecycle": "node test-source-lifecycle.mjs",

@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react';
 import {ArrowUpRight,RefreshCw} from 'lucide-react';
 import {api} from './api';
+import type {Freshness} from './types';
 import {lifecycleLabel,lifecycleReasonLabel,quoteWorkflowLabel,type SourceLifecycle} from './sourceLifecycle';
 import {AdmissionCell} from './ExecutionAdmission';
 import './CompanyCockpit.css';
@@ -16,20 +17,20 @@ export interface CompanyDashboard {
 const count=(n:number)=>n.toLocaleString('zh-TW');
 const time=(v:string|null)=>v&&!Number.isNaN(Date.parse(v))?new Date(v).toLocaleString('zh-TW',{hour12:false}):'尚無成功同步紀錄';
 const sourceLabel=(v:string)=>({ready:'已同步',review_required:'待核對',pending:'等待同步',error:'同步異常',disabled:'尚未啟用'}[v]||'待核對');
-export function CompanyCockpit({refreshVersion,role}:{refreshVersion:number;role?:string|null}){
+export function CompanyCockpit({refreshVersion,role,freshness}:{refreshVersion:number;role?:string|null;freshness?:Freshness}){
  const[data,setData]=useState<CompanyDashboard>();const[error,setError]=useState('');const[loading,setLoading]=useState(true);
  const[q,setQ]=useState('');const[search,setSearch]=useState('');const[group,setGroup]=useState('');const[lifecycle,setLifecycle]=useState('');const[offset,setOffset]=useState(0);const[reload,setReload]=useState(0);
  useEffect(()=>{const timer=window.setTimeout(()=>{setSearch(q.trim());setOffset(0)},250);return()=>window.clearTimeout(timer)},[q]);
  useEffect(()=>{let active=true;const controller=new AbortController();setLoading(true);setError('');const params=new URLSearchParams({offset:String(offset),limit:'40'});if(search)params.set('q',search);if(group)params.set('group',group);if(lifecycle)params.set('lifecycle',lifecycle);
   api<CompanyDashboard>(`/api/company-dashboard?${params}`,{signal:controller.signal}).then(result=>{if(active)setData(result)}).catch(e=>{if(active)setError(e instanceof Error?e.message:'暫時無法讀取公司資料')}).finally(()=>{if(active)setLoading(false)});return()=>{active=false;controller.abort()};
- },[search,group,lifecycle,offset,reload,refreshVersion]);
+ },[search,group,lifecycle,offset,reload,refreshVersion,freshness?.datasets.sources.changed_at]);
  const total=data?.totals;
  return <div className="company-cockpit" aria-busy={loading}>
   <header className="cockpit-heading"><div><p className="cockpit-eyebrow">YONG XIANG · 全公司</p><h1>公司駕駛艙</h1><p>案件與報價紀錄、工作台交付與各組工作量。</p></div><button className="button" disabled={loading} onClick={()=>setReload(n=>n+1)}><RefreshCw size={16}/>重新整理</button></header>
   {error&&<div className="cockpit-error" role="alert"><strong>資料暫時無法更新</strong><p>{error}</p>{data&&<p>下方保留上次成功讀取的資料，請勿視為最新狀態。</p>}<button className="button" onClick={()=>setReload(n=>n+1)}>重試</button></div>}
   {!data&&loading&&<p className="cockpit-loading" role="status">正在讀取全公司案件與交付資料…</p>}
   {data&&total&&<>
-   <div className="cockpit-freshness" role="status"><span>{loading?'正在更新…':`資料時間 ${time(data.checked_at)}`}</span><span>來源：{data.source.status==='ready'&&data.source.mapping_status==='review_required'?'來源已讀取，部分關聯待核對':sourceLabel(data.source.status)} · 最後成功 {time(data.source.last_success_at)}</span></div>
+   <div className="cockpit-freshness" role="status"><span>{loading?'正在更新…':`資料時間 ${time(freshness?.datasets.sources.as_of||data.checked_at)}`}</span><span>來源：{data.source.status==='ready'&&data.source.mapping_status==='review_required'?'來源已讀取，部分關聯待核對':sourceLabel(data.source.status)} · 最後成功 {time(data.source.last_success_at)}</span></div>
    <section className="cockpit-source" aria-labelledby="cockpit-source-title"><div className="cockpit-section-title"><h2 id="cockpit-source-title">案件與報價紀錄</h2><span>V4 與報價總表同步資料</span></div><div className="cockpit-source-layout"><div className="cockpit-case-total"><strong>{count(total.cases)}</strong><span>來源紀錄</span></div><div><p className="cockpit-source-summary">已成案 {count(total.confirmed_cases)} 件／待確認報價 {count(total.intake_records)} 筆</p><h3 className="cockpit-breakdown-title">案件狀態（工程進度）</h3><div className="cockpit-distribution">{Object.entries(total.lifecycle_counts||{}).sort((a,b)=>b[1]-a[1]).map(([label,n])=><button key={label} className={lifecycle===label?'selected':''} onClick={()=>{setLifecycle(lifecycle===label?'':label);setOffset(0)}} aria-pressed={lifecycle===label}><span>{label}</span><span className="cockpit-bar" aria-hidden="true"><i style={{width:`${total.cases?n/total.cases*100:0}%`}}/></span><strong>{count(n)}</strong></button>)}{!total.cases&&<p>目前沒有可顯示的來源紀錄。</p>}</div><p className="cockpit-note">案件狀態只採用來源「案件狀態」欄位的明確選項；空白、無法對應或互相衝突時顯示「待核對」，不會由日期、入帳或成案推斷結案。報價狀態與「待確認單」關聯另列，「待確認單」僅表示尚未關聯確認單。</p></div></div></section>
    <section className="cockpit-delivery" aria-labelledby="cockpit-delivery-title"><div className="cockpit-section-title"><h2 id="cockpit-delivery-title">工作台已確認任務</h2><span>僅計入已啟用執行的案件，不代表工程實際完成率</span></div><p className="cockpit-note">已啟用 {count(total.workbench_cases)} 件案件 · 已確認 {count(total.deliveries_confirmed)} 筆交付成果</p><dl className="cockpit-metrics"><div><dt>已完成 / 全部任務</dt><dd>{count(total.tasks_completed)} <small>/ {count(total.tasks_total)}</small></dd></div><div><dt>已設定期限且逾期</dt><dd>{count(total.tasks_overdue)}</dd></div><div><dt>待本地確認</dt><dd>{count(total.pending_local_reviews)}</dd></div><div><dt>待 Lark 審批</dt><dd>{count(total.pending_native_reviews)}</dd></div></dl><p className="cockpit-note">{total.tasks_total===0?'尚無工作台已啟用案件的任務資料。 ':''}{data.missing.task_due_date>0?`${count(data.missing.task_due_date)} 項任務未設定期限，無法判斷是否逾期。`:'逾期判斷依已設定的任務期限。'}來源已結案不會自動視為工作台任務已完成。</p></section>
    <section className="cockpit-groups" aria-labelledby="cockpit-groups-title"><div className="cockpit-section-title"><h2 id="cockpit-groups-title">各組工作量</h2><span>案件數與工作台已確認任務</span></div><div className="cockpit-table-scroll"><table><thead><tr><th>組別</th><th>案件</th><th>已完成 / 任務</th><th>逾期</th></tr></thead><tbody>{data.groups.map(row=><tr key={row.group}><th scope="row"><button className="cockpit-group-button" onClick={()=>{setGroup(row.group);setOffset(0)}}>{row.group||'未設定組別'}</button></th><td>{count(row.cases)}</td><td>{count(row.tasks_completed)} / {count(row.tasks_total)}</td><td>{count(row.tasks_overdue)}</td></tr>)}</tbody></table></div>{!data.groups.length&&<p className="cockpit-note">目前沒有組別工作量資料。</p>}{data.missing.group>0&&<p className="cockpit-note">{count(data.missing.group)} 件案件尚無工作台組別資料。</p>}</section>
