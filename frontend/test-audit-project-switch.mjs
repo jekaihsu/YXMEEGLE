@@ -81,6 +81,32 @@ for(const status of [404,503]){
  await settle(last('B'),200,rowsOf('AUDIT_B',1,1));
  assert.ok(text().includes('AUDIT_B_0'));
 }
-console.log('audit trail project switch isolation: ok');
+// A version refresh can shrink a three-page result below the requested offset.
+// Cover both a nonempty first page and an empty result, plus the legacy 404 fallback.
+for(const mode of ['api-one','api-empty','legacy']){
+ await act(async()=>root.render(null));calls=[];
+ const largeEvents=Array.from({length:61},(_,i)=>({id:`E${i}`,project_id:'A',message:`LEGACY_LARGE_${i}`,at:'t'}));
+ const showVersion=async(version,events)=>act(async()=>root.render(React.createElement(AuditTrail,{w:{...w,version,events},p:P('A')})));
+ await showVersion(1,largeEvents);
+ await settle(last('A'),mode==='legacy'?404:200,rowsOf('AUDIT_LARGE',30,61));
+ for(const offset of ['30','60']){
+  await act(async()=>{[...document.querySelectorAll('button')].find(b=>b.textContent==='下一頁').click()});
+  assert.equal(last('A').offset,offset);
+  await settle(last('A'),mode==='legacy'?404:200,rowsOf('AUDIT_LARGE',offset==='60'?1:30,61));
+ }
+ const total=mode==='api-empty'?0:1;
+ await showVersion(2,[{id:'SURVIVOR',project_id:'A',message:'LEGACY_SURVIVOR',at:'t'}]);
+ const refresh=last('A');assert.equal(refresh.offset,'60');
+ assert.ok(!text().includes('共 61 筆'),'old count hidden while refresh is pending');
+ await settle(refresh,mode==='legacy'?404:200,{items:[],total});
+ const recovery=last('A');assert.notEqual(recovery,refresh,'out-of-range page must refetch');
+ assert.equal(recovery.offset,'0','request offset resets to the remaining page');
+ await settle(recovery,mode==='legacy'?404:200,rowsOf('AUDIT_SURVIVOR',total,total));
+ assert.ok(text().includes(`共 ${total} 筆`),'count reflects refreshed total');
+ assert.equal(document.querySelectorAll('article').length,total);
+ if(total)assert.ok(text().includes(mode==='legacy'?'LEGACY_SURVIVOR':'AUDIT_SURVIVOR_0'));
+ for(const button of document.querySelectorAll('button'))assert.ok(button.disabled,'single-page result disables navigation');
+}
+console.log('audit trail project switch isolation and shrinking totals: ok');
 await act(async()=>root.unmount());
 dom.window.close();
