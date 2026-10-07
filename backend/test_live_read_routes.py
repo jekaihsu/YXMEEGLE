@@ -228,7 +228,7 @@ def test_test_session_never_calls_roster_even_when_person_is_stale(tmp_path):
     assert app.state.live_read.queue_depth==0
 
 
-@pytest.mark.parametrize('kind,expected', [('bootstrap', 'recovery'), ('grant', 'normal'), ('member', 'denied')])
+@pytest.mark.parametrize('kind,expected', [('bootstrap', 'recovery'), ('grant', 'normal'), ('member', 'denied'), ('fresh_member', 'normal')])
 def test_oauth_failed_roster_preserves_access_policy(tmp_path,monkeypatch,kind,expected):
     from urllib.parse import parse_qs,urlparse
     from sqlalchemy import select
@@ -236,8 +236,8 @@ def test_oauth_failed_roster_preserves_access_policy(tmp_path,monkeypatch,kind,e
     app,client=production_client(tmp_path)
     with app.state.sessions.begin() as db:
         p=db.get(PersonRow,('lark-company','u-manager'))
-        p.data={**p.data,'role':'member' if kind=='member' else 'manager', 'bootstrap_admin':kind=='bootstrap',
-                'authz_version':1, 'directory_last_seen_at':(datetime.now(timezone.utc)-timedelta(seconds=901)).isoformat()}
+        p.data={**p.data,'role':'member' if kind in ('member', 'fresh_member') else 'manager', 'bootstrap_admin':kind=='bootstrap',
+                'authz_version':1, 'directory_last_seen_at':(datetime.now(timezone.utc)-timedelta(seconds=90 if kind=='fresh_member' else 901)).isoformat()}
     if kind=='grant':
         import json
         app.state.cfg['LARK_COMPANY_ADMIN_GRANTS_JSON']=json.dumps([{'open_id':'u-manager', 'app_id':app.state.cfg['LARK_APP_ID'], 'tenant':'company', 'authorized_at':datetime.now(timezone.utc).isoformat(), 'enabled':True, 'role':'manager', 'grant_id':'test-grant', 'reason':'test', 'authorized_by':'owner', 'decision_ref':'test'}])
@@ -338,3 +338,42 @@ def test_app_shutdown_closes_both_coordinator_executors(tmp_path):
     for executor in (coordinator.executor, coordinator.roster_executor):
         with pytest.raises(RuntimeError, match='shutdown'):
             executor.submit(lambda: None)
+
+
+def test_public_freshness_omits_snapshot_and_exception_internals(harness):
+    client, coordinator, _, _, _ = harness
+    coordinator.ensure('lark-company', 'sources', wait=True)
+    def failed(wid):
+        raise OSError('private details')
+    coordinator.refreshers['roster'] = failed
+    client.post('/api/live/refresh', json={'datasets': ['roster'], 'wait': True})
+    response = client.get('/api/live/status')
+    for dataset in response.json()['freshness']['datasets'].values():
+        assert not {'error_code', 'fingerprint', 'changed_at'} & dataset.keys()
+    assert 'OSError' not in response.text
+
+
+def test_forced_refresh_records_actor_and_datasets(tmp_path):
+    from .app import AuditRow
+    from sqlalchemy import select
+    app, client = production_client(tmp_path)
+    app.state.live_read.refreshers['roster'] = lambda wid: {'fingerprint': 'audit'}
+    response = client.post('/api/live/refresh', json={'datasets': ['roster', 'roster'], 'force': True, 'wait': True})
+    assert response.status_code == 200, response.text
+    with app.state.sessions() as db:
+        rows = list(db.scalars(select(AuditRow).where(AuditRow.actor_id == 'u-manager')))
+    forced = [row for row in rows if row.data.get('force')]
+    assert len(forced) == 1
+    assert forced[0].data['datasets'] == ['roster']
+
+
+@pytest.mark.parametrize('path', ['/api/workspace', '/api/sources'])
+def test_display_cache_read_failure_returns_cached_content(tmp_path, path):
+    app, client = production_client(tmp_path)
+    def failed(key):
+        raise OSError('private database details')
+    app.state.live_read._read = failed
+    response = client.get(path)
+    assert response.status_code == 200, response.text
+    assert response.json()['freshness']['datasets']['sources']['status'] == 'error'
+    assert 'private database details' not in response.text

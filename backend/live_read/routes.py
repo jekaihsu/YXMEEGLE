@@ -34,7 +34,7 @@ def refresh(coordinator, wid, datasets, *, wait=False, force=False):
     return JSONResponse({'freshness': freshness}, status_code=202 if pending else 200)
 
 
-def register(app, identity, coordinator, *, authorize=None):
+def register(app, identity, coordinator, *, authorize=None, audit=None):
     @app.get('/api/live/status')
     def status(request: Request):
         data, user = identity(request)
@@ -54,4 +54,6 @@ def register(app, identity, coordinator, *, authorize=None):
                 if authorize is None:
                     raise HTTPException(403, '需要資料同步權限')
                 authorize(wid, dataset, user)
+        if body.force and audit is not None:
+            audit(wid, user, datasets)
         return refresh(coordinator, wid, datasets, wait=body.wait, force=body.force)

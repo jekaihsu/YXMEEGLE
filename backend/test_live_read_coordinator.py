@@ -65,15 +65,12 @@ def test_freshness_snapshot_and_ttl(harness):
             'sources': {'as_of': '2026-10-07T10:00:00+08:00',
                         'fetched_at': '2026-10-07T10:00:00+08:00',
                         'age_seconds': 0, 'ttl_seconds': 60, 'status': 'fresh',
-                        'fingerprint': 'sha256:first', 'changed_at': '2026-10-07T10:00:00+08:00',
                         'last_error': None, 'lark': {'calls': 0, 'retries': 0, 'duration_ms': 0}},
             'roster': {'as_of': None, 'fetched_at': None, 'age_seconds': None,
-                       'ttl_seconds': 60, 'status': 'never', 'fingerprint': None,
-                       'changed_at': None, 'last_error': None,
+                       'ttl_seconds': 60, 'status': 'never', 'last_error': None,
                        'lark': {'calls': 0, 'retries': 0, 'duration_ms': 0}, 'hard_max_age_seconds': 900},
             'attendance': {'as_of': None, 'fetched_at': None, 'age_seconds': None,
-                           'ttl_seconds': 300, 'status': 'never', 'fingerprint': None,
-                           'changed_at': None, 'last_error': None,
+                           'ttl_seconds': 300, 'status': 'never', 'last_error': None,
                            'lark': {'calls': 0, 'retries': 0, 'duration_ms': 0}}}}
     c.ensure(h.wid, 'sources')
     assert h.calls == [h.wid]
@@ -81,7 +78,7 @@ def test_freshness_snapshot_and_ttl(harness):
     assert c.status(h.wid)['datasets']['sources']['status'] == 'stale'
     c.ensure(h.wid, 'sources')
     assert len(h.calls) == 2
-    assert c.status(h.wid)['datasets']['sources']['changed_at'] == '2026-10-07T10:00:00+08:00'
+    assert c._read(c._key(h.wid, 'sources'))['changed_at'] == '2026-10-07T10:00:00+08:00'
 
 
 def test_as_of_is_read_start_and_changed_at_advances_only_on_change(harness):
@@ -191,7 +188,7 @@ def test_lease_expiry_and_late_owner_is_fenced(harness):
     from .live_read.coordinator import LeaseLost
     with pytest.raises(LeaseLost):
         a._futures[a._key(h.wid, 'sources')].result(timeout=2)
-    assert a.status(h.wid)['datasets']['sources']['fingerprint'] == 'new-owner'
+    assert a._read(a._key(h.wid, 'sources'))['fingerprint'] == 'new-owner'
 
 
 def test_wait_timeout_local_and_foreign_lease(harness):

@@ -68,7 +68,12 @@ class RefreshCoordinator:
             return dict(row.data or {}) if row else {}
 
     def status(self, wid):
-        rows = {d: self._read(self._key(wid, d)) for d in DATASETS}
+        rows = {}
+        for dataset in DATASETS:
+            try:
+                rows[dataset] = self._read(self._key(wid, dataset))
+            except Exception:
+                rows[dataset] = {'last_error': 'Lark refresh failed'}
         workspace_as_of = None
         if not self._enabled(wid):
             from ..models import WorkspaceRow
@@ -77,6 +82,9 @@ class RefreshCoordinator:
                 workspace_as_of = (workspace.data or {}).get('as_of') if workspace else None
         result = freshness(rows, self.config, self._now(), self._enabled(wid), workspace_as_of)
         for dataset in DATASETS:
+            # Snapshot fingerprints and internal exception classes are not public.
+            for field in ('fingerprint', 'changed_at', 'error_code'):
+                result['datasets'][dataset].pop(field, None)
             if dataset not in self.refreshers:
                 result['datasets'][dataset]['status'] = 'unconfigured'
         return result
@@ -167,9 +175,16 @@ class RefreshCoordinator:
             self.roster_executor.shutdown(wait=True)
 
     def ensure(self, wid, dataset, *, wait=False, force=False):
+        if dataset not in DATASETS:
+            raise ValueError('Unknown live-read dataset')
         deadline = monotonic() + self.config.blocking_timeout_seconds
         while True:
-            result = self._ensure_once(wid, dataset, wait=wait, force=force, deadline=deadline)
+            try:
+                result = self._ensure_once(wid, dataset, wait=wait, force=force, deadline=deadline)
+            except Exception:
+                if wait:
+                    raise
+                return dict(status='error', last_error='Lark refresh failed')
             if not wait or result['status'] != 'busy':
                 return result
             # A pending claimant owns this attempt; retries join its result.

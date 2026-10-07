@@ -942,7 +942,12 @@ def create_app(overrides=None):
             db.add(audit.record(AuditRow,wid,user['id'],action,details={'live_read':True}))
         return None
 
-    register_live(app,identity,app.state.live_read,authorize=authorize_live)
+    def audit_live_refresh(wid,user,datasets):
+        with sessions.begin() as db:
+            db.add(audit.record(AuditRow,wid,user['id'],'live_refresh',
+                                details={'live_read':True,'force':True,'datasets':datasets}))
+
+    register_live(app,identity,app.state.live_read,authorize=authorize_live,audit=audit_live_refresh)
     from .runtime_health import register as register_runtime_health
     register_runtime_health(app,identity,sessions,CacheRow,cfg,workspace_model=WorkspaceRow,coordinator=app.state.live_read)
 
