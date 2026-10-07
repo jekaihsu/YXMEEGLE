@@ -5,7 +5,6 @@ business collections are rows with indexed workspace, kind, parent and ordering.
 All materialization happens within the caller's version-checked transaction.
 """
 from copy import deepcopy
-from . import index_tables
 from sqlalchemy import Column, String, Integer, JSON, ForeignKey, UniqueConstraint, select, delete
 
 COLLECTIONS=('users','projects','approvals','events','sop_templates','delegations','jobs','recurring','input_mappings','input_revisions','cost_allocations','daily_unmatched','daily_reviews','handover_requests','sop_requests','training_plans','capability_catalog','capability_awards','learning_standards','work_schedules','approved_leave_delegations','capability_bindings','learning_mappings','financial_requests','source_quotes','source_confirmations','contract_items')
@@ -121,6 +120,7 @@ def save(db,model,wid,state):
     for row in existing.values():
         if row.kind!='events': db.delete(row)
     if indexed:
+        from . import index_tables  # lazy: storage must stay importable inside the isolated backup helper bundle
         index_tables.replace_projects(db,model,wid,state,dirty)
         index_tables.replace_counters(db,model,wid,state)
     root['storage_schema']=2
