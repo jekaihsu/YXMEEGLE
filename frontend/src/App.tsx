@@ -1,13 +1,12 @@
 import {useReloadGuard} from './reloadGuard';
 import {ageFreshness,datasetNotice,failedFreshness} from './freshness';
 import {DataFreshness} from './DataFreshness';
-import {CompanyCockpit} from './CompanyCockpit';
 import {RecoveryPage} from './RecoveryPage';
 import {AdmissionCell,ExecutionAdmissionQueue} from './ExecutionAdmission';
 import {ProjectExecutionNotice,executionAllowed,executionReason} from './ProjectExecution';
 import {projectQuotes} from './sourceQuotes';
 import {ProjectReadiness,SourceContractIndex} from './ProjectReadiness';
-import { useCallback, useEffect, useMemo, useState, useRef, type FormEvent, type MouseEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useRef, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { Activity, ArrowDown, ArrowRight, ArrowUpRight, BarChart3, Bell, CalendarDays, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Circle, CircleCheck, CircleDot, Clock3, Copy, Download, ExternalLink, File, FileCheck2, FilePlus2, Files, Filter, FolderOpen, GitBranch, LayoutDashboard, Link2, ListTodo, Loader2, Menu, MessageSquare, MoreHorizontal, Network, Pause, Play, Plus, RefreshCw, Search, Send, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, TriangleAlert, Upload, Users, X } from 'lucide-react';
 import { api, ApiError, readRoute, normalizeRoute, getSessionEpoch, invalidateSessionEpoch, liveRefresh } from './api';
 import { ProjectOperations, Administration, Routines, ActionForm, Field as OpsField } from './Operations';
@@ -27,6 +26,8 @@ import {SourceMappingSummary} from './SourceMappingSummary';
 import {lifecycleGate} from './sourceLifecycle';
 import {CompletionCelebration,newlyCompletedNodes,type CompletionMoment} from './CompletionCelebration';
 import type { Approval, Node, Project, Route, Session, SourceData, Task, User, Workspace, Freshness, LiveDataset } from './types';
+
+const CompanyCockpit = lazy(() => import('./CompanyCockpit').then(module => ({default: module.CompanyCockpit})));
 
 type ActionScope={project_id?:string;node_id?:string;task_id?:string};
 type Ctx={w:Workspace;s:Session;busy:boolean;error:string;registerDrafts:(scope:DraftScope|null)=>void;onFreshness?:(freshness:Freshness)=>void;onRefreshError?:(datasets:LiveDataset[])=>void;reloadVersion?:number;route:Route;go:(r:Route)=>void;run:(action:string,payload?:Record<string,unknown>,scope?:ActionScope)=>Promise<Workspace|undefined>;refresh:()=>Promise<void>;notify:(m:string)=>void;upload:(form:FormData)=>Promise<boolean>};
@@ -136,7 +137,7 @@ export default function App(){
   {callbackError&&<div className="error-banner auth-callback-banner" role="alert"><TriangleAlert size={18}/><span><strong>{callbackError.title}</strong><br/>{callbackError.description} {callbackError.next}</span><a className="text-button" href="/api/auth/lark/login">重新登入</a></div>}
   {error&&<div className="error-banner workspace-error" role="alert"><TriangleAlert size={18}/><span>{error}</span><button className="text-button" onClick={()=>{setError('');void refresh()}}>重新載入</button><button className="icon-button" onClick={()=>setError('')} aria-label="關閉錯誤訊息"><X size={16}/></button></div>}
   {!c?<div className="loading-page"><span className="brand-mark"><i/><i/><i/><i/></span><h2>{error?'暫時無法連接工作區':'準備你的工作台'}</h2><p>{error?'請確認服務已啟動，或使用下方登入。':'正在讀取案件、排程與參與人員'}</p>{!error?<Loader2 className="spin"/>:<><button className="button" onClick={()=>void refresh()}>重新連接</button>{s?.auth_configured&&<a className="button primary" href="/api/auth/lark/login">使用 Lark 登入</a>}</>}</div>:<main key={route.view} className={`workspace ${route.view==='project'?'project-workspace':''}`}>
-   {route.view==='company'&&<CompanyCockpit refreshVersion={workspaceReload} role={c.s.user?.role} freshness={c.w.freshness}/>}{route.view==='dashboard'&&<Dashboard c={c}/>}{route.view==='projects'&&<Projects c={c}/>}{route.view==='work'&&<MyWork c={c}/>}{route.view==='schedule'&&<Schedule c={c}/>}{route.view==='project'&&<ProjectDetail c={c}/>}{route.view==='approvals'&&<Approvals c={c}/>}{route.view==='sources'&&<Sources c={c}/>}{route.view==='admin'&&<Administration c={c}/>} {route.view==='routines'&&<Routines c={c}/>}
+   {route.view==='company'&&<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在準備公司駕駛艙…</p></div>}><CompanyCockpit refreshVersion={workspaceReload} role={c.s.user?.role} freshness={c.w.freshness}/></Suspense>}{route.view==='dashboard'&&<Dashboard c={c}/>}{route.view==='projects'&&<Projects c={c}/>}{route.view==='work'&&<MyWork c={c}/>}{route.view==='schedule'&&<Schedule c={c}/>}{route.view==='project'&&<ProjectDetail c={c}/>}{route.view==='approvals'&&<Approvals c={c}/>}{route.view==='sources'&&<Sources c={c}/>}{route.view==='admin'&&<Administration c={c}/>} {route.view==='routines'&&<Routines c={c}/>}
   </main>}
   </div>
   {completionMoment&&<CompletionCelebration key={completionMoment.id} moment={completionMoment} onClose={dismissCompletion}/>}

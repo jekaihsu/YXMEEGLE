@@ -1,7 +1,7 @@
 // Issue #51: protect patched tooling, including Vite's nested esbuild, and local binding.
 // Run after npm ci and npm run build: npm run test:dev-tooling
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { isIP } from 'node:net';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -47,6 +47,33 @@ test('local CI runs tooling after the build and checks API responses', async () 
   assert.match(ci, /npm run build[\s\S]*npm run test:dev-tooling/);
 });
 
+test('production keeps the company route outside the initial JavaScript budget', async () => {
+  const manifest = await json('dist/.vite/manifest.json');
+  const entry = manifest['index.html'];
+  const company = manifest['src/CompanyCockpit.tsx'];
+  assert.ok(entry?.isEntry);
+  assert.ok(company?.isDynamicEntry, 'company must remain a lazy route');
+  assert.ok(entry.dynamicImports.includes('src/CompanyCockpit.tsx'));
+
+  const initial = new Set();
+  function visit(key) {
+    if (initial.has(key)) return;
+    initial.add(key);
+    for (const dependency of manifest[key].imports || []) visit(dependency);
+  }
+  visit('index.html');
+  assert.ok(!initial.has('src/CompanyCockpit.tsx'), 'company must not be eagerly imported');
+  const entryBytes = (await stat(new URL(`dist/${entry.file}`, import.meta.url))).size;
+  const initialBytes = (await Promise.all([...initial].map(async key =>
+    (await stat(new URL(`dist/${manifest[key].file}`, import.meta.url))).size
+  ))).reduce((total, bytes) => total + bytes, 0);
+  // Baseline: one 449.84 KB chunk. Count all static imports to avoid hiding bytes in vendors.
+  assert.ok(entryBytes < 300_000, `entry JavaScript is ${entryBytes} bytes (budget 300000)`);
+  assert.ok(initialBytes < 445_000, `initial JavaScript is ${initialBytes} bytes (budget 445000)`);
+  const html = await readFile(new URL('dist/index.html', import.meta.url), 'utf8');
+  assert.ok(!html.includes(company.file), 'company must not be preloaded on first paint');
+});
+
 function loopback(server) {
   const { address } = server.address();
   assert.ok((isIP(address) === 4 && address.startsWith('127.')) || address === '::1',
@@ -79,9 +106,17 @@ test('default production preview also binds locally', async () => {
   assert.equal(pkg.scripts.preview, 'vite preview');
   const server = await preview({ root, preview: { port: 0 } });
   try {
-    const response = await fetch(loopback(server.httpServer), { signal: AbortSignal.timeout(10000) });
+    const origin = loopback(server.httpServer);
+    const response = await fetch(origin, { signal: AbortSignal.timeout(10000) });
     assert.equal(response.status, 200);
     assert.match(await response.text(), /src="\/assets\//, 'preview serves the production bundle');
+    const company = (await json('dist/.vite/manifest.json'))['src/CompanyCockpit.tsx'];
+    for (const file of [company.file, ...(company.css || [])]) {
+      const asset = await fetch(`${origin}/${file}`, { signal: AbortSignal.timeout(10000) });
+      assert.equal(asset.status, 200, `lazy route asset ${file}`);
+      assert.match(asset.headers.get('content-type'), file.endsWith('.css') ? /text\/css/ : /javascript/);
+      assert.ok((await asset.text()).length > 0);
+    }
   } finally {
     server.httpServer.closeAllConnections();
     await new Promise((resolve, reject) => server.httpServer.close(error => error ? reject(error) : resolve()));
