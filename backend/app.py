@@ -221,8 +221,10 @@ def create_app(overrides=None):
                 row=WorkspaceRow(id=wid,version=1,data=data); db.add(row); db.flush()
                 row.data=storage.save(db,BusinessRow,wid,data)
 
-    def load(db,row,*,collections=None):
-        state=upgrade(storage.load(db,BusinessRow,row) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections))
+    def load(db,row,*,collections=None,project_ids=None):
+        if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=[c for c in storage.COLLECTIONS if c!='projects'],project_ids=project_ids,project_children=storage.PROJECT_CHILDREN)
+        else: state=storage.load(db,BusinessRow,row) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections)
+        state=upgrade(state)
         from .workspace_environment import normalize_environment
         from .case_cutover import initialize_execution_system
         normalize_environment(state,row.id,cfg)
@@ -486,6 +488,20 @@ def create_app(overrides=None):
         with phase(request,'project'): items=[p for p in state['projects'] if visible_project(state,p) and (not q or q.casefold() in ' '.join(str(p.get(k,'')) for k in ('code','name','client')).casefold()) and (not status or p['status']==status) and (not owner or p['pm_id']==owner)]
         items.sort(key=lambda p:(p.get('due_date') or '9999',p['id']))
         return {'total':len(items),'offset':offset,'limit':limit,'items':[dict(id=p['id'],code=p['code'],name=p['name'],status=p['status'],source_status=p.get('source_status'),pm_id=p['pm_id'],due_date=p.get('due_date')) for p in items[offset:offset+limit]]}
+
+    PROJECT_SLICE=('approvals','events','financial_requests','source_quotes','source_confirmations','contract_items','node_skip_requests')
+
+    @app.get('/api/projects/{project_id}')
+    def project_detail(request:Request,project_id:str):
+        """One project tree and its own records, projected exactly like /api/workspace (same visibility and privacy filters)."""
+        data,user=identity(request); require(shell_enabled,'尚未啟用單一案件讀取',404)
+        with sessions() as db:
+            with phase(request,'load'): state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
+            with phase(request,'project'): result=public_ws(state,data['wid'],user,data['mode'],owned=True)
+        require(len(result['projects'])==1,'找不到這個案件',404)
+        mine=lambda item:isinstance(item,dict) and item.get('project_id')==project_id
+        return dict(scope='project',version=result['version'],as_of=result['as_of'],project=result['projects'][0],policy_summary=result['policy_summary'],
+                    **{k:[i for i in result.get(k,[]) if mine(i)] for k in PROJECT_SLICE})
 
     @app.get('/api/daily-reports')
     def daily_reports(request:Request,project_id:str='',department:str='',actor_id:str='',date_from:str='',date_to:str='',status:str='all',q:str='',offset:int=0,limit:int=50):
