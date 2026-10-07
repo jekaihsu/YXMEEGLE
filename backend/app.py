@@ -82,11 +82,14 @@ def _reidentify_pilot_project(project,occupied_ids=()):
         elif isinstance(value,list):
             for child in value: collect(child)
     collect(copied)
+    file_urls={f'/api/files/{item["id"]}/download':f'/api/files/{id_map[item["id"]]}/download'
+               for item in copied.get('files',[]) if item.get('id') in id_map}
     source_id=copied['id']
     def rewrite(value):
         if isinstance(value,dict):
             for key,child in list(value.items()):
                 if key=='id' and isinstance(child,str): value[key]=id_map.get(child,child)
+                elif key=='url' and isinstance(child,str): value[key]=file_urls.get(child,child)
                 elif isinstance(child,str): value[key]=id_map.get(child,child)
                 else: rewrite(child)
         elif isinstance(value,list):

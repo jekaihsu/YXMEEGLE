@@ -72,6 +72,49 @@ def test_http_pilot_snapshot_preserves_all_local_versions_and_formal_state(tmp_p
         assert download.status_code == 200 and download.content == payload
 
 
+def test_pilot_copy_rekeys_colliding_attachment_url_and_preserves_target_bytes(tmp_path):
+    app, client, pid, files, payloads = prepare_uploads(tmp_path)
+    existing_payload = b'unrelated target project attachment'
+    existing = {
+        **files[0], 'size': len(existing_payload),
+        'sha256': hashlib.sha256(existing_payload).hexdigest(),
+    }
+    with app.state.sessions.begin() as db:
+        row = db.get(WorkspaceRow, 'test-lark-company')
+        state = storage.load(db, BusinessRow, row)
+        project = next(p for p in state['projects'] if p['id'] != pid)
+        project.update(pm_id='u-manager', execution_system='workbench', case_visibility='new_case')
+        project['files'].append(existing)
+        existing_pid = project['id']
+        row.data = storage.save(db, BusinessRow, row.id, state)
+    target = app.state.upload_dir / hashlib.sha256(b'test-lark-company').hexdigest()
+    target.mkdir(parents=True, exist_ok=True)
+    (target / existing['id']).write_bytes(existing_payload)
+    before_source = snapshot(app, 'lark-company')
+    before_target_project = deepcopy(project)
+
+    response = client.post('/api/pilot/copy', json={'project_id': pid})
+    assert response.status_code == 200, response.text
+    assert client.post('/api/workspace/switch', json={'environment': 'test'}).status_code == 200
+    ws = client.get('/api/workspace').json()
+    copied = next(p for p in ws['projects'] if p['id'] == response.json()['project_id'])
+    assert copied['files'][0]['id'] != existing['id']
+    assert copied['files'][1]['id'] == files[1]['id']
+    assert {item['file_key'] for item in copied['files']} == {copied['files'][0]['id']}
+    for item, payload in zip(copied['files'], payloads):
+        assert item['url'] == f"/api/files/{item['id']}/download"
+        download = client.get(item['url'])
+        assert download.status_code == 200 and download.content == payload
+        assert hashlib.sha256(download.content).hexdigest() == item['sha256']
+        assert (target / item['id']).read_bytes() == payload
+    download = client.get(existing['url'])
+    assert download.status_code == 200 and download.content == existing_payload
+    assert (target / existing['id']).read_bytes() == existing_payload
+    assert snapshot(app, 'lark-company') == before_source
+    target_projects = snapshot(app, 'test-lark-company')[1]['projects']
+    assert next(p for p in target_projects if p['id'] == existing_pid) == before_target_project
+
+
 @pytest.mark.parametrize('failure', ['missing', 'size', 'sha256', 'database'])
 def test_failed_pilot_copy_rolls_back_snapshot_and_copied_bytes(tmp_path, monkeypatch, failure):
     app, client, pid, files, payloads = prepare_uploads(tmp_path)
