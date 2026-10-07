@@ -54,7 +54,9 @@ async function scenario(kind,change,status=200,body){
   if(change==='mode')session={...session,mode:session.mode==='demo'?'lark':'demo'};
   if(change==='recovery')session={...session,access_mode:'recovery'};
   current={...workspace,workspace_id:session.workspace_id,environment:session.environment,version:1,projects:[]};
-  await flush(()=>document.querySelector(change==='logout'||change==='expiry'?'.login-card button':'button[aria-label="重新整理資料"]').click());
+  // Drive an explicit session read to test identity changes during a pending
+  // mutation; the normal refresh buttons now correctly guard that mutation.
+  await flush(()=>window.epochContext.refresh());
   if(change==='recovery'){assert.equal(window.epochContext.w,undefined);session={...session,access_mode:undefined};await flush(()=>window.epochContext.refresh())}
   assert.equal(window.epochContext.w.version,1,'new epoch accepts lower version');
   assert.equal(window.epochContext.w.projects.length,0);
