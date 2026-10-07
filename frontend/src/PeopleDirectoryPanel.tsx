@@ -4,11 +4,11 @@ import {api,getSessionEpoch,liveRefresh} from './api';
 import type {Context} from './Operations';
 
 export function PeopleDirectoryPanel({c}:{c:Context}){
- const[busy,setBusy]=useState(false);const[error,setError]=useState('');
+ const[busy,setBusy]=useState(false);const[error,setError]=useState('');const[message,setMessage]=useState('');
  const freshness=c.w.freshness?.datasets.roster;
  const status=c.w.people_directory_status||{};
  const canSync=c.s.mode==='lark'&&c.w.environment==='production'&&(c.s.user?.role==='manager'||c.s.user?.capabilities?.some(k=>['manage_people','manage_sources'].includes(k)));
- const sync=async()=>{setBusy(true);setError('');try{if(c.w.freshness?.enabled){const epoch=getSessionEpoch();const result=await liveRefresh(['roster'],true);if(epoch!==getSessionEpoch())return;c.onFreshness?.(result.freshness);const state=result.freshness&&ageFreshness(result.freshness,Date.now(),Date.now()).datasets.roster;if(!state||state.status!=='fresh'){setError(state?datasetNotice('roster',state)||'名冊讀取結果尚未確認':'名冊讀取結果尚未確認');return}setError('名冊資料已讀取，請核對下方人員。')}else await api('/api/people/sync',{method:'POST'});await c.refresh()}catch(e){setError((e as Error).message);await c.refresh()}finally{setBusy(false)}};
+ const sync=async()=>{const epoch=getSessionEpoch();setBusy(true);setError('');setMessage('');try{if(c.w.freshness?.enabled){const result=await liveRefresh(['roster'],true);if(epoch!==getSessionEpoch())return;c.onFreshness?.(result.freshness);const state=result.freshness&&ageFreshness(result.freshness,Date.now(),Date.now()).datasets.roster;if(!state||state.status!=='fresh'){const notice=state?datasetNotice('roster',state)||'名冊讀取結果尚未確認':'名冊讀取結果尚未確認';if(state&&['refreshing','never','stale'].includes(state.status))setMessage(notice);else setError(notice);return}setMessage('名冊資料已讀取，請核對下方人員。')}else await api('/api/people/sync',{method:'POST'});await c.refresh()}catch(e){if(epoch===getSessionEpoch()){c.onRefreshError?.(['roster']);setError((e as Error).message);await c.refresh()}}finally{if(epoch===getSessionEpoch())setBusy(false)}};
  const directoryPeople=c.w.users.filter(u=>!!(u as any).directory_source);
  const reasons:Record<string,string>={missing_account:'未填寫可識別的 Lark 人員帳號',multiple_accounts:'同一筆名冊填入多個人員帳號',missing_name:'缺少人員姓名',employment_unknown:'在職狀態未明確',duplicate_account:'同一人員帳號出現在多筆名冊'};
  const sourceUrl=status.base_token&&status.table_id?`https://yong-xiang-survey.jp.larksuite.com/base/${encodeURIComponent(status.base_token)}?table=${encodeURIComponent(status.table_id)}`:'';
@@ -24,6 +24,7 @@ export function PeopleDirectoryPanel({c}:{c:Context}){
   {!!status.field_warnings?.length&&<p className="ops-notice">來源欄位待核對：{status.field_warnings.map((w:{field:string})=>({name:'姓名',department:'部門',employment:'在職狀態'}[w.field]||w.field)).join('、')}。</p>}
   <p><small>{c.w.freshness?.enabled?`開啟工作區時檢查更新，名冊資料有效時間 ${freshness?.ttl_seconds??60} 秒；`:'公司背景同步依目前設定檢查更新；'}新增名冊不自動取得管理或審批權限。已停用的人員不因同步自動恢復。</small></p>
   {canSync?<button className="button" disabled={busy||c.busy} onClick={()=>void sync()}>{busy?'正在核對 Lark 名冊…':'同步 Lark 人員名冊'}</button>:<p><small>{c.s.mode==='demo'?'此為示範名冊；真實名冊需使用 Lark 登入公司正式工作區。':'請由有名冊同步權限的人員，在公司正式工作區執行同步。'}</small></p>}
+  {message&&<p role="status">{message}</p>}
   {error&&<p className="error-banner" role="alert">{error}</p>}
  </section>;
 }

@@ -44,3 +44,5 @@ button:focus-visible,a:focus-visible,summary:focus-visible{outline-color:#366ed1
 .data-freshness .button{min-height:36px}.freshness-details{position:relative;font-size:12px}.freshness-details summary{cursor:pointer}.freshness-details ul{margin:4px 0;padding-left:18px}
 
 .data-freshness .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+.data-freshness{flex-wrap:wrap}.freshness-details[open] ul{position:absolute;right:0;top:100%;z-index:30;width:280px;max-width:calc(100vw - 32px);padding:12px 12px 12px 28px;background:white;color:#334155;border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 16px #0002;overflow-wrap:anywhere}

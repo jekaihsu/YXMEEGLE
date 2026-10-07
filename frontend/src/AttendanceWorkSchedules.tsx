@@ -1,4 +1,4 @@
-import {datasetNotice} from './freshness';
+import {ageFreshness,datasetNotice} from './freshness';
 import {useState} from 'react';
 import {api,ApiError,getSessionEpoch,liveRefresh} from './api';
 import {DraftForm} from './FormDraft';
@@ -10,7 +10,7 @@ export function AttendanceWorkSchedules({c}:{c:Context}){
  const freshness=c.w.freshness?.datasets.attendance;
  const status=c.w.attendance_schedule_status;const canEdit=c.s.user?.role==='manager'||c.s.user?.capabilities?.includes('calendar_edit');const formal=c.s.mode==='lark'&&c.w.environment==='production';
  const name=(id:string)=>c.w.users.find(u=>u.id===id)?.name||'名冊待核對';
- const sync=async()=>{setBusy(true);setMessage('');try{const epoch=getSessionEpoch();const result=c.w.freshness?.enabled?await liveRefresh(['attendance'],true):await api<any>('/api/attendance/sync',{method:'POST',body:JSON.stringify({date_from:from,date_to:to})});if(epoch!==getSessionEpoch())return;if(result.freshness)c.onFreshness?.(result.freshness);await c.refresh();setMessage((result.freshness?.datasets.attendance.status==='fresh'||result.status==='ready')?'已查回班表，請核對下方人員與日期。':result.freshness?datasetNotice('attendance',result.freshness.datasets.attendance)||'班表讀取結果尚未確認':'已查回同步結果，仍有條件待核對。')}catch(e){if(e instanceof ApiError&&e.status===409)await c.refresh();setMessage((e as Error).message)}finally{setBusy(false)}};
+ const sync=async()=>{const epoch=getSessionEpoch();setBusy(true);setMessage('');try{const result=c.w.freshness?.enabled?await liveRefresh(['attendance'],true):await api<any>('/api/attendance/sync',{method:'POST',body:JSON.stringify({date_from:from,date_to:to})});if(epoch!==getSessionEpoch())return;if(result.freshness)c.onFreshness?.(result.freshness);await c.refresh();const state=result.freshness&&ageFreshness(result.freshness,Date.now(),Date.now()).datasets.attendance;setMessage((c.w.freshness?.enabled?state?.status==='fresh':result.status==='ready')?'已查回班表，請核對下方人員與日期。':state?datasetNotice('attendance',state)||'班表讀取結果尚未確認':'已查回同步結果，仍有條件待核對。')}catch(e){if(epoch!==getSessionEpoch())return;c.onRefreshError?.(['attendance']);if(e instanceof ApiError&&e.status===409)await c.refresh();setMessage((e as Error).message)}finally{if(epoch===getSessionEpoch())setBusy(false)}};
  const defaultUser=c.w.users.some(u=>u.id===params.get('user'))?params.get('user')||'':'';const defaultDay=/^\d{4}-\d{2}-\d{2}$/.test(params.get('day')||'')?params.get('day')||'':'';
  const reasons:Record<string,string>={employee_identity_unverified:'尚未核實 Attendance 員工識別',flexible_or_unknown_shift:'彈性班次或班次未明確，不能推算截止',missing_shift_hours:'班次缺少正常工時',ambiguous_shift_hours:'正常上下班時間有歧義',missing_or_ambiguous_schedule:'該日班表缺漏或多筆不一致'};
  const labels:Record<string,string>={ready:'本次班表查回完成',partial:'部分班表待核對',blocked:'同步條件待處理',failed:'同步失敗',pending_schedule:'班表待設定',not_configured:'尚未設定班表同步'};

@@ -27,3 +27,7 @@ export function datasetNotice(key:LiveDataset,d:Freshness['datasets'][LiveDatase
   default:return '';
  }
 }
+
+export function failedFreshness(value:Freshness,datasets:LiveDataset[]):Freshness {
+ return {...value,datasets:Object.fromEntries(Object.entries(value.datasets).map(([key,d])=>[key,{...d,status:datasets.includes(key as LiveDataset)&&d.status!=='unconfigured'?'error':d.status}])) as Freshness['datasets']};
+}

@@ -1,10 +1,16 @@
 // Shared with App so every request captures the active session epoch.
 let sessionEpoch=0;
+const pendingMutations=new Map<number,number>();
+export const getPendingMutations=()=>pendingMutations.get(sessionEpoch)||0;
+const mutationChanged=()=>{if(typeof window!=='undefined')window.dispatchEvent(new Event('yx:mutation-state'))};
 export const getSessionEpoch=()=>sessionEpoch;
 export const invalidateSessionEpoch=()=>{sessionEpoch++};
 export class ApiError extends Error {constructor(public status:number,message:string){super(message)}}
 export async function api<T>(url:string,init?:RequestInit,isCurrent:()=>boolean=()=>true,onResponse?:(status:number)=>void):Promise<T>{
   const epoch=getSessionEpoch();
+  const mutating=!!init?.method&&!['GET','HEAD'].includes(init.method.toUpperCase());
+  if(mutating){pendingMutations.set(epoch,(pendingMutations.get(epoch)||0)+1);mutationChanged()}
+  try{
   const response=await fetch(url,{credentials:'same-origin',...init,headers:{...(init?.body instanceof FormData?{}:{'Content-Type':'application/json'}),...init?.headers}});
   onResponse?.(response.status);
   const malformed='服務回應格式不正確，請稍後再試。';
@@ -14,6 +20,7 @@ export async function api<T>(url:string,init?:RequestInit,isCurrent:()=>boolean=
   if(!response.ok)throw new ApiError(response.status,typeof data?.detail==='string'?data.detail:JSON.stringify(data?.detail||'操作未完成'));
   if(!parsed||data===null||typeof data!=='object')throw new ApiError(response.status,malformed);
   return data;
+  }finally{if(mutating){const remaining=(pendingMutations.get(epoch)||1)-1;if(remaining)pendingMutations.set(epoch,remaining);else pendingMutations.delete(epoch);mutationChanged()}}
 }
 export function normalizeRoute<T extends {view:string;tab?:string;section?:string}>(route:T):T {
  if(route.view==='learning')return {...route,view:'admin',tab:'people'};

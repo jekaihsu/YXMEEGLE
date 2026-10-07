@@ -23,7 +23,7 @@ export function CompanyCockpit({refreshVersion,role,freshness}:{refreshVersion:n
  useEffect(()=>{const timer=window.setTimeout(()=>{setSearch(q.trim());setOffset(0)},250);return()=>window.clearTimeout(timer)},[q]);
  useEffect(()=>{let active=true;const controller=new AbortController();setLoading(true);setError('');const params=new URLSearchParams({offset:String(offset),limit:'40'});if(search)params.set('q',search);if(group)params.set('group',group);if(lifecycle)params.set('lifecycle',lifecycle);
   api<CompanyDashboard>(`/api/company-dashboard?${params}`,{signal:controller.signal}).then(result=>{if(active)setData(result)}).catch(e=>{if(active)setError(e instanceof Error?e.message:'暫時無法讀取公司資料')}).finally(()=>{if(active)setLoading(false)});return()=>{active=false;controller.abort()};
- },[search,group,lifecycle,offset,reload,refreshVersion,freshness?.datasets.sources.changed_at]);
+ },[search,group,lifecycle,offset,reload,refreshVersion]);
  const total=data?.totals;
  return <div className="company-cockpit" aria-busy={loading}>
   <header className="cockpit-heading"><div><p className="cockpit-eyebrow">YONG XIANG · 全公司</p><h1>公司駕駛艙</h1><p>案件與報價紀錄、工作台交付與各組工作量。</p></div><button className="button" disabled={loading} onClick={()=>setReload(n=>n+1)}><RefreshCw size={16}/>重新整理</button></header>
