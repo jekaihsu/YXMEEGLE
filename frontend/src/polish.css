@@ -1,0 +1,30 @@
+/* Cross-screen polish: consistent page heads, spacing and tables. Scoped under .workspace so it wins over legacy rules. */
+.workspace .operations>h1{font-size:var(--fs-large-title);font-weight:600;letter-spacing:-.02em;line-height:1.2}
+.workspace .operations>h1+p{color:var(--label-2);font-size:var(--fs-subhead);margin:var(--sp-1) 0 var(--sp-6)}
+.workspace .ops-tabs{margin-bottom:var(--sp-6);gap:var(--sp-1);padding:2px;border:.5px solid var(--glass-border);border-radius:var(--radius-pill);background:var(--glass-fill);width:fit-content;max-width:100%}
+.workspace .ops-tabs button{min-height:44px;border-radius:var(--radius-pill)}
+.workspace .table-scroll{border-radius:var(--radius-card);overflow-x:auto;border:.5px solid var(--glass-border);background:var(--surface)}
+.workspace .table-scroll .data-table{background:none}
+.workspace .data-table th{padding:var(--sp-3) var(--sp-4);font-size:var(--fs-caption);font-weight:600;color:var(--label-2);text-align:left;white-space:nowrap}
+.workspace .data-table td{padding:var(--sp-3) var(--sp-4)}
+.workspace .operations h2{margin:var(--sp-6) 0 var(--sp-3)}
+.workspace .operations>h1~.table-scroll,.workspace .operations>p+.table-scroll{margin-top:var(--sp-4)}
+.workspace .data-table td,.workspace .data-table th{border-color:var(--sep)}
+@media(max-width:760px){
+ .ds-page-head{flex-direction:column;align-items:stretch;gap:var(--sp-3)}
+ .ds-page-head h1{font-size:var(--fs-title1)}
+ .ds-actions{flex-wrap:wrap}.ds-actions .ds-button{flex:1 1 auto;white-space:nowrap}
+}
+.workspace .operations>.data-table{border-radius:var(--radius-card);overflow:hidden;border:.5px solid var(--glass-border);margin-bottom:var(--sp-7)}
+.workspace .operations .ds-group>h2{margin:0;padding:var(--sp-4) var(--sp-4) var(--sp-2);font-size:var(--fs-title2)}
+.workspace .operations .ds-group>.data-table{background:none}
+/* Flow: quieter stage chips, no heavy borders or shadows. */
+.workspace .major-approval-summary{border:0;border-left:0;border-radius:var(--radius-card);background:var(--glass-fill);box-shadow:none;outline:.5px solid var(--glass-border)}
+.workspace .workflow{border:0;background:none;box-shadow:none;padding:0}
+.workspace .stage-button{border:.5px solid var(--glass-border);box-shadow:none;background:var(--surface);color:var(--label);border-radius:var(--radius-m)}
+.workspace .stage-button.in_progress{background:var(--accent-fill);border-color:var(--accent)}
+.workspace .stage-button.completed{background:var(--surface-2);border-color:transparent;color:var(--label)}
+.workspace .stage-button.completed *{color:inherit}.workspace .stage-button.completed svg{color:var(--positive)}
+.workspace .stage-button.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.workspace .stage-button .stage-action-label{color:var(--accent)}
+.workspace .stage-button.completed .stage-action-label{color:var(--label-2)}
