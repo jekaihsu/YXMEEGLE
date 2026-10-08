@@ -18,5 +18,18 @@ export function AuditTrail({w,p}:{w:Workspace;p:Project}){
  const hasMore=legacy?(currentPage+1)*30<total:data?.has_more??((currentPage+1)*30<total);
  const countLabel=data?.has_more?`至少 ${total} 筆`:`共 ${total} 筆`;
  useEffect(()=>{if(pageOutOfRange)setPage(currentPage)},[pageOutOfRange,currentPage,p.id]);
- return <section className="audit-trail"><h2>操作紀錄</h2><p>查看誰在何時處理了哪些工作，以及確認、退回和來源更新的記錄。</p>{legacy&&<p className="ops-notice">目前服務僅提供舊版活動紀錄；完整變更稽核尚未接通。</p>}{error&&<p className="form-error" role="alert">{error}</p>}{rows.map((row:any,index)=><article key={row.id||index}><header><strong>{row.message||row.action}</strong><span>{row.actor_name||w.users.find(u=>u.id===row.actor_id)?.name|| (row.actor_id==='system'?'系統':'原操作人員')}</span></header><time>{row.created_at||row.at}</time>{row.reason&&<p>{row.reason}</p>}{row.outcome&&<p>結果：{row.outcome}</p>}{row.changes&&<details><summary>查看變更內容</summary><pre>{JSON.stringify(row.changes,null,2)}</pre></details>}</article>)}{!error&&settled&&!pageOutOfRange&&!rows.length&&<p className="empty">尚無可見操作紀錄。</p>}<div className="daily-pagination"><span>{countLabel}</span><button className="button" disabled={!currentPage} onClick={()=>setPage(currentPage-1)}>上一頁</button><button className="button" disabled={!hasMore} onClick={()=>setPage(currentPage+1)}>下一頁</button></div></section>;
+ const days=new Map<string,any[]>();
+ for(const row of rows){const day=String(row.created_at||row.at||'').slice(0,10);days.set(day,[...(days.get(day)||[]),row])}
+ return <section className="audit-trail audit-screen"><h2>操作紀錄</h2><p>查看誰在何時處理了哪些工作，以及確認、退回和來源更新的記錄。</p>
+  {legacy&&<p className="ops-notice">目前服務僅提供舊版活動紀錄；完整變更稽核尚未接通。</p>}
+  {error&&<p className="form-error" role="alert">{error}</p>}
+  {!cur&&<section className="ds-section" aria-hidden="true"><div className="ds-group glass--flat audit-skeleton"><div className="skeleton skeleton-row audit-day-placeholder"/>{Array.from({length:3},(_,i)=><div className="audit-entry" key={i}><div className="ds-row"><span className="ds-row-main"><span className="skeleton skeleton-row"/><small className="skeleton skeleton-row"/></span><span className="skeleton skeleton-row audit-time-placeholder"/></div></div>)}</div></section>}
+  {[...days].map(([day,items])=><section className="ds-section" key={day}>{day&&<h2>{day}</h2>}<div className="ds-group glass--flat">{items.map((row:any,index)=><article className="audit-entry" key={row.id||index}>
+   <div className="ds-row"><span className="ds-row-main"><strong>{row.message||row.action}</strong><small>{row.actor_name||w.users.find(u=>u.id===row.actor_id)?.name||(row.actor_id==='system'?'系統':'原操作人員')}</small></span><time className="ds-row-value" dateTime={row.created_at||row.at}>{row.created_at||row.at}</time></div>
+   {row.reason&&<p>{row.reason}</p>}{row.outcome&&<p>結果：{row.outcome}</p>}
+   {row.changes&&<details><summary>查看變更內容</summary><pre>{JSON.stringify(row.changes,null,2)}</pre></details>}
+  </article>)}</div></section>)}
+  {!error&&settled&&!pageOutOfRange&&!rows.length&&<p className="empty">尚無可見操作紀錄。</p>}
+  <div className="daily-pagination"><span>{countLabel}</span><button className="ds-button" type="button" disabled={!currentPage} onClick={()=>setPage(currentPage-1)}>上一頁</button><button className="ds-button" type="button" disabled={!hasMore} onClick={()=>setPage(currentPage+1)}>下一頁</button></div>
+ </section>;
 }

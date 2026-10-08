@@ -10,4 +10,5 @@ import './workbench.css';
 import './brand-workspace.css';
 import './company-workspace.css';
 import './design/shell.css';
+import './audit-trail.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><ThemeProvider><AppErrorBoundary><App /></AppErrorBoundary></ThemeProvider></React.StrictMode>);
