@@ -167,3 +167,5 @@
  .workspace .node-section .task-table td:nth-child(4){display:block;width:100%;line-height:1.6}
  .workspace .node-section .task-table td:nth-child(4) small{display:block}
 }
+
+.workspace .appearance-control{padding:var(--sp-4);margin:0}
