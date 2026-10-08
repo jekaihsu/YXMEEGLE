@@ -44,3 +44,44 @@ Event `{id,project_id,node_id?,task_id?,actor_id,action,message,created_at}`.
 - calendar_update `{holidays,workdays}` PM/manager. demo_reset `{}` manager only; explicitly confirmed UI, seed only demo workspace.
 
 Backend owns schema implementation and informs frontend immediately if changes necessary. Frontend reads this contract and may show capability errors but must not fake persisted successful operations. All features operate on API-backed data. Bootstrap seed deterministic rich realistic Traditional Chinese scenarios and as_of for reproducible demo only. Production date is real Asia/Taipei.
+
+
+## Shell and overview reads
+
+These authenticated reads are enabled by `WORKSPACE_SHELL_ENABLED` and require `INDEX_TABLES_ENABLED` for indexed responses. `GET /api/session` advertises `features: {workspace_shell: true}` when shell mode is enabled; the flag-off response omits `features`.
+
+### Shell workspace
+
+`GET /api/workspace?scope=shell` returns `scope: "shell"`, `version`, `as_of`, `workspace_id`, `environment`, `users`, `calendar`, `source_status`, `file_categories`, `approval_connection`, `freshness`, and the following dashboard fields. `approvals` and `events` are empty arrays; read the full workspace on demand for their records.
+
+- `projects`: slim visible case cards in workspace order, containing `id`, `code`, `name`, `client`, `pm_id`, `status`, `execution_status`, `due_date`, `case_type`, `source_kind`, `source_status`, `concurrency_version`, `progress: {completed_nodes, approved_skipped_nodes, total_nodes}`, `overdue_tasks`, `active_tasks`, and execution admission fields. No project trees (`nodes`, `files`, `comments`, `daily_reports`) or overview-only facts (`contract_amount`, `source_lifecycle`, `current_nodes`, `blocked_tasks`) are included.
+- `counts`: integer `approvals_pending`, `daily_unmatched`, `my_overdue_tasks`, `my_active_tasks`, `active_tasks`, `overdue_tasks`, `due_today_tasks`, `blocked_tasks`. Task totals cover visible cases; `my_*` follows the user's execution authority, including valid delegation and business override. Open tasks exclude `completed` and `superseded`.
+- `attention`: at most five open overdue or due-today tasks, overdue first, then workspace project/node/task order (task ID breaks ties).
+- `blocked`: a separate list of at most five open tasks with status `paused` or `blocked`, including undated and future-dated tasks, in project/node/task order with task ID as tie-breaker. `counts.blocked_tasks` counts the entire visible set, not just these five. Unmet input dependencies alone do not qualify. `attention` keeps its existing meaning; the two lists may overlap.
+- Both task lists use exactly `{task_id, project_id, node_id, node_key, node_name, assignee_id, status, due_date, project_code, project_name, title}`. An undated task has `due_date: ""`.
+- `pending_approvals`: at most two visible pending applications as `{id, title, type, project_id}`; `counts.approvals_pending` covers all visible pending applications.
+
+A shell response carries a weak `ETag`. A matching `If-None-Match` returns an empty 304 response with the same ETag; validators vary with workspace, identity/authority, version, date and users. Responses use `Cache-Control: no-store`; clients may retain the body and explicitly revalidate. When the flag is off or the index is missing/stale/not backfilled, this endpoint falls back to the full workspace (without `scope: "shell"`). Clients must inspect the returned scope.
+
+### Paged case overview
+
+`GET /api/projects?view=overview&tab=all|formal|intake|active|overdue|completed&sort=due|name|progress&dir=asc|desc&q=&status=&owner=&offset=0&limit=30` returns `{total, offset, limit, facets: {all, formal, intake}, items: ProjectCard[]}`. Defaults are `tab=formal`, `sort=due`, `dir=asc`, `offset=0`, `limit=30`; offset must be nonnegative and limit is 1–100. Invalid queries or a disabled shell feature return 422; an index that is not ready returns 503 with no full-workspace fallback.
+
+Search matches code/name/client (literal wildcard characters); `owner` filters PM and `status` filters indexed case status. The `overdue` tab selects cases with overdue tasks, not every paused/blocked case. Facets count all visible cases independent of search and filters. Due and progress sorting use case ID to break ties; direction applies to ties too.
+
+Each overview item contains all shared shell-card fields with identical values, plus:
+
+| Field | Type | Presence and meaning |
+|---|---|---|
+| `contract_amount` | number or null | Always present; null means unset. Same amount as the full workspace for every user who can see the case, including members; no extra finance-role read gate. |
+| `source_lifecycle` | `{relationship: string, state: "mapped" or "needs_verification", canonical: string or null, reasons: string[]}` | Omitted when the project has no lifecycle (including non-governed demo cases), never substituted with null. Compact projection excludes source IDs, `lifecycle_sources`, `blank_sources` and `quote_workflow`. |
+| `current_nodes` | `{key: string, name: string, status: "in_progress" or "paused"}[]` | Always present; current refreshed stages in node order, empty when none. |
+| `blocked_tasks` | integer ≥ 0 | Always present; this visible case's open tasks whose status is paused/blocked, regardless of due date. Does not inspect input dependencies. |
+
+Visibility filters apply before listing and aggregation: excluded/history and source-review cases are not exposed in production overview cards, shell lists or blocked totals. Facts are maintained on workspace writes; finance approval, stage transitions and pauses update subsequent overview reads without a manual backfill. Older servers can omit these additive fields; clients retain missing-field fallbacks.
+
+### Single case detail
+
+`GET /api/projects/{id}` returns `{scope: "project", version, as_of, project, ...caseRecords}`: one full visible project tree plus its case records and global templates/catalogues, projected with the same privacy rules as the full workspace. Shared shell metadata is not repeated. A missing/invisible project, or a disabled shell feature, returns 404. Full lifecycle details remain available in the project tree.
+
+Contract evidence: `backend/test_projects_overview.py` covers shared-card parity, nullable amount/lifecycle omission, current stages, status-blocked counts, member/manager parity, visibility, write maintenance, paging/filter/sort validation and fixed query count at page sizes 10/100. `backend/test_shell.py` covers feature gating, fallback, ETag/304, counts/visibility, undated/future blocked tasks, exact task-list keys and the five-item ordering/limit.
