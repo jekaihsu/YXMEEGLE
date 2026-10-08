@@ -1,0 +1,23 @@
+/* Native approval controls and change confirmation lines: quiet grouped blocks; status text is the focus, never colour alone. */
+.native-approval-controls,.financial-requests article,.approval-gates{padding:var(--sp-4);margin-block:var(--sp-3)}
+.native-approval-controls{display:flex;flex-direction:column;gap:var(--sp-3);color:var(--label)}
+.native-approval-controls h3,.financial-requests>h3,.change-lines h3{font-size:var(--fs-footnote);font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--label-2)}
+.native-approval-controls h3:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.na-status{font-size:var(--fs-headline);font-weight:600;line-height:1.35}
+.na-note,.native-approval-controls p,.financial-requests p,.change-lines p{font-size:var(--fs-subhead);color:var(--label-2);overflow-wrap:anywhere}
+.native-approval-controls .na-status{color:var(--label)}
+.native-approval-controls .inline-actions{display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+.native-approval-controls [role=status]:empty{display:none}.native-approval-controls [role=alert],.financial-requests [role=alert],.change-lines [role=alert]{color:var(--critical);font-weight:600}
+.financial-requests{display:flex;flex-direction:column;gap:var(--sp-2)}.financial-requests article{display:flex;flex-direction:column;gap:var(--sp-2)}
+.financial-requests article>strong{font-size:var(--fs-body);font-weight:600}
+.approval-gates{display:grid;gap:0;padding:0}
+.approval-gates>div{position:relative;padding:var(--sp-3) var(--sp-4);font-size:var(--fs-body)}
+.approval-gates>div+div::before{content:"";position:absolute;top:0;left:var(--sp-4);right:0;border-top:1px solid var(--sep)}
+.approval-gates span{display:flex;flex-direction:column;gap:2px;font-weight:600}.approval-gates span :is(p,small){font-weight:400;color:var(--label-2)}
+.na-form{padding:var(--sp-2) 0}.na-form summary{min-height:44px;display:flex;align-items:center;color:var(--accent);font-size:var(--fs-callout);cursor:pointer}
+.na-form form{display:grid;gap:var(--sp-3)}
+.na-form label{display:grid;gap:var(--sp-1);font-size:var(--fs-footnote);color:var(--label-2)}
+.na-form :is(select,textarea){min-height:44px;padding:var(--sp-2) var(--sp-3);border:.5px solid var(--glass-border);border-radius:var(--radius-m);background:var(--surface);color:var(--label);font-size:var(--fs-body)}
+.na-form fieldset{border:0;padding:0;display:grid;gap:var(--sp-2)}.na-form legend{font-size:var(--fs-footnote);color:var(--label-2);margin-bottom:var(--sp-1)}
+.na-form fieldset label{display:flex;align-items:center;gap:var(--sp-2);min-height:44px;font-size:var(--fs-subhead);color:var(--label)}
+.na-form a{color:var(--accent)}
