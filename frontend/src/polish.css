@@ -32,3 +32,22 @@
  .workspace .portfolio-page .tabbar,.workspace .project-detail .project-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;width:100%;border-radius:var(--radius-pill);scrollbar-width:none}
  .workspace .portfolio-page .tabbar button,.workspace .project-detail .project-tabs button{flex:0 0 auto;white-space:nowrap}
 }
+/* Schedule: each day scrolls inside a fixed height instead of stretching the page. */
+.workspace .calendar-day{min-height:0}
+.workspace .calendar-tasks{max-height:min(32rem,60vh);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;display:flex;flex-direction:column;gap:var(--sp-2)}
+.workspace .calendar-task{border:.5px solid var(--glass-border);box-shadow:none;border-radius:var(--radius-m);background:var(--surface);flex:none}
+.workspace .calendar-task small{color:var(--label-2)}
+.workspace .calendar-day>header{position:sticky;top:0;z-index:1}
+/* Avatars grow with their initials instead of overflowing a fixed circle. */
+.workspace .avatar,.app-shell .avatar{width:auto;min-width:1.75rem;height:1.75rem;padding:0 var(--sp-1);border:0;font-size:var(--fs-caption);font-weight:600;line-height:1;white-space:nowrap}
+.workspace .avatar.small,.app-shell .avatar.small{min-width:1.5rem;height:1.5rem;font-size:.6875rem}
+/* Cockpit: header-only tables add noise when there is no data, so hide the empty table and keep the explanatory note. */
+.workspace .cockpit-groups .ds-section:not(:has(tbody tr)),.workspace .cockpit-cases .ds-section:not(:has(tbody tr)){display:none}
+/* My Work: quieter task table. */
+.workspace .task-table{font-size:var(--fs-subhead)}
+.workspace .task-table td small{display:block;color:var(--label-2);font-size:var(--fs-footnote)}
+.workspace .task-table .task-title .text-button{font-weight:500;color:var(--label)}
+.workspace .task-table td:nth-last-child(2){color:var(--label-2);font-size:var(--fs-footnote);white-space:nowrap}
+.workspace .task-table td:last-child svg{color:var(--label-2);opacity:.6}
+.workspace .task-table tbody tr:hover{background:var(--surface-2)}
+.workspace .task-table .mono,.workspace .task-table .person-cell{font-size:var(--fs-footnote)}
