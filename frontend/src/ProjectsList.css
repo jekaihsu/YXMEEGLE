@@ -47,3 +47,11 @@
 .portfolio-page .projects-table{min-width:52rem}
 .portfolio-page .projects-table th:first-child{width:28%}
 .portfolio-page .stage-chips{max-width:none}
+.portfolio-page .projects-table{min-width:70rem;table-layout:auto}
+.portfolio-page .projects-table th:first-child{min-width:16rem;width:auto}
+.portfolio-page .projects-table :is(th,td):nth-child(2){min-width:8rem}
+.portfolio-page .projects-table :is(th,td):nth-child(3){min-width:8rem}
+.portfolio-page .projects-table :is(th,td):nth-child(4){min-width:8rem}
+.portfolio-page .project-source-status,.portfolio-page .admission-cell{overflow-wrap:normal}
+.portfolio-page .tabbar button span{background:none;border-radius:0;padding:0}
+.portfolio-page .table-toolbar{margin-block:var(--sp-3)}

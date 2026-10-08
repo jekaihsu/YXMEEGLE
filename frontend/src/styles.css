@@ -66,3 +66,6 @@
 :is(.ds-row-main,.inbox-title,.approval-row-main,.task-title,.project-title>div,.page-heading>div){min-width:0}
 :is(.form-row,.form-field,.ops-fields,.calendar-grid,.resource-table){min-width:0}
 @media(max-width:760px){.table-footer{flex-wrap:wrap}.section-caption{white-space:normal}.heading-actions{flex-shrink:1}.modal .form-row{grid-template-columns:1fr}}
+.empty-icon{display:none}
+.empty{padding:var(--sp-7) 0;text-align:left;align-items:flex-start;justify-content:flex-start}
+.empty h3,.empty strong{color:var(--label)}

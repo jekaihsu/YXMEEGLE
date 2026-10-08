@@ -69,5 +69,5 @@
 .company-cockpit table:not(.cockpit-case-table){min-width:40rem}
 .company-cockpit th:first-child{min-width:10rem}
 .cockpit-distribution button>span:first-child{overflow-wrap:normal;min-width:8rem}
-.cockpit-health .ds-stat strong{color:var(--warning);font-weight:500}
+.cockpit-health .ds-stat strong{font-weight:500}
 .cockpit-error{border:0;padding:var(--sp-3) 0;color:var(--warning);background:none}

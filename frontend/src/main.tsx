@@ -1,14 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
-import {AppErrorBoundary} from './AppErrorBoundary';
-import {ThemeProvider} from './design/appearance';
 import './design/tokens.css';
 import './design/glass.css';
 import './styles.css';
 import './workbench.css';
 import './brand-workspace.css';
 import './company-workspace.css';
-import './design/shell.css';
 import './audit-trail.css';
+import App from './App';
+import {AppErrorBoundary} from './AppErrorBoundary';
+import {ThemeProvider} from './design/appearance';
+import './design/shell.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><ThemeProvider><AppErrorBoundary><App /></AppErrorBoundary></ThemeProvider></React.StrictMode>);
