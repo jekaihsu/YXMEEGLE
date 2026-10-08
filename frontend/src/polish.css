@@ -11,9 +11,9 @@
 .workspace .operations>h1~.table-scroll,.workspace .operations>p+.table-scroll{margin-top:var(--sp-4)}
 .workspace .data-table td,.workspace .data-table th{border-color:var(--sep)}
 @media(max-width:760px){
- .ds-page-head{flex-direction:column;align-items:stretch;gap:var(--sp-3)}
- .ds-page-head h1{font-size:var(--fs-title1)}
- .ds-actions{flex-wrap:wrap}.ds-actions .ds-button{flex:1 1 auto;white-space:nowrap}
+ .workspace .ds-page-head{flex-direction:column;align-items:stretch;gap:var(--sp-3)}
+ .workspace .ds-page-head h1{font-size:var(--fs-title1)}
+ .workspace .ds-actions{flex-wrap:wrap}.workspace .ds-actions .ds-button{flex:1 1 auto;white-space:nowrap}
 }
 .workspace .operations>.data-table{border-radius:var(--radius-card);overflow:hidden;border:.5px solid var(--glass-border);margin-bottom:var(--sp-7)}
 .workspace .operations .ds-group>h2{margin:0;padding:var(--sp-4) var(--sp-4) var(--sp-2);font-size:var(--fs-title2)}
@@ -54,4 +54,48 @@
 @media(max-width:760px){
  .workspace .operations .ops-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;width:100%;border-radius:var(--radius-pill);scrollbar-width:none}
  .workspace .operations .ops-tabs button{flex:0 0 auto;white-space:nowrap}
+}
+
+/* Review fixes ------------------------------------------------------ */
+/* Content surfaces are opaque; blur/translucency stays on bars and sheets. */
+.workspace .glass:not(.ds-sheet),.workspace .glass--flat,.workspace .table-scroll,.workspace .portfolio-index,.workspace .tabbar,.workspace .project-tabs,.workspace .ops-tabs{background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:none;border:.5px solid var(--separator)}
+.workspace .ds-segmented.glass--flat{background:var(--surface-2)}
+/* Same pill buttons everywhere: no raised bottom border. */
+.workspace .button,.modal .button,.task-inspector .button{border:0;border-radius:var(--radius-pill);background:var(--surface-2);color:var(--accent);font-weight:500;min-height:44px;padding:0 var(--sp-5);box-shadow:none;display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2)}
+.workspace .button.primary,.modal .button.primary,.task-inspector .button.primary{background:var(--accent);color:var(--on-accent)}
+.workspace .button.compact,.modal .button.compact{font-size:var(--fs-subhead);padding:0 var(--sp-4)}
+.workspace .button:disabled,.modal .button:disabled{opacity:.4}
+/* Empty table rows explain themselves. */
+.workspace .data-table td.ops-empty{padding:var(--sp-5) var(--sp-4);color:var(--label-2);font-size:var(--fs-subhead);white-space:normal}
+/* Nested cards inside project readiness collapse to one surface. */
+.workspace .ds-section.project-readiness{border:0;background:none;box-shadow:none;padding:0;border-radius:0}
+.pr-more{border-top:1px solid var(--sep)}.pr-more summary{min-height:44px;display:flex;align-items:center;padding:0 var(--sp-4);color:var(--accent);font-size:var(--fs-subhead);cursor:pointer}
+/* Schedule at XL: keep day columns readable and scroll the week sideways. */
+.workspace .calendar-grid{grid-template-columns:repeat(7,minmax(11rem,1fr));min-width:77rem}
+.workspace .calendar-day>header{display:flex;flex-wrap:nowrap;align-items:baseline;gap:var(--sp-2);white-space:nowrap}
+.workspace .calendar-task .avatar{display:none}
+.workspace .calendar-task em{white-space:nowrap;font-style:normal;color:var(--label-2)}
+/* Phone page heads align to the content gutter. */
+@media(max-width:760px){
+ .workspace .ds-page-head{text-align:left;align-items:stretch}.workspace .ds-page-head>div:first-child{text-align:left}
+ .workspace .ds-actions{justify-content:flex-start}
+}
+/* My Work on phones: compact rows that keep title, project, status and due date visible. */
+@media(max-width:760px){
+ .workspace .table-scroll .task-table.with-project,.workspace .table-scroll .task-table.with-project tbody{display:block;min-width:0}
+ .workspace .task-table.with-project thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+ .workspace .task-table.with-project tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--sp-1) var(--sp-3);padding:var(--sp-3) var(--sp-4);border-top:1px solid var(--sep)}
+ .workspace .task-table.with-project tbody tr:first-child{border-top:0}
+ .workspace .task-table.with-project td{display:block;padding:0;border:0;min-width:0}
+ .workspace .task-table.with-project td:nth-child(1){grid-column:1/-1}
+ .workspace .task-table.with-project td:nth-child(2){grid-column:1}
+ .workspace .task-table.with-project td:nth-child(4){grid-column:2;grid-row:2;justify-self:end}
+ .workspace .task-table.with-project td:nth-child(5){grid-column:1/-1;font-size:var(--fs-footnote)}
+ .workspace .task-table.with-project td:is(:nth-child(3),:nth-child(6),:nth-child(7)){display:none}
+}
+@media(max-width:760px){
+ .workspace .task-table.with-project td:nth-child(2){display:flex;flex-wrap:wrap;align-items:baseline;gap:0 var(--sp-2);line-height:1.4}
+ .workspace .task-table.with-project td{line-height:1.4}
+ .workspace .task-table.with-project td small{display:inline}
+ .workspace .task-table.with-project .task-title small{display:block}
 }

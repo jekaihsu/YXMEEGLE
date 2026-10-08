@@ -42,7 +42,7 @@
 @media(max-width:1500px){.portfolio-page .projects-table :is(th,td):nth-child(5){display:none}}
 @media(max-width:1280px){.portfolio-page .projects-table :is(th,td):nth-child(4){display:none}}
 html[data-text=xl] .portfolio-page .projects-table :is(th,td):is(:nth-child(4),:nth-child(5)){display:none}
-html[data-text=xl] .portfolio-page .projects-table :is(th,td):nth-child(7){display:none}
+html[data-text=xl] .portfolio-page .projects-table :is(th,td):nth-child(8){display:none}
 @media(max-width:760px){
  .portfolio-page .projects-table,.portfolio-page .projects-table tbody{display:block;min-width:0}
  .portfolio-page .projects-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
