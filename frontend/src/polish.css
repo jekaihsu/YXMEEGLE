@@ -124,3 +124,11 @@
  .workspace .comfortable-tasks .work-project{width:100%}
  .workspace .comfortable-tasks .work-due{margin-left:auto}
 }
+
+/* Count-first week starts at Monday; detailed work lives in a paginated list. */
+.workspace .calendar-grid{grid-template-columns:repeat(7,minmax(8rem,1fr));min-width:56rem}
+.workspace .calendar-day .day-count{font-size:var(--fs-title1);font-weight:600;color:var(--label)}
+.workspace .calendar-day .day-count small{display:block;font-size:var(--fs-caption);font-weight:400;color:var(--label-2)}
+.workspace .calendar-tasks{gap:var(--sp-3);padding:var(--sp-4)}
+.workspace .calendar-tasks p{font-size:var(--fs-footnote);line-height:1.5;margin:0}
+.workspace .schedule-day-details{margin-top:var(--sp-6)}
