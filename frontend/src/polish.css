@@ -142,3 +142,5 @@
  .modal .participant-edit-row .collaborator-options{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
  .modal .collaborator-options label{font-size:var(--fs-footnote)}
 }
+/* The workspace already supplies the shared page gutter. */
+.workspace>.company-cockpit,.workspace>.operations.operations{max-width:none;margin:0}

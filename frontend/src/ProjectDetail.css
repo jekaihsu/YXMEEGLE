@@ -23,3 +23,12 @@
 
 .workspace .case-overview .event-list .event{padding:var(--sp-3) var(--sp-4);gap:var(--sp-3)}
 .workspace .case-overview .event-list :is(p,small){font-size:var(--fs-footnote);line-height:1.6}
+/* Case-data categories and fields follow the same left reading edge. */
+.workspace .project-detail .case-data-navigation{padding:0 0 var(--sp-4)}
+.workspace .project-detail .case-data-navigation label{align-items:flex-start;text-align:left;gap:var(--sp-2);margin:0}
+.workspace .project-detail .case-data-navigation select{width:min(20rem,100%);min-width:0;max-width:100%}
+.workspace .project-detail .definition-grid{max-width:48rem;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 var(--sp-6)}
+.workspace .project-detail .definition-grid>div{display:flex;flex-direction:column;align-items:flex-start;gap:var(--sp-1);padding:var(--sp-4) 0;overflow-wrap:anywhere}
+.workspace .project-detail .definition-grid dt{font-size:var(--fs-footnote);color:var(--label-2)}
+.workspace .project-detail .definition-grid dd{font-size:var(--fs-subhead);color:var(--label)}
+@media(max-width:600px){.workspace .project-detail .definition-grid{grid-template-columns:minmax(0,1fr)}}
