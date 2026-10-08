@@ -26,6 +26,8 @@ try{
  for(const tab of ['data','logs']){await go(`project&project=pB&tab=${tab}`);assert.ok(await visible('.project-tabs [aria-current=page]'),`phone ${tab} selected tab visible`);await page.reload();await page.locator('.project-tabs').waitFor();assert.ok(await visible('.project-tabs [aria-current=page]'),`phone ${tab} reload selected tab visible`)}
  for(const tab of ['daily','jobs']){await go(`admin&tab=${tab}`);await page.locator('.ops-tabs').waitFor();assert.ok(await visible('.ops-tabs [aria-current=page]'),`phone admin ${tab} selected tab visible`)}
  await go('project&project=pB&tab=flow&node=nB4');assert.ok(await visible('.stage-button.selected'),'phone selected flow stage visible');
+ const deadline=page.locator('.node-section .task-table td:nth-child(4)').first();
+ assert.ok(await deadline.isVisible(),'phone flow deadline visible');assert.match(await deadline.innerText(),/10\/01/);assert.match(await deadline.innerText(),/逾期 1 天/);
  assert.deepEqual(errors,[],'shell second-case routes have no runtime error');
  console.log('Responsive detail: phone late tabs, admin tabs and selected flow stage visible on entry/reload');
  await page.setViewportSize({width:1024,height:1000});

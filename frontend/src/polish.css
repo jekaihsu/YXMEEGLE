@@ -162,3 +162,8 @@
  .workspace .calendar-day>header{flex-wrap:wrap;padding-inline:var(--sp-2)}
  .workspace .calendar-day>header small{flex-basis:100%;min-height:1em}
 }
+
+@media(max-width:760px){
+ .workspace .node-section .task-table td:nth-child(4){display:block;width:100%;line-height:1.6}
+ .workspace .node-section .task-table td:nth-child(4) small{display:block}
+}
