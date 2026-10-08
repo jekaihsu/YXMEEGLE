@@ -3,9 +3,10 @@
 Run: DATABASE_URL=... .venv/bin/python scripts/backfill_index.py [--workspace ID] [--batch 50] [--dry-run]
 Idempotent and re-runnable. The workspace is read once in a short read-only
 transaction; rows are written in small batches, each its own transaction that
-re-checks workspaces.version (a concurrent write restarts that workspace, since
-index maintenance then covers changed projects). Extra rows for vanished projects
-are removed at the end. Locks the main tables only for the batch's index rows.
+locks and re-checks workspaces.version before changing index rows. A concurrent
+write restarts that workspace. Extra rows for vanished projects are removed at
+the end. Each batch and final publication hold the workspace writer lock until
+commit; writers may proceed between batches. Quiesce all writers for rollout.
 """
 import argparse
 import os
@@ -13,12 +14,23 @@ from pathlib import Path
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, update
 from sqlalchemy.orm import sessionmaker
 
 from backend import index_tables, storage
 from backend.policy import upgrade
 from backend.models import BusinessRow, WorkspaceRow
+
+
+def lock_version(db,wid,version):
+    """Use the same conditional workspace UPDATE as admin repair.
+
+    PostgreSQL waits for a concurrent writer, then rechecks the version predicate;
+    success holds the row lock through index replacement and transaction commit.
+    Unlike SELECT FOR UPDATE this also acquires a write lock on SQLite.
+    """
+    return db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==version)
+                      .values(version=version)).rowcount==1
 
 
 def backfill_workspace(sessions,wid,*,batch=50,dry_run=False,retries=3):
@@ -32,11 +44,11 @@ def backfill_workspace(sessions,wid,*,batch=50,dry_run=False,retries=3):
         stale=False
         for start in range(0,len(ids),batch):
             with sessions.begin() as db:
-                if db.scalar(select(WorkspaceRow.version).where(WorkspaceRow.id==wid))!=version: stale=True; break
+                if not lock_version(db,wid,version): stale=True; break
                 index_tables.replace_projects(db,BusinessRow,wid,state,ids[start:start+batch])
         if stale: continue
         with sessions.begin() as db:
-            if db.scalar(select(WorkspaceRow.version).where(WorkspaceRow.id==wid))!=version: continue
+            if not lock_version(db,wid,version): continue
             pi,ti,_=index_tables.tables(BusinessRow)
             known=set(ids); extra=[r for r in db.scalars(select(pi.c.project_id).where(pi.c.workspace_id==wid)) if r not in known]
             index_tables.replace_projects(db,BusinessRow,wid,state,extra)
