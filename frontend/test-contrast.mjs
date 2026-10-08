@@ -10,3 +10,25 @@ const ratio=(a,b)=>{const[x,y]=[lum(a),lum(b)].sort((p,q)=>q-p);return(x+.05)/(y
 for(const[name,t]of[['light',light],['dark',dark]])for(const[fg,bg]of[['on-accent','accent'],['accent','bg'],['accent','surface'],['label','bg'],['label-2','bg'],['label-2','surface']]){
  if(!t[fg]||!t[bg])continue;const r=ratio(t[fg],t[bg]);assert(r>=4.5,`${name} ${fg} on ${bg}: ${r.toFixed(2)}`)}
 console.log('contrast ok');
+
+// Exercise the real cascade, including the brand rules that previously overrode polish.
+import {build} from 'esbuild';
+import {createRequire} from 'node:module';
+const {chromium}=createRequire(process.env.PLAYWRIGHT_MODULE||'/tmp/shots/node_modules/playwright-core/package.json')('playwright-core');
+const bundle=await build({entryPoints:['src/main.tsx'],bundle:true,write:false,outdir:'/tmp/yx-contrast',loader:{'.css':'css'}});
+const styles=bundle.outputFiles.filter(f=>f.path.endsWith('.css')).map(f=>f.text).join('\n');
+const browser=await chromium.launch({executablePath:process.env.CHROME_EXECUTABLE||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
+try{
+ const page=await browser.newPage();
+ await page.setContent(`<style>${styles}</style><main class="workspace"><div class="workflow"><button class="stage-button completed"><div class="stage-button-top"><strong>已完成階段</strong><svg></svg></div><div class="stage-button-bottom">負責人<small>完成日期</small></div><span class="stage-action-label">查看成果</span></button></div></main>`);
+ for(const theme of ['light','dark']){
+  await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);
+  await page.waitForTimeout(350);
+  const pairs=await page.evaluate(()=>['.stage-button-top strong','.stage-button-bottom','.stage-button-bottom small','.stage-action-label'].map(selector=>{
+   const card=document.querySelector('.workflow .stage-button.completed');
+   const rgb=value=>'#'+value.match(/\d+/g).slice(0,3).map(n=>Number(n).toString(16).padStart(2,'0')).join('');
+   return {selector,fg:rgb(getComputedStyle(card.querySelector(selector)).color),bg:rgb(getComputedStyle(card).backgroundColor)};
+  }));
+  for(const {selector,fg,bg} of pairs){const r=ratio(fg,bg);assert(r>=4.5,`${theme} completed ${selector}: ${r.toFixed(2)}`);console.log(`${theme} completed ${selector}: ${r.toFixed(2)}:1`)}
+ }
+}finally{await browser.close()}
