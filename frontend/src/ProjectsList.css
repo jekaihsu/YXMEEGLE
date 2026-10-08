@@ -74,3 +74,23 @@
 
 /* Workflow labels must stay within their own cell, including finance-pending states. */
 .portfolio-page .projects-table .workflow-status .ds-badge{white-space:normal;overflow-wrap:anywhere;line-height:1.5}
+
+/* Phone rows become cards while keeping one data source and table semantics. */
+@media(max-width:600px){
+ .workspace .portfolio-page .table-scroll{border:0;background:none;box-shadow:none}
+ .workspace .portfolio-page .table-scroll .projects-table{display:block;min-width:0;table-layout:auto}
+ .portfolio-page .projects-table thead{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%)}
+ .portfolio-page .projects-table tbody{display:flex;flex-direction:column;gap:var(--sp-3)}
+ .portfolio-page .projects-table tbody tr{display:grid;height:auto;grid-template-columns:minmax(0,1fr);padding:var(--sp-4);border:1px solid var(--separator);border-radius:var(--radius-card);background:var(--surface)}
+ .workspace .portfolio-page .projects-table td{display:none;border:0;padding:var(--sp-2) 0}
+ .workspace .portfolio-page .projects-table td:first-child,.workspace .portfolio-page .projects-table td:nth-child(2){display:block}
+ .workspace .portfolio-page .projects-table td:nth-child(6),.workspace .portfolio-page .projects-table td:nth-child(8),.workspace .portfolio-page .projects-table td:nth-child(9){display:grid;grid-template-columns:6rem minmax(0,1fr);align-items:center;gap:var(--sp-3);text-align:left}
+ .portfolio-page .projects-table td:nth-child(6)::before{content:"專案經理"}
+ .portfolio-page .projects-table td:nth-child(8)::before{content:"任務進度"}
+ .portfolio-page .projects-table td:nth-child(9)::before{content:"有效期限"}
+ .portfolio-page .projects-table td::before{font-size:var(--fs-footnote);color:var(--label-2)}
+ .portfolio-page .projects-table .case-link{white-space:normal;font-size:var(--fs-body);line-height:1.5;min-height:44px;display:flex;align-items:center}
+ .portfolio-page .projects-table .case-code{white-space:normal;line-height:1.5}
+ .portfolio-page .projects-table .progress-track i{background:var(--accent)}
+ .portfolio-page .pager{flex-wrap:wrap}
+}
