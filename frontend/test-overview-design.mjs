@@ -25,5 +25,14 @@ w.projects=Array.from({length:300},(_,i)=>({...structuredClone(p),id:`p${i}`,cod
 await flush(()=>root.render(React.createElement(Projects,{c:{...c,route:{view:'projects'}}})));
 assert.equal(document.querySelectorAll('tbody tr').length,10);assert.ok(document.querySelector('.table-footer').textContent.includes('共 300 筆'));
 const row=document.querySelector('tbody tr');assert.equal(row.querySelector('.verification-cell').getAttribute('aria-label'),'已驗證');assert.equal(row.querySelector('[data-kind=business]').textContent,'示範');assert.equal(row.querySelector('[data-kind=workflow]').textContent,'進行中');assert.equal(row.querySelector('[data-kind=verification]').textContent,'✓');assert.equal(row.querySelector('[data-tone=accent]'),null);assert.ok(row.textContent.includes('受阻'));assert.ok(row.textContent.includes('即將到期'));assert.ok(row.querySelector('.deadline').classList.contains('is-upcoming'));assert.equal(row.querySelector('.numeric').textContent,'NT$ 120,000');
+assert.equal(row.querySelector('.progress-cell').textContent,'0%');
+assert.equal(row.querySelector('[role=progressbar]').getAttribute('aria-valuenow'),'0');
+assert.equal(row.querySelector('.progress-track i').style.width,'0%');
+w.projects[0].nodes[0].tasks[0].status='completed';
+await flush(()=>root.render(React.createElement(Projects,{c:{...c,route:{view:'projects'}}})));
+const updated=document.querySelector('tbody tr');
+assert.equal(updated.querySelector('.progress-cell').textContent,'33%');
+assert.equal(updated.querySelector('[role=progressbar]').getAttribute('aria-valuenow'),'33');
+assert.equal(updated.querySelector('.progress-track i').style.width,'33%');
 await flush(()=>[...document.querySelectorAll('.pager button')].find(b=>b.textContent==='下一頁').click());assert.ok(document.querySelector('tbody').textContent.includes('CASE-011'));assert.ok(!document.querySelector('tbody').textContent.includes('CASE-001'));
 await flush(()=>root.unmount());dom.window.close();console.log('Overview design: next action, undated blocked attention, distinct verification/deadline states and 300-case paging passed');
