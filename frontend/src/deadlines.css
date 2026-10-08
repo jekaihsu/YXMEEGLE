@@ -1,0 +1,22 @@
+.deadline-screen.deadline-screen{color:var(--label);font:var(--fs-body)/1.6 var(--font);min-width:0}
+.deadline-screen.deadline-screen h3{font-size:var(--fs-title2);color:var(--label);margin:var(--sp-6) 0 var(--sp-2)}
+.deadline-screen.deadline-screen p,.deadline-screen.deadline-screen label{color:var(--label-2);font-size:var(--fs-subhead)}
+.deadline-screen>.ds-section>.ds-group>p,.deadline-screen>.ds-section>.ds-group>label,.deadline-screen .ops-form{padding:var(--sp-4);margin:0}
+.deadline-screen.deadline-screen input,.deadline-screen.deadline-screen select,.deadline-screen.deadline-screen textarea{background:var(--surface);color:var(--label);border:1px solid var(--separator);border-radius:var(--radius-s);min-height:44px;font:inherit;max-width:100%}
+.deadline-screen.deadline-screen :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.deadline-screen.deadline-screen .data-table{width:100%;min-width:0;margin:0;font-size:var(--fs-subhead);background:var(--surface)}
+.deadline-screen.deadline-screen .data-table th,.deadline-screen.deadline-screen .data-table td{padding:var(--sp-3) var(--sp-4);color:var(--label);border-color:var(--separator);white-space:normal;overflow-wrap:anywhere;font-size:inherit}
+.deadline-screen.deadline-screen .data-table th{background:var(--surface);color:var(--label-2);font-size:var(--fs-footnote)}
+.deadline-screen.deadline-screen .data-table small{display:block;color:var(--label-2);font-size:var(--fs-footnote)}
+.deadline-screen .data-table [data-overdue=true] td:nth-child(2){color:var(--critical)}
+.deadline-screen .ds-badge{display:block;width:fit-content;margin-top:var(--sp-1)}
+.deadline-screen .deadline-conflict{padding:var(--sp-4);background:var(--surface)}
+.deadline-screen .deadline-conflict+.deadline-conflict{border-top:1px solid var(--separator)}
+.deadline-screen.deadline-screen summary{color:var(--label);min-height:44px;cursor:pointer}
+.deadline-screen.deadline-screen .ops-form{border-color:var(--separator)}
+.deadline-screen.deadline-screen .text-button{color:var(--accent);min-height:44px;display:inline-flex;align-items:center}
+.deadline-screen.deadline-screen .button{background:var(--surface-2);color:var(--accent);border:0;border-radius:var(--radius-pill);min-height:44px;font-size:var(--fs-callout)}
+.deadline-screen.deadline-screen .button.primary{background:var(--accent);color:var(--on-accent)}
+.deadline-screen.deadline-screen .ops-input{background:var(--surface);color:var(--label);border:0;border-radius:0;box-shadow:none}
+.deadline-screen.deadline-screen .ops-status{background:var(--surface-2);color:var(--label-2)}
+@media(max-width:600px){.deadline-screen .ops-fields{grid-template-columns:1fr}.deadline-screen.deadline-screen .data-table th,.deadline-screen.deadline-screen .data-table td{padding:var(--sp-2);font-size:var(--fs-footnote)}}
