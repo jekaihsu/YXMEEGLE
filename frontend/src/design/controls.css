@@ -1,0 +1,24 @@
+/* Shared sizing policy also covers lazy-loaded screens and legacy overrides.
+   Only control sizing is authoritative; page layout and appearance stay local. */
+:is(.button,.ds-button){
+ min-height:var(--control-height)!important;
+ padding:var(--control-pad-block) var(--button-pad-inline)!important;
+}
+:is(.button.compact,.ds-button[data-variant=plain]){padding-inline:var(--control-pad-inline)!important}
+:is(.tabbar,.project-tabs,.ops-tabs,.segmented,.ds-segmented)>button{
+ min-height:var(--control-height)!important;
+ padding:var(--control-pad-block) var(--control-pad-inline)!important;
+}
+input:not([type=checkbox],[type=radio],[type=range],[type=color],[type=hidden]),select,textarea{
+ padding:var(--control-pad-block) var(--control-pad-inline)!important;
+}
+input:not([type=checkbox],[type=radio],[type=range],[type=color],[type=hidden]),select{min-height:var(--control-height)!important}
+select{padding-inline-end:var(--sp-7)!important}
+textarea{min-height:var(--control-height);padding-block:var(--sp-3)!important}
+/* Search wrappers provide the horizontal inset around icons and clear buttons. */
+.search-field input{padding-inline:0!important;min-width:0}
+.icon-button{
+ min-width:var(--control-height);min-height:var(--control-height)!important;height:auto!important;
+ padding:var(--control-pad-block)!important;
+}
+.text-button{min-height:var(--control-height)!important;padding:var(--sp-2)!important}
