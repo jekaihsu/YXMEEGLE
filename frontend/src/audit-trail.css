@@ -1,0 +1,22 @@
+.audit-screen.audit-trail{color:var(--label);font:var(--fs-body)/1.6 var(--font)}
+.audit-screen.audit-trail>h2{font-size:var(--fs-title1);font-weight:600}
+.audit-screen.audit-trail>p{color:var(--label-2);margin:var(--sp-2) 0 var(--sp-6);font-size:var(--fs-subhead)}
+.audit-screen.audit-trail .audit-entry{position:relative;background:var(--surface);border:0;border-radius:0;padding:0 0 var(--sp-3) var(--sp-4);margin:0;line-height:1.6;overflow-wrap:anywhere}
+.audit-screen .audit-entry+.audit-entry{border-top:1px solid var(--separator)}
+.audit-screen .audit-entry::before{content:"";position:absolute;left:var(--sp-3);top:var(--sp-5);bottom:0;border-left:1px solid var(--separator)}
+.audit-screen .audit-entry::after{content:"";position:absolute;left:var(--sp-2);top:var(--sp-5);width:var(--sp-2);height:var(--sp-2);border-radius:var(--radius-pill);background:var(--accent)}
+.audit-screen .ds-row{align-items:flex-start;flex-wrap:wrap;background:var(--surface)}
+.audit-screen .ds-row-main{flex-basis:50%;overflow-wrap:anywhere}
+.audit-screen.audit-trail time{color:var(--label-2);font-size:var(--fs-footnote);font-variant-numeric:tabular-nums}
+.audit-screen .audit-entry>p,.audit-screen .audit-entry>details{padding:0 var(--sp-4);margin:var(--sp-2) 0;font-size:var(--fs-subhead);color:var(--label)}
+.audit-screen summary{color:var(--accent);cursor:pointer;min-height:44px;display:flex;align-items:center}
+.audit-screen.audit-trail pre{font-size:var(--fs-footnote);background:var(--surface-2);padding:var(--sp-3);border-radius:var(--radius-s);color:var(--label)}
+.audit-screen.audit-trail .ops-notice{background:var(--surface);border-color:var(--accent);padding:var(--sp-4)}
+.audit-screen.audit-trail .form-error{color:var(--critical)}
+.audit-screen .daily-pagination{align-items:center;flex-wrap:wrap;gap:var(--sp-2);color:var(--label-2);font-size:var(--fs-footnote)}
+.audit-screen .daily-pagination>span{margin-right:auto}
+.audit-screen .audit-skeleton>.skeleton,.audit-screen .audit-skeleton>div:first-child{margin:var(--sp-4)}
+.audit-screen .audit-skeleton .ds-row-main>span,.audit-screen .audit-skeleton .ds-row-main small{display:block;width:100%}
+.audit-screen .audit-skeleton .audit-entry>div:last-child{margin-inline:var(--sp-4)}
+
+.audit-screen .audit-day-placeholder{width:30%}.audit-screen .audit-time-placeholder{width:30%}.audit-screen .audit-skeleton .ds-row-main small{width:40%}
