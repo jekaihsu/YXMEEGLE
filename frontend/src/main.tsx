@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import {AppErrorBoundary} from './AppErrorBoundary';
+import './design/tokens.css';
 import './styles.css';
 import './workbench.css';
 import './brand-workspace.css';
