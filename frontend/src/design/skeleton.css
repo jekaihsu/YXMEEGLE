@@ -1,7 +1,7 @@
 .skeleton {
   min-height: 1em;
-  border-radius: 6px;
-  background: linear-gradient(90deg, #eef0f3 25%, #f8f9fb 50%, #eef0f3 75%);
+  border-radius: var(--radius-s);
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--sep) 50%, var(--surface-2) 75%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
 }
@@ -9,4 +9,3 @@
 .skeleton-header { height: 2rem; width: 60%; }
 .skeleton-chip { display: inline-block; height: 1.5rem; width: 5rem; margin: .25rem; }
 @keyframes skeleton-shimmer { to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }

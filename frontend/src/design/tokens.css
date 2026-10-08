@@ -10,6 +10,8 @@
  --fs-large-title:2.125rem;--fs-title1:1.75rem;--fs-title2:1.375rem;--fs-headline:1.0625rem;--fs-body:1.0625rem;--fs-callout:1rem;--fs-subhead:.9375rem;--fs-footnote:.8125rem;--fs-caption:.75rem;
  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-7:32px;--sp-8:44px;--sp-9:64px;
  --radius-s:8px;--radius-m:12px;--radius-l:18px;--radius-pill:999px;
+ /* legacy aliases for screens not yet migrated */
+ --accent-dark:color-mix(in srgb,var(--accent) 85%,#000);--accent-soft:color-mix(in srgb,var(--accent) 10%,var(--surface));--line:var(--sep);--muted:var(--label-2);--text-secondary:var(--label-2);--green:var(--positive);--amber:var(--warning);--red:var(--critical);
  --dur-fast:120ms;--dur-base:220ms;--dur-slow:360ms;--ease:cubic-bezier(.25,.1,.25,1);
 }
 :root[data-text=s]{--text-scale:.9}

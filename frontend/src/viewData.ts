@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useRef,useState,type DependencyList} from 'react';
 import {getSessionEpoch} from './api';
-import './skeleton.css';
+import './design/skeleton.css';
 
 export type ViewDataFetcher<T>=(signal:AbortSignal,isCurrent:()=>boolean)=>Promise<T>;
 type ViewState<T>={key:string;epoch:number;data?:T;loading:boolean;error:string};
