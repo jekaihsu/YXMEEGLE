@@ -180,7 +180,10 @@ def test_light_endpoints_budget(tmp_path):
 # Index-backed ceilings (INDEX_TABLES_ENABLED + WORKSPACE_SHELL_ENABLED). Queries include the
 # identity lookup and live-read bookkeeping that every route pays; shell raw bytes are 319 slim cards.
 INDEXED_PROJECTS_MAX = (8, 1_900)  # measured 7: identity 2, row + readiness 3, COUNT, page
-INDEXED_SHELL_MAX = (24, 165_000, 30_000)  # queries, raw bytes, gzip bytes
+# The fixture has no blocked tasks: skip that sample query after the aggregate.
+# 25 includes the authoritative task-title lookup added for dashboard samples;
+# fixtures with blocked tasks need one additional bounded sample query.
+INDEXED_SHELL_MAX = (25, 165_000, 30_000)  # queries, raw bytes, gzip bytes
 
 
 @pytest.mark.perf

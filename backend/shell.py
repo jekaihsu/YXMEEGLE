@@ -104,7 +104,7 @@ def build(db,model,row,state,user,facts,today,approval_connection):
     attention=[dict(r._mapping) for r in db.execute(task_rows.where(or_(late,today_q))
         .order_by(case((late,0),else_=1),pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))]
     blocked=[dict(r._mapping) for r in db.execute(task_rows.where(blocked_q)
-        .order_by(pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))]
+        .order_by(pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))] if allc[5] else []
     if attention or blocked:
         titles={r.entity_id:(r.data or {}).get('title') for r in db.execute(select(model.entity_id,model.data).where(model.workspace_id==wid,model.kind=='tasks',model.entity_id.in_(sorted({a['task_id'] for a in attention+blocked}))))}
         for a in attention+blocked: a['title']=titles.get(a['task_id'],'')

@@ -4,7 +4,7 @@ import json
 from datetime import date, timedelta
 import pytest
 from . import app as backend_app
-from .test_perf_budget import scaled_client, count_queries
+from .test_perf_budget import scaled_client, count_queries, INDEXED_SHELL_MAX
 from .models import WorkspaceRow
 
 ON = dict(upgraded=True, WORKSPACE_SHELL_ENABLED='true', INDEX_TABLES_ENABLED='true')
@@ -125,8 +125,9 @@ def test_shell_budget_319(tmp_path):
         print('shell', stats['queries'], 'queries', raw, 'raw', response.headers['content-length'], 'wire')
         assert response.json()['scope'] == 'shell' and 'server-timing' in response.headers
         # Fixture names are long CJK strings: 319 slim cards alone are ~148 KB. The 150 KB plan target needs P4-2 (server-paged cards).
-        # Queries include ~14 from live-read ensure()/status and identity that are outside the shell itself (11: two more load the pending approvals the dashboard lists).
-        assert stats['queries'] <= 26 and raw <= 165_000 and int(response.headers['content-length']) <= 30_000
+        # Share the documented fixture budget with the opt-in release gate.
+        queries_max, raw_max, wire_max = INDEXED_SHELL_MAX
+        assert stats['queries'] <= queries_max and raw <= raw_max and int(response.headers['content-length']) <= wire_max
 
 
 def shell_get(client, tag=None):
