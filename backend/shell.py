@@ -94,22 +94,25 @@ def build(db,model,row,state,user,facts,today,approval_connection):
     cards=[card(r,state,per_project) for r in rows]
     joined=ti.join(pi,and_(pi.c.workspace_id==ti.c.workspace_id,pi.c.project_id==ti.c.project_id))
     today_q=and_(openq,func.substr(ti.c.due_date,1,10)==as_of[:10])
+    blocked_q=and_(openq,ti.c.status.in_(('paused','blocked')))
     # Legacy Dashboard: every open task of every visible case (not only the user's own); the 'my' numbers stay the nav badge.
     owned=mine(ti,user,facts); one=lambda cond:func.coalesce(func.sum(case((cond,1),else_=0)),0)
-    allc=db.execute(select(one(openq),one(late),one(today_q),one(and_(openq,owned)),one(and_(late,owned))).select_from(joined).where(ti.c.workspace_id==wid,*vis)).one()
+    allc=db.execute(select(one(openq),one(late),one(today_q),one(and_(openq,owned)),one(and_(late,owned)),one(blocked_q)).select_from(joined).where(ti.c.workspace_id==wid,*vis)).one()
     my_active,my_late=allc[3],allc[4]
     # [...overdue, ...dueToday] in workspace order: project, node, task ordinal
-    attention=[dict(r._mapping) for r in db.execute(select(ti.c.task_id,ti.c.project_id,ti.c.node_id,ti.c.node_key,ti.c.node_name,ti.c.assignee_id,ti.c.status,ti.c.due_date,pi.c.code.label('project_code'),pi.c.name.label('project_name'))
-        .select_from(joined).where(ti.c.workspace_id==wid,or_(late,today_q),*vis)
+    task_rows=select(ti.c.task_id,ti.c.project_id,ti.c.node_id,ti.c.node_key,ti.c.node_name,ti.c.assignee_id,ti.c.status,ti.c.due_date,pi.c.code.label('project_code'),pi.c.name.label('project_name')).select_from(joined).where(ti.c.workspace_id==wid,*vis)
+    attention=[dict(r._mapping) for r in db.execute(task_rows.where(or_(late,today_q))
         .order_by(case((late,0),else_=1),pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))]
-    if attention:
-        titles={r.entity_id:(r.data or {}).get('title') for r in db.execute(select(model.entity_id,model.data).where(model.workspace_id==wid,model.kind=='tasks',model.entity_id.in_([a['task_id'] for a in attention])))}
-        for a in attention: a['title']=titles.get(a['task_id'],'')
+    blocked=[dict(r._mapping) for r in db.execute(task_rows.where(blocked_q)
+        .order_by(pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))]
+    if attention or blocked:
+        titles={r.entity_id:(r.data or {}).get('title') for r in db.execute(select(model.entity_id,model.data).where(model.workspace_id==wid,model.kind=='tasks',model.entity_id.in_(sorted({a['task_id'] for a in attention+blocked}))))}
+        for a in attention+blocked: a['title']=titles.get(a['task_id'],'')
     return dict(scope='shell',version=row.version,as_of=as_of,workspace_id=wid,environment=env,users=state['users'],
                 calendar=state.get('calendar'),source_status=state.get('source_status'),file_categories=categories(state),approval_connection=approval_connection,
                 counts=dict(approvals_pending=pending,daily_unmatched=counters.get('daily_unmatched',0),my_overdue_tasks=int(my_late),my_active_tasks=int(my_active),
-                            active_tasks=int(allc[0]),overdue_tasks=int(allc[1]),due_today_tasks=int(allc[2])),
-                projects=cards,attention=attention,pending_approvals=pending_items,approvals=[],events=[])
+                            active_tasks=int(allc[0]),overdue_tasks=int(allc[1]),due_today_tasks=int(allc[2]),blocked_tasks=int(allc[5])),
+                projects=cards,attention=attention,blocked=blocked,pending_approvals=pending_items,approvals=[],events=[])
 
 
 TABS=('all','formal','intake','active','overdue','completed')
