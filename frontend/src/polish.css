@@ -117,3 +117,14 @@
  .workspace .calendar-day>header{gap:var(--sp-1);padding:var(--sp-3) var(--sp-2)}
  .workspace .calendar-task>small{white-space:normal;overflow-wrap:anywhere}
 }
+
+/* Edge cues follow the actual scroll position; the selected tab is centered by the shared tabs helper. */
+.workspace :is(.tabbar,.ops-tabs){scroll-padding-inline:var(--sp-4)}
+.workspace :is(.tabbar,.ops-tabs)[data-scroll-before=true]{border-left:4px solid var(--accent)}
+.workspace :is(.tabbar,.ops-tabs)[data-scroll-after=true]{border-right:4px solid var(--accent)}
+@media(max-width:760px){
+ .workspace :is(.tabbar,.ops-tabs){overflow-x:auto;flex-wrap:nowrap;max-width:100%;scrollbar-width:thin}
+ .workspace :is(.tabbar,.ops-tabs)>button{flex:0 0 auto;white-space:nowrap}
+}
+
+.workspace .tab-scroll-hint{font-size:var(--fs-footnote);color:var(--accent);margin:var(--sp-1) 0 var(--sp-3);text-align:right}
