@@ -38,7 +38,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible{outline-color:var(--s
 .data-freshness-stale,.data-freshness-refreshing{color:var(--label-2)}
 .data-freshness-error,.data-freshness-blocked{background:var(--surface-2);border-radius:var(--radius-s);padding:4px 8px}
 .dataset-as-of{font-size:var(--fs-caption);color:var(--label-2);overflow-wrap:anywhere}
-@media(max-width:900px){.topbar{flex-wrap:wrap;height:auto;gap:8px;padding-top:10px;padding-bottom:10px}.topbar-right{flex-wrap:wrap}.topbar-right .data-freshness{order:5;flex-basis:100%}}
+@media(max-width:900px){.topbar{flex-wrap:nowrap;gap:8px}.topbar-right{flex-wrap:nowrap}.topbar-right .data-freshness{order:0;flex-basis:auto}}
 .source-freshness{padding:12px;border-radius:var(--radius-s);background:var(--surface-2);color:var(--label-2)}.source-freshness-blocked{background:var(--surface-2);color:var(--label-2)}
 
 .data-freshness .button{min-height:36px}.freshness-details{position:relative;font-size:var(--fs-caption)}.freshness-details summary{cursor:pointer}.freshness-details ul{margin:4px 0;padding-left:18px}

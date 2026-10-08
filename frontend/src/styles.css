@@ -99,3 +99,8 @@
 @media(max-width:900px){.calendar-grid{min-width:56rem}}
 .topbar-right{align-items:center;white-space:nowrap}
 @media(max-width:760px){.topbar-right{gap:var(--sp-2)}.topbar-right .freshness-view summary{white-space:nowrap}.demo-tag{display:none}}
+.topbar-right>*{margin:0;align-self:center}
+.topbar-right .data-freshness{display:flex;align-items:center;min-height:0;padding:0;line-height:1}
+
+.topbar,.topbar-right{flex-wrap:nowrap}
+.topbar{justify-content:space-between;gap:var(--sp-3)}
