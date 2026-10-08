@@ -132,3 +132,8 @@
 .workspace .calendar-tasks{gap:var(--sp-3);padding:var(--sp-4)}
 .workspace .calendar-tasks p{font-size:var(--fs-footnote);line-height:1.5;margin:0}
 .workspace .schedule-day-details{margin-top:var(--sp-6)}
+
+/* A raised selected pill remains identifiable after revealing late tabs. */
+.workspace :is(.project-tabs,.ops-tabs){scroll-padding-inline:var(--sp-4)}
+.workspace :is(.project-tabs,.ops-tabs) [aria-current=page]{background:var(--surface);color:var(--label);box-shadow:var(--shadow-sm)}
+.workspace .workflow-scroll{scroll-padding-inline:var(--sp-4)}
