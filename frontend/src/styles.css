@@ -83,3 +83,11 @@
 :is(.revision,.stage-chips>span){background:none;border:0;border-radius:0}
 .eyebrow{display:none}
 :is(.resource-table,.compact-table) :is(th,td){vertical-align:baseline}
+.empty>span{display:none}
+.modal footer,.task-inspector .inspector-footer{background:var(--surface);color:var(--label)}
+.participant-edit-row{grid-template-columns:4rem minmax(14rem,1fr);gap:var(--sp-2) var(--sp-4)}
+.participant-edit-row .collaborator-options{grid-column:2}
+.participant-edit-row>select{width:100%;min-width:0}
+.collaborator-options{gap:var(--sp-2) var(--sp-4)}
+.collaborator-options label{min-height:32px;color:var(--label)}
+@media(max-width:760px){.participant-edit-row{grid-template-columns:3.5rem minmax(0,1fr)}}

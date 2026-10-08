@@ -26,3 +26,14 @@
 .project-detail .project-tabs button.active{background:none}
 .co-progress,.co-actions{padding-inline:0}
 @media(max-width:760px){.project-detail .project-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-2)}.project-detail .project-tabs button{white-space:normal}}
+/* The process is a sequence of choices, not nested cards. */
+.project-detail .workflow-scroll{background:none;border:0;border-radius:0}
+.project-detail .workflow{background:none;padding:var(--sp-4) 0;min-height:0;gap:var(--sp-4)}
+.project-detail .workflow .stage-button{background:none;border:0;border-radius:0;padding:var(--sp-3);box-shadow:none;color:var(--label);min-width:8rem;transform:none}
+.project-detail .workflow .stage-button.selected{background:var(--accent-fill);color:var(--accent);border-radius:var(--radius-s)}
+.project-detail .workflow .stage-button-top strong{color:inherit;font-size:var(--fs-subhead)}
+.project-detail .workflow .production-group{background:none;border:0;padding:0}
+.project-detail .workflow .stage-action-label{color:var(--label-2)}
+.project-detail .node-index{background:none;border:0;padding:0;min-width:2rem}
+.project-detail .data-table :is(th,td){background:transparent}
+.project-detail .ops-input{background:none;border:0;padding:var(--sp-3) 0}

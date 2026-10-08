@@ -8,7 +8,7 @@ import type { Freshness, Route, Session, User, Workspace } from './types';
 
 export const ROLE:Record<string,string>={pm:'專案經理',manager:'系統管理員',member:'組員'};
 const NAV=[{view:'dashboard',label:'工作總覽',icon:LayoutDashboard},{view:'company',label:'公司駕駛艙',icon:BarChart3},{view:'projects',label:'案件總覽',icon:FolderOpen},{view:'work',label:'我的工作',icon:ListTodo},{view:'schedule',label:'排程與人力',icon:CalendarDays},{view:'approvals',label:'變更與展延',icon:GitBranch},{view:'routines',label:'追蹤與檢討',icon:Clock3},{view:'admin',label:'管理設定',icon:Settings2}] as const;
-export function Avatar({user,small=false}:{user?:User;small?:boolean}){return <span className={`avatar ${small?'small':''}`} style={{background:({'控制組':'#e8edff','圖資組':'#e8f1ed','外業組':'#fff0dd','報告組':'#f4eafa'} as Record<string,string>)[user?.department||'']}}>{(user?.name||'未').slice(-2)}</span>}
+export function Avatar({user,small=false}:{user?:User;small?:boolean}){return <span className={`avatar ${small?'small':''}`}>{(user?.name||'未').slice(-2)}</span>}
 function ChevronsIcon(){return <ChevronDown size={15}/>}
 
 type CallbackError={title:string;description:string;next:string};

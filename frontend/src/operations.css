@@ -43,3 +43,7 @@
 .operations .ops-tabs button{padding:var(--sp-2) 0}
 .operations :is(.ops-form,.ds-group){padding-inline:0}
 .operations .data-table :is(th,td){background:transparent}
+.operations .ops-tabs button{background:none;border-radius:0;box-shadow:none}
+.operations>h1{font-weight:500;margin-bottom:var(--sp-2)}
+.operations>p{font-size:var(--fs-subhead);margin-bottom:var(--sp-6)}
+.operations>h1+.data-table,.operations>p+.data-table{margin-top:var(--sp-6)}
