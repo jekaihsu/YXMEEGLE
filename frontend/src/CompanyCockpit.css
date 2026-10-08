@@ -1,7 +1,7 @@
 .company-cockpit{max-width:1080px;margin:0 auto;min-width:0;color:var(--label);font-family:var(--font);font-size:var(--fs-body);line-height:1.5}
 .cockpit-heading,.cockpit-section-title,.cockpit-freshness,.cockpit-pagination{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--sp-4);align-items:baseline}
 .cockpit-heading{align-items:flex-start;margin-bottom:var(--sp-6)}
-.cockpit-heading h1{font-size:var(--fs-large-title);font-weight:600;letter-spacing:-.02em;line-height:1.2;margin:var(--sp-1) 0 var(--sp-2)}
+.cockpit-heading h1{font-size:var(--fs-large-title);font-weight:600;letter-spacing:0;line-height:1.2;margin:var(--sp-1) 0 var(--sp-2)}
 .cockpit-heading p{margin:0;color:var(--label-2);font-size:var(--fs-subhead)}
 .cockpit-heading .ds-eyebrow{color:var(--accent);font-size:var(--fs-caption)}
 .cockpit-freshness{font-size:var(--fs-footnote);color:var(--label-2);gap:var(--sp-2);margin-bottom:var(--sp-7)}
@@ -13,18 +13,18 @@
 .company-cockpit button.ds-row:hover{background:var(--surface-2)}
 .company-cockpit .ds-row{color:var(--label);background:var(--surface);overflow-wrap:anywhere}
 .cockpit-health{padding:var(--sp-6);margin:var(--sp-5) 0 var(--sp-4)}
-.cockpit-health .ds-stat strong{font-size:calc(var(--fs-large-title) * 2);letter-spacing:-.04em}
+.cockpit-health .ds-stat strong{font-size:calc(var(--fs-large-title) * 2);letter-spacing:0}
 .company-cockpit .ds-row-value{color:var(--label);text-align:right;flex-shrink:0}
 .company-cockpit .ds-row-value small{color:var(--label-2)}
 .cockpit-source-detail{padding:var(--sp-4);background:var(--surface)}
 .cockpit-source-summary{margin:0 0 var(--sp-5);font-size:var(--fs-callout);font-weight:600}
 .cockpit-breakdown-title{font-weight:500;margin:0 0 var(--sp-2)}
 .cockpit-distribution{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 var(--sp-6)}
-.company-cockpit .cockpit-distribution button{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:var(--sp-3);border:0;border-bottom:1px solid var(--separator);border-radius:0;padding:var(--sp-3) 0;text-align:left;color:var(--label);background:var(--surface);font-size:var(--fs-subhead)}
+.company-cockpit .cockpit-distribution button{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:var(--sp-3);border:0;border-bottom:1px solid var(--separator);border-radius:var(--radius-s);padding:var(--sp-3) 0;text-align:left;color:var(--label);background:var(--surface);font-size:var(--fs-subhead)}
 .cockpit-distribution button>span:first-child{overflow-wrap:anywhere}
 .company-cockpit .cockpit-distribution button:hover,.company-cockpit .cockpit-distribution button.selected{background:var(--accent-fill)}
 .cockpit-bar{height:var(--sp-1);background:var(--surface-2);overflow:hidden;border-radius:var(--radius-pill)}
-.cockpit-bar i{display:block;height:100%;background:var(--accent);border-radius:inherit}
+.cockpit-bar i{display:block;height:100%;background:var(--accent);border-radius:var(--radius-s)}
 .cockpit-note{line-height:1.8;margin:var(--sp-4) 0 0;overflow-wrap:anywhere}
 .cockpit-table-scroll{overflow-x:auto;max-width:100%;background:var(--surface);padding:0 var(--sp-4)}
 .company-cockpit table{width:100%;border-collapse:collapse;font-size:var(--fs-subhead);text-align:left}
@@ -62,3 +62,12 @@
 .admission-queue ul{list-style:none;margin:var(--sp-2) 0 0;padding:0;display:grid;gap:var(--sp-3)}
 .admission-queue li{display:grid;gap:var(--sp-1)}
 .admission-queue form{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:end}
+.cockpit-health{padding:var(--sp-4) 0;margin:var(--sp-3) 0}
+.company-cockpit :is(.ds-row,.cockpit-source-detail,.cockpit-table-scroll,.cockpit-distribution button){background:transparent}
+.cockpit-source-detail,.cockpit-table-scroll{padding:0}
+.company-cockpit :is(th,td){vertical-align:baseline;overflow-wrap:normal}
+.company-cockpit table:not(.cockpit-case-table){min-width:40rem}
+.company-cockpit th:first-child{min-width:10rem}
+.cockpit-distribution button>span:first-child{overflow-wrap:normal;min-width:8rem}
+.cockpit-health .ds-stat strong{color:var(--warning);font-weight:500}
+.cockpit-error{border:0;padding:var(--sp-3) 0;color:var(--warning);background:none}
