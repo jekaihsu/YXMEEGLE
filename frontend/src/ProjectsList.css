@@ -34,9 +34,9 @@
 .portfolio-page .form-error{padding:var(--sp-3) var(--sp-4);color:var(--critical)}
 @media(max-width:760px){.portfolio-page .portfolio-index button{padding:var(--sp-4)}.portfolio-page .portfolio-index strong{font-size:var(--fs-title1)}.portfolio-page .tabbar{border-radius:var(--radius-m)}}
 
-/* Keep every operational column visible; compact rows scroll inside the table. */
+/* Compact operational columns fit desktop; optional columns and phones can scroll. */
 .portfolio-page .portfolio-index{margin-bottom:0;box-shadow:var(--glass-highlight),var(--glass-shadow)}
-.portfolio-page .table-scroll .projects-table{min-width:1240px;background:var(--surface);table-layout:fixed;line-height:1.2}
+.portfolio-page .table-scroll .projects-table{min-width:80rem;background:var(--surface);table-layout:fixed;line-height:1.2}
 .portfolio-page .projects-table th{padding:var(--sp-2);letter-spacing:0}
 .portfolio-page .projects-table tbody tr{height:40px}
 .portfolio-page .projects-table .case-link{font-size:var(--fs-subhead);line-height:1.2;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:none}
@@ -57,17 +57,49 @@
 .portfolio-page .verification-cell{display:inline-flex}
 .portfolio-page .table-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-.portfolio-page .projects-table th:first-child{width:230px}
-.portfolio-page .projects-table th:nth-child(2){width:80px}
-.portfolio-page .projects-table th:nth-child(3){width:55px}
-.portfolio-page .projects-table th:nth-child(4){width:110px}
-.portfolio-page .projects-table th:nth-child(5){width:140px}
-.portfolio-page .projects-table th:nth-child(6){width:96px}
-.portfolio-page .projects-table th:nth-child(7){width:96px}
-.portfolio-page .projects-table th:nth-child(8){width:90px}
-.portfolio-page .projects-table th:nth-child(9),.portfolio-page .projects-table th:nth-child(10){width:110px}
-.portfolio-page .projects-table th:last-child{width:28px}
+.portfolio-page .projects-table th:first-child{width:10rem}
+.portfolio-page .projects-table th:nth-child(2){width:4.5rem}
+.portfolio-page .projects-table th:nth-child(3){width:4.5rem}
+.portfolio-page .projects-table th:nth-child(4){width:5rem}
+.portfolio-page .projects-table th:nth-child(5){width:10rem}
+.portfolio-page .projects-table th:nth-child(6){width:5.5rem}
+.portfolio-page .projects-table th:nth-child(7){width:5rem}
+.portfolio-page .projects-table th:nth-child(8){width:4.5rem}
+.portfolio-page .projects-table th:nth-child(9){width:6rem}
+.portfolio-page .projects-table th:nth-child(10){width:7.5rem}
+.portfolio-page .projects-table th:last-child{width:2rem}
 .portfolio-page .projects-table .case-code{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:14px}
 .portfolio-page .projects-table .case-code small{display:inline;margin:0;font-size:var(--fs-caption)}
 .portfolio-page .projects-table .cell-title{line-height:18px}
 .portfolio-page .projects-table td small{margin-top:0}
+
+.portfolio-page .table-preferences{display:flex;flex-wrap:wrap;align-items:flex-start;gap:var(--sp-3)}
+.portfolio-page .column-preferences{border:1px solid var(--sep);border-radius:var(--radius-m);background:var(--surface);font-size:var(--fs-subhead)}
+.portfolio-page .column-preferences summary{padding:var(--sp-3);cursor:pointer;min-height:44px}
+.portfolio-page .column-preferences>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-2);padding:var(--sp-3);border-top:1px solid var(--sep)}
+.portfolio-page .column-preferences label{display:flex;align-items:center;gap:var(--sp-2);min-height:44px}
+.portfolio-page .column-preferences input{accent-color:var(--accent);width:1rem;height:1rem}
+.portfolio-page[data-density=comfortable] .projects-table td{padding:var(--sp-3) var(--sp-2)}
+.portfolio-page .projects-table [hidden]{display:none}
+
+/* Larger text keeps metadata and badges on their own readable lines. */
+.portfolio-page .projects-table .case-code{line-height:1.4}
+.portfolio-page .projects-table .cell-title{line-height:1.3}
+.portfolio-page .projects-table .case-code .ds-status-badge{padding-block:0}
+@media(max-width:760px){
+ .workspace .portfolio-page .tabbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-1);overflow:visible;border-radius:var(--radius-m)}
+ .workspace .portfolio-page .tabbar button{min-width:0;padding-inline:var(--sp-2);white-space:normal}
+ .portfolio-page .portfolio-index button{flex-wrap:wrap;gap:var(--sp-2);align-content:center}
+ .portfolio-page .portfolio-index button>span{flex-basis:100%}
+ .portfolio-page .portfolio-index strong{margin:0}
+ .portfolio-page .pager{flex-wrap:wrap}
+ .portfolio-page .column-preferences{max-width:100%}
+}
+
+.portfolio-page .projects-table .person-cell{flex-wrap:wrap;white-space:normal;overflow-wrap:anywhere;gap:var(--sp-1)}
+.portfolio-page .projects-table .case-link{white-space:normal}
+@media(min-width:761px) and (max-width:1100px){.portfolio-page .person-cell .avatar{display:none}}
+
+/* The empty track remains visible at zero, with room beneath the numeric value. */
+.portfolio-page .progress-cell{flex-direction:column;align-items:stretch;gap:var(--sp-1)}
+.portfolio-page .progress-track{flex:none;width:100%;box-sizing:border-box;border:1px solid var(--label-2)}

@@ -39,3 +39,11 @@
 .workspace .today-layout .event-list .event{padding:var(--sp-2) var(--sp-3)}
 @media(max-width:1100px){.workspace .today-layout{grid-template-columns:1fr}.workspace .today-layout .today-aside{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4);padding-top:var(--sp-3)}.workspace .today-layout .today-activity{grid-column:1/-1}}
 @media(max-width:760px){.workspace .today-layout .today-aside{grid-template-columns:1fr}.today-main .dh-hero{padding:var(--sp-4)}.workspace .today-layout .ds-row{gap:var(--sp-2)}.dh-attention{max-width:6rem}.today-main .dh-blocked{flex-wrap:wrap}.today-main .dh-blocked>span:last-child{margin-left:auto}}
+
+/* Allow long task labels and attention badges to share narrow rows without squeezing text. */
+@media(max-width:760px){
+ .workspace .today-layout .work-inbox .ds-row{flex-wrap:wrap}
+ .workspace .today-layout .work-inbox .ds-row-main{flex-basis:calc(100% - 2.5rem)}
+ .workspace .today-layout .work-inbox .ds-row-value{margin-left:auto}
+ .workspace .today-layout .dh-progress{width:5.5rem;gap:var(--sp-2)}
+}

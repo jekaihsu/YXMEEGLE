@@ -2,8 +2,9 @@ import {useState, type ReactNode} from 'react';
 import {ArrowRight, CalendarDays, ChevronRight, CircleCheck, Clock3, GitBranch} from 'lucide-react';
 import {type Project} from './types';
 import {Ctx,TaskRow,active,isTaskActor,taskReadiness,openGuidedTask,allTasks,isLate,date,openTask,nameOf,elapsed,NODE_NAMES,STATUS,progress,Empty,unmatchedDaily,num,EventList,FullWorkspaceGate} from './appCommon';
-import {Badge,Button,Page,Progress,Row} from './design';
+import {StatusBadge,Button,Page,Progress,Row} from './design';
 import './DailyHome.css';
+import {CaseSummary} from './CaseSummary';
 
 type Item={key:string;title:string;detail:string;late?:number;today?:boolean;blocked?:boolean;icon:ReactNode;onClick:()=>void};
 
@@ -15,7 +16,7 @@ export function NextAction({c,rows}:{c:Ctx;rows:TaskRow[]}){
  const ordered=[...owned].sort((a,b)=>(a.t.status==='in_progress'?-1:0)-(b.t.status==='in_progress'?-1:0)||(a.t.due_date||'9999').localeCompare(b.t.due_date||'9999'));
  const next=ordered.find(r=>!taskReadiness(r,c));const blocked=ordered.filter(r=>operationallyBlocked(r));
  if(!owned.length)return null;
- return <section className="dh-hero" aria-label="接續我的工作"><p className="dh-kicker">接續我的工作 · {owned.length} 項待處理 · 可平行作業</p>{next?<><h2>{next.t.title}</h2><p>{next.p.code} · {next.n.name} · {next.t.status==='in_progress'?'作業中，接著補齊成果':'檢視內容後，由你確認開始'}</p><Button variant="primary" onClick={()=>openGuidedTask(c,next)}>{next.t.status==='in_progress'?'繼續此任務':'前往此任務'}<ArrowRight size={17}/></Button></>:<><h2>先補齊條件，再接續作業</h2><p>你負責的任務目前仍有待處理條件。</p></>}{blocked.slice(0,2).map(r=><button key={r.t.id} type="button" className="dh-blocked" onClick={()=>openGuidedTask(c,r)}><span><Badge tone="critical">受阻</Badge> {r.t.title}<small>{r.p.code} · {r.n.name} · 待解除作業條件</small></span><span>查看處理方式<ArrowRight size={14}/></span></button>)}</section>
+ return <section className="dh-hero" aria-label="接續我的工作"><p className="dh-kicker">接續我的工作 · {owned.length} 項待處理 · 可平行作業</p>{next?<><h2>{next.t.title}</h2><p>{next.p.code} · {next.n.name} · {next.t.status==='in_progress'?'作業中，接著補齊成果':'檢視內容後，由你確認開始'}</p><Button variant="primary" onClick={()=>openGuidedTask(c,next)}>{next.t.status==='in_progress'?'繼續此任務':'前往此任務'}<ArrowRight size={17}/></Button></>:<><h2>先補齊條件，再接續作業</h2><p>你負責的任務目前仍有待處理條件。</p></>}{blocked.slice(0,2).map(r=><button key={r.t.id} type="button" className="dh-blocked" onClick={()=>openGuidedTask(c,r)}><span><StatusBadge kind="attention" state="blocked">受阻</StatusBadge> {r.t.title}<small>{r.p.code} · {r.n.name} · 待解除作業條件</small></span><span>查看處理方式<ArrowRight size={14}/></span></button>)}</section>
 }
 
 function Group({title,count,caption,className,children}:{title:string;count?:number;caption?:string;className?:string;children:ReactNode}){
@@ -25,7 +26,7 @@ const More=({onClick,children}:{onClick:()=>void;children:ReactNode})=><Row labe
 
 function Inbox({c,count,caption,items,moreWork,morePending}:{c:Ctx;count:number;caption:string;items:Item[];moreWork:boolean;morePending:boolean}){
  return <Group title="需要關注" count={count} caption={caption} className="work-inbox">
-  {items.map(i=><Row key={i.key} icon={i.icon} label={i.title} detail={i.detail} onClick={i.onClick} value={<span className="dh-attention">{i.blocked&&<Badge tone="critical">受阻</Badge>}{i.late!=null?<Badge tone="critical">逾期 {i.late} 天</Badge>:i.today?<Badge tone="warning">當日到期</Badge>:!i.blocked&&<ChevronRight size={17}/>}</span>}/>)}
+  {items.map(i=><Row key={i.key} icon={i.icon} label={i.title} detail={i.detail} onClick={i.onClick} value={<span className="dh-attention">{i.blocked&&<StatusBadge kind="attention" state="blocked">受阻</StatusBadge>}{i.late!=null?<StatusBadge kind="attention" state="overdue">逾期 {i.late} 天</StatusBadge>:i.today?<StatusBadge kind="attention" state="today">當日到期</StatusBadge>:!i.blocked&&<ChevronRight size={17}/>}</span>}/>)}
   {!items.length&&<Row icon={<CircleCheck size={20}/>} label="資料日期內沒有到期或待審工作" detail="其他排定任務可在「我的工作」查看。"/>}
   {moreWork&&<More onClick={()=>c.go({view:'work',tab:'all'})}>查看全部工作</More>}{morePending&&<More onClick={()=>c.go({view:'approvals'})}>查看全部待審申請</More>}
  </Group>
@@ -43,7 +44,7 @@ function Portfolio({c,formal,rows}:{c:Ctx;formal:Project[];rows:{p:Project;stage
 
 function Aside({c,formal,intakes,daily,activity}:{c:Ctx;formal:number;intakes:number;daily:ReactNode;activity:ReactNode}){
  return <aside className="today-aside">
-  <Group title="案件分流" className="dh-totals"><Row href="#view=projects&tab=formal" label="正式案件" detail="依工程確認單建立" value={formal}/><Row href="#view=projects&tab=intake" label="待確認接案" detail="尚未列入正式案件" value={intakes}/></Group>
+  <Group title="案件分流" className="dh-totals"><CaseSummary formal={formal} intakes={intakes}/></Group>
   <Group title="當日日報" className="today-daily">{daily}{unmatchedDaily(c.w)>0&&<Row label={`${num(unmatchedDaily(c.w))} 筆日報待配對`} onClick={()=>c.go({view:'admin',tab:'daily'})} value="前往核對"/>}<Row label="填報紀錄不等同任務完成，成果仍需確認交接。"/></Group>
   {activity}
  </aside>

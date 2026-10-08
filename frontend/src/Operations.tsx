@@ -9,7 +9,7 @@ import {DriveFileStorage} from './DriveFileStorage';
 import {AttendanceWorkSchedules} from './AttendanceWorkSchedules';
 import {useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactElement, type ReactNode} from 'react';
 import {createPortal} from 'react-dom';
-import {Badge, Button, Row, Section, Sheet, Skeleton} from './design';
+import {StatusBadge, Button, Row, Section, Sheet, Skeleton} from './design';
 import {DraftForm} from './FormDraft';
 import {FileCategorySettings} from './FileCategorySettings';
 import {api,ApiError} from './api';
@@ -31,7 +31,7 @@ const projectOperator=(c:Context,p:Project)=>c.s.user?.can_business_override||[p
 const values=(event:FormEvent<HTMLFormElement>)=>Object.fromEntries(new FormData(event.currentTarget).entries());
 export function Person({c,name,value='',label:caption='負責人'}:{c:Context;name:string;value?:string;label?:string}){return <label>{caption}<select name={name} defaultValue={value}><option value="">尚未指定</option>{c.w.users.filter(u=>u.active!==false).map(u=><option key={u.id} value={u.id}>{u.name} · {u.department}</option>)}</select></label>}
 export function Field({title,name,type='text',required=true,value,children}:{title:string;name:string;type?:string;required?:boolean;value?:string|number;children?:ReactNode}){return <label>{title}{children||<input name={name} type={type} required={required} defaultValue={value} step={type==='number'?'any':undefined} min={type==='number'?0:undefined}/>}</label>}
-export function Status({value}:{value:string}){return <Badge tone={['conflict','failed','returned','outcome_unknown'].includes(value)?'critical':undefined}>{label(value)}</Badge>}
+export function Status({value}:{value:string}){return <StatusBadge kind="workflow" state={value}>{label(value)}</StatusBadge>}
 export const ActionForm=DraftForm;
 
 /** Keep the draft mounted while its single sheet opens and closes. */

@@ -39,3 +39,10 @@ button.ds-row:hover,a.ds-row:hover{background:var(--surface-2)}
 @keyframes ds-fade{from{opacity:0}}
 @keyframes ds-rise{from{transform:translateY(24px)}}
 @media(prefers-reduced-motion:reduce){.ds-backdrop,.ds-sheet{width:min(560px,100%);max-height:90vh;overflow:auto;color:var(--label);padding:var(--sp-4) var(--sp-5) var(--sp-6);animation:ds-rise 300ms ease-out}.ds-sheet.glass{border-radius:var(--radius-card) var(--radius-card) 0 0}}
+
+/* Status domains differ in shape as well as text; blue is reserved for actions/selections. */
+.ds-status-badge[data-kind=business]{border-radius:var(--radius-s);border:1px solid var(--sep);color:var(--label)}
+.ds-status-badge[data-kind=workflow]{border-radius:var(--radius-pill);border:1px solid var(--sep)}
+.ds-status-badge[data-kind=verification]{border-radius:var(--radius-s);border:1px dashed currentColor;background:none}
+.ds-status-badge[data-kind=attention]{border-radius:var(--radius-s);background:color-mix(in srgb,currentColor 10%,var(--surface));border:1px solid currentColor}
+.ds-status-badge[data-tone=positive]{color:color-mix(in srgb,var(--positive) 85%,var(--label))}.ds-status-badge[data-tone=warning]{color:var(--warning)}.ds-status-badge[data-tone=critical]{color:var(--critical)}
