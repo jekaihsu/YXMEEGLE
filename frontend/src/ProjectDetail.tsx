@@ -46,8 +46,9 @@ export function ProjectDetailGate({c}:{c:Ctx}){
  useEffect(()=>{if(shell&&detail.data)perfMark('project-detail-render')},[shell,detail.data]);
  if(!shell)return <ProjectDetail c={c}/>;
  if(!detail.data)return detail.error?<ProjectUnavailable c={c} error={detail.error}/>:<div className="project-detail" role="status"><p className="co-loading">正在讀取案件…</p><Skeleton height="2.5rem" width="60%"/><Skeleton lines={4}/></div>;
- const {scope:_scope,version:_version,as_of:_asOf,project,...records}=detail.data;
- return <ProjectDetail c={{...c,w:{...c.w,...records,projects:c.w.projects.map(p=>p.id===project.id?project:p)}}}/>;
+ const {scope:_scope,version,as_of:asOf,project,...records}=detail.data;
+ const readVersion={version,project_versions:typeof project.concurrency_version==='number'?{[project.id]:project.concurrency_version}:{}};
+ return <ProjectDetail c={{...c,run:(action,payload,scope)=>c.run(action,payload,scope,readVersion),upload:form=>c.upload(form,readVersion),w:{...c.w,...records,version,as_of:asOf||c.w.as_of,projects:c.w.projects.map(p=>p.id===project.id?project:p)}}}/>;
 }
 export function ProjectDetail({c}:{c:Ctx}){
  const p=c.w.projects.find(p=>p.id===c.route.project);const[modal,setModal]=useState(c.route.focus?'complete-node':'');useEffect(()=>{if(c.route.focus)setModal('complete-node')},[c.route.focus,c.route.node]);const[approvalType,setApprovalType]=useState<'change'|'extension'>('change');const[expanded,setExpanded]=useState<Record<string,boolean>>({});

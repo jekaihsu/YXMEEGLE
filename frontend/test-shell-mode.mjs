@@ -7,7 +7,7 @@ import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Simulate} from 'react-dom/test-utils';
 import {a,b,workspace} from './session-epoch-fixture.mjs';
-const bundle=await build({entryPoints:['src/App.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'},plugins:[{name:'observe-shell',setup(build){build.onLoad({filter:/\/App\.tsx$/},async({path})=>({contents:"import {unmatchedDaily} from './appCommon';\n"+(await fs.readFile(path,'utf8')).replace(' const overdue=w?',' window.shellContext={w,s,error,run,upload,refresh,unmatchedDaily};\n const overdue=w?'),loader:'tsx'}))}}]});
+const bundle=await build({entryPoints:['src/App.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'},plugins:[{name:'observe-shell',setup(build){build.onLoad({filter:/\/ProjectDetail\.tsx$/},async({path})=>({contents:(await fs.readFile(path,'utf8')).replace(' const p=c.w.projects.find(p=>p.id===c.route.project);',' window.detailContext=c; const p=c.w.projects.find(p=>p.id===c.route.project);'),loader:'tsx'}));build.onLoad({filter:/\/App\.tsx$/},async({path})=>({contents:"import {unmatchedDaily} from './appCommon';\n"+(await fs.readFile(path,'utf8')).replace(' const overdue=w?',' window.shellContext={w,s,error,run,upload,refresh,unmatchedDaily};\n const overdue=w?'),loader:'tsx'}))}}]});
 const path=new URL('./.shell-test-bundle.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);
 let App;try{App=(await import(path.href)).default}finally{await fs.unlink(path)}
 const overviewFacts=[{contract_amount:123456,source_lifecycle:{relationship:'已關聯確認單',state:'mapped',canonical:'執行中',reasons:[]},current_nodes:[{key:'field',name:'SERVER_FIELD',status:'in_progress'},{key:'custom',name:'PAUSED_STAGE',status:'paused'}],blocked_tasks:2},{contract_amount:null,current_nodes:[],blocked_tasks:0}];
@@ -22,12 +22,12 @@ for(const key of ['window','document','location','history','sessionStorage','For
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(resolve=>setTimeout(resolve,0))});
 // Stand-in for GET /api/projects?view=overview: same tabs, sorts, facets and paging contract as backend/shell.py.
-let fullAsOf=workspace.as_of;let fullGate=async()=>{};let overviewGate=async()=>{};let detailGate=async()=>{};
+let detailVersion;let detailProjectVersion;let expectedVersion;let fullAsOf=workspace.as_of;let fullGate=async()=>{};let overviewGate=async()=>{};let detailGate=async()=>{};
 // Stand-in for GET /api/projects/{id}: the single project tree plus its own records.
 const detail=async(url)=>{
  const id=decodeURIComponent(url.split('/').pop());await detailGate(id);const project=workspace.projects.find(p=>p.id===id);
  if(!project)return new Response(JSON.stringify({detail:'找不到這個案件'}),{status:404});
- return json({scope:'project',version:current.version,as_of:workspace.as_of,project,settings:{},delegations:[],handover_requests:[],sop_requests:[],sop_templates:[],approved_leave_delegations:[],approvals:[],events:[],policy_summary:[],financial_requests:[],source_quotes:[],source_confirmations:[],contract_items:[],node_skip_requests:[]});
+ return json({scope:'project',version:detailVersion??current.version,as_of:workspace.as_of,project:{...project,concurrency_version:detailProjectVersion??current.projects.find(p=>p.id===id)?.concurrency_version},settings:{},delegations:[],handover_requests:[],sop_requests:[],sop_templates:[],approved_leave_delegations:[],approvals:[],events:[],policy_summary:[],financial_requests:[],source_quotes:[],source_confirmations:[],contract_items:[],node_skip_requests:[]});
 };
 const pct=p=>p.progress.total_nodes?p.progress.completed_nodes/p.progress.total_nodes:0;
 const overview=async(url)=>{
@@ -49,7 +49,7 @@ globalThis.fetch=async(url,init)=>{
  if(url.startsWith('/api/projects?view=overview'))return overview(url);
  if(url.startsWith('/api/projects/'))return detail(url);
  if(url==='/api/workspace?scope=shell')return init.headers.get('If-None-Match')===etag?new Response(null,{status:304,headers:{ETag:etag}}):json(current,{ETag:etag});
- if(url==='/api/actions'||url==='/api/files')return failMutation?new Response(JSON.stringify({detail:'conflict'}),{status:409}):json(mutationResponse||{...workspace,version:2});
+ if(url==='/api/actions'||url==='/api/files'){const submitted=url==='/api/actions'?JSON.parse(init.body).project_versions?.pA:Number(init.body.get('project_version'));return (failMutation||(expectedVersion!==undefined&&submitted!==expectedVersion))?new Response(JSON.stringify({detail:'conflict'}),{status:409}):json(mutationResponse||{...workspace,version:2});}
  throw Error('Unexpected endpoint '+url);
 };
 const mount=async(next)=>{if(root)await flush(()=>root.unmount());features=next;requests.length=0;root=createRoot(document.getElementById('root'));await flush(()=>root.render(React.createElement(App)))};
@@ -209,6 +209,23 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  await flush(()=>window.shellContext.run('case_execution_assign',{execution_system:'workbench'},{project_id:'pA'}));
  assert.equal(window.shellContext.w.scope,undefined,'mutation response is the full workspace');assert.equal(detailUrls().length,reads,'no extra project read after the full workspace arrives');
  assert.ok(document.querySelector('.workspace').textContent.includes('PRIVATE_CASE_A'),'detail keeps rendering from the full workspace');
+
+ // External change after shell load: the detail's versions must reach actual action and upload closures.
+ current=shell;etag='W/"fresh-detail"';location.hash='view=project&project=pA';detailVersion=2;detailProjectVersion=8;expectedVersion=8;
+ await mount({workspace_shell:true});
+ await goto('view=project&project=pA&tab=flow');
+ // Complete-node boundary uses the detail context; capture it without replacing App's run implementation.
+ await flush(()=>[...document.querySelectorAll('.node-actions button')].find(b=>b.textContent==='完成節點').click());
+ // Exercise the same hydrated context exposed by a test-only observer in ProjectDetail.
+ await flush(()=>window.detailContext.run('comment_add',{text:'fresh read'},{project_id:'pA'}));
+ let freshBody=JSON.parse(requests.findLast(r=>r.url==='/api/actions').init.body);
+ assert.equal(freshBody.version,2);assert.deepEqual(freshBody.project_versions,{pA:8});assert.equal(window.shellContext.error,'');
+ await mount({workspace_shell:true});const freshForm=new FormData();freshForm.set('project_id','pA');
+ await flush(()=>window.detailContext.upload(freshForm));assert.equal(freshForm.get('version'),'2');assert.equal(freshForm.get('project_version'),'8');assert.equal(window.shellContext.error,'');
+ await mount({workspace_shell:true});expectedVersion=9;
+ await flush(()=>window.detailContext.run('comment_add',{text:'now stale'},{project_id:'pA'}));
+ assert.ok(window.shellContext.error.includes('conflict'),'a real later change still conflicts');
+ detailVersion=undefined;detailProjectVersion=undefined;expectedVersion=undefined;
 
  // P4-4: screens that need broader data read the full workspace only when opened, behind a loading state, once per shell version.
  current=shell;etag='W/"shell-A:1"';location.hash='view=dashboard';

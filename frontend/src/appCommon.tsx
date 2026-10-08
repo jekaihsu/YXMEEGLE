@@ -9,8 +9,9 @@ import {type DraftScope} from './useDraftNavigationGuard';
 import {lifecycleGate} from './sourceLifecycle';
 import {type Node, type Project, type Route, type Session, type Task, type Workspace, type Freshness, type LiveDataset} from './types';
 
+export type ReadVersion={version:number;project_versions:Record<string,number>};
 export type ActionScope={project_id?:string;node_id?:string;task_id?:string};
-export type Ctx={w:Workspace;s:Session;busy:boolean;error:string;registerDrafts:(scope:DraftScope|null)=>void;onFreshness?:(freshness:Freshness)=>void;onRefreshError?:(datasets:LiveDataset[])=>void;reloadVersion?:number;route:Route;go:(r:Route)=>void;run:(action:string,payload?:Record<string,unknown>,scope?:ActionScope)=>Promise<Workspace|undefined>;refresh:()=>Promise<void>;notify:(m:string)=>void;upload:(form:FormData)=>Promise<boolean>};
+export type Ctx={w:Workspace;s:Session;busy:boolean;error:string;registerDrafts:(scope:DraftScope|null)=>void;onFreshness?:(freshness:Freshness)=>void;onRefreshError?:(datasets:LiveDataset[])=>void;reloadVersion?:number;route:Route;go:(r:Route)=>void;run:(action:string,payload?:Record<string,unknown>,scope?:ActionScope,readVersion?:ReadVersion)=>Promise<Workspace|undefined>;refresh:()=>Promise<void>;notify:(m:string)=>void;upload:(form:FormData,readVersion?:ReadVersion)=>Promise<boolean>};
 export type ProjectPage={total:number;offset:number;limit:number;facets:{all:number;formal:number;intake:number};items:Project[]};
 export type ProjectSlice={scope:'project';version:number;project:Project;[key:string]:any};
 export type TaskRow={p:Project;n:Node;t:Task};
