@@ -20,7 +20,7 @@ const styles=bundle.outputFiles.filter(f=>f.path.endsWith('.css')).map(f=>f.text
 const browser=await chromium.launch({executablePath:process.env.CHROME_EXECUTABLE||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
 try{
  const page=await browser.newPage();
- await page.setContent(`<style>${styles}</style><main class="workspace"><div class="workflow"><button class="stage-button completed"><div class="stage-button-top"><strong>已完成階段</strong><svg></svg></div><div class="stage-button-bottom">負責人<small>完成日期</small></div><span class="stage-action-label">查看成果</span></button></div></main>`);
+ await page.setContent(`<style>${styles}</style><main class="workspace"><div class="workflow"><button class="stage-button completed"><div class="stage-button-top"><strong>已完成階段</strong><svg></svg></div><div class="stage-button-bottom">負責人<small>完成日期</small></div><span class="stage-action-label">查看成果</span></button></div><div class="appearance-control"><div class="ds-segmented"><button aria-checked="true">M</button><button aria-checked="true">深色</button><button aria-checked="true">舒適</button></div></div><div class="workflow"><button class="stage-button in_progress selected"><span class="stage-action-label">待他人處理</span><span class="stage-button-bottom"><small>09/24</small></span></button></div></main>`);
  for(const theme of ['light','dark']){
   await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);
   await page.waitForTimeout(350);
@@ -29,6 +29,13 @@ try{
    const rgb=value=>'#'+value.match(/\d+/g).slice(0,3).map(n=>Number(n).toString(16).padStart(2,'0')).join('');
    return {selector,fg:rgb(getComputedStyle(card.querySelector(selector)).color),bg:rgb(getComputedStyle(card).backgroundColor)};
   }));
+  const selectedPairs=await page.evaluate(()=>[...document.querySelectorAll('.ds-segmented button[aria-checked=true],.stage-button.selected .stage-action-label,.stage-button.selected small')].map(el=>{
+   const rgb=value=>value.match(/[\d.]+/g).map(Number);const color=rgb(getComputedStyle(el).color);let bg=[0,0,0],layers=[];
+   for(let node=el;node;node=node.parentElement){const c=rgb(getComputedStyle(node).backgroundColor);layers.unshift(c)}
+   for(const c of layers){const a=c.length>3?c[3]:1;bg=bg.map((v,i)=>c[i]*a+v*(1-a))}
+   const hex=c=>'#'+c.slice(0,3).map(n=>Math.round(n).toString(16).padStart(2,'0')).join('');return {selector:el.textContent,fg:hex(color),bg:hex(bg)};
+  }));
+  pairs.push(...selectedPairs);
   for(const {selector,fg,bg} of pairs){const r=ratio(fg,bg);assert(r>=4.5,`${theme} completed ${selector}: ${r.toFixed(2)}`);console.log(`${theme} completed ${selector}: ${r.toFixed(2)}:1`)}
  }
 }finally{await browser.close()}

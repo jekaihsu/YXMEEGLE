@@ -28,7 +28,7 @@ button.ds-row:hover,a.ds-row:hover{background:var(--surface-2)}
 .ds-button:active{transform:scale(.97)}.ds-button:disabled{opacity:.4}
 .ds-segmented{display:inline-flex;padding:2px;gap:2px}.ds-segmented.glass--flat{border-radius:var(--radius-pill)}
 .ds-segmented button{min-height:44px;padding:0 var(--sp-4);border-radius:var(--radius-pill);font-size:var(--fs-subhead);color:var(--label);transition:background 300ms ease-out,color 300ms ease-out}
-.ds-segmented button[aria-checked=true]{background:var(--accent-fill);color:var(--accent);font-weight:600}
+.ds-segmented button[aria-checked=true]{background:var(--accent-fill);color:var(--label);font-weight:600}
 .ds-backdrop{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;animation:ds-fade var(--dur-base) var(--ease)}
 .ds-sheet{width:min(560px,100%);max-height:90vh;overflow:auto;color:var(--label);padding:var(--sp-4) var(--sp-5) var(--sp-6);animation:ds-rise 300ms ease-out}.ds-sheet.glass{border-radius:var(--radius-card) var(--radius-card) 0 0}
 .ds-sheet header{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-3)}
