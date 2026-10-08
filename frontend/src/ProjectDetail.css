@@ -20,3 +20,6 @@
 .case-overview .dh-hero{margin-bottom:var(--sp-6)}
 @media(max-width:760px){.project-detail .project-title{flex-direction:column;align-items:flex-start}.project-detail .project-title h1{font-size:var(--fs-title1)}.project-detail .project-source-status{align-items:flex-start}}
 .co-loading{color:var(--label-2);font-size:var(--fs-subhead);margin-bottom:var(--sp-3)}
+
+.workspace .case-overview .event-list .event{padding:var(--sp-3) var(--sp-4);gap:var(--sp-3)}
+.workspace .case-overview .event-list :is(p,small){font-size:var(--fs-footnote);line-height:1.6}

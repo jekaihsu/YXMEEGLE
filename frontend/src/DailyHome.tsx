@@ -44,7 +44,7 @@ function Portfolio({c,formal,rows}:{c:Ctx;formal:Project[];rows:{p:Project;stage
 function Aside({c,formal,intakes,daily,activity}:{c:Ctx;formal:number;intakes:number;daily:ReactNode;activity:ReactNode}){
  return <aside className="today-aside">
   <Group title="案件分流" className="dh-totals"><Row href="#view=projects&tab=formal" label="正式案件" detail="依工程確認單建立" value={formal}/><Row href="#view=projects&tab=intake" label="待確認接案" detail="尚未列入正式案件" value={intakes}/></Group>
-  <Group title="當日日報" className="today-daily">{daily}{unmatchedDaily(c.w)>0&&<Row label={`${num(unmatchedDaily(c.w))} 筆日報待配對`} onClick={()=>c.go({view:'admin',tab:'daily'})} value="前往核對"/>}<Row label="填報紀錄不等同任務完成，成果仍需確認交接。"/></Group>
+  <Group title="當日日報" className="today-daily">{daily}{unmatchedDaily(c.w)>0&&<Row label={`${num(unmatchedDaily(c.w))} 筆日報待配對`} onClick={()=>c.go({view:'admin',tab:'daily'})} value="前往核對"/>}<p>填報紀錄不等同任務完成，成果仍需確認交接。</p></Group>
   {activity}
  </aside>
 }
