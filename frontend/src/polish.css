@@ -24,7 +24,12 @@
 .workspace .stage-button{border:.5px solid var(--glass-border);box-shadow:none;background:var(--surface);color:var(--label);border-radius:var(--radius-m)}
 .workspace .stage-button.in_progress{background:var(--accent-fill);border-color:var(--accent)}
 .workspace .stage-button.completed{background:var(--surface-2);border-color:transparent;color:var(--label)}
-.workspace .stage-button.completed *{color:inherit}.workspace .stage-button.completed svg{color:var(--positive)}
+.workspace .stage-button.completed strong,.workspace .stage-button.completed .stage-button-bottom{color:var(--label)}
+.workspace .stage-button.completed small{color:var(--label-2)}
+.workspace .stage-button.completed svg{color:var(--positive)}
+.workspace .flow-legend .green-dot{background:var(--positive)}
+.workspace .flow-legend .purple-dot{background:var(--accent)}
+.workspace .flow-legend .gray-dot{background:var(--surface-2);border:1px solid var(--label-2)}
 .workspace .stage-button.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .workspace .stage-button .stage-action-label{color:var(--accent)}
 .workspace .stage-button.completed .stage-action-label{color:var(--label-2)}
