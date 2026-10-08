@@ -1,0 +1,45 @@
+/* App shell: translucent topbar, source-list sidebar, mobile tabbar, route progress, page transitions. Loaded last; tokens only. */
+.app-shell,.app-shell .main-shell{background:var(--bg);color:var(--label);font-family:var(--font)}
+.app-shell .sidebar{background:color-mix(in srgb,var(--surface-2) 80%,transparent);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-right:1px solid var(--sep);padding:0 var(--sp-3)}
+.app-shell .brand{height:auto;padding:var(--sp-5) var(--sp-3) var(--sp-2);font-size:var(--fs-headline);font-weight:600;letter-spacing:0;color:var(--label)}
+.app-shell .brand-en{color:var(--label-2);font-size:var(--fs-caption);font-weight:500;letter-spacing:.08em;padding-top:2px}
+.app-shell .brand-mark{transform:none}.app-shell .brand-mark i{background:var(--accent)!important;border-radius:3px}
+.app-shell .workspace-caption{margin:0 var(--sp-3) var(--sp-5);font-size:var(--fs-footnote);color:var(--label-2)}
+.app-shell .nav-label{padding:0 var(--sp-3);margin-bottom:var(--sp-1);font-size:var(--fs-caption);font-weight:600;letter-spacing:.04em;color:var(--label-2)}
+.app-shell .nav-item,.app-shell .recent-project{border:0;border-radius:var(--radius-s);padding:var(--sp-2) var(--sp-3);margin-bottom:2px;font-size:var(--fs-subhead);font-weight:400;color:var(--label);transition:background var(--dur-fast) var(--ease)}
+.app-shell .nav-item svg{color:var(--accent)}
+.app-shell .nav-item:hover,.app-shell .recent-project:hover{background:color-mix(in srgb,var(--label) 6%,transparent)}
+.app-shell .nav-item.active,.app-shell .recent-project.selected{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font-weight:600}
+.app-shell .nav-item.active svg{color:var(--accent);stroke-width:1.75}
+.app-shell .nav-item em{background:var(--critical);color:#fff;border:0;border-radius:var(--radius-pill);padding:0 var(--sp-2);font-size:var(--fs-caption);font-weight:600}
+.app-shell .recent-project small,.app-shell .sidebar-status{color:var(--label-2);font-size:var(--fs-footnote)}
+.app-shell .project-dot{background:var(--label-2)}.app-shell .status-dot,.app-shell .sidebar-status .tiny-dot{background:var(--positive)}
+.app-shell .user-button{border-top:1px solid var(--sep);color:var(--label)}
+.app-shell .topbar{background:color-mix(in srgb,var(--bg) 72%,transparent);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--sep);color:var(--label)}
+.app-shell .breadcrumbs,.app-shell .top-date{color:var(--label-2);font-size:var(--fs-footnote)}
+.app-shell .breadcrumbs strong{color:var(--label);font-weight:600}
+.app-shell .demo-tag{background:var(--surface-2);color:var(--label-2);border:0;border-radius:var(--radius-pill);font-size:var(--fs-caption);font-weight:600}
+.app-shell .sidebar-scrim{background:rgba(0,0,0,.4)}
+@media(prefers-reduced-transparency:reduce){.app-shell .sidebar{background:var(--surface-2);-webkit-backdrop-filter:none;backdrop-filter:none}.app-shell .topbar{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}}
+
+/* Route progress: a thin accent bar that sweeps once per navigation, indeterminate while the workspace loads. */
+.route-progress{position:fixed;top:0;left:0;right:0;height:2px;z-index:120;pointer-events:none;background:var(--accent);transform-origin:left;transform:scaleX(0);opacity:0;animation:route-progress var(--dur-slow) var(--ease)}
+.route-progress[data-loading=true]{animation:route-loading 1.2s var(--ease) infinite}
+@keyframes route-progress{from{transform:scaleX(0);opacity:1}70%{transform:scaleX(1);opacity:1}to{transform:scaleX(1);opacity:0}}
+@keyframes route-loading{from{transform:scaleX(0);opacity:1}to{transform:scaleX(1);opacity:.2}}
+
+/* Page transition: workspace is keyed by view, so it fades in on every route change. */
+.app-shell .workspace{animation:page-in var(--dur-base) var(--ease)}
+@keyframes page-in{from{opacity:0;transform:translateY(6px)}}
+@media(prefers-reduced-motion:reduce){.route-progress,.app-shell .workspace{animation:none}}
+
+/* Mobile tabbar */
+.mobile-tabs{display:none}
+@media(max-width:760px){
+ .app-shell .workspace{padding-bottom:calc(var(--sp-9) + env(safe-area-inset-bottom))}
+ .mobile-tabs{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;padding-bottom:env(safe-area-inset-bottom);background:color-mix(in srgb,var(--surface) 80%,transparent);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:1px solid var(--sep)}
+ .mobile-tabs button{flex:1;min-width:0;min-height:49px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:var(--fs-caption);color:var(--label-2);transition:color var(--dur-fast) var(--ease)}
+ .mobile-tabs button[aria-current=page]{color:var(--accent);font-weight:600}
+ .mobile-tabs svg{stroke-width:1.75}
+ .app-shell .toast{bottom:calc(var(--sp-9) + env(safe-area-inset-bottom))}
+}
