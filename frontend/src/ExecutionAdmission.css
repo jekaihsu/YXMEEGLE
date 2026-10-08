@@ -1,0 +1,12 @@
+/* Execution admission: the cell is plain text with a reason; the queue is a grouped list of one-case forms. */
+.admission-cell{display:flex;flex-direction:column;gap:2px}.admission-cell strong{font-weight:600}
+.admission-cell small{font-size:var(--fs-footnote);color:var(--label-2)}.admission-cell.not-admitted .admission-reason{color:var(--warning)}.admission-cell a{color:var(--accent)}
+.admission-queue .ea-note{padding:var(--sp-3) var(--sp-4);color:var(--label-2);font-size:var(--fs-subhead)}
+.admission-queue ul{list-style:none;margin:0;padding:0}
+.admission-queue li{position:relative;display:grid;gap:var(--sp-2);padding:var(--sp-3) var(--sp-4)}
+.admission-queue li::before{content:"";position:absolute;top:0;left:var(--sp-4);right:0;border-top:1px solid var(--sep)}
+.admission-queue li>a{font-size:var(--fs-body);font-weight:600;color:var(--label)}.admission-queue li>a:hover{color:var(--accent)}
+.admission-queue li>small{font-size:var(--fs-footnote);color:var(--label-2)}
+.admission-queue form{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:end}
+.admission-queue label{display:grid;gap:var(--sp-1);flex:1 1 12rem;font-size:var(--fs-footnote);color:var(--label-2)}
+.admission-queue :is(select,input){min-height:44px;padding:0 var(--sp-3);border:.5px solid var(--glass-border);border-radius:var(--radius-m);background:var(--surface);color:var(--label);font-size:var(--fs-body)}
