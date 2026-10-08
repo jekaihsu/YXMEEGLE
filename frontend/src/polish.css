@@ -88,3 +88,45 @@
 .portfolio-page .projects-table td:first-child .case-link{display:inline}
 .portfolio-page .projects-table td:first-child small{margin-top:2px}
 @media(max-width:760px){.task-table .task-title small{display:none}.task-table .c-status{align-self:center}}
+
+/* Settings: align people block to the page edge, compact intro */
+.operations .ds-row{padding-left:0}
+.operations .data-table :is(th,td):first-child{padding-left:0}
+.owned-view[aria-label="Lark 動態人員名冊"] p{margin:0 0 var(--sp-1);font-size:var(--fs-subhead);color:var(--label-2);line-height:1.6}
+.owned-view[aria-label="Lark 動態人員名冊"] .dataset-as-of,.owned-view[aria-label="Lark 動態人員名冊"] .dataset-as-of+p{display:inline}
+.owned-view[aria-label="Lark 動態人員名冊"] .dataset-as-of::after{content:' · '}
+.owned-view[aria-label="Lark 動態人員名冊"] p:last-of-type{margin-bottom:var(--sp-5)}
+
+/* Done = ink, in progress = accent */
+.complete-icon{color:var(--label)}
+
+/* Sidebar: fewer recent cases at larger text sizes */
+:root[data-text=l] .recent-project:nth-of-type(n+3),:root[data-text=xl] .recent-project:nth-of-type(n+3){display:none}
+
+/* Loading and login gates: left-aligned block, skeleton instead of a bare spinner */
+.login-card{display:flex;flex-direction:column;align-items:flex-start}
+.login-card>.button{width:auto;min-width:12rem}
+.loading-skeleton{display:grid;gap:var(--sp-3);width:min(24rem,80vw);margin-top:var(--sp-5)}
+
+/* Mobile projects table: stacked rows with the facts that matter */
+@media(max-width:760px){
+ .portfolio-page .projects-table{min-width:0;display:block}
+ .portfolio-page .projects-table thead{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden}
+ .portfolio-page .projects-table tbody{display:block}
+ .portfolio-page .projects-table tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name status" "prog due" "adm pm";gap:var(--sp-1) var(--sp-3);padding:var(--sp-3) 0;border-top:1px solid var(--sep)}
+ .portfolio-page .projects-table td{display:block;padding:0;border:0;min-width:0!important;font-size:var(--fs-footnote)}
+ .portfolio-page .projects-table td:nth-child(1){grid-area:name;font-size:var(--fs-subhead)}
+ .portfolio-page .projects-table td:nth-child(2){grid-area:status;text-align:right}
+ .portfolio-page .projects-table td:nth-child(3){grid-area:adm;color:var(--label-2)}
+ .portfolio-page .projects-table td:nth-child(4){grid-area:pm;text-align:right}
+ .portfolio-page .projects-table td:nth-child(5){display:none}
+ .portfolio-page .projects-table td:nth-child(6){grid-area:prog}
+ .portfolio-page .projects-table td:nth-child(7){grid-area:due;text-align:right}
+ .portfolio-page .projects-table td:nth-child(n+8){display:none}
+ .portfolio-page .projects-table .person-cell .avatar{display:none}
+}
+.operations .ds-row .ds-button,.operations .ds-row-main{padding-left:0}
+@media(min-width:761px){.portfolio-page .projects-table{min-width:0;width:100%}.portfolio-page .projects-table th:first-child{min-width:12rem}.portfolio-page .projects-table :is(th,td):nth-child(n+2){min-width:0}.portfolio-page .projects-table th,.portfolio-page .projects-table td{padding-inline:var(--sp-3)}}
+@media(max-width:760px){.portfolio-page .projects-table td:first-child .case-code,.portfolio-page .projects-table td:first-child .case-link{display:block}}
+.operations>.text-button,.operations .text-button{padding-left:0}
+@media(min-width:761px){.portfolio-page .projects-table :is(td,th):nth-child(2),.portfolio-page .projects-table :is(td,th):nth-child(3),.portfolio-page .projects-table :is(td,th):nth-child(5),.portfolio-page .projects-table :is(td,th):nth-child(7){white-space:nowrap}}
