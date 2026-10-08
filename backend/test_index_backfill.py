@@ -39,3 +39,42 @@ def test_backfill_removes_extra_rows(tmp_path):
         db.execute(ProjectIndex.__table__.insert().values(workspace_id='w',project_id='ghost'))
     backfill(engine); assert count(sessions,ProjectIndex)==4
     engine.dispose()
+
+
+import pytest
+
+
+@pytest.mark.parametrize('phase', ['replace_projects', 'replace_counters'])
+def test_backfill_holds_writer_lock_through_each_publish(tmp_path, monkeypatch, phase):
+    """A second connection cannot commit between the version check and replacement."""
+    from sqlalchemy import update
+    from sqlalchemy.exc import OperationalError
+    from backend import index_tables, index_reads
+    engine, sessions, _ = seeded(tmp_path, 2)
+    contender = create_engine(engine.url, connect_args={'timeout':0})
+    original = getattr(index_tables, phase)
+    attempts = []
+    def competing_write(*args, **kwargs):
+        try:
+            with contender.begin() as connection:
+                connection.execute(update(WorkspaceRow).where(WorkspaceRow.id == 'w').values(version=2))
+        except OperationalError as error:
+            assert 'locked' in str(error)
+            attempts.append('locked')
+        else:
+            attempts.append('committed')
+        return original(*args, **kwargs)
+    monkeypatch.setattr(index_tables, phase, competing_write)
+    try:
+        backfill(engine, batch=1)
+        assert attempts and set(attempts) == {'locked'}
+        with sessions() as db:
+            db.info['index_tables'] = True
+            row = db.get(WorkspaceRow, 'w')
+            assert row.version == 1 and index_reads.ready(db, BusinessRow, row)
+        # The transaction releases its lock after publishing.
+        with contender.begin() as connection:
+            assert connection.execute(update(WorkspaceRow).where(WorkspaceRow.id == 'w').values(version=2)).rowcount == 1
+    finally:
+        contender.dispose()
+        engine.dispose()

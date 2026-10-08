@@ -20,3 +20,7 @@
 .case-overview .dh-hero{margin-bottom:var(--sp-6)}
 @media(max-width:760px){.project-detail .project-title{flex-direction:column;align-items:flex-start}.project-detail .project-title h1{font-size:var(--fs-title1)}.project-detail .project-source-status{align-items:flex-start}}
 .co-loading{color:var(--label-2);font-size:var(--fs-subhead);margin-bottom:var(--sp-3)}
+
+.case-overview .event-list{padding:var(--sp-4)}
+.case-overview .event{padding-block:var(--sp-2)}
+@media(max-width:760px){.case-overview .dh-hero{display:block}.case-overview .dh-hero .ds-button{margin-top:var(--sp-3)}}

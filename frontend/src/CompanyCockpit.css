@@ -1,4 +1,4 @@
-.company-cockpit{max-width:1080px;margin:0 auto;min-width:0;color:var(--label);font-family:var(--font);font-size:var(--fs-body);line-height:1.5}
+.company-cockpit{max-width:none;margin:0;min-width:0;color:var(--label);font-family:var(--font);font-size:var(--fs-body);line-height:1.5}
 .cockpit-heading,.cockpit-section-title,.cockpit-freshness,.cockpit-pagination{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--sp-4);align-items:baseline}
 .cockpit-heading{align-items:flex-start;margin-bottom:var(--sp-6)}
 .cockpit-heading h1{font-size:var(--fs-large-title);font-weight:600;letter-spacing:-.02em;line-height:1.2;margin:var(--sp-1) 0 var(--sp-2)}

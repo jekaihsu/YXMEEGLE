@@ -26,7 +26,7 @@
 .workspace .stage-button.completed{background:var(--surface-2);border-color:transparent;color:var(--label)}
 .workspace .stage-button.completed *{color:inherit}.workspace .stage-button.completed svg{color:var(--positive)}
 .workspace .stage-button.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-.workspace .stage-button .stage-action-label{color:var(--accent)}
+.workspace .stage-button .stage-action-label{color:var(--label)}
 .workspace .stage-button.completed .stage-action-label{color:var(--label-2)}
 @media(max-width:760px){
  .workspace .portfolio-page .tabbar,.workspace .project-detail .project-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;width:100%;border-radius:var(--radius-pill);scrollbar-width:none}
@@ -100,6 +100,86 @@
  .workspace .task-table.with-project .task-title small{display:block}
 }
 /* Final: opaque hero; day lists show 6 tasks then expand instead of nested scrolling. */
-.workspace .dh-hero{background:var(--surface);border:.5px solid var(--separator);border-radius:var(--radius-card);box-shadow:none}
+.workspace .dh-hero{background:var(--surface-2);border:0;border-radius:var(--radius-card);box-shadow:none}
 .workspace .calendar-tasks{max-height:none;overflow:visible}
 .calendar-more{min-height:44px;width:100%;color:var(--accent);font-size:var(--fs-subhead);border-radius:var(--radius-m);background:var(--surface-2)}
+
+/* Comfortable work list: one line on desktop, explicit fields on phones. */
+.workspace .work-completion{display:flex;align-items:center;gap:var(--control-gap);margin-block:var(--sp-4)}
+.workspace .comfortable-tasks{width:100%;font-size:var(--fs-subhead);table-layout:fixed}
+.workspace .comfortable-tasks th{font-weight:400}
+.workspace .comfortable-tasks td{height:var(--control-h);padding:var(--sp-2) var(--sp-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.workspace .comfortable-tasks th:first-child{width:35%}
+.workspace .comfortable-tasks .task-title{display:flex;align-items:center;gap:var(--sp-2);min-width:0}
+.workspace .comfortable-tasks .task-title svg{flex:none}
+.workspace .comfortable-tasks .text-button{display:block;min-width:0;max-width:100%;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;color:var(--label);font-weight:500}
+.workspace .comfortable-tasks .work-project{color:var(--label-2);font-size:var(--fs-footnote)}
+.workspace .comfortable-tasks .work-due{font-size:var(--fs-footnote)}
+@media(max-width:760px){
+ .workspace .comfortable-tasks,.workspace .comfortable-tasks tbody{display:block;min-width:0}
+ .workspace .comfortable-tasks thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .workspace .comfortable-tasks tr{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2) var(--sp-3);padding:var(--sp-3) var(--sp-4);border-bottom:1px solid var(--separator)}
+ .workspace .comfortable-tasks td{display:block;height:auto;padding:0;border:0;max-width:100%}
+ .workspace .comfortable-tasks .work-task{width:100%}
+ .workspace .comfortable-tasks .work-project{width:100%}
+ .workspace .comfortable-tasks .work-due{margin-left:auto}
+}
+
+/* Count-first week starts at Monday; detailed work lives in a paginated list. */
+.workspace .calendar-grid{grid-template-columns:repeat(7,minmax(8rem,1fr));min-width:56rem}
+.workspace .calendar-day .day-count{font-size:var(--fs-title1);font-weight:600;color:var(--label)}
+.workspace .calendar-day .day-count small{display:block;font-size:var(--fs-caption);font-weight:400;color:var(--label-2)}
+.workspace .calendar-tasks{gap:var(--sp-3);padding:var(--sp-4)}
+.workspace .calendar-tasks p{font-size:var(--fs-footnote);line-height:1.5;margin:0}
+.workspace .schedule-day-details{margin-top:var(--sp-6)}
+
+/* A raised selected pill remains identifiable after revealing late tabs. */
+.workspace :is(.project-tabs,.ops-tabs){scroll-padding-inline:var(--sp-4)}
+.workspace :is(.project-tabs,.ops-tabs) [aria-current=page]{background:var(--surface);color:var(--label);box-shadow:var(--shadow-sm)}
+.workspace .workflow-scroll{scroll-padding-inline:var(--sp-4)}
+
+/* Reserve the identity and deadline columns; task titles use the remaining width. */
+@media(min-width:761px){
+ .workspace .comfortable-tasks th:first-child{width:auto}
+ .workspace .comfortable-tasks th.work-project{width:10rem}
+ .workspace .comfortable-tasks th.work-owner{width:6rem}
+ .workspace .comfortable-tasks th.work-status{width:7rem}
+ .workspace .comfortable-tasks th.work-due{width:8rem}
+ .workspace .comfortable-tasks th.work-points{width:7rem}
+ .workspace .comfortable-tasks :is(.work-project,.work-due){overflow:visible;text-overflow:clip}
+}
+@media(min-width:761px) and (max-width:1100px){.workspace .comfortable-tasks .work-points{display:none}}
+@media(min-width:1024px){
+ .workspace .calendar-grid{grid-template-columns:repeat(7,minmax(0,1fr));min-width:0}
+ .workspace .calendar-tasks{padding:var(--sp-2)}
+}
+.workspace .calendar-tasks p>span{display:block;white-space:nowrap}
+@media(min-width:761px) and (max-width:1100px){
+ .workspace .comfortable-tasks td.work-project{white-space:normal}
+ .workspace .comfortable-tasks .work-project .mono{display:block;white-space:nowrap}
+}
+@media(min-width:1024px) and (max-width:1200px){
+ .workspace .calendar-day>header{flex-wrap:wrap;padding-inline:var(--sp-2)}
+ .workspace .calendar-day>header small{flex-basis:100%;min-height:1em}
+}
+
+@media(max-width:760px){
+ .workspace .node-section .task-table td:nth-child(4){display:block;width:100%;line-height:1.6}
+ .workspace .node-section .task-table td:nth-child(4) small{display:block}
+}
+
+.workspace .appearance-control{padding:var(--sp-4);margin:0}
+
+.workspace .inspector-fields>div{padding-block:var(--sp-3);gap:var(--sp-3)}
+.workspace .inspector-fields dt{font-size:var(--fs-footnote);color:var(--label-2)}
+.workspace .inspector-fields dd{font-size:var(--fs-callout);color:var(--label);line-height:1.6;margin:0}
+
+.workspace .portfolio-stage{white-space:nowrap}
+
+.workspace :is(.table-toolbar,.schedule-toolbar) :is(input,select){font-size:var(--fs-subhead)}
+
+.workspace :is(.calendar-grid,.source-connection){border:1px solid var(--separator)}
+.workspace .operations .ds-section>h2{padding-inline:0}
+.workspace .project-topline>.ds-button{margin-inline-start:calc(-1 * var(--control-px))}
+
+@media(min-width:1024px){.workspace .calendar-day>header{height:5rem;box-sizing:border-box}}

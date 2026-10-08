@@ -1,6 +1,8 @@
 // Real browser events are required: jsdom dispatchEvent misses the microtask
 // checkpoint between document capture and React's listener.
-// PLAYWRIGHT_MODULE and CHROME_EXECUTABLE may select existing installations.
+// CI: set PLAYWRIGHT_MODULE to an existing playwright-core module directory when it
+// is not on the local module path (for example /tmp/shots/node_modules/playwright-core).
+// CHROME_EXECUTABLE selects an existing browser; this test installs nothing.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createServer} from 'node:http';
@@ -37,8 +39,14 @@ try{
   assert.equal(await page.locator('.projects-table tbody tr').count(),1,`${width}: search filters rows`);
   assert.match(await page.locator('.projects-table tbody').innerText(),/YX-002/);
   const reads=requests.length;
+  await Promise.all([page.waitForResponse(response=>new URL(response.url()).pathname==='/api/workspace'),page.getByRole('button',{name:'重新整理資料',exact:true}).click()]);
+  assert.ok(requests.length>reads,`${width}: search then blur permits manual refresh`);
+  await page.evaluate(()=>{const form=document.createElement('form');form.innerHTML='<label>Unsaved edit<input aria-label="Unsaved edit"></label>';document.querySelector('.workspace').append(form)});
+  await page.getByRole('textbox',{name:'Unsaved edit'}).fill('Keep this draft');
+  const protectedReads=requests.length;
   await page.getByRole('button',{name:'重新整理資料',exact:true}).click();
-  assert.equal(requests.length,reads,`${width}: blurred dirty input still blocks workspace reload`);
+  assert.equal(requests.length,protectedReads,`${width}: real unsaved form still blocks manual refresh`);
+  await page.evaluate(()=>document.querySelector('[aria-label="Unsaved edit"]').closest('form').remove());
   await page.getByRole('button',{name:'清除搜尋',exact:true}).click();
   assert.equal(await input.inputValue(),'');
   assert.equal(await page.locator('.projects-table tbody tr').count(),3);
@@ -59,3 +67,5 @@ try{
  await browser?.close();
  await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));
 }
+
+await import('./test-responsive-detail.mjs');

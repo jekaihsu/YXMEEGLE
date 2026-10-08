@@ -7,7 +7,7 @@ import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Simulate} from 'react-dom/test-utils';
 import {a,b,workspace} from './session-epoch-fixture.mjs';
-const bundle=await build({entryPoints:['src/App.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'},plugins:[{name:'observe-shell',setup(build){build.onLoad({filter:/\/App\.tsx$/},async({path})=>({contents:"import {unmatchedDaily} from './appCommon';\n"+(await fs.readFile(path,'utf8')).replace(' const overdue=w?',' window.shellContext={w,s,error,run,upload,refresh,unmatchedDaily};\n const overdue=w?'),loader:'tsx'}))}}]});
+const bundle=await build({entryPoints:['src/App.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'},plugins:[{name:'observe-shell',setup(build){build.onLoad({filter:/\/ProjectDetail\.tsx$/},async({path})=>({contents:(await fs.readFile(path,'utf8')).replace(' const p=c.w.projects.find(p=>p.id===c.route.project);',' window.detailContext=c; const p=c.w.projects.find(p=>p.id===c.route.project);'),loader:'tsx'}));build.onLoad({filter:/\/App\.tsx$/},async({path})=>({contents:"import {unmatchedDaily} from './appCommon';\n"+(await fs.readFile(path,'utf8')).replace(' const overdue=w?',' window.shellContext={w,s,error,run,upload,refresh,unmatchedDaily};\n const overdue=w?'),loader:'tsx'}))}}]});
 const path=new URL('./.shell-test-bundle.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);
 let App;try{App=(await import(path.href)).default}finally{await fs.unlink(path)}
 const overviewFacts=[{contract_amount:123456,source_lifecycle:{relationship:'已關聯確認單',state:'mapped',canonical:'執行中',reasons:[]},current_nodes:[{key:'field',name:'SERVER_FIELD',status:'in_progress'},{key:'custom',name:'PAUSED_STAGE',status:'paused'}],blocked_tasks:2},{contract_amount:null,current_nodes:[],blocked_tasks:0}];
@@ -22,12 +22,12 @@ for(const key of ['window','document','location','history','sessionStorage','For
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(resolve=>setTimeout(resolve,0))});
 // Stand-in for GET /api/projects?view=overview: same tabs, sorts, facets and paging contract as backend/shell.py.
-let fullGate=async()=>{};let overviewGate=async()=>{};let detailGate=async()=>{};
+let detailVersion;let detailProjectVersion;let expectedVersion;let fullAsOf=workspace.as_of;let fullGate=async()=>{};let overviewGate=async()=>{};let detailGate=async()=>{};
 // Stand-in for GET /api/projects/{id}: the single project tree plus its own records.
 const detail=async(url)=>{
  const id=decodeURIComponent(url.split('/').pop());await detailGate(id);const project=workspace.projects.find(p=>p.id===id);
  if(!project)return new Response(JSON.stringify({detail:'找不到這個案件'}),{status:404});
- return json({scope:'project',version:current.version,as_of:workspace.as_of,project,settings:{},delegations:[],handover_requests:[],sop_requests:[],sop_templates:[],approved_leave_delegations:[],approvals:[],events:[],policy_summary:[],financial_requests:[],source_quotes:[],source_confirmations:[],contract_items:[],node_skip_requests:[]});
+ return json({scope:'project',version:detailVersion??current.version,as_of:workspace.as_of,project:{...project,concurrency_version:detailProjectVersion??current.projects.find(p=>p.id===id)?.concurrency_version},settings:{},delegations:[],handover_requests:[],sop_requests:[],sop_templates:[],approved_leave_delegations:[],approvals:[],events:[],policy_summary:[],financial_requests:[],source_quotes:[],source_confirmations:[],contract_items:id==='pB'?[{id:'shared-contract',project_id:'pB',name:'Shared contract item',task_refs:[{project_id:'pA',node_id:'nA',task_id:'tA'}]}]:[],node_skip_requests:[]});
 };
 const pct=p=>p.progress.total_nodes?p.progress.completed_nodes/p.progress.total_nodes:0;
 const overview=async(url)=>{
@@ -44,11 +44,12 @@ let root;let features;let current=shell;let user=a;let etag='W/"shell-A:1"';let 
 globalThis.fetch=async(url,init)=>{
  requests.push({url,init});
  if(url==='/api/session')return json({user,users:[a,b],mode:'lark',environment:'production',workspace_id:'workspace-A',auth_configured:true,features});
- if(url==='/api/workspace'){await fullGate();return json({...workspace,version:current.version});}
+ if(url==='/api/workspace'){await fullGate();return json({...workspace,as_of:fullAsOf,version:current.version});}
+ if(url.startsWith('/api/daily-reports?'))return json({items:[{id:'shell-daily',project_id:'pA',project_code:'PRIVATE_CASE_A',date:'2026-10-08',department:'外業',person:'Daily worker',description:'Shell daily regression record'}],total:1,summary:{unmatched:0}});
  if(url.startsWith('/api/projects?view=overview'))return overview(url);
  if(url.startsWith('/api/projects/'))return detail(url);
  if(url==='/api/workspace?scope=shell')return init.headers.get('If-None-Match')===etag?new Response(null,{status:304,headers:{ETag:etag}}):json(current,{ETag:etag});
- if(url==='/api/actions'||url==='/api/files')return failMutation?new Response(JSON.stringify({detail:'conflict'}),{status:409}):json(mutationResponse||{...workspace,version:2});
+ if(url==='/api/actions'||url==='/api/files'){const submitted=url==='/api/actions'?JSON.parse(init.body).project_versions?.pA:Number(init.body.get('project_version'));return (failMutation||(expectedVersion!==undefined&&submitted!==expectedVersion))?new Response(JSON.stringify({detail:'conflict'}),{status:409}):json(mutationResponse||{...workspace,version:2});}
  throw Error('Unexpected endpoint '+url);
 };
 const mount=async(next)=>{if(root)await flush(()=>root.unmount());features=next;requests.length=0;root=createRoot(document.getElementById('root'));await flush(()=>root.render(React.createElement(App)))};
@@ -65,29 +66,32 @@ try{
  assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects?view=overview&tab=formal&sort=due&dir=asc&limit=10&offset=0']);
  assert.equal(window.shellContext.w.scope,'shell');assert.equal(rows().length,2);
  assert.ok(document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期 4'));
+ await flush(()=>button('待確認接案').click());assert.ok(document.querySelector('.empty').textContent.includes('尚無待確認接案'));assert.ok(!document.querySelector('.empty').textContent.includes('試試其他關鍵字'));await flush(()=>button('正式案件').click());
  assert.ok(document.querySelector('.notification-button i'));assert.equal(window.shellContext.unmatchedDaily(window.shellContext.w),535);
- assert.equal(rows()[0].querySelector('.stage-chips').textContent,'外業PAUSED_STAGE');
+ assert.equal(rows()[0].querySelector('.stage-chips').textContent,'外業、PAUSED_STAGE');
  assert.equal(rows()[1].querySelector('.stage-chips').textContent,'');
  assert.ok(rows()[0].textContent.includes('123,456'));assert.equal(rows()[1].querySelector('td.mono.numeric').textContent,'待帶入');
  assert.equal(rows()[0].querySelector('.verification-cell').getAttribute('aria-label'),'已驗證');
  assert.equal(rows()[1].querySelector('.verification-cell').getAttribute('aria-label'),'來源待確認');
  assert.ok(rows()[0].querySelector('.attention-badges').textContent.includes('受阻'));
- assert.ok(!document.querySelector('.verification-legend').textContent.includes('摘要未提供'));
- assert.ok(document.querySelector('.verification-legend').textContent.includes('受阻僅計暫停／受阻狀態任務'));
+ assert.ok(!document.querySelector('.verification-legend').textContent.includes('作業明細與合約金額請至案件查看'));
+ // Implementation-specific blocked counting copy was removed from the data-verification legend.
+ assert.ok(document.querySelector('.verification-legend').textContent.includes('資料驗證：✓ 已驗證'));
  // Old servers keep hidden amounts and the stage dash/status hint.
  includeFacts=false;await mount({workspace_shell:true});
  assert.ok(!document.querySelector('.projects-table thead').textContent.includes('合約金額'));
  assert.ok(rows()[0].querySelector('.stage-chips').textContent.includes('—進行中'));
- assert.ok(document.querySelector('.verification-legend').textContent.includes('摘要未提供'));
+ assert.ok(document.querySelector('.verification-legend').textContent.includes('作業明細與合約金額請至案件查看'));
  includeFacts=true;overviewFacts[0].source_lifecycle.reasons=['conflict'];await mount({workspace_shell:true});
  assert.equal(rows()[0].querySelector('.verification-cell').getAttribute('aria-label'),'不一致');assert.equal(rows()[0].querySelector('.verification-cell').textContent,'!');
  overviewFacts[0].source_lifecycle.reasons=[];await mount({workspace_shell:true});
  assert.equal(rows()[0].querySelector('.progress-cell span').textContent,'40%');
- assert.equal(rows()[1].querySelector('.progress-cell span').textContent,'0%');
+ assert.equal(rows()[1].querySelector('.progress-cell span').textContent,'—');assert.equal(rows()[1].querySelector('.progress-empty').getAttribute('aria-label'),'任務進度 0%');
  // P4-1: the dashboard renders from counts, the attention list and cards; no tree scan and no full workspace.
  await flush(()=>{location.hash='view=dashboard';window.dispatchEvent(new window.Event('hashchange'))});
+ // UX contract: self names are omitted and blocked captions use plain language.
  const todo=document.querySelector('.work-inbox');
- assert.ok(todo.textContent.includes('TASK_A')&&todo.textContent.includes('逾期 1 天')&&todo.textContent.includes('APPROVAL_A')&&todo.textContent.includes('NODE_A')&&todo.textContent.includes(workspace.users[0].name)&&todo.textContent.includes('逾期 6 · 當日到期 2'));
+ assert.ok(todo.textContent.includes('TASK_A')&&todo.textContent.includes('逾期 1 天')&&todo.textContent.includes('APPROVAL_A')&&todo.textContent.includes('NODE_A')&&!todo.textContent.includes(workspace.users[0].name)&&todo.textContent.includes('逾期 6 · 當日到期 2'));
  assert.equal(todo.querySelector('.heading-count').textContent,'11');assert.ok(document.querySelector('.today-aside').textContent.includes('535 筆日報待配對'));
  assert.ok(document.querySelector('.project-preview-row').textContent.includes('PRIVATE_CASE_A'));
  assert.ok(!requests.some(r=>r.url==='/api/workspace'),'dashboard never loads the full workspace');
@@ -102,7 +106,7 @@ try{
  assert.ok(inbox.textContent.indexOf('UNDATED_BLOCKED')<inbox.textContent.indexOf('DUE_TODAY'));
  assert.ok(inbox.textContent.indexOf('FUTURE_BLOCKED')<inbox.textContent.indexOf('DUE_TODAY'));
  assert.equal(inbox.textContent.split('TASK_A').length-1,1,'overlap is rendered once');
- assert.ok(inbox.textContent.includes('受阻 8（僅暫停／受阻狀態）')&&!inbox.textContent.includes('已載入'));
+ assert.ok(inbox.textContent.includes('受阻 8')&&!inbox.textContent.includes('已載入'));
  assert.ok(inbox.textContent.includes('查看全部工作'),'blocked remainder has a link');
  const rowFor=title=>[...inbox.querySelectorAll('.ds-row')].find(r=>r.textContent.includes(title));
  assert.ok(rowFor('TASK_A').textContent.includes('受阻'),'blocked badge comes from either list');
@@ -110,9 +114,9 @@ try{
  await flush(()=>rowFor('UNDATED_BLOCKED').click());assert.ok(location.hash.includes('task=undated'));
  await flush(()=>{location.hash='view=dashboard';window.dispatchEvent(new window.Event('hashchange'))});
  current={...shell,attention:[{...base,status:'paused'}]};etag='W/"old-blocked"';await flush(()=>window.shellContext.refresh());
- assert.ok(document.querySelector('.work-inbox').textContent.includes('受阻 1（已載入，僅暫停／受阻狀態）'));
+ assert.ok(document.querySelector('.work-inbox').textContent.includes('受阻 1'));
  current={...shell,blocked:[],counts:{...shell.counts,blocked_tasks:0}};etag='W/"zero-blocked"';await flush(()=>window.shellContext.refresh());
- assert.ok(document.querySelector('.work-inbox').textContent.includes('受阻 0（僅暫停／受阻狀態）'));
+ assert.ok(document.querySelector('.work-inbox').textContent.includes('受阻 0'));
  current=shell;etag='W/"shell-A:1"';await flush(()=>window.shellContext.refresh());
  await flush(()=>{location.hash='view=projects';window.dispatchEvent(new window.Event('hashchange'))});
  await flush(()=>button('需要關注').click());assert.equal(rows().length,1);assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'));
@@ -152,7 +156,8 @@ try{
  assert.equal(pages().length,1);assert.equal(pages()[0].get('limit'),'10');assert.equal(pages()[0].get('offset'),'0');
  assert.equal(rows().length,10);assert.ok(rows()[0].textContent.includes('CODE_01'));assert.ok(document.querySelector('.table-footer').textContent.includes('共 20 筆 · 第 1 / 2 頁'));
  assert.ok(document.querySelector('.projects-table thead').textContent.includes('合約金額'),'overview facts expose contract amounts while shell cards remain slim');
- assert.equal(document.querySelector('.portfolio-index strong').textContent,'20');
+ // Counts now live only in the filter tabs; the duplicate summary cards were removed.
+ assert.equal(button('正式案件').querySelector('span').textContent,'20');
  const nextPage=[...document.querySelectorAll('.table-footer button')].find(b=>b.textContent==='下一頁');
  await flush(()=>nextPage.click());assert.equal(pages().at(-1).get('offset'),'10');assert.equal(rows().length,10);assert.ok(rows()[0].textContent.includes('CODE_13'));
  assert.ok([...document.querySelectorAll('.table-footer button')].find(b=>b.textContent==='下一頁').disabled);
@@ -185,8 +190,19 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  const detailUrls=()=>requests.map(r=>r.url).filter(u=>u.startsWith('/api/projects/'));
  assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects/pA']);
  assert.ok(document.querySelector('.workspace').textContent.includes('PRIVATE_CASE_A')&&document.querySelector('.workspace').textContent.includes('TASK_A'),'detail renders the project tree');
+ // Regression: click the daily tab with two shell cards, only the open card hydrated.
+ assert.equal(window.shellContext.w.projects.length,2);
+ assert.equal(window.shellContext.w.projects[1].daily_reports,undefined);
+ await flush(()=>[...document.querySelectorAll('.project-tabs button')].find(b=>b.textContent==='日報紀錄').click());
+ assert.equal(document.querySelector('.daily-records h2').textContent,'日報紀錄');
+ assert.equal(document.querySelector('.daily-cards article p').textContent,'Shell daily regression record');
+ assert.ok(document.querySelector('.daily-records [role=status]').textContent.includes('共 1 筆符合條件'));
  await goto('view=project&project=pA&tab=flow');await goto('view=project&project=pA&tab=data&section=basic');assert.deepEqual(detailUrls(),['/api/projects/pA'],'tabs do not refetch the project');
  await goto('view=project&project=pB');assert.deepEqual(detailUrls(),['/api/projects/pA','/api/projects/pB']);assert.ok(document.querySelector('.workspace').textContent.includes('CASE_B'));
+ await flush(()=>[...document.querySelectorAll('.project-tabs button')].find(b=>b.textContent==='流程與交付').click());
+ assert.ok(document.querySelector('.stage-button'),'second shell case flow renders without scanning unhydrated cards');
+ assert.ok(document.querySelector('.node-section'),'second case selected stage renders');
+ await goto('view=project&project=pB&tab=data&section=contracts');assert.ok(document.querySelector('.source-contract-index').textContent.includes('Shared contract item'));assert.ok(document.querySelector('.source-contract-index a[href*=pA]'),'a cross-case reference stays navigable while its shell card has no nodes');
  await goto('view=project&project=zz');assert.ok(document.querySelector('.workspace').textContent.includes('找不到這個案件'));
  let freeA;const heldA=new Promise(resolve=>{freeA=resolve});detailGate=async id=>{if(id==='pA')await heldA};
  await goto('view=project&project=pA');await goto('view=project&project=pB');await flush(async()=>{freeA();await heldA});
@@ -196,23 +212,47 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  assert.equal(window.shellContext.w.scope,undefined,'mutation response is the full workspace');assert.equal(detailUrls().length,reads,'no extra project read after the full workspace arrives');
  assert.ok(document.querySelector('.workspace').textContent.includes('PRIVATE_CASE_A'),'detail keeps rendering from the full workspace');
 
+ // External change after shell load: the detail's versions must reach actual action and upload closures.
+ current=shell;etag='W/"fresh-detail"';location.hash='view=project&project=pA';detailVersion=2;detailProjectVersion=8;expectedVersion=8;
+ await mount({workspace_shell:true});
+ await goto('view=project&project=pA&tab=flow');
+ // Complete-node boundary uses the detail context; capture it without replacing App's run implementation.
+ await flush(()=>[...document.querySelectorAll('.node-actions button')].find(b=>b.textContent==='完成節點').click());
+ // Exercise the same hydrated context exposed by a test-only observer in ProjectDetail.
+ await flush(()=>window.detailContext.run('comment_add',{text:'fresh read'},{project_id:'pA'}));
+ let freshBody=JSON.parse(requests.findLast(r=>r.url==='/api/actions').init.body);
+ assert.equal(freshBody.version,2);assert.deepEqual(freshBody.project_versions,{pA:8});assert.equal(window.shellContext.error,'');
+ await mount({workspace_shell:true});const freshForm=new FormData();freshForm.set('project_id','pA');
+ await flush(()=>window.detailContext.upload(freshForm));assert.equal(freshForm.get('version'),'2');assert.equal(freshForm.get('project_version'),'8');assert.equal(window.shellContext.error,'');
+ await mount({workspace_shell:true});expectedVersion=9;
+ await flush(()=>window.detailContext.run('comment_add',{text:'now stale'},{project_id:'pA'}));
+ assert.ok(window.shellContext.error.includes('conflict'),'a real later change still conflicts');
+ detailVersion=undefined;detailProjectVersion=undefined;expectedVersion=undefined;
+
  // P4-4: screens that need broader data read the full workspace only when opened, behind a loading state, once per shell version.
  current=shell;etag='W/"shell-A:1"';location.hash='view=dashboard';
  await mount({workspace_shell:true});
  const fullReads=()=>requests.filter(r=>r.url==='/api/workspace').length;
  assert.equal(fullReads(),0,'first paint never reads the full workspace');
  let openFull;const heldFull=new Promise(resolve=>{openFull=resolve});fullGate=()=>heldFull;
- await goto('view=work');assert.equal(fullReads(),1);assert.ok(document.querySelector('.workspace [role="status"]').textContent.includes('正在載入完整資料'),'loading state while the full read is pending');
+ await goto('view=work');assert.equal(fullReads(),1);assert.ok(document.querySelector('.workspace [role="status"]').textContent.includes('正在讀取工作資料'),'loading state while the full read is pending');
  assert.ok(document.querySelector('[aria-label="主要導覽"]'),'the shell stays usable while a screen loads');
+ await goto('view=schedule');await goto('view=work');assert.equal(fullReads(),1,'an in-flight full read is shared across screen switches');
  await flush(async()=>{openFull();await heldFull});fullGate=async()=>{};
  assert.ok(document.querySelector('.workspace').textContent.includes('TASK_A'),'my work renders the loaded task');
  for(const view of ['approvals','schedule','routines','admin','work'])await goto('view='+view);
  assert.equal(fullReads(),1,'one full read per shell version, shared by every screen');
  await goto('view=dashboard');await flush(()=>[...document.querySelectorAll('.today-activity button')].find(b=>b.textContent==='載入近期活動').click());
  assert.equal(fullReads(),1);assert.ok(document.querySelector('.today-activity').textContent.includes('尚無操作紀錄'));
+ fullAsOf='2026-10-09';current={...shell,as_of:fullAsOf};etag='W/"shell-next-day"';
+ await flush(()=>window.shellContext.refresh());await goto('view=schedule');
+ assert.equal(fullReads(),2,'same-version explicit refresh crosses the date boundary');
+ assert.equal(document.querySelector('[aria-label="排程日期"]').value,'2026-10-09','fresh schedule uses the next day at the same workspace version');
+ await goto('view=dashboard');user={...a,role:'pm'};await flush(()=>window.shellContext.refresh());await goto('view=work');
+ assert.equal(fullReads(),3,'same-user authority change invalidates the full response');user=a;
  current={...shell,version:5};etag='W/"shell-A:5"';await flush(()=>window.shellContext.refresh());await goto('view=approvals');
- assert.equal(fullReads(),2,'a newer shell version reads the full workspace again');
+ assert.equal(fullReads(),4,'a newer shell version reads the full workspace again');
  await flush(()=>window.shellContext.run('case_execution_assign',{execution_system:'workbench'},{project_id:'pA'}));
- await goto('view=schedule');await goto('view=work');assert.equal(fullReads(),2,'after a mutation the app holds the full workspace and reads nothing');
+ await goto('view=schedule');await goto('view=work');assert.equal(fullReads(),4,'after a mutation the app holds the full workspace and reads nothing');
  console.log('Shell mode: feature gating, server-side paging/filter reset/stale-response guard, lazy single-project detail, on-demand full workspace, summary-only render/filter/sort, badges, 304, identity cache, mutation/upload concurrency and 409 passed');
 }finally{await flush(()=>root.unmount());dom.window.close()}

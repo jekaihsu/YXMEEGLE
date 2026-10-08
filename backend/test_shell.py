@@ -4,7 +4,7 @@ import json
 from datetime import date, timedelta
 import pytest
 from . import app as backend_app
-from .test_perf_budget import scaled_client, count_queries
+from .test_perf_budget import scaled_client, count_queries, INDEXED_SHELL_MAX
 from .models import WorkspaceRow
 
 ON = dict(upgraded=True, WORKSPACE_SHELL_ENABLED='true', INDEX_TABLES_ENABLED='true')
@@ -125,8 +125,9 @@ def test_shell_budget_319(tmp_path):
         print('shell', stats['queries'], 'queries', raw, 'raw', response.headers['content-length'], 'wire')
         assert response.json()['scope'] == 'shell' and 'server-timing' in response.headers
         # Fixture names are long CJK strings: 319 slim cards alone are ~148 KB. The 150 KB plan target needs P4-2 (server-paged cards).
-        # Queries include ~14 from live-read ensure()/status and identity that are outside the shell itself (11: two more load the pending approvals the dashboard lists).
-        assert stats['queries'] <= 26 and raw <= 165_000 and int(response.headers['content-length']) <= 30_000
+        # Share the documented fixture budget with the opt-in release gate.
+        queries_max, raw_max, wire_max = INDEXED_SHELL_MAX
+        assert stats['queries'] <= queries_max and raw <= raw_max and int(response.headers['content-length']) <= wire_max
 
 
 def shell_get(client, tag=None):
@@ -234,3 +235,57 @@ def test_shell_blocked_limit_and_workspace_order(tmp_path):
         assert shell['counts']['blocked_tasks'] == 7 and len(shell['blocked']) == 5
         assert [a['task_id'] for a in shell['blocked']] == expected[:5]
         assert shell['blocked'][0]['status'] == 'blocked'
+
+
+def test_disabled_maintenance_gap_stays_unavailable_until_repair(tmp_path, monkeypatch):
+    from . import storage, workspace_environment
+    from .models import BusinessRow
+    from .test_projects_overview import edit_workspace
+    with scaled_client(tmp_path, 3, **ON) as (app, client):
+        monkeypatch.setattr(workspace_environment, 'normalize_environment', lambda state, wid, cfg: state.update(environment='production') or state)
+        edit_workspace(app, client, lambda state: [p.update(case_visibility='new_case') for p in state['projects']])
+        assert shell_get(client).json()['scope'] == 'shell'
+        wid = app.state.signer.loads(client.cookies.get('meegle_session'))['wid']
+        with app.state.sessions.begin() as db:
+            db.info['index_tables'] = False
+            row = db.get(WorkspaceRow, wid)
+            state = storage.load(db, BusinessRow, row)
+            state['projects'][0].update(case_visibility='excluded_history')
+            state['projects'][1].update(contract_amount=987654321)
+            state['version'] = row.version + 1
+            row.data = storage.save(db, BusinessRow, wid, state)
+            row.version = state['version']
+        assert shell_get(client).json().get('scope') is None
+        edit_workspace(app, client, lambda state: state['projects'][2].update(name='unrelated change'))
+        # Neither the revoked case nor the missed amount belongs to the changed tree.
+        body = shell_get(client).json()
+        assert body.get('scope') is None
+        assert [p['id'] for p in body['projects']] == ['p002', 'p003']
+        assert body['projects'][0]['contract_amount'] == 987654321
+        assert client.post('/api/admin/index-health/repair').json()['repaired'] is True
+        assert shell_get(client).json()['scope'] == 'shell'
+        page = client.get('/api/projects?view=overview&tab=all').json()
+        assert [p['id'] for p in page['items']] == ['p002', 'p003']
+        assert page['items'][0]['contract_amount'] == 987654321
+
+
+@pytest.mark.parametrize('repair', ['admin', 'backfill'])
+def test_same_version_index_repair_invalidates_shell_etag(tmp_path, repair):
+    from sqlalchemy import update
+    from .models import ProjectIndex
+    from scripts.backfill_index import backfill
+    with scaled_client(tmp_path, 2, **ON) as (app, client):
+        expected = shell_get(client).json()['projects'][0]['name']
+        with app.state.sessions.begin() as db:
+            db.execute(update(ProjectIndex).where(ProjectIndex.project_id == 'p001').values(name='stale index name'))
+        stale = shell_get(client)
+        assert stale.json()['projects'][0]['name'] == 'stale index name'
+        if repair == 'admin':
+            assert client.post('/api/admin/index-health/repair').json()['repaired'] is True
+        else:
+            backfill(app.state.engine)
+        fresh = shell_get(client, stale.headers['etag'])
+        assert fresh.status_code == 200
+        assert fresh.json()['version'] == stale.json()['version']
+        assert fresh.json()['projects'][0]['name'] == expected
+        assert shell_get(client, fresh.headers['etag']).status_code == 304

@@ -213,9 +213,17 @@ def visible_project(ws,project):
     return ws.get('environment') in ('test','demo') or project.get('case_visibility') in ('new_case','source_reference')
 
 
-def filter_visible_cases(state):
+def related_project_ids(row):
+    related=set(row.get('project_ids',[]))|set(row.get('review_project_ids',[]))
+    if row.get('project_id'):related.add(row['project_id'])
+    if row.get('linked_project_id'):related.add(row['linked_project_id'])
+    related.update(ref.get('project_id') for ref in row.get('task_refs',[]) if ref.get('project_id'))
+    return related
+
+
+def filter_visible_cases(state,*,authorized_project_ids=None):
     if state.get('environment') in ('test','demo'):return state
-    visible={p['id'] for p in state.get('projects',[]) if visible_project(state,p)}
+    visible=set(authorized_project_ids) if authorized_project_ids is not None else {p['id'] for p in state.get('projects',[]) if visible_project(state,p)}
     allowed_sources=set(state.get('source_visible_record_ids',[]))
     state['projects']=[p for p in state.get('projects',[]) if p['id'] in visible]
     for key,value in list(state.items()):
@@ -234,10 +242,7 @@ def filter_visible_cases(state):
         if key not in state:continue
         rows=[]
         for row in state[key]:
-            related=set(row.get('project_ids',[]))|set(row.get('review_project_ids',[]))
-            if row.get('project_id'):related.add(row['project_id'])
-            if row.get('linked_project_id'):related.add(row['linked_project_id'])
-            related.update(ref.get('project_id') for ref in row.get('task_refs',[]) if ref.get('project_id'))
+            related=related_project_ids(row)
             if identity(row.get('source_identity') or {}) not in allowed_sources or related-visible:continue
             if not related&visible:continue
             rows.append(row)

@@ -1,0 +1,57 @@
+/* Shared sizing for native controls and both generations of app controls.
+   Loaded after screen styles so the same tokens govern every route. */
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) button{min-height:var(--control-h);min-width:var(--control-h)}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) :is(.button,.ds-button,.text-button){min-height:var(--control-h);padding:var(--control-py) var(--control-px);gap:var(--control-gap)}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) .button.compact{min-height:var(--control-compact-h);padding:var(--control-py) var(--control-px)}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]),select,textarea){min-height:var(--control-h);padding:var(--control-py) var(--control-px)}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) .icon-button{min-height:var(--control-h);min-width:var(--control-h);padding:var(--sp-2);align-items:center;justify-content:center}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) :is(.project-tabs,.tabbar,.ops-tabs,.segmented,.ds-segmented,.inspector-tabs){gap:var(--control-gap);padding:var(--sp-1)}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) :is(.project-tabs,.tabbar,.ops-tabs,.segmented,.ds-segmented,.inspector-tabs) button{min-height:var(--control-h);padding:var(--tab-py) var(--tab-px);white-space:nowrap}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) .sidebar-close{min-height:var(--control-h);min-width:var(--control-h);padding:var(--sp-2)}
+.app-shell .search-field{min-height:var(--control-h);padding-inline:var(--control-px)}
+.app-shell .search-field input{padding-inline:0}
+.app-shell :is(.toolbar-filters,.ds-actions,.project-tools,.pager){gap:var(--control-gap)}
+/* Small checkboxes keep their glyph size; their wrapping label is the target. */
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) label:has(>input:is([type=checkbox],[type=radio])){min-height:var(--control-h);display:flex;align-items:center;gap:var(--control-gap)}
+@media(max-width:760px){
+ .app-shell .portfolio-page .tabbar button{white-space:normal}
+}
+
+/* Navigation tabs share one quiet segmented idiom and the control tokens. */
+.app-shell .workspace :is(.tabbar.tabbar,.project-tabs.project-tabs,.ops-tabs.ops-tabs,.segmented.segmented){display:flex;flex-wrap:wrap;align-items:center;gap:var(--control-gap);width:fit-content;max-width:100%;padding:var(--sp-1);margin-bottom:var(--sp-5);background:var(--surface-2);border:0;border-radius:var(--radius-m);box-shadow:none}
+.app-shell .workspace :is(.tabbar.tabbar,.project-tabs.project-tabs,.ops-tabs.ops-tabs,.segmented.segmented) button{flex:none;margin:0;padding:var(--tab-py) var(--tab-px);min-height:var(--control-h);border:0;border-radius:var(--radius-s);background:none;box-shadow:none;color:var(--label-2);font-size:var(--fs-subhead);font-weight:500;line-height:1.3}
+.app-shell .workspace :is(.tabbar.tabbar,.project-tabs.project-tabs,.ops-tabs.ops-tabs,.segmented.segmented) button.active{background:var(--surface);color:var(--label)}
+.app-shell .workspace :is(.eyebrow,.ds-eyebrow){color:var(--label-2);font-size:var(--fs-caption);letter-spacing:0;text-transform:none;line-height:1.5;margin:0 0 var(--sp-2)}
+.app-shell .workspace :is(.page-heading,.ds-page-head) h1{font-size:var(--fs-large-title);font-weight:600;line-height:1.2;letter-spacing:-.02em}
+.app-shell .workspace .operations :is(th,td){padding:var(--sp-3) var(--sp-4)}
+.app-shell .workspace .operations th{font-weight:400;color:var(--label-2)}
+.app-shell .project-detail h2{font-size:var(--fs-title2);font-weight:600;line-height:1.4}
+.app-shell .project-detail :is(.case-data-navigation,.flow-operation-picker){justify-content:flex-start;text-align:left;padding-inline:0;margin-block:var(--sp-5)}
+.app-shell .project-detail :is(.case-data-navigation,.flow-operation-picker) label{margin:0;max-width:24rem;text-align:left}
+@media(max-width:760px){
+ .app-shell .workspace :is(.tabbar.tabbar,.project-tabs.project-tabs,.ops-tabs.ops-tabs,.segmented.segmented){flex-wrap:nowrap;overflow-x:auto;width:100%;scrollbar-width:thin}
+ .app-shell .workspace :is(.page-heading,.ds-page-head) h1{font-size:var(--fs-title1)}
+}
+
+.app-shell .skip-link{position:fixed;top:var(--sp-3);left:var(--sp-3);z-index:1000;padding:var(--control-py) var(--control-px);background:var(--surface);color:var(--accent);border:1px solid var(--separator);border-radius:var(--radius-s);transform:translateY(-200%)}
+.app-shell .skip-link:focus{transform:none}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) input:is([type=checkbox],[type=radio]){min-width:24px;min-height:24px;width:24px;height:24px;flex-shrink:0;accent-color:var(--accent)}
+@media(max-width:760px){
+ .app-shell .sidebar.open{overflow:hidden}
+ .app-shell .sidebar.open nav{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+ .app-shell .sidebar.open .sidebar-projects{display:none}
+ .app-shell .sidebar.open .sidebar-bottom{flex:none;position:sticky;bottom:0;margin-top:0;padding-top:var(--sp-2);padding-bottom:env(safe-area-inset-bottom);background:var(--glass-bar-fill)}
+ .app-shell .node-actions{flex-wrap:wrap;justify-content:flex-start;min-width:0}
+}
+.app-shell .workspace :is(.tabbar,.project-tabs,.ops-tabs) button.active::after{content:none}
+
+/* Nested Page primitives inherit the workspace gutter without a second inset. */
+.app-shell .workspace .operations>.ds-page{max-width:none;margin:0;padding:0}
+.app-shell .project-detail :is(.case-data-navigation,.flow-operation-picker) label{align-items:flex-start;width:100%}
+.app-shell .project-detail :is(.case-data-navigation,.flow-operation-picker) select{width:100%}
+.app-shell .workspace .calendar-more{white-space:nowrap}
+@media(max-width:760px){.app-shell .workspace .operations .people-table :is(th,td){white-space:nowrap}}
+
+/* Focus belongs to the search control, without a second box inside it. */
+.app-shell .workspace .search-field:focus-within{outline:3px solid var(--label-2);outline-offset:3px}
+.app-shell .workspace .search-field input:focus{border:0;outline:none;box-shadow:none}

@@ -37,8 +37,8 @@ def mine(ti,user,facts):
     return or_(and_(ti.c.assignee_id==user['id'],ti.c.assignee_id.in_(facts['active'])),ti.c.task_id.in_(sorted(facts['delegated']) or ['']))
 
 
-def etag(wid,user,version,today,users):
-    key=json.dumps([wid,user['id'],user.get('authz_version',0),user.get('role'),sorted(user.get('capabilities',[])),user.get('active',True),can_business_override(user),version,today,users],sort_keys=True,default=str)
+def etag(wid,user,version,today,users,index_generation=None):
+    key=json.dumps([wid,user['id'],user.get('authz_version',0),user.get('role'),sorted(user.get('capabilities',[])),user.get('active',True),can_business_override(user),version,today,users,index_generation],sort_keys=True,default=str)
     return 'W/"shell-'+hashlib.sha256(key.encode()).hexdigest()[:32]+'"'
 
 
@@ -104,7 +104,7 @@ def build(db,model,row,state,user,facts,today,approval_connection):
     attention=[dict(r._mapping) for r in db.execute(task_rows.where(or_(late,today_q))
         .order_by(case((late,0),else_=1),pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))]
     blocked=[dict(r._mapping) for r in db.execute(task_rows.where(blocked_q)
-        .order_by(pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))]
+        .order_by(pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))] if allc[5] else []
     if attention or blocked:
         titles={r.entity_id:(r.data or {}).get('title') for r in db.execute(select(model.entity_id,model.data).where(model.workspace_id==wid,model.kind=='tasks',model.entity_id.in_(sorted({a['task_id'] for a in attention+blocked}))))}
         for a in attention+blocked: a['title']=titles.get(a['task_id'],'')

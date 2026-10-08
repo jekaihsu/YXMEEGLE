@@ -4,13 +4,13 @@ import {ChevronRight, Circle, CircleCheck, CircleDot, FolderOpen, Loader2, Pause
 import {useViewData} from './viewData';
 import {api, perfMark, getSessionEpoch} from './api';
 import {useDialogFocus} from './useDialogFocus';
-import {Avatar} from './AppShell';
 import {type DraftScope} from './useDraftNavigationGuard';
 import {lifecycleGate} from './sourceLifecycle';
 import {type Node, type Project, type Route, type Session, type Task, type Workspace, type Freshness, type LiveDataset} from './types';
 
+export type ReadVersion={version:number;project_versions:Record<string,number>};
 export type ActionScope={project_id?:string;node_id?:string;task_id?:string};
-export type Ctx={w:Workspace;s:Session;busy:boolean;error:string;registerDrafts:(scope:DraftScope|null)=>void;onFreshness?:(freshness:Freshness)=>void;onRefreshError?:(datasets:LiveDataset[])=>void;reloadVersion?:number;route:Route;go:(r:Route)=>void;run:(action:string,payload?:Record<string,unknown>,scope?:ActionScope)=>Promise<Workspace|undefined>;refresh:()=>Promise<void>;notify:(m:string)=>void;upload:(form:FormData)=>Promise<boolean>};
+export type Ctx={w:Workspace;s:Session;busy:boolean;error:string;registerDrafts:(scope:DraftScope|null)=>void;onFreshness?:(freshness:Freshness)=>void;onRefreshError?:(datasets:LiveDataset[])=>void;reloadVersion?:number;route:Route;go:(r:Route)=>void;run:(action:string,payload?:Record<string,unknown>,scope?:ActionScope,readVersion?:ReadVersion)=>Promise<Workspace|undefined>;refresh:()=>Promise<void>;notify:(m:string)=>void;upload:(form:FormData,readVersion?:ReadVersion)=>Promise<boolean>};
 export type ProjectPage={total:number;offset:number;limit:number;facets:{all:number;formal:number;intake:number};items:Project[]};
 export type ProjectSlice={scope:'project';version:number;project:Project;[key:string]:any};
 export type TaskRow={p:Project;n:Node;t:Task};
@@ -57,23 +57,29 @@ export function taskReadiness(r:TaskRow,c:Ctx){
 }
 export function openGuidedTask(c:Ctx,r:TaskRow){c.go({view:'project',project:r.p.id,node:r.n.id,tab:'flow',completion:r.n.id,focus:r.t.id})}
 export function EventList({c,project,limit=20}:{c:Ctx;project?:string;limit?:number}){const events=[...c.w.events].filter(e=>!project||e.project_id===project).sort((a,b)=>b.created_at.localeCompare(a.created_at)).slice(0,limit);return events.length?<div className="event-list">{events.map(e=><div className="event" key={e.id}><span className="event-dot"/><div><p><strong>{nameOf(c.w,e.actor_id)}</strong> {eventMessage(e)}</p><small>{c.w.projects.find(p=>p.id===e.project_id)?.code} · {stamp(e.created_at)}</small></div></div>)}</div>:<Empty title="尚無操作紀錄" detail="任務、參與人員及審批的操作會記錄在這裡。"/>}
-export function TaskTable({rows,c,showProject=true}:{rows:TaskRow[];c:Ctx;showProject?:boolean}){return <div className="table-scroll"><table className={`data-table task-table${showProject?' with-project':''}`}><thead><tr><th>任務</th>{showProject&&<th>案件 / 節點</th>}<th>負責人</th><th>狀態</th><th>排程</th><th>營業額點數</th><th/></tr></thead><tbody>{rows.map(r=><tr key={r.t.id} className={`clickable ${r.t.status==='superseded'?'superseded-row':''}`} onClick={()=>openTask(c,r)}><td><div className="task-title"><TaskIcon status={r.t.status}/><div><button className="text-button" onClick={e=>{e.stopPropagation();openTask(c,r)}}>{r.t.title}</button><small>{r.t.required?'必做 SOP':'增補任務'}{r.t.revision>1?` · v${r.t.revision}`:''}</small></div></div></td>{showProject&&<td><span className="mono">{r.p.code}</span><small>{NODE_NAMES[r.n.key]||r.n.name}</small></td>}<td><span className="person-cell"><Avatar small user={c.w.users.find(u=>u.id===r.t.owner_id)}/>{nameOf(c.w,r.t.owner_id)}</span></td><td><Badge status={r.t.status}/></td><td><span className={`mono ${isLate(r.t,c.w.as_of)?'late-text':''}`}>{shortDate(r.t.start_date)} → {shortDate(r.t.due_date)}</span>{isLate(r.t,c.w.as_of)&&<small className="late-text">逾期 {elapsed(r.t.due_date,c.w.as_of)} 天</small>}</td><td className="mono">{num(r.t.points)} <span className="muted">點</span></td><td><ChevronRight size={16} className="muted"/></td></tr>)}</tbody></table>{!rows.length&&<Empty title="目前沒有符合的任務" detail="調整篩選條件，或從案件節點新增任務。"/>}</div>}
+export function TaskTable({rows,c,showProject=true,comfortable=false}:{rows:TaskRow[];c:Ctx;showProject?:boolean;comfortable?:boolean}){
+ if(!comfortable)return <div className="table-scroll"><table aria-label="任務清單" className={`data-table task-table${showProject?' with-project':''}`}><thead><tr><th scope="col">任務</th>{showProject&&<th scope="col">案件 / 節點</th>}<th scope="col">負責人</th><th scope="col">狀態</th><th scope="col">排程</th><th scope="col">營業額點數</th><th scope="col"/></tr></thead><tbody>{rows.map(r=><tr key={r.t.id} className={`clickable ${r.t.status==='superseded'?'superseded-row':''}`} onClick={()=>openTask(c,r)}><td><div className="task-title"><TaskIcon status={r.t.status}/><div><button className="text-button" onClick={e=>{e.stopPropagation();openTask(c,r)}}>{r.t.title}</button>{(!r.t.required||r.t.revision>1)&&<small>{!r.t.required?'增補任務':''}{r.t.revision>1?`${!r.t.required?' · ':''}v${r.t.revision}`:''}</small>}</div></div></td>{showProject&&<td><span className="mono">{r.p.code}</span><small>{NODE_NAMES[r.n.key]||r.n.name}</small></td>}<td><span className="person-cell">{nameOf(c.w,r.t.owner_id)}</span></td><td><Badge status={r.t.status}/></td><td><span className={`mono ${isLate(r.t,c.w.as_of)?'late-text':''}`}>{shortDate(r.t.start_date)} → {shortDate(r.t.due_date)}</span>{isLate(r.t,c.w.as_of)&&<small className="late-text">逾期 {elapsed(r.t.due_date,c.w.as_of)} 天</small>}</td><td className="mono">{num(r.t.points)} <span className="muted">點</span></td><td><ChevronRight size={16} className="muted"/></td></tr>)}</tbody></table>{!rows.length&&<Empty title="目前沒有符合的任務" detail="調整篩選條件，或從案件節點新增任務。"/>}</div>
+ const showOwner=rows.some(r=>r.t.owner_id!==c.s.user?.id);
+ const showPoints=rows.some(r=>r.t.points!=null);
+ return <div className="table-scroll"><table aria-label="任務清單" className="data-table comfortable-tasks"><thead><tr><th scope="col">任務</th>{showProject&&<th scope="col" className="work-project">案件 / 節點</th>}{showOwner&&<th scope="col" className="work-owner">負責人</th>}<th scope="col" className="work-status">狀態</th><th scope="col" className="work-due">有效期限</th>{showPoints&&<th scope="col" className="work-points">營業額點數</th>}</tr></thead><tbody>{rows.map(r=><tr key={r.t.id}><td className="work-task"><div className="task-title"><TaskIcon status={r.t.status}/><button className="text-button" title={r.t.title} onClick={()=>openTask(c,r)}>{r.t.title}</button></div></td>{showProject&&<td className="work-project"><span className="mono">{r.p.code}</span> · {NODE_NAMES[r.n.key]||r.n.name}</td>}{showOwner&&<td className="work-owner">{r.t.owner_id===c.s.user?.id?'本人':nameOf(c.w,r.t.owner_id)}</td>}<td className="work-status"><Badge status={r.t.status}/></td><td className={`work-due mono ${isLate(r.t,c.w.as_of)?'late-text':''}`}>{date(r.t.due_date)}</td>{showPoints&&<td className="work-points mono">{r.t.points==null?'—':`${num(r.t.points)} 點`}</td>}</tr>)}</tbody></table>{!rows.length&&<Empty title="目前沒有符合的任務" detail="調整篩選條件，或從案件節點新增任務。"/>}</div>
+}
 export function TaskIcon({status}:{status:string}){return status==='completed'?<CircleCheck size={18} className="complete-icon"/>:status==='paused'?<Pause size={18} className="paused-icon"/>:status==='in_progress'?<CircleDot size={18} className="accent-text"/>:<Circle size={18} className="muted"/>}
 // Screens that still need tasks, schedules or approvals across cases read the full workspace, but only once the user opens them.
-// The result is shared per session epoch and shell version, so a mutation or a newer shell never reuses an older copy.
+// Share one read in the current session/reload generation, date and authority; release old decoded workspaces.
 export const fullReads=new Map<string,Promise<Workspace>>();
-export function readFullWorkspace(version:number){
- const key=`${getSessionEpoch()}:${version}`;
- for(const old of fullReads.keys())if(!old.startsWith(`${getSessionEpoch()}:`))fullReads.delete(old);
+export function readFullWorkspace(version:number,generation=0,asOf='',authority=''){
+ const key=`${getSessionEpoch()}:${version}:${generation}:${asOf}:${authority}`;
+ for(const old of fullReads.keys())if(old!==key)fullReads.delete(old);
  let read=fullReads.get(key);
- if(!read){read=api<Workspace>('/api/workspace');fullReads.set(key,read);read.catch(()=>fullReads.delete(key))}
+ if(!read){read=api<Workspace>('/api/workspace');fullReads.set(key,read);read.catch(()=>{if(fullReads.get(key)===read)fullReads.delete(key)})}
  return read;
 }
 export function FullWorkspaceGate({c,children}:{c:Ctx;children:(c:Ctx)=>ReactNode}){
  const shell=c.w.scope==='shell';
- const full=useViewData<Workspace|undefined>(shell?`full:${c.w.version}`:'full-loaded',(_signal,current)=>shell?readFullWorkspace(c.w.version).then(data=>{if(!current())throw new DOMException('stale','AbortError');return data}):Promise.resolve(undefined),[]);
+ const generation=c.reloadVersion??0;const authority=JSON.stringify(c.s.user);const asOf=c.w.as_of;
+ const full=useViewData<Workspace|undefined>(shell?`full:${c.w.version}:${generation}:${asOf}:${authority}`:'full-loaded',(_signal,current)=>shell?readFullWorkspace(c.w.version,generation,asOf,authority).then(data=>{if(!current())throw new DOMException('stale','AbortError');return data}):Promise.resolve(undefined),[]);
  useEffect(()=>{if(shell&&full.data)perfMark('full-workspace-render')},[shell,full.data]);
  if(!shell)return <>{children(c)}</>;
  if(full.data)return <>{children({...c,w:{...full.data,freshness:c.w.freshness}})}</>;
- return full.error?<div className="error-banner" role="alert"><TriangleAlert size={18}/><span>{full.error}</span><button className="text-button" onClick={full.reload}>重試</button></div>:<div role="status"><p className="co-loading">正在載入完整資料…</p><Skeleton lines={4}/></div>;
+ return full.error?<div className="error-banner" role="alert"><TriangleAlert size={18}/><span>{full.error}</span><button className="text-button" onClick={full.reload}>重試</button></div>:<div role="status"><p className="co-loading">正在讀取工作資料…</p><Skeleton lines={4}/></div>;
 }
