@@ -45,6 +45,7 @@ globalThis.fetch=async(url,init)=>{
  requests.push({url,init});
  if(url==='/api/session')return json({user,users:[a,b],mode:'lark',environment:'production',workspace_id:'workspace-A',auth_configured:true,features});
  if(url==='/api/workspace'){await fullGate();return json({...workspace,version:current.version});}
+ if(url.startsWith('/api/daily-reports?'))return json({items:[{id:'shell-daily',project_id:'pA',project_code:'PRIVATE_CASE_A',date:'2026-10-08',department:'外業',person:'Daily worker',description:'Shell daily regression record'}],total:1,summary:{unmatched:0}});
  if(url.startsWith('/api/projects?view=overview'))return overview(url);
  if(url.startsWith('/api/projects/'))return detail(url);
  if(url==='/api/workspace?scope=shell')return init.headers.get('If-None-Match')===etag?new Response(null,{status:304,headers:{ETag:etag}}):json(current,{ETag:etag});
@@ -185,6 +186,13 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  const detailUrls=()=>requests.map(r=>r.url).filter(u=>u.startsWith('/api/projects/'));
  assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects/pA']);
  assert.ok(document.querySelector('.workspace').textContent.includes('PRIVATE_CASE_A')&&document.querySelector('.workspace').textContent.includes('TASK_A'),'detail renders the project tree');
+ // Regression: click the daily tab with two shell cards, only the open card hydrated.
+ assert.equal(window.shellContext.w.projects.length,2);
+ assert.equal(window.shellContext.w.projects[1].daily_reports,undefined);
+ await flush(()=>[...document.querySelectorAll('.project-tabs button')].find(b=>b.textContent==='日報紀錄').click());
+ assert.equal(document.querySelector('.daily-records h2').textContent,'日報紀錄');
+ assert.equal(document.querySelector('.daily-cards article p').textContent,'Shell daily regression record');
+ assert.ok(document.querySelector('.daily-records [role=status]').textContent.includes('共 1 筆符合條件'));
  await goto('view=project&project=pA&tab=flow');await goto('view=project&project=pA&tab=data&section=basic');assert.deepEqual(detailUrls(),['/api/projects/pA'],'tabs do not refetch the project');
  await goto('view=project&project=pB');assert.deepEqual(detailUrls(),['/api/projects/pA','/api/projects/pB']);assert.ok(document.querySelector('.workspace').textContent.includes('CASE_B'));
  await goto('view=project&project=zz');assert.ok(document.querySelector('.workspace').textContent.includes('找不到這個案件'));

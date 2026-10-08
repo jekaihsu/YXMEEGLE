@@ -17,7 +17,7 @@ export function DailyRecords({w,p,go}:{w:Workspace;p:Project;go:(r:Route)=>void}
  const remotePageCount=current?Math.max(1,Math.ceil(current.total/30)):1;
  const pageOutOfRange=!!current&&page>=remotePageCount;
  const records=useMemo(()=>{
-  const matched=w.projects.flatMap(project=>project.daily_reports.map(row=>({...row,project,unmatched:false})));
+  const matched=w.projects.flatMap(project=>(project.daily_reports||[]).map(row=>({...row,project,unmatched:false})));
   const unmatched=(w.daily_unmatched||[]).map((row:any)=>({...row,project:null,unmatched:true}));
   return [...matched,...unmatched];
  },[w]);
