@@ -51,3 +51,32 @@ def test_detail_loads_one_project_tree_not_the_workspace(tmp_path):
         flat = [x for st, p in statements for x in (p if isinstance(p, (tuple, list)) else tuple(p.values()))]
         assert pid in flat
         assert not any(isinstance(x, (tuple, list)) and len(x) > 12 for x in flat)
+
+
+def test_shared_business_records_require_all_related_cases_visible(tmp_path, monkeypatch):
+    from .source_case_policy import identity
+    from .test_projects_overview import edit_workspace
+    with scaled_client(tmp_path, 3, **ON) as (app, client):
+        monkeypatch.setattr(workspace_environment, 'normalize_environment', lambda state, wid, cfg: state.update(environment='production') or state)
+        source = {'base_token':'fixture', 'table_id':'table', 'record_id':'shared'}
+        collections = ('source_quotes', 'source_confirmations', 'contract_items')
+        def prepare(state):
+            for p in state['projects']: p['case_visibility'] = 'new_case'
+            state['source_visible_record_ids'] = [identity(source)]
+            for key in collections:
+                state[key] = [{'id':'shared', 'source_identity':source, 'project_id':'p002', 'project_ids':['p001','p002']},
+                              {'id':'unrelated', 'source_identity':source, 'project_ids':['p003']}]
+        edit_workspace(app, client, prepare)
+        full = client.get('/api/workspace').json()
+        detail = client.get('/api/projects/p001').json()
+        for key in collections:
+            assert [r['id'] for r in full[key]] == ['shared', 'unrelated']
+            assert [r['id'] for r in detail[key]] == ['shared']
+        edit_workspace(app, client, lambda state: state['projects'][1].update(case_visibility='excluded_history'))
+        hidden = client.get('/api/projects/p001').json()
+        full = client.get('/api/workspace').json()
+        for key in collections:
+            assert [r['id'] for r in full[key]] == ['unrelated']
+            assert hidden[key] == []
+        assert hidden['project']['id'] == 'p001'
+        assert client.get('/api/projects/p002').status_code == 404

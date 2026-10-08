@@ -319,12 +319,12 @@ def create_app(overrides=None):
                 access=require_access(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'),allow_recovery=(request.method,request.url.path) in recovery_routes)
                 data={**data,'access_mode':access}
         return data,user
-    def public_ws(data,wid,user,mode=None,owned=False):
+    def public_ws(data,wid,user,mode=None,owned=False,authorized_project_ids=None):
         """owned=True: caller passes a fresh load nobody else uses; it is projected in place (no deepcopy)."""
         file_categories=categories(data); verification=data.get('native_definition_verification')
         result=strip_migration_archive(data) if owned else public_copy(data)
         from .source_case_policy import filter_visible_cases
-        filter_visible_cases(result)
+        filter_visible_cases(result,authorized_project_ids=authorized_project_ids)
         result['workspace_id']=wid
         result['file_categories']=file_categories
         if not result['projects'] or any(p.get('source_kind')=='lark' for p in result['projects']): result['as_of']=now()[:10]
@@ -499,12 +499,19 @@ def create_app(overrides=None):
         Lists keep this case's rows plus global rows without a project_id (templates, catalogues); the rest of the workspace is not sent.
         """
         data,user=identity(request); require(shell_enabled,'尚未啟用單一案件讀取',404)
+        from .source_case_policy import visible_project, related_project_ids
         with sessions() as db:
-            with phase(request,'load'): state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
-            with phase(request,'project'): result=public_ws(state,data['wid'],user,data['mode'],owned=True)
+            with phase(request,'load'):
+                row=db.get(WorkspaceRow,data['wid'])
+                state=load(db,row,project_ids=[project_id])
+                headers=storage.load_partial(db,BusinessRow,row,collections=('projects',))
+                authorized={p['id'] for p in headers['projects'] if visible_project(state,p)}
+            with phase(request,'project'): result=public_ws(state,data['wid'],user,data['mode'],owned=True,authorized_project_ids=authorized)
+        for key in ('source_quotes','source_confirmations','contract_items'):
+            result[key]=[item for item in result.get(key,[]) if not related_project_ids(item) or project_id in related_project_ids(item)]
         require(len(result['projects'])==1,'找不到這個案件',404)
         mine=lambda item:not isinstance(item,dict) or item.get('project_id',project_id)==project_id
-        records={k:[i for i in v if mine(i)] if isinstance(v,list) else v for k,v in result.items() if k not in DETAIL_SKIP}
+        records={k:[i for i in v if mine(i)] if isinstance(v,list) and k not in ('source_quotes','source_confirmations','contract_items') else v for k,v in result.items() if k not in DETAIL_SKIP}
         return dict(records,scope='project',version=result['version'],as_of=result['as_of'],project=result['projects'][0])
 
     @app.get('/api/daily-reports')
