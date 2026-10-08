@@ -18,3 +18,5 @@
 .project-preview-row{display:contents}.project-preview-row+.project-preview-row>.ds-row::before,.project-preview-row+.ds-row::before{content:"";position:absolute;top:0;left:var(--sp-4);right:0;border-top:1px solid var(--sep)}
 .today-layout .today-aside{border-left:0;padding-left:0}
 .today-daily,.today-activity{padding:0;margin:0 0 var(--sp-6)}
+.ds-group>.project-preview-row{display:contents;border:0;padding:0;background:none;border-radius:0}
+.ds-group>.project-preview-row:hover{background:none}
