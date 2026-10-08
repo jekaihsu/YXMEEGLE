@@ -103,3 +103,24 @@
 .workspace .dh-hero{background:var(--surface-2);border:0;border-radius:var(--radius-card);box-shadow:none}
 .workspace .calendar-tasks{max-height:none;overflow:visible}
 .calendar-more{min-height:44px;width:100%;color:var(--accent);font-size:var(--fs-subhead);border-radius:var(--radius-m);background:var(--surface-2)}
+
+/* Comfortable work list: one line on desktop, explicit fields on phones. */
+.workspace .work-completion{display:flex;align-items:center;gap:var(--control-gap);margin-block:var(--sp-4)}
+.workspace .comfortable-tasks{width:100%;font-size:var(--fs-subhead);table-layout:fixed}
+.workspace .comfortable-tasks th{font-weight:400}
+.workspace .comfortable-tasks td{height:var(--control-h);padding:var(--sp-2) var(--sp-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.workspace .comfortable-tasks th:first-child{width:35%}
+.workspace .comfortable-tasks .task-title{display:flex;align-items:center;gap:var(--sp-2);min-width:0}
+.workspace .comfortable-tasks .task-title svg{flex:none}
+.workspace .comfortable-tasks .text-button{display:block;min-width:0;max-width:100%;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;color:var(--label);font-weight:500}
+.workspace .comfortable-tasks .work-project{color:var(--label-2);font-size:var(--fs-footnote)}
+.workspace .comfortable-tasks .work-due{font-size:var(--fs-footnote)}
+@media(max-width:760px){
+ .workspace .comfortable-tasks,.workspace .comfortable-tasks tbody{display:block;min-width:0}
+ .workspace .comfortable-tasks thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .workspace .comfortable-tasks tr{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2) var(--sp-3);padding:var(--sp-3) var(--sp-4);border-bottom:1px solid var(--separator)}
+ .workspace .comfortable-tasks td{display:block;height:auto;padding:0;border:0;max-width:100%}
+ .workspace .comfortable-tasks .work-task{width:100%}
+ .workspace .comfortable-tasks .work-project{width:100%}
+ .workspace .comfortable-tasks .work-due{margin-left:auto}
+}
