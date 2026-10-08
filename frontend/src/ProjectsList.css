@@ -33,9 +33,27 @@
 .portfolio-page .table-footer{display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5);align-items:center;justify-content:space-between;padding:0 var(--sp-2);border:0;background:none;font-size:var(--fs-footnote);color:var(--label-2)}.portfolio-page .pager{display:flex;gap:var(--sp-2);align-items:center}
 .portfolio-page .form-error{padding:var(--sp-3) var(--sp-4);color:var(--critical)}
 @media(max-width:760px){.portfolio-page .portfolio-index button{padding:var(--sp-4)}.portfolio-page .portfolio-index strong{font-size:var(--fs-title1)}.portfolio-page .tabbar{border-radius:var(--radius-m)}}
-.portfolio-page .projects-table{min-width:62rem}
 .portfolio-page .projects-table th:nth-child(1){min-width:15rem}
 .portfolio-page .projects-table :is(th,td):nth-child(2){min-width:9rem}
 .portfolio-page .projects-table :is(th,td):nth-child(3){min-width:8rem}
 .portfolio-page .project-source-status{display:flex;flex-direction:column;align-items:flex-start;gap:var(--sp-1)}
 .portfolio-page .projects-table .ds-badge{white-space:nowrap}
+/* Narrower screens drop secondary columns instead of scrolling; phones turn rows into compact cards. */
+@media(max-width:1500px){.portfolio-page .projects-table :is(th,td):nth-child(5){display:none}}
+@media(max-width:1280px){.portfolio-page .projects-table :is(th,td):nth-child(4){display:none}}
+html[data-text=xl] .portfolio-page .projects-table :is(th,td):is(:nth-child(4),:nth-child(5)){display:none}
+html[data-text=xl] .portfolio-page .projects-table :is(th,td):nth-child(7){display:none}
+@media(max-width:760px){
+ .portfolio-page .projects-table,.portfolio-page .projects-table tbody{display:block;min-width:0}
+ .portfolio-page .projects-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+ .portfolio-page .projects-table tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--sp-1) var(--sp-3);padding:var(--sp-3) var(--sp-4);border-top:1px solid var(--sep)}
+ .portfolio-page .projects-table tbody tr:first-child{border-top:0}
+ .portfolio-page .projects-table td{display:block;padding:0;border:0;min-width:0}
+ .portfolio-page .projects-table td:nth-child(1){grid-column:1/-1}
+ .portfolio-page .projects-table td:is(:nth-child(2),:nth-child(3)){grid-column:1}
+ .portfolio-page .projects-table td:nth-child(6){grid-column:2;grid-row:2/4;align-self:center}
+ .portfolio-page .projects-table td:nth-child(7){grid-column:1}
+ .portfolio-page .projects-table td:is(:nth-child(4),:nth-child(5),:nth-child(8),:nth-child(9)){display:none}
+ .portfolio-page .progress-cell{min-width:0;flex-direction:column;align-items:flex-end;gap:var(--sp-1)}.portfolio-page .progress-cell .progress-track{width:5rem;flex:none}
+}
+.portfolio-page .table-scroll .projects-table{min-width:0}
