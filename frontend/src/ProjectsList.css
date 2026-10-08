@@ -58,8 +58,8 @@
 .portfolio-page .table-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 .portfolio-page .projects-table th:first-child{width:230px}
-.portfolio-page .projects-table th:nth-child(2){width:80px}
-.portfolio-page .projects-table th:nth-child(3){width:55px}
+.portfolio-page .projects-table th:nth-child(2){width:110px}
+.portfolio-page .projects-table th:nth-child(3){width:90px}
 .portfolio-page .projects-table th:nth-child(4){width:110px}
 .portfolio-page .projects-table th:nth-child(5){width:140px}
 .portfolio-page .projects-table th:nth-child(6){width:96px}
@@ -71,3 +71,6 @@
 .portfolio-page .projects-table .case-code small{display:inline;margin:0;font-size:var(--fs-caption)}
 .portfolio-page .projects-table .cell-title{line-height:18px}
 .portfolio-page .projects-table td small{margin-top:0}
+
+/* Workflow labels must stay within their own cell, including finance-pending states. */
+.portfolio-page .projects-table .workflow-status .ds-badge{white-space:normal;overflow-wrap:anywhere;line-height:1.5}
