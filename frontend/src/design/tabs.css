@@ -1,0 +1,9 @@
+/* Shared section navigation: case, case filters, My Work, Changes and Admin. */
+.app-shell .workspace :is(.tabbar,.ops-tabs){display:flex;flex-wrap:nowrap;gap:2px;padding:2px;width:fit-content;max-width:100%;margin:0 0 var(--sp-5);border:.5px solid var(--separator);border-radius:var(--radius-pill);background:var(--surface);box-shadow:none;overflow-x:auto;scrollbar-width:thin}
+.app-shell .workspace :is(.tabbar,.ops-tabs)>button{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;gap:var(--sp-2);min-height:44px;padding:0 var(--sp-4);border:0;border-radius:var(--radius-pill);background:none;color:var(--label);font-size:var(--fs-subhead);font-weight:500;white-space:nowrap;box-shadow:none}
+.app-shell .workspace :is(.tabbar,.ops-tabs)>button.active{background:var(--accent-fill);color:var(--accent);font-weight:600}
+.app-shell .workspace :is(.tabbar,.ops-tabs)>button::after{display:none}
+.app-shell .workspace :is(.tabbar,.ops-tabs)>button>span{background:var(--surface-2);color:var(--label-2);border-radius:var(--radius-s);padding:1px var(--sp-1);font-size:var(--fs-caption)}
+.app-shell .workspace :is(.tabbar,.ops-tabs)[data-scroll-before=true]{border-left:4px solid var(--accent)}
+.app-shell .workspace :is(.tabbar,.ops-tabs)[data-scroll-after=true]{border-right:4px solid var(--accent)}
+@media(max-width:760px){.app-shell .workspace :is(.tabbar,.ops-tabs){width:100%}}
