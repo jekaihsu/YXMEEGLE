@@ -10,6 +10,8 @@ import {a,b,workspace} from './session-epoch-fixture.mjs';
 const bundle=await build({entryPoints:['src/App.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'},plugins:[{name:'observe-shell',setup(build){build.onLoad({filter:/\/App\.tsx$/},async({path})=>({contents:"import {unmatchedDaily} from './appCommon';\n"+(await fs.readFile(path,'utf8')).replace(' const overdue=w?',' window.shellContext={w,s,error,run,upload,refresh,unmatchedDaily};\n const overdue=w?'),loader:'tsx'}))}}]});
 const path=new URL('./.shell-test-bundle.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);
 let App;try{App=(await import(path.href)).default}finally{await fs.unlink(path)}
+const overviewFacts=[{contract_amount:123456,source_lifecycle:{relationship:'已關聯確認單',state:'mapped',canonical:'執行中',reasons:[]},current_nodes:[{key:'field',name:'SERVER_FIELD',status:'in_progress'},{key:'custom',name:'PAUSED_STAGE',status:'paused'}],blocked_tasks:2},{contract_amount:null,current_nodes:[],blocked_tasks:0}];
+let includeFacts=true;
 const shell={...workspace,scope:'shell',attention:[{task_id:'tA',project_id:'pA',project_code:'PRIVATE_CASE_A',project_name:'PRIVATE_CASE_A',node_id:'nA',node_key:'sales',node_name:'NODE_A',assignee_id:workspace.users[0].id,status:'pending',due_date:'2026-10-01',title:'TASK_A'}],pending_approvals:[{id:'apA',title:'APPROVAL_A',type:'change',project_id:'pA'}],counts:{approvals_pending:3,daily_unmatched:535,my_overdue_tasks:4,my_active_tasks:12,active_tasks:30,overdue_tasks:6,due_today_tasks:2},projects:workspace.projects.map((p,i)=>{
  const {nodes,files,comments,daily_reports,...summary}=p;
  return {...summary,concurrency_version:i+7,progress:{completed_nodes:i?0:4,approved_skipped_nodes:i?0:1,total_nodes:i?0:10},overdue_tasks:i?0:2,active_tasks:5,execution_status:i?'completed':'in_progress'};
@@ -30,7 +32,7 @@ const detail=async(url)=>{
 const pct=p=>p.progress.total_nodes?p.progress.completed_nodes/p.progress.total_nodes:0;
 const overview=async(url)=>{
  const query=new URL(url,'http://x').searchParams;await overviewGate(query);
- const cards=current.projects,formal=p=>p.case_type!=='intake',tab=query.get('tab'),needle=(query.get('q')||'').toLowerCase(),sign=query.get('dir')==='desc'?-1:1;
+ const cards=current.projects.map((p,i)=>includeFacts?{...p,...overviewFacts[i%2]}:p),formal=p=>p.case_type!=='intake',tab=query.get('tab'),needle=(query.get('q')||'').toLowerCase(),sign=query.get('dir')==='desc'?-1:1;
  const keep={all:()=>true,formal,intake:p=>!formal(p),active:p=>p.execution_status!=='completed',overdue:p=>p.overdue_tasks>0,completed:p=>p.execution_status==='completed'}[tab];
  const key={due:p=>p.due_date||'9999',name:p=>p.name,progress:pct}[query.get('sort')];
  const hit=cards.filter(p=>keep(p)&&(!needle||(p.code+' '+p.name+' '+p.client).toLowerCase().includes(needle))&&(!query.get('owner')||p.pm_id===query.get('owner')))
@@ -64,7 +66,22 @@ try{
  assert.equal(window.shellContext.w.scope,'shell');assert.equal(rows().length,2);
  assert.ok(document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期 4'));
  assert.ok(document.querySelector('.notification-button i'));assert.equal(window.shellContext.unmatchedDaily(window.shellContext.w),535);
- assert.ok(rows()[0].querySelector('.stage-chips').textContent.includes('進行中'));
+ assert.equal(rows()[0].querySelector('.stage-chips').textContent,'外業PAUSED_STAGE');
+ assert.equal(rows()[1].querySelector('.stage-chips').textContent,'');
+ assert.ok(rows()[0].textContent.includes('123,456'));assert.equal(rows()[1].querySelector('td.mono.numeric').textContent,'待帶入');
+ assert.equal(rows()[0].querySelector('.verification-cell').getAttribute('aria-label'),'已驗證');
+ assert.equal(rows()[1].querySelector('.verification-cell').getAttribute('aria-label'),'來源待確認');
+ assert.ok(rows()[0].querySelector('.attention-badges').textContent.includes('受阻'));
+ assert.ok(!document.querySelector('.verification-legend').textContent.includes('摘要未提供'));
+ assert.ok(document.querySelector('.verification-legend').textContent.includes('受阻僅計暫停／受阻狀態任務'));
+ // Old servers keep hidden amounts and the stage dash/status hint.
+ includeFacts=false;await mount({workspace_shell:true});
+ assert.ok(!document.querySelector('.projects-table thead').textContent.includes('合約金額'));
+ assert.ok(rows()[0].querySelector('.stage-chips').textContent.includes('—進行中'));
+ assert.ok(document.querySelector('.verification-legend').textContent.includes('摘要未提供'));
+ includeFacts=true;overviewFacts[0].source_lifecycle.reasons=['conflict'];await mount({workspace_shell:true});
+ assert.equal(rows()[0].querySelector('.verification-cell').getAttribute('aria-label'),'不一致');assert.equal(rows()[0].querySelector('.verification-cell').textContent,'!');
+ overviewFacts[0].source_lifecycle.reasons=[];await mount({workspace_shell:true});
  assert.equal(rows()[0].querySelector('.progress-cell span').textContent,'40%');
  assert.equal(rows()[1].querySelector('.progress-cell span').textContent,'0%');
  // P4-1: the dashboard renders from counts, the attention list and cards; no tree scan and no full workspace.
@@ -111,7 +128,7 @@ try{
  const pages=()=>requests.filter(r=>r.url.startsWith('/api/projects?view=overview')).map(r=>new URL(r.url,'http://x').searchParams);
  assert.equal(pages().length,1);assert.equal(pages()[0].get('limit'),'10');assert.equal(pages()[0].get('offset'),'0');
  assert.equal(rows().length,10);assert.ok(rows()[0].textContent.includes('CODE_01'));assert.ok(document.querySelector('.table-footer').textContent.includes('共 20 筆 · 第 1 / 2 頁'));
- assert.ok(!document.querySelector('.projects-table thead').textContent.includes('合約金額'),'contract amount is not in shell cards');
+ assert.ok(document.querySelector('.projects-table thead').textContent.includes('合約金額'),'overview facts expose contract amounts while shell cards remain slim');
  assert.equal(document.querySelector('.portfolio-index strong').textContent,'20');
  const nextPage=[...document.querySelectorAll('.table-footer button')].find(b=>b.textContent==='下一頁');
  await flush(()=>nextPage.click());assert.equal(pages().at(-1).get('offset'),'10');assert.equal(rows().length,10);assert.ok(rows()[0].textContent.includes('CODE_13'));
