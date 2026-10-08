@@ -122,9 +122,9 @@ console.log('Daily records: fallback shrink persists page 0 when the API becomes
 // A pending read and a failed read must not claim a confirmed zero count; local retry recovers.
 let finishRead;globalThis.fetch=()=>new Promise(resolve=>{finishRead=resolve});
 await render({id:'failure',code:'failure',daily_reports:[]});
-assert.match(status(),/正在讀取/);assert.ok(!status().includes('共 0'));
+assert.match(status(),/正在讀取/);assert.ok(!status().includes('共 0'));assert.equal(document.querySelector('.dr-empty'),null);assert.equal(document.querySelector('.daily-pagination'),null);
 await act(async()=>finishRead(new Response(JSON.stringify({detail:'daily unavailable'}),{status:500})));await tick();
-assert.match(status(),/筆數尚未確認/);assert.ok(!status().includes('共 0'));
+assert.match(status(),/筆數尚未確認/);assert.ok(!status().includes('共 0'));assert.equal(document.querySelector('.daily-pagination'),null);
 assert.ok(document.querySelector('[role=alert]').textContent.includes('daily unavailable'));
 globalThis.fetch=async()=>new Response(JSON.stringify(resp(mk('failure',['recovered']),1)),{status:200});
 await click('重試日報');assert.deepEqual(shown(),['recovered']);assert.match(status(),/共 1 筆/);assert.equal(document.querySelector('[role=alert]'),null);
