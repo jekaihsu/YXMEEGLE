@@ -10,7 +10,7 @@ import {a,b,workspace} from './session-epoch-fixture.mjs';
 const bundle=await build({entryPoints:['src/App.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'},plugins:[{name:'observe-shell',setup(build){build.onLoad({filter:/\/App\.tsx$/},async({path})=>({contents:(await fs.readFile(path,'utf8')).replace(' const overdue=w?',' window.shellContext={w,s,error,run,upload,refresh,unmatchedDaily};\n const overdue=w?'),loader:'tsx'}))}}]});
 const path=new URL('./.shell-test-bundle.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);
 let App;try{App=(await import(path.href)).default}finally{await fs.unlink(path)}
-const shell={...workspace,scope:'shell',attention:[{task_id:'tA',project_id:'pA',project_code:'PRIVATE_CASE_A',project_name:'PRIVATE_CASE_A',node_key:'sales',status:'pending',due_date:'2026-10-01',title:'TASK_A'}],counts:{approvals_pending:3,daily_unmatched:535,my_overdue_tasks:4,my_active_tasks:12},projects:workspace.projects.map((p,i)=>{
+const shell={...workspace,scope:'shell',attention:[{task_id:'tA',project_id:'pA',project_code:'PRIVATE_CASE_A',project_name:'PRIVATE_CASE_A',node_id:'nA',node_key:'sales',node_name:'NODE_A',assignee_id:workspace.users[0].id,status:'pending',due_date:'2026-10-01',title:'TASK_A'}],pending_approvals:[{id:'apA',title:'APPROVAL_A',type:'change',project_id:'pA'}],counts:{approvals_pending:3,daily_unmatched:535,my_overdue_tasks:4,my_active_tasks:12,active_tasks:30,overdue_tasks:6,due_today_tasks:2},projects:workspace.projects.map((p,i)=>{
  const {nodes,files,comments,daily_reports,...summary}=p;
  return {...summary,concurrency_version:i+7,progress:{completed_nodes:i?0:4,approved_skipped_nodes:i?0:1,total_nodes:i?0:10},overdue_tasks:i?0:2,active_tasks:5,execution_status:i?'completed':'in_progress'};
 })};
@@ -70,8 +70,8 @@ try{
  // P4-1: the dashboard renders from counts, the attention list and cards; no tree scan and no full workspace.
  await flush(()=>{location.hash='view=dashboard';window.dispatchEvent(new window.Event('hashchange'))});
  const todo=document.querySelector('.work-inbox');
- assert.ok(todo.textContent.includes('TASK_A')&&todo.textContent.includes('逾期 1 天')&&todo.textContent.includes('3 筆待審申請'));
- assert.equal(todo.querySelector('.heading-count').textContent,'7');assert.ok(document.querySelector('.today-aside').textContent.includes('535 筆日報待配對'));
+ assert.ok(todo.textContent.includes('TASK_A')&&todo.textContent.includes('逾期 1 天')&&todo.textContent.includes('APPROVAL_A')&&todo.textContent.includes('NODE_A')&&todo.textContent.includes(workspace.users[0].name)&&todo.textContent.includes('逾期 6 · 當日到期 2'));
+ assert.equal(todo.querySelector('.heading-count').textContent,'11');assert.ok(document.querySelector('.today-aside').textContent.includes('535 筆日報待配對'));
  assert.ok(document.querySelector('.project-preview-row').textContent.includes('PRIVATE_CASE_A'));
  assert.ok(!requests.some(r=>r.url==='/api/workspace'),'dashboard never loads the full workspace');
  await flush(()=>{location.hash='view=projects';window.dispatchEvent(new window.Event('hashchange'))});
@@ -96,7 +96,7 @@ try{
  current={...shell,version:3};etag='W/"shell-A:3"';await flush(()=>window.shellContext.refresh());
  const form=new FormData();form.set('project_id','pB');await flush(()=>window.shellContext.upload(form));
  assert.equal(form.get('version'),'3');assert.equal(form.get('project_version'),'8');assert.equal(window.shellContext.error,'');
- mutationResponse={...shell,version:4,counts:{...shell.counts,approvals_pending:0,my_overdue_tasks:0}};
+ mutationResponse={...shell,version:4,pending_approvals:[],counts:{...shell.counts,approvals_pending:0,my_overdue_tasks:0}};
  await flush(()=>window.shellContext.run('case_execution_assign',{}, {project_id:'pA'}));
  assert.equal(window.shellContext.w.scope,'shell');assert.equal(window.shellContext.error,'');
  assert.equal(document.querySelector('.notification-button i'),null);assert.ok(!document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期 '));
