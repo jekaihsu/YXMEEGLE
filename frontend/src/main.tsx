@@ -11,4 +11,5 @@ import App from './App';
 import {AppErrorBoundary} from './AppErrorBoundary';
 import {ThemeProvider} from './design/appearance';
 import './design/shell.css';
+import './polish.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><ThemeProvider><AppErrorBoundary><App /></AppErrorBoundary></ThemeProvider></React.StrictMode>);
