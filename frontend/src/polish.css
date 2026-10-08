@@ -51,3 +51,7 @@
 .workspace .task-table td:last-child svg{color:var(--label-2);opacity:.6}
 .workspace .task-table tbody tr:hover{background:var(--surface-2)}
 .workspace .task-table .mono,.workspace .task-table .person-cell{font-size:var(--fs-footnote)}
+@media(max-width:760px){
+ .workspace .operations .ops-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;width:100%;border-radius:var(--radius-pill);scrollbar-width:none}
+ .workspace .operations .ops-tabs button{flex:0 0 auto;white-space:nowrap}
+}
