@@ -1,6 +1,6 @@
 /* Projects list: one hero (the two counts), a quiet toolbar and a borderless grouped table. Selectors are scoped to beat legacy rules. */
 .portfolio-page{display:flex;flex-direction:column;gap:var(--sp-5)}
-.portfolio-page .portfolio-index.glass{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;border:.5px solid var(--glass-border);border-radius:var(--radius-card);background:var(--glass-fill);overflow:hidden}
+.portfolio-page .portfolio-index{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;border:.5px solid var(--glass-border);border-radius:var(--radius-card);background:var(--glass-fill);overflow:hidden}
 .portfolio-page .portfolio-index button{display:flex;align-items:center;gap:var(--sp-3);min-height:44px;padding:var(--sp-5);text-align:left;background:none;border:0;border-radius:0;color:var(--label);box-shadow:none;transition:background 300ms ease-out}
 .portfolio-page .portfolio-index button+button{border-left:.5px solid var(--sep)}
 .portfolio-page .portfolio-index button>span{flex:1;font-size:var(--fs-headline);font-weight:600}.portfolio-page .portfolio-index small{display:block;font-weight:400;font-size:var(--fs-footnote);color:var(--label-2)}
@@ -20,40 +20,54 @@
 .portfolio-page .table-scroll{overflow-x:auto;border:.5px solid var(--glass-border);border-radius:var(--radius-card);background:var(--glass-fill);box-shadow:var(--glass-highlight),var(--glass-shadow)}
 .portfolio-page .projects-table{width:100%;border-collapse:collapse;font-size:var(--fs-subhead);color:var(--label);background:none}
 .portfolio-page .projects-table th{padding:var(--sp-3) var(--sp-4);text-align:left;font-size:var(--fs-caption);font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--label-2);background:none;border:0;white-space:nowrap}
-.portfolio-page .projects-table td{padding:var(--sp-3) var(--sp-4);vertical-align:middle;border:0;border-top:1px solid var(--sep);background:none;color:var(--label)}
+.portfolio-page .projects-table td{padding:var(--sp-1) var(--sp-2);vertical-align:middle;border:0;border-top:1px solid var(--sep);background:none;color:var(--label)}
 .portfolio-page .projects-table tbody tr{transition:background var(--dur-fast) var(--ease)}.portfolio-page .projects-table tbody tr:hover{background:var(--surface-2)}
 .portfolio-page .projects-table small,.portfolio-page .case-code{display:block;font-size:var(--fs-footnote);color:var(--label-2)}
 .portfolio-page .case-link{display:block;font-size:var(--fs-body);font-weight:600;color:var(--label);overflow-wrap:anywhere}.portfolio-page .case-link:hover{color:var(--accent)}
-.portfolio-page .demo-inline{margin-left:var(--sp-2);color:var(--accent)}
+.portfolio-page .demo-inline{margin-left:var(--sp-2);color:var(--label-2)}
 .portfolio-page .person-cell{display:flex;align-items:center;gap:var(--sp-2);white-space:nowrap}
 .portfolio-page .stage-chips{display:flex;flex-wrap:wrap;gap:var(--sp-1)}
 .portfolio-page .progress-cell{display:flex;align-items:center;gap:var(--sp-3);min-width:7rem;font-variant-numeric:tabular-nums}.portfolio-page .progress-cell small{display:inline}
-.portfolio-page .progress-track{flex:1;height:6px;border-radius:var(--radius-pill);background:var(--surface-2);overflow:hidden}.portfolio-page .progress-track i{display:block;height:100%;background:var(--accent);border-radius:inherit;transition:width var(--dur-slow) var(--ease)}
+.portfolio-page .progress-track{flex:1;height:6px;border-radius:var(--radius-pill);background:var(--surface-2);overflow:hidden}.portfolio-page .progress-track i{display:block;height:100%;background:var(--label-2);border-radius:inherit;transition:width var(--dur-slow) var(--ease)}
 .portfolio-page .mono{font-variant-numeric:tabular-nums;white-space:nowrap}
 .portfolio-page .table-footer{display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5);align-items:center;justify-content:space-between;padding:0 var(--sp-2);border:0;background:none;font-size:var(--fs-footnote);color:var(--label-2)}.portfolio-page .pager{display:flex;gap:var(--sp-2);align-items:center}
 .portfolio-page .form-error{padding:var(--sp-3) var(--sp-4);color:var(--critical)}
 @media(max-width:760px){.portfolio-page .portfolio-index button{padding:var(--sp-4)}.portfolio-page .portfolio-index strong{font-size:var(--fs-title1)}.portfolio-page .tabbar{border-radius:var(--radius-m)}}
-.portfolio-page .projects-table th:nth-child(1){min-width:15rem}
-.portfolio-page .projects-table :is(th,td):nth-child(2){min-width:9rem}
-.portfolio-page .projects-table :is(th,td):nth-child(3){min-width:8rem}
-.portfolio-page .project-source-status{display:flex;flex-direction:column;align-items:flex-start;gap:var(--sp-1)}
-.portfolio-page .projects-table .ds-badge{white-space:nowrap}
-/* Narrower screens drop secondary columns instead of scrolling; phones turn rows into compact cards. */
-@media(max-width:1500px){.portfolio-page .projects-table :is(th,td):nth-child(5){display:none}}
-@media(max-width:1280px){.portfolio-page .projects-table :is(th,td):nth-child(4){display:none}}
-html[data-text=xl] .portfolio-page .projects-table :is(th,td):is(:nth-child(4),:nth-child(5)){display:none}
-html[data-text=xl] .portfolio-page .projects-table :is(th,td):nth-child(8){display:none}
-@media(max-width:760px){
- .portfolio-page .projects-table,.portfolio-page .projects-table tbody{display:block;min-width:0}
- .portfolio-page .projects-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
- .portfolio-page .projects-table tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--sp-1) var(--sp-3);padding:var(--sp-3) var(--sp-4);border-top:1px solid var(--sep)}
- .portfolio-page .projects-table tbody tr:first-child{border-top:0}
- .portfolio-page .projects-table td{display:block;padding:0;border:0;min-width:0}
- .portfolio-page .projects-table td:nth-child(1){grid-column:1/-1}
- .portfolio-page .projects-table td:is(:nth-child(2),:nth-child(3)){grid-column:1}
- .portfolio-page .projects-table td:nth-child(6){grid-column:2;grid-row:2/4;align-self:center}
- .portfolio-page .projects-table td:nth-child(7){grid-column:1}
- .portfolio-page .projects-table td:is(:nth-child(4),:nth-child(5),:nth-child(8),:nth-child(9)){display:none}
- .portfolio-page .progress-cell{min-width:0;flex-direction:column;align-items:flex-end;gap:var(--sp-1)}.portfolio-page .progress-cell .progress-track{width:5rem;flex:none}
-}
-.portfolio-page .table-scroll .projects-table{min-width:0}
+
+/* Keep every operational column visible; compact rows scroll inside the table. */
+.portfolio-page .portfolio-index{margin-bottom:0;box-shadow:var(--glass-highlight),var(--glass-shadow)}
+.portfolio-page .table-scroll .projects-table{min-width:1240px;background:var(--surface);table-layout:fixed;line-height:1.2}
+.portfolio-page .projects-table th{padding:var(--sp-2);letter-spacing:0}
+.portfolio-page .projects-table tbody tr{height:40px}
+.portfolio-page .projects-table .case-link{font-size:var(--fs-subhead);line-height:1.2;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:none}
+.portfolio-page .projects-table td:first-child>small{display:inline;margin:0;font-size:var(--fs-caption)}
+.portfolio-page .projects-table .case-code{display:inline;font-size:var(--fs-caption);margin-right:var(--sp-2)}
+.portfolio-page .projects-table .demo-inline{font-size:var(--fs-caption)}
+.portfolio-page .projects-table .person-cell .avatar{width:24px;height:24px;font-size:var(--fs-caption)}
+.portfolio-page .stage-chips{font-size:var(--fs-caption)}
+.portfolio-page .stage-chips>span{padding:2px var(--sp-1);border:0;color:var(--label-2);background:var(--surface-2)}
+.portfolio-page .progress-cell{min-width:0;gap:var(--sp-2);justify-content:flex-end}
+.portfolio-page .progress-cell>span{min-width:2.5rem;text-align:right}
+.portfolio-page .numeric{text-align:right!important}
+.portfolio-page .deadline.is-overdue{color:var(--critical);font-weight:600}
+.portfolio-page .deadline.is-upcoming{color:var(--warning);font-weight:600}
+.portfolio-page .attention-badges{display:flex;flex-wrap:wrap;gap:2px}
+.portfolio-page .projects-table .ds-badge{white-space:nowrap;line-height:1.2;padding:2px var(--sp-1)}
+.portfolio-page .verification-legend{font-size:var(--fs-caption);color:var(--label-2)}
+.portfolio-page .verification-cell{display:inline-flex}
+.portfolio-page .table-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.portfolio-page .projects-table th:first-child{width:230px}
+.portfolio-page .projects-table th:nth-child(2){width:80px}
+.portfolio-page .projects-table th:nth-child(3){width:55px}
+.portfolio-page .projects-table th:nth-child(4){width:110px}
+.portfolio-page .projects-table th:nth-child(5){width:140px}
+.portfolio-page .projects-table th:nth-child(6){width:96px}
+.portfolio-page .projects-table th:nth-child(7){width:96px}
+.portfolio-page .projects-table th:nth-child(8){width:90px}
+.portfolio-page .projects-table th:nth-child(9),.portfolio-page .projects-table th:nth-child(10){width:110px}
+.portfolio-page .projects-table th:last-child{width:28px}
+.portfolio-page .projects-table .case-code{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:14px}
+.portfolio-page .projects-table .case-code small{display:inline;margin:0;font-size:var(--fs-caption)}
+.portfolio-page .projects-table .cell-title{line-height:18px}
+.portfolio-page .projects-table td small{margin-top:0}
