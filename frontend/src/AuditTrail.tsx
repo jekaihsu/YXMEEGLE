@@ -20,7 +20,7 @@ export function AuditTrail({w,p}:{w:Workspace;p:Project}){
  useEffect(()=>{if(pageOutOfRange)setPage(currentPage)},[pageOutOfRange,currentPage,p.id]);
  const days=new Map<string,any[]>();
  for(const row of rows){const day=String(row.created_at||row.at||'').slice(0,10);days.set(day,[...(days.get(day)||[]),row])}
- return <section className="audit-trail audit-screen"><h2>操作紀錄</h2><p>查看誰在何時處理了哪些工作，以及確認、退回和來源更新的記錄。</p>
+ return <section className="audit-trail audit-screen"><h2>操作紀錄</h2><p>記錄指派、排程、資料與審批的詳細異動；案件活動呈現任務與交接動態。</p>
   {legacy&&<p className="ops-notice">目前服務僅提供舊版活動紀錄；完整變更稽核尚未接通。</p>}
   {error&&<p className="form-error" role="alert">{error}</p>}
   {!cur&&<section className="ds-section" aria-hidden="true"><div className="ds-group glass--flat audit-skeleton"><div className="skeleton skeleton-row audit-day-placeholder"/>{Array.from({length:3},(_,i)=><div className="audit-entry" key={i}><div className="ds-row"><span className="ds-row-main"><span className="skeleton skeleton-row"/><small className="skeleton skeleton-row"/></span><span className="skeleton skeleton-row audit-time-placeholder"/></div></div>)}</div></section>}

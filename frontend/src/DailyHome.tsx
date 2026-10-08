@@ -11,12 +11,12 @@ type Item={key:string;title:string;detail:string;late?:number;today?:boolean;blo
 const operationallyBlocked=(r:TaskRow)=>['paused','blocked'].includes(r.t.status)||(r.t.input_task_ids as string[]|undefined)?.some(id=>!r.p.nodes.some(n=>n.tasks.some(t=>t.id===id&&t.status==='completed'&&!!t.output)))===true;
 const uniqueRows=(rows:TaskRow[])=>{const seen=new Set<string>();return rows.filter(r=>{if(seen.has(r.t.id))return false;seen.add(r.t.id);return true})};
 
-export function NextAction({c,rows}:{c:Ctx;rows:TaskRow[]}){
+export function NextAction({c,rows,showProject=true}:{c:Ctx;rows:TaskRow[];showProject?:boolean}){
  const owned=rows.filter(r=>active(r.t)&&isTaskActor(r.t,c)&&r.p.case_type!=='intake');
  const ordered=[...owned].sort((a,b)=>(a.t.status==='in_progress'?-1:0)-(b.t.status==='in_progress'?-1:0)||(a.t.due_date||'9999').localeCompare(b.t.due_date||'9999'));
  const next=ordered.find(r=>!taskReadiness(r,c))||ordered[0];
  if(!owned.length)return null;
- return <section className="dh-hero" aria-label="接續我的工作"><p className="dh-kicker">接續我的工作 · {owned.length} 項待處理</p><h2>{next.t.title}</h2><p>{next.p.code} · {next.n.name} · {next.t.due_date?`到期 ${date(next.t.due_date)}`:'未排定期限'}</p><Button variant="primary" onClick={()=>openGuidedTask(c,next)}>{taskReadiness(next,c)?'查看處理方式':next.t.status==='in_progress'?'繼續此任務':'前往此任務'}<ArrowRight size={17}/></Button></section>
+ return <section className="dh-hero" aria-label="接續我的工作"><p className="dh-kicker">接續我的工作 · {owned.length} 項待處理</p><h2>{next.t.title}</h2><p>{showProject&&<>{next.p.code} · </>}{next.n.name} · {next.t.due_date?`到期 ${date(next.t.due_date)}`:'未排定期限'}</p><Button variant="primary" onClick={()=>openGuidedTask(c,next)}>{taskReadiness(next,c)?'查看處理方式':next.t.status==='in_progress'?'繼續此任務':'前往此任務'}<ArrowRight size={17}/></Button></section>
 }
 
 function Group({title,count,caption,className,children}:{title:string;count?:number;caption?:string;className?:string;children:ReactNode}){
