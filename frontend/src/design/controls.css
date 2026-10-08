@@ -1,0 +1,18 @@
+/* Shared sizing for native controls and both generations of app controls.
+   Loaded after screen styles so the same tokens govern every route. */
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) button{min-height:var(--control-h);min-width:var(--control-h)}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) :is(.button,.ds-button,.text-button){min-height:var(--control-h);padding:var(--control-py) var(--control-px);gap:var(--control-gap)}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) .button.compact{min-height:var(--control-compact-h);padding:var(--control-py) var(--control-px)}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]),select,textarea){min-height:var(--control-h);padding:var(--control-py) var(--control-px)}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) .icon-button{min-height:var(--control-h);min-width:var(--control-h);padding:var(--sp-2);align-items:center;justify-content:center}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) :is(.project-tabs,.tabbar,.ops-tabs,.segmented,.ds-segmented,.inspector-tabs){gap:var(--control-gap);padding:var(--sp-1)}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) :is(.project-tabs,.tabbar,.ops-tabs,.segmented,.ds-segmented,.inspector-tabs) button{min-height:var(--control-h);padding:var(--tab-py) var(--tab-px);white-space:nowrap}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) .sidebar-close{min-height:var(--control-h);min-width:var(--control-h);padding:var(--sp-2)}
+.app-shell .search-field{min-height:var(--control-h);padding-inline:var(--control-px)}
+.app-shell .search-field input{padding-inline:0}
+.app-shell :is(.toolbar-filters,.ds-actions,.project-tools,.pager){gap:var(--control-gap)}
+/* Small checkboxes keep their glyph size; their wrapping label is the target. */
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) label:has(>input:is([type=checkbox],[type=radio])){min-height:var(--control-h);display:flex;align-items:center;gap:var(--control-gap)}
+@media(max-width:760px){
+ .app-shell .portfolio-page .tabbar button{white-space:normal}
+}
