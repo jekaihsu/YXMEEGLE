@@ -48,6 +48,7 @@ try{
   assert.match(await page.locator('td.work-due').first().innerText(),/2026\/10\/01/);
  };
  await go('work&tab=all');await page.locator('.comfortable-tasks').waitFor();await checkColumns();
+ for(const control of await page.locator('.table-toolbar input,.table-toolbar select').all())assert.ok(await control.evaluate(e=>parseFloat(getComputedStyle(e).fontSize)>=15),'work filters use shared readable type');
  await go('schedule');await page.locator('.calendar-grid').waitFor();
  assert.ok(await page.locator('.calendar-grid').evaluate(e=>e.scrollWidth<=e.parentElement.clientWidth+1),'all seven days fit at 1024px');
  await page.getByRole('button',{name:'查看當日工作',exact:true}).first().click();await checkColumns();
