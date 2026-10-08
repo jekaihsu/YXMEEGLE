@@ -73,13 +73,14 @@ try{
  assert.equal(rows()[0].querySelector('.verification-cell').getAttribute('aria-label'),'已驗證');
  assert.equal(rows()[1].querySelector('.verification-cell').getAttribute('aria-label'),'來源待確認');
  assert.ok(rows()[0].querySelector('.attention-badges').textContent.includes('受阻'));
- assert.ok(!document.querySelector('.verification-legend').textContent.includes('摘要未提供'));
- assert.ok(document.querySelector('.verification-legend').textContent.includes('受阻僅計暫停／受阻狀態任務'));
+ assert.ok(!document.querySelector('.verification-legend').textContent.includes('作業明細與合約金額請至案件查看'));
+ // Implementation-specific blocked counting copy was removed from the data-verification legend.
+ assert.ok(document.querySelector('.verification-legend').textContent.includes('資料驗證：✓ 已驗證'));
  // Old servers keep hidden amounts and the stage dash/status hint.
  includeFacts=false;await mount({workspace_shell:true});
  assert.ok(!document.querySelector('.projects-table thead').textContent.includes('合約金額'));
  assert.ok(rows()[0].querySelector('.stage-chips').textContent.includes('—進行中'));
- assert.ok(document.querySelector('.verification-legend').textContent.includes('摘要未提供'));
+ assert.ok(document.querySelector('.verification-legend').textContent.includes('作業明細與合約金額請至案件查看'));
  includeFacts=true;overviewFacts[0].source_lifecycle.reasons=['conflict'];await mount({workspace_shell:true});
  assert.equal(rows()[0].querySelector('.verification-cell').getAttribute('aria-label'),'不一致');assert.equal(rows()[0].querySelector('.verification-cell').textContent,'!');
  overviewFacts[0].source_lifecycle.reasons=[];await mount({workspace_shell:true});
@@ -212,7 +213,7 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  const fullReads=()=>requests.filter(r=>r.url==='/api/workspace').length;
  assert.equal(fullReads(),0,'first paint never reads the full workspace');
  let openFull;const heldFull=new Promise(resolve=>{openFull=resolve});fullGate=()=>heldFull;
- await goto('view=work');assert.equal(fullReads(),1);assert.ok(document.querySelector('.workspace [role="status"]').textContent.includes('正在載入完整資料'),'loading state while the full read is pending');
+ await goto('view=work');assert.equal(fullReads(),1);assert.ok(document.querySelector('.workspace [role="status"]').textContent.includes('正在讀取工作資料'),'loading state while the full read is pending');
  assert.ok(document.querySelector('[aria-label="主要導覽"]'),'the shell stays usable while a screen loads');
  await flush(async()=>{openFull();await heldFull});fullGate=async()=>{};
  assert.ok(document.querySelector('.workspace').textContent.includes('TASK_A'),'my work renders the loaded task');

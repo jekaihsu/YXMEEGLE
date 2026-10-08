@@ -80,5 +80,5 @@ export function FullWorkspaceGate({c,children}:{c:Ctx;children:(c:Ctx)=>ReactNod
  useEffect(()=>{if(shell&&full.data)perfMark('full-workspace-render')},[shell,full.data]);
  if(!shell)return <>{children(c)}</>;
  if(full.data)return <>{children({...c,w:{...full.data,freshness:c.w.freshness}})}</>;
- return full.error?<div className="error-banner" role="alert"><TriangleAlert size={18}/><span>{full.error}</span><button className="text-button" onClick={full.reload}>重試</button></div>:<div role="status"><p className="co-loading">正在載入完整資料…</p><Skeleton lines={4}/></div>;
+ return full.error?<div className="error-banner" role="alert"><TriangleAlert size={18}/><span>{full.error}</span><button className="text-button" onClick={full.reload}>重試</button></div>:<div role="status"><p className="co-loading">正在讀取工作資料…</p><Skeleton lines={4}/></div>;
 }
