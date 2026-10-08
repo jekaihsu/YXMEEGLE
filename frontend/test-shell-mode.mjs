@@ -66,6 +66,7 @@ try{
  assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects?view=overview&tab=formal&sort=due&dir=asc&limit=10&offset=0']);
  assert.equal(window.shellContext.w.scope,'shell');assert.equal(rows().length,2);
  assert.ok(document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期 4'));
+ await flush(()=>button('待確認接案').click());assert.ok(document.querySelector('.empty').textContent.includes('尚無待確認接案'));assert.ok(!document.querySelector('.empty').textContent.includes('試試其他關鍵字'));await flush(()=>button('正式案件').click());
  assert.ok(document.querySelector('.notification-button i'));assert.equal(window.shellContext.unmatchedDaily(window.shellContext.w),535);
  assert.equal(rows()[0].querySelector('.stage-chips').textContent,'外業、PAUSED_STAGE');
  assert.equal(rows()[1].querySelector('.stage-chips').textContent,'');
