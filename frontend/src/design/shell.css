@@ -46,3 +46,7 @@ body{background-color:var(--bg);background-image:var(--bg-tint);background-attac
  .mobile-tabs svg{stroke-width:1.75}
  .app-shell .toast{bottom:calc(var(--sp-9) + env(safe-area-inset-bottom))}
 }
+/* Dividers use the theme separator, never legacy solid colours. */
+.app-shell .topbar.glass--bar{border-bottom:.5px solid var(--separator)}
+.app-shell .sidebar.glass--bar{border-right:.5px solid var(--separator)}
+.app-shell .sidebar-projects,.app-shell .user-button{border-top:.5px solid var(--separator)}
