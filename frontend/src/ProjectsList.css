@@ -36,7 +36,7 @@
 
 /* Keep every operational column visible; compact rows scroll inside the table. */
 .portfolio-page .portfolio-index{margin-bottom:0;box-shadow:var(--glass-highlight),var(--glass-shadow)}
-.portfolio-page .table-scroll .projects-table{min-width:1240px;background:var(--surface);table-layout:fixed;line-height:1.2}
+.portfolio-page .table-scroll .projects-table{min-width:80rem;background:var(--surface);table-layout:fixed;line-height:1.2}
 .portfolio-page .projects-table th{padding:var(--sp-2);letter-spacing:0}
 .portfolio-page .projects-table tbody tr{height:40px}
 .portfolio-page .projects-table .case-link{font-size:var(--fs-subhead);line-height:1.2;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:none}
@@ -57,16 +57,16 @@
 .portfolio-page .verification-cell{display:inline-flex}
 .portfolio-page .table-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-.portfolio-page .projects-table th:first-child{width:230px}
-.portfolio-page .projects-table th:nth-child(2){width:80px}
-.portfolio-page .projects-table th:nth-child(3){width:55px}
-.portfolio-page .projects-table th:nth-child(4){width:110px}
-.portfolio-page .projects-table th:nth-child(5){width:140px}
-.portfolio-page .projects-table th:nth-child(6){width:96px}
-.portfolio-page .projects-table th:nth-child(7){width:96px}
-.portfolio-page .projects-table th:nth-child(8){width:90px}
-.portfolio-page .projects-table th:nth-child(9),.portfolio-page .projects-table th:nth-child(10){width:110px}
-.portfolio-page .projects-table th:last-child{width:28px}
+.portfolio-page .projects-table th:first-child{width:16rem}
+.portfolio-page .projects-table th:nth-child(2){width:5.5rem}
+.portfolio-page .projects-table th:nth-child(3){width:5.5rem}
+.portfolio-page .projects-table th:nth-child(4){width:7.5rem}
+.portfolio-page .projects-table th:nth-child(5){width:10rem}
+.portfolio-page .projects-table th:nth-child(6){width:7rem}
+.portfolio-page .projects-table th:nth-child(7){width:7rem}
+.portfolio-page .projects-table th:nth-child(8){width:6.5rem}
+.portfolio-page .projects-table th:nth-child(9),.portfolio-page .projects-table th:nth-child(10){width:7.5rem}
+.portfolio-page .projects-table th:last-child{width:2rem}
 .portfolio-page .projects-table .case-code{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:14px}
 .portfolio-page .projects-table .case-code small{display:inline;margin:0;font-size:var(--fs-caption)}
 .portfolio-page .projects-table .cell-title{line-height:18px}
