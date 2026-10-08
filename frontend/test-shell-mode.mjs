@@ -198,6 +198,9 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  assert.ok(document.querySelector('.daily-records [role=status]').textContent.includes('共 1 筆符合條件'));
  await goto('view=project&project=pA&tab=flow');await goto('view=project&project=pA&tab=data&section=basic');assert.deepEqual(detailUrls(),['/api/projects/pA'],'tabs do not refetch the project');
  await goto('view=project&project=pB');assert.deepEqual(detailUrls(),['/api/projects/pA','/api/projects/pB']);assert.ok(document.querySelector('.workspace').textContent.includes('CASE_B'));
+ await flush(()=>[...document.querySelectorAll('.project-tabs button')].find(b=>b.textContent==='流程與交付').click());
+ assert.ok(document.querySelector('.stage-button'),'second shell case flow renders without scanning unhydrated cards');
+ assert.ok(document.querySelector('.node-section').textContent.includes('TASK_B'),'second case task is visible');
  await goto('view=project&project=zz');assert.ok(document.querySelector('.workspace').textContent.includes('找不到這個案件'));
  let freeA;const heldA=new Promise(resolve=>{freeA=resolve});detailGate=async id=>{if(id==='pA')await heldA};
  await goto('view=project&project=pA');await goto('view=project&project=pB');await flush(async()=>{freeA();await heldA});
