@@ -4,6 +4,7 @@ import App from './App';
 import {AppErrorBoundary} from './AppErrorBoundary';
 import {ThemeProvider} from './design/appearance';
 import './design/tokens.css';
+import './design/glass.css';
 import './styles.css';
 import './workbench.css';
 import './brand-workspace.css';
