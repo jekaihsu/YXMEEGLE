@@ -1,5 +1,5 @@
 import {useState,useEffect} from 'react';
-import {Badge,Section} from './design';
+import {StatusBadge,Section} from './design';
 import './deadlines.css';
 import {SopFollowups} from './SopApplicability';
 import {ActionForm,Field,who,type Context} from './Operations';
@@ -20,7 +20,7 @@ export function Deadlines({c,p}:{c:Context;p:Project}){
  const tasks=p.nodes.flatMap(n=>n.tasks.filter(t=>t.sop_due_provenance).map(t=>({...t,node:n.name}))) as Row[];
  tasks.sort((a,b)=>Number(overdue(b))-Number(overdue(a))||String(a.due_date||'9999').localeCompare(String(b.due_date||'9999')));
  return <section className="deadline-screen"><h3>SOP 事件與期限</h3><p>以有佐證的業務日期，依公司工作日計算期限。既有人工日期、契約日期與已開工作業保留核對紀錄。</p>
- <Section title="期限依據">{!tasks.length?<p>尚無由 SOP 事件計算的有效期限。</p>:<div className="table-scroll"><table className="data-table"><thead><tr><th>工作</th><th>有效期限</th><th>依據</th></tr></thead><tbody>{tasks.map(t=><tr key={t.id} data-overdue={overdue(t)}><td>{t.title}<small>{t.node} · {who(c,t.owner_id)}</small></td><td>{t.due_date}{overdue(t)&&<Badge tone="critical">逾期</Badge>}</td><td>{kinds[events.find(e=>e.id===t.sop_due_provenance.event_id)?.event_type]||'業務事件'}<small>事件 v{t.sop_due_provenance.event_version} · {t.sop_due_provenance.anchor_date} 起 {t.sop_due_provenance.workday_offset} 工作日</small></td></tr>)}</tbody></table></div>}</Section>
+ <Section title="期限依據">{!tasks.length?<p>尚無由 SOP 事件計算的有效期限。</p>:<div className="table-scroll"><table className="data-table"><thead><tr><th>工作</th><th>有效期限</th><th>依據</th></tr></thead><tbody>{tasks.map(t=><tr key={t.id} data-overdue={overdue(t)}><td>{t.title}<small>{t.node} · {who(c,t.owner_id)}</small></td><td>{t.due_date}{overdue(t)&&<StatusBadge kind="attention" state="overdue">逾期</StatusBadge>}</td><td>{kinds[events.find(e=>e.id===t.sop_due_provenance.event_id)?.event_type]||'業務事件'}<small>事件 v{t.sop_due_provenance.event_version} · {t.sop_due_provenance.anchor_date} 起 {t.sop_due_provenance.workday_offset} 工作日</small></td></tr>)}</tbody></table></div>}</Section>
  {lead&&<Section><label>登錄方式<select value={selected} onChange={e=>setSelected(e.target.value)}><option value="">新增業務事件</option>{events.filter(e=>!e.superseded_by).map(e=><option key={e.id} value={e.id}>更正：{kinds[e.event_type]} · {e.scope_key} · v{e.version}</option>)}</select></label>
  <ActionForm key={`${p.id}:${selected}`} draftId={`sop-event:${p.id}:${selected||'new'}:v${prior?.version??0}`} title={prior?'更正事件並保留原版本':'登錄有佐證的業務事件'} busy={c.busy} onSubmit={d=>c.run('sop_event_record',{...d,replaces_id:prior?.id},{project_id:p.id})}>
  <Field title="事件" name="event_type"><select name="event_type" defaultValue={prior?.event_type}>{Object.entries(kinds).map(([key,title])=><option key={key} value={key}>{title}</option>)}</select></Field>

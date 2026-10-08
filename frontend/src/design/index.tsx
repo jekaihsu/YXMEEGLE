@@ -32,6 +32,16 @@ export function Badge({children,tone,icon}:{children:ReactNode;tone?:'positive'|
  return <span className="ds-badge" data-tone={tone}>{icon}{children}</span>;
 }
 
+export type StatusKind='business'|'workflow'|'verification'|'attention';
+/** The domain is explicit: source verification never implies workflow completion. */
+export function StatusBadge({kind,state,children}:{kind:StatusKind;state?:string;children:ReactNode}){
+ const positive=['completed','approved','executed','verified','已驗證'].includes(state||'');
+ const critical=['overdue','blocked','rejected','failed','conflict','outcome_unknown'].includes(state||'');
+ const warning=['intake','pending_verification','inconsistent','paused','rework','returned','soon','today','不一致','來源待確認','source_conflict'].includes(state||'');
+ const tone=positive?'positive':critical?'critical':warning?'warning':undefined;
+ return <span className="ds-badge ds-status-badge" data-kind={kind} data-tone={tone}>{children}</span>;
+}
+
 export function Button({variant='secondary',...props}:ButtonHTMLAttributes<HTMLButtonElement>&{variant?:'primary'|'secondary'|'plain'|'destructive'}){
  return <button type="button" {...props} className={`ds-button ${props.className||''}`} data-variant={variant}/>;
 }

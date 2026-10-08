@@ -1,4 +1,4 @@
-import {Badge as DsBadge,Skeleton} from './design';
+import {StatusBadge,Skeleton,type StatusKind} from './design';
 import {useEffect, useState, type MouseEvent, type ReactNode} from 'react';
 import {ChevronRight, Circle, CircleCheck, CircleDot, FolderOpen, Loader2, Pause, TriangleAlert, X} from 'lucide-react';
 import {useViewData} from './viewData';
@@ -35,8 +35,7 @@ export const isLead=(s:Session)=>['pm','manager'].includes(s.user?.role||'');
 export const isProjectLead=(s:Session,p:Project)=>s.user?.role==='manager'||[p.pm_id,p.supervisor_id].includes(s.user?.id||'');
 export const isTaskActor=(t:Task,_c:Ctx)=>t.can_execute===true;
 export const safeUrl=(value?:string)=>value&&/^https?:\/\//i.test(value)?value:undefined;
-const BADGE_TONE:Record<string,'positive'|'warning'|'critical'|'accent'>={completed:'positive',approved:'positive',executed:'positive',in_progress:'accent',active:'accent',ongoing:'accent',paused:'warning',rework:'warning',rejected:'critical'};
-export function Badge({status,label}:{status:string;label?:string}){return <DsBadge tone={BADGE_TONE[status]}>{label||STATUS[status]||status}</DsBadge>}
+export function Badge({status,label,kind}:{status:string;label?:string;kind?:StatusKind}){return <StatusBadge kind={kind||(status==='source_conflict'?'verification':'workflow')} state={status}>{label||STATUS[status]||status}</StatusBadge>}
 export function Empty({title='目前沒有資料',detail,icon=<FolderOpen/>}:{title?:string;detail?:string;icon?:ReactNode}){return <div className="empty"><span>{icon}</span><h3>{title}</h3>{detail&&<p>{detail}</p>}</div>}
 export function Modal({title,subtitle,children,onClose,wide=false}:{title:string;subtitle?:string;children:ReactNode;onClose:()=>void;wide?:boolean}){const dialogRef=useDialogFocus(onClose);return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><section ref={dialogRef} tabIndex={-1} className={`modal ${wide?'wide':''}`} role="dialog" aria-modal="true" aria-label={title}><header><div><h2>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div><button className="icon-button" onClick={onClose} aria-label="關閉"><X size={19}/></button></header>{children}</section></div>}
 export function Field({label,children,hint}:{label:string;children:ReactNode;hint?:string}){return <label className="form-field"><span>{label}</span>{children}{hint&&<small>{hint}</small>}</label>}
