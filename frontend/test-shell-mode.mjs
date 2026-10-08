@@ -27,7 +27,7 @@ let detailVersion;let detailProjectVersion;let expectedVersion;let fullAsOf=work
 const detail=async(url)=>{
  const id=decodeURIComponent(url.split('/').pop());await detailGate(id);const project=workspace.projects.find(p=>p.id===id);
  if(!project)return new Response(JSON.stringify({detail:'找不到這個案件'}),{status:404});
- return json({scope:'project',version:detailVersion??current.version,as_of:workspace.as_of,project:{...project,concurrency_version:detailProjectVersion??current.projects.find(p=>p.id===id)?.concurrency_version},settings:{},delegations:[],handover_requests:[],sop_requests:[],sop_templates:[],approved_leave_delegations:[],approvals:[],events:[],policy_summary:[],financial_requests:[],source_quotes:[],source_confirmations:[],contract_items:[],node_skip_requests:[]});
+ return json({scope:'project',version:detailVersion??current.version,as_of:workspace.as_of,project:{...project,concurrency_version:detailProjectVersion??current.projects.find(p=>p.id===id)?.concurrency_version},settings:{},delegations:[],handover_requests:[],sop_requests:[],sop_templates:[],approved_leave_delegations:[],approvals:[],events:[],policy_summary:[],financial_requests:[],source_quotes:[],source_confirmations:[],contract_items:id==='pB'?[{id:'shared-contract',project_id:'pB',name:'Shared contract item',task_refs:[{project_id:'pA',node_id:'nA',task_id:'tA'}]}]:[],node_skip_requests:[]});
 };
 const pct=p=>p.progress.total_nodes?p.progress.completed_nodes/p.progress.total_nodes:0;
 const overview=async(url)=>{
@@ -202,6 +202,7 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  await flush(()=>[...document.querySelectorAll('.project-tabs button')].find(b=>b.textContent==='流程與交付').click());
  assert.ok(document.querySelector('.stage-button'),'second shell case flow renders without scanning unhydrated cards');
  assert.ok(document.querySelector('.node-section'),'second case selected stage renders');
+ await goto('view=project&project=pB&tab=data&section=contracts');assert.ok(document.querySelector('.source-contract-index').textContent.includes('Shared contract item'));assert.ok(document.querySelector('.source-contract-index a[href*=pA]'),'a cross-case reference stays navigable while its shell card has no nodes');
  await goto('view=project&project=zz');assert.ok(document.querySelector('.workspace').textContent.includes('找不到這個案件'));
  let freeA;const heldA=new Promise(resolve=>{freeA=resolve});detailGate=async id=>{if(id==='pA')await heldA};
  await goto('view=project&project=pA');await goto('view=project&project=pB');await flush(async()=>{freeA();await heldA});
@@ -236,6 +237,7 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  let openFull;const heldFull=new Promise(resolve=>{openFull=resolve});fullGate=()=>heldFull;
  await goto('view=work');assert.equal(fullReads(),1);assert.ok(document.querySelector('.workspace [role="status"]').textContent.includes('正在讀取工作資料'),'loading state while the full read is pending');
  assert.ok(document.querySelector('[aria-label="主要導覽"]'),'the shell stays usable while a screen loads');
+ await goto('view=schedule');await goto('view=work');assert.equal(fullReads(),1,'an in-flight full read is shared across screen switches');
  await flush(async()=>{openFull();await heldFull});fullGate=async()=>{};
  assert.ok(document.querySelector('.workspace').textContent.includes('TASK_A'),'my work renders the loaded task');
  for(const view of ['approvals','schedule','routines','admin','work'])await goto('view='+view);
@@ -245,7 +247,7 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  fullAsOf='2026-10-09';current={...shell,as_of:fullAsOf};etag='W/"shell-next-day"';
  await flush(()=>window.shellContext.refresh());await goto('view=schedule');
  assert.equal(fullReads(),2,'same-version explicit refresh crosses the date boundary');
- assert.ok(document.querySelector('.schedule-meta').textContent.includes('2026/10'),'fresh schedule date is rendered');
+ assert.equal(document.querySelector('[aria-label="排程日期"]').value,'2026-10-09','fresh schedule uses the next day at the same workspace version');
  await goto('view=dashboard');user={...a,role:'pm'};await flush(()=>window.shellContext.refresh());await goto('view=work');
  assert.equal(fullReads(),3,'same-user authority change invalidates the full response');user=a;
  current={...shell,version:5};etag='W/"shell-A:5"';await flush(()=>window.shellContext.refresh());await goto('view=approvals');

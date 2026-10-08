@@ -65,7 +65,7 @@ export function TaskTable({rows,c,showProject=true,comfortable=false}:{rows:Task
 }
 export function TaskIcon({status}:{status:string}){return status==='completed'?<CircleCheck size={18} className="complete-icon"/>:status==='paused'?<Pause size={18} className="paused-icon"/>:status==='in_progress'?<CircleDot size={18} className="accent-text"/>:<Circle size={18} className="muted"/>}
 // Screens that still need tasks, schedules or approvals across cases read the full workspace, but only once the user opens them.
-// The result is shared per session epoch and shell version, so a mutation or a newer shell never reuses an older copy.
+// Share one read in the current session/reload generation, date and authority; release old decoded workspaces.
 export const fullReads=new Map<string,Promise<Workspace>>();
 export function readFullWorkspace(version:number,generation=0,asOf='',authority=''){
  const key=`${getSessionEpoch()}:${version}:${generation}:${asOf}:${authority}`;

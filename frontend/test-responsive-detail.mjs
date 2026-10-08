@@ -50,6 +50,9 @@ try{
   for(const selector of ['td.work-project','td.work-due'])for(const cell of await page.locator(selector).all())assert.ok(await cell.evaluate(e=>e.scrollWidth<=e.clientWidth+1),`${selector} fits without truncation at 1024px`);
   assert.match(await page.locator('td.work-due').first().innerText(),/2026\/10\/01/);
  };
+ await go('project&project=pB&tab=data&section=files');
+ await page.getByRole('combobox',{name:'所屬階段',exact:true}).selectOption('nB4');
+ await Promise.all([page.waitForResponse(r=>new URL(r.url()).pathname==='/api/workspace'),page.getByRole('button',{name:'重新整理資料',exact:true}).click()]);
  await go('projects');await page.locator('.projects-table').waitFor();
  const tableTop=await page.locator('.projects-table').evaluate(e=>e.getBoundingClientRect().top);
  await page.locator('.column-preferences summary').click();assert.ok(Math.abs(await page.locator('.projects-table').evaluate(e=>e.getBoundingClientRect().top)-tableTop)<1,'column choices overlay without shifting table');

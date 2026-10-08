@@ -30,7 +30,7 @@ export function MentionComposer({users,busy,onSubmit,storageKey}:{users:User[];b
   {selected.some(id=>!users.some(u=>u.id===id&&u.can_mention===true&&u.active!==false))&&<p role="alert" className="form-error">部分標註對象已停用或尚未核實 Lark 帳號；請移除後重新選擇，留言草稿仍保留。</p>}
   <div className="mention-actions"><Button variant="plain" disabled={busy} aria-expanded={open} aria-controls={pickerId} onClick={()=>{if(open)setOpen(false);else openPicker()}}>＠ 標註同事</Button><small>留言儲存後通知同事；測試區僅模擬，送達狀態另行顯示。</small><Button type="submit" variant="primary" disabled={busy||!body.trim()||selected.some(id=>!users.some(u=>u.id===id&&u.can_mention===true&&u.active!==false))}>{busy?'儲存中…':'送出'}</Button></div>
   {open&&<section id={pickerId} data-local-escape className="mention-picker glass--flat" aria-label="選擇標註同事" onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();setOpen(false);textarea.current?.focus()}}}>
-   <label>搜尋同事<input ref={search} value={query} onChange={e=>setQuery(e.target.value)} placeholder="姓名或部門" onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();if(candidates.length===1)select(candidates[0].id)}}}/></label>
+   <label>搜尋同事<input data-reload-safe ref={search} value={query} onChange={e=>setQuery(e.target.value)} placeholder="姓名或部門" onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();if(candidates.length===1)select(candidates[0].id)}}}/></label>
    <div className="mention-options">{candidates.map(person=><Row key={person.id} onClick={()=>select(person.id)} label={<strong>{personLabel(person,users)}</strong>} detail={person.department||'部門待核對'}/>)}{!candidates.length&&<p>沒有符合的在職同事；可到人員設定核對名冊同步狀態。</p>}</div>
    <Button variant="plain" onClick={()=>{setOpen(false);textarea.current?.focus()}}>取消選人</Button>
   </section>}
