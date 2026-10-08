@@ -18,9 +18,9 @@
 }
 
 /* Navigation tabs share one quiet segmented idiom and the control tokens. */
-.app-shell .workspace :is(.tabbar,.project-tabs,.ops-tabs,.segmented){display:flex;flex-wrap:wrap;align-items:center;gap:var(--control-gap);width:fit-content;max-width:100%;padding:var(--sp-1);margin-bottom:var(--sp-5);background:var(--surface-2);border:0;border-radius:var(--radius-m);box-shadow:none}
-.app-shell .workspace :is(.tabbar,.project-tabs,.ops-tabs,.segmented) button{flex:none;margin:0;padding:var(--tab-py) var(--tab-px);min-height:var(--control-h);border:0;border-radius:var(--radius-s);background:none;box-shadow:none;color:var(--label-2);font-size:var(--fs-subhead);font-weight:500;line-height:1.3}
-.app-shell .workspace :is(.tabbar,.project-tabs,.ops-tabs,.segmented) button.active{background:var(--surface);color:var(--label)}
+.app-shell .workspace :is(.tabbar.tabbar,.project-tabs.project-tabs,.ops-tabs.ops-tabs,.segmented.segmented){display:flex;flex-wrap:wrap;align-items:center;gap:var(--control-gap);width:fit-content;max-width:100%;padding:var(--sp-1);margin-bottom:var(--sp-5);background:var(--surface-2);border:0;border-radius:var(--radius-m);box-shadow:none}
+.app-shell .workspace :is(.tabbar.tabbar,.project-tabs.project-tabs,.ops-tabs.ops-tabs,.segmented.segmented) button{flex:none;margin:0;padding:var(--tab-py) var(--tab-px);min-height:var(--control-h);border:0;border-radius:var(--radius-s);background:none;box-shadow:none;color:var(--label-2);font-size:var(--fs-subhead);font-weight:500;line-height:1.3}
+.app-shell .workspace :is(.tabbar.tabbar,.project-tabs.project-tabs,.ops-tabs.ops-tabs,.segmented.segmented) button.active{background:var(--surface);color:var(--label)}
 .app-shell .workspace :is(.eyebrow,.ds-eyebrow){color:var(--label-2);font-size:var(--fs-caption);letter-spacing:0;text-transform:none;line-height:1.5;margin:0 0 var(--sp-2)}
 .app-shell .workspace :is(.page-heading,.ds-page-head) h1{font-size:var(--fs-large-title);font-weight:600;line-height:1.2;letter-spacing:-.02em}
 .app-shell .workspace .operations :is(th,td){padding:var(--sp-3) var(--sp-4)}
@@ -29,7 +29,7 @@
 .app-shell .project-detail :is(.case-data-navigation,.flow-operation-picker){justify-content:flex-start;text-align:left;padding-inline:0;margin-block:var(--sp-5)}
 .app-shell .project-detail :is(.case-data-navigation,.flow-operation-picker) label{margin:0;max-width:24rem;text-align:left}
 @media(max-width:760px){
- .app-shell .workspace :is(.tabbar,.project-tabs,.ops-tabs,.segmented){flex-wrap:nowrap;overflow-x:auto;width:100%;scrollbar-width:thin}
+ .app-shell .workspace :is(.tabbar.tabbar,.project-tabs.project-tabs,.ops-tabs.ops-tabs,.segmented.segmented){flex-wrap:nowrap;overflow-x:auto;width:100%;scrollbar-width:thin}
  .app-shell .workspace :is(.page-heading,.ds-page-head) h1{font-size:var(--fs-title1)}
 }
 
@@ -44,3 +44,10 @@
  .app-shell .node-actions{flex-wrap:wrap;justify-content:flex-start;min-width:0}
 }
 .app-shell .workspace :is(.tabbar,.project-tabs,.ops-tabs) button.active::after{content:none}
+
+/* Nested Page primitives inherit the workspace gutter without a second inset. */
+.app-shell .workspace .operations>.ds-page{max-width:none;margin:0;padding:0}
+.app-shell .project-detail :is(.case-data-navigation,.flow-operation-picker) label{align-items:flex-start;width:100%}
+.app-shell .project-detail :is(.case-data-navigation,.flow-operation-picker) select{width:100%}
+.app-shell .workspace .calendar-more{white-space:nowrap}
+@media(max-width:760px){.app-shell .workspace .operations .people-table :is(th,td){white-space:nowrap}}
