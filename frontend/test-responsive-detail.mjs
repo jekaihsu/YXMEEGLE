@@ -9,7 +9,7 @@ const bundle=await build({entryPoints:['src/main.tsx'],bundle:true,write:false,o
 const js=bundle.outputFiles.find(f=>f.path.endsWith('.js')).text,css=bundle.outputFiles.find(f=>f.path.endsWith('.css')).text;
 const server=createServer((req,res)=>{res.setHeader('Content-Type',req.url==='/app.js'?'text/javascript':req.url==='/app.css'?'text/css':'text/html');res.end(req.url==='/app.js'?js:req.url==='/app.css'?css:'<!doctype html><html lang="zh-TW"><title>Responsive regression</title><link rel="stylesheet" href="/app.css"><div id="root"></div><script src="/app.js"></script></html>')});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));let browser;
-const w=structuredClone(workspace);w.projects[1].code='C115236';
+const w=structuredClone(workspace);w.projects[1].code='C115236';w.projects[0].nodes[0].tasks[0].due_date='2026-10-01';
 w.projects[1].nodes=['sales','pm','confirmation','field','control','mapping','report','pricing','settlement'].map((key,i)=>({...structuredClone(w.projects[0].nodes[0]),id:'nB'+i,key,name:key,status:i<4?'completed':i===4?'in_progress':'pending',tasks:[{...structuredClone(w.projects[0].nodes[0].tasks[0]),id:'tB'+i,title:'Flow task '+i,owner_id:w.users[1].id,start_date:'2026-09-21',due_date:'2026-10-01',status:'pending',points:12}]}));
 const shell={...w,scope:'shell',projects:w.projects.map(({nodes,files,comments,daily_reports,...p})=>p),counts:{},attention:[],pending_approvals:[]};
 try{
@@ -28,6 +28,17 @@ try{
  await go('project&project=pB&tab=flow&node=nB4');assert.ok(await visible('.stage-button.selected'),'phone selected flow stage visible');
  assert.deepEqual(errors,[],'shell second-case routes have no runtime error');
  console.log('Responsive detail: phone late tabs, admin tabs and selected flow stage visible on entry/reload');
- // Additional layout assertions below are enabled as their focused fixes land.
+ await page.setViewportSize({width:1024,height:1000});
+ const checkColumns=async()=>{
+  assert.ok(await page.locator('.comfortable-tasks .work-project').count()>0);
+  for(const selector of ['td.work-project','td.work-due'])for(const cell of await page.locator(selector).all())assert.ok(await cell.evaluate(e=>e.scrollWidth<=e.clientWidth+1),`${selector} fits without truncation at 1024px`);
+  assert.match(await page.locator('td.work-due').first().innerText(),/2026\/10\/01/);
+ };
+ await go('work&tab=all');await page.locator('.comfortable-tasks').waitFor();await checkColumns();
+ await go('schedule');await page.locator('.calendar-grid').waitFor();
+ assert.ok(await page.locator('.calendar-grid').evaluate(e=>e.scrollWidth<=e.parentElement.clientWidth+1),'all seven days fit at 1024px');
+ await page.getByRole('button',{name:'查看當日工作',exact:true}).first().click();await checkColumns();
+ console.log('Responsive detail: 1024px all-task/day codes and dates fit; all seven weekdays visible');
+
  await page.close();
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve))}

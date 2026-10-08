@@ -137,3 +137,28 @@
 .workspace :is(.project-tabs,.ops-tabs){scroll-padding-inline:var(--sp-4)}
 .workspace :is(.project-tabs,.ops-tabs) [aria-current=page]{background:var(--surface);color:var(--label);box-shadow:var(--shadow-sm)}
 .workspace .workflow-scroll{scroll-padding-inline:var(--sp-4)}
+
+/* Reserve the identity and deadline columns; task titles use the remaining width. */
+@media(min-width:761px){
+ .workspace .comfortable-tasks th:first-child{width:auto}
+ .workspace .comfortable-tasks th.work-project{width:10rem}
+ .workspace .comfortable-tasks th.work-owner{width:6rem}
+ .workspace .comfortable-tasks th.work-status{width:7rem}
+ .workspace .comfortable-tasks th.work-due{width:8rem}
+ .workspace .comfortable-tasks th.work-points{width:7rem}
+ .workspace .comfortable-tasks :is(.work-project,.work-due){overflow:visible;text-overflow:clip}
+}
+@media(min-width:761px) and (max-width:1100px){.workspace .comfortable-tasks .work-points{display:none}}
+@media(min-width:1024px){
+ .workspace .calendar-grid{grid-template-columns:repeat(7,minmax(0,1fr));min-width:0}
+ .workspace .calendar-tasks{padding:var(--sp-2)}
+}
+.workspace .calendar-tasks p>span{display:block;white-space:nowrap}
+@media(min-width:761px) and (max-width:1100px){
+ .workspace .comfortable-tasks td.work-project{white-space:normal}
+ .workspace .comfortable-tasks .work-project .mono{display:block;white-space:nowrap}
+}
+@media(min-width:1024px) and (max-width:1200px){
+ .workspace .calendar-day>header{flex-wrap:wrap;padding-inline:var(--sp-2)}
+ .workspace .calendar-day>header small{flex-basis:100%;min-height:1em}
+}
