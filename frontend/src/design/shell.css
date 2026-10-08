@@ -50,3 +50,13 @@ body{background-color:var(--bg);background-image:var(--bg-tint);background-attac
 .app-shell .topbar.glass--bar{border-bottom:.5px solid var(--separator)}
 .app-shell .sidebar.glass--bar{border-right:.5px solid var(--separator)}
 .app-shell .sidebar-projects,.app-shell .user-button{border-top:.5px solid var(--separator)}
+/* Mobile top bar stays on one line: freshness text shrinks and truncates instead of wrapping under the title. */
+@media(max-width:760px){
+ .app-shell .topbar.glass--bar{flex-wrap:nowrap;gap:var(--sp-2)}
+ .app-shell .topbar .breadcrumbs{flex:0 1 auto;min-width:0;white-space:nowrap}.app-shell .topbar .breadcrumbs strong{overflow:hidden;text-overflow:ellipsis}
+ .app-shell .topbar-right{flex:1 1 0;min-width:0;justify-content:flex-end;flex-wrap:nowrap;gap:var(--sp-2)}
+ .app-shell .topbar .data-freshness{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-caption)}
+ .app-shell .topbar .data-freshness *{white-space:nowrap}
+ .app-shell .demo-tag{flex:none;white-space:nowrap}
+}
+@media(max-width:760px){.app-shell .topbar .data-freshness{order:-1}}
