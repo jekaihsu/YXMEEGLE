@@ -50,3 +50,6 @@
 .portfolio-page .project-source-status,.portfolio-page .admission-cell{overflow-wrap:normal}
 .portfolio-page .tabbar button span{background:none;border-radius:0;padding:0}
 .portfolio-page .table-toolbar{margin-block:var(--sp-3)}
+.portfolio-page .admission-cell strong{font-weight:500}
+.portfolio-page .admission-cell.not-admitted strong{color:var(--label-2)}
+.portfolio-page .projects-table{min-width:60rem}
