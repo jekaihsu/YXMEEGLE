@@ -63,3 +63,5 @@ body{background-color:var(--bg);background-image:var(--bg-tint);background-attac
 @media(max-width:760px){.app-shell .main-shell{margin-left:0}.app-shell .workspace{padding:24px 20px 96px}.app-shell .topbar{padding-inline:16px}.mobile-tabs svg{display:none}.mobile-tabs button{min-height:54px}}
 
 .app-shell .recent-project small{white-space:normal;overflow:visible;text-overflow:clip}
+.mobile-tabs button{padding-inline:0}
+.mobile-tabs button span{white-space:nowrap}

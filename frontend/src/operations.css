@@ -5,7 +5,7 @@
 .operations .ops-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--sp-5);margin-bottom:var(--sp-6)}
 .operations .ops-heading h2{margin:0;color:var(--label);font-size:var(--fs-title1)}
 .operations .ops-notice{padding:var(--sp-3) var(--sp-4);color:var(--label-2)}
-.operations .ops-tabs{display:flex;flex-wrap:wrap;gap:var(--sp-2);background:none;border:0}
+.operations .ops-tabs{display:flex;flex-wrap:wrap;background:none;border:0}
 .operations .ops-tabs button.active{background:none;color:var(--accent);border-radius:0;box-shadow:none}
 .operations .ds-row{background:var(--surface)}
 .operations .ops-form{padding:var(--sp-4);animation:none}
@@ -31,7 +31,7 @@
 .ops-modal .ds-sheet>header h2{margin:0}
 .ops-modal .ops-form>summary{display:none}
 .ops-modal .ops-fields{grid-template-columns:1fr}
-@media(max-width:760px){.operations .ops-heading{flex-direction:column;gap:var(--sp-2)}.operations .ops-fields{grid-template-columns:1fr}.operations .data-table{display:block;overflow:auto}.operations .ops-tabs{border-radius:var(--radius-m)}.operations .ops-tabs button{flex-basis:40%}.operations:is(input,select,textarea){font-size:var(--fs-callout)}}
+@media(max-width:760px){.operations .ops-heading{flex-direction:column;gap:var(--sp-2)}.operations .ops-fields{grid-template-columns:1fr}.operations .data-table{overflow:auto}.operations .ops-tabs{border-radius:var(--radius-m)}.operations .ops-tabs button{flex-basis:40%}.operations:is(input,select,textarea){font-size:var(--fs-callout)}}
 @media(prefers-reduced-motion:reduce){.operations .ds-backdrop,.operations .ds-sheet{animation:none}.operations .button,.operations .ds-button{transition:none}}
 
 .operations h1{font-size:var(--fs-large-title)}
@@ -47,3 +47,4 @@
 .operations>h1{font-weight:500;margin-bottom:var(--sp-2)}
 .operations>p{font-size:var(--fs-subhead);margin-bottom:var(--sp-6)}
 .operations>h1+.data-table,.operations>p+.data-table{margin-top:var(--sp-6)}
+@media(max-width:760px){.operations .data-table{display:table;width:100%}.operations .data-table:has(th:nth-child(n+5)){display:block;overflow:auto}}
