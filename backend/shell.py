@@ -48,17 +48,18 @@ def open_late(ti,today):
 
 
 def project_counts(db,ti,wid,today,ids=None):
-    """{project_id: (open tasks, overdue tasks)}; ids limits the scan to one page of projects."""
+    """{project_id: (open, overdue, blocked tasks)}; ids limits the scan to one page of projects."""
     openq,late=open_late(ti,today); where=[ti.c.workspace_id==wid]
     if ids is not None: where.append(ti.c.project_id.in_(ids))
-    return {r.project_id:(r.active,r.late) for r in db.execute(select(ti.c.project_id,func.sum(case((openq,1),else_=0)).label('active'),
-        func.sum(case((late,1),else_=0)).label('late')).where(*where).group_by(ti.c.project_id))}
+    return {r.project_id:(r.active,r.late,r.blocked) for r in db.execute(select(ti.c.project_id,func.sum(case((openq,1),else_=0)).label('active'),
+        func.sum(case((late,1),else_=0)).label('late'),
+        func.sum(case((and_(openq,ti.c.status.in_(('paused','blocked'))),1),else_=0)).label('blocked')).where(*where).group_by(ti.c.project_id))}
 
 
-def card(r,state,per_project):
+def card(r,state,per_project,detail=False):
     """List-row view of one project_index row, shared by the shell and the paged overview."""
     summary=r['summary'] or {}; derived=summary.get('execution_status') or r['execution_status']  # full workspace shows the refreshed value (status mirrors it)
-    active,overdue=per_project.get(r['project_id'],(0,0))
+    active,overdue,blocked=per_project.get(r['project_id'],(0,0,0))
     card=dict(id=r['project_id'],code=r['code'],name=r['name'],client=r['client'],pm_id=r['pm_id'],status=derived,execution_status=derived,
               due_date=r['due_date'],case_type=r['case_type'],source_kind=r['source_kind'],
               source_status=r['source_status'],concurrency_version=r['concurrency_version'],
@@ -67,6 +68,10 @@ def card(r,state,per_project):
     view=project_execution_view(state,dict(case_visibility=r['case_visibility'],execution_system=r['execution_system']))
     view.pop('execution_system_label')  # the client derives it from execution_system
     card.update({k:v for k,v in view.items() if v is not None})
+    if detail:
+        facts=r['shell_facts']
+        card.update(contract_amount=facts['contract_amount'],current_nodes=facts['current_nodes'],blocked_tasks=blocked or 0)
+        if facts['source_lifecycle'] is not None: card['source_lifecycle']=facts['source_lifecycle']
     return card
 
 
@@ -136,4 +141,4 @@ def overview_page(db,model,row,state,today,*,q='',status='',owner='',tab='formal
     order=[(o.desc() if desc else o.asc()) for o in (key,_binary(pi.c.project_id,db))]
     rows=db.execute(select(pi).where(*where).order_by(*order).limit(limit).offset(offset)).mappings().all()
     counts=project_counts(db,ti,wid,today,[r['project_id'] for r in rows])
-    return dict(total=total,offset=offset,limit=limit,facets=facets,items=[card(r,state,counts) for r in rows])
+    return dict(total=total,offset=offset,limit=limit,facets=facets,items=[card(r,state,counts,detail=True) for r in rows])
