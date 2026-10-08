@@ -177,3 +177,7 @@
 .workspace .portfolio-stage{white-space:nowrap}
 
 .workspace :is(.table-toolbar,.schedule-toolbar) :is(input,select){font-size:var(--fs-subhead)}
+
+.workspace :is(.calendar-grid,.source-connection){border:1px solid var(--separator)}
+.workspace .operations .ds-section>h2{padding-inline:0}
+.workspace .project-topline>.ds-button{margin-inline-start:calc(-1 * var(--control-px))}

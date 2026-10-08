@@ -29,8 +29,10 @@ try{
  await go('dashboard');
  for(const status of await page.locator('.portfolio-stage').all())assert.equal(await status.evaluate(e=>e.getClientRects().length),1,'dashboard stage does not split mid-word');
  await go('admin&tab=settings');
+ assert.ok(await page.locator('.operations .ds-section>h2').first().evaluate(e=>Math.abs(e.getBoundingClientRect().left-document.querySelector('h1').getBoundingClientRect().left)<1),'admin section headings align with the page title');
  assert.ok(await page.locator('.appearance-control').evaluate(e=>['paddingTop','paddingRight','paddingBottom','paddingLeft'].every(k=>parseFloat(getComputedStyle(e)[k])>=16)),'appearance controls have inner padding');
- await go('project&project=pB&tab=flow&node=nB4');assert.ok(await visible('.stage-button.selected'),'phone selected flow stage visible');
+ await go('project&project=pB&tab=flow&node=nB4');
+ assert.ok(await page.locator('.project-topline>.ds-button svg').first().evaluate(e=>Math.abs(e.getBoundingClientRect().left-document.querySelector('h1').getBoundingClientRect().left)<2),'case back link content aligns with title');assert.ok(await visible('.stage-button.selected'),'phone selected flow stage visible');
  assert.equal(await page.locator('.node-section .task-table .avatar').count(),0,'full owner names have no repeated monogram');
  assert.ok(!(await page.locator('.node-section .task-table').innerText()).includes('必做 SOP'),'default SOP labels omitted');
  const deadline=page.locator('.node-section .task-table td:nth-child(4)').first();
@@ -54,7 +56,11 @@ try{
  await page.locator('.column-preferences summary').click();
  await go('work&tab=all');await page.locator('.comfortable-tasks').waitFor();await checkColumns();
  for(const control of await page.locator('.table-toolbar input,.table-toolbar select').all())assert.ok(await control.evaluate(e=>parseFloat(getComputedStyle(e).fontSize)>=15),'work filters use shared readable type');
+ await page.getByRole('textbox',{name:'搜尋任務'}).focus();
+ assert.equal(await page.locator('.search-field').evaluate(e=>getComputedStyle(e).outlineWidth),'3px','search retains one visible focus ring');
+ assert.equal(await page.getByRole('textbox',{name:'搜尋任務'}).evaluate(e=>getComputedStyle(e).boxShadow),'none','search has no doubled inner focus box');
  await go('schedule');await page.locator('.calendar-grid').waitFor();
+ assert.equal(await page.locator('.calendar-grid').evaluate(e=>getComputedStyle(e).borderTopWidth),'1px','calendar uses a quiet hairline');
  assert.ok(await page.locator('.calendar-grid').evaluate(e=>e.scrollWidth<=e.parentElement.clientWidth+1),'all seven days fit at 1024px');
  await page.getByRole('button',{name:'查看當日工作',exact:true}).first().click();await checkColumns();
  console.log('Responsive detail: 1024px all-task/day codes and dates fit; all seven weekdays visible');
