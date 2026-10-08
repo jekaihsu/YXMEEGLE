@@ -28,7 +28,11 @@
     "test:contrast": "node test-contrast.mjs",
     "test:shell-mode": "node test-shell-mode.mjs",
     "test:dev-tooling": "node --test --test-timeout=30000 test-dev-tooling.mjs",
-    "test:live-read-regressions": "node test-live-read-regressions.mjs"
+    "test:live-read-regressions": "node test-live-read-regressions.mjs",
+    "test:overview-design": "node test-overview-design.mjs",
+    "test:company-route": "node test-company-route.mjs",
+    "test:project-preferences": "node test-project-preferences.mjs",
+    "test:search-input": "node test-search-input.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",

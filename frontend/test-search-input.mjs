@@ -1,6 +1,8 @@
 // Real browser events are required: jsdom dispatchEvent misses the microtask
 // checkpoint between document capture and React's listener.
-// PLAYWRIGHT_MODULE and CHROME_EXECUTABLE may select existing installations.
+// CI: set PLAYWRIGHT_MODULE to an existing playwright-core module directory when it
+// is not on the local module path (for example /tmp/shots/node_modules/playwright-core).
+// CHROME_EXECUTABLE selects an existing browser; this test installs nothing.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {createServer} from 'node:http';
