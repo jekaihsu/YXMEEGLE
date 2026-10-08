@@ -28,10 +28,17 @@ try{
  await go('admin&tab=settings');
  assert.ok(await page.locator('.appearance-control').evaluate(e=>['paddingTop','paddingRight','paddingBottom','paddingLeft'].every(k=>parseFloat(getComputedStyle(e)[k])>=16)),'appearance controls have inner padding');
  await go('project&project=pB&tab=flow&node=nB4');assert.ok(await visible('.stage-button.selected'),'phone selected flow stage visible');
+ assert.equal(await page.locator('.node-section .task-table .avatar').count(),0,'full owner names have no repeated monogram');
+ assert.ok(!(await page.locator('.node-section .task-table').innerText()).includes('必做 SOP'),'default SOP labels omitted');
  const deadline=page.locator('.node-section .task-table td:nth-child(4)').first();
  assert.ok(await deadline.isVisible(),'phone flow deadline visible');assert.match(await deadline.innerText(),/10\/01/);assert.match(await deadline.innerText(),/逾期 1 天/);
  assert.deepEqual(errors,[],'shell second-case routes have no runtime error');
  console.log('Responsive detail: phone late tabs, admin tabs and selected flow stage visible on entry/reload');
+ await go('project&project=pB&tab=data&section=participants');
+ assert.equal(await page.locator('.person-cell .avatar').count(),0,'participant full names have no repeated monogram');
+ await go('project&project=pB&tab=flow&node=nB4&task=tB4');
+ assert.ok(await page.locator('.inspector-fields>div').first().evaluate(e=>parseFloat(getComputedStyle(e).paddingTop)>=12),'inspector facts have separate spacing');
+ assert.equal(await page.locator('.inspector-fields .avatar').count(),0,'inspector owner name is not repeated');
  await page.setViewportSize({width:1024,height:1000});
  const checkColumns=async()=>{
   assert.ok(await page.locator('.comfortable-tasks .work-project').count()>0);
