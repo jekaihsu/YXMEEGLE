@@ -16,7 +16,7 @@
 .operations textarea{min-height:calc(var(--sp-8)*3);resize:vertical}
 .operations input[type=checkbox]{width:var(--sp-5);height:var(--sp-5);min-height:0;flex-shrink:0;accent-color:var(--accent)}
 .operations label:has(input[type=checkbox]){flex-direction:row;align-items:center;min-height:var(--sp-8);gap:var(--sp-3)}
-.operations .data-table{font-size:var(--fs-subhead);width:100%;background:var(--surface);color:var(--label)}
+.operations .data-table{font-size:var(--fs-subhead);width:100%;background:transparent;color:var(--label)}
 .operations .data-table:is(th,td){background:var(--surface);border-color:var(--separator);color:var(--label);white-space:normal}
 .operations.operations .ops-review{padding:0;}
 .operations:is(.ops-review,.finance-readonly)>.ds-section>.ds-group{padding:var(--sp-4)}
