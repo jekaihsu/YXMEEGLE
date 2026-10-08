@@ -17,89 +17,67 @@
 .portfolio-page .toolbar-filters{display:flex;gap:var(--sp-2);align-items:center;flex-wrap:wrap}
 .portfolio-page .toolbar-filters select,.portfolio-page .pager select{min-height:44px;padding:0 var(--sp-3);border:.5px solid var(--glass-border);border-radius:var(--radius-m);background:var(--surface);color:var(--label);font-size:var(--fs-subhead)}
 .portfolio-page .icon-button.bordered{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;border:.5px solid var(--glass-border);border-radius:var(--radius-pill);background:var(--surface);color:var(--label)}
-.portfolio-page .table-scroll{overflow-x:auto;border:.5px solid var(--glass-border);border-radius:var(--radius-card);background:var(--glass-fill);box-shadow:var(--glass-highlight),var(--glass-shadow)}
-.portfolio-page .projects-table{width:100%;border-collapse:collapse;font-size:var(--fs-subhead);color:var(--label);background:none}
-.portfolio-page .projects-table th{padding:var(--sp-3) var(--sp-4);text-align:left;font-size:var(--fs-caption);font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--label-2);background:none;border:0;white-space:nowrap}
-.portfolio-page .projects-table td{padding:var(--sp-1) var(--sp-2);vertical-align:middle;border:0;border-top:1px solid var(--sep);background:none;color:var(--label)}
-.portfolio-page .projects-table tbody tr{transition:background var(--dur-fast) var(--ease)}.portfolio-page .projects-table tbody tr:hover{background:var(--surface-2)}
-.portfolio-page .projects-table small,.portfolio-page .case-code{display:block;font-size:var(--fs-footnote);color:var(--label-2)}
-.portfolio-page .case-link{display:block;font-size:var(--fs-body);font-weight:600;color:var(--label);overflow-wrap:anywhere}.portfolio-page .case-link:hover{color:var(--accent)}
-.portfolio-page .demo-inline{margin-left:var(--sp-2);color:var(--label-2)}
-.portfolio-page .person-cell{display:flex;align-items:center;gap:var(--sp-2);white-space:nowrap}
-.portfolio-page .stage-chips{display:flex;flex-wrap:wrap;gap:var(--sp-1)}
-.portfolio-page .progress-cell{display:flex;align-items:center;gap:var(--sp-3);min-width:7rem;font-variant-numeric:tabular-nums}.portfolio-page .progress-cell small{display:inline}
-.portfolio-page .progress-track{flex:1;height:6px;border-radius:var(--radius-pill);background:var(--surface-2);overflow:hidden}.portfolio-page .progress-track i{display:block;height:100%;background:var(--label-2);border-radius:inherit;transition:width var(--dur-slow) var(--ease)}
-.portfolio-page .mono{font-variant-numeric:tabular-nums;white-space:nowrap}
-.portfolio-page .table-footer{display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5);align-items:center;justify-content:space-between;padding:0 var(--sp-2);border:0;background:none;font-size:var(--fs-footnote);color:var(--label-2)}.portfolio-page .pager{display:flex;gap:var(--sp-2);align-items:center}
-.portfolio-page .form-error{padding:var(--sp-3) var(--sp-4);color:var(--critical)}
-@media(max-width:760px){.portfolio-page .portfolio-index button{padding:var(--sp-4)}.portfolio-page .portfolio-index strong{font-size:var(--fs-title1)}.portfolio-page .tabbar{border-radius:var(--radius-m)}}
-
-/* Compact operational columns fit desktop; optional columns and phones can scroll. */
-.portfolio-page .portfolio-index{margin-bottom:0;box-shadow:var(--glass-highlight),var(--glass-shadow)}
-.portfolio-page .table-scroll .projects-table{min-width:80rem;background:var(--surface);table-layout:fixed;line-height:1.2}
-.portfolio-page .projects-table th{padding:var(--sp-2);letter-spacing:0}
-.portfolio-page .projects-table tbody tr{height:40px}
-.portfolio-page .projects-table .case-link{font-size:var(--fs-subhead);line-height:1.2;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:none}
-.portfolio-page .projects-table td:first-child>small{display:inline;margin:0;font-size:var(--fs-caption)}
-.portfolio-page .projects-table .case-code{display:inline;font-size:var(--fs-caption);margin-right:var(--sp-2)}
-.portfolio-page .projects-table .demo-inline{font-size:var(--fs-caption)}
-.portfolio-page .projects-table .person-cell .avatar{width:24px;height:24px;font-size:var(--fs-caption)}
-.portfolio-page .stage-chips{font-size:var(--fs-caption)}
-.portfolio-page .stage-chips>span{padding:2px var(--sp-1);border:0;color:var(--label-2);background:var(--surface-2)}
-.portfolio-page .progress-cell{min-width:0;gap:var(--sp-2);justify-content:flex-end}
-.portfolio-page .progress-cell>span{min-width:2.5rem;text-align:right}
-.portfolio-page .numeric{text-align:right!important}
-.portfolio-page .deadline.is-overdue{color:var(--critical);font-weight:600}
-.portfolio-page .deadline.is-upcoming{color:var(--warning);font-weight:600}
-.portfolio-page .attention-badges{display:flex;flex-wrap:wrap;gap:2px}
-.portfolio-page .projects-table .ds-badge{white-space:nowrap;line-height:1.2;padding:2px var(--sp-1)}
-.portfolio-page .verification-legend{font-size:var(--fs-caption);color:var(--label-2)}
-.portfolio-page .verification-cell{display:inline-flex}
+/* Solid table rows use hairlines and a single line of content at either density. */
+.portfolio-page .table-scroll{overflow-x:auto;border:0;border-radius:var(--radius-m);background:var(--surface);box-shadow:none}
 .portfolio-page .table-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-
-.portfolio-page .projects-table th:first-child{width:10rem}
-.portfolio-page .projects-table th:nth-child(2){width:4.5rem}
-.portfolio-page .projects-table th:nth-child(3){width:4.5rem}
-.portfolio-page .projects-table th:nth-child(4){width:5rem}
-.portfolio-page .projects-table th:nth-child(5){width:10rem}
-.portfolio-page .projects-table th:nth-child(6){width:5.5rem}
-.portfolio-page .projects-table th:nth-child(7){width:5rem}
-.portfolio-page .projects-table th:nth-child(8){width:4.5rem}
-.portfolio-page .projects-table th:nth-child(9){width:6rem}
-.portfolio-page .projects-table th:nth-child(10){width:7.5rem}
-.portfolio-page .projects-table th:last-child{width:2rem}
-.portfolio-page .projects-table .case-code{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:14px}
-.portfolio-page .projects-table .case-code small{display:inline;margin:0;font-size:var(--fs-caption)}
-.portfolio-page .projects-table .cell-title{line-height:18px}
-.portfolio-page .projects-table td small{margin-top:0}
-
+.portfolio-page .table-scroll .projects-table{width:100%;table-layout:fixed;border-collapse:collapse;background:var(--surface);font-size:var(--fs-subhead);line-height:1.3;color:var(--label)}
+.portfolio-page .projects-table th{padding:var(--sp-3) var(--sp-4);text-align:left;font-size:var(--fs-caption);font-weight:400;text-transform:none;letter-spacing:0;color:var(--label-2);background:none;border:0;white-space:nowrap}
+.portfolio-page .projects-table td{height:44px;box-sizing:border-box;padding:var(--sp-2) var(--sp-4);vertical-align:middle;border:0;border-top:.5px solid var(--separator);background:none;color:var(--label);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.portfolio-page[data-density=compact] .projects-table td{height:36px;padding:var(--sp-1) var(--sp-3)}
+.portfolio-page .projects-table tbody tr{transition:background var(--dur-fast) var(--ease)}
+.portfolio-page .projects-table tbody tr:hover{background:var(--surface-2)}
+.portfolio-page .projects-table .case-link{display:flex;align-items:center;gap:var(--sp-3);min-width:0;max-width:none;margin:0;font-size:var(--fs-subhead);font-weight:500;line-height:1.3;color:var(--label);white-space:nowrap;overflow:hidden}
+.portfolio-page .case-link:hover{color:var(--accent)}
+.portfolio-page .projects-table .case-code{display:inline;flex:none;font-size:var(--fs-caption);font-weight:400;color:var(--label-2);line-height:inherit}
+.portfolio-page .case-name{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.portfolio-page .person-cell{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.portfolio-page .stage-chips{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--label-2);font-size:var(--fs-footnote)}
+.portfolio-page .stage-chips>span{padding:0;border:0;border-radius:0;background:none;color:inherit}
+.portfolio-page .shell-workflow-hint{margin-left:var(--sp-2)}
+.portfolio-page .case-status{display:flex;align-items:center;gap:var(--sp-2);white-space:nowrap}
+.portfolio-page .attention-badges,.portfolio-page .verification-cell{display:inline-flex}
+.portfolio-page .projects-table .ds-badge{font-size:var(--fs-caption);font-weight:400;white-space:nowrap;line-height:1.3;padding:2px var(--sp-2)}
+.portfolio-page .projects-table .ds-status-badge[data-kind=workflow]{padding-inline:0}
+.portfolio-page .progress-cell{display:flex;align-items:center;justify-content:flex-end;gap:var(--sp-2);min-width:0;font-size:var(--fs-footnote);font-variant-numeric:tabular-nums}
+.portfolio-page .progress-cell>span{min-width:2.5rem;text-align:right}
+.portfolio-page .progress-cell small{display:inline;margin:0;font-size:inherit;color:var(--label-2)}
+.portfolio-page .progress-track{flex:1;height:3px;min-width:1rem;border:0;border-radius:var(--radius-pill);background:var(--surface-2);overflow:hidden}
+.portfolio-page .progress-track i{display:block;height:100%;background:var(--label-2);border-radius:inherit}
+.portfolio-page .progress-empty{color:var(--label-2)}
+.portfolio-page .mono{font-variant-numeric:tabular-nums;white-space:nowrap}
+.portfolio-page .numeric{text-align:right!important}
+.portfolio-page .deadline.is-overdue{color:var(--critical)}
+.portfolio-page .deadline.is-upcoming{color:var(--warning)}
+.portfolio-page .verification-legend{font-size:var(--fs-caption);color:var(--label-2)}
+.portfolio-page .table-footer{display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5);align-items:center;justify-content:space-between;padding:0 var(--sp-2);border:0;background:none;font-size:var(--fs-footnote);color:var(--label-2)}
+.portfolio-page .pager{display:flex;gap:var(--sp-2);align-items:center;flex-wrap:wrap}
+.portfolio-page .form-error{padding:var(--sp-3) var(--sp-4);color:var(--critical)}
 .portfolio-page .table-preferences{display:flex;flex-wrap:wrap;align-items:flex-start;gap:var(--sp-3)}
-.portfolio-page .column-preferences{border:1px solid var(--sep);border-radius:var(--radius-m);background:var(--surface);font-size:var(--fs-subhead)}
+.portfolio-page .column-preferences{border:0;border-radius:var(--radius-m);background:var(--surface);font-size:var(--fs-subhead)}
 .portfolio-page .column-preferences summary{padding:var(--sp-3);cursor:pointer;min-height:44px}
-.portfolio-page .column-preferences>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-2);padding:var(--sp-3);border-top:1px solid var(--sep)}
+.portfolio-page .column-preferences>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-2);padding:var(--sp-3);border-top:.5px solid var(--separator)}
 .portfolio-page .column-preferences label{display:flex;align-items:center;gap:var(--sp-2);min-height:44px}
 .portfolio-page .column-preferences input{accent-color:var(--accent);width:1rem;height:1rem}
-.portfolio-page[data-density=comfortable] .projects-table td{padding:var(--sp-3) var(--sp-2)}
-.portfolio-page .projects-table [hidden]{display:none}
-
-/* Larger text keeps metadata and badges on their own readable lines. */
-.portfolio-page .projects-table .case-code{line-height:1.4}
-.portfolio-page .projects-table .cell-title{line-height:1.3}
-.portfolio-page .projects-table .case-code .ds-status-badge{padding-block:0}
+.portfolio-page .projects-table [hidden],.portfolio-page .verification-legend[hidden]{display:none}
 @media(max-width:760px){
  .workspace .portfolio-page .tabbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-1);overflow:visible;border-radius:var(--radius-m)}
  .workspace .portfolio-page .tabbar button{min-width:0;padding-inline:var(--sp-2);white-space:normal}
- .portfolio-page .portfolio-index button{flex-wrap:wrap;gap:var(--sp-2);align-content:center}
+ .portfolio-page .portfolio-index button{padding:var(--sp-4);flex-wrap:wrap;gap:var(--sp-2);align-content:center}
  .portfolio-page .portfolio-index button>span{flex-basis:100%}
- .portfolio-page .portfolio-index strong{margin:0}
- .portfolio-page .pager{flex-wrap:wrap}
+ .portfolio-page .portfolio-index strong{margin:0;font-size:var(--fs-title1)}
  .portfolio-page .column-preferences{max-width:100%}
+ .portfolio-page .table-scroll{overflow:visible;background:none}
+ .portfolio-page .table-scroll .projects-table{display:block;min-width:0!important;background:none}
+ .portfolio-page .projects-table colgroup{display:none}
+ .portfolio-page .projects-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .portfolio-page .projects-table tbody{display:flex;flex-direction:column;gap:var(--sp-2)}
+ .portfolio-page .projects-table tbody tr{display:flex;flex-wrap:wrap;gap:var(--sp-2) var(--sp-3);padding:var(--sp-4);background:var(--surface);border-radius:var(--radius-m)}
+ .portfolio-page .projects-table td,.portfolio-page[data-density=compact] .projects-table td{display:block;height:auto;max-width:100%;padding:0;border:0;font-size:var(--fs-footnote)}
+ .portfolio-page[data-density=compact] .projects-table tbody tr{padding:var(--sp-3)}
+ .portfolio-page .projects-table td[data-column=name]{width:100%}
+ .portfolio-page .projects-table td[data-column=workflow]{width:100%}
+ .portfolio-page .projects-table td[data-label]::before{content:attr(data-label) ' ';font-size:var(--fs-caption);color:var(--label-2)}
+ .portfolio-page .projects-table td[data-column=workflow]::before{content:none}
+ .portfolio-page .person-cell,.portfolio-page .stage-chips,.portfolio-page .progress-cell{display:inline-flex}
+ .portfolio-page .projects-table td[hidden]{display:none}
 }
-
-.portfolio-page .projects-table .person-cell{flex-wrap:wrap;white-space:normal;overflow-wrap:anywhere;gap:var(--sp-1)}
-.portfolio-page .projects-table .case-link{white-space:normal}
-@media(min-width:761px) and (max-width:1100px){.portfolio-page .person-cell .avatar{display:none}}
-
-/* The empty track remains visible at zero, with room beneath the numeric value. */
-.portfolio-page .progress-cell{flex-direction:column;align-items:stretch;gap:var(--sp-1)}
-.portfolio-page .progress-track{flex:none;width:100%;box-sizing:border-box;border:1px solid var(--label-2)}

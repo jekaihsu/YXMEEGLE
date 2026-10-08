@@ -66,7 +66,7 @@ try{
  assert.equal(window.shellContext.w.scope,'shell');assert.equal(rows().length,2);
  assert.ok(document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期 4'));
  assert.ok(document.querySelector('.notification-button i'));assert.equal(window.shellContext.unmatchedDaily(window.shellContext.w),535);
- assert.equal(rows()[0].querySelector('.stage-chips').textContent,'外業PAUSED_STAGE');
+ assert.equal(rows()[0].querySelector('.stage-chips').textContent,'外業、PAUSED_STAGE');
  assert.equal(rows()[1].querySelector('.stage-chips').textContent,'');
  assert.ok(rows()[0].textContent.includes('123,456'));assert.equal(rows()[1].querySelector('td.mono.numeric').textContent,'待帶入');
  assert.equal(rows()[0].querySelector('.verification-cell').getAttribute('aria-label'),'已驗證');
@@ -83,7 +83,7 @@ try{
  assert.equal(rows()[0].querySelector('.verification-cell').getAttribute('aria-label'),'不一致');assert.equal(rows()[0].querySelector('.verification-cell').textContent,'!');
  overviewFacts[0].source_lifecycle.reasons=[];await mount({workspace_shell:true});
  assert.equal(rows()[0].querySelector('.progress-cell span').textContent,'40%');
- assert.equal(rows()[1].querySelector('.progress-cell span').textContent,'0%');
+ assert.equal(rows()[1].querySelector('.progress-cell span').textContent,'—');assert.equal(rows()[1].querySelector('.progress-empty').getAttribute('aria-label'),'任務進度 0%');
  // P4-1: the dashboard renders from counts, the attention list and cards; no tree scan and no full workspace.
  await flush(()=>{location.hash='view=dashboard';window.dispatchEvent(new window.Event('hashchange'))});
  const todo=document.querySelector('.work-inbox');

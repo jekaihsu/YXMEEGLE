@@ -23,11 +23,11 @@ const inbox=document.querySelector('.work-inbox');assert.ok(inbox.textContent.in
 await flush(()=>[...document.querySelectorAll('.dh-hero button')].find(b=>b.textContent.includes('繼續此任務')).click());assert.equal(calls.at(-1).focus,'ready');
 w.projects=Array.from({length:300},(_,i)=>({...structuredClone(p),id:`p${i}`,code:`CASE-${String(i+1).padStart(3,'0')}`,name:`Road survey ${i+1}`}));
 await flush(()=>root.render(React.createElement(Projects,{c:{...c,route:{view:'projects'}}})));
-assert.equal(document.querySelectorAll('tbody tr').length,10);assert.ok(document.querySelector('.table-footer').textContent.includes('共 300 筆'));
-const row=document.querySelector('tbody tr');assert.equal(row.querySelector('.verification-cell').getAttribute('aria-label'),'已驗證');assert.equal(row.querySelector('[data-kind=business]').textContent,'示範');assert.equal(row.querySelector('[data-kind=workflow]').textContent,'進行中');assert.equal(row.querySelector('[data-kind=verification]').textContent,'✓');assert.equal(row.querySelector('[data-tone=accent]'),null);assert.ok(row.textContent.includes('受阻'));assert.ok(row.textContent.includes('即將到期'));assert.ok(row.querySelector('.deadline').classList.contains('is-upcoming'));assert.equal(row.querySelector('.numeric').textContent,'NT$ 120,000');
-assert.equal(row.querySelector('.progress-cell').textContent,'0%');
-assert.equal(row.querySelector('[role=progressbar]').getAttribute('aria-valuenow'),'0');
-assert.equal(row.querySelector('.progress-track i').style.width,'0%');
+assert.equal(document.querySelectorAll('tbody tr').length,10);assert.equal(document.querySelector('.person-cell').textContent,w.users.find(u=>u.id===p.pm_id).name);assert.equal(document.querySelector('.person-cell .avatar'),null);assert.ok(document.querySelector('.table-footer').textContent.includes('共 300 筆'));
+const row=document.querySelector('tbody tr');assert.equal(row.querySelector('.verification-cell').getAttribute('aria-label'),'已驗證');assert.ok(row.querySelector('.case-link').title.includes('示範'));assert.equal(row.querySelector('[data-kind=workflow]').textContent,'進行中');assert.equal(row.querySelector('[data-kind=verification]').textContent,'✓');assert.equal(row.querySelector('[data-tone=accent]'),null);assert.ok(row.textContent.includes('受阻'));assert.equal(row.querySelectorAll('.attention-badges .ds-status-badge').length,1);assert.ok(row.querySelector('.case-status').title.includes('逾期'));assert.ok(row.querySelector('.case-status').title.includes('即將到期'));assert.ok(row.querySelector('.deadline').classList.contains('is-upcoming'));assert.equal(row.querySelector('.numeric').textContent,'NT$ 120,000');
+assert.equal(row.querySelector('.progress-cell').textContent,'—');
+assert.equal(row.querySelector('.progress-empty').getAttribute('aria-label'),'任務進度 0%');
+assert.equal(row.querySelector('[role=progressbar]'),null);
 w.projects[0].nodes[0].tasks[0].status='completed';
 await flush(()=>root.render(React.createElement(Projects,{c:{...c,route:{view:'projects'}}})));
 const updated=document.querySelector('tbody tr');
