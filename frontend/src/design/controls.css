@@ -32,3 +32,14 @@
  .app-shell .workspace :is(.tabbar,.project-tabs,.ops-tabs,.segmented){flex-wrap:nowrap;overflow-x:auto;width:100%;scrollbar-width:thin}
  .app-shell .workspace :is(.page-heading,.ds-page-head) h1{font-size:var(--fs-title1)}
 }
+
+.app-shell .skip-link{position:fixed;top:var(--sp-3);left:var(--sp-3);z-index:1000;padding:var(--control-py) var(--control-px);background:var(--surface);color:var(--accent);border:1px solid var(--separator);border-radius:var(--radius-s);transform:translateY(-200%)}
+.app-shell .skip-link:focus{transform:none}
+:is(.app-shell,.modal,.ds-sheet,.task-inspector) input:is([type=checkbox],[type=radio]){min-width:24px;min-height:24px;width:24px;height:24px;flex-shrink:0;accent-color:var(--accent)}
+@media(max-width:760px){
+ .app-shell .sidebar.open{overflow:hidden}
+ .app-shell .sidebar.open nav{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+ .app-shell .sidebar.open .sidebar-projects{display:none}
+ .app-shell .sidebar.open .sidebar-bottom{flex:none;position:sticky;bottom:0;margin-top:0;padding-top:var(--sp-2);padding-bottom:env(safe-area-inset-bottom);background:var(--glass-bar-fill)}
+ .app-shell .node-actions{flex-wrap:wrap;justify-content:flex-start;min-width:0}
+}
