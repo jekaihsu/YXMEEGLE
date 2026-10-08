@@ -89,17 +89,25 @@ def replace_projects(db,model,wid,state,project_ids):
     if tasks: db.execute(insert(ti),tasks)
 
 
-def replace_counters(db,model,wid,state):
+def replace_counters(db,model,wid,state,*,previous_version=None,initial=False):
     """Write only counters whose value or version differs; delete vanished ones."""
     *_,ci=tables(model)
     desired=counter_values(state); version=state.get('version',0)
     existing={(r.key,r.subject_id):r for r in db.execute(select(ci).where(ci.c.workspace_id==wid))}
+    # Only a complete generation may follow the authoritative version forward.
+    # Full backfill/repair omits previous_version; new storage has no old trees.
+    marker=existing.get(('projects_total',''))
+    complete=previous_version is None or (marker is None and initial) or (marker is not None and marker.source_version==previous_version)
+    def source_version(key):
+        if key==('projects_total','') and not complete:
+            return marker.source_version if marker is not None else -1
+        return version
     for key,row in existing.items():
         if key not in desired:
             db.execute(delete(ci).where(ci.c.workspace_id==wid,ci.c.key==key[0],ci.c.subject_id==key[1]))
-        elif row.value!=desired[key] or row.source_version!=version:
-            db.execute(ci.update().where(ci.c.workspace_id==wid,ci.c.key==key[0],ci.c.subject_id==key[1]).values(value=desired[key],source_version=version))
-    fresh=[dict(workspace_id=wid,key=k,subject_id=s,value=v,source_version=version) for (k,s),v in desired.items() if (k,s) not in existing]
+        elif row.value!=desired[key] or row.source_version!=source_version(key):
+            db.execute(ci.update().where(ci.c.workspace_id==wid,ci.c.key==key[0],ci.c.subject_id==key[1]).values(value=desired[key],source_version=source_version(key)))
+    fresh=[dict(workspace_id=wid,key=k,subject_id=s,value=v,source_version=source_version((k,s))) for (k,s),v in desired.items() if (k,s) not in existing]
     if fresh: db.execute(insert(ci),fresh)
 
 
@@ -122,14 +130,18 @@ def reconcile(db,model,wid,state):
     mp,ep,sp=_mismatch(actual_p,expected_p,'project_id')
     mt,et,st=_mismatch(actual_t,expected_t,'task_id')
     desired=counter_values(state)
-    actual_c={(r.key,r.subject_id):r.value for r in db.execute(select(ci).where(ci.c.workspace_id==wid))}
+    counter_rows={(r.key,r.subject_id):r for r in db.execute(select(ci).where(ci.c.workspace_id==wid))}
+    actual_c={key:r.value for key,r in counter_rows.items()}
+    marker=counter_rows.get(('projects_total',''))
+    generation=dict(expected_version=state.get('version',0),source_version=marker.source_version if marker else None)
     drift=sorted((k,s,actual_c.get((k,s)),desired.get((k,s))) for k,s in actual_c.keys()|desired.keys() if actual_c.get((k,s))!=desired.get((k,s)))
     report={'projects':{'expected':len(expected_p),'actual':len(actual_p),'missing':mp,'extra':ep,'stale':sp},
             'tasks':{'expected':len(expected_t),'actual':len(actual_t),'missing':mt,'extra':et,'stale':st},
             'counters':{'expected':len(desired),'actual':len(actual_c),'drift':[{'key':k,'subject_id':s,'stored':a,'expected':e} for k,s,a,e in drift]}}
     task_projects={t['project_id'] for t in tasks if t['task_id'] in set(mt)|set(st)}|{actual_t[t]['project_id'] for t in et}
     report['dirty_projects']=sorted(set(mp)|set(ep)|set(sp)|task_projects)
-    report['healthy']=not (report['dirty_projects'] or drift)
+    report['generation']=generation
+    report['healthy']=not (report['dirty_projects'] or drift) and generation['source_version']==generation['expected_version']
     return report
 
 

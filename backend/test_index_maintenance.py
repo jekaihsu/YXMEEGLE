@@ -117,3 +117,28 @@ def test_app_flag_wires_sessions_and_api_write_updates_index(tmp_path):
         with on.state.sessions() as db:
             assert db.scalar(select(ProjectIndex.project_id).where(ProjectIndex.workspace_id==wid)) is not None or not state['projects']
     for a in (off,on): a.state.engine.dispose()
+
+
+def test_reconcile_repairs_generation_gap_even_when_rows_match(tmp_path):
+    from backend import index_reads
+    engine, sessions = make(tmp_path, True)
+    state = build_scaled_workspace(2)
+    commit(sessions, state)
+    with sessions.begin() as db:
+        db.info['index_tables'] = False
+        row = db.get(WorkspaceRow, 'w')
+        state = storage.load(db, BusinessRow, row)
+        state['version'] = row.version + 1
+        row.data = storage.save(db, BusinessRow, 'w', state)
+        row.version = state['version']
+    commit(sessions, load(sessions))
+    with sessions.begin() as db:
+        row = db.get(WorkspaceRow, 'w')
+        state = storage.load(db, BusinessRow, row)
+        assert index_reads.ready(db, BusinessRow, row) is False
+        report = index_tables.reconcile(db, BusinessRow, 'w', state)
+        assert report['healthy'] is False and report['dirty_projects'] == []
+        index_tables.repair(db, BusinessRow, 'w', state, report)
+        assert index_reads.ready(db, BusinessRow, row) is True
+        assert index_tables.reconcile(db, BusinessRow, 'w', state)['healthy'] is True
+    engine.dispose()

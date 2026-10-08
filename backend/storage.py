@@ -101,6 +101,7 @@ def save(db,model,wid,state):
     new_events=[key for key in desired if key[0]=='events' and key not in existing]
     for index,key in enumerate(new_events):
         desired[key]['ordinal']=event_ordinal-len(new_events)+index
+    initial_index=not any(kind=='projects' for kind,_ in existing)
     indexed=db.info.get('index_tables')
     dirty=set(changed_projects)
     if indexed:
@@ -122,7 +123,7 @@ def save(db,model,wid,state):
     if indexed:
         from . import index_tables  # lazy: storage must stay importable inside the isolated backup helper bundle
         index_tables.replace_projects(db,model,wid,state,dirty)
-        index_tables.replace_counters(db,model,wid,state)
+        index_tables.replace_counters(db,model,wid,state,previous_version=previous_root.get('version',0),initial=initial_index)
     root['storage_schema']=2
     return root
 

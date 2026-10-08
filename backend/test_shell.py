@@ -234,3 +234,35 @@ def test_shell_blocked_limit_and_workspace_order(tmp_path):
         assert shell['counts']['blocked_tasks'] == 7 and len(shell['blocked']) == 5
         assert [a['task_id'] for a in shell['blocked']] == expected[:5]
         assert shell['blocked'][0]['status'] == 'blocked'
+
+
+def test_disabled_maintenance_gap_stays_unavailable_until_repair(tmp_path, monkeypatch):
+    from . import storage, workspace_environment
+    from .models import BusinessRow
+    from .test_projects_overview import edit_workspace
+    with scaled_client(tmp_path, 3, **ON) as (app, client):
+        monkeypatch.setattr(workspace_environment, 'normalize_environment', lambda state, wid, cfg: state.update(environment='production') or state)
+        edit_workspace(app, client, lambda state: [p.update(case_visibility='new_case') for p in state['projects']])
+        assert shell_get(client).json()['scope'] == 'shell'
+        wid = app.state.signer.loads(client.cookies.get('meegle_session'))['wid']
+        with app.state.sessions.begin() as db:
+            db.info['index_tables'] = False
+            row = db.get(WorkspaceRow, wid)
+            state = storage.load(db, BusinessRow, row)
+            state['projects'][0].update(case_visibility='excluded_history')
+            state['projects'][1].update(contract_amount=987654321)
+            state['version'] = row.version + 1
+            row.data = storage.save(db, BusinessRow, wid, state)
+            row.version = state['version']
+        assert shell_get(client).json().get('scope') is None
+        edit_workspace(app, client, lambda state: state['projects'][2].update(name='unrelated change'))
+        # Neither the revoked case nor the missed amount belongs to the changed tree.
+        body = shell_get(client).json()
+        assert body.get('scope') is None
+        assert [p['id'] for p in body['projects']] == ['p002', 'p003']
+        assert body['projects'][0]['contract_amount'] == 987654321
+        assert client.post('/api/admin/index-health/repair').json()['repaired'] is True
+        assert shell_get(client).json()['scope'] == 'shell'
+        page = client.get('/api/projects?view=overview&tab=all').json()
+        assert [p['id'] for p in page['items']] == ['p002', 'p003']
+        assert page['items'][0]['contract_amount'] == 987654321
