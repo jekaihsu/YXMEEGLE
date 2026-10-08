@@ -1,0 +1,35 @@
+/* Projects list: one hero (the two counts), a quiet toolbar and a borderless grouped table. Selectors are scoped to beat legacy rules. */
+.portfolio-page{display:flex;flex-direction:column;gap:var(--sp-5)}
+.portfolio-page .portfolio-index.glass{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;border:.5px solid var(--glass-border);border-radius:var(--radius-card);background:var(--glass-fill);overflow:hidden}
+.portfolio-page .portfolio-index button{display:flex;align-items:center;gap:var(--sp-3);min-height:44px;padding:var(--sp-5);text-align:left;background:none;border:0;border-radius:0;color:var(--label);box-shadow:none;transition:background 300ms ease-out}
+.portfolio-page .portfolio-index button+button{border-left:.5px solid var(--sep)}
+.portfolio-page .portfolio-index button>span{flex:1;font-size:var(--fs-headline);font-weight:600}.portfolio-page .portfolio-index small{display:block;font-weight:400;font-size:var(--fs-footnote);color:var(--label-2)}
+.portfolio-page .portfolio-index strong{font-size:var(--fs-large-title);font-weight:600;font-variant-numeric:tabular-nums;line-height:1}
+.portfolio-page .portfolio-index svg{color:var(--label-2)}
+.portfolio-page .portfolio-index button.selected{background:var(--accent-fill)}.portfolio-page .portfolio-index button.selected strong,.portfolio-page .portfolio-index button.selected svg{color:var(--accent)}
+.portfolio-page .portfolio-surface{background:none;border:0;box-shadow:none;padding:0;display:flex;flex-direction:column;gap:var(--sp-3)}
+.portfolio-page .tabbar{display:flex;flex-wrap:wrap;gap:var(--sp-1);padding:2px;margin:0;width:fit-content;max-width:100%;border:.5px solid var(--glass-border);border-radius:var(--radius-pill);background:var(--glass-fill);box-shadow:none}
+.portfolio-page .tabbar button{min-height:44px;padding:0 var(--sp-4);border:0;border-radius:var(--radius-pill);background:none;color:var(--label);font-size:var(--fs-subhead);transition:background 300ms ease-out,color 300ms ease-out}
+.portfolio-page .tabbar button.active{background:var(--accent-fill);color:var(--accent);font-weight:600}.portfolio-page .tabbar button span{margin-left:var(--sp-1);color:var(--label-2);font-variant-numeric:tabular-nums}
+.portfolio-page .table-toolbar{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:center;justify-content:space-between;padding:0;border:0;background:none}
+.portfolio-page .search-field{display:flex;align-items:center;gap:var(--sp-2);flex:1 1 16rem;min-height:44px;padding:0 var(--sp-3);border:.5px solid var(--glass-border);border-radius:var(--radius-pill);background:var(--surface);color:var(--label-2)}
+.portfolio-page .search-field input{flex:1;min-width:0;border:0;outline:0;background:none;color:var(--label);font-size:var(--fs-body)}.portfolio-page .search-field button{display:inline-flex;min-width:44px;min-height:44px;align-items:center;justify-content:center;color:var(--label-2)}
+.portfolio-page .toolbar-filters{display:flex;gap:var(--sp-2);align-items:center;flex-wrap:wrap}
+.portfolio-page .toolbar-filters select,.portfolio-page .pager select{min-height:44px;padding:0 var(--sp-3);border:.5px solid var(--glass-border);border-radius:var(--radius-m);background:var(--surface);color:var(--label);font-size:var(--fs-subhead)}
+.portfolio-page .icon-button.bordered{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;border:.5px solid var(--glass-border);border-radius:var(--radius-pill);background:var(--surface);color:var(--label)}
+.portfolio-page .table-scroll{overflow-x:auto;border:.5px solid var(--glass-border);border-radius:var(--radius-card);background:var(--glass-fill);box-shadow:var(--glass-highlight),var(--glass-shadow)}
+.portfolio-page .projects-table{width:100%;border-collapse:collapse;font-size:var(--fs-subhead);color:var(--label);background:none}
+.portfolio-page .projects-table th{padding:var(--sp-3) var(--sp-4);text-align:left;font-size:var(--fs-caption);font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--label-2);background:none;border:0;white-space:nowrap}
+.portfolio-page .projects-table td{padding:var(--sp-3) var(--sp-4);vertical-align:middle;border:0;border-top:1px solid var(--sep);background:none;color:var(--label)}
+.portfolio-page .projects-table tbody tr{transition:background var(--dur-fast) var(--ease)}.portfolio-page .projects-table tbody tr:hover{background:var(--surface-2)}
+.portfolio-page .projects-table small,.portfolio-page .case-code{display:block;font-size:var(--fs-footnote);color:var(--label-2)}
+.portfolio-page .case-link{display:block;font-size:var(--fs-body);font-weight:600;color:var(--label);overflow-wrap:anywhere}.portfolio-page .case-link:hover{color:var(--accent)}
+.portfolio-page .demo-inline{margin-left:var(--sp-2);color:var(--accent)}
+.portfolio-page .person-cell{display:flex;align-items:center;gap:var(--sp-2);white-space:nowrap}
+.portfolio-page .stage-chips{display:flex;flex-wrap:wrap;gap:var(--sp-1)}
+.portfolio-page .progress-cell{display:flex;align-items:center;gap:var(--sp-3);min-width:7rem;font-variant-numeric:tabular-nums}.portfolio-page .progress-cell small{display:inline}
+.portfolio-page .progress-track{flex:1;height:6px;border-radius:var(--radius-pill);background:var(--surface-2);overflow:hidden}.portfolio-page .progress-track i{display:block;height:100%;background:var(--accent);border-radius:inherit;transition:width var(--dur-slow) var(--ease)}
+.portfolio-page .mono{font-variant-numeric:tabular-nums;white-space:nowrap}
+.portfolio-page .table-footer{display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5);align-items:center;justify-content:space-between;padding:0 var(--sp-2);border:0;background:none;font-size:var(--fs-footnote);color:var(--label-2)}.portfolio-page .pager{display:flex;gap:var(--sp-2);align-items:center}
+.portfolio-page .form-error{padding:var(--sp-3) var(--sp-4);color:var(--critical)}
+@media(max-width:760px){.portfolio-page .portfolio-index button{padding:var(--sp-4)}.portfolio-page .portfolio-index strong{font-size:var(--fs-title1)}.portfolio-page .tabbar{border-radius:var(--radius-m)}}
