@@ -33,3 +33,9 @@
 .portfolio-page .table-footer{display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5);align-items:center;justify-content:space-between;padding:0 var(--sp-2);border:0;background:none;font-size:var(--fs-footnote);color:var(--label-2)}.portfolio-page .pager{display:flex;gap:var(--sp-2);align-items:center}
 .portfolio-page .form-error{padding:var(--sp-3) var(--sp-4);color:var(--critical)}
 @media(max-width:760px){.portfolio-page .portfolio-index button{padding:var(--sp-4)}.portfolio-page .portfolio-index strong{font-size:var(--fs-title1)}.portfolio-page .tabbar{border-radius:var(--radius-m)}}
+.portfolio-page .projects-table{min-width:62rem}
+.portfolio-page .projects-table th:nth-child(1){min-width:15rem}
+.portfolio-page .projects-table :is(th,td):nth-child(2){min-width:9rem}
+.portfolio-page .projects-table :is(th,td):nth-child(3){min-width:8rem}
+.portfolio-page .project-source-status{display:flex;flex-direction:column;align-items:flex-start;gap:var(--sp-1)}
+.portfolio-page .projects-table .ds-badge{white-space:nowrap}
