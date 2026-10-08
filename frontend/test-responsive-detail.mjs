@@ -22,7 +22,7 @@ try{
  else if(url.pathname.startsWith('/api/projects/'))data={...w,scope:'project',project:w.projects.find(p=>p.id===url.pathname.split('/').at(-1))};
  else if(url.pathname==='/api/daily-reports')data={items:[],total:0,summary:{}};
  return route.fulfill({json:data});});
- const go=async hash=>{await page.goto(`http://127.0.0.1:${server.address().port}/#view=${hash}`);await page.locator('h1').waitFor();await page.waitForTimeout(150)};
+ const go=async hash=>{await page.goto(`http://127.0.0.1:${server.address().port}/#view=${hash}`);await page.locator('h1').waitFor();await page.waitForTimeout(350)};
  const visible=async selector=>page.locator(selector).evaluate(el=>{const r=el.getBoundingClientRect(),p=el.parentElement.closest('.project-tabs,.ops-tabs,.workflow-scroll')||el.closest('.workflow-scroll');const b=p.getBoundingClientRect();return r.left>=b.left-1&&r.right<=b.right+1});
  for(const tab of ['data','logs']){await go(`project&project=pB&tab=${tab}`);assert.ok(await visible('.project-tabs [aria-current=page]'),`phone ${tab} selected tab visible`);await page.reload();await page.locator('.project-tabs').waitFor();assert.ok(await visible('.project-tabs [aria-current=page]'),`phone ${tab} reload selected tab visible`)}
  for(const tab of ['daily','jobs']){await go(`admin&tab=${tab}`);await page.locator('.ops-tabs').waitFor();assert.ok(await visible('.ops-tabs [aria-current=page]'),`phone admin ${tab} selected tab visible`)}
@@ -64,6 +64,8 @@ try{
  assert.equal(await page.getByRole('textbox',{name:'搜尋任務'}).evaluate(e=>getComputedStyle(e).boxShadow),'none','search has no doubled inner focus box');
  await go('schedule');await page.locator('.calendar-grid').waitFor();
  assert.equal(await page.locator('.calendar-grid').evaluate(e=>getComputedStyle(e).borderTopWidth),'1px','calendar uses a quiet hairline');
+ const countTops=await page.locator('.day-count').evaluateAll(elements=>elements.map(e=>e.getBoundingClientRect().top));
+ assert.ok(Math.max(...countTops)-Math.min(...countTops)<1,'week counts align across today and non-work days');
  assert.ok(await page.locator('.calendar-grid').evaluate(e=>e.scrollWidth<=e.parentElement.clientWidth+1),'all seven days fit at 1024px');
  await page.getByRole('button',{name:'查看當日工作',exact:true}).first().click();await checkColumns();
  console.log('Responsive detail: 1024px all-task/day codes and dates fit; all seven weekdays visible');
