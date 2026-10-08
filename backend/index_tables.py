@@ -33,7 +33,7 @@ def project_rows(wid,state,project_ids=None,summaries=True):
         for ni,n in enumerate(nodes):
             for ti,t in enumerate(n.get('tasks',[])):
                 task_total+=1; task_done+=t.get('status')=='completed'
-                tasks.append(dict(workspace_id=wid,task_id=t['id'],project_id=p['id'],node_id=n['id'],node_key=n.get('key') or '',
+                tasks.append(dict(workspace_id=wid,task_id=t['id'],project_id=p['id'],node_id=n['id'],node_key=n.get('key') or '',node_name=n.get('name') or '',
                                   node_ordinal=ni,ordinal=ti,assignee_id=t.get('owner_id') or n.get('owner_id') or '',
                                   status=t.get('status') or '',due_date=t.get('due_date') or '',required=bool(t.get('required',True))))
         projects.append(dict(workspace_id=wid,project_id=p['id'],ordinal=i,code=p.get('code') or '',name=p.get('name') or '',client=p.get('client') or '',

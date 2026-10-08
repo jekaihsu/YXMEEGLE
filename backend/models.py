@@ -76,6 +76,7 @@ class TaskIndex(Base):
     status=Column(String(60),nullable=False,default='')
     due_date=Column(String(32),nullable=False,default='')
     required=Column(Boolean,nullable=False,default=True)
+    node_name=Column(String(200),nullable=True)  # node title shown on the dashboard; NULL until re-backfilled
 
 class WorkspaceCounter(Base):
     """Stored non-time-dependent counts; subject_id is '' for workspace-wide keys."""

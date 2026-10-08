@@ -3,7 +3,7 @@
 Run: DATABASE_URL=... .venv/bin/python scripts/migrate_index_tables.py
 Tables are created IF NOT EXISTS (new, empty, so no table rewrite). Each index is
 then built with CREATE INDEX IF NOT EXISTS; PostgreSQL uses CONCURRENTLY outside a
-transaction, allowing writes. SQLite: pause application writes. Safe to repeat; a
+transaction, allowing writes. SQLite: pause application writes. Missing nullable columns (task_index.node_name) are added; re-run scripts/backfill_index.py afterwards to fill them. Safe to repeat; a
 conflicting or invalid index fails verification. If a PostgreSQL build is
 interrupted, drop its invalid index before retrying. Nothing reads these tables
 unless INDEX_TABLES_ENABLED is on; populate them with scripts.backfill_index.
@@ -27,6 +27,14 @@ def migrate(engine):
         raise ValueError('Index table migration supports SQLite and PostgreSQL')
     concurrent='CONCURRENTLY ' if dialect=='postgresql' else ''
     Base.metadata.create_all(engine,tables=list(TABLES),checkfirst=True)
+    # Columns added after the first release: nullable, so existing rows stay valid until re-backfilled.
+    for table in TABLES:
+        have={c['name'] for c in inspect(engine).get_columns(table.name)}
+        for column in table.columns:
+            if column.name not in have:
+                if not column.nullable: raise ValueError(f'{table.name}.{column.name} cannot be added to a populated table')
+                with engine.begin() as connection:
+                    connection.exec_driver_sql(f'ALTER TABLE {table.name} ADD COLUMN {column.name} {column.type.compile(dialect=engine.dialect)}')
     with engine.connect().execution_options(isolation_level='AUTOCOMMIT') as connection:
         for table in TABLES:
             for index in sorted(table.indexes,key=lambda i:i.name):
