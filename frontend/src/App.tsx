@@ -66,7 +66,7 @@ export default function App(){
   if(automatic&&(dirtyDraftRef.current||reloadGuard.blocked()||mutationActive.current!==null))return false;
   let order=++refreshOrder.current;
   try{const session=await api<Session>('/api/session',undefined,()=>order===refreshOrder.current);if(order!==refreshOrder.current)return;
-   const key=JSON.stringify([session.workspace_id,session.mode,session.environment,session.user?.id,session.access_mode]);
+   const key=JSON.stringify([session.workspace_id,session.mode,session.environment,session.user,session.access_mode]);
    if(key!==sessionKey.current){clearWorkspace();sessionKey.current=key;order=refreshOrder.current}
    setS(session);if(session.access_mode==='recovery'){workspaceRef.current=undefined;setW(undefined);setError('');return}if(!session.user){workspaceRef.current=undefined;setW(undefined);setError('');return}
    const shellMode=session.features?.workspace_shell===true;

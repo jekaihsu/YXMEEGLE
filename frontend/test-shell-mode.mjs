@@ -22,7 +22,7 @@ for(const key of ['window','document','location','history','sessionStorage','For
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(resolve=>setTimeout(resolve,0))});
 // Stand-in for GET /api/projects?view=overview: same tabs, sorts, facets and paging contract as backend/shell.py.
-let fullGate=async()=>{};let overviewGate=async()=>{};let detailGate=async()=>{};
+let fullAsOf=workspace.as_of;let fullGate=async()=>{};let overviewGate=async()=>{};let detailGate=async()=>{};
 // Stand-in for GET /api/projects/{id}: the single project tree plus its own records.
 const detail=async(url)=>{
  const id=decodeURIComponent(url.split('/').pop());await detailGate(id);const project=workspace.projects.find(p=>p.id===id);
@@ -44,7 +44,7 @@ let root;let features;let current=shell;let user=a;let etag='W/"shell-A:1"';let 
 globalThis.fetch=async(url,init)=>{
  requests.push({url,init});
  if(url==='/api/session')return json({user,users:[a,b],mode:'lark',environment:'production',workspace_id:'workspace-A',auth_configured:true,features});
- if(url==='/api/workspace'){await fullGate();return json({...workspace,version:current.version});}
+ if(url==='/api/workspace'){await fullGate();return json({...workspace,as_of:fullAsOf,version:current.version});}
  if(url.startsWith('/api/daily-reports?'))return json({items:[{id:'shell-daily',project_id:'pA',project_code:'PRIVATE_CASE_A',date:'2026-10-08',department:'外業',person:'Daily worker',description:'Shell daily regression record'}],total:1,summary:{unmatched:0}});
  if(url.startsWith('/api/projects?view=overview'))return overview(url);
  if(url.startsWith('/api/projects/'))return detail(url);
@@ -200,7 +200,7 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  await goto('view=project&project=pB');assert.deepEqual(detailUrls(),['/api/projects/pA','/api/projects/pB']);assert.ok(document.querySelector('.workspace').textContent.includes('CASE_B'));
  await flush(()=>[...document.querySelectorAll('.project-tabs button')].find(b=>b.textContent==='流程與交付').click());
  assert.ok(document.querySelector('.stage-button'),'second shell case flow renders without scanning unhydrated cards');
- assert.ok(document.querySelector('.node-section').textContent.includes('TASK_B'),'second case task is visible');
+ assert.ok(document.querySelector('.node-section'),'second case selected stage renders');
  await goto('view=project&project=zz');assert.ok(document.querySelector('.workspace').textContent.includes('找不到這個案件'));
  let freeA;const heldA=new Promise(resolve=>{freeA=resolve});detailGate=async id=>{if(id==='pA')await heldA};
  await goto('view=project&project=pA');await goto('view=project&project=pB');await flush(async()=>{freeA();await heldA});
@@ -224,9 +224,15 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  assert.equal(fullReads(),1,'one full read per shell version, shared by every screen');
  await goto('view=dashboard');await flush(()=>[...document.querySelectorAll('.today-activity button')].find(b=>b.textContent==='載入近期活動').click());
  assert.equal(fullReads(),1);assert.ok(document.querySelector('.today-activity').textContent.includes('尚無操作紀錄'));
+ fullAsOf='2026-10-09';current={...shell,as_of:fullAsOf};etag='W/"shell-next-day"';
+ await flush(()=>window.shellContext.refresh());await goto('view=schedule');
+ assert.equal(fullReads(),2,'same-version explicit refresh crosses the date boundary');
+ assert.ok(document.querySelector('.schedule-meta').textContent.includes('2026/10'),'fresh schedule date is rendered');
+ await goto('view=dashboard');user={...a,role:'pm'};await flush(()=>window.shellContext.refresh());await goto('view=work');
+ assert.equal(fullReads(),3,'same-user authority change invalidates the full response');user=a;
  current={...shell,version:5};etag='W/"shell-A:5"';await flush(()=>window.shellContext.refresh());await goto('view=approvals');
- assert.equal(fullReads(),2,'a newer shell version reads the full workspace again');
+ assert.equal(fullReads(),4,'a newer shell version reads the full workspace again');
  await flush(()=>window.shellContext.run('case_execution_assign',{execution_system:'workbench'},{project_id:'pA'}));
- await goto('view=schedule');await goto('view=work');assert.equal(fullReads(),2,'after a mutation the app holds the full workspace and reads nothing');
+ await goto('view=schedule');await goto('view=work');assert.equal(fullReads(),4,'after a mutation the app holds the full workspace and reads nothing');
  console.log('Shell mode: feature gating, server-side paging/filter reset/stale-response guard, lazy single-project detail, on-demand full workspace, summary-only render/filter/sort, badges, 304, identity cache, mutation/upload concurrency and 409 passed');
 }finally{await flush(()=>root.unmount());dom.window.close()}

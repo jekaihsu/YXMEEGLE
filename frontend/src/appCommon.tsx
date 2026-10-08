@@ -67,16 +67,17 @@ export function TaskIcon({status}:{status:string}){return status==='completed'?<
 // Screens that still need tasks, schedules or approvals across cases read the full workspace, but only once the user opens them.
 // The result is shared per session epoch and shell version, so a mutation or a newer shell never reuses an older copy.
 export const fullReads=new Map<string,Promise<Workspace>>();
-export function readFullWorkspace(version:number){
- const key=`${getSessionEpoch()}:${version}`;
- for(const old of fullReads.keys())if(!old.startsWith(`${getSessionEpoch()}:`))fullReads.delete(old);
+export function readFullWorkspace(version:number,generation=0,asOf='',authority=''){
+ const key=`${getSessionEpoch()}:${version}:${generation}:${asOf}:${authority}`;
+ for(const old of fullReads.keys())if(old!==key)fullReads.delete(old);
  let read=fullReads.get(key);
- if(!read){read=api<Workspace>('/api/workspace');fullReads.set(key,read);read.catch(()=>fullReads.delete(key))}
+ if(!read){read=api<Workspace>('/api/workspace');fullReads.set(key,read);read.catch(()=>{if(fullReads.get(key)===read)fullReads.delete(key)})}
  return read;
 }
 export function FullWorkspaceGate({c,children}:{c:Ctx;children:(c:Ctx)=>ReactNode}){
  const shell=c.w.scope==='shell';
- const full=useViewData<Workspace|undefined>(shell?`full:${c.w.version}`:'full-loaded',(_signal,current)=>shell?readFullWorkspace(c.w.version).then(data=>{if(!current())throw new DOMException('stale','AbortError');return data}):Promise.resolve(undefined),[]);
+ const generation=c.reloadVersion??0;const authority=JSON.stringify(c.s.user);const asOf=c.w.as_of;
+ const full=useViewData<Workspace|undefined>(shell?`full:${c.w.version}:${generation}:${asOf}:${authority}`:'full-loaded',(_signal,current)=>shell?readFullWorkspace(c.w.version,generation,asOf,authority).then(data=>{if(!current())throw new DOMException('stale','AbortError');return data}):Promise.resolve(undefined),[]);
  useEffect(()=>{if(shell&&full.data)perfMark('full-workspace-render')},[shell,full.data]);
  if(!shell)return <>{children(c)}</>;
  if(full.data)return <>{children({...c,w:{...full.data,freshness:c.w.freshness}})}</>;
