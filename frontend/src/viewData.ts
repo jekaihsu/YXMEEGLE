@@ -1,3 +1,5 @@
+import {createElement} from 'react';
+import {Section,Row,Skeleton} from './design';
 import {useCallback,useEffect,useRef,useState,type DependencyList} from 'react';
 import {getSessionEpoch} from './api';
 import './design/skeleton.css';
@@ -37,4 +39,9 @@ export function useViewData<T>(key:string,fetcher:ViewDataFetcher<T>,deps:Depend
  },[key,epoch,revision]);
  const visible=state.key===key&&state.epoch===epoch?state:{data:undefined,loading:true,error:''};
  return {data:visible.data,loading:visible.loading,error:visible.error,reload};
+}
+
+/** Grouped row placeholders matching the title and detail of a loaded list. */
+export function ViewSkeleton({rows=3}:{rows?:number}){
+ return createElement(Section,null,...Array.from({length:rows},(_,key)=>createElement(Row,{key,label:createElement(Skeleton,{width:'60%',height:'1.0625rem'}),detail:createElement(Skeleton,{lines:2,width:'80%',height:'.8125rem'})})));
 }
