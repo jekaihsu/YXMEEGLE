@@ -173,3 +173,5 @@
 .workspace .inspector-fields>div{padding-block:var(--sp-3);gap:var(--sp-3)}
 .workspace .inspector-fields dt{font-size:var(--fs-footnote);color:var(--label-2)}
 .workspace .inspector-fields dd{font-size:var(--fs-callout);color:var(--label);line-height:1.6;margin:0}
+
+.workspace .portfolio-stage{white-space:nowrap}

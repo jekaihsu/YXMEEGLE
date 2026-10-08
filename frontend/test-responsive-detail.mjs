@@ -25,6 +25,8 @@ try{
  const visible=async selector=>page.locator(selector).evaluate(el=>{const r=el.getBoundingClientRect(),p=el.parentElement.closest('.project-tabs,.ops-tabs,.workflow-scroll')||el.closest('.workflow-scroll');const b=p.getBoundingClientRect();return r.left>=b.left-1&&r.right<=b.right+1});
  for(const tab of ['data','logs']){await go(`project&project=pB&tab=${tab}`);assert.ok(await visible('.project-tabs [aria-current=page]'),`phone ${tab} selected tab visible`);await page.reload();await page.locator('.project-tabs').waitFor();assert.ok(await visible('.project-tabs [aria-current=page]'),`phone ${tab} reload selected tab visible`)}
  for(const tab of ['daily','jobs']){await go(`admin&tab=${tab}`);await page.locator('.ops-tabs').waitFor();assert.ok(await visible('.ops-tabs [aria-current=page]'),`phone admin ${tab} selected tab visible`)}
+ await go('dashboard');
+ for(const status of await page.locator('.portfolio-stage').all())assert.equal(await status.evaluate(e=>e.getClientRects().length),1,'dashboard stage does not split mid-word');
  await go('admin&tab=settings');
  assert.ok(await page.locator('.appearance-control').evaluate(e=>['paddingTop','paddingRight','paddingBottom','paddingLeft'].every(k=>parseFloat(getComputedStyle(e)[k])>=16)),'appearance controls have inner padding');
  await go('project&project=pB&tab=flow&node=nB4');assert.ok(await visible('.stage-button.selected'),'phone selected flow stage visible');

@@ -36,7 +36,7 @@ const approvalItem=(c:Ctx,a:{id:string;title:string;type:string;project_id:strin
 
 function Portfolio({c,formal,rows}:{c:Ctx;formal:Project[];rows:{p:Project;stage:string;percent:number}[]}){
  return <Group title="案件進度" caption="正式案件">
-  {rows.map(({p,stage,percent})=><div key={p.id} className="project-preview-row"><Row href={`#view=project&project=${encodeURIComponent(p.id)}`} label={p.name} detail={`${p.code} · ${p.client} · ${stage}`} value={<span className="dh-progress"><strong>{percent}<small>%</small></strong><Progress value={percent} label={`${p.code} 任務進度`}/></span>}/></div>)}
+  {rows.map(({p,stage,percent})=><div key={p.id} className="project-preview-row"><Row href={`#view=project&project=${encodeURIComponent(p.id)}`} label={p.name} detail={<>{p.code} · {p.client} · <span className="portfolio-stage">{stage}</span></>} value={<span className="dh-progress"><strong>{percent}<small>%</small></strong><Progress value={percent} label={`${p.code} 任務進度`}/></span>}/></div>)}
   {!rows.length&&<Empty title="尚無正式案件" detail="待成案資料會分開保留，確認成案後再進入此清單。"/>}
   <More onClick={()=>c.go({view:'projects'})}>{`查看全部 ${formal.length} 案`}</More>
  </Group>
