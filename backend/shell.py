@@ -12,7 +12,8 @@ from .operations import delegation_valid
 from .workspace_projection import filter_private_workspace
 
 CLOSED=('completed','superseded')
-ATTENTION_LIMIT=10
+ATTENTION_LIMIT=5  # Dashboard shows [...overdue, ...dueToday].slice(0,5)
+PENDING_SHOWN=2
 
 
 def delegated_task_ids(state,user,today):
@@ -73,31 +74,37 @@ def build(db,model,row,state,user,facts,today,approval_connection):
     wid=row.id; pi,ti,ci=index_tables.tables(model); env=state.get('environment','production')
     vis=visibility(pi,env)
     counters={r.key:r.value for r in db.execute(select(ci.c.key,ci.c.value).where(ci.c.workspace_id==wid,ci.c.subject_id==''))}
-    hidden=db.scalar(select(func.count()).select_from(pi).where(pi.c.workspace_id==wid,~and_(*vis))) if vis else 0
-    pending=counters.get('approvals_pending',0)
-    if hidden:  # approvals of hidden cases must not be counted: recount exactly from the visible set
+    rows=db.execute(select(pi).where(pi.c.workspace_id==wid,*vis).order_by(pi.c.ordinal,pi.c.project_id)).mappings().all()
+    hidden=counters.get('projects_total',0)-len(rows) if vis else 0  # ready() has verified projects_total against the index
+    pending=counters.get('approvals_pending',0); pending_items=[]
+    if pending:  # one partial load serves the exact recount over visible cases (hidden ones must not count) and the rows the dashboard lists
         from . import storage
-        visible={r for r in db.scalars(select(pi.c.project_id).where(pi.c.workspace_id==wid,*vis))}
-        pending=sum(a.get('status')=='pending' and a.get('project_id') in visible for a in storage.load_partial(db,model,row,collections=('approvals',))['approvals'])
-    openq,late=open_late(ti,today)
-    per_project=project_counts(db,ti,wid,today)
+        visible={r for r in db.scalars(select(pi.c.project_id).where(pi.c.workspace_id==wid,*vis))} if hidden else None
+        shown=[a for a in storage.load_partial(db,model,row,collections=('approvals',))['approvals'] if a.get('status')=='pending' and (visible is None or a.get('project_id') in visible)]
+        pending=len(shown) if hidden else pending
+        pending_items=[dict(id=a['id'],title=a.get('title',''),type=a.get('type',''),project_id=a['project_id']) for a in shown[:PENDING_SHOWN]]
+    as_of=today if not rows or any(r['source_kind']=='lark' for r in rows) else state.get('as_of',today)  # the date the legacy dashboard measures lateness against
+    openq,late=open_late(ti,as_of)
+    per_project=project_counts(db,ti,wid,as_of)
+    cards=[card(r,state,per_project) for r in rows]
     joined=ti.join(pi,and_(pi.c.workspace_id==ti.c.workspace_id,pi.c.project_id==ti.c.project_id))
-    owned=mine(ti,user,facts)
-    my_active,my_late=db.execute(select(func.coalesce(func.sum(case((openq,1),else_=0)),0),func.coalesce(func.sum(case((late,1),else_=0)),0))
-        .select_from(joined).where(ti.c.workspace_id==wid,owned,*vis)).one()
-    tomorrow=(date.fromisoformat(today)+timedelta(days=1)).isoformat()
-    attention=[dict(r._mapping) for r in db.execute(select(ti.c.task_id,ti.c.project_id,ti.c.node_key,ti.c.status,ti.c.due_date,pi.c.code.label('project_code'),pi.c.name.label('project_name'))
-        .select_from(joined).where(ti.c.workspace_id==wid,owned,openq,ti.c.due_date!='',ti.c.due_date<tomorrow,*vis)
-        .order_by(ti.c.due_date,ti.c.task_id).limit(ATTENTION_LIMIT))]
+    today_q=and_(openq,func.substr(ti.c.due_date,1,10)==as_of[:10])
+    # Legacy Dashboard: every open task of every visible case (not only the user's own); the 'my' numbers stay the nav badge.
+    owned=mine(ti,user,facts); one=lambda cond:func.coalesce(func.sum(case((cond,1),else_=0)),0)
+    allc=db.execute(select(one(openq),one(late),one(today_q),one(and_(openq,owned)),one(and_(late,owned))).select_from(joined).where(ti.c.workspace_id==wid,*vis)).one()
+    my_active,my_late=allc[3],allc[4]
+    # [...overdue, ...dueToday] in workspace order: project, node, task ordinal
+    attention=[dict(r._mapping) for r in db.execute(select(ti.c.task_id,ti.c.project_id,ti.c.node_id,ti.c.node_key,ti.c.node_name,ti.c.assignee_id,ti.c.status,ti.c.due_date,pi.c.code.label('project_code'),pi.c.name.label('project_name'))
+        .select_from(joined).where(ti.c.workspace_id==wid,or_(late,today_q),*vis)
+        .order_by(case((late,0),else_=1),pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))]
     if attention:
         titles={r.entity_id:(r.data or {}).get('title') for r in db.execute(select(model.entity_id,model.data).where(model.workspace_id==wid,model.kind=='tasks',model.entity_id.in_([a['task_id'] for a in attention])))}
         for a in attention: a['title']=titles.get(a['task_id'],'')
-    cards=[card(r,state,per_project) for r in db.execute(select(pi).where(pi.c.workspace_id==wid,*vis).order_by(pi.c.ordinal,pi.c.project_id)).mappings()]
-    lark=any(c['source_kind']=='lark' for c in cards)
-    return dict(scope='shell',version=row.version,as_of=today if not cards or lark else state.get('as_of',today),workspace_id=wid,environment=env,users=state['users'],
+    return dict(scope='shell',version=row.version,as_of=as_of,workspace_id=wid,environment=env,users=state['users'],
                 calendar=state.get('calendar'),source_status=state.get('source_status'),file_categories=categories(state),approval_connection=approval_connection,
-                counts=dict(approvals_pending=pending,daily_unmatched=counters.get('daily_unmatched',0),my_overdue_tasks=int(my_late),my_active_tasks=int(my_active)),
-                projects=cards,attention=attention,approvals=[],events=[])
+                counts=dict(approvals_pending=pending,daily_unmatched=counters.get('daily_unmatched',0),my_overdue_tasks=int(my_late),my_active_tasks=int(my_active),
+                            active_tasks=int(allc[0]),overdue_tasks=int(allc[1]),due_today_tasks=int(allc[2])),
+                projects=cards,attention=attention,pending_approvals=pending_items,approvals=[],events=[])
 
 
 TABS=('all','formal','intake','active','overdue','completed')

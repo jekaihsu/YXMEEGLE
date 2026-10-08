@@ -62,9 +62,8 @@ def test_shell_my_counts_equal_legacy_can_execute(tmp_path, uid):
         assert shell['counts']['my_active_tasks'] == sum(t['status'] not in ('completed', 'superseded') for t in rows)
         assert shell['counts']['approvals_pending'] == sum(a['status'] == 'pending' for a in full['approvals'])
         assert shell['counts']['daily_unmatched'] == len(full['daily_unmatched'])
-        assert all(a['task_id'] for a in shell['attention']) and len(shell['attention']) <= 10
-        due = sorted((t['due_date'], t['id']) for t in rows if t['status'] not in ('completed', 'superseded') and t['due_date'] and t['due_date'][:10] <= shell['as_of'])
-        assert [(a['due_date'], a['task_id']) for a in shell['attention']] == due[:10]
+        # the attention list is the dashboard's, not the user's own: see test_shell_dashboard_equivalence.py
+        assert all(a['task_id'] for a in shell['attention']) and len(shell['attention']) <= 5
 
 
 def test_shell_overdue_uses_taipei_today(tmp_path, monkeypatch):
@@ -113,8 +112,8 @@ def test_shell_budget_319(tmp_path):
         print('shell', stats['queries'], 'queries', raw, 'raw', response.headers['content-length'], 'wire')
         assert response.json()['scope'] == 'shell' and 'server-timing' in response.headers
         # Fixture names are long CJK strings: 319 slim cards alone are ~148 KB. The 150 KB plan target needs P4-2 (server-paged cards).
-        # Queries include ~14 from live-read ensure()/status and identity that are outside the shell itself (9).
-        assert stats['queries'] <= 24 and raw <= 165_000 and int(response.headers['content-length']) <= 30_000
+        # Queries include ~14 from live-read ensure()/status and identity that are outside the shell itself (11: two more load the pending approvals the dashboard lists).
+        assert stats['queries'] <= 26 and raw <= 165_000 and int(response.headers['content-length']) <= 30_000
 
 
 def shell_get(client, tag=None):
