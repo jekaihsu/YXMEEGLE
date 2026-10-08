@@ -267,3 +267,25 @@ def test_disabled_maintenance_gap_stays_unavailable_until_repair(tmp_path, monke
         page = client.get('/api/projects?view=overview&tab=all').json()
         assert [p['id'] for p in page['items']] == ['p002', 'p003']
         assert page['items'][0]['contract_amount'] == 987654321
+
+
+@pytest.mark.parametrize('repair', ['admin', 'backfill'])
+def test_same_version_index_repair_invalidates_shell_etag(tmp_path, repair):
+    from sqlalchemy import update
+    from .models import ProjectIndex
+    from scripts.backfill_index import backfill
+    with scaled_client(tmp_path, 2, **ON) as (app, client):
+        expected = shell_get(client).json()['projects'][0]['name']
+        with app.state.sessions.begin() as db:
+            db.execute(update(ProjectIndex).where(ProjectIndex.project_id == 'p001').values(name='stale index name'))
+        stale = shell_get(client)
+        assert stale.json()['projects'][0]['name'] == 'stale index name'
+        if repair == 'admin':
+            assert client.post('/api/admin/index-health/repair').json()['repaired'] is True
+        else:
+            backfill(app.state.engine)
+        fresh = shell_get(client, stale.headers['etag'])
+        assert fresh.status_code == 200
+        assert fresh.json()['version'] == stale.json()['version']
+        assert fresh.json()['projects'][0]['name'] == expected
+        assert shell_get(client, fresh.headers['etag']).status_code == 304

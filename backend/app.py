@@ -325,6 +325,7 @@ def create_app(overrides=None):
         result=strip_migration_archive(data) if owned else public_copy(data)
         from .source_case_policy import filter_visible_cases
         filter_visible_cases(result,authorized_project_ids=authorized_project_ids)
+        result.pop('_index_generation',None)
         result['workspace_id']=wid
         result['file_categories']=file_categories
         if not result['projects'] or any(p.get('source_kind')=='lark' for p in result['projects']): result['as_of']=now()[:10]
@@ -433,7 +434,7 @@ def create_app(overrides=None):
                 if not index_reads.ready(db,BusinessRow,row): return None
                 state=load(db,row,collections=('users','delegations','approved_leave_delegations'))
             today=now()[:10]; facts=shell.prepare(state,user,today)
-            tag=shell.etag(wid,user,row.version,today,state['users'])
+            tag=shell.etag(wid,user,row.version,today,state['users'],row.data.get('_index_generation'))
             if tag in [v.strip() for v in request.headers.get('if-none-match','').split(',')]: return Response(status_code=304,headers={'ETag':tag})
             with phase(request,'project'):
                 result=shell.build(db,BusinessRow,row,state,user,facts,today,approval_connection(cfg,simulation_available=(data['mode']=='demo') or wid.startswith('test-'),definition_verification=state.get('native_definition_verification')))

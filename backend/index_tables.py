@@ -5,6 +5,7 @@ workspace state dict, so a from-scratch rebuild and incremental maintenance shar
 one code path. Core statements only: valid on SQLite and PostgreSQL.
 """
 from copy import deepcopy
+from uuid import uuid4
 from sqlalchemy import select, delete, insert
 
 CLOSED_TASK_STATUSES=('completed','approved_skipped')
@@ -145,7 +146,16 @@ def reconcile(db,model,wid,state):
     return report
 
 
+def mark_rebuilt(db,model,wid):
+    """Invalidate shell validators after a serialized same-version index rebuild."""
+    workspace=model.metadata.tables['workspaces']
+    root=dict(db.scalar(select(workspace.c.data).where(workspace.c.id==wid)))
+    root['_index_generation']=uuid4().hex
+    db.execute(workspace.update().where(workspace.c.id==wid).values(data=root))
+
+
 def repair(db,model,wid,state,report):
     """Rewrite only the projects and counters a report flagged."""
     replace_projects(db,model,wid,state,report['dirty_projects'])
     replace_counters(db,model,wid,state)
+    mark_rebuilt(db,model,wid)

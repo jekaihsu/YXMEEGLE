@@ -37,8 +37,8 @@ def mine(ti,user,facts):
     return or_(and_(ti.c.assignee_id==user['id'],ti.c.assignee_id.in_(facts['active'])),ti.c.task_id.in_(sorted(facts['delegated']) or ['']))
 
 
-def etag(wid,user,version,today,users):
-    key=json.dumps([wid,user['id'],user.get('authz_version',0),user.get('role'),sorted(user.get('capabilities',[])),user.get('active',True),can_business_override(user),version,today,users],sort_keys=True,default=str)
+def etag(wid,user,version,today,users,index_generation=None):
+    key=json.dumps([wid,user['id'],user.get('authz_version',0),user.get('role'),sorted(user.get('capabilities',[])),user.get('active',True),can_business_override(user),version,today,users,index_generation],sort_keys=True,default=str)
     return 'W/"shell-'+hashlib.sha256(key.encode()).hexdigest()[:32]+'"'
 
 
