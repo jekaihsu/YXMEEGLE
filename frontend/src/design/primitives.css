@@ -45,4 +45,4 @@ button.ds-row:hover,a.ds-row:hover{background:var(--surface-2)}
 .ds-status-badge[data-kind=workflow]{border-radius:var(--radius-pill);border:1px solid var(--sep)}
 .ds-status-badge[data-kind=verification]{border-radius:var(--radius-s);border:1px dashed currentColor;background:none}
 .ds-status-badge[data-kind=attention]{border-radius:var(--radius-s);background:color-mix(in srgb,currentColor 10%,var(--surface));border:1px solid currentColor}
-.ds-status-badge[data-tone=positive]{color:var(--positive)}.ds-status-badge[data-tone=warning]{color:var(--warning)}.ds-status-badge[data-tone=critical]{color:var(--critical)}
+.ds-status-badge[data-tone=positive]{color:color-mix(in srgb,var(--positive) 85%,var(--label))}.ds-status-badge[data-tone=warning]{color:var(--warning)}.ds-status-badge[data-tone=critical]{color:var(--critical)}

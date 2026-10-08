@@ -21,9 +21,10 @@ import {CompletionCelebration, newlyCompletedNodes, type CompletionMoment} from 
 import {type Approval, type Project, type Route, type Session, type SourceData, type Workspace, type Freshness, type LiveDataset} from './types';
 import {ActionScope, Ctx, TaskRow, STATUS, NODE_NAMES, SOURCE_KINDS, eventMessage, date, shortDate, stamp, num, active, allTasks, isLate, nameOf, isLead, isProjectLead, isTaskActor, safeUrl, Badge, Empty, Modal, Field, Primary, PageHead, openTask, TaskTable, FullWorkspaceGate} from './appCommon';
 import {Dashboard, ShellDashboard} from './DailyHome';
-import {Projects} from './ProjectsList';
+
 import {ProjectDetailGate} from './ProjectDetail';
 
+const Projects = lazy(() => import('./ProjectsList').then(module => ({default: module.Projects})));
 const CompanyCockpit = lazy(() => import('./CompanyCockpit').then(module => ({default: module.CompanyCockpit})));
 
 
@@ -94,7 +95,7 @@ export default function App(){
   {toast&&<div className="toast glass" role="status" aria-live="polite"><CircleCheck size={18}/>{toast}</div>}
   {sessionOpen&&s&&<Modal title={s.mode==='demo'?'切換示範角色':'目前登入身份'} subtitle="角色會影響可操作的案件、節點及子任務。" onClose={()=>setSessionOpen(false)}>{s.mode==='demo'?<div className="role-list">{s.users.map(u=><button key={u.id} disabled={busy} className={`role-option ${u.id===s.user?.id?'selected':''}`} onClick={()=>void switchUser(u.id)}><Avatar user={u}/><span><strong>{u.name}</strong><small>{u.department} · {ROLE[u.role]||u.role}</small></span>{u.id===s.user?.id?<Check size={18}/>:<ChevronRight size={16}/>}</button>)}</div>:<div className="modal-body"><p>目前為 Lark 登入，使用者身份由登入帳號決定。</p><p>{s.environment==='test'?'目前在獨立測試區，來源與正式案件分開。':'目前在公司正式工作區。'}</p><button className="button" onClick={()=>{setSessionOpen(false);go({view:'admin',tab:'settings'})}}>切換工作區</button><button className="button" disabled={busy} onClick={()=>void logout()}>登出</button></div>}</Modal>}
   </>}>
-   {c&&<>{route.view==='company'&&<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在準備公司駕駛艙…</p></div>}><CompanyCockpit refreshVersion={workspaceReload} role={c.s.user?.role} freshness={c.w.freshness}/></Suspense>}{route.view==='dashboard'&&(c.w.scope==='shell'?<ShellDashboard c={c}/>:<Dashboard c={c}/>)}{route.view==='projects'&&<Projects c={c}/>}{route.view==='work'&&<FullWorkspaceGate c={c}>{fc=><MyWork c={fc}/>}</FullWorkspaceGate>}{route.view==='schedule'&&<FullWorkspaceGate c={c}>{fc=><Schedule c={fc}/>}</FullWorkspaceGate>}{route.view==='project'&&<ProjectDetailGate c={c}/>}{route.view==='approvals'&&<FullWorkspaceGate c={c}>{fc=><Approvals c={fc}/>}</FullWorkspaceGate>}{route.view==='sources'&&<Sources c={c}/>}{route.view==='admin'&&<FullWorkspaceGate c={c}>{fc=><Administration c={fc}/>}</FullWorkspaceGate>} {route.view==='routines'&&<FullWorkspaceGate c={c}>{fc=><Routines c={fc}/>}</FullWorkspaceGate>}</>}
+   {c&&<>{route.view==='company'&&<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在準備公司駕駛艙…</p></div>}><CompanyCockpit refreshVersion={workspaceReload} role={c.s.user?.role} freshness={c.w.freshness}/></Suspense>}{route.view==='dashboard'&&(c.w.scope==='shell'?<ShellDashboard c={c}/>:<Dashboard c={c}/>)}{route.view==='projects'&&<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在載入案件…</p></div>}><Projects c={c}/></Suspense>}{route.view==='work'&&<FullWorkspaceGate c={c}>{fc=><MyWork c={fc}/>}</FullWorkspaceGate>}{route.view==='schedule'&&<FullWorkspaceGate c={c}>{fc=><Schedule c={fc}/>}</FullWorkspaceGate>}{route.view==='project'&&<ProjectDetailGate c={c}/>}{route.view==='approvals'&&<FullWorkspaceGate c={c}>{fc=><Approvals c={fc}/>}</FullWorkspaceGate>}{route.view==='sources'&&<Sources c={c}/>}{route.view==='admin'&&<FullWorkspaceGate c={c}>{fc=><Administration c={fc}/>}</FullWorkspaceGate>} {route.view==='routines'&&<FullWorkspaceGate c={c}>{fc=><Routines c={fc}/>}</FullWorkspaceGate>}</>}
  </AppShell></DraftNamespace.Provider>
 }
 
