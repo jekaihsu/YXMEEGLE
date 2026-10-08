@@ -5,7 +5,7 @@
 .audit-screen .audit-entry+.audit-entry{border-top:1px solid var(--separator)}
 .audit-screen .audit-entry::before{content:"";position:absolute;left:var(--sp-3);top:var(--sp-5);bottom:0;border-left:1px solid var(--separator)}
 .audit-screen .audit-entry::after{content:"";position:absolute;left:var(--sp-2);top:var(--sp-5);width:var(--sp-2);height:var(--sp-2);border-radius:var(--radius-pill);background:var(--accent)}
-.audit-screen .ds-row{align-items:flex-start;flex-wrap:wrap;background:var(--surface)}
+.audit-screen .ds-row{align-items:flex-start;flex-wrap:wrap;background:transparent}
 .audit-screen .ds-row-main{flex-basis:50%;overflow-wrap:anywhere}
 .audit-screen.audit-trail time{color:var(--label-2);font-size:var(--fs-footnote);font-variant-numeric:tabular-nums}
 .audit-screen .audit-entry>p,.audit-screen .audit-entry>details{padding:0 var(--sp-4);margin:var(--sp-2) 0;font-size:var(--fs-subhead);color:var(--label)}
