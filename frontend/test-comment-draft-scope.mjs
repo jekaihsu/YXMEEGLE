@@ -10,7 +10,7 @@ globalThis.cancelAnimationFrame=clearTimeout;
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=(await import('react')).default,{act}=await import('react');
 const {createRoot}=await import('react-dom/client');
-const bundle=await build({entryPoints:['src/App.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'},plugins:[{name:'expose-comments',setup(b){b.onLoad({filter:/\/App\.tsx$/},async({path})=>({contents:await fs.readFile(path,'utf8')+'\nexport {Comments};',loader:'tsx'}))}}]});
+const bundle=await build({entryPoints:['src/ProjectDetail.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const path=new URL('./.comment-draft-bundle.mjs',import.meta.url);
 await fs.writeFile(path,bundle.outputFiles[0].text);
 let Comments;try{({Comments}=await import(path.href))}finally{await fs.unlink(path)}
