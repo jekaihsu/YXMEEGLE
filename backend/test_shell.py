@@ -92,6 +92,13 @@ def test_shell_hides_invisible_cases_from_cards_and_counts(tmp_path, monkeypatch
     from .models import ProjectIndex
     with scaled_client(tmp_path, 8, **ON) as (app, client):
         switch(client, 'ou_015')
+        from .test_projects_overview import edit_workspace
+        def pause(state):
+            for p in state['projects']:
+                for n in p['nodes']:
+                    for t in n['tasks']: t['status'] = 'completed'
+            for p in state['projects'][:2]: p['nodes'][0]['tasks'][0].update(status='paused', due_date=None)
+        edit_workspace(app, client, pause)
         everything = client.get('/api/workspace?scope=shell').json()
         with app.state.sessions.begin() as db:
             db.execute(update(ProjectIndex).where(ProjectIndex.project_id == 'p001').values(case_visibility='excluded_history'))
@@ -101,6 +108,12 @@ def test_shell_hides_invisible_cases_from_cards_and_counts(tmp_path, monkeypatch
         assert 'p001' not in [p['id'] for p in shell['projects']] and len(shell['projects']) == 7
         assert shell['counts']['my_active_tasks'] < everything['counts']['my_active_tasks']
         assert not any(a['project_id'] == 'p001' for a in shell['attention'])
+        assert everything['counts']['blocked_tasks'] == 2 and shell['counts']['blocked_tasks'] == 1
+        assert [a['project_id'] for a in shell['blocked']] == ['p002']
+        with app.state.sessions.begin() as db:
+            db.execute(update(ProjectIndex).where(ProjectIndex.project_id == 'p002').values(case_visibility='source_review'))
+        hidden = client.get('/api/workspace?scope=shell').json()
+        assert hidden['counts']['blocked_tasks'] == 0 and hidden['blocked'] == []
 
 
 def test_shell_budget_319(tmp_path):
@@ -163,3 +176,61 @@ def test_shell_etag_changes_with_version_authority_and_day(tmp_path, monkeypatch
         assert shell.etag('w2', user, 1, '2026-10-08', []) != base and shell.etag('w', user, 1, '2026-10-09', []) != base
         monkeypatch.setattr(backend_app, 'now', lambda: '2030-01-01T00:00:00+08:00')
         assert shell_get(client, tag).status_code == 200
+
+
+def test_shell_blocked_undated_future_and_closed_tasks(tmp_path):
+    from .test_projects_overview import edit_workspace
+    with scaled_client(tmp_path, 2, **ON) as (app, client):
+        as_of = client.get('/api/workspace?scope=shell').json()['as_of']
+        def prepare(state):
+            for p in state['projects']:
+                for n in p['nodes']:
+                    for t in n['tasks']: t.update(status='completed', due_date=None)
+            state['projects'][-1]['nodes'][-1]['tasks'][-1].update(status='pending', due_date=as_of)
+        edit_workspace(app, client, prepare)
+        before = client.get('/api/workspace?scope=shell').json()
+        assert len(before['attention']) == 1 and before['counts']['blocked_tasks'] == 0 and before['blocked'] == []
+        def pause(state):
+            tasks = [t for p in state['projects'] for n in p['nodes'] for t in n['tasks']]
+            tasks[0].update(status='paused', due_date=None)
+            tasks[1].update(status='paused', due_date='2099-01-01')
+            # Closed records and an unmet input dependency are not status-blocked.
+            tasks[3].update(status='completed', paused=True)
+            tasks[4].update(status='superseded', paused=True)
+            tasks[5].update(status='pending', input_task_ids=[tasks[0]['id']])
+        edit_workspace(app, client, pause)
+        body = client.get('/api/workspace?scope=shell').json()
+        assert body['attention'] == before['attention']
+        assert body['counts']['blocked_tasks'] == 2
+        assert [(a['task_id'], a['due_date'], a['status']) for a in body['blocked']] == [
+            ('p001-sales-t1', '', 'paused'), ('p001-sales-t2', '2099-01-01', 'paused')]
+        expected_keys = {'task_id', 'project_id', 'node_id', 'node_key', 'node_name', 'assignee_id', 'status', 'due_date',
+                         'project_code', 'project_name', 'title'}
+        assert set(body['attention'][0]) == expected_keys
+        assert all(set(a) == expected_keys for a in body['blocked'])
+        full = client.get('/api/workspace').json()
+        titles = {t['id']: t['title'] for p in full['projects'] for n in p['nodes'] for t in n['tasks']}
+        assert all(a['title'] == titles[a['task_id']] for a in body['blocked'] + body['attention'])
+
+
+def test_shell_blocked_limit_and_workspace_order(tmp_path):
+    from .test_projects_overview import edit_workspace
+    with scaled_client(tmp_path, 3, **ON) as (app, client):
+        def pause(state):
+            for p in state['projects']:
+                for n in p['nodes']:
+                    for t in n['tasks']: t.update(status='completed', due_date=None)
+            # Reverse project/node/task order to ensure the list follows ordinals, not IDs.
+            state['projects'].reverse()
+            for p in state['projects']:
+                p['nodes'].reverse()
+                for n in p['nodes']: n['tasks'].reverse()
+            tasks = [t for p in state['projects'] for n in p['nodes'] for t in n['tasks']]
+            for i, t in enumerate(tasks[:7]): t['status'] = 'paused' if i % 2 else 'blocked'
+        edit_workspace(app, client, pause)
+        full = client.get('/api/workspace').json()
+        expected = [t['id'] for p in full['projects'] for n in p['nodes'] for t in n['tasks'] if t['status'] in ('paused', 'blocked')]
+        shell = client.get('/api/workspace?scope=shell').json()
+        assert shell['counts']['blocked_tasks'] == 7 and len(shell['blocked']) == 5
+        assert [a['task_id'] for a in shell['blocked']] == expected[:5]
+        assert shell['blocked'][0]['status'] == 'blocked'

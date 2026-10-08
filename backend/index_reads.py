@@ -16,7 +16,8 @@ def ready(db,model,row):
     pi,_,ci=index_tables.tables(model)
     total=db.execute(select(ci.c.value,ci.c.source_version).where(ci.c.workspace_id==row.id,ci.c.key=='projects_total',ci.c.subject_id=='')).first()
     if total is None or total.source_version!=row.version: return False
-    return db.scalar(select(func.count()).select_from(pi).where(pi.c.workspace_id==row.id))==total.value
+    rows,facts=db.execute(select(func.count(),func.count(pi.c.shell_facts)).where(pi.c.workspace_id==row.id)).one()
+    return rows==facts==total.value
 
 
 def visibility(pi,environment):

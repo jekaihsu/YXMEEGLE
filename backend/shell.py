@@ -48,17 +48,18 @@ def open_late(ti,today):
 
 
 def project_counts(db,ti,wid,today,ids=None):
-    """{project_id: (open tasks, overdue tasks)}; ids limits the scan to one page of projects."""
+    """{project_id: (open, overdue, blocked tasks)}; ids limits the scan to one page of projects."""
     openq,late=open_late(ti,today); where=[ti.c.workspace_id==wid]
     if ids is not None: where.append(ti.c.project_id.in_(ids))
-    return {r.project_id:(r.active,r.late) for r in db.execute(select(ti.c.project_id,func.sum(case((openq,1),else_=0)).label('active'),
-        func.sum(case((late,1),else_=0)).label('late')).where(*where).group_by(ti.c.project_id))}
+    return {r.project_id:(r.active,r.late,r.blocked) for r in db.execute(select(ti.c.project_id,func.sum(case((openq,1),else_=0)).label('active'),
+        func.sum(case((late,1),else_=0)).label('late'),
+        func.sum(case((and_(openq,ti.c.status.in_(('paused','blocked'))),1),else_=0)).label('blocked')).where(*where).group_by(ti.c.project_id))}
 
 
-def card(r,state,per_project):
+def card(r,state,per_project,detail=False):
     """List-row view of one project_index row, shared by the shell and the paged overview."""
     summary=r['summary'] or {}; derived=summary.get('execution_status') or r['execution_status']  # full workspace shows the refreshed value (status mirrors it)
-    active,overdue=per_project.get(r['project_id'],(0,0))
+    active,overdue,blocked=per_project.get(r['project_id'],(0,0,0))
     card=dict(id=r['project_id'],code=r['code'],name=r['name'],client=r['client'],pm_id=r['pm_id'],status=derived,execution_status=derived,
               due_date=r['due_date'],case_type=r['case_type'],source_kind=r['source_kind'],
               source_status=r['source_status'],concurrency_version=r['concurrency_version'],
@@ -67,6 +68,10 @@ def card(r,state,per_project):
     view=project_execution_view(state,dict(case_visibility=r['case_visibility'],execution_system=r['execution_system']))
     view.pop('execution_system_label')  # the client derives it from execution_system
     card.update({k:v for k,v in view.items() if v is not None})
+    if detail:
+        facts=r['shell_facts']
+        card.update(contract_amount=facts['contract_amount'],current_nodes=facts['current_nodes'],blocked_tasks=blocked or 0)
+        if facts['source_lifecycle'] is not None: card['source_lifecycle']=facts['source_lifecycle']
     return card
 
 
@@ -89,22 +94,25 @@ def build(db,model,row,state,user,facts,today,approval_connection):
     cards=[card(r,state,per_project) for r in rows]
     joined=ti.join(pi,and_(pi.c.workspace_id==ti.c.workspace_id,pi.c.project_id==ti.c.project_id))
     today_q=and_(openq,func.substr(ti.c.due_date,1,10)==as_of[:10])
+    blocked_q=and_(openq,ti.c.status.in_(('paused','blocked')))
     # Legacy Dashboard: every open task of every visible case (not only the user's own); the 'my' numbers stay the nav badge.
     owned=mine(ti,user,facts); one=lambda cond:func.coalesce(func.sum(case((cond,1),else_=0)),0)
-    allc=db.execute(select(one(openq),one(late),one(today_q),one(and_(openq,owned)),one(and_(late,owned))).select_from(joined).where(ti.c.workspace_id==wid,*vis)).one()
+    allc=db.execute(select(one(openq),one(late),one(today_q),one(and_(openq,owned)),one(and_(late,owned)),one(blocked_q)).select_from(joined).where(ti.c.workspace_id==wid,*vis)).one()
     my_active,my_late=allc[3],allc[4]
     # [...overdue, ...dueToday] in workspace order: project, node, task ordinal
-    attention=[dict(r._mapping) for r in db.execute(select(ti.c.task_id,ti.c.project_id,ti.c.node_id,ti.c.node_key,ti.c.node_name,ti.c.assignee_id,ti.c.status,ti.c.due_date,pi.c.code.label('project_code'),pi.c.name.label('project_name'))
-        .select_from(joined).where(ti.c.workspace_id==wid,or_(late,today_q),*vis)
+    task_rows=select(ti.c.task_id,ti.c.project_id,ti.c.node_id,ti.c.node_key,ti.c.node_name,ti.c.assignee_id,ti.c.status,ti.c.due_date,pi.c.code.label('project_code'),pi.c.name.label('project_name')).select_from(joined).where(ti.c.workspace_id==wid,*vis)
+    attention=[dict(r._mapping) for r in db.execute(task_rows.where(or_(late,today_q))
         .order_by(case((late,0),else_=1),pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))]
-    if attention:
-        titles={r.entity_id:(r.data or {}).get('title') for r in db.execute(select(model.entity_id,model.data).where(model.workspace_id==wid,model.kind=='tasks',model.entity_id.in_([a['task_id'] for a in attention])))}
-        for a in attention: a['title']=titles.get(a['task_id'],'')
+    blocked=[dict(r._mapping) for r in db.execute(task_rows.where(blocked_q)
+        .order_by(pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))]
+    if attention or blocked:
+        titles={r.entity_id:(r.data or {}).get('title') for r in db.execute(select(model.entity_id,model.data).where(model.workspace_id==wid,model.kind=='tasks',model.entity_id.in_(sorted({a['task_id'] for a in attention+blocked}))))}
+        for a in attention+blocked: a['title']=titles.get(a['task_id'],'')
     return dict(scope='shell',version=row.version,as_of=as_of,workspace_id=wid,environment=env,users=state['users'],
                 calendar=state.get('calendar'),source_status=state.get('source_status'),file_categories=categories(state),approval_connection=approval_connection,
                 counts=dict(approvals_pending=pending,daily_unmatched=counters.get('daily_unmatched',0),my_overdue_tasks=int(my_late),my_active_tasks=int(my_active),
-                            active_tasks=int(allc[0]),overdue_tasks=int(allc[1]),due_today_tasks=int(allc[2])),
-                projects=cards,attention=attention,pending_approvals=pending_items,approvals=[],events=[])
+                            active_tasks=int(allc[0]),overdue_tasks=int(allc[1]),due_today_tasks=int(allc[2]),blocked_tasks=int(allc[5])),
+                projects=cards,attention=attention,blocked=blocked,pending_approvals=pending_items,approvals=[],events=[])
 
 
 TABS=('all','formal','intake','active','overdue','completed')
@@ -136,4 +144,4 @@ def overview_page(db,model,row,state,today,*,q='',status='',owner='',tab='formal
     order=[(o.desc() if desc else o.asc()) for o in (key,_binary(pi.c.project_id,db))]
     rows=db.execute(select(pi).where(*where).order_by(*order).limit(limit).offset(offset)).mappings().all()
     counts=project_counts(db,ti,wid,today,[r['project_id'] for r in rows])
-    return dict(total=total,offset=offset,limit=limit,facets=facets,items=[card(r,state,counts) for r in rows])
+    return dict(total=total,offset=offset,limit=limit,facets=facets,items=[card(r,state,counts,detail=True) for r in rows])

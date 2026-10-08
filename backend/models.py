@@ -57,6 +57,7 @@ class ProjectIndex(Base):
     tasks_total=Column(Integer,nullable=False,default=0)
     tasks_completed=Column(Integer,nullable=False,default=0)
     summary=Column(JSON)
+    shell_facts=Column(JSON(none_as_null=True))  # SQL NULL until re-backfilled
     source_version=Column(Integer,nullable=False,default=0)
 
 class TaskIndex(Base):
