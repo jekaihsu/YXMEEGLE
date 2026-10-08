@@ -61,3 +61,5 @@ body{background-color:var(--bg);background-image:var(--bg-tint);background-attac
 .app-shell .toast.glass{background:var(--surface);border:1px solid var(--sep);border-radius:var(--radius-s)}
 @media(max-width:1000px){.app-shell .workspace{padding-inline:24px}.app-shell .topbar{padding-inline:24px}}
 @media(max-width:760px){.app-shell .main-shell{margin-left:0}.app-shell .workspace{padding:24px 20px 96px}.app-shell .topbar{padding-inline:16px}.mobile-tabs svg{display:none}.mobile-tabs button{min-height:54px}}
+
+.app-shell .recent-project small{white-space:normal;overflow:visible;text-overflow:clip}

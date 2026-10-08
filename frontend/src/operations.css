@@ -5,8 +5,8 @@
 .operations .ops-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--sp-5);margin-bottom:var(--sp-6)}
 .operations .ops-heading h2{margin:0;color:var(--label);font-size:var(--fs-title1)}
 .operations .ops-notice{padding:var(--sp-3) var(--sp-4);color:var(--label-2)}
-.operations .ops-tabs{display:flex;flex-wrap:wrap;gap:var(--sp-2);background:var(--surface-2);border:0}
-.operations .ops-tabs button.active{background:var(--accent-fill);color:var(--accent);border-radius:var(--radius-pill);box-shadow:none}
+.operations .ops-tabs{display:flex;flex-wrap:wrap;gap:var(--sp-2);background:none;border:0}
+.operations .ops-tabs button.active{background:none;color:var(--accent);border-radius:0;box-shadow:none}
 .operations .ds-row{background:var(--surface)}
 .operations .ops-form{padding:var(--sp-4);animation:none}
 .operations .ops-fields{display:grid;gap:var(--sp-4);margin:var(--sp-4) 0}
@@ -38,3 +38,8 @@
 .operations h3{font-size:var(--fs-headline);color:var(--label)}
 .operations .text-button{background:none;color:var(--accent)}
 .operations .ds-badge{white-space:normal}
+
+.operations .ops-tabs{gap:var(--sp-4);margin-block:var(--sp-5);padding:0}
+.operations .ops-tabs button{padding:var(--sp-2) 0}
+.operations :is(.ops-form,.ds-group){padding-inline:0}
+.operations .data-table :is(th,td){background:transparent}

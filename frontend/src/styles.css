@@ -69,3 +69,17 @@
 .empty-icon{display:none}
 .empty{padding:var(--sp-7) 0;text-align:left;align-items:flex-start;justify-content:flex-start}
 .empty h3,.empty strong{color:var(--label)}
+/* A timetable scrolls as one evidence field, with readable day lanes. */
+.calendar-scroll{max-height:68vh;overflow:auto;overscroll-behavior:contain}
+.calendar-grid{min-width:80rem;border:0;border-radius:0;overflow:visible}
+.calendar-day,.calendar-day.holiday{background:transparent;min-width:0}
+.calendar-day>header{position:sticky;top:0;background:var(--bg);z-index:1;min-height:56px;gap:var(--sp-2)}
+.calendar-day>header :is(span,small){white-space:nowrap}
+.calendar-task{padding:var(--sp-3) var(--sp-2);margin:0;border-bottom:1px solid var(--sep)}
+.calendar-task>strong{color:var(--label);font-size:var(--fs-subhead);font-weight:500}
+.calendar-task:hover{transform:none;background:var(--surface-2)}
+:is(.person-cell,.calendar-task,.project-meta,.task-title) .avatar{display:none}
+.tabbar>button span{background:none;border-radius:0;padding:0}
+:is(.revision,.stage-chips>span){background:none;border:0;border-radius:0}
+.eyebrow{display:none}
+:is(.resource-table,.compact-table) :is(th,td){vertical-align:baseline}
