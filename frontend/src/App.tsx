@@ -1,73 +1,37 @@
 import {useReloadGuard} from './reloadGuard';
-import {ageFreshness,datasetNotice,failedFreshness} from './freshness';
+import {ageFreshness, datasetNotice, failedFreshness} from './freshness';
 import {DataFreshness} from './DataFreshness';
 import {RecoveryPage} from './RecoveryPage';
-import {AdmissionCell,ExecutionAdmissionQueue} from './ExecutionAdmission';
-import {ProjectExecutionNotice,executionAllowed,executionReason} from './ProjectExecution';
+import {AdmissionCell, ExecutionAdmissionQueue} from './ExecutionAdmission';
+import {ProjectExecutionNotice, executionAllowed, executionReason} from './ProjectExecution';
 import {projectQuotes} from './sourceQuotes';
-import {ProjectReadiness,SourceContractIndex} from './ProjectReadiness';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useRef, type FormEvent, type MouseEvent, type ReactNode } from 'react';
-import { Activity, ArrowDown, ArrowRight, ArrowUpRight, BarChart3, CalendarDays, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Circle, CircleCheck, CircleDot, Clock3, Copy, Download, ExternalLink, File, FileCheck2, FilePlus2, Files, Filter, FolderOpen, GitBranch, LayoutDashboard, Link2, ListTodo, Loader2, MessageSquare, MoreHorizontal, Network, Pause, Play, Plus, RefreshCw, Search, Send, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, TriangleAlert, Upload, Users, X } from 'lucide-react';
-import { useViewData } from './viewData';
-import { api, perfFirstRender, perfMark, ApiError, readRoute, normalizeRoute, getSessionEpoch, invalidateSessionEpoch, liveRefresh } from './api';
-import { ProjectOperations, Administration, Routines, ActionForm, Field as OpsField } from './Operations';
+import {ProjectReadiness, SourceContractIndex} from './ProjectReadiness';
+import {lazy, Suspense, useCallback, useEffect, useState, useRef, type FormEvent, type ReactNode} from 'react';
+import {Activity, ArrowDown, ArrowRight, ArrowUpRight, CalendarDays, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, CircleCheck, Clock3, Download, ExternalLink, FileCheck2, FilePlus2, Files, GitBranch, Link2, Loader2, MessageSquare, Network, Pause, Play, Plus, RefreshCw, Search, Send, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, TriangleAlert, Upload, Users, X} from 'lucide-react';
+import {useViewData} from './viewData';
+import {api, perfFirstRender, perfMark, ApiError, readRoute, normalizeRoute, getSessionEpoch, invalidateSessionEpoch, liveRefresh} from './api';
+import {ProjectOperations, Administration, Routines, ActionForm, Field as OpsField} from './Operations';
 import {useDialogFocus} from './useDialogFocus';
-import {MentionComposer,MentionTags,MentionDelivery} from './MentionComposer';
+import {MentionComposer, MentionTags, MentionDelivery} from './MentionComposer';
 import {MentionInbox} from './MentionInbox';
-import {AppShell,Avatar,ROLE} from './AppShell';
-import {useDraftNavigationGuard,type DraftScope} from './useDraftNavigationGuard';
-import {NativeApprovalControls,FinancialApprovalRequests} from './NativeApprovalControls';
+import {AppShell, Avatar, ROLE} from './AppShell';
+import {useDraftNavigationGuard, type DraftScope} from './useDraftNavigationGuard';
+import {NativeApprovalControls, FinancialApprovalRequests} from './NativeApprovalControls';
 import {ChangeConfirmationLines} from './ChangeConfirmationLines';
 import {DraftNamespace} from './FormDraft';
 import {AuditTrail} from './AuditTrail';
-import {FilePanel,FileModal} from './FileWorkspace';
+import {FilePanel, FileModal} from './FileWorkspace';
 import {DailyRecords} from './DailyRecords';
 import {TaskBatchCompletion} from './TaskBatchCompletion';
-import {draftKey,useDraft,clearDrafts} from './drafts';
+import {draftKey, useDraft, clearDrafts} from './drafts';
 import {SourceMappingSummary} from './SourceMappingSummary';
 import {lifecycleGate} from './sourceLifecycle';
-import {CompletionCelebration,newlyCompletedNodes,type CompletionMoment} from './CompletionCelebration';
-import type { Approval, Node, Project, Route, Session, SourceData, Task, User, Workspace, Freshness, LiveDataset } from './types';
+import {CompletionCelebration, newlyCompletedNodes, type CompletionMoment} from './CompletionCelebration';
+import {type Approval, type Node, type Project, type Route, type Session, type SourceData, type Task, type Workspace, type Freshness, type LiveDataset} from './types';
+import {ActionScope,Ctx,ProjectPage,ProjectSlice,TaskRow,STATUS,NODE_NAMES,SOURCE_KINDS,eventMessage,date,shortDate,stamp,num,money,unmatchedDaily,active,allTasks,isLate,progress,elapsed,nameOf,isLead,isProjectLead,isTaskActor,safeUrl,Badge,Empty,Modal,Field,OwnerSelect,Primary,PageHead,openTask,taskReadiness,openGuidedTask,EventList,TaskTable,TaskIcon,FullWorkspaceGate} from './appCommon';
 
 const CompanyCockpit = lazy(() => import('./CompanyCockpit').then(module => ({default: module.CompanyCockpit})));
 
-type ActionScope={project_id?:string;node_id?:string;task_id?:string};
-type Ctx={w:Workspace;s:Session;busy:boolean;error:string;registerDrafts:(scope:DraftScope|null)=>void;onFreshness?:(freshness:Freshness)=>void;onRefreshError?:(datasets:LiveDataset[])=>void;reloadVersion?:number;route:Route;go:(r:Route)=>void;run:(action:string,payload?:Record<string,unknown>,scope?:ActionScope)=>Promise<Workspace|undefined>;refresh:()=>Promise<void>;notify:(m:string)=>void;upload:(form:FormData)=>Promise<boolean>};
-type ProjectPage={total:number;offset:number;limit:number;facets:{all:number;formal:number;intake:number};items:Project[]};
-type ProjectSlice={scope:'project';version:number;project:Project;[key:string]:any};
-type TaskRow={p:Project;n:Node;t:Task};
-const STATUS:Record<string,string>={approved_skipped:'核准跳過',engineering_complete:'工程完成、財務待結',internal:'內部案',source_conflict:'來源待核對',pending:'尚未開始',in_progress:'進行中',completed:'已完成',paused:'暫停中',superseded:'舊版留存',rework:'退回修正',draft:'草稿',approved:'已核准',executed:'已套用',rejected:'已駁回',withdrawn:'已撤回',active:'進行中',ongoing:'進行中'};
-const NODE_NAMES:Record<string,string>={sales:'業務',pm:'PM',confirmation:'確認單',field:'外業',control:'控制',mapping:'圖資',report:'報告',pricing:'計價',settlement:'結算'};
-const SOURCE_KINDS:Record<string,string>={quote:'報價資料',quote_confirmation:'報價確認單',daily:'日報紀錄',case:'案件資料',work:'工作單',confirmation:'工程確認單',contract:'合約明細',reporting:'填報工項',cost:'成本單'};
-const ACTION_NAMES:Record<string,string>={node_skip_create:'建立節點跳過草稿',node_skip_submit:'送出節點跳過審批',node_skip_vote:'確認節點跳過申請',node_skip_apply:'套用核准跳過',node_skip_withdraw:'撤回節點跳過申請',task_start:'開始作業',task_complete:'完成任務並交付成果',task_return:'退回任務修正',task_update:'更新任務指派與排程',task_add:'新增任務',node_complete:'送交節點確認',participants_update:'更新案件參與人員',comment_add:'新增評論',file_link:'加入檔案連結',approval_create:'建立審批草稿',approval_submit:'送出審批',approval_confirm:'完成審批確認',approval_lark:'更新示範審批結果',approval_execute:'套用已核准的調整',approval_withdraw:'撤回申請',change_resume:'恢復受影響工項',calendar_update:'更新工作日設定',demo_reset:'還原示範工作區'};
-const eventMessage=(e:{action?:string;message?:string})=>e.message&&e.message!==e.action?e.message:ACTION_NAMES[e.action||'']||e.action||'更新紀錄';
-const date=(value?:string|null)=>value?value.slice(0,10).replaceAll('-','/'):'未排定';
-const shortDate=(value?:string|null)=>value?value.slice(5,10).replace('-','/'):'—';
-const stamp=(value?:string|null)=>value?`${date(value)} ${value.includes('T')?new Date(value).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}):''}`:'—';
-const num=(value?:number|null)=>value==null?'—':value.toLocaleString('zh-TW',{maximumFractionDigits:2});
-const money=(value?:number|null)=>value==null?'待帶入':`NT$ ${num(value)}`;
-const unmatchedDaily=(w:Workspace)=>w.scope==='shell'&&w.counts?w.counts.daily_unmatched:w.source_status.mapping?.daily_unmatched??(Array.isArray(w.daily_unmatched)?w.daily_unmatched.length:0);
-const active=(t:Task)=>!['completed','superseded'].includes(t.status);
-const allTasks=(w:Workspace):TaskRow[]=>w.projects.flatMap(p=>(p.nodes||[]).flatMap(n=>n.tasks.map(t=>({p,n,t}))));
-const isLate=(t:{due_date:string|null;status:string},now:string)=>!!t.due_date&&t.due_date.slice(0,10)<now.slice(0,10)&&!['completed','superseded'].includes(t.status);
-const progress=(p:Project)=>{const ts=p.nodes.flatMap(n=>n.tasks).filter(t=>t.status!=='superseded');return ts.length?Math.round(ts.filter(t=>t.status==='completed').length/ts.length*100):0};
-const elapsed=(start:string|null|undefined,end:string|null|undefined)=>start&&end?Math.max(0,Math.floor((new Date(end).getTime()-new Date(start).getTime())/86400000)):0;
-const nameOf=(w:Workspace,id?:string)=>w.users.find(u=>u.id===id)?.name||'尚未指派';
-const isLead=(s:Session)=>['pm','manager'].includes(s.user?.role||'');
-const isProjectLead=(s:Session,p:Project)=>s.user?.role==='manager'||[p.pm_id,p.supervisor_id].includes(s.user?.id||'');
-const isTaskActor=(t:Task,_c:Ctx)=>t.can_execute===true;
-const safeUrl=(value?:string)=>value&&/^https?:\/\//i.test(value)?value:undefined;
-function Badge({status,label}:{status:string;label?:string}){return <span className={`badge ${status}`}><i/>{label||STATUS[status]||status}</span>}
-function Empty({title='目前沒有資料',detail,icon=<FolderOpen/>}:{title?:string;detail?:string;icon?:ReactNode}){return <div className="empty"><span>{icon}</span><h3>{title}</h3>{detail&&<p>{detail}</p>}</div>}
-function Modal({title,subtitle,children,onClose,wide=false}:{title:string;subtitle?:string;children:ReactNode;onClose:()=>void;wide?:boolean}){const dialogRef=useDialogFocus(onClose);return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><section ref={dialogRef} tabIndex={-1} className={`modal ${wide?'wide':''}`} role="dialog" aria-modal="true" aria-label={title}><header><div><h2>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div><button className="icon-button" onClick={onClose} aria-label="關閉"><X size={19}/></button></header>{children}</section></div>}
-function Field({label,children,hint}:{label:string;children:ReactNode;hint?:string}){return <label className="form-field"><span>{label}</span>{children}{hint&&<small>{hint}</small>}</label>}
-function OwnerSelect({w,value,onChange,name,disabled=false}:{w:Workspace;value?:string;onChange?:(s:string)=>void;name?:string;disabled?:boolean}){
- const[localValue,setLocalValue]=useState(value||'');const selected=onChange?(value||''):localValue;
- return <>{name&&<input type="hidden" name={name} value={selected} disabled={disabled}/>}<select aria-label="選擇負責人" value={selected} onChange={e=>{setLocalValue(e.target.value);onChange?.(e.target.value)}} disabled={disabled}><option value="">尚未指派</option>{w.users.filter(u=>u.active!==false||u.id===selected).map(u=><option key={u.id} value={u.id} disabled={u.active===false}>{u.name} · {u.department}{u.active===false?'（已停用，保留歷史指派）':''}</option>)}</select></>
-}
-function Primary({children,busy,disabled,...rest}:{children:ReactNode;busy?:boolean;disabled?:boolean;onClick?:(e:MouseEvent<HTMLButtonElement>)=>void;type?:'button'|'submit'}){return <button className="button primary" disabled={disabled||busy} {...rest}>{busy?<Loader2 className="spin" size={15}/>:null}{children}</button>}
-function PageHead({eyebrow,title,subtitle,children}:{eyebrow:string;title:string;subtitle?:string;children?:ReactNode}){return <div className="page-heading"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1>{subtitle&&<p>{subtitle}</p>}</div><div className="heading-actions">{children}</div></div>}
-function openTask(c:Ctx,row:TaskRow){c.go({view:'project',project:row.p.id,node:row.n.id,task:row.t.id,tab:'flow'})}
 
 export default function App(){
  const [w,setW]=useState<Workspace>();const[s,setS]=useState<Session>();const[error,setError]=useState('');const[toast,setToast]=useState('');const[busy,setBusy]=useState(false);const[route,setRoute]=useState<Route>(readRoute() as Route);const[mobile,setMobile]=useState(false);const[sessionOpen,setSessionOpen]=useState(false);
@@ -140,16 +104,6 @@ export default function App(){
  </AppShell></DraftNamespace.Provider>
 }
 
-function taskReadiness(r:TaskRow,c:Ctx){
- {const g=lifecycleGate(r.p);if(g)return g;}
- if(r.t.status==='paused')return '待設計變更審批';
- if(!isTaskActor(r.t,c))return `待 ${nameOf(c.w,r.t.owner_id)} 處理`;
- if(!['pending','in_progress','rework'].includes(r.t.status))return '查看目前狀態';
- if((r.t.input_task_ids as string[]|undefined)?.some(id=>!r.p.nodes.some(n=>n.tasks.some(t=>t.id===id&&t.status==='completed'&&!!t.output))))return '待前置成果交付';
- if(r.n.key==='field'){const permit=[...(r.p.evidence||[])].reverse().find((e:{node_id:string;key:string;withdrawn?:boolean})=>e.node_id===r.n.id&&e.key==='permits'&&!e.withdrawn);if(!permit||!['accepted','not_applicable'].includes(permit.status))return '待公務證明核准'}
- return '';
-}
-function openGuidedTask(c:Ctx,r:TaskRow){c.go({view:'project',project:r.p.id,node:r.n.id,tab:'flow',completion:r.n.id,focus:r.t.id})}
 function NextAction({c,rows}:{c:Ctx;rows:TaskRow[]}){
  const owned=rows.filter(r=>active(r.t)&&isTaskActor(r.t,c)&&r.p.case_type!=='intake');
  const ordered=[...owned].sort((a,b)=>(a.t.status==='in_progress'?-1:0)-(b.t.status==='in_progress'?-1:0)||(a.t.due_date||'9999').localeCompare(b.t.due_date||'9999'));
@@ -195,7 +149,6 @@ function ShellActivity({c}:{c:Ctx}){
  return <section className="today-activity"><div className="section-heading"><h2>近期活動</h2><Activity size={17}/></div>{open?<FullWorkspaceGate c={c}>{fc=><EventList c={fc} limit={3}/>}</FullWorkspaceGate>:<button className="text-button" onClick={()=>setOpen(true)}>載入近期活動</button>}</section>
 }
 function Metric({label,value,detail,icon,warn=false,onClick}:{label:string;value:number;detail:string;icon:ReactNode;warn?:boolean;onClick?:()=>void}){return <button className={`metric ${warn?'warning':''}`} onClick={onClick} disabled={!onClick}><span className="metric-label">{label}{icon}</span><strong>{value.toString().padStart(2,'0')}</strong><small>{detail}</small></button>}
-function EventList({c,project,limit=20}:{c:Ctx;project?:string;limit?:number}){const events=[...c.w.events].filter(e=>!project||e.project_id===project).sort((a,b)=>b.created_at.localeCompare(a.created_at)).slice(0,limit);return events.length?<div className="event-list">{events.map(e=><div className="event" key={e.id}><span className="event-dot"/><div><p><strong>{nameOf(c.w,e.actor_id)}</strong> {eventMessage(e)}</p><small>{c.w.projects.find(p=>p.id===e.project_id)?.code} · {stamp(e.created_at)}</small></div></div>)}</div>:<Empty title="尚無操作紀錄" detail="任務、參與人員及審批的操作會記錄在這裡。"/>}
 
 function Projects({c}:{c:Ctx}){const[q,setQ]=useState('');const[filter,setFilter]=useState(c.route.tab==='intake'?'intake':'formal');const[sort,setSort]=useState('due');const[owner,setOwner]=useState('all');const[direction,setDirection]=useState(1);const shell=c.w.scope==='shell';const projectProgress=(p:Project)=>shell?(p.progress?.total_nodes?Math.round(p.progress.completed_nodes/p.progress.total_nodes*100):0):progress(p);
 const[pageIndex,setPageIndex]=useState({key:'',page:0});const[pageSize,setPageSize]=useState(10);const[sentQ,setSentQ]=useState('');
@@ -211,8 +164,6 @@ useEffect(()=>{if(shell&&server.data)perfMark('project-page-render')},[shell,ser
 return <div className="portfolio-page"><PageHead eyebrow="案件管理" title="案件總覽" subtitle="工程確認單成案，報價資料先保留為待確認接案。"><button className="button" onClick={()=>c.go({view:'sources'})}><Network size={16}/>查看資料來源</button></PageHead><div className="portfolio-index"><button className={filter==='formal'?'selected':''} onClick={()=>setFilter('formal')}><span>正式案件<small>已確認的工程案件</small></span><strong>{facets.formal}</strong><ArrowUpRight size={20}/></button><button className={filter==='intake'?'selected':''} onClick={()=>setFilter('intake')}><span>待確認接案<small>報價與尚待確認資料</small></span><strong>{facets.intake}</strong><ArrowUpRight size={20}/></button></div><ExecutionAdmissionQueue w={c.w} s={c.s} run={(action,payload,scope)=>c.run(action,payload,scope)} busy={c.busy}/><div className="portfolio-surface"><div className="tabbar"><button className={filter==='all'?'active':''} onClick={()=>setFilter('all')}>全部紀錄<span>{facets.all}</span></button><button className={filter==='formal'?'active':''} onClick={()=>setFilter('formal')}>正式案件<span>{facets.formal}</span></button><button className={filter==='intake'?'active':''} onClick={()=>setFilter('intake')}>待確認接案<span>{facets.intake}</span></button><button className={filter==='active'?'active':''} onClick={()=>setFilter('active')}>執行中</button><button className={filter==='overdue'?'active':''} onClick={()=>setFilter('overdue')}>需要關注</button><button className={filter==='completed'?'active':''} onClick={()=>setFilter('completed')}>交付已完成</button></div><div className="table-toolbar"><div className="search-field"><Search size={16}/><input aria-label="搜尋案件" placeholder="搜尋案號、案件名稱或業主…" value={q} onChange={e=>setQ(e.target.value)}/>{q&&<button onClick={()=>setQ('')} aria-label="清除搜尋"><X size={14}/></button>}</div><div className="toolbar-filters"><select value={owner} onChange={e=>setOwner(e.target.value)} aria-label="篩選專案經理"><option value="all">所有專案經理</option>{c.w.users.filter(u=>u.role==='pm'||u.role==='manager').map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select><select value={sort} onChange={e=>setSort(e.target.value)} aria-label="案件排序"><option value="due">依案件期限</option><option value="progress">依任務進度</option><option value="name">依案件名稱</option></select><button className="icon-button bordered" aria-label="切換排序方向" onClick={()=>setDirection(-direction)}><ArrowDown size={16} style={{transform:direction===1?'':'rotate(180deg)'}}/></button></div></div><div className="table-scroll"><table className="data-table projects-table"><thead><tr><th>案件名稱</th><th>狀態</th><th>執行歸屬</th><th>專案經理</th><th>目前作業</th><th>任務進度</th><th>有效期限</th>{!shell&&<th>合約金額</th>}<th/></tr></thead><tbody>{ps.map(p=><tr key={p.id} className="clickable" onClick={()=>c.go({view:'project',project:p.id})}><td><span className="case-code">{p.code}<span className="demo-inline">{p.source_kind==='demo'?'示範':p.case_type==='intake'?'待確認接案':'正式案'}</span></span><a className="cell-title case-link" href={`#view=project&project=${encodeURIComponent(p.id)}`} onClick={e=>e.stopPropagation()}>{p.name}</a><small>{p.client}</small>{!shell&&p.parent_code&&<small>母案 {p.parent_code}</small>}</td><td><span className="project-source-status"><small>{p.source_kind==='demo'?'示範来源狀態':'來源狀態（V4）'}</small><Badge status={p.status} label={p.source_status||'來源待核對'}/></span></td><td><AdmissionCell p={p} role={c.s.user?.role}/></td><td><span className="person-cell"><Avatar small user={c.w.users.find(u=>u.id===p.pm_id)}/>{nameOf(c.w,p.pm_id)}</span></td><td><div className="stage-chips">{shell?<Badge status={p.execution_status||'pending'}/>:p.nodes.filter(n=>n.status==='in_progress'||n.status==='paused').map(n=><span key={n.id}>{NODE_NAMES[n.key]}</span>)}</div></td><td><div className="progress-cell"><span>{projectProgress(p)}<small>%</small></span><div className="progress-track"><i style={{width:`${projectProgress(p)}%`}}/></div></div></td><td className="mono">{date(p.due_date)}</td>{!shell&&<td className="mono">{money(p.contract_amount)}</td>}<td><ChevronRight size={16}/></td></tr>)}</tbody></table>{shell&&server.error&&<div className="form-error" role="alert">{server.error}<button className="text-button" onClick={server.reload}>重試</button></div>}{shell&&server.loading&&!server.data&&<div className="skeleton skeleton-row" role="status" aria-label="正在載入案件"/>}{!ps.length&&!(shell&&(server.loading||server.error))&&<Empty title="沒有符合條件的案件" detail="試試其他關鍵字或篩選條件。"/>}</div><div className="table-footer">{shell?<span>共 {total} 筆 · 第 {page+1} / {pages} 頁 · 正式案 {facets.formal} · 接案 {facets.intake}</span>:<span>共 {ps.length} 筆 · 正式案 {ps.filter(p=>p.case_type!=='intake').length} · 接案 {ps.filter(p=>p.case_type==='intake').length}</span>}{shell&&<span className="pager"><select aria-label="每頁筆數" value={pageSize} onChange={e=>setPageSize(Number(e.target.value))}>{[10,25,50,100].map(n=><option key={n} value={n}>每頁 {n} 筆</option>)}</select><button className="button compact" disabled={page===0} onClick={()=>setPageIndex({key:filterKey,page:page-1})}>上一頁</button><button className="button compact" disabled={page+1>=pages} onClick={()=>setPageIndex({key:filterKey,page:page+1})}>下一頁</button></span>}<span>{c.s.mode==='demo'?'此清單為獨立示範案件':'真實案件 · 已保留來源關係'}</span></div></div></div>}
 function MyWork({c}:{c:Ctx}){const[scope,setScope]=useState(c.route.tab==='all'?'all':'mine');const[status,setStatus]=useState('active');const[q,setQ]=useState('');const rows=allTasks(c.w).filter(r=>(scope==='all'||isTaskActor(r.t,c)||scope==='team'&&c.w.users.find(u=>u.id===r.t.owner_id)?.department===c.s.user?.department)&&(status==='all'||status==='active'&&active(r.t)||status==='overdue'&&isLate(r.t,c.w.as_of)||status==='completed'&&r.t.status==='completed')&&`${r.t.title} ${r.p.code}`.includes(q)).sort((a,b)=>(a.t.due_date||'9999').localeCompare(b.t.due_date||'9999'));
 return <><PageHead eyebrow="MY WORK" title="我的工作" subtitle={`${c.s.user?.name}，這裡是你負責的任務與即將到來的交接。`}><span className="quiet-label"><Avatar small user={c.s.user||undefined}/>{c.s.user?.department}</span></PageHead><MentionInbox w={c.w} userId={c.s.user?.id||''} onOpen={target=>c.go({view:'project',...target,tab:'flow'})}/><div className="tabbar"><button className={scope==='mine'?'active':''} onClick={()=>setScope('mine')}>指派給我</button><button className={scope==='team'?'active':''} onClick={()=>setScope('team')}>同組工作</button><button className={scope==='all'?'active':''} onClick={()=>setScope('all')}>所有任務</button></div><div className="table-toolbar"><div className="search-field"><Search size={16}/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="搜尋任務或案號…" aria-label="搜尋任務"/></div><select aria-label="篩選任務狀態" value={status} onChange={e=>setStatus(e.target.value)}><option value="active">待處理任務</option><option value="overdue">逾期任務</option><option value="completed">已完成</option><option value="all">全部狀態</option></select></div><TaskBatchCompletion w={c.w} s={c.s} rows={rows} busy={c.busy} run={(action,payload)=>c.run(action,payload)}/><TaskTable rows={rows} c={c}/><div className="table-footer"><span>{rows.length} 項任務</span><span>完成操作由任務負責人執行；主管可檢視與指派</span></div></>}
-function TaskTable({rows,c,showProject=true}:{rows:TaskRow[];c:Ctx;showProject?:boolean}){return <div className="table-scroll"><table className="data-table task-table"><thead><tr><th>任務</th>{showProject&&<th>案件 / 節點</th>}<th>負責人</th><th>狀態</th><th>排程</th><th>營業額點數</th><th/></tr></thead><tbody>{rows.map(r=><tr key={r.t.id} className={`clickable ${r.t.status==='superseded'?'superseded-row':''}`} onClick={()=>openTask(c,r)}><td><div className="task-title"><TaskIcon status={r.t.status}/><div><button className="text-button" onClick={e=>{e.stopPropagation();openTask(c,r)}}>{r.t.title}</button><small>{r.t.required?'必做 SOP':'增補任務'}{r.t.revision>1?` · v${r.t.revision}`:''}</small></div></div></td>{showProject&&<td><span className="mono">{r.p.code}</span><small>{NODE_NAMES[r.n.key]||r.n.name}</small></td>}<td><span className="person-cell"><Avatar small user={c.w.users.find(u=>u.id===r.t.owner_id)}/>{nameOf(c.w,r.t.owner_id)}</span></td><td><Badge status={r.t.status}/></td><td><span className={`mono ${isLate(r.t,c.w.as_of)?'late-text':''}`}>{shortDate(r.t.start_date)} → {shortDate(r.t.due_date)}</span>{isLate(r.t,c.w.as_of)&&<small className="late-text">逾期 {elapsed(r.t.due_date,c.w.as_of)} 天</small>}</td><td className="mono">{num(r.t.points)} <span className="muted">點</span></td><td><ChevronRight size={16} className="muted"/></td></tr>)}</tbody></table>{!rows.length&&<Empty title="目前沒有符合的任務" detail="調整篩選條件，或從案件節點新增任務。"/>}</div>}
-function TaskIcon({status}:{status:string}){return status==='completed'?<CircleCheck size={18} className="complete-icon"/>:status==='paused'?<Pause size={18} className="paused-icon"/>:status==='in_progress'?<CircleDot size={18} className="accent-text"/>:<Circle size={18} className="muted"/>}
 
 function CaseOverview({c,p}:{c:Ctx;p:Project}){
  const tasks=p.nodes.flatMap(n=>n.tasks.map(t=>({p,n,t}))).filter(r=>active(r.t)).sort((a,b)=>(a.t.due_date||'9999').localeCompare(b.t.due_date||'9999')).slice(0,4);
@@ -220,24 +171,6 @@ function CaseOverview({c,p}:{c:Ctx;p:Project}){
  const navigate=(tab:string)=>c.go({view:'project',project:p.id,tab});
  return <div className="case-overview"><NextAction c={c} rows={p.nodes.flatMap(n=>n.tasks.map(t=>({p,n,t})))}/><section className="case-brief"><div className="case-progress-summary"><span className="section-kicker">任務完成度</span><strong>{progress(p)}<small>%</small></strong><div className="progress-track"><i style={{width:`${progress(p)}%`}}/></div><p>{completed} / {total.length} 項任務完成</p></div><dl className="case-facts"><div><dt>案件性質</dt><dd>{p.case_type==='intake'?'待確認接案':'正式案件'}</dd></div><div><dt>有效期限</dt><dd>{date(p.due_date)}</dd></div><div><dt>專案經理</dt><dd>{nameOf(c.w,p.pm_id)}</dd></div><div><dt>合約金額</dt><dd>{money(p.contract_amount)}</dd></div>{p.parent_code&&<div><dt>母案</dt><dd>{p.parent_code}</dd></div>}</dl><div className="case-next-actions"><button className="button primary" onClick={()=>navigate('flow')}>流程與交付<ArrowRight size={16}/></button><button className="button" onClick={()=>navigate('quotes')}>報價（{projectQuotes(c.w,p).length}）</button><p>同案多份報價集中查看，不重複建立案件。</p></div></section>
  <ProjectReadiness w={c.w} p={p}/><div className="case-overview-grid"><section><div className="section-heading"><div><span className="section-kicker">接下來的工作</span><h2>待處理任務</h2></div><button className="text-button" onClick={()=>navigate('flow')}>全部任務<ArrowUpRight size={16}/></button></div>{tasks.map(r=><button key={r.t.id} className="inbox-row" onClick={()=>openTask(c,r)}><TaskIcon status={r.t.status}/><span className="inbox-title"><strong>{r.t.title}</strong><small>{r.n.name} · {nameOf(c.w,r.t.owner_id)}</small></span><span className={`inbox-date ${isLate(r.t,c.w.as_of)?'late-text':''}`}>{shortDate(r.t.due_date)}</span><ChevronRight size={17}/></button>)}{!tasks.length&&<Empty title="目前沒有待處理任務"/>}</section><aside><div className="section-heading"><h2>案件活動</h2><button className="text-button" onClick={()=>navigate('logs')}>全部<ArrowUpRight size={15}/></button></div><EventList c={c} project={p.id} limit={3}/><div className="case-source-note"><span className="section-kicker">資料與關係</span><button onClick={()=>navigate('basic')}>基本資料<ChevronRight size={16}/></button><button onClick={()=>navigate('family')}>母子案關係<ChevronRight size={16}/></button><button onClick={()=>navigate('daily')}>日報紀錄<span>{p.daily_reports.length}</span><ChevronRight size={16}/></button></div></aside></div></div>
-}
-// Screens that still need tasks, schedules or approvals across cases read the full workspace, but only once the user opens them.
-// The result is shared per session epoch and shell version, so a mutation or a newer shell never reuses an older copy.
-const fullReads=new Map<string,Promise<Workspace>>();
-function readFullWorkspace(version:number){
- const key=`${getSessionEpoch()}:${version}`;
- for(const old of fullReads.keys())if(!old.startsWith(`${getSessionEpoch()}:`))fullReads.delete(old);
- let read=fullReads.get(key);
- if(!read){read=api<Workspace>('/api/workspace');fullReads.set(key,read);read.catch(()=>fullReads.delete(key))}
- return read;
-}
-function FullWorkspaceGate({c,children}:{c:Ctx;children:(c:Ctx)=>ReactNode}){
- const shell=c.w.scope==='shell';
- const full=useViewData<Workspace|undefined>(shell?`full:${c.w.version}`:'full-loaded',(_signal,current)=>shell?readFullWorkspace(c.w.version).then(data=>{if(!current())throw new DOMException('stale','AbortError');return data}):Promise.resolve(undefined),[]);
- useEffect(()=>{if(shell&&full.data)perfMark('full-workspace-render')},[shell,full.data]);
- if(!shell)return <>{children(c)}</>;
- if(full.data)return <>{children({...c,w:{...full.data,freshness:c.w.freshness}})}</>;
- return full.error?<div className="error-banner" role="alert"><TriangleAlert size={18}/><span>{full.error}</span><button className="text-button" onClick={full.reload}>重試</button></div>:<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在載入完整資料…</p></div>;
 }
 function ProjectDetailGate({c}:{c:Ctx}){
  // Shell mode reads only this project (tree plus its own approvals, events and records); a full workspace, after any mutation, takes the legacy path unchanged.
