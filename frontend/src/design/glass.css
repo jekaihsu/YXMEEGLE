@@ -1,6 +1,6 @@
 /* Glass utilities. Max ~4 real-blur elements per route: topbar, sidebar, tabbar, sheets/toasts, one hero Stat. */
 .glass,.glass--bar,.glass--flat{background:var(--glass-fill);border:.5px solid var(--glass-border);box-shadow:var(--glass-highlight),var(--glass-shadow);border-radius:var(--radius-card)}
-.glass{-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur)}
+.glass,.glass--bar{-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur)}
 .glass--bar{background:var(--glass-bar-fill);border-radius:0;border-width:0 0 .5px}
 .glass--flat{-webkit-backdrop-filter:none;backdrop-filter:none}
 .glass .glass,.glass--bar .glass{-webkit-backdrop-filter:none;backdrop-filter:none}
