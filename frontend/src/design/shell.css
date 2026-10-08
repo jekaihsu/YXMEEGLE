@@ -1,5 +1,7 @@
 /* App shell: translucent topbar, source-list sidebar, mobile tabbar, route progress, page transitions. Loaded last; tokens only. */
-.app-shell,.app-shell .main-shell{background:var(--bg);color:var(--label);font-family:var(--font)}
+/* Subtle tint behind everything so the blur has something to refract. */
+body{background-color:var(--bg);background-image:var(--bg-tint);background-attachment:fixed}
+.app-shell,.app-shell .main-shell{background:transparent;color:var(--label);font-family:var(--font)}
 .app-shell .sidebar.glass--bar{background:var(--glass-bar-fill);border-width:0 .5px 0 0;padding:0 var(--sp-3)}
 .app-shell .brand{height:auto;padding:var(--sp-5) var(--sp-3) var(--sp-2);font-size:var(--fs-headline);font-weight:600;letter-spacing:0;color:var(--label)}
 .app-shell .brand-en{color:var(--label-2);font-size:var(--fs-caption);font-weight:500;letter-spacing:.08em;padding-top:2px}
