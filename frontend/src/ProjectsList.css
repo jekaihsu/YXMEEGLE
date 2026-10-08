@@ -81,3 +81,8 @@
  .portfolio-page .person-cell,.portfolio-page .stage-chips,.portfolio-page .progress-cell{display:inline-flex}
  .portfolio-page .projects-table td[hidden]{display:none}
 }
+
+/* Column choices overlay the table instead of shifting its first row. */
+.portfolio-page .column-preferences{position:relative}
+.portfolio-page .column-preferences>div{position:absolute;top:100%;left:0;z-index:25;width:min(24rem,calc(100vw - 40px));box-sizing:border-box;background:var(--surface);border:1px solid var(--separator);border-radius:var(--radius-m);box-shadow:var(--shadow-sm)}
+.portfolio-page .column-preferences>div>.ds-button{grid-column:1/-1}

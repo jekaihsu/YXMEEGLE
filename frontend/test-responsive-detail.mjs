@@ -18,6 +18,7 @@ try{
  await page.route('**/api/**',route=>{const url=new URL(route.request().url());let data=w;
  if(url.pathname==='/api/session')data={user:w.users[0],users:w.users,mode:'demo',auth_configured:false,features:{workspace_shell:true}};
  else if(url.pathname==='/api/workspace'&&url.search)data=shell;
+ else if(url.pathname==='/api/projects')data={items:shell.projects,total:2,offset:0,limit:10,facets:{all:2,formal:2,intake:0}};
  else if(url.pathname.startsWith('/api/projects/'))data={...w,scope:'project',project:w.projects.find(p=>p.id===url.pathname.split('/').at(-1))};
  else if(url.pathname==='/api/daily-reports')data={items:[],total:0,summary:{}};
  return route.fulfill({json:data});});
@@ -47,6 +48,10 @@ try{
   for(const selector of ['td.work-project','td.work-due'])for(const cell of await page.locator(selector).all())assert.ok(await cell.evaluate(e=>e.scrollWidth<=e.clientWidth+1),`${selector} fits without truncation at 1024px`);
   assert.match(await page.locator('td.work-due').first().innerText(),/2026\/10\/01/);
  };
+ await go('projects');await page.locator('.projects-table').waitFor();
+ const tableTop=await page.locator('.projects-table').evaluate(e=>e.getBoundingClientRect().top);
+ await page.locator('.column-preferences summary').click();assert.ok(Math.abs(await page.locator('.projects-table').evaluate(e=>e.getBoundingClientRect().top)-tableTop)<1,'column choices overlay without shifting table');
+ await page.locator('.column-preferences summary').click();
  await go('work&tab=all');await page.locator('.comfortable-tasks').waitFor();await checkColumns();
  for(const control of await page.locator('.table-toolbar input,.table-toolbar select').all())assert.ok(await control.evaluate(e=>parseFloat(getComputedStyle(e).fontSize)>=15),'work filters use shared readable type');
  await go('schedule');await page.locator('.calendar-grid').waitFor();
