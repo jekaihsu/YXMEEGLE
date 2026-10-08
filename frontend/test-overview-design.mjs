@@ -8,9 +8,9 @@ import {workspace,a} from './session-epoch-fixture.mjs';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/'});
 for(const key of ['window','document','location','localStorage','sessionStorage','HTMLElement','Event','MouseEvent'])globalThis[key]=dom.window[key];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
-const bundle=await build({stdin:{contents:"export {Dashboard} from './src/DailyHome';export {Projects} from './src/ProjectsList';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,format:'esm',platform:'node',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {Dashboard,ShellDashboard} from './src/DailyHome';export {Projects} from './src/ProjectsList';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,format:'esm',platform:'node',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const path=new URL('./.overview-test-bundle.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);
-let Dashboard,Projects;try{({Dashboard,Projects}=await import(path.href))}finally{await fs.unlink(path)}
+let Dashboard,ShellDashboard,Projects;try{({Dashboard,ShellDashboard,Projects}=await import(path.href))}finally{await fs.unlink(path)}
 const w=structuredClone(workspace);w.as_of='2026-10-08T09:00:00+08:00';w.projects=w.projects.slice(0,1);
 const p=w.projects[0];p.code='CASE-001';p.contract_amount=120000;p.case_type='formal';p.execution_status='in_progress';p.source_lifecycle={state:'mapped',canonical:'執行中',reasons:[]};p.due_date='2026-10-10';
 const base=p.nodes[0].tasks[0];p.nodes[0].tasks=[{...base,id:'ready',title:'Next survey',status:'in_progress',due_date:'2026-10-10'},{...base,id:'blocked',title:'Blocked survey',status:'paused',due_date:null},{...base,id:'late',title:'Overdue survey',due_date:'2026-10-05'}];
@@ -21,6 +21,22 @@ await flush(()=>root.render(React.createElement(Dashboard,{c})));
 assert.equal(document.querySelector('.dh-hero h2').textContent,'Next survey');
 const inbox=document.querySelector('.work-inbox');assert.ok(inbox.textContent.includes('受阻 1'));assert.ok(inbox.textContent.includes('Blocked survey'));assert.ok(inbox.textContent.includes('逾期 3 天'));assert.equal(inbox.querySelector('.heading-count').textContent,'2');assert.ok(inbox.querySelector('[data-kind=attention][data-tone=critical]'));assert.equal(inbox.querySelector('[data-tone=accent]'),null);assert.ok(!inbox.textContent.includes('來源'));
 await flush(()=>[...document.querySelectorAll('.dh-hero button')].find(b=>b.textContent.includes('繼續此任務')).click());assert.equal(calls.at(-1).focus,'ready');
+// Shell hero names a concrete owned task without claiming it is ready to start.
+const shellTask={task_id:'shell-next',project_id:p.id,project_code:'CASE-001',node_id:p.nodes[0].id,node_key:'field',assignee_id:a.id,status:'paused',due_date:'2026-10-09',title:'Resolve survey hold'};
+const shell={...w,scope:'shell',attention:[],blocked:[shellTask],counts:{my_active_tasks:1,approvals_pending:0,blocked_tasks:1},projects:w.projects.map(({nodes,files,comments,daily_reports,...card})=>card)};
+await flush(()=>root.render(React.createElement(ShellDashboard,{c:{...c,w:shell}})));
+const hero=document.querySelector('.dh-hero');
+assert.equal(hero.querySelector('h2').textContent,'Resolve survey hold');
+assert.ok(hero.querySelector('p:not(.dh-kicker)').textContent.includes('CASE-001 · 到期 2026/10/09'));
+assert.equal(hero.querySelectorAll('button').length,1);
+assert.equal(hero.querySelector('button').textContent,'查看處理方式');
+assert.ok(!document.querySelector('.work-inbox').textContent.includes(a.name),'self name is omitted from inbox details');
+assert.ok(document.querySelector('.work-inbox').textContent.includes('受阻 1'));
+assert.ok(!document.querySelector('.work-inbox').textContent.includes('僅暫停'));
+await flush(()=>hero.querySelector('button').click());
+assert.deepEqual(calls.at(-1),{view:'project',project:p.id,node:p.nodes[0].id,task:'shell-next',tab:'flow'});
+await flush(()=>root.render(React.createElement(ShellDashboard,{c:{...c,w:{...shell,blocked:[],attention:[{...shellTask,assignee_id:'someone-else'}]}}})));
+assert.equal(document.querySelector('.dh-hero h2').textContent,'從我的工作接續下一項任務','other peoples tasks are not presented as my next task');
 w.projects=Array.from({length:300},(_,i)=>({...structuredClone(p),id:`p${i}`,code:`CASE-${String(i+1).padStart(3,'0')}`,name:`Road survey ${i+1}`}));
 await flush(()=>root.render(React.createElement(Projects,{c:{...c,route:{view:'projects'}}})));
 assert.equal(document.querySelectorAll('tbody tr').length,10);assert.equal(document.querySelector('.person-cell').textContent,w.users.find(u=>u.id===p.pm_id).name);assert.equal(document.querySelector('.person-cell .avatar'),null);assert.ok(document.querySelector('.table-footer').textContent.includes('共 300 筆'));

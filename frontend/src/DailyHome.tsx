@@ -14,9 +14,9 @@ const uniqueRows=(rows:TaskRow[])=>{const seen=new Set<string>();return rows.fil
 export function NextAction({c,rows}:{c:Ctx;rows:TaskRow[]}){
  const owned=rows.filter(r=>active(r.t)&&isTaskActor(r.t,c)&&r.p.case_type!=='intake');
  const ordered=[...owned].sort((a,b)=>(a.t.status==='in_progress'?-1:0)-(b.t.status==='in_progress'?-1:0)||(a.t.due_date||'9999').localeCompare(b.t.due_date||'9999'));
- const next=ordered.find(r=>!taskReadiness(r,c));const blocked=ordered.filter(r=>operationallyBlocked(r));
+ const next=ordered.find(r=>!taskReadiness(r,c))||ordered[0];
  if(!owned.length)return null;
- return <section className="dh-hero" aria-label="接續我的工作"><p className="dh-kicker">接續我的工作 · {owned.length} 項待處理 · 可平行作業</p>{next?<><h2>{next.t.title}</h2><p>{next.p.code} · {next.n.name} · {next.t.status==='in_progress'?'作業中，接著補齊成果':'檢視內容後，由你確認開始'}</p><Button variant="primary" onClick={()=>openGuidedTask(c,next)}>{next.t.status==='in_progress'?'繼續此任務':'前往此任務'}<ArrowRight size={17}/></Button></>:<><h2>先補齊條件，再接續作業</h2><p>你負責的任務目前仍有待處理條件。</p></>}{blocked.slice(0,2).map(r=><button key={r.t.id} type="button" className="dh-blocked" onClick={()=>openGuidedTask(c,r)}><span><StatusBadge kind="attention" state="blocked">受阻</StatusBadge> {r.t.title}<small>{r.p.code} · {r.n.name} · 待解除作業條件</small></span><span>查看處理方式<ArrowRight size={14}/></span></button>)}</section>
+ return <section className="dh-hero" aria-label="接續我的工作"><p className="dh-kicker">接續我的工作 · {owned.length} 項待處理</p><h2>{next.t.title}</h2><p>{next.p.code} · {next.n.name} · {next.t.due_date?`到期 ${date(next.t.due_date)}`:'未排定期限'}</p><Button variant="primary" onClick={()=>openGuidedTask(c,next)}>{taskReadiness(next,c)?'查看處理方式':next.t.status==='in_progress'?'繼續此任務':'前往此任務'}<ArrowRight size={17}/></Button></section>
 }
 
 function Group({title,count,caption,className,children}:{title:string;count?:number;caption?:string;className?:string;children:ReactNode}){
@@ -59,7 +59,7 @@ export function Dashboard({c}:{c:Ctx}){
  const focus=[...formal].sort((a,b)=>late(b)-late(a)).slice(0,5);
  const blocked=rows.filter(r=>active(r.t)&&operationallyBlocked(r));const attention=uniqueRows([...overdue,...blocked,...dueToday]);
  const tasks=uniqueRows([...overdue.slice(0,2),...blocked.slice(0,2),...dueToday,...overdue.slice(2),...blocked.slice(2)]).slice(0,5);const reports=c.w.projects.flatMap(p=>p.daily_reports.map(r=>({...r,p}))).filter(r=>r.date===c.w.as_of.slice(0,10));
- const items=[...tasks.map(r=>({...taskItem(c,r.t.id,r.t.title,`${r.p.code} · ${r.n.name} · ${nameOf(c.w,r.t.owner_id)}`,r.t.due_date,()=>openTask(c,r)),blocked:operationallyBlocked(r)})),...pending.slice(0,2).map(a=>approvalItem(c,a))];
+ const items=[...tasks.map(r=>({...taskItem(c,r.t.id,r.t.title,`${r.p.code} · ${r.n.name}${r.t.owner_id&&r.t.owner_id!==c.s.user?.id?` · ${nameOf(c.w,r.t.owner_id)}`:""}`,r.t.due_date,()=>openTask(c,r)),blocked:operationallyBlocked(r)})),...pending.slice(0,2).map(a=>approvalItem(c,a))];
  return <Head c={c}><div className="today-layout"><div className="today-main"><NextAction c={c} rows={rows}/>
   <Inbox c={c} count={attention.length+pending.length} caption={`逾期 ${overdue.length} · 當日到期 ${dueToday.length} · 受阻 ${blocked.length}`} items={items} moreWork={attention.length>5} morePending={pending.length>2}/>
   <Portfolio c={c} formal={formal} rows={focus.map(p=>({p,percent:progress(p),stage:p.nodes.filter(n=>['in_progress','paused'].includes(n.status)).map(n=>NODE_NAMES[n.key]||n.name).join('、')||STATUS[p.status]||p.status}))}/></div>
@@ -75,10 +75,11 @@ export function ShellDashboard({c}:{c:Ctx}){
  const shownDue=shown.filter(a=>!!a.due_date&&a.due_date.slice(0,10)<=c.w.as_of.slice(0,10)).length;const shownBlocked=shown.filter(a=>blockedIds.has(a.task_id)).length;
  const formal=c.w.projects.filter(p=>p.case_type!=='intake');const intakes=c.w.projects.filter(p=>p.case_type==='intake');
  const focus=[...formal].sort((a,b)=>(b.overdue_tasks??0)-(a.overdue_tasks??0)).slice(0,5);const percent=(p:Project)=>p.progress?.total_nodes?Math.round(p.progress.completed_nodes/p.progress.total_nodes*100):0;
- const items=[...shown.map(a=>({...taskItem(c,a.task_id,a.title||'未命名任務',`${a.project_code} · ${a.node_name||NODE_NAMES[a.node_key]||a.node_key} · ${nameOf(c.w,a.assignee_id)}`,a.due_date,()=>c.go({view:'project',project:a.project_id,node:a.node_id,task:a.task_id,tab:'flow'})),blocked:blockedIds.has(a.task_id)})),...pending.map(a=>approvalItem(c,a))];
+ const next=ordered.find(a=>a.assignee_id===c.s.user?.id&&c.w.projects.find(p=>p.id===a.project_id)?.case_type!=='intake');
+ const items=[...shown.map(a=>({...taskItem(c,a.task_id,a.title||'未命名任務',`${a.project_code} · ${a.node_name||NODE_NAMES[a.node_key]||a.node_key}${a.assignee_id&&a.assignee_id!==c.s.user?.id?` · ${nameOf(c.w,a.assignee_id)}`:""}`,a.due_date,()=>c.go({view:'project',project:a.project_id,node:a.node_id,task:a.task_id,tab:'flow'})),blocked:blockedIds.has(a.task_id)})),...pending.map(a=>approvalItem(c,a))];
  return <Head c={c}><div className="today-layout"><div className="today-main">
-  <section className="dh-hero" aria-label="接續我的工作"><p className="dh-kicker">接續我的工作 · {counts.my_active_tasks} 項待處理</p><h2>從我的工作接續下一項任務</h2><p>檢視指派給你的任務，確認作業條件後開始。</p><Button variant="primary" onClick={()=>c.go({view:'work'})}>我的工作<ArrowRight size={17}/></Button></section>
-  <Inbox c={c} count={overdue+dueToday+counts.approvals_pending} caption={`逾期 ${overdue} · 當日到期 ${dueToday}${counts.blocked_tasks!==undefined?` · 受阻 ${counts.blocked_tasks}（僅暫停／受阻狀態）`:blocked.length?` · 受阻 ${blocked.length}（已載入，僅暫停／受阻狀態）`:""}`} items={items} moreWork={ordered.length>shown.length||overdue+dueToday>shownDue||(counts.blocked_tasks??blocked.length)>shownBlocked} morePending={counts.approvals_pending>pending.length}/>
+  <section className="dh-hero" aria-label="接續我的工作"><p className="dh-kicker">接續我的工作 · {counts.my_active_tasks} 項待處理</p><h2>{next?.title||'從我的工作接續下一項任務'}</h2><p>{next?`${next.project_code} · ${next.due_date?`到期 ${date(next.due_date)}`:'未排定期限'}${blockedIds.has(next.task_id)?' · 先查看待處理條件':''}`:'檢視指派給你的任務，確認作業條件後開始。'}</p><Button variant="primary" onClick={()=>next?c.go({view:'project',project:next.project_id,node:next.node_id,task:next.task_id,tab:'flow'}):c.go({view:'work'})}>{next?(blockedIds.has(next.task_id)?'查看處理方式':'前往此任務'):'我的工作'}<ArrowRight size={17}/></Button></section>
+  <Inbox c={c} count={overdue+dueToday+counts.approvals_pending} caption={`逾期 ${overdue} · 當日到期 ${dueToday}${counts.blocked_tasks!==undefined?` · 受阻 ${counts.blocked_tasks}`:blocked.length?` · 受阻 ${blocked.length}`:""}`} items={items} moreWork={ordered.length>shown.length||overdue+dueToday>shownDue||(counts.blocked_tasks??blocked.length)>shownBlocked} morePending={counts.approvals_pending>pending.length}/>
   <Portfolio c={c} formal={formal} rows={focus.map(p=>({p,percent:percent(p),stage:STATUS[p.execution_status||p.status]||p.status}))}/></div>
   <Aside c={c} formal={formal.length} intakes={intakes.length} activity={<ShellActivity c={c}/>} daily={<Row label="日報請至各案件的「日報」頁查看"/>}/></div></Head>
 }

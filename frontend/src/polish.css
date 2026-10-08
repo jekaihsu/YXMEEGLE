@@ -100,6 +100,6 @@
  .workspace .task-table.with-project .task-title small{display:block}
 }
 /* Final: opaque hero; day lists show 6 tasks then expand instead of nested scrolling. */
-.workspace .dh-hero{background:var(--surface);border:.5px solid var(--separator);border-radius:var(--radius-card);box-shadow:none}
+.workspace .dh-hero{background:var(--surface-2);border:0;border-radius:var(--radius-card);box-shadow:none}
 .workspace .calendar-tasks{max-height:none;overflow:visible}
 .calendar-more{min-height:44px;width:100%;color:var(--accent);font-size:var(--fs-subhead);border-radius:var(--radius-m);background:var(--surface-2)}

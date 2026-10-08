@@ -87,8 +87,9 @@ try{
  assert.equal(rows()[1].querySelector('.progress-cell span').textContent,'—');assert.equal(rows()[1].querySelector('.progress-empty').getAttribute('aria-label'),'任務進度 0%');
  // P4-1: the dashboard renders from counts, the attention list and cards; no tree scan and no full workspace.
  await flush(()=>{location.hash='view=dashboard';window.dispatchEvent(new window.Event('hashchange'))});
+ // UX contract: self names are omitted and blocked captions use plain language.
  const todo=document.querySelector('.work-inbox');
- assert.ok(todo.textContent.includes('TASK_A')&&todo.textContent.includes('逾期 1 天')&&todo.textContent.includes('APPROVAL_A')&&todo.textContent.includes('NODE_A')&&todo.textContent.includes(workspace.users[0].name)&&todo.textContent.includes('逾期 6 · 當日到期 2'));
+ assert.ok(todo.textContent.includes('TASK_A')&&todo.textContent.includes('逾期 1 天')&&todo.textContent.includes('APPROVAL_A')&&todo.textContent.includes('NODE_A')&&!todo.textContent.includes(workspace.users[0].name)&&todo.textContent.includes('逾期 6 · 當日到期 2'));
  assert.equal(todo.querySelector('.heading-count').textContent,'11');assert.ok(document.querySelector('.today-aside').textContent.includes('535 筆日報待配對'));
  assert.ok(document.querySelector('.project-preview-row').textContent.includes('PRIVATE_CASE_A'));
  assert.ok(!requests.some(r=>r.url==='/api/workspace'),'dashboard never loads the full workspace');
@@ -103,7 +104,7 @@ try{
  assert.ok(inbox.textContent.indexOf('UNDATED_BLOCKED')<inbox.textContent.indexOf('DUE_TODAY'));
  assert.ok(inbox.textContent.indexOf('FUTURE_BLOCKED')<inbox.textContent.indexOf('DUE_TODAY'));
  assert.equal(inbox.textContent.split('TASK_A').length-1,1,'overlap is rendered once');
- assert.ok(inbox.textContent.includes('受阻 8（僅暫停／受阻狀態）')&&!inbox.textContent.includes('已載入'));
+ assert.ok(inbox.textContent.includes('受阻 8')&&!inbox.textContent.includes('已載入'));
  assert.ok(inbox.textContent.includes('查看全部工作'),'blocked remainder has a link');
  const rowFor=title=>[...inbox.querySelectorAll('.ds-row')].find(r=>r.textContent.includes(title));
  assert.ok(rowFor('TASK_A').textContent.includes('受阻'),'blocked badge comes from either list');
@@ -111,9 +112,9 @@ try{
  await flush(()=>rowFor('UNDATED_BLOCKED').click());assert.ok(location.hash.includes('task=undated'));
  await flush(()=>{location.hash='view=dashboard';window.dispatchEvent(new window.Event('hashchange'))});
  current={...shell,attention:[{...base,status:'paused'}]};etag='W/"old-blocked"';await flush(()=>window.shellContext.refresh());
- assert.ok(document.querySelector('.work-inbox').textContent.includes('受阻 1（已載入，僅暫停／受阻狀態）'));
+ assert.ok(document.querySelector('.work-inbox').textContent.includes('受阻 1'));
  current={...shell,blocked:[],counts:{...shell.counts,blocked_tasks:0}};etag='W/"zero-blocked"';await flush(()=>window.shellContext.refresh());
- assert.ok(document.querySelector('.work-inbox').textContent.includes('受阻 0（僅暫停／受阻狀態）'));
+ assert.ok(document.querySelector('.work-inbox').textContent.includes('受阻 0'));
  current=shell;etag='W/"shell-A:1"';await flush(()=>window.shellContext.refresh());
  await flush(()=>{location.hash='view=projects';window.dispatchEvent(new window.Event('hashchange'))});
  await flush(()=>button('需要關注').click());assert.equal(rows().length,1);assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'));

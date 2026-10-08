@@ -4,7 +4,7 @@
 .ds-section>h2 .heading-count{margin-left:var(--sp-2);color:var(--accent);font-variant-numeric:tabular-nums}
 .ds-section>h2 small{margin-left:var(--sp-3);font-size:var(--fs-footnote);font-weight:400;text-transform:none;letter-spacing:0}
 .dh-hero{padding:var(--sp-6);margin-bottom:var(--sp-6);display:flex;flex-direction:column;gap:var(--sp-3);align-items:flex-start}
-.dh-kicker{font-size:var(--fs-caption);font-weight:600;color:var(--accent);letter-spacing:.04em}
+.dh-kicker{font-size:var(--fs-caption);font-weight:600;color:var(--label-2);letter-spacing:.04em}
 .dh-hero h2{font-size:var(--fs-title1);line-height:1.2;font-weight:600;letter-spacing:-.01em}
 .dh-hero p:not(.dh-kicker){color:var(--label-2);font-size:var(--fs-subhead)}
 .dh-blocked{display:flex;justify-content:space-between;gap:var(--sp-4);width:100%;min-height:44px;padding-top:var(--sp-3);border-top:1px solid var(--sep);text-align:left;font-size:var(--fs-subhead)}
@@ -29,7 +29,7 @@
 .workspace .today-layout .ds-row-icon{color:var(--label-2)}
 .workspace .today-layout .ds-row-main{overflow-wrap:anywhere}
 .workspace .today-layout .ds-row-value{flex-shrink:0}
-.today-main .dh-hero{padding:var(--sp-4) var(--sp-5);margin-bottom:var(--sp-4);gap:var(--sp-2);border-inline-start:4px solid var(--accent);box-shadow:var(--glass-highlight),var(--glass-shadow)}
+.today-main .dh-hero{padding:var(--sp-4) var(--sp-5);margin-bottom:var(--sp-4);gap:var(--sp-2);border:0;box-shadow:none}
 .today-main .dh-hero .ds-button{margin-top:var(--sp-1)}
 .today-main .dh-blocked{padding-top:var(--sp-2);align-items:center}
 .dh-attention{display:flex;justify-content:flex-end;gap:var(--sp-1);flex-wrap:wrap}
