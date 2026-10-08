@@ -21,7 +21,12 @@ const column=text=>[...document.querySelectorAll('.column-preferences label')].f
 await mount();
 assert.equal(document.querySelector('.portfolio-page').dataset.density,'compact');
 assert.equal(column('案件名稱').disabled,true);
-assert.equal(column('合約金額').checked,true);
+assert.equal(column('合約金額').checked,false);
+assert.equal(column('執行歸屬').checked,false);
+for(const label of ['工作狀態','資料驗證','需要關注','專案經理','目前作業','任務進度','有效期限'])assert.equal(column(label).checked,true);
+await flush(()=>column('合約金額').click());
+assert.equal([...document.querySelectorAll('th')].find(e=>e.textContent==='合約金額').hidden,false);
+await flush(()=>button('顯示全部欄位').click());
 await flush(()=>button('舒適').click());
 await flush(()=>column('合約金額').click());
 assert.deepEqual(JSON.parse(localStorage.getItem('yx.caseOverview')),{density:'comfortable',hiddenColumns:['contract']});
