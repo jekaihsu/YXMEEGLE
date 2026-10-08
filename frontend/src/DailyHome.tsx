@@ -50,7 +50,7 @@ function Aside({c,formal,intakes,daily,activity}:{c:Ctx;formal:number;intakes:nu
  </aside>
 }
 
-const Head=({c,children}:{c:Ctx;children:ReactNode})=><Page eyebrow={`${date(c.w.as_of)} · 資料日期`} title="工作總覽" subtitle="先掌握待處理工作，再查看案件進度。" actions={<><Button onClick={()=>c.go({view:'schedule'})}><CalendarDays size={16}/>查看排程</Button><Button variant="primary" onClick={()=>c.go({view:'work'})}>我的工作<ArrowRight size={16}/></Button></>}>{children}</Page>;
+const Head=({c,children}:{c:Ctx;children:ReactNode})=><Page eyebrow={`${date(c.w.as_of)} · 資料日期`} title="工作總覽" subtitle="先掌握待處理工作，再查看案件進度。" actions={<><Button onClick={()=>c.go({view:'schedule'})}><CalendarDays size={16}/>查看排程</Button></>}>{children}</Page>;
 
 export function Dashboard({c}:{c:Ctx}){
  const rows=allTasks(c.w);const overdue=rows.filter(r=>isLate(r.t,c.w.as_of));const pending=c.w.approvals.filter(a=>a.status==='pending');const dueToday=rows.filter(r=>active(r.t)&&r.t.due_date?.slice(0,10)===c.w.as_of.slice(0,10));

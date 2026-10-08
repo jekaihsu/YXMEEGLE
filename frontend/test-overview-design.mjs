@@ -36,6 +36,7 @@ assert.ok(!document.querySelector('.work-inbox').textContent.includes('僅暫停
 await flush(()=>hero.querySelector('button').click());
 assert.deepEqual(calls.at(-1),{view:'project',project:p.id,node:p.nodes[0].id,task:'shell-next',tab:'flow'});
 await flush(()=>root.render(React.createElement(ShellDashboard,{c:{...c,w:{...shell,blocked:[],attention:[{...shellTask,assignee_id:'someone-else'}]}}})));
+assert.equal([...document.querySelectorAll('button')].filter(b=>b.textContent==='我的工作').length,1,'fallback has one work destination');
 assert.equal(document.querySelector('.dh-hero h2').textContent,'從我的工作接續下一項任務','other peoples tasks are not presented as my next task');
 w.projects=Array.from({length:300},(_,i)=>({...structuredClone(p),id:`p${i}`,code:`CASE-${String(i+1).padStart(3,'0')}`,name:`Road survey ${i+1}`}));
 await flush(()=>root.render(React.createElement(Projects,{c:{...c,route:{view:'projects'}}})));
