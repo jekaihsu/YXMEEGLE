@@ -47,3 +47,29 @@ def test_scripts_run_directly_and_honour_help(tmp_path):
     for name in ('migrate_index_tables','backfill_index'):
         done=subprocess.run([sys.executable,str(root/'scripts'/f'{name}.py'),'--help'],cwd=tmp_path,capture_output=True,text=True)
         assert done.returncode==0 and 'usage' in done.stdout
+
+
+def test_shell_facts_column_migration_requires_backfill(tmp_path):
+    from sqlalchemy import select
+    from backend import index_reads
+    from backend.models import BusinessRow, ProjectIndex, WorkspaceRow
+    from backend.test_index_backfill import seeded
+    from scripts.backfill_index import backfill
+
+    engine, sessions, _ = seeded(tmp_path, 2)
+    backfill(engine)
+    with engine.begin() as db:
+        db.exec_driver_sql('ALTER TABLE project_index DROP COLUMN shell_facts')
+    migrate(engine); migrate(engine)
+    assert 'shell_facts' in {c['name'] for c in inspect(engine).get_columns('project_index')}
+    with sessions() as db:
+        db.info['index_tables'] = True
+        assert db.scalars(select(ProjectIndex.shell_facts)).all() == [None, None]
+        assert not index_reads.ready(db, BusinessRow, db.get(WorkspaceRow, 'w'))
+    backfill(engine)
+    with sessions() as db:
+        db.info['index_tables'] = True
+        facts = db.scalars(select(ProjectIndex.shell_facts)).all()
+        assert len(facts) == 2 and all(f['v'] == 1 and 'contract_amount' in f for f in facts)
+        assert index_reads.ready(db, BusinessRow, db.get(WorkspaceRow, 'w'))
+    engine.dispose()

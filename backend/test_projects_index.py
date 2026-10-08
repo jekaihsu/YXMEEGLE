@@ -83,3 +83,49 @@ def test_stale_or_missing_index_uses_legacy_path(tmp_path):
         with app.state.sessions.begin() as db:
             db.get(WorkspaceRow, db.scalars(select(WorkspaceRow.id)).first()).version += 1
         assert client.get('/api/projects?limit=3').json()['total'] == 10
+
+
+def test_null_shell_facts_falls_back_and_reconcile_detects_corruption(tmp_path):
+    from sqlalchemy import null, update
+    from . import index_tables
+    from .models import ProjectIndex
+    from .test_shell import ON as SHELL_ON
+    from scripts.backfill_index import backfill
+
+    with scaled_client(tmp_path, 2, **SHELL_ON) as (app, client):
+        with app.state.sessions.begin() as db:
+            db.execute(update(ProjectIndex).where(ProjectIndex.project_id == 'p001').values(shell_facts=null()))
+        full = client.get('/api/workspace?scope=shell').json()
+        assert full.get('scope') is None and len(full['projects'][0]['nodes']) == 9
+        assert client.get('/api/projects?view=overview').status_code == 503
+        backfill(app.state.engine)
+        assert client.get('/api/workspace?scope=shell').json()['scope'] == 'shell'
+        with app.state.sessions.begin() as db:
+            db.execute(update(ProjectIndex).where(ProjectIndex.project_id == 'p001').values(shell_facts={'v': 1, 'contract_amount': -1}))
+            row = db.get(WorkspaceRow, full['workspace_id'])
+            report = index_tables.reconcile(db, BusinessRow, row.id, upgrade(storage.load(db, BusinessRow, row)))
+        assert not report['healthy'] and report['projects']['stale'] == ['p001']
+
+
+def test_shell_facts_use_refreshed_nodes_and_raw_fallback():
+    from .index_tables import project_rows
+    from .operations import project_summary
+    from .perf_fixture import build_scaled_workspace
+    from copy import deepcopy
+
+    state = upgrade(build_scaled_workspace(1)); p = state['projects'][0]
+    p['contract_amount'] = 123.5
+    p['source_lifecycle'] = {'relationship': '待確認單', 'state': 'needs_verification', 'canonical': None,
+                             'reasons': ['blank'], 'lifecycle_sources': [{'source_id': 'secret-id'}]}
+    refreshed = project_summary(state, deepcopy(p))
+    row = project_rows('w', state)[0][0]
+    expected = [{'key': n['key'], 'name': s['name'], 'status': s['status']}
+                for n, s in zip(p['nodes'], refreshed['nodes']) if s['status'] in ('in_progress', 'paused')]
+    assert row['shell_facts'] == {'v': 1, 'contract_amount': 123.5, 'current_nodes': expected,
+                                  'source_lifecycle': {'relationship': '待確認單', 'state': 'needs_verification',
+                                                       'canonical': None, 'reasons': ['blank']}}
+    # A malformed legacy node makes project_summary fail; facts still preserve raw stage status.
+    p['nodes'][0].pop('key'); p['nodes'][0]['status'] = 'paused'
+    fallback = project_rows('w', state)[0][0]
+    assert fallback['summary'] is None
+    assert fallback['shell_facts']['current_nodes'][0] == {'key': '', 'name': p['nodes'][0]['name'], 'status': 'paused'}

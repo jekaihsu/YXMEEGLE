@@ -36,6 +36,16 @@ def project_rows(wid,state,project_ids=None,summaries=True):
                 tasks.append(dict(workspace_id=wid,task_id=t['id'],project_id=p['id'],node_id=n['id'],node_key=n.get('key') or '',node_name=n.get('name') or '',
                                   node_ordinal=ni,ordinal=ti,assignee_id=t.get('owner_id') or n.get('owner_id') or '',
                                   status=t.get('status') or '',due_date=t.get('due_date') or '',required=bool(t.get('required',True))))
+        summary=project_summary_json(state,p) if summaries else None
+        refreshed={n['id']:n for n in (summary or {}).get('nodes',[])}
+        current_nodes=[]
+        for n in nodes:
+            current=refreshed.get(n['id'],n)
+            if current.get('status') in ('in_progress','paused'):
+                current_nodes.append(dict(key=n.get('key') or '',name=current.get('name') or '',status=current['status']))
+        lifecycle=p.get('source_lifecycle')
+        facts=dict(v=1,contract_amount=p.get('contract_amount'),current_nodes=current_nodes,
+                   source_lifecycle={k:lifecycle.get(k) for k in ('relationship','state','canonical','reasons')} if lifecycle is not None else None)
         projects.append(dict(workspace_id=wid,project_id=p['id'],ordinal=i,code=p.get('code') or '',name=p.get('name') or '',client=p.get('client') or '',
                              pm_id=p.get('pm_id') or '',admin_id=p.get('admin_id') or '',supervisor_id=p.get('supervisor_id') or '',
                              status=p.get('status') or '',execution_status=p.get('execution_status') or '',priority=p.get('priority') or '',
@@ -43,7 +53,7 @@ def project_rows(wid,state,project_ids=None,summaries=True):
                              source_status=p.get('source_status') or '',execution_system=p.get('execution_system') or '',due_date=p.get('due_date') or '',
                              created_at=p.get('created_at') or '',concurrency_version=p.get('concurrency_version',0),
                              nodes_total=len(nodes),nodes_completed=sum(n.get('status')=='completed' for n in nodes),
-                             tasks_total=task_total,tasks_completed=task_done,summary=project_summary_json(state,p) if summaries else None,source_version=state.get('version',0)))
+                             tasks_total=task_total,tasks_completed=task_done,summary=summary,shell_facts=facts,source_version=state.get('version',0)))
     return projects,tasks
 
 
