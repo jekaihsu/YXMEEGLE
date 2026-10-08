@@ -2,7 +2,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {getPendingMutations,getSessionEpoch} from './api';
 
 type Editable=HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement;
-const editable=(target:EventTarget|null):target is Editable=>target instanceof window.HTMLElement&&target.matches('input:not([type=hidden]):not([type=button]):not([type=submit]),textarea,select');
+const editable=(target:EventTarget|null):target is Editable=>target instanceof window.HTMLElement&&!target.closest('[data-reload-safe]')&&target.matches('input:not([type=hidden]):not([type=button]):not([type=submit]),textarea,select');
 export function useReloadGuard(){
  const dirty=useRef(new Map<Editable,string>());
  const baseline=useRef(new WeakMap<Editable,string>());
