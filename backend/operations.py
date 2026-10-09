@@ -417,13 +417,19 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         require(user['role']=='manager')
         allowed=set(ws['settings'])
         require(set(data)<=allowed,'未知設定',422)
+        from .policy import defaults
+        approved=defaults()
+        for key,value in data.items():
+            expected=approved.get(key)
+            if expected is not None:
+                require(type(value) is type(expected),'設定欄位型別錯誤',422)
+        for key in ('daily_backup_days','monthly_backup_months','rpo_hours','rto_hours'):
+            if key in data: require(data[key]>0,'保留期間與復原目標需為正整數',422)
         proposed={**ws['settings'],**data}
         require(proposed.get('deadline_basis')=='scheduled_shift' and proposed.get('cutoff_time') is None,'截止時間必須依個人正常班表，不能改為固定時間',422)
         require(proposed.get('source_sync_seconds')==ws['settings'].get('source_sync_seconds'),
                 '來源讀取頻率由伺服器環境設定管理',422)
         require(proposed.get('test_connection_mode') in ('simulation','isolated_live'),'測試連線模式錯誤',422)
-        from .policy import defaults
-        approved=defaults()
         for key in ('v4_base','quote_base','capability_base'):
             require(proposed.get(key)==approved[key],'案件與能力來源僅限使用者已核定的 Base',422)
         for key in ('digest_time',):
