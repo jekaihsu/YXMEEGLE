@@ -49,3 +49,9 @@
 .routine-page .table-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .routine-scroll-hint{display:none}
 @media(max-width:760px){.workspace .routine-scroll-hint{display:block;font-size:var(--fs-footnote);margin:0 0 var(--sp-3)}}
+
+/* SOP disclosure labels have the same touch inset as other controls. */
+.workspace .administration-page>.ops-form>summary{min-height:var(--control-height);padding:var(--control-pad-block) var(--control-pad-inline);box-sizing:border-box;cursor:pointer;color:var(--label);font-size:var(--fs-subhead);font-weight:500;line-height:1.6;border-radius:var(--radius-m)}
+.workspace .administration-page>.ops-form>summary:hover{background:var(--surface-2)}
+.workspace .administration-page>.ops-form>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.workspace .administration-page>.ops-form>div{padding:var(--sp-4);border-top:1px solid var(--separator)}
