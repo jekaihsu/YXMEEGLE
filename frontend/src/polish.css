@@ -37,12 +37,6 @@
  .workspace .portfolio-page .tabbar,.workspace .project-detail .project-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;width:100%;border-radius:var(--radius-pill);scrollbar-width:none}
  .workspace .portfolio-page .tabbar button,.workspace .project-detail .project-tabs button{flex:0 0 auto;white-space:nowrap}
 }
-/* Schedule: each day scrolls inside a fixed height instead of stretching the page. */
-.workspace .calendar-day{min-height:0}
-.workspace .calendar-tasks{max-height:min(32rem,60vh);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;display:flex;flex-direction:column;gap:var(--sp-2)}
-.workspace .calendar-task{border:.5px solid var(--glass-border);box-shadow:none;border-radius:var(--radius-m);background:var(--surface);flex:none}
-.workspace .calendar-task small{color:var(--label-2)}
-.workspace .calendar-day>header{position:sticky;top:0;z-index:1}
 /* Avatars grow with their initials instead of overflowing a fixed circle. */
 .workspace .avatar,.app-shell .avatar{width:auto;min-width:1.75rem;height:1.75rem;padding:0 var(--sp-1);border:0;font-size:var(--fs-caption);font-weight:600;line-height:1;white-space:nowrap}
 .workspace .avatar.small,.app-shell .avatar.small{min-width:1.5rem;height:1.5rem;font-size:.6875rem}
@@ -70,11 +64,6 @@
 /* Nested cards inside project readiness collapse to one surface. */
 .workspace .ds-section.project-readiness{border:0;background:none;box-shadow:none;padding:0;border-radius:0}
 .pr-more{border-top:1px solid var(--sep)}.pr-more summary{min-height:44px;display:flex;align-items:center;padding:0 var(--sp-4);color:var(--accent);font-size:var(--fs-subhead);cursor:pointer}
-/* Narrow screens and larger text keep readable day columns with an explicit scroll cue. */
-.workspace .calendar-grid{grid-template-columns:repeat(7,minmax(11rem,1fr));min-width:77rem}
-.workspace .calendar-day>header{display:flex;flex-wrap:nowrap;align-items:baseline;gap:var(--sp-2);white-space:nowrap}
-.workspace .calendar-task .avatar{display:none}
-.workspace .calendar-task em{white-space:nowrap;font-style:normal;color:var(--label-2)}
 /* Phone page heads align to the content gutter. */
 @media(max-width:760px){
  .workspace .ds-page-head{text-align:left;align-items:stretch}.workspace .ds-page-head>div:first-child{text-align:left}
@@ -98,19 +87,8 @@
  .workspace .task-table.with-project .task-title small{display:block}
  .workspace .task-table.with-project .person-cell,.workspace .task-table.with-project .col-points{font-size:var(--fs-footnote);color:var(--label-2)}
 }
-/* Final: opaque hero; day lists show 6 tasks then expand instead of nested scrolling. */
+/* Home hero remains opaque. */
 .workspace .dh-hero{background:var(--surface);border:.5px solid var(--separator);border-radius:var(--radius-card);box-shadow:none}
-.workspace .calendar-tasks{max-height:none;overflow:visible}
-.calendar-more{min-height:44px;width:100%;color:var(--accent);font-size:var(--fs-subhead);border-radius:var(--radius-m);background:var(--surface-2)}
-
-.workspace .schedule-scroll-hint{font-size:var(--fs-footnote);color:var(--label-2);margin:0 0 var(--sp-2)}
-@media(min-width:1200px){
- :root:not([data-text=xl]) .workspace .calendar-grid{grid-template-columns:repeat(7,minmax(0,1fr));min-width:0}
- :root:not([data-text=xl]) .workspace .schedule-scroll-hint{display:none}
- .workspace .calendar-day{min-width:0}
- .workspace .calendar-day>header{gap:var(--sp-1);padding:var(--sp-3) var(--sp-2)}
- .workspace .calendar-task>small{white-space:normal;overflow-wrap:anywhere}
-}
 
 /* Edge cues follow the actual scroll position; the selected tab is centered by the shared tabs helper. */
 .workspace :is(.tabbar,.ops-tabs){scroll-padding-inline:var(--sp-4)}
@@ -122,13 +100,9 @@
 }
 
 .workspace .tab-scroll-hint{font-size:var(--fs-footnote);color:var(--accent);margin:var(--sp-1) 0 var(--sp-3);text-align:right}
-/* Workload rows retain their identity while day cells scroll underneath. */
-.workspace .resource-table :is(th,td):first-child{position:sticky;left:0;z-index:2;min-width:140px;width:140px;background:var(--surface);box-shadow:1px 0 0 var(--sep)}
-.workspace .resource-table th:first-child{z-index:3}
-.workspace .resource-table td:first-child small{display:block;color:var(--label-2)}
 /* Checkbox labels are the full touch target, including the text. */
-.workspace .schedule-meta .checkbox-line,.modal .collaborator-options label{min-height:44px;padding:var(--sp-2) var(--sp-3);gap:var(--sp-2);border-radius:var(--radius-s);cursor:pointer}
-.workspace .schedule-meta .checkbox-line:hover,.modal .collaborator-options label:hover{background:var(--surface-2)}
+.modal .collaborator-options label{min-height:44px;padding:var(--sp-2) var(--sp-3);gap:var(--sp-2);border-radius:var(--radius-s);cursor:pointer}
+.modal .collaborator-options label:hover{background:var(--surface-2)}
 .modal .collaborator-options{gap:var(--sp-2);padding:0}
 .modal .participant-edit-row>select{width:100%;min-width:0}
 @media(min-width:761px){.modal .participant-edit-row{grid-template-columns:65px minmax(240px,1fr) minmax(0,1.5fr)}}
@@ -140,12 +114,6 @@
 .workspace>.company-cockpit,.workspace>.operations.operations{max-width:none;margin:0}
 /* Hide columns only when they have no information to compare. */
 .workspace .task-table.hide-owner .col-owner,.workspace .task-table.hide-points .col-points{display:none}
-/* Workload cells open that person's week; the bar fill must read against its tinted track. */
-button.resource-cell{all:unset;box-sizing:border-box;display:block;width:100%;padding:var(--sp-1) 0;border-radius:8px;cursor:pointer;text-align:center}
-button.resource-cell:hover{background:var(--surface-2)}
-button.resource-cell:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.resource-cell .resource-bar>i{background:var(--accent)}
-.resource-cell strong.high-load{color:var(--warning,var(--label))}
 /* My Work controls (table and board): scope tabs and search share one row so the work starts higher on the page.
    Kept here, not in the lazy board stylesheet, because the table view needs them before the board ever loads. */
 .workspace .mywork-controls{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-4)}
