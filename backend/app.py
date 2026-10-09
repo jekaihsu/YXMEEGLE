@@ -808,6 +808,8 @@ def create_app(overrides=None):
         if expected: require((remote.get('definition_code') or remote.get('approval_code'))==expected,'此審批實例不屬於設定的審批定義',409)
         def mutate(state):
             target=find(state['approvals'],approval_id,'申請')
+            actor=find(state['users'],user['id'],'操作者')
+            require(is_pm(actor,find(state['projects'],target['project_id'],'案件')))
             # Do not turn an arbitrary reference into authorization to change project scope.
             target.update(lark_instance_code=instance_code,lark_external_status=remote.get('status','UNKNOWN'),lark_checked_at=now(),lark_binding_verified=False)
             target['history'].append({'action':'lark_refresh','actor_id':user['id'],'created_at':now(),'message':'唯讀取得原生審批狀態；尚未驗證此實例與案件範圍一致，不自動核准'})
@@ -867,6 +869,8 @@ def create_app(overrides=None):
         except RemoteFailure as exc: raise HTTPException(502,str(exc))
         finally: adapter.client.close()
         def mutate(state):
+            actor=find(state['users'],user['id'],'操作者')
+            require(capable(actor,'manage_handover'),'需要交接管理權限',403)
             known={u['id'] for u in state['users']}
             require(result['principal_id'] in known and result['delegate_id'] in known,'請先核實兩人的公司身分',409)
             state['approved_leave_delegations']=[a for a in state['approved_leave_delegations'] if a['id']!=code]+[result]

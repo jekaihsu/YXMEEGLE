@@ -188,6 +188,7 @@ def register(app,identity,load,persist,sessions,W,B,P,cfg,uploads):
         finally:
             if adapter: adapter.client.close()
         def mutate(s):
+            require(capable(find(s['users'],user['id']),'manage_sources'),'來源查證權限已改變',403)
             try: require_same_policy(policy,connection_policy(data['wid'],s,cfg,'input',for_verification=True))
             except RemoteFailure as exc: raise HTTPException(409,str(exc))
             m=find(s['input_mappings'],mapping_id); require(m==mapping,'映射已變更',409); m.update(verified=True,verified_at=now(),remote_value=value,schema=field,verified_mode=policy['mode'])
@@ -198,14 +199,15 @@ def register(app,identity,load,persist,sessions,W,B,P,cfg,uploads):
         data,user=identity(request); body=await json_object(request)
         require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
         def mutate(s):
+            actor=find(s['users'],user['id'],'操作者')
             p=next((p for p in s['projects'] if any(f['id']==file_id for f in p['files'])),None); require(p is not None,'文件不存在',404)
             from .case_cutover import require_execution
             require_execution(s,p)
             f=find(p['files'],file_id); n=next((n for n in p['nodes'] if n['id']==f.get('node_id')),None)
-            require(operator(user,p,n)); require(f['storage']=='local' and not f.get('withdrawn'),'文件不可送出',409)
+            require(operator(actor,p,n)); require(f['storage']=='local' and not f.get('withdrawn'),'文件不可送出',409)
             require(not f.get('remote_status') and not any(j.get('key')=='file:'+file_id for j in s.get('jobs',[])),
                     '此文件已有送存紀錄，請至背景工作核對結果；失敗重試須使用原工作，不能重新排隊',409)
-            queue(s,'file',user,{'project_id':p['id'],'file_id':file_id},'file:'+file_id); f['remote_status']='queued'
+            queue(s,'file',actor,{'project_id':p['id'],'file_id':file_id},'file:'+file_id); f['remote_status']='queued'
         return persist(data['wid'],body['version'],mutate,actor_id=user['id'])
 
     @app.post('/api/learning/mappings/verify')
