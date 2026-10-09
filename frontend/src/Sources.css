@@ -1,0 +1,17 @@
+/* Connection details use the same neutral surface and insets as the home hero. */
+.workspace .source-connection{padding:var(--sp-6) var(--sp-7);gap:var(--sp-4);border:.5px solid var(--separator);border-radius:var(--radius-card);background:var(--surface);box-shadow:none}
+.workspace .source-connection>div:nth-child(2){min-width:0}
+.workspace .source-connection h2{flex-wrap:wrap;gap:var(--sp-3);font-size:var(--fs-headline);color:var(--label)}
+.workspace .source-connection p{margin-top:var(--sp-3);font-size:var(--fs-subhead);line-height:1.65}
+.workspace .source-connection>.quiet-label{flex-shrink:0}
+.workspace .source-flow{gap:var(--sp-3);padding:var(--sp-5) 0 var(--sp-6)}
+.workspace .source-flow>div>strong{color:var(--label);font-size:var(--fs-subhead)}
+.workspace .source-flow>svg,.workspace .source-note>svg{flex-shrink:0}
+@media(max-width:760px){
+ .workspace .source-connection{display:grid;grid-template-columns:auto minmax(0,1fr);padding:var(--sp-5);gap:var(--sp-3)}
+ .workspace .source-connection>:last-child:not(div){grid-column:2;margin:0;justify-self:start}
+ .workspace .source-flow{flex-direction:column;align-items:stretch}
+ .workspace .source-flow>div{text-align:left;padding:var(--sp-3) var(--sp-4);background:var(--surface);border-radius:var(--radius-m)}
+ .workspace .source-flow>div>strong{margin:var(--sp-2) 0}
+ .workspace .source-flow>svg{align-self:center;transform:rotate(90deg)}
+}
