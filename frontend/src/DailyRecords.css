@@ -14,3 +14,12 @@
 .daily-cards footer{display:flex;flex-wrap:wrap;gap:var(--sp-1) var(--sp-4);font-size:var(--fs-footnote);color:var(--label-2)}.daily-cards footer a{color:var(--accent)}
 .dr-empty{color:var(--label-2);padding:var(--sp-5) var(--sp-4);text-align:center}
 .daily-pagination{display:flex;justify-content:flex-end;gap:var(--sp-2)}
+
+/* One grouped surface; record details keep the home's 12px reading rhythm. */
+.workspace .daily-records .daily-filters{margin:0}
+.workspace .daily-records .daily-cards{margin:0;gap:0}
+.workspace .daily-records .daily-cards article{border:0;border-radius:0;padding:var(--sp-4) var(--sp-5);gap:var(--sp-3)}
+.workspace .daily-records .daily-cards article+article::before{left:var(--sp-5);right:var(--sp-5)}
+.workspace .daily-records .daily-cards article p{margin:0;line-height:1.6;font-size:var(--fs-subhead)}
+.workspace .daily-records .daily-cards footer{gap:var(--sp-3);line-height:1.6}
+@media(max-width:760px){.workspace .daily-records .daily-cards article{padding:var(--sp-4)}.workspace .daily-records .daily-cards article+article::before{left:var(--sp-4);right:var(--sp-4)}}
