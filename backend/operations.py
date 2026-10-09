@@ -725,6 +725,7 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
     elif action=='finance_allocate':
         require(p and (operator(user,p) or capable(user,'finance_edit')))
         amount=decimal(data.get('total')); parts=data.get('parts',[])
+        require(isinstance(parts,list) and all(isinstance(x,dict) for x in parts),'分攤需為物件清單',422)
         require(parts and sum((decimal(x.get('amount')) for x in parts),Decimal(0))==amount,'分攤金額合計需等於成本總額',422)
         for x in parts: find(ws['projects'],x.get('project_id'))
         require(data.get('source_id') and data.get('reason'),'需成本來源與分攤依據',422)
