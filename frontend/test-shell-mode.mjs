@@ -112,7 +112,8 @@ try{
  assert.equal(pages().length,1);assert.equal(pages()[0].get('limit'),'10');assert.equal(pages()[0].get('offset'),'0');
  assert.equal(rows().length,10);assert.ok(rows()[0].textContent.includes('CODE_01'));assert.ok(document.querySelector('.table-footer').textContent.includes('共 20 筆 · 第 1 / 2 頁'));
  assert.ok(!document.querySelector('.projects-table thead').textContent.includes('合約金額'),'contract amount is not in shell cards');
- assert.equal(document.querySelector('.portfolio-index strong').textContent,'20');
+ // The formal-case count moved from the removed .portfolio-index block onto the 正式案件 filter tab.
+ assert.equal([...document.querySelectorAll('.portfolio-surface .tabbar button')].find(b=>b.textContent.startsWith('正式案件'))?.querySelector('span')?.textContent,'20');
  const nextPage=[...document.querySelectorAll('.table-footer button')].find(b=>b.textContent==='下一頁');
  await flush(()=>nextPage.click());assert.equal(pages().at(-1).get('offset'),'10');assert.equal(rows().length,10);assert.ok(rows()[0].textContent.includes('CODE_13'));
  assert.ok([...document.querySelectorAll('.table-footer button')].find(b=>b.textContent==='下一頁').disabled);
