@@ -121,4 +121,21 @@ assert.deepEqual(shown(),['f-restored']);
 console.log('Daily records: fallback shrink persists page 0 when the API becomes available');
 await act(async()=>root.unmount());
 }
+
+// Shell summaries intentionally omit detail lists; neither remote nor fallback rendering may crash.
+for(const mode of ['populated','empty','workspace-fallback']){
+ const project={id:'shell-p1',code:'SHELL',daily_reports:[{id:'loaded',date:'2026-10-01',description:'loaded-detail'}]};
+ const workspace={version:1,projects:[project,{id:'shell-p2',code:'SUMMARY'}],daily_unmatched:[]};
+ globalThis.fetch=async()=>mode==='workspace-fallback'
+  ?new Response(JSON.stringify({detail:'Not found'}),{status:404,headers:{'content-type':'application/json'}})
+  :new Response(JSON.stringify({items:mode==='empty'?[]:[{id:'remote',description:'remote-record',project_id:project.id}],total:mode==='empty'?0:1,summary:{}}),{status:200,headers:{'content-type':'application/json'}});
+ const root=createRoot(document.getElementById('root'));
+ await act(async()=>{root.render(React.createElement(DailyRecords,{w:workspace,p:project,go:()=>{}}));await new Promise(r=>setTimeout(r,20))});
+ const text=document.body.textContent;
+ assert.match(text,mode==='workspace-fallback'?/loaded-detail/:mode==='empty'?/此範圍尚無已配對紀錄/:/remote-record/);
+ assert.equal(document.querySelectorAll('[role=alert]').length,0);
+ await act(async()=>root.unmount());
+ console.log('Daily shell summaries:',mode,'renders without missing-list crash');
+}
+
 dom.window.close();

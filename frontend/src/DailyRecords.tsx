@@ -16,8 +16,9 @@ export function DailyRecords({w,p,go}:{w:Workspace;p:Project;go:(r:Route)=>void}
  const current=remote&&remote.key===requestKey?remote:null;
  const remotePageCount=current?Math.max(1,Math.ceil(current.total/30)):1;
  const pageOutOfRange=!!current&&page>=remotePageCount;
+ // Shell summaries omit detail lists; fallback includes only locally loaded records.
  const records=useMemo(()=>{
-  const matched=w.projects.flatMap(project=>project.daily_reports.map(row=>({...row,project,unmatched:false})));
+  const matched=w.projects.flatMap(project=>(project.daily_reports??[]).map(row=>({...row,project,unmatched:false})));
   const unmatched=(w.daily_unmatched||[]).map((row:any)=>({...row,project:null,unmatched:true}));
   return [...matched,...unmatched];
  },[w]);
