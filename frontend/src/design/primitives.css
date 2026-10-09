@@ -26,7 +26,7 @@ button.ds-row:hover,a.ds-row:hover{background:var(--surface-2)}
 .ds-button[data-variant=plain]{background:none;padding:0 var(--sp-3)}
 .ds-button[data-variant=destructive]{color:var(--critical)}
 .ds-button:active{transform:scale(.97)}.ds-button:disabled{opacity:.4}
-.ds-segmented{display:inline-flex;padding:2px;gap:2px}.ds-segmented.glass--flat{border-radius:var(--radius-pill)}
+.ds-segmented{display:inline-flex;padding:2px;gap:2px}.ds-segmented.glass--flat{background:var(--surface-2);border-radius:var(--radius-pill)}
 .ds-segmented button{min-height:44px;padding:0 var(--sp-4);border-radius:var(--radius-pill);font-size:var(--fs-subhead);color:var(--label);transition:background 300ms ease-out,color 300ms ease-out}
 .ds-segmented button[aria-checked=true]{background:var(--accent-fill);color:var(--accent);font-weight:600}
 .ds-backdrop{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;animation:ds-fade var(--dur-base) var(--ease)}

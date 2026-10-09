@@ -64,7 +64,7 @@
 /* Review fixes ------------------------------------------------------ */
 /* Content surfaces are opaque; blur/translucency stays on bars and sheets. */
 .workspace .glass:not(.ds-sheet),.workspace .glass--flat,.workspace .table-scroll,.workspace .portfolio-index,.workspace .tabbar,.workspace .project-tabs,.workspace .ops-tabs{background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:none;border:.5px solid var(--separator)}
-.workspace .ds-segmented.glass--flat{background:var(--surface-2)}
+
 /* Empty table rows explain themselves. */
 .workspace .data-table td.ops-empty{padding:var(--sp-5) var(--sp-4);color:var(--label-2);font-size:var(--fs-subhead);white-space:normal}
 /* Nested cards inside project readiness collapse to one surface. */
