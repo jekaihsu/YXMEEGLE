@@ -9,7 +9,7 @@ from fastapi import HTTPException
 MAX_ACTION_BYTES = 256 * 1024
 MAX_ACTION_NAME = 120  # must not exceed AuditRow.action String(120)
 TEXT_LIMIT = 10000
-TEXT_FIELDS = {'title', 'name', 'body', 'description', 'reason', 'output', 'note',
+TEXT_FIELDS = {'title', 'name', 'body', 'description', 'reason', 'output', 'note', 'evidence',
                'qualification_note', 'source_url', 'reference_url', 'url',
                'department', 'role', 'direction', 'result', 'seat', 'scope',
                'classification', 'start_date', 'due_date', 'day', 'end_time',
