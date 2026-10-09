@@ -15,3 +15,17 @@
  .workspace .source-flow>div>strong{margin:var(--sp-2) 0}
  .workspace .source-flow>svg{align-self:center;transform:rotate(90deg)}
 }
+
+/* Source identities stay readable in internally scrolling tables. */
+.workspace .source-table-scroll .data-table{min-width:42rem}
+.workspace .source-table-scroll .data-table :is(th,td){padding:var(--sp-4);vertical-align:top;line-height:1.6}
+.workspace .source-table-scroll .data-table :is(th,td):first-child{min-width:10rem}
+.workspace .source-table-scroll .data-table :is(th,td):nth-child(2){min-width:14rem}
+.workspace .source-table-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.source-scroll-hint{display:none}
+@media(max-width:760px){
+ .workspace .source-scroll-hint{display:block;font-size:var(--fs-footnote);color:var(--label-2);margin:0 0 var(--sp-3)}
+ .workspace .source-record-filters{flex-wrap:wrap;width:100%;gap:var(--sp-3)}
+ .workspace .source-record-filters>select{flex:1 1 10rem;min-width:0;max-width:100%}
+ .workspace .source-record-filters>.search-field{flex:1 1 16rem;max-width:100%}
+}
