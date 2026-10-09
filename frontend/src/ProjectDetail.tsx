@@ -43,9 +43,9 @@ export function ProjectDetailGate({c}:{c:Ctx}){
  const detail=useViewData<ProjectSlice|undefined>(shell?`project:${id}`:'project-legacy',(signal,current)=>shell&&id?api<ProjectSlice>(`/api/projects/${encodeURIComponent(id)}`,{signal},current):Promise.resolve(undefined),[c.reloadVersion]);
  useEffect(()=>{if(shell&&detail.data)perfMark('project-detail-render')},[shell,detail.data]);
  if(!shell)return <ProjectDetail c={c}/>;
- if(!detail.data)return detail.error?<Empty title={detail.error.includes('找不到')?'找不到這個案件':'案件讀取失敗'} detail={detail.error.includes('找不到')?'案件連結可能已失效，請回到案件總覽重新開啟。':detail.error}/>:<div className="project-detail" role="status"><p className="co-loading">正在讀取案件…</p><Skeleton height="2.5rem" width="60%"/><Skeleton lines={4}/></div>;
+ if(!detail.data)return detail.error?<div className="project-detail"><div role="alert"><Empty title={detail.error.includes('找不到')?'找不到這個案件':'案件讀取失敗'} detail={detail.error.includes('找不到')?'案件連結可能已失效，請回到案件總覽重新開啟。':detail.error}/></div><div className="co-actions"><Button onClick={detail.reload}>重試</Button><Button onClick={()=>c.go({view:'projects'})}>案件總覽</Button></div></div>:<div className="project-detail" role="status"><p className="co-loading">正在讀取案件…</p><Skeleton height="2.5rem" width="60%"/><Skeleton lines={4}/></div>;
  const {scope:_scope,version:_version,as_of:_asOf,project,...records}=detail.data;
- return <ProjectDetail c={{...c,w:{...c.w,...records,projects:c.w.projects.some(p=>p.id===project.id)?c.w.projects.map(p=>p.id===project.id?project:p):[...c.w.projects,project]}}}/>;
+ return <>{detail.error&&<div className="form-error" role="alert">案件更新失敗，以下顯示上次載入的資料：{detail.error}<Button onClick={detail.reload}>重試</Button></div>}<ProjectDetail c={{...c,w:{...c.w,...records,projects:c.w.projects.some(p=>p.id===project.id)?c.w.projects.map(p=>p.id===project.id?project:p):[...c.w.projects,project]}}}/></>;
 }
 export function ProjectDetail({c}:{c:Ctx}){
  const p=c.w.projects.find(p=>p.id===c.route.project);const[modal,setModal]=useState(c.route.focus?'complete-node':'');useEffect(()=>{if(c.route.focus)setModal('complete-node')},[c.route.focus,c.route.node]);const[approvalType,setApprovalType]=useState<'change'|'extension'>('change');const[expanded,setExpanded]=useState<Record<string,boolean>>({});
