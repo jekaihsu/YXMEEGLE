@@ -37,13 +37,13 @@
 .operations .text-button{background:none;color:var(--accent)}
 .operations .ds-badge{white-space:normal}
 
-/* Keep routine identities and dates readable while the history scrolls on phones. */
+/* Keep identities, dates and statuses readable beside long history details. */
 .routine-page .data-table,.administration-page .table-scroll>.data-table{display:table;min-width:calc(var(--sp-9)*11);margin:0}
 .routine-page .data-table :is(th,td){padding:var(--sp-4);line-height:1.6;vertical-align:top}
-.routine-page .data-table :is(th,td):first-child{min-width:calc(var(--sp-8)*4)}
+.routine-page .data-table :is(th,td):first-child,.administration-page .table-scroll>.job-history :is(th,td):is(:first-child,:nth-child(2)){min-width:calc(var(--sp-8)*4)}
 .routine-page .data-table :is(th,td):nth-child(2){min-width:calc(var(--sp-7)*3)}
-.routine-page .data-table :is(th,td):nth-child(3){min-width:calc(var(--sp-8)*4)}
-.routine-page .data-table :is(th,td):last-child{min-width:calc(var(--sp-9)*4)}
+.routine-page .data-table :is(th,td):nth-child(3),.administration-page .table-scroll>.job-history :is(th,td):nth-child(3){min-width:calc(var(--sp-8)*4)}
+.routine-page .data-table :is(th,td):last-child,.administration-page .table-scroll>.job-history :is(th,td):last-child{min-width:calc(var(--sp-9)*4)}
 .table-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .routine-scroll-hint{display:none}
 @media(max-width:760px){.workspace .routine-scroll-hint{display:block;font-size:var(--fs-footnote);margin:0 0 var(--sp-3)}}
