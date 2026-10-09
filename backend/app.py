@@ -802,9 +802,16 @@ def create_app(overrides=None):
         try:
             with httpx.Client(timeout=25) as client:
                 response=client.get(API+'/approval/v4/instances/detail',headers={'Authorization':'Bearer '+token},params={'instance_code':instance_code,'locale':'zh-TW','user_id_type':'open_id'})
-                require(response.status_code==200,'Lark 審批讀取失敗',502); result=response.json(); require(result.get('code',0)==0,'目前身份無法讀取該 Lark 審批實例',403)
+                require(response.status_code==200,'Lark 審批讀取失敗',502)
+                try: result=response.json()
+                except ValueError: raise HTTPException(502,'Lark 審批回應無法核實')
+                require(isinstance(result,dict) and type(result.get('code',0)) is int,'Lark 審批回應格式不完整',502)
+                require(result.get('code',0)==0,'目前身份無法讀取該 Lark 審批實例',403)
         except httpx.HTTPError: raise HTTPException(502,'Lark 審批服務暫時無法連線')
         remote=result.get('data',{}); expected=cfg.get('LARK_CHANGE_APPROVAL_CODE' if approval['type']=='change' else 'LARK_EXTENSION_APPROVAL_CODE')
+        require(isinstance(remote,dict),'Lark 審批回應內容無法核實',502)
+        status=remote.get('status','UNKNOWN')
+        require(isinstance(status,str) and re.fullmatch(r'[A-Z_]{1,40}',status),'Lark 審批狀態無法核實',502)
         if expected: require((remote.get('definition_code') or remote.get('approval_code'))==expected,'此審批實例不屬於設定的審批定義',409)
         def mutate(state):
             target=find(state['approvals'],approval_id,'申請')
