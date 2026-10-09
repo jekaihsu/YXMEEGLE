@@ -46,4 +46,4 @@
 .column-resize::after{content:"";position:absolute;top:var(--sp-3);bottom:var(--sp-3);left:var(--sp-1);width:calc(var(--sp-1) * .5);background:var(--sep);border-radius:var(--radius-pill)}
 .column-resize:focus-visible::after{background:var(--accent)}
 @media(hover:hover){.portfolio-page .case-link:hover{color:var(--accent)}.column-resize:hover::after{background:var(--accent)}}
-@media(max-width:760px){.portfolio-page .search-field{flex-basis:100%}.column-resize{display:none}}
+@media(max-width:760px){.portfolio-page .search-field{flex-basis:100%}.portfolio-page .search-field input{font-size:var(--fs-callout)}.column-resize{display:none}}
