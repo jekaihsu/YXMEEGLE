@@ -417,13 +417,19 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         require(user['role']=='manager')
         allowed=set(ws['settings'])
         require(set(data)<=allowed,'未知設定',422)
+        from .policy import defaults
+        approved=defaults()
+        for key,value in data.items():
+            expected=approved.get(key)
+            if expected is not None:
+                require(type(value) is type(expected),'設定欄位型別錯誤',422)
+        for key in ('daily_backup_days','monthly_backup_months','rpo_hours','rto_hours'):
+            if key in data: require(data[key]>0,'保留期間與復原目標需為正整數',422)
         proposed={**ws['settings'],**data}
         require(proposed.get('deadline_basis')=='scheduled_shift' and proposed.get('cutoff_time') is None,'截止時間必須依個人正常班表，不能改為固定時間',422)
         require(proposed.get('source_sync_seconds')==ws['settings'].get('source_sync_seconds'),
                 '來源讀取頻率由伺服器環境設定管理',422)
         require(proposed.get('test_connection_mode') in ('simulation','isolated_live'),'測試連線模式錯誤',422)
-        from .policy import defaults
-        approved=defaults()
         for key in ('v4_base','quote_base','capability_base'):
             require(proposed.get(key)==approved[key],'案件與能力來源僅限使用者已核定的 Base',422)
         for key in ('digest_time',):
@@ -447,10 +453,11 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         source=find(ws['sop_templates'],data.get('source_id'),'SOP 範本')
         version=deepcopy(source); version.update(id=uid(),version=max(s['version'] for s in ws['sop_templates'])+1,status='draft',created_by=user['id'],created_at=now())
         if data.get('nodes'):
-            require({s['key'] for s in data['nodes']}=={s['key'] for s in source['nodes']},'需保留全部既有節點',422)
+            require(all(isinstance(s.get('key'),str) for s in data['nodes']),'SOP 節點識別格式錯誤',422)
+            require(len(data['nodes'])==len(source['nodes']) and {s['key'] for s in data['nodes']}=={s['key'] for s in source['nodes']},'需保留全部既有節點且不可重複',422)
             for s in data['nodes']:
-                require(s.get('review_mode') in ('all','any') and s.get('tasks') and all(isinstance(t,str) and t.strip() for t in s['tasks']),'SOP任務與模式錯誤',422)
-                require(isinstance(s.get('requirements'),list) and all(isinstance(r.get('key'),str) and r.get('label') for r in s['requirements']),'文件規則錯誤',422)
+                require(s.get('review_mode') in ('all','any') and isinstance(s.get('tasks'),list) and s['tasks'] and all(isinstance(t,str) and t.strip() for t in s['tasks']),'SOP任務與模式錯誤',422)
+                require(isinstance(s.get('requirements'),list) and all(isinstance(r,dict) and isinstance(r.get('key'),str) and r['key'].strip() and isinstance(r.get('label'),str) and r['label'].strip() for r in s['requirements']),'文件規則錯誤',422)
             version['nodes']=deepcopy(data['nodes'])
             for node in version['nodes']:
                 original=next(s for s in source['nodes'] if s['key']==node['key'])
@@ -718,6 +725,7 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
     elif action=='finance_allocate':
         require(p and (operator(user,p) or capable(user,'finance_edit')))
         amount=decimal(data.get('total')); parts=data.get('parts',[])
+        require(isinstance(parts,list) and all(isinstance(x,dict) for x in parts),'分攤需為物件清單',422)
         require(parts and sum((decimal(x.get('amount')) for x in parts),Decimal(0))==amount,'分攤金額合計需等於成本總額',422)
         for x in parts: find(ws['projects'],x.get('project_id'))
         require(data.get('source_id') and data.get('reason'),'需成本來源與分攤依據',422)

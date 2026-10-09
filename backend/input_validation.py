@@ -9,7 +9,7 @@ from fastapi import HTTPException
 MAX_ACTION_BYTES = 256 * 1024
 MAX_ACTION_NAME = 120  # must not exceed AuditRow.action String(120)
 TEXT_LIMIT = 10000
-TEXT_FIELDS = {'title', 'name', 'body', 'description', 'reason', 'output', 'note',
+TEXT_FIELDS = {'title', 'name', 'body', 'description', 'reason', 'output', 'note', 'evidence',
                'qualification_note', 'source_url', 'reference_url', 'url',
                'department', 'role', 'direction', 'result', 'seat', 'scope',
                'classification', 'start_date', 'due_date', 'day', 'end_time',
@@ -144,6 +144,13 @@ def validate_action(body):
     if not isinstance(payload, dict):
         invalid('payload 必須是物件')
     _payload_fields(payload)
+    if body['action'] == 'calendar_update':
+        for key in ('holidays', 'workdays'):
+            values = payload.get(key, [])
+            if not isinstance(values, list):
+                invalid(f'{key} 必須是日期清單')
+            for value in values:
+                text(value, key, 10)
     if body['action'] in ('task_add', 'task_update') and 'title' in payload and not payload['title'].strip():
         invalid('任務名稱不可空白')
     return body

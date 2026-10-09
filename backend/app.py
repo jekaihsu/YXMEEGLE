@@ -21,7 +21,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.engine import make_url
 from .seed import seed, USERS
-from .workflow import apply_action, require, find, event, now, uid, is_pm, is_owner
+from .workflow import apply_action, require, find, event, now, uid, is_pm, is_owner, valid_date
 from .sources import API, configuration, import_sources
 from .policy import upgrade, CAPABILITIES, MANAGER_CAPABILITIES
 from .operations import apply_operation, project_summary, capable, review_hash, invalidate
@@ -513,6 +513,11 @@ def create_app(overrides=None):
         data,user=identity(request)
         require(offset>=0 and 1<=limit<=100,'分頁參數錯誤',422)
         require(status in ('all','matched','unmatched','source_missing'),'日報狀態錯誤',422)
+        for value in (date_from,date_to):
+            if value:
+                try: valid_date(value)
+                except HTTPException: raise HTTPException(422,'日期需為 YYYY-MM-DD')
+        require(not (date_from and date_to) or date_from<=date_to,'結束日期不能早於開始日期',422)
         with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
         from .source_case_policy import filter_visible_cases
         filter_visible_cases(state);filter_private_workspace(state,user)
@@ -797,12 +802,21 @@ def create_app(overrides=None):
         try:
             with httpx.Client(timeout=25) as client:
                 response=client.get(API+'/approval/v4/instances/detail',headers={'Authorization':'Bearer '+token},params={'instance_code':instance_code,'locale':'zh-TW','user_id_type':'open_id'})
-                require(response.status_code==200,'Lark 審批讀取失敗',502); result=response.json(); require(result.get('code',0)==0,'目前身份無法讀取該 Lark 審批實例',403)
+                require(response.status_code==200,'Lark 審批讀取失敗',502)
+                try: result=response.json()
+                except ValueError: raise HTTPException(502,'Lark 審批回應無法核實')
+                require(isinstance(result,dict) and type(result.get('code',0)) is int,'Lark 審批回應格式不完整',502)
+                require(result.get('code',0)==0,'目前身份無法讀取該 Lark 審批實例',403)
         except httpx.HTTPError: raise HTTPException(502,'Lark 審批服務暫時無法連線')
         remote=result.get('data',{}); expected=cfg.get('LARK_CHANGE_APPROVAL_CODE' if approval['type']=='change' else 'LARK_EXTENSION_APPROVAL_CODE')
+        require(isinstance(remote,dict),'Lark 審批回應內容無法核實',502)
+        status=remote.get('status','UNKNOWN')
+        require(isinstance(status,str) and re.fullmatch(r'[A-Z_]{1,40}',status),'Lark 審批狀態無法核實',502)
         if expected: require((remote.get('definition_code') or remote.get('approval_code'))==expected,'此審批實例不屬於設定的審批定義',409)
         def mutate(state):
             target=find(state['approvals'],approval_id,'申請')
+            actor=find(state['users'],user['id'],'操作者')
+            require(is_pm(actor,find(state['projects'],target['project_id'],'案件')))
             # Do not turn an arbitrary reference into authorization to change project scope.
             target.update(lark_instance_code=instance_code,lark_external_status=remote.get('status','UNKNOWN'),lark_checked_at=now(),lark_binding_verified=False)
             target['history'].append({'action':'lark_refresh','actor_id':user['id'],'created_at':now(),'message':'唯讀取得原生審批狀態；尚未驗證此實例與案件範圍一致，不自動核准'})
@@ -862,6 +876,8 @@ def create_app(overrides=None):
         except RemoteFailure as exc: raise HTTPException(502,str(exc))
         finally: adapter.client.close()
         def mutate(state):
+            actor=find(state['users'],user['id'],'操作者')
+            require(capable(actor,'manage_handover'),'需要交接管理權限',403)
             known={u['id'] for u in state['users']}
             require(result['principal_id'] in known and result['delegate_id'] in known,'請先核實兩人的公司身分',409)
             state['approved_leave_delegations']=[a for a in state['approved_leave_delegations'] if a['id']!=code]+[result]
@@ -983,8 +999,12 @@ def create_app(overrides=None):
         copied_files=[]
         try:
             with sessions.begin() as db:
-                source=db.get(WorkspaceRow,org); require(source is not None,'正式工作區尚未建立',409); source_state=load(db,source)
-                p=find(source_state['projects'],body.get('project_id'),'V4案件'); target=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one(); state=load(db,target); expected=target.version
+                source=db.get(WorkspaceRow,org); require(source is not None,'正式工作區尚未建立',409)
+                target=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one()
+                source_state=load(db,source)
+                actor=find(source_state['users'],user['id'],'操作者')
+                require(actor.get('active',True) and actor.get('role')=='manager','需公司管理員',403)
+                p=find(source_state['projects'],body.get('project_id'),'V4案件'); state=load(db,target); expected=target.version
                 require(not any(x.get('pilot_source_id')==p['id'] for x in state['projects']),'此試行案已複製',409)
                 occupied_ids=set()
                 def collect_ids(value):
