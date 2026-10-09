@@ -30,7 +30,7 @@
 .workspace .flow-legend .green-dot{background:var(--positive)}
 .workspace .flow-legend .purple-dot{background:var(--accent)}
 .workspace .flow-legend .gray-dot{background:var(--surface-2);border:1px solid var(--label-2)}
-.workspace .stage-button.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+
 .workspace .stage-button .stage-action-label{color:var(--accent)}
 .workspace .stage-button.completed .stage-action-label{color:var(--label-2)}
 @media(max-width:760px){
