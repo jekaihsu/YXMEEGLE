@@ -157,7 +157,7 @@ button.resource-cell:focus-visible{outline:2px solid var(--accent);outline-offse
 
 @media(max-width:760px){.workspace .mywork-controls>.tabbar{width:100%}.workspace .mywork-controls .search-field{max-width:none}}
 /* Dialogs: the title stays put while the body scrolls, and the scrollbar is slim and kept off the rounded corners. */
-.modal>header{position:sticky;top:0;z-index:3;background:var(--surface)}
+
 /* An older rule sets scrollbar-width on .modal; Chrome then ignores ::-webkit-scrollbar, so reset it where the pseudo-element works. */
 @supports selector(::-webkit-scrollbar){.modal.modal{scrollbar-width:auto;scrollbar-color:auto}}
 .modal::-webkit-scrollbar{width:6px}
