@@ -116,6 +116,28 @@ def test_isolated_or_disabled_workspaces_never_call_readers(harness, wid, enable
         assert db.query(CacheRow).count() == 0
 
 
+@pytest.mark.parametrize('enabled', [True, False])
+def test_unconfigured_ensure_only_reads_requested_dataset(harness, enabled):
+    from .test_perf_budget import count_queries
+
+    h = harness
+    h.cfg['LARK_LIVE_READ_ENABLED'] = str(enabled).lower()
+    h.readers.pop('sources')
+    with h.sessions.begin() as db:
+        db.add(WorkspaceRow(id=h.wid, version=1,
+                            data={'as_of': '2026-10-07T09:00:00+08:00'}))
+        db.add(CacheRow(id=f'live:{h.wid}:sources', data={
+            'as_of': '2026-10-07T09:59:00+08:00', 'last_error': 'Lark refresh failed',
+            'fingerprint': 'private', 'error_code': 'private'}))
+    c = h.make()
+    expected = c.status(h.wid)['datasets']['sources']
+    with count_queries(h.engine) as stats:
+        result = c.ensure(h.wid, 'sources')
+    assert result == expected
+    assert stats['queries'] <= (1 if enabled else 2)
+    assert h.calls == []
+
+
 def test_concurrent_ensure_coalesces_to_one_threaded_refresh(harness):
     h = harness
     entered, release = Event(), Event()

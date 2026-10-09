@@ -68,8 +68,11 @@ class RefreshCoordinator:
             return dict(row.data or {}) if row else {}
 
     def status(self, wid):
+        return self._status(wid, DATASETS)
+
+    def _status(self, wid, datasets):
         rows = {}
-        for dataset in DATASETS:
+        for dataset in datasets:
             try:
                 rows[dataset] = self._read(self._key(wid, dataset))
             except Exception:
@@ -199,7 +202,7 @@ class RefreshCoordinator:
         if dataset not in DATASETS:
             raise ValueError('Unknown live-read dataset')
         if not self._enabled(wid) or dataset not in self.refreshers:
-            return dict(self.status(wid)['datasets'][dataset], status='unconfigured')
+            return dict(self._status(wid, (dataset,))['datasets'][dataset], status='unconfigured')
         slots = self._roster_slots if dataset == 'roster' else self._slots
         executor = self.roster_executor if dataset == 'roster' else self.executor
         key = self._key(wid, dataset)
