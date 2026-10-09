@@ -36,7 +36,7 @@
 
 /* Keep every operational column visible; compact rows scroll inside the table. */
 .portfolio-page .portfolio-index{margin-bottom:0;box-shadow:var(--glass-highlight),var(--glass-shadow)}
-.portfolio-page .table-scroll .projects-table{min-width:1240px;background:var(--surface);table-layout:fixed;line-height:1.2}
+.portfolio-page .table-scroll .projects-table{min-width:920px;background:var(--surface);table-layout:fixed;line-height:1.2}
 .portfolio-page .projects-table th{padding:var(--sp-2);letter-spacing:0}
 .portfolio-page .projects-table tbody tr{height:40px}
 .portfolio-page .projects-table .case-link{font-size:var(--fs-subhead);line-height:1.2;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:none}
@@ -57,16 +57,16 @@
 .portfolio-page .verification-cell{display:inline-flex}
 .portfolio-page .table-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-.portfolio-page .projects-table th:first-child{width:230px}
-.portfolio-page .projects-table th:nth-child(2){width:110px}
-.portfolio-page .projects-table th:nth-child(3){width:90px}
-.portfolio-page .projects-table th:nth-child(4){width:110px}
-.portfolio-page .projects-table th:nth-child(5){width:140px}
-.portfolio-page .projects-table th:nth-child(6){width:96px}
-.portfolio-page .projects-table th:nth-child(7){width:96px}
-.portfolio-page .projects-table th:nth-child(8){width:90px}
-.portfolio-page .projects-table th:nth-child(9),.portfolio-page .projects-table th:nth-child(10){width:110px}
+/* Columns: project, status (+verification/attention), ownership (+manager), stage, progress, deadline, [contract amount], chevron. */
+.portfolio-page .projects-table th:first-child{width:26%}
+.portfolio-page .projects-table th:nth-child(2){width:150px}
+.portfolio-page .projects-table th:nth-child(3){width:170px}
+.portfolio-page .projects-table th:nth-child(4){width:96px}
+.portfolio-page .projects-table th:nth-child(5){width:96px}
+.portfolio-page .projects-table th:nth-child(6),.portfolio-page .projects-table th:nth-child(7){width:104px}
 .portfolio-page .projects-table th:last-child{width:28px}
+.portfolio-page .status-secondary{display:flex;flex-wrap:wrap;gap:2px;margin-top:2px}
+.portfolio-page .owner-cell{display:flex;flex-direction:column;gap:2px;align-items:flex-start}
 .portfolio-page .projects-table .case-code{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:14px}
 .portfolio-page .projects-table .case-code small{display:inline;margin:0;font-size:var(--fs-caption)}
 .portfolio-page .projects-table .cell-title{line-height:18px}
@@ -84,13 +84,18 @@
  .portfolio-page .projects-table tbody tr{display:grid;height:auto;grid-template-columns:minmax(0,1fr);padding:var(--sp-4);border:1px solid var(--separator);border-radius:var(--radius-card);background:var(--surface)}
  .workspace .portfolio-page .projects-table td{display:none;border:0;padding:var(--sp-2) 0}
  .workspace .portfolio-page .projects-table td:first-child,.workspace .portfolio-page .projects-table td:nth-child(2){display:block}
- .workspace .portfolio-page .projects-table td:nth-child(6),.workspace .portfolio-page .projects-table td:nth-child(8),.workspace .portfolio-page .projects-table td:nth-child(9){display:grid;grid-template-columns:6rem minmax(0,1fr);align-items:center;gap:var(--sp-3);text-align:left}
- .portfolio-page .projects-table td:nth-child(6)::before{content:"專案經理"}
- .portfolio-page .projects-table td:nth-child(8)::before{content:"任務進度"}
- .portfolio-page .projects-table td:nth-child(9)::before{content:"有效期限"}
+  .workspace .portfolio-page .projects-table td:nth-child(3),.workspace .portfolio-page .projects-table td:nth-child(5),.workspace .portfolio-page .projects-table td:nth-child(6){display:grid;grid-template-columns:6rem minmax(0,1fr);align-items:center;gap:var(--sp-3);text-align:left}
+ .portfolio-page .projects-table td:nth-child(3)::before{content:"歸屬 · 經理"}
+ .portfolio-page .projects-table td:nth-child(5)::before{content:"任務進度"}
+ .portfolio-page .projects-table td:nth-child(6)::before{content:"有效期限"}
  .portfolio-page .projects-table td::before{font-size:var(--fs-footnote);color:var(--label-2)}
  .portfolio-page .projects-table .case-link{white-space:normal;font-size:var(--fs-body);line-height:1.5;min-height:44px;display:flex;align-items:center}
  .portfolio-page .projects-table .case-code{white-space:normal;line-height:1.5}
  .portfolio-page .projects-table .progress-track i{background:var(--accent)}
  .portfolio-page .pager{flex-wrap:wrap}
 }
+
+/* Filter tabs wrap instead of clipping or scrolling horizontally. */
+.workspace .portfolio-page .portfolio-surface .tabbar{flex-wrap:wrap;overflow:visible;gap:var(--sp-1);width:fit-content;max-width:100%;border-left-width:.5px;border-right-width:.5px;border-bottom-width:.5px}
+.workspace .portfolio-page .portfolio-surface .tabbar>button{flex:1 1 auto;white-space:nowrap;padding:0 var(--sp-3);justify-content:center}
+@media(max-width:600px){.workspace .portfolio-page .portfolio-surface .tabbar{width:100%;border-radius:var(--radius-m)}.workspace .portfolio-page .portfolio-surface .tabbar>button{flex:1 1 30%}}
