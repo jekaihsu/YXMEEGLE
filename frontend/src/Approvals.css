@@ -1,0 +1,17 @@
+/* Approval titles carry the hierarchy; status remains visible beside metadata. */
+.workspace .approval-list{overflow:hidden;border:.5px solid var(--separator);border-radius:var(--radius-card);background:var(--surface)}
+.workspace .approval-row{padding:var(--sp-4) var(--sp-5);gap:var(--sp-3);color:var(--label)}
+.workspace .approval-row:last-child{border-bottom:0}
+.workspace .approval-row:hover{background:var(--surface-2)}
+.workspace .approval-row-main{min-width:0;line-height:1.6;overflow-wrap:anywhere}
+.workspace .approval-row-main>strong{font-size:var(--fs-subhead);font-weight:600;color:var(--label);margin-top:var(--sp-2)}
+.workspace .approval-row-main>small{margin-top:var(--sp-2)}
+.workspace .approval-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.modal .approval-history summary{min-height:var(--control-height);padding:var(--control-pad-block) var(--control-pad-inline);box-sizing:border-box;cursor:pointer}
+@media(max-width:760px){
+ .workspace .approval-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;padding:var(--sp-4)}
+ .workspace .approval-type-icon{grid-column:1;grid-row:1}
+ .workspace .approval-row-main{grid-column:2/-1;grid-row:1}
+ .workspace .approval-row>.ds-badge{grid-column:2;justify-self:start}
+ .workspace .approval-row>svg{grid-column:3;align-self:center}
+}
