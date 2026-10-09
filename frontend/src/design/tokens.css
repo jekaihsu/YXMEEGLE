@@ -8,7 +8,7 @@
  --separator:#0000001a;--radius-card:18px;
  --glass-fill:rgb(255 255 255/.72);--glass-bar-fill:rgb(245 245 247/.82);--glass-blur:saturate(180%) blur(20px);--glass-border:#0000001a;--glass-highlight:inset 0 1px 0 rgb(255 255 255/.7);--glass-shadow:0 4px 20px #0000000d;
  --bg-tint:radial-gradient(60rem 40rem at 10% -10%,#0c54941f,transparent 70%),radial-gradient(50rem 36rem at 100% 0,#0c549414,transparent 70%);
- --positive:#248a3d;--warning:#b25000;--critical:#d70015;--on-critical:#fff;
+ --positive:#1f7a35;--warning:#b25000;--critical:#d70015;--on-critical:#fff;
  --font:-apple-system,"SF Pro Text","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
  --fs-large-title:2.125rem;--fs-title1:1.75rem;--fs-title2:1.375rem;--fs-headline:1.0625rem;--fs-body:1.0625rem;--fs-callout:1rem;--fs-subhead:.9375rem;--fs-footnote:.8125rem;--fs-caption:.75rem;
  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-7:32px;--sp-8:44px;--sp-9:64px;
@@ -30,7 +30,7 @@ html{font-size:calc(100% * var(--text-scale))}
  --accent:#5ea3e0;--accent-hover:#7bb5e8;--on-accent:#04213b;--accent-fill:#5ea3e026;
  --glass-fill:rgb(28 28 30/.68);--glass-bar-fill:rgb(10 10 10/.78);--glass-border:#ffffff1a;--glass-highlight:inset 0 1px 0 rgb(255 255 255/.08);--glass-shadow:0 4px 20px #0006;
  --bg-tint:radial-gradient(60rem 40rem at 10% -10%,#5ea3e01f,transparent 70%),radial-gradient(50rem 36rem at 100% 0,#5ea3e014,transparent 70%);
- --positive:#30d158;--warning:#ff9f0a;--critical:#ff453a;--on-critical:#000;
+ --positive:#30d158;--warning:#ff9f0a;--critical:#ff6961;--on-critical:#000;
 }
 @media(prefers-color-scheme:dark){
  :root:not([data-theme=light]):not([data-theme=dark]){
@@ -41,7 +41,7 @@ html{font-size:calc(100% * var(--text-scale))}
   --accent:#5ea3e0;--accent-hover:#7bb5e8;--on-accent:#04213b;--accent-fill:#5ea3e026;
   --glass-fill:rgb(28 28 30/.68);--glass-bar-fill:rgb(10 10 10/.78);--glass-border:#ffffff1a;--glass-highlight:inset 0 1px 0 rgb(255 255 255/.08);--glass-shadow:0 4px 20px #0006;
   --bg-tint:radial-gradient(60rem 40rem at 10% -10%,#5ea3e01f,transparent 70%),radial-gradient(50rem 36rem at 100% 0,#5ea3e014,transparent 70%);
-  --positive:#30d158;--warning:#ff9f0a;--critical:#ff453a;--on-critical:#000;
+  --positive:#30d158;--warning:#ff9f0a;--critical:#ff6961;--on-critical:#000;
  }
 }
 @media(prefers-reduced-motion:reduce){:root{--dur-fast:0ms;--dur-base:0ms;--dur-slow:0ms}}
