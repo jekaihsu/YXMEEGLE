@@ -144,6 +144,13 @@ def validate_action(body):
     if not isinstance(payload, dict):
         invalid('payload 必須是物件')
     _payload_fields(payload)
+    if body['action'] == 'calendar_update':
+        for key in ('holidays', 'workdays'):
+            values = payload.get(key, [])
+            if not isinstance(values, list):
+                invalid(f'{key} 必須是日期清單')
+            for value in values:
+                text(value, key, 10)
     if body['action'] in ('task_add', 'task_update') and 'title' in payload and not payload['title'].strip():
         invalid('任務名稱不可空白')
     return body
