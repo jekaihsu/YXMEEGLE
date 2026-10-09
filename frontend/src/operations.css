@@ -38,3 +38,20 @@
 .operations h3{font-size:var(--fs-headline);color:var(--label)}
 .operations .text-button{background:none;color:var(--accent)}
 .operations .ds-badge{white-space:normal}
+
+/* Keep routine identities and dates readable while the history scrolls on phones. */
+.workspace .routine-page .data-table{display:table;min-width:42rem;margin:0}
+.workspace .routine-page .data-table :is(th,td){padding:var(--sp-4);line-height:1.6;vertical-align:top}
+.routine-page .data-table :is(th,td):first-child{min-width:10rem}
+.routine-page .data-table :is(th,td):nth-child(2){min-width:6rem}
+.routine-page .data-table :is(th,td):nth-child(3){min-width:10rem}
+.routine-page .data-table :is(th,td):last-child{min-width:16rem}
+.routine-page .table-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.routine-scroll-hint{display:none}
+@media(max-width:760px){.workspace .routine-scroll-hint{display:block;font-size:var(--fs-footnote);margin:0 0 var(--sp-3)}}
+
+/* SOP disclosure labels have the same touch inset as other controls. */
+.workspace .administration-page>.ops-form>summary{min-height:var(--control-height);padding:var(--control-pad-block) var(--control-pad-inline);box-sizing:border-box;cursor:pointer;color:var(--label);font-size:var(--fs-subhead);font-weight:500;line-height:1.6;border-radius:var(--radius-m)}
+.workspace .administration-page>.ops-form>summary:hover{background:var(--surface-2)}
+.workspace .administration-page>.ops-form>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.workspace .administration-page>.ops-form>div{padding:var(--sp-4);border-top:1px solid var(--separator)}
