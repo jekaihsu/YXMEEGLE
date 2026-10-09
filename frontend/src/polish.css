@@ -80,6 +80,24 @@
  .workspace .ds-page-head{text-align:left;align-items:stretch}.workspace .ds-page-head>div:first-child{text-align:left}
  .workspace .ds-actions{justify-content:flex-start}
 }
+/* Phone task cards keep the status and schedule visible alongside the case. */
+@media(max-width:760px){
+ .workspace .table-scroll .task-table.with-project,.workspace .table-scroll .task-table.with-project tbody{display:block;min-width:0}
+ .workspace .task-table.with-project thead{position:absolute;width:var(--sp-1);height:var(--sp-1);overflow:hidden;clip-path:inset(50%)}
+ .workspace .task-table.with-project tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--sp-1) var(--sp-3);padding:var(--sp-3) var(--sp-4);border-top:.5px solid var(--separator)}
+ .workspace .task-table.with-project tbody tr:first-child{border-top:0}
+ .workspace .task-table.with-project td{display:block;padding:0;border:0;min-width:0;line-height:1.4}
+ .workspace .task-table.with-project td:first-child{grid-column:1/-1}
+ .workspace .task-table.with-project td:nth-child(2){grid-column:1;grid-row:2;display:flex;flex-wrap:wrap;align-items:baseline;gap:0 var(--sp-2)}
+ .workspace .task-table.with-project td:nth-child(4){grid-column:2;grid-row:2;justify-self:end}
+ .workspace .task-table.with-project td:nth-child(5){grid-column:1/-1;grid-row:3}
+ .workspace .task-table.with-project .col-owner{grid-column:1/-1;grid-row:4}
+ .workspace .task-table.with-project .col-points{grid-column:1/-1;grid-row:5}
+ .workspace .task-table.with-project td:last-child{display:none}
+ .workspace .task-table.with-project td small{display:inline}
+ .workspace .task-table.with-project .task-title small{display:block}
+ .workspace .task-table.with-project .person-cell,.workspace .task-table.with-project .col-points{font-size:var(--fs-footnote);color:var(--label-2)}
+}
 /* Final: opaque hero; day lists show 6 tasks then expand instead of nested scrolling. */
 .workspace .dh-hero{background:var(--surface);border:.5px solid var(--separator);border-radius:var(--radius-card);box-shadow:none}
 .workspace .calendar-tasks{max-height:none;overflow:visible}
@@ -121,7 +139,7 @@
 /* The workspace already supplies the shared page gutter. */
 .workspace>.company-cockpit,.workspace>.operations.operations{max-width:none;margin:0}
 /* Hide columns only when they have no information to compare. */
-.task-table.hide-owner .col-owner,.task-table.hide-points .col-points{display:none}
+.workspace .task-table.hide-owner .col-owner,.workspace .task-table.hide-points .col-points{display:none}
 /* Workload cells open that person's week; the bar fill must read against its tinted track. */
 button.resource-cell{all:unset;box-sizing:border-box;display:block;width:100%;padding:var(--sp-1) 0;border-radius:8px;cursor:pointer;text-align:center}
 button.resource-cell:hover{background:var(--surface-2)}
