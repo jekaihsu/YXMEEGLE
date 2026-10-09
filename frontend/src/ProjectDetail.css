@@ -35,3 +35,6 @@
 
 /* Back navigation follows the content edge rather than the shared button inset. */
 .workspace .project-detail .project-topline>.ds-button[data-variant=plain]{padding-left:0!important;justify-content:flex-start;border-radius:var(--radius-s)}
+
+/* Populated comparison tables keep readable columns and scroll within the case. */
+.project-detail .case-comparison-scroll .data-table{min-width:40rem}
