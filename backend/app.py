@@ -21,7 +21,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.engine import make_url
 from .seed import seed, USERS
-from .workflow import apply_action, require, find, event, now, uid, is_pm, is_owner
+from .workflow import apply_action, require, find, event, now, uid, is_pm, is_owner, valid_date
 from .sources import API, configuration, import_sources
 from .policy import upgrade, CAPABILITIES, MANAGER_CAPABILITIES
 from .operations import apply_operation, project_summary, capable, review_hash, invalidate
@@ -513,6 +513,11 @@ def create_app(overrides=None):
         data,user=identity(request)
         require(offset>=0 and 1<=limit<=100,'分頁參數錯誤',422)
         require(status in ('all','matched','unmatched','source_missing'),'日報狀態錯誤',422)
+        for value in (date_from,date_to):
+            if value:
+                try: valid_date(value)
+                except HTTPException: raise HTTPException(422,'日期需為 YYYY-MM-DD')
+        require(not (date_from and date_to) or date_from<=date_to,'結束日期不能早於開始日期',422)
         with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
         from .source_case_policy import filter_visible_cases
         filter_visible_cases(state);filter_private_workspace(state,user)
