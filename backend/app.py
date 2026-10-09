@@ -999,8 +999,12 @@ def create_app(overrides=None):
         copied_files=[]
         try:
             with sessions.begin() as db:
-                source=db.get(WorkspaceRow,org); require(source is not None,'正式工作區尚未建立',409); source_state=load(db,source)
-                p=find(source_state['projects'],body.get('project_id'),'V4案件'); target=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one(); state=load(db,target); expected=target.version
+                source=db.get(WorkspaceRow,org); require(source is not None,'正式工作區尚未建立',409)
+                target=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one()
+                source_state=load(db,source)
+                actor=find(source_state['users'],user['id'],'操作者')
+                require(actor.get('active',True) and actor.get('role')=='manager','需公司管理員',403)
+                p=find(source_state['projects'],body.get('project_id'),'V4案件'); state=load(db,target); expected=target.version
                 require(not any(x.get('pilot_source_id')==p['id'] for x in state['projects']),'此試行案已複製',409)
                 occupied_ids=set()
                 def collect_ids(value):
