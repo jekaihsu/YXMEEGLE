@@ -144,3 +144,50 @@
 }
 /* The workspace already supplies the shared page gutter. */
 .workspace>.company-cockpit,.workspace>.operations.operations{max-width:none;margin:0}
+/* Task table columns with nothing to compare hide without shifting the mobile nth-child layout. */
+.task-table.hide-owner .col-owner,.task-table.hide-points .col-points{display:none}
+/* Workload cells open that person's week; the bar fill must read against its tinted track. */
+button.resource-cell{all:unset;box-sizing:border-box;display:block;width:100%;padding:var(--sp-1) 0;border-radius:8px;cursor:pointer;text-align:center}
+button.resource-cell:hover{background:var(--surface-2)}
+button.resource-cell:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.resource-cell .resource-bar>i{background:var(--accent)}
+.resource-cell strong.high-load{color:var(--warning,var(--label))}
+/* My Work controls (table and board): scope tabs and search share one row so the work starts higher on the page.
+   Kept here, not in the lazy board stylesheet, because the table view needs them before the board ever loads. */
+.workspace .mywork-controls{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-4)}
+.workspace .mywork-controls>.tabbar{margin:0;width:auto;flex:0 0 auto}
+.workspace .mywork-controls>.table-toolbar{margin:0;padding:0;border:0;background:none;flex:1 1 18rem;display:flex;gap:var(--sp-3);align-items:center}
+.workspace .mywork-controls .search-field{flex:1 1 auto;max-width:26rem}
+.workspace .mywork-controls+.batch-completion{margin:0 0 var(--sp-4)}
+
+@media(max-width:760px){.workspace .mywork-controls>.tabbar{width:100%}.workspace .mywork-controls .search-field{max-width:none}}
+/* Dialogs: the title stays put while the body scrolls, and the scrollbar is slim and kept off the rounded corners. */
+.modal>header{position:sticky;top:0;z-index:3;background:var(--surface)}
+/* An older rule sets scrollbar-width on .modal; Chrome then ignores ::-webkit-scrollbar, so reset it where the pseudo-element works. */
+@supports selector(::-webkit-scrollbar){.modal.modal{scrollbar-width:auto;scrollbar-color:auto}}
+.modal::-webkit-scrollbar{width:6px}
+.modal::-webkit-scrollbar-track{background:transparent;margin-block:var(--sp-5)}
+.modal::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--label) 18%,transparent);border-radius:var(--radius-pill)}
+@supports not selector(::-webkit-scrollbar){.modal{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--label) 18%,transparent) transparent}}
+/* Completion sheet: the task brief reads as two label/value rows instead of four stacked blocks. */
+.modal dl.completion-description{display:grid;grid-template-columns:auto 1fr;gap:var(--sp-2) var(--sp-4);margin:var(--sp-4) 0}
+.modal dl.completion-description dt{font-size:var(--fs-footnote);font-weight:600;color:var(--label-2);white-space:nowrap}
+.modal dl.completion-description dd{margin:0;font-size:var(--fs-subhead);line-height:1.6;color:var(--label);white-space:pre-wrap;overflow-wrap:anywhere}
+.modal .completion-owner{margin-top:var(--sp-1);font-size:var(--fs-footnote)}
+/* Stage page: compact approval strip, inline section picker, and the submit action inside the requirements card. */
+.workspace .major-approval-summary{padding:var(--sp-3) var(--sp-4);gap:var(--sp-4)}
+.workspace .major-approval-summary>div{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--sp-1) var(--sp-3);min-width:0}
+.workspace .major-approval-summary h2{margin:0;font-size:var(--fs-subhead)}
+.workspace .major-approval-summary p{margin:0;font-size:var(--fs-footnote);color:var(--label-2)}
+.operations.flow-operations .ops-heading h2{font-size:var(--fs-title2)}
+.operations .ops-heading .ops-source{font-size:var(--fs-footnote);color:var(--label-2)}
+.operations .ops-sheet-trigger{padding:var(--sp-3) var(--sp-4) var(--sp-4);border-top:.5px solid var(--sep)}
+/* Stage sections as an underline tab row: all eight stay visible and scroll sideways on narrow screens. */
+.operations.flow-operations .flow-operation-picker{display:flex;flex-wrap:nowrap;gap:var(--sp-1);overflow-x:auto;margin:var(--sp-4) 0;padding:0;border:0;border-bottom:.5px solid var(--sep);background:none;scrollbar-width:none}
+.operations.flow-operations .flow-operation-picker::-webkit-scrollbar{display:none}
+.operations.flow-operations .flow-operation-picker>button{flex:0 0 auto;white-space:nowrap;margin-bottom:-.5px;border:0;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--label-2);font-size:var(--fs-subhead);font-weight:500;cursor:pointer}
+.operations.flow-operations .flow-operation-picker>button:hover{color:var(--label)}
+.operations.flow-operations .flow-operation-picker>button.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.operations.flow-operations .flow-operation-picker>button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+/* With the step's main action in the footer, the in-body row only holds the 完整任務內容 link. */
+.modal .completion-task-actions{padding-top:var(--sp-2);border-top:0}

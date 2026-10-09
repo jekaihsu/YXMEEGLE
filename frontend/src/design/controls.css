@@ -22,3 +22,22 @@ textarea{min-height:var(--control-height);padding-block:var(--sp-3)!important}
  padding:var(--control-pad-block)!important;
 }
 .text-button{min-height:var(--control-height)!important;padding:var(--sp-2)!important}
+/* Safari keeps its native macOS control look (ignoring radius, padding and background) unless appearance is off,
+   so selects draw their own chevron and date/time fields reset WebKit's inner layout. The grey chevron reads in both themes. */
+select:not([multiple]){
+ -webkit-appearance:none;appearance:none;
+ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")!important;
+ background-repeat:no-repeat!important;background-position:right var(--sp-3) center!important;background-size:12px!important;
+ text-overflow:ellipsis;cursor:pointer;
+}
+select:disabled{cursor:not-allowed;opacity:.6}
+input:is([type=date],[type=time],[type=datetime-local],[type=month]){
+ -webkit-appearance:none;appearance:none;
+ display:inline-flex;align-items:center;min-width:0;text-align:left;cursor:pointer;
+}
+/* WebKit centres the value and adds its own margins; on iOS an empty field collapses without a min-height. */
+input::-webkit-date-and-time-value{text-align:left;margin:0;min-height:1.4em}
+input::-webkit-datetime-edit{padding:0;line-height:1.4}
+input::-webkit-datetime-edit-fields-wrapper{padding:0}
+input::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.6;margin-inline-start:var(--sp-2)}
+input::-webkit-calendar-picker-indicator:hover{opacity:1}

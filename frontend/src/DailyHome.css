@@ -21,27 +21,52 @@
 .ds-group>.project-preview-row{display:contents;border:0;padding:0;background:none;border-radius:0}
 .ds-group>.project-preview-row:hover{background:none}
 
-/* Compact grouped lists keep the next action above growing attention queues. */
-.workspace .today-layout{gap:var(--sp-5);grid-template-columns:minmax(0,1fr) 17rem}
-.workspace .today-layout .ds-section{margin-bottom:var(--sp-4)}
+/* Grouped lists share a comfortable reading rhythm. */
+.workspace .today-layout{gap:var(--sp-6);grid-template-columns:minmax(0,1fr) 17rem}
+.workspace .today-layout .ds-section{margin-bottom:var(--sp-6)}
 .workspace .today-layout .ds-section>h2{display:flex;align-items:baseline;flex-wrap:wrap;row-gap:var(--sp-1);padding:0 var(--sp-3) var(--sp-2)}
-.workspace .today-layout .ds-row{padding:var(--sp-2) var(--sp-3);font-size:var(--fs-subhead);min-height:44px}
+.workspace .today-layout .ds-row{padding:var(--sp-4) var(--sp-5);font-size:var(--fs-subhead);min-height:88px;gap:var(--sp-4)}
 .workspace .today-layout .ds-row-icon{color:var(--label-2)}
-.workspace .today-layout .ds-row-main{overflow-wrap:anywhere}
+.workspace .today-layout .ds-row-main{overflow-wrap:anywhere;line-height:1.5;gap:var(--sp-1)}
 .workspace .today-layout .ds-row-value{flex-shrink:0}
 .today-main .dh-hero{padding:var(--sp-6) var(--sp-7);margin-bottom:var(--sp-4);gap:var(--sp-3)}
 .today-main .dh-hero h2{line-height:1.35;overflow-wrap:anywhere}
 .today-main .dh-hero p:not(.dh-kicker){max-width:55ch;line-height:1.65}
-.today-main .dh-hero .ds-button{margin-top:var(--sp-1)}
-.today-main .dh-blocked{padding-top:var(--sp-2);align-items:center}
+.today-main .dh-hero .ds-button{margin-top:var(--sp-1);align-self:flex-end}
+.today-main .dh-blocked{padding:var(--sp-4) 0 var(--sp-2);align-items:center;line-height:1.5}
+.today-main .dh-blocked small{margin-top:var(--sp-1)}
 .dh-attention{display:flex;justify-content:flex-end;gap:var(--sp-1);flex-wrap:wrap}
 .workspace .today-layout .heading-count{color:var(--label)}
 .workspace .today-layout .dh-progress .ds-progress{height:10px}
 .workspace .today-layout .dh-progress .ds-progress::-webkit-progress-value{background:var(--accent)}
 .workspace .today-layout .dh-progress .ds-progress::-moz-progress-bar{background:var(--accent)}
-.workspace .today-layout .event-list .event{padding:var(--sp-3) var(--sp-4);gap:var(--sp-3)}
+.workspace .today-layout .event-list .event{padding:var(--sp-5);gap:var(--sp-4)}
 @media(max-width:1100px){.workspace .today-layout{grid-template-columns:1fr}.workspace .today-layout .today-aside{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4);padding-top:var(--sp-3)}.workspace .today-layout .today-activity{grid-column:1/-1}}
 @media(max-width:760px){.workspace .today-layout .today-aside{grid-template-columns:1fr}.today-main .dh-hero{padding:var(--sp-5)}.workspace .today-layout .ds-row{gap:var(--sp-2)}.dh-attention{max-width:6rem}.today-main .dh-blocked{flex-wrap:wrap}.today-main .dh-blocked>span:last-child{margin-left:auto}}
 
 .workspace .today-layout .event-list :is(p,small){font-size:var(--fs-footnote);line-height:1.6}
 .workspace .today-daily .ds-group>p{font-size:var(--fs-footnote);font-weight:400;line-height:1.6;margin:0;padding:var(--sp-3) var(--sp-4);color:var(--label-2)}
+
+/* Give summary counts enough space and contrast for a quick scan. */
+.workspace .today-layout .dh-totals .ds-row{padding:var(--sp-4) var(--sp-5);gap:var(--sp-4);min-height:88px}
+.workspace .today-layout .dh-totals .ds-row-main{line-height:1.5}
+.workspace .today-layout .dh-totals .ds-row-main small{margin-top:var(--sp-1)}
+.workspace .today-layout .dh-totals .ds-row-value{font-size:var(--fs-title1);font-weight:650;color:var(--label);line-height:1;min-width:2ch;text-align:right;font-variant-numeric:tabular-nums}
+
+.workspace .today-layout .ds-row:not(:has(small)){min-height:60px}
+.workspace .today-layout .ds-row+.ds-row::before{left:var(--sp-5);right:var(--sp-5)}
+.workspace .today-layout .project-preview-row+.project-preview-row>.ds-row::before,
+.workspace .today-layout .project-preview-row+.ds-row::before{left:var(--sp-5);right:var(--sp-5)}
+.workspace .today-daily .ds-group>p{padding:var(--sp-4) var(--sp-5)}
+@media(max-width:760px){.workspace .today-layout .ds-row{padding:var(--sp-4);gap:var(--sp-3)}.workspace .today-layout .dh-progress{width:6rem;gap:var(--sp-2)}}
+
+
+/* Pair the task details and primary action, then span blocked work below. */
+.today-main .dh-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start}
+.today-main .dh-hero>.dh-kicker,.today-main .dh-hero>h2,.today-main .dh-hero>p{grid-column:1}
+.today-main .dh-hero>.ds-button{grid-column:2;grid-row:2 / 4;align-self:center;margin-top:0}
+.today-main .dh-hero>.dh-blocked{grid-column:1 / -1}
+@media(max-width:760px){
+ .today-main .dh-hero{grid-template-columns:minmax(0,1fr)}
+ .today-main .dh-hero>.ds-button{grid-column:1;grid-row:auto;align-self:auto}
+}

@@ -32,3 +32,6 @@
 .workspace .project-detail .definition-grid dt{font-size:var(--fs-footnote);color:var(--label-2)}
 .workspace .project-detail .definition-grid dd{font-size:var(--fs-subhead);color:var(--label)}
 @media(max-width:600px){.workspace .project-detail .definition-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Back navigation follows the content edge rather than the shared button inset. */
+.workspace .project-detail .project-topline>.ds-button[data-variant=plain]{padding-left:0!important;justify-content:flex-start;border-radius:var(--radius-s)}

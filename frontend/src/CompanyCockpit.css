@@ -62,3 +62,45 @@
 .admission-queue ul{list-style:none;margin:var(--sp-2) 0 0;padding:0;display:grid;gap:var(--sp-3)}
 .admission-queue li{display:grid;gap:var(--sp-1)}
 .admission-queue form{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:end}
+
+/* Company overview follows the same roomy cards and reading edges as the workspace. */
+.company-cockpit{max-width:none}
+.cockpit-heading{align-items:center}
+.cockpit-freshness{padding-bottom:var(--sp-4);border-bottom:1px solid var(--separator);line-height:1.6}
+.cockpit-overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-6);margin-bottom:var(--sp-7);align-items:stretch}
+.cockpit-overview-grid>section{min-width:0;padding:var(--sp-6);border:1px solid var(--separator);border-radius:var(--radius-card);background:var(--surface)}
+.cockpit-overview-grid .cockpit-section-title{align-items:flex-start;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-5)}
+.cockpit-overview-grid .ds-group{box-shadow:none;border:0;background:transparent}
+.company-cockpit .ds-row{padding:var(--sp-5) var(--sp-6);min-height:80px;gap:var(--sp-4)}
+.company-cockpit .ds-row-main{gap:var(--sp-2);line-height:1.5}
+.company-cockpit .ds-row-value{font-size:var(--fs-title1);font-weight:600;line-height:1.2}
+.company-cockpit .ds-row-value small{font-size:var(--fs-subhead);font-weight:400}
+.company-cockpit .ds-row+.ds-row::before{left:var(--sp-6);right:var(--sp-6)}
+.cockpit-delivery .cockpit-note:first-of-type{margin:0 0 var(--sp-5)}
+.cockpit-health{padding:var(--sp-5) var(--sp-6);background:var(--surface-2);border-radius:var(--radius-m)}
+.cockpit-overview-grid .cockpit-delivery .ds-row{background:var(--surface-2);border-radius:var(--radius-m)}
+.cockpit-source-detail{padding:var(--sp-5) 0 0}
+.cockpit-overview-grid .cockpit-source-layout>.ds-row{padding:0 0 var(--sp-5);min-height:64px;border-bottom:1px solid var(--separator)}
+.cockpit-source-summary{font-size:var(--fs-headline);line-height:1.6}
+.cockpit-distribution{grid-template-columns:1fr}
+.company-cockpit .cockpit-distribution button{padding:var(--sp-4);min-height:60px;align-items:center;border-radius:var(--radius-s)}
+.cockpit-distribution .ds-badge{font-size:var(--fs-subhead);padding:var(--sp-1) var(--sp-2)}
+.cockpit-note{line-height:1.7}
+.cockpit-table-scroll{padding:0 var(--sp-3);border-radius:var(--radius-card)}
+.company-cockpit th,.company-cockpit td{padding:var(--sp-5) var(--sp-4);line-height:1.6;text-align:left}
+.company-cockpit thead th{padding-block:var(--sp-4);font-weight:600;white-space:nowrap}
+.company-cockpit tbody tr:last-child :is(th,td){border-bottom:0}
+.company-cockpit .cockpit-case-table th:first-child{min-width:15rem}
+.company-cockpit .cockpit-case-table a{gap:var(--sp-2);padding:0}
+.company-cockpit .cockpit-group-button{padding-left:0!important}
+.cockpit-filters{gap:var(--sp-4);margin-bottom:var(--sp-5)}
+.cockpit-cases-title,#cockpit-cases-title{scroll-margin-top:6rem}
+@media(max-width:1100px){.cockpit-overview-grid{grid-template-columns:1fr}}
+@media(max-width:760px){
+ .cockpit-overview-grid>section{padding:var(--sp-5)}
+ .company-cockpit .ds-row{padding:var(--sp-4);gap:var(--sp-3)}
+ .cockpit-freshness{flex-direction:column;align-items:flex-start}
+ .cockpit-section-title{align-items:flex-start;flex-direction:column}
+ .cockpit-table-scroll{padding:0 var(--sp-2)}
+ .company-cockpit th,.company-cockpit td{padding:var(--sp-4)}
+}

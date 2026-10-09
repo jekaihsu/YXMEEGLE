@@ -60,3 +60,34 @@ body{background-color:var(--bg);background-image:var(--bg-tint);background-attac
  .app-shell .demo-tag{flex:none;white-space:nowrap}
 }
 @media(max-width:760px){.app-shell .topbar .data-freshness{order:-1}}
+
+/* The navigation scrolls independently; workspace identity remains in reach. */
+.app-shell .sidebar.glass--bar{overflow:hidden}
+/* The scroller spans the sidebar's own 12px inset so its bar runs along the border instead of over the nav.
+   Chrome ignores ::-webkit-scrollbar once scrollbar-width is set, so the standard properties are for Firefox only. */
+.app-shell .sidebar-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;margin-inline:-12px;padding-inline:12px 8px;scrollbar-gutter:stable}
+@supports not selector(::-webkit-scrollbar){.app-shell .sidebar-scroll{scrollbar-width:thin;scrollbar-color:var(--sep) transparent}}
+.app-shell .sidebar-scroll::-webkit-scrollbar{width:4px}
+.app-shell .sidebar-scroll::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--label) 14%,transparent);border-radius:var(--radius-pill)}
+.app-shell .sidebar-scroll:is(:hover,:focus-within)::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--label) 22%,transparent)}
+.app-shell .sidebar-scroll::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--label) 40%,transparent)}
+.app-shell .sidebar-scroll::-webkit-scrollbar-track{background:transparent;margin-block:var(--sp-2)}
+.app-shell .sidebar-bottom{flex:0 0 auto;margin-top:0;padding-top:var(--sp-3);padding-bottom:env(safe-area-inset-bottom)}
+
+/* Desktop compact navigation keeps the company identity and reopen control visible. */
+.compact-brand{display:none}
+.app-shell .sidebar-toggle{display:inline-flex;align-items:center;justify-content:center;width:32px;min-height:32px;flex:none;color:var(--label-2);border-radius:var(--radius-s)}
+.app-shell .sidebar-toggle:hover{background:var(--surface-2);color:var(--accent)}
+.app-shell .sidebar-collapse{position:absolute;right:var(--sp-2);top:var(--sp-5);z-index:1}
+.app-shell .sidebar-scroll .brand{padding-right:var(--sp-8)}
+@media(min-width:761px){
+ .app-shell.sidebar-compact .sidebar{display:none}
+ .app-shell.sidebar-compact .main-shell{margin-left:0}
+ .app-shell.sidebar-compact .compact-brand{display:flex;align-items:center;gap:var(--sp-3);position:fixed;top:var(--sp-2);left:var(--sp-3);z-index:50;padding:var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3);border:.5px solid var(--glass-border);border-radius:var(--radius-pill);background:var(--glass-bar-fill);box-shadow:var(--glass-highlight),var(--glass-shadow)}
+ .compact-brand a{display:flex;align-items:center;gap:var(--sp-2);color:var(--label);font-size:var(--fs-subhead);white-space:nowrap}
+ .compact-brand .brand-mark{width:24px;height:24px;gap:3px}
+ .compact-brand .brand-mark i{background:var(--accent)!important;border-radius:3px}
+ .app-shell.sidebar-compact .topbar .breadcrumbs{margin-left:232px}
+}
+@media(min-width:761px) and (max-width:1100px){.app-shell.sidebar-compact .breadcrumbs{display:none}.app-shell.sidebar-compact .topbar-right{margin-left:auto}}
+@media(max-width:760px){.app-shell .sidebar-collapse{display:none}}

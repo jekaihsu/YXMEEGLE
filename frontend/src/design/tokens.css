@@ -46,3 +46,4 @@ html{font-size:calc(100% * var(--text-scale))}
 }
 @media(prefers-reduced-motion:reduce){:root{--dur-fast:0ms;--dur-base:0ms;--dur-slow:0ms}}
 .appearance-control{display:flex;flex-wrap:wrap;gap:var(--sp-4) var(--sp-7);margin-bottom:var(--sp-6)}
+.appearance-field{display:flex;align-items:center;gap:var(--sp-3)}.appearance-field>span{font-size:var(--fs-footnote);color:var(--label-2)}
