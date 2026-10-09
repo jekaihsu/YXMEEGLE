@@ -1,6 +1,5 @@
 import './polish.css';
 import './Sources.css';
-import './Approvals.css';
 import {useReloadGuard} from './reloadGuard';
 import {ageFreshness, datasetNotice, failedFreshness} from './freshness';
 import {DataFreshness} from './DataFreshness';
