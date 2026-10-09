@@ -11,8 +11,9 @@
 .mention-options .ds-row{background:var(--surface);color:var(--label);white-space:normal}
 .mention-inbox{margin-block:var(--sp-6);color:var(--label);min-width:0}
 .mention-inbox .section-heading p,.mention-inbox time{font-size:var(--fs-footnote);color:var(--label-2)}
-.mention-inbox .ds-row{color:var(--label);background:var(--surface);white-space:normal;flex-wrap:wrap}
-.mention-inbox-copy{display:grid;gap:var(--sp-2)}
+.mention-inbox .ds-row{color:var(--label);white-space:normal;flex-wrap:wrap}
+.mention-inbox-copy{display:grid;gap:var(--sp-1);min-width:0;overflow-wrap:anywhere;font-size:var(--fs-subhead)}
+.mention-inbox-copy small{font-size:var(--fs-footnote);color:var(--label-2)}
 .mention-composer .form-error{color:var(--critical)}
 
 .mention-inbox .section-heading h2,.mention-picker label{color:var(--label)}
