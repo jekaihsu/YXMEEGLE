@@ -2,7 +2,7 @@
 .deadline-screen.deadline-screen h3{font-size:var(--fs-title2);color:var(--label);margin:var(--sp-6) 0 var(--sp-2)}
 .deadline-screen.deadline-screen p,.deadline-screen.deadline-screen label{color:var(--label-2);font-size:var(--fs-subhead)}
 .deadline-screen>.ds-section>.ds-group>p,.deadline-screen>.ds-section>.ds-group>label,.deadline-screen .ops-form{padding:var(--sp-4);margin:0}
-.deadline-screen.deadline-screen input,.deadline-screen.deadline-screen select,.deadline-screen.deadline-screen textarea{background:var(--surface);color:var(--label);border:1px solid var(--separator);border-radius:var(--radius-s);min-height:44px;font:inherit;max-width:100%}
+.deadline-screen.deadline-screen input,.deadline-screen.deadline-screen select,.deadline-screen.deadline-screen textarea{background:var(--surface);color:var(--label);border:.5px solid var(--separator);border-radius:var(--radius-m);min-height:var(--control-height);font:var(--fs-subhead)/1.55 var(--font);max-width:100%}
 .deadline-screen.deadline-screen :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .deadline-screen.deadline-screen .data-table{width:100%;min-width:0;margin:0;font-size:var(--fs-subhead);background:var(--surface)}
 .deadline-screen.deadline-screen .data-table th,.deadline-screen.deadline-screen .data-table td{padding:var(--sp-3) var(--sp-4);color:var(--label);border-color:var(--separator);white-space:normal;overflow-wrap:anywhere;font-size:inherit}
@@ -19,4 +19,4 @@
 .deadline-screen.deadline-screen .button.primary{background:var(--accent);color:var(--on-accent)}
 .deadline-screen.deadline-screen .ops-input{background:var(--surface);color:var(--label);border:0;border-radius:0;box-shadow:none}
 .deadline-screen.deadline-screen .ops-status{background:var(--surface-2);color:var(--label-2)}
-@media(max-width:600px){.deadline-screen .ops-fields{grid-template-columns:1fr}.deadline-screen.deadline-screen .data-table th,.deadline-screen.deadline-screen .data-table td{padding:var(--sp-2);font-size:var(--fs-footnote)}}
+@media(max-width:760px){.deadline-screen .ops-fields{grid-template-columns:1fr}.deadline-screen.deadline-screen .data-table th,.deadline-screen.deadline-screen .data-table td{padding:var(--sp-2);font-size:var(--fs-subhead)}.deadline-screen.deadline-screen :is(input,select,textarea){font-size:var(--fs-callout)}}

@@ -40,12 +40,12 @@
 .operations .ds-badge{white-space:normal}
 
 /* Keep routine identities and dates readable while the history scrolls on phones. */
-.workspace .routine-page .data-table{display:table;min-width:42rem;margin:0}
-.workspace .routine-page .data-table :is(th,td){padding:var(--sp-4);line-height:1.6;vertical-align:top}
-.routine-page .data-table :is(th,td):first-child{min-width:10rem}
-.routine-page .data-table :is(th,td):nth-child(2){min-width:6rem}
-.routine-page .data-table :is(th,td):nth-child(3){min-width:10rem}
-.routine-page .data-table :is(th,td):last-child{min-width:16rem}
+.routine-page .data-table{display:table;min-width:calc(var(--sp-9)*11);margin:0}
+.routine-page .data-table :is(th,td){padding:var(--sp-4);line-height:1.6;vertical-align:top}
+.routine-page .data-table :is(th,td):first-child{min-width:calc(var(--sp-8)*4)}
+.routine-page .data-table :is(th,td):nth-child(2){min-width:calc(var(--sp-7)*3)}
+.routine-page .data-table :is(th,td):nth-child(3){min-width:calc(var(--sp-8)*4)}
+.routine-page .data-table :is(th,td):last-child{min-width:calc(var(--sp-9)*4)}
 .routine-page .table-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .routine-scroll-hint{display:none}
 @media(max-width:760px){.workspace .routine-scroll-hint{display:block;font-size:var(--fs-footnote);margin:0 0 var(--sp-3)}}
@@ -55,3 +55,6 @@
 .workspace .administration-page>.ops-form>summary:hover{background:var(--surface-2)}
 .workspace .administration-page>.ops-form>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .workspace .administration-page>.ops-form>div{padding:var(--sp-4);border-top:1px solid var(--separator)}
+
+.routine-page>p{font-size:var(--fs-subhead);margin:var(--sp-1) 0 var(--sp-6)}
+@media(max-width:760px){.routine-page h1{font-size:var(--fs-title1)}}
