@@ -70,3 +70,7 @@
  .today-main .dh-hero{grid-template-columns:minmax(0,1fr)}
  .today-main .dh-hero>.ds-button{grid-column:1;grid-row:auto;align-self:auto}
 }
+
+/* Task names can contain unbroken file references on both home and case heroes. */
+.dh-hero h2{overflow-wrap:anywhere;line-height:1.35}
+.dh-blocked>span:first-child{min-width:0;overflow-wrap:anywhere}

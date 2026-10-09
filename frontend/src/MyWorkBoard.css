@@ -44,3 +44,7 @@
  .mwb-lane,.mwb-lane.is-empty,.mwb-lane.collapsed{flex:0 0 auto;min-width:0;max-width:none}
  .mwb-lane.is-empty .mwb-cards{display:none}
 }
+
+/* Long task names wrap within their card, including the stacked phone lanes. */
+.mwb-title{min-width:0;width:100%}
+.mwb-title>strong{min-width:0;overflow-wrap:anywhere}
