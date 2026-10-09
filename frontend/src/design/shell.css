@@ -13,7 +13,7 @@ body{background-color:var(--bg);background-image:var(--bg-tint);background-attac
 .app-shell .nav-item:hover,.app-shell .recent-project:hover{background:color-mix(in srgb,var(--label) 6%,transparent)}
 .app-shell .nav-item.active,.app-shell .recent-project.selected{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font-weight:600}
 .app-shell .nav-item.active svg{color:var(--accent);stroke-width:1.75}
-.app-shell .nav-item em{background:var(--critical);color:var(--surface);border:0;border-radius:var(--radius-pill);padding:0 var(--sp-2);font-size:var(--fs-caption);font-weight:600}
+.app-shell .nav-item em{background:var(--critical);color:var(--on-critical);border:0;border-radius:var(--radius-pill);padding:0 var(--sp-2);font-size:var(--fs-caption);font-weight:600}
 .app-shell .recent-project small,.app-shell .sidebar-status{color:var(--label-2);font-size:var(--fs-footnote)}
 .app-shell .project-dot{background:var(--label-2)}.app-shell .status-dot,.app-shell .sidebar-status .tiny-dot{background:var(--positive)}
 .app-shell .user-button{border-top:.5px solid var(--glass-border);color:var(--label)}
