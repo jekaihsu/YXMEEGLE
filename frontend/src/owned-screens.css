@@ -5,7 +5,7 @@
 & :is(.ops-notice,.ops-form){background:none;border:0;border-radius:0;box-shadow:none;color:inherit;padding:var(--sp-4) 0}
 & .ops-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));gap:var(--sp-4)}
 & label{display:grid;gap:var(--sp-2);min-width:0}
-& :is(input,select){min-height:var(--sp-8);min-width:0;width:100%;background:var(--surface);color:var(--label);border:.5px solid var(--separator);border-radius:var(--radius-m);font:inherit}
+& :is(input,select){min-height:var(--sp-8);min-width:0;width:100%;background:var(--surface);color:var(--label);border:.5px solid var(--separator);border-radius:var(--radius-m)}
 & fieldset{display:block;min-width:0;grid-column:1/-1}& fieldset label{display:flex;align-items:center;min-height:var(--sp-8);border-bottom:1px solid var(--separator)}
 & input[type=checkbox]{width:var(--sp-5);min-height:var(--sp-5);accent-color:var(--accent)}
 & .button{min-height:var(--sp-8);border:0;border-radius:var(--radius-pill);background:var(--surface-2);color:var(--accent);font:inherit;white-space:normal}& .button.primary{background:var(--accent);color:var(--on-accent)}
