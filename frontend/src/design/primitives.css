@@ -19,7 +19,7 @@ button.ds-row:hover,a.ds-row:hover{background:var(--surface-2)}
 .ds-stat strong{font-size:var(--fs-title1);font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
 .ds-stat span{font-size:var(--fs-footnote);color:var(--label-2)}
 .ds-stat[data-tone=warning] strong{color:var(--warning)}.ds-stat[data-tone=critical] strong{color:var(--critical)}.ds-stat[data-tone=positive] strong{color:var(--positive)}
-.ds-badge{display:inline-flex;align-items:center;gap:var(--sp-1);padding:2px var(--sp-2);border-radius:var(--radius-pill);font-size:var(--fs-caption);font-weight:600;background:var(--surface-2);color:var(--label-2)}
+.badge,.ds-badge{display:inline-flex;align-items:center;gap:var(--sp-1);padding:2px var(--sp-2);border-radius:var(--radius-pill);font-size:var(--fs-caption);font-weight:600;background:var(--surface-2);color:var(--label-2);white-space:nowrap}
 .ds-badge[data-tone=positive]{color:var(--positive)}.ds-badge[data-tone=warning]{color:var(--warning)}.ds-badge[data-tone=critical]{color:var(--critical)}.ds-badge[data-tone=accent]{color:var(--accent)}
 .ds-button{min-height:44px;padding:0 var(--sp-5);border-radius:var(--radius-pill);font-size:var(--fs-callout);font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);background:var(--surface-2);color:var(--accent);transition:opacity var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease)}
 .ds-button[data-variant=primary]{background:var(--accent);color:var(--accent-fg)}
