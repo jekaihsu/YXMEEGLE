@@ -1,6 +1,7 @@
 /* Shared sizing policy also covers lazy-loaded screens and legacy overrides.
    Only control sizing is authoritative; page layout and appearance stay local. */
 :is(.button,.ds-button){
+ min-width:var(--control-height)!important;
  min-height:var(--control-height)!important;
  padding:var(--control-pad-block) var(--button-pad-inline)!important;
 }
@@ -21,7 +22,7 @@ textarea{min-height:var(--control-height);padding-block:var(--sp-3)!important}
  min-width:var(--control-height);min-height:var(--control-height)!important;height:auto!important;
  padding:var(--control-pad-block)!important;
 }
-.text-button{min-height:var(--control-height)!important;padding:var(--sp-2)!important}
+.text-button{min-width:var(--control-height)!important;min-height:var(--control-height)!important;padding:var(--sp-2)!important}
 /* Safari keeps its native macOS control look (ignoring radius, padding and background) unless appearance is off,
    so selects draw their own chevron and date/time fields reset WebKit's inner layout. The grey chevron reads in both themes. */
 select:not([multiple]){
