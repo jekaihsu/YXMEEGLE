@@ -43,3 +43,9 @@
 .auth-error-card{margin:18px 0;padding:15px 16px;border:1px solid color-mix(in srgb,var(--critical) 30%,var(--surface));border-left:4px solid var(--critical);border-radius:8px;background:var(--surface);color:var(--critical);text-align:left;line-height:1.65}.auth-error-card strong{display:block;margin-bottom:5px;color:var(--critical)}.auth-error-card p{margin:4px 0;color:var(--label)}.auth-callback-banner{align-items:flex-start}.auth-callback-banner strong{color:var(--critical)}
 
 .table-footer .pager{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* Schedule date picker: fixed width in line with the neighbouring 44px controls; the native indicator stays full-size and clickable. */
+.schedule-toolbar .week-switch{gap:var(--sp-2,8px)}
+.schedule-toolbar .week-switch input[type=date]{flex:0 0 auto;width:10.5rem;min-width:0;height:var(--control-height,44px);line-height:1;border:.5px solid var(--glass-border,var(--sep));border-radius:var(--radius-m,8px);background:var(--surface);color:var(--label);font-size:var(--fs-subhead,.875rem);cursor:pointer}
+.schedule-toolbar .week-switch input[type=date]::-webkit-calendar-picker-indicator{cursor:pointer;width:20px;height:20px;padding:4px;margin:0 0 0 auto;opacity:.7}
+.schedule-toolbar .week-switch .icon-button,.schedule-toolbar .week-switch .button.compact{min-width:44px;height:44px;min-height:44px}
