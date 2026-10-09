@@ -7,7 +7,7 @@
 .daily-records .dr-note{background:none;border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2);color:var(--label-2);font-size:var(--fs-subhead)}.dr-note[data-tone=critical]{color:var(--critical)}
 .daily-records [role=status]{color:var(--label-2);font-size:var(--fs-footnote);font-variant-numeric:tabular-nums}
 .daily-cards{display:flex;flex-direction:column;margin:0;gap:0}
-.daily-cards article{position:relative;display:flex;flex-direction:column;gap:var(--sp-3);padding:var(--sp-4) var(--sp-5)}
+.daily-cards article{border:0;border-radius:0;position:relative;display:flex;flex-direction:column;gap:var(--sp-3);padding:var(--sp-4) var(--sp-5)}
 .daily-cards article+article::before{content:"";position:absolute;top:0;left:var(--sp-5);right:var(--sp-5);border-top:1px solid var(--sep)}
 .daily-cards header{display:flex;justify-content:space-between;gap:var(--sp-3);flex-wrap:wrap;font-size:var(--fs-subhead)}.daily-cards header span{color:var(--label-2)}
 .daily-cards article p{margin:0;line-height:1.6;font-size:var(--fs-subhead);overflow-wrap:anywhere}
