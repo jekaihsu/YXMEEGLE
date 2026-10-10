@@ -21,9 +21,11 @@
 /* Flow: quieter stage chips, no heavy borders or shadows. */
 .workspace .major-approval-summary{border:0;border-left:0;border-radius:var(--radius-card);background:var(--glass-fill);box-shadow:none;outline:.5px solid var(--glass-border)}
 .workspace .workflow{border:0;background:none;box-shadow:none;padding:0}
+.workspace .workflow-scroll{border:0;border-radius:0;background:none;padding:2px}
+.workspace .workflow .production-group{background:none;border:.5px solid var(--glass-border);border-radius:var(--radius-m)}
 .workspace .stage-button{border:.5px solid var(--glass-border);box-shadow:none;background:var(--surface);color:var(--label);border-radius:var(--radius-m)}
 .workspace .stage-button.in_progress{background:var(--accent-fill);border-color:var(--accent)}
-.workspace .stage-button.completed{background:var(--surface-2);border-color:transparent;color:var(--label)}
+.workspace .stage-button.completed{background:var(--surface-2);border-color:var(--glass-border);color:var(--label)}
 .workspace .stage-button.completed strong,.workspace .stage-button.completed .stage-button-bottom{color:var(--label)}
 .workspace .stage-button.completed small{color:var(--label-2)}
 .workspace .stage-button.completed svg{color:var(--positive)}
