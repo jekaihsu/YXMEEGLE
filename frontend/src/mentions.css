@@ -1,7 +1,4 @@
 @import './freshness-view.css';
-.mention-tags{display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-block:var(--sp-3)}
-.mention-tags .ds-badge{color:var(--accent);background:var(--accent-fill)}
-.mention-tags button{background:transparent;color:inherit;min-width:var(--sp-8);min-height:var(--sp-8);font-size:var(--fs-title2)}
 .mention-composer.mention-composer textarea,.mention-picker input{width:100%;box-sizing:border-box;min-height:var(--sp-8);padding:var(--sp-3);border:1px solid var(--separator);border-radius:var(--radius-s);background:var(--surface);color:var(--label);font:inherit}
 .mention-actions{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;margin-top:var(--sp-3)}
 .mention-actions small{flex:1;min-width:min(100%,16rem);color:var(--label-2);font-size:var(--fs-footnote)}

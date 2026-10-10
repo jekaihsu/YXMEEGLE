@@ -156,16 +156,16 @@ button.resource-cell:focus-visible{outline:2px solid var(--accent);outline-offse
 .resource-cell strong.high-load{color:var(--warning,var(--label))}
 /* My Work controls (table and board): scope tabs and search share one row so the work starts higher on the page.
    Kept here, not in the lazy board stylesheet, because the table view needs them before the board ever loads. */
-.workspace .mywork-controls{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-4)}
-.workspace .mywork-controls>.tabbar{margin:0;width:auto;flex:0 0 auto}
-.workspace .mywork-controls>.table-toolbar{margin:0;padding:0;border:0;background:none;flex:1 1 18rem;display:flex;gap:var(--sp-3);align-items:center}
-.workspace .mywork-controls>.table-toolbar{justify-content:flex-start;flex-wrap:nowrap}
-.workspace .mywork-controls .search-field{flex:1 1 10rem;min-width:0;max-width:26rem}
+.workspace .mywork-controls{display:flex;width:100%;box-sizing:border-box;flex-wrap:wrap;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-4)}
+.workspace .mywork-controls>.tabbar{margin:0;width:auto;max-width:100%;flex:0 0 auto}
+.workspace .mywork-controls>.table-toolbar{margin:0;padding:0;border:0;background:none;flex:1 1 22rem;min-width:min(100%,22rem);display:flex;gap:var(--sp-3);align-items:center;justify-content:stretch;flex-wrap:nowrap}
+.workspace .mywork-controls .search-field{flex:1 1 10rem;width:auto;min-width:0;max-width:none}
+.workspace .mywork-controls .table-toolbar>select{flex:0 0 12rem;min-width:0}
 /* Search and status picker share one height (the 44px touch target), so their centre lines match. */
 .workspace .mywork-controls .search-field,.workspace .mywork-controls .table-toolbar>select{box-sizing:border-box;height:44px;min-height:44px;margin:0}
 .workspace .mywork-controls+.batch-completion{margin:0 0 var(--sp-4)}
 
-@media(max-width:760px){.workspace .mywork-controls>.tabbar{width:100%}.workspace .mywork-controls .search-field{max-width:none}}
+@media(max-width:760px){.workspace .mywork-controls>.tabbar{width:100%}.workspace .mywork-controls>.table-toolbar{width:100%;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(9rem,12rem)}.workspace .mywork-controls .search-field{max-width:none}.workspace .mywork-controls .table-toolbar>select{width:100%;flex-basis:auto}}
 /* Dialogs: the title stays put while the body scrolls, and the scrollbar is slim and kept off the rounded corners. */
 .modal>header{position:sticky;top:0;z-index:3;background:var(--surface)}
 /* An older rule sets scrollbar-width on .modal; Chrome then ignores ::-webkit-scrollbar, so reset it where the pseudo-element works. */
@@ -196,3 +196,19 @@ button.resource-cell:focus-visible{outline:2px solid var(--accent);outline-offse
 .operations.flow-operations .flow-operation-picker>button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 /* With the step's main action in the footer, the in-body row only holds the 完整任務內容 link. */
 .modal .completion-task-actions{padding-top:var(--sp-2);border-top:0}
+/* Toolbar rows: pill groups sit at the same 44px as the search, select and date controls beside them. */
+.app-shell .workspace :is(.mywork-controls>.tabbar,.schedule-toolbar>.ds-segmented){margin:0;height:var(--control-height);box-sizing:border-box;align-items:stretch}
+.app-shell .workspace :is(.mywork-controls>.tabbar,.schedule-toolbar>.ds-segmented)>button{min-height:0!important;padding-block:0!important}
+.workspace .mywork-controls .search-field{border:.5px solid var(--glass-border);border-radius:var(--radius-pill);background:var(--surface)}
+.workspace .mywork-controls .table-toolbar>select{border-radius:var(--radius-pill)}
+.ds-segmented button{display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2)}
+.workspace .schedule-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3)}
+.workspace .schedule-toolbar .week-switch input[type=date],.workspace .schedule-toolbar>select{border-radius:var(--radius-pill)}
+.workspace .schedule-toolbar .week-switch .icon-button{border-radius:var(--radius-pill)}
+.workspace .schedule-toolbar-actions{display:flex;align-items:center;gap:var(--sp-4);margin-left:auto}
+.workspace .schedule-toolbar>.schedule-toolbar-actions+select{margin-left:0}
+.app-shell .workspace .schedule-toolbar-actions>.ds-segmented{height:var(--control-height);box-sizing:border-box;align-items:stretch}
+.app-shell .workspace .schedule-toolbar-actions>.ds-segmented>button{min-height:0!important;padding-block:0!important}
+@media(max-width:760px){.workspace .mywork-controls .search-field:last-child{grid-column:1/-1}}
+.workspace .mywork-controls .table-toolbar>.ds-picker{flex:0 0 12rem}
+.workspace .schedule-toolbar>.ds-picker>button{min-width:8.5rem}

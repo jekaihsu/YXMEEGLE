@@ -19,6 +19,10 @@
 
 fieldset.node-actions{border:0;padding:0;margin:0;min-width:0}
 
+/* Node cards use the same quiet outline as other workspace panels. */
+.node-section{border:1px solid var(--sep);border-bottom:1px solid var(--sep);border-radius:14px;box-shadow:none}
+.node-section-header{border-bottom:1px solid var(--sep)}
+
 /* Native approval actions: keep every action reachable at ~390px width and 200% text. */
 .native-approval-controls h3:focus{outline:none}.native-approval-controls h3:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 .native-approval-controls{min-width:0;overflow-wrap:anywhere}

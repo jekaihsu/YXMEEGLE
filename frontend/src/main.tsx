@@ -9,6 +9,7 @@ import './styles.css';
 import './workbench.css';
 import './brand-workspace.css';
 import './company-workspace.css';
+import './discussion.css';
 import './design/shell.css';
 import './audit-trail.css';
 import './design/controls.css';
