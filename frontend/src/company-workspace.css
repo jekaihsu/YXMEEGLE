@@ -18,3 +18,9 @@
 @media(max-width:760px){.inspector-fields>div{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}.inspector-fields dt{width:auto}.inspector-fields dd{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;flex-wrap:wrap}}
 
 fieldset.node-actions{border:0;padding:0;margin:0;min-width:0}
+
+/* #view=work: status picker and search share one height and centre line */
+.table-toolbar.my-work-toolbar{justify-content:flex-start;align-items:center;gap:12px}
+.table-toolbar.my-work-toolbar>.search-field,.table-toolbar.my-work-toolbar>select{box-sizing:border-box;height:45px;min-height:45px;margin:0}
+.table-toolbar.my-work-toolbar>select{font-size:.8125rem}
+@media(max-width:760px){.table-toolbar.my-work-toolbar{flex-direction:column;align-items:stretch;gap:10px}.table-toolbar.my-work-toolbar>.search-field,.table-toolbar.my-work-toolbar>select{width:100%;max-width:none}}
