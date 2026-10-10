@@ -15,8 +15,8 @@ def admitted(person, app_id):
         return False
     if person.get('identity_app_id') not in (None, '', app_id):
         return False
-    if person.get('bootstrap_admin'):
-        return person.get('role') == 'manager' and not person.get('manager_revoked')
+    if person.get('bootstrap_admin') and person.get('role')=='manager':
+        return not person.get('manager_revoked')
     source = person.get('directory_source') or {}
     return (person.get('directory_status') == 'employed'
             and not person.get('directory_missing', False)
@@ -29,6 +29,17 @@ def require_admission(person, app_id):
 
 
 DIRECTORY_MAX_AGE_SECONDS=900
+
+
+def roster_age_seconds(person, now):
+    """Return roster verification age, or None for missing/invalid timestamps."""
+    try:
+        stamp=datetime.fromisoformat(person.get('directory_last_seen_at','').replace('Z','+00:00'))
+        if stamp.tzinfo is None:return None
+        age=(now-stamp).total_seconds()
+        return age if age>=0 else None
+    except (ValueError,TypeError,AttributeError):
+        return None
 
 
 def company_admin_grant(person,cfg,*,tenant=None,now=None):
@@ -122,10 +133,13 @@ def readonly_sync_actor(state,cfg,connection_name):
     return {'id':'system:company-readonly','name':'公司唯讀同步','role':'system','active':True,'capabilities':[]}
 
 
-def readonly_sync_connection(cfg,actor_id):
+def readonly_sync_connection(cfg,actor_id,dataset='sources'):
+    from .live_read.config import LiveReadConfig
+    from .live_read.status import ttl_seconds
+    interval=ttl_seconds(LiveReadConfig.from_env(cfg),dataset)
     return {'enabled':True,'authorization':'company_application_readonly','app_id':cfg.get('LARK_APP_ID'),
             'tenant':cfg.get('LARK_WORKER_ORGANIZATION'),'authorized_by':actor_id,
-            'interval_seconds':300}
+            'interval_seconds':interval}
 
 
 def test_profile(formal, overlay):

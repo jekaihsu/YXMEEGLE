@@ -48,17 +48,24 @@ class LarkAdapter:
             operation,codes=rejected[path]
             if isinstance(payload,dict) and type(payload.get('code')) is int and payload['code'] in codes:
                 raise NativeRequestRejected(operation,payload['code'])
+        try: retry_after=max(1,int(response.headers.get('x-ogw-ratelimit-reset',response.headers.get('Retry-After','60'))))
+        except ValueError: retry_after=60
+        retry_codes=(1254290,99991400,1254607)
         if response.status_code==429:
-            try: retry_after=max(1,int(response.headers.get('Retry-After','60')))
-            except ValueError: retry_after=60
             raise RemoteFailure('Lark 限流，稍後重試','retry',retry_after)
         if response.status_code in (401,403): raise RemoteFailure('Lark 授權或資源權限不足','blocked')
         if response.status_code>=500: raise RemoteFailure('Lark 服務暫時不可用','outcome_unknown' if method!='GET' else 'failed')
-        if response.status_code>=400: raise RemoteFailure(f'Lark 請求失敗 HTTP {response.status_code}','blocked')
+        if response.status_code>=400:
+            try: error=response.json()
+            except (ValueError,TypeError): error=None
+            if isinstance(error,dict) and error.get('code') in retry_codes:
+                raise RemoteFailure(f"Lark 拒絕請求（{error['code']}）",'retry',retry_after)
+            raise RemoteFailure(f'Lark 請求失敗 HTTP {response.status_code}','blocked')
         try: result=response.json()
         except (ValueError,TypeError) as exc:
             raise RemoteFailure('Lark 回應無法核實','outcome_unknown' if method!='GET' else 'failed') from exc
         if not isinstance(result,dict): raise RemoteFailure('Lark 回應格式不完整','outcome_unknown' if method!='GET' else 'failed')
+        if result.get('code') in retry_codes: raise RemoteFailure(f"Lark 拒絕請求（{result['code']}）",'retry',retry_after)
         if result.get('code',0)!=0: raise RemoteFailure(f"Lark 拒絕請求（{result.get('code')}）",'blocked')
         data=result.get('data',{})
         if not isinstance(data,dict): raise RemoteFailure('Lark 回應內容無法核實','outcome_unknown' if method!='GET' else 'failed')
@@ -198,19 +205,30 @@ class LarkAdapter:
 
     def folder(self,parent,name):
         # A UUID suffix in planned folder names allows reuse after a lost response.
-        cursor=None
+        cursor=None; seen=set(); matches=[]
         for _ in range(100):
             params={'folder_token':parent,'page_size':200}
             if cursor: params['page_token']=cursor
             result=self.request('GET','/drive/v1/files',params=params)
-            matches=[x for x in result.get('files',[]) if x['name']==name and x['type']=='folder']
-            if len(matches)>1: raise RemoteFailure('目的資料夾重名，需管理員核對','blocked')
-            if matches: return matches[0]['token']
-            if not result.get('has_more'): break
+            files=result.get('files'); has_more=result.get('has_more')
+            if not isinstance(files,list) or type(has_more) is not bool:
+                raise RemoteFailure('Drive 目錄回應不完整，停止建立資料夾','blocked')
+            for item in files:
+                if not isinstance(item,dict) or not isinstance(item.get('name'),str) or not isinstance(item.get('type'),str):
+                    raise RemoteFailure('Drive 目錄項目格式不完整，停止建立資料夾','blocked')
+                if item['name']==name and item['type']=='folder':
+                    if not isinstance(item.get('token'),str) or not item['token']:
+                        raise RemoteFailure('目的資料夾缺少識別碼，需管理員核對','blocked')
+                    matches.append(item)
+            if not has_more: break
             next_cursor=result.get('next_page_token')
-            if not next_cursor or next_cursor==cursor: raise RemoteFailure('Drive 目錄分頁不完整','blocked')
+            if not isinstance(next_cursor,str) or not next_cursor or next_cursor in seen:
+                raise RemoteFailure('Drive 目錄分頁不完整','blocked')
+            seen.add(next_cursor)
             cursor=next_cursor
         else: raise RemoteFailure('Drive 目錄超過查詢上限','blocked')
+        if len(matches)>1: raise RemoteFailure('目的資料夾重名，需管理員核對','blocked')
+        if matches: return matches[0]['token']
         result=self.request('POST','/drive/v1/files/create_folder',json={'name':name,'folder_token':parent})
         if not result.get('token'): raise RemoteFailure('資料夾建立結果待核實','outcome_unknown')
         return result['token']

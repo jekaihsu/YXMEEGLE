@@ -12,21 +12,44 @@ import secrets
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 from datetime import datetime, timezone
-from sqlalchemy import create_engine, MetaData, Table, Column, String, Integer, JSON, select, inspect
+from sqlalchemy import create_engine, MetaData, select, inspect
 try:
     from .backup_publish import publish
 except ImportError:
     from backup_publish import publish
 
-META=MetaData()
-TABLES=[
-    Table('workspaces',META,Column('id',String(120),primary_key=True),Column('version',Integer,nullable=False),Column('data',JSON,nullable=False)),
-    Table('receipts',META,Column('id',String(300),primary_key=True),Column('fingerprint',String(64)),Column('result',JSON)),
-    Table('source_caches',META,Column('id',String(120),primary_key=True),Column('data',JSON)),
-    Table('business_records',META,Column('workspace_id',String(120),primary_key=True),Column('kind',String(60),primary_key=True),Column('entity_id',String(160),primary_key=True),Column('parent_id',String(160),nullable=False,index=True),Column('ordinal',Integer,nullable=False),Column('data',JSON,nullable=False)),
-    Table('company_people',META,Column('organization_id',String(120),primary_key=True),Column('person_id',String(120),primary_key=True),Column('data',JSON,nullable=False)),
-    Table('action_audit',META,Column('id',String(64),primary_key=True),Column('workspace_id',String(120),nullable=False,index=True),Column('actor_id',String(120),nullable=False),Column('action',String(120),nullable=False),Column('created_at',String(64),nullable=False,index=True),Column('data',JSON,nullable=False)),
-]
+def _canonical_base():
+    try:
+        from backend.models import Base
+    except ImportError:
+        import sys
+        sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+        from backend.models import Base
+    return Base
+
+# The application's SQLAlchemy models are the only schema definition. Login
+# sessions are deliberately not portable and are recreated by the app on start.
+META=_canonical_base().metadata
+PORTABLE=('workspaces','receipts','source_caches','business_records','company_people','action_audit')
+TABLES=[META.tables[name] for name in PORTABLE]
+
+def assert_schema(engine):
+    """create_all never alters existing tables, so verify the live schema."""
+    with engine.connect() as connection:
+        inspector=inspect(connection)
+        actual_names=set(inspector.get_table_names())
+        for table in TABLES:
+            if table.name not in actual_names: raise ValueError(f'Restore schema mismatch: missing table {table.name}')
+            want={'columns':{c.name:c.nullable for c in table.columns},
+                  'pk':sorted(c.name for c in table.primary_key.columns),
+                  'fks':sorted((tuple(f.parent.name for f in k.elements),k.referred_table.name,tuple(f.column.name for f in k.elements)) for k in table.foreign_key_constraints),
+                  'indexes':sorted((tuple(c.name for c in i.columns),bool(i.unique)) for i in table.indexes)}
+            have={'columns':{c['name']:c['nullable'] for c in inspector.get_columns(table.name)},
+                  'pk':sorted(inspector.get_pk_constraint(table.name)['constrained_columns']),
+                  'fks':sorted((tuple(f['constrained_columns']),f['referred_table'],tuple(f['referred_columns'])) for f in inspector.get_foreign_keys(table.name)),
+                  'indexes':sorted((tuple(i['column_names']),bool(i['unique'])) for i in inspector.get_indexes(table.name))}
+            for key in want:
+                if want[key]!=have[key]: raise ValueError(f'Restore schema mismatch: {table.name} {key}')
 
 def engine_for(url):
     if url.startswith('postgres://'):url='postgresql+psycopg://'+url[len('postgres://'):]
@@ -96,6 +119,13 @@ def assert_empty_database(engine):
             raise ValueError('Restore target database must be empty')
 
 
+def make_dirs(folder,created):
+    """Create folder, recording each directory this call newly creates (outermost first)."""
+    missing=[]
+    while not folder.exists():missing.append(folder);folder=folder.parent
+    for item in reversed(missing):
+        item.mkdir();created.append(item)
+
 def restore(engine,uploads,source):
     uploads=Path(uploads).resolve()
     if uploads.exists() and any(uploads.iterdir()):raise ValueError('Restore upload directory must be empty')
@@ -123,20 +153,25 @@ def restore(engine,uploads,source):
     # is still not an empty restore target; inspect every table, not just those
     # included in our portable backup. Run restore with the target app stopped.
     assert_empty_database(engine)
-    META.create_all(engine)
-    written=[]
+    META.create_all(engine,tables=TABLES)
+    assert_schema(engine)
+    written=[];created=[]
     try:
         with engine.begin() as connection:
             if any(connection.execute(select(t).limit(1)).first() for t in TABLES):
                 raise ValueError('Restore target database must be empty')
             for name,data in validated.items():
-                dest=uploads/name[len('uploads/'):];dest.parent.mkdir(parents=True,exist_ok=True)
-                with dest.open('xb') as handle:handle.write(data)
-                written.append(dest)
+                dest=uploads/name[len('uploads/'):];make_dirs(dest.parent,created)
+                with dest.open('xb') as handle:
+                    written.append(dest)
+                    handle.write(data)
             for table in TABLES:
                 if rows[table.name]:connection.execute(table.insert(),rows[table.name])
     except Exception:
         for path in written:path.unlink(missing_ok=True)
+        for folder in reversed(created):
+            try:folder.rmdir()  # only removes directories this restore created and left empty
+            except OSError:pass
         raise
     return {'tables':{k:len(v) for k,v in rows.items()},'files':len(written),'sessions_restored':False}
 

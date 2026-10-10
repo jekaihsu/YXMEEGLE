@@ -1,0 +1,108 @@
+// Exercise real App closures and React state; expose context only in the test bundle.
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {build} from 'esbuild';
+import {a,b,workspace} from './session-epoch-fixture.mjs';
+import {JSDOM} from 'jsdom';
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+const bundle=await build({entryPoints:['src/App.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'},plugins:[{name:'observe-app-context',setup(b){b.onLoad({filter:/\/App\.tsx$/},async({path})=>({contents:(await fs.readFile(path,'utf8')).replace(' const overdue=w?', ' window.epochContext={w,s,busy,error,completionMoment,run,upload,refresh,logout};\n const overdue=w?'),loader:'tsx'}))}}]});
+// File URL keeps external React imports resolved from this directory.
+const bundlePath=new URL('./.epoch-test-bundle.mjs',import.meta.url);
+await fs.writeFile(bundlePath,bundle.outputFiles[0].text);
+let App;try{App=(await import(bundlePath.href)).default}finally{await fs.unlink(bundlePath)}
+const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json'}});
+let checks=0;
+async function scenario(kind,change,status=200,body){
+ const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=projects'});
+ for(const key of ['window','document','location','history','sessionStorage','FormData','Event'])globalThis[key]=dom.window[key];
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ let session={user:a,users:[a,b],mode:kind==='switch'?'demo':'lark',environment:'production',workspace_id:'workspace-A',auth_configured:true};
+ let current={...workspace,version:10};let release;let calls=0;
+ globalThis.fetch=async(url)=>{
+  if(url==='/api/session')return json(session);
+  if(url==='/api/workspace')return json(current);
+  if(url==='/api/logout')return json({});
+  if(url==='/api/actions'||url==='/api/files'||url==='/api/demo/session'){calls++;return new Promise(resolve=>{release=resolve})}
+  throw Error('Unexpected endpoint '+url);
+ };
+ const root=createRoot(document.getElementById('root'));
+ const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(resolve=>setTimeout(resolve,0))});
+ await flush(()=>root.render(React.createElement(App)));
+ let pending;await flush(()=>{if(kind==='switch'){document.querySelector('.user-button').click();return}pending=kind==='run'?window.epochContext.run('task_start',{}, {project_id:'pA',node_id:'nA'}):window.epochContext.upload(new FormData())});
+ if(kind==='switch')await flush(()=>document.querySelector('.role-option:not(.selected)').click());
+ assert.equal(calls,1);
+ const oldRelease=release;
+ const draftKey='yx:draft:v1:'+a.id+':workspace-A:comment:pA:project';
+ const draft=JSON.stringify({value:'unsent text',at:Date.now()});
+ sessionStorage.setItem(draftKey,draft);
+ if(change){
+  if(change==='logout')await flush(()=>window.epochContext.logout());
+  if(change==='expiry')await flush(()=>window.dispatchEvent(new Event('yx:session-expired')));
+  if(change==='logout'||change==='expiry'){
+   assert.equal(window.epochContext.w,undefined,'clearing identity removes workspace');
+   assert.equal(window.epochContext.s.user,null,'identity is cleared before login');
+   assert.ok(!document.body.textContent.includes('PRIVATE_CASE_A'));
+   const signedIn=session;session={...session,user:null,users:[]};
+   await flush(()=>document.querySelector('.login-card button').click());
+   assert.equal(window.epochContext.w,undefined,'anonymous session cannot load workspace');
+   session=signedIn; // Log back into the same identity: the old epoch must stay invalid.
+  }
+  if(change==='actor')session={...session,user:b};
+  if(change==='workspace')session={...session,workspace_id:'workspace-B'};
+  if(change==='environment')session={...session,environment:'test'};
+  if(change==='mode')session={...session,mode:session.mode==='demo'?'lark':'demo'};
+  if(change==='recovery')session={...session,access_mode:'recovery'};
+  current={...workspace,workspace_id:session.workspace_id,environment:session.environment,version:1,projects:[]};
+  // Drive an explicit session read to test identity changes during a pending
+  // mutation; the normal refresh buttons now correctly guard that mutation.
+  await flush(()=>window.epochContext.refresh());
+  if(change==='recovery'){assert.equal(window.epochContext.w,undefined);session={...session,access_mode:undefined};await flush(()=>window.epochContext.refresh())}
+  assert.equal(window.epochContext.w.version,1,'new epoch accepts lower version');
+  assert.equal(window.epochContext.w.projects.length,0);
+  assert.ok(!document.body.textContent.includes('PRIVATE_CASE_A'),'refresh clears previous workspace from screen');
+  if(change==='environment')assert.ok(document.body.textContent.includes('獨立測試區'));
+  let newer;await flush(()=>{newer=window.epochContext.upload(new FormData())});
+  const newRelease=release;
+  let result;await flush(async()=>{oldRelease(json(status===200?{...workspace,version:99,projects:workspace.projects.map(p=>({...p,nodes:p.nodes.map(n=>({...n,status:'completed',tasks:n.tasks.map(t=>({...t,status:'completed'}))}))}))}:{detail:'OLD_ERROR'},status));result=await pending});
+  assert.equal(result,kind==='upload'?false:undefined,'stale result is not returned to callers');
+  assert.equal(window.epochContext.s.user.id,session.user.id,'stale 401 cannot expire new session');
+  assert.equal(window.epochContext.w.projects.length,0,'old data stays cleared');
+  assert.ok(!document.body.textContent.includes('PRIVATE_CASE_A'),'delayed response cannot revive previous workspace on screen');
+  assert.equal(window.epochContext.error,kind==='switch'?'OLD_ERROR':'');
+  assert.equal(window.epochContext.completionMoment,null);
+  if(kind!=='switch')assert.equal(window.epochContext.busy,true,'old finally cannot unlock newer mutation');
+  assert.ok(!document.body.textContent.includes('已儲存，工作台已更新'));
+  assert.ok(!document.body.textContent.includes('檔案已上傳'));
+  await flush(async()=>{newRelease(json({...current,version:2}));await newer});
+  assert.equal(window.epochContext.w.version,2);
+ }else if(body!==undefined){
+  const before=window.epochContext.w;
+  let result;await flush(async()=>{oldRelease(new Response(body,{status}));result=await pending});
+  assert.equal(result,kind==='upload'?false:undefined);
+  assert.equal(window.epochContext.w,before,'invalid response preserves workspace');
+  assert.equal(window.epochContext.s.user.id,a.id);
+  assert.equal(window.epochContext.error,'服務回應格式不正確，請稍後再試。');
+  assert.equal(window.epochContext.completionMoment,null);
+  assert.equal(sessionStorage.getItem(draftKey),draft,'failed mutation preserves draft');
+  assert.ok(!document.body.textContent.includes('已儲存，工作台已更新'));
+  assert.ok(!document.body.textContent.includes('檔案已上傳'));
+ }else{
+  await flush(async()=>{oldRelease(json({...workspace,version:11}));await pending});
+  assert.equal(window.epochContext.w.version,11);
+  assert.ok(document.body.textContent.includes(kind==='run'?'已儲存，工作台已更新':'檔案已上傳'));
+  current={...workspace,version:9};await flush(()=>window.epochContext.refresh());
+  if(change==='recovery'){assert.equal(window.epochContext.w,undefined);session={...session,access_mode:undefined};await flush(()=>window.epochContext.refresh())}
+  assert.equal(window.epochContext.w.version,11,'same epoch rejects older version');
+ }
+ assert.equal(window.epochContext.busy,false);
+ await flush(()=>root.unmount());dom.window.close();checks++;
+}
+for(const kind of ['run','upload']){
+ for(const change of ['actor','workspace','environment','mode','recovery','logout','expiry'])await scenario(kind,change);
+ for(const status of [401,409,500])await scenario(kind,'actor',status);
+ await scenario(kind,null);
+ for(const body of ['', '   \n', '<html>proxy fallback</html>', '{"broken":', 'null'])await scenario(kind,null,200,body);
+}
+for(const change of ['actor','workspace','environment','mode','recovery','logout','expiry'])await scenario('switch',change,401);
+console.log(`Session epoch: ${checks} App regression scenarios passed`);

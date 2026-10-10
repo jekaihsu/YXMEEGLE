@@ -168,7 +168,7 @@ def test_digest_once_daily_with_overdue_escalation_and_stop_rules(ws):
                j['payload']['source_project_ids']==[p['id']] for j in ws['jobs'])
     schedule(ws,'2026-09-28T10:00:00+08:00'); assert len(ws['jobs'])==first
     assert any(j['payload']['recipients']==['u-manager'] for j in ws['jobs'])
-    p['source_status']='中止'; ws['jobs']=[]
+    p['source_status']='中止'; p['source_lifecycle']={'canonical':'中止','state':'mapped'}; ws['jobs']=[]
     schedule(ws,'2026-09-29T09:00:00+08:00'); assert not ws['jobs']
     call(ws,'recurring_create',dict(kind='receivable',owner_id='u-manager',start_date='2026-09-01'))
     schedule(ws,'2026-09-29T09:00:00+08:00'); assert ws['jobs']
@@ -225,8 +225,8 @@ def test_worker_test_workspace_never_calls_remote_and_issue_once(api_app,ws):
     app.state.worker.adapter_factory=lambda cfg:pytest.fail('Test workspace called remote')
     app.state.worker.run_one(wid)
     state=client.get('/api/workspace').json(); issue=state['projects'][0]['confirmation_issues'][0]
-    assert issue['status']=='simulated'; assert len(issue['receipts'])==2; assert len(state['projects'][0]['handoffs'])==1
-    app.state.worker.run_one(wid); state=client.get('/api/workspace').json(); assert len(state['projects'][0]['handoffs'])==1
+    assert issue['status']=='simulated'; assert len(issue['receipts'])==2; assert state['projects'][0]['handoffs']==[]  # preview issuance never hands off PM
+    app.state.worker.run_one(wid); state=client.get('/api/workspace').json(); assert state['projects'][0]['handoffs']==[]  # preview issuance never hands off PM
 
 def test_worker_recovers_only_failed_recipient_without_resend(api_app,ws):
     app,client=api_app; p,n=ready(ws,'confirmation'); call(ws,'confirmation_issue',{'version':'1','recipients':['u-field','u-control']})
@@ -292,6 +292,8 @@ def test_backup_restore_normalized_rows_and_file_hash(api_app,ws,tmp_path):
     with restored.connect() as conn:
         assert conn.execute(select(BusinessRow).where(BusinessRow.kind=='projects')).first()
         assert conn.execute(select(WorkspaceRow)).first()
+        foreign_keys=conn.exec_driver_sql('PRAGMA foreign_key_list(business_records)').fetchall()
+        assert any(row[2]=='workspaces' and row[3]=='workspace_id' and row[4]=='id' for row in foreign_keys)
     with pytest.raises(ValueError): restore(restored,out,target)
 
 def test_source_configuration_allows_two_sources_and_rejects_wrong_kinds(monkeypatch):
@@ -326,8 +328,70 @@ def test_confirmation_requires_actual_recipient_acknowledgments(api_app,ws):
     for u in ('u-field','u-control'): call(ws,'confirmation_ack',dict(id=issue['id'],evidence='本組確認'),user=u)
     assert not missing(p,n,ws)
 
+def test_confirmation_replacement_requires_new_delivery_and_acknowledgments(api_app,ws):
+    app,client=api_app
+    p,n=ready(ws,'confirmation')
+    def deliver(version):
+        call(ws,'confirmation_issue',dict(version=version,recipients=['u-field','u-control']))
+        wid=inject(api_app,ws)
+        app.state.worker.adapter_factory=lambda cfg:pytest.fail('Test workspace called remote')
+        # A prior review can leave a mention ahead of the new delivery job.
+        for _ in range(len(ws['jobs'])+1):
+            app.state.worker.run_one(wid)
+            with app.state.sessions() as db:
+                state=storage.load(db,BusinessRow,db.get(WorkspaceRow,wid))
+            if state['projects'][0]['confirmation_issues'][-1]['status']=='simulated': break
+        ws.clear(); ws.update(state)
+        return ws['projects'][0],next(x for x in ws['projects'][0]['nodes'] if x['key']=='confirmation')
+    def complete():
+        call(ws,'review_submit',key='confirmation',user='u-pm')
+        call(ws,'review_vote',dict(cycle_id=n['review_cycles'][-1]['id'],seat='owner',result='approved'),key='confirmation',user='u-pm')
+        assert n['status']=='completed'
+    p,n=deliver('1'); old=p['confirmation_issues'][-1]
+    assert old['status']=='simulated' and len(old['receipts'])==2
+    for user in old['recipients']:
+        call(ws,'confirmation_ack',dict(id=old['id'],evidence='v1 checked'),user=user)
+    assert not missing(p,n,ws)
+    complete()
+    call(ws,'evidence_submit',dict(key='confirmation',note='changed scope v2',url='https://example.com/confirmation-v2'),key='confirmation',user='u-pm')
+    assert next(e for e in p['evidence'] if e['id']==old['evidence_id'])['withdrawn']
+    assert n['status']=='rework' and missing(p,n,ws)
+    with pytest.raises(HTTPException) as error:
+        call(ws,'review_submit',key='confirmation',user='u-pm')
+    assert error.value.status_code==409
+    with pytest.raises(HTTPException) as error:
+        call(ws,'confirmation_ack',dict(id=old['id'],evidence='old receipt reused'),user='u-field')
+    assert error.value.status_code==409
+    assert len(old['acknowledgments'])==2
+    with pytest.raises(HTTPException):
+        call(ws,'confirmation_issue',dict(version='1',recipients=old['recipients']))
+    p,n=deliver('2'); new=p['confirmation_issues'][-1]
+    assert new['evidence_id']!=old['evidence_id'] and len(new['receipts'])==2
+    assert missing(p,n,ws)
+    call(ws,'confirmation_ack',dict(id=new['id'],evidence='v2 checked'),user='u-field')
+    assert missing(p,n,ws)
+    call(ws,'confirmation_ack',dict(id=new['id'],evidence='v2 checked'),user='u-control')
+    assert not missing(p,n,ws)
+    complete()
+
+@pytest.mark.parametrize('changed',['pm','recipients'])
+def test_confirmation_receipt_is_bound_to_pm_and_recipient_scope(api_app,ws,changed):
+    app,client=api_app; ready(ws,'confirmation')
+    call(ws,'confirmation_issue',dict(version='1',recipients=['u-field']))
+    wid=inject(api_app,ws); app.state.worker.run_one(wid)
+    ws=client.get('/api/workspace').json(); p=ws['projects'][0]
+    n=next(x for x in p['nodes'] if x['key']=='confirmation'); issue=p['confirmation_issues'][-1]
+    call(ws,'confirmation_ack',dict(id=issue['id'],evidence='checked'),user='u-field')
+    assert not missing(p,n,ws)
+    if changed=='pm': p['pm_id']='u-control'
+    else: issue['recipients'].append('u-control')
+    assert '確認單尚未取得全部發出回執' in missing(p,n,ws)
+    with pytest.raises(HTTPException) as error:
+        call(ws,'confirmation_ack',dict(id=issue['id'],evidence='checked again'),user='u-field')
+    assert error.value.status_code==409
+
 def test_idle_worker_does_not_bump_version_and_serializes_leases(api_app,ws):
-    app,client=api_app; ws['projects'][0]['source_status']='中止'; wid=inject(api_app,ws)
+    app,client=api_app; ws['projects'][0]['source_lifecycle']={'canonical':'中止','state':'mapped'}; wid=inject(api_app,ws)
     before=client.get('/api/workspace').json()['version']; app.state.worker.run_one(wid)
     assert client.get('/api/workspace').json()['version']==before
     actor=ws['users'][0]; first=queue(ws,'digest',actor,dict(recipients=[actor['id']],text='one'),'one'); first.update(status='running',lease_until='2099-01-01T00:00:00+08:00')
@@ -342,3 +406,12 @@ def test_monthly_submission_waits_for_supervisor(ws):
     with pytest.raises(HTTPException): call(ws,'recurring_review',dict(id=r['id'],entry_id=r['history'][-1]['id'],result='accepted',evidence='核准'),user='u-field')
     call(ws,'recurring_review',dict(id=r['id'],entry_id=r['history'][-1]['id'],result='accepted',evidence='核准'))
     assert r['history'][-1]['status']=='accepted'
+
+
+def test_source_interval_is_server_managed_not_a_fixed_ui_cadence(ws):
+    ws['settings']['source_sync_seconds'] = 120
+    assert call(ws, 'admin_settings', {'digest_time': '10:00'})
+    with pytest.raises(HTTPException) as exc:
+        call(ws, 'admin_settings', {'source_sync_seconds': 300})
+    assert exc.value.status_code == 422
+    assert '伺服器' in exc.value.detail

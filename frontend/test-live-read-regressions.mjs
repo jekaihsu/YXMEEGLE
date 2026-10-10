@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict';
+import {fakeClock} from './fake-clock-fixture.mjs';
+import fs from 'node:fs/promises';
+import {build} from 'esbuild';
+import {JSDOM} from 'jsdom';
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+const bundle=await build({stdin:{contents:"export {DataFreshness} from './src/DataFreshness';export {liveRefresh} from './src/api';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external'});
+const path=new URL('./.live-regression-bundle.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);
+let mod;try{mod=await import(path.href)}finally{await fs.unlink(path)}
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost'});
+for(const key of ['window','document','Event','FormData'])globalThis[key]=dom.window[key];
+Object.defineProperty(document,'hidden',{configurable:true,value:false});
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const clock=fakeClock(dom.window,Date.parse('2026-10-07T02:02:23Z'));
+const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(r=>clock.realTimeout(r,0))});
+const dataset=(status='fresh',age=12)=>({status,as_of:age===null?null:'2026-10-07T02:02:11Z',changed_at:'2026-10-07T02:02:11Z',age_seconds:age,ttl_seconds:60,fetched_at:null,last_error:null,fingerprint:null,lark:{calls:0,retries:0,duration_ms:0}});
+const freshness=()=>({enabled:true,server_time:'2026-10-07T02:02:23Z',datasets:{sources:dataset(),roster:dataset(),attendance:dataset()}});
+let root=createRoot(document.getElementById('root'));
+const render=(data,props={})=>flush(()=>root.render(React.createElement(mod.DataFreshness,{freshness:data,refresh:()=>{},...props})));
+try{
+ const data=freshness();await render(data);assert.equal(document.querySelector('.data-freshness').dataset.state,'fresh');
+ const originalText=document.body.textContent;let reads=0;
+ globalThis.fetch=async()=>{reads++;return new Response(JSON.stringify({freshness:freshness()}))};
+ await flush(()=>clock.advance(600000));
+ assert.equal(document.body.textContent,originalText,'freshness remains static without a clock ticker');assert.equal(reads,0);
+ const published=[];const refreshing=freshness();refreshing.datasets.sources.status='refreshing';
+ await render(refreshing,{onFreshness:f=>published.push(f)});
+ await flush(()=>clock.advance(600000));assert.equal(reads,0);assert.equal(clock.intervals,0);
+ assert.equal(published.at(-1).datasets.sources.status,'refreshing','no autonomous status reads');
+ const error=freshness();error.server_time='2026-10-07T02:03:24Z';error.datasets.roster=dataset('error',null);
+ await render(error);
+ assert.match(document.querySelector('[role="status"]').textContent,/名冊.*時間未知/,'M3: unknown roster age never borrows sources age');
+ assert.doesNotMatch(document.body.textContent,/0 分鐘前/);
+ error.datasets.roster={...dataset('error',20),as_of:'2026-10-07T02:03:04Z'};await render({...error});
+ assert.match(document.querySelector('[role="status"]').textContent,/名冊.*秒前/,'M3: sub-minute failures say seconds');
+ let retryBody;globalThis.fetch=async(url,init)=>{retryBody=JSON.parse(init.body);return new Response(JSON.stringify({freshness:error}))};
+ await flush(()=>document.querySelector('.data-freshness button').click());
+ assert.deepEqual(retryBody.datasets,['roster'],'minor 12: retry targets the erroring dataset');
+ const snapshot={...error,server_time:'2026-10-07T02:05:23Z'};await render(snapshot);
+ await render({...freshness(),server_time:'2026-10-07T02:01:23Z'});
+ assert.equal(document.querySelector('.data-freshness').dataset.state,'error','older snapshot cannot overwrite newer freshness');
+ globalThis.fetch=async()=>new Response(JSON.stringify({freshness:freshness()}),{status:202});
+ assert.equal((await mod.liveRefresh(['sources'],true)).freshness.datasets.sources.status,'refreshing','M4: HTTP 202 cannot be reported as fresh even with a cached fresh body');
+ globalThis.fetch=async()=>new Response(JSON.stringify({status:'ready'}),{status:202});
+ await assert.rejects(()=>mod.liveRefresh(['sources'],true),/資料讀取結果尚未確認/,'M4: missing freshness status is never accepted as success');
+ console.log('Live-read regressions passed');
+}finally{await flush(()=>root.unmount());clock.restore();dom.window.close()}

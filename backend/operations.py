@@ -4,9 +4,12 @@ import json
 from copy import deepcopy
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from .source_lifecycle import declared, needs_review
 from .policy import upgrade, CAPABILITIES, TECHNICAL, FINANCIAL
 from .workflow import require, find, now, uid, event, blocked, all_tasks, valid_date, http_url
+from .delivery_approval import reviewer_seats, active_seats, approved_seats, refresh_reviewers
 from .business_policy import can_business_override
+from .quote_review_rules import invalidate_pending_quote_reviews
 
 def capable(user, capability):
     return user.get('active',True) and (user.get('role')=='manager' or capability in user.get('capabilities',[]))
@@ -65,6 +68,18 @@ def queue(ws,kind,actor,payload,key):
 def evidence_for(p,n,key):
     return next((e for e in reversed(p['evidence']) if e['node_id']==n['id'] and e['key']==key and not e.get('withdrawn') and not e.get('superseded_for_current')),None)
 
+def confirmation_current(p,n,issue):
+    evidence=evidence_for(p,n,'confirmation')
+    # Evidence IDs identify immutable submissions; replacements receive a new ID.
+    if not issue or not evidence or evidence.get('status')!='accepted': return False
+    recipients=issue.get('recipients'); version=issue.get('version')
+    if not isinstance(recipients,list) or not version: return False
+    return bool(issue.get('evidence_id')==evidence.get('id')
+                and issue.get('pm_id')==p['pm_id']
+                and issue.get('fingerprint')==digest({'version':version,
+                    'evidence':evidence.get('id'),'pm':p['pm_id'],'recipients':recipients,
+                    **({'groups':issue['recipient_groups']} if issue.get('recipient_groups') else {})}))
+
 
 def daily_evidence_current(p,e):
     if not e.get('daily_id'): return True
@@ -88,9 +103,10 @@ def reconcile_daily_evidence(ws):
 def delivery_fingerprint(item):
     return digest({k:item.get(k) for k in ('work_item_ids','quantity','unit','evidence_ids','task_snapshots','version')})
 
-def delivery_current(p,item):
+def delivery_current(p,item,ws):
     if item.get('status')!='approved' or item.get('superseded_by'): return False
     if item.get('content_hash')!=delivery_fingerprint(item): return False
+    if not approved_seats(ws,p,item): return False
     for ident in item.get('evidence_ids',[]):
         e=next((e for e in p['evidence'] if e['id']==ident),None)
         if not e or e.get('withdrawn') or e.get('status')!='accepted': return False
@@ -100,22 +116,22 @@ def delivery_current(p,item):
         if not task or any(task.get(k)!=snapshot.get(k) for k in ('revision','status','output')): return False
     return True
 
-def payment_delivery_valid(p,batch):
+def payment_delivery_valid(p,batch,ws):
     if batch.get('phase')=='advance' and not batch.get('delivery_references'):
         return bool(str(batch.get('contract_evidence','')).strip() and str(batch.get('claim_evidence','')).strip())
     refs=batch.get('delivery_references',[])
     if not refs: return False
     for ref in refs:
         item=next((x for x in p.get('delivery_batches',[]) if x['id']==ref['id']),None)
-        if not item or not delivery_current(p,item) or item['version']!=ref['version'] or item['content_hash']!=ref['content_hash']: return False
+        if not item or not delivery_current(p,item,ws) or item['version']!=ref['version'] or item['content_hash']!=ref['content_hash']: return False
     return True
 
-def delivery_references(p,identifiers,batch_id=None,kind=None):
+def delivery_references(p,identifiers,ws,batch_id=None,kind=None):
     require(isinstance(identifiers,list) and identifiers and all(isinstance(x,str) and x for x in identifiers) and len(set(identifiers))==len(identifiers),'需指定不重複的已核定交付批次',422)
     refs=[]
     for ident in identifiers:
         item=find(p.get('delivery_batches',[]),ident,'交付批次')
-        require(delivery_current(p,item),'交付批次尚未核定、已換版或證據已失效',409)
+        require(delivery_current(p,item,ws),'交付批次尚未核定、已換版或證據已失效',409)
         for other in p['payment_batches']:
             if other['id']==batch_id or other.get('kind')!=kind or other.get('status')=='cancelled': continue
             used_ids={r['id'] for r in other.get('delivery_references',[])}
@@ -138,7 +154,7 @@ def refresh_payment_status(ws,p,batch):
     batch['recorded_amount']=str(sum((decimal(r['amount']) for r in batch.get('receipts',[])),Decimal(0)))
     batch['verified_amount']=str(verified)
     if batch.get('status') in ('draft','needs_review','cancelled'): return
-    if not payment_delivery_valid(p,batch):
+    if not payment_delivery_valid(p,batch,ws):
         batch['status']='needs_review'; batch['review_reason']='交付批次未綁定或版本已失效'; return
     batch['status']='paid' if verified==decimal(batch['amount']) and verified>0 else 'partially_paid' if verified>0 else 'approved'
 
@@ -147,7 +163,8 @@ def refresh_project_state(p,ws):
     refresh_skips(ws,p)
     p.setdefault('delivery_batches',[])
     for item in p['delivery_batches']:
-        if item['status']=='approved' and not delivery_current(p,item):
+        refresh_reviewers(ws,p,item)
+        if item['status']=='approved' and not delivery_current(p,item,ws):
             item.update(status='invalidated',invalidated_reason='交付成果、文件或工項版本已變更')
     if ws.get('environment')=='production':
         for node in p['nodes']:
@@ -173,7 +190,7 @@ def refresh_project_state(p,ws):
     if settlement and settlement['status']=='completed' and engineering:
         p['execution_status']='completed'
     elif engineering: p['execution_status']='engineering_complete'
-    elif p.get('source_status')=='中止': p['execution_status']='paused'
+    elif needs_review(p) or declared(p)=='中止': p['execution_status']='paused'
     elif p.get('execution_status') in ('in_progress','engineering_complete','completed') or any(n['status'] in ('in_progress','rework','completed') for n in p['nodes']): p['execution_status']='in_progress'
     else: p['execution_status']='pending'
     p['status']=p['execution_status']
@@ -195,6 +212,8 @@ def missing(p,n,ws):
     from .sop_contracts import completion_reasons
     issues=completion_reasons(p,n)
     if any(c['node_id']==n['id'] and c['status']=='pending' for c in p.get('sop_deadline_conflicts',[])): issues.append('SOP 期限異動尚待主管核對')
+    from .sop_execution import node_closure_reasons
+    issues.extend(node_closure_reasons(ws,p,n))
     if n['key'] in FINANCIAL:
         if ws.get('environment')=='production' and not financial_confirmation(ws,p,n): issues.append('此節點尚未取得有效的 Lark 原生財務共同核准')
         if p.get('migration_review_required') or p.get('migration_conflicts'): issues.append('來源案件合併尚待主管核對')
@@ -212,7 +231,7 @@ def missing(p,n,ws):
     if any(x['project_id']==p['id'] and x.get('node_id')==n['id'] and x['status']!='succeeded' for x in ws['input_revisions'] if not x.get('superseded')): issues.append('Input 尚未核實存回 Lark')
     if n['key']=='confirmation':
         issue=p['confirmation_issues'][-1] if p['confirmation_issues'] else None
-        if not issue or issue['status'] not in ('issued','simulated'): issues.append('確認單尚未取得全部發出回執')
+        if not confirmation_current(p,n,issue) or issue['status'] not in ('issued','simulated'): issues.append('確認單尚未取得全部發出回執')
         elif set(issue['recipients'])!={a['user_id'] for a in issue.get('acknowledgments',[])}: issues.append('各組尚未確認此版本確認單')
     if n['key']=='settlement':
         from .node_skip import valid_waiver
@@ -225,7 +244,7 @@ def missing(p,n,ws):
             if not any(v['status']=='approved' for v in p['finance_versions']): issues.append('財務基準尚未核定')
             if not p.get('payment_reconciliation',{}).get('confirmed'): issues.append('收付款總額尚未核對結清')
             if any(b['status']!='paid' for b in p['payment_batches']): issues.append('收付款尚未結清')
-            if any(not payment_delivery_valid(p,b) for b in p['payment_batches']): issues.append('請款交付版本尚未核實')
+            if any(not payment_delivery_valid(p,b,ws) for b in p['payment_batches']): issues.append('請款交付版本尚未核實')
             if any(not r.get('verified') or set(valid_attestations(ws,p,r))!={'pm','admin'} or len(set(valid_attestations(ws,p,r).values()))!=2 for b in p['payment_batches'] for r in b.get('receipts',[])): issues.append('實際收付款尚未完成雙方核對')
     return issues
 
@@ -335,7 +354,7 @@ def vote(ws,user,p,n,data):
         if all(x['status']=='completed' for x in p['nodes'] if x['key'] in TECHNICAL): p['execution_status']='engineering_complete'
         if n['key']=='settlement': p['execution_status']='completed'
 
-def apply_operation(ws,user,body,demo=False):
+def apply_operation(ws,user,body,demo=False,cfg=None):
     from .input_validation import validate_action
     validate_action(body)
     """Returns False for legacy task actions, True for handled actions."""
@@ -355,6 +374,12 @@ def apply_operation(ws,user,body,demo=False):
     if action in ('sop_event_record','sop_deadline_resolve','sop_followup_complete'):
         from .sop_deadlines import apply_sop_deadline
         return apply_sop_deadline(ws,user,body)
+    if action in ('sop_condition_propose','sop_condition_confirm'):
+        from .sop_execution import apply_condition
+        return apply_condition(ws,user,body)
+    if action=='sop_round_open':
+        from .sop_execution import apply_round
+        return apply_round(ws,user,body)
     if action in ('sop_applicability_propose','sop_applicability_confirm'):
         from .sop_applicability import apply_applicability
         return apply_applicability(ws,user,body)
@@ -368,6 +393,7 @@ def apply_operation(ws,user,body,demo=False):
         require(not (p.get('migration_review_required') or p.get('migration_conflicts')),'來源案件合併尚待主管核對',409)
         if action!='finance_approve': require(not p.get('migration_finance_reapproval_required'),'合併後財務基準尚未重新共同核定',409)
     if action=='admin_person':
+        from .workspace_projection import person_event_message
         require(capable(user,'manage_people'))
         ident=str(data.get('id','')).strip(); require(bool(ident),'請提供已核對的 Lark open_id 或測試人員識別',422)
         target=next((x for x in ws['users'] if x['id']==ident),None)
@@ -386,17 +412,24 @@ def apply_operation(ws,user,body,demo=False):
         require(target['default_workspace'] in ('test','production'),'預設工作區錯誤',422)
         target['avatar']=target['name'][:1]; target['authz_version']=target.get('authz_version',0)+1
         for project in ws['projects']: refresh_project_state(project,ws)
-        event(ws,user,action,message=json.dumps({'person':ident,'before':previous,'after':target},ensure_ascii=False)); return True
+        event(ws,user,action,message=person_event_message(ident,previous,target)); return True
     if action=='admin_settings':
         require(user['role']=='manager')
         allowed=set(ws['settings'])
         require(set(data)<=allowed,'未知設定',422)
-        proposed={**ws['settings'],**data}
-        require(proposed.get('deadline_basis')=='scheduled_shift' and proposed.get('cutoff_time') is None,'截止時間必須依個人正常班表，不能改為固定時間',422)
-        require(proposed.get('source_sync_seconds')==300,'來源同步固定每五分鐘',422)
-        require(proposed.get('test_connection_mode') in ('simulation','isolated_live'),'測試連線模式錯誤',422)
         from .policy import defaults
         approved=defaults()
+        for key,value in data.items():
+            expected=approved.get(key)
+            if expected is not None:
+                require(type(value) is type(expected),'設定欄位型別錯誤',422)
+        for key in ('daily_backup_days','monthly_backup_months','rpo_hours','rto_hours'):
+            if key in data: require(data[key]>0,'保留期間與復原目標需為正整數',422)
+        proposed={**ws['settings'],**data}
+        require(proposed.get('deadline_basis')=='scheduled_shift' and proposed.get('cutoff_time') is None,'截止時間必須依個人正常班表，不能改為固定時間',422)
+        require(proposed.get('source_sync_seconds')==ws['settings'].get('source_sync_seconds'),
+                '來源讀取頻率由伺服器環境設定管理',422)
+        require(proposed.get('test_connection_mode') in ('simulation','isolated_live'),'測試連線模式錯誤',422)
         for key in ('v4_base','quote_base','capability_base'):
             require(proposed.get(key)==approved[key],'案件與能力來源僅限使用者已核定的 Base',422)
         for key in ('digest_time',):
@@ -409,16 +442,22 @@ def apply_operation(ws,user,body,demo=False):
         require(not proposed.get('input_base') or proposed['input_base'] not in (proposed['v4_base'],proposed['quote_base'],proposed['capability_base'],proposed['test_base']),'Input 登錄 Base 不可指向來源或測試 Base',422)
         require(not proposed.get('test_input_table') or proposed['test_input_table']!=proposed.get('input_table'),'隔離測試 Input 表不可混用正式表',422)
         require(not proposed['test_drive_root'] or proposed['test_drive_root']!=proposed['drive_root'],'測試目錄不可指向正式目錄',422)
+        if cfg is not None and ('drive_root' in data or 'test_drive_root' in data):
+            for key in ('drive_root','test_drive_root'): require(isinstance(proposed.get(key),str),'Drive 目錄需為文字',422)
+            approved,test_root=cfg.get('LARK_DRIVE_ROOT'),cfg.get('LARK_TEST_DRIVE_ROOT')
+            require(ws.get('environment')!='production' or (bool(proposed['drive_root']) and proposed['drive_root']==approved and proposed['drive_root']!=test_root),'正式 Drive 目錄須等同伺服器核定目錄且不得為測試目錄',422)
+            require(not proposed['test_drive_root'] or proposed['test_drive_root']!=approved,'測試目錄不可指向伺服器核定的正式目錄',422)
         ws['settings']=proposed
     elif action=='sop_draft':
         require(capable(user,'edit_sop'))
         source=find(ws['sop_templates'],data.get('source_id'),'SOP 範本')
         version=deepcopy(source); version.update(id=uid(),version=max(s['version'] for s in ws['sop_templates'])+1,status='draft',created_by=user['id'],created_at=now())
         if data.get('nodes'):
-            require({s['key'] for s in data['nodes']}=={s['key'] for s in source['nodes']},'需保留全部既有節點',422)
+            require(all(isinstance(s.get('key'),str) for s in data['nodes']),'SOP 節點識別格式錯誤',422)
+            require(len(data['nodes'])==len(source['nodes']) and {s['key'] for s in data['nodes']}=={s['key'] for s in source['nodes']},'需保留全部既有節點且不可重複',422)
             for s in data['nodes']:
-                require(s.get('review_mode') in ('all','any') and s.get('tasks') and all(isinstance(t,str) and t.strip() for t in s['tasks']),'SOP任務與模式錯誤',422)
-                require(isinstance(s.get('requirements'),list) and all(isinstance(r.get('key'),str) and r.get('label') for r in s['requirements']),'文件規則錯誤',422)
+                require(s.get('review_mode') in ('all','any') and isinstance(s.get('tasks'),list) and s['tasks'] and all(isinstance(t,str) and t.strip() for t in s['tasks']),'SOP任務與模式錯誤',422)
+                require(isinstance(s.get('requirements'),list) and all(isinstance(r,dict) and isinstance(r.get('key'),str) and r['key'].strip() and isinstance(r.get('label'),str) and r['label'].strip() for r in s['requirements']),'文件規則錯誤',422)
             version['nodes']=deepcopy(data['nodes'])
             for node in version['nodes']:
                 original=next(s for s in source['nodes'] if s['key']==node['key'])
@@ -448,8 +487,10 @@ def apply_operation(ws,user,body,demo=False):
         require(lead(user,p)); require(req['status']=='pending' and req['from_version']==p['sop_version'],'申請已失效',409)
         require(not any(c.get('status')=='pending' for node in p['nodes'] for c in node.get('review_cycles',[])),
                 '案件仍有送審中的範圍，請先處理審核再套用 SOP',409)
+        from .native_approval import abandoned_not_created
         require(not any(item.get('project_id')==p['id'] and item.get('native_binding',{}).get('attempted')
                         and item.get('status') not in ('executed','applied')
+                        and not abandoned_not_created(item)
                         and item.get('native_receipt',{}).get('external_status') not in ('REJECTED','CANCELED','DELETED')
                         for collection in ('approvals','node_skip_requests','financial_requests') for item in ws.get(collection,[])),
                 '原生審批仍有未處理的核准或未知結果，請先核實範圍再套用 SOP',409)
@@ -476,6 +517,8 @@ def apply_operation(ws,user,body,demo=False):
             if key in data:
                 if data[key]: active_user(ws,data[key])
                 p[key]=data[key]
+        if before_roles.get('pm_id')!=p.get('pm_id') or before_roles.get('sales_id')!=p.get('sales_id'):
+            invalidate_pending_quote_reviews(p)
         for node in p['nodes']:
             for task in node['tasks']:
                 role=task.get('sop_owner_role')
@@ -645,7 +688,8 @@ def apply_operation(ws,user,body,demo=False):
             require(str(data.get('reason','')).strip(),'交付換版需填理由',422)
         ident=uid()
         item=dict(id=ident,lineage_id=previous.get('lineage_id',previous['id']) if previous else ident,version=previous['version']+1 if previous else 1,replaces_id=previous['id'] if previous else None,work_item_ids=selected,quantity=str(quantity),unit=unit,evidence_ids=evidence_ids,status='submitted',task_snapshots=[{k:t.get(k) for k in ('id','revision','status','output')} for t in tasks],required_reviewer_ids=list(dict.fromkeys(node.get('supervisor_id') or p.get('supervisor_id') for node in nodes)),approvals=[],created_by=user['id'],created_at=now(),reason=data.get('reason',''))
-        require(all(item['required_reviewer_ids']),'交付組別主管尚未指定',409)
+        item['required_reviewer_seats']=reviewer_seats(p,item)
+        require(active_seats(ws,item['required_reviewer_seats']),'交付組別主管尚未指定或非在職人員',409)
         item['content_hash']=delivery_fingerprint(item)
         if previous: previous.update(superseded_by=ident,status='superseded')
         p['delivery_batches'].append(item)
@@ -653,15 +697,18 @@ def apply_operation(ws,user,body,demo=False):
     elif action=='delivery_review':
         require(p is not None,'請指定案件',422); item=find(p['delivery_batches'],data.get('id'),'交付批次')
         require(item['status']=='submitted' and not item.get('superseded_by'),'交付批次已核定、退回或換版',409)
-        require(user['id'] in item['required_reviewer_ids'],'需對應組主管核定交付')
+        delivery_seats=reviewer_seats(p,item)
+        require(user['id'] in delivery_seats.values(),'需由現任交付組主管核定交付')
+        require(active_seats(ws,delivery_seats),'交付組別主管尚未指定或非在職人員',409)
+        refresh_reviewers(ws,p,item)
         result=data.get('result'); require(result in ('approved','returned'),'交付核定結果錯誤',422)
         if result=='returned':
             require(str(data.get('reason','')).strip(),'退回需填理由',422); item.update(status='returned',returned_by=user['id'],reason=data['reason'])
         else:
-            item['approvals']=[a for a in item['approvals'] if a['actor_id']!=user['id']]+[dict(actor_id=user['id'],at=now(),content_hash=item['content_hash'])]
-            if set(item['required_reviewer_ids'])<={a['actor_id'] for a in item['approvals']}:
+            item['approvals']=[a for a in item['approvals'] if a['actor_id']!=user['id']]+[dict(actor_id=user['id'],at=now(),content_hash=item['content_hash'],node_ids=[ident for ident,reviewer in delivery_seats.items() if reviewer==user['id']])]
+            if approved_seats(ws,p,item):
                 item.update(status='approved',approved_at=now())
-                require(delivery_current(p,item),'交付引用資料已變更，請重新提交版本',409)
+                require(delivery_current(p,item,ws),'交付引用資料已變更，請重新提交版本',409)
     elif action=='finance_propose':
         require(p and (operator(user,p) or capable(user,'finance_edit')))
         amount=str(decimal(data.get('contract_amount'))); budget=str(decimal(data.get('budget')))
@@ -678,6 +725,7 @@ def apply_operation(ws,user,body,demo=False):
     elif action=='finance_allocate':
         require(p and (operator(user,p) or capable(user,'finance_edit')))
         amount=decimal(data.get('total')); parts=data.get('parts',[])
+        require(isinstance(parts,list) and all(isinstance(x,dict) for x in parts),'分攤需為物件清單',422)
         require(parts and sum((decimal(x.get('amount')) for x in parts),Decimal(0))==amount,'分攤金額合計需等於成本總額',422)
         for x in parts: find(ws['projects'],x.get('project_id'))
         require(data.get('source_id') and data.get('reason'),'需成本來源與分攤依據',422)
@@ -707,7 +755,7 @@ def apply_operation(ws,user,body,demo=False):
         require(str(data.get('contract_evidence','')).strip() and str(data.get('claim_evidence','')).strip(),'需合約條件及請款證據',422)
         if kind=='subcontract' and phase!='advance': require(data.get('acceptance_evidence'),'成果款需驗收證據',422)
         amount=decimal(data.get('amount')); require(amount>0,'款項金額需大於零',422)
-        refs=delivery_references(p,data.get('delivery_batch_ids',[]),kind=kind) if phase!='advance' or data.get('delivery_batch_ids') else []
+        refs=delivery_references(p,data.get('delivery_batch_ids',[]),ws,kind=kind) if phase!='advance' or data.get('delivery_batch_ids') else []
         p['payment_batches'].append(dict(id=uid(),kind=kind,phase=phase,amount=str(amount),status='draft',contract_evidence=data['contract_evidence'],claim_evidence=data['claim_evidence'],acceptance_evidence=data.get('acceptance_evidence',''),delivery_references=refs,technical_approved_by=None,created_by=user['id'],created_at=now()))
         p['payment_reconciliation']={'confirmed':False}
         for node in p['nodes']:
@@ -718,13 +766,13 @@ def apply_operation(ws,user,body,demo=False):
         require(p and operator(user,p)); b=find(p['payment_batches'],data.get('id'))
         require(str(data.get('reason','')).strip(),'款項換版需填理由',422)
         require(b['status']!='cancelled','款項已取消',409)
-        refs=delivery_references(p,data.get('delivery_batch_ids',[]),batch_id=b['id'],kind=b['kind'])
+        refs=delivery_references(p,data.get('delivery_batch_ids',[]),ws,batch_id=b['id'],kind=b['kind'])
         b.setdefault('revision_history',[]).append(dict(delivery_references=deepcopy(b.get('delivery_references',[])),attestations=deepcopy(b.get('attestations',[])),status=b['status'],at=now(),actor_id=user['id'],reason=data['reason']))
         b.update(delivery_references=refs,attestations=[],technical_approved_by=None,status='draft')
         p['payment_reconciliation']={'confirmed':False}
     elif action=='payment_approve':
         require(p and capable(user,'finance_approve')); b=find(p['payment_batches'],data.get('id')); require(b['status']=='draft','款項非草稿',409)
-        require(payment_delivery_valid(p,b),'須綁定有效核定交付版本後重新確認',409)
+        require(payment_delivery_valid(p,b,ws),'須綁定有效核定交付版本後重新確認',409)
         require_financial_pair(ws,p,b)
         require(b['kind']!='subcontract' or b['phase']=='advance' or b['technical_approved_by'],'成果款需組主管驗收',409); b.update(status='approved',approved_by=user['id'],approved_at=now())
         kind='receivable' if b['kind']=='receivable' else 'subcontract_receivable'
@@ -743,7 +791,7 @@ def apply_operation(ws,user,body,demo=False):
         receivables=sum((decimal(b['amount']) for b in p['payment_batches'] if b['kind']=='receivable'),Decimal(0))
         require(receivables==decimal(v['contract_amount']) and all(b['status']=='paid' for b in p['payment_batches']),'應收總額與核定合約或實收付尚未結清',409)
         for batch in p['payment_batches']:
-            require(payment_delivery_valid(p,batch),'請款交付版本尚未核實',409)
+            require(payment_delivery_valid(p,batch,ws),'請款交付版本尚未核實',409)
             for receipt in batch.get('receipts',[]): require_financial_pair(ws,p,receipt)
         require(data.get('evidence') and data.get('all_payables_declared') is True,'需確認全部下包應付款已登錄並提供核對證據',422)
         p['payment_reconciliation']=dict(confirmed=True,evidence=data['evidence'],actor_id=user['id'],at=now(),finance_id=v['id'])
@@ -756,7 +804,7 @@ def apply_operation(ws,user,body,demo=False):
         require(r['status']=='active','此追蹤已結束',409)
         require(data.get('evidence'),'請記錄本次追蹤結果與佐證',422)
         if data.get('finished'):
-            if r['kind']=='client_contact': require(p.get('source_status') in ('已完工','已結案') or p['execution_status'] in ('engineering_complete','completed'),'工程完成前持續聯繫',409)
+            if r['kind']=='client_contact': require(declared(p) in ('已完工','已結案') or p['execution_status'] in ('engineering_complete','completed'),'工程完成前持續聯繫',409)
             elif r['kind'] in ('receivable','subcontract_receivable'):
                 settled=any(b['id']==r.get('batch_id') and b['status']=='paid' for b in p['payment_batches']) if r.get('batch_id') else p.get('payment_reconciliation',{}).get('confirmed')
                 require(settled,'款項尚未核實結清',409)
@@ -800,43 +848,67 @@ def apply_operation(ws,user,body,demo=False):
         h=find(ws['handover_requests'],data.get('id')); require(h['to_id']==user['id'],'需接手人接受'); require(h['status']=='awaiting_acceptance','交接尚未核准',409); p=find(ws['projects'],h['project_id'])
         active_user(ws,h['to_id']); prior=h['from_id']; replacement=h['to_id']
         require(not (p['pm_id']==prior and p['admin_id']==replacement or p['admin_id']==prior and p['pm_id']==replacement),'交接會造成PM與行政同人',409)
+        for node in p['nodes']:
+            targets=seats(p,node)
+            if prior in targets.values() and any(c['status']=='pending' for c in node['review_cycles']):
+                targets={f'person:{replacement}' if seat==f'person:{prior}' else seat: replacement if ident==prior else ident for seat,ident in targets.items()}
+                require(len(set(targets.values()))==len(targets),'交接會造成待審節點的不同確認職責由同一人擔任；請先調整確認人分派',409)
+        previous_hashes={node['id']:review_hash(p,node) for node in p['nodes']}
+        if p['pm_id']==prior and prior!=replacement:
+            invalidate_pending_quote_reviews(p)
         for key in ('pm_id','admin_id','supervisor_id'):
             if p[key]==prior: p[key]=replacement
         for node in p['nodes']:
             if node['owner_id']==prior: node['owner_id']=replacement
+            if node.get('supervisor_id')==prior: node['supervisor_id']=replacement
+            if prior in node.get('reviewers',[]):
+                node['reviewers']=list(dict.fromkeys(replacement if ident==prior else ident for ident in node['reviewers']))
             for t in node['tasks']:
                 if t['owner_id']==prior and t['status'] not in ('completed','superseded'): t['owner_id']=replacement
             for c in node['review_cycles']:
                 if c['status']=='pending':
-                    for seat,ident in list(c['seats'].items()):
-                        if ident==prior:
-                            c['seats'][seat]=replacement
-                            for v in c['votes']:
-                                if v['seat']==seat: v['invalidated']='職責交接'
+                    targets=seats(p,node)
+                    fingerprint=review_hash(p,node)
+                    if targets==c['seats'] and fingerprint==previous_hashes[node['id']]: continue
+                    for v in c['votes']:
+                        if targets.get(v['seat'])!=c['seats'].get(v['seat']): v['invalidated']='職責交接'
+                    c['seats']=targets
+                    if c['content_hash']==previous_hashes[node['id']]:
+                        c['content_hash']=fingerprint
+                    else:
+                        c.update(status='invalidated',invalidated_reason='交接前內容已改版，請重新送審')
         for r in ws['recurring']:
             if r['project_id']==p['id'] and r['owner_id']==prior and r['status']=='active': r['owner_id']=replacement
         h.update(status='accepted',accepted_at=now()); p['handoffs'].append(deepcopy(h))
     elif action=='confirmation_issue':
         require(p and (user['id'] in p['issuer_ids'] or capable(user,'issue_confirmation')),'沒有確認單發出權')
-        active_user(ws,p['pm_id']); version=str(data.get('version','')).strip(); recipients=list(dict.fromkeys(data.get('recipients',[])))
+        active_user(ws,p['pm_id']); version=str(data.get('version','')).strip(); raw_recipients=data.get('recipients',[])
+        require(isinstance(raw_recipients,list) and all(isinstance(x,str) for x in raw_recipients),'收件人格式不正確',422)
+        recipients=list(dict.fromkeys(raw_recipients))
         require(version and recipients,'需版本與收件人',422)
         for ident in recipients: active_user(ws,ident)
         node=next(x for x in p['nodes'] if x['key']=='confirmation'); evidence=evidence_for(p,node,'confirmation')
         require(evidence and evidence['status']=='accepted','需核定確認單資料',409)
-        fingerprint=digest({'version':version,'evidence':evidence['id'],'pm':p['pm_id'],'recipients':recipients})
+        groups=data.get('recipient_groups') or {}
+        from .sop_execution import fan_out_targets
+        require(isinstance(groups,dict) and set(groups)<=set(recipients) and all(isinstance(v,list) and v and all(isinstance(x,str) for x in v) and set(v)<=set(fan_out_targets()) for v in groups.values()),'收件人組別須屬 state_4 的下游節點',422)
+        groups={k:sorted(set(v)) for k,v in groups.items()}
+        fingerprint=digest({'version':version,'evidence':evidence['id'],'pm':p['pm_id'],'recipients':recipients,**({'groups':groups} if groups else {})})
         prior=next((i for i in p['confirmation_issues'] if i['version']==version),None)
         if prior: require(prior['fingerprint']==fingerprint,'同版本發出內容不同，請使用新版本',409)
         else:
-            issue=dict(id=uid(),version=version,status='queued',fingerprint=fingerprint,pm_id=p['pm_id'],recipients=recipients,evidence_id=evidence['id'],issued_by=user['id'],created_at=now())
+            issue=dict(id=uid(),version=version,status='queued',fingerprint=fingerprint,pm_id=p['pm_id'],recipients=recipients,recipient_groups=groups,evidence_id=evidence['id'],issued_by=user['id'],created_at=now())
             p['confirmation_issues'].append(issue)
             queue(ws,'confirmation',user,{'project_id':p['id'],'issue_id':issue['id'],'recipients':recipients,'text':f"確認單 {p['code']} {p['name']} v{version} 已正式發出。PM：{active_user(ws,p['pm_id'])['name']}。請至工作台確認。"},'confirmation:'+issue['id'])
     elif action=='confirmation_ack':
         require(p is not None,'請指定案件',422); issue=find(p['confirmation_issues'],data.get('id'))
+        node=next(x for x in p['nodes'] if x['key']=='confirmation')
+        require(confirmation_current(p,node,issue),'確認單資料或發出範圍已變更，請重新發出',409)
         require(issue['status'] in ('issued','simulated'),'確認單尚未成功發出',409)
         require(user['id'] in issue['recipients'],'只能由指定收件人確認')
         require(str(data.get('evidence','')).strip(),'需填寫組別確認紀錄',422)
         issue['acknowledgments']=[a for a in issue.get('acknowledgments',[]) if a['user_id']!=user['id']]+[dict(user_id=user['id'],evidence=data['evidence'],at=now())]
-        node=next(x for x in p['nodes'] if x['key']=='confirmation'); invalidate(node,'收件組別確認更新')
+        invalidate(node,'收件組別確認更新')
     elif action=='input_mapping':
         require(capable(user,'manage_sources')); require(p and n,'請指定案件與節點',422)
         if ws.get('environment')=='production':

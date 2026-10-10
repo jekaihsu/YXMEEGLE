@@ -1,5 +1,6 @@
 """Response-only privacy projection; authoritative storage remains intact."""
 from copy import deepcopy
+import json
 
 
 def public_person(person, *, include_authority=False):
@@ -12,6 +13,72 @@ def public_person(person, *, include_authority=False):
         from .business_policy import can_business_override
         result['can_business_override'] = can_business_override(person)
     return result
+
+
+PERSON_EVENT_FIELDS = ('name','department','role','active','default_workspace')
+PERSON_EVENT_MAX_TEXT = 200
+
+
+def _bounded_scalar(value):
+    """Scalars only: nested containers and oversized text collapse to None."""
+    if isinstance(value, str):
+        return value[:PERSON_EVENT_MAX_TEXT]
+    if isinstance(value, (bool, int)) or value is None:
+        return value
+    if isinstance(value, float) and value == value and value not in (float('inf'), float('-inf')):
+        return value
+    return None
+
+
+def _event_json(person_id, changes, capabilities_changed=False):
+    summary = {'person': _bounded_scalar(person_id), 'changes': changes}
+    if capabilities_changed:
+        summary['capabilities_changed'] = True
+    return json.dumps(summary, ensure_ascii=False)
+
+
+def person_event_message(person_id, before, after):
+    """Whitelisted audit summary for a person change; never serializes the profile.
+
+    Capability names are authority data visible only to their owner, so the event
+    records that they changed, not which ones. Full diffs live in action receipts.
+    """
+    before, after = before or {}, after or {}
+    changes = {key: {'before': _bounded_scalar(before.get(key)), 'after': _bounded_scalar(after.get(key))}
+               for key in PERSON_EVENT_FIELDS if before.get(key) != after.get(key)}
+    try:
+        changed = sorted(map(str, before.get('capabilities') or [])) != sorted(map(str, after.get('capabilities') or []))
+    except TypeError:
+        changed = True
+    return _event_json(person_id, changes, changed)
+
+
+def _sanitize_person_event(event):
+    """Rewrite legacy and current person events to the whitelisted summary.
+
+    Only scalar, bounded values of whitelisted fields survive; every other key
+    (including top-level before/details) is discarded.
+    """
+    message = event.get('message')
+    try:
+        data = json.loads(message) if isinstance(message, (str, bytes)) else None
+    except ValueError:
+        data = None
+    if not isinstance(data, dict):
+        event['message'] = _event_json(None, {})
+        return
+    if isinstance(data.get('before'), dict) or isinstance(data.get('after'), dict):
+        event['message'] = person_event_message(
+            data.get('person'),
+            data['before'] if isinstance(data.get('before'), dict) else {},
+            data['after'] if isinstance(data.get('after'), dict) else {})
+        return
+    changes = data.get('changes') if isinstance(data.get('changes'), dict) else {}
+    event['message'] = _event_json(
+        data.get('person'),
+        {key: {'before': _bounded_scalar(value.get('before')), 'after': _bounded_scalar(value.get('after'))}
+         for key, value in changes.items() if key in PERSON_EVENT_FIELDS and isinstance(value, dict)},
+        data.get('capabilities_changed') is True)
 
 
 def public_source_cache(cache, user=None):
@@ -62,6 +129,18 @@ def public_copy(value):
     return deepcopy(value)
 
 
+def strip_migration_archive(value):
+    """In-place twin of public_copy for data the caller owns (a fresh decode nobody else holds)."""
+    if isinstance(value, dict):
+        value.pop('migration_archive', None)
+        for item in value.values():
+            strip_migration_archive(item)
+    elif isinstance(value, list):
+        for item in value:
+            strip_migration_archive(item)
+    return value
+
+
 def filter_private_workspace(state, user):
     """Apply the existing leave-view policy after authoritative policy calculations.
 
@@ -100,8 +179,13 @@ def filter_private_workspace(state, user):
     if not may_manage:
         state['delegations'] = [item for item in state.get('delegations', [])
             if ident in (item.get('principal_id'), item.get('delegate_id'))]
+        # Handover rows use from_id/to_id (operations.handover_request); delegations
+        # use principal_id/delegate_id. The project's PM/supervisor may also see them.
+        leads = {project.get('id'): (project.get('pm_id'), project.get('supervisor_id'))
+                 for project in state.get('projects', [])}
         state['handover_requests'] = [item for item in state.get('handover_requests', [])
-            if ident in (item.get('principal_id'), item.get('delegate_id'), item.get('requested_by'))]
+            if ident and (ident in (item.get('from_id'), item.get('to_id'), item.get('requested_by'))
+                          or ident in leads.get(item.get('project_id'), ()))]
     if not actor or actor.get('role')!='manager':
         state.pop('source_case_review',None)
     # Background snapshots and source payloads are operational, not public case
@@ -112,6 +196,9 @@ def filter_private_workspace(state, user):
     for key in ('capability_bindings','capability_awards','training_plans','learning_mappings'):
         state.pop(key, None)
     state.pop('_mention_reservations', None)
+    for item in state.get('events', []):
+        if isinstance(item, dict) and item.get('action') == 'admin_person':
+            _sanitize_person_event(item)
     for person in state.get('users', []):
         safe = public_person(person, include_authority=person.get('id') == ident)
         person.clear()

@@ -154,7 +154,9 @@ def test_reviewed_bundle_imports_from_private_directory_and_command_is_bounded(c
     import subprocess,sys
     from pathlib import Path
     repository=Path(__file__).resolve().parents[1]
-    for name in snapshot.MODULES:(tmp_path/name).write_bytes((repository/name).read_bytes())
+    for name in snapshot.MODULES:
+        (tmp_path/name).parent.mkdir(parents=True,exist_ok=True)
+        (tmp_path/name).write_bytes((repository/name).read_bytes())
     capture.failure[0]=True
     with pytest.raises(snapshot.SnapshotError):snapshot.execute('capture')
     attempt=write_diagnostic()
@@ -162,7 +164,7 @@ def test_reviewed_bundle_imports_from_private_directory_and_command_is_bounded(c
     assert marker['command_characters']<32000 and repair['id']==attempt['id']
     root=tmp_path/'private-reviewed-helper';root.mkdir()
     with ZipFile(io.BytesIO(base64.b64decode(repair['helper_bundle']))) as z:
-        assert set(z.namelist())==set(snapshot.MODULES)|{'scripts/__init__.py'}
+        assert set(z.namelist())==set(snapshot.MODULES)|{'scripts/__init__.py','backend/__init__.py'}
         z.extractall(root)  # Known exact, reviewed test bundle only.
     code="import sys;from pathlib import Path;sys.path.insert(0,sys.argv[1]);import scripts.backup_restore as a;import scripts.backup_publish as b;import scripts.backup_live_legacy as c;assert all(Path(m.__file__).resolve().is_relative_to(Path(sys.argv[1])) for m in (a,b,c));print('isolated')"
     result=subprocess.run([sys.executable,'-c',code,str(root)],cwd=tmp_path,capture_output=True,text=True)

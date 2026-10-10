@@ -1,4 +1,5 @@
 import time
+import pytest
 from datetime import datetime, timezone
 from copy import deepcopy
 from fastapi.testclient import TestClient
@@ -7,14 +8,14 @@ from .app import create_app, WorkspaceRow, PersonRow, AuthRow, AuditRow, Busines
 from .seed import seed
 from .policy import upgrade
 from . import storage
-from .production_access import admitted
+from .production_access import admitted, access_mode
 
 
-def company(tmp_path):
+def company(tmp_path, overrides=None):
     app=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/company.db','UPLOAD_DIR':str(tmp_path/'uploads'),
                     'DEMO_MODE':'false','APP_ENV':'development','LARK_APP_ID':'app1','LARK_APP_SECRET':'unused',
                     'LARK_REDIRECT_URI':'https://example.test/api/auth/lark/callback','LARK_ALLOWED_TENANTS':'company',
-                    'LARK_WORKER_ORGANIZATION':'company'})
+                    'LARK_WORKER_ORGANIZATION':'company', **(overrides or {})})
     state=upgrade(seed()); state['environment']='production'
     for u in state['users']:
         u.update(identity_app_id='app1',directory_status='employed',directory_missing=False,directory_last_seen_at=datetime.now(timezone.utc).isoformat(),
@@ -76,6 +77,22 @@ def test_admission_rejects_unknown_left_wrong_app_and_missing():
         assert not admitted({**person,**change},'app1')
 
 
+def test_demoted_bootstrap_admin_keeps_employee_access_without_manager_recovery():
+    now=datetime.now(timezone.utc)
+    person={'id':'bootstrap','active':True,'bootstrap_admin':True,'role':'member','identity_app_id':'app1',
+            'directory_status':'employed','directory_missing':False,'directory_last_seen_at':now.isoformat(),
+            'directory_source':{'app_id':'app1','record_id':'roster-row'}}
+    assert admitted(person,'app1')
+    assert access_mode(person,'app1',now=now)=='normal'
+
+    stale={**person,'directory_last_seen_at':'2020-01-01T00:00:00+00:00'}
+    assert admitted(stale,'app1')
+    assert access_mode(stale,'app1',now=now)=='denied'
+    manager={**stale,'role':'manager'}
+    assert access_mode(manager,'app1',now=now)=='recovery'
+    assert not admitted({**manager,'manager_revoked':True},'app1')
+
+
 def test_audit_receipt_idempotent_and_denied_is_recorded(tmp_path):
     app,c=company(tmp_path)
     version=c.get('/api/workspace').json()['version']
@@ -102,3 +119,102 @@ def test_event_history_is_append_only_and_old_ordinals_stay_stable(tmp_path):
         after={r.entity_id:r.ordinal for r in db.scalars(select(BusinessRow).where(BusinessRow.workspace_id=='lark-company',BusinessRow.kind=='events'))}
         assert all(after[k]==v for k,v in ordinals.items())
         assert after['new-event']<min(ordinals.values(),default=0)
+
+
+def test_pilot_copy_copies_verified_attachment_to_isolated_namespace(tmp_path):
+    import hashlib
+    app,c=company(tmp_path)
+    with app.state.sessions.begin() as db:
+        # The isolated namespace starts empty (ensure_workspace); the copy must not collide with a same-id case.
+        test=db.get(WorkspaceRow,'test-lark-company'); tstate=storage.load(db,BusinessRow,test); tstate['projects']=[]
+        test.data=storage.save(db,BusinessRow,test.id,tstate)
+        row=db.get(WorkspaceRow,'lark-company'); state=storage.load(db,BusinessRow,row)
+        project=state['projects'][0]; payload=b'formal attachment bytes'
+        file_id='pilot-file'; digest=hashlib.sha256(payload).hexdigest()
+        project['files']=[{'id':file_id,'name':'proof.txt','storage':'local','size':len(payload),'sha256':digest,'url':f'/api/files/{file_id}/download'}]
+        row.data=storage.save(db,BusinessRow,row.id,state)
+    source_dir=app.state.upload_dir/hashlib.sha256(b'lark-company').hexdigest(); source_dir.mkdir()
+    (source_dir/'pilot-file').write_bytes(payload)
+    response=c.post('/api/pilot/copy',json={'project_id':project['id']})
+    assert response.status_code==200,response.text
+    test_dir=app.state.upload_dir/hashlib.sha256(b'test-lark-company').hexdigest()
+    assert (test_dir/'pilot-file').read_bytes()==payload
+    assert (source_dir/'pilot-file').read_bytes()==payload
+    copied=c.get('/api/files/pilot-file/download')
+    assert copied.status_code==200 and copied.content==payload
+    assert c.post('/api/workspace/switch',json={'environment':'production'}).status_code==200
+    formal=c.get('/api/files/pilot-file/download')
+    assert formal.status_code==404
+
+
+def test_pilot_copy_rejects_missing_or_corrupt_attachment_without_workspace_change(tmp_path):
+    import hashlib
+    app,c=company(tmp_path)
+    with app.state.sessions.begin() as db:
+        row=db.get(WorkspaceRow,'lark-company'); state=storage.load(db,BusinessRow,row)
+        project=state['projects'][0]
+        project['files']=[{'id':'missing-file','name':'proof.txt','storage':'local','size':1,'sha256':hashlib.sha256(b'x').hexdigest()}]
+        row.data=storage.save(db,BusinessRow,row.id,state)
+    before=c.get('/api/workspace').json()
+    c.post('/api/workspace/switch',json={'environment':'production'})
+    response=c.post('/api/pilot/copy',json={'project_id':project['id']})
+    assert response.status_code==409
+    c.post('/api/workspace/switch',json={'environment':'test'})
+    after=c.get('/api/workspace').json()
+    assert len(after['projects'])==len(before['projects'])
+    assert not (app.state.upload_dir/hashlib.sha256(b'test-lark-company').hexdigest()/'missing-file').exists()
+
+
+def _snapshot(app,c):
+    with app.state.sessions() as db:
+        counts=(len(db.execute(select(AuditRow)).scalars().all()),db.get(AuthRow,'sid').data['wid'],
+                [(r.id,r.version,deepcopy(storage.load(db,BusinessRow,r)))
+                 for r in db.execute(select(WorkspaceRow)).scalars().all()])
+    return counts,c.cookies.get('meegle_session')
+
+
+def test_workspace_switch_and_pilot_copy_reject_non_object_bodies_without_state_change(tmp_path):
+    app,c=company(tmp_path)
+    pid=c.get('/api/workspace').json()['projects'][0]['id']
+    hdr={'content-type':'application/json'}
+    bad=[b'[]',b'null',b'1',b'"x"',b'true',b'false',b'{bad',b'',b'\xff',b'[{"environment":"production"}]']
+    for path in ('/api/workspace/switch','/api/pilot/copy'):
+        for raw in bad:
+            before=_snapshot(app,c)
+            r=c.post(path,content=raw,headers=hdr)
+            assert r.status_code==422,(path,raw,r.status_code,r.text)
+            assert _snapshot(app,c)==before
+    # missing / wrongly typed fields
+    for path,body in (('/api/workspace/switch',{}),('/api/workspace/switch',{'environment':['production']}),
+                      ('/api/workspace/switch',{'environment':'staging'}),('/api/pilot/copy',{}),
+                      ('/api/pilot/copy',{'project_id':['x']}),('/api/pilot/copy',{'project_id':None})):
+        before=_snapshot(app,c)
+        r=c.post(path,json=body)
+        assert 400<=r.status_code<500,(path,body,r.status_code)
+        assert _snapshot(app,c)==before
+    # valid boundary still works
+    assert c.post('/api/pilot/copy',json={'project_id':pid}).status_code==200
+    assert c.post('/api/workspace/switch',json={'environment':'production'}).status_code==200
+
+
+def test_workspace_switch_and_pilot_copy_reject_deeply_nested_json_without_state_change(tmp_path):
+    app,c=company(tmp_path)
+    hdr={'content-type':'application/json'}
+    depth=20000
+    for raw in (b'['*depth+b']'*depth,b'{"a":'*depth+b'1'+b'}'*depth):
+        for path in ('/api/workspace/switch','/api/pilot/copy'):
+            before=_snapshot(app,c)
+            r=c.post(path,content=raw,headers=hdr)
+            assert r.status_code==422,(path,r.status_code)
+            assert r.json()['detail']=='請求內容必須是有效的 JSON'
+            assert _snapshot(app,c)==before
+
+
+@pytest.mark.parametrize('enabled,expected', [('false', (300,300,300)), ('true',(60,60,300))])
+def test_readonly_connection_reports_effective_dataset_interval(enabled, expected):
+    from .production_access import readonly_sync_connection
+    cfg = {'LARK_LIVE_READ_ENABLED': enabled}
+    assert tuple(readonly_sync_connection(cfg, 'manager', dataset)['interval_seconds']
+                 for dataset in ('sources', 'roster', 'attendance')) == expected
+    cfg.update(LARK_LIVE_READ_ROSTER_TTL_SECONDS='120')
+    assert readonly_sync_connection(cfg, 'manager', 'roster')['interval_seconds'] == 120

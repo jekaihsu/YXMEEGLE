@@ -1,0 +1,4 @@
+.drive-storage.file-storage-actions{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-2) var(--sp-3);width:100%;background:var(--surface);color:var(--label-2);font:var(--fs-footnote)/1.6 var(--font);overflow-wrap:anywhere}
+.drive-storage.file-storage-actions small{font-size:inherit;color:var(--label-2)}
+.drive-storage.file-storage-actions .ds-button{font-size:var(--fs-footnote);white-space:normal;text-align:left}
+.drive-storage.file-storage-actions a{display:inline-flex;align-items:center;min-height:44px;color:var(--accent);margin-inline-start:var(--sp-2);text-decoration:underline}

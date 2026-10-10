@@ -1,0 +1,27 @@
+.file-screen.file-workspace,.file-sheet.file-sheet{color:var(--label);font:var(--fs-body)/1.6 var(--font);min-width:0}
+.file-screen.file-workspace .section-heading{align-items:flex-start;gap:var(--sp-4);flex-wrap:wrap}
+.file-screen.file-workspace h2{color:var(--label);font-size:var(--fs-title1);font-weight:600}
+.file-screen.file-workspace p,.file-sheet.file-sheet p{color:var(--label-2);font-size:var(--fs-subhead);margin:var(--sp-2) 0 var(--sp-4)}
+.file-screen .heading-actions{display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+.file-screen.file-workspace .daily-filters{gap:var(--sp-4);margin:var(--sp-6) 0}
+.file-screen.file-workspace label,.file-sheet.file-sheet label{font-size:var(--fs-subhead);color:var(--label-2);min-width:0;flex:1 1 12rem}
+.file-screen.file-workspace select,.file-sheet.file-sheet select,.file-sheet.file-sheet input{color:var(--label);background:var(--surface);border:1px solid var(--separator);border-radius:var(--radius-s);padding:var(--sp-3);min-height:44px;min-width:0;width:100%;font:inherit}
+.file-screen.file-workspace .file-groups{display:block;margin:var(--sp-6) 0}
+.file-screen .ds-group>.ds-row,.file-screen.file-workspace .file-version{background:var(--surface)}
+.file-screen.file-workspace .file-version{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-2) var(--sp-4);border-top:1px solid var(--separator);padding:var(--sp-4);margin:0;font-size:var(--fs-subhead)}
+.file-screen.file-workspace .file-version small{color:var(--label-2);font-size:var(--fs-footnote);overflow-wrap:anywhere}
+.file-screen .file-version .file-storage-status{flex-basis:100%}
+.file-screen.file-workspace a{color:var(--accent);min-height:44px;display:inline-flex;align-items:center;text-decoration:underline;overflow-wrap:anywhere}
+.file-screen.file-workspace .source-attachment-index{display:block;margin:0;background:var(--surface)}
+.file-screen .source-attachment-index>p{padding:var(--sp-4);margin:0}
+.file-screen.file-workspace .source-attachment-index article{border:0;border-top:1px solid var(--separator);border-radius:0;padding:var(--sp-4);background:var(--surface);gap:var(--sp-3);font-size:var(--fs-subhead)}
+.file-screen .source-attachment-index article span{color:var(--label-2)}
+.file-sheet.file-sheet{width:min(640px,100%);max-height:90dvh;border-radius:var(--radius-card) var(--radius-card) 0 0;animation:ds-rise var(--dur-base) var(--ease)}
+.file-sheet.file-sheet h2{font-size:var(--fs-title2);color:var(--label)}
+.file-sheet.file-sheet header{align-items:flex-start;gap:var(--sp-3)}
+.file-sheet.file-sheet .form-field{display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-4)}
+.file-sheet.file-sheet .form-row{display:flex;flex-wrap:wrap;gap:var(--sp-4)}
+.file-sheet.file-sheet footer{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:var(--sp-2);border-top:1px solid var(--separator);padding-top:var(--sp-4)}
+.file-sheet.file-sheet .form-error{color:var(--critical)}
+.file-screen .ds-row-main,.file-sheet{overflow-wrap:anywhere}
+@media(prefers-reduced-motion:reduce){.file-sheet.file-sheet{animation:none}.file-sheet-backdrop{animation:none}}

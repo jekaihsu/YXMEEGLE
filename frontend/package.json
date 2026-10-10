@@ -3,7 +3,45 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "scripts": { "dev": "vite --host 0.0.0.0", "build": "tsc -b && vite build", "preview": "vite preview --host 0.0.0.0" },
-  "dependencies": { "lucide-react": "0.468.0", "react": "18.3.1", "react-dom": "18.3.1" },
-  "devDependencies": { "@types/react": "18.3.18", "@types/react-dom": "18.3.5", "@vitejs/plugin-react": "4.3.4", "typescript": "5.7.3", "vite": "6.0.7" }
+  "scripts": {
+    "test:view-data": "node test-view-data.mjs",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test:audit-pagination": "node test-audit-pagination.mjs",
+    "test:audit-project-switch": "node test-audit-project-switch.mjs",
+    "test:session-epoch": "node test-session-epoch.mjs",
+    "test:daily-records": "node test-daily-records.mjs",
+    "test:comment-draft": "node test-comment-draft-scope.mjs",
+    "test:input-recovery": "node test-input-recovery.mjs",
+    "test:native-approval-version": "node test-native-approval-version.mjs",
+    "test:native-approval-a11y": "node test-native-approval-a11y.mjs && node test-approval-detail-a11y.mjs",
+    "test:financial-draft": "node test-financial-draft-scope.mjs",
+    "test:form-draft": "node test-form-draft-identity.mjs && node test-recurring-draft-period.mjs && node test-draft-callsites.mjs",
+    "test:freshness-wiring": "node test-freshness-wiring.mjs",
+    "test:data-freshness": "node test-data-freshness.mjs",
+    "test:company-cockpit": "node test-company-cockpit.mjs",
+    "test:source-lifecycle": "node test-source-lifecycle.mjs",
+    "test:execution-admission": "node test-execution-admission.mjs",
+    "test:api-response": "node test-api-response.mjs",
+    "test:perf": "node test-perf.mjs",
+    "test:contrast": "node test-contrast.mjs",
+    "test:shell-mode": "node test-shell-mode.mjs",
+    "test:dev-tooling": "node --test --test-timeout=30000 test-dev-tooling.mjs",
+    "test:live-read-regressions": "node test-live-read-regressions.mjs"
+  },
+  "dependencies": {
+    "lucide-react": "0.468.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.18",
+    "@types/react-dom": "18.3.5",
+    "@vitejs/plugin-react": "4.3.4",
+    "esbuild": "0.28.2",
+    "jsdom": "26.1.0",
+    "typescript": "5.7.3",
+    "vite": "6.4.3"
+  }
 }

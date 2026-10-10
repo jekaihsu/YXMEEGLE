@@ -1,0 +1,92 @@
+"""Partial-load endpoints must return exactly what the legacy full load returned.
+
+Legacy behaviour is reproduced by routing ``storage.load_partial`` to the full ``storage.load``.
+"""
+import re
+
+import pytest
+
+from . import storage
+from .test_perf_budget import scaled_client
+
+USERS = ('u-manager', 'u-pm', 'ou_020')
+
+
+def legacy_and_current(client, monkeypatch, path):
+    current = client.get(path)
+    with monkeypatch.context() as m:
+        m.setattr(storage, 'load_partial', lambda db, model, row, **kw: storage.load(db, model, row))
+        legacy = client.get(path)
+    return legacy, current
+
+
+def switch(client, uid):
+    assert client.post('/api/demo/session', json={'user_id': uid}).status_code == 200
+
+
+def test_session_matches_full_load(tmp_path, monkeypatch):
+    with scaled_client(tmp_path, 12) as (app, client):
+        for uid in USERS:
+            switch(client, uid)
+            legacy, current = legacy_and_current(client, monkeypatch, '/api/session')
+            assert current.status_code == legacy.status_code == 200
+            assert current.content == legacy.content
+            assert current.json()['users']
+
+
+PROJECT_QUERIES = ['', '?limit=5', '?offset=3&limit=4', '?offset=500', '?q=a', '?q=ZZZ-none',
+                   '?status=in_progress', '?status=nope', '?owner=u-pm', '?owner=ou_006&limit=2',
+                   '?q=a&status=in_progress&owner=u-pm&offset=1&limit=3']
+
+
+@pytest.mark.parametrize('query', PROJECT_QUERIES)
+def test_projects_matches_full_load(tmp_path, monkeypatch, query):
+    with scaled_client(tmp_path, 12) as (app, client):
+        for uid in USERS:
+            switch(client, uid)
+            legacy, current = legacy_and_current(client, monkeypatch, '/api/projects' + query)
+            assert current.status_code == legacy.status_code == 200
+            assert current.content == legacy.content
+
+
+@pytest.mark.parametrize('query', ['', '?limit=2', '?offset=1&limit=2', '?project_id=nope'])
+def test_audit_matches_full_load(tmp_path, monkeypatch, query):
+    with scaled_client(tmp_path, 4) as (app, client):
+        version = client.get('/api/workspace').json()['version']
+        for n in range(3):
+            body = {'action': 'comment_add', 'version': version + n, 'request_id': f'audit-{n}',
+                    'project_id': client.get('/api/projects').json()['items'][0]['id'], 'payload': {'body': f'c{n}'}}
+            assert client.post('/api/actions', json=body).status_code == 200
+        for uid in USERS:
+            switch(client, uid)
+            legacy, current = legacy_and_current(client, monkeypatch, '/api/audit' + query)
+            assert current.status_code == legacy.status_code == 200
+            assert current.content == legacy.content
+        assert client.get('/api/audit').json()['items']
+
+
+def test_strip_migration_archive_equals_public_copy():
+    from copy import deepcopy
+    from . import app as app_module
+    from .workspace_projection import public_copy, strip_migration_archive
+    value = {'migration_archive': {'x': 1}, 'a': [{'migration_archive': 1, 'b': {'migration_archive': [], 'c': 2}}, 3, (4,)], 'd': 'e'}
+    expected = public_copy(value)
+    assert strip_migration_archive(deepcopy(value)) == expected
+    assert app_module.strip_migration_archive is strip_migration_archive
+
+
+@pytest.mark.parametrize('path', ['/api/workspace', '/api/company-dashboard'])
+def test_owned_projection_matches_copying_projection(tmp_path, monkeypatch, path):
+    from . import app as app_module
+    from .workspace_projection import public_copy
+    with scaled_client(tmp_path, 12) as (app, client):
+        for uid in USERS:
+            switch(client, uid)
+            current = client.get(path)
+            with monkeypatch.context() as m:
+                m.setattr(app_module, 'strip_migration_archive', public_copy)
+                legacy = client.get(path)
+            assert current.status_code == legacy.status_code == 200
+            # Generated-at stamps carry the request time; scrub them before comparing.
+            scrub = lambda r: re.sub(r'[0-9a-f]{32}', 'ID', re.sub(r'\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?([+-]\d\d:\d\d|Z)?', 'T', r.text))
+            assert scrub(current) == scrub(legacy)

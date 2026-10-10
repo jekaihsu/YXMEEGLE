@@ -1,0 +1,49 @@
+/* Design tokens. Screens use these variables only; appearance is driven by data-theme / data-text on <html>. */
+:root{
+ color-scheme:light;
+ --text-scale:1;
+ --bg:#f5f5f7;--surface:#fff;--surface-2:#f5f5f7;
+ --label:#1d1d1f;--label-2:#6e6e73;--sep:rgba(60,60,67,.18);
+ --accent:#0c5494;--accent-hover:#0a4679;--on-accent:#fff;--accent-fg:var(--on-accent);--accent-fill:#0c54941f;
+ --separator:#0000001a;--radius-card:18px;
+ --glass-fill:rgb(255 255 255/.72);--glass-bar-fill:rgb(245 245 247/.82);--glass-blur:saturate(180%) blur(20px);--glass-border:#0000001a;--glass-highlight:inset 0 1px 0 rgb(255 255 255/.7);--glass-shadow:0 4px 20px #0000000d;
+ --bg-tint:radial-gradient(60rem 40rem at 10% -10%,#0c54941f,transparent 70%),radial-gradient(50rem 36rem at 100% 0,#0c549414,transparent 70%);
+ --positive:#248a3d;--warning:#b25000;--critical:#d70015;
+ --font:-apple-system,"SF Pro Text","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+ --fs-large-title:2.125rem;--fs-title1:1.75rem;--fs-title2:1.375rem;--fs-headline:1.0625rem;--fs-body:1.0625rem;--fs-callout:1rem;--fs-subhead:.9375rem;--fs-footnote:.8125rem;--fs-caption:.75rem;
+ --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-7:32px;--sp-8:44px;--sp-9:64px;
+ --control-height:44px;--control-pad-block:10px;--control-pad-inline:var(--sp-4);--button-pad-inline:var(--sp-5);
+ --radius-s:8px;--radius-m:12px;--radius-l:18px;--radius-pill:999px;
+ /* legacy aliases for screens not yet migrated */
+ --scrim:rgb(0 0 0/.4);--shadow-sm:0 1px 4px #0000000d;--shadow-lg:0 12px 40px #00000026;--accent-dark:var(--accent-hover);--accent-soft:color-mix(in srgb,var(--accent) 10%,var(--surface));--line:var(--sep);--muted:var(--label-2);--text-secondary:var(--label-2);--green:var(--positive);--amber:var(--warning);--red:var(--critical);
+ --dur-fast:120ms;--dur-base:220ms;--dur-slow:360ms;--ease:cubic-bezier(.25,.1,.25,1);
+}
+:root[data-text=s]{--text-scale:.9}
+:root[data-text=l]{--text-scale:1.125}
+:root[data-text=xl]{--text-scale:1.25}
+html{font-size:calc(100% * var(--text-scale))}
+:root[data-theme=dark]{
+ color-scheme:dark;
+ --shadow-sm:0 1px 4px #0006;--shadow-lg:0 12px 40px #000a;
+ --bg:#0a0a0a;--surface:#1a1a1a;--surface-2:#2c2c2e;
+ --label:#f5f5f7;--label-2:#a1a1a6;--sep:#ffffff1a;--separator:#ffffff1a;
+ --accent:#5ea3e0;--accent-hover:#7bb5e8;--on-accent:#04213b;--accent-fill:#5ea3e026;
+ --glass-fill:rgb(28 28 30/.68);--glass-bar-fill:rgb(10 10 10/.78);--glass-border:#ffffff1a;--glass-highlight:inset 0 1px 0 rgb(255 255 255/.08);--glass-shadow:0 4px 20px #0006;
+ --bg-tint:radial-gradient(60rem 40rem at 10% -10%,#5ea3e01f,transparent 70%),radial-gradient(50rem 36rem at 100% 0,#5ea3e014,transparent 70%);
+ --positive:#30d158;--warning:#ff9f0a;--critical:#ff453a;
+}
+@media(prefers-color-scheme:dark){
+ :root:not([data-theme=light]):not([data-theme=dark]){
+  color-scheme:dark;
+  --shadow-sm:0 1px 4px #0006;--shadow-lg:0 12px 40px #000a;
+  --bg:#0a0a0a;--surface:#1a1a1a;--surface-2:#2c2c2e;
+  --label:#f5f5f7;--label-2:#a1a1a6;--sep:#ffffff1a;--separator:#ffffff1a;
+  --accent:#5ea3e0;--accent-hover:#7bb5e8;--on-accent:#04213b;--accent-fill:#5ea3e026;
+  --glass-fill:rgb(28 28 30/.68);--glass-bar-fill:rgb(10 10 10/.78);--glass-border:#ffffff1a;--glass-highlight:inset 0 1px 0 rgb(255 255 255/.08);--glass-shadow:0 4px 20px #0006;
+  --bg-tint:radial-gradient(60rem 40rem at 10% -10%,#5ea3e01f,transparent 70%),radial-gradient(50rem 36rem at 100% 0,#5ea3e014,transparent 70%);
+  --positive:#30d158;--warning:#ff9f0a;--critical:#ff453a;
+ }
+}
+@media(prefers-reduced-motion:reduce){:root{--dur-fast:0ms;--dur-base:0ms;--dur-slow:0ms}}
+.appearance-control{display:flex;flex-wrap:wrap;gap:var(--sp-4) var(--sp-7);margin-bottom:var(--sp-6)}
+.appearance-field{display:flex;align-items:center;gap:var(--sp-3)}.appearance-field>span{font-size:var(--fs-footnote);color:var(--label-2)}

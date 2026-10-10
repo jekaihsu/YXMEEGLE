@@ -20,7 +20,7 @@ FIELDS={
  'daily':['工作日期-薪資','工作日期-營業額明細','營業額組別-明細','姓名','案件編號','工作內容','營業額點數','最終營業額點數','日期','組別','填寫人','人員','工程編號','案號','所屬成本單','所屬案件','工項說明','內業工項','合約工項','外業工項','本明細適用工項','備註','組長帳號-津貼自動化','組員帳號-津貼自動化'],
  'cost':['出工日期','工作日期','日期','組別','內業組別','所屬組別','填報帳號','組長帳號-津貼自動化','組員帳號-津貼自動化']}
 FIELDS['quote_confirmation']=FIELDS['confirmation'][:]
-FIELDS['quote']+=['案件已入帳','累計已入帳','累計已請款','案件可請款總額','入帳資料檢核','可請款未請','入帳日期','付款條件']
+FIELDS['quote']+=['狀態','案件狀態','案件已入帳','累計已入帳','累計已請款','案件可請款總額','入帳資料檢核','可請款未請','入帳日期','付款條件']
 FIELDS['confirmation']+=['案件已入帳','入帳日期']
 FIELDS['quote_confirmation']+=['案件已入帳','入帳日期']
 REVIEW_FIELDS=['檢核狀態','工務助理檢核','外業經理檢核','控制組檢核','品管檢核','雅雯檢核','檢核時間','PM檢核','內業組長檢核']
@@ -55,13 +55,27 @@ def fetch_sources(token,cfg=None,client=None):
     if not tables: raise HTTPException(503,'尚未設定 LARK_SOURCE_TABLES_JSON')
     try: max_pages=max(1,min(int(cfg.get('LARK_SOURCE_MAX_PAGES','50')),100))
     except ValueError: raise HTTPException(503,'LARK_SOURCE_MAX_PAGES 必須為整數')
+    records_api=cfg.get('LARK_BITABLE_RECORDS_API','list')
+    if records_api not in ('list','search'): raise HTTPException(503,'LARK_BITABLE_RECORDS_API 必須為 list 或 search')
+    page_size=500 if records_api=='search' else 200
     collected=[]; summary=[]; partial=False
     with (nullcontext(client) if client is not None else httpx.Client(timeout=30)) as client:
+        def request(method,url,**kwargs):
+            from .live_read.client import ReadBlocked, ReadFailure
+            from .live_read.rate_limit import BudgetExceeded
+            try:
+                # Legacy get-only test clients remain supported.
+                if method=='GET' and not hasattr(client,'request'): return client.get(url,**kwargs)
+                return client.request(method,url,**kwargs)
+            except ReadBlocked:
+                raise HTTPException(403,'目前 Lark 身分沒有這張 Base 的資源存取權限（1254302）；請確認表格分享權限') from None
+            except (ReadFailure, BudgetExceeded):
+                raise HTTPException(502,'Lark 讀取失敗；保留上次成功資料') from None
         for table in tables:
-            params={'page_size':200,'user_id_type':'open_id'}; count=0
-            available=set(); linked_tables={}; attachment_fields=[]; schema_params={'page_size':100}; schema_tokens=set()
+            params={'page_size':page_size,'user_id_type':'open_id'}; count=0
+            available=set(); linked_tables={}; attachment_fields=[]; field_schema=[]; schema_params={'page_size':100}; schema_tokens=set()
             for _ in range(20):
-                schema=client.get(f"{API}/bitable/v1/apps/{table['base_token']}/tables/{table['table_id']}/fields",headers={'Authorization':f'Bearer {token}'},params=schema_params)
+                schema=request('GET',f"{API}/bitable/v1/apps/{table['base_token']}/tables/{table['table_id']}/fields",headers={'Authorization':f'Bearer {token}'},params=schema_params)
                 if schema.status_code!=200: raise HTTPException(502,'無法讀取來源欄位設定')
                 if schema.json().get('code',0)==1254302: raise HTTPException(403,'目前 Lark 身分沒有這張 Base 的資源存取權限（1254302）；請確認表格分享權限')
                 if schema.json().get('code',0)!=0: raise HTTPException(502,'無法讀取來源欄位設定')
@@ -71,6 +85,7 @@ def fetch_sources(token,cfg=None,client=None):
                 schema_items=metadata.get('items') or []
                 available.update(f['field_name'] for f in schema_items)
                 for field in schema_items:
+                    field_schema.append({key:field.get(key) for key in ('field_id','field_name','type','property')})
                     if field.get('type')==17: attachment_fields.append(field['field_name'])
                     target=(field.get('property') or {}).get('table_id')
                     if target: linked_tables[field['field_name']]=target
@@ -90,11 +105,15 @@ def fetch_sources(token,cfg=None,client=None):
             if table.get('kind')=='daily': desired+=['工作日期-薪資','工作日期-營業額明細','日期',PROVISIONAL_CASE_FIELD,'可能確認單工作編號']
             projected=list(dict.fromkeys(f for f in desired if f in available))
             if not projected: raise HTTPException(422,f"來源表 {table.get('name',table['table_id'])} 缺少已知映射欄位")
-            params['field_names']=json.dumps(projected,ensure_ascii=False)
-            params['automatic_fields']='true'
+            if records_api=='list':
+                params['field_names']=json.dumps(projected,ensure_ascii=False)
+                params['automatic_fields']='true'
             record_tokens=set(); record_ids=set(); pages_read=0
             for _ in range(max_pages):
-                response=client.get(f"{API}/bitable/v1/apps/{table['base_token']}/tables/{table['table_id']}/records",headers={'Authorization':f'Bearer {token}'},params=params)
+                url=f"{API}/bitable/v1/apps/{table['base_token']}/tables/{table['table_id']}/records"
+                kwargs={'headers':{'Authorization':f'Bearer {token}'},'params':params}
+                if records_api=='search': kwargs['json']={'field_names':projected,'automatic_fields':True}
+                response=request('POST' if records_api=='search' else 'GET',url+'/search' if records_api=='search' else url,**kwargs)
                 if response.status_code!=200: raise HTTPException(502,'Lark 讀取失敗，請檢查應用權限或重新登入')
                 data=response.json()
                 if data.get('code',0)==1254302: raise HTTPException(403,'目前 Lark 身分沒有這張 Base 的資源存取權限（1254302）；請確認表格分享權限')
@@ -106,13 +125,13 @@ def fetch_sources(token,cfg=None,client=None):
                 current_ids=[item['record_id'] for item in items]
                 if len(set(current_ids))!=len(current_ids) or record_ids.intersection(current_ids): raise HTTPException(502,'Lark 分頁包含重複紀錄；請重新同步，保留上次成功資料')
                 record_ids.update(current_ids); count+=len(items)
-                collected.extend({'base_token':table['base_token'],'table_id':table['table_id'],'kind':table.get('kind','quote'),'department':table.get('department'),'cost_table_id':table.get('cost_table_id') or linked_tables.get('所屬成本單'),'linked_tables':linked_tables,'attachment_fields':attachment_fields,'record_id':item['record_id'],'created_time':item.get('created_time'),'fields':item.get('fields') or {}} for item in items)
+                collected.extend({'base_token':table['base_token'],'table_id':table['table_id'],'kind':table.get('kind','quote'),'department':table.get('department'),'cost_table_id':table.get('cost_table_id') or linked_tables.get('所屬成本單'),'linked_tables':linked_tables,'attachment_fields':attachment_fields,'record_id':item['record_id'],'created_time':item.get('created_time'),'last_modified_time':item.get('last_modified_time'),'fields':item.get('fields') or {}} for item in items)
                 if not page.get('has_more'): break
                 next_token=page.get('page_token')
                 if not next_token or next_token in record_tokens: raise HTTPException(502,'Lark 紀錄分頁游標缺漏或重複；保留上次成功資料')
                 record_tokens.add(next_token); params['page_token']=next_token
             table_partial=bool(page.get('has_more')); partial=partial or table_partial
-            summary.append({'name':table.get('name',table['table_id']),'base_token':table['base_token'],'kind':table.get('kind','quote'),'table_id':table['table_id'],'count':count,'status':'partial' if table_partial else 'ready','attachment_fields':attachment_fields,'pages_read':pages_read,'page_limit':max_pages,'record_limit':max_pages*200})
+            summary.append({'name':table.get('name',table['table_id']),'base_token':table['base_token'],'kind':table.get('kind','quote'),'table_id':table['table_id'],'count':count,'status':'partial' if table_partial else 'ready','attachment_fields':attachment_fields,'department':table.get('department'),'cost_table_id':table.get('cost_table_id') or linked_tables.get('所屬成本單'),'linked_tables':linked_tables,'field_names':projected,'field_schema':field_schema,'pages_read':pages_read,'page_limit':max_pages,'record_limit':max_pages*page_size})
     return {'configured':True,'last_sync':datetime.now(timezone(timedelta(hours=8))).isoformat(),'status':'partial' if partial else 'ready','message':'已達本次讀取上限；目前為部分資料' if partial else '來源唯讀同步完成；未寫入 Lark','tables':summary,'records':collected}
 
 def text(value):

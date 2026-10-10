@@ -16,7 +16,9 @@ def find(items, ident, label='資料'):
     if not found: fail(f'{label}不存在',404)
     return found
 def valid_date(value):
-    try: date.fromisoformat(value)
+    try:
+        parsed=date.fromisoformat(value)
+        if parsed.isoformat()!=value: raise ValueError()
     except (ValueError, TypeError): fail('日期需為 YYYY-MM-DD')
     return value
 def http_url(value):

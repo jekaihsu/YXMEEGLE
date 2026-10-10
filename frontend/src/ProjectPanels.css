@@ -1,0 +1,16 @@
+/* Project readiness, execution notice and SOP panels: grouped rows, tokens only. */
+.sc-item>.ds-row:not(:first-child){padding-left:var(--sp-8);font-size:var(--fs-subhead)}
+.sc-item+.sc-item>.ds-row:first-child::before{content:"";position:absolute;top:0;left:var(--sp-4);right:0;border-top:1px solid var(--sep)}
+.sc-item>.ds-row:first-child::before{display:none}
+.ds-row-value a{color:var(--accent)}
+.pe-assign{padding:var(--sp-3) var(--sp-4);border-top:1px solid var(--sep)}
+.pe-assign summary{min-height:44px;display:flex;align-items:center;color:var(--accent);font-size:var(--fs-callout);cursor:pointer}
+.pe-assign form{display:grid;gap:var(--sp-3);padding-bottom:var(--sp-2)}
+.pe-assign label{display:grid;gap:var(--sp-1);font-size:var(--fs-footnote);color:var(--label-2)}
+.pe-assign :is(select,textarea){min-height:44px;padding:var(--sp-2) var(--sp-3);border:.5px solid var(--glass-border);border-radius:var(--radius-m);background:var(--surface);color:var(--label);font-size:var(--fs-body)}
+.pe-assign [role=alert]{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center;color:var(--critical);font-size:var(--fs-subhead)}
+.sop-applicability>h3{font-size:var(--fs-footnote);font-weight:600;color:var(--label-2);text-transform:uppercase;letter-spacing:.04em;padding:0 var(--sp-4) var(--sp-2)}
+.sop-applicability>article{margin-bottom:var(--sp-3)}
+.sop-note{position:relative;padding:var(--sp-3) var(--sp-4);color:var(--label-2);font-size:var(--fs-subhead);overflow-wrap:anywhere}
+.sop-note::before{content:"";position:absolute;top:0;left:var(--sp-4);right:0;border-top:1px solid var(--sep)}
+.sop-applicability .ops-status{color:var(--accent);font-weight:600}

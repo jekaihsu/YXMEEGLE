@@ -13,11 +13,24 @@ BACKUP_CHECK_MAX_AGE=900
 DIRECTORY_WARNING_AGE=600
 
 
-def directory_status(sessions,workspace_model,cfg,now):
+def directory_status(sessions,workspace_model,cfg,now,*,live_read=None):
     from .production_access import DIRECTORY_MAX_AGE_SECONDS
     result={'status':'missing','last_success_at':None,'success_age_seconds':None,
             'max_age_seconds':DIRECTORY_MAX_AGE_SECONDS,'warning_age_seconds':DIRECTORY_WARNING_AGE,
             'blocking':True,'recovery_hint':'請檢查名冊來源讀取權限與背景同步，重新同步公司名冊成功後再驗證同事登入。'}
+    if live_read and live_read['enabled']:
+        roster=live_read['datasets']['roster']
+        success,age=timestamp(roster.get('as_of'),now)
+        precise_age=(now-datetime.fromisoformat(success)).total_seconds() if success else None
+        result.update(last_success_at=success,success_age_seconds=age,
+                      recovery_hint='請檢查名冊來源唯讀權限，重新讀取公司名冊成功後再驗證同事登入。')
+        if precise_age is None or precise_age<0: result['status']='missing' if success is None else 'invalid'
+        elif precise_age>DIRECTORY_MAX_AGE_SECONDS: result['status']='stale'
+        elif roster['status'] in ('error','blocked','unconfigured'): result['status']='degraded'
+        else:
+            result['blocking']=False
+            result['status']='warning' if age>=DIRECTORY_WARNING_AGE else 'ok'
+        return result
     if workspace_model is None or not cfg.get('LARK_WORKER_ORGANIZATION'):return result
     try:
         with sessions() as db:
@@ -115,18 +128,24 @@ def backup_status(cfg,now):
     return result
 
 
-def snapshot(sessions,cache_row,cfg,*,now=None,workspace_model=None):
+def snapshot(sessions,cache_row,cfg,*,now=None,workspace_model=None,coordinator=None):
     now=(now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     worker=worker_status(sessions,cache_row,now); backup=backup_status(cfg,now)
-    directory=directory_status(sessions,workspace_model,cfg,now)
-    return {'checked_at':now.isoformat(),
+    live_read=None
+    if coordinator:
+        live_read=coordinator.status('lark-'+cfg.get('LARK_WORKER_ORGANIZATION',''))
+        live_read={**live_read,'queue_depth':coordinator.queue_depth}
+    directory=directory_status(sessions,workspace_model,cfg,now,live_read=live_read)
+    result={'checked_at':now.isoformat(),
             'status':'ok' if worker['status']=='ok' and backup['status']=='ok' and directory['status']=='ok' else 'attention',
             'worker':worker,'backup':backup,'directory':directory,
             'scope':'runtime_only','external_integrations_verified':False,
             'backup_archive_verified_by_this_request':False}
+    if live_read is not None: result['live_read']=live_read
+    return result
 
 
-def register(app,identity,sessions,CacheRow,cfg,*,workspace_model=None):
+def register(app,identity,sessions,CacheRow,cfg,*,workspace_model=None,coordinator=None):
     @app.get('/api/admin/runtime-health')
     def runtime_health(request:Request):
         data,user=identity(request)
@@ -138,4 +157,4 @@ def register(app,identity,sessions,CacheRow,cfg,*,workspace_model=None):
         if not (tenant and data.get('mode')=='lark' and (data.get('wid')=='lark-'+tenant or recovery)
                 and user.get('role')=='manager' and user.get('active',True)):
             raise HTTPException(403,'僅公司正式工作區管理員可查看維護狀態')
-        return JSONResponse(snapshot(sessions,CacheRow,cfg,workspace_model=workspace_model),headers={'Cache-Control':'no-store'})
+        return JSONResponse(snapshot(sessions,CacheRow,cfg,workspace_model=workspace_model,coordinator=coordinator),headers={'Cache-Control':'no-store'})

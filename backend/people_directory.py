@@ -233,7 +233,7 @@ class PeopleDirectoryService:
                     'stats':stats,'message':'已唯讀更新公司名冊；缺漏或重複身分保留待核對' if review else '已唯讀更新公司名冊；未讀取薪資、未更改授權'}
                 from .production_access import readonly_sync_connection
                 prior=state.get('people_directory_connection',{})
-                state['people_directory_connection']=readonly_sync_connection(self.cfg,actor_id or prior.get('authorized_by') or prior.get('actor_id'))
+                state['people_directory_connection']=readonly_sync_connection(self.cfg,actor_id or prior.get('authorized_by') or prior.get('actor_id'),dataset='roster')
                 event(state,actor,'people_directory_sync',message='唯讀同步人員名冊，保留原有授權及歷史')
                 self._save(db,row,state)
                 return deepcopy(state['people_directory_status'])
@@ -247,6 +247,9 @@ class PeopleDirectoryService:
             if adapter: adapter.client.close()
 
     def run_due(self,wid):
+        from .live_read.config import LiveReadConfig
+        config=LiveReadConfig.from_env(self.cfg)
+        if config.enabled: return None
         if not wid.startswith('lark-') or wid!='lark-'+self.cfg.get('LARK_WORKER_ORGANIZATION',''): return None
         with self.sessions.begin() as db:
             row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update())
@@ -257,7 +260,7 @@ class PeopleDirectoryService:
             if previous:
                 try:
                     age=(datetime.fromisoformat(now())-datetime.fromisoformat(previous)).total_seconds()
-                    if age<300: return None
+                    if age<config.roster_ttl_seconds: return None
                 except (ValueError,TypeError): pass
             status['last_attempt_at']=now(); self._save(db,row,state)
         return self.sync(wid,None)

@@ -28,14 +28,13 @@ def models(base):
 
 def save(db,model,wid,state):
     """Replace only changed entity rows; preserve one atomic workspace revision."""
+    if '_partial' in state: raise ValueError('partial workspaces are read-only')
     root=deepcopy(state); desired={}
     archive=root.pop('migration_archive',None)
-    if archive is not None:
-        if db.get(model,(wid,'migration_archive','original')) is None:
-            db.add(model(workspace_id=wid,kind='migration_archive',entity_id='original',parent_id='',ordinal=0,data=deepcopy(archive)))
-        root['migration_archive_ref']='original'
+    if archive is not None: root['migration_archive_ref']='original'
     def add(kind,record,parent='',ordinal=0):
         item=deepcopy(record); ident=str(item.get('id') or f'{parent}:{ordinal}')
+        if (kind,ident) in desired: raise ValueError(f'duplicate record id in storage.save: kind={kind} id={ident}')
         desired[(kind,ident)]={'parent_id':parent,'ordinal':ordinal,'data':item}
         return item
     for collection in COLLECTIONS:
@@ -49,6 +48,8 @@ def save(db,model,wid,state):
                     for k,review in enumerate(nr.pop('review_cycles',[])): add('review_cycles',review,node['id'],k)
                 for child in PROJECT_CHILDREN:
                     for j,value in enumerate(row.pop(child,[])): add('project_'+child,value,pid,j)
+    if archive is not None and db.get(model,(wid,'migration_archive','original')) is None:
+        db.add(model(workspace_id=wid,kind='migration_archive',entity_id='original',parent_id='',ordinal=0,data=deepcopy(archive)))
     existing={(r.kind,r.entity_id):r for r in db.scalars(select(model).where(model.workspace_id==wid,model.kind!='migration_archive'))}
     def project_of(key,value):
         kind,ident=key
@@ -100,6 +101,15 @@ def save(db,model,wid,state):
     new_events=[key for key in desired if key[0]=='events' and key not in existing]
     for index,key in enumerate(new_events):
         desired[key]['ordinal']=event_ordinal-len(new_events)+index
+    indexed=db.info.get('index_tables')
+    dirty=set(changed_projects)
+    if indexed:
+        # Moves and reorders change index rows without changing entity data.
+        for key,value in desired.items():
+            old=existing.get(key)
+            if old and key[0] in ('projects','nodes','tasks') and (old.parent_id!=value['parent_id'] or old.ordinal!=value['ordinal']):
+                pid=project_of(key,value)
+                if pid: dirty.add(pid)
     for key,value in desired.items():
         old=existing.pop(key,None)
         if old:
@@ -109,14 +119,74 @@ def save(db,model,wid,state):
         else: db.add(model(workspace_id=wid,kind=key[0],entity_id=key[1],**value))
     for row in existing.values():
         if row.kind!='events': db.delete(row)
+    if indexed:
+        from . import index_tables  # lazy: storage must stay importable inside the isolated backup helper bundle
+        index_tables.replace_projects(db,model,wid,state,dirty)
+        index_tables.replace_counters(db,model,wid,state)
     root['storage_schema']=2
     return root
+
+def load_partial(db,model,row,*,collections=(),project_ids=None,project_children=()):
+    """Read selected collections and project trees; never pass this to save.
+
+    Project IDs also select their headers, nodes, tasks and review cycles.
+    Without IDs, project headers have empty nested lists. Other project lists
+    are loaded only when explicitly named in project_children.
+    """
+    collections=tuple(collections)
+    project_children=tuple(project_children)
+    project_ids=None if project_ids is None else tuple(project_ids)
+    if set(collections)-set(COLLECTIONS): raise ValueError('unknown workspace collection')
+    if set(project_children)-set(PROJECT_CHILDREN): raise ValueError('unknown project child')
+    kinds=set(collections)
+    if project_ids is not None: kinds.add('projects')
+    result={key:deepcopy(value) for key,value in row.data.items() if key not in COLLECTIONS}
+    for collection in COLLECTIONS: result[collection]=[]
+    if row.data.get('storage_schema')!=2:
+        for collection in kinds: result[collection]=deepcopy(row.data.get(collection,[]))
+        if project_ids is not None:
+            result['projects']=[p for p in result['projects'] if p['id'] in project_ids]
+        for p in result['projects']:
+            if project_ids is None: p['nodes']=[]
+            for child in PROJECT_CHILDREN:
+                if project_ids is None or child not in project_children: p[child]=[]
+    else:
+        def fetch(selected,**filters):
+            query=select(model.kind,model.parent_id,model.data).where(model.workspace_id==row.id,model.kind.in_(selected))
+            for column,values in filters.items(): query=query.where(getattr(model,column).in_(values))
+            return db.execute(query.order_by(model.ordinal))
+        top=kinds-{'projects'}
+        if top:
+            for kind,parent,data in fetch(top,parent_id=('',)): result[kind].append(data)
+        if 'projects' in kinds and project_ids != ():
+            filters={'parent_id':('',)}
+            if project_ids is not None: filters['entity_id']=project_ids
+            result['projects']=[data for kind,parent,data in fetch(('projects',),**filters)]
+        records={}
+        selected_ids=[p['id'] for p in result['projects']] if project_ids is not None else []
+        if selected_ids:
+            nested=('nodes',)+tuple('project_'+child for child in project_children)
+            for kind,parent,data in fetch(nested,parent_id=selected_ids):
+                records.setdefault((kind,parent),[]).append(data)
+            node_ids=[n['id'] for pid in selected_ids for n in records.get(('nodes',pid),[])]
+            if node_ids:
+                for kind,parent,data in fetch(('tasks','review_cycles'),parent_id=node_ids):
+                    records.setdefault((kind,parent),[]).append(data)
+        for p in result['projects']:
+            p['nodes']=records.get(('nodes',p['id']),[])
+            for n in p['nodes']:
+                n['tasks']=records.get(('tasks',n['id']),[])
+                n['review_cycles']=records.get(('review_cycles',n['id']),[])
+            for child in PROJECT_CHILDREN: p[child]=records.get(('project_'+child,p['id']),[])
+    result['_partial']={'collections':list(collections),'project_ids':None if project_ids is None else list(project_ids),'project_children':list(project_children)}
+    return result
 
 def load(db,model,row):
     if row.data.get('storage_schema')!=2: return deepcopy(row.data)
     result=deepcopy(row.data); records={}
-    for r in db.scalars(select(model).where(model.workspace_id==row.id,model.kind!='migration_archive').order_by(model.ordinal)):
-        records.setdefault((r.kind,r.parent_id),[]).append(deepcopy(r.data))
+    # Column selection decodes fresh JSON without aliasing identity-map objects.
+    for kind,parent,data in db.execute(select(model.kind,model.parent_id,model.data).where(model.workspace_id==row.id,model.kind!='migration_archive').order_by(model.ordinal)):
+        records.setdefault((kind,parent),[]).append(data)
     for collection in COLLECTIONS: result[collection]=records.get((collection,''),result.get(collection,[]))
     for p in result['projects']:
         p['nodes']=records.get(('nodes',p['id']),[])

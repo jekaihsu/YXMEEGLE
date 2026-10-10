@@ -11,6 +11,11 @@ import re
 import secrets
 import shutil
 
+try:
+    from .stage_inventory import inventory_digest
+except ImportError:
+    from stage_inventory import inventory_digest
+
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = ROOT / '.runtime'
 PROJECT = '6ab61680a4c05a5bcb57ace9'
@@ -129,6 +134,7 @@ def staging():
               'scripts/backup_offsite_acceptance.py','backend/requirements.lock']
     files = [ROOT / x for x in exact]
     files += [p for p in (ROOT/'backend').glob('*.py') if not p.name.startswith('test_')]
+    files += [p for p in (ROOT/'backend'/'live_read').rglob('*.py') if not p.name.startswith('test_')]
     for part in ('frontend/src', 'frontend/public'):
         source = ROOT / part
         if source.exists(): files += [p for p in source.rglob('*') if p.is_file()]
@@ -154,7 +160,7 @@ def staging():
     except ImportError:
         from verify_stage_package import verify_stage
     smoke = verify_stage(folder)
-    write(folder.name + '-smoke.json', dict(smoke, stage=str(folder)))
+    write(folder.name + '-smoke.json', dict(smoke, stage=str(folder), inventory_sha256=inventory_digest(manifest)))
     if not smoke.get('ok'):
         raise SystemExit('Deployment package verification failed: ' + smoke.get('reason', 'unknown'))
     print(json.dumps({'staging_directory': str(folder), 'files': len(manifest), 'bytes': sum(f['size'] for f in manifest), 'runtime_smoke_passed': True}))

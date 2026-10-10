@@ -1,0 +1,25 @@
+/* Daily records: a grouped list of rows; filters and notes stay quiet. */
+.daily-records{display:flex;flex-direction:column;gap:var(--sp-4)}
+.dr-head h2{font-size:var(--fs-title2);font-weight:600}.dr-head p{color:var(--label-2);font-size:var(--fs-subhead);margin-top:var(--sp-1)}
+.daily-records .daily-filters{display:flex;flex-wrap:wrap;gap:var(--sp-3)}
+.daily-records .daily-filters label{display:flex;flex-direction:column;gap:var(--sp-1);flex:1 1 11rem;font-size:var(--fs-footnote);color:var(--label-2)}
+.daily-records .daily-filters :is(select,input){min-height:44px;padding:0 var(--sp-3);border:.5px solid var(--glass-border);border-radius:var(--radius-m);background:var(--surface);color:var(--label);font-size:var(--fs-body)}
+.daily-records .dr-note{background:none;border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2);color:var(--label-2);font-size:var(--fs-subhead)}.dr-note[data-tone=critical]{color:var(--critical)}
+.daily-records [role=status]{color:var(--label-2);font-size:var(--fs-footnote);font-variant-numeric:tabular-nums}
+.daily-cards{display:flex;flex-direction:column}
+.daily-cards article{position:relative;display:flex;flex-direction:column;gap:var(--sp-1);padding:var(--sp-3) var(--sp-4)}
+.daily-cards article+article::before{content:"";position:absolute;top:0;left:var(--sp-4);right:0;border-top:1px solid var(--sep)}
+.daily-cards header{display:flex;justify-content:space-between;gap:var(--sp-3);flex-wrap:wrap;font-size:var(--fs-subhead)}.daily-cards header span{color:var(--label-2)}
+.daily-cards article p{font-size:var(--fs-body);overflow-wrap:anywhere}
+.daily-cards footer{display:flex;flex-wrap:wrap;gap:var(--sp-1) var(--sp-4);font-size:var(--fs-footnote);color:var(--label-2)}.daily-cards footer a{color:var(--accent)}
+.dr-empty{color:var(--label-2);padding:var(--sp-5) var(--sp-4);text-align:center}
+.daily-pagination{display:flex;justify-content:flex-end;gap:var(--sp-2)}
+
+/* One grouped surface; record details keep the home's 12px reading rhythm. */
+.workspace .daily-records .daily-filters{margin:0}
+.workspace .daily-records .daily-cards{margin:0;gap:0}
+.workspace .daily-records .daily-cards article{border:0;border-radius:0;padding:var(--sp-4) var(--sp-5);gap:var(--sp-3)}
+.workspace .daily-records .daily-cards article+article::before{left:var(--sp-5);right:var(--sp-5)}
+.workspace .daily-records .daily-cards article p{margin:0;line-height:1.6;font-size:var(--fs-subhead)}
+.workspace .daily-records .daily-cards footer{gap:var(--sp-3);line-height:1.6}
+@media(max-width:760px){.workspace .daily-records .daily-cards article{padding:var(--sp-4)}.workspace .daily-records .daily-cards article+article::before{left:var(--sp-4);right:var(--sp-4)}}

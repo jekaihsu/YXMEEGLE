@@ -1,0 +1,93 @@
+/* App shell: translucent topbar, source-list sidebar, mobile tabbar, route progress, page transitions. Loaded last; tokens only. */
+/* Subtle tint behind everything so the blur has something to refract. */
+body{background-color:var(--bg);background-image:var(--bg-tint);background-attachment:fixed}
+.app-shell,.app-shell .main-shell{background:transparent;color:var(--label);font-family:var(--font)}
+.app-shell .sidebar.glass--bar{background:var(--glass-bar-fill);border-width:0 .5px 0 0;padding:0 var(--sp-3)}
+.app-shell .brand{height:auto;padding:var(--sp-5) var(--sp-3) var(--sp-2);font-size:var(--fs-headline);font-weight:600;letter-spacing:0;color:var(--label)}
+.app-shell .brand-en{color:var(--label-2);font-size:var(--fs-caption);font-weight:500;letter-spacing:.08em;padding-top:2px}
+.app-shell .brand-mark{transform:none}.app-shell .brand-mark i{background:var(--accent)!important;border-radius:3px}
+.app-shell .workspace-caption{margin:0 var(--sp-3) var(--sp-5);font-size:var(--fs-footnote);color:var(--label-2)}
+.app-shell .nav-label{padding:0 var(--sp-3);margin-bottom:var(--sp-1);font-size:var(--fs-caption);font-weight:600;letter-spacing:.04em;color:var(--label-2)}
+.app-shell .nav-item,.app-shell .recent-project{border:0;border-radius:var(--radius-s);padding:var(--sp-2) var(--sp-3);margin-bottom:2px;font-size:var(--fs-subhead);font-weight:400;color:var(--label);transition:background var(--dur-fast) var(--ease)}
+.app-shell .nav-item svg{color:var(--accent)}
+.app-shell .nav-item:hover,.app-shell .recent-project:hover{background:color-mix(in srgb,var(--label) 6%,transparent)}
+.app-shell .nav-item.active,.app-shell .recent-project.selected{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font-weight:600}
+.app-shell .nav-item.active svg{color:var(--accent);stroke-width:1.75}
+.app-shell .nav-item em{background:var(--critical);color:#fff;border:0;border-radius:var(--radius-pill);padding:0 var(--sp-2);font-size:var(--fs-caption);font-weight:600}
+.app-shell .recent-project small,.app-shell .sidebar-status{color:var(--label-2);font-size:var(--fs-footnote)}
+.app-shell .project-dot{background:var(--label-2)}.app-shell .status-dot,.app-shell .sidebar-status .tiny-dot{background:var(--positive)}
+.app-shell .user-button{border-top:.5px solid var(--glass-border);color:var(--label)}
+.app-shell .topbar.glass--bar{background:var(--glass-bar-fill)}
+.app-shell .breadcrumbs,.app-shell .top-date{color:var(--label-2);font-size:var(--fs-footnote)}
+.app-shell .breadcrumbs strong{color:var(--label);font-weight:600}
+.app-shell .demo-tag{background:var(--surface-2);color:var(--label-2);border:0;border-radius:var(--radius-pill);font-size:var(--fs-caption);font-weight:600}
+.app-shell .sidebar-scrim{background:rgb(0 0 0/.4);-webkit-backdrop-filter:none;backdrop-filter:none}
+.app-shell .toast.glass{background:var(--glass-fill);color:var(--label);border-radius:var(--radius-pill)}.app-shell .toast.glass svg{color:var(--positive)}
+
+/* Route progress: a thin accent bar that sweeps once per navigation, indeterminate while the workspace loads. */
+.route-progress{position:fixed;top:0;left:0;right:0;height:2px;z-index:120;pointer-events:none;background:var(--accent);transform-origin:left;transform:scaleX(0);opacity:0;animation:route-progress var(--dur-slow) var(--ease)}
+.route-progress[data-loading=true]{animation:route-loading 1.2s var(--ease) infinite}
+@keyframes route-progress{from{transform:scaleX(0);opacity:1}70%{transform:scaleX(1);opacity:1}to{transform:scaleX(1);opacity:0}}
+@keyframes route-loading{from{transform:scaleX(0);opacity:1}to{transform:scaleX(1);opacity:.2}}
+
+/* Page transition: workspace is keyed by view, so it fades in on every route change. */
+.app-shell .workspace{animation:page-in var(--dur-base) var(--ease)}
+@keyframes page-in{from{opacity:0;transform:translateY(6px)}}
+@media(prefers-reduced-motion:reduce){.route-progress,.app-shell .workspace{animation:none}}
+
+/* Mobile tabbar */
+.mobile-tabs{display:none}
+@media(max-width:760px){
+ .app-shell .workspace{padding-bottom:calc(var(--sp-9) + env(safe-area-inset-bottom))}
+ .mobile-tabs{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;padding-bottom:env(safe-area-inset-bottom);}
+ .mobile-tabs.glass--bar{background:var(--glass-bar-fill);border-width:.5px 0 0}
+ .mobile-tabs button{flex:1;min-width:0;min-height:49px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:var(--fs-caption);color:var(--label-2);transition:color 300ms ease-out}
+ .mobile-tabs button[aria-current=page]{color:var(--accent);font-weight:600}
+ .mobile-tabs svg{stroke-width:1.75}
+ .app-shell .toast{bottom:calc(var(--sp-9) + env(safe-area-inset-bottom))}
+}
+/* Dividers use the theme separator, never legacy solid colours. */
+.app-shell .topbar.glass--bar{border-bottom:.5px solid var(--separator)}
+.app-shell .sidebar.glass--bar{border-right:.5px solid var(--separator)}
+.app-shell .sidebar-projects,.app-shell .user-button{border-top:.5px solid var(--separator)}
+/* Mobile top bar stays on one line: freshness text shrinks and truncates instead of wrapping under the title. */
+@media(max-width:760px){
+ .app-shell .topbar.glass--bar{flex-wrap:nowrap;gap:var(--sp-2)}
+ .app-shell .topbar .breadcrumbs{flex:0 1 auto;min-width:0;white-space:nowrap}.app-shell .topbar .breadcrumbs strong{overflow:hidden;text-overflow:ellipsis}
+ .app-shell .topbar-right{flex:1 1 0;min-width:0;justify-content:flex-end;flex-wrap:nowrap;gap:var(--sp-2)}
+ .app-shell .topbar .data-freshness{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-caption)}
+ .app-shell .topbar .data-freshness *{white-space:nowrap}
+ .app-shell .demo-tag{flex:none;white-space:nowrap}
+}
+@media(max-width:760px){.app-shell .topbar .data-freshness{order:-1}}
+
+/* The navigation scrolls independently; workspace identity remains in reach. */
+.app-shell .sidebar.glass--bar{overflow:hidden}
+/* The scroller spans the sidebar's own 12px inset so its bar runs along the border instead of over the nav.
+   Chrome ignores ::-webkit-scrollbar once scrollbar-width is set, so the standard properties are for Firefox only. */
+.app-shell .sidebar-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;margin-inline:-12px;padding-inline:12px 8px;scrollbar-gutter:stable}
+@supports not selector(::-webkit-scrollbar){.app-shell .sidebar-scroll{scrollbar-width:thin;scrollbar-color:var(--sep) transparent}}
+.app-shell .sidebar-scroll::-webkit-scrollbar{width:4px}
+.app-shell .sidebar-scroll::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--label) 14%,transparent);border-radius:var(--radius-pill)}
+.app-shell .sidebar-scroll:is(:hover,:focus-within)::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--label) 22%,transparent)}
+.app-shell .sidebar-scroll::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--label) 40%,transparent)}
+.app-shell .sidebar-scroll::-webkit-scrollbar-track{background:transparent;margin-block:var(--sp-2)}
+.app-shell .sidebar-bottom{flex:0 0 auto;margin-top:0;padding-top:var(--sp-3);padding-bottom:env(safe-area-inset-bottom)}
+
+/* Desktop compact navigation keeps the company identity and reopen control visible. */
+.compact-brand{display:none}
+.app-shell .sidebar-toggle{display:inline-flex;align-items:center;justify-content:center;width:32px;min-height:32px;flex:none;color:var(--label-2);border-radius:var(--radius-s)}
+.app-shell .sidebar-toggle:hover{background:var(--surface-2);color:var(--accent)}
+.app-shell .sidebar-collapse{position:absolute;right:var(--sp-2);top:var(--sp-5);z-index:1}
+.app-shell .sidebar-scroll .brand{padding-right:var(--sp-8)}
+@media(min-width:761px){
+ .app-shell.sidebar-compact .sidebar{display:none}
+ .app-shell.sidebar-compact .main-shell{margin-left:0}
+ .app-shell.sidebar-compact .compact-brand{display:flex;align-items:center;gap:var(--sp-3);position:fixed;top:var(--sp-2);left:var(--sp-3);z-index:50;padding:var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3);border:.5px solid var(--glass-border);border-radius:var(--radius-pill);background:var(--glass-bar-fill);box-shadow:var(--glass-highlight),var(--glass-shadow)}
+ .compact-brand a{display:flex;align-items:center;gap:var(--sp-2);color:var(--label);font-size:var(--fs-subhead);white-space:nowrap}
+ .compact-brand .brand-mark{width:24px;height:24px;gap:3px}
+ .compact-brand .brand-mark i{background:var(--accent)!important;border-radius:3px}
+ .app-shell.sidebar-compact .topbar .breadcrumbs{margin-left:232px}
+}
+@media(min-width:761px) and (max-width:1100px){.app-shell.sidebar-compact .breadcrumbs{display:none}.app-shell.sidebar-compact .topbar-right{margin-left:auto}}
+@media(max-width:760px){.app-shell .sidebar-collapse{display:none}}

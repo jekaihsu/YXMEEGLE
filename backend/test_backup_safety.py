@@ -5,6 +5,7 @@ from zipfile import ZipFile
 
 import pytest
 from sqlalchemy import Column, MetaData, String, Table, create_engine, select
+from sqlalchemy.exc import IntegrityError
 
 from scripts import backup_restore as br
 from scripts import backup_schedule as schedule
@@ -136,3 +137,81 @@ def test_pg_drill_rejects_production_alias_and_unsafe_targets(target):
 
 def test_pg_drill_accepts_separately_named_postgresql_database():
     validate_target('postgresql://user@host/company','postgresql+psycopg://user@host/yx_restore_20260928')
+
+
+@pytest.mark.parametrize('existing_root', [False, True])
+def test_restore_db_failure_rolls_back_new_directories_and_allows_retry(tmp_path, existing_root):
+    engine,uploads=source(tmp_path)
+    target=tmp_path/'backup.zip'; br.backup(engine,uploads,target)
+    bad=tmp_path/'bad.zip'
+    with ZipFile(target) as archive:
+        entries={name:archive.read(name) for name in archive.namelist()}
+    rows=json.loads(entries['database.json'])
+    rows['workspaces']*=2  # duplicate primary key forces the DB insert to fail after files are written
+    entries['database.json']=json.dumps(rows).encode()
+    manifest=json.loads(entries['manifest.json'])
+    manifest['sha256']['database.json']=hashlib.sha256(entries['database.json']).hexdigest()
+    entries['manifest.json']=json.dumps(manifest).encode()
+    with ZipFile(bad,'w') as archive:
+        for name,data in entries.items(): archive.writestr(name,data)
+    restored=create_engine('sqlite:///'+str(tmp_path/'restored.db'))
+    output=tmp_path/'new-parent'/'restored-uploads'
+    if existing_root: output.mkdir(parents=True)
+    with pytest.raises(IntegrityError):
+        br.restore(restored,output,bad)
+    if existing_root:
+        assert output.is_dir() and not list(output.iterdir())
+    else:
+        assert not output.parent.exists()
+    with restored.connect() as db:
+        assert all(db.execute(select(table).limit(1)).first() is None for table in br.TABLES)
+    assert br.restore(restored,output,target)['files']==1
+    assert next(output.rglob('file_one')).read_bytes()==b'company evidence'
+
+
+def test_restore_failure_keeps_preexisting_empty_upload_directory(tmp_path):
+    engine,uploads=source(tmp_path)
+    target=tmp_path/'backup.zip'; br.backup(engine,uploads,target)
+    restored=create_engine('sqlite:///'+str(tmp_path/'restored.db'))
+    br.META.create_all(restored)
+    output=tmp_path/'restored-uploads'; output.mkdir()
+    with restored.begin() as db: db.execute(br.TABLES[0].insert(),{'id':'x','version':1,'data':{}})
+    with pytest.raises(ValueError,match='must be empty'):
+        br.restore(restored,output,target)
+    assert output.is_dir()
+
+
+@pytest.mark.parametrize('keep_unrelated_file', [False, True])
+def test_restore_partial_write_failure_cleans_owned_paths(tmp_path, monkeypatch, keep_unrelated_file):
+    engine,uploads=source(tmp_path)
+    target=tmp_path/'backup.zip'; br.backup(engine,uploads,target)
+    restored=create_engine('sqlite:///'+str(tmp_path/'restored.db'))
+    output=tmp_path/'restored-uploads'
+    original_open=br.Path.open
+    unrelated=output/'unrelated'
+
+    class FailingWriter:
+        def __init__(self, handle): self.handle=handle
+        def __enter__(self): return self
+        def __exit__(self, *args): self.handle.close()
+        def write(self, data):
+            self.handle.write(data[:3])
+            if keep_unrelated_file: unrelated.write_bytes(b'preserve me')
+            raise OSError('simulated disk write failure')
+
+    def failing_open(path, mode='r', *args, **kwargs):
+        handle=original_open(path, mode, *args, **kwargs)
+        return FailingWriter(handle) if mode=='xb' else handle
+
+    with monkeypatch.context() as patch:
+        patch.setattr(br.Path, 'open', failing_open)
+        with pytest.raises(OSError, match='simulated disk write failure'):
+            br.restore(restored,output,target)
+    with restored.connect() as db:
+        assert all(db.execute(select(table).limit(1)).first() is None for table in br.TABLES)
+    if keep_unrelated_file:
+        assert list(output.iterdir())==[unrelated]
+        assert unrelated.read_bytes()==b'preserve me'
+    else:
+        assert not output.exists()
+        assert br.restore(restored,output,target)['files']==1

@@ -135,7 +135,7 @@ class AttendanceScheduleService(PeopleDirectoryService):
                     'message':'已讀取正常班表；未核對的班次保留待確認，人工設定優先'}
                 from .production_access import readonly_sync_connection
                 prior=current.get('attendance_schedule_connection',{})
-                current['attendance_schedule_connection']=readonly_sync_connection(self.cfg,actor_id or prior.get('authorized_by') or prior.get('actor_id'))
+                current['attendance_schedule_connection']=readonly_sync_connection(self.cfg,actor_id or prior.get('authorized_by') or prior.get('actor_id'),dataset='attendance')
                 event(current,actor,'attendance_schedule_sync',message='唯讀更新正常班表，保留人工設定與歷史')
                 self._save(db,row,current)
                 return deepcopy(current['attendance_schedule_status'])
@@ -153,6 +153,9 @@ class AttendanceScheduleService(PeopleDirectoryService):
             if adapter:adapter.client.close()
 
     def run_due(self,wid):
+        from .live_read.config import LiveReadConfig
+        config=LiveReadConfig.from_env(self.cfg)
+        if config.enabled: return None
         if wid!='lark-'+self.cfg.get('LARK_WORKER_ORGANIZATION',''):return None
         with self.sessions.begin() as db:
             row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update())
@@ -162,7 +165,7 @@ class AttendanceScheduleService(PeopleDirectoryService):
             status=state.setdefault('attendance_schedule_status',{});previous=status.get('last_attempt_at')
             if previous:
                 try:
-                    if (datetime.fromisoformat(now())-datetime.fromisoformat(previous)).total_seconds()<300:return None
+                    if (datetime.fromisoformat(now())-datetime.fromisoformat(previous)).total_seconds()<config.attendance_ttl_seconds:return None
                 except (ValueError,TypeError):pass
             status['last_attempt_at']=now();self._save(db,row,state)
         return self.sync(wid,None)

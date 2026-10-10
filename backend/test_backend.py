@@ -119,6 +119,22 @@ def test_production_config_and_oauth_state(tmp_path):
     assert c.get('/api/auth/lark/callback?state=forged&code=fake').status_code==400
     r=c.get('/api/auth/lark/login',follow_redirects=False); assert 'app_id=test' in r.headers['location']
 
+def test_lark_oauth_denial_returns_safe_actionable_error_redirect(tmp_path):
+    from urllib.parse import parse_qs,urlparse
+    cfg={'DATABASE_URL':f'sqlite:///{tmp_path}/oauth-denial.db','UPLOAD_DIR':str(tmp_path/'u'),
+         'APP_ENV':'development','DEMO_MODE':'false','SESSION_SECRET':'oauth-denial-test'*4,
+         'LARK_APP_ID':'test','LARK_APP_SECRET':'test','LARK_REDIRECT_URI':'https://example.org/api/auth/lark/callback',
+         'LARK_ALLOWED_TENANTS':'tenant'}
+    client=TestClient(create_app(cfg))
+    login=client.get('/api/auth/lark/login',follow_redirects=False)
+    state=parse_qs(urlparse(login.headers['location']).query)['state'][0]
+    denied=client.get('/api/auth/lark/callback',params={'state':state,'error':'access_denied',
+        'error_description':'synthetic private provider detail'},follow_redirects=False)
+    assert denied.status_code==303
+    assert denied.headers['location']=='/?auth_error=authorization_denied'
+    assert 'synthetic' not in denied.headers['location']
+    assert 'lark_oauth_state' in denied.headers.get('set-cookie','')
+
 def test_source_normalization_formula_values_repeated_sync_and_manual_protection():
     ws=seed(True)
     def rec(kind,ident,fields): return {'kind':kind,'base_token':'base','table_id':kind,'record_id':ident,'fields':fields}
@@ -424,6 +440,8 @@ def test_gzip_large_workspace_and_authenticated_sources_preserves_json_and_acces
     from . import workflow
     # Compare transport encodings at the same authorization observation time.
     checked_at=workflow.now(); monkeypatch.setattr(workflow,'now',lambda:checked_at)
+    from datetime import datetime
+    app.state.live_read.clock=lambda:datetime.fromisoformat(checked_at)
     from .app import CacheRow
     compressed=client.get('/api/workspace',headers={'Accept-Encoding':'gzip'})
     plain=client.get('/api/workspace',headers={'Accept-Encoding':'identity'})
@@ -445,5 +463,8 @@ def test_gzip_large_workspace_and_authenticated_sources_preserves_json_and_acces
     assert compressed.status_code==200 and compressed.headers.get('content-encoding')=='gzip'
     from .source_case_policy import visible_source_snapshot
     from .workspace_projection import public_source_cache
-    assert compressed.json()==plain.json()==public_source_cache(visible_source_snapshot(state,cache))
+    freshness=app.state.live_read.status('lark-compression')
+    expected={**public_source_cache(visible_source_snapshot(state,cache)),
+              'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
+    assert compressed.json()==plain.json()==expected
     assert client.get('/api/sources',headers={'Accept-Encoding':'gzip'}).json()['records']==[]

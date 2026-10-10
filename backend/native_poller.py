@@ -18,6 +18,12 @@ from .lark_adapter import application_adapter,RemoteFailure
 COLLECTIONS=('approvals','node_skip_requests','financial_requests')
 
 
+def _attempt_key(value):
+    if not value:return (0,0.0)
+    try:return (1,datetime.fromisoformat(value).timestamp())
+    except (TypeError,ValueError):return (0,0.0)
+
+
 class NativeApprovalPoller:
     def __init__(self,sessions,W,B,P,cfg,adapter_factory=None):
         self.sessions,self.W,self.B,self.P,self.cfg=sessions,W,B,P,cfg
@@ -135,8 +141,12 @@ class NativeApprovalPoller:
             row=db.get(self.W,wid)
             if not row:return []
             state=self._load(db,row)
-            candidates=[(c,i['id']) for c in COLLECTIONS for i in state.get(c,[])
+            candidates=[(c,i['id'],i.get('native_poll_status',{}).get('last_attempt_at') or '')
+                        for c in COLLECTIONS for i in state.get(c,[])
                         if i.get('native_binding',{}).get('attempted') and not i.get('simulated')]
+        # Never-polled first, then least recently attempted, so a full batch of
+        # old items cannot starve newer ones. Stable sort keeps ties deterministic.
+        candidates=[(c,i) for c,i,_ in sorted(candidates,key=lambda x:_attempt_key(x[2]))]
         results=[]
         for collection,ident in candidates:
             if len(results)>=10:break
