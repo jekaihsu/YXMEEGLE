@@ -157,7 +157,10 @@ button.resource-cell:focus-visible{outline:2px solid var(--accent);outline-offse
 .workspace .mywork-controls{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-4)}
 .workspace .mywork-controls>.tabbar{margin:0;width:auto;flex:0 0 auto}
 .workspace .mywork-controls>.table-toolbar{margin:0;padding:0;border:0;background:none;flex:1 1 18rem;display:flex;gap:var(--sp-3);align-items:center}
-.workspace .mywork-controls .search-field{flex:1 1 auto;max-width:26rem}
+.workspace .mywork-controls>.table-toolbar{justify-content:flex-start;flex-wrap:nowrap}
+.workspace .mywork-controls .search-field{flex:1 1 10rem;min-width:0;max-width:26rem}
+/* Search and status picker share one height (the 44px touch target), so their centre lines match. */
+.workspace .mywork-controls .search-field,.workspace .mywork-controls .table-toolbar>select{box-sizing:border-box;height:44px;min-height:44px;margin:0}
 .workspace .mywork-controls+.batch-completion{margin:0 0 var(--sp-4)}
 
 @media(max-width:760px){.workspace .mywork-controls>.tabbar{width:100%}.workspace .mywork-controls .search-field{max-width:none}}
