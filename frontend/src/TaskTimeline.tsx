@@ -46,6 +46,7 @@ export function TaskTimeline({c,rows,groupBy,defaultScale='week',storageKey}:{c:
  const pending=useRef<{shift?:number;focus?:string;smooth?:boolean}>({focus:asOf});
  const frame=useRef(0);
 
+ const hasBody=rows.some(r=>r.t.due_date);
  const col=Math.max(MIN_COL,viewW?Math.floor(viewW/FIT[scale]):40);
  const days=Array.from({length:range.days},(_,i)=>addDays(range.start,i));
  const last=days[days.length-1];
@@ -54,7 +55,11 @@ export function TaskTimeline({c,rows,groupBy,defaultScale='week',storageKey}:{c:
  const isOff=(d:string)=>!workdays.includes(d)&&([0,6].includes(weekday(d))||holidays.includes(d));
 
  // Track the calendar pane's width so a zoom level always fits its number of days.
- useLayoutEffect(()=>{const el=body.current;if(!el)return;if(typeof ResizeObserver!=='function'){setViewW(el.clientWidth);return}const ro=new ResizeObserver(()=>setViewW(el.clientWidth));ro.observe(el);setViewW(el.clientWidth);return()=>ro.disconnect()},[]);
+ useLayoutEffect(()=>{const el=body.current;if(!el)return;if(typeof ResizeObserver!=='function'){setViewW(el.clientWidth);return}const ro=new ResizeObserver(()=>setViewW(el.clientWidth));ro.observe(el);setViewW(el.clientWidth);return()=>ro.disconnect()},[hasBody]);
+ // The scroll pane unmounts when there are no tasks; when it comes back it starts at scrollLeft 0, so reset the range around today
+ // and re-focus today, otherwise the edge-loading would keep prepending days and drift years into the past.
+ const mounted=useRef(false);
+ useLayoutEffect(()=>{if(!hasBody)return;if(mounted.current){setRange({start:addDays(asOf,-BEFORE),days:BEFORE+AFTER});pending.current={focus:asOf}}mounted.current=true},[hasBody]);
 
  const readVisible=useCallback(()=>{const el=body.current;if(!el)return;
   const from=Math.floor(el.scrollLeft/col),to=Math.floor((el.scrollLeft+el.clientWidth-1)/col);
