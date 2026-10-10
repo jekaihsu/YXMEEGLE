@@ -16,11 +16,13 @@ export function DailyRecords({w,p,go}:{w:Workspace;p:Project;go:(r:Route)=>void}
  const current=remote&&remote.key===requestKey?remote:null;
  const remotePageCount=current?Math.max(1,Math.ceil(current.total/30)):1;
  const pageOutOfRange=!!current&&page>=remotePageCount;
+ // Only the pre-/api/daily-reports fallback lists from the workspace; in shell mode the other cards are summaries without daily_reports.
  const records=useMemo(()=>{
-  const matched=w.projects.flatMap(project=>project.daily_reports.map(row=>({...row,project,unmatched:false})));
+  if(!fallback)return [];
+  const matched=w.projects.flatMap(project=>(project.daily_reports||[]).map(row=>({...row,project,unmatched:false})));
   const unmatched=(w.daily_unmatched||[]).map((row:any)=>({...row,project:null,unmatched:true}));
   return [...matched,...unmatched];
- },[w]);
+ },[w,fallback]);
  const filtered=records.filter(r=>(scope==='all'||scope==='unmatched'&&r.unmatched||scope==='project'&&r.project?.id===p.id)&&(!day||r.date?.slice(0,10)===day)&&`${r.person||''} ${r.department||''} ${r.description||''} ${r.project?.code||r.source_case_code||r.case_code||''}`.toLowerCase().includes(query.toLowerCase())).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
  const total=current?.total??(fallback?filtered.length:0);const settled=!!current||fallback;const currentPage=settled?Math.min(page,Math.max(1,Math.ceil(total/30))-1):page;const pageCount=Math.max(1,Math.ceil(total/30),currentPage+1);const visible:any[]=current&&!pageOutOfRange?current.items.map(r=>({...r,unmatched:!r.project_id,project:r.project_id?{id:r.project_id,code:r.project_code}:null})):fallback?filtered.slice(currentPage*30,(currentPage+1)*30):[];
  useEffect(()=>{if(settled&&page!==currentPage)setPage(currentPage)},[settled,page,currentPage,p.id]);

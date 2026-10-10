@@ -60,7 +60,7 @@ export function Dashboard({c}:{c:Ctx}){
  const late=(p:Project)=>p.nodes.flatMap(n=>n.tasks).filter(t=>isLate(t,c.w.as_of)).length;
  const focus=[...formal].sort((a,b)=>late(b)-late(a)).slice(0,5);
  const blocked=rows.filter(r=>active(r.t)&&operationallyBlocked(r));const attention=uniqueRows([...overdue,...blocked,...dueToday]);
- const tasks=uniqueRows([...overdue.slice(0,2),...blocked.slice(0,2),...dueToday,...overdue.slice(2),...blocked.slice(2)]).slice(0,5);const reports=c.w.projects.flatMap(p=>p.daily_reports.map(r=>({...r,p}))).filter(r=>r.date===c.w.as_of.slice(0,10));
+ const tasks=uniqueRows([...overdue.slice(0,2),...blocked.slice(0,2),...dueToday,...overdue.slice(2),...blocked.slice(2)]).slice(0,5);const reports=c.w.projects.flatMap(p=>(p.daily_reports||[]).map(r=>({...r,p}))).filter(r=>r.date===c.w.as_of.slice(0,10));
  const items=[...tasks.map(r=>({...taskItem(c,r.t.id,r.t.title,`${r.p.code} · ${r.n.name} · ${nameOf(c.w,r.t.owner_id)}`,r.t.due_date,()=>openTask(c,r)),blocked:operationallyBlocked(r)})),...pending.slice(0,2).map(a=>approvalItem(c,a))];
  return <Head c={c}><div className="today-layout"><div className="today-main"><NextAction c={c} rows={rows}/>
   <Inbox c={c} count={attention.length+pending.length} caption={countLine([['逾期',overdue.length],['當日到期',dueToday.length],['受阻',blocked.length]])} items={items} moreWork={attention.length>5} morePending={pending.length>2}/>

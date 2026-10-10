@@ -45,6 +45,7 @@ globalThis.fetch=async(url,init)=>{
  if(url==='/api/workspace'){await fullGate();return json({...workspace,version:current.version});}
  if(url.startsWith('/api/projects?view=overview'))return overview(url);
  if(url.startsWith('/api/projects/'))return detail(url);
+ if(url.startsWith('/api/daily-reports?'))return json({items:[],total:0,offset:0,limit:30,summary:{}});
  if(url==='/api/workspace?scope=shell')return init.headers.get('If-None-Match')===etag?new Response(null,{status:304,headers:{ETag:etag}}):json(current,{ETag:etag});
  if(url==='/api/actions'||url==='/api/files')return failMutation?new Response(JSON.stringify({detail:'conflict'}),{status:409}):json(mutationResponse||{...workspace,version:2});
  throw Error('Unexpected endpoint '+url);
@@ -148,6 +149,9 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  assert.ok(document.querySelector('.workspace').textContent.includes('PRIVATE_CASE_A')&&document.querySelector('.workspace').textContent.includes('TASK_A'),'detail renders the project tree');
  await goto('view=project&project=pA&tab=flow');await goto('view=project&project=pA&tab=data&section=basic');assert.deepEqual(detailUrls(),['/api/projects/pA'],'tabs do not refetch the project');
  await goto('view=project&project=pB');assert.deepEqual(detailUrls(),['/api/projects/pA','/api/projects/pB']);assert.ok(document.querySelector('.workspace').textContent.includes('CASE_B'));
+ // The 日報 tab lists through /api/daily-reports; the other cards in the shell are summaries without daily_reports and must not be scanned.
+ await goto('view=project&project=pB&tab=daily');assert.ok(!document.querySelector('.workspace').textContent.includes('畫面暫時無法顯示'),'daily tab survives summary projects without daily_reports');assert.ok(document.querySelector('.daily-records'),'daily tab renders');
+ assert.ok(requests.some(r=>r.url.startsWith('/api/daily-reports?')&&r.url.includes('project_id=pB')),'daily tab reads the project daily list from the API');
  await goto('view=project&project=zz');assert.ok(document.querySelector('.workspace').textContent.includes('找不到這個案件'));
  let freeA;const heldA=new Promise(resolve=>{freeA=resolve});detailGate=async id=>{if(id==='pA')await heldA};
  await goto('view=project&project=pA');await goto('view=project&project=pB');await flush(async()=>{freeA();await heldA});
