@@ -64,7 +64,7 @@ try{
  assert.equal(window.shellContext.w.scope,'shell');assert.equal(rows().length,2);
  assert.ok(document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期 4'));
  assert.ok(document.querySelector('.notification-button i'));assert.equal(window.shellContext.unmatchedDaily(window.shellContext.w),535);
- assert.ok(rows()[0].querySelector('.stage-chips').textContent.includes('進行中'));
+ assert.equal(rows()[0].querySelector('.stage-chips').textContent,'—'); // 目前作業 no longer repeats the workflow badge shown in the status column
  assert.equal(rows()[0].querySelector('.progress-cell span').textContent,'40%');
  assert.equal(rows()[1].querySelector('.progress-cell span').textContent,'0%');
  // P4-1: the dashboard renders from counts, the attention list and cards; no tree scan and no full workspace.
