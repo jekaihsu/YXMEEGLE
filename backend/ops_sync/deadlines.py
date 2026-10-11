@@ -115,6 +115,12 @@ class DeadlineService:
     # -- proposals -----------------------------------------------------------------------
     def submit_change(self, command_id, entity_id, intended, expected_value, expected_revision, actor,
                       source='app', occurred_at=None, schema_binding_version=SCHEMA_BINDING):
+        return self.d.tx(lambda dom: self.submit_change_in_txn(
+            dom, command_id, entity_id, intended, expected_value, expected_revision, actor, source, occurred_at,
+            schema_binding_version))
+
+    def submit_change_in_txn(self, dom, command_id, entity_id, intended, expected_value, expected_revision, actor,
+                             source='app', occurred_at=None, schema_binding_version=SCHEMA_BINDING):
         occurred = V.to_utc_iso(occurred_at if occurred_at is not None else self.d.now(), 'occurred_at')
         if source not in ('app', 'lark'):
             raise V.ValidationError('source must be app or lark', 'invalid_source')
@@ -152,7 +158,7 @@ class DeadlineService:
                     'expires_at': V.add_seconds(self.d.now_iso(), self.proposal_ttl), 'receipt_id': None}
                 return {'status': state, 'reason': reason, 'proposal_id': command_id}
             return self.d.ledgered(dom, command_id, payload, run)
-        return self.d.tx(apply)
+        return apply(dom)
 
     def _terminate(self, prop, reason, state=FAILED):
         prop['state'], prop['reason'], prop['closed_at'] = state, reason, self.d.now_iso()
@@ -170,6 +176,9 @@ class DeadlineService:
         return self.d.tx(apply)
 
     def reject(self, entity_id, command_id, actor, reason='rejected'):
+        return self.d.tx(lambda dom: self.reject_in_txn(dom, entity_id, command_id, actor, reason))
+
+    def reject_in_txn(self, dom, entity_id, command_id, actor, reason='rejected'):
         def apply(dom):
             if not self.d.policy.allows(self.d.in_scope(actor).key, 'approve_deadline', entity_id):
                 return {'status': 'denied', 'reason': 'not_authorized'}
@@ -180,9 +189,12 @@ class DeadlineService:
                 self._terminate(prop, 'rejected')
                 prop['rejection_note'], prop['rejected_by'] = reason, actor.key
             return {'status': prop['state'], 'reason': prop['reason']}
-        return self.d.tx(apply)
+        return apply(dom)
 
     def expire_due(self):
+        return self.d.tx(lambda dom: self.expire_due_in_txn(dom))
+
+    def expire_due_in_txn(self, dom):
         def apply(dom):
             expired = []
             for rec in list(dom['cases'].values()) + list(dom['nodes'].values()):
@@ -191,7 +203,7 @@ class DeadlineService:
                         self._terminate(prop, 'expired')
                         expired.append(prop['proposal_id'])
             return expired
-        return self.d.tx(apply)
+        return apply(dom)
 
     # -- receipts ------------------------------------------------------------------------
     def build_receipt(self, entity_id, command_id, approvers, receipt_id, issued_at=None):
@@ -207,6 +219,9 @@ class DeadlineService:
             issued_at if issued_at is not None else self.d.now())
 
     def approve(self, receipt):
+        return self.d.tx(lambda dom: self.approve_in_txn(dom, receipt))
+
+    def approve_in_txn(self, dom, receipt):
         """Verify a receipt and, only if every binding still holds, apply the effective change exactly once."""
         if not isinstance(receipt, MockReceipt):
             raise V.ValidationError('receipt must be a MockReceipt', 'invalid_receipt')
@@ -285,7 +300,7 @@ class DeadlineService:
             result = {'status': CONFIRMED, 'reason': None, 'revision': prior['revision'] + 1, 'duplicate': False}
             dl['receipts'][receipt.receipt_id] = {'fingerprint': V.fingerprint(payload), 'result': copy.deepcopy(result)}
             return result
-        return self.d.tx(apply)
+        return apply(dom)
 
     # -- derived -------------------------------------------------------------------------
     def record_derived(self, entity_id, entry):

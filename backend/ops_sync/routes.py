@@ -18,6 +18,7 @@ from .commands import CommandEnvelope
 from .eligibility import PersonIdentity
 from .engine import CONFIRMED, CONFLICT, FAILED, QUEUED, UNKNOWN_S, WAITING, IdentityCollision, OpsEngine
 from .workspace_store import WorkspaceStore
+from .unit import JointOperations
 
 ADAPTER_NAMESPACE = 'ops_sync_mock_lark'
 APPROVAL_FIELDS = ('case.deadline', 'node.deadline')
@@ -138,15 +139,6 @@ def register(app, identity, load, sessions, WorkspaceRow, clock=None):
             mock.direct_edit(entity_id, field_id, V.SetValue(F.person('u-manager').key) if 'pm' in field_id or 'resp' in field_id
                              else V.SetValue('2026-12-31'))
 
-    def delivery(engine, mock, body, user, entity_id, command_id, field_id, intended, approval_ref=None):
-        guarded(lambda: engine.observe(entity_id, [field_id]))
-        base = engine.projection(entity_id, field_id)
-        require(base is not None, '無法讀取基準值', 409)
-        envelope = CommandEnvelope(command_id, entity_id, field_id, base[0], base[1], intended, user['id'], 'app',
-                                   body.get('occurred_at') or engine._now(), BINDING, approval_ref)
-        result = guarded(lambda: engine.submit(envelope))
-        return result
-
     def run_dispatch(engine, mock, body, entity_id, field_id):
         inject(mock, body.get('mock_outcome'), entity_id, field_id)
         guarded(engine.run_once)
@@ -166,18 +158,19 @@ def register(app, identity, load, sessions, WorkspaceRow, clock=None):
         entity_id, command_id = flow_ids(body)
         people = body.get('person_ids')
         require(isinstance(people, list) and all(isinstance(p, str) for p in people), 'person_ids 必須是人員代號清單', 422)
-        data, user, state, fx, domain, _, engine, mock = flow_ctx(request, entity_id)
+        data, user, state, fx, domain, deadlines, engine, mock = flow_ctx(request, entity_id)
         is_case = entity_id.startswith('case:')
         candidates = V.CLEAR if not people else guarded(lambda: [F.person(p) for p in people])
-        assign = domain.assign_pm if is_case else domain.assign_responsible
-        result = guarded(lambda: assign(command_id, entity_id, fx.actor, candidates, body.get('reason') or '', 'app'))
+        field_id = 'case.pm' if is_case else 'node.responsible'
+        intended = V.CLEAR if not people else V.SetValue(candidates[0].key)
+        unit = JointOperations(domain, deadlines, engine)
+        base = guarded(lambda: unit.read(entity_id, field_id))
+        envelope = unit.envelope(body, user['id'], entity_id, command_id, field_id, intended, base)
+        result = guarded(lambda: unit.assign(envelope, base, fx.actor, candidates, body.get('reason') or ''))
         if result['status'] in ('denied', 'conflict'):
             fail(F.reason_text(result['reason']), 422)
-        command = None
-        if result['status'] in ('assigned', 'cleared') and not result['duplicate']:
-            field_id = 'case.pm' if is_case else 'node.responsible'
-            intended = V.CLEAR if not people else V.SetValue(candidates[0].key)
-            delivery(engine, mock, body, user, entity_id, command_id, field_id, intended)
+        if not result['duplicate'] and (result['status'] in ('assigned', 'cleared') or
+                                        result['status'] == 'unchanged' and intended != base.fresh['value']):
             run_dispatch(engine, mock, body, entity_id, field_id)
         command = next((c for c in snapshot(engine, user, state)['commands'] if c['command_id'] == command_id), None)
         return JSONResponse(flow_view(user, state, fx, domain, engine, {'outcome': {'status': result['status'], 'duplicate': result['duplicate']},
@@ -190,20 +183,17 @@ def register(app, identity, load, sessions, WorkspaceRow, clock=None):
         intended, expected_rev = body.get('intended'), body.get('expected_revision')
         require(isinstance(intended, str), 'intended 必須是日期字串', 422)
         data, user, state, fx, domain, deadlines, engine, mock = flow_ctx(request, entity_id)
-        eff = deadlines.dates(entity_id)['approved_effective']
         expected = V.SetValue(body['expected']) if isinstance(body.get('expected'), str) else V.CLEAR
-        current = V.decode(V.encode(eff['value']))
-        if expected != current or expected_rev != eff['revision']:     # stale draft: record nothing, hand back current vs intended
-            fail(F.reason_text('baseline_changed'), 409)
-        result = guarded(lambda: deadlines.submit_change(command_id, entity_id, V.SetValue(intended), expected, expected_rev,
-                                                         fx.actor, 'app', body.get('occurred_at') or engine._now()))
+        field_id = 'case.deadline' if entity_id.startswith('case:') else 'node.deadline'
+        unit = JointOperations(domain, deadlines, engine)
+        base = guarded(lambda: unit.read(entity_id, field_id))
+        envelope = guarded(lambda: unit.envelope(body, user['id'], entity_id, command_id, field_id,
+                                               V.SetValue(V.normalize_date(intended)), base))
+        result = guarded(lambda: unit.propose(envelope, base, expected, expected_rev, fx.actor))
         if result['status'] == 'denied':
             fail(F.reason_text(result['reason']), 422)
         if result['status'] != 'waiting_approval':
             fail(F.reason_text(result['reason']), 409 if result['status'] == 'conflict' else 422)
-        if not result['duplicate']:
-            field_id = 'case.deadline' if entity_id.startswith('case:') else 'node.deadline'
-            delivery(engine, mock, body, user, entity_id, command_id, field_id, V.SetValue(V.normalize_date(intended)))
         command = next((c for c in snapshot(engine, user, state)['commands'] if c['command_id'] == command_id), None)
         return JSONResponse(flow_view(user, state, fx, domain, engine, {'outcome': {'status': 'proposed', 'duplicate': result['duplicate']},
                                                                         'command': command}))
@@ -218,29 +208,17 @@ def register(app, identity, load, sessions, WorkspaceRow, clock=None):
         require(decision in F.DECISIONS, 'decision 必須是 approved、rejected 或 stale', 422)
         data, user, state, fx, domain, deadlines, engine, mock = flow_ctx(request, entity_id)
         require(fx.actor not in F.APPROVERS, '模擬核准人不得為操作者', 403)
-        guarded(lambda: deadlines.expire_due())
         prop = deadlines.proposal(entity_id, command_id)
         require(prop is not None, '找不到申請', 404)
         field_id = prop['field_id']
-        status, reason, duplicate = prop['state'], None, False
-        if status == 'confirmed' and decision != 'stale':      # replaying a decision on a consumed proposal is a no-op
-            duplicate = True
-        elif decision == 'rejected':
-            out = guarded(lambda: deadlines.reject(entity_id, command_id, F.APPROVERS[0], 'mock rejected'))
-            status, reason = out['status'], out.get('reason')
-            if status == 'failed':
-                guarded(lambda: engine.reject_approval(command_id, 'approval_rejected'))
-        else:
-            receipt = F.mock_receipt(deadlines, entity_id, command_id, decision)
-            out = guarded(lambda: deadlines.approve(receipt))
-            status, reason, duplicate = out['status'], out.get('reason'), out['duplicate']
-            if decision == 'approved' and status == 'denied':
-                fail(F.reason_text(reason), 422)
-            if decision == 'approved' and status == 'confirmed' and not duplicate:
-                guarded(lambda: engine.grant_approval(command_id, receipt.receipt_id))
-                run_dispatch(engine, mock, body, entity_id, field_id)
-            elif status == 'conflict':
-                guarded(lambda: engine.reject_approval(command_id, 'baseline_changed'))
+        receipt = None if decision == 'rejected' else F.mock_receipt(deadlines, entity_id, command_id, decision)
+        unit = JointOperations(domain, deadlines, engine)
+        out = guarded(lambda: unit.decide(entity_id, command_id, decision, F.APPROVERS[0], receipt))
+        status, reason, duplicate = out['status'], out.get('reason'), out['duplicate']
+        if decision == 'approved' and status == 'denied':
+            fail(F.reason_text(reason), 422)
+        if decision == 'approved' and status == 'confirmed' and not duplicate:
+            run_dispatch(engine, mock, body, entity_id, field_id)
         command = next((c for c in snapshot(engine, user, state)['commands'] if c['command_id'] == command_id), None)
         return JSONResponse(flow_view(user, state, fx, domain, engine, {
             'outcome': {'status': status, 'reason': reason, 'reason_text': F.reason_text(reason), 'duplicate': duplicate,
@@ -285,27 +263,27 @@ def register(app, identity, load, sessions, WorkspaceRow, clock=None):
         conflict = engine_for(data['wid'])[0].snapshot()['conflicts'].get(conflict_id)
         require(conflict is not None, '找不到衝突', 404)
         entity_id, field_id = conflict['entity_id'], conflict['field_id']
-        data, user, state, fx, domain, _, engine, mock = flow_ctx(request, entity_id)
+        data, user, state, fx, domain, deadlines, engine, mock = flow_ctx(request, entity_id)
         require(field_id in ('case.pm', 'node.responsible'), '期限衝突請以新的期限申請處理', 422)
         if conflict['resolution']:
             require(conflict['resolution']['command_id'] == command_id, '此衝突已處理', 409)
             return JSONResponse(flow_view(user, state, fx, domain, engine))
         expected, expected_rev = _value(body, 'expected'), body.get('expected_revision')
-        obs = guarded(lambda: mock.read(entity_id, [field_id]))
-        require(obs.complete and V.encode(obs.values[field_id]) == V.encode(expected) and obs.revisions[field_id] == expected_rev,
+        unit = JointOperations(domain, deadlines, engine)
+        base = guarded(lambda: unit.read(entity_id, field_id))
+        require(V.encode(base.fresh['value']) == V.encode(expected) and base.fresh['revision'] == expected_rev,
                 F.reason_text('baseline_changed'), 409)
         target = expected if mode == 'keep_current' else V.decode(conflict['intended'])
         try:
             candidates = V.CLEAR if target is V.CLEAR else [PersonIdentity.from_key(target.value)]
         except ValueError:
             fail('衝突中的值不是有效的人員代號，無法處理', 422)
-        assign = domain.assign_pm if entity_id.startswith('case:') else domain.assign_responsible
-        result = guarded(lambda: assign(command_id, entity_id, fx.actor, candidates, body.get('reason') or f'conflict {mode}', 'app'))
-        if result['status'] in ('denied', 'conflict'):
-            fail(F.reason_text(result['reason']), 422)
         envelope = CommandEnvelope(command_id, entity_id, field_id, expected, expected_rev, target, user['id'], 'app',
                                    engine._now(), BINDING, resolves=conflict_id, resolution=mode)
-        guarded(lambda: engine.resolve_conflict(envelope, conflict_id, mode))
+        result = guarded(lambda: unit.assign(envelope, base, fx.actor, candidates,
+                                            body.get('reason') or f'conflict {mode}', conflict_id, mode))
+        if result['status'] in ('denied', 'conflict'):
+            fail(F.reason_text(result['reason']), 422)
         run_dispatch(engine, mock, body, entity_id, field_id)
         command = next((c for c in snapshot(engine, user, state)['commands'] if c['command_id'] == command_id), None)
         return JSONResponse(flow_view(user, state, fx, domain, engine, {'outcome': {'status': result['status'], 'duplicate': False},

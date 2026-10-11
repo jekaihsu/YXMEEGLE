@@ -139,6 +139,9 @@ class OpsEngine:
         return QUEUED, None
 
     def grant_approval(self, command_id, approval_ref):
+        return self._tx(lambda ns: self.grant_approval_in_txn(ns, command_id, approval_ref))
+
+    def grant_approval_in_txn(self, ns, command_id, approval_ref):
         """Hand a consumed domain approval to a waiting command. A ref that is not a consumed, matching, unused
         approval leaves the command waiting (reason says why); replaying the same grant is a no-op."""
         def apply(ns):
@@ -154,15 +157,18 @@ class OpsEngine:
                 self._set(ns, cmd, QUEUED)
                 cmd['next_attempt_at'] = self._now()
             return cmd['state']
-        return self._tx(apply)
+        return apply(ns)
 
     def reject_approval(self, command_id, reason='approval_rejected'):
+        return self._tx(lambda ns: self.reject_approval_in_txn(ns, command_id, reason))
+
+    def reject_approval_in_txn(self, ns, command_id, reason='approval_rejected'):
         def apply(ns):
             cmd = ns['commands'][command_id]
             if cmd['state'] == WAITING:
                 self._set(ns, cmd, FAILED, reason)
             return cmd['state']
-        return self._tx(apply)
+        return apply(ns)
 
     def withdraw(self, command_id):
         def apply(ns):
@@ -273,7 +279,9 @@ class OpsEngine:
             obs = self.adapter.read(entity_id, [field_id])
         except A.AdapterError as exc:
             return {'ok': False, 'code': exc.code}
-        if not obs.complete or obs.values.get(field_id) is V.UNKNOWN or field_id not in obs.revisions:
+        if (not obs.complete or field_id not in obs.values or obs.values[field_id] in (V.UNKNOWN, V.OMITTED)
+                or isinstance(obs.revisions.get(field_id), bool) or not isinstance(obs.revisions.get(field_id), int)
+                or obs.revisions[field_id] < 0):
             return {'ok': False, 'code': obs.reason or 'incomplete_read'}
         if obs.binding_version != self.binding:
             return {'ok': False, 'code': 'schema_binding_mismatch'}
@@ -539,10 +547,17 @@ class OpsEngine:
 
     # -- conflict resolution ---------------------------------------------------------------
     def resolve_conflict(self, envelope, conflict_id, mode):
-        """A resolution is a NEW linked command with a freshly read baseline; it never rewrites the original."""
+        """Standalone resolution, with adapter I/O outside the transaction."""
+        fresh = self._safe_read(envelope.entity_id, envelope.field_id)
+        if not fresh['ok']:
+            raise V.OpsError('fresh complete baseline unavailable: ' + fresh['code'], 'baseline_unavailable')
+        return self._tx(lambda ns: self.resolve_conflict_in_txn(ns, envelope, conflict_id, mode, fresh))
+
+    def resolve_conflict_in_txn(self, ns, envelope, conflict_id, mode, fresh, confirm_current=True):
+        """Recheck the conflict in every CAS attempt. Joint routes defer confirmation to dispatch/readback."""
         if envelope.resolves != conflict_id or envelope.resolution != mode:
             raise V.ValidationError('envelope must link the conflict and resolution mode', 'invalid_resolution')
-        conflict = self.snapshot()['conflicts'].get(conflict_id)
+        conflict = ns['conflicts'].get(conflict_id)
         if not conflict or conflict['resolution']:
             raise V.OpsError('no open conflict', 'conflict_not_open')
         if envelope.command_id == conflict['command_id']:
@@ -551,31 +566,28 @@ class OpsEngine:
             raise V.ValidationError('resolution targets another field', 'invalid_resolution')
         if mode == 'apply_intended' and V.encode(V.coerce(envelope.field_id, envelope.intended_value)) != conflict['intended']:
             raise V.ValidationError('apply_intended must carry the original intended value', 'invalid_resolution')
-        fresh = self._safe_read(envelope.entity_id, envelope.field_id)
-        if not fresh['ok']:
-            raise V.OpsError('fresh complete baseline unavailable: ' + fresh['code'], 'baseline_unavailable')
         if V.encode(V.coerce(envelope.field_id, envelope.expected_value)) != V.encode(fresh['value']) or envelope.expected_revision != fresh['revision']:
             raise V.OpsError('another change occurred; re-read and retry', 'baseline_changed')
         if mode == 'keep_current' and V.encode(V.coerce(envelope.field_id, envelope.intended_value)) != V.encode(fresh['value']):
             raise V.ValidationError('keep_current must not request a different value', 'invalid_resolution')
-
-        def apply(ns):
-            slot_key = f'{envelope.entity_id}|{envelope.field_id}'
-            slot = ns['projection'].get(slot_key)
-            if slot is None or fresh['revision'] >= slot['revision']:
-                ns['projection'][slot_key] = {'value': V.encode(fresh['value']), 'revision': fresh['revision']}
-            result = self._submit_in_txn(ns, envelope)
-            cmd = ns['commands'][envelope.command_id]
-            if result['duplicate']:
-                return result
-            if cmd['state'] != FAILED:
-                ns['conflicts'][conflict_id]['resolution'] = {'mode': mode, 'command_id': envelope.command_id,
-                                                              'actor': envelope.actor, 'at': self._now()}
-            if mode == 'keep_current' and cmd['state'] == QUEUED:
-                self._set(ns, cmd, CONFIRMED, 'resolved_keep_current')
-                cmd['result'] = {'resolution': 'keep_current'}
-                self._history(ns, kind='resolution_keep_current', command_id=envelope.command_id, conflict_id=conflict_id,
-                              entity_id=envelope.entity_id, field_id=envelope.field_id, actor=envelope.actor)
-                result['status'] = CONFIRMED
+        slot_key = f'{envelope.entity_id}|{envelope.field_id}'
+        slot = ns['projection'].get(slot_key)
+        token = {'value': V.encode(fresh['value']), 'revision': fresh['revision']}
+        if slot and (slot['revision'] > fresh['revision'] or
+                     slot['revision'] == fresh['revision'] and slot['value'] != token['value']):
+            raise V.OpsError('projection changed; re-read and retry', 'baseline_changed')
+        ns['projection'][slot_key] = token
+        result = self._submit_in_txn(ns, envelope)
+        cmd = ns['commands'][envelope.command_id]
+        if result['duplicate']:
             return result
-        return self._tx(apply)
+        if cmd['state'] != FAILED:
+            conflict['resolution'] = {'mode': mode, 'command_id': envelope.command_id,
+                                      'actor': envelope.actor, 'at': self._now()}
+        if mode == 'keep_current' and cmd['state'] == QUEUED and confirm_current:
+            self._set(ns, cmd, CONFIRMED, 'resolved_keep_current')
+            cmd['result'] = {'resolution': 'keep_current'}
+            self._history(ns, kind='resolution_keep_current', command_id=envelope.command_id, conflict_id=conflict_id,
+                          entity_id=envelope.entity_id, field_id=envelope.field_id, actor=envelope.actor)
+            result['status'] = CONFIRMED
+        return result

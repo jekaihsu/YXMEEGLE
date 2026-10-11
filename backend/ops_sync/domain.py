@@ -219,6 +219,9 @@ class DomainService:
         return {'status': 'assigned' if new else 'cleared'}
 
     def assign_pm(self, command_id, entity_id, actor, candidates, reason='', source='app'):
+        return self.tx(lambda dom: self.assign_pm_in_txn(dom, command_id, entity_id, actor, candidates, reason, source))
+
+    def assign_pm_in_txn(self, dom, command_id, entity_id, actor, candidates, reason='', source='app'):
         payload = {'op': 'assign_pm', 'entity_id': entity_id, 'actor': actor.key,
                    'candidates': 'CLEAR' if candidates is V.CLEAR else sorted(c.key for c in candidates), 'source': source}
 
@@ -247,9 +250,13 @@ class DomainService:
                         pm['eligibility_revision'] = ev.revision
                 return result
             return self.ledgered(dom, command_id, payload, run)
-        return self.tx(apply)
+        return apply(dom)
 
     def assign_responsible(self, command_id, node_entity_id, actor, candidates, reason='', source='app'):
+        return self.tx(lambda dom: self.assign_responsible_in_txn(
+            dom, command_id, node_entity_id, actor, candidates, reason, source))
+
+    def assign_responsible_in_txn(self, dom, command_id, node_entity_id, actor, candidates, reason='', source='app'):
         payload = {'op': 'assign_responsible', 'entity_id': node_entity_id, 'actor': actor.key,
                    'candidates': 'CLEAR' if candidates is V.CLEAR else sorted(c.key for c in candidates), 'source': source}
 
@@ -268,4 +275,4 @@ class DomainService:
             return self.ledgered(dom, command_id, payload, lambda: self._assign(
                 dom, node['responsible'], node_entity_id, 'node.responsible', 'assign_responsible', command_id, actor, source,
                 candidates, reason, check))
-        return self.tx(apply)
+        return apply(dom)
