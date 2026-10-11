@@ -217,3 +217,13 @@ These decisions do not block contract/mock work and do not grant live permission
 ## T0 evidence boundary
 
 T0 delivers this document in one local commit. No production code or tests change. `scripts/local_ci.sh`: not run, docs only, under the task-specific exception. The matrix is a test specification, not passing evidence. Independent review/verification and Lead closure are still required. No push, PR, merge, deployment or self-approval.
+
+## Field-mapping reconciliation (owner audit, label-level; NOT approved live bindings)
+
+Source: owner workbook 工作台與Lark標頭對照.xlsx. All 351 actual mapping / writeback / two-way-sync tests are **unperformed** (row 41) and no field IDs or types exist (row 43). Therefore every mapping below is a candidate and the synthetic flow labels it "未確認／模擬".
+
+- **Case PM**: H0073/H0183/H0197 (rows 52/129/143) are candidates only. They do not establish PM eligibility; A0003/A0013 (rows 253/263) are unmapped. Eligibility is a synthetic fixture rule behind the adapter.
+- **Node owner**: H0078 (row 57) is unconfirmed; H0164 (row 112): a case/quote PM does not prove node responsibility, so the UI never infers it.
+- **Dates**: case deadline candidates H0182/H0201/H0202 (rows 128/147/148) must not be reused as task original/effective dates H0023/H0031 (rows 22/30).
+- **Identity**: A0010 (row 260): OpenID, Lark account and person are different identity types; the flow uses a typed (tenant, app, person_id) binding, never a display name or free string.
+- Qualification, assignment, node and date mappings stay separate and unmapped states are preserved. No label-based auto-binding, no live schema/data write, no live adapter enablement.

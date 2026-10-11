@@ -45,6 +45,7 @@ try{
    const url=new URL(route.request().url()),path=url.pathname,method=route.request().method();
    if(path.startsWith('/api/ops-sync/')){
     if(!on)return route.fulfill({status:404,json:{detail:'API 不存在'}});
+    if(path==='/api/ops-sync/flow')return route.fulfill({json:{notice:MOCK_NOTICE,mapping_notice:'未確認／模擬',roster:[],entities:[],mock_outcomes:['normal'],dispatch_denial:{suspended:[],held_commands:[]},commands:[]}});
     if(method==='POST'&&stale409){posts.push({path,body:route.request().postDataJSON()});stale409=false;
      statusBody={...statusBody,conflicts:statusBody.conflicts.map(k=>({...k,current:{...set('ou_test_pm_10'),revision:4}}))};   // someone changed the field meanwhile
      return route.fulfill({status:409,json:{detail:'基準值已被更動'}});}
@@ -82,7 +83,7 @@ try{
  const conflict=await page.locator('.ops-sync-item[data-state=conflict]').innerText();
  assert.ok(conflict.includes('預期（送出時）')&&conflict.includes('ou_test_pm_9（版本 3）')&&conflict.includes('擬變更')&&conflict.includes('ou_test_pm_2'));
  assert.equal(await page.locator('.ops-sync-item[data-state=unknown]').getByRole('button',{name:'立即重新核對'}).count(),1);
- assert.equal(await page.locator('.ops-sync-item[data-state=failed]').getByRole('button').count(),0);
+ assert.equal(await page.locator('.ops-sync-item[data-state=failed]').getByRole('button').count(),1);   // only the new-command retry; never an in-place retry
  await page.screenshot({path:process.env.OPS_SYNC_SCREENSHOT||undefined}).catch(()=>{});
  // explicit resolve: nothing is sent until the user chooses; the request carries the freshly read baseline
  assert.equal(posts.length,0);

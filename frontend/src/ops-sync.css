@@ -8,3 +8,10 @@
 .ops-sync .ops-sync-item[data-state=conflict]{border-inline-start:3px solid var(--critical)}
 .ops-sync .inline-actions{display:flex;flex-wrap:wrap;gap:var(--sp-3)}
 .ops-sync .ops-sync-item>.ds-button{justify-self:start}
+.ops-flow .ops-flow-pick{padding:var(--sp-4)}
+.ops-flow .ops-flow-people{display:grid;gap:var(--sp-2);border:1px solid var(--separator);padding:var(--sp-3)}
+.ops-flow .ops-flow-people label{display:flex;gap:var(--sp-2);align-items:center}
+.ops-flow .ops-flow-proposals{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-2)}
+.ops-flow .ops-flow-proposals li{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center}
+.ops-flow .ops-flow-denial{display:grid;gap:var(--sp-2)}
+.ops-flow .ops-flow-notice{border-inline-start:3px solid var(--accent);padding-inline-start:var(--sp-3)}

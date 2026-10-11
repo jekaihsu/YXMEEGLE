@@ -4,14 +4,14 @@ import {api,ApiError} from './api';
 import {FIELDS,MOCK_NOTICE,OpsState,OpsValue,STATES,reasonText,valueText} from './opsSyncView';
 import './ops-sync.css';
 
-type Command={command_id:string;entity_id:string;field_id:string;state:OpsState;reason?:string|null;actor:string;expected:OpsValue;expected_revision:number;intended:OpsValue;attempts:number;reconcile?:{phase:string;reads:number;blocker?:string|null}|null};
+export type Command={command_id:string;entity_id:string;field_id:string;state:OpsState;reason?:string|null;actor:string;expected:OpsValue;expected_revision:number;intended:OpsValue;attempts:number;reconcile?:{phase:string;reads:number;blocker?:string|null}|null};
 type Conflict={conflict_id:string;command_id:string;entity_id:string;field_id:string;reason:string;open:boolean;expected:OpsValue&{revision:number};current:OpsValue&{revision:number};intended:OpsValue;resolution?:string|null};
 type Status={notice:string;live:boolean;commands:Command[];conflicts:Conflict[]};
 const wire=(v:OpsValue)=>v.kind==='set'?{t:'set',v:v.value}:{t:'clear'};
 const BINDING='mock-binding-v1';
 
 // Flag OFF => the server has no such route (404) and this renders nothing.
-export function OpsSyncPanel(){
+export function OpsSyncPanel({onRetry}:{onRetry?:(c:Command)=>void}={}){
  const[status,setStatus]=useState<Status|null>(null);const[hidden,setHidden]=useState(false);const[error,setError]=useState('');const[busy,setBusy]=useState('');
  const[intent,setIntent]=useState<{conflict:string;mode:'keep_current'|'apply_intended'}|null>(null);
  const load=useCallback(async(keepError=false)=>{try{setStatus(await api<Status>('/api/ops-sync/status'));if(!keepError)setError('')}catch(e){if(e instanceof ApiError&&e.status===404)setHidden(true);else setError((e as Error).message)}},[]);
@@ -36,6 +36,7 @@ export function OpsSyncPanel(){
    {c.reason&&c.reason!=='awaiting_approval'&&<p className="ops-sync-reason">原因：{reasonText(c.reason)}</p>}
    {c.state==='unknown'&&<><p className="ops-sync-reason">核對進度：{c.reconcile?.phase==='exhausted'?'自動讀回次數已用完，需手動重新核對':'等待下一次讀回'}（已讀回 {c.reconcile?.reads??0} 次）</p>
     <Button disabled={!!busy} onClick={()=>void act(c.command_id,'/api/ops-sync/reconcile',{command_id:c.command_id})}>{busy===c.command_id?'核對中…':'立即重新核對'}</Button></>}
+   {c.state==='failed'&&onRetry&&<Button disabled={!!busy} onClick={()=>onRetry(c)}>以相同內容重新送出（新申請）</Button>}
    {c.state==='conflict'&&k&&<>
     <dl className="ops-sync-values" aria-label="衝突內容"><div><dt>預期（送出時）</dt><dd>{valueText(k.expected)}（版本 {k.expected.revision}）</dd></div><div><dt>目前</dt><dd>{valueText(k.current)}（版本 {k.current.revision}）</dd></div><div><dt>擬變更</dt><dd>{valueText(k.intended)}</dd></div></dl>
     {intent&&intent.conflict===k.conflict_id&&error&&<p role="note" className="ops-sync-intent" data-intent={intent.mode}>您剛才選擇：{intent.mode==='keep_current'?'保留目前值':'套用擬變更值'}（尚未送出，請核對上方最新內容後再按一次）</p>}
