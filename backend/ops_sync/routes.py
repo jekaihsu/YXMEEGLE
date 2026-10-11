@@ -10,8 +10,10 @@ from fastapi.responses import JSONResponse
 from ..input_validation import json_object
 from ..operations import lead
 from ..workflow import fail, find, require
+from . import flow as F
 from . import values as V
-from .adapter import MockLarkAdapter
+from .clock import SystemClock
+from .adapter import BINDING, MockLarkAdapter
 from .commands import CommandEnvelope
 from .engine import CONFIRMED, CONFLICT, FAILED, QUEUED, UNKNOWN_S, WAITING, IdentityCollision, OpsEngine
 from .workspace_store import WorkspaceStore
@@ -64,11 +66,13 @@ def _value(body, key):
 
 
 def register(app, identity, load, sessions, WorkspaceRow, clock=None):
-    def engine_for(wid):
+    clk = clock or SystemClock()
+
+    def engine_for(wid, authorizer=None):
         factory = app.state.ops_store_for
         require(factory is not None, '功能未啟用', 404)
         mock = MockLarkAdapter(WorkspaceStore(sessions, wid, namespace=ADAPTER_NAMESPACE))
-        return OpsEngine(factory(wid), mock, clock=clock, approval_required=APPROVAL_FIELDS), mock
+        return OpsEngine(factory(wid), mock, clock=clock, authorizer=authorizer, approval_required=APPROVAL_FIELDS), mock
 
     def access(request, entity_id=None):
         data, user = identity(request)
@@ -93,7 +97,8 @@ def register(app, identity, load, sessions, WorkspaceRow, clock=None):
         except IdentityCollision as exc:
             fail(str(exc), 409)
         except V.OpsError as exc:
-            fail(f'{exc.code}: {exc}', 409 if exc.code in ('conflict_not_open', 'baseline_changed', 'baseline_unavailable') else 422)
+            fail(f'{exc.code}: {exc}', 409 if exc.code in ('conflict_not_open', 'baseline_changed', 'baseline_unavailable')
+                 else 404 if exc.code == 'unknown_entity' else 422)
 
     def snapshot(engine, user, state):
         snap = engine.snapshot()
@@ -114,7 +119,7 @@ def register(app, identity, load, sessions, WorkspaceRow, clock=None):
         entity_id = body.get('entity_id')
         require(isinstance(entity_id, str) and isinstance(body.get('command_id'), str), '缺少 entity_id 或 command_id', 422)
         data, user, state = access(request, entity_id)
-        engine, _ = engine_for(data['wid'])
+        engine, _ = engine_for(data['wid'], F.Fixtures(clk, user['id'], True).authorizer())
         field_id = body.get('field_id')
         envelope = CommandEnvelope(
             body['command_id'], entity_id, field_id, _value(body, 'expected'), body.get('expected_revision'),
@@ -159,3 +164,155 @@ def register(app, identity, load, sessions, WorkspaceRow, clock=None):
         access(request, cmd['envelope']['entity_id'])
         guarded(lambda: (engine.request_recovery(command_id), engine.run_once()))
         return JSONResponse(snapshot(engine, user, state))
+
+    # -- synthetic local vertical flow (all fixture data; mock adapter only) --------------------------------------
+    def flow_ctx(request, entity_id=None, body=None):
+        data, user, state = access(request, entity_id)
+        fx = F.Fixtures(clk, user['id'], entity_id is not None)
+        domain, deadlines = fx.services(app.state.ops_store_for(data['wid']))
+        guarded(lambda: F.sync(domain, state))
+        engine, mock = engine_for(data['wid'], fx.authorizer())
+        require(MockLarkAdapter.live is False, '僅限本機模擬', 403)
+        return data, user, state, fx, domain, deadlines, engine, mock
+
+    def flow_view(user, state, fx, domain, engine, extra=None):
+        led = {p['id'] for p in state['projects'] if lead(user, p)}
+        snap = snapshot(engine, user, state)
+        return {**snap, 'mapping_notice': F.MAPPING_NOTICE, 'roster': F.roster_view(fx), 'mock_outcomes': list(F.MOCK_OUTCOMES),
+                'entities': F.entities_view(domain, lambda pid: pid in led, fx),
+                'dispatch_denial': F.dispatch_denial(engine.snapshot()), **(extra or {})}
+
+    def flow_ids(body):
+        entity_id, command_id = body.get('entity_id'), body.get('command_id')
+        require(isinstance(entity_id, str) and isinstance(command_id, str) and command_id.strip(), '缺少 entity_id 或 command_id', 422)
+        return entity_id, command_id
+
+    def inject(mock, outcome, entity_id, field_id):
+        require(outcome in (None, *F.MOCK_OUTCOMES), '不支援的模擬情境', 422)
+        if outcome in ('timeout_after_commit', 'permission_lost'):
+            mock.inject(outcome)
+        elif outcome == 'concurrent_edit':
+            mock.direct_edit(entity_id, field_id, V.SetValue(F.person('u-manager').key) if 'pm' in field_id or 'resp' in field_id
+                             else V.SetValue('2026-12-31'))
+
+    def delivery(engine, mock, body, user, entity_id, command_id, field_id, intended, approval_ref=None):
+        guarded(lambda: engine.observe(entity_id, [field_id]))
+        base = engine.projection(entity_id, field_id)
+        require(base is not None, '無法讀取基準值', 409)
+        envelope = CommandEnvelope(command_id, entity_id, field_id, base[0], base[1], intended, user['id'], 'app',
+                                   body.get('occurred_at') or engine._now(), BINDING, approval_ref)
+        result = guarded(lambda: engine.submit(envelope))
+        return result
+
+    def run_dispatch(engine, mock, body, entity_id, field_id):
+        inject(mock, body.get('mock_outcome'), entity_id, field_id)
+        guarded(engine.run_once)
+
+    @app.get('/api/ops-sync/flow')
+    def flow(request: Request):
+        data, user, state = access(request)
+        fx = F.Fixtures(clk, user['id'], False)
+        domain, _ = fx.services(app.state.ops_store_for(data['wid']))
+        guarded(lambda: F.sync(domain, state))
+        engine, _ = engine_for(data['wid'], fx.authorizer())
+        return JSONResponse(flow_view(user, state, fx, domain, engine))
+
+    @app.post('/api/ops-sync/flow/assign')
+    async def flow_assign(request: Request):
+        body = await json_object(request)
+        entity_id, command_id = flow_ids(body)
+        people = body.get('person_ids')
+        require(isinstance(people, list) and all(isinstance(p, str) for p in people), 'person_ids 必須是人員代號清單', 422)
+        data, user, state, fx, domain, _, engine, mock = flow_ctx(request, entity_id)
+        is_case = entity_id.startswith('case:')
+        candidates = V.CLEAR if not people else guarded(lambda: [F.person(p) for p in people])
+        assign = domain.assign_pm if is_case else domain.assign_responsible
+        result = guarded(lambda: assign(command_id, entity_id, fx.actor, candidates, body.get('reason') or '', 'app'))
+        if result['status'] in ('denied', 'conflict'):
+            fail(F.reason_text(result['reason']), 422)
+        command = None
+        if result['status'] in ('assigned', 'cleared') and not result['duplicate']:
+            field_id = 'case.pm' if is_case else 'node.responsible'
+            intended = V.CLEAR if not people else V.SetValue(candidates[0].key)
+            delivery(engine, mock, body, user, entity_id, command_id, field_id, intended)
+            run_dispatch(engine, mock, body, entity_id, field_id)
+        command = next((c for c in snapshot(engine, user, state)['commands'] if c['command_id'] == command_id), None)
+        return JSONResponse(flow_view(user, state, fx, domain, engine, {'outcome': {'status': result['status'], 'duplicate': result['duplicate']},
+                                                                        'command': command}))
+
+    @app.post('/api/ops-sync/flow/propose')
+    async def flow_propose(request: Request):
+        body = await json_object(request)
+        entity_id, command_id = flow_ids(body)
+        intended, expected_rev = body.get('intended'), body.get('expected_revision')
+        require(isinstance(intended, str), 'intended 必須是日期字串', 422)
+        data, user, state, fx, domain, deadlines, engine, mock = flow_ctx(request, entity_id)
+        eff = deadlines.dates(entity_id)['approved_effective']
+        expected = V.SetValue(body['expected']) if isinstance(body.get('expected'), str) else V.CLEAR
+        current = V.decode(V.encode(eff['value']))
+        if expected != current or expected_rev != eff['revision']:     # stale draft: record nothing, hand back current vs intended
+            fail(F.reason_text('baseline_changed'), 409)
+        result = guarded(lambda: deadlines.submit_change(command_id, entity_id, V.SetValue(intended), expected, expected_rev,
+                                                         fx.actor, 'app', body.get('occurred_at') or engine._now()))
+        if result['status'] == 'denied':
+            fail(F.reason_text(result['reason']), 422)
+        if result['status'] != 'waiting_approval':
+            fail(F.reason_text(result['reason']), 409 if result['status'] == 'conflict' else 422)
+        if not result['duplicate']:
+            field_id = 'case.deadline' if entity_id.startswith('case:') else 'node.deadline'
+            delivery(engine, mock, body, user, entity_id, command_id, field_id, V.SetValue(V.normalize_date(intended)))
+        command = next((c for c in snapshot(engine, user, state)['commands'] if c['command_id'] == command_id), None)
+        return JSONResponse(flow_view(user, state, fx, domain, engine, {'outcome': {'status': 'proposed', 'duplicate': result['duplicate']},
+                                                                        'command': command}))
+
+    @app.post('/api/ops-sync/flow/decide')
+    async def flow_decide(request: Request):
+        """MOCK decision on a proposal. Approval is granted only by consuming a mock receipt through the domain approval
+        path, which binds it to the delivery command (YXS-49). The signed-in user is never an approver."""
+        body = await json_object(request)
+        entity_id, command_id = flow_ids(body)
+        decision = body.get('decision')
+        require(decision in F.DECISIONS, 'decision 必須是 approved、rejected 或 stale', 422)
+        data, user, state, fx, domain, deadlines, engine, mock = flow_ctx(request, entity_id)
+        require(fx.actor not in F.APPROVERS, '模擬核准人不得為操作者', 403)
+        guarded(lambda: deadlines.expire_due())
+        prop = deadlines.proposal(entity_id, command_id)
+        require(prop is not None, '找不到申請', 404)
+        field_id = prop['field_id']
+        status, reason, duplicate = prop['state'], None, False
+        if status == 'confirmed' and decision != 'stale':      # replaying a decision on a consumed proposal is a no-op
+            duplicate = True
+        elif decision == 'rejected':
+            out = guarded(lambda: deadlines.reject(entity_id, command_id, F.APPROVERS[0], 'mock rejected'))
+            status, reason = out['status'], out.get('reason')
+            if status == 'failed':
+                guarded(lambda: engine.reject_approval(command_id, 'approval_rejected'))
+        else:
+            receipt = F.mock_receipt(deadlines, entity_id, command_id, decision)
+            out = guarded(lambda: deadlines.approve(receipt))
+            status, reason, duplicate = out['status'], out.get('reason'), out['duplicate']
+            if decision == 'approved' and status == 'denied':
+                fail(F.reason_text(reason), 422)
+            if decision == 'approved' and status == 'confirmed' and not duplicate:
+                guarded(lambda: engine.grant_approval(command_id, receipt.receipt_id))
+                run_dispatch(engine, mock, body, entity_id, field_id)
+            elif status == 'conflict':
+                guarded(lambda: engine.reject_approval(command_id, 'baseline_changed'))
+        command = next((c for c in snapshot(engine, user, state)['commands'] if c['command_id'] == command_id), None)
+        return JSONResponse(flow_view(user, state, fx, domain, engine, {
+            'outcome': {'status': status, 'reason': reason, 'reason_text': F.reason_text(reason), 'duplicate': duplicate,
+                        'decision': decision, 'mock': True}, 'command': command}))
+
+    @app.post('/api/ops-sync/flow/resume-dispatch')
+    async def flow_resume(request: Request):
+        body = await json_object(request)
+        data, user, state = access(request)
+        require(any(lead(user, p) for p in state['projects']), '只有案件負責人可恢復派送', 403)
+        fx = F.Fixtures(clk, user['id'], True)
+        domain, _ = fx.services(app.state.ops_store_for(data['wid']))
+        engine, _ = engine_for(data['wid'], fx.authorizer())
+        reason = body.get('reason')
+        require(reason is None or isinstance(reason, str), 'reason 必須是字串', 422)
+        guarded(lambda: engine.resume_dispatch(reason))
+        guarded(engine.run_once)
+        return JSONResponse(flow_view(user, state, fx, domain, engine))

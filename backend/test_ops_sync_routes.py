@@ -32,7 +32,7 @@ def as_user(app, user):
     return client
 
 
-def body(cid, field='case.pm', expected=None, rev=0, intended='ou_test_pm_2', entity='case:p1'):
+def body(cid, field='case.pm', expected=None, rev=0, intended='synthetic|yxs-local|u-pm', entity='case:p1'):
     return {'command_id': cid, 'entity_id': entity, 'field_id': field, 'expected': expected or {'t': 'clear'},
             'expected_revision': rev, 'intended': {'t': 'set', 'v': intended}, 'schema_binding_version': BINDING, 'occurred_at': '2026-10-11T00:00:00+00:00'}
 
@@ -74,7 +74,7 @@ def test_submit_is_confirmed_only_after_mock_readback(tmp_path):
     assert status['live'] is False and status['notice'] == NOTICE and [c['state'] for c in status['commands']] == ['confirmed']
     dup = client.post('/api/ops-sync/commands', json=body('c1')).json()
     assert dup['duplicate'] and len(client.get('/api/ops-sync/status').json()['commands']) == 1
-    assert client.post('/api/ops-sync/commands', json=body('c1', intended='ou_other')).status_code == 409
+    assert client.post('/api/ops-sync/commands', json=body('c1', intended='synthetic|yxs-local|u-control')).status_code == 409
 
 
 def test_deadline_waits_for_approval_and_never_writes(tmp_path):
@@ -87,13 +87,13 @@ def test_deadline_waits_for_approval_and_never_writes(tmp_path):
 def test_stale_baseline_becomes_conflict_and_can_be_resolved(tmp_path):
     app, client = make(tmp_path, 'true')
     assert client.post('/api/ops-sync/commands', json=body('c1')).json()['command']['state'] == 'confirmed'
-    stale = client.post('/api/ops-sync/commands', json=body('c2', intended='ou_test_pm_3')).json()['command']
+    stale = client.post('/api/ops-sync/commands', json=body('c2', intended='synthetic|yxs-local|u-manager')).json()['command']
     assert stale['state'] == 'conflict' and stale['reason'] == 'baseline_changed'
     conflict = client.get('/api/ops-sync/status').json()['conflicts'][0]
     assert conflict['open'] and conflict['expected']['revision'] == 0 and conflict['current']['revision'] == 1
-    assert conflict['current']['value'] == 'ou_test_pm_2' and conflict['intended']['value'] == 'ou_test_pm_3'
-    resolve = {'command_id': 'r1', 'resolution': 'apply_intended', 'expected': {'t': 'set', 'v': 'ou_test_pm_2'},
-               'expected_revision': 1, 'intended': {'t': 'set', 'v': 'ou_test_pm_3'}, 'schema_binding_version': BINDING}
+    assert conflict['current']['value'] == 'synthetic|yxs-local|u-pm' and conflict['intended']['value'] == 'synthetic|yxs-local|u-manager'
+    resolve = {'command_id': 'r1', 'resolution': 'apply_intended', 'expected': {'t': 'set', 'v': 'synthetic|yxs-local|u-pm'},
+               'expected_revision': 1, 'intended': {'t': 'set', 'v': 'synthetic|yxs-local|u-manager'}, 'schema_binding_version': BINDING}
     wrong = client.post(f"/api/ops-sync/conflicts/{conflict['conflict_id']}/resolve", json={**resolve, 'expected_revision': 0})
     assert wrong.status_code == 409
     done = client.post(f"/api/ops-sync/conflicts/{conflict['conflict_id']}/resolve", json=resolve).json()
