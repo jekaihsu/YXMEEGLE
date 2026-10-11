@@ -229,3 +229,14 @@ Source: owner workbook 工作台與Lark標頭對照.xlsx. All 351 actual mapping
 - **Dates**: case deadline candidates H0182/H0201/H0202 (rows 128/147/148) must not be reused as task original/effective dates H0023/H0031 (rows 22/30).
 - **Identity**: A0010 (row 260): OpenID, Lark account and person are different identity types; the flow uses a typed (tenant, app, person_id) binding, never a display name or free string.
 - Qualification, assignment, node and date mappings stay separate and unmapped states are preserved. No label-based auto-binding, no live schema/data write, no live adapter enablement.
+
+### Workbook-audit reconciliation: status of each claim (YXS-51)
+
+| Audit point | Status in this branch |
+| --- | --- |
+| Mappings are unconfirmed | UNCONFIRMED. No field ID, type or binding is verified; the UI states "未確認／模擬" and `MAPPING_NOTICE` is shown with every flow response. |
+| Person identity is typed | Implemented for the synthetic flow only: `PersonIdentity(tenant, app, person_id)`; free strings and display names are rejected (422) in assign and conflict resolution. Not validated against any real Lark identity type. |
+| No label-based binding | Holds: nothing binds a workbook label to a Lark field. The binding version is a mock constant. |
+| No reuse of case dates as task dates | Holds: case/node deadlines are separate fields; derived task dates are plans from a confirmed effective deadline, never copies of the contract end date. |
+| Mapping, writeback and two-way-sync tests | UNPERFORMED (workbook row 41: 351 tests). Passing tests in this repository exercise the mock adapter only and are not evidence for any Lark mapping. |
+| Live adapter, PostgreSQL, power-loss durability | Not enabled / UNTESTED. |
