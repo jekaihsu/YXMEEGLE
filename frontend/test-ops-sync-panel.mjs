@@ -45,13 +45,13 @@ try{
    const url=new URL(route.request().url()),path=url.pathname,method=route.request().method();
    if(path.startsWith('/api/ops-sync/')){
     if(!on)return route.fulfill({status:404,json:{detail:'API 不存在'}});
-    if(path==='/api/ops-sync/flow')return route.fulfill({json:{notice:MOCK_NOTICE,mapping_notice:'未確認／模擬',roster:[],entities:[],mock_outcomes:['normal'],dispatch_denial:{suspended:[],held_commands:[]},commands:[]}});
+        if(path==='/api/ops-sync/flow'&&method==='GET')return route.fulfill({json:{...statusBody,mapping_notice:'未確認／模擬',roster:[],entities:[],mock_outcomes:['normal'],dispatch_denial:{suspended:[],held_commands:[]}}});
     if(method==='POST'&&stale409){posts.push({path,body:route.request().postDataJSON()});stale409=false;
      statusBody={...statusBody,conflicts:statusBody.conflicts.map(k=>({...k,current:{...set('ou_test_pm_10'),revision:4}}))};   // someone changed the field meanwhile
      return route.fulfill({status:409,json:{detail:'基準值已被更動'}});}
     if(method==='POST'){posts.push({path,body:route.request().postDataJSON()});
      statusBody={...statusBody,commands:statusBody.commands.map(c=>c.command_id==='c-conf'?{...c,state:'confirmed'}:c),conflicts:statusBody.conflicts.map(k=>({...k,open:false,resolution:posts.at(-1).body.resolution}))}}
-    return route.fulfill({json:statusBody});
+    return route.fulfill({json:{...statusBody,mapping_notice:'未確認／模擬',roster:[],entities:[],mock_outcomes:['normal'],dispatch_denial:{suspended:[],held_commands:[]}}});
    }
    return route.fulfill({json:path==='/api/session'?{user:w.users.find(u=>u.role==='manager')||w.users[0],users:w.users,mode:'demo',auth_configured:false}:w});
   });
@@ -106,8 +106,10 @@ try{
  assert.equal(posts.length,2);
  assert.equal(await page.locator('.ops-sync-intent').count(),0,'intent note cleared after success');
  const {path,body}=posts[1];
- assert.equal(path,'/api/ops-sync/conflicts/conflict%3Ac-conf/resolve');
- assert.deepEqual([body.resolution,body.expected,body.expected_revision,body.intended],['apply_intended',{t:'set',v:'ou_test_pm_10'},4,{t:'set',v:'ou_test_pm_2'}]);
+ assert.equal(path,'/api/ops-sync/flow/resolve-conflict');
+ assert.deepEqual([body.conflict_id,body.resolution,body.expected,body.expected_revision],['conflict:c-conf','apply_intended',{t:'set',v:'ou_test_pm_10'},4]);
+ assert.equal(body.intended,undefined,'the client never sends the value to write; the server derives it through the domain');
+ assert.equal(body.schema_binding_version,undefined);
  assert.match(body.command_id,/^c-conf:resolve:/);
  assert.notEqual(posts[0].body.command_id,body.command_id);
  assert.deepEqual(errors,[]);
