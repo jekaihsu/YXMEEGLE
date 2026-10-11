@@ -105,3 +105,27 @@ def test_snapshot_cleanup_on_dispatch_failure(tmp_path):
             assert (snapshot / 'app.py').read_bytes() == b'reviewed'
             raise RuntimeError('dispatch failed')
     assert not snapshot.exists()
+
+
+def test_staged_package_includes_ops_sync_and_boots_with_the_feature_flag_on(tmp_path, monkeypatch):
+    """The flag-gated feature path imports backend.ops_sync; a package without it would crash on boot once the flag is set."""
+    import subprocess
+    import sys
+    monkeypatch.setattr(deploy_prepare, 'RUNTIME', tmp_path)
+    stage = deploy_prepare.staging()
+    manifest = {f['path'] for f in json.loads((tmp_path / 'zeabur-stage-manifest.json').read_text())['files']}
+    source = {p.name for p in (Path(deploy_prepare.ROOT) / 'backend' / 'ops_sync').glob('*.py')}
+    shipped = {Path(m).name for m in manifest if m.startswith('backend/ops_sync/')}
+    assert {'engine.py', 'workspace_store.py', 'routes.py', 'approval_binding.py', 'flags.py'} <= shipped
+    assert not {n for n in shipped if n.startswith('test')}                 # test-only helpers are not deployed
+    assert source - shipped == {'testing.py', 'testing_worker.py'}          # nothing else is left behind
+    assert 'backend/workspace_migration.py' in manifest
+    probe = ("import sys; sys.path.insert(0, sys.argv[1]);"
+             "from backend.app import create_app;"
+             "app = create_app({'DATABASE_URL': 'sqlite:///' + sys.argv[2], 'UPLOAD_DIR': sys.argv[3], 'SESSION_SECRET': 'x' * 40,"
+             "'APP_ENV': 'development', 'DEMO_MODE': 'true', 'FEATURE_LARK_AUTHORITATIVE_OPS': 'true'});"
+             "assert app.state.ops_store_for is not None;"
+             "assert any(r.path == '/api/ops-sync/status' for r in app.routes); print('booted')")
+    out = subprocess.run([sys.executable, '-c', probe, str(stage), str(tmp_path / 'boot.db'), str(tmp_path / 'u')], cwd=tmp_path,
+                         capture_output=True, text=True, timeout=120, env={'PATH': '/usr/bin:/bin'})
+    assert out.returncode == 0 and out.stdout.strip() == 'booted', out.stderr[-2000:]

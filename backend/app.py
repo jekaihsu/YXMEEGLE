@@ -121,15 +121,8 @@ def create_app(overrides=None):
     engine=create_engine(db_url,connect_args={'check_same_thread':False,'timeout':20} if db_url.startswith('sqlite') else {},pool_pre_ping=True)
     Base.metadata.create_all(engine); sessions=sessionmaker(engine,expire_on_commit=False,info={'index_tables':str(cfg.get('INDEX_TABLES_ENABLED','false')).lower()=='true'})
     # Migration is reversible: preserve the original JSON before normalizing.
-    with sessions.begin() as db:
-        for row in db.scalars(select(WorkspaceRow)):
-            if row.data.get('storage_schema')!=2:
-                state=upgrade(deepcopy(row.data))
-                state.setdefault('migration_archive',deepcopy(row.data))
-                row.data=storage.save(db,BusinessRow,row.id,state)
-            elif 'migration_archive' in row.data:
-                state=upgrade(storage.load(db,BusinessRow,row))
-                row.data=storage.save(db,BusinessRow,row.id,state)
+    from .workspace_migration import migrate_workspaces
+    migrate_workspaces(sessions,WorkspaceRow,BusinessRow,upgrade,storage)
     signer=URLSafeTimedSerializer(secret,salt='meegle-session-v1')
     upload_dir=Path(cfg.get('UPLOAD_DIR','./backend/uploads')).resolve(); upload_dir.mkdir(parents=True,exist_ok=True)
     @asynccontextmanager

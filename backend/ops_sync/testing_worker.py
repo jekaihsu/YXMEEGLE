@@ -79,6 +79,24 @@ def main(argv):
         engine.submit(env(args[0], intended=V.SetValue(args[1])))
         engine.run_once()
         print(engine.status(args[0])['state'], flush=True)
+    elif cmd == 'grant':         # grant CID REF ENTITY BARRIER|- COMMIT_NO: hand a consumed approval over, kill at a barrier
+        cid, ref, entity = args[:3]
+        engine, _ = engine_for(ws, lark)
+        engine.observe(entity)
+        barrier = None if args[3] == '-' else args[3]
+        engine, _ = engine_for(ws, lark, killer(barrier, int(args[4])))
+        engine.grant_approval(cid, ref)
+        print('granted', flush=True)
+    elif cmd == 'race':          # race CID REF ENTITY READY_DIR: grant the approval and dispatch, all processes released at once
+        cid, ref, entity = args[:3]
+        engine, _ = engine_for(ws, lark)
+        engine.observe(entity)
+        open(os.path.join(args[3], cid + '.' + str(os.getpid())), 'w').close()
+        wait_for(os.path.join(args[3], 'go'))
+        engine.grant_approval(cid, ref)
+        engine.run_once()
+        status = engine.status(cid)
+        print(f"{status['state']}:{status['reason']}", flush=True)
     elif cmd == 'lease_then_die':  # take a lease and die holding it
         engine, _ = engine_for(ws, lark)
         engine.observe('case_test_1')

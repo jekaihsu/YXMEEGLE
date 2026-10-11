@@ -21,7 +21,7 @@ assert.equal(valueText({kind:'clear',value:null}),'（空白）');assert.equal(v
 
 const set=v=>({kind:'set',value:v}),clear={kind:'clear',value:null};
 const cmd=(id,state,extra={})=>({command_id:id,entity_id:'case:p1',field_id:'case.pm',state,reason:null,actor:'u-pm',expected:clear,expected_revision:0,intended:set('ou_test_pm_2'),attempts:0,reconcile:null,...extra});
-let on=true,statusBody,posts=[];
+let on=true,statusBody,posts=[],stale409=false;
 const fixture=()=>({notice:MOCK_NOTICE,live:false,commands:[
  cmd('c-wait','waiting_approval',{field_id:'case.deadline',reason:'awaiting_approval',intended:set('2026-10-20')}),
  cmd('c-pend','pending'),cmd('c-ok','confirmed',{attempts:1}),
@@ -45,6 +45,9 @@ try{
    const url=new URL(route.request().url()),path=url.pathname,method=route.request().method();
    if(path.startsWith('/api/ops-sync/')){
     if(!on)return route.fulfill({status:404,json:{detail:'API 不存在'}});
+    if(method==='POST'&&stale409){posts.push({path,body:route.request().postDataJSON()});stale409=false;
+     statusBody={...statusBody,conflicts:statusBody.conflicts.map(k=>({...k,current:{...set('ou_test_pm_10'),revision:4}}))};   // someone changed the field meanwhile
+     return route.fulfill({status:409,json:{detail:'基準值已被更動'}});}
     if(method==='POST'){posts.push({path,body:route.request().postDataJSON()});
      statusBody={...statusBody,commands:statusBody.commands.map(c=>c.command_id==='c-conf'?{...c,state:'confirmed'}:c),conflicts:statusBody.conflicts.map(k=>({...k,open:false,resolution:posts.at(-1).body.resolution}))}}
     return route.fulfill({json:statusBody});
@@ -83,13 +86,29 @@ try{
  await page.screenshot({path:process.env.OPS_SYNC_SCREENSHOT||undefined}).catch(()=>{});
  // explicit resolve: nothing is sent until the user chooses; the request carries the freshly read baseline
  assert.equal(posts.length,0);
+ // 409 / reload: the data moved under the user. Latest state is shown, their choice stays visible, nothing is auto-resubmitted.
+ stale409=true;
+ await page.getByRole('button',{name:'套用擬變更值'}).click();
+ await page.getByRole('alert').waitFor();
+ assert.match(await page.getByRole('alert').innerText(),/已被更新.*尚未送出/);
+ await page.locator('.ops-sync-intent').waitFor();
+ assert.match(await page.locator('.ops-sync-intent').innerText(),/套用擬變更值.*尚未送出/);
+ assert.equal(await page.locator('.ops-sync-intent').getAttribute('data-intent'),'apply_intended');
+ const reloaded=await page.locator('.ops-sync-item[data-state=conflict]').innerText();
+ assert.ok(reloaded.includes('ou_test_pm_10（版本 4）')&&reloaded.includes('ou_test_pm_2'),'fresh current value and the intended value are both on screen');
+ assert.equal(await page.locator('.ops-sync-item[data-state=conflict]').getByRole('button',{name:'套用擬變更值'}).isEnabled(),true);
+ await page.waitForTimeout(300);
+ assert.equal(posts.length,1,'no automatic resubmission after a 409');
+ // explicit retry carries the freshly read baseline
  await page.getByRole('button',{name:'套用擬變更值'}).click();
  await page.locator('.ops-sync-item[data-state=confirmed]').nth(1).waitFor();
- assert.equal(posts.length,1);
- const {path,body}=posts[0];
+ assert.equal(posts.length,2);
+ assert.equal(await page.locator('.ops-sync-intent').count(),0,'intent note cleared after success');
+ const {path,body}=posts[1];
  assert.equal(path,'/api/ops-sync/conflicts/conflict%3Ac-conf/resolve');
- assert.deepEqual([body.resolution,body.expected,body.expected_revision,body.intended],['apply_intended',{t:'set',v:'ou_test_pm_9'},3,{t:'set',v:'ou_test_pm_2'}]);
+ assert.deepEqual([body.resolution,body.expected,body.expected_revision,body.intended],['apply_intended',{t:'set',v:'ou_test_pm_10'},4,{t:'set',v:'ou_test_pm_2'}]);
  assert.match(body.command_id,/^c-conf:resolve:/);
+ assert.notEqual(posts[0].body.command_id,body.command_id);
  assert.deepEqual(errors,[]);
  console.log('ops-sync panel: ok');
 }finally{await browser?.close();server.close()}

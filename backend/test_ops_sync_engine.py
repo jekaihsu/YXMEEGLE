@@ -367,18 +367,20 @@ def test_keep_current_resolution_writes_nothing(rig):
     assert rig.engine.snapshot()['conflicts']['conflict:b']['resolution']['mode'] == 'keep_current'
 
 
-def test_approval_gate_blocks_dispatch_until_granted(rig):
+def test_approval_gate_blocks_dispatch_until_a_consumed_approval_is_granted(rig):
+    """A bare reference never opens the gate; the consumed-approval flow is in test_ops_sync_approval_dispatch.py."""
     engine = rig.restart(approval_required={'case.deadline'})
     engine.observe(E)
     assert engine.submit(env('c1'))['status'] == 'waiting_approval'
     assert engine.run_once() == [] and rig.adapter.write_count == 0
-    engine.grant_approval('c1', 'mock-receipt-1')
-    engine.run_once()
-    assert engine.status('c1')['state'] == 'confirmed'
-    assert engine.submit(env('c2', intended=D2, expected=D1, expected_revision=1))['status'] == 'waiting_approval'
-    engine.reject_approval('c2')
-    assert engine.status('c2')['reason'] == 'approval_rejected'
-    assert engine.projection(E, 'case.deadline') == (D1, 1)
+    assert engine.grant_approval('c1', 'mock-receipt-1') == 'waiting_approval'
+    assert engine.status('c1')['reason'] == 'approval_not_consumed'
+    assert engine.run_once() == [] and rig.adapter.write_count == 0
+    assert engine.submit(env('c2', intended=D2, approval_ref='mock-receipt-2'))['reason'] == 'approval_not_consumed'
+    assert engine.submit(env('c3', intended=D2))['status'] == 'waiting_approval'
+    engine.reject_approval('c3')
+    assert engine.status('c3')['reason'] == 'approval_rejected'
+    assert engine.projection(E, 'case.deadline') == (V.CLEAR, 0)
 
 
 def test_authorizer_is_checked_at_submit_and_again_before_dispatch(rig):

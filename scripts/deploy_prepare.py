@@ -135,6 +135,8 @@ def staging():
     files = [ROOT / x for x in exact]
     files += [p for p in (ROOT/'backend').glob('*.py') if not p.name.startswith('test_')]
     files += [p for p in (ROOT/'backend'/'live_read').rglob('*.py') if not p.name.startswith('test_')]
+    # ops_sync is imported by app.py when FEATURE_LARK_AUTHORITATIVE_OPS is on; its test-only helpers (testing*.py) stay out.
+    files += [p for p in (ROOT/'backend'/'ops_sync').rglob('*.py') if not p.name.startswith('test')]
     for part in ('frontend/src', 'frontend/public'):
         source = ROOT / part
         if source.exists(): files += [p for p in source.rglob('*') if p.is_file()]

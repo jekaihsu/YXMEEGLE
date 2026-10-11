@@ -2,13 +2,14 @@
 
 All state lives in the `ops_sync` namespace of an injected `OpsStore`. Every state change is one
 store transaction; adapter calls happen between transactions and are fenced by per-entity leases.
-Approval receipt verification, PM eligibility and derived-date recalculation belong to later
-tasks: `approval_required` only gates dispatch on the presence of an approval grant.
+PM eligibility and derived-date recalculation belong to later tasks. `approval_required` fields dispatch only on a
+consumed, matching domain approval that is bound to the command (see approval_binding.py), never on a bare reference.
 """
 from dataclasses import dataclass
 from datetime import timezone
 
 from . import adapter as A
+from . import approval_binding as AB
 from . import values as V
 from .clock import SystemClock
 from .commands import CommandEnvelope, payload_fingerprint
@@ -38,7 +39,7 @@ class Attempt:
 
 def _ns(ns):
     for key in ('commands', 'inbox', 'checkpoints', 'projection', 'conflicts', 'fence', 'entity_leases',
-                'suspended', 'recovery_needed', 'proposals'):
+                'suspended', 'recovery_needed', 'proposals', 'approval_bindings'):
         ns.setdefault(key, {})
     for key in ('history', 'outbox', 'integrity'):
         ns.setdefault(key, [])
@@ -112,8 +113,11 @@ class OpsEngine:
             denied = self.authorizer(envelope, 'submit')
             if denied:
                 state, reason = FAILED, denied
-            elif envelope.field_id in self.approval_required and not envelope.approval_ref:
-                state, reason = WAITING, 'awaiting_approval'
+            elif envelope.field_id in self.approval_required:
+                if not envelope.approval_ref:
+                    state, reason = WAITING, 'awaiting_approval'
+                else:
+                    state, reason = self._bind_approval(ns, payload)
         cmd = {'envelope': payload, 'fingerprint': digest, 'state': state, 'reason': reason, 'attempts': [],
                'next_attempt_at': self._now(), 'lease': None, 'reconcile': None, 'result': None,
                'created_at': self._now(), 'seq': len(ns['commands'])}
@@ -125,10 +129,27 @@ class OpsEngine:
         """Accept a command. Durable acceptance + outbox entry are one atomic transaction."""
         return self._tx(lambda ns: self._submit_in_txn(ns, envelope))
 
+    @staticmethod
+    def _bind_approval(ns, payload):
+        """Verify the consumed approval and bind it to the command in this same transaction -> (state, reason)."""
+        denied = AB.verify(ns, payload, require_bound=False)
+        if denied:
+            return FAILED, denied
+        AB.bind(ns, payload)
+        return QUEUED, None
+
     def grant_approval(self, command_id, approval_ref):
+        """Hand a consumed domain approval to a waiting command. A ref that is not a consumed, matching, unused
+        approval leaves the command waiting (reason says why); replaying the same grant is a no-op."""
         def apply(ns):
             cmd = ns['commands'][command_id]
             if cmd['state'] == WAITING:
+                trial = dict(cmd['envelope'], approval_ref=approval_ref)
+                denied = AB.verify(ns, trial, require_bound=False)
+                if denied:
+                    cmd['reason'] = denied
+                    return cmd['state']
+                AB.bind(ns, trial)
                 cmd['envelope']['approval_ref'] = approval_ref
                 self._set(ns, cmd, QUEUED)
                 cmd['next_attempt_at'] = self._now()
@@ -175,8 +196,12 @@ class OpsEngine:
         envelope = CommandEnvelope(env['command_id'], env['entity_id'], env['field_id'], V.decode(env['expected']),
                                    env['expected_revision'], V.decode(env['intended']), env['actor'], env['source'],
                                    env['occurred_at'], env['schema_binding_version'], env['approval_ref'])
-        if env['field_id'] in self.approval_required and not env['approval_ref']:
-            return 'approval_missing'
+        if env['field_id'] in self.approval_required:
+            if not env['approval_ref']:
+                return 'approval_missing'
+            denied = AB.verify(ns, env, require_bound=True)
+            if denied:
+                return denied
         return self.authorizer(envelope, 'dispatch')
 
     def begin_dispatch(self, command_id):
