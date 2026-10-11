@@ -96,16 +96,6 @@ def test_role_gate_and_typed_person_binding_enforced_server_side(rig):
     assert pm.get(URL).json()['commands'] == [] and writes(app) == 0
 
 
-def test_raw_command_route_cannot_bypass_pm_eligibility(rig):
-    app, pm = rig
-    body = {'command_id': 'raw1', 'entity_id': CASE, 'field_id': 'case.pm', 'expected': {'t': 'clear'}, 'expected_revision': 0,
-            'intended': {'t': 'set', 'v': PM('u-revoked')}, 'schema_binding_version': 'mock-binding-v1'}
-    cmd = pm.post('/api/ops-sync/commands', json=body).json()['command']
-    assert cmd['state'] == 'failed' and cmd['reason'] == 'ineligible' and writes(app) == 0
-    free = pm.post('/api/ops-sync/commands', json={**body, 'command_id': 'raw2', 'intended': {'t': 'set', 'v': 'ou_free_string'}}).json()['command']
-    assert free['state'] == 'failed' and free['reason'] == 'invalid_person'
-
-
 def test_node_responsible_is_independent_of_the_case_pm(rig):
     app, pm = rig
     assert command(assign(pm, 'a1').json(), 'a1')['state'] == 'confirmed'
@@ -170,9 +160,7 @@ def test_decisions_cannot_be_forged_or_target_unknown_proposals(rig):
     propose(pm, 'p1')
     assert decide(pm, 'p1', 'granted').status_code == 422
     assert decide(pm, 'nope', 'approved').status_code == 404
-    forged = pm.post('/api/ops-sync/commands', json={
-        'command_id': 'forge', 'entity_id': CASE, 'field_id': 'case.deadline', 'expected': {'t': 'clear'}, 'expected_revision': 0,
-        'intended': {'t': 'set', 'v': '2026-10-20'}, 'approval_ref': 'made-up', 'schema_binding_version': 'mock-binding-v1'}).json()['command']
+    forged = propose(pm, 'forge', approval_ref='made-up', receipt_id='made-up').json()['command']
     assert forged['state'] == 'waiting_approval' and writes(app) == 0                            # approval_ref in the body is ignored
     assert entity(pm.get(URL).json(), CASE)['deadline']['effective']['revision'] == 0
 
@@ -182,7 +170,7 @@ def test_unknown_outcome_reconciles_the_same_operation_without_a_second_write(ri
     out = assign(pm, 'a1', mock_outcome='timeout_after_commit').json()
     cmd = command(out, 'a1')
     assert cmd['state'] == 'unknown' and entity(out, CASE)['seat']['person_id'] == 'u-pm' and cmd['attempts'] == 1
-    done = pm.post('/api/ops-sync/reconcile', json={'command_id': 'a1'}).json()
+    done = pm.post(f'{URL}/reconcile', json={'command_id': 'a1'}).json()
     assert command(done, 'a1')['state'] == 'confirmed' and writes(app) == 1
 
 

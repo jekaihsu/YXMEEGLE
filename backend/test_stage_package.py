@@ -125,7 +125,7 @@ def test_staged_package_includes_ops_sync_and_boots_with_the_feature_flag_on(tmp
              "app = create_app({'DATABASE_URL': 'sqlite:///' + sys.argv[2], 'UPLOAD_DIR': sys.argv[3], 'SESSION_SECRET': 'x' * 40,"
              "'APP_ENV': 'development', 'DEMO_MODE': 'true', 'FEATURE_LARK_AUTHORITATIVE_OPS': 'true'});"
              "assert app.state.ops_store_for is not None;"
-             "assert any(r.path == '/api/ops-sync/status' for r in app.routes); print('booted')")
+             "assert any(r.path == '/api/ops-sync/flow' for r in app.routes); print('booted')")
     out = subprocess.run([sys.executable, '-c', probe, str(stage), str(tmp_path / 'boot.db'), str(tmp_path / 'u')], cwd=tmp_path,
                          capture_output=True, text=True, timeout=120, env={'PATH': '/usr/bin:/bin'})
     assert out.returncode == 0 and out.stdout.strip() == 'booted', out.stderr[-2000:]

@@ -15,6 +15,7 @@ from . import values as V
 from .clock import SystemClock
 from .adapter import BINDING, MockLarkAdapter
 from .commands import CommandEnvelope
+from .eligibility import PersonIdentity
 from .engine import CONFIRMED, CONFLICT, FAILED, QUEUED, UNKNOWN_S, WAITING, IdentityCollision, OpsEngine
 from .workspace_store import WorkspaceStore
 
@@ -106,64 +107,6 @@ def register(app, identity, load, sessions, WorkspaceRow, clock=None):
                 if visible(user, state, c['envelope']['entity_id'])]
         conflicts = [conflict_view(c) for c in snap['conflicts'].values() if visible(user, state, c['entity_id'])]
         return {'notice': NOTICE, 'live': False, 'commands': cmds, 'conflicts': conflicts}
-
-    @app.get('/api/ops-sync/status')
-    def status(request: Request):
-        data, user, state = access(request)
-        engine, _ = engine_for(data['wid'])
-        return JSONResponse(snapshot(engine, user, state))
-
-    @app.post('/api/ops-sync/commands')
-    async def submit(request: Request):
-        body = await json_object(request)
-        entity_id = body.get('entity_id')
-        require(isinstance(entity_id, str) and isinstance(body.get('command_id'), str), '缺少 entity_id 或 command_id', 422)
-        data, user, state = access(request, entity_id)
-        engine, _ = engine_for(data['wid'], F.Fixtures(clk, user['id'], True).authorizer())
-        field_id = body.get('field_id')
-        envelope = CommandEnvelope(
-            body['command_id'], entity_id, field_id, _value(body, 'expected'), body.get('expected_revision'),
-            _value(body, 'intended'), user['id'], 'app', body.get('occurred_at') or engine._now(),
-            body.get('schema_binding_version') or '')
-
-        def run():
-            engine.observe(entity_id, [field_id] if field_id in V.FIELD_TYPES else None)
-            result = engine.submit(envelope)
-            if not result['duplicate']:
-                engine.run_once()
-            return result
-        result = guarded(run)
-        view = next((c for c in snapshot(engine, user, state)['commands'] if c['command_id'] == body['command_id']), None)
-        return JSONResponse({'accepted': True, 'duplicate': result['duplicate'], 'command': view})
-
-    @app.post('/api/ops-sync/conflicts/{conflict_id}/resolve')
-    async def resolve(conflict_id: str, request: Request):
-        body = await json_object(request)
-        data, user, state = access(request)
-        engine, _ = engine_for(data['wid'])
-        conflict = engine.snapshot()['conflicts'].get(conflict_id)
-        require(conflict is not None, '找不到衝突', 404)
-        access(request, conflict['entity_id'])
-        mode = body.get('resolution')
-        envelope = CommandEnvelope(
-            body.get('command_id') or '', conflict['entity_id'], conflict['field_id'], _value(body, 'expected'),
-            body.get('expected_revision'), _value(body, 'intended'), user['id'], 'app', engine._now(),
-            body.get('schema_binding_version') or '', resolves=conflict_id, resolution=mode)
-        guarded(lambda: engine.resolve_conflict(envelope, conflict_id, mode))
-        guarded(engine.run_once)
-        return JSONResponse(snapshot(engine, user, state))
-
-    @app.post('/api/ops-sync/reconcile')
-    async def reconcile(request: Request):
-        body = await json_object(request)
-        command_id = body.get('command_id')
-        data, user, state = access(request)
-        engine, _ = engine_for(data['wid'])
-        cmd = engine.snapshot()['commands'].get(command_id) if isinstance(command_id, str) else None
-        require(cmd is not None, '找不到指令', 404)
-        access(request, cmd['envelope']['entity_id'])
-        guarded(lambda: (engine.request_recovery(command_id), engine.run_once()))
-        return JSONResponse(snapshot(engine, user, state))
 
     # -- synthetic local vertical flow (all fixture data; mock adapter only) --------------------------------------
     def flow_ctx(request, entity_id=None, body=None):
@@ -316,3 +259,54 @@ def register(app, identity, load, sessions, WorkspaceRow, clock=None):
         guarded(lambda: engine.resume_dispatch(reason))
         guarded(engine.run_once)
         return JSONResponse(flow_view(user, state, fx, domain, engine))
+
+    @app.post('/api/ops-sync/flow/reconcile')
+    async def flow_reconcile(request: Request):
+        """Re-read a delivery whose outcome is unknown. Never creates or changes intent: the domain record already holds it."""
+        body = await json_object(request)
+        command_id = body.get('command_id')
+        data, user, state = access(request)
+        engine, _ = engine_for(data['wid'])
+        cmd = engine.snapshot()['commands'].get(command_id) if isinstance(command_id, str) else None
+        require(cmd is not None, '找不到指令', 404)
+        data, user, state, fx, domain, _, engine, _ = flow_ctx(request, cmd['envelope']['entity_id'])
+        guarded(lambda: (engine.request_recovery(command_id), engine.run_once()))
+        return JSONResponse(flow_view(user, state, fx, domain, engine))
+
+    @app.post('/api/ops-sync/flow/resolve-conflict')
+    async def flow_resolve(request: Request):
+        """Resolve an open seat conflict THROUGH the domain: the chosen person goes through the same eligibility / role /
+        history gates as an assignment before the engine writes it, so the domain seat, projection and mock converge."""
+        body = await json_object(request)
+        conflict_id, command_id, mode = body.get('conflict_id'), body.get('command_id'), body.get('resolution')
+        require(isinstance(conflict_id, str) and isinstance(command_id, str) and command_id.strip(), '缺少 conflict_id 或 command_id', 422)
+        require(mode in ('keep_current', 'apply_intended'), 'resolution 必須是 keep_current 或 apply_intended', 422)
+        data, user, state = access(request)
+        conflict = engine_for(data['wid'])[0].snapshot()['conflicts'].get(conflict_id)
+        require(conflict is not None, '找不到衝突', 404)
+        entity_id, field_id = conflict['entity_id'], conflict['field_id']
+        data, user, state, fx, domain, _, engine, mock = flow_ctx(request, entity_id)
+        require(field_id in ('case.pm', 'node.responsible'), '期限衝突請以新的期限申請處理', 422)
+        if conflict['resolution']:
+            require(conflict['resolution']['command_id'] == command_id, '此衝突已處理', 409)
+            return JSONResponse(flow_view(user, state, fx, domain, engine))
+        expected, expected_rev = _value(body, 'expected'), body.get('expected_revision')
+        obs = guarded(lambda: mock.read(entity_id, [field_id]))
+        require(obs.complete and V.encode(obs.values[field_id]) == V.encode(expected) and obs.revisions[field_id] == expected_rev,
+                F.reason_text('baseline_changed'), 409)
+        target = expected if mode == 'keep_current' else V.decode(conflict['intended'])
+        try:
+            candidates = V.CLEAR if target is V.CLEAR else [PersonIdentity.from_key(target.value)]
+        except ValueError:
+            fail('衝突中的值不是有效的人員代號，無法處理', 422)
+        assign = domain.assign_pm if entity_id.startswith('case:') else domain.assign_responsible
+        result = guarded(lambda: assign(command_id, entity_id, fx.actor, candidates, body.get('reason') or f'conflict {mode}', 'app'))
+        if result['status'] in ('denied', 'conflict'):
+            fail(F.reason_text(result['reason']), 422)
+        envelope = CommandEnvelope(command_id, entity_id, field_id, expected, expected_rev, target, user['id'], 'app',
+                                   engine._now(), BINDING, resolves=conflict_id, resolution=mode)
+        guarded(lambda: engine.resolve_conflict(envelope, conflict_id, mode))
+        run_dispatch(engine, mock, body, entity_id, field_id)
+        command = next((c for c in snapshot(engine, user, state)['commands'] if c['command_id'] == command_id), None)
+        return JSONResponse(flow_view(user, state, fx, domain, engine, {'outcome': {'status': result['status'], 'duplicate': False},
+                                                                        'command': command}))

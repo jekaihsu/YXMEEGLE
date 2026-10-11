@@ -11,8 +11,9 @@ from .ops_sync.workspace_store import WorkspaceStore
 from .ops_sync.routes import ADAPTER_NAMESPACE, NOTICE
 from .seed import seed
 
-PATHS = [('get', '/api/ops-sync/status'), ('post', '/api/ops-sync/commands'),
-         ('post', '/api/ops-sync/conflicts/x/resolve'), ('post', '/api/ops-sync/reconcile')]
+PATHS = [('get', '/api/ops-sync/flow'), ('post', '/api/ops-sync/flow/assign'), ('post', '/api/ops-sync/flow/propose'),
+         ('post', '/api/ops-sync/flow/decide'), ('post', '/api/ops-sync/flow/reconcile'),
+         ('post', '/api/ops-sync/flow/resolve-conflict'), ('post', '/api/ops-sync/flow/resume-dispatch')]
 
 
 def make(tmp_path, flag, user='u-pm'):
@@ -48,7 +49,7 @@ def test_flag_off_routes_do_not_exist(tmp_path, flag):
     app, client = make(tmp_path, flag)
     assert app.state.ops_store_for is None
     # The app answers any unregistered POST with 405 (GET catch-all); the ops paths must be indistinguishable from that.
-    assert client.get('/api/ops-sync/status').status_code == 404
+    assert client.get('/api/ops-sync/flow').status_code == 404
     unregistered = client.post('/api/never-registered', json={}).status_code
     assert unregistered in (404, 405)
     for method, path in PATHS:
@@ -57,88 +58,66 @@ def test_flag_off_routes_do_not_exist(tmp_path, flag):
     assert 'ops_sync' not in client.get('/api/workspace').text
 
 
+def assign_body(cid, entity='case:p1', people=('u-pm',)):
+    return {'command_id': cid, 'entity_id': entity, 'person_ids': list(people), 'occurred_at': '2026-10-11T00:00:00+00:00'}
+
+
 def test_live_writes_stay_disabled_and_no_network(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(socket.socket, 'connect', lambda *a, **k: calls.append(a))
     app, client = make(tmp_path, 'true')
     assert MockLarkAdapter.live is False
-    assert client.post('/api/ops-sync/commands', json=body('c1')).status_code == 200
+    assert client.post('/api/ops-sync/flow/assign', json=assign_body('c1')).status_code == 200
     assert calls == []
 
 
-def test_submit_is_confirmed_only_after_mock_readback(tmp_path):
+def test_assign_is_confirmed_only_after_mock_readback_and_is_idempotent(tmp_path):
     app, client = make(tmp_path, 'true')
-    first = client.post('/api/ops-sync/commands', json=body('c1')).json()
-    assert first['accepted'] and first['command']['state'] == 'confirmed' and first['command']['attempts'] == 1
-    status = client.get('/api/ops-sync/status').json()
-    assert status['live'] is False and status['notice'] == NOTICE and [c['state'] for c in status['commands']] == ['confirmed']
-    dup = client.post('/api/ops-sync/commands', json=body('c1')).json()
-    assert dup['duplicate'] and len(client.get('/api/ops-sync/status').json()['commands']) == 1
-    assert client.post('/api/ops-sync/commands', json=body('c1', intended='synthetic|yxs-local|u-control')).status_code == 409
+    first = client.post('/api/ops-sync/flow/assign', json=assign_body('c1')).json()
+    assert first['command']['state'] == 'confirmed' and first['command']['attempts'] == 1
+    assert first['live'] is False and first['notice'] == NOTICE
+    dup = client.post('/api/ops-sync/flow/assign', json=assign_body('c1')).json()
+    assert dup['outcome']['duplicate'] and len(client.get('/api/ops-sync/flow').json()['commands']) == 1
 
 
 def test_deadline_waits_for_approval_and_never_writes(tmp_path):
     app, client = make(tmp_path, 'true')
-    out = client.post('/api/ops-sync/commands', json={**body('d1', field='case.deadline'), 'intended': {'t': 'set', 'v': '2026-10-20'}}).json()
+    out = client.post('/api/ops-sync/flow/propose', json={'command_id': 'd1', 'entity_id': 'case:p1', 'intended': '2026-10-20',
+                                                         'expected_revision': 0}).json()
     assert out['command']['state'] == 'waiting_approval' and out['command']['attempts'] == 0
     assert MockLarkAdapter(WorkspaceStore(app.state.sessions, 'demo-ops', namespace=ADAPTER_NAMESPACE)).write_count == 0
 
 
-def test_stale_baseline_becomes_conflict_and_can_be_resolved(tmp_path):
-    app, client = make(tmp_path, 'true')
-    assert client.post('/api/ops-sync/commands', json=body('c1')).json()['command']['state'] == 'confirmed'
-    stale = client.post('/api/ops-sync/commands', json=body('c2', intended='synthetic|yxs-local|u-manager')).json()['command']
-    assert stale['state'] == 'conflict' and stale['reason'] == 'baseline_changed'
-    conflict = client.get('/api/ops-sync/status').json()['conflicts'][0]
-    assert conflict['open'] and conflict['expected']['revision'] == 0 and conflict['current']['revision'] == 1
-    assert conflict['current']['value'] == 'synthetic|yxs-local|u-pm' and conflict['intended']['value'] == 'synthetic|yxs-local|u-manager'
-    resolve = {'command_id': 'r1', 'resolution': 'apply_intended', 'expected': {'t': 'set', 'v': 'synthetic|yxs-local|u-pm'},
-               'expected_revision': 1, 'intended': {'t': 'set', 'v': 'synthetic|yxs-local|u-manager'}, 'schema_binding_version': BINDING}
-    wrong = client.post(f"/api/ops-sync/conflicts/{conflict['conflict_id']}/resolve", json={**resolve, 'expected_revision': 0})
-    assert wrong.status_code == 409
-    done = client.post(f"/api/ops-sync/conflicts/{conflict['conflict_id']}/resolve", json=resolve).json()
-    assert [c['state'] for c in done['commands']] == ['confirmed', 'conflict', 'confirmed']
-    assert not done['conflicts'][0]['open']
-
-
 def test_unknown_then_reconcile_confirms(tmp_path):
     app, client = make(tmp_path, 'true')
-    client.get('/api/ops-sync/status')
-    eng = engine(app)
-    eng.adapter.inject('timeout_after_commit')
-    from .ops_sync.testing import env
-    eng.observe('case:p1', ['case.pm'])
-    eng.submit(env('u1', field='case.pm', entity='case:p1', actor='u-pm'))
-    eng.run_once()
-    states = {c['command_id']: c for c in client.get('/api/ops-sync/status').json()['commands']}
-    assert states['u1']['state'] == 'unknown' and states['u1']['reconcile']['phase'] == 'pending'
-    out = client.post('/api/ops-sync/reconcile', json={'command_id': 'u1'}).json()
-    assert [c['state'] for c in out['commands']] == ['confirmed']
-    assert client.post('/api/ops-sync/reconcile', json={'command_id': 'nope'}).status_code == 404
+    out = client.post('/api/ops-sync/flow/assign', json={**assign_body('u1'), 'mock_outcome': 'timeout_after_commit'}).json()
+    assert out['command']['state'] == 'unknown' and out['command']['reconcile']['phase'] == 'pending'
+    done = client.post('/api/ops-sync/flow/reconcile', json={'command_id': 'u1'}).json()
+    assert [c['state'] for c in done['commands']] == ['confirmed']
+    assert client.post('/api/ops-sync/flow/reconcile', json={'command_id': 'nope'}).status_code == 404
 
 
 def test_permission_denied_for_non_lead_and_unknown_entity(tmp_path):
     app, _ = make(tmp_path, 'true')
     member = as_user(app, 'u-field')
-    assert member.post('/api/ops-sync/commands', json=body('m1')).status_code == 403
-    assert member.get('/api/ops-sync/status').json()['commands'] == []
+    assert member.post('/api/ops-sync/flow/assign', json=assign_body('m1')).status_code == 403
+    assert member.get('/api/ops-sync/flow').json()['commands'] == []
     pm = as_user(app, 'u-pm')
-    assert pm.post('/api/ops-sync/commands', json=body('m2', entity='case:nope')).status_code == 404
-    assert pm.post('/api/ops-sync/commands', json=body('m3', entity='garbage')).status_code == 404
-    assert as_user(app, 'u-pm').get('/api/ops-sync/status').json()['commands'] == []   # nothing recorded for denied calls
-    assert pm.post('/api/ops-sync/commands', json={**body('m4'), 'expected_revision': 'x'}).status_code == 422
+    assert pm.post('/api/ops-sync/flow/assign', json=assign_body('m2', entity='case:nope')).status_code == 404
+    assert pm.post('/api/ops-sync/flow/assign', json=assign_body('m3', entity='garbage')).status_code == 404
+    assert pm.get('/api/ops-sync/flow').json()['commands'] == []       # nothing recorded for denied calls
 
 
-def test_ineligible_actor_cannot_read_other_leads_commands_or_act_as_body_actor(tmp_path):
+def test_other_lead_cannot_read_commands_or_act_as_body_actor(tmp_path):
     app, pm = make(tmp_path, 'true')
-    pm.post('/api/ops-sync/commands', json=body('c1'))
+    pm.post('/api/ops-sync/flow/assign', json=assign_body('c1'))
     other = as_user(app, 'u-control')
-    assert other.get('/api/ops-sync/status').json()['commands'] == []
-    assert other.post('/api/ops-sync/reconcile', json={'command_id': 'c1'}).status_code == 403
-    out = pm.post('/api/ops-sync/commands', json={**body('c9'), 'actor': 'u-manager'}).json()
+    assert other.get('/api/ops-sync/flow').json()['commands'] == []
+    assert other.post('/api/ops-sync/flow/reconcile', json={'command_id': 'c1'}).status_code == 403
+    out = pm.post('/api/ops-sync/flow/assign', json={**assign_body('c9', people=('u-manager',)), 'actor': 'u-manager'}).json()
     assert out['command']['actor'] == 'u-pm'                                         # actor comes from the session
 
 
 def test_no_session_is_rejected(tmp_path):
     app, _ = make(tmp_path, 'true')
-    assert TestClient(app).get('/api/ops-sync/status').status_code == 401
+    assert TestClient(app).get('/api/ops-sync/flow').status_code == 401
