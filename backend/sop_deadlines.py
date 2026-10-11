@@ -70,6 +70,10 @@ def _started(task):
     return bool(task.get('started_at') or task.get('completed_at') or task.get('status') not in ('pending',None))
 
 
+def _manual(task,prior):
+    return bool(task.get('due_date') and (not prior or task['due_date']!=prior.get('calculated_due')))
+
+
 def _materialize(ws,p,record,user):
     from .operations import add_workdays, digest, invalidate
     created=[]
@@ -95,7 +99,7 @@ def _materialize(ws,p,record,user):
             prior=task.get('sop_due_provenance')
             if prior!=provenance or task.get('due_date')!=calculated:
                 task.setdefault('sop_deadline_history',[]).append(dict(due_date=task.get('due_date'),provenance=deepcopy(prior),at=now()))
-            manual=bool(task.get('due_date') and (not prior or task['due_date']!=prior.get('calculated_due')))
+            manual=_manual(task,prior)
             if task.get('due_date')!=calculated and (_fixed(task) or _started(task) or manual):
                 for conflict in p['sop_deadline_conflicts']:
                     if conflict['task_id']==task['id'] and conflict['status']=='pending': conflict['status']='superseded'
