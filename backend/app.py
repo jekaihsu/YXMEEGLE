@@ -1050,6 +1050,8 @@ def create_app(overrides=None):
         from .ops_sync.flags import resolve_flags as resolve_ops_flags
         from .ops_sync.workspace_store import ops_store_factory
         app.state.ops_store_for=ops_store_factory(resolve_ops_flags({'FEATURE_LARK_AUTHORITATIVE_OPS':True}),sessions)
+        from .ops_sync.routes import register as register_ops_routes
+        register_ops_routes(app,identity,load,sessions,WorkspaceRow)
     from .live_read.coordinator import RefreshCoordinator
     from .live_read.datasets import build_refreshers
     from .live_read.routes import register as register_live, refresh as live_refresh
