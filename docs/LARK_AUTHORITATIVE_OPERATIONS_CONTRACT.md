@@ -119,6 +119,29 @@ The following deliberate-failure tests are mandatory implementation evidence in 
 
 **Go/no-go criterion:** GO only when every guarantee above has passing deliberate-failure evidence for the actual workspace store, including all cooperating writer paths and filesystem/transaction durability semantics. Record commands, output and tested implementation SHA. Until then, workspace JSON durability is UNPROVEN. NO-GO if any required guarantee fails or cannot be tested: stop durable integration, retain disabled flags/live writer, and report the narrow storage decision/blocker to the Lead. Do not substitute an in-memory store, weaken recovery or concurrency guarantees, add SQL tables/dependencies, or change storage policy without the required decision and approval.
 
+### Workspace row store (`backend/ops_sync/workspace_store.py`): proven vs not proven
+
+`WorkspaceStore` is the `OpsStore` the local feature path uses when `FEATURE_LARK_AUTHORITATIVE_OPS` is on (default off; `app.state.ops_store_for`). It works on the existing `workspaces` row (`id`, `version`, `data` JSON) with no new schema: read `(version, data)`, run the transaction on a private copy of `data["ops_sync"]` only, write back with `UPDATE ... WHERE id=? AND version=?`, bump `version` exactly as `app.persist_mutation` does and mirror it into `data["version"]` (the app serves that value and checks it against `row.version`). A CAS miss re-reads and re-runs the transaction, bounded (default 8); exhaustion raises `StorageBusy` and commits nothing. A missing row, non-object data, non-object namespace, non-integer version or undecodable JSON raises `StorageBlocked` and writes nothing. `JsonFileStore` stays a test-only store.
+
+| Guarantee | Status | Evidence (`backend/test_ops_sync_workspace_store.py` unless noted) |
+| --- | --- | --- |
+| Commit-or-nothing on exception and injected failure | PROVEN on SQLite | `test_fn_exception_commits_nothing_and_keeps_the_version`, `test_injected_failure_mid_transaction_is_commit_or_nothing` |
+| kill -9 at each commit barrier, restart recovery, replay safe | PROVEN on SQLite | `test_kill_9_at_each_commit_barrier_recovers_a_complete_old_or_new_state`, `test_external_sigkill_mid_stream_loses_no_acknowledged_command_and_never_splits_a_commit`, `test_storage_kill_mid_write_recovers_complete_transaction[workspace-*]` |
+| Duplicate command/event suppression across restart | PROVEN on SQLite | `test_duplicate_command_and_event_suppression_survives_restart`, `test_storage_restart_preserves_duplicate_suppression[workspace-*]` |
+| Two-process contention, no lost updates, same-field conflict | PROVEN on SQLite | `test_two_process_contention_has_no_lost_updates_and_conflicts_on_the_same_field`, `test_storage_two_process_writers_serialize_and_fence[workspace]` |
+| App writer and ops writer neither clobber the other; unrelated keys kept | PROVEN on SQLite, including the real `create_app` write path and an `app.persist_mutation`-style CAS writer | `test_app_style_writer_is_not_clobbered_by_an_ops_write_and_vice_versa`, `test_ops_namespace_survives_real_app_writes_and_stale_app_clients_get_a_409`, `test_storage_ops_transaction_preserves_unrelated_workspace_keys[workspace]` |
+| Fail closed on corrupt/missing data, no reset | PROVEN on SQLite | `test_corrupt_row_data_fails_closed_without_reset`, `test_missing_row_fails_closed_and_creates_nothing`, `test_non_integer_row_version_fails_closed` |
+| JSON round trip (CLEAR/SET/UNKNOWN tags, unicode) | PROVEN on SQLite | `test_json_column_round_trip_keeps_markers_unicode_and_types` |
+| Engine and storage suites on both stores | PROVEN | the `store_kind` fixture (`backend/conftest.py`) runs the engine, domain-persistence and storage suites against `JsonFileStore` and `WorkspaceStore` |
+| PostgreSQL | **UNTESTED. No claim is made.** | No PostgreSQL was available. The CAS is plain SQL and row-level, but read-committed isolation, `synchronous_commit`, pool/replica behavior and `with_for_update` interplay with `persist_mutation` are unverified. |
+| Durability against power loss / OS crash | NOT proven | Tests kill the process, not the machine. SQLite's default journal gives crash safety only with honest `fsync`; this was not fault-injected below the process level. |
+| App writers other than the `persist_mutation` pattern | NOT proven | `index_health_run` rewrites with an unchanged version and `create_app` start-up migration writes `data` without a version bump. Neither is a CAS-safe writer; ops writes that race them are not covered. |
+| Live Lark, production or staging data | NOT touched | Synthetic data and temp SQLite files only. |
+
+The wiring imports `ops_sync` only when the flag is on; `backend/ops_sync` is not yet in the deploy package inventory (`scripts/deploy_prepare.py`), so enabling the flag in a staged build needs that inventory change first (YXS-45 scope).
+
+Side effect to expect: every ops commit bumps `row.version`, so an app client holding an older workspace version gets the app's existing 409 and must reload.
+
 ## Events and conflicts
 
 Persist inbox events before processing. Dedup by source scope and `event_id`; identical replay is a no-op, different payload under the same ID is a failed integrity check. Events carry entity/field, source revision, command identity if available and presence-aware observations. Never trust arrival order or occurred_at as authoritative revision order.

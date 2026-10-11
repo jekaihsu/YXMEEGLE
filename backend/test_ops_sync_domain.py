@@ -19,6 +19,7 @@ from .ops_sync.engine import IdentityCollision
 from .ops_sync.flags import OpsFlags, resolve_flags
 from .ops_sync.projection import case_entity_id, node_entity_id, project_headers, sync_headers
 from .ops_sync.store import JsonFileStore, MemoryStore
+from .ops_sync.testing import open_store, seed_workspace, ws_path
 
 ROOT = Path(__file__).resolve().parent.parent
 BASE_SHA = 'f1455b1671859cbe3b09ace82baee0903b33d0bc'
@@ -536,10 +537,10 @@ def workspace():
                          {'id': 'p-2', 'nodes': []}]}
 
 
-def test_projection_is_flag_gated_read_only_and_idempotent(tmp_path):
+def test_projection_is_flag_gated_read_only_and_idempotent(tmp_path, store_kind):
     ws = workspace()
     before = copy.deepcopy(ws)
-    rig = Rig(JsonFileStore(tmp_path / 'ws.json'))
+    rig = Rig(open_store(store_kind, ws_path(tmp_path, store_kind)))
     assert sync_headers(rig.d, ws, OpsFlags()) is None
     assert sync_headers(rig.d, ws, resolve_flags({'FEATURE_LARK_AUTHORITATIVE_OPS': 'true'})) is None
     assert 'p-2' not in rig.d.snapshot()['project_index']
@@ -552,9 +553,9 @@ def test_projection_is_flag_gated_read_only_and_idempotent(tmp_path):
     assert project_headers(ws)[1][0]['entity_id'] == case_entity_id('p-2')
 
 
-def test_roundtrip_preserves_project_node_task_ids_and_histories(tmp_path):
-    path = tmp_path / 'ws.json'
-    rig = Rig(JsonFileStore(path))
+def test_roundtrip_preserves_project_node_task_ids_and_histories(tmp_path, store_kind):
+    path = ws_path(tmp_path, store_kind)
+    rig = Rig(open_store(store_kind, path))
     ws = workspace()
     flags = OpsFlags(lark_authoritative_ops=True)
     sync_headers(rig.d, ws, flags)
@@ -564,7 +565,7 @@ def test_roundtrip_preserves_project_node_task_ids_and_histories(tmp_path):
     rig.propose('d1', entity=case_entity_id('p-1'))
     rig.dl.approve(dataclasses.replace(rig.dl.build_receipt(case_entity_id('p-1'), 'd1', (SUP1, SUP2), 'r1')))
     before = rig.d.snapshot()
-    rig.store = JsonFileStore(path)
+    rig.store = open_store(store_kind, path)
     rig.restart()                                           # fresh store handle and services over the same file
     assert sync_headers(rig.d, ws, flags) == 0              # re-import after restart mints nothing
     assert rig.d.assign_pm('swap', case_entity_id('p-1'), ADMIN, [PM2])['duplicate']
@@ -574,12 +575,15 @@ def test_roundtrip_preserves_project_node_task_ids_and_histories(tmp_path):
     assert case['project_id'] == 'p-1' and case['node_ids'] == [node_entity_id('p-1', 'n-1'), node_entity_id('p-1', 'n-2')]
     assert [h['new'] for h in case['pm']['history']] == [PM1.key, PM2.key]
     assert case['deadline']['original']['value'] == '2026-10-15' and case['deadline']['effective']['revision'] == 1
-    assert JsonFileStore(path).snapshot()['domain'] == before
+    assert open_store(store_kind, path).snapshot()['domain'] == before
 
 
-def test_domain_state_preserves_unrelated_workspace_keys(tmp_path):
-    store = JsonFileStore(tmp_path / 'ws.json')
-    store.transact_raw(lambda ws: ws.update(projects=[{'id': 'p-9'}], sentinel={'keep': 1}))
+def test_domain_state_preserves_unrelated_workspace_keys(tmp_path, store_kind):
+    if store_kind == 'workspace':
+        seed_workspace(ws_path(tmp_path, store_kind), {'version': 1, 'projects': [{'id': 'p-9'}], 'sentinel': {'keep': 1}})
+    store = open_store(store_kind, ws_path(tmp_path, store_kind))
+    if store_kind == 'file':
+        store.transact_raw(lambda ws: ws.update(projects=[{'id': 'p-9'}], sentinel={'keep': 1}))
     rig = Rig(store)
     rig.seat_pm()
     raw = store.snapshot_raw()

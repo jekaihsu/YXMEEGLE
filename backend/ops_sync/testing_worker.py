@@ -8,14 +8,14 @@ from . import values as V
 from .clock import FakeClock
 from .engine import OpsEngine
 from .store import JsonFileStore
-from .testing import env
+from .testing import COMMIT_START, app_style_write, env, open_store, sqlite_sessions
 
 
 def killer(barrier, commit_no):
     state = {'commit': 0}
 
     def hook(name):
-        if name == 'before_tmp_write':
+        if name in COMMIT_START:
             state['commit'] += 1
         if barrier and name == barrier and state['commit'] >= commit_no:
             os._exit(9)           # simulate SIGKILL: no cleanup, no ack
@@ -24,7 +24,8 @@ def killer(barrier, commit_no):
 
 def engine_for(ws, lark, hook=None):
     adapter = A.MockLarkAdapter(JsonFileStore(lark, namespace='mock_lark'))
-    return OpsEngine(JsonFileStore(ws, hook=hook), adapter, FakeClock()), adapter
+    kind = os.environ.get('OPS_TEST_STORE', 'file')           # which real durable OpsStore the worker drives
+    return OpsEngine(open_store(kind, ws, hook=hook), adapter, FakeClock()), adapter
 
 
 def wait_for(path, timeout=20):
@@ -56,10 +57,20 @@ def main(argv):
             engine.submit(env(f'{args[0]}-{i}', field='case.pm', intended=V.SetValue(f'ou_test_{args[0]}_{i}')))
         print('ack', flush=True)
     elif cmd == 'unrelated':     # unrelated PREFIX N: a non-ops writer sharing the file
-        store = JsonFileStore(ws)
-        for i in range(int(args[1])):
-            store.transact_raw(lambda doc, i=i: doc.__setitem__(f'{args[0]}_{i}', {'value': i}))
+        if os.environ.get('OPS_TEST_STORE') == 'workspace':   # app.persist_mutation-style CAS writer
+            sessions = sqlite_sessions(ws)
+            for i in range(int(args[1])):
+                app_style_write(sessions, lambda data, i=i: data.__setitem__(f'{args[0]}_{i}', {'value': i}))
+        else:
+            store = JsonFileStore(ws)
+            for i in range(int(args[1])):
+                store.transact_raw(lambda doc, i=i: doc.__setitem__(f'{args[0]}_{i}', {'value': i}))
         print('ack', flush=True)
+    elif cmd == 'stream':        # stream PREFIX N: acknowledge every accepted command on stdout (for external SIGKILL)
+        engine, _ = engine_for(ws, lark)
+        for i in range(int(args[1])):
+            engine.submit(env(f'{args[0]}-{i}', field='case.pm', intended=V.SetValue(f'ou_test_{args[0]}_{i}')))
+            print(f'ack {args[0]}-{i}', flush=True)
     elif cmd == 'compete':       # compete CID VALUE READY_DIR: same baseline, then race
         engine, _ = engine_for(ws, lark)
         engine.observe('case_test_1')

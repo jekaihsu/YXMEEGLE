@@ -5,7 +5,7 @@ from .ops_sync import values as V
 from .ops_sync.clock import FakeClock
 from .ops_sync.engine import IdentityCollision, OpsEngine
 from .ops_sync.store import JsonFileStore
-from .ops_sync.testing import env
+from .ops_sync.testing import env, open_store, ws_path
 
 E = 'case_test_1'
 D1, D2 = V.SetValue('2026-10-20'), V.SetValue('2026-10-25')
@@ -14,15 +14,16 @@ D1, D2 = V.SetValue('2026-10-20'), V.SetValue('2026-10-25')
 class Rig:
     """Persistent stores + injectable clock; `restart()` simulates a fresh process on the same files."""
 
-    def __init__(self, tmp_path):
-        self.ws = tmp_path / 'workspace.json'
+    def __init__(self, tmp_path, kind='file'):
+        self.kind = kind
+        self.ws = ws_path(tmp_path, kind)
         self.lark = tmp_path / 'lark.json'
         self.clock = FakeClock()
         self.adapter = A.MockLarkAdapter(JsonFileStore(self.lark, namespace='mock_lark'))
         self.engine = self.make()
 
     def make(self, **kw):
-        return OpsEngine(JsonFileStore(self.ws), self.adapter, self.clock, **kw)
+        return OpsEngine(open_store(self.kind, self.ws), self.adapter, self.clock, **kw)
 
     def restart(self, **kw):
         self.adapter = A.MockLarkAdapter(JsonFileStore(self.lark, namespace='mock_lark'))
@@ -34,8 +35,8 @@ class Rig:
 
 
 @pytest.fixture
-def rig(tmp_path):
-    r = Rig(tmp_path)
+def rig(tmp_path, store_kind):
+    r = Rig(tmp_path, store_kind)
     assert r.engine.observe(E)['complete']
     return r
 

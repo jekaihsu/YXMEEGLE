@@ -1043,6 +1043,13 @@ def create_app(overrides=None):
     app.state.people_directory=PeopleDirectoryService(sessions,WorkspaceRow,BusinessRow,PersonRow,cfg)
     from .attendance_service import AttendanceScheduleService
     app.state.attendance_schedule=AttendanceScheduleService(sessions,WorkspaceRow,BusinessRow,PersonRow,cfg)
+    # Default OFF and not imported unless on (ops_sync is not in the deploy package yet). When on, the local feature
+    # path gets the version-CAS WorkspaceRow store, never the file mock.
+    app.state.ops_store_for=None
+    if str(cfg.get('FEATURE_LARK_AUTHORITATIVE_OPS','false')).lower()=='true':
+        from .ops_sync.flags import resolve_flags as resolve_ops_flags
+        from .ops_sync.workspace_store import ops_store_factory
+        app.state.ops_store_for=ops_store_factory(resolve_ops_flags({'FEATURE_LARK_AUTHORITATIVE_OPS':True}),sessions)
     from .live_read.coordinator import RefreshCoordinator
     from .live_read.datasets import build_refreshers
     from .live_read.routes import register as register_live, refresh as live_refresh
