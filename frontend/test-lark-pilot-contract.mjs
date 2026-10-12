@@ -123,3 +123,15 @@ for(const enabled of [false,true])test(`roster recovery routes only roster and r
   assert.ok(document.body.textContent.includes('工程確認單'));
  }finally{await clean()}
 });
+
+for(const age of ['expired','unknown'])test(`live roster recovery rejects fresh status with ${age} age`,async()=>{
+ setup();const calls=[];const stamp=new Date().toISOString();
+ const freshness={enabled:true,server_time:stamp,datasets:Object.fromEntries(['roster','sources','attendance'].map(k=>[k,{status:'fresh',ttl_seconds:60,age_seconds:age==='unknown'?null:60,as_of:age==='unknown'?null:new Date(Date.parse(stamp)-60000).toISOString()}]))};
+ globalThis.fetch=async(url,init)=>{calls.push({url,init});return new Response(JSON.stringify(url==='/api/lark-pilot/shadow'?{code:'pilot_roster_stale'}:{freshness}),{status:url==='/api/lark-pilot/shadow'?403:200})};
+ try{
+  await render(React.createElement(LarkPilotPanel,{c:c(true)}));await flush(()=>document.querySelector('button').click());
+  assert.equal(calls.length,2,'aged roster must not trigger pilot re-fetch');
+  assert.ok(document.body.textContent.includes('名冊讀取尚未完成'));
+  assert.equal(document.querySelector('button').disabled,false);
+ }finally{await clean()}
+});

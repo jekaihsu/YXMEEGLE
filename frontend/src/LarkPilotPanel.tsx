@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {api,ApiError,fetchPilotShadow,getSessionEpoch,liveRefresh} from './api';
 import {statusNames,time} from './DataFreshness';
+import {ageFreshness} from './freshness';
 import './lark-pilot.css';
 import type {Context} from './Operations';
 
@@ -80,7 +81,7 @@ export function LarkPilotPanel({demo=false,c}:{demo?:boolean;c?:Context}){
    const result=c.w.freshness?.enabled?await liveRefresh(['roster'],true,controller.signal):await api<{freshness?:import('./types').Freshness}>('/api/people/sync',{method:'POST',signal:controller.signal,timeoutMs:120000});
    if(!current())return;
    if(result.freshness)c.onFreshness?.(result.freshness);
-   if(result.freshness&&result.freshness.datasets.roster.status!=='fresh'){setMessage('名冊讀取尚未完成，請稍後重試');return}
+   if(result.freshness&&(c.w.freshness?.enabled?ageFreshness(result.freshness,Date.now(),Date.now()):result.freshness).datasets.roster.status!=='fresh'){setMessage('名冊讀取尚未完成，請稍後重試');return}
    setRetry(value=>value+1);
   }catch(error){if(current())setMessage(errorMessage(error))}
   finally{syncing.current=false;if(current())setBusy(false)}
