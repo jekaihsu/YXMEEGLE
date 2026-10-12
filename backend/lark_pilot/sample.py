@@ -11,6 +11,11 @@ CASES, WORK, PEOPLE = 'tblmSQrcCs9vPQZx', 'tbl5zPLS0ExWNEty', 'tblfaCO2xPUNptQH'
 FIELDS = {CASES: ('fldgZDflpb', 'flddfFq9zI'),
           WORK: ('fldjfxJIMb', 'fldlqnGoTh', 'fldvSpUqa9', 'fldJs4RTUm', 'fldnCPisZ5'),
           PEOPLE: ('fldCTLvsWG',)}
+# Lark search takes field NAMES in field_names and keys response fields by NAME. Names come from the
+# verified live schema capture (vcc117-mapping .runtime/lark-schema-capture/<table_id>.json, table.fields).
+NAMES = {'fldgZDflpb': '工程確認單編號', 'flddfFq9zI': '外業工作單', 'fldjfxJIMb': '工作單號',
+         'fldlqnGoTh': '組長人員-津貼來源V2', 'fldvSpUqa9': '組員人員-津貼來源V2',
+         'fldJs4RTUm': '組長帳號-津貼自動化', 'fldnCPisZ5': '組員帳號-津貼自動化', 'fldCTLvsWG': 'Lark帳號'}
 CAPS = {'cases': 3, 'work_orders': 10, 'people': 10}
 ROOT = f'/bitable/v1/apps/{BASE}/tables'
 SEARCH = ROOT + '/{table}/records/search'
@@ -50,13 +55,21 @@ class PilotReader:
     def search_records(self, table, count, record_ids=None):
         if table not in FIELDS or not 1 <= count <= (3 if table == CASES else 10):
             raise ReadBlocked('Pilot search outside bounded sample')
-        body = {'field_names': list(FIELDS[table]), 'page_size': count}
+        body = {'field_names': [NAMES[f] for f in FIELDS[table]], 'page_size': count}
         if record_ids is not None:
             # Stable Base record IDs only; never expand a person name into a query.
             body['filter'] = {'conjunction': 'or', 'conditions': [
                 {'field_name': 'record_id', 'operator': 'is', 'value': [key]} for key in record_ids[:count]]}
         self.requests.append({'method': 'POST', 'endpoint': TEMPLATE})
-        return self.client.request('POST', SEARCH.format(table=table), json=body).json()['data']
+        data = self.client.request('POST', SEARCH.format(table=table), json=body).json()['data']
+        by_name = {NAMES[f]: f for f in FIELDS[table]}
+        for item in data.get('items', []):
+            fields = item.get('fields', {}) if isinstance(item, dict) else {}
+            if isinstance(fields, dict):
+                if set(fields) - set(by_name):
+                    raise ReadFailure('field_name_mismatch')
+                item['fields'] = {by_name[k]: v for k, v in fields.items()}
+        return data
 
     def read(self):
         result = empty_result()

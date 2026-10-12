@@ -44,3 +44,18 @@ def test_pilot_read_against_name_only_lark_is_not_an_error():
     assert case['fldgZDflpb'] == {'state': 'present', 'value': 'SYN'}
     assert case['flddfFq9zI']['state'] == 'present'
     assert result['records']['people'][0]['identity']['ids'] == ['ou_SYN']
+
+
+def test_unexpected_response_field_key_is_a_clear_error_code():
+    from .lark_pilot.sample import PilotReader
+    def drifted(request):
+        res = lark_like(request)
+        if res.status_code == 200 and b'record_id' in res.content:
+            return httpx.Response(200, json={'code': 0, 'data': {'items': [{'record_id': 'rec_SYN', 'fields': {'fldgZDflpb': 'x'}}]}})
+        return res
+    clock = Clock()
+    with PilotReader(CFG, transport=httpx.MockTransport(drifted), clock=clock, sleep=clock.sleep,
+                     bucket=TokenBucket(10, clock=clock, sleep=clock.sleep),
+                     token_cache=TenantTokenCache(clock=clock)) as reader:
+        result = reader.read()
+    assert result['status'] == 'error' and result['receipt']['outcome'] == 'partial'

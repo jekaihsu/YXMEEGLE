@@ -27,7 +27,9 @@ def run(items=None, failure=None, cfg=None, has_more=True):
                 raise failure[1]
             return httpx.Response(failure[1], json={'code': 1254302})
         table = next((t for t in (CASES, WORK, PEOPLE) if t in request.url.path), None)
-        return httpx.Response(200, json={'code': 0, 'data': {'items': (items or {}).get(table, []), 'has_more': has_more}})
+        from .lark_pilot.sample import NAMES
+        named = [{**x, 'fields': {NAMES.get(k, k): v for k, v in x['fields'].items()}} for x in (items or {}).get(table, [])]
+        return httpx.Response(200, json={'code': 0, 'data': {'items': named, 'has_more': has_more}})
     with PilotReader(cfg or CFG, transport=httpx.MockTransport(handler), clock=clock,
                      sleep=clock.sleep, bucket=TokenBucket(10, clock=clock, sleep=clock.sleep),
                      token_cache=TenantTokenCache(clock=clock)) as reader:
@@ -59,7 +61,7 @@ def test_E01_E08_E09_E16_E17_sanitized_capped_deterministic_reads():
     searches = [json.loads(r.content) for r in calls if r.url.path.endswith('/records/search')]
     assert [s['page_size'] for s in searches] == [1, 3, 10, 10]
     assert all('page_token' not in str(r.url) for r in calls)
-    assert all(f.startswith('fld') for s in searches for f in s['field_names'])
+    assert not any(f.startswith('fld') for s in searches for f in s['field_names'])
     assert all(r.method == 'GET' or r.url.path.endswith(('/records/search', '/tenant_access_token/internal')) for r in calls)
     output = json.dumps(first)
     assert not any(secret in output for secret in ['Bearer', 'tenant_access_token', 'app_secret', 'SYN_token', CFG['LARK_APP_SECRET']])
