@@ -93,3 +93,13 @@ for(const enabled of [false,true])test(`roster retry timeout is visible, mode ${
   assert.equal(document.querySelector('button').disabled,false);
  }finally{globalThis.setTimeout=nativeTimer;await clean()}
 });
+for(const defect of ['unread','no-time','incomplete'])test(`fresh envelope cannot hide ${defect} table`,async()=>{
+ setup();const data=payload();
+ data.table_states={cases:'present',work_orders:'present',people:'present'};
+ data.table_fetched_at={cases:'2026-10-12T00:00:05Z',work_orders:'2026-10-12T00:00:05Z',people:'2026-10-12T00:00:05Z'};
+ data.counts={cases:{requested:1,returned:1,omitted:0,has_more:false},work_orders:{requested:0,returned:0,omitted:0,has_more:false},people:{requested:0,returned:0,omitted:0,has_more:false}};
+ if(defect==='unread')data.table_states.people='not_read';
+ if(defect==='no-time')data.table_fetched_at.people=null;
+ if(defect==='incomplete')data.counts.cases.has_more=true;
+ try{await render(React.createElement(PilotView,{data:parsePilot(data),now:Date.parse('2026-10-12T00:00:10Z')}));assert.ok(!document.body.textContent.includes('Lark 即時'));assert.equal(document.querySelector('.data-freshness-fresh'),null)}finally{await clean()}
+});

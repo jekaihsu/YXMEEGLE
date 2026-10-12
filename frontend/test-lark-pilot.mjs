@@ -13,7 +13,7 @@ const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost'});
 for(const k of ['window','document','Event','FormData'])globalThis[k]=dom.window[k];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const root=createRoot(document.getElementById('root'));
-const payload=(status='fresh',source='lark_live')=>({status,source,fetched_at:'2026-10-12T00:00:00Z',ttl_seconds:60,records:{cases:[],work_orders:[],people:[]},table_states:{cases:'present',work_orders:'unmapped',people:'forbidden'}});
+const payload=(status='fresh',source='lark_live')=>({status,source,fetched_at:'2026-10-12T00:00:00Z',ttl_seconds:60,records:{cases:[],work_orders:[],people:[]},table_states:{cases:'present',work_orders:'present',people:'present'},table_fetched_at:{cases:'2026-10-12T00:00:00Z',work_orders:'2026-10-12T00:00:00Z',people:'2026-10-12T00:00:00Z'},counts:Object.fromEntries(['cases','work_orders','people'].map(name=>[name,['blocked','error','partial'].includes(status)?null:{requested:0,returned:0,omitted:0,has_more:false}]))});
 const render=async(element)=>act(async()=>{root.render(element);await new Promise(r=>setTimeout(r,0))});
 try{
  for(const [state,copy] of Object.entries({fresh:'已讀取',stale:'資料待更新',blocked:'無法讀取',partial:'部分資料',error:'讀取失敗',unconfigured:'尚未設定'})){
