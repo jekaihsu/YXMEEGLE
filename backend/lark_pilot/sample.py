@@ -117,8 +117,7 @@ class PilotReader:
                     row['freshness'] = 'partial'
         if result['status'] == 'fresh' and any(
             result['table_states'][name] != 'present' or
-            result['counts'][name]['has_more'] or result['counts'][name]['omitted'] > 0 or
-            result['counts'][name]['returned'] < result['counts'][name]['requested']
+            result['counts'][name]['has_more'] or result['counts'][name]['omitted'] > 0
             for name in CAPS
         ):
             result['status'] = 'partial'

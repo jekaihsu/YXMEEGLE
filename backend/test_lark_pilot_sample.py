@@ -14,7 +14,7 @@ from .live_read.rate_limit import TokenBucket
 from .live_read.token_cache import TenantTokenCache
 
 
-def run(items=None, failure=None, cfg=None):
+def run(items=None, failure=None, cfg=None, has_more=True):
     from .lark_pilot.sample import PilotReader, CASES, WORK, PEOPLE
     clock = Clock()
     calls = []
@@ -27,7 +27,7 @@ def run(items=None, failure=None, cfg=None):
                 raise failure[1]
             return httpx.Response(failure[1], json={'code': 1254302})
         table = next((t for t in (CASES, WORK, PEOPLE) if t in request.url.path), None)
-        return httpx.Response(200, json={'code': 0, 'data': {'items': (items or {}).get(table, []), 'has_more': True}})
+        return httpx.Response(200, json={'code': 0, 'data': {'items': (items or {}).get(table, []), 'has_more': has_more}})
     with PilotReader(cfg or CFG, transport=httpx.MockTransport(handler), clock=clock,
                      sleep=clock.sleep, bucket=TokenBucket(10, clock=clock, sleep=clock.sleep),
                      token_cache=TenantTokenCache(clock=clock)) as reader:
@@ -162,3 +162,11 @@ def test_E22_no_database_coordinator_or_write_imports():
             if isinstance(node, (ast.Import, ast.ImportFrom)):
                 names = [a.name for a in node.names] + [getattr(node, 'module', '') or '']
                 assert not any(f in name for f in forbidden for name in names)
+
+
+def test_complete_small_tables_are_fresh():
+    result, _ = run(fixtures(), has_more=False)
+    assert result['counts']['cases']['returned'] < result['counts']['cases']['requested']
+    assert result['status'] == 'fresh'
+    assert result['receipt']['outcome'] == 'ok'
+    assert all(row['freshness'] == 'fresh' for rows in result['records'].values() for row in rows)
