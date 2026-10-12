@@ -1,7 +1,8 @@
-import {useEffect,useState} from 'react';
-import {ApiError,fetchPilotShadow,getSessionEpoch} from './api';
+import {useEffect,useRef,useState} from 'react';
+import {api,ApiError,fetchPilotShadow,getSessionEpoch,liveRefresh} from './api';
 import {statusNames,time} from './DataFreshness';
 import './lark-pilot.css';
+import type {Context} from './Operations';
 
 const sources={lark_live:'Lark 即時',lark_live_cached:'快取',mock:'示範',local:'本機',unmapped:'未對映'};
 const notices={fresh:'已讀取',stale:'資料待更新',partial:'部分資料，無法讀取的欄位仍待核對',blocked:'無法讀取，權限不足',error:'讀取失敗',unconfigured:'尚未設定'};
@@ -43,14 +44,32 @@ export function PilotView({data,now=Date.now()}:{data:PilotData;now?:number}){
    <div className="lark-pilot-scroll" tabIndex={0} aria-label={`${groups[name]}試讀欄位，可左右捲動`}><table><thead><tr><th>紀錄識別</th><th>欄位識別</th><th>狀態</th><th>原始值</th></tr></thead><tbody>{data.records[name].flatMap(row=>Object.entries(row.fields).map(([id,cell])=><tr key={`${row.record_id}:${id}`}><td>{row.record_id}</td><td>{id}</td><td>{fieldNames[cell.state]}</td><td>{cell.state==='present'?show(cell.value):'—'}</td></tr>))}</tbody></table></div>}</div>)}
  </section>;
 }
-export function LarkPilotPanel({demo=false}:{demo?:boolean}){
+const errorMessages:Record<string,string>={pilot_disabled:'尚未設定',pilot_not_company_workspace:'尚未設定',pilot_roster_missing:'尚無名冊核實紀錄',pilot_config_invalid:'系統設定異常',access_roster_expired:'公司名冊已逾 15 分鐘',access_not_admitted:'帳號尚未核實或已停用',source_authorization_denied:'你沒有讀取 Lark 來源的權限',lark_permission_denied:'Lark 拒絕此應用讀取',lark_read_failed:'Lark 資料暫時無法讀取',client_timeout:'讀取逾時，請重試。'};
+const errorMessage=(error:unknown)=>error instanceof ApiError?(error.code==='pilot_roster_stale'?`名冊核實已逾 ${error.ceiling_seconds??60} 秒，請重新核對名冊`:errorMessages[error.code||'']||'讀取失敗（原因不明）'):'讀取失敗（原因不明）';
+export function LarkPilotPanel({demo=false,c}:{demo?:boolean;c?:Context}){
  const [data,setData]=useState<PilotData>();const [message,setMessage]=useState('讀取中…');const [now,setNow]=useState(Date.now);
+ const [reason,setReason]=useState<string>();const [retry,setRetry]=useState(0);const [busy,setBusy]=useState(false);
+ const syncing=useRef(false);const recovery=useRef<AbortController>();
+ useEffect(()=>()=>recovery.current?.abort(),[]);
  useEffect(()=>{
-  setData(undefined);setMessage(demo?'示範資料':'讀取中…');if(demo)return;
+  setData(undefined);setReason(undefined);setMessage(demo?'示範資料':'讀取中…');if(demo)return;
   const controller=new AbortController();const epoch=getSessionEpoch();let active=true;
-  void fetchPilotShadow(controller.signal).then(parsePilot).then(next=>{if(active&&epoch===getSessionEpoch()){setData(next);setNow(Date.now());setMessage('')}}).catch((error:unknown)=>{if(active&&epoch===getSessionEpoch())setMessage(error instanceof ApiError&&error.status===404?'尚未設定':error instanceof ApiError&&error.status===403?'無法讀取，權限不足':'讀取失敗')});
+  void fetchPilotShadow(controller.signal).then(parsePilot).then(next=>{if(active&&epoch===getSessionEpoch()){setData(next);setNow(Date.now());setMessage('')}}).catch((error:unknown)=>{if(active&&epoch===getSessionEpoch()){setMessage(errorMessage(error));setReason(error instanceof ApiError?error.code:undefined)}});
   return()=>{active=false;controller.abort()};
- },[demo]);
+ },[demo,retry]);
+ const retryRoster=async()=>{
+  if(!c||syncing.current)return;
+  syncing.current=true;setBusy(true);const epoch=getSessionEpoch();const controller=new AbortController();recovery.current=controller;
+  const current=()=>!controller.signal.aborted&&epoch===getSessionEpoch();
+  try{
+   const result=c.w.freshness?.enabled?await liveRefresh(['roster'],true,controller.signal):await api<{freshness?:import('./types').Freshness}>('/api/people/sync',{method:'POST',signal:controller.signal,timeoutMs:120000});
+   if(!current())return;
+   if(result.freshness)c.onFreshness?.(result.freshness);
+   if(result.freshness&&result.freshness.datasets.roster.status!=='fresh'){setMessage('名冊讀取尚未完成，請稍後重試');return}
+   setRetry(value=>value+1);
+  }catch(error){if(current())setMessage(errorMessage(error))}
+  finally{syncing.current=false;if(current())setBusy(false)}
+ };
  useEffect(()=>{if(!data?.fetched_at||data.status!=='fresh')return;const delay=Math.max(0,Date.parse(data.fetched_at)+data.ttl_seconds*1000-Date.now()+1);const timer=setTimeout(()=>setNow(Date.now()),Math.min(delay,2147483647));return()=>clearTimeout(timer)},[data]);
- return demo||!data?<section className="lark-pilot" aria-label="唯讀 Lark 試讀"><h2>唯讀 Lark 試讀</h2><p role="status" aria-live="polite">{message}</p></section>:<PilotView data={data} now={now}/>;
+ return demo||!data?<section className="lark-pilot" aria-label="唯讀 Lark 試讀"><h2>唯讀 Lark 試讀</h2><p role="status" aria-live="polite">{message}</p>{c&&['pilot_roster_stale','pilot_roster_missing'].includes(reason||'')&&<button disabled={busy} onClick={()=>void retryRoster()}>重新核對名冊後重試</button>}</section>:<PilotView data={data} now={now}/>;
 }

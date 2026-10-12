@@ -80,3 +80,16 @@ for(const enabled of [false,true])test(`B5 roster failure visible without source
  globalThis.fetch=async(url,init)=>{calls.push({url,init});return new Response(JSON.stringify({code:'lark_read_failed',detail:'Lark 資料暫時無法讀取'}),{status:502})};
  try{await render(React.createElement(PeopleDirectoryPanel,{c:context}));await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='同步 Lark 人員名冊').click());assert.equal(calls.length,1);assert.equal(calls[0].url,enabled?'/api/live/refresh':'/api/people/sync');assert.ok(document.querySelector('[role="alert"]').textContent.includes('Lark 資料暫時無法讀取'))}finally{await clean()}
 });
+for(const enabled of [false,true])test(`roster retry timeout is visible, mode ${enabled}`,async()=>{
+ setup();const nativeTimer=globalThis.setTimeout;const timers=[];const calls=[];
+ globalThis.setTimeout=(fn,delay,...args)=>delay>=30000?(timers.push(fn),12345):nativeTimer(fn,delay,...args);
+ globalThis.fetch=async(url,init)=>{calls.push({url,init});return url==='/api/lark-pilot/shadow'?new Response(JSON.stringify({code:'pilot_roster_stale',ceiling_seconds:60}),{status:403}):new Promise(()=>{})};
+ try{
+  await render(React.createElement(LarkPilotPanel,{c:c(enabled)}));
+  await flush(()=>document.querySelector('button').click());
+  await flush(()=>timers.forEach(fn=>fn()));
+  assert.ok(document.body.textContent.includes('讀取逾時'));
+  assert.equal(calls.length,2);assert.ok(calls[1].init.signal.aborted);
+  assert.equal(document.querySelector('button').disabled,false);
+ }finally{globalThis.setTimeout=nativeTimer;await clean()}
+});
