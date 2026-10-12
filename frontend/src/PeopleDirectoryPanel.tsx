@@ -1,16 +1,38 @@
 import {Section,Button,Badge} from './design';
 import './owned-screens.css';
 import {ageFreshness,datasetNotice} from './freshness';
-import {useState} from 'react';
+import {useRef,useState} from 'react';
 import {api,getSessionEpoch,liveRefresh} from './api';
+import type {Freshness,DatasetFreshness} from './types';
 import type {Context} from './Operations';
 
 export function PeopleDirectoryPanel({c}:{c:Context}){
  const[busy,setBusy]=useState(false);const[error,setError]=useState('');const[message,setMessage]=useState('');
- const freshness=c.w.freshness?.datasets.roster;
+ const [read,setRead]=useState<{epoch:number;parent:Freshness|undefined;data:DatasetFreshness}>();
+ const inFlight=useRef(false);
+ const freshness=read?.epoch===getSessionEpoch()&&read.parent===c.w.freshness?read.data:c.w.freshness?.datasets?.roster;
  const status=c.w.people_directory_status||{};
  const canSync=c.s.mode==='lark'&&c.w.environment==='production'&&(c.s.user?.role==='manager'||c.s.user?.capabilities?.some(k=>['manage_people','manage_sources'].includes(k)));
- const sync=async()=>{const epoch=getSessionEpoch();setBusy(true);setError('');setMessage('');try{if(c.w.freshness?.enabled){const result=await liveRefresh(['roster'],true);if(epoch!==getSessionEpoch())return;c.onFreshness?.(result.freshness);const state=result.freshness&&ageFreshness(result.freshness,Date.now(),Date.now()).datasets.roster;if(!state||state.status!=='fresh'){const notice=state?datasetNotice('roster',state)||'名冊讀取結果尚未確認':'名冊讀取結果尚未確認';if(state&&['refreshing','never','stale'].includes(state.status))setMessage(notice);else setError(notice);return}setMessage('名冊資料已讀取，請核對下方人員。')}else await api('/api/people/sync',{method:'POST',timeoutMs:120000});await c.refresh()}catch(e){if(epoch===getSessionEpoch()){c.onRefreshError?.(['roster']);setError((e as Error).message);await c.refresh()}}finally{if(epoch===getSessionEpoch())setBusy(false)}};
+ const sync=async()=>{
+  if(inFlight.current)return;
+  inFlight.current=true;const epoch=getSessionEpoch();setBusy(true);setError('');setMessage('');
+  try{
+   const result=c.w.freshness?.enabled?await liveRefresh(['roster'],true):await api<{freshness?:Freshness}>('/api/people/sync',{method:'POST',timeoutMs:120000});
+   if(epoch!==getSessionEpoch())return;
+   if(result.freshness){
+    c.onFreshness?.(result.freshness);
+    const state=ageFreshness(result.freshness,Date.now(),Date.now()).datasets.roster;
+    setRead({epoch,parent:c.w.freshness,data:state});
+    if(c.w.freshness?.enabled&&state.status!=='fresh'){
+     const notice=datasetNotice('roster',state)||'名冊讀取結果尚未確認';
+     if(['refreshing','never','stale'].includes(state.status))setMessage(notice);else setError(notice);
+     return;
+    }
+   }
+   setMessage('名冊資料已讀取，請核對下方人員。');await c.refresh();
+  }catch(e){if(epoch===getSessionEpoch()){c.onRefreshError?.(['roster']);setError((e as Error).message);await c.refresh()}}
+  finally{inFlight.current=false;if(epoch===getSessionEpoch())setBusy(false)}
+ };
  const directoryPeople=c.w.users.filter(u=>!!(u as any).directory_source);
  const reasons:Record<string,string>={missing_account:'未填寫可識別的 Lark 人員帳號',multiple_accounts:'同一筆名冊填入多個人員帳號',missing_name:'缺少人員姓名',employment_unknown:'在職狀態未明確',duplicate_account:'同一人員帳號出現在多筆名冊'};
  const sourceUrl=status.base_token&&status.table_id?`https://yong-xiang-survey.jp.larksuite.com/base/${encodeURIComponent(status.base_token)}?table=${encodeURIComponent(status.table_id)}`:'';
