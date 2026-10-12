@@ -95,7 +95,7 @@ def test_E04_E05_partial_keeps_cases_and_marks_denied_links():
     result, _ = run(fixtures(), (WORK, httpx.ReadTimeout('SYN_sensitive_error')))
     assert result['status'] == 'partial'
     assert result['records']['cases']
-    assert result['last_error'] == 'Lark 資料暫時無法讀取'
+    assert result['last_error'] == 'Lark 暫時無法讀取（逾時或服務暫時異常）'
     assert 'SYN_sensitive_error' not in json.dumps(result)
 
 

@@ -21,6 +21,11 @@ ALLOWED_GETS = (r'/bitable/v1/apps/[^/]+(?:/.*)?',
 class ReadFailure(RuntimeError):
     status = 'failed'
 
+    def __init__(self, message='', *, upstream_status=None, lark_code=None, kind=None):
+        super().__init__(message)
+        # Non-secret upstream diagnostics only: never headers, tokens or response bodies.
+        self.upstream_status, self.lark_code, self.kind = upstream_status, lark_code, kind
+
 
 class ReadBlocked(ReadFailure):
     status = 'blocked'
@@ -110,7 +115,7 @@ class LiveLarkClient:
             try:
                 response = self.client.request(method, API + path, **options)
             except httpx.HTTPError:
-                raise ReadFailure('Lark read transport failed') from None
+                raise ReadFailure('Lark read transport failed', kind='transient') from None
             if self.clock() >= self.deadline:
                 raise BudgetExceeded('Lark read budget exhausted')
             try:
@@ -128,7 +133,8 @@ class LiveLarkClient:
                 self.retries += 1
                 continue
             if code == 1254302 or (response.status_code in (401, 403) and not invalid_token):
-                raise ReadBlocked('Lark authorization or resource access denied')
+                raise ReadBlocked('Lark authorization or resource access denied', upstream_status=response.status_code,
+                                  lark_code=code, kind='permission_denied')
             if retryable and attempt < RetryPolicy.max_attempts:
                 delay = RetryPolicy.after(response, attempt)
                 if response.status_code == 429 or code == 99991400:
@@ -140,9 +146,11 @@ class LiveLarkClient:
                 self.sleep(delay)
                 continue
             if retryable or invalid_token:
-                raise ReadFailure('Lark read attempts exhausted')
+                raise ReadFailure('Lark read attempts exhausted', upstream_status=response.status_code,
+                                  lark_code=code, kind='transient')
             if response.status_code >= 400 or code != 0:
-                raise ReadFailure('Lark read rejected')
+                raise ReadFailure('Lark read rejected', upstream_status=response.status_code, lark_code=code,
+                                  kind='field_not_found' if code == 1254045 else 'rejected')
             if not isinstance(body, dict) or not body:
                 raise ReadFailure('Lark response is incomplete')
             return response

@@ -29,7 +29,8 @@ def empty_result():
             'counts': {name: None for name in CAPS},
             'table_fetched_at': {name: None for name in CAPS},
             'receipt': {'identity_category': 'missing', 'config_present': False, 'outcome': 'unconfigured',
-                        'endpoint': None, 'operation': None, 'permission_needed': None, 'requests': []}}
+                        'endpoint': None, 'operation': None, 'permission_needed': None, 'requests': [],
+                        'upstream_status': None, 'lark_code': None, 'error_kind': None}}
 
 
 class PilotReader:
@@ -67,7 +68,7 @@ class PilotReader:
             fields = item.get('fields', {}) if isinstance(item, dict) else {}
             if isinstance(fields, dict):
                 if set(fields) - set(by_name):
-                    raise ReadFailure('field_name_mismatch')
+                    raise ReadFailure('field_name_mismatch', kind='field_not_found')
                 item['fields'] = {by_name[k]: v for k, v in fields.items()}
         return data
 
@@ -121,8 +122,15 @@ class PilotReader:
             receipt['outcome'] = 'denied' if denied else 'partial'
             receipt['permission_needed'] = 'bitable:app:readonly and application Base/table read grant' if denied else None
             result['status'] = 'partial' if any(result['records'].values()) else 'blocked' if denied else 'error'
-            result['code'] = 'lark_permission_denied' if denied else 'lark_read_failed'
-            result['last_error'] = 'Lark 拒絕此應用讀取' if denied else 'Lark 資料暫時無法讀取'
+            kind = getattr(exc, 'kind', None)
+            receipt.update(upstream_status=getattr(exc, 'upstream_status', None),
+                           lark_code=getattr(exc, 'lark_code', None), error_kind=kind)
+            result['code'] = ('lark_permission_denied' if denied else 'lark_field_not_found'
+                              if kind == 'field_not_found' else 'lark_read_failed')
+            result['last_error'] = ('Lark 拒絕此應用讀取' if denied else
+                                    'Lark 欄位名稱不存在（欄位對映需更新）' if kind == 'field_not_found' else
+                                    'Lark 暫時無法讀取（逾時或服務暫時異常）' if kind == 'transient' else
+                                    'Lark 資料暫時無法讀取')
             if active:
                 result['table_states'][active] = 'forbidden' if denied else 'partial'
             for rows in result['records'].values():

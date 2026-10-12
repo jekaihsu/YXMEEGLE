@@ -59,3 +59,30 @@ def test_unexpected_response_field_key_is_a_clear_error_code():
                      token_cache=TenantTokenCache(clock=clock)) as reader:
         result = reader.read()
     assert result['status'] == 'error' and result['receipt']['outcome'] == 'partial'
+
+
+def read_with(handler):
+    from .lark_pilot.sample import PilotReader
+    clock = Clock()
+    with PilotReader(CFG, transport=httpx.MockTransport(handler), clock=clock, sleep=clock.sleep,
+                     bucket=TokenBucket(10, clock=clock, sleep=clock.sleep),
+                     token_cache=TenantTokenCache(clock=clock)) as reader:
+        return reader.read()
+
+
+def test_receipt_carries_non_secret_upstream_diagnostics():
+    from .lark_pilot.sample import CASES
+    def reject(request):
+        if CASES in request.url.path and request.url.path.endswith('/search'):
+            return httpx.Response(400, json={'code': 1254045, 'msg': 'SYN_body_secret'})
+        return lark_like(request)
+    result = read_with(reject)
+    assert result['receipt']['upstream_status'] == 400 and result['receipt']['lark_code'] == 1254045
+    assert result['receipt']['error_kind'] == 'field_not_found' and result['code'] == 'lark_field_not_found'
+    denied = read_with(lambda r: httpx.Response(403, json={'code': 1254302}) if r.url.path.endswith('/tables') else lark_like(r))
+    assert (denied['receipt']['upstream_status'], denied['receipt']['lark_code']) == (403, 1254302)
+    assert denied['receipt']['error_kind'] == 'permission_denied'
+    timeout = read_with(lambda r: (_ for _ in ()).throw(httpx.ReadTimeout('SYN_t')) if '/auth/' not in r.url.path else lark_like(r))
+    assert timeout['receipt']['error_kind'] == 'transient' and '逾時' in timeout['last_error']
+    assert len({result['last_error'], denied['last_error'], timeout['last_error']}) == 3
+    assert not any(s in json.dumps([result, denied, timeout]) for s in ('SYN_body_secret', 'SYN_token', 'Bearer'))
