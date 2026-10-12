@@ -20,8 +20,9 @@ TEMPLATE = '/bitable/v1/apps/{base}/tables/{table}/records/search'
 def empty_result():
     return {'status': 'unconfigured', 'source': 'unmapped', 'fetched_at': None, 'ttl_seconds': 60,
             'last_error': None, 'sampling_rule': 'first page; sort stable record IDs; follow links; no pagination',
-            'records': {name: [] for name in CAPS}, 'table_states': {name: 'unmapped' for name in CAPS},
-            'counts': {name: {'requested': 0, 'returned': 0, 'omitted': 0, 'has_more': False} for name in CAPS},
+            'records': {name: [] for name in CAPS}, 'table_states': {name: 'not_read' for name in CAPS},
+            'counts': {name: None for name in CAPS},
+            'table_fetched_at': {name: None for name in CAPS},
             'receipt': {'identity_category': 'missing', 'config_present': False, 'outcome': 'unconfigured',
                         'endpoint': None, 'operation': None, 'permission_needed': None, 'requests': []}}
 
@@ -85,7 +86,6 @@ class PilotReader:
                     keys = sorted({key for row in previous for f in links
                                    for key in ids(row['fields'][f].get('value'))})
                     if not keys:
-                        result['table_states'][name] = 'unmapped'
                         continue
                 count = CAPS[name] if keys is None else min(CAPS[name], len(keys))
                 receipt.update(endpoint=TEMPLATE, operation='sample_' + name)
@@ -97,7 +97,8 @@ class PilotReader:
                 candidates = {x['record_id']: x for x in items if keys is None or x['record_id'] in keys[:count]}
                 chosen = [candidates[key] for key in sorted(candidates)[:count]]
                 stamp = datetime.now(timezone.utc).isoformat()
-                result['fetched_at'] = stamp
+                result['fetched_at'] = result['fetched_at'] or stamp
+                result['table_fetched_at'][name] = stamp
                 result['records'][name] = [project(x, table, FIELDS[table], self.source, stamp) for x in chosen]
                 result['table_states'][name] = 'present'
                 result['counts'][name] = {'requested': count, 'returned': len(chosen),
@@ -107,9 +108,21 @@ class PilotReader:
             receipt['outcome'] = 'denied' if denied else 'partial'
             receipt['permission_needed'] = 'bitable:app:readonly and application Base/table read grant' if denied else None
             result['status'] = 'partial' if any(result['records'].values()) else 'blocked' if denied else 'error'
-            result['last_error'] = 'Lark 權限不足' if denied else 'Lark 資料暫時無法讀取'
+            result['code'] = 'lark_permission_denied' if denied else 'lark_read_failed'
+            result['last_error'] = 'Lark 拒絕此應用讀取' if denied else 'Lark 資料暫時無法讀取'
             if active:
                 result['table_states'][active] = 'forbidden' if denied else 'partial'
+            for rows in result['records'].values():
+                for row in rows:
+                    row['freshness'] = 'partial'
+        if result['status'] == 'fresh' and any(
+            result['table_states'][name] != 'present' or
+            result['counts'][name]['has_more'] or result['counts'][name]['omitted'] > 0 or
+            result['counts'][name]['returned'] < result['counts'][name]['requested']
+            for name in CAPS
+        ):
+            result['status'] = 'partial'
+            receipt['outcome'] = 'partial'
             for rows in result['records'].values():
                 for row in rows:
                     row['freshness'] = 'partial'

@@ -89,7 +89,7 @@ def test_E04_E05_partial_keeps_cases_and_marks_denied_links():
     assert result['status'] == 'partial'
     assert result['records']['cases'][0]['links']['flddfFq9zI']['state'] == 'denied'
     assert result['table_states']['work_orders'] == 'forbidden'
-    assert result['table_states']['people'] == 'unmapped'
+    assert result['table_states']['people'] == 'not_read'
     result, _ = run(fixtures(), (WORK, httpx.ReadTimeout('SYN_sensitive_error')))
     assert result['status'] == 'partial'
     assert result['records']['cases']

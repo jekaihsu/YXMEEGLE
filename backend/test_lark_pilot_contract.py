@@ -163,3 +163,17 @@ def test_pilot_non_200_has_message_and_code(integrated, method, enabled, code):
     assert response.status_code in (404, 405)
     assert response.json()['code'] == code
     assert response.json()['detail']
+
+def test_incomplete_sample_is_partial_and_oldest_table_sets_envelope(monkeypatch):
+    from .lark_pilot import sample
+    stamps = iter(datetime(2026, 10, 12, 0, 0, second, tzinfo=timezone.utc) for second in (1, 5, 9))
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return next(stamps)
+    monkeypatch.setattr(sample, 'datetime', Clock)
+    result, _ = run(fixtures(40))
+    assert result['status'] == 'partial'
+    assert result['fetched_at'] == result['table_fetched_at']['cases']
+    assert result['table_fetched_at']['people'] > result['fetched_at']
+    assert all(row['freshness'] == 'partial' for rows in result['records'].values() for row in rows)
