@@ -18,7 +18,7 @@ def legacy_dashboard(w):
     name = lambda uid: next((u['name'] for u in w['users'] if u['id'] == uid), '尚未指派')
     pending = [a for a in w['approvals'] if a['status'] == 'pending']
     return dict(
-        overdue=len(overdue), due_today=len(due_today), active=sum(active(r[2]) for r in rows), pending=len(pending),
+        my_overdue=sum(t.get('can_execute') is True for _, _, t in overdue), other_overdue=sum(t.get('can_execute') is not True for _, _, t in overdue), overdue=len(overdue), due_today=len(due_today), active=sum(active(r[2]) for r in rows), pending=len(pending),
         attention=[dict(task_id=t['id'], title=t['title'], project_id=p['id'], project_code=p['code'], node_name=n['name'], assignee=name(t.get('owner_id')),
                         due_date=t['due_date']) for p, n, t in (overdue + due_today)[:SHOWN]],
         approvals=[(a['id'], a['title'], a['type'], a['project_id']) for a in pending[:2]],
@@ -28,7 +28,7 @@ def legacy_dashboard(w):
 def shell_dashboard(s):
     names = {u['id']: u['name'] for u in s['users']}
     c = s['counts']
-    return dict(overdue=c['overdue_tasks'], due_today=c['due_today_tasks'], active=c['active_tasks'], pending=c['approvals_pending'],
+    return dict(my_overdue=c['my_overdue_tasks'], other_overdue=c['overdue_tasks']-c['my_overdue_tasks'], overdue=c['overdue_tasks'], due_today=c['due_today_tasks'], active=c['active_tasks'], pending=c['approvals_pending'],
                 attention=[dict(task_id=a['task_id'], title=a['title'], project_id=a['project_id'], project_code=a['project_code'], node_name=a['node_name'],
                                 assignee=names.get(a['assignee_id'], '尚未指派'), due_date=a['due_date']) for a in s['attention'][:SHOWN]],
                 approvals=[(a['id'], a['title'], a['type'], a['project_id']) for a in s['pending_approvals']],

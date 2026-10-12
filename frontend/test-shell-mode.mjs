@@ -71,7 +71,7 @@ try{
  // P4-1: the dashboard renders from counts, the attention list and cards; no tree scan and no full workspace.
  await flush(()=>{location.hash='view=dashboard';window.dispatchEvent(new window.Event('hashchange'))});
  const todo=document.querySelector('.work-inbox');
- assert.ok(todo.textContent.includes('TASK_A')&&todo.textContent.includes('逾期 1 天')&&todo.textContent.includes('APPROVAL_A')&&todo.textContent.includes('NODE_A')&&todo.textContent.includes(workspace.users[0].name)&&todo.textContent.includes('逾期 6 · 當日到期 2'));
+ assert.ok(todo.textContent.includes('TASK_A')&&todo.textContent.includes('逾期 1 天')&&todo.textContent.includes('APPROVAL_A')&&todo.textContent.includes('NODE_A')&&todo.textContent.includes(workspace.users[0].name)&&todo.textContent.includes('本人可執行逾期 4 · 非本人可執行逾期 2 · 當日到期 2'));
  assert.equal(todo.querySelector('.heading-count').textContent,'11');assert.ok(document.querySelector('.today-aside').textContent.includes('535 筆日報待配對'));
  assert.ok(document.querySelector('.project-preview-row').textContent.includes('PRIVATE_CASE_A'));
  assert.ok(!requests.some(r=>r.url==='/api/workspace'),'dashboard never loads the full workspace');
