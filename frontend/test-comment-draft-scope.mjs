@@ -28,12 +28,12 @@ const fill=async value=>act(async()=>{
 });
 const click=async label=>act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent.includes(label)).click());
 await show();await fill('PRIVATE_A_COMMENT');
-await click('標註同事');await click('User One');
-await show('B');assert.equal(text().value,'');assert.equal(document.querySelector('.mention-chip'),null);
+await click('插入標註');await click('User One');
+await show('B');assert.equal(text().value,'');assert.ok(!text().value.includes('@'));
 await fill('B_COMMENT');await click('送出');
 assert.deepEqual(submissions.pop(),{action:'comment_add',payload:{body:'B_COMMENT',mentions:[]},scope:{project_id:'B',node_id:undefined,task_id:undefined}});
-await show();assert.equal(text().value,'PRIVATE_A_COMMENT');assert.ok(document.querySelector('.mention-chip'));
-await click('標註同事');
+await show();assert.equal(text().value,'PRIVATE_A_COMMENT @User One ');assert.ok(text().value.includes('@User One'));
+await click('插入標註');
 await show('A','n1');assert.equal(text().value,'');assert.equal(document.querySelector('.mention-picker'),null);
 await fill('NODE_1');await show('A','n2');assert.equal(text().value,'');
 await fill('NODE_2');await show('A','n1');assert.equal(text().value,'NODE_1');
@@ -43,7 +43,7 @@ await show('A','n1','t1');assert.equal(text().value,'TASK_1');await click('送�
 assert.deepEqual(submissions.pop().scope,{project_id:'A',node_id:'n1',task_id:'t1'});
 await show('A',undefined,undefined,'u2');assert.equal(text().value,'');await fill('USER_2');
 await show('A',undefined,undefined,'u1','w2');assert.equal(text().value,'');await fill('WORKSPACE_2');
-await show();assert.equal(text().value,'PRIVATE_A_COMMENT');await click('送出');
-assert.deepEqual(submissions.pop(),{action:'comment_add',payload:{body:'PRIVATE_A_COMMENT',mentions:['u1']},scope:{project_id:'A',node_id:undefined,task_id:undefined}});
+await show();assert.equal(text().value,'PRIVATE_A_COMMENT @User One ');await click('送出');
+assert.deepEqual(submissions.pop(),{action:'comment_add',payload:{body:'PRIVATE_A_COMMENT @User One ',mentions:['u1']},scope:{project_id:'A',node_id:undefined,task_id:undefined}});
 await act(async()=>root.unmount());dom.window.close();
 console.log('comment draft scope: project/node/task/user/workspace isolation and submissions passed');
