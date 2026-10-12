@@ -1,6 +1,7 @@
 """Read-only pilot acceptance with synthetic HTTP and no production identity."""
 import ast
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -133,7 +134,8 @@ def test_E15_E21_router_disabled_before_identity_and_preserves_authorizer():
     calls = []
     def identity(request):
         calls.append('identity')
-        return {'wid': 'company', 'mode': 'lark'}, {'id': 'ou_SYN'}
+        return {'wid': 'company', 'mode': 'lark'}, {'id': 'ou_SYN',
+            'directory_last_seen_at': datetime.now(timezone.utc).isoformat()}
     def authorize(*args):
         calls.append('authorize')
         raise HTTPException(403, 'SYN_denied')
