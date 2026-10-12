@@ -21,7 +21,7 @@ const render=element=>flush(()=>root.render(element));
 const clean=async()=>{if(root)await flush(()=>root.unmount());root=undefined;fullReads.clear()};
 const setup=()=>{root=createRoot(document.getElementById('root'))};
 const c=enabled=>({w:{scope:'shell',version:1,environment:'production',users:[],freshness:{enabled}},s:{mode:'lark',user:{id:'ou_SYN',role:'manager',capabilities:['manage_people']}},refresh:async()=>{}});
-const messages={pilot_disabled:'尚未設定',pilot_not_company_workspace:'尚未設定',pilot_roster_missing:'尚無名冊核實紀錄',pilot_config_invalid:'系統設定異常',access_roster_expired:'公司名冊已逾 15 分鐘',access_not_admitted:'帳號尚未核實或已停用',source_authorization_denied:'你沒有讀取 Lark 來源的權限'};
+const messages={pilot_disabled:'唯讀 Lark 試讀尚未啟用',pilot_not_company_workspace:'此工作區不是公司工作區',pilot_method_not_allowed:'唯讀 Lark 試讀不支援此請求方式',pilot_read_failed:'唯讀 Lark 試讀暫時無法完成',pilot_roster_missing:'尚無名冊核實紀錄',pilot_config_invalid:'系統設定異常',access_roster_expired:'公司名冊已逾 15 分鐘',access_not_admitted:'帳號尚未核實或已停用',source_authorization_denied:'你沒有讀取 Lark 來源的權限'};
 for(const [code,message] of Object.entries(messages))test(`B1 ${code}`,async()=>{
  setup();const calls=[];
  globalThis.fetch=async(url,init)=>{calls.push({url,init});return new Response(JSON.stringify({code,detail:'SYN_private_detail'}),{status:['pilot_disabled','pilot_not_company_workspace'].includes(code)?404:403})};
