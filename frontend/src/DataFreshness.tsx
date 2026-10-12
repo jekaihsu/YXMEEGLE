@@ -12,9 +12,9 @@ export interface DataFreshnessProps {
   refresh:()=>boolean|void|Promise<boolean|void>;
 }
 const names=datasetNames;
-const statusNames={fresh:'已讀取',stale:'資料待更新',refreshing:'更新中',never:'尚未讀取',error:'讀取失敗',blocked:'權限不足',unconfigured:'尚未設定'};
+export const statusNames={fresh:'已讀取',stale:'資料待更新',refreshing:'更新中',never:'尚未讀取',error:'讀取失敗',blocked:'權限不足',unconfigured:'尚未設定'};
 const priority=['blocked','error','refreshing','never','stale','fresh','unconfigured'] as const;
-const time=(value:string|null)=>value?new Date(value).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'—';
+export const time=(value:string|null)=>value?new Date(value).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'—';
 
 export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDraft=false,refresh,onFreshness}:DataFreshnessProps){
   const [current,setCurrent]=useState(freshness);

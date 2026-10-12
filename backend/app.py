@@ -36,6 +36,8 @@ from .file_categories import categories, validate_category, save_category
 
 from .models import Base, WorkspaceRow, Receipt, AuthRow, CacheRow, AuditRow, BusinessRow, PersonRow
 
+NO_ROSTER_REFRESH_PATHS = frozenset({'/api/live/status', '/api/lark-pilot/shadow'})
+
 class Action(BaseModel):
     action:str; version:int; request_id:str=Field(min_length=1,max_length=120)
     project_id:str|None=None; node_id:str|None=None; task_id:str|None=None; payload:dict=Field(default_factory=dict)
@@ -295,7 +297,7 @@ def create_app(overrides=None):
                 user=deepcopy(profile.data) if profile else find(load(db,row)['users'],data['uid'],'登入人員')
             else: user=find(load(db,row,collections=('users',))['users'],data['uid'],'登入人員')
             if (data.get('mode')=='lark' and not data['wid'].startswith('test-')
-                    and request.url.path != '/api/live/status'):
+                    and request.url.path not in NO_ROSTER_REFRESH_PATHS):
                 from .live_read.admission import ensure_roster_for_admission
                 # End the DB read transaction before a blocking roster refresh.
                 db.rollback()
@@ -1078,6 +1080,8 @@ def create_app(overrides=None):
                                 details={'live_read':True,'force':True,'datasets':datasets}))
 
     register_live(app,identity,app.state.live_read,authorize=authorize_live,audit=audit_live_refresh)
+    from .lark_pilot.routes import register as register_pilot
+    register_pilot(app, identity=identity, authorize=authorize_live, cfg=cfg)
     from .runtime_health import register as register_runtime_health
     register_runtime_health(app,identity,sessions,CacheRow,cfg,workspace_model=WorkspaceRow,coordinator=app.state.live_read)
 

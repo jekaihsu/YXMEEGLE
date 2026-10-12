@@ -1,0 +1,21 @@
+# Pilot candidate implementation receipt
+
+Verdict: INCONCLUSIVE. Author self-checks only, no independent PASS or delivery acceptance. Owner Shilpa, standard lane, rejection count 0. Branch ava-apple/yxs-54-lark-readonly-pilot, isolated worktree of the same name under /Users/vc/Local/worktrees/YXMEEGLE. Base ava-apple/yxs-lark-authoritative-operations at c7ed20d7b93f2d077cb10c563abf6a68f2ee18cb. Exact candidate head, command outputs and evidence links are in the canonical implementation-receipt document on YXS-56.
+
+The pilot performs a capped in-memory projection with a default-off GET endpoint and a read-only Sources panel. No database/coordinator handle enters the pilot module. Injected transport emits mock, never live. No retained backend cache exists. Explicit null, omitted, denied, partial and unmapped states remain distinct. No name matching, eligibility inference or schedule-to-deadline inference is added.
+
+The original synthetic identity regression recorded a bulk refresher plus source_caches INSERT/UPDATE/UPDATE before the fix. The exact-path exemption now preserves the existing cookie/session, admission, active/access and source-authority checks. Adjacent paths still refresh. Existing one-time local person/admin-grant/audit maintenance is retained. Settled synthetic identity produces zero mutations; stale/unknown/inactive/missing/wrong-app/source-unauthorized identities deny before the reader.
+
+Skipping refresh does not certify the external roster as current. Existing local admission evidence lasts for the unchanged 900-second policy. External revocation can remain unknown until a separate refresh. Stored denial, inactive status and removed capability apply immediately; expired evidence fails closed. Owner-authorized company-admin grants retain their existing behavior. Independent review must assess these consistency limits before permitting live reads.
+
+Owner approval is bounded to 600–800 changed lines and the exact pilot-path candidate, conditional on independent review. Manisha's packaging decision permits one staging rglob entry and a manifest regression. Before that entry the regression fails with all four pilot runtime files absent. After it the regression passes and the local credential-free isolated boot reports runtime_smoke_passed: true. No deployment, credential or permission change occurred.
+
+Manisha separately authorized the stale comment-draft expectation correction. It changes only the test to the established inline mention behavior; project/node/task/user/workspace isolation and mentions payload checks remain intact. It is a separate local commit.
+
+Required checks are the complete scripts/local_ci.sh pre-push checks, all frontend test:* scripts, company-route and build. Actual outputs and exits are attached to the canonical receipt. Lint is not configured. The reviewed pinned TDD method was recovered from prior durable evidence; the packaging regression was run failing before the one-line fix and passing after it.
+
+Browser proof uses the exact base Sources page on port 8158, candidate Sources page on port 8157, and synthetic component states on port 8156. Loading/empty/error/denied/partial/stale/cached/mock/local/unmapped, mobile and keyboard evidence is synthetic. Browser/server sessions close after capture. No live badge in these fixtures establishes runtime access.
+
+Live preflight/sample and access denial receipt are NOT RUN under the owner's review-first condition. Matrix classifications remain proposed/schema-only. No authorized private live preview is recorded. These are pending evidence, not silently waived acceptance criteria.
+
+Next gates: Viveka owns YXS-57 exact-head independent Review. Only its PASS permits the bounded live preflight/sample continuation; Satya owns YXS-58 independent Verification, and Manisha retains delivery acceptance. Any new SHA invalidates earlier verdicts. No push, PR, merge, activation, deployment, Lark business-data write or independent PASS.

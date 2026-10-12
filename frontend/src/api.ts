@@ -115,3 +115,5 @@ export function perfMark(name:string){
     console.log('[yx-perf]',name,summary.marks[name].toFixed(1),'ms');
   });
 }
+
+export const fetchPilotShadow=(signal?:AbortSignal)=>api<unknown>('/api/lark-pilot/shadow',{method:'GET',cache:'no-store',signal});
