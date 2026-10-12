@@ -52,3 +52,19 @@ await assert.rejects(api('/x'),e=>e instanceof ApiError&&e.status===502&&!e.mess
 assert.equal(mutationEvents,6,'every POST publishes a start and finish event');
 assert.equal(getPendingMutations(),0);
 console.log('api response tests passed');
+// Bounded reads must settle even if fetch or body consumption ignores abort.
+const nativeTimer=globalThis.setTimeout,nativeClear=globalThis.clearTimeout;
+for(const stage of ['fetch','body']){
+ let expire,signal,cleared=false;
+ globalThis.setTimeout=fn=>{expire=fn;return 123};
+ globalThis.clearTimeout=()=>{cleared=true};
+ globalThis.fetch=(_url,init)=>{signal=init.signal;return stage==='fetch'?new Promise(()=>{}):Promise.resolve({status:200,ok:true,text:()=>new Promise(()=>{})})};
+ try{
+  const result=api('/api/workspace',{timeoutMs:120000});
+  const rejected=assert.rejects(result,e=>e instanceof ApiError&&e.code==='client_timeout');
+  await Promise.resolve();assert.equal(typeof expire,'function');expire();await rejected;
+  assert.ok(signal.aborted);assert.ok(cleared);
+ }finally{globalThis.setTimeout=nativeTimer;globalThis.clearTimeout=nativeClear}
+}
+respond(JSON.stringify({code:'pilot_roster_stale',ceiling_seconds:30,detail:'stale'}),403);
+await assert.rejects(api('/x'),e=>e.code==='pilot_roster_stale'&&e.ceiling_seconds===30);

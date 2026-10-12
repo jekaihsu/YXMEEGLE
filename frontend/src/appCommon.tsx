@@ -71,7 +71,7 @@ export function readFullWorkspace(version:number){
  const key=`${getSessionEpoch()}:${version}`;
  for(const old of fullReads.keys())if(!old.startsWith(`${getSessionEpoch()}:`))fullReads.delete(old);
  let read=fullReads.get(key);
- if(!read){read=api<Workspace>('/api/workspace');fullReads.set(key,read);read.catch(()=>fullReads.delete(key))}
+ if(!read){read=api<Workspace>('/api/workspace',{timeoutMs:120000});fullReads.set(key,read);read.catch(()=>fullReads.delete(key))}
  return read;
 }
 export function FullWorkspaceGate({c,children}:{c:Ctx;children:(c:Ctx)=>ReactNode}){

@@ -2,19 +2,29 @@
 // Shared with App so every request captures the active session epoch.
 let sessionEpoch=0;
 const etagCache=new Map<string,{etag:string;data:unknown}>();
-export type ApiRequestInit=RequestInit & {etag?:boolean};
+export type ApiRequestInit=RequestInit & {etag?:boolean;timeoutMs?:number};
 const pendingMutations=new Map<number,number>();
 export const getPendingMutations=()=>pendingMutations.get(sessionEpoch)||0;
 const mutationChanged=()=>{if(typeof window!=='undefined')window.dispatchEvent(new Event('yx:mutation-state'))};
 export const getSessionEpoch=()=>sessionEpoch;
 export const invalidateSessionEpoch=()=>{sessionEpoch++;etagCache.clear()};
-export class ApiError extends Error {constructor(public status:number,message:string){super(message)}}
+export class ApiError extends Error {constructor(public status:number,message:string,public code?:string,public ceiling_seconds?:number){super(message)}}
 export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boolean=()=>true,onResponse?:(status:number)=>void):Promise<T>{
   const epoch=getSessionEpoch();
   const mutating=!!init?.method&&!['GET','HEAD'].includes(init.method.toUpperCase());
   if(mutating){pendingMutations.set(epoch,(pendingMutations.get(epoch)||0)+1);mutationChanged()}
+  const {etag,timeoutMs,...request}=init||{};
+  const controller=timeoutMs?new AbortController():undefined;
+  let timer:ReturnType<typeof setTimeout>|undefined;
+  let cancel:()=>void=()=>{};
+  const deadline=controller?new Promise<never>((_resolve,reject)=>{
+   cancel=()=>{reject(new DOMException('aborted','AbortError'));controller.abort()};
+   request.signal?.addEventListener('abort',cancel,{once:true});
+   timer=setTimeout(()=>{reject(new ApiError(408,'讀取逾時，請重試。','client_timeout'));controller.abort()},timeoutMs);
+   if(request.signal?.aborted)cancel();
+  }):undefined;
+  const bounded=<V>(work:Promise<V>):Promise<V>=>deadline?Promise.race([work,deadline]):work;
   try{
-  const {etag,...request}=init||{};
   const cacheable=etag===true&&!mutating&&(!init?.method||init.method.toUpperCase()==='GET');
   const cached=cacheable&&init?.cache!=='reload'&&init?.cache!=='no-store'?etagCache.get(url):undefined;
   const headers=new Headers(init?.headers);
@@ -22,15 +32,15 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
   if(cached)headers.set('If-None-Match',cached.etag);
   else if(cacheable)headers.delete('If-None-Match');
   const trace=perfStart(url);
-  const response=await fetch(url,{credentials:'same-origin',...request,headers});
+  const response=await bounded(fetch(url,{credentials:'same-origin',...request,headers,...(controller?{signal:controller.signal}:{})}));
   perfHeaders(trace,response);
   onResponse?.(response.status);
   if(response.status===304&&cached)return cached.data as T;
   const malformed='服務回應格式不正確，請稍後再試。';
   let data:any;let parsed=true;
-  try{const text=await response.text();data=JSON.parse(text);perfParsed(trace,text)}catch{data={detail:malformed};parsed=false}
+  try{const text=await bounded(response.text());data=JSON.parse(text);perfParsed(trace,text)}catch(error){if(controller?.signal.aborted)throw error;data={detail:malformed};parsed=false}
   if(response.status===401&&epoch===getSessionEpoch()&&isCurrent())window.dispatchEvent(new Event('yx:session-expired'));
-  if(!response.ok)throw new ApiError(response.status,typeof data?.detail==='string'?data.detail:JSON.stringify(data?.detail||'操作未完成'));
+  if(!response.ok)throw new ApiError(response.status,typeof data?.detail==='string'?data.detail:JSON.stringify(data?.detail||'操作未完成'),typeof data?.code==='string'?data.code:undefined,Number.isFinite(data?.ceiling_seconds)?data.ceiling_seconds:undefined);
   if(!parsed||data===null||typeof data!=='object')throw new ApiError(response.status,malformed);
   if(cacheable&&epoch===getSessionEpoch()&&isCurrent()&&!init?.signal?.aborted){
    const value=response.headers.get('ETag');
@@ -40,7 +50,7 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
    }else etagCache.delete(url);
   }
   return data;
-  }finally{if(mutating){const remaining=(pendingMutations.get(epoch)||1)-1;if(remaining)pendingMutations.set(epoch,remaining);else pendingMutations.delete(epoch);mutationChanged()}}
+  }finally{if(timer!==undefined)clearTimeout(timer);request.signal?.removeEventListener('abort',cancel);if(mutating){const remaining=(pendingMutations.get(epoch)||1)-1;if(remaining)pendingMutations.set(epoch,remaining);else pendingMutations.delete(epoch);mutationChanged()}}
 }
 export function normalizeRoute<T extends {view:string;tab?:string;section?:string}>(route:T):T {
  if(route.view==='learning')return {...route,view:'admin',tab:'people'};
@@ -65,7 +75,7 @@ async function checkedLive(request:Promise<LiveResult>):Promise<LiveResult>{
 export function liveStatus(signal?:AbortSignal){return checkedLive(api<LiveResult>('/api/live/status',{signal}))}
 export function liveRefresh(datasets:import('./types').LiveDataset[],wait=false,signal?:AbortSignal){
  let status=200;
- return checkedLive(api<LiveResult>('/api/live/refresh',{signal,method:'POST',body:JSON.stringify({datasets,wait,force:false})},()=>true,value=>{status=value})).then(result=>{
+ return checkedLive(api<LiveResult>('/api/live/refresh',{signal,timeoutMs:120000,method:'POST',body:JSON.stringify({datasets,wait,force:false})},()=>true,value=>{status=value})).then(result=>{
   if(status!==202)return result;
   // Accepted work is still in flight, even if the response includes an older fresh snapshot.
   return {...result,freshness:{...result.freshness,datasets:Object.fromEntries(Object.entries(result.freshness.datasets).map(([key,d])=>[key,{...d,status:datasets.includes(key as import('./types').LiveDataset)&&!['error','blocked','unconfigured'].includes(d.status)?'refreshing':d.status}])) as import('./types').Freshness['datasets']}};
@@ -116,4 +126,4 @@ export function perfMark(name:string){
   });
 }
 
-export const fetchPilotShadow=(signal?:AbortSignal)=>api<unknown>('/api/lark-pilot/shadow',{method:'GET',cache:'no-store',signal});
+export const fetchPilotShadow=(signal?:AbortSignal)=>api<unknown>('/api/lark-pilot/shadow',{method:'GET',cache:'no-store',signal,timeoutMs:120000});
