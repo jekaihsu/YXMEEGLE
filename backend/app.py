@@ -136,6 +136,8 @@ def create_app(overrides=None):
 
     app=FastAPI(title='詠翔專案工作台',docs_url=None if production else '/api/docs',lifespan=lifespan); app.state.engine=engine; app.state.sessions=sessions; app.state.signer=signer
     app.state.cfg=cfg; app.state.upload_dir=upload_dir
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+    @app.exception_handler(StarletteHTTPException)
     @app.exception_handler(HTTPException)
     async def safe_auth_error(request,exc):
         from fastapi.responses import JSONResponse
@@ -149,7 +151,10 @@ def create_app(overrides=None):
                   'authorization_denied' if '使用者拒絕授權' in detail else 'expired')
             response=RedirectResponse('/?auth_error='+code,status_code=303)
             response.delete_cookie('lark_oauth_state'); return response
-        return JSONResponse({'detail':exc.detail},status_code=exc.status_code,headers=exc.headers)
+        body = {'detail': exc.detail}
+        if request.url.path == '/api/lark-pilot/shadow':
+            body['code'] = getattr(exc, 'code', 'pilot_method_not_allowed' if exc.status_code == 405 else 'pilot_read_failed')
+        return JSONResponse(body,status_code=exc.status_code,headers=exc.headers)
     app.add_middleware(GZipMiddleware,minimum_size=1000,compresslevel=5)
     from .request_limits import JsonRequestLimit
     app.add_middleware(JsonRequestLimit)

@@ -1,4 +1,5 @@
 """Company admission is independent of simulated workspace permissions."""
+from fastapi import HTTPException
 from copy import deepcopy
 from datetime import datetime,timezone
 import json
@@ -25,7 +26,10 @@ def admitted(person, app_id):
 
 
 def require_admission(person, app_id):
-    require(admitted(person, app_id), '尚未核實在職名冊或帳號已停用，請聯絡公司管理員核對', 403)
+    if not admitted(person, app_id):
+        exc = HTTPException(403, '尚未核實在職名冊或帳號已停用，請聯絡公司管理員核對')
+        exc.code = 'access_not_admitted'
+        raise exc
 
 
 DIRECTORY_MAX_AGE_SECONDS=900
@@ -92,9 +96,12 @@ def access_mode(person,app_id,*,now=None,cfg=None,tenant=None):
 
 def require_access(person,app_id,*,allow_recovery=False,now=None,cfg=None,tenant=None):
     mode=access_mode(person,app_id,now=now,cfg=cfg,tenant=tenant)
-    require(mode=='normal' or allow_recovery and mode=='recovery',
-            '公司名冊已逾15分鐘未核實，請由維運管理員恢復同步' if admitted(person,app_id)
-            else '尚未核實在職名冊或帳號已停用',403)
+    if not (mode=='normal' or allow_recovery and mode=='recovery'):
+        verified = admitted(person, app_id)
+        exc = HTTPException(403, '公司名冊已逾15分鐘未核實，請由維運管理員恢復同步' if verified
+                            else '尚未核實在職名冊或帳號已停用')
+        exc.code = 'access_roster_expired' if verified else 'access_not_admitted'
+        raise exc
     return mode
 
 

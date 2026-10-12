@@ -152,3 +152,14 @@ def test_A9_disabled_and_method_guards(isolated):
     assert client.get(PATH).status_code == 404
     assert client.post(PATH).status_code == 405
     assert calls == [] and identity.call_count == authorize.call_count == reader.call_count == 0
+
+@pytest.mark.parametrize('method,enabled,code', [
+    ('GET', 'false', 'pilot_disabled'), ('POST', 'true', 'pilot_method_not_allowed'),
+])
+def test_pilot_non_200_has_message_and_code(integrated, method, enabled, code):
+    app, client, _, _, _ = integrated
+    app.state.cfg['LARK_PILOT_READONLY_ENABLED'] = enabled
+    response = client.request(method, PATH)
+    assert response.status_code in (404, 405)
+    assert response.json()['code'] == code
+    assert response.json()['detail']
