@@ -135,3 +135,14 @@ for(const age of ['expired','unknown'])test(`live roster recovery rejects fresh 
   assert.equal(document.querySelector('button').disabled,false);
  }finally{await clean()}
 });
+
+test('legacy roster sync success re-fetches pilot though freshness is unconfigured',async()=>{
+ setup();const calls=[];const stamp=new Date().toISOString();
+ // Real legacy /api/people/sync shape: live reads are disabled, so every dataset reports unconfigured.
+ const freshness={enabled:false,server_time:stamp,datasets:Object.fromEntries(['roster','sources','attendance'].map(k=>[k,{status:'unconfigured',ttl_seconds:300,age_seconds:0,as_of:stamp}]))};
+ globalThis.fetch=async(url,init)=>{calls.push({url,init});return new Response(JSON.stringify(url==='/api/lark-pilot/shadow'?(calls.length===1?{code:'pilot_roster_stale'}:payload()):{status:'ready',last_success_at:stamp,freshness}),{status:calls.length===1?403:200})};
+ try{
+  await render(React.createElement(LarkPilotPanel,{c:c(false)}));await flush(()=>document.querySelector('button').click());
+  assert.deepEqual(calls.map(x=>x.url),['/api/lark-pilot/shadow','/api/people/sync','/api/lark-pilot/shadow']);
+ }finally{await clean()}
+});
