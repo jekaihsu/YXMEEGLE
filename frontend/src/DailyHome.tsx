@@ -69,14 +69,14 @@ export function Dashboard({c}:{c:Ctx}){
 }
 export function ShellDashboard({c}:{c:Ctx}){
  // Built from the shell response only: counts, the server's needs-attention list and project cards. No task, node or event scan.
- const counts=c.w.counts||{approvals_pending:0,daily_unmatched:0,my_overdue_tasks:0,my_active_tasks:0};const attention=c.w.attention||[];const pending=c.w.pending_approvals||[];const overdue=counts.overdue_tasks??0,dueToday=counts.due_today_tasks??0;
+ const counts=c.w.counts||{approvals_pending:0,daily_unmatched:0,my_overdue_tasks:0,my_active_tasks:0};const attention=c.w.attention||[];const pending=c.w.pending_approvals||[];const overdue=counts.my_overdue_tasks??0,others=Math.max(0,(counts.overdue_tasks??0)-overdue),dueToday=counts.due_today_tasks??0;  // 可執行逾期 = the viewer's own executable tasks (the nav badge); the rest of the visible overdue is only counted
  const blocked=attention.filter(a=>['paused','blocked'].includes(a.status));
  const formal=c.w.projects.filter(p=>p.case_type!=='intake');const intakes=c.w.projects.filter(p=>p.case_type==='intake');
  const focus=[...formal].sort((a,b)=>(b.overdue_tasks??0)-(a.overdue_tasks??0)).slice(0,5);const percent=(p:Project)=>p.progress?.total_nodes?Math.round(p.progress.completed_nodes/p.progress.total_nodes*100):0;
  const items=[...attention.slice(0,5).map(a=>({...taskItem(c,a.task_id,a.title||'未命名任務',`${a.project_code} · ${a.node_name||NODE_NAMES[a.node_key]||a.node_key} · ${nameOf(c.w,a.assignee_id)}`,a.due_date,()=>c.go({view:'project',project:a.project_id,node:a.node_id,task:a.task_id,tab:'flow'})),blocked:['paused','blocked'].includes(a.status)})),...pending.map(a=>approvalItem(c,a))];
  return <Head c={c}><div className="today-layout"><div className="today-main">
   <section className="dh-hero" aria-label="接續我的工作"><p className="dh-kicker">接續我的工作 · {counts.my_active_tasks} 項待處理</p><h2>從我的工作接續下一項任務</h2><p>檢視指派給你的任務，確認作業條件後開始。</p><Button variant="primary" onClick={()=>c.go({view:'work'})}>我的工作<ArrowRight size={17}/></Button></section>
-  <Inbox c={c} count={overdue+dueToday+counts.approvals_pending} caption={[countLine([['逾期',overdue],['當日到期',dueToday]]),blocked.length?`受阻 ${blocked.length}（已載入）`:''].filter(Boolean).join(' · ')} items={items} moreWork={overdue+dueToday>attention.slice(0,5).length} morePending={counts.approvals_pending>pending.length}/>
+  <Inbox c={c} count={overdue+dueToday+counts.approvals_pending} caption={[countLine([['可執行逾期',overdue],['當日到期',dueToday],['非本人可執行逾期',others]]),blocked.length?`受阻 ${blocked.length}（已載入）`:''].filter(Boolean).join(' · ')} items={items} moreWork={overdue+dueToday>attention.slice(0,5).length} morePending={counts.approvals_pending>pending.length}/>
   <Portfolio c={c} formal={formal} rows={focus.map(p=>({p,percent:percent(p),stage:STATUS[p.execution_status||p.status]||p.status}))}/></div>
   <Aside c={c} formal={formal.length} intakes={intakes.length} activity={<ShellActivity c={c}/>} daily={<Row label="日報請至各案件的「日報」頁查看"/>}/></div></Head>
 }
