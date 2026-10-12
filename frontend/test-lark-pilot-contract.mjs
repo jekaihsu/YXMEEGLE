@@ -109,3 +109,16 @@ for(const enabled of [false,true])test(`roster displays response as_of before pa
  globalThis.fetch=async()=>new Response(JSON.stringify({freshness}));
  try{await render(React.createElement(PeopleDirectoryPanel,{c:context}));await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='同步 Lark 人員名冊').click());assert.ok(document.body.textContent.includes(new Date(stamp).toLocaleString('zh-TW')),document.body.textContent)}finally{await clean()}
 });
+
+for(const enabled of [false,true])test(`roster recovery routes only roster and re-fetches pilot, mode ${enabled}`,async()=>{
+ setup();const calls=[];const stamp=new Date().toISOString();
+ const freshness={enabled,server_time:stamp,datasets:Object.fromEntries(['roster','sources','attendance'].map(k=>[k,{status:'fresh',ttl_seconds:60,age_seconds:0,as_of:stamp}]))};
+ globalThis.fetch=async(url,init)=>{calls.push({url,init});return new Response(JSON.stringify(url==='/api/lark-pilot/shadow'?(calls.length===1?{code:'pilot_roster_missing'}:payload()):{freshness}),{status:calls.length===1?403:200})};
+ try{
+  await render(React.createElement(LarkPilotPanel,{c:c(enabled)}));await flush(()=>document.querySelector('button').click());
+  assert.deepEqual(calls.map(x=>x.url),['/api/lark-pilot/shadow',enabled?'/api/live/refresh':'/api/people/sync','/api/lark-pilot/shadow']);
+  assert.equal(calls[1].init.method,'POST');
+  assert.deepEqual(calls[1].init.body===undefined?undefined:JSON.parse(calls[1].init.body),enabled?{datasets:['roster'],wait:true,force:false}:undefined);
+  assert.ok(document.body.textContent.includes('工程確認單'));
+ }finally{await clean()}
+});
