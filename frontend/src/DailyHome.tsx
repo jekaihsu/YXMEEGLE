@@ -55,7 +55,7 @@ const countLine=(parts:[string,number][])=>parts.filter(([,n])=>n>0).map(([l,n])
 const Head=({c,children}:{c:Ctx;children:ReactNode})=><Page eyebrow={`${date(c.w.as_of)} · 資料日期`} title="工作總覽" subtitle="先掌握待處理工作，再查看案件進度。" actions={<><Button onClick={()=>c.go({view:'schedule'})}><CalendarDays size={16}/>查看排程</Button></>}>{children}</Page>;
 
 export function Dashboard({c}:{c:Ctx}){
- const rows=allTasks(c.w);const overdue=rows.filter(r=>r.t.can_execute===true&&isLate(r.t,c.w.as_of));const sourceLate=rows.filter(r=>r.t.can_execute!==true&&isLate(r.t,c.w.as_of)).length;const pending=c.w.approvals.filter(a=>a.status==='pending');const dueToday=rows.filter(r=>active(r.t)&&r.t.due_date?.slice(0,10)===c.w.as_of.slice(0,10));
+ const rows=allTasks(c.w);const overdue=rows.filter(r=>isLate(r.t,c.w.as_of));const otherLate=rows.filter(r=>r.t.can_execute!==true&&isLate(r.t,c.w.as_of)).length;const pending=c.w.approvals.filter(a=>a.status==='pending');const dueToday=rows.filter(r=>active(r.t)&&r.t.due_date?.slice(0,10)===c.w.as_of.slice(0,10));
  const formal=c.w.projects.filter(p=>p.case_type!=='intake');const intakes=c.w.projects.filter(p=>p.case_type==='intake');
  const late=(p:Project)=>p.nodes.flatMap(n=>n.tasks).filter(t=>isLate(t,c.w.as_of)).length;
  const focus=[...formal].sort((a,b)=>late(b)-late(a)).slice(0,5);
@@ -63,7 +63,7 @@ export function Dashboard({c}:{c:Ctx}){
  const tasks=uniqueRows([...overdue.slice(0,2),...blocked.slice(0,2),...dueToday,...overdue.slice(2),...blocked.slice(2)]).slice(0,5);const reports=c.w.projects.flatMap(p=>(p.daily_reports||[]).map(r=>({...r,p}))).filter(r=>r.date===c.w.as_of.slice(0,10));
  const items=[...tasks.map(r=>({...taskItem(c,r.t.id,r.t.title,`${r.p.code} · ${r.n.name} · ${nameOf(c.w,r.t.owner_id)}`,r.t.due_date,()=>openTask(c,r)),blocked:operationallyBlocked(r)})),...pending.slice(0,2).map(a=>approvalItem(c,a))];
  return <Head c={c}><div className="today-layout"><div className="today-main"><NextAction c={c} rows={rows}/>
-  <Inbox c={c} count={attention.length+pending.length} caption={countLine([['可執行逾期',overdue.length],['當日到期',dueToday.length],['受阻',blocked.length],['來源資料逾期（非可執行任務）',sourceLate]])} items={items} moreWork={attention.length>5} morePending={pending.length>2}/>
+  <Inbox c={c} count={attention.length+pending.length} caption={countLine([['本人可執行逾期',overdue.length-otherLate],['當日到期',dueToday.length],['受阻',blocked.length],['非本人可執行逾期',otherLate]])} items={items} moreWork={attention.length>5} morePending={pending.length>2}/>
   <Portfolio c={c} formal={formal} rows={focus.map(p=>({p,percent:progress(p),stage:p.nodes.filter(n=>['in_progress','paused'].includes(n.status)).map(n=>NODE_NAMES[n.key]||n.name).join('、')||STATUS[p.status]||p.status}))}/></div>
   <Aside c={c} formal={formal.length} intakes={intakes.length} activity={<section className="today-activity ds-section"><h2>近期活動</h2><div className="ds-group glass--flat"><EventList c={c} limit={3}/></div></section>} daily={<>{reports.slice(0,3).map(r=><Row key={r.id} label={r.case_code} detail={`${r.department} · ${r.person}`} onClick={()=>c.go({view:'project',project:r.p.id,tab:'daily'})}/>)}{!reports.length&&<Row label={c.s.mode==='lark'&&(c.w.source_status.status!=='ready'||unmatchedDaily(c.w)>0)?'日報來源待核對，尚無已配對紀錄':'資料日期內尚無已配對日報'}/>}</>}/></div></Head>
 }
