@@ -13,12 +13,13 @@ def legacy_dashboard(w):
     today = w['as_of'][:10]
     rows = [(p, n, t) for p in w['projects'] for n in p['nodes'] for t in n['tasks']]
     active = lambda t: t['status'] not in CLOSED
-    overdue = [r for r in rows if r[2]['due_date'] and r[2]['due_date'][:10] < today and active(r[2])]
+    late = [r for r in rows if r[2]['due_date'] and r[2]['due_date'][:10] < today and active(r[2])]
+    overdue = [r for r in late if r[2].get('can_execute') is True]  # DailyHome: 可執行逾期 only; the rest is 非本人可執行逾期
     due_today = [r for r in rows if active(r[2]) and (r[2]['due_date'] or '')[:10] == today]
     name = lambda uid: next((u['name'] for u in w['users'] if u['id'] == uid), '尚未指派')
     pending = [a for a in w['approvals'] if a['status'] == 'pending']
     return dict(
-        overdue=len(overdue), due_today=len(due_today), active=sum(active(r[2]) for r in rows), pending=len(pending),
+        overdue=len(overdue), others_overdue=len(late) - len(overdue), due_today=len(due_today), active=sum(active(r[2]) for r in rows), pending=len(pending),
         attention=[dict(task_id=t['id'], title=t['title'], project_id=p['id'], project_code=p['code'], node_name=n['name'], assignee=name(t.get('owner_id')),
                         due_date=t['due_date']) for p, n, t in (overdue + due_today)[:SHOWN]],
         approvals=[(a['id'], a['title'], a['type'], a['project_id']) for a in pending[:2]],
@@ -28,7 +29,7 @@ def legacy_dashboard(w):
 def shell_dashboard(s):
     names = {u['id']: u['name'] for u in s['users']}
     c = s['counts']
-    return dict(overdue=c['overdue_tasks'], due_today=c['due_today_tasks'], active=c['active_tasks'], pending=c['approvals_pending'],
+    return dict(overdue=c['my_overdue_tasks'], others_overdue=c['overdue_tasks'] - c['my_overdue_tasks'], due_today=c['due_today_tasks'], active=c['active_tasks'], pending=c['approvals_pending'],
                 attention=[dict(task_id=a['task_id'], title=a['title'], project_id=a['project_id'], project_code=a['project_code'], node_name=a['node_name'],
                                 assignee=names.get(a['assignee_id'], '尚未指派'), due_date=a['due_date']) for a in s['attention'][:SHOWN]],
                 approvals=[(a['id'], a['title'], a['type'], a['project_id']) for a in s['pending_approvals']],
@@ -43,7 +44,7 @@ def test_shell_dashboard_equals_legacy_dashboard(tmp_path, monkeypatch, uid, tod
         switch(client, uid)
         full = client.get('/api/workspace').json(); shell = client.get('/api/workspace?scope=shell').json()
         legacy = legacy_dashboard(full)
-        assert legacy['overdue'] + legacy['due_today'] > 0 and legacy['pending'] > 0
+        assert legacy['overdue'] + legacy['others_overdue'] + legacy['due_today'] > 0 and legacy['pending'] > 0
         assert shell_dashboard(shell) == legacy
         assert len(shell['attention']) >= min(SHOWN, legacy['overdue'] + legacy['due_today'])
 
@@ -54,7 +55,8 @@ def test_manager_owning_no_tasks_still_sees_everything(tmp_path, monkeypatch):
         switch(client, 'u-manager')
         full = client.get('/api/workspace').json(); shell = client.get('/api/workspace?scope=shell').json()
         assert not any(t['owner_id'] == 'u-manager' for p in full['projects'] for n in p['nodes'] for t in n['tasks'])
-        assert shell['counts']['overdue_tasks'] > 0 and shell['attention'] and shell['pending_approvals']
+        assert shell['counts']['overdue_tasks'] > 0 and shell['counts']['my_overdue_tasks'] == 0 and shell['pending_approvals']
+        assert all(a['due_date'][:10] == shell['as_of'][:10] for a in shell['attention'])  # others' overdue work is a count, never a row
         assert shell_dashboard(shell) == legacy_dashboard(full)
 
 
@@ -72,4 +74,4 @@ def test_shell_dashboard_never_leaks_hidden_cases(tmp_path, monkeypatch):
         hidden = {'p001', 'p002', 'p003'}
         assert not any(a['project_id'] in hidden for a in shell['attention'] + shell['pending_approvals'])
         everything = legacy_dashboard(client.get('/api/workspace').json())  # full path hides via source_case_policy only if the state says so; counts must not exceed it
-        assert shell['counts']['overdue_tasks'] <= everything['overdue']
+        assert shell['counts']['overdue_tasks'] <= everything['overdue'] + everything['others_overdue']

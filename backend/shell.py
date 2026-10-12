@@ -93,10 +93,11 @@ def build(db,model,row,state,user,facts,today,approval_connection):
     owned=mine(ti,user,facts); one=lambda cond:func.coalesce(func.sum(case((cond,1),else_=0)),0)
     allc=db.execute(select(one(openq),one(late),one(today_q),one(and_(openq,owned)),one(and_(late,owned))).select_from(joined).where(ti.c.workspace_id==wid,*vis)).one()
     my_active,my_late=allc[3],allc[4]
-    # [...overdue, ...dueToday] in workspace order: project, node, task ordinal
+    # [...overdue, ...dueToday] in workspace order: project, node, task ordinal. Overdue rows are the viewer's executable ones (as the 可執行逾期 count); others' overdue stay a count only.
+    mylate=and_(late,owned)
     attention=[dict(r._mapping) for r in db.execute(select(ti.c.task_id,ti.c.project_id,ti.c.node_id,ti.c.node_key,ti.c.node_name,ti.c.assignee_id,ti.c.status,ti.c.due_date,pi.c.code.label('project_code'),pi.c.name.label('project_name'))
-        .select_from(joined).where(ti.c.workspace_id==wid,or_(late,today_q),*vis)
-        .order_by(case((late,0),else_=1),pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))]
+        .select_from(joined).where(ti.c.workspace_id==wid,or_(mylate,today_q),*vis)
+        .order_by(case((mylate,0),else_=1),pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))]
     if attention:
         titles={r.entity_id:(r.data or {}).get('title') for r in db.execute(select(model.entity_id,model.data).where(model.workspace_id==wid,model.kind=='tasks',model.entity_id.in_([a['task_id'] for a in attention])))}
         for a in attention: a['title']=titles.get(a['task_id'],'')
