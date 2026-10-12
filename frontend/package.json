@@ -6,6 +6,7 @@
   "scripts": {
     "test:lark-pilot": "node test-lark-pilot.mjs",
     "test:lark-pilot-contract": "node test-lark-pilot-contract.mjs",
+    "test:overview": "node test-overview-design.mjs",
     "test:view-data": "node test-view-data.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",

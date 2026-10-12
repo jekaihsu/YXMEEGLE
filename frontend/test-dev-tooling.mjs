@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile, stat } from 'node:fs/promises';
 import { isIP } from 'node:net';
 import test from 'node:test';
+import {spawnSync} from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createServer, preview } from 'vite';
 
@@ -121,4 +122,10 @@ test('default production preview also binds locally', async () => {
     server.httpServer.closeAllConnections();
     await new Promise((resolve, reject) => server.httpServer.close(error => error ? reject(error) : resolve()));
   }
+});
+
+test('normal overview script runs full and shell rendering regressions', () => {
+  const run=spawnSync('npm',['run','test:overview'],{cwd:root,encoding:'utf8'});
+  assert.equal(run.status,0,run.stdout+run.stderr);
+  assert.match(run.stdout,/Overview design:/);
 });
