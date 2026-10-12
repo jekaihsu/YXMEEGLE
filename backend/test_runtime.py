@@ -168,3 +168,23 @@ def test_runtime_health_uses_live_roster_and_preserves_hard_limit(age,status,blo
     assert result['directory']['max_age_seconds']==900
     assert result['live_read']['queue_depth']==2
     assert result['external_integrations_verified'] is False
+
+
+def test_worker_log_carries_http_status_without_detail(tmp_path,monkeypatch,capsys):
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from backend.app import create_app, WorkspaceRow
+    from backend.seed import seed
+    from scripts import run_worker
+    app=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/worker.db','UPLOAD_DIR':str(tmp_path/'uploads'),
+                    'DEMO_MODE':'true','LARK_LIVE_READ_ENABLED':'false'})
+    with app.state.sessions.begin() as db: db.add(WorkspaceRow(id='demo-worker',version=1,data=seed()))
+    def boom(wid): raise HTTPException(409,'secret-detail-ou_123')
+    noop=SimpleNamespace(run_due=lambda wid:None,run_one=lambda wid:None)
+    app.state.native_poller=app.state.people_directory=app.state.attendance_schedule=noop
+    app.state.worker=noop; app.state.source_sync=SimpleNamespace(run_due=boom)
+    monkeypatch.setattr(run_worker,'app',app); monkeypatch.setattr(sys,'argv',['run_worker.py','--once'])
+    run_worker.main()
+    out=capsys.readouterr().out
+    assert json.loads(out.strip().splitlines()[0])=={'component':'source','error_type':'HTTPException','status_code':409}
+    assert 'secret-detail' not in out
