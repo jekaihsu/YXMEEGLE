@@ -13,13 +13,13 @@ const path=new URL('./.overview-test-bundle.mjs',import.meta.url);await fs.write
 let Dashboard,Projects;try{({Dashboard,Projects}=await import(path.href))}finally{await fs.unlink(path)}
 const w=structuredClone(workspace);w.as_of='2026-10-08T09:00:00+08:00';w.projects=w.projects.slice(0,1);
 const p=w.projects[0];p.code='CASE-001';p.contract_amount=120000;p.case_type='formal';p.execution_status='in_progress';p.source_lifecycle={state:'mapped',canonical:'執行中',reasons:[]};p.due_date='2026-10-10';
-const base=p.nodes[0].tasks[0];p.nodes[0].tasks=[{...base,id:'ready',title:'Next survey',status:'in_progress',due_date:'2026-10-10'},{...base,id:'blocked',title:'Blocked survey',status:'paused',due_date:null},{...base,id:'late',title:'Overdue survey',due_date:'2026-10-05'}];
+const base=p.nodes[0].tasks[0];p.nodes[0].tasks=[{...base,id:'ready',title:'Next survey',status:'in_progress',due_date:'2026-10-10'},{...base,id:'blocked',title:'Blocked survey',status:'paused',due_date:null},{...base,id:'late',title:'Overdue survey',due_date:'2026-10-05'},{...base,id:'src1',title:'Source only A',can_execute:false,due_date:'2026-09-01'},{...base,id:'src2',title:'Source only B',can_execute:false,due_date:'2026-09-02'}];
 const calls=[];const c={w,s:{user:a,mode:'demo',users:w.users},route:{view:'dashboard'},go:route=>calls.push(route),run:async()=>undefined,reloadVersion:0,busy:false};
 const root=createRoot(document.getElementById('root'));
 const flush=async fn=>act(async()=>{fn?.();await new Promise(r=>setTimeout(r,30))});
 await flush(()=>root.render(React.createElement(Dashboard,{c})));
 assert.equal(document.querySelector('.dh-hero h2').textContent,'Next survey');
-const inbox=document.querySelector('.work-inbox');assert.ok(inbox.textContent.includes('受阻 1'));assert.ok(inbox.textContent.includes('Blocked survey'));assert.ok(inbox.textContent.includes('逾期 3 天'));assert.equal(inbox.querySelector('.heading-count').textContent,'2');assert.ok(!inbox.textContent.includes('來源'));
+const inbox=document.querySelector('.work-inbox');assert.ok(inbox.textContent.includes('受阻 1'));assert.ok(inbox.textContent.includes('Blocked survey'));assert.ok(inbox.textContent.includes('逾期 3 天'));assert.equal(inbox.querySelector('.heading-count').textContent,'2');assert.ok(!inbox.textContent.includes('Source only'));const cap=inbox.textContent;assert.ok(cap.includes('可執行逾期 1'));assert.ok(cap.includes('來源資料逾期（非可執行任務） 2'));assert.ok(!/(^|[^行])逾期 [0-9]/.test(cap.replace(/逾期 3 天/g,'')));
 await flush(()=>[...document.querySelectorAll('.dh-hero button')].find(b=>b.textContent.includes('繼續此任務')).click());assert.equal(calls.at(-1).focus,'ready');
 w.projects=Array.from({length:300},(_,i)=>({...structuredClone(p),id:`p${i}`,code:`CASE-${String(i+1).padStart(3,'0')}`,name:`Road survey ${i+1}`}));
 await flush(()=>root.render(React.createElement(Projects,{c:{...c,route:{view:'projects'}}})));
