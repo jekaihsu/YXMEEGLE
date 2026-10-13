@@ -220,11 +220,7 @@ def test_scaled_workspace_omits_work_items_without_affecting_navigation(tmp_path
         with app.state.sessions.begin() as db:
             row=db.get(WorkspaceRow,wid);state=storage.load(db,BusinessRow,row)
             pid=state['projects'][0]['id']
-            for key in ('source_confirmations','contract_items'):
-                state[key]=deepcopy(source[key])
-                for item in state[key]:item['project_id']=pid
-            row.data=storage.save(db,BusinessRow,wid,state)
-        before=client.get('/api/workspace')
+        before=base
         with app.state.sessions.begin() as db:
             row=db.get(WorkspaceRow,wid);state=storage.load(db,BusinessRow,row)
             state['source_work_items']=[{**source['source_work_items'][i%12],'id':f'b/items/{i}',
@@ -242,6 +238,12 @@ def test_scaled_workspace_omits_work_items_without_affecting_navigation(tmp_path
         sizes=[len(json.dumps(p,ensure_ascii=False,separators=(',',':')).encode()) for p in (left,right)]
         print(f'workspace base_raw={len(base.content)} before_raw={len(before.content)} after_raw={len(after.content)} normalized={sizes} delta={sizes[1]-sizes[0]}')
         assert sizes[0]==sizes[1]
+        with app.state.sessions.begin() as db:
+            row=db.get(WorkspaceRow,wid);state=storage.load(db,BusinessRow,row)
+            for key in ('source_confirmations','contract_items'):
+                state[key]=deepcopy(source[key])
+                for item in state[key]:item['project_id']=pid
+            row.data=storage.save(db,BusinessRow,wid,state)
         navigation=client.get(f'/api/projects/{pid}/navigation')
         assert navigation.status_code==200
         assert sum(len(c['work_items']) for c in navigation.json()['confirmations'][0]['contracts'])>0
