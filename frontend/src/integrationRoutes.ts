@@ -45,7 +45,7 @@ export function sourceHealthInput(fetched: Fetched): {page_state: unknown; sourc
  if (fetched.status === 'loading') return {page_state: {states: ['loading'], count: null}, sources: []};
  if (fetched.status === 'error') return {page_state: failureState(fetched), sources: []};
  const body = record(fetched.body);
- // A missing page_state key is unknown; only an explicit null is the clean-read fact (see sourceHealthView).
+ // A missing page_state key is unknown; an explicit null is passed through and also renders unknown (no per-request complete-read evidence exists).
  if (!body || !('page_state' in body)) return {page_state: {states: ['unknown'], count: null}, sources: []};
  return {page_state: body.page_state, sources: body.sources};
 }

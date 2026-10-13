@@ -36,6 +36,9 @@ export function LegacyTabs({c, view}: {c: Ctx; view: 'work' | 'sources'}) {
   value={legacy ? 'legacy' : 'new'} onChange={v => c.go(v === 'legacy' ? {view, tab: 'legacy'} : {view})}/>;
 }
 
+// Set when a My Work row navigates away; the remounted page restores focus only when browser Back lands on that exact hash.
+let pendingReturnHash: string | null = null;
+
 export function WorkPage({c}: {c: Ctx}) {
  const fetched = useFetched('/api/my-work', c.reloadVersion ?? c.w.version);
  const filters = useMemo(() => filtersFromRoute(c.route), [c.route]);
@@ -44,12 +47,18 @@ export function WorkPage({c}: {c: Ctx}) {
  const update = useCallback((next: Partial<typeof filters>, replace: boolean) => c.go(withFilters(c.route, {...filters, ...next}), replace), [c, filters]);
  const navigate = useCallback((route: string) => {
   const hash = hashOfRoute(route);
-  if (hash) c.go(parseRoute(hash) as Ctx['route']);
+  if (!hash) return;
+  pendingReturnHash = location.hash;
+  c.go(parseRoute(hash) as Ctx['route']);
  }, [c]);
+ // Peek on every render (StrictMode safe); cleared once focus has been restored.
+ const restoreFocus = pendingReturnHash !== null && pendingReturnHash === location.hash;
+ const focusRestored = useCallback(() => {pendingReturnHash = null}, []);
  return <main className="page work-page" aria-label="我的工作">
   <LegacyTabs c={c} view="work"/>
   <MyWorkTable view={view} onSelect={id => update({selectedId: id}, false)} onModeChange={mode => update({mode, selectedId: null}, true)}
-   onSearch={search => update({search}, true)} onNavigate={navigate}/>
+   onSearch={search => update({search}, true)} onNavigate={navigate}
+   restoreFocus={restoreFocus} onFocusRestored={focusRestored}/>
  </main>;
 }
 
