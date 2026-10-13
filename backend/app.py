@@ -526,6 +526,16 @@ def create_app(overrides=None):
         filter_visible_cases(state);filter_private_workspace(state,user)
         return daily_index(state,project_id=project_id,department=department,actor_id=actor_id,date_from=date_from,date_to=date_to,status=status,q=q,offset=offset,limit=limit,coverage_scope=coverage_scope)
 
+    @app.get('/api/projects/{project_id}/navigation')
+    def project_navigation(request:Request,project_id:str):
+        from .case_navigation import case_navigation
+        from .source_case_policy import visible_project
+        data,user=identity(request)
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
+        require(any(p['id']==project_id and visible_project(state,p) for p in state.get('projects',[])),'找不到這個案件',404)
+        filter_private_workspace(state,user)
+        return case_navigation(state,project_id)
+
     AUDIT_BATCH=100
 
     def audit_page(db,wid,offset,limit,project_id,accept,prefilter=()):
