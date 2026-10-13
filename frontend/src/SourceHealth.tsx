@@ -17,6 +17,7 @@ function renderCount(val: number | null | undefined): string {
 
 export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: SourceHealthProps) {
   const page = view?.page;
+  const pageHealthy = page?.healthy === true;
   const pageStates = page?.states ?? ['unknown'];
   const pageStatusLabel = page?.statusLabel ?? '狀態未知';
   const pageExplanation = page?.explanation ?? '目前無法確認資料狀態，請聯絡管理員。';
@@ -73,15 +74,15 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
     <div className="source-health-root">
       {/* 頁面資料狀態橫幅 (Page state banner for every C-STATE value including view.page null) */}
       <section
-        className={`source-health-banner ${pageStates.map(s => `state-${s}`).join(' ')}`}
-        data-state={pageStates.join(' ')}
+        className={`source-health-banner ${pageHealthy ? 'state-healthy' : pageStates.map(s => `state-${s}`).join(' ')}`}
+        data-state={pageHealthy ? 'healthy' : pageStates.join(' ')}
         role="status"
         aria-live="polite"
         aria-label="頁面資料狀態"
       >
         <div className="source-health-banner-header">
           <span className="source-health-banner-title">頁面資料狀態</span>
-          <span className="source-health-status-badge" data-state={pageStates[0] ?? 'unknown'}>
+          <span className="source-health-status-badge" data-state={pageHealthy ? 'healthy' : pageStates[0] ?? 'unknown'}>
             {pageStatusLabel}
           </span>
         </div>

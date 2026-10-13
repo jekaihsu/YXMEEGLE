@@ -77,6 +77,8 @@ export interface PageHealth {
  states: DataStateName[];
  statusLabel: string;
  explanation: string;
+ // true only for an explicit null page_state: a clean, complete, fresh read (not unknown, not an alarm).
+ healthy: boolean;
 }
 export type SourceHealthView = {page: PageHealth; diagnostic: null} | {
  page: PageHealth;
@@ -172,9 +174,11 @@ function sourceRow(raw: Record<string, unknown>, key: string): SourceRow {
 
 export function buildSourceHealthView(input: unknown, options: SourceHealthOptions): SourceHealthView {
  const raw = record(input);
- const pageState = parseDataState(raw.page_state);
- const page: PageHealth = {states: [...pageState.states], statusLabel: pageState.states.map(s => DATA_STATE_LABELS[s]).join('・'),
-  explanation: pageState.states.map(s => guidance[s]).join(' ')};
+ // Only an explicit null is the backend's clean-read fact; a missing or malformed page_state stays unknown.
+ const page: PageHealth = raw.page_state === null
+  ? {states: [], statusLabel: '資料正常', explanation: '目前已完成讀取，資料正常。', healthy: true}
+  : (pageState => ({states: [...pageState.states], statusLabel: pageState.states.map(s => DATA_STATE_LABELS[s]).join('・'),
+   explanation: pageState.states.map(s => guidance[s]).join(' '), healthy: false}))(parseDataState(raw.page_state));
  if (options.diagnosticCapability !== true) return {page, diagnostic: null};
  const candidates = Array.isArray(raw.sources) ? Array.from(raw.sources, record) : [];
  // Drop forbidden or malformed explicit states BEFORE metadata projection,

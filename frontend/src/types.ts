@@ -40,7 +40,7 @@ export interface Workspace {scope?:'full'|'shell';attention?:ShellAttention[];ho
 export interface Session {features?:{workspace_shell?:boolean};access_mode?:string;user:User|null;users:User[];mode:string;auth_configured:boolean;environment?:string;workspace_id?:string}
 export interface SourceData {freshness?:Freshness;as_of?:string|null;configured:boolean;last_sync:string;status:string;message:string;tables:unknown[];records:unknown[];mapping?:SourceMapping}
 export type View = 'company'|'dashboard'|'projects'|'work'|'schedule'|'approvals'|'sources'|'project'|'admin'|'routines';
-export interface Route {view:View;project?:string;node?:string;task?:string;tab?:string;section?:string;completion?:string;focus?:string;comment?:string;approval?:string}
+export interface Route {view:View;project?:string;node?:string;task?:string;tab?:string;section?:string;completion?:string;focus?:string;comment?:string;approval?:string;ctx?:string}
 
 export interface WorkSchedule {id:string;user_id:string;day:string;end_time:string;version:number;active?:boolean;source_url?:string;basis?:string}
 export interface CapabilitySkill {id:string;name:string;department?:string;category?:string;level?:string|number;source_url?:string;source_record_id?:string;active?:boolean}

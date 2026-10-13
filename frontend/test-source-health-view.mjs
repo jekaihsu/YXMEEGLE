@@ -69,7 +69,7 @@ test('4 partial and stale independent and coexisting', () => {
 test('5 viewer split; forbidden omitted from every output; search cannot alter summary', () => {
  const forbidden = problem('SECRET_KEY', ['forbidden'], {name: 'SECRET_NAME', base_id: 'SECRET_BASE', loaded_count: 991, last_success: iso(1), fields: [{field_id: 'SECRET_FIELD'}], retry_handle: 'SECRET_HANDLE', read_authorized: true});
  const sources = [healthy('a', {last_success: iso(5), loaded_count: 7, base_id: 'base'}), forbidden];
- assert.deepEqual(build(input(sources), {diagnosticCapability: false}), {page: {states: ['partial', 'stale'], statusLabel: '部分資料・資料待更新', explanation: '目前只顯示部分資料，請確認既有來源的讀取狀態。 目前資料待更新，請確認最近成功讀取時間。'}, diagnostic: null});
+ assert.deepEqual(build(input(sources), {diagnosticCapability: false}), {page: {states: ['partial', 'stale'], statusLabel: '部分資料・資料待更新', explanation: '目前只顯示部分資料，請確認既有來源的讀取狀態。 目前資料待更新，請確認最近成功讀取時間。', healthy: false}, diagnostic: null});
  assert.equal(build(input(sources), {diagnosticCapability: 'true'}).diagnostic, null);
  const diagnostic = view(sources, {selectedKey: 'SECRET_KEY'});
  assert.deepEqual(keys(diagnostic), ['a']);
@@ -221,10 +221,21 @@ test('F7 malformed and forbidden-looking states expose no metadata anywhere', ()
 
 test('F8 ordinary read_failed guidance offers an available administrator action', () => {
  const result = build({page_state: {states: ['read_failed']}, sources: []}, {diagnosticCapability: false});
- assert.deepEqual(result, {page: {states: ['read_failed'], statusLabel: '讀取失敗', explanation: '請聯絡管理員確認既有授權讀取的失敗原因。'}, diagnostic: null});
+ assert.deepEqual(result, {page: {states: ['read_failed'], statusLabel: '讀取失敗', explanation: '請聯絡管理員確認既有授權讀取的失敗原因。', healthy: false}, diagnostic: null});
 });
 
 let passed = 0;
+test('H1 explicit null page_state is a non-alarming healthy read; absent or malformed stays unknown', () => {
+ const healthyPage = build({page_state: null, sources: []}, {diagnosticCapability: false}).page;
+ assert.deepEqual(healthyPage, {states: [], statusLabel: '資料正常', explanation: '目前已完成讀取，資料正常。', healthy: true});
+ assert.equal(build({page_state: null, sources: []}, options).page.healthy, true);
+ for (const bad of [{sources: []}, {page_state: undefined, sources: []}, {page_state: 0, sources: []}, {page_state: {}, sources: []}, {page_state: {states: ['bogus']}, sources: []}, null, 'x']) {
+  const page = build(bad, options).page;
+  assert.deepEqual([page.states, page.statusLabel, page.healthy], [['unknown'], '狀態未知', false], JSON.stringify(bad));
+ }
+ assert.equal(build({page_state: {states: ['stale']}, sources: []}, options).page.healthy, false);
+});
+
 for (const [name, run] of tests) {
  if (process.env.SOURCE_HEALTH_TEST && !name.startsWith(process.env.SOURCE_HEALTH_TEST)) continue;
  run(); passed++; console.log(`PASS ${name}`);
@@ -245,6 +256,7 @@ if (!process.env.SOURCE_HEALTH_MODULE) {
   ['caller string re-enables mapping authority', 'const mapped = false;', "const mapped = raw.mapped === true && record(raw.receipt).source_key === key && text(record(raw.receipt).reference) !== null;", '3 distinct'],
   ['caller string re-enables acceptance', 'const accepted = false;', "const accepted = raw.accepted === true && text(record(raw.receipt).reference) !== null;", 'F4 '],
   ['field caller string re-enables YX binding', 'const mapping = null;', 'const mapping = text(field.yx_mapping);', '3 distinct'],
+  ['null page_state treated as unknown', "raw.page_state === null", 'false', 'H1 '],
   ['forbidden metadata leaked', 'permitsSourceState(source.data_state)', 'true', '5 viewer split'],
  ];
  const dir = mkdtempSync(join(tmpdir(), 'source-health-mutations-'));
