@@ -49,6 +49,8 @@ python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
 
 ## 3. Zeabur 容器
 
+案件總覽的「最近加入」排序使用 `pg_input_is_valid`，需要 PostgreSQL >= 16；本儲存庫部署使用 `postgres:17`。
+
 1. 以此專案根目錄為 Docker build context，使用根 Dockerfile。不要以 `frontend` 或 `backend` 子目錄作 context，否則多階段 COPY 路徑不完整。
 2. 在同一專案提供 PostgreSQL，將連線字串設為應用的 DATABASE_URL。程式接受 `postgresql://`、`postgres://` 或 `postgresql+psycopg://`，內部使用 psycopg；production 拒絕 SQLite。
 3. 為附件掛載持久 volume 到 `/data/uploads`，並確認 PostgreSQL 自身資料也持久化。兩者是不同儲存範圍，不能只備份其中一個。
