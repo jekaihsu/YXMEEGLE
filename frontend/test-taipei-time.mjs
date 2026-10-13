@@ -35,5 +35,18 @@ assert.ok(text.includes('讀取驗證 2026/10/05 17:00:00 (台北時間)'),text)
 assert.ok(text.includes(`來源同步 ${want}`),text);
 assert.ok(text.includes('資料待更新'),text);
 assert.ok(document.querySelector('[role="status"]').title.includes('讀取驗證'));
+// VCC-119 round 2: legacy/disabled mode (staging: LARK_LIVE_READ_ENABLED=false) must show the source sync and the stored data time.
+const legacyDs=()=>({status:'unconfigured',as_of:'2026-10-05T17:00:00+08:00',fetched_at:null,age_seconds:637000,ttl_seconds:300,changed_at:null,fingerprint:null,last_error:null});
+const legacy={enabled:false,server_time:'2026-10-13T09:00:00+08:00',datasets:{sources:legacyDs(),roster:legacyDs(),attendance:legacyDs()}};
+await act(async()=>{root.render(React.createElement(DataFreshness,{freshness:legacy,syncedAt:'2026-10-13T08:54:22+08:00',refresh:()=>{}}))});
+{const el=document.querySelector('[role="status"]');const t=el.textContent;
+ assert.equal(t,'來源同步 2026/10/13 08:54:22 (台北時間) · 資料時間 2026/10/05 17:00:00 (台北時間)',t);
+ assert.ok(!t.includes('尚未設定')&&!t.includes('讀取驗證')&&!t.includes('Lark'),t);
+ assert.ok(!el.title.includes('讀取驗證'),el.title);assert.ok(el.title.includes('資料時間距今'),el.title);assert.ok(el.title.includes('資料時間 2026/10/05 17:00:00'),el.title);
+ assert.equal(document.querySelector('button'),null);}
+await act(async()=>{root.render(React.createElement(DataFreshness,{freshness:legacy,syncedAt:null,refresh:()=>{}}))});
+assert.equal(document.querySelector('[role="status"]').textContent,'尚未設定');
+await act(async()=>{root.render(React.createElement(DataFreshness,{freshness:fresh,syncedAt:'2026-10-13T08:54:22+08:00',refresh:()=>{}}))});
+assert.ok(document.querySelector('[role="status"]').textContent.includes('讀取驗證 2026/10/05 17:00:00 (台北時間)'));
 await act(async()=>root.unmount());
 console.log(`ok TZ=${process.env.TZ}`);

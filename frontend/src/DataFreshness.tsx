@@ -60,14 +60,17 @@ export function DataFreshness({freshness,syncedAt,demo=false,mutationActive=fals
   const age=source?.age_seconds;
   const ageText=retainedAge(age??null);
   let label=`Lark 讀取驗證 ${time(source?.as_of||null)}${syncedAt?` · 來源同步 ${time(syncedAt)}`:''}`;
-  if(state==='unconfigured')label=demo?'示範資料':'尚未設定';
+  // Disabled/legacy mode: nothing was read from Lark. as_of is the stored workspace data time, not a verification.
+  const legacy=!current?.enabled&&!demo&&state==='unconfigured';
+  const dataAt=legacy?entries.find(([key])=>key==='sources')?.[1]||entries[0]?.[1]:undefined;
+  if(state==='unconfigured')label=demo?'示範資料':legacy&&syncedAt?`來源同步 ${time(syncedAt)}${dataAt?.as_of?` · 資料時間 ${time(dataAt.as_of)}`:''}`:'尚未設定';
   if(state==='stale')label+=` · 資料待更新（距上次讀取驗證 ${retainedAge(age??null).replace('顯示 ','').replace('資料','')}）`;
   if(state==='refreshing')label='更新中…';
   if(state==='never')label=`正在讀取 Lark ${names[deciding[0]?.[0]||'sources']}…`;
   if(state==='error')label=`${deciding.map(([key])=>names[key]).join('、')}：Lark 暫時無法讀取，${ageText}`;
   if(state==='blocked')label=`${deciding.map(([key])=>names[key]).join('、')}：Lark 權限不足（1254302），請聯絡管理員`;
   const color=state==='error'||state==='blocked'?'var(--critical)':state==='stale'?'var(--critical)':'var(--label-2)';
-  const details=entries.map(([key,d])=>`${names[key]}：讀取驗證 ${time(d.as_of)} · 距今 ${d.age_seconds??'—'} 秒 · 有效 ${d.ttl_seconds} 秒`).join('\n');
+  const details=legacy?(dataAt?`資料時間 ${time(dataAt.as_of)}（已儲存的工作區資料，並非即時讀取） · 資料時間距今 ${dataAt.age_seconds==null?'—':Math.floor(dataAt.age_seconds)} 秒`:''):entries.map(([key,d])=>`${names[key]}：讀取驗證 ${time(d.as_of)} · 距今 ${d.age_seconds??'—'} 秒 · 有效 ${d.ttl_seconds} 秒`).join('\n');
   return <div className={`data-freshness freshness-view data-freshness-${state}`} data-state={state}>
     <span role="status" aria-live="polite" title={details} style={{color}}>
       {state==='refreshing'?<span className="spin" aria-hidden="true">◌ </span>:null}{state==='fresh'||state==='stale'||state==='error'?<><span aria-hidden="true">{label}</span><span className="sr-only">{state==='fresh'?'Lark 資料已讀取':state==='stale'?'Lark 資料待更新':`${deciding.map(([key])=>names[key]).join('、')}：Lark 暫時無法讀取，顯示先前資料`}</span></>:label}
