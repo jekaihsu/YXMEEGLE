@@ -27,26 +27,17 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
   const drawer = diagnostic?.drawer ?? null;
   const summary = diagnostic?.summary ?? null;
 
+  const rowSelectButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const prevSelectedKeyRef = useRef<string | null>(selectedKey);
-  const lastTriggerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const prevKey = prevSelectedKeyRef.current;
     prevSelectedKeyRef.current = selectedKey;
 
     if (prevKey !== null && selectedKey === null) {
-      if (lastTriggerRef.current && document.contains(lastTriggerRef.current)) {
-        lastTriggerRef.current.focus();
-      } else {
-        const rowEl = document.querySelector<HTMLElement>(`.source-health-row[data-key="${prevKey}"]`);
-        if (rowEl) {
-          const selectBtn = rowEl.querySelector<HTMLElement>('.source-health-btn-select');
-          if (selectBtn) {
-            selectBtn.focus();
-          } else {
-            rowEl.focus();
-          }
-        }
+      const targetBtn = rowSelectButtonRefs.current.get(prevKey);
+      if (targetBtn) {
+        targetBtn.focus();
       }
     }
   }, [selectedKey]);
@@ -125,7 +116,6 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                       {renderSortHeader('key', '來源代碼')}
                       <th scope="col">版本</th>
                       <th scope="col">讀取狀態</th>
-                      <th scope="col">需要注意</th>
                       <th scope="col">對應狀態</th>
                       <th scope="col">載入筆數</th>
                       {renderSortHeader('last_attempt', '最近嘗試')}
@@ -137,7 +127,7 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                   <tbody>
                     {rows.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="source-health-empty-cell">
+                        <td colSpan={10} className="source-health-empty-cell">
                           尚無符合條件的來源資料
                         </td>
                       </tr>
@@ -148,23 +138,13 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                           <tr
                             key={row.key}
                             data-key={row.key}
-                            tabIndex={0}
                             aria-selected={isSelected}
                             aria-current={isSelected ? 'true' : undefined}
                             className={`source-health-row ${isSelected ? 'is-selected' : ''} ${
                               row.needsAttention ? 'needs-attention' : ''
                             }`}
-                            onClick={e => {
-                              lastTriggerRef.current = e.currentTarget;
+                            onClick={() => {
                               onSelect?.(isSelected ? null : row.key);
-                            }}
-                            onKeyDown={e => {
-                              if (e.target !== e.currentTarget) return;
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                lastTriggerRef.current = e.currentTarget;
-                                onSelect?.(isSelected ? null : row.key);
-                              }
                             }}
                           >
                             <td className="source-health-cell-name">
@@ -179,13 +159,6 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                                 {row.statusLabel}
                               </span>
                             </td>
-                            <td className="source-health-cell-attention">
-                              {row.needsAttention && (
-                                <span className="source-health-attention-tag active">
-                                  需要注意
-                                </span>
-                              )}
-                            </td>
                             <td className="source-health-cell-stage">
                               <span className="source-health-mapping-tag">{row.mappingLabel}</span>
                             </td>
@@ -197,18 +170,23 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                               <div className="source-health-row-actions">
                                 <button
                                   type="button"
+                                  ref={el => {
+                                    if (el) {
+                                      rowSelectButtonRefs.current.set(row.key, el);
+                                    } else {
+                                      rowSelectButtonRefs.current.delete(row.key);
+                                    }
+                                  }}
                                   className="source-health-btn-select"
                                   aria-expanded={isSelected}
                                   onClick={e => {
                                     e.stopPropagation();
-                                    lastTriggerRef.current = e.currentTarget;
                                     onSelect?.(isSelected ? null : row.key);
                                   }}
                                   onKeyDown={e => {
                                     if (e.key === 'Enter' || e.key === ' ') {
                                       e.preventDefault();
                                       e.stopPropagation();
-                                      lastTriggerRef.current = e.currentTarget;
                                       onSelect?.(isSelected ? null : row.key);
                                     }
                                   }}
@@ -271,11 +249,6 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                       <span className="source-health-tag" data-attention={drawer.needsAttention}>
                         {drawer.statusLabel}
                       </span>
-                      {drawer.needsAttention && (
-                        <span className="source-health-attention-tag active">
-                          需要注意
-                        </span>
-                      )}
                     </div>
                   </div>
 

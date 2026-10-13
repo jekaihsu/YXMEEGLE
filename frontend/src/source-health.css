@@ -228,7 +228,7 @@
   white-space: nowrap;
 }
 
-/* Rows as keyboard-focusable buttons */
+/* Table rows */
 .source-health-row {
   cursor: pointer;
   transition: background-color 0.12s, outline-color 0.12s;
@@ -364,6 +364,12 @@
 
 .source-health-btn-retry:hover {
   background: color-mix(in srgb, var(--accent, #0070f3) 10%, transparent);
+}
+
+.source-health-btn-select:focus-visible,
+.source-health-btn-retry:focus-visible {
+  outline: 2px solid var(--accent, #0070f3);
+  outline-offset: 2px;
 }
 
 /* Detail Drawer */
