@@ -273,7 +273,10 @@ class EdgeInstance(_FrozenRow):
         if not is_source_key(row["source_key"]):
             raise ValueError("edge instance source_key must be a base/table/record key")
         base, table, record_id = row["source_key"].split("/")
-        if row["source_version_key"] != (base, table, record_id, version):
+        canonical_key = (base, table, record_id, version)
+        supplied_key = row["source_version_key"]
+        if not (isinstance(supplied_key, tuple) and supplied_key == canonical_key
+                and all(type(a) is type(b) for a, b in zip(supplied_key, canonical_key))):
             raise ValueError("edge instance source_version_key must match source_key and the graph version")
         if navigation == "linked" and not is_source_key(target_key):
             raise ValueError("linked edge instance needs a base/table/record target_key")
@@ -283,7 +286,7 @@ class EdgeInstance(_FrozenRow):
         if not isinstance(reason, str):
             raise ValueError("edge instance reason must be a str")
         return cls({"edge_type": row["edge_type"], "source_key": row["source_key"],
-                    "source_version_key": row["source_version_key"], "navigation": navigation,
+                    "source_version_key": canonical_key, "navigation": navigation,
                     "reason": reason, "target_key": target_key,
                     "target_table_id": row.get("target_table_id"),
                     "target_record_id": row.get("target_record_id")})
@@ -370,8 +373,57 @@ def _field_schemas(tables):
     return schemas
 
 
+_LINK_KEYS = ("record_id", "record_ids", "link_record_ids")
+
+
+def _link_shape_ok(value):
+    """True if every table_id/record value in a raw native link is a str (or a list/dict of them)."""
+    if isinstance(value, str):
+        return True
+    if isinstance(value, list):
+        return all(_link_shape_ok(item) for item in value)
+    if isinstance(value, dict):
+        if value.get("table_id") is not None and not isinstance(value["table_id"], str):
+            return False
+        present = [k for k in _LINK_KEYS if k in value]
+        return bool(present) and all(_link_shape_ok(value[k]) for k in present)
+    return False
+
+
+def _split_native_links(value):
+    """Split a raw link value into (well-formed value, malformed items); nothing is guessed or dropped."""
+    if value is None:
+        return None, []
+    if isinstance(value, list):
+        good, bad = [], []
+        for item in value:
+            (good if _link_shape_ok(item) else bad).append(item)
+        return good, bad
+    return (value, []) if _link_shape_ok(value) else (None, [value])
+
+
+def _malformed_link_row(item):
+    table = item.get("table_id") if isinstance(item, dict) else None
+    record = {k: item[k] for k in _LINK_KEYS if k in item} if isinstance(item, dict) else item
+    return {"navigation": "unresolved", "reason": "malformed_native_link", "target_key": None,
+            "target_table_id": table, "target_record_id": record}
+
+
 def _native_links(row, edge, index, schemas):
-    """Return (targets, missing, reason) from the existing native resolver."""
+    """Return (targets, missing, reason, malformed) from the existing native resolver."""
+    fields = row.get("fields")
+    field = edge.source_field
+    if isinstance(fields, Mapping) and field in fields:
+        clean, malformed = _split_native_links(fields[field])
+        if malformed:
+            row = {**row, "fields": {**fields, field: clean}}
+    else:
+        malformed = []
+    targets, missing, reason = _resolve_native_links(row, edge, index, schemas)
+    return targets, missing, reason, malformed
+
+
+def _resolve_native_links(row, edge, index, schemas):
     if edge.field_id is None:
         targets, missing = native_records(row, edge.source_field, index, edge.target_kinds)
         return targets, missing, None
@@ -432,7 +484,7 @@ def build_native_edge_graph(records, edge_types, *, tables=None, version=None):
                 continue
             common = {"edge_type": edge.edge_type, "source_key": ref.source_key,
                       "source_version_key": ref.version_key}
-            targets, missing, schema_reason = _native_links(row, edge, index, schemas)
+            targets, missing, schema_reason, malformed = _native_links(row, edge, index, schemas)
             found = []
             if schema_reason:
                 found.append({"navigation": "unresolved", "reason": schema_reason,
@@ -447,6 +499,7 @@ def build_native_edge_graph(records, edge_types, *, tables=None, version=None):
                     continue
                 found.append({"navigation": "linked", "reason": "native_link", "target_key": target_key,
                               "target_table_id": target["table_id"], "target_record_id": target["record_id"]})
+            found.extend(_malformed_link_row(item) for item in malformed)
             for item in missing:
                 found.append({"navigation": "unresolved", "reason": "native_target_unresolved",
                               "target_key": None, "target_table_id": item.get("table_id"),
