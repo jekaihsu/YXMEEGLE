@@ -106,3 +106,44 @@ def test_unchanged_snapshot_backfills_after_old_importer_version(harness,monkeyp
     h.clock[0]='2026-09-27T10:01:00+08:00'
     h.service.sync(h.wid,None,skip_unchanged=True)
     assert len(h.read()[0]['source_work_items'])==12
+
+
+def test_item_own_admission_and_unresolved_confirmation_fail_closed():
+    state,records,_,_=imported()
+    state.update(environment='production',source_visible_record_ids=[entity_id(r).replace('/','|') for r in records])
+    state['projects'][0]['case_visibility']='source_reference'
+    assert len(filter_visible_cases(deepcopy(state))['source_work_items'])==12
+    single=state['contract_items'][0]['id']
+    item=next(i for i in state['source_work_items'] if single in i['contract_ids'])
+    state['source_visible_record_ids'].remove(item['id'].replace('/','|'))
+    visible=filter_visible_cases(deepcopy(state))['source_work_items']
+    assert len(visible)==11 and item['id'] not in {i['id'] for i in visible}
+    state['source_visible_record_ids'].append(item['id'].replace('/','|'))
+    contract=next(c for c in state['contract_items'] if c['id'] in item['contract_ids'])
+    contract['unresolved_confirmation_ids']=['recNOPE']
+    visible=filter_visible_cases(deepcopy(state))['source_work_items']
+    assert len(visible)==11 and item['id'] not in {i['id'] for i in visible}
+
+
+import pytest
+
+@pytest.mark.parametrize('mode',['cross-project','unresolved','no-case','unassigned'])
+def test_importer_ambiguous_project_is_never_attributed(mode):
+    from .source_work_items import update_work_items
+    state,records,tables,assignments=imported()
+    item=next(r for r in records if r['kind']=='reporting')
+    contract=next(r for r in records if r['kind']=='contract')
+    extra=deepcopy(contract);extra['record_id']='recExtra'
+    item['fields']['來源合約明細（日報關聯）'][0]['record_ids'].append('recExtra')
+    if mode in ('cross-project','unassigned'):
+        confirmation=deepcopy(records[0]);confirmation['record_id']='recOther'
+        records.append(confirmation)
+        if mode=='cross-project':assignments[source_id(confirmation)]='other'
+        extra['fields']['所屬成案確認單（日報關聯）'][0]['record_ids']=['recOther']
+    elif mode=='unresolved':extra['fields']['所屬成案確認單（日報關聯）'][0]['record_ids']=['recNOPE']
+    else:extra['fields']['所屬成案確認單（日報關聯）']=[]
+    records.append(extra)
+    update_work_items(state,records,tables,assignments)
+    assert len(state['source_work_items'])==12
+    assert next(i for i in state['source_work_items'] if i['id']==entity_id(item))['project_id'] is None
+    assert all(i['project_id']=='p' for i in state['source_work_items'] if i['id']!=entity_id(item))

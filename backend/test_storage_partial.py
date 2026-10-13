@@ -210,3 +210,15 @@ def test_partial_project_uses_only_selected_kinds_and_parents(complete_projects)
     assert {key: value for key, value in partial.items()
             if key not in storage.COLLECTIONS and key != '_partial'} == {
                 key: value for key, value in full.items() if key not in storage.COLLECTIONS}
+
+
+def test_work_item_storage_overflow_uses_sentinel_without_project_projection(workspace_db):
+    db,row=workspace_db
+    state=storage.load(db,BusinessRow,row);pid=state['projects'][0]['id']
+    state['source_work_items']=[{'id':f'b/items/{i}','project_id':pid} for i in range(250)]
+    state['source_work_items_status']={pid:{'partial':False}}
+    row.data=storage.save(db,BusinessRow,row.id,state);db.flush()
+    partial=storage.load_partial(db,BusinessRow,row,collections=['source_work_items'],project_ids=[pid])
+    assert len(partial['source_work_items'])==201
+    assert partial['source_work_items_status'][pid]['truncated'] is True
+    assert len(storage.load(db,BusinessRow,row)['source_work_items'])==250
