@@ -177,3 +177,49 @@ def test_added_sort_parses_instants_and_keeps_invalid_last(tmp_path, direction, 
             for r, stamp in zip(rows, stamps):
                 r.created_at = stamp
         assert [p['id'] for p in everything(client, tab='all', sort='created', dir=direction)[1]] == [ids[i] for i in order]
+
+
+@pytest.mark.parametrize('direction, order', [
+    ('asc', [1, 3, 2, 5, 10, 0, 4, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
+    ('desc', [17, 16, 15, 14, 13, 12, 11, 9, 8, 7, 6, 4, 0, 10, 5, 2, 3, 1, 19, 18]),
+])
+def test_created_sort_mixed_offsets_across_page_boundaries(tmp_path, direction, order):
+    from .models import ProjectIndex
+    with scaled_client(tmp_path, 20, **ON) as (app, client):
+        with app.state.sessions.begin() as db:
+            # ID order disagrees with ordinal for every tied instant.
+            rows = db.scalars(select(ProjectIndex).order_by(ProjectIndex.project_id.desc())).all()
+            ids = [r.project_id for r in rows]
+            hours = [2, 0, 1, 0, 2, 1, 2, 2, 2, 3, 1, 3, 3, 3, 3, 3, 4, 4]
+            for i, r in enumerate(rows):
+                r.ordinal = i
+                r.created_at = (f'2026-10-13T{hours[i]:02d}:00:00+00:00' if i % 3 == 0 else
+                                f'2026-10-13T{hours[i] + 8:02d}:00:00+08:00' if i % 3 == 1 else
+                                f'2026-10-13T{hours[i]:02d}:00:00Z') if i < 18 else ['invalid', ''][i - 18]
+        expected = [ids[i] for i in order]
+        for _ in range(2):
+            pages = []
+            for offset in (0, 7, 14):
+                response = client.get('/api/projects', params={
+                    'view': 'overview', 'tab': 'all', 'sort': 'created',
+                    'dir': direction, 'limit': 7, 'offset': offset,
+                })
+                assert response.status_code == 200
+                page = response.json()
+                assert (page['total'], page['limit'], page['offset']) == (20, 7, offset)
+                page_ids = [p['id'] for p in page['items']]
+                assert page_ids == expected[offset:offset + 7]
+                pages.append(page_ids)
+            walked = [pid for page in pages for pid in page]
+            assert [len(page) for page in pages] == [7, 7, 6]
+            assert len(walked) == len(set(walked)) == 20
+            assert set(walked) == set(ids)  # no skips
+            assert walked == expected  # literal order, including both boundary ties and invalid last
+            assert client.get('/api/projects', params={
+                'view': 'overview', 'tab': 'all', 'sort': 'created',
+                'dir': direction, 'limit': 7, 'offset': 21,
+            }).json()['items'] == []
+            with app.state.sessions.begin() as db:
+                values = [dict(r) for r in db.execute(select(ProjectIndex.__table__)).mappings()]
+                db.execute(ProjectIndex.__table__.delete())
+                db.execute(ProjectIndex.__table__.insert(), values[::-1])
