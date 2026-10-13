@@ -92,11 +92,37 @@ def test_evidence_cannot_complete_guard_and_input_remains_unchanged():
     assert after['nodes'] == before['nodes']
     assert after['header']['execution_state'] == {'state': 'existing', 'tasks': [
         {'id': 't', 'status': 'in_progress', 'completed_at': None}]}
-    assert [r['id'] for r in after['deliverables']['rows']] == ['daily', 'file', 'native-file']
+    assert [r['id'] for r in after['deliverables']['rows']] == ['file', 'native-file']
     assert all(r['evidence_only'] for r in after['deliverables']['rows'])
-    assert after['deliverables']['rows'][0]['work_item_relation'] == 'unlocated'
+    assert [r['relation_scope'] for r in after['deliverables']['rows']] == ['node', 'work_item']
     assert 'points' not in json.dumps(after)
     assert state == snapshot
+
+
+def test_case_dailies_do_not_populate_either_work_items_deliverables():
+    state = fixture()
+    second = 'base/items/second'
+    state['source_work_items'].append({'id': second, 'project_id': 'p', 'contract_ids': []})
+    before = {key: build_work_item_detail(state, key)['deliverables'] for key in (ITEM, second)}
+    state['projects'][0]['daily_reports'] = [
+        {'id': 'case-daily', 'date': '2026-10-13', 'description': 'Case evidence', 'points': 100}]
+    for key in (ITEM, second):
+        result = build_work_item_detail(state, key)
+        assert result['deliverables'] == {
+            'read_state': {'states': ['unlocated'], 'count': None},
+            'rows': [], 'reason': 'evidence_is_not_workflow_completion'}
+        assert result['deliverables'] == before[key]
+        assert result['case_daily_reports'] == {
+            'read_state': {'states': ['unlocated']},
+            'reason': 'work-item daily-report edge unverified',
+            'link': {'view': 'project', 'project_id': 'p', 'tab': 'daily'}}
+        assert 'case-daily' not in json.dumps(result)
+        assert 'Case evidence' not in json.dumps(result)
+    state['projects'] = []  # no navigation hint for an absent case
+    for key in (ITEM, second):
+        assert build_work_item_detail(state, key)['case_daily_reports'] == {
+            'read_state': {'states': ['unlocated']},
+            'reason': 'work-item daily-report edge unverified'}
 
 
 def test_plan_actual_unavailable_units_never_mixed_amounts_withheld():
