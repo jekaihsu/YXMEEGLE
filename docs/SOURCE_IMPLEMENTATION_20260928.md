@@ -92,3 +92,11 @@
 - 仍需公司權限與實際 employee_id 的真排班查回驗收；fake adapter 測試不等於 Attendance 已正式串通。
 
 第二輪 source entity／Attendance service與reader／native poller／native route／局部失效／finance 專項 **54 passed**。此前較廣 source/daily/native 組 **72 passed**。兩組有重疊，不相加宣稱總測試數；本輪無遠端業務寫入。
+
+### F7 — source work items (2026-10-13, VCC-120)
+
+`source_work_items` adds a read-only `base/table/record` collection alongside existing source entities, without a database migration. It stores only identity, project, native contract links, source category/URL, and missing-source state; 外業 is retained without creating executable tasks. Links resolve through schema field IDs `flduW5c5uF` (item→contract) and `fldDSpokn5` (contract→confirmation); `fldOFyOZgb` is the forward contract→item link. Hidden/unresolved linked cases fail closed; completed refreshes mark removed rows missing and retain data.
+
+The importer projection version forces backfill on the next normal refresh, even when the source snapshot is unchanged. Navigation uses it only for cases with collection readiness metadata; otherwise the prior task projection and 外業 warning remain. Partial snapshots and capped reads show explicit partial states and return `work_items_status.partial/truncated` booleans. Reads cap at 200 records and 24,000 serialized collection bytes; project SQL reads request at most 201 rows so overflow is detectable. Regression checks assert 24 queries, 165,000 raw bytes, 30,000 gzip bytes and collection size below the 10 MB workspace budget. These are local fixture checks, **not acceptance evidence**: acceptance requires replay of C115264 against the deployed application.
+
+Rollback sets workspace `source_work_items_enabled=false` or reverts the navigation reader; preserve the stored collection. Do not revert storage registration or delete cached rows as a rollback procedure. No new Lark scope, dependency, existing collection shape, amount/count display, or source writes are introduced.
