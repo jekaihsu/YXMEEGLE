@@ -36,11 +36,11 @@ def _permitted(value):
     return ('authorized' not in value or value['authorized'] is True) and value.get('status') not in ('forbidden', 'unauthorized')
 
 
-def _state(snapshot, freshness, table=None):
+def _state(snapshot, freshness, table=None, *, viewer_filtered=None):
     status = (table or snapshot).get('status')
-    if status in ('forbidden', 'unauthorized') or freshness.get('status') == 'blocked':
+    if status in ('forbidden', 'unauthorized'):
         return data_state('forbidden')
-    if snapshot.get('status') == 'error' or status in ('error', 'read_failed') or freshness.get('last_error') or freshness.get('status') == 'error':
+    if snapshot.get('status') == 'error' or status in ('error', 'read_failed') or freshness.get('last_error') or freshness.get('status') in ('error', 'blocked'):
         return data_state('read_failed')
     if status == 'loading' or freshness.get('status') == 'refreshing':
         return data_state('loading')
@@ -55,15 +55,19 @@ def _state(snapshot, freshness, table=None):
     states = (['partial'] if partial else []) + (['stale'] if stale else [])
     if states:
         return data_state(*states)
-    if _count(table.get('count')) == 0:
-        # The visible cache count is not an unfiltered whole-table count.
-        return data_state('filtered_empty')
     if freshness.get('status') != 'fresh':
+        return data_state('unknown')
+    if _count(table.get('count')) == 0:
+        # A visible zero alone proves neither an empty source nor a filter.
+        if viewer_filtered is False:
+            return data_state('complete_empty')
+        if viewer_filtered is True:
+            return data_state('filtered_empty')
         return data_state('unknown')
     return None  # Explicit healthy read fact, not a new C-STATE value.
 
 
-def build_source_health(snapshot, freshness=None, *, diagnostic=False, read_authorized=False):
+def build_source_health(snapshot, freshness=None, *, diagnostic=False, read_authorized=False, viewer_filtered=None):
     """Build SourceHealthInput without returning any record values.
 
     ``freshness`` is status(wid)['datasets']['sources'], not the full envelope.
@@ -74,11 +78,21 @@ def build_source_health(snapshot, freshness=None, *, diagnostic=False, read_auth
 
     G-DIAG is the caller's decision: this function does not check any role.
     ``read_authorized=True`` supplies only the dataset 'sources' retry handle.
+    ``viewer_filtered`` is the caller's explicit fact about this snapshot:
+    True asserts a filter narrowed it; False asserts it was not narrowed.
+    None (the default), or any non-boolean value, leaves that scope unknown.
+    A complete fresh zero-row read is filtered_empty only with True, or
+    complete_empty only with False; unknown scope emits unknown with no count.
+    ``diagnostic=True`` exposes only already permitted source read evidence.
+    located/readable describe the last successful read, including retained
+    evidence during a current read_failed; they do not prove current access.
+    Freshness blocked is an application read_failed with safe error='blocked',
+    while viewer authorization and explicit forbidden remain caller decisions.
     Healthy nonempty pages use None (there is no healthy state in C-STATE);
     their diagnostic rows carry the explicit health='healthy' fact.
     """
     freshness = freshness or {}
-    if not _permitted(snapshot) or freshness.get('status') == 'blocked':
+    if not _permitted(snapshot):
         return {'page_state': data_state('forbidden'), 'sources': []}
 
     tables = [t for t in snapshot.get('tables', []) if _permitted(t)]
@@ -88,11 +102,12 @@ def build_source_health(snapshot, freshness=None, *, diagnostic=False, read_auth
     page_states = []
     relevant_times = []
     for table, identity in sorted(zip(tables, identities), key=lambda pair: json.dumps(pair[1])):
-        if not all(isinstance(part, str) and part for part in identity) or identities.count(identity) != 1:
+        if not all(isinstance(part, str) and part.strip() for part in identity) or identities.count(identity) != 1:
+            # Keep the page conservative, but summarize only the emitted rows
+            # that the frontend can identify, select and count.
             page_states.append('unknown')
-            relevant_times.append(None)
             continue
-        state = _state(snapshot, freshness, table)
+        state = _state(snapshot, freshness, table, viewer_filtered=viewer_filtered)
         if state and state['states'] == ['forbidden']:
             continue
         key = 'source:' + hashlib.sha256(json.dumps(identity).encode()).hexdigest()
@@ -120,7 +135,7 @@ def build_source_health(snapshot, freshness=None, *, diagnostic=False, read_auth
         if diagnostic is True:
             if isinstance(table.get('name'), str) and table['name'].strip():
                 row['name'] = table['name']
-            loaded = _count(table.get('count')) if read else None
+            loaded = _count(table.get('count')) if read and (state is None or state['states'] != ['unknown']) else None
             if loaded is not None:
                 row['loaded_count'] = loaded
             if read_authorized is True:
@@ -142,11 +157,13 @@ def build_source_health(snapshot, freshness=None, *, diagnostic=False, read_auth
         page = data_state(*[s for s in ('partial', 'stale') if s in page_states])
     elif page_states and all(s == 'filtered_empty' for s in page_states) and len(page_states) == len(relevant_times):
         page = data_state('filtered_empty')
+    elif page_states and all(s == 'complete_empty' for s in page_states):
+        page = data_state('complete_empty') if len(page_states) == len(relevant_times) else None
     else:
         page = None if relevant_times and not page_states else data_state('unknown')
     result = {'page_state': page, 'sources': rows}
     if page and 'read_failed' in page['states']:
-        result['error'] = 'source_read_failed'
+        result['error'] = 'blocked' if freshness.get('status') == 'blocked' else 'source_read_failed'
     if diagnostic is True:
         oldest = min(relevant_times, key=lambda t: datetime.fromisoformat(t)) if relevant_times and all(relevant_times) else None
         result['diagnostic'] = {'sources': identifiers, 'receipt_state': 'receipt_missing', 'last_success': oldest}

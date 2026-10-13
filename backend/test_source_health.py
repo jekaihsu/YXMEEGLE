@@ -156,9 +156,12 @@ def test_retry_only_existing_authorized_sources_dataset():
 def test_empty_visible_read_loading_and_blocked_stay_distinct():
     value = snapshot()
     value['tables'][0]['count'] = 0
-    assert build(value)['page_state'] == {'states': ['filtered_empty'], 'count': 0}
+    assert build(value)['page_state'] == {'states': ['unknown'], 'count': None}
     assert build(value, {'status': 'refreshing'})['page_state']['states'] == ['loading']
-    assert build(value, {'status': 'blocked'}, diagnostic=True) == {'page_state': {'states': ['forbidden']}, 'sources': []}
+    blocked = build(value, {'status': 'blocked'}, diagnostic=True)
+    assert blocked['page_state'] == {'states': ['read_failed'], 'count': None}
+    assert blocked['error'] == 'blocked'
+    assert blocked['sources'][0]['last_success'] == '2026-10-10T08:00:00.000+08:00'
     value['tables'][0]['pages_read'] = 0
     assert build(value)['page_state']['states'] == ['unknown']
 
@@ -213,3 +216,124 @@ def test_unknown_freshness_cannot_claim_healthy(freshness):
     assert result['sources'][0]['readable'] is True
     assert result['sources'][0]['last_success'] == '2026-10-10T08:00:00.000+08:00'
     assert 'health' not in result['sources'][0]
+
+
+def test_healthy_and_complete_empty_sources_leave_page_clean():
+    value = snapshot()
+    value['tables'].append(dict(value['tables'][0], table_id='table-B', count=0))
+    result = build(value, {'status': 'fresh'}, diagnostic=True, viewer_filtered=False)
+    assert result['page_state'] is None
+    assert result['sources'][0]['health'] == 'healthy'
+    assert result['sources'][1]['data_state'] == {'states': ['complete_empty'], 'count': 0}
+
+
+def test_empty_read_without_filter_fact_is_unknown_without_count():
+    value = snapshot()
+    value['tables'][0]['count'] = 0
+    result = build(value, {'status': 'fresh'}, diagnostic=True)
+    assert result['page_state'] == {'states': ['unknown'], 'count': None}
+    assert result['sources'][0]['data_state'] == {'states': ['unknown'], 'count': None}
+    assert 'loaded_count' not in result['sources'][0]
+
+
+@pytest.mark.parametrize(('viewer_filtered', 'expected'), [
+    (False, 'complete_empty'), (True, 'filtered_empty'),
+    (None, 'unknown'), ('true', 'unknown'), (0, 'unknown')])
+def test_empty_scope_requires_explicit_boolean_filter_fact(viewer_filtered, expected):
+    value = snapshot()
+    value['tables'][0]['count'] = 0
+    result = build(value, {'status': 'fresh'}, diagnostic=True, viewer_filtered=viewer_filtered)
+    assert result['page_state'] == {'states': [expected], 'count': None if expected == 'unknown' else 0}
+    assert result['sources'][0]['data_state'] == result['page_state']
+
+
+@pytest.mark.parametrize(('viewer_filtered', 'expected'), [(False, 'complete_empty'), (True, 'filtered_empty')])
+def test_all_relevant_empty_sources_aggregate_to_proven_empty(viewer_filtered, expected):
+    value = snapshot()
+    value['tables'][0]['count'] = 0
+    value['tables'].append(dict(value['tables'][0], table_id='table-B'))
+    result = build(value, {'status': 'fresh'}, diagnostic=True, viewer_filtered=viewer_filtered)
+    assert result['page_state'] == {'states': [expected], 'count': 0}
+    assert [r['data_state'] for r in result['sources']] == [result['page_state'], result['page_state']]
+
+
+@pytest.mark.parametrize('freshness', [{}, {'status': 'unconfigured'}])
+def test_empty_with_filter_fact_still_requires_freshness(freshness):
+    value = snapshot()
+    value['tables'][0]['count'] = 0
+    assert build(value, freshness, viewer_filtered=False)['page_state'] == {'states': ['unknown'], 'count': None}
+
+
+@pytest.mark.parametrize(('status', 'expected'), [('never', ['unknown']), ('partial', ['partial']), ('error', ['read_failed'])])
+def test_empty_does_not_override_another_sources_real_state(status, expected):
+    value = snapshot()
+    value['tables'][0]['status'] = status
+    value['tables'].append(dict(snapshot()['tables'][0], table_id='table-B', count=0))
+    result = build(value, {'status': 'fresh'}, diagnostic=True, viewer_filtered=False)
+    assert result['page_state'] == {'states': expected, 'count': None}
+    assert result['sources'][0]['data_state']['states'] == expected
+
+
+def test_summaries_exclude_dropped_duplicate_and_malformed_identities():
+    value = snapshot()
+    value['tables'] += [dict(value['tables'][0], table_id='table-B', last_sync=NEW, count=3),
+                        dict(value['tables'][0], last_sync='2026-09-01T00:00:00Z', count=999),
+                        dict(value['tables'][0], base_token=None, count=998),
+                        dict(value['tables'][0], table_id='   ', count=997)]
+    result = build(value, {'status': 'fresh'}, diagnostic=True)
+    assert result['diagnostic']['last_success'] == '2026-10-14T08:00:00.000+08:00'
+    assert [r['loaded_count'] for r in result['sources']] == [3]
+    assert [r['table_id'] for r in result['diagnostic']['sources']] == ['table-B']
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('node unavailable: cross-language summary check not-run')
+    module = (Path(__file__).resolve().parents[1] / 'frontend/src/sourceHealthView.ts').as_uri()
+    script = r'''
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const {buildSourceHealthView} = await import(process.argv[1]);
+const input = JSON.parse(readFileSync(0, 'utf8'));
+const view = buildSourceHealthView(input, {diagnosticCapability: true});
+assert.equal(view.diagnostic.summary.last_success.value, '2026-10-14T08:00:00.000+08:00');
+assert.equal(view.diagnostic.summary.last_success.value, input.diagnostic.last_success);
+assert.deepEqual(view.diagnostic.rows.map(r => r.counts.loaded), [3]);
+console.log('summary and counts agree');
+'''
+    check = subprocess.run([node, '--input-type=module', '-e', script, module], input=json.dumps(result), text=True, capture_output=True, timeout=30)
+    assert check.returncode == 0, check.stdout + check.stderr
+    assert check.stdout.strip() == 'summary and counts agree'
+
+
+def test_application_blocked_read_retains_diagnostics_and_safe_category():
+    value = snapshot()
+    freshness = {'status': 'blocked', 'last_error': 'SECRET_SERVICE_403'}
+    result = build(value, freshness, diagnostic=True)
+    assert result['page_state'] == {'states': ['read_failed'], 'count': None}
+    assert result['error'] == 'blocked'
+    assert result['sources'][0]['data_state'] == {'states': ['read_failed'], 'count': None}
+    assert result['sources'][0]['last_success'] == '2026-10-10T08:00:00.000+08:00'
+    assert result['sources'][0]['loaded_count'] == 7
+    assert 'SECRET_SERVICE' not in json.dumps(result)
+    assert build(value, freshness) == {'page_state': {'states': ['read_failed'], 'count': None}, 'sources': [], 'error': 'blocked'}
+    value['authorized'] = False
+    assert build(value, freshness, diagnostic=True) == {'page_state': {'states': ['forbidden']}, 'sources': []}
+
+
+def test_current_read_failed_is_distinct_from_retained_read_evidence():
+    result = row(snapshot(status='error'), freshness={'status': 'error'})
+    assert result['located'] is True
+    assert result['readable'] is True
+    assert result['last_success'] == '2026-10-10T08:00:00.000+08:00'
+    assert result['data_state'] == {'states': ['read_failed'], 'count': None}
+    assert 'health' not in result
+
+
+@pytest.mark.parametrize(('age', 'expected'), [(59, None), (60, ['stale']), (61, ['stale'])])
+def test_age_at_or_above_ttl_is_stale_even_with_fresh_status(age, expected):
+    result = build(snapshot(), {'status': 'fresh', 'age_seconds': age, 'ttl_seconds': 60}, diagnostic=True)
+    if expected is None:
+        assert result['page_state'] is None
+        assert result['sources'][0]['health'] == 'healthy'
+    else:
+        assert result['page_state'] == {'states': expected, 'count': None}
+        assert result['sources'][0]['data_state'] == result['page_state']
