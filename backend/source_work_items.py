@@ -12,8 +12,8 @@ MAX_BYTES=24_000  # Leaves headroom within 165 KB raw / 30 KB gzip request ceili
 def update_work_items(ws,records,tables,assignments):
     from .source_entities import entity_id
     from .v4_sources import native_records
-    schemas={(t['base_token'],t['table_id']):{f['field_id']:f for f in t.get('field_schema',[])} for t in tables or []}
-    complete={(t['base_token'],t['table_id']) for t in tables or [] if t.get('status')=='ready'}
+    schemas={(t.get('base_token'),t.get('table_id')):{f['field_id']:f for f in t.get('field_schema') or [] if f.get('field_id')} for t in tables or []}
+    complete={(t.get('base_token'),t.get('table_id')) for t in tables or [] if t.get('status')=='ready'}
     index={}
     for r in records:index.setdefault((r['base_token'],r['record_id']),[]).append(r)
     def field(row,fid):return schemas.get((row['base_token'],row['table_id']),{}).get(fid,{})

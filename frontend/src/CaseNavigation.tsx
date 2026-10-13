@@ -3,7 +3,7 @@ import {Row} from './design';
 import {fetchCaseNavigation} from './api';
 import './ProjectPanels.css';
 
-export type Navigation={confirmations:{id:string;code?:string;source_url?:string;contracts:{id:string;item_number?:string;title?:string;unresolved:boolean;work_items:{id:string;category:string;source_url?:string}[]}[];edge_states:{contracts:string;work_items:string;daily:string;files:string}}[]};
+export type Navigation={work_items_status?:{partial:boolean;truncated:boolean};confirmations:{id:string;code?:string;source_url?:string;contracts:{id:string;item_number?:string;title?:string;unresolved:boolean;work_items:{id:string;category:string;source_url?:string}[]}[];edge_states:{contracts:string;work_items:string;daily:string;files:string}}[]};
 const sourceLink=(url:string|undefined,label:string)=>/^https?:\/\//i.test(url||'')?<a href={url} target="_blank" rel="noreferrer" aria-label={label}>開啟 Lark 來源</a>:null;
 export function CaseNavigation({projectId}:{projectId:string}){
  const [state,setState]=useState<{id:string;data?:Navigation;error?:string}>({id:projectId});
@@ -22,7 +22,9 @@ export function CaseNavigation({projectId}:{projectId:string}){
     {contract.work_items.map(item=><Row key={item.id} label={`工作項 · ${item.category}`} value={sourceLink(item.source_url,`開啟${item.category}工作項來源`)}/>)}
     {!contract.work_items.length&&<Row label="工作項尚未建立關聯（來源待核對）"/>}
    </div>)}
-   {caseRow.edge_states.work_items.startsWith('partial')&&<Row label="外業工作項尚未匯入"/>}
+   {caseRow.edge_states.work_items==='partial: 外業 work items not imported'&&<Row label="外業工作項尚未匯入"/>}
+   {caseRow.edge_states.work_items==='partial: source work items truncated'&&<Row label="工作項僅顯示部分資料（讀取上限）"/>}
+   {caseRow.edge_states.work_items==='partial: source work items incomplete'&&<Row label="工作項來源尚未完整核實"/>}
    {caseRow.edge_states.daily!=='linked'&&<Row label="尚無關聯日報"/>}
    {caseRow.edge_states.files!=='linked'&&<Row label="尚無文件（來源未建立關聯）"/>}
   </div>)}

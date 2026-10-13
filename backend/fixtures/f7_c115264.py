@@ -11,6 +11,7 @@ def fixture():
     def link(table,rid):return [{'table_id':table,'record_ids':[rid]}]
     records=[row(CONF,'confirmation','recvsnzx3bjtAA',{'工程確認單編號':'C115264'})]
     contracts=('recvsctWu1CN83','recvsctWu1D17w','recvsctWu1ErKg','recvsctWu1cYnK')
+    records[0]['fields']['合約明細（日報關聯）']=[{'table_id':CONTRACT,'record_ids':list(contracts)}]
     categories=(('報告',),('外業','控制','圖資'),('報告','外業','控制','圖資'),('報告','報告','外業','控制'))
     for cid,num,cats in zip(contracts,(3,1,1,2),categories):
         records.append(row(CONTRACT,'contract',cid,{'所屬成案確認單（日報關聯）':link(CONF,records[0]['record_id']),
@@ -18,9 +19,11 @@ def fixture():
         for i,category in enumerate(cats):
             records.append(row(ITEM,'reporting',f'recItem{num}{cid[-4:]}{i}',
                 {'來源合約明細（日報關聯）':link(CONTRACT,cid),'工項類別':category,'對應營業額':999}))
+    for contract in (r for r in records if r['kind']=='contract'):
+        contract['fields']['合約填報工項（日報關聯）']=[{'table_id':ITEM,'record_ids':[r['record_id'] for r in records if r['kind']=='reporting' and r['fields']['來源合約明細（日報關聯）'][0]['record_ids']==[contract['record_id']]]}]
     tables=[dict(base_token=BASE,table_id=table,status='ready',field_schema=fields) for table,fields in (
         (CONF,[]),
-        (CONTRACT,[dict(field_id='fldDSpokn5',field_name='所屬成案確認單（日報關聯）',property={'table_id':CONF})]),
+        (CONTRACT,[dict(field_id='fldDSpokn5',field_name='所屬成案確認單（日報關聯）',property={'table_id':CONF}),dict(field_id='fldOFyOZgb',field_name='合約填報工項（日報關聯）',property={'table_id':ITEM})]),
         (ITEM,[dict(field_id='flduW5c5uF',field_name='來源合約明細（日報關聯）',property={'table_id':CONTRACT}),
                dict(field_id='fldzDDIQkr',field_name='工項類別')]))]
     return records,tables

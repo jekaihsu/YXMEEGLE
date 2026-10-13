@@ -164,6 +164,9 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
                 from .source_work_items import MAX_ROWS
                 query=query.where(model.data['project_id'].as_string().in_(project_ids)).limit(MAX_ROWS+1)
             result['source_work_items']=list(db.scalars(query.order_by(model.ordinal)))
+            if project_ids is not None and len(result['source_work_items'])>MAX_ROWS:
+                for pid in project_ids:
+                    result.setdefault('source_work_items_status',{}).setdefault(pid,{'partial':True})['truncated']=True
         if 'projects' in kinds and project_ids != ():
             filters={'parent_id':('',)}
             if project_ids is not None: filters['entity_id']=project_ids

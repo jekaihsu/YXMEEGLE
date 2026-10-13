@@ -145,3 +145,64 @@ def test_populated_route_whitelist_and_hidden_cross_project(tmp_path):
     assert all(x not in response.text for x in ('amount','history','PAYLOAD_SECRET','HISTORY_SECRET','HIDDEN_SECRET','count'))
     assert client.get('/api/projects/p1/navigation').status_code==404
     app.state.engine.dispose()
+
+
+def test_new_collection_drives_categories_and_case_specific_completeness():
+    from .test_source_work_items import imported
+    state,_,_,_=imported()
+    result=case_navigation(state,'p')['confirmations'][0]
+    assert [len(c['work_items']) for c in result['contracts']]==[1,3,4,4]
+    assert sorted(i['category'] for c in result['contracts'] for i in c['work_items'])==sorted(['報告']*4+['外業']*3+['控制']*3+['圖資']*2)
+    assert result['edge_states']['work_items']=='linked'
+    state['source_confirmations'].append({'id':'empty-new','project_id':'p','source_kind':'confirmation'})
+    assert case_navigation(state,'p')['confirmations'][1]['edge_states']['work_items']=='partial: 外業 work items not imported'
+    state['source_work_items_status']['p']['partial']=True
+    assert case_navigation(state,'p')['confirmations'][0]['edge_states']['work_items']=='partial: source work items incomplete'
+    state['source_work_items_enabled']=False
+    assert case_navigation(state,'p')['confirmations'][0]['edge_states']['work_items']=='partial: 外業 work items not imported'
+    assert len(state['source_work_items'])==12
+
+
+def test_collection_route_storage_and_request_ceilings(tmp_path):
+    import gzip,json,hashlib
+    from .test_perf_budget import scaled_client,count_queries
+    from .test_source_work_items import imported
+    source,_,_,_=imported()
+    def populate(state):
+        pid=state['projects'][0]['id']
+        for collection in ('source_confirmations','contract_items','source_work_items'):
+            state[collection]=deepcopy(source[collection])
+            for item in state[collection]:item['project_id']=pid
+        state['source_work_items_status']={pid:{'partial':False}}
+    with scaled_client(tmp_path,2,mutate=populate) as (app,client):
+        # Use the actual project identity from storage, independent of fixture naming.
+        with app.state.sessions() as db:
+            from .app import WorkspaceRow,BusinessRow
+            from . import storage
+            wid=app.state.signer.loads(client.cookies.get('meegle_session'))['wid']
+            root=db.get(WorkspaceRow,wid);saved=storage.load(db,BusinessRow,root)
+            pid=saved['projects'][0]['id']
+            assert len(saved['source_work_items'])==12
+        for size in (12,696):
+            if size==696:
+                with app.state.sessions.begin() as db:
+                    root=db.get(WorkspaceRow,wid);saved=storage.load(db,BusinessRow,root)
+                    template=saved['source_work_items'][0]
+                    saved['source_work_items']=[{**template,'id':f'{template["id"]}-{i:04d}',
+                        'source_url':template['source_url']+hashlib.sha256(str(i).encode()).hexdigest()} for i in range(size)]
+                    root.data=storage.save(db,BusinessRow,wid,saved)
+            with count_queries(app.state.engine) as stats:response=client.get(f'/api/projects/{pid}/navigation')
+            assert response.status_code==200
+            raw=len(response.content);wire=len(gzip.compress(response.content))
+            print(f'F7 size={size}: queries={stats["queries"]}, raw={raw}, gzip={wire}, collection={len(json.dumps(saved["source_work_items"],ensure_ascii=False).encode())}')
+            assert stats['queries']<=24 and raw<=165_000 and wire<=30_000
+            assert len(json.dumps(saved['source_work_items'],ensure_ascii=False).encode())<10_000_000
+            with app.state.sessions() as db:
+                persisted=storage.load(db,BusinessRow,db.get(WorkspaceRow,wid))
+                assert len(persisted['source_work_items'])==size
+                other=storage.load_partial(db,BusinessRow,db.get(WorkspaceRow,wid),collections=['source_work_items'],project_ids=[saved['projects'][1]['id']])
+                assert other['source_work_items']==[]
+            assert response.json()['work_items_status']=={'partial':size!=12,'truncated':size!=12}
+            case=response.json()['confirmations'][0]
+            assert case['edge_states']['work_items']==('linked' if size==12 else 'partial: source work items truncated')
+            if size==12:assert '外業' in response.text
