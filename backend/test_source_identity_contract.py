@@ -794,3 +794,84 @@ def test_valid_absent_native_target_keeps_unresolved_semantics():
     missing = [r for r in graph.instances
                if r["source_key"] == "base-A/tblW/recW3" and r["navigation"] == "unresolved"]
     assert [(r["reason"], r["target_record_id"]) for r in missing] == [("native_target_unresolved", "recMISSING")]
+
+
+# P1-C2-N-FIX1: reviewer regressions (task_a99046fad671) for the standalone constructor and nested links.
+@pytest.mark.parametrize("version,bad", [(1, True), (1, 1.0), (0, False), (0, 0.0), (1, [1]), (1, 2.5)])
+def test_standalone_edge_instance_rejects_noncanonical_version_component(version, bad):
+    row = dict(chain_graph(version=version).instances[0])
+    row["source_version_key"] = (*row["source_version_key"][:3], bad)
+    with pytest.raises(ValueError, match="source_version_key"):
+        source_identity.EdgeInstance(row)
+
+
+@pytest.mark.parametrize("key", [None, ("base-A", "tblW", "recW1"), ["base-A", "tblW", "recW1", 1],
+                                 ("base-A", "tblW", "recOTHER", 1), ("base-A", "tblW", "recW1", 1, 2)])
+def test_standalone_edge_instance_rejects_structurally_wrong_key(key):
+    row = dict(chain_graph(version=1).instances[0])
+    row["source_version_key"] = key
+    with pytest.raises(ValueError, match="source_version_key"):
+        source_identity.EdgeInstance(row)
+
+
+def test_standalone_edge_instance_with_canonical_key_keeps_exact_types():
+    built = chain_graph(version=1).instances[0]
+    inst = source_identity.EdgeInstance(dict(built))
+    assert [type(c) for c in inst["source_version_key"]] == [str, str, str, int]
+    assert inst["verification"] == "receipt_missing" and inst["receipt_ref"] is None
+
+
+def _mine(value):
+    records = chain_records()
+    records[5]["fields"][ITEM_FIELD] = value
+    graph = build_native_edge_graph(records, [ITEM_TO_CONTRACT])
+    return [r for r in graph.instances if r["source_key"] == "base-A/tblW/recW1"]
+
+
+@pytest.mark.parametrize("value,linked,malformed", [
+    ([["recL2", {"record_id": "recL1", "table_id": ["bad"]}]], ["base-A/tblL/recL2"], 1),
+    ({"table_id": "tblL", "record_ids": ["recL2", {"record_id": 5}]}, ["base-A/tblL/recL2"], 1),
+    ({"table_id": "tblL", "record_ids": ["recL2", 5, [7, "recL1"]]}, ["base-A/tblL/recL1", "base-A/tblL/recL2"], 2),
+    ({"table_id": "tblL", "link_record_ids": [{"record_ids": ["recL1", None, {"x": 1}]}, "recL2"]},
+     ["base-A/tblL/recL1", "base-A/tblL/recL2"], 2),
+])
+def test_nested_malformed_descendant_keeps_valid_branches_and_table_context(value, linked, malformed):
+    mine = _mine(value)
+    assert sorted(r["target_key"] for r in mine if r["navigation"] == "linked") == linked
+    assert [r["reason"] for r in mine].count("malformed_native_link") == malformed
+    assert all(r["verification"] == "receipt_missing" for r in mine)
+
+
+def test_nested_valid_branch_keeps_inherited_table_context_for_wrong_table():
+    # recL1 only lives in tblL; an inherited bogus-but-valid table must still yield native 'unresolved'.
+    mine = _mine({"table_id": "tblOTHER", "record_ids": ["recL1", {"record_id": 5}]})
+    assert [r["navigation"] for r in mine if r["reason"] != "malformed_native_link"] == ["unresolved"]
+    assert sum(r["reason"] == "malformed_native_link" for r in mine) == 1
+
+
+@pytest.mark.parametrize("value", [
+    {"record_id": "recL1", "record_ids": None},
+    {"record_id": "recL1", "record_ids": None, "link_record_ids": None, "table_id": None},
+])
+def test_nullable_unused_collection_resolves_like_native_records(value):
+    mine = _mine(value)
+    assert [r["target_key"] for r in mine if r["navigation"] == "linked"] == ["base-A/tblL/recL1"]
+    assert all(r["reason"] != "malformed_native_link" for r in mine)
+
+
+@pytest.mark.parametrize("value", [
+    "recL1", ["recL1", "recL2"], {"record_id": "recL1", "table_id": "tblL"}, {"record_ids": ["recL1", "recL2"]},
+    {"link_record_ids": ["recL2"], "table_id": ""}, [{"record_id": "recL1"}, ["recL2"]],
+    {"table_id": None, "record_id": "recL1"}, {"record_ids": []}, [], None, ["notrec", "recL1"],
+])
+def test_valid_native_shapes_match_native_records_exactly(value):
+    records = chain_records()
+    records[5]["fields"][ITEM_FIELD] = value
+    row = records[5]
+    index = {}
+    for rec in records:
+        index.setdefault((rec["base_token"], rec["record_id"]), []).append(rec)
+    expected, _ = v4_sources.native_records(row, ITEM_FIELD, index, ITEM_TO_CONTRACT.target_kinds)
+    got = [r["target_key"] for r in _mine(value) if r["navigation"] == "linked"]
+    assert sorted(got) == sorted(f"{e['base_token']}/{e['table_id']}/{e['record_id']}" for e in expected)
+    assert all(r["reason"] != "malformed_native_link" for r in _mine(value))

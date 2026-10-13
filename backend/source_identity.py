@@ -240,6 +240,21 @@ class _FrozenRow(Mapping):
         return {k: self[k] for k in self.FIELDS}
 
 
+def _require_canonical_version_key(source_key, supplied, canonical=None):
+    """Reject any source_version_key that is not exactly (base, table, record, version) for ``source_key``.
+
+    ``canonical`` (the graph-snapshot key) is additionally enforced when known; ``version`` is exactly an int/str/None, so ``True``/``1.0`` never
+    pass for ``1``, nor ``False``/``0.0`` for ``0``.
+    """
+    ok = (isinstance(supplied, tuple) and len(supplied) == 4 and is_source_key(source_key)
+          and tuple(supplied[:3]) == tuple(source_key.split("/"))
+          and all(type(c) is str for c in supplied[:3]) and type(supplied[3]) in (int, str, type(None)))
+    if ok and canonical is not None:
+        ok = supplied == canonical and all(type(a) is type(b) for a, b in zip(supplied, canonical))
+    if not ok:
+        raise ValueError("edge instance source_version_key must match source_key and the graph version")
+
+
 class EdgeInstance(_FrozenRow):
     """One immutable edge instance exposing only the declared instance schema.
 
@@ -253,8 +268,10 @@ class EdgeInstance(_FrozenRow):
     FIELDS = STORED + ("verification", "receipt_ref")
 
     def __init__(self, values):
+        data = {k: deepcopy(values[k]) for k in self.STORED}
+        _require_canonical_version_key(data["source_key"], data["source_version_key"])
         object.__setattr__(self, "_data", MappingProxyType(
-            {**{k: deepcopy(values[k]) for k in self.STORED},
+            {**data,
              "verification": RECEIPT_MISSING, "receipt_ref": None}))
 
     @classmethod
@@ -274,10 +291,7 @@ class EdgeInstance(_FrozenRow):
             raise ValueError("edge instance source_key must be a base/table/record key")
         base, table, record_id = row["source_key"].split("/")
         canonical_key = (base, table, record_id, version)
-        supplied_key = row["source_version_key"]
-        if not (isinstance(supplied_key, tuple) and supplied_key == canonical_key
-                and all(type(a) is type(b) for a, b in zip(supplied_key, canonical_key))):
-            raise ValueError("edge instance source_version_key must match source_key and the graph version")
+        _require_canonical_version_key(row["source_key"], row["source_version_key"], canonical_key)
         if navigation == "linked" and not is_source_key(target_key):
             raise ValueError("linked edge instance needs a base/table/record target_key")
         if navigation == "unresolved" and target_key is not None:
@@ -376,30 +390,51 @@ def _field_schemas(tables):
 _LINK_KEYS = ("record_id", "record_ids", "link_record_ids")
 
 
-def _link_shape_ok(value):
-    """True if every table_id/record value in a raw native link is a str (or a list/dict of them)."""
+def _clean_native_link(value, bad):
+    """Mirror ``v4_sources.native_records.visit`` and return ``value`` minus malformed descendants.
+
+    Every malformed descendant is appended to ``bad``; valid branches (and the table_id they inherit)
+    are kept. A dict whose own ``table_id`` is malformed is dropped whole: no table is guessed for it.
+    ``None`` under a link key is an absent optional collection, exactly as the native resolver sees it.
+    """
     if isinstance(value, str):
-        return True
+        return value
     if isinstance(value, list):
-        return all(_link_shape_ok(item) for item in value)
+        kept = []
+        for item in value:
+            cleaned = _clean_native_link(item, bad)
+            if cleaned is not _DROP:
+                kept.append(cleaned)
+        return kept
     if isinstance(value, dict):
-        if value.get("table_id") is not None and not isinstance(value["table_id"], str):
-            return False
-        present = [k for k in _LINK_KEYS if k in value]
-        return bool(present) and all(_link_shape_ok(value[k]) for k in present)
-    return False
+        table = value.get("table_id")
+        if table is not None and not isinstance(table, str):
+            bad.append(value)
+            return _DROP
+        present = [k for k in _LINK_KEYS if value.get(k) is not None]
+        if not present:
+            bad.append(value)
+            return _DROP
+        kept = {} if table is None else {"table_id": table}
+        for key in present:
+            cleaned = _clean_native_link(value[key], bad)
+            if cleaned is not _DROP:
+                kept[key] = cleaned
+        return kept
+    bad.append(value)
+    return _DROP
+
+
+_DROP = object()
 
 
 def _split_native_links(value):
-    """Split a raw link value into (well-formed value, malformed items); nothing is guessed or dropped."""
+    """Split a raw link value into (well-formed value, malformed items); nothing is guessed."""
     if value is None:
         return None, []
-    if isinstance(value, list):
-        good, bad = [], []
-        for item in value:
-            (good if _link_shape_ok(item) else bad).append(item)
-        return good, bad
-    return (value, []) if _link_shape_ok(value) else (None, [value])
+    bad = []
+    clean = _clean_native_link(value, bad)
+    return (None if clean is _DROP else clean), bad
 
 
 def _malformed_link_row(item):
