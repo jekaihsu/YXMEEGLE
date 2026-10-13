@@ -146,3 +146,13 @@ test('legacy roster sync success re-fetches pilot though freshness is unconfigur
   assert.deepEqual(calls.map(x=>x.url),['/api/lark-pilot/shadow','/api/people/sync','/api/lark-pilot/shadow']);
  }finally{await clean()}
 });
+const reasonCases={no_linked_records:'案件目前沒有關聯的工單，未讀取',traversal_unavailable:'目前唯讀範圍無法依關聯讀取',access_denied:'應用尚無此資料表讀取權限（Lark 1254302）',read_failed:'讀取失敗'};
+for(const [reason,wording] of Object.entries(reasonCases))test(`VCC-119 per-table reason ${reason}`,async()=>{
+ setup();globalThis.fetch=()=>{throw Error('view must not fetch')};
+ const data={...payload(),status:'partial',table_reasons:{work_orders:reason}};
+ try{await render(React.createElement(PilotView,{data:parsePilot(data),now:Date.parse('2026-10-12T00:00:10Z')}));const text=document.body.textContent;assert.ok(text.includes(wording),text);assert.equal(text.includes('讀取失敗'),reason==='read_failed',text);assert.ok(text.includes('部分資料'));assert.ok(!text.includes('Lark 即時'))}finally{await clean()}
+});
+test('VCC-119 old payload and unknown reason degrade to plain table state',async()=>{
+ setup();
+ try{assert.deepEqual(parsePilot(payload()).table_reasons,{});const data=parsePilot({...payload(),table_reasons:{work_orders:'SYN_new_reason',people:{x:1}}});assert.deepEqual(data.table_reasons,{});await render(React.createElement(PilotView,{data,now:Date.parse('2026-10-12T00:00:10Z')}));assert.ok(document.body.textContent.includes('尚未讀取'));assert.ok(!document.body.textContent.includes('SYN_new_reason'))}finally{await clean()}
+});
