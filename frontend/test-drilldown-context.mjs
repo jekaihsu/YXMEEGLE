@@ -186,6 +186,29 @@ test('11. corrupt return frame is refused at back()', () => {
   eq(back(wrongParent).reason, 'corrupt_return_frame', 'overview is not a valid parent of contract');
 });
 
+test('12. hash envelope: unknown or duplicated parameters reject the whole hash to the safe default', () => {
+  const c = base('confirmations', {filters: {pm: 'pm-a'}, cursor: 'opaque'});
+  const good = unwrap(hashFor(c)), ctx = good.split('ctx=')[1], other = unwrap(encodeContext(rich.confirmations));
+  eq(unwrap(parseHash(good)), c, 'valid hash still applies');
+  eq(unwrap(parseHash('#/' + good)), c, 'leading # accepted');
+  const rejected = (h, reason) => {
+    const r = parseHash(h); ok(!r.ok, `must reject ${h.slice(0, 40)}`);
+    eq(r.reason, reason, h.slice(0, 40)); eq(r.value, defaultContext(r.value.route), 'safe default');
+    ok(Object.keys(r.value.filters).length === 0 && r.value.cursor === null, 'nothing partially applied');
+  };
+  for (const k of ['hidden_id', 'amount', '金額', 'foo', 'View', 'ctx2']) rejected(`${good}&${k}=1`, 'unknown_param');
+  rejected(`${good}&hidden_id=restricted&amount=123`, 'unknown_param');
+  rejected(`amount=1&${good}`, 'unknown_param');
+  rejected('view=confirmations&amount=1', 'unknown_param');   // bare view plus unknown key
+  rejected(`${good}&ctx=bogus`, 'duplicate_param');
+  rejected(`${good}&ctx=${ctx}`, 'duplicate_param');
+  rejected(`view=contract&${good}`, 'duplicate_param');
+  rejected(`${good}&vie%77=contract`, 'duplicate_param');   // percent-encoded alias of view
+  rejected(`${good}&view=confirmations`, 'duplicate_param');
+  rejected(`${good}&%61mount=1`, 'unknown_param');
+  eq(parseHash(`view=confirmations&ctx=${other}`).ok, true, 'control: exactly view+ctx ok');
+});
+
 // ---- runner + mutation checks --------------------------------------------
 let failed = 0;
 for (const [name, fn] of tests) {
@@ -222,6 +245,8 @@ const mutate = async (label, from, to, expectTests) => {
   await mutate('drill_cursor_reset', 'sort: target.sort ?? null, cursor: null,', 'sort: target.sort ?? null, cursor: f.value.cursor,', ['7']);
   // Aliasing is prevented in depth (validateContext rebuilds every object, clone() copies again), so no single-line mutation breaks test 10; it stays as a behavior check.
   await mutate('canonical_check', "if (encodeContext(v.value).value !== encoded) return safe('bad_encoding');", '', ['4']);
+  await mutate('hash_unknown_param', "if (!['view', 'ctx'].includes(k)) return {ok: false, reason: 'unknown_param', value: defaultContext('overview')};", '', ['12']);
+  await mutate('hash_duplicate_param', "if (p.getAll(k).length > 1) return {ok: false, reason: 'duplicate_param', value: defaultContext('overview')};", '', ['12']);
   await mutate('oversize_bound', 'if (out.length > LIMITS.encodedLen) return', 'if (false) return', ['4']);
 }
 if (failed) { console.error(`${failed} FAILED`); process.exit(1); }
