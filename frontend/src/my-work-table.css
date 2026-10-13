@@ -576,12 +576,6 @@
   font-weight: 500;
 }
 
-.my-work-not-approved-warning {
-  margin: 6px 0 0;
-  font-size: 0.8125rem;
-  color: var(--critical, #ef4444);
-  font-weight: 500;
-}
 
 .my-work-drawer-empty-text {
   margin: 0;

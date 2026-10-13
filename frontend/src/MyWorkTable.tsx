@@ -29,7 +29,7 @@ export function MyWorkTable({
   onNavigate,
 }: MyWorkTableProps) {
   const selectedId = view.filters.selectedId;
-  const openingControlRef = useRef<HTMLElement | null>(null);
+  const rowSelectButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const lastOpenedTaskIdRef = useRef<string | null>(null);
   const prevDrawerOpenRef = useRef(view.drawer.open);
 
@@ -37,24 +37,22 @@ export function MyWorkTable({
     lastOpenedTaskIdRef.current = view.drawer.task.id;
   }
 
-  const restoreFocusToOpeningControl = () => {
+  const restoreFocusToRow = () => {
     const targetId = lastOpenedTaskIdRef.current;
-    if (openingControlRef.current && document.body.contains(openingControlRef.current)) {
-      openingControlRef.current.focus();
-    } else if (targetId) {
-      const el = document.getElementById(`my-work-row-btn-${targetId}`);
-      el?.focus();
+    if (targetId) {
+      const btn = rowSelectButtonRefs.current.get(targetId);
+      btn?.focus();
     }
   };
 
   const handleCloseDrawer = () => {
     onSelect?.(null);
-    restoreFocusToOpeningControl();
+    restoreFocusToRow();
   };
 
   useEffect(() => {
     if (prevDrawerOpenRef.current && !view.drawer.open) {
-      restoreFocusToOpeningControl();
+      restoreFocusToRow();
     }
     prevDrawerOpenRef.current = view.drawer.open;
   }, [view.drawer.open]);
@@ -190,11 +188,13 @@ export function MyWorkTable({
                       className={`my-work-row ${
                         isSelected ? 'is-selected' : ''
                       } ${row.needsAttention ? 'needs-attention' : ''}`}
-                      onClick={() => onSelect?.(row.id)}
+                      onClick={() => {
+                        lastOpenedTaskIdRef.current = row.id;
+                        onSelect?.(row.id);
+                      }}
                       onKeyDown={(e) => {
                         if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
                           e.preventDefault();
-                          openingControlRef.current = document.getElementById(`my-work-row-btn-${row.id}`);
                           lastOpenedTaskIdRef.current = row.id;
                           onSelect?.(row.id);
                         }
@@ -207,17 +207,22 @@ export function MyWorkTable({
                             id={`my-work-row-btn-${row.id}`}
                             data-row-select-id={row.id}
                             className="my-work-row-title-btn"
+                            ref={(el) => {
+                              if (el) {
+                                rowSelectButtonRefs.current.set(row.id, el);
+                              } else {
+                                rowSelectButtonRefs.current.delete(row.id);
+                              }
+                            }}
                             aria-pressed={isSelected}
                             aria-label={`選取任務：${row.title}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              openingControlRef.current = e.currentTarget;
                               lastOpenedTaskIdRef.current = row.id;
                               onSelect?.(row.id);
                             }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
-                                openingControlRef.current = e.currentTarget;
                                 lastOpenedTaskIdRef.current = row.id;
                               }
                             }}
@@ -448,17 +453,12 @@ export function MyWorkTable({
               </dl>
             </section>
 
-            {/* Handoff & Confirmation: awaiting confirmation shown as not approved */}
+            {/* Handoff & Confirmation */}
             <section className="my-work-drawer-section">
               <h4>交接與確認狀態</h4>
               <p className="my-work-drawer-handoff-status">
                 {view.drawer.task.handoffLabel}
               </p>
-              {view.drawer.task.awaitingMyConfirmation && (
-                <p className="my-work-not-approved-warning">
-                  等待我確認（尚未核准）
-                </p>
-              )}
             </section>
 
             {/* Attached Evidence */}
@@ -481,18 +481,10 @@ export function MyWorkTable({
               </p>
             </section>
 
-            {/* Verified Parent Case / Work Item */}
+            {/* Parent Case / Work Item */}
             <section className="my-work-drawer-section">
               <h4>母層關聯</h4>
               <dl className="my-work-drawer-dl">
-                <div>
-                  <dt>母層核實狀態</dt>
-                  <dd>
-                    {view.drawer.task.parent.verified
-                      ? '已核實關聯'
-                      : '關聯未驗證（unknown）'}
-                  </dd>
-                </div>
                 <div>
                   <dt>母案件</dt>
                   <dd>{view.drawer.task.parent.caseTitle}</dd>
