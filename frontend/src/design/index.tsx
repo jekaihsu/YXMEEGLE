@@ -1,4 +1,4 @@
-import {useEffect,useId,useRef,useState} from 'react';
+import {createContext,useContext,useEffect,useId,useRef,useState} from 'react';
 import type {ButtonHTMLAttributes,CSSProperties,KeyboardEvent,ReactNode} from 'react';
 import {Check,ChevronDown} from 'lucide-react';
 import {useDialogFocus} from '../useDialogFocus';
@@ -34,8 +34,15 @@ export function Badge({children,tone,icon}:{children:ReactNode;tone?:'positive'|
  return <span className="ds-badge" data-tone={tone}>{icon}{children}</span>;
 }
 
-export function Button({variant='secondary',...props}:ButtonHTMLAttributes<HTMLButtonElement>&{variant?:'primary'|'secondary'|'plain'|'destructive'}){
- return <button type="button" {...props} className={`ds-button ${props.className||''}`} data-variant={variant}/>;
+// Project detail opts in; other routes retain their existing button layout.
+export const DisabledActionReasons=createContext(false);
+export function DisabledAction({disabled,reason,children}:{disabled?:boolean;reason?:string;children:(descriptionId?:string)=>ReactNode}){
+ const scoped=useContext(DisabledActionReasons);const id=useId();
+ if(!scoped||!disabled)return <>{children()}</>;
+ return <span className="disabled-action">{children(id)}<span id={id} className="disabled-action-reason">{reason||'目前無法操作'}</span></span>;
+}
+export function Button({variant='secondary',disabledReason,...props}:ButtonHTMLAttributes<HTMLButtonElement>&{variant?:'primary'|'secondary'|'plain'|'destructive';disabledReason?:string}){
+ return <DisabledAction disabled={variant==='primary'&&props.disabled} reason={disabledReason}>{id=><button type="button" {...props} aria-describedby={[props['aria-describedby'],id].filter(Boolean).join(' ')||undefined} className={`ds-button ${props.className||''}`} data-variant={variant}/>}</DisabledAction>;
 }
 
 export function Segmented<T extends string>({label,options,value,onChange}:{label:string;options:[T,ReactNode][];value:T;onChange:(v:T)=>void}){
