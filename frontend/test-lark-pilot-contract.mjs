@@ -108,7 +108,7 @@ for(const enabled of [false,true])test(`roster displays response as_of before pa
  setup();const context=c(enabled);context.w.freshness.datasets={};const stamp=new Date().toISOString();context.onFreshness=()=>{};
  const freshness={enabled,server_time:stamp,datasets:Object.fromEntries(['roster','sources','attendance'].map(k=>[k,{status:'fresh',ttl_seconds:60,age_seconds:0,as_of:stamp}]))};
  globalThis.fetch=async()=>new Response(JSON.stringify({freshness}));
- try{await render(React.createElement(PeopleDirectoryPanel,{c:context}));await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='同步 Lark 人員名冊').click());assert.ok(document.body.textContent.includes(new Date(stamp).toLocaleString('zh-TW')),document.body.textContent)}finally{await clean()}
+ try{await render(React.createElement(PeopleDirectoryPanel,{c:context}));await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='同步 Lark 人員名冊').click());const t=document.body.textContent;assert.ok(t.includes(new Date(stamp).toLocaleDateString('sv-SE',{timeZone:'Asia/Taipei'}).replaceAll('-','/'))&&t.includes('(台北時間)'),t)}finally{await clean()}
 });
 
 for(const enabled of [false,true])test(`roster recovery routes only roster and re-fetches pilot, mode ${enabled}`,async()=>{

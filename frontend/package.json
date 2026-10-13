@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "test:taipei-time": "node test-taipei-time.mjs",
     "test:lark-pilot": "node test-lark-pilot.mjs",
     "test:lark-pilot-contract": "node test-lark-pilot-contract.mjs",
     "test:overview": "node test-overview-design.mjs",

@@ -1,3 +1,4 @@
+import {taipeiTime} from './taipeiTime';
 import {Badge as DsBadge,Skeleton} from './design';
 import {useEffect, useState, type MouseEvent, type ReactNode} from 'react';
 import {ChevronRight, Circle, CircleCheck, CircleDot, FolderOpen, Loader2, Pause, TriangleAlert, X} from 'lucide-react';
@@ -21,7 +22,7 @@ export const ACTION_NAMES:Record<string,string>={node_skip_create:'建立節點�
 export const eventMessage=(e:{action?:string;message?:string})=>e.message&&e.message!==e.action?e.message:ACTION_NAMES[e.action||'']||e.action||'更新紀錄';
 export const date=(value?:string|null)=>value?value.slice(0,10).replaceAll('-','/'):'未排定';
 export const shortDate=(value?:string|null)=>value?value.slice(5,10).replace('-','/'):'—';
-export const stamp=(value?:string|null)=>value?`${date(value)} ${value.includes('T')?new Date(value).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}):''}`:'—';
+export const stamp=(value?:string|null)=>taipeiTime(value);
 export const num=(value?:number|null)=>value==null?'—':value.toLocaleString('zh-TW',{maximumFractionDigits:2});
 export const money=(value?:number|null)=>value==null?'待帶入':`NT$ ${num(value)}`;
 export const unmatchedDaily=(w:Workspace)=>w.scope==='shell'&&w.counts?w.counts.daily_unmatched:w.source_status.mapping?.daily_unmatched??(Array.isArray(w.daily_unmatched)?w.daily_unmatched.length:0);

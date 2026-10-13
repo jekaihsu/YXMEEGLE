@@ -1,3 +1,4 @@
+import {taipeiTime} from './taipeiTime';
 import {Section,Row,Button,Badge} from './design';
 import {ViewSkeleton} from './viewData';
 import './owned-screens.css';
@@ -8,7 +9,7 @@ import type {Session} from './types';
 type HealthItem={status:string;last_success_at?:string|null;last_heartbeat_at?:string|null;last_checked_at?:string|null;recovery_hint?:string;blocking?:boolean};
 type Health={checked_at:string;status:string;worker:HealthItem;backup:HealthItem;directory:HealthItem};
 const labels:Record<string,string>={ok:'正常',warning:'即將逾期或資料待核對',attention:'需要處理',missing:'尚無紀錄',unavailable:'暫時無法讀取',invalid:'紀錄格式待處理',stale:'紀錄已逾期',degraded:'最近執行異常',starting:'啟動中，尚無成功紀錄',not_configured:'尚未設定',local_only:'僅本機備份'};
-const stamp=(value?:string|null)=>value&&Number.isFinite(Date.parse(value))?new Date(value).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'尚無';
+const stamp=(value?:string|null)=>taipeiTime(value,'尚無');
 export function RuntimeHealthPanel({w,s}:{w:{environment?:string;workspace_id?:string};s:Session}){
  const[health,setHealth]=useState<Health|null>(null);const[error,setError]=useState('');const[loading,setLoading]=useState(false);const[reload,setReload]=useState(0);
  const allowed=s.mode==='lark'&&w.environment==='production'&&s.user?.role==='manager';

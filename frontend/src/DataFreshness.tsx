@@ -2,11 +2,13 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {getSessionEpoch,liveRefresh} from './api';
 import {ageFreshness,datasetNames,retainedAge,failedFreshness} from './freshness';
 import type {Freshness,LiveDataset} from './types';
+import {taipeiTime} from './taipeiTime';
 
 export interface DataFreshnessProps {
   freshness?:Freshness;
   onFreshness?:(freshness:Freshness,snapshot?:Freshness)=>void;
   demo?:boolean;
+  syncedAt?:string|null;
   mutationActive?:boolean;
   dirtyDraft?:boolean;
   refresh:()=>boolean|void|Promise<boolean|void>;
@@ -14,9 +16,9 @@ export interface DataFreshnessProps {
 const names=datasetNames;
 export const statusNames={fresh:'已讀取',stale:'資料待更新',refreshing:'更新中',never:'尚未讀取',error:'讀取失敗',blocked:'權限不足',unconfigured:'尚未設定'};
 const priority=['blocked','error','refreshing','never','stale','fresh','unconfigured'] as const;
-export const time=(value:string|null)=>value?new Date(value).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'—';
+export const time=(value:string|null)=>taipeiTime(value);
 
-export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDraft=false,refresh,onFreshness}:DataFreshnessProps){
+export function DataFreshness({freshness,syncedAt,demo=false,mutationActive=false,dirtyDraft=false,refresh,onFreshness}:DataFreshnessProps){
   const [current,setCurrent]=useState(freshness);
   const receivedAt=useRef(Date.now());
   const latestSnapshot=useRef(freshness);
@@ -57,21 +59,21 @@ export function DataFreshness({freshness,demo=false,mutationActive=false,dirtyDr
   const source=deciding[0]?.[1];
   const age=source?.age_seconds;
   const ageText=retainedAge(age??null);
-  let label=`Lark 資料 ${time(source?.as_of||null)}`;
+  let label=`Lark 讀取驗證 ${time(source?.as_of||null)}${syncedAt?` · 來源同步 ${time(syncedAt)}`:''}`;
   if(state==='unconfigured')label=demo?'示範資料':'尚未設定';
-  if(state==='stale')label+=' · 資料待更新';
+  if(state==='stale')label+=` · 資料待更新（距上次讀取驗證 ${retainedAge(age??null).replace('顯示 ','').replace('資料','')}）`;
   if(state==='refreshing')label='更新中…';
   if(state==='never')label=`正在讀取 Lark ${names[deciding[0]?.[0]||'sources']}…`;
   if(state==='error')label=`${deciding.map(([key])=>names[key]).join('、')}：Lark 暫時無法讀取，${ageText}`;
   if(state==='blocked')label=`${deciding.map(([key])=>names[key]).join('、')}：Lark 權限不足（1254302），請聯絡管理員`;
   const color=state==='error'||state==='blocked'?'var(--critical)':state==='stale'?'var(--critical)':'var(--label-2)';
-  const details=entries.map(([key,d])=>`${names[key]}：${time(d.as_of)} · ${d.age_seconds??'—'} 秒前 · TTL ${d.ttl_seconds} 秒`).join('\n');
+  const details=entries.map(([key,d])=>`${names[key]}：讀取驗證 ${time(d.as_of)} · 距今 ${d.age_seconds??'—'} 秒 · 有效 ${d.ttl_seconds} 秒`).join('\n');
   return <div className={`data-freshness freshness-view data-freshness-${state}`} data-state={state}>
     <span role="status" aria-live="polite" title={details} style={{color}}>
       {state==='refreshing'?<span className="spin" aria-hidden="true">◌ </span>:null}{state==='fresh'||state==='stale'||state==='error'?<><span aria-hidden="true">{label}</span><span className="sr-only">{state==='fresh'?'Lark 資料已讀取':state==='stale'?'Lark 資料待更新':`${deciding.map(([key])=>names[key]).join('、')}：Lark 暫時無法讀取，顯示先前資料`}</span></>:label}
       {requestError?<span> · {requestError}</span>:null}
     </span>
-    {!demo&&active?<details className="freshness-details"><summary>資料讀取詳情</summary><ul className="glass--flat">{entries.map(([key,d])=><li key={key}>{names[key]}：{time(d.as_of)} · {d.age_seconds==null?'時間未知':`${Math.floor(d.age_seconds)} 秒前`} · 有效時間 {d.ttl_seconds} 秒 · {statusNames[d.status]}</li>)}</ul></details>:null}
+    {!demo&&active?<details className="freshness-details"><summary>資料讀取詳情</summary><ul className="glass--flat">{entries.map(([key,d])=><li key={key}>{names[key]}：讀取驗證 {time(d.as_of)} · {d.age_seconds==null?'時間未知':`距今 ${Math.floor(d.age_seconds)} 秒`} · 有效時間 {d.ttl_seconds} 秒 · {statusNames[d.status]}</li>)}</ul></details>:null}
     {active?<button type="button" className="ds-button" data-variant="plain" onClick={reread} disabled={busy} aria-busy={busy}>{busy?'讀取中…':state==='error'?'重試':'重新整理'}</button>:null}
   </div>;
 }
