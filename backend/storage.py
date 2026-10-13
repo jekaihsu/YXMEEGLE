@@ -61,7 +61,7 @@ def save(db,model,wid,state):
             return node['parent_id'] if node else old.parent_id if old else None
         if kind in {'approvals','sop_requests','financial_requests','delegations','recurring',
                     'input_mappings','input_revisions','cost_allocations','daily_reviews','handover_requests',
-                    'source_quotes','source_confirmations','contract_items'}:
+                    'source_quotes','source_confirmations','contract_items','source_work_items'}:
             return value['data'].get('project_id') or value['data'].get('linked_project_id')
         return None
     changed_projects=set()

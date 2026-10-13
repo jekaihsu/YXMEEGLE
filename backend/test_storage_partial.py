@@ -222,3 +222,17 @@ def test_work_item_storage_overflow_uses_sentinel_without_project_projection(wor
     assert len(partial['source_work_items'])==201
     assert partial['source_work_items_status'][pid]['truncated'] is True
     assert len(storage.load(db,BusinessRow,row)['source_work_items'])==250
+
+
+def test_work_item_change_advances_only_owning_project_version(workspace_db):
+    db,row=workspace_db
+    state=storage.load(db,BusinessRow,row);pid=state['projects'][0]['id']
+    state['source_work_items']=[{'id':'b/items/one','project_id':pid,'category':'報告'}]
+    row.data=storage.save(db,BusinessRow,row.id,state);db.flush()
+    state=storage.load(db,BusinessRow,row)
+    versions=[p['concurrency_version'] for p in state['projects']]
+    state['source_work_items'][0]['category']='外業'
+    row.data=storage.save(db,BusinessRow,row.id,state);db.flush()
+    saved=storage.load(db,BusinessRow,row)
+    assert [p['concurrency_version'] for p in saved['projects']]==[versions[0]+1,versions[1]]
+    assert saved['source_work_items'][0]['category']=='外業'
