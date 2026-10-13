@@ -152,7 +152,7 @@ def test_created_sort_id_tie_and_mixed_formats(tmp_path):
         assert [p['id'] for p in everything(client, tab='all', sort='created', dir='desc')[1]] == [ids[2], ids[1], ids[0], ids[3]]
 
 
-def test_created_sort_null_source_values_are_indexed_as_empty(tmp_path):
+def test_created_sort_missing_app_add_times_are_indexed_as_empty(tmp_path):
     def missing_dates(state):
         for p, stamp in zip(state['projects'], [None, '', '2026-10-01', '2026-10-13']):
             p['created_at'] = stamp
@@ -160,3 +160,20 @@ def test_created_sort_null_source_values_are_indexed_as_empty(tmp_path):
         ids = [p['id'] for p in client.get('/api/workspace').json()['projects']]
         assert [p['id'] for p in everything(client, tab='all', sort='created', dir='asc')[1]] == [ids[2], ids[3], ids[0], ids[1]]
         assert [p['id'] for p in everything(client, tab='all', sort='created', dir='desc')[1]] == [ids[3], ids[2], ids[1], ids[0]]
+
+
+@pytest.mark.parametrize('direction, order', [
+    ('asc', [1, 0, 2, 3, 4, 5]), ('desc', [3, 2, 0, 1, 5, 4]),
+])
+def test_added_sort_parses_instants_and_keeps_invalid_last(tmp_path, direction, order):
+    from .models import ProjectIndex
+    with scaled_client(tmp_path, 6, **ON) as (app, client):
+        with app.state.sessions.begin() as db:
+            rows = db.scalars(select(ProjectIndex).order_by(ProjectIndex.ordinal)).all()
+            ids = [r.project_id for r in rows]
+            # App add times: lexical order reverses 00:00Z and 01:00Z.
+            stamps = ['2026-10-13T01:00:00+00:00', '2026-10-13T08:00:00+08:00',
+                      '2026-10-13T09:00:00+08:00', '2026-10-13T02:00:00Z', 'invalid', '']
+            for r, stamp in zip(rows, stamps):
+                r.created_at = stamp
+        assert [p['id'] for p in everything(client, tab='all', sort='created', dir=direction)[1]] == [ids[i] for i in order]

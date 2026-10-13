@@ -2,7 +2,7 @@
 import hashlib
 import json
 from datetime import date, timedelta
-from sqlalchemy import select, func, and_, or_, case
+from sqlalchemy import select, func, and_, or_, case, cast, TIMESTAMP
 from . import index_tables
 from .index_reads import visibility, search, _binary
 from .business_policy import can_business_override
@@ -183,10 +183,14 @@ def overview_page(db,model,row,state,today,*,q='',status='',owner='',tab='formal
     elif sort=='name': key=_binary(key,db)
     order=[(o.desc() if desc else o.asc()) for o in (key,_binary(pi.c.project_id,db))]
     if sort=='created':
-        # Missing creation dates stay last in either direction; ties use insertion order.
-        stamp=func.coalesce(pi.c.created_at,'')
-        order=[case((stamp=='',1),else_=0).asc()]+[(o.desc() if desc else o.asc())
-                for o in (_binary(stamp,db),pi.c.ordinal,_binary(pi.c.project_id,db))]
+        # App import/add time, not source recency. Parse offsets; invalid values stay last.
+        if db.get_bind().dialect.name=='postgresql':
+            stamp=case((func.pg_input_is_valid(pi.c.created_at,'timestamp with time zone'),
+                        cast(pi.c.created_at,TIMESTAMP(timezone=True))),else_=None)
+        else:
+            stamp=func.julianday(pi.c.created_at)
+        order=[case((stamp.is_(None),1),else_=0).asc()]+[(o.desc() if desc else o.asc())
+                for o in (stamp,pi.c.ordinal,_binary(pi.c.project_id,db))]
     rows=db.execute(select(pi).where(*where).order_by(*order).limit(limit).offset(offset)).mappings().all()
     counts=project_counts(db,ti,wid,today,[r['project_id'] for r in rows])
     return dict(total=total,offset=offset,limit=limit,facets=facets,items=[card(r,state,counts) for r in rows])
