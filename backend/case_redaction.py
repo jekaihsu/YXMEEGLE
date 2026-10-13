@@ -130,3 +130,20 @@ def _unresolved_records(node, key, plan):
 
 HANDLERS.update(unresolved_confirmation_ids=_unresolved, unresolved_quote_ids=_unresolved,
                 unresolved=_unresolved_records)
+
+
+def _refs(node, key, plan):
+    if isinstance(node[key], list):
+        node[key] = [value for value in node[key] if value in plan.admitted]
+
+
+def _entity_ids(node, key, plan):
+    values = node[key]
+    if isinstance(values, dict):
+        for collection in CASE_COLLECTIONS:
+            if collection in values:
+                _refs(values, collection, plan)
+
+
+HANDLERS.update(confirmation_ids=_refs, quote_ids=_refs, source_record_ids=_refs,
+                source_entity_ids=_entity_ids)

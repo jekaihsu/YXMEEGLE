@@ -131,3 +131,27 @@ def test_builder_id_form_completeness():
         explained |= value.startswith(('quote:','work_item:')) and value.split(':',1)[1] in exact
         explained |= all(part in exact for part in value.split('|'))
         assert explained,(path,value)
+
+
+def test_admitted_reference_order_and_ghost_whitelist(isolated_http):
+    from .source_entities import entity_id
+    from .sources import source_id
+    from .case_universe import record
+    app,client,_,signin=isolated_http
+    state,records,pid=build_universe(True)
+    a=next(r for r in records if r['record_id']=='recCaseA')
+    c=next(r for r in records if r['record_id']=='recCaseC')
+    qa=next(q for q in state['source_quotes'] if q['source_identity']['record_id']=='recQuoteA')
+    qa['confirmation_ids']=[entity_id(c),'universe-base/confirmation-table/recGhostX',entity_id(a)]
+    p=next(p for p in state['projects'] if p['id']==pid)
+    p['source_record_ids']=[source_id(c),'src-unknown-ghost',source_id(a)]
+    p['source_entity_ids']['source_confirmations']=[entity_id(c),'ghost-confirmation',entity_id(a)]
+    install(app,state);signin('u-manager');response=client.get('/api/workspace')
+    assert response.status_code==200
+    public=response.json();qa=next(q for q in public['source_quotes'] if q['source_identity']['record_id']=='recQuoteA')
+    assert qa['confirmation_ids']==[entity_id(c),entity_id(a)]
+    p=next(p for p in public['projects'] if p['id']==pid)
+    assert p['source_record_ids']==[source_id(c),source_id(a)]
+    assert p['source_entity_ids']['source_confirmations']==[entity_id(c),entity_id(a)]
+    # Contract ids remain outside phase 1; reference indexing must preserve them.
+    assert p['source_entity_ids']['contract_items']

@@ -346,20 +346,10 @@ def create_app(overrides=None):
         result.pop('source_work_items_status',None)
         result.pop('source_work_items_enabled',None)
         if result.get('environment') not in ('test','demo'):
-            # Use confirmations retained by filter_visible_cases; redact links
-            # only after policy calculations against the original contract.
-            visible_confirmations={c['id'] for c in result.get('source_confirmations',[])}
-            for collection in ('contract_items','source_quotes'):
-                for record in result.get(collection,[]):
-                    if 'confirmation_ids' in record:
-                        record['confirmation_ids']=[cid for cid in record['confirmation_ids'] if cid in visible_confirmations]
-            visible_quotes={q['id'] for q in result.get('source_quotes',[])}
-            for confirmation in result.get('source_confirmations',[]):
-                if 'quote_ids' in confirmation:
-                    confirmation['quote_ids']=[qid for qid in confirmation['quote_ids'] if qid in visible_quotes]
             from .source_case_policy import CASE_KINDS, identity as source_identity
             # Provenance uses pipe identities; entities also expose slash ids.
-            visible_provenance=visible_confirmations|visible_quotes|{
+            visible_provenance={record['id'] for collection in ('source_confirmations','source_quotes')
+                for record in result.get(collection,[])}|{
                 source_identity(record.get('source_identity') or {})
                 for collection in ('source_confirmations','source_quotes')
                 for record in result.get(collection,[])}
