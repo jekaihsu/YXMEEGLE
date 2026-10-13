@@ -229,3 +229,82 @@ def test_confirmation_quote_links_public_round_trip(linked_sources,viewer,admit_
         stored=storage.load(db,BusinessRow,db.get(WorkspaceRow,'lark-boundary'))
         assert stored['source_confirmations']==original['source_confirmations']
         assert stored['source_quotes']==original['source_quotes']
+
+
+@pytest.mark.parametrize('viewer,admit_hidden',[('u-pm',False),('u-manager',False),('u-manager',True)])
+def test_source_provenance_public_round_trip(linked_sources,viewer,admit_hidden):
+    app,client,signin,_=linked_sources
+    with app.state.sessions.begin() as db:
+        row=db.get(WorkspaceRow,'lark-boundary');state=storage.load(db,BusinessRow,row)
+        state['source_quotes'].append(dict(id='base/quotes/recHIDDENQ',project_id='p2',code='Q999777',
+            source_identity=dict(base_token='base',table_id='quotes',record_id='recHIDDENQ')))
+        if admit_hidden:
+            state['source_visible_record_ids'] += ['base|confirmations|recHIDDENB','base|quotes|recHIDDENQ']
+        records=[dict(id=ident,kind=kind,fields={'工程確認單編號':code}) for ident,kind,code in [
+            ('base|daily|recDaily','daily',''),
+            ('base|confirmations|recHIDDENB','confirmation','C999777'),
+            ('base|quotes|recHIDDENQ','quote','Q999777'),
+            ('base|confirmations|recA','quote_confirmation','C115264'),
+            ('base|confirmations|recHIDDENC','confirmation','C888666'),
+            ('base|quotes|recQ','quote','Q1')]]
+        provenance={'records':records,'unresolved':[]}
+        project=state['projects'][1]
+        project['daily_reports'].append(dict(id='probe-daily',date='2026-10-13',description='probe',
+            source_provenance=deepcopy(provenance)))
+        project['nodes'][0]['source_provenance']=deepcopy(provenance)
+        project['nodes'][0]['tasks'][0]['source_provenance']=deepcopy(provenance)
+        project['nodes'][0]['tasks'][0]['change_explanation']=[{'before':'base|confirmations|recHIDDENB'}]
+        original=deepcopy(project)
+        row.data=storage.save(db,BusinessRow,row.id,state)
+    signin(viewer)
+    workspace=client.get('/api/workspace')
+    assert workspace.status_code==200,workspace.text
+    body=dict(action='comment_add',project_id='p2',version=workspace.json()['version'],
+        request_id='provenance-roundtrip',payload={'body':'hello'})
+    expected=['base|daily|recDaily']+(['base|confirmations|recHIDDENB','base|quotes|recHIDDENQ'] if admit_hidden else [])+[
+        'base|confirmations|recA','base|quotes|recQ']
+    for response in [workspace,client.get('/api/projects/p2'),client.post('/api/actions',json=body),
+                     client.post('/api/actions',json=body)]:
+        assert response.status_code==200,response.text
+        project=response.json().get('project') or next(p for p in response.json()['projects'] if p['id']=='p2')
+        daily=next(d for d in project['daily_reports'] if d['id']=='probe-daily')
+        for holder in [daily,project['nodes'][0],project['nodes'][0]['tasks'][0]]:
+            assert [r['id'] for r in holder['source_provenance']['records']]==expected
+        assert 'change_explanation' not in project['nodes'][0]['tasks'][0]
+        for token,visible in [('recHIDDENB',admit_hidden),('C999777',admit_hidden),
+                              ('recHIDDENQ',admit_hidden),('Q999777',admit_hidden),
+                              ('recHIDDENC',False),('C888666',False)]:
+            assert (token in response.text)==visible
+    daily_index=client.get('/api/daily-reports')
+    assert daily_index.status_code==200,daily_index.text
+    assert 'source_provenance' not in daily_index.text
+    with app.state.sessions() as db:
+        stored=storage.load(db,BusinessRow,db.get(WorkspaceRow,'lark-boundary'))['projects'][1]
+        assert stored['daily_reports']==original['daily_reports']
+        assert stored['nodes']==original['nodes']
+
+
+@pytest.mark.parametrize('environment,wid,mode',[
+    ('demo','demo-provenance','demo'),('test','test-lark-boundary','lark')])
+def test_source_provenance_simulation_bypass(tmp_path,environment,wid,mode):
+    app=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/simulation.db',
+        'UPLOAD_DIR':str(tmp_path/'files'),'DEMO_MODE':'true','APP_ENV':'development',
+        'SESSION_SECRET':'boundary-only'*4,'LARK_WORKER_ORGANIZATION':'boundary',
+        'LARK_ALLOWED_TENANTS':'boundary'})
+    state=upgrade(seed());state['environment']=environment
+    records=[{'id':'base|confirmations|recNotAdmitted','kind':'confirmation','fields':{}}]
+    state['source_visible_record_ids']=[]
+    state['projects'][1]['daily_reports'].append(dict(id='probe-daily',date='2026-10-13',
+        description='probe',source_provenance={'records':records,'unresolved':[]}))
+    with app.state.sessions.begin() as db:
+        row=WorkspaceRow(id=wid,version=state['version'],data={});db.add(row);db.flush()
+        row.data=storage.save(db,BusinessRow,wid,state)
+        db.add(AuthRow(id='simulation-session',data={'wid':wid,'expires':time.time()+3600}))
+    client=TestClient(app)
+    client.cookies.set('meegle_session',app.state.signer.dumps(dict(
+        mode=mode,sid='simulation-session',wid=wid,uid='u-manager')))
+    response=client.get('/api/workspace')
+    assert response.status_code==200,response.text
+    project=next(p for p in response.json()['projects'] if p['id']=='p2')
+    daily=next(d for d in project['daily_reports'] if d['id']=='probe-daily')
+    assert daily['source_provenance']['records']==records

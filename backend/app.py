@@ -355,6 +355,22 @@ def create_app(overrides=None):
             for confirmation in result.get('source_confirmations',[]):
                 if 'quote_ids' in confirmation:
                     confirmation['quote_ids']=[qid for qid in confirmation['quote_ids'] if qid in visible_quotes]
+            from .source_case_policy import CASE_KINDS, identity as source_identity
+            # Provenance uses pipe identities; entities also expose slash ids.
+            visible_provenance=visible_confirmations|visible_quotes|{
+                source_identity(record.get('source_identity') or {})
+                for collection in ('source_confirmations','source_quotes')
+                for record in result.get(collection,[])}
+            def redact_provenance(value):
+                if isinstance(value,dict):
+                    provenance=value.get('source_provenance')
+                    if isinstance(provenance,dict) and isinstance(provenance.get('records'),list):
+                        provenance['records']=[record for record in provenance['records']
+                            if record.get('kind') not in CASE_KINDS or record.get('id') in visible_provenance]
+                    for child in value.values():redact_provenance(child)
+                elif isinstance(value,list):
+                    for child in value:redact_provenance(child)
+            redact_provenance(result['projects'])
         return filter_private_workspace(result,user)
     def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None):
         require(bool(actor_id),'缺少操作人員身分',403)
