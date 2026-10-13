@@ -31,6 +31,7 @@
     "test:perf": "node test-perf.mjs",
     "test:contrast": "node test-contrast.mjs",
     "test:shell-mode": "node test-shell-mode.mjs",
+    "test:case-navigation": "node test-case-navigation.mjs",
     "test:home-executable": "node test-home-executable.mjs",
     "test:work-assigned-visibility": "node test-work-assigned-visibility.mjs",
     "test:dev-tooling": "node --test --test-timeout=30000 test-dev-tooling.mjs",
