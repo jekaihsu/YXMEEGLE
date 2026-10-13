@@ -1,8 +1,12 @@
-# YX v2 P1–P8 execution plan (2026-10-13)
+# YX v2 P1–P8 execution plan (2026-10-13, rev 3)
 
-Owner: the single Claude commander (parent task `task_6f78140157c0`, continued by `task_ec8184733081`). This plan does not create a second commander. It persists the full P1–P8 plan the owner authorized. It covers what is in flight, who owns which files, which gates block what, and how integration is serialized.
+Owner: the single Claude commander. Parent task `task_6f78140157c0`, continued by `task_ec8184733081` (P1/P2 planning and reviews) and now by `task_67bb22a5d7b6` (P1–P8 execution). This plan does not create a second commander. Revision 3 adds the complete P3–P8 specs and issue IDs, records the C-ID architecture decisions, and replaces the old no-push/no-staging rule with the owner's serial merge, push and staging authorization (§4).
 
-Status at writing: P1 foundations C-STATE and C-ID exist as unaccepted candidates. All P1 feature work and all P2 work are held behind them. P3–P8 are **pending complete spec intake**. No acceptance has been inferred from their titles.
+**Status at rev 3:**
+- C-STATE is accepted and integrated into `ava-apple/yx-v2`.
+- The 126F1 and 127F1 view models and C-ID v2 are in flight.
+- P2 is held until every P1 gate passes. P3–P8 are specified and sequenced, but no later-phase coding is dispatched before the previous phase is accepted.
+- Staging deploys are blocked on Zeabur authentication (§10).
 
 VCC-125 remains a hard gate. Nothing in this plan claims production readiness or complete authorization coverage.
 
@@ -12,211 +16,582 @@ VCC-125 remains a hard gate. Nothing in this plan claims production readiness or
 
 | What | Where |
 |---|---|
-| Full P1/P2 interface specs (seven issues, v1.1) | `/Users/vc/Documents/Codex/2026-10-13/task-2/library-handoff/extracted/all-seven-interface-specs.md` |
-| Issue → Page mapping | same folder, `issue-id-mapping.json`; reference screenshots `*-actual-reference.jpg` |
+| P1/P2 interface specs (7 issues, v1.1) | `/Users/vc/Documents/Codex/2026-10-13/task-2/library-handoff/extracted/all-seven-interface-specs.md` |
+| P1/P2 issue → Page map and screenshots | same folder: `issue-id-mapping.json`, `*-actual-reference.jpg` |
+| P3–P8 interface specs (14 interfaces, v1.1) | `/Users/vc/Documents/Codex/2026-10-13/task-2/library-handoff/p3-p8-extracted/all-fourteen-interface-specs.md` (per-interface `*-spec.md` are identical copies) |
+| P3–P8 bundle | `yx-p3-p8-interface-handoff-20261013.zip`, SHA256 `37f928da7804a2d741a0c7f370b445dd38c5f697a3cf5ddfd9cad47c36ae1bae`, 820436 bytes, version 0. Hash and size re-verified by the commander on 2026-10-13. |
+| P3–P8 map, image provenance | `document-issue-map.json` (its issue IDs are null for 13 of 14 at snapshot), `manifest.json` (image SHA-256/capture/dimensions), `bundle-manifest.json` |
 | Commander P1/P2 spec and task table | `/Users/vc/orca/workspaces/YXMEEGLE/yx-v2-commander/.runtime/task_6f78140157c0/spec.md`, `tasks.tsv` |
-| Linear issue bodies captured at planning time | same folder, `issues/VCC-126..132.{json,md}` |
-| Reference site (layout analogue only, never acceptance evidence) | <https://pmsolution.zeabur.app/> |
+| Child records for this continuation | `.runtime/task_67bb22a5d7b6/children.tsv` and `spec-*.txt` in the plan worktree |
+| Reference site | <https://pmsolution.zeabur.app/>. Used only as visual and UI/UX reference evidence. It is never authority for formulas, data, permissions, schema or YX bindings, and its numbers are never test constants. |
 
-### Issues and v1.1 interface Pages
+### 1.1 Issues, Pages and reference captures (all 21 verified in Linear, status Backlog, 2026-10-13)
 
-| Phase | Issue | Interface | v1.1 spec Page | Reference capture |
-|---|---|---|---|---|
-| P1 | [VCC-126](https://linear.app/vc-studio/issue/VCC-126/p1-implement-my-work-interface-v11) | My Work | [page_211c06e0…](https://chatgpt.com/space/page_211c06e05fc48191a101ba2ab6df4bd6) | `/` overview, 2026-10-13T13:20:30Z |
-| P1 | [VCC-127](https://linear.app/vc-studio/issue/VCC-127/p1-implement-source-health-interface-v11) | Source Health | [page_dc5b32d0…](https://chatgpt.com/space/page_dc5b32d0a4c481919fa215cc51b045c8) | `/sources`, 13:29:21Z |
-| P2 | [VCC-128](https://linear.app/vc-studio/issue/VCC-128/p2-implement-manager-overview-interface-v11) | Manager Overview | [page_c753f9a5…](https://chatgpt.com/space/page_c753f9a57fa88191ad7322dc979cf116) | `/` overview, 13:20:30Z |
-| P2 | [VCC-129](https://linear.app/vc-studio/issue/VCC-129/p2-implement-confirmation-list-interface-v11) | Confirmation List | [page_bd99af28…](https://chatgpt.com/space/page_bd99af28dedc819182d79eca26869631) | `/reports/r01` raw table, 13:30:24Z |
-| P2 | [VCC-130](https://linear.app/vc-studio/issue/VCC-130/p2-implement-case-and-confirmation-detail-interface-v11) | Case and Confirmation Detail | [page_28660d53…](https://chatgpt.com/space/page_28660d5339148191aa0d89a1e3d3bfd8) | `/reports/r01` group drilldown, 13:30:54Z |
-| P2 | [VCC-131](https://linear.app/vc-studio/issue/VCC-131/p2-implement-contract-detail-interface-v11) | Contract Detail | [page_c218dc50…](https://chatgpt.com/space/page_c218dc5004608191972a0e02bff5edb2) | `/reports/r01` group drilldown, 13:30:54Z |
-| P2 | [VCC-132](https://linear.app/vc-studio/issue/VCC-132/p2-implement-work-item-detail-interface-v11) | Work Item Detail | [page_f6b11a0b…](https://chatgpt.com/space/page_f6b11a0b6bc481918a3af035afb4c6c4) | `/reports/r01` raw table, 13:30:24Z |
+The commander verified the 14 P3–P8 IDs with a read-only Linear listing. Titles match the map's interface names. They were added here, not recreated. All 14 P3–P8 screenshots were pixel-inspected by the coordinator. The Document/Delivery Workspace and R03 captures are one reused image (same SHA-256 `c1ca3e3f013a…`); the manifest documents that reuse as a nearest analogue.
 
-Related gates and evidence: [VCC-117](https://linear.app/vc-studio/issue/VCC-117/map-lark-source-fields-and-case-node-relationships) is bounded mapping evidence. [VCC-120](https://linear.app/vc-studio/issue/VCC-120) is the existing connected-data views; compare against it before reimplementing anything. [VCC-113](https://linear.app/vc-studio/issue/VCC-113/reviewfix-frontend-work-overview-my-work-case-overview-case-detail)/114 are earlier review work. [VCC-122](https://linear.app/vc-studio/issue/VCC-122/follow-up-13-contract-item-differences-cause-unverified) covers contract-item differences. [VCC-123](https://linear.app/vc-studio/issue/VCC-123/follow-up-unknown-deadline-provenance) covers deadline provenance. [VCC-125](https://linear.app/vc-studio/issue/VCC-125/vcc-124-follow-up-residual-hidden-id-leaks-on-apiaudit-action-409) is the hard release gate. Shared Pages: [phase approval index](https://chatgpt.com/space/page_0cb44163425c8191bd8d8714d46be8c6), [YX scope and workflow](https://chatgpt.com/space/page_75e46aa59b388191991e5d258b10cb0b), [data-operation plan (background only, not a write contract)](https://chatgpt.com/space/page_f9b4da6a5734819190fd72a208738f49).
+| Phase | Issue | Interface | v1.1 spec Page | Reference URL · capture (UTC) | Screenshot file (sha256 prefix) |
+|---|---|---|---|---|---|
+| P1 | [VCC-126](https://linear.app/vc-studio/issue/VCC-126/p1-implement-my-work-interface-v11) | My Work | [page_211c06e0…](https://chatgpt.com/space/page_211c06e05fc48191a101ba2ab6df4bd6) | `/` · 13:20:30Z | P1/P2 bundle |
+| P1 | [VCC-127](https://linear.app/vc-studio/issue/VCC-127/p1-implement-source-health-interface-v11) | Source Health | [page_dc5b32d0…](https://chatgpt.com/space/page_dc5b32d0a4c481919fa215cc51b045c8) | `/sources` · 13:29:21Z | P1/P2 bundle |
+| P2 | [VCC-128](https://linear.app/vc-studio/issue/VCC-128/p2-implement-manager-overview-interface-v11) | Manager Overview | [page_c753f9a5…](https://chatgpt.com/space/page_c753f9a57fa88191ad7322dc979cf116) | `/` · 13:20:30Z | P1/P2 bundle |
+| P2 | [VCC-129](https://linear.app/vc-studio/issue/VCC-129/p2-implement-confirmation-list-interface-v11) | Confirmation List | [page_bd99af28…](https://chatgpt.com/space/page_bd99af28dedc819182d79eca26869631) | `/reports/r01` raw · 13:30:24Z | P1/P2 bundle |
+| P2 | [VCC-130](https://linear.app/vc-studio/issue/VCC-130/p2-implement-case-and-confirmation-detail-interface-v11) | Case and Confirmation Detail | [page_28660d53…](https://chatgpt.com/space/page_28660d5339148191aa0d89a1e3d3bfd8) | `/reports/r01` drilldown · 13:30:54Z | P1/P2 bundle |
+| P2 | [VCC-131](https://linear.app/vc-studio/issue/VCC-131/p2-implement-contract-detail-interface-v11) | Contract Detail | [page_c218dc50…](https://chatgpt.com/space/page_c218dc5004608191972a0e02bff5edb2) | `/reports/r01` drilldown · 13:30:54Z | P1/P2 bundle |
+| P2 | [VCC-132](https://linear.app/vc-studio/issue/VCC-132/p2-implement-work-item-detail-interface-v11) | Work Item Detail | [page_f6b11a0b…](https://chatgpt.com/space/page_f6b11a0b6bc481918a3af035afb4c6c4) | `/reports/r01` raw · 13:30:24Z | P1/P2 bundle |
+| P3 | [VCC-133](https://linear.app/vc-studio/issue/VCC-133/p3-implement-document-and-delivery-workspace-interface-v11) | Document and Delivery Workspace | [page_f032f426…](https://chatgpt.com/space/page_f032f426e8548191b62d9f8add891df3) | `/reports/r03` · 13:22:23.365Z | `document-delivery-workspace-actual-reference.jpg` (c1ca3e3f013a) |
+| P3 | [VCC-134](https://linear.app/vc-studio/issue/VCC-134/p3-implement-r03-report-quality-review-interface-v11) | R03 Report Quality Review | [page_cb729390…](https://chatgpt.com/space/page_cb72939040108191af74db09808b9413) | `/reports/r03` · 13:22:23.365Z | `r03-report-quality-actual-reference.jpg` (c1ca3e3f013a) |
+| P4 | [VCC-135](https://linear.app/vc-studio/issue/VCC-135/p4-implement-r01-field-quality-review-interface-v11) | R01 Field Quality Review | [page_6c616efe…](https://chatgpt.com/space/page_6c616efe9424819189be1e879c26cb14) | `/reports/r01` · 13:21:10.105Z | `R01-actual-reference.jpg` (3a0c94580d5c) |
+| P4 | [VCC-136](https://linear.app/vc-studio/issue/VCC-136/p4-implement-r02-internal-quality-review-interface-v11) | R02 Internal Quality Review | [page_3ce4f194…](https://chatgpt.com/space/page_3ce4f1944c3881918b94f104f33cfa84) | `/reports/r02` · 13:21:38.725Z | `R02-actual-reference.jpg` (918f58630bec) |
+| P4 | [VCC-137](https://linear.app/vc-studio/issue/VCC-137/p4-implement-r09-internal-plan-versus-actual-interface-v11) | R09 Internal Plan vs Actual | [page_e3d337c8…](https://chatgpt.com/space/page_e3d337c87d1c8191b1c698386ea71199) | `/reports/r09` · 13:27:33.621Z | `R09-actual-reference.jpg` (ff01e4d62df7) |
+| P4 | [VCC-138](https://linear.app/vc-studio/issue/VCC-138/p4-implement-r10-field-plan-versus-actual-interface-v11) | R10 Field Plan vs Actual | [page_d8e957c3…](https://chatgpt.com/space/page_d8e957c3546881919b60bd4f13d66592) | `/reports/r10` · 13:28:04.066Z | `R10-actual-reference.jpg` (e538db3384d6) |
+| P4 | [VCC-139](https://linear.app/vc-studio/issue/VCC-139/p4-implement-r11-administrative-reporting-interface-v11) | R11 Administrative Reporting | [page_f749e875…](https://chatgpt.com/space/page_f749e8757dec8191ac0312e39deb0d95) | `/reports/r11` · 13:28:40.598Z | `R11-actual-reference.jpg` (d8a0bdbd4418) |
+| P5 | [VCC-140](https://linear.app/vc-studio/issue/VCC-140/p5-implement-r05-business-quotations-interface-v11) | R05 Business Quotations | [page_92847e19…](https://chatgpt.com/space/page_92847e192714819195c5adef5342bf1f) | `/reports/r05` · 13:23:22.347Z | `r05-actual-reference.jpg` (462294dbaa28) |
+| P5 | [VCC-141](https://linear.app/vc-studio/issue/VCC-141/p5-implement-r06-billing-source-detail-interface-v11) | R06 Billing Source Detail | [page_900b4bfa…](https://chatgpt.com/space/page_900b4bfaca808191b78018f3a6eb9bfa) | `/reports/r06` · 13:23:45.703Z | `r06-actual-reference.jpg` (826cc32b72de) |
+| P6 | [VCC-142](https://linear.app/vc-studio/issue/VCC-142/p6-implement-r07-asset-workspace-interface-v11) | R07 Asset Workspace | [page_8783a3f5…](https://chatgpt.com/space/page_8783a3f508c88191966336635e3babbc) | `/reports/r07` · 13:24:17.646Z | `r07-actual-reference.jpg` (3291f5dd1c26) |
+| P6 | [VCC-143](https://linear.app/vc-studio/issue/VCC-143/p6-implement-asset-detail-interface-v11) | Asset Detail | [page_49ee2cfa…](https://chatgpt.com/space/page_49ee2cfadc308191b423fd4b6c73e65a) | `/reports/r07` · 13:25:48.997Z | `asset-detail-actual-reference.jpg` (f6a25b33391b) |
+| P7 | [VCC-144](https://linear.app/vc-studio/issue/VCC-144/p7-implement-client-directory-and-detail-interface-v11) | Client Directory and Detail | [page_0bf6c5a0…](https://chatgpt.com/space/page_0bf6c5a0b12c8191abd46c5ad7e56cad) | `/reports/r08` · 13:26:53.746Z | `a21-actual-reference.jpg` (2a7e068da823) |
+| P7 | [VCC-145](https://linear.app/vc-studio/issue/VCC-145/p7-implement-r08-client-contact-activity-interface-v11) | R08 Client Contact Activity | [page_50473aee…](https://chatgpt.com/space/page_50473aee774c81918e0c4adadb2d0891) | `/reports/r08` · 13:26:16.913Z | `a22-actual-reference.jpg` (4163035926da) |
+| P8 | [VCC-146](https://linear.app/vc-studio/issue/VCC-146/p8-implement-r04-authorized-hr-reporting-interface-v11) | R04 Authorized HR Reporting | [page_433dc99c…](https://chatgpt.com/space/page_433dc99cc3448191b7a164efdf189091) | `/reports/r04` · 13:22:57.237Z | `a23-actual-reference.jpg` (f05e42f70dd7) |
+
+All reference captures were taken at a 1180 × 757 viewport before the approved privacy crop.
+
+Related gates and evidence:
+- [VCC-117](https://linear.app/vc-studio/issue/VCC-117/map-lark-source-fields-and-case-node-relationships): bounded mapping evidence. Its receipts are not in the repo.
+- [VCC-120](https://linear.app/vc-studio/issue/VCC-120): existing connected-data views. Compare against it before reimplementing anything.
+- [VCC-121](https://linear.app/vc-studio/issue/VCC-121/follow-up-535-unresolved-reports-42-attachments-unlinked-to-cases): unresolved report/attachment links. Discovery gap for P3.
+- [VCC-122](https://linear.app/vc-studio/issue/VCC-122/follow-up-13-contract-item-differences-cause-unverified) and [VCC-123](https://linear.app/vc-studio/issue/VCC-123/follow-up-unknown-deadline-provenance).
+- [VCC-125](https://linear.app/vc-studio/issue/VCC-125/vcc-124-follow-up-residual-hidden-id-leaks-on-apiaudit-action-409): hard release gate.
+
+Shared Pages: [phase index](https://chatgpt.com/space/page_0cb44163425c8191bd8d8714d46be8c6), [YX scope and workflow](https://chatgpt.com/space/page_75e46aa59b388191991e5d258b10cb0b), [data-operation plan (background only, not a write contract)](https://chatgpt.com/space/page_f9b4da6a5734819190fd72a208738f49).
 
 ---
 
-## 2. Phase map
+## 2. Phase map and strictly sequential gates
 
-| Phase | Scope | Status | Gate to start |
+| Phase | Scope | Status | Starts only after |
 |---|---|---|---|
-| **P1** | VCC-126 My Work, VCC-127 Source Health, shared contracts C-STATE and C-ID | **In progress**: foundations only | Owner authorization (given) |
-| **P2** | VCC-128 Manager Overview, 129 Confirmation List, 130 Case/Confirmation Detail, 131 Contract Detail, 132 Work Item Detail | **Held** | P1-REV accepted, plus source/authorization receipts and cross-review (§5) |
-| P3 | — | **Pending complete spec intake** | Full spec text, owner approval, P2 final review |
-| P4 | — | **Pending complete spec intake** | Same |
-| P5 | — | **Pending complete spec intake** | Same |
-| P6 | — | **Pending complete spec intake** | Same |
-| P7 | — | **Pending complete spec intake** | Same |
-| P8 | — | **Pending complete spec intake** | Same |
+| **P1** | VCC-126, VCC-127, C-STATE, C-ID | **In progress** | Owner authorization (given) |
+| **P2** | VCC-128..132 | **Held** | G-P1-REV: P1 integrated, tested, cross-reviewed, browser evidence, coordinator acceptance |
+| **P3** | VCC-133, VCC-134 | Specified, not dispatched | P2 accepted (integration + real tests + independent review + responsive browser) |
+| **P4** | VCC-135..139 | Specified, not dispatched | P3 accepted |
+| **P5** | VCC-140, VCC-141 | Specified, not dispatched | P4 accepted |
+| **P6** | VCC-142, VCC-143 | Specified, not dispatched | P5 accepted |
+| **P7** | VCC-144, VCC-145 | Specified, not dispatched | P6 accepted |
+| **P8** | VCC-146 | Specified, not dispatched | P7 accepted |
 
-P3–P8 rule: no task, worktree, file reservation or acceptance criterion may be created for them until their complete specs are read into a commander task, the same way P1/P2 were. Titles, the reference site, and the "later-phase screen" links in VCC-132 are not specs. VCC-132 itself forbids implementing P3/P4.
+The full approved specs are authoritative, so Linear bookkeeping is not a precondition for starting a phase.
+
+Within a phase, disjoint work runs in parallel. No coding task, worktree or file reservation for phase N+1 is created before phase N is accepted. Plan and spec analysis may proceed earlier.
+
+A blocked source, grant or undefined business rule stays explicitly blocked or deferred with a visible reason. It is never labelled accepted to advance a phase. A phase may be accepted with documented, spec-permitted gaps: the safe UI, explicit `unlocated`, and calculations shown as unavailable.
 
 ---
 
 ## 3. Models and roles
 
-| Role | Agent | Model / effort | Uses |
-|---|---|---|---|
-| Commander (single) | Claude | Opus (`claude-opus-5-5`) | Plans, task specs, dependency gates, ordering integration |
-| Claude code changes | Claude | Sonnet 5.5 (`claude-sonnet-5-5`), medium | Logic and view-model modules, remediation |
-| Claude reviews / hard contracts | Claude | Opus (`claude-opus-5-5`), high | Independent reviews of Codex-authored code; high-risk access modules |
-| Codex code changes and reviews | Codex | `gpt-6.1-sol`, medium | Logic modules, reconciliation tests, independent reviews of Claude-authored code |
-| Simple isolated UI | AGY (Antigravity) | agent default | Presentational `.tsx`/`.css` built on an accepted view model |
-| Integration owner | Claude | Sonnet 5.5, medium | **Only** writer of the shared hub files; serial merges |
+| Role | Agent / model / effort | Uses |
+|---|---|---|
+| Commander (single) | Claude Opus `claude-opus-5-5` | Plan, specs, gates, architecture decisions from the specs, integration order, reports |
+| Logic and coding | Codex `gpt-6.1-sol`, medium, **and** Claude Sonnet `claude-sonnet-5-5`, medium | Backend read models, view models, reconciliation tests. Both families get real coding rows in every phase. |
+| Hard contracts / reviews | Claude Opus `claude-opus-5-5`, high | Identity, access and redaction contracts. Independent review of Codex-authored SHAs. |
+| Reviews of Claude-authored code | Codex `gpt-6.1-sol`, medium | Independent review of Claude-authored SHAs |
+| Simple isolated UI | AGY (Antigravity), agent default | Presentational `.tsx`/`.css`, only after the view model is reviewed |
+| Integration | Commander, in `/Users/vc/orca/workspaces/YXMEEGLE/yx-v2` | The only writer of the shared hub files. Serial merges. |
 
-This supersedes the older `tasks.tsv` model column (`codex/high`, `claude-opus-5-5/high` for every coder). Owner column assignments in `tasks.tsv` stay as they are. Both Codex and Claude do real logic/coding work, and neither model is used only to review.
-
-**Review pairing:** the reviewer always comes from the other model family than the author. Codex reviews Claude-authored code, and Claude Opus reviews Codex-authored code. A review covers one exact SHA. Any later commit invalidates it.
+Rules:
+- **Review pairing:** the reviewer always comes from the other model family. A review covers one exact SHA, and any later commit invalidates it.
+- **Launch receipts:** each `worker-start` JSON records the requested and effective agent/model/effort, and a copy is kept in `.runtime/task_67bb22a5d7b6/start-*.json`. If a requested configuration is unavailable, report it; never substitute silently.
 
 ---
 
-## 4. Ownership, worktrees and integration
+## 4. Ownership, integration, push and staging
 
-### Shared hub files: a single writer
+### 4.1 Shared hub files: single writer
 
-Only the integration owner (`P1-INT`, later `P2-INT`, in `/Users/vc/orca/workspaces/YXMEEGLE/yx-v2` on `ava-apple/yx-v2`) edits these files:
+Only the integration owner edits these files:
+- `backend/app.py`
+- `frontend/src/App.tsx`, `api.ts`, `types.ts`, `AppShell.tsx`
+- shared CSS
+- `scripts/local_ci.sh`
+- `frontend/package.json`
 
-`backend/app.py`, `frontend/src/App.tsx`, `frontend/src/api.ts`, `frontend/src/types.ts`, `frontend/src/AppShell.tsx`, shared CSS, `scripts/local_ci.sh`, `frontend/package.json`.
+Feature workers add new files only, and each task's file set is exclusive. Phase N file sets are fixed at phase start against the then-current `yx-v2` HEAD, after inspecting real paths. §8 lists the proposed names.
 
-Feature workers add new files only. The exclusive file list for each task is in `tasks.tsv`, and no file appears in two tasks.
+### 4.2 Integration, push and staging rule (replaces the rev 1–2 "nothing pushed/deployed" clause)
 
-### Integration rule
+The owner now expressly authorizes the following:
 
-1. Each worker commits on its own branch in its own child worktree and reports its exact SHA.
-2. An independent cross-model review of that exact SHA passes. Findings get fixed, and the fix gets re-reviewed.
-3. The integration owner merges into `ava-apple/yx-v2` one candidate at a time and runs `scripts/local_ci.sh` after each merge. A red result stops the queue.
-4. P2 merge order: 129, 130, 131, 132, 128, NAV, UI-a, UI-b, then E2E.
-5. Nothing is pushed, deployed or sent externally without a separate owner instruction.
+1. Each worker commits in its own child worktree, branched from the **newest verified `ava-apple/yx-v2`**, and reports its exact SHA.
+2. An independent cross-model review of that exact SHA passes. Findings are fixed, and the fix is re-reviewed.
+3. The commander merges into `ava-apple/yx-v2` **serially, one candidate at a time**. Each merge is `--no-ff` and keeps reviewed SHAs (no rebase). After every merge, `scripts/local_ci.sh` runs on the result. A red result stops the queue. After a conflict resolution, the affected checks and the review rerun.
+4. After each independently accepted stage, the commander pushes `ava-apple/yx-v2` to `origin` with a normal push, never a force push. The commander records the local SHA and the `git ls-remote` remote SHA.
+5. After each accepted stage, the commander deploys only to the **verified existing Zeabur staging target** (§10) and records:
+   - source SHA;
+   - build/stage inventory hash;
+   - deployed SHA;
+   - `/api/health`;
+   - authenticated browser evidence.
 
-### Current P1 state (verified 2026-10-13)
+   If the target cannot be authenticated or verified, the code stage stays ready, and the exact blocker is reported. No credential, scope or service is created or changed.
+6. **Never:** a production deploy, a merge to or push of `ava-apple/yx-company-system`, a force push, or rewriting a reviewed SHA.
+7. P2 merge order: 129, 130, 131, 132, 128, NAV, UI-a, UI-b, E2E. Later phases use the order given in §8.
+
+### 4.3 Current state (verified 2026-10-13, rev 3)
 
 | Item | Branch / worktree | Exact SHA | Author | Review | State |
 |---|---|---|---|---|---|
-| P1-C1 C-STATE | `ava-apple/p1-c1` / `p1-c1` | `727f386e94a2ffd21f22264187f52f254002dd55` | Claude Opus | superseded | base of hardening |
-| P1-C1 hardening | `ava-apple/p1-c1-hardening` / `p1-c1-hardening` | `1da39c3ec65509ad08561e8f74675eebb6a401db` | Claude Sonnet | `task_3717b15b9345`: **changes requested** (msg_40df7bf9ff4b) | needs remediation |
-| P1-C2 C-ID | `ava-apple/p1-c2` / `p1-c2` | `f24889238669794ef356258a0ceb08f6086544f4` | Codex | `task_77ca4877621f` (Claude Opus): PASS with test gaps F1–F8 | superseded by hardening |
-| P1-C2 hardening | `ava-apple/p1-c2-hardening` / `p1-c2-hardening` | `44d93b4293f2c1160e6be97280b671c6fe9362da` | Codex (`task_98b8b9481f1d`) | **pending**; coordinator reran 30 tests (pass); owner says C-ID "seems wrong" | needs independent Opus review + contract decisions (§7) |
+| P1-C1 C-STATE (remediated) | `ava-apple/p1-c1-remediation` | `0ed93e7609ab689e9ef5c22143fbc3b0be8fc470` | Claude Sonnet (`task_66025376e1f5`) | Codex `task_3a4624cbce68`: **PASS, no findings** | **Accepted, integrated** |
+| `yx-v2` integration | `ava-apple/yx-v2` / `yx-v2` | `69f7d4add1d19dc23bb93a1a2fa062858e8d324a` | commander merge of `0ed93e7` onto `6ab9b06` | covered by the C-STATE review (merge only adds the 4 C-STATE files) | `scripts/local_ci.sh` **exit 0**: 3050 passed, 20 skipped, 1 xfailed, all frontend checks passed. Log: `worker-evidence/task_67bb22a5d7b6/local_ci_69f7d4a.log` |
+| P1-C2 C-ID hardening | `ava-apple/p1-c2-hardening` | `44d93b4293f2c1160e6be97280b671c6fe9362da` | Codex (`task_98b8b9481f1d`) | Opus `task_ebfd09513665`: hardening PASS, **not fit for P2** (design) | superseded by C2-V2 |
+| P1-C2-V2 base | `ava-apple/p1-c2-v2` / `p1-c2-v2` | `799fe4a432077c848daaa998d98a0ce329a45615` (= `69f7d4a` + `--no-ff` merge of `44d93b4`; 30/30 pass) | commander | — | worker running |
 
-C1 review defects to fix (from msg_40df7bf9ff4b):
-1. `frontend/src/dataState.ts:52-64`: `dataStateCount`/`describeDataState` don't validate direct inputs. Duplicate states, incompatible combinations and empty states with a count all leak the count. Examples: `['partial','partial']`+7, `['partial','complete_empty']`+7, `['complete_empty']`+7.
-2. `frontend/src/dataState.ts:37-46,54-64`: sparse arrays (`Array(1)`) pass `every`, so the count leaks.
+Before C-STATE was integrated, the commander re-verified it:
+- `_ci-venv/bin/python -m pytest backend/test_data_state.py`: 18 passed.
+- `node frontend/test-data-state.mjs`: 180 checks passed.
 
-### Child tasks created by this plan
+### 4.4 Child tasks (Run `run_25ff399808aa`; earlier Run `run_67505fe63eb0` is settled)
 
-The tasks are disjoint, and none edits the code of another in-flight task. Exact Orca task IDs, worktrees and models are recorded in the commander report and in `.runtime/task_ec8184733081/children.tsv` in the plan worktree.
-
-Orca Run `run_67505fe63eb0`. Worktrees live under `/Users/vc/orca/workspaces/YXMEEGLE/`; setup hooks were skipped.
-
-| ID | Orca task / dispatch | Agent / model | Worktree / branch (base) | Exclusive files | Purpose |
+| ID | Orca task / dispatch | Agent / model | Worktree / branch (base) | Exclusive files | Reviewer |
 |---|---|---|---|---|---|
-| P1-C1-REM | `task_66025376e1f5` / `ctx_3afab6ecf1f8` | Claude Sonnet 5.5, medium | `p1-c1-remediation` / `ava-apple/p1-c1-remediation` (from `1da39c3`) | `frontend/src/dataState.ts`, `frontend/test-data-state.mjs` (backend `data_state.py` and its test only if a parity gap is proven) | Fix review findings 1–2 with regressions that fail first |
-| P1-C2-REV | `task_ebfd09513665` / `ctx_99fa333231e4` | Claude Opus, high | `p1-c2-opus-review` / `ava-apple/p1-c2-opus-review` (from `44d93b4`) | read-only | Independent review of exact `44d93b4`; confirm or sharpen the §7 questions; no fixes |
-| P1-C1-REM-REV | created once P1-C1-REM reports | Codex `gpt-6.1-sol`, medium | review worktree at the P1-C1-REM SHA | read-only | Cross-model review of the remediation SHA |
+| P1-126F1 | `task_75322defe946` / `ctx_a97df7fed145` | Claude `claude-sonnet-5-5`, medium | `p1-126f1` / `ava-apple/p1-126f1` (`69f7d4a`) | `frontend/src/myWorkView.ts`, `frontend/test-my-work-view.mjs` | Codex `gpt-6.1-sol` medium |
+| P1-127F1 | `task_9350171345dd` / `ctx_86bd20e4559b` | Codex `gpt-6.1-sol`, medium | `p1-127f1` / `ava-apple/p1-127f1` (`69f7d4a`) | `frontend/src/sourceHealthView.ts`, `frontend/test-source-health-view.mjs` | Claude Opus high |
+| P1-C2-V2 | `task_d08b2b98793b` / `ctx_c194365a7b22` | Claude `claude-opus-5-5`, high | `p1-c2-v2` / `ava-apple/p1-c2-v2` (`799fe4a`) | `backend/source_identity.py`, `backend/test_source_identity_contract.py` | Codex `gpt-6.1-sol` medium |
 
-**Results (2026-10-13, all three settled, terminals released, worktrees kept):**
+Model notes:
+- 127F1 swapped to Codex (the `tasks.tsv` row said Claude) so that both families code in P1.
+- C2-V2 uses Opus because it is a hard identity contract.
 
-- **P1-C1-REM** committed `0ed93e7609ab689e9ef5c22143fbc3b0be8fc470` on `ava-apple/p1-c1-remediation`. It changes only the two allowed files: direct helpers now reparse through `parseDataState`, and sparse or empty state arrays are rejected. Checks: 180 frontend checks pass, 18 backend tests pass, strict tsc passes. One intended behavior change: a direct `{states:['complete_empty']}` with no count now reads 0, which matches the backend.
-- **P1-C1-REM-REV** (Codex): **PASS, no findings** on `0ed93e7`. Report: `/Users/vc/orca/workspaces/YXMEEGLE/worker-evidence/task_3a4624cbce68/review.md`. 41 backend/frontend envelope comparisons agree, and reverting F1 or F2 fails the tests. **G-C1 now needs only coordinator acceptance of `0ed93e7`.**
-- **P1-C2-REV** (Claude Opus) on `44d93b4`: **DESIGN-DECISION-REQUIRED.** Report: `/Users/vc/orca/workspaces/YXMEEGLE/worker-evidence/task_ebfd09513665/review.md`.
-  - The hardening itself passes: F1–F4 are fixed, 30/30 tests pass, and it has minor items N1–N4.
-  - All eight §7 questions are confirmed. C-ID is a one-target, record-keyed resolver with no viewer context. It runs parallel to identity the repo already has: typed one-to-many native relations (`v4_sources.RELATIONS`/`native_records`, `source_entities.update_entities`, `source_work_items`) and the existing `project_id`/`assignments` case identity. As built, it cannot serve the P2 chains.
-  - The `/` key collision also affects `source_id` and would break `source_work_items.py:27`.
-  - **G-C2 is blocked on the owner's decisions 1–9 in that report.** No C-ID coder is started until they are made.
+Settled children from earlier continuations stay recorded in `.runtime/task_ec8184733081/children.tsv`:
+- P1-C1-REM `task_66025376e1f5`
+- P1-C1-REM-REV `task_3a4624cbce68`
+- P1-C2-REV `task_ebfd09513665`
 
-No other coder is created for C1 or C2. Remaining P1 rows in `tasks.tsv` (127B1/B2/B3, 127F1/F2, 126B1/B2, 126F1/F2, INT, REV) are **held** until their gates in §5 pass. AGY has no authorized task yet because both of its UI tasks depend on accepted view models (127F1, 126F1), and those depend on accepted C-STATE.
+Their worktrees are preserved.
+
+### 4.5 Remaining P1 rows and owners
+
+| Row | Owner | Depends on |
+|---|---|---|
+| 127B1 source health read model | Codex `gpt-6.1-sol` medium | G-C2 |
+| 127B2 diagnostic access | Claude Opus high | 127B1 + G-DIAG |
+| 127B3 mapping receipts | Codex `gpt-6.1-sol` medium | G-C2; G-RCPT for any "mapped" output |
+| 126B1 my-work read model | Claude Sonnet medium | G-C2 |
+| 126B2 activity/actions | Codex `gpt-6.1-sol` medium | 126B1 |
+| 127F2 / 126F2 presentational UI | AGY | Reviewed 127F1 / 126F1 |
+| P1-INT hub wiring | commander | all P1 rows |
+| P1-REV final exact-SHA cross-review | Codex + Opus | P1-INT |
 
 ---
 
 ## 5. Dependency gates
 
-| Gate | Unblocks | Condition (all required) |
+| Gate | Unblocks | Condition | State |
+|---|---|---|---|
+| G-C1 | 126F1, 127F1 | C-STATE reviewed and accepted | **Passed** (`0ed93e7`, integrated at `69f7d4a`) |
+| G-C2 | 127B1, 127B3, 126B1 | C2-V2 final SHA implements §7 D1–D8 + F6/N1–N4, Codex review passes, coordinator accepts | In progress |
+| G-RCPT | any field/edge shown as mapped/accepted | Supplied VCC-117 same-version source/schema/permission receipt per field and native edge type. Absent → `unlocated` / `receipt_missing`; no invented IDs | **Open, hard evidence gate** (no receipts in repo) |
+| G-RSCHEMA | trusting receipt content | Receipt schema, location and verifier authority defined by owner/VCC-117 | **Open, unresolved** |
+| G-TOKEN | asserting Lark token alphabet | Evidence on whether base/table/record tokens can contain `/`. Until then C-ID rejects such components (D8) | **Open, unresolved** |
+| G-DIAG | 127B2 diagnostic layer | Coordinator confirms which existing grant is diagnostic (proposal: `company_admin_grant`). Otherwise page-state view only | Open |
+| G-P1-REV | all of P2 | P1-INT green on `scripts/local_ci.sh`; cross-review passes; browser evidence; coordinator accepts | Open |
+| G-AMT | P2-131B amounts | Separate approval to show contract amounts (`QUOTE_FINANCE` re-verified) | Open |
+| G-RCODE | P2-132B work orders / node instances | R01/02/09/10 work-order and node models verified; until then `unlocated` + Source Health link | Open |
+| G-P(N) | phase N+1 | Phase N integration + real tests + independent review + responsive browser evidence + coordinator acceptance | Sequential (§2) |
+| G-STG | staging publication of any stage | Zeabur auth verified for the existing staging target (§10) | **Blocked**: CLI token returns 401 |
+| G-VCC125 | any production release | VCC-125 closed; never waived | Open |
+
+Stop and escalate on any of these: a GET endpoint not listed in the task table, a change to an existing response shape, a missing diagnostic capability, contract amounts, payroll/HR data beyond the existing allowlists, or any field or edge without a receipt.
+
+---
+
+## 6. Per-task delivery and evidence
+
+Each worker's `worker_done` and report must contain all of the following. A missing item counts as a failed check.
+
+1. **Candidate/deployed commit:** exact SHA and branch. For UI work, also the SHA running in the isolated review instance and, once staged, the deployed staging SHA.
+2. **What changed:** a file list matching the exclusive set, plus a behavior paragraph.
+3. **Tests:** named tests, recorded separately as pass, fail, blocked or not-run. Fixes need failing-first evidence. State and identity guards need mutation/negative checks. The real framework is required; a shim does not count.
+4. **Review:** reviewer identity from the other family, the reviewed SHA and the verdict.
+5. **UI evidence** (UI-facing rows and phase acceptance), captured on synthetic, privacy-safe data only:
+   - Widths: one screenshot per interface at desktop (≥1180 px) and narrow (≤600 px). P3+ also needs tablet and enlarged text/zoom (200%), with the actual dimensions and zoom recorded.
+   - States: loading, complete-empty, filtered-empty, unlocated, forbidden, read failure, partial, stale, unknown.
+   - Interaction: keyboard focus, the drawer below the table on narrow screens, return navigation.
+   - Each capture records the actual candidate or deployed SHA, what changed, the remaining work, and the specific owner decision.
+   - Reference comparison (§9) per page: displayed fields, sorting, filtering, dashboard semantics, native relationship navigation, UI/UX.
+   - Screenshots are evidence kept under `worker-evidence/`. They are **not** uploaded to Library.
+6. **Remaining work:** open gaps, including gates the task did not cover.
+7. **Owner decision:** the single specific owner decision or action needed next, or "none".
+
+---
+
+## 7. C-ID architecture decisions (rev 3; supersede the rev 2 question list)
+
+The Opus review `task_ebfd09513665` confirmed that C-ID at `44d93b4` is a one-target, record-keyed resolver with no native-edge, cardinality or caller-permission model, so it cannot serve the P2 chains. The approved specs already decide the architecture below; the commander records it here and does not wait on the optional clarification. C2-V2 implements it (spec: `.runtime/task_67bb22a5d7b6/spec-c2-v2.txt`).
+
+| # | Question | Decision | Spec basis |
+|---|---|---|---|
+| D1 | Edge grain | Typed edges. An edge type declares source kind/table, native field name and optional field ID, target kinds, direction, and cardinality one\|many. Instances are keyed by (source_key, edge_type). "Ambiguous" means only: more than one verified target on a cardinality-one type. | Shared gate 2 ("source field, target, direction, cardinality and permission boundary") |
+| D2 | Native links | The existing native resolver is the source of instances (`v4_sources.native_records`/`RELATIONS`, plus the field-ID links in `source_work_items`). It is reused, not reimplemented. Missing targets stay explicit unresolved rows. | VCC-132 "use native relationship IDs"; gate 2 |
+| D3 | Verification | Per edge type, through a caller-supplied opaque receipt reference. Without one, instances are navigable but marked `receipt_missing`, never mapped/accepted. Receipt content is not validated until G-RSCHEMA is resolved. | Gate 1; G-RCPT |
+| D4 | Reverse navigation | Part of C-ID, built from the same forward instances so parent→child and child→parent agree by construction. | VCC-130 round-trip; "one-to-many and many-to-many" tests |
+| D5 | Permission boundary | Stays in callers (`production_access.require_access`, `source_case_policy`, `case_redaction`). C-ID takes no viewer and has no `forbidden` outcome. Callers redact target keys and reasons. | Commander spec "every new endpoint goes through…"; existing route authorization |
+| D6 | Stable cross-version identity | Only the existing `project_id` from the existing `assignments` mapping, which is built from verified import mapping and human pairing reviews. Provenance `assignment`. No new issuer, no grouping by name, case number or suffix. | Gate 2 "independently verified stable business identities" |
+| D7 | Versions | `SourceRef.version` stays separate from `source_key`. A version-qualified tuple key keeps source versions separate. `entity_id`, `sources.source_id` and stored IDs are unchanged. | VCC-129 "one source record version" |
+| D8 | `/` in keys | The slash-delimited `entity_id` is not mutated. `SourceRef` rejects components that are empty, non-string, padded or contain `/`, so a would-be collision becomes an explicit unresolvable reference. Token encoding remains an unresolved evidence gate (G-TOKEN). | No evidence to re-key; unknown must not become a wrong join |
+| F6 | Validation | Confirmed by commander probe on `799fe4a`: `SourceRef.from_entity(..., version=True)` and `SourceRef('', '', '', '', '', None)` are both accepted. Fix: `__post_init__` validation shared by both paths. `bool` is not a version, and `source_key` must equal the joined components. Focused commit first, then re-review of the exact final SHA. | Review F6 |
+| N1–N4 | Minor findings | Reject padded or malformed targets. Raise `TypeError` on a mapping or non-iterable registry. Flag contested cardinality-one edges. | Review N1–N4 |
+
+These remain explicit evidence gates, and no values are invented for them:
+- the missing VCC-117 receipts (G-RCPT);
+- the receipt schema and verifier authority (G-RSCHEMA);
+- Lark token encoding (G-TOKEN).
+
+---
+
+## 8. Phase-by-phase interface plan
+
+Common to every interface:
+- the nine C-STATE states;
+- unknown is never 0;
+- a selection-only drawer, placed below the table on narrow screens;
+- keyboard access to filters, headers, rows and Back;
+- text status labels;
+- filter, sort, cursor and context preserved across drilldown and return;
+- source time and completeness always visible;
+- source context + record_id row keys;
+- no joins by name, case number or suffix;
+- aggregation at source grain before joins;
+- one canonical fact set for table, KPI, chart, drilldown and existing export;
+- R01/R10 and R02/R03/R09 totals are never added;
+- the V4 transactional cutoff 2026-10-07 20:10:44 Asia/Taipei is verified per source and never applied to asset masters;
+- fetch time is not source-updated time;
+- Lark stays read-only, with no new scope, credential or role.
+
+Child template per interface (file names are proposals, fixed at phase start):
+- `B`: backend read model, `backend/<iface>.py` + test.
+- `F1`: view model, `frontend/src/<iface>View.ts` + test.
+- `F2`: AGY presentational `.tsx`/`.css`, after F1 is reviewed.
+- `INT`: hub wiring by the commander.
+
+Within each phase, B and F1 of one interface go to different families, alternating across interfaces so both families code.
+
+### P1 (in progress)
+- **VCC-126 My Work.**
+  - Fields: task identity, case/work item, assignee, workflow state, next deliverable, effective due date (verified formal field only, else unknown), pending reason, handoff/confirmation state.
+  - Filter: all unfinished history. No week filter; weekly activity is a separate dataset.
+  - Navigation: task → drawer, case/work item → detail, document → workspace.
+  - Actions: no Complete/Approve.
+- **VCC-127 Source Health.**
+  - Ordering: attention-first sort.
+  - Timestamps: last attempt, last success and source updated are separate; a summary uses the oldest snapshot.
+  - Mapping states: located/readable/mapped/presented/accepted are distinct.
+  - Access: forbidden sources leak nothing; the diagnostic layer only with existing access; retry repeats the authorized read only.
+
+### P2 (held; rows in `tasks.tsv`)
+- 128: Manager Overview. Each KPI equals its same-set drilldown denominator.
+- 129: Confirmation List. One row per source version; cursor pagination.
+- 130: Case/Confirmation Detail. Parent↔child round-trip with no forbidden-child leak.
+- 131: Contract Detail. Original and revised amounts are never summed; units are isolated; amounts gated by G-AMT.
+- 132: Work Item Detail. Native edges only; rework is a distinct instance; plan/actual only for the same unit and period.
+
+### P3 (after P2 acceptance)
+
+#### VCC-133 Document and Delivery Workspace
+- **Fields:** document name/type, version, parent case/work item/task, owner, delivery/review state, effective due date with its meaning, last update, authorized file/source entry point.
+- **Expansion and drawer:** expanding a row shows version history and submission events. The drawer shows native parents, handoff/approval summary, formal Drive/Input source and history.
+- **Filters:** case, document type, responsible person, delivery state, version, search.
+- **Left nav:** All / Input / Output / Daily-report Evidence / Relationships Awaiting Confirmation.
+- **Sort:** most recently updated first, using verified source-updated time only, with a stable ID tie-break.
+- **Dashboard semantics:** linked/unlinked count cards never replace delivery information.
+  - Not uploaded, awaiting delivery, delivered and unknown are distinct.
+  - Pending review is not approved.
+  - An empty view is not proof that nothing is outstanding.
+- **Identity:** document → version → submission event → delivery/review state stay separate keys. Case, work item and task parent types are never collapsed.
+- **Dates:** the effective approved due date, the pending requested date and the estimated date stay separate. No invented N-day deadline.
+- **Navigation:** parent → 130/132; Report Review → R03; relationship issue → Source Health. Return preserves filters and selection. Forbidden attachments are never preloaded.
+- **Reference comparison:** borrow the R03 quality-table structure, field switching and gap messaging. Replace its columns with document/type/version/parent/owner/delivery/review/deadline. The reference empty state does not validate a populated journey.
+- **Gates:** native parent relations; document/version/submission definitions; status authority; VCC-121 gaps stay discovery gaps.
+
+#### VCC-134 R03 Report Quality Review
+- **Fields:** the 12 configured default columns: Work Order No., Person, Related Case, Case Code, Office Work Item, Billable Qty, Revenue Points, Final Revenue Points, Quality Check, Ya-wen Check, Check Time, Rework Flag. Key Fields/All Fields; All Fields only from the verified schema.
+- **Tabs:** Quality Work Orders / Deliveries / Client Replies / Raw Table. Table/Chart toggle; existing export.
+- **Filters and date basis:** reporting-date / check-date / no-week. The `v4-internal-work` (`tblrCo8KeZiuJUNh`) dateField is NOT configured, so date/week filtering is blocked until the actual field is bound. Unbound dates never hide records.
+- **Dashboard semantics:**
+  - Delivery and Reply areas: `report-delivery` is unlocated, so they show the explicit gap. There are no fake N+1/2/3 counts or zero/pending/completed states.
+  - R02/R03/R09 totals are never added.
+- **Navigation:** work order → 132; document → VCC-133. Delivery/reply links activate only when the edge is verified.
+- **Reference comparison:** borrow the raw-table layout, field modes, Table/Chart and check-date entry.
+- **Gates:** quality-table read access; actual date field; work order → native work item; delivery/reply source location.
+- **P3 merge order:** 134B, 133B, 134F1, 133F1, UI ×2, E2E. Proposed owners: 133B Sonnet, 133F1 Codex, 134B Codex, 134F1 Sonnet.
+
+### P4 (after P3 acceptance)
+
+#### VCC-135 R01 Field Quality Review
+- **Fields:**
+  - Group summary: group, work orders, checked, failed, failure rate (when defined), modified, SOP violations (when defined), revenue points, planned points, variance.
+  - Group × Mon–Sun matrix and this week's errors.
+  - Detail: date, work order, case, work item, qty, original and revised revenue, check result, exception, notes, SOP annotations.
+- **Sort:** by group name initially. Numeric columns sort numerically.
+- **Filters:** week, version, group chips, raw-table search, filters and column chooser.
+- **Dashboard semantics:**
+  - 4 cards: work orders, groups, original revenue, checked denominator.
+  - Failure rate uses only the approved checked-only denominator. A zero denominator shows unavailable, never 0%.
+  - A missing SOP/exception field shows an availability warning.
+  - Plan variance uses the comparable subset only.
+  - R01 + R10 are never added.
+- **Navigation:** group → group details; group-day cell → that group's work orders that day; work order → source/132. Return preserves week and group. SOP writes are not reproduced.
+- **Sources:**
+  - `v3-field-work` `tbl97f1uXqi7Qz0k` (date 出工日期).
+  - `v3-field-cost` `tblQCy3eU0wsUj1I`.
+  - `v4-field-work` `tbl5zPLS0ExWNEty` (date 工作日期-薪資; this is not a synonym of the V3 date).
+  - `v4-field-cost` `tbl8wRYCUCvbSoJG`.
+  - Field IDs are unverified.
+- **Edges:** work order → cost parent → person/group → case/work item. Orphans go to a visible list.
+
+#### VCC-136 R02 Internal Quality Review
+- **Fields:**
+  - Group subtotals and personnel: distinct headcount, work orders, checked, failed, failure rate (when defined), modified, SOP, revenue/planned points, variance.
+  - Person × day matrix.
+  - Separate Owner Progress tab: case, work no., this week's points, progress %, days to delivery, latest work day. Progress % and days to delivery show — with a reason until defined.
+- **Sort:** no approved default beyond group summary first. None is invented.
+- **Filters:** group/person chips, Simple/Detailed, week/version.
+- **Dashboard semantics:**
+  - Headcount is deduplicated across groups by native person.
+  - Unmatched-parent work orders are listed, never dropped.
+  - A+B are not separately additive.
+- **Navigation:** person → day → work order → 132; owner-progress case → 130. Native person identity is preserved across group switches.
+- **Sources:**
+  - `v3-internal-work` `tblTP5Naz52FBpFg`.
+  - `v3-internal-cost` `tbl8JdWLLwlPFuoF`.
+  - `v4-internal-work` `tblrCo8KeZiuJUNh` (dateField unconfigured).
+  - `v4-internal-cost` `tblKwSDRg6WaGHYr`.
+
+#### VCC-137 R09 Internal Plan vs Actual
+- **Views:**
+  - Person-day: planned, actual, matched, planned-no-actual, actual-no-plan, achievement rate (when defined), person/group, points.
+  - Case: case no., project, planned/actual person-days, revenue, work orders, result.
+  - Exceptions: 6 categories. They are not enumerated in the spec, so they are a discovery gate and are never invented.
+  - Milestones and remaining points: a separate, explicitly undefined area.
+- **Sort:** person-day table first, by person name. Exceptions filtered by category.
+- **Filters:** Personnel/Cases grain; All / Planned+Done / Planned-Not-Done / Unplanned-Done chips; category chips.
+- **Dashboard semantics:**
+  - Overall person-days are deduplicated by native person + day. Case sums may exceed the overall total.
+  - Multi-person schedules are expanded; cost-only actuals are kept.
+  - Unknown actual ≠ Unplanned Done. A match ≠ delivery completion.
+  - Person-day and case denominators stay separate across view switches.
+- **Navigation:** person-day → source; case → 130; work order → 132.
+- **Sources:** `v3-schedule` `tblN8c3WN44233aG` (dateField unconfigured), `v4-schedule` `tblZz6Mkhv9gHrB2` (開始日期), and the R02 internal work/cost tables. The V3 case resolver is unverified.
+
+#### VCC-138 R10 Field Plan vs Actual
+- **Views:**
+  - KPIs: planned/matched/unplanned group-days, case intersection, actual group-days, work orders, revenue.
+  - Tabs: Case Comparison / Exceptions / Pending Inspection.
+  - The N+1/N+2 milestone area is explanation-only.
+- **Sort:** case table first. Consecutive dates may collapse for display only and expand to daily rows.
+- **Filters:** result chips; Unplanned Done / Planned Not Done / Work-order Exception chips.
+- **Dashboard semantics:**
+  - A match is native group + business day + native case.
+  - Duplicate or all-zero case numbers produce warnings and are never keys.
+  - No inferred cost-table dependency.
+  - Plan = 1 with an unavailable actual means unknown.
+  - No N+1/N+2 overdue counts.
+- **Navigation:** case → 130; work order → 132; pending inspection → the original Lark work order (read-only).
+- **Sources:** R01 field-work tables and the schedules; V3 cases. The V3 schedule and cases dateFields need discovery.
+
+#### VCC-139 R11 Administrative Reporting
+- **Fields:**
+  - Per person: work orders, recorded work person-days (not attendance), revenue points, planned points (when defined), variance, exceptions, overtime hours (verified source only).
+  - Totals: work orders, cost records, submitters, revenue.
+  - Scheduled-only people are kept.
+- **Sort:** personnel summary first.
+- **Filters:** personnel, version, week. Tabs: Summary / Exceptions / Raw Table.
+- **Dashboard semantics:**
+  - No check field, so no checked/failed/failure rate.
+  - One point per person-day and full shared value per participant are unapproved; derived values show unavailable.
+  - The historical "26 missing cost parents" figure is not an expected count.
+- **Navigation:** person → that week's person-day; work order → source; missing-cost-parent row → Source Health. Return preserves the person.
+- **Sources:** the V4 admin work/cost table IDs are **not located** and must be found through existing authorized discovery. Admin work date fields are unconfigured.
+- **P4 merge order:** 135, 136, 137, 138, 139, then UI and E2E. The R01/R10 and R02/R09 pairs share source adapters, so each pair gets one shared fact-adapter row (owner: Codex) before the report rows.
+
+### P5 (after P4 acceptance)
+
+#### VCC-140 R05 Business Quotations
+- **Fields:**
+  - Cards: current-period record count and prior-week difference; raw fieldwork-confirmation revenue only with a verified common definition. No growth rate without a comparable basis.
+  - Charts: daily counts, quotation-owner distribution, status distribution.
+  - Table: the 10 observed columns (報價編號, 工程編號, 詢價日期, 回傳單日期, 工程名稱, 業主類型, 報價負責人, 案件負責人, 報價日期, 報價期限). All 33 runtime fields are inventoried before any complete selector is shown.
+- **Default:** table on the inquiry-date basis. No invented stable order.
+- **Date bases:** 8, each enabled only once mapped to a real field: 詢價, 回傳單, 報價, 報價期限, 確認單回傳開會, 合約開始, 內業期限圖或報, 不依週.
+- **Dashboard semantics:**
+  - A quotation is not a win or an admitted case; no won/admitted KPI until defined.
+  - Blank revenue is unknown, never 0 or −100%.
+  - Points and currency are separate.
+  - The one-day chart/table discrepancy is tested.
+- **Navigation:** chart segment → table filter; clear → overview. Row → source; verified edge → 129/130.
+- **Source:** `quotes` `tblENZvYAya93Twa`.
+
+#### VCC-141 R06 Billing Source Detail
+- **Default:** the authorized raw receivables-view table, with a read-only successful-fetch snapshot time (not an as-of date) and one compact pending-rules notice.
+- **Tabs:** receivables stock, billing events and receipt events, each with its own date semantics. Unbound tabs state the gap. Historical as-of is disabled.
+- **Fields:** the 59 runtime fields are inventoried first.
+- **Dashboard semantics:**
+  - No oversized unknown-balance cards.
+  - Empty ≠ zero company receivables.
+  - No receipt-week filter on stock.
+  - No partial-billing, split-payment, tax, currency or discount formulas.
+- **Drawer:** currency, tax basis, formula explanation, split-receipt evidence.
+- **Source:** `tblWsSaOcy4nKuGI` view `vewUGIqzfl` (v3). View scope and table scope are labelled separately.
+- **Owners:** 140B Sonnet / 140F1 Codex; 141B Codex / 141F1 Sonnet. Merge 140, then 141.
+
+### P6 (after P5 acceptance)
+
+#### VCC-142 R07 Asset Workspace
+- **Subpages:** 8: Equipment, Lent-not-returned, Reservations & returns, Equipment maintenance, TAF, Vehicles, Vehicle maintenance, Rates.
+- **Fields:**
+  - Equipment: name, number, rental class, availability, custodian group, available/abnormal/maintenance counts.
+  - Loans: asset, loan date, group, elapsed days.
+  - Maintenance: count, latest date, elapsed, cost.
+  - TAF: no cost column.
+  - Vehicles: plate, status, mileage, next maintenance, reminders, insurance expiry.
+- **Default:** equipment, all statuses.
+- **Filters:** the date filter applies to event subpages only, never current stock.
+- **Dashboard semantics:**
+  - Lending, availability and rental type are independent and never summed as exclusive categories.
+  - Rates are not assets.
+  - The two vehicle sources are never added.
+  - Missing dates are never overdue.
+  - Blank placeholder rows are identified separately.
+  - Loan/return pairs match by event ID or native edge only; a historical return never clears a newer loan.
+- **Navigation:** asset → VCC-143; event → source record. Return restores the subpage and filters.
+- **Sources:** 14 listed tables (`tblHZFEypeKfWOsF`, `tbl4DLVKuXf4yaEy`, `tblvIt8V2ZHnqAFX`, `tblYUUwi0MEGuLZ0`, `tblVLETpvLxMNwaC` 借出日期, `tbl2qFvPOihhe3R1` 歸還日期, `tbl5qdqsc4W7zYsS`, `tblDaO9z94PSjuVq`, `tblnq7QP6Zqcp6rA`, `tbl2PlmDyO1ciy2E`, `tblfgeEtMuBTg72O`, `tblg3Fo23T6Gos6S`, `tblTQv8l5ntnbwyp`). The non-official `tblZmvrjDC5Q3sIp` is excluded from the main screen.
+
+#### VCC-143 Asset Detail
+- **Top:** identity card (equipment no. + custodian, or plate + mileage) and a return path to R07.
+- **Left sections:** Overview / Loan-Return / Reservations / Maintenance / TAF / Rates.
+- **Main:** the event table, sorted by event time descending with ID as the tie-break, plus the selected loan→return relationship.
+- **Dashboard semantics:**
+  - An unmatched event means return status needs verification; no completed chain is drawn.
+  - TAF has no expiry without a validity period.
+  - Missing rates are unknown.
+- **Navigation:** event → source; document → VCC-133 or the original file. Return restores the R07 subpage and filters.
+- **Owners:** shared asset fact adapter Codex; 142B Sonnet; 142F1 Codex; 143B Codex; 143F1 Sonnet.
+
+### P7 (after P6 acceptance)
+
+#### VCC-144 Client Directory and Detail
+- **Fields:** a 9-field schema (name, type, tax ID, contact, company phone, mobile, fax, address, email), each with its own field permission. The directory summary shows name/type and already-authorized ordinary contact fields only. Tax ID, address and mobile appear in authorized detail only.
+- **Top:** return to R08, name search, type filter.
+- **Main:** left client list (position preserved); center tabs Basic / Related Cases / Contact Activity. The contact-event source is unlocated and stated as such.
+- **Sort:** no business order is specified; none is invented.
+- **Navigation:** case → 130 (verified edge only); event → R08; source → the same native record. Return restores the search and list position.
+- **Source:** `owner-contacts` `tbl4fmZN6cBB7u1d` view `vewiP0FJer`. `contact-log` is unlocated.
+- **Fixtures:** no real contact values in fixtures or screenshots.
+
+#### VCC-145 R08 Client Contact Activity
+- **Default:** reach the activity tab from the directory. While the source is unlocated, show a labelled shell with no events, counts or follow-up rules.
+- **Counts:** directory and event counts stay separate.
+- **Filters:** case/client/responsible-person, enabled only once source-backed.
+- **Drawer:** time, summary, to-do, next follow-up and parent case, only after source and rule approval.
+- **Gating:** the observed 5 directory records are not 5 events. Next and pending follow-up stay gated.
+- **Owners:** 144B Sonnet / 144F1 Codex; 145 is shell-only F1 Codex plus AGY.
+
+### P8 (after P7 acceptance)
+
+#### VCC-146 R04 Authorized HR Reporting
+- **Access:** only within the existing `HR_VIEWERS` and field allowlists, applied to queries, aggregates, exports, caches and revocation. Unauthorized viewers get no rows, names or counts. Rosters are never disclosed. No payroll amounts.
+- **Tabs:** Recruitment / Weekly Attendance / Weekly Travel-Outings / Monthly Overtime.
+  - Recruitment shows unlocated/unauthorized ("cannot be determined"), never 0.
+  - Weekly Attendance is the default.
+  - Monthly Overtime has its own month selector that persists into detail and return; it does not inherit the week.
+- **Fields:**
+  - Attendance: expected/present person-days, late, early, missing punch, leave, travel, outing.
+  - Travel: type, person, group, start/end, duration, reason.
+  - Overtime: weekday/holiday/total hours, distinct persons, form count.
+- **Sort:** travel by start time. The direction is unspecified, so it is validated, not invented.
+- **Dashboard semantics:**
+  - No denominator, half-day or missing-punch rules until approved.
+  - Future days are never absences.
+- **Identity:** open_id first. An ambiguous name match stays unknown.
+- **Sources:** `salary-overtime` `tblomH0DXCzXgenE`; `v3-people` `tblmlpA6nG5Ou7NQ`. `hr` is unlocated.
+- **Owners:** B Claude Opus high (access-critical) / F1 Codex. Fixtures are synthetic only.
+
+---
+
+## 9. Reference comparison rules (pmsolution.zeabur.app)
+
+The reference is visual and UI/UX evidence only. Every per-page screenshot report compares these six dimensions, citing the capture in §1.1.
+
+| Dimension | Borrow | Do not borrow |
 |---|---|---|
-| G-C1 | 127F1, 126F1 (then AGY 127F2, 126F2) | P1-C1-REM SHA passes Codex review; coordinator accepts C-STATE |
-| G-C2 | 127B3 | §7 questions answered by coordinator/owner; Opus review of the resulting C-ID SHA passes; coordinator accepts C-ID |
-| G-C1+C2 | 127B1, 126B1 | G-C1 and G-C2 |
-| G-RCPT | any field/edge shown as "mapped/accepted" | Supplied VCC-117 same-version source/schema/permission receipt per field and native edge. Absent receipt → `unlocated`; no invented IDs |
-| G-DIAG | 127B2 diagnostic layer | Coordinator confirms which **existing** grant is the diagnostic role (default proposal: `company_admin_grant`; not assumed). Otherwise ordinary page-state view only |
-| G-P1 | P1-INT | All P1 rows reviewed by the other model family at exact SHA |
-| G-P1-REV | **all of P2** | P1-INT SHA green on `scripts/local_ci.sh`; cross-review passes; coordinator accepts C-STATE + C-ID; G-RCPT receipts exist for the sources P2 consumes |
-| G-AMT | P2-131B amount display | Separate approval to show contract amounts (VCC-120 omitted them; `QUOTE_FINANCE` visibility must be re-verified) |
-| G-RCODE | P2-132B work orders / node instances | R01/02/09/10 work-order and node-instance models verified; until then those sections render `unlocated` with a Source Health link |
-| G-VCC125 | any production release | VCC-125 closed; never waived by this plan |
-
-Stop and escalate if any of these comes up: a GET endpoint not listed in `tasks.tsv`, a change to an existing response shape, a missing diagnostic capability, contract amounts, or any field/edge without a receipt.
+| Displayed fields | Configured column structure, field modes (Key/All), original vs revised side by side, plan vs actual for the same item, unit and period | Treating configured labels as a verified schema; summing original + revised; mixed-unit totals; points as % complete |
+| Sorting | Asc/desc/clear; numeric sort for numeric columns; verified source-modified time desc, else source order + stable ID | Retrieval time used as business-update time; invented business priority |
+| Filtering | Version, week/date-basis controls bound to verified fields, chips, Reset, column chooser; filters preserved both ways | Reference reporting week as a to-do or stock filter; receipt-week on receivables; filters on unbound date fields |
+| Dashboard semantics | Snapshot vs period activity kept separate; KPI = same-set drilldown denominator; undefined cards shown unavailable with a reason | Adding overlapping reports (R01/R10, R02/R03/R09); zero for unknown; reference formulas (N+1/N+2, half-day, one point per person-day) |
+| Native relationship navigation | Native-ID chains with breadcrumbs and an exact return context; explicit unresolved rows | Joins by name, case number or suffix; collapsed nodes; suffix-paired loan/return |
+| UI/UX | Fixed nav, scope/freshness header, sticky identity columns, dense tables, selection-only drawer (below on narrow screens), text labels, focus, server pagination | Local SOP write/approve controls, technical IDs as primary columns, oversized coverage cards, colour-only status |
 
 ---
 
-## 6. Per-task delivery and gates
+## 10. Staging target and browser evidence
 
-Each worker's `worker_done` and report must contain the items below. A missing item counts as a failed check, not a skipped one.
+**Existing staging target (inspected 2026-10-13, read-only):**
+- Repository operator: `scripts/workbench_cloud_setup.py`, app `yx-workbench-staging`. Zeabur project and environment IDs are in that script; the staging service ID is in `scripts/verify_frozen_release_source.py` (`SERVICES['staging']`).
+- Origin: `https://yongxiang-workbench-staging.zeabur.app`. `GET /api/health` → 200 `{"status":"ok","mode":"lark","database":"postgresql"}`.
+- The health endpoint does not expose a build SHA. The deployed SHA must come from the Zeabur deployment record or the stage inventory receipt (`stage_inventory`, `verify_stage_package`).
 
-1. **Deployed/candidate commit:** exact SHA and branch. For UI work, also the exact SHA running in the isolated review instance.
-2. **What changed:** changed-file list (must match the exclusive set) and one paragraph on behavior.
-3. **Tests:** named tests from `tasks.tsv`, with pass/fail/blocked/not-run recorded separately. Include failing-first evidence for fixes, plus mutation/negative checks for state and identity guards.
-4. **Review:** reviewer identity (other model family), reviewed SHA and verdict. A later commit invalidates the review.
-5. **Staging/browser (UI-facing rows only).** Run the isolated demo instance: SQLite plus Vite on scratch ports, never the shared worktree or production. Attach one screenshot **per interface** at desktop (≥1180 px) and narrow (≤600 px) widths covering:
-   - loading, complete-empty, filtered-empty, unlocated, forbidden, read failure, partial, stale, and unknown.
-   - keyboard focus.
-   - the drawer-below layout on narrow screens.
+**Blocker G-STG:** the local Zeabur credential (`~/.config/zeabur/cli.yaml`) is rejected. `zeabur auth status` and a read-only GraphQL `me` query both return **401 Unauthorized**. Per owner rules, no credential is created or changed.
 
-   Screenshots carry no personnel or contact data, and synthetic numbers must agree with each other.
-6. **Remaining work:** what is still open, including gates the task did not cover.
-7. **Specific owner decision:** the single decision the owner must make next for this item, or "none".
+**Owner action:** re-authenticate the existing Zeabur CLI account (`zeabur auth login`) on this Mac mini. Until then, every stage stays merge- and push-ready with its exact SHA, and staging is reported as blocked.
 
-Final gates (FINAL-REV): non-authors review the exact final SHA, `scripts/local_ci.sh` passes plus targeted authorization/UI regressions, and the VCC-125 gate is restated. Production deploy is out of scope.
+**Isolated browser evidence:** run the local demo instance (SQLite + Vite on scratch ports, `DEMO_MODE`, synthetic data), never production data.
+- Capture desktop 1280×800 and narrow 390×844.
+- From P3 on, also capture tablet 820×1180 and 200% zoom.
+- Store under `worker-evidence/<task>/screens/`, with the exact SHA in the file name.
 
----
-
-## 7. P1-C2 (C-ID) contract questions for the coordinator
-
-These are open design questions. The plan does not guess an answer, and no worker may implement a mapping until each one is answered. Together they may explain the owner's sense that C-ID "seems wrong". The Opus review (P1-C2-REV) is asked to confirm or refine them against `44d93b4`.
-
-1. **Edge grain.** The registry is one record key → one target key (`resolve_edge`). The specs need edges typed by native **source field**, with target table, direction, cardinality and permission boundary (shared gate 2). Today, two verified edges from one record (for example confirmation → case and confirmation → contract line) return `ambiguous_verified_edges`. Should edges be keyed by `(source_key, source_field)` or by edge type?
-2. **Cardinality.** The 130/131/132 chains are one-to-many (case → lines → work items). The current contract can only resolve to one target and has no child → parent reverse lookup. Which edges are one-to-one, and is reverse navigation part of C-ID or a separate module?
-3. **Stable business identity vs record key.** The specs separate "source context + record_id" (row identity) from "independently verified stable business identities" (grouping, for example a canonical case across V3/V4). C-ID only maps record key → record key. What is the stable case identity, and who issues it?
-4. **Native link fields.** `source_entities.update_entities` already resolves native Lark link fields (`native_records`), and C-ID ignores them. Should a native relation ID count as an edge needing an external receipt, or as verified by nature subject to a per-edge receipt? VCC-132 says "use native relationship IDs".
-5. **Version.** `SourceRef.version` is not part of `source_key` (`base/table/record_id`). VCC-129 says "source context + record_id identifies one source record version". Does "version" mean V3/V4 source generation (different base, so already distinct) or a revision of one record? If it means a revision, two versions collide on one key.
-6. **Receipt format.** The `verification_status`/`verified_by`/`evidence_ref` strings have no schema link to VCC-117 receipts, and no receipts are in the repo. What is the receipt file format and location, and who is allowed to mark an edge `independently_verified`?
-7. **Permission boundary.** `resolve_edge` takes no viewer context, but VCC-130/132 require "missing" and "forbidden" relations to stay distinct without leaking the forbidden target. Is that C-ID's job or the caller's (`source_case_policy` / `case_redaction`)?
-8. **Key escaping.** `entity_id` joins with `/` and does not escape it (review F7). Should we accept that Lark tokens contain no `/`, or harden the key?
+Once G-STG clears, repeat the captures against staging, authenticated with an existing demo/staging account only.
 
 ---
 
-## 8. PMSolution reference: what to borrow and what not
+## 11. Reporting
 
-The reference site <https://pmsolution.zeabur.app/> is a layout analogue only. Its numbers are not test constants, and its screens prove no YX schema, binding or access.
-
-| Topic | Borrow | Do not borrow |
-|---|---|---|
-| Comparison fields | Original vs revised amount side by side (131), plan vs actual for the **same item, unit and period** (132), quantity, points, check result, exception | Summing original+revised, totalling mixed units, treating points as % complete, using document counts in place of plan/actual, any new difference formula |
-| Sort | Columns sort ascending/descending/clear. Sort by source-modified time descending only if that time is verified, otherwise by source order plus stable ID. Detail evidence sorts date descending plus stable ID, and Source Health puts attention rows first | Treating retrieval time as business-update time |
-| Filter | Version, PM, admission, deadline range, source/status filters, Reset Filters, column chooser. Filters, cursor, sort and columns are preserved both ways | Reusing the reference **reporting week** as the to-do or case-visibility filter. Old unfinished work always stays visible |
-| Dashboard semantics | The snapshot (stock at a timestamp) and weekly activity (events in a period) stay separate. Each KPI equals its drilldown denominator on the same set. Undefined cards show as unavailable with a reason. Zero is shown only for a complete authorized population | Adding overlapping cards together, totalling R01/R10 or R02/R03/R09 views, routine trend charts, overdue rate |
-| Native relationship navigation | Confirmation → contract line → work item → work order / node instance, followed through native IDs, with breadcrumbs and a return route to the exact context. Missing edges show as an explicit unresolved row | Joins by name, case number or suffix, making a report group/day into a case, a collapsed or extra contract node |
-| UI/UX | Fixed nav, data-scope and freshness header, sticky identity columns, dense table, a selection-only drawer (below the table on narrow screens), text status labels, keyboard focus, footer totals (matching / loaded / authorized), real server pagination | Local SOP write/complete/approve controls, technical IDs as primary columns, large coverage cards, color-only status |
-
----
-
-## 9. Safe cleanup rules
-
-- Do not delete any worktree, branch, `.runtime` evidence, stash or report while any task, review or integration still references it. That includes `p1-c1*`, `p1-c2*`, `yx-v2*`, `_reports`, `worker-evidence`, and the `library-handoff` folder.
-- Cleanup needs an explicit owner instruction for each item. This plan performs none.
-- Before any approved cleanup:
-  - Check that `git status` is clean.
-  - Check that the branch is merged into `ava-apple/yx-v2`, or archived as a patch with its SHA recorded.
-  - Check that no Orca dispatch is live on that worktree.
-- Settled Orca worker terminals are released only after their `worker_done` is accepted. Worktrees stay in place.
-- Never use bare `git stash`. Never force-push. Never rewrite a reviewed SHA.
+- Commander → coordinator: through `orca orchestration` (status, escalation, `worker_done`). Root owns Slack and Linear; the commander sends no Slack or Linear messages and only reads Linear.
+- Completion reporting to Anya goes through the existing authenticated OpenClaw route, if available, only for task completion. No new endpoint or channel is invented.
+- The final owner report gives, per page:
+  - completed, deferred and blocked capabilities;
+  - exact candidate, remote and deployed SHAs;
+  - tests (pass/fail/blocked/not-run);
+  - reviewer and verdict;
+  - staging and browser evidence;
+  - the reference comparison;
+  - the owner decision.
 
 ---
 
-## 10. Out of scope (unchanged)
+## 12. Cleanup
 
-The following are out of scope:
+None in this continuation. Every worktree, branch, `.runtime` record, report, `worker-evidence` and `library-handoff` folder is preserved:
+- `p1-c1*`, `p1-c2*` (including `p1-c2-v2`), `p1-126f1`, `p1-127f1`, `yx-v2*`;
+- `_reports`, `worker-evidence`, `library-handoff`.
+
+Later cleanup needs an explicit owner instruction per item, plus all of these checks:
+- a clean status;
+- the branch merged into `yx-v2` or archived with its SHA;
+- no live dispatch on it.
+
+Settled Orca terminals are released only after their `worker_done` is accepted. Never use bare `git stash`, never force-push, never rewrite a reviewed SHA.
+
+---
+
+## 13. Out of scope
+
 - Lark/Base writes.
 - New scopes, credentials, roles or grants.
-- Approval or SOP-completion shortcuts.
-- New formulas.
+- Approval or SOP shortcuts.
+- New or guessed formulas or mappings.
 - Dependency, schema or runtime/security changes.
 - Freshness-ceiling increases.
 - Production deploy.
-- P3–P8 implementation.
+- Merges to `ava-apple/yx-company-system`.
+- Payroll data.
 - The VCC-122, VCC-123 and VCC-125 fixes.
+- Any later-phase coding before the previous phase is accepted.
