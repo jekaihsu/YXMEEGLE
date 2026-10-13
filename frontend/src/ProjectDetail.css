@@ -70,5 +70,7 @@
 .workspace .project-detail :is(.project-tabs,.ops-tabs)[data-scroll-before]{border-inline:0}
 
 /* Keep the explanation adjacent to its disabled primary action. */
-.disabled-action { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--sp-1); max-width: 100%; }
-.disabled-action-reason { color: var(--text-secondary); font-size: var(--fs-footnote); line-height: 1.5; }
+.disabled-action { flex-shrink: 0; display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--sp-1); max-width: 100%; }
+.disabled-action-reason { color: var(--text-secondary); font-size: var(--fs-footnote); line-height: 1.5; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.project-detail .inspector-footer { flex-wrap: wrap; }

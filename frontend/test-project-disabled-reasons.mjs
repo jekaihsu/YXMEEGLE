@@ -26,10 +26,15 @@ for(const b of buttons.slice(0,2)){
  assert.ok(reason.includes(b.textContent==='Save'?'目前無法操作':'前置成果尚未交付'),reason);
 }
 assert.ok(buttons[0].getAttribute('aria-describedby').includes('existing'));
+assert.notEqual(buttons[0].getAttribute('aria-describedby').split(' ').at(-1),buttons[1].getAttribute('aria-describedby'));
+assert.equal(document.querySelector('.disabled-action-reason').title,'目前無法操作');
 assert.equal(buttons[2].getAttribute('aria-describedby'),null);
 await render(true,false);
 assert.equal(document.querySelectorAll('.disabled-action-reason').length,0);
 await render(false,true);
 assert.equal(document.querySelectorAll('.disabled-action-reason').length,0);
+await React.act(async()=>root.render(React.createElement(ui.DisabledActionReasons.Provider,{value:true},React.createElement(ui.Primary,{busy:true},'Busy'))));
+assert.equal(document.querySelector('button').disabled,true);
+assert.equal(document.getElementById(document.querySelector('button').getAttribute('aria-describedby')).textContent,'目前無法操作');
 await React.act(async()=>root.unmount());
 console.log('Disabled primary reasons: scoped, visible, associated, enabled and secondary behavior passed');
