@@ -86,3 +86,17 @@ def test_receipt_carries_non_secret_upstream_diagnostics():
     assert timeout['receipt']['error_kind'] == 'transient' and '逾時' in timeout['last_error']
     assert len({result['last_error'], denied['last_error'], timeout['last_error']}) == 3
     assert not any(s in json.dumps([result, denied, timeout]) for s in ('SYN_body_secret', 'SYN_token', 'Bearer'))
+
+
+def test_live_link_shape_link_record_ids_is_extracted():
+    """Live Lark link cells are {"link_record_ids": [...]}; an empty link is {}."""
+    from .lark_pilot.shadow import field, ids, link
+    live = {'flddfFq9zI': {'link_record_ids': ['recB', 'recA']}, 'fldlqnGoTh': {'link_record_ids': ['recA']}, 'fldvSpUqa9': {}}
+    assert ids(live['flddfFq9zI']) == ['recA', 'recB'] and ids(live['fldlqnGoTh']) == ['recA']
+    assert ids({}) == [] and ids(live.get('missing')) == []
+    assert ids({'record_ids': ['recC']}) == ['recC'] and ids(['recD']) == ['recD']  # existing shapes still work
+    present = field(live, 'flddfFq9zI')['value']
+    assert link(present, ['recA', 'recB'], 'present') == {'state': 'resolved', 'ids': ['recA', 'recB']}
+    assert link(present, ['recA'], 'present')['state'] == 'dangling'
+    assert link(live['fldvSpUqa9'], [], 'present') == {'state': 'unmapped', 'ids': []}
+    assert link(field(live, 'fldJs4RTUm').get('value'), [], 'present')['state'] == 'unmapped'  # omitted field

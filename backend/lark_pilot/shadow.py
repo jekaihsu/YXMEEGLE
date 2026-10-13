@@ -7,7 +7,7 @@ def field(fields, key):
 
 def ids(value):
     if isinstance(value, dict):
-        value = value.get('record_ids', [])
+        value = value.get('record_ids', value.get('link_record_ids', []))
     if not isinstance(value, list):
         return []
     return sorted({item if isinstance(item, str) else item.get('record_id', '') if isinstance(item.get('record_id', ''), str) else ''
