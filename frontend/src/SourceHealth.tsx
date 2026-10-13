@@ -1,5 +1,5 @@
+import {useRef, useEffect} from 'react';
 import type {SourceHealthView, SourceRow, SortColumn} from './sourceHealthView.ts';
-import type {DataStateName} from './dataState.ts';
 import './source-health.css';
 
 export interface SourceHealthProps {
@@ -10,42 +10,14 @@ export interface SourceHealthProps {
   currentSort?: {column: SortColumn; direction: 'asc' | 'desc' | 'clear'} | null;
 }
 
-const GUIDANCE: Record<DataStateName, string> = {
-  loading: '請等待目前的讀取完成。',
-  complete_empty: '目前已完成讀取，尚無資料。',
-  filtered_empty: '請調整或清除篩選條件。',
-  unlocated: '請聯絡管理員確認既有來源與對應證據。',
-  forbidden: '請聯絡管理員確認既有存取權限。',
-  read_failed: '請聯絡管理員確認既有授權讀取的失敗原因。',
-  partial: '目前只顯示部分資料，請確認既有來源的讀取狀態。',
-  stale: '目前資料待更新，請確認最近成功讀取時間。',
-  unknown: '目前無法確認資料狀態，請聯絡管理員。',
-};
-
 function renderCount(val: number | null | undefined): string {
   if (val === null || val === undefined) return '未知';
   return String(val);
 }
 
-function renderBooleanStage(val: boolean | null | undefined, trueLabel: string, falseLabel: string): string {
-  if (val === null || val === undefined) return '未知';
-  return val ? trueLabel : falseLabel;
-}
-
-function getRepairGuidance(row: SourceRow): string {
-  if (row.dataState === null) {
-    return '資料狀態正常，無需修復。';
-  }
-  const states = row.dataState.states;
-  if (!states.length) {
-    return '資料狀態正常，無需修復。';
-  }
-  return states.map(s => GUIDANCE[s] ?? '請確認來源與設定。').join(' ');
-}
-
 export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: SourceHealthProps) {
   const page = view?.page;
-  const pageStates: readonly DataStateName[] = page?.states ?? ['unknown'];
+  const pageStates = page?.states ?? ['unknown'];
   const pageStatusLabel = page?.statusLabel ?? '狀態未知';
   const pageExplanation = page?.explanation ?? '目前無法確認資料狀態，請聯絡管理員。';
 
@@ -54,6 +26,30 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
   const selectedKey = diagnostic?.selectedKey ?? null;
   const drawer = diagnostic?.drawer ?? null;
   const summary = diagnostic?.summary ?? null;
+
+  const prevSelectedKeyRef = useRef<string | null>(selectedKey);
+  const lastTriggerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const prevKey = prevSelectedKeyRef.current;
+    prevSelectedKeyRef.current = selectedKey;
+
+    if (prevKey !== null && selectedKey === null) {
+      if (lastTriggerRef.current && document.contains(lastTriggerRef.current)) {
+        lastTriggerRef.current.focus();
+      } else {
+        const rowEl = document.querySelector<HTMLElement>(`.source-health-row[data-key="${prevKey}"]`);
+        if (rowEl) {
+          const selectBtn = rowEl.querySelector<HTMLElement>('.source-health-btn-select');
+          if (selectBtn) {
+            selectBtn.focus();
+          } else {
+            rowEl.focus();
+          }
+        }
+      }
+    }
+  }, [selectedKey]);
 
   const getAriaSort = (col: SortColumn): 'ascending' | 'descending' | 'none' => {
     if (currentSort && currentSort.column === col) {
@@ -113,15 +109,7 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
             <div className="source-health-summary-meta">
               <div className="source-health-meta-item">
                 <span className="source-health-meta-label">最近讀取成功：</span>
-                <span className="source-health-meta-value">{summary?.last_success.label ?? '狀態未知'}</span>
-              </div>
-              <div className="source-health-meta-item">
-                <span className="source-health-meta-label">來源紀錄更新：</span>
-                <span className="source-health-meta-value">依各列時間顯示</span>
-              </div>
-              <div className="source-health-meta-item">
-                <span className="source-health-meta-label">來源數量：</span>
-                <span className="source-health-meta-value">{rows.length} 個</span>
+                <span className="source-health-meta-value">{summary?.last_success.label ?? '未知'}</span>
               </div>
             </div>
           </div>
@@ -138,11 +126,7 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                       <th scope="col">版本</th>
                       <th scope="col">讀取狀態</th>
                       <th scope="col">需要注意</th>
-                      <th scope="col">定位</th>
-                      <th scope="col">可讀</th>
-                      <th scope="col">對應</th>
-                      <th scope="col">呈現</th>
-                      <th scope="col">驗收</th>
+                      <th scope="col">對應狀態</th>
                       <th scope="col">載入筆數</th>
                       {renderSortHeader('last_attempt', '最近嘗試')}
                       {renderSortHeader('last_success', '最近成功')}
@@ -153,7 +137,7 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                   <tbody>
                     {rows.length === 0 ? (
                       <tr>
-                        <td colSpan={15} className="source-health-empty-cell">
+                        <td colSpan={11} className="source-health-empty-cell">
                           尚無符合條件的來源資料
                         </td>
                       </tr>
@@ -163,17 +147,22 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                         return (
                           <tr
                             key={row.key}
+                            data-key={row.key}
                             tabIndex={0}
-                            role="button"
-                            aria-pressed={isSelected}
                             aria-selected={isSelected}
+                            aria-current={isSelected ? 'true' : undefined}
                             className={`source-health-row ${isSelected ? 'is-selected' : ''} ${
                               row.needsAttention ? 'needs-attention' : ''
                             }`}
-                            onClick={() => onSelect?.(isSelected ? null : row.key)}
+                            onClick={e => {
+                              lastTriggerRef.current = e.currentTarget;
+                              onSelect?.(isSelected ? null : row.key);
+                            }}
                             onKeyDown={e => {
+                              if (e.target !== e.currentTarget) return;
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
+                                lastTriggerRef.current = e.currentTarget;
                                 onSelect?.(isSelected ? null : row.key);
                               }
                             }}
@@ -191,25 +180,14 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                               </span>
                             </td>
                             <td className="source-health-cell-attention">
-                              <span className={`source-health-attention-tag ${row.needsAttention ? 'active' : 'inactive'}`}>
-                                {row.needsAttention ? '需要注意' : '無'}
-                              </span>
-                            </td>
-                            <td className="source-health-cell-stage">
-                              {renderBooleanStage(row.located, '已定位', '未定位')}
-                            </td>
-                            <td className="source-health-cell-stage">
-                              {renderBooleanStage(row.readable, '可讀取', '不可讀')}
+                              {row.needsAttention && (
+                                <span className="source-health-attention-tag active">
+                                  需要注意
+                                </span>
+                              )}
                             </td>
                             <td className="source-health-cell-stage">
                               <span className="source-health-mapping-tag">{row.mappingLabel}</span>
-                            </td>
-                            <td className="source-health-cell-stage">
-                              {renderBooleanStage(row.presented, '已呈現', '未呈現')}
-                            </td>
-                            <td className="source-health-cell-stage">
-                              {/* mapped/accepted never shown as done */}
-                              <span className="source-health-accepted-tag">未驗收</span>
                             </td>
                             <td className="source-health-cell-count">{renderCount(row.counts.loaded)}</td>
                             <td className="source-health-cell-time">{row.last_attempt.label}</td>
@@ -220,9 +198,19 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                                 <button
                                   type="button"
                                   className="source-health-btn-select"
+                                  aria-expanded={isSelected}
                                   onClick={e => {
                                     e.stopPropagation();
+                                    lastTriggerRef.current = e.currentTarget;
                                     onSelect?.(isSelected ? null : row.key);
+                                  }}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      lastTriggerRef.current = e.currentTarget;
+                                      onSelect?.(isSelected ? null : row.key);
+                                    }
                                   }}
                                 >
                                   {isSelected ? '收合' : '詳情'}
@@ -234,6 +222,13 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                                     onClick={e => {
                                       e.stopPropagation();
                                       onRetry?.(row.retry!.handle);
+                                    }}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        onRetry?.(row.retry!.handle);
+                                      }
                                     }}
                                   >
                                     重試
@@ -276,19 +271,15 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                       <span className="source-health-tag" data-attention={drawer.needsAttention}>
                         {drawer.statusLabel}
                       </span>
-                      <span className={`source-health-attention-tag ${drawer.needsAttention ? 'active' : 'inactive'}`}>
-                        {drawer.needsAttention ? '需要注意' : '狀態正常'}
-                      </span>
+                      {drawer.needsAttention && (
+                        <span className="source-health-attention-tag active">
+                          需要注意
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  {/* 安全修復指引 */}
-                  <div className="source-health-drawer-section">
-                    <h4 className="source-health-drawer-section-title">修復指引</h4>
-                    <p className="source-health-guidance-text">{getRepairGuidance(drawer)}</p>
-                  </div>
-
-                  {/* 識別代碼 (Identifiers) */}
+                  {/* 原生識別代碼 (Identifiers) */}
                   <div className="source-health-drawer-section">
                     <h4 className="source-health-drawer-section-title">原生識別代碼</h4>
                     <dl className="source-health-dl">
@@ -306,7 +297,7 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                       </div>
                       <div>
                         <dt>截止規則</dt>
-                        <dd>{drawer.cutoffRule ?? '未設定'}</dd>
+                        <dd>{drawer.cutoffRule ?? '未知'}</dd>
                       </div>
                     </dl>
                   </div>
@@ -334,29 +325,13 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                     </dl>
                   </div>
 
-                  {/* 處理階段 (Processing stages) */}
+                  {/* 對應狀態 */}
                   <div className="source-health-drawer-section">
-                    <h4 className="source-health-drawer-section-title">處理階段狀態</h4>
+                    <h4 className="source-health-drawer-section-title">對應狀態</h4>
                     <dl className="source-health-dl">
-                      <div>
-                        <dt>來源定位</dt>
-                        <dd>{renderBooleanStage(drawer.located, '已定位', '未定位')}</dd>
-                      </div>
-                      <div>
-                        <dt>可讀狀態</dt>
-                        <dd>{renderBooleanStage(drawer.readable, '可讀取', '不可讀')}</dd>
-                      </div>
                       <div>
                         <dt>對應狀態</dt>
                         <dd>{drawer.mappingLabel}</dd>
-                      </div>
-                      <div>
-                        <dt>呈現狀態</dt>
-                        <dd>{renderBooleanStage(drawer.presented, '已呈現', '未呈現')}</dd>
-                      </div>
-                      <div>
-                        <dt>驗收狀態</dt>
-                        <dd>未驗收</dd>
                       </div>
                     </dl>
                   </div>
@@ -400,12 +375,12 @@ export function SourceHealth({view, onSelect, onSort, onRetry, currentSort}: Sou
                           <tbody>
                             {drawer.fields.map((field, idx) => (
                               <tr key={field.fieldId ?? `field-${idx}`}>
-                                <td>{field.name ?? '未命名'}</td>
+                                <td>{field.name ?? '未知'}</td>
                                 <td>{field.type ?? '未知'}</td>
                                 <td>
                                   <code>{field.fieldId ?? '未知'}</code>
                                 </td>
-                                <td>{field.yxMapping ?? '未對應'}</td>
+                                <td>{field.yxMapping ?? '未知'}</td>
                                 <td>{field.mappingLabel}</td>
                               </tr>
                             ))}
