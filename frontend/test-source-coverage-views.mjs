@@ -88,6 +88,30 @@ await tick();
 assert.match(document.querySelector('.daily-records').textContent,/全部可見案件日報/);
 assert.ok(!document.querySelector('option[value="unmatched"]'));
 
+// A valid HTTP payload without coverage must never imply a known numeric scope.
+const assertUnknown=()=>{
+ const status=document.querySelector('[role="status"]').textContent;
+ assert.match(status,/範圍尚未確認|筆數暫不可用/);
+ assert.doesNotMatch(status,/共 \d+ 筆|第 \d+／\d+ 頁/);
+ assert.ok(!document.querySelector('.dr-empty'),'unknown is not a proven empty result');
+};
+let finishUnknown;
+globalThis.fetch=()=>new Promise(resolve=>{finishUnknown=resolve});
+await act(async()=>root.render(React.createElement(DailyRecords,{key:'unknown',w:{...fixture.full_zero,environment:undefined},p:zero,go:()=>{}})));
+assertUnknown();
+const {coverage:omittedCoverage,...withoutCoverage}=fixture.daily_all;
+await act(async()=>finishUnknown(new Response(JSON.stringify({...withoutCoverage,total:7}),{status:200})));
+await tick();assertUnknown();
+// A failed request must not display the internal zero default either.
+globalThis.fetch=async()=>new Response(JSON.stringify({detail:'Unavailable'}),{status:503});
+await act(async()=>root.render(React.createElement(DailyRecords,{key:'failed',w:fixture.full_zero,p:zero,go:()=>{}})));
+await tick();assertUnknown();
+// Known current API coverage permits a proven zero again.
+globalThis.fetch=async()=>new Response(JSON.stringify(fixture.daily_all),{status:200});
+await act(async()=>root.render(React.createElement(DailyRecords,{key:'known-again',w:fixture.full_zero,p:zero,go:()=>{}})));
+await tick();
+assert.match(document.querySelector('[role="status"]').textContent,/共 0 筆.*第 1／1 頁/);
+
 const demoCase={...fixture.daily_case,coverage:{scope:'workspace',project_only:true,unmatched_available:false}};
 const demoUnmatched={...fixture.daily_case,items:[{id:'demo-orphan',date:'2026-10-01',description:'DEMO_UNMATCHED',project_id:null}],total:1,summary:{matched:0,unmatched:1,source_missing:0},coverage:{scope:'workspace',project_only:false,unmatched_available:true}};
 globalThis.fetch=async url=>{

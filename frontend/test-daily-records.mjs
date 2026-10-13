@@ -50,7 +50,7 @@ const mk=(pid,ids)=>ids.map(id=>({id,date:'2026-10-01',department:'組',person:'
 const calls=[];let handler;
 globalThis.fetch=async(url)=>{const q=new URL(String(url),'http://x').searchParams;calls.push({pid:q.get('project_id'),offset:q.get('offset')});return new Response(JSON.stringify(handler(q)),{status:200,headers:{'content-type':'application/json'}})};
 const render=async(proj)=>{await act(async()=>{root.render(React.createElement(DailyRecords,{w,p:proj,go:()=>{}}));await new Promise(r=>setTimeout(r,20))})};
-const resp=(items,total)=>({items,total,offset:0,limit:30,summary:{matched:total,unmatched:0,source_missing:0}});
+const resp=(items,total)=>({coverage:{scope:'visible_cases',project_only:true,unmatched_available:false},items,total,offset:0,limit:30,summary:{matched:total,unmatched:0,source_missing:0}});
 // Case 1: A at page 3 -> switch to one-row B resets to offset 0 and shows B's record.
 handler=q=>q.get('project_id')==='A'?resp(mk('A',['a-row']),61):resp(mk('B',['b-only']),1);
 await render({id:'A',code:'A',daily_reports:[]});
