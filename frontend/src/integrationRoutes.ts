@@ -38,7 +38,7 @@ export function myWorkInput(fetched: Fetched, filters: MyWorkFilters): MyWorkInp
  if (!body) return {filters, readState: {states: ['unknown'], count: null}};
  // weeklyActivity stays absent: /api/my-work/activity is not built (126B2).
  return {filters, rows: body.rows, readState: body.readState, assignment: body.assignment as MyWorkInput['assignment'],
-  canSeeAwaitingConfirmation: body.canSeeAwaitingConfirmation === true};
+  canSeeAwaitingConfirmation: body.canSeeAwaitingConfirmation === true, asOf: body.as_of};
 }
 
 export function sourceHealthInput(fetched: Fetched): {page_state: unknown; sources: unknown} {

@@ -11,6 +11,7 @@ import type {
   MyWorkDetail,
   MyWorkAction,
 } from './myWorkView.ts';
+import { MY_WORK_LABELS } from './myWorkView.ts';
 import './my-work-table.css';
 
 export interface MyWorkTableProps {
@@ -153,6 +154,7 @@ export function MyWorkTable({
           data-state={bannerStateClass}
         >
           <span className="my-work-banner-state-text">{bannerText}</span>
+          <span className="my-work-banner-as-of"> · {view.dataAsOfLabel}</span>
           {view.selectionDropped && (
             <span className="my-work-selection-dropped-note">
               · 原選取項目已不再符合目前條件或已被移除
@@ -481,7 +483,9 @@ export function MyWorkTable({
             {/* Attached Evidence */}
             <section className="my-work-drawer-section">
               <h4>附加佐證</h4>
-              {view.drawer.task.evidence.length === 0 ? (
+              {view.drawer.task.evidence === null ? (
+                <p className="my-work-drawer-empty-text">{MY_WORK_LABELS.unknown}</p>
+              ) : view.drawer.task.evidence.length === 0 ? (
                 <p className="my-work-drawer-empty-text">無附加佐證</p>
               ) : (
                 <ul className="my-work-drawer-evidence-list">

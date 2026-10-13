@@ -128,7 +128,7 @@ def test_formal_due_requires_a_proven_field_and_never_an_estimated_one(monkeypat
 def test_unassigned_empty_forbidden_not_loaded_failed_stale_are_distinct():
     unassigned = run(workspace(project('p1', 'Case One', [task('x', owner='other')])))
     empty = run(workspace(project('p1', 'Case One', [task('done', status='completed')])))
-    assert unassigned == {'rows': [], 'readState': 'ready', 'assignment': 'unassigned', 'canSeeAwaitingConfirmation': False}
+    assert unassigned == {'rows': [], 'readState': 'ready', 'assignment': 'unassigned', 'canSeeAwaitingConfirmation': False, 'as_of': '2026-10-14'}
     assert empty['assignment'] == 'assigned' and empty['rows'] == [] and empty['readState'] == 'ready'
     ws = workspace(project('p1', 'Case One', [task('t')]))
     states = {
@@ -564,3 +564,9 @@ def test_known_viewer_assignment_survives_missing_task_identity(ident):
 def test_missing_identity_of_other_owner_task_asserts_no_assignment():
     out = run(workspace(project('p', 'Visible', [task(None, owner='other')])))
     assert out['rows'] == [] and out['assignment'] != 'assigned'
+
+
+def test_as_of_is_the_workspace_as_of_and_absent_when_blocked():
+    out = run(workspace(project('p1', 'Case One', [task('t')])))
+    assert out['as_of'] == '2026-10-14'
+    assert 'as_of' not in build_my_work_input(workspace(), {'id': 'viewer'}, {'admitted': False})

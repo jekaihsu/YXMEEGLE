@@ -183,6 +183,17 @@ test('11. FIX3: no derived in-progress claim; unknown pending sentinel stays unk
  eq(buildMyWorkView({rows:[{...bare,queue:'awaiting_my_confirmation'}],readState:'ready',assignment:'assigned',canSeeAwaitingConfirmation:true,filters:{mode:'awaiting_my_confirmation'}}).rows[0].statusLabel,MY_WORK_LABELS.pending,'awaiting flag is pending');
  eq(one({attention:true,workflow_state:'active'}).statusLabel,MY_WORK_LABELS.attention,'attention flag unchanged');
 });
+test('7. F1: absent evidence is unknown, only an explicit empty list is none; F2: data as-of',()=>{
+ const sel=extra=>view([row('a',extra)],{filters:{selectedId:'a'}}).drawer.task;
+ eq(sel({}).evidence,null,'evidence field absent is unknown, not an empty list');
+ eq(sel({evidence:'x'}).evidence,null,'malformed evidence is unknown');
+ eq(sel({evidence:[]}).evidence,[],'explicit empty list is the only none');
+ eq(sel({evidence:[{id:'d',title:'T'}]}).evidence,[{id:'d',title:'T'}],'supplied evidence listed');
+ eq(view([row('a')]).rows[0].evidencePresent,false,'absent evidence is not present');
+ eq(view([row('a')],{asOf:'2026-10-14'}).dataAsOfLabel,'資料日期 2026-10-14','as_of shown');
+ eq(view([row('a')]).dataAsOfLabel,'資料日期 '+MY_WORK_LABELS.unknown,'missing as_of is unknown');
+ eq(view([row('a')],{asOf:42}).dataAsOfLabel,'資料日期 '+MY_WORK_LABELS.unknown,'malformed as_of is unknown');
+});
 let failed=0;
 for(const [name,fn] of tests){try{await fn();console.log(`ok - ${name}`)}catch(e){failed++;console.log(`not ok - ${name}\n${e.message}`)}}
 if(failed){console.log(`${failed} failed`);process.exit(1)}

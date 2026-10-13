@@ -54,7 +54,9 @@ export type MyWorkRow={
  evidencePresent:boolean;outcomeNote:string|null;actions:MyWorkAction[];
 };
 export type MyWorkDetail=MyWorkRow&{
- requiredInput:string;requiredOutput:string;evidence:{id:string;title:string}[];
+ requiredInput:string;requiredOutput:string;
+ // null = the read model did not supply evidence (unknown); [] = supplied and empty (none).
+ evidence:{id:string;title:string}[]|null;
  parent:{verified:boolean;caseTitle:string;workItemTitle:string};
 };
 
@@ -64,6 +66,8 @@ export type MyWorkInput={
  rows?:unknown;
  // 'ready' = clean successful read; otherwise a C-STATE value; undefined = not loaded yet.
  readState?:unknown;
+ // Workspace as_of the route read; anything but a non-empty string is unknown.
+ asOf?:unknown;
  assignment?:'assigned'|'unassigned'|'unknown';
  canSeeAwaitingConfirmation?:boolean;
  filters?:Partial<{search:unknown;mode:unknown;selectedId:unknown}>;
@@ -76,6 +80,7 @@ export type MyWorkView={
  // null = clean complete read with rows; every other page state is a C-STATE value.
  pageState:DataState|null;
  pageStateLabel:string|null;
+ dataAsOfLabel:string;
  count:number|null;
  emptyReason:'unassigned'|'no_pending'|null;
  rows:MyWorkRow[];
@@ -139,13 +144,14 @@ function parseRow(raw:unknown):Parsed{
  const parentCase=verified?text(parent?.case_title):MY_WORK_LABELS.unknown;
  const parentItem=verified?text(parent?.work_item_title):MY_WORK_LABELS.unknown;
  // Evidence presence is shown as a fact only; it never feeds any completion state.
- const evidence=(Array.isArray(r.evidence)?r.evidence:[]).map(rec).filter((e):e is Record<string,unknown>=>!!e&&!!str(e.id)).map(e=>({id:str(e.id),title:text(e.title)}));
+ // An absent/malformed field is unknown, never an empty list: /api/my-work does not read attached evidence.
+ const evidence=!Array.isArray(r.evidence)?null:r.evidence.map(rec).filter((e):e is Record<string,unknown>=>!!e&&!!str(e.id)).map(e=>({id:str(e.id),title:text(e.title)}));
  const row:MyWorkRow={
   id,title:text(r.title),caseTitle:text(r.case_title),workItemTitle:text(r.work_item_title),assignee:text(r.assignee_name),
   workflowLabel:text(r.workflow_state),
   statusLabel:attention?MY_WORK_LABELS.attention:pendingKnown?MY_WORK_LABELS.pending:MY_WORK_LABELS.unknown,
   nextDeliverable:text(r.next_deliverable),dueLabel,pendingReason:pendingReason||MY_WORK_LABELS.unknown,handoffLabel,
-  awaitingMyConfirmation:awaiting,needsAttention:attention,finishedKnown,evidencePresent:evidence.length>0,
+  awaitingMyConfirmation:awaiting,needsAttention:attention,finishedKnown,evidencePresent:!!evidence&&evidence.length>0,
   outcomeNote:outcome==='unknown'?MY_WORK_LABELS.outcomeUnknown:null,
   actions:parseActions(r.entry_points,outcome),
  };
@@ -188,7 +194,7 @@ export function buildMyWorkView(input:MyWorkInput):MyWorkView{
  const search=str(f.search);
  const wanted=str(f.selectedId)||null;
  const weekly=parseWeekly(input.weeklyActivity);
- const base:Omit<MyWorkView,'pageState'|'pageStateLabel'|'count'|'emptyReason'|'rows'|'drawer'|'filters'|'selectionDropped'>={
+ const base:Omit<MyWorkView,'pageState'|'pageStateLabel'|'dataAsOfLabel'|'count'|'emptyReason'|'rows'|'drawer'|'filters'|'selectionDropped'>={
   mode,modes:(canAwait?MY_WORK_MODES:['todo' as MyWorkMode]).map(m=>({mode:m,label:MY_WORK_LABELS.modes[m]})),showModeToggle:canAwait,weekly,
  };
  // One revocation set for every dataset: a task revoked at row level leaves the table, drawer and weekly output.
@@ -200,7 +206,7 @@ export function buildMyWorkView(input:MyWorkInput):MyWorkView{
   // A revoked/blocked page exposes no weekly ids, titles, dates or length.
   const blocked=!!parsedState&&parsedState.states.some(s=>BLOCKING.has(s));
   const weeklyOut=blocked?{period:{start:null,end:null},items:[]}:{...weekly,items:weekly.items.filter(i=>!revoked.has(i.id))};
-  return {...base,weekly:weeklyOut,pageState:parsedState,pageStateLabel:parsedState?describeDataState(parsedState):null,count:parsedState?dataStateCount(parsedState):rows.length,emptyReason,rows,
+  return {...base,weekly:weeklyOut,pageState:parsedState,pageStateLabel:parsedState?describeDataState(parsedState):null,dataAsOfLabel:`資料日期 ${text(input.asOf)}`,count:parsedState?dataStateCount(parsedState):rows.length,emptyReason,rows,
    drawer:{open:!!task,task},filters:{search,mode,selectedId:kept},selectionDropped:!!wanted&&!task};
  };
  const read=input.readState;
