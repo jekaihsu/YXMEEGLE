@@ -150,7 +150,8 @@ test('9. FIX1: revocation hides weekly; stale/unknown never invented; missing fa
  const r=buildMyWorkView({readState:'ready',rows:[bare],assignment:'assigned'}).rows[0];
  eq([r.handoffLabel,r.statusLabel],['unknown','unknown'],'missing handoff/status facts read unknown');
  const known=view([row('a',{handoff_state:'已交接'})]).rows[0];
- eq([known.handoffLabel,known.statusLabel],['已交接',MY_WORK_LABELS.normal],'known facts still shown');
+ eq([known.handoffLabel,known.statusLabel],['已交接','unknown'],'handoff shown; no derived status from workflow_state');
+ eq(known.workflowLabel,'進行中','workflow_state kept verbatim as source text');
 });
 test('10. FIX2: task-level revocation applies to every dataset; status needs a known vocabulary value',()=>{
  const items=[{id:'SECRET-ID',title:'SECRET-NAME',date:'2026-10-13'},{id:'OPEN-ID',title:'OPEN-NAME',date:'2026-10-13'}];
@@ -165,7 +166,22 @@ test('10. FIX2: task-level revocation applies to every dataset; status needs a k
  const bare={id:'a',ended:false};
  const label=extra=>view([{...bare,...extra}]).rows[0].statusLabel;
  for(const extra of [{workflow_state:'unknown'},{queue:'unknown'},{workflow_state:'garbage'},{workflow_state:'  '},{attention:false}])eq(label(extra),'unknown','not established: '+JSON.stringify(extra));
- for(const extra of [{workflow_state:'in_progress'},{workflow_state:'進行中'},{queue:'active'}])eq(label(extra),MY_WORK_LABELS.normal,'recognised: '+JSON.stringify(extra));
+ });
+test('11. FIX3: no derived in-progress claim; unknown pending sentinel stays unknown and ordinary',()=>{
+ const bare={id:'a',ended:false};
+ const one=extra=>view([{...bare,...extra}]).rows[0];
+ for(const extra of [{workflow_state:'active'},{queue:'active'},{workflow_state:'in_progress'},{workflow_state:'進行中'},{workflow_state:'ACTIVE'},{queue:'in_progress'}]){
+  const r=one(extra);eq(r.statusLabel,'unknown','no affirmative status: '+JSON.stringify(extra));
+  ok(!JSON.stringify(r).includes('進行中')||extra.workflow_state==='進行中','no derived 進行中 label: '+JSON.stringify(extra));
+ }
+ eq(one({workflow_state:'Active '}).workflowLabel,'Active','workflow_state shown as supplied (trimmed only)');
+ eq(one({queue:'active'}).workflowLabel,'unknown','queue is not turned into workflow text');
+ const u=one({pending_reason:'unknown'});eq([u.pendingReason,u.statusLabel],['unknown','unknown'],'pending_reason unknown stays unknown');
+ eq(ids(view([row('z',{pending_reason:'unknown'}),row('a')])),['a','z'],'unknown pending reason keeps ordinary rank (id order)');
+ eq(ids(view([row('a'),row('z',{pending_reason:'等待客戶'})])),['z','a'],'known pending reason ranks first');
+ eq(one({pending_reason:'等待客戶'}).statusLabel,MY_WORK_LABELS.pending,'known pending reason is pending');
+ eq(buildMyWorkView({rows:[{...bare,queue:'awaiting_my_confirmation'}],readState:'ready',assignment:'assigned',canSeeAwaitingConfirmation:true,filters:{mode:'awaiting_my_confirmation'}}).rows[0].statusLabel,MY_WORK_LABELS.pending,'awaiting flag is pending');
+ eq(one({attention:true,workflow_state:'active'}).statusLabel,MY_WORK_LABELS.attention,'attention flag unchanged');
 });
 let failed=0;
 for(const [name,fn] of tests){try{await fn();console.log(`ok - ${name}`)}catch(e){failed++;console.log(`not ok - ${name}\n${e.message}`)}}

@@ -14,7 +14,6 @@ export const MY_WORK_LABELS={
  unknown:'unknown',
  attention:'需注意',
  pending:'待處理',
- normal:'進行中',
  awaiting:'等待我確認（尚未核准）',
  handoffNone:'無交接／確認',
  handoffPending:'交接待確認（尚未核准）',
@@ -116,9 +115,6 @@ function parseActions(raw:unknown,outcome:OperationOutcome):MyWorkAction[]{
  return out;
 }
 
-// Known vocabulary meaning "being worked on". Anything else (including the literal 'unknown') establishes nothing.
-const IN_PROGRESS:ReadonlySet<string>=new Set(['in_progress','active','進行中']);
-
 type Parsed={row:MyWorkRow;detail:MyWorkDetail}|'forbidden'|'malformed';
 
 function parseRow(raw:unknown):Parsed{
@@ -133,8 +129,9 @@ function parseRow(raw:unknown):Parsed{
  // Only a verified formal field is a due date; every other date stays unknown.
  const dueLabel=due&&due.verified_formal===true&&str(due.value)?str(due.value):MY_WORK_LABELS.unknown;
  const outcome=parseOutcome(r.operation_outcome);
- // 進行中 is only claimed when a recognised workflow/queue value says so; strings are matched, never trusted by presence.
- const statusKnown=IN_PROGRESS.has(str(r.workflow_state).toLowerCase())||IN_PROGRESS.has(str(r.queue).toLowerCase());
+ // No in-progress status is derived: workflow_state is source text shown as supplied (adapter contract unresolved).
+ // Pending needs the awaiting flag or a known (non-sentinel) reason; the sentinel itself establishes nothing.
+ const pendingKnown=awaiting||(pendingReason!==''&&pendingReason!==MY_WORK_LABELS.unknown);
  const handoffText=str(r.handoff_state);
  const handoffLabel=awaiting?MY_WORK_LABELS.awaiting:handoffText||MY_WORK_LABELS.unknown;
  const parent=rec(r.parent);
@@ -146,7 +143,7 @@ function parseRow(raw:unknown):Parsed{
  const row:MyWorkRow={
   id,title:text(r.title),caseTitle:text(r.case_title),workItemTitle:text(r.work_item_title),assignee:text(r.assignee_name),
   workflowLabel:text(r.workflow_state),
-  statusLabel:attention?MY_WORK_LABELS.attention:awaiting||pendingReason?MY_WORK_LABELS.pending:statusKnown?MY_WORK_LABELS.normal:MY_WORK_LABELS.unknown,
+  statusLabel:attention?MY_WORK_LABELS.attention:pendingKnown?MY_WORK_LABELS.pending:MY_WORK_LABELS.unknown,
   nextDeliverable:text(r.next_deliverable),dueLabel,pendingReason:pendingReason||MY_WORK_LABELS.unknown,handoffLabel,
   awaitingMyConfirmation:awaiting,needsAttention:attention,finishedKnown,evidencePresent:evidence.length>0,
   outcomeNote:outcome==='unknown'?MY_WORK_LABELS.outcomeUnknown:null,
