@@ -207,3 +207,26 @@ def test_policy_labels_do_not_match_admitted_code_prefixes():
     out={'policy_summary':[{'project_id':'p','closure':{'missing':['報價 Q1：x','報價 Q10：x']}}]}
     cr.apply(out,plan)
     assert out['policy_summary'][0]['closure']['missing']==['報價 ［不開放檢視］：x','報價 Q10：x']
+
+
+@pytest.mark.parametrize('viewer,admit_hidden',[('u-pm',False),('u-manager',False),('u-manager',True)])
+def test_all_public_routes_and_receipt_replay(isolated_http,viewer,admit_hidden):
+    app,client,_,signin=isolated_http
+    state,records,pid=build_universe(admit_hidden);install(app,state);signin(viewer)
+    needles=forbidden(state,records)
+    from .source_case_policy import filter_visible_cases
+    from copy import deepcopy
+    visible=deepcopy(state);filter_visible_cases(visible)
+    routes=['/api/workspace','/api/workspace?scope=shell','/api/projects','/api/sources','/api/daily-reports',
+            '/api/company-dashboard','/api/audit','/api/session']
+    routes += [route for p in visible['projects'] for route in ('/api/projects/'+p['id'],'/api/projects/'+p['id']+'/navigation')]
+    for route in routes:
+        response=client.get(route);assert response.status_code==200,(route,response.text)
+        assert not any(n in response.text for n in needles),route
+        assert app.state.case_redaction_stats.fallback==0,route
+    public=client.get('/api/workspace').json()
+    body=dict(action='comment_add',project_id=pid,version=public['version'],request_id='route-replay-'+viewer,payload={'body':'hello'})
+    for response in (client.post('/api/actions',json=body),client.post('/api/actions',json=body)):
+        assert response.status_code==200,response.text
+        assert not any(n in response.text for n in needles)
+        assert app.state.case_redaction_stats.fallback==0

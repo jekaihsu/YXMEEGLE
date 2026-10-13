@@ -261,15 +261,13 @@ def test_source_provenance_public_round_trip(linked_sources,viewer,admit_hidden)
     assert workspace.status_code==200,workspace.text
     body=dict(action='comment_add',project_id='p2',version=workspace.json()['version'],
         request_id='provenance-roundtrip',payload={'body':'hello'})
-    expected=['base|daily|recDaily']+(['base|confirmations|recHIDDENB','base|quotes|recHIDDENQ'] if admit_hidden else [])+[
-        'base|confirmations|recA','base|quotes|recQ']
     for response in [workspace,client.get('/api/projects/p2'),client.post('/api/actions',json=body),
                      client.post('/api/actions',json=body)]:
         assert response.status_code==200,response.text
         project=response.json().get('project') or next(p for p in response.json()['projects'] if p['id']=='p2')
         daily=next(d for d in project['daily_reports'] if d['id']=='probe-daily')
         for holder in [daily,project['nodes'][0],project['nodes'][0]['tasks'][0]]:
-            assert [r['id'] for r in holder['source_provenance']['records']]==expected
+            assert 'source_provenance' not in holder
         assert 'change_explanation' not in project['nodes'][0]['tasks'][0]
         for token,visible in [('recHIDDENB',admit_hidden),('C999777',admit_hidden),
                               ('recHIDDENQ',admit_hidden),('Q999777',admit_hidden),

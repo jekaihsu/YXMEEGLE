@@ -345,24 +345,6 @@ def create_app(overrides=None):
         result.pop('source_work_items',None)
         result.pop('source_work_items_status',None)
         result.pop('source_work_items_enabled',None)
-        if result.get('environment') not in ('test','demo'):
-            from .source_case_policy import CASE_KINDS, identity as source_identity
-            # Provenance uses pipe identities; entities also expose slash ids.
-            visible_provenance={record['id'] for collection in ('source_confirmations','source_quotes')
-                for record in result.get(collection,[])}|{
-                source_identity(record.get('source_identity') or {})
-                for collection in ('source_confirmations','source_quotes')
-                for record in result.get(collection,[])}
-            def redact_provenance(value):
-                if isinstance(value,dict):
-                    provenance=value.get('source_provenance')
-                    if isinstance(provenance,dict) and isinstance(provenance.get('records'),list):
-                        provenance['records']=[record for record in provenance['records']
-                            if record.get('kind') not in CASE_KINDS or record.get('id') in visible_provenance]
-                    for child in value.values():redact_provenance(child)
-                elif isinstance(value,list):
-                    for child in value:redact_provenance(child)
-            redact_provenance(result['projects'])
         out=filter_private_workspace(result,user)
         if out.get('environment') not in ('test','demo'):
             app.state.case_redaction_stats=case_redaction.apply(out,case_redaction.make_plan(pre,out))

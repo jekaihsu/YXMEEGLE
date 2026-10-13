@@ -223,3 +223,19 @@ def _source_urls(node, key, plan):
 
 
 HANDLERS['source_urls'] = _source_urls
+
+
+def _provenance(node, key, plan):
+    node.pop(key, None)
+
+
+HANDLERS['source_provenance'] = _provenance
+
+
+def _case_scalar(node, key, plan):
+    if isinstance(node[key], str) and node[key] in plan.hidden:
+        node[key] = None
+
+
+# Lifecycle status/raw values remain intact; only diagnostic identities change.
+HANDLERS.update(source_id=_case_scalar, blank_sources=_refs)
