@@ -1,11 +1,12 @@
 """Pure, unwired Manager Overview (VCC-128) for an already authorized workspace.
 
-Population protocol: ``population(state, filters) -> list[dict]`` supplies one
+Population protocol: ``population(state, filters) -> list[dict] | None`` supplies one
 row per confirmation version, with ``row_key`` (source context + record_id +
-version) and ``project_id`` (existing assignments mapping's stable case ID, or
+version, encoded as an injective opaque string) and ``project_id`` (existing assignments mapping's stable case ID, or
 None for unresolved). It must use only this narrowed state, preserve source
 versions, and apply exactly the supplied filters. No confirmation_list import,
-name/code/suffix join, source read, or permission widening occurs here.
+name/code/suffix join, source read, or permission widening occurs here. None
+means unavailable/undetermined population, never an empty or zero population.
 
 ``population_state`` is an optional trusted C-STATE envelope for that exact
 filtered read, authorized by the coordinator's P2-128B contract clarification.
@@ -61,6 +62,9 @@ def _measure(value, read):
     states = read['states']
     if states == ['forbidden']:
         return None, data_state('forbidden'), 'Population is not authorized.'
+    if value is None:
+        return None, data_state('unknown') if states[0] in EMPTY else data_state(*states), (
+            'The population is unavailable; no denominator is established.')
     if states[0] in UNCOUNTED:
         return None, data_state(*states), 'The population read does not establish a count.'
     if value == 0 and states[0] not in EMPTY:
@@ -146,14 +150,22 @@ def build_manager_overview(state, *, population, filters=None, period=None,
                 'weekly_activity': _unknown('No authorized weekly event population.', state='forbidden'),
                 'source_health': _health(source_health)}
     rows = population(state, deepcopy(filters))
-    if not isinstance(rows, list):
-        raise ValueError('population must return a list')
+    available = rows is not None
+    if available and not isinstance(rows, list):
+        raise ValueError('population must return a list or None')
+    if not available:
+        rows = []
     projects = {p['id']: p for p in state.get('projects', [])}
     versions = {}
     unresolved = []
+    row_keys = set()
     for row in rows:
         if not isinstance(row, dict) or 'row_key' not in row or 'project_id' not in row:
             raise ValueError('population row lacks required identity')
+        key = row['row_key']
+        if not isinstance(key, str) or not key or key in row_keys:
+            raise ValueError('population row_key must be a unique nonempty opaque string')
+        row_keys.add(key)
         pid = row['project_id']
         if pid is None:
             unresolved.append({'details': {'row_key': deepcopy(row['row_key']),
@@ -165,17 +177,19 @@ def build_manager_overview(state, *, population, filters=None, period=None,
         else:
             versions.setdefault(pid, []).append(row['row_key'])
     read = _read_state(population_state, rows)
+    if not available and read['states'][0] in EMPTY:
+        read = data_state('unknown')  # None contradicts a claim of proven emptiness.
     people = {p['id']: p for p in state.get('users', [])}
     cases = [_case(projects[pid], keys, people) for pid, keys in versions.items()
              if projects[pid].get('execution_status') != 'completed']
     cards = [_card('confirmation_versions', 'Confirmation versions', 'confirmation_version',
-                   len(rows), read, filters, as_of),
-             _card('stable_cases', 'Stable cases', 'stable_case', len(versions), read, filters, as_of),
+                   len(rows) if available else None, read, filters, as_of),
+             _card('stable_cases', 'Stable cases', 'stable_case', len(versions) if available else None, read, filters, as_of),
              _unavailable_card('pending_decisions', 'Pending decisions',
                                'No manager-level pending-decision definition.', filters, as_of),
              _unavailable_card('overdue_cases', 'Overdue cases',
                                'VCC-123: effective approved due date provenance is unresolved.', filters, as_of)]
-    unresolved_count, unresolved_state, reason = _measure(len(unresolved), read)
+    unresolved_count, unresolved_state, reason = _measure(len(unresolved) if available else None, read)
     return {'as_of': as_of,
             'snapshot': {'state': read, 'filters': deepcopy(filters), 'cases': cases, 'cards': cards,
                          'unresolved': {'value': unresolved_count, 'state': unresolved_state,
