@@ -1,4 +1,4 @@
-# YX v2 P1–P8 execution plan (2026-10-13, rev 3.5 of 2026-10-14)
+# YX v2 P1–P8 execution plan (2026-10-13, rev 3.6 of 2026-10-14)
 
 Owner: the single Claude commander. Parent task `task_6f78140157c0`, continued by `task_ec8184733081` (P1/P2 planning and reviews) then by `task_67bb22a5d7b6` (P1–P8 execution), and now by `task_97a32b5dcb2e` (P1/P2 continuation only; P3–P8 are not dispatched by this task). This plan does not create a second commander. Revision 3 adds the complete P3–P8 specs and issue IDs, records the C-ID architecture decisions, and replaces the old no-push/no-staging rule with the owner's serial merge, push and staging authorization (§4).
 
@@ -276,6 +276,29 @@ Binding decisions made during these rounds:
 - **C-ID:** malformed diagnostics are always unresolved with a null target, and carry a structural locator. Ordinary rows keep their 8-component identity. Table-only and nullable containers are native no-ops, exactly as `native_records` treats them.
 
 **P1-INT** `task_c7e639e9e6ed` / `ctx_28c92afc7c3a`: Claude Sonnet 5.5 medium, worktree `p1-int`, branch `ava-apple/p1-int`, from `534c0f0`. It is the sole writer of the hub files and registers only `GET /api/source-health` and `GET /api/my-work`.
+
+| 10 | P1-INT route wiring | `6c926551e5c75e8f1392d2cd5b02f865a2a085a9`. Sonnet `task_c7e639e9e6ed` produced `0a7cbb3`, which labelled `page_state` null as 資料正常. That violated the owner's correction `msg_2da3335aa577`, so FIX1 `task_ac643adf1d11` restored null → unknown | Codex `task_606546259acc` PASS-WITH-FINDINGS, with isolated demo browser evidence in `worker-evidence/task_606546259acc/screens` | `6e1476efd4db68afc02f6cd8f37909b4bd6624f5` | `local_ci` exit 0 (3452 passed) |
+| 11 | P1-INT-FIX2/FIX3 | `c2d38b7ac7189847839b160e4df940bc20a90ff0`. N1/W1 by `task_d9a56995101d`; F1–F3 from the Opus P1-REV, fixed by `task_3e8884438106` | Opus P1-REV `task_05984fe4777c` on `6e1476e`: CHANGES-REQUESTED (F1 Medium: evidence unknown → none). Codex P1-FINAL-REV `task_089ad14fcd65` on `50ddfdb` is running | `50ddfdb50ab0b43e81e031c5a676ca5295d47830` | `local_ci` running; push only after CI and review |
+
+Push note: the remote reached `534c0f0` through a push that was not made by the commander, while the commander was holding pushes for the contention-flake decision.
+
+**Routes now in code** (they become delivered only once P1-FINAL-REV and coordinator acceptance pass):
+- `GET /api/source-health` returns the page state only, with `diagnostic=False`. It passes `viewer_filtered=None` because `visible_source_snapshot` narrows rows.
+- `GET /api/my-work` returns the full-workspace load with B1 redaction and `as_of`.
+- `#sources` and `#work` render SourceHealth and MyWorkTable. The legacy views remain at `tab=legacy`.
+
+`page_state` null is always unknown, because no per-request complete-read evidence exists (`source_health.py:67`).
+
+**Documented P1 gaps** (not delivered; none is labelled done):
+- 126B2 weekly activity: `/api/my-work/activity` is not registered.
+- 127B2 diagnostics: G-DIAG.
+- 127B3 mapping exception lists: G-RCPT, G-RSCHEMA.
+- Per-request complete-read evidence: Source Health stays unknown.
+- My Work fields: next_deliverable, work_item_title, document → workspace link, work-item detail link, and attached evidence (shown as unknown). Each needs a verified source relation.
+- Retry on the new Source Health page.
+- Browser captures of the remaining C-STATE states.
+- VCC-123 deadline provenance: every effective due date is unknown.
+- VCC-125: open release gate.
 
 
 ### 4.5 Remaining P1 rows and owners
