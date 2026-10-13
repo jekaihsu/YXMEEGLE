@@ -30,6 +30,7 @@ import binascii
 import hashlib
 import json
 from collections import Counter
+from urllib.parse import quote
 
 from .case_cutover import admission_fields, execution_allowed
 from .data_state import data_state
@@ -64,6 +65,18 @@ def _error(err, status=422):
 def _dedupe_key(ref):
     """Two deliveries of the same record version collapse; different versions never do."""
     return ref.version_key
+
+
+def _row_key(ref):
+    """Injective public key over the full version-qualified identity.
+
+    ``source_key`` has exactly three non-empty components without ``/``; the
+    version part is type-tagged (u none, i int, s str) and percent-encoded, so
+    it never contains ``@`` and the last ``@`` always splits it off.
+    """
+    v = ref.version
+    tag = 'u' if v is None else f'i{v}' if isinstance(v, int) else 's' + quote(v, safe='')
+    return f'{ref.source_key}@{tag}'
 
 
 def _case_link(entity, projects):
@@ -180,7 +193,6 @@ def _build_rows(state, source_state):
     projects = {p['id']: p for p in state.get('projects') or [] if isinstance(p, dict) and p.get('id')}
     users = {u.get('id'): u for u in state.get('users') or [] if isinstance(u, dict)}
     seen, rows, unkeyed, collapsed = set(), [], 0, 0
-    retained_all = source_state in ('read_failed', 'stale')
     for order, entity in enumerate(state.get('source_confirmations') or []):
         if not isinstance(entity, dict) or entity.get('source_kind') not in (None, 'confirmation', 'quote_confirmation'):
             continue
@@ -214,8 +226,9 @@ def _build_rows(state, source_state):
         number = text(entity.get('code') or fields.get('工程確認單編號')) or None
         name = text(fields.get('工程名稱')) or None
         missing = entity.get('source_missing') is True
-        status = 'missing' if missing else 'stale' if retained_all or source_state == 'stale' else 'located'
-        key = ref.source_key if version is None else f'{ref.source_key}@{version}'
+        # Only a healthy read observed these rows; partial/stale/failed reads retain earlier ones.
+        status = 'missing' if missing else 'located' if source_state == 'ok' else 'unknown' if source_state == 'unknown' else 'stale'
+        key = _row_key(ref)
         rows.append({
             'row_key': key, 'case_number': number, 'project_name': name,
             'confirmation_version': {'value': None if version is None else str(version),
@@ -294,29 +307,66 @@ def _apply(rows, q, filters):
     return kept, {**excluded, 'distinct_rows': len(unknown_rows)} if unknown_rows else {'distinct_rows': 0}
 
 
-def confirmation_population(state, filters=None, *, q='', sort=None):
-    """Exact ordered ``row_key`` list for a filter set; the drilldown denominator.
+def _snapshot(state, source_state):
+    """Provenance of a retained read: ``last_success_at`` must be supplied by the caller's source status."""
+    if source_state == 'ok':
+        return None
+    source = state.get('source_status')
+    stamp = source.get('last_success_at') if isinstance(source, dict) else None
+    proven = isinstance(stamp, str) and bool(stamp.strip())
+    return {'state': 'proven' if proven else 'unproven', 'last_success_at': stamp if proven else None}
 
-    Pure and side-effect free.  Returns ``None`` when the source cannot be read
-    for this caller (forbidden / unlocated / loading), never an empty list.
+
+def _counts_known(source_state, snapshot, authorized):
+    """May row counts be shown as numbers?  Never for an undetermined read, nor an empty non-current one."""
+    if source_state == 'ok':
+        return True
+    if source_state == 'unknown':
+        return False
+    if source_state == 'read_failed':
+        return snapshot['state'] == 'proven'
+    return authorized > 0          # partial / stale: delivered rows are a snapshot; an empty one proves nothing
+
+
+def _basis(source_state, known):
+    if source_state == 'ok':
+        return 'current'
+    if not known:
+        return 'undetermined'
+    return 'partial_snapshot' if source_state == 'partial' else 'retained_snapshot'
+
+
+def confirmation_population(state, filters=None, *, q='', sort=None):
+    """Ordered ``{'row_key', 'project_id'}`` dicts for a filter set; the drilldown denominator.
+
+    ``project_id`` is the visibility-checked assignment (``None`` when
+    unresolved).  Pure and side-effect free.  Returns ``None`` (never a list)
+    when the source cannot be read for this caller (forbidden / unlocated /
+    loading / undetermined / failed without a proven snapshot / empty partial
+    or stale read).
     """
     source_state = _source_state(state)
     if source_state in ('forbidden', 'unlocated', 'loading'):
         return None
     rows, _ = _build_rows(state, source_state)
+    if not _counts_known(source_state, _snapshot(state, source_state), len(rows)):
+        return None
     matching, _ = _apply(rows, q or '', _normalize_filters(filters))
-    return [r['row_key'] for r in _ordered(matching, _normalize_sort(sort))]
+    return [{'row_key': r['row_key'], 'project_id': r['case_link']['project_id']}
+            for r in _ordered(matching, _normalize_sort(sort))]
 
 
 def _page_state(source_state, authorized, matching):
     if source_state in ('read_failed', 'loading', 'unlocated', 'unknown'):
         return data_state(source_state)
     flags = [s for s in ('partial', 'stale') if source_state == s]
+    if flags:                      # C-STATE: only partial/stale combine; a filtered zero keeps them
+        return data_state(*flags)
     if authorized == 0:
-        return data_state(*flags) if flags else data_state('complete_empty')
+        return data_state('complete_empty')
     if matching == 0:
         return data_state('filtered_empty')
-    return data_state(*flags) if flags else None
+    return None
 
 
 def _public(row):
@@ -353,6 +403,8 @@ def build_confirmation_list(state, *, q='', filters=None, sort=None, cursor=None
     page = ordered[start:start + limit]
     more = start + limit < len(ordered)
     grouping = Counter(r['case_link']['project_id'] for r in matching if r['case_link']['state'] == 'linked')
+    snapshot = _snapshot(state, source_state)
+    known = _counts_known(source_state, snapshot, len(rows))
     deadline = {'status': 'unavailable', 'reason': DEADLINE_REASON, 'hides_rows': False,
                 'requested': {k: v for k, v in norm_filters.items() if k.startswith('deadline_')}}
     return {
@@ -360,8 +412,9 @@ def build_confirmation_list(state, *, q='', filters=None, sort=None, cursor=None
         'page_state': _page_state(source_state, len(rows), len(matching)),
         'rows': [_public(r) for r in page],
         'next_cursor': _encode_cursor(binding, page[-1]['row_key']) if more and page else None,
-        'totals': {'matching': len(matching), 'loaded': len(page), 'authorized_source': len(rows)},
-        'totals_basis': 'retained_snapshot' if source_state in ('read_failed', 'stale') else 'current',
+        'totals': {'matching': len(matching) if known else None, 'loaded': len(page),
+                   'authorized_source': len(rows) if known else None},
+        'totals_basis': _basis(source_state, known), 'snapshot': snapshot,
         'filter_status': {'deadline': deadline},
         'excluded_unknown': excluded,
         'sort': {'applied': norm_sort, 'order_basis': 'source_order_then_row_key' if norm_sort is None
