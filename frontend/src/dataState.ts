@@ -31,14 +31,18 @@ const isState=(value:unknown):value is DataStateName=>typeof value==='string'&&(
 const isCount=(value:unknown):value is number=>typeof value==='number'&&Number.isInteger(value)&&value>=0;
 
 // Anything malformed or contradictory reads as unknown rather than as a count.
+// This is the one validation: the helpers below run direct values through it too.
 export function parseDataState(value:unknown):DataState{
  if(!value||typeof value!=='object')return unknown();
- const {states,count,name}=value as {states?:unknown;count?:unknown;name?:unknown};
- if(!Array.isArray(states)||!states.length||!states.every(isState)||new Set(states).size!==states.length)return unknown();
+ const {states: raw,count,name}=value as {states?:unknown;count?:unknown;name?:unknown};
+ // Array.from turns sparse holes into undefined, which isState rejects.
+ const states=Array.isArray(raw)?Array.from(raw as unknown[]):null;
+ if(!states||!states.length||!states.every(isState)||new Set(states).size!==states.length)return unknown();
  // Forbidden wins over anything sent alongside it, which is dropped unrendered.
  if(states.includes('forbidden'))return {states:['forbidden']};
  if(states.length>1&&!states.every(state=>COMBINABLE.has(state)))return unknown();
  const ordered=DATA_STATES.filter((state):state is ReadableStateName=>state!=='forbidden'&&states.includes(state));
+ if(!ordered.length)return unknown();
  if(count!==null&&count!==undefined&&!isCount(count))return unknown();
  const known=isCount(count)?count:null;
  if(EMPTY.has(ordered[0])&&known!==null&&known!==0)return unknown();
@@ -47,21 +51,16 @@ export function parseDataState(value:unknown):DataState{
  return typeof name==='string'&&name?{...result,name}:result;
 }
 
-// Direct values can bypass the parser (casts, malformed input), so the helpers
-// re-check: unreadable states read as unknown, forbidden suppresses everything.
-const statesOf=(state:DataState):readonly DataStateName[]=>{
- const states=(state as {states?:unknown}|null|undefined)?.states;
- if(!Array.isArray(states)||!states.length||!states.every(isState))return ['unknown'];
- return states.includes('forbidden')?['forbidden']:states;
-};
+// Direct values can bypass the type system (casts, malformed input), so the
+// helpers re-validate with the parser: invalid reads as unknown, forbidden
+// suppresses everything.
+const statesOf=(state:DataState):readonly DataStateName[]=>parseDataState(state).states;
 export const hasDataState=(state:DataState,name:DataStateName)=>statesOf(state).includes(name);
 
 // null means "show no number": callers must not substitute 0.
 export function dataStateCount(state:DataState):number|null{
- const states=statesOf(state);
- const count=(state as {count?:unknown}|null|undefined)?.count;
- if(states.includes('forbidden')||states.some(name=>UNCOUNTED.has(name)))return null;
- return isCount(count)?count:null;
+ const parsed=parseDataState(state);
+ return 'count' in parsed&&typeof parsed.count==='number'?parsed.count:null;
 }
 
 export function describeDataState(state:DataState):string{

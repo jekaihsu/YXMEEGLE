@@ -65,6 +65,19 @@ for(const direct of [null,undefined,{},{states:'partial',count:3},{states:['read
 }
 eq(describeDataState({states:['partial','stale'],count:0}),'部分資料・資料待更新（0 筆）','a direct known zero still renders');
 
+// Direct values get the parser's validation: duplicates, incompatible pairs,
+// non-zero empties and sparse holes all read as unknown with no count.
+const sparse=Array(1);
+for(const direct of [{states:['partial','partial'],count:7},{states:['partial','complete_empty'],count:7},{states:['complete_empty'],count:7},{states:['filtered_empty'],count:7},{states:['stale','loading'],count:7},{states:sparse,count:7},{states:[,'partial'],count:7},{states:['partial',,'stale'],count:7}]){
+ eq(dataStateCount(direct),null,`${JSON.stringify(direct)} direct value exposes no count`);
+ eq(describeDataState(direct),DATA_STATE_LABELS.unknown,`${JSON.stringify(direct)} direct value reads as unknown`);
+ eq(hasDataState(direct,'unknown'),true,`${JSON.stringify(direct)} direct value has unknown state`);
+}
+eq(parseDataState({states:sparse,count:7}),unknown,'a sparse states array parses as unknown');
+eq(parseDataState({states:['partial',,'stale'],count:7}),unknown,'a sparse array with holes parses as unknown');
+eq(dataStateCount({states:['stale','partial'],count:7}),7,'a valid direct partial+stale keeps its count');
+eq(describeDataState({states:['stale','partial'],count:7}),'部分資料・資料待更新（7 筆）','a valid direct partial+stale renders ordered with count');
+
 // Compile-time contract: forbidden values with count/name must not type-check.
 // Uses a sibling TypeScript binary when present; never installs anything.
 const here=dirname(fileURLToPath(import.meta.url));
