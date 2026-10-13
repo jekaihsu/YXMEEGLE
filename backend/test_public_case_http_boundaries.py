@@ -145,3 +145,55 @@ def test_work_item_internal_flags_absent_from_public_routes(isolated_http,enable
         assert 'source_work_items_enabled' not in response.text,path
         assert 'source_work_items_status' not in response.text,path
         if path.endswith('scope=shell'):assert response.json()['scope']=='shell'
+
+
+@pytest.fixture
+def linked_sources(isolated_http):
+    app,client,_,signin=isolated_http
+    with app.state.sessions.begin() as db:
+        row=db.get(WorkspaceRow,'lark-boundary');state=storage.load(db,BusinessRow,row)
+        def entity(table,rid,pid,code):
+            return dict(id=f'base/{table}/{rid}',project_id=pid,code=code,
+                source_identity=dict(base_token='base',table_id=table,record_id=rid))
+        a,b,c=[f'base/confirmations/{rid}' for rid in ('recA','recHIDDENB','recHIDDENC')]
+        state['source_confirmations']=[entity('confirmations',rid,pid,code) for rid,pid,code in
+            [('recA','p2','C115264'),('recHIDDENB','p2','C999777'),('recHIDDENC','p1','C888666')]]
+        quote=entity('quotes','recQ','p2','Q1');quote['confirmation_ids']=[b,a,c]
+        state['source_quotes']=[quote]
+        state['contract_items']=[dict(entity('contracts',rid,'p2',rid),confirmation_ids=links)
+            for rid,links in [('k1',[a,b]),('k2',[b]),('k3',[b,a])]]
+        state['source_visible_record_ids'] += ['base|confirmations|recA','base|confirmations|recHIDDENC',
+            'base|quotes|recQ',*[f'base|contracts|k{i}' for i in (1,2,3)]]
+        row.data=storage.save(db,BusinessRow,row.id,state)
+    return app,client,signin,state
+
+
+@pytest.mark.parametrize('viewer,admit_hidden',[('u-pm',False),('u-manager',False),('u-manager',True)])
+def test_quote_confirmation_links_public_round_trip(linked_sources,viewer,admit_hidden):
+    app,client,signin,original=linked_sources
+    with app.state.sessions.begin() as db:
+        row=db.get(WorkspaceRow,'lark-boundary');state=storage.load(db,BusinessRow,row)
+        if admit_hidden:state['source_visible_record_ids'].append('base|confirmations|recHIDDENB')
+        row.data=storage.save(db,BusinessRow,row.id,state)
+    signin(viewer)
+    a,b,c=[f'base/confirmations/{rid}' for rid in ('recA','recHIDDENB','recHIDDENC')]
+    expected=[b,a] if admit_hidden else [a]
+    workspace=client.get('/api/workspace')
+    assert workspace.status_code==200,workspace.text
+    body=dict(action='comment_add',project_id='p2',version=workspace.json()['version'],
+        request_id='quote-links-roundtrip',payload={'body':'hello'})
+    responses=[workspace,client.get('/api/projects/p2'),client.post('/api/actions',json=body),
+        client.post('/api/actions',json=body)]
+    for response in responses:
+        assert response.status_code==200,response.text
+        assert response.json()['source_quotes'][0]['confirmation_ids']==expected
+        contracts={r['id']:r['confirmation_ids'] for r in response.json()['contract_items']}
+        assert contracts['base/contracts/k2']==([b] if admit_hidden else [])
+        assert contracts['base/contracts/k3']==([b,a] if admit_hidden else [a])
+        for token,visible in [('recHIDDENB',admit_hidden),('C999777',admit_hidden),
+                              ('recHIDDENC',False),('C888666',False)]:
+            assert (token in response.text)==visible
+    with app.state.sessions() as db:
+        stored=storage.load(db,BusinessRow,db.get(WorkspaceRow,'lark-boundary'))
+        assert stored['source_quotes']==original['source_quotes']
+        assert stored['contract_items']==original['contract_items']

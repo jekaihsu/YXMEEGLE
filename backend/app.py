@@ -347,9 +347,10 @@ def create_app(overrides=None):
             # Use confirmations retained by filter_visible_cases; redact links
             # only after policy calculations against the original contract.
             visible_confirmations={c['id'] for c in result.get('source_confirmations',[])}
-            for contract in result.get('contract_items',[]):
-                if 'confirmation_ids' in contract:
-                    contract['confirmation_ids']=[cid for cid in contract['confirmation_ids'] if cid in visible_confirmations]
+            for collection in ('contract_items','source_quotes'):
+                for record in result.get(collection,[]):
+                    if 'confirmation_ids' in record:
+                        record['confirmation_ids']=[cid for cid in record['confirmation_ids'] if cid in visible_confirmations]
         return filter_private_workspace(result,user)
     def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None):
         require(bool(actor_id),'缺少操作人員身分',403)
