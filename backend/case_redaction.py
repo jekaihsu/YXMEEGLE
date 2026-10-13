@@ -61,3 +61,52 @@ def make_plan(before, after):
         for label in (q.get('quote_code'), q.get('id')) if label and label not in allowed_codes]
         for p in before.get('projects', ())}
     return plan
+
+
+HANDLERS = {}
+TERMINAL = frozenset()
+
+
+def sweep(node, plan):
+    hidden, codes = plan.hidden, plan.hidden_codes
+    plan.visited += 1
+    if type(node) is dict:
+        hit = HANDLERS.keys() & node.keys()
+        for key in hit:
+            HANDLERS[key](node, key, plan)
+        for key in list(node):
+            if key in hidden or key in codes or (':' in key and key.split(':', 1)[1] in hidden):
+                del node[key]; plan.fallback += 1
+        for key, value in node.items():
+            kind = type(value)
+            if kind is str:
+                if value in hidden or value in codes:
+                    node[key] = None; plan.fallback += 1
+                elif len(value) > 24:
+                    if 'record=' in value:
+                        match = _URL_REC.search(value)
+                        if match and match.group(1) in hidden:
+                            node[key] = None; plan.fallback += 1
+                    elif '|' in value and any(part in hidden for part in value.split('|')):
+                        node[key] = '|'.join(part for part in value.split('|') if part not in hidden)
+                        plan.fallback += 1
+            elif kind in (dict, list) and key not in TERMINAL:
+                sweep(value, plan)
+    elif type(node) is list:
+        kept = []
+        for value in node:
+            kind = type(value)
+            if kind is str and (value in hidden or value in codes):
+                plan.fallback += 1
+            else:
+                if kind in (dict, list):sweep(value, plan)
+                kept.append(value)
+        node[:] = kept
+
+
+def apply(out, plan):
+    sweep(out, plan)
+    if plan.fallback:
+        import logging
+        logging.getLogger(__name__).warning('case_redaction unregistered holder: %d hits', plan.fallback)
+    return plan

@@ -324,6 +324,8 @@ def create_app(overrides=None):
         file_categories=categories(data); verification=data.get('native_definition_verification')
         result=strip_migration_archive(data) if owned else public_copy(data)
         from .source_case_policy import filter_visible_cases
+        from . import case_redaction
+        pre=case_redaction.snapshot(result)
         filter_visible_cases(result)
         result['workspace_id']=wid
         result['file_categories']=file_categories
@@ -371,7 +373,10 @@ def create_app(overrides=None):
                 elif isinstance(value,list):
                     for child in value:redact_provenance(child)
             redact_provenance(result['projects'])
-        return filter_private_workspace(result,user)
+        out=filter_private_workspace(result,user)
+        if out.get('environment') not in ('test','demo'):
+            app.state.case_redaction_stats=case_redaction.apply(out,case_redaction.make_plan(pre,out))
+        return out
     def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None):
         require(bool(actor_id),'缺少操作人員身分',403)
         with sessions.begin() as db:
