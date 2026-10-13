@@ -1,4 +1,4 @@
-# YX v2 P1–P8 execution plan (2026-10-13, rev 3)
+# YX v2 P1–P8 execution plan (2026-10-13, rev 3.2)
 
 Owner: the single Claude commander. Parent task `task_6f78140157c0`, continued by `task_ec8184733081` (P1/P2 planning and reviews) and now by `task_67bb22a5d7b6` (P1–P8 execution). This plan does not create a second commander. Revision 3 adds the complete P3–P8 specs and issue IDs, records the C-ID architecture decisions, and replaces the old no-push/no-staging rule with the owner's serial merge, push and staging authorization (§4).
 
@@ -93,7 +93,7 @@ A blocked source, grant or undefined business rule stays explicitly blocked or d
 |---|---|---|
 | Commander (single) | Claude Opus `claude-opus-5-5` | Plan, specs, gates, architecture decisions from the specs, integration order, reports |
 | Logic and coding | Codex `gpt-6.1-sol`, medium, **and** Claude Sonnet `claude-sonnet-5-5`, medium | Backend read models, view models, reconciliation tests. Both families get real coding rows in every phase. |
-| Hard contracts / reviews | Claude Opus `claude-opus-5-5`, high | Identity, access and redaction contracts. Independent review of Codex-authored SHAs. |
+| Plans and reviews only | Claude Opus `claude-opus-5-5`, high | Planning and independent review of Codex-authored SHAs. **Opus writes no code**: per the owner's preference, relayed by the coordinator at 15:28Z, code changes use Claude Sonnet 5.5 medium, including hard identity, access and redaction contracts. |
 | Reviews of Claude-authored code | Codex `gpt-6.1-sol`, medium | Independent review of Claude-authored SHAs |
 | Simple isolated UI | AGY (Antigravity), agent default | Presentational `.tsx`/`.css`, only after the view model is reviewed |
 | Integration | Commander, in `/Users/vc/orca/workspaces/YXMEEGLE/yx-v2` | The only writer of the shared hub files. Serial merges. |
@@ -155,11 +155,16 @@ Before C-STATE was integrated, the commander re-verified it:
 |---|---|---|---|---|---|
 | P1-126F1 | `task_75322defe946` / `ctx_a97df7fed145` | Claude `claude-sonnet-5-5`, medium | `p1-126f1` / `ava-apple/p1-126f1` (`69f7d4a`) | `frontend/src/myWorkView.ts`, `frontend/test-my-work-view.mjs` | Codex `gpt-6.1-sol` medium |
 | P1-127F1 | `task_9350171345dd` / `ctx_86bd20e4559b` | Codex `gpt-6.1-sol`, medium | `p1-127f1` / `ava-apple/p1-127f1` (`69f7d4a`) | `frontend/src/sourceHealthView.ts`, `frontend/test-source-health-view.mjs` | Claude Opus high |
-| P1-C2-V2 | `task_d08b2b98793b` / `ctx_c194365a7b22` | Claude `claude-opus-5-5`, high | `p1-c2-v2` / `ava-apple/p1-c2-v2` (`799fe4a`) | `backend/source_identity.py`, `backend/test_source_identity_contract.py` | Codex `gpt-6.1-sol` medium |
+| P1-C2-V2 (superseded) | `task_d08b2b98793b` / `ctx_c194365a7b22`, retry `ctx_00739c5756e7` | Claude `claude-opus-5-5`, high: launched in error; fenced by coordinator under the code = Sonnet rule | `p1-c2-v2` (`799fe4a`) | same as C2-V2-S | — |
+| P1-C2-V2-S | `task_f3b133db9e24` / `ctx_a24da445cd6c` | Claude `claude-sonnet-5-5`, medium | `p1-c2-v2` / `ava-apple/p1-c2-v2` (on preserved `ad0bd9a` ← `1cc6f18` ← `799fe4a`) | `backend/source_identity.py`, `backend/test_source_identity_contract.py` | Codex `gpt-6.1-sol` medium |
+| P1-126F1-REV | `task_cbb71f8fae80` / `ctx_3d96b6dcd0dc` | Codex `gpt-6.1-sol`, medium | `p1-126f1-review` (`06dc8aa`) | read-only | **CHANGES-REQUESTED**: F1 forbidden weekly leak, F2 stale null→0, F3 invented labels |
+| P1-126F1-FIX1 | `task_fdc4abe1afb0` / `ctx_463694fdcd9b` | Claude `claude-sonnet-5-5`, medium | `p1-126f1` → `80d80be435922da5d2bc03f83c3a314a4ad8af7e` | same as 126F1 | re-review below |
+| P1-126F1-REV2 | `task_7d65050ebbbc` / `ctx_be942b3c7e43` | Codex `gpt-6.1-sol`, medium | `p1-126f1-review2` (`80d80be`) | read-only | running |
+| P1-127F1-REV | `task_14e34b145b79` / `ctx_f61245d3d7c2` | Claude `claude-opus-5-5`, high (review only) | `p1-127f1-review` (`4e7749967efd9c716601ed4da7a790a0b90c7aac`) | read-only | running; also judged against the receipt rule (§7 D3) |
 
 Model notes:
 - 127F1 swapped to Codex (the `tasks.tsv` row said Claude) so that both families code in P1.
-- C2-V2 uses Opus because it is a hard identity contract.
+- C2-V2 was first launched on Opus in error and has been reassigned to Sonnet. The Opus commits `1cc6f18` and `ad0bd9a` are preserved without rewrite.
 
 Settled children from earlier continuations stay recorded in `.runtime/task_ec8184733081/children.tsv`:
 - P1-C1-REM `task_66025376e1f5`
@@ -168,12 +173,40 @@ Settled children from earlier continuations stay recorded in `.runtime/task_ec81
 
 Their worktrees are preserved.
 
+### 4.4a Integration log (2026-10-14)
+
+| Order | Row | Reviewed SHA | Final review | yx-v2 merge | CI / push |
+|---|---|---|---|---|---|
+| 1 | C-STATE | `0ed93e7` | Codex `task_3a4624cbce68` PASS | `69f7d4a` | `local_ci` green; pushed with plan at `7870953` |
+| 2 | 127F1 Source Health view model | `2cd9a2c7aa1390c1a6d0db9e6f954cb4b9b4e69f` (2 correction rounds) | Opus `task_9968bba181e2` PASS-WITH-FINDINGS (H1/H2 low test notes) | `04e8388` | first run: 1 flaky two-process contention test (`test_ops_sync_workspace_store`, no backend diff, 5/5 isolated passes); rerun green, 3050 passed |
+| 3 | C-ID v2 | `78b495b` (Opus `1cc6f18`/`ad0bd9a` preserved, Sonnet `697593d`/`171a145`/`78b495b`) | Codex `task_e173b53f4708` PASS-WITH-FINDINGS (N1 nit; N2 inherited: `native_records` raises on malformed raw link table shapes, so a future input boundary must validate them) | `2ea1e53` | pre-push CI 3211 passed; **remote `ava-apple/yx-v2` = `2ea1e530cbdd74b1c85ea4c0824309e7751d3688`** |
+| 4 | 126F1 My Work view model | `0cbd2446ae88f6eb72ae348eebb4cde9e5c5afe3` (3 correction rounds; the third was authorized by the coordinator) | Codex `task_22a233bc69e4` PASS-WITH-FINDINGS (R1 nonblocking: no repo test pins `parent.verified===true`) | `b444931` | pushed with this plan revision |
+
+Review history, with every report under `worker-evidence/<task>/review.md`:
+- 126F1: `task_cbb71f8fae80`, `task_7d65050ebbbc` and `task_c8d663374cdb` were each CHANGES-REQUESTED; `task_22a233bc69e4` passed.
+- 127F1: `task_14e34b145b79` and `task_b8f63dad0a92` were CHANGES-REQUESTED; `task_9968bba181e2` passed.
+- C-ID: `task_442cb2c2f880` and `task_2b6bc084dbac` were CHANGES-REQUESTED; `task_e173b53f4708` passed.
+
+Commander decisions taken during review:
+- 127F1 G5: a present non-boolean stage flag fails closed.
+- 127F1 G6: the mapping label is `對應未驗證`, and mapped/accepted stay literal false/null.
+- 126F1: no derived in-progress status, and `workflow_state` is shown verbatim. The coordinator approved this.
+
+Residual nonblocking notes (H1/H2, N1/N2, R1) are carried to the F2 UI and B rows.
+
+**Next ready P1 rows (G-C1 and G-C2 reviews passed; coordinator acceptance pending):**
+- 127B1: Codex.
+- 126B1: Sonnet.
+- 127B3: Codex. It must output `receipt_missing` only, with no receipt acceptance.
+- AGY 127F2 and 126F2: presentational UI built on the integrated view models. They need G6 label copy and must handle `dataState:null`.
+- 127B2 stays blocked on G-DIAG.
+
 ### 4.5 Remaining P1 rows and owners
 
 | Row | Owner | Depends on |
 |---|---|---|
 | 127B1 source health read model | Codex `gpt-6.1-sol` medium | G-C2 |
-| 127B2 diagnostic access | Claude Opus high | 127B1 + G-DIAG |
+| 127B2 diagnostic access | Claude Sonnet medium | 127B1 + G-DIAG |
 | 127B3 mapping receipts | Codex `gpt-6.1-sol` medium | G-C2; G-RCPT for any "mapped" output |
 | 126B1 my-work read model | Claude Sonnet medium | G-C2 |
 | 126B2 activity/actions | Codex `gpt-6.1-sol` medium | 126B1 |
@@ -188,7 +221,7 @@ Their worktrees are preserved.
 | Gate | Unblocks | Condition | State |
 |---|---|---|---|
 | G-C1 | 126F1, 127F1 | C-STATE reviewed and accepted | **Passed** (`0ed93e7`, integrated at `69f7d4a`) |
-| G-C2 | 127B1, 127B3, 126B1 | C2-V2 final SHA implements §7 D1–D8 + F6/N1–N4, Codex review passes, coordinator accepts | In progress |
+| G-C2 | 127B1, 127B3, 126B1 | C2-V2 final SHA implements §7 D1–D8 (D3 as revised) + F6/N1–N4, Codex review passes, coordinator accepts | **Review passed** (`78b495b`, Codex `task_e173b53f4708` PASS-WITH-FINDINGS); integrated at `2ea1e53`; awaiting coordinator acceptance |
 | G-RCPT | any field/edge shown as mapped/accepted | Supplied VCC-117 same-version source/schema/permission receipt per field and native edge type. Absent → `unlocated` / `receipt_missing`; no invented IDs | **Open, hard evidence gate** (no receipts in repo) |
 | G-RSCHEMA | trusting receipt content | Receipt schema, location and verifier authority defined by owner/VCC-117 | **Open, unresolved** |
 | G-TOKEN | asserting Lark token alphabet | Evidence on whether base/table/record tokens can contain `/`. Until then C-ID rejects such components (D8) | **Open, unresolved** |
@@ -232,7 +265,7 @@ The Opus review `task_ebfd09513665` confirmed that C-ID at `44d93b4` is a one-ta
 |---|---|---|---|
 | D1 | Edge grain | Typed edges. An edge type declares source kind/table, native field name and optional field ID, target kinds, direction, and cardinality one\|many. Instances are keyed by (source_key, edge_type). "Ambiguous" means only: more than one verified target on a cardinality-one type. | Shared gate 2 ("source field, target, direction, cardinality and permission boundary") |
 | D2 | Native links | The existing native resolver is the source of instances (`v4_sources.native_records`/`RELATIONS`, plus the field-ID links in `source_work_items`). It is reused, not reimplemented. Missing targets stay explicit unresolved rows. | VCC-132 "use native relationship IDs"; gate 2 |
-| D3 | Verification | Per edge type, through a caller-supplied opaque receipt reference. Without one, instances are navigable but marked `receipt_missing`, never mapped/accepted. Receipt content is not validated until G-RSCHEMA is resolved. | Gate 1; G-RCPT |
+| D3 (revised by owner, 15:35Z) | Verification | **No caller-supplied string is ever an authoritative receipt.** No code path may mark an edge accepted, mapped or verified on the strength of a free-form receipt, `verified_by` or `evidence_ref` value. That includes legacy `resolve_edge`, which returns an explicit unresolved reason instead. Receipt schema and verifier authority must come from existing trustworthy read-only evidence. Until real VCC-117 evidence exists, every edge type and instance is `receipt_missing` (`unlocated` for mapping). Native edge IDs remain usable for read-only navigation. | Gate 1; G-RCPT; owner decision |
 | D4 | Reverse navigation | Part of C-ID, built from the same forward instances so parent→child and child→parent agree by construction. | VCC-130 round-trip; "one-to-many and many-to-many" tests |
 | D5 | Permission boundary | Stays in callers (`production_access.require_access`, `source_case_policy`, `case_redaction`). C-ID takes no viewer and has no `forbidden` outcome. Callers redact target keys and reasons. | Commander spec "every new endpoint goes through…"; existing route authorization |
 | D6 | Stable cross-version identity | Only the existing `project_id` from the existing `assignments` mapping, which is built from verified import mapping and human pairing reviews. Provenance `assignment`. No new issuer, no grouping by name, case number or suffix. | Gate 2 "independently verified stable business identities" |
@@ -513,7 +546,7 @@ Within each phase, B and F1 of one interface go to different families, alternati
   - Future days are never absences.
 - **Identity:** open_id first. An ambiguous name match stays unknown.
 - **Sources:** `salary-overtime` `tblomH0DXCzXgenE`; `v3-people` `tblmlpA6nG5Ou7NQ`. `hr` is unlocated.
-- **Owners:** B Claude Opus high (access-critical) / F1 Codex. Fixtures are synthetic only.
+- **Owners:** B Claude Sonnet medium (access-critical; Opus reviews) / F1 Codex. Fixtures are synthetic only.
 
 ---
 
