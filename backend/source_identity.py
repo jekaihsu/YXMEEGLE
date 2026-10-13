@@ -227,17 +227,23 @@ class _FrozenRow(Mapping):
         return deepcopy(self._data[key])
 
     def __iter__(self):
-        return iter(self.FIELDS)
+        return iter(self._data)
 
     def __len__(self):
-        return len(self.FIELDS)
+        return len(self._data)
 
     def __repr__(self):
         return f"{type(self).__name__}({dict(self)!r})"
 
     def to_dict(self):
         """A fresh plain dict of the declared fields."""
-        return {k: self[k] for k in self.FIELDS}
+        return {k: self[k] for k in self._data}
+
+
+def _valid_locator(locator):
+    """A locator is a tuple of non-negative list indexes and recognized link-key names only."""
+    return isinstance(locator, tuple) and all(
+        type(c) is int and c >= 0 or type(c) is str and c in _LINK_KEYS for c in locator)
 
 
 def _require_canonical_version_key(source_key, supplied, canonical=None):
@@ -258,10 +264,11 @@ def _require_canonical_version_key(source_key, supplied, canonical=None):
 class EdgeInstance(_FrozenRow):
     """One immutable edge instance exposing only the declared instance schema.
 
-    ``locator`` is None except on ``malformed_native_link`` diagnostics, where it is the tuple of list
-    indexes (int) and link-key names (str) from the source field root to the malformed value: part of
-    the instance identity, so each malformed occurrence is a distinct diagnostic. It never holds a
-    caller value.
+    Only ``malformed_native_link`` diagnostics carry a ``locator`` key (and identity component): the
+    tuple of list indexes (int) and link-key names (str) from the source field root to the malformed
+    value, so each malformed occurrence stays a distinct diagnostic. It never holds a caller value.
+    Every other row has exactly the base fields and identity. A malformed diagnostic is always
+    unresolved with a null target.
 
     ``verification`` and ``receipt_ref`` are not stored: they are produced from
     ``RECEIPT_MISSING`` on every read, so no input can set or change them.
@@ -269,15 +276,23 @@ class EdgeInstance(_FrozenRow):
 
     __slots__ = ()
     STORED = ("edge_type", "source_key", "source_version_key", "navigation", "reason",
-              "target_key", "target_table_id", "target_record_id", "locator")
-    FIELDS = STORED + ("verification", "receipt_ref")
+              "target_key", "target_table_id", "target_record_id")
+    FIELDS = STORED + ("locator", "verification", "receipt_ref")
 
     def __init__(self, values):
-        data = {k: deepcopy(values.get(k) if k == "locator" else values[k]) for k in self.STORED}
+        data = {k: deepcopy(values[k]) for k in self.STORED}
         _require_canonical_version_key(data["source_key"], data["source_version_key"])
+        if data["reason"] == "malformed_native_link":
+            if data["navigation"] != "unresolved" or data["target_key"] is not None:
+                raise ValueError("malformed native link diagnostics must be unresolved with a null target_key")
+            locator = values.get("locator")
+            if locator is not None and not _valid_locator(locator):
+                raise ValueError("edge instance locator must be None or a malformed-link index/key path")
+            data["locator"] = deepcopy(locator)
+        elif values.get("locator") is not None:
+            raise ValueError("only malformed native link diagnostics carry a locator")
         object.__setattr__(self, "_data", MappingProxyType(
-            {**data,
-             "verification": RECEIPT_MISSING, "receipt_ref": None}))
+            {**data, "verification": RECEIPT_MISSING, "receipt_ref": None}))
 
     @classmethod
     def from_row(cls, row, version):
@@ -304,23 +319,18 @@ class EdgeInstance(_FrozenRow):
         reason = row.get("reason", "native_link" if navigation == "linked" else "native_target_unresolved")
         if not isinstance(reason, str):
             raise ValueError("edge instance reason must be a str")
-        locator = row.get("locator")
-        if locator is not None and not (
-                reason == "malformed_native_link" and isinstance(locator, tuple)
-                and all(type(c) is int and c >= 0 or c in _LINK_KEYS for c in locator)):
-            raise ValueError("edge instance locator must be None or a malformed-link index/key path")
         return cls({"edge_type": row["edge_type"], "source_key": row["source_key"],
                     "source_version_key": canonical_key, "navigation": navigation,
                     "reason": reason, "target_key": target_key,
                     "target_table_id": row.get("target_table_id"),
-                    "target_record_id": row.get("target_record_id"), "locator": locator})
+                    "target_record_id": row.get("target_record_id"), "locator": row.get("locator")})
 
     @property
     def identity(self):
         """Hashable identity; malformed diagnostics are compared by repr, never hashed raw."""
         d = self._data
         return tuple(repr(d[k]) if k.startswith("target_") and k != "target_key" else d[k]
-                     for k in self.STORED)
+                     for k in d if k not in ("verification", "receipt_ref"))
 
 
 class RejectedRow(_FrozenRow):
@@ -426,6 +436,8 @@ def _clean_native_link(value, bad, path=()):
             return _DROP
         present = [k for k in _LINK_KEYS if k in value]
         if not present:
+            if "table_id" in value and not table:
+                return {}  # table-only container with a null/empty table_id: a no-op, as in native_records
             bad.append((path, value))
             return _DROP
         kept = {} if table is None else {"table_id": table}

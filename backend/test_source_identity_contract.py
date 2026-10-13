@@ -915,7 +915,7 @@ def test_each_repeated_malformed_descendant_is_its_own_diagnostic(bad, paths):
     assert [r["target_key"] for r in mine if r["navigation"] == "linked"] == ["base-A/tblL/recL2"]
     found = [r for r in mine if r["reason"] == "malformed_native_link"]
     assert [r["locator"] for r in found] == paths
-    assert all(r["locator"] is None for r in mine if r["reason"] != "malformed_native_link")
+    assert all("locator" not in r for r in mine if r["reason"] != "malformed_native_link")
 
 
 def test_malformed_locator_is_structural_only_and_validated():
@@ -965,3 +965,66 @@ def test_valid_recursive_shapes_match_native_resolver_with_and_without_malformed
                     if r["reason"] == "native_target_unresolved"} == {
                 (r["table_id"], r["record_id"]) for r in missing}, (raw, context)
             assert sum(r["reason"] == "malformed_native_link" for r in mine) == int(malformed)
+
+
+def _malformed_row(value=5):
+    _, _, graph, mine = _observe_link_value(["recL2", value])
+    return graph, next(r.to_dict() for r in mine if r["reason"] == "malformed_native_link")
+
+
+@pytest.mark.parametrize("path", ["from_row", "instance", "graph"])
+@pytest.mark.parametrize("forge", [
+    {"navigation": "linked", "target_key": "base-A/tblL/recL1"},
+    {"target_key": "base-A/tblL/recL1"}, {"navigation": "linked"}])
+def test_malformed_diagnostic_cannot_be_promoted_to_linked(path, forge):
+    graph, row = _malformed_row()
+    forged = {**row, **forge, "verification": "verified", "receipt_ref": "caller-string"}
+    with pytest.raises(ValueError):
+        if path == "from_row":
+            source_identity.EdgeInstance.from_row(forged, None)
+        elif path == "instance":
+            source_identity.EdgeInstance(forged)
+        else:
+            source_identity.NativeEdgeGraph(graph.edge_types, None, [forged], (), {}, {})
+    assert row["navigation"] == "unresolved" and row["target_key"] is None
+
+
+@pytest.mark.parametrize("container", [
+    {"table_id": None}, {"table_id": ""}, {"table_id": None, "record_ids": None}])
+def test_table_only_nullable_container_is_native_noop(container):
+    import dataclasses
+    edge = dataclasses.replace(ITEM_TO_CONTRACT, cardinality="one")
+    targets, missing, graph, mine = _observe_link_value([container, "recL2"], edge=edge)
+    assert [r["record_id"] for r in targets] == ["recL2"] and missing == []
+    assert edge_targets(graph, ref("tblW", "recW1"), edge.edge_type)["navigation"] == "linked"
+    assert [r["reason"] for r in mine] == ["native_link"]
+
+
+@pytest.mark.parametrize("container", [{}, {"CUSTOMER_SECRET": None}, {"table_id": 5}, {"record_id": 5}])
+def test_unrecognized_or_malformed_containers_stay_malformed(container):
+    _, _, graph, mine = _observe_link_value(["recL2", container])
+    assert sum(r["reason"] == "malformed_native_link" for r in mine) == 1
+
+
+@pytest.mark.parametrize("locator", [
+    ("CUSTOMER_SECRET",), (["caller"],), ({"a": 1},), (True,), (-1,), ["record_ids"], "record_ids", (1.0,)])
+def test_direct_instance_rejects_caller_value_locator(locator):
+    _, row = _malformed_row()
+    with pytest.raises((ValueError, TypeError)):
+        source_identity.EdgeInstance({**row, "locator": locator})
+    with pytest.raises((ValueError, TypeError)):
+        source_identity.EdgeInstance({**row, "reason": "native_link", "locator": (1,)})
+    assert hash(source_identity.EdgeInstance(row).identity) is not None
+
+
+def test_ordinary_rows_keep_exact_pre_locator_shape_and_identity():
+    graph = _observe_link_value("recL2")[2]
+    row = next(r for r in graph.instances if r["reason"] == "native_link")
+    assert tuple(row) == ("edge_type", "source_key", "source_version_key", "navigation", "reason",
+                          "target_key", "target_table_id", "target_record_id", "verification", "receipt_ref")
+    assert len(row.identity) == 8 and "locator" not in row.to_dict()
+    assert row.identity == (row["edge_type"], row["source_key"], row["source_version_key"], "linked",
+                            "native_link", row["target_key"], repr(row["target_table_id"]),
+                            repr(row["target_record_id"]))
+    _, bad = _malformed_row()
+    assert "locator" in bad and len(source_identity.EdgeInstance(bad).identity) == 9
