@@ -197,3 +197,35 @@ def test_quote_confirmation_links_public_round_trip(linked_sources,viewer,admit_
         stored=storage.load(db,BusinessRow,db.get(WorkspaceRow,'lark-boundary'))
         assert stored['source_quotes']==original['source_quotes']
         assert stored['contract_items']==original['contract_items']
+
+
+@pytest.mark.parametrize('viewer,admit_hidden',[('u-pm',False),('u-manager',False),('u-manager',True)])
+def test_confirmation_quote_links_public_round_trip(linked_sources,viewer,admit_hidden):
+    app,client,signin,_=linked_sources
+    q,h,c=[f'base/quotes/{rid}' for rid in ('recQ','recHIDDENQ','recHISTORYQ')]
+    with app.state.sessions.begin() as db:
+        row=db.get(WorkspaceRow,'lark-boundary');state=storage.load(db,BusinessRow,row)
+        state['source_confirmations'][0]['quote_ids']=[h,q,c]
+        for rid,pid,code in [('recHIDDENQ','p2','Q999777'),('recHISTORYQ','p1','Q888666')]:
+            state['source_quotes'].append(dict(id=f'base/quotes/{rid}',project_id=pid,code=code,
+                source_identity=dict(base_token='base',table_id='quotes',record_id=rid)))
+        state['source_visible_record_ids'].append('base|quotes|recHISTORYQ')
+        if admit_hidden:state['source_visible_record_ids'].append('base|quotes|recHIDDENQ')
+        original=deepcopy(state)
+        row.data=storage.save(db,BusinessRow,row.id,state)
+    signin(viewer)
+    workspace=client.get('/api/workspace')
+    assert workspace.status_code==200,workspace.text
+    body=dict(action='comment_add',project_id='p2',version=workspace.json()['version'],
+        request_id='confirmation-links-roundtrip',payload={'body':'hello'})
+    for response in [workspace,client.get('/api/projects/p2'),client.post('/api/actions',json=body),
+                     client.post('/api/actions',json=body)]:
+        assert response.status_code==200,response.text
+        assert response.json()['source_confirmations'][0]['quote_ids']==([h,q] if admit_hidden else [q])
+        for token,visible in [('recHIDDENQ',admit_hidden),('Q999777',admit_hidden),
+                              ('recHISTORYQ',False),('Q888666',False)]:
+            assert (token in response.text)==visible
+    with app.state.sessions() as db:
+        stored=storage.load(db,BusinessRow,db.get(WorkspaceRow,'lark-boundary'))
+        assert stored['source_confirmations']==original['source_confirmations']
+        assert stored['source_quotes']==original['source_quotes']

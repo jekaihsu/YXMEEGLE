@@ -351,6 +351,10 @@ def create_app(overrides=None):
                 for record in result.get(collection,[]):
                     if 'confirmation_ids' in record:
                         record['confirmation_ids']=[cid for cid in record['confirmation_ids'] if cid in visible_confirmations]
+            visible_quotes={q['id'] for q in result.get('source_quotes',[])}
+            for confirmation in result.get('source_confirmations',[]):
+                if 'quote_ids' in confirmation:
+                    confirmation['quote_ids']=[qid for qid in confirmation['quote_ids'] if qid in visible_quotes]
         return filter_private_workspace(result,user)
     def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None):
         require(bool(actor_id),'缺少操作人員身分',403)
