@@ -33,7 +33,7 @@ await render(true,false);
 assert.equal(document.querySelectorAll('.disabled-action-reason').length,0);
 await render(false,true);
 assert.equal(document.querySelectorAll('.disabled-action-reason').length,0);
-await React.act(async()=>root.render(React.createElement(ui.DisabledActionReasons.Provider,{value:true},React.createElement(ui.Primary,{busy:true},'Busy'))));
+await React.act(async()=>root.render(React.createElement(ui.DisabledActionReasons.Provider,{value:true},React.createElement(ui.Primary,{busy:true,disabledReason:'前置成果尚未交付'},'Busy'))));
 assert.equal(document.querySelector('button').disabled,true);
 assert.equal(document.getElementById(document.querySelector('button').getAttribute('aria-describedby')).textContent,'目前無法操作');
 await React.act(async()=>root.unmount());
