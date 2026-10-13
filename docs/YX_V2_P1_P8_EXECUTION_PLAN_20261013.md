@@ -1,6 +1,16 @@
-# YX v2 P1–P8 execution plan (2026-10-13, rev 3.6 of 2026-10-14)
+# YX v2 P1–P8 execution plan (2026-10-13, rev 3.7 of 2026-10-14)
 
-Owner: the single Claude commander. Parent task `task_6f78140157c0`, continued by `task_ec8184733081` (P1/P2 planning and reviews) then by `task_67bb22a5d7b6` (P1–P8 execution), and now by `task_97a32b5dcb2e` (P1/P2 continuation only; P3–P8 are not dispatched by this task). This plan does not create a second commander. Revision 3 adds the complete P3–P8 specs and issue IDs, records the C-ID architecture decisions, and replaces the old no-push/no-staging rule with the owner's serial merge, push and staging authorization (§4).
+Owner: the single Claude commander. Parent task `task_6f78140157c0`, continued by `task_ec8184733081` (P1/P2 planning and reviews) then by `task_67bb22a5d7b6` (P1–P8 execution), then by `task_97a32b5dcb2e` (P1 continuation), and now by `task_7bab31d03ad7` (P2 onward, one phase at a time). This plan does not create a second commander. Revision 3 adds the complete P3–P8 specs and issue IDs, records the C-ID architecture decisions, and replaces the old no-push/no-staging rule with the owner's serial merge, push and staging authorization (§4).
+
+**Rev 3.7 owner direction (2026-10-14, base `ava-apple/yx-v2` = `7ae4a9d47a85dc2a35b0f994a3eced7e06ab3f41`, clean, equal to `origin`):**
+- **P2 starts now without staging acceptance.** G-P1-REV no longer blocks P2; P1 stays integrated with its documented gaps (§4.4d). P3 starts only after P2 acceptance, then P4–P8 one phase at a time, each after the prior phase passes.
+- The Opus commander (`task_7bab31d03ad7`) plans and performs exact-SHA cross-model reviews only. It writes no application code.
+- Real coding goes to **both** Claude Sonnet `claude-sonnet-5-5` medium and Codex `gpt-6.1-sol` medium, with disjoint file ownership in separate Orca-managed child worktrees. AGY is used only for simple presentational UI after contracts settle.
+- **The root coordinator owns serial integration into `ava-apple/yx-v2`** (and any push). Children and the commander commit locally only and never push, merge or deploy. This supersedes the commander-merge/push clauses of §4.2.
+- Deployment and cleanup are on hold. Every worktree and all evidence are preserved. Staging (§10, G-STG) is not a precondition for any phase in this continuation.
+- Unchanged: Lark read-only, no new scopes/credentials/roles/grants/permissions, no guessed relationship/formula/mapping, field allowlists and unknown-versus-zero preserved, contract amounts hidden (G-AMT), VCC-125 open, no authorization-complete or release claim.
+- Review budget: one cross-model review per meaningful change; delta-only re-review for fixes; one focused-test run plus one build/type pass per integration; no repeated broad reviews.
+- P2 wave 1 children: §4.6.
 
 **Status at rev 3.3 (2026-10-14, `ava-apple/yx-v2` = `416e1bdff6bf4ffaa1a2e54c956f7fab0efe6c52`):**
 - C-STATE, C-ID v2, the 127F1 Source Health view model and the 126F1 My Work view model are integrated. **None of them is wired to a route yet** (§4.4b). P1 interfaces are therefore not delivered; only helper/view-model artifacts exist.
@@ -70,8 +80,8 @@ Shared Pages: [phase index](https://chatgpt.com/space/page_0cb44163425c8191bd8d8
 
 | Phase | Scope | Status | Starts only after |
 |---|---|---|---|
-| **P1** | VCC-126, VCC-127, C-STATE, C-ID | **In progress** | Owner authorization (given) |
-| **P2** | VCC-128..132 | **Held** | G-P1-REV: P1 integrated, tested, cross-reviewed, browser evidence, coordinator acceptance |
+| **P1** | VCC-126, VCC-127, C-STATE, C-ID | **Integrated with documented gaps** (§4.4d) | Owner authorization (given) |
+| **P2** | VCC-128..132 | **In progress** (rev 3.7, wave 1 §4.6) | Owner direction 2026-10-14: starts now without staging acceptance |
 | **P3** | VCC-133, VCC-134 | Specified, not dispatched | P2 accepted (integration + real tests + independent review + responsive browser) |
 | **P4** | VCC-135..139 | Specified, not dispatched | P3 accepted |
 | **P5** | VCC-140, VCC-141 | Specified, not dispatched | P4 accepted |
@@ -307,6 +317,33 @@ Push note: the remote reached `534c0f0` through a push that was not made by the 
 - VCC-125: open release gate.
 
 
+### 4.6 P2 children (rev 3.7; commander `task_7bab31d03ad7`, Run `run_78850e7617f6`; records and specs in `.runtime/task_7bab31d03ad7/` of the commander worktree)
+
+All rows branch from `7ae4a9d`, live in Orca `new-child` worktrees under `/Users/vc/orca/workspaces/YXMEEGLE/p2-*`, commit locally and are integrated by the root coordinator only. Effective agent/model/effort is recorded in `start-*.json`.
+
+| ID | Orca task / dispatch | Agent / model | Worktree / branch | Exclusive files | Reviewer (other family) | State |
+|---|---|---|---|---|---|---|
+| P2-129B Confirmation List read model | `task_fdfb6ebb821f` / `ctx_e70eb9bd4e3b` | Claude `claude-sonnet-5-5` medium | `p2-129b` / `ava-apple/p2-129b` | `backend/confirmation_list.py`, `backend/test_confirmation_list.py` | Codex `gpt-6.1-sol` medium | dispatched |
+| P2-130B Case/Confirmation Detail read model | `task_7dadd7a6da03` / `ctx_c4c7409a7885` | Claude `claude-sonnet-5-5` medium | `p2-130b` / `ava-apple/p2-130b` | `backend/case_detail.py`, `backend/test_case_detail.py` | Codex `gpt-6.1-sol` medium | dispatched |
+| P2-131B Contract Detail read model | `task_1c6df5239e18` / `ctx_a8cd8bf90fd1` | Codex `gpt-6.1-sol` medium | `p2-131b` / `ava-apple/p2-131b` | `backend/contract_detail.py`, `backend/test_contract_detail.py` | Opus commander | dispatched |
+| P2-132B Work Item Detail read model | `task_dd50a157ceec` / `ctx_43dee71a62c5` | Codex `gpt-6.1-sol` medium | `p2-132b` / `ava-apple/p2-132b` | `backend/work_item_detail.py`, `backend/test_work_item_detail.py` | Opus commander | dispatched |
+| P2-NAV return context | `task_dcf510090854` / `ctx_624d8d2efe24` | Claude `claude-sonnet-5-5` medium | `p2-nav` / `ava-apple/p2-nav` | `frontend/src/drilldownContext.ts`, `frontend/test-drilldown-context.mjs` | Codex `gpt-6.1-sol` medium | dispatched |
+
+Held P2 rows (file sets fixed now, dispatched when their input is reviewed):
+- **P2-128B** Manager Overview read model, Codex: `backend/manager_overview.py` + test. Waits for the reviewed 129B `confirmation_population`, so each KPI equals its drilldown denominator.
+- **P2-F1** view models, after the matching B contract is reviewed, alternating families: 129F1 Codex `frontend/src/confirmationListView.ts`; 130F1 Codex `caseDetailView.ts`; 131F1 Sonnet `contractDetailView.ts`; 132F1 Sonnet `workItemDetailView.ts`; 128F1 Sonnet `managerOverviewView.ts` (each + `frontend/test-<name>.mjs`).
+- **P2-UI-a / UI-b** AGY presentational components (file sets as in `tasks.tsv`), after the F1s are reviewed.
+- **P2-INT** Sonnet: the only writer of the hub files; registers only the five approved P2 GETs through the existing authorization chain (§4.4b). The root coordinator merges.
+- **P2-E2E** Codex: `backend/test_p2_reconciliation.py`, `frontend/test-p2-navigation.mjs`.
+
+Gate decisions binding on P2 wave 1 (from the approved specs; no owner question needed):
+- Contract amounts are output as `withheld` with reason G-AMT; no values and no derived values.
+- Work orders (132) are `unlocated` with a Source Health link until G-RCODE.
+- Effective due dates are unknown unless a verified formal field is proven (VCC-123); the 129 deadline-range filter is `unavailable` and never hides rows.
+- Edge verification is `receipt_missing` (D3); native IDs are used for read-only navigation only.
+
+P2 integration order is unchanged from §4.2 item 7 (129, 130, 131, 132, 128, NAV, UI-a, UI-b, E2E), executed by the root coordinator.
+
 ### 4.5 Remaining P1 rows and owners
 
 | Row | Owner | Depends on |
@@ -332,11 +369,11 @@ Push note: the remote reached `534c0f0` through a push that was not made by the 
 | G-RSCHEMA | trusting receipt content | Receipt schema, location and verifier authority defined by owner/VCC-117 | **Open, unresolved** |
 | G-TOKEN | asserting Lark token alphabet | Evidence on whether base/table/record tokens can contain `/`. Until then C-ID rejects such components (D8) | **Open, unresolved** |
 | G-DIAG | 127B2 diagnostic layer | Coordinator confirms which existing grant is diagnostic (proposal: `company_admin_grant`). Otherwise page-state view only | Open |
-| G-P1-REV | all of P2 | P1-INT green on `scripts/local_ci.sh`; cross-review passes; browser evidence; coordinator accepts | Open |
+| G-P1-REV | (formerly all of P2) | P1-INT green on `scripts/local_ci.sh`; cross-review passes; browser evidence; coordinator accepts | **Superseded for P2 start** by the rev 3.7 owner direction; P1 gaps stay documented |
 | G-AMT | P2-131B amounts | Separate approval to show contract amounts (`QUOTE_FINANCE` re-verified) | Open |
 | G-RCODE | P2-132B work orders / node instances | R01/02/09/10 work-order and node models verified; until then `unlocated` + Source Health link | Open |
 | G-P(N) | phase N+1 | Phase N integration + real tests + independent review + responsive browser evidence + coordinator acceptance | Sequential (§2) |
-| G-STG | staging publication of any stage | Exact-SHA artifact prepared from an accepted, pushed `yx-v2` SHA; the parent re-uploads it to the existing staging service through its verified authenticated browser (§10) | **Path available** (CLI 401 no longer the route). No accepted P1 stage is ready to stage yet |
+| G-STG (on hold, rev 3.7) | staging publication of any stage | Exact-SHA artifact prepared from an accepted, pushed `yx-v2` SHA; the parent re-uploads it to the existing staging service through its verified authenticated browser (§10) | **Path available** (CLI 401 no longer the route). No accepted P1 stage is ready to stage yet |
 | G-VCC125 | any production release | VCC-125 closed; never waived | Open |
 
 Stop and escalate on any of these: a GET endpoint not listed in the task table, a change to an existing response shape, a missing diagnostic capability, contract amounts, payroll/HR data beyond the existing allowlists, or any field or edge without a receipt.
@@ -426,7 +463,7 @@ Within each phase, B and F1 of one interface go to different families, alternati
   - Mapping states: located/readable/mapped/presented/accepted are distinct.
   - Access: forbidden sources leak nothing; the diagnostic layer only with existing access; retry repeats the authorized read only.
 
-### P2 (held; rows in `tasks.tsv`)
+### P2 (in progress; rows in §4.6)
 - 128: Manager Overview. Each KPI equals its same-set drilldown denominator.
 - 129: Confirmation List. One row per source version; cursor pagination.
 - 130: Case/Confirmation Detail. Parent↔child round-trip with no forbidden-child leak.
