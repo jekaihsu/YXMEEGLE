@@ -24,6 +24,7 @@ import {draftKey, clearDrafts} from './drafts';
 import {SourceMappingSummary} from './SourceMappingSummary';
 import {CompletionCelebration, newlyCompletedNodes, type CompletionMoment} from './CompletionCelebration';
 import {type Approval, type Project, type Route, type Session, type SourceData, type Workspace, type Freshness, type LiveDataset} from './types';
+import {homeOverdueCount} from './executableTasks';
 import {ActionScope, Ctx, TaskRow, STATUS, NODE_NAMES, SOURCE_KINDS, eventMessage, date, shortDate, stamp, num, active, allTasks, isLate, nameOf, isLead, isProjectLead, isTaskActor, safeUrl, Badge, Empty, Modal, Field, Primary, PageHead, openTask, TaskTable, FullWorkspaceGate} from './appCommon';
 import {Dashboard, ShellDashboard} from './DailyHome';
 import {Projects} from './ProjectsList';
@@ -94,7 +95,7 @@ export default function App(){
  const switchUser=async(id:string)=>{if(!allowNavigation({view:'dashboard'}))return;setBusy(true);try{await api('/api/demo/session',{method:'POST',body:JSON.stringify({user_id:id})});await refresh();setSessionOpen(false);notify('已切換示範角色')}catch(e){setError((e as Error).message)}finally{setBusy(false)}};
  const c=w&&s?.user?{w:{...w,freshness:liveFreshness||w.freshness},s,busy,error,registerDrafts,onFreshness:acceptFreshness,onRefreshError,reloadVersion:workspaceReload,route,go,run,refresh,notify,upload}:null;
  const reread=async()=>{if(dirtyDraftRef.current||reloadGuard.blocked()||mutationActive.current!==null)return;const epoch=getSessionEpoch();try{if(s?.mode==='lark'&&w?.freshness?.enabled){const result=await liveRefresh(['sources','attendance']);if(epoch===getSessionEpoch())acceptFreshness(result.freshness)};if(epoch===getSessionEpoch())await guardedRefresh()}catch(e){if(epoch===getSessionEpoch()){onRefreshError(['sources','attendance']);setError((e as Error).message)}}};
- const overdue=w?w.scope==='shell'&&w.counts?w.counts.my_overdue_tasks:allTasks(w).filter(r=>r.t.can_execute===true&&isLate(r.t,w.as_of)).length:0;
+ const overdue=w?homeOverdueCount(w):0;
  const activeNav=route.view==='project'?'projects':route.view;
  if(s?.access_mode==='recovery'&&s.user)return <><header className="topbar"><DataFreshness key={getSessionEpoch()} demo={s.mode==='demo'} mutationActive={busy} dirtyDraft={dirtyDraft} refresh={refresh}/></header><RecoveryPage s={s} refresh={refresh} logout={logout}/></>;
  if(!s?.user)return <main className="login-page"><section className="login-card"><span className="brand-mark" aria-hidden="true"><i/><i/><i/><i/></span><p className="eyebrow">詠翔專案工作台</p><h1>{loading?'正在確認登入狀態':'登入公司工作台'}</h1><p>{loading?'請稍候。':'使用公司 Lark 帳號，查看你有權限的案件與工作。'}</p>{error&&<p className="form-error" role="alert">{error}</p>}{callbackError&&<div className="auth-error-card" role="alert"><strong>{callbackError.title}</strong><p>{callbackError.description}</p><p>{callbackError.next}</p></div>}{!loading&&s?.auth_configured&&<a className="button primary" href={'/api/auth/lark/login?next='+encodeURIComponent(location.pathname+location.search+location.hash)} onClick={()=>sessionStorage.setItem('yx:return-route',location.hash)}>使用 Lark 登入</a>}{!loading&&s&&!s.auth_configured&&<p>公司登入尚未設定，請由系統管理員確認應用與回呼網址。</p>}<button className="button" disabled={loading} onClick={()=>void refresh()}>重新檢查</button></section></main>;
