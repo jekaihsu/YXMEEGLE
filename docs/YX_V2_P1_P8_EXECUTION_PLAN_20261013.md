@@ -1,4 +1,4 @@
-# YX v2 P1–P8 execution plan (2026-10-13, rev 3.3 of 2026-10-14)
+# YX v2 P1–P8 execution plan (2026-10-13, rev 3.4 of 2026-10-14)
 
 Owner: the single Claude commander. Parent task `task_6f78140157c0`, continued by `task_ec8184733081` (P1/P2 planning and reviews) then by `task_67bb22a5d7b6` (P1–P8 execution), and now by `task_97a32b5dcb2e` (P1/P2 continuation only; P3–P8 are not dispatched by this task). This plan does not create a second commander. Revision 3 adds the complete P3–P8 specs and issue IDs, records the C-ID architecture decisions, and replaces the old no-push/no-staging rule with the owner's serial merge, push and staging authorization (§4).
 
@@ -243,6 +243,30 @@ Held rows:
 - 127B2 (Sonnet): waits for G-DIAG.
 
 P1 merge order: C2-N, 127B1, 126B1, 127B3, 126B2, F2 ×2, P1-INT (the commander wires the three approved GETs and the `#work`/`#sources` bodies), then P1-REV.
+Because the file sets are disjoint, rows merge in the order they are accepted. The order above is the default.
+
+Review and correction rounds in this continuation (every report is under `worker-evidence/<task>/`):
+
+| Row | Candidate SHAs (author task) | Reviews (other family) | State |
+|---|---|---|---|
+| C2-N | `771d6ef` (`task_91d611b7f9d0`) → `0dab393` (FIX1 `task_4da5febd32de`) → `a139fd4f25a9c4938207f9a180a67e5a2bc8ad9b` (FIX2 `task_0a796693ed10`, final round) | Codex: `task_a99046fad671` CHANGES-REQUESTED (standalone constructor key; recursive sibling loss); `task_02fc6a882f2e` CHANGES-REQUESTED (all-null link dict; diagnostic collapse); REV3 `task_73719da5a4f5` running | not accepted |
+| 127B1 | `4b85a91` (`task_50231ff50986`) → `e1b25a9a925b2741924e05358b50d4629efd0711` (FIX1 `task_0b128e71a49a`) | Opus: `task_e946714db749` PASS-WITH-FINDINGS (2 Medium); `task_0b7b3793ade6` **PASS-WITH-FINDINGS**. Its R1 (Low) is accepted as fail-closed: with `viewer_filtered=True`, a healthy table plus a filtered-empty table gives page `unknown` | **accepted, integrated** |
+| 126B1 | `bd4084a` (`task_c94f5b3156f0`) → `693b4eb` (FIX1 `task_815d0d2c4467`) → FIX2 `task_db0f5930291f` running (final round) | Codex: `task_ef2cc07991fb` CHANGES-REQUESTED (F1–F4); `task_b7d16e94a335` CHANGES-REQUESTED (R1 critical: malformed known-other tasks; R2: hidden demo disables the redaction default) | correcting |
+| 127F2 | `5a744b5` (AGY `task_c85dcc2b9f77`) → `77ce146ee7cb3bea314f1e88b4169d7e02c01ffd` (AGY FIX1 `task_16f8b81774fe`) | Codex: `task_ab85c1d21f7b` CHANGES-REQUESTED (keyboard intercept; derived copy/counts; ARIA; focus); REV2 `task_4dd025a77a0c` running | reviewing |
+| 126F2 | `3bbed53` (AGY `task_de0e26027d09`) → AGY FIX1 `task_33fc638f1538` running | Codex: `task_cf4b3a41b3d5` CHANGES-REQUESTED (keyboard intercept; ARIA; claimed mutation checks were not real) | correcting |
+
+**P1-INT obligations already recorded from reviews:**
+- On the real path, pass `viewer_filtered=False` to `build_source_health` only after re-verifying that `visible_source_snapshot` does not narrow rows for the viewer.
+- Resolve the `page_state: None` → unknown rendering with a separately reviewed view-model change.
+- My Work's supervisor toggle stays tied to the existing per-item authorization.
+- Both AGY reports list view-model copy follow-ups.
+
+### 4.4d Integration log (continuation)
+
+| Order | Row | Reviewed SHA | Final review | yx-v2 merge | CI / push |
+|---|---|---|---|---|---|
+| 5 | 127B1 Source Health read model (pure, unwired) | `e1b25a9` | Opus `task_0b7b3793ade6` PASS-WITH-FINDINGS | `d4e13156213043b9b6ca77a843554bd6529894b0` | `scripts/local_ci.sh` **exit 0**: backend 3258 passed, 20 skipped, 1 xfailed; frontend checks passed. Log: `worker-evidence/task_97a32b5dcb2e/local_ci_d4e1315.log`. Pushed with this plan revision |
+
 
 ### 4.5 Remaining P1 rows and owners
 
