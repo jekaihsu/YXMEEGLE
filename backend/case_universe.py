@@ -25,13 +25,17 @@ def build_universe(admit_hidden=False):
                      ('recQuoteD',['recCaseD']),('recQuoteAB',['recCaseA','recCaseB']),
                      ('recQuoteMissing',['recCaseA'])]:
         records.append(record('quote',rid,{'報價編號':'Q'+rid,'此案確認單':link('confirmation',*refs)}))
-    for suffix,refs in [('A',['recCaseA']),('B',['recCaseB']),('AB',['recCaseA','recCaseB']),('Ghost',['recGhostX'])]:
+    for suffix,refs in [('A',['recCaseA']),('B',['recCaseB']),('D',['recCaseD']),('AB',['recCaseA','recCaseB']),('Ghost',['recGhostX'])]:
         records.append(record('contract','recContract'+suffix,{'所屬成案確認單（日報關聯）':link('confirmation',*refs)}))
         records.append(record('reporting','recReport'+suffix,{'來源合約明細（日報關聯）':link('contract','recContract'+suffix),
             '工項類別':'控制','工項名稱':'universe item'}))
     records.append(record('daily','recDailyA',{'日期':'2026-10-13','組別':'控制',
         '所屬案件':link('confirmation','recCaseA'),'內業工項':link('reporting','recReportA')}))
     import_sources(state,records)
+    task=next(t for p in state['projects'] for n in p['nodes'] for t in n['tasks'] if t['id']==source_id(next(r for r in records if r['record_id']=='recReportA')))
+    next(r for r in records if r['record_id']=='recDailyA')['fields']['內業工項']=[]
+    task['started_at']='2026-10-01T00:00:00+08:00'
+    next(r for r in records if r['record_id']=='recReportA')['fields']['來源合約明細（日報關聯）']=link('contract','recContractD')
     qa=next(r for r in records if r['record_id']=='recQuoteA')
     qa['fields']['此案確認單']=link('confirmation','recCaseA','recCaseB')
     next(r for r in records if r['record_id']=='recContractA')['fields']['所屬成案確認單（日報關聯）']=link('confirmation','recCaseA','recCaseB')
@@ -68,8 +72,12 @@ def build_universe(admit_hidden=False):
     pa['source_record_ids'].append(source_id(hq))
     from .v4_sources import quote_snapshot
     pa['quotes'].append(quote_snapshot(hq))
+    pa['quotes'].append(quote_snapshot(next(r for r in records if r['record_id']=='recQuoteMissing')))
+    from .source_projection import preserve_missing_sources
+    preserve_missing_sources(state,current,tables,{pa['id']:pa.get('source_record_history',[])})
     pa.setdefault('source_record_history',[]).append(dict(id=source_id(hb),url=url(hb),fields=deepcopy(hb['fields'])))
     pa.setdefault('source_conflicts',{})['quote:'+source_id(hq)]=['C115902']
+    next(q for q in state['source_quotes'] if q['source_identity']['record_id']=='recQuoteA')['fields']['此案確認單']+=link('confirmation','recCaseB')
     state['source_case_review']=[dict(identity=identity(hb),code=['C115902'])]
     return state,records,pa['id']
 

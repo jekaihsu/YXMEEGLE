@@ -147,3 +147,79 @@ def _entity_ids(node, key, plan):
 
 HANDLERS.update(confirmation_ids=_refs, quote_ids=_refs, source_record_ids=_refs,
                 source_entity_ids=_entity_ids)
+
+
+def _names_hidden(row, plan):
+    for key in ('id','quote_id','source_url','url','record_ids','link_record_ids','text','code','quote_code','engineering_code'):
+        value = row.get(key)
+        if type(value) is str:
+            if value in plan.hidden or value in plan.hidden_codes:return True
+            match = _URL_REC.search(value) if 'record=' in value else None
+            if match and match.group(1) in plan.hidden:return True
+        elif type(value) is list and any(type(x) is str and x in plan.hidden for x in value):
+            return True
+    return False
+
+
+def _record_list(node, key, plan):
+    if not isinstance(node[key], list):return
+    kept = []
+    for row in node[key]:
+        if isinstance(row, dict) and _names_hidden(row, plan):
+            if key != 'quotes' or not row.get('source_missing'):continue
+            # A process-secret HMAC preserves a stable row key without exposing identity.
+            opaque = hmac.new(_OPAQUE_KEY, str(row.get('id')).encode(), hashlib.sha256).hexdigest()
+            row = {k: row.get(k) for k in ('amount', 'source_missing')}
+            row.update(id='removed-'+opaque,
+                quote_code=None,engineering_code=None,source_url=None,url=None,fields=None,review_available=False)
+        sweep(row, plan);kept.append(row)
+    node[key] = kept
+
+
+def _fields(node, key, plan):
+    if not isinstance(node[key], dict):return
+    for name, value in node[key].items():
+        if isinstance(value, list):
+            node[key][name] = [x for x in value if not (type(x) is str and (x in plan.hidden or x in plan.hidden_codes)
+                or isinstance(x, dict) and _names_hidden(x, plan))]
+
+
+def _conflicts(node, key, plan):
+    if not isinstance(node[key], dict):return
+    for name in list(node[key]):
+        if ':' in name and name.split(':', 1)[1] in plan.hidden:
+            del node[key][name]
+        elif isinstance(node[key][name], list):
+            node[key][name] = [x for x in node[key][name] if not (type(x) is str and (x in plan.hidden or x in plan.hidden_codes))]
+
+
+def _scrub_text(messages, labels):
+    for i, message in enumerate(messages):
+        for label in labels:message = message.replace('報價 '+label+'：', '報價 '+PLACEHOLDER+'：')
+        messages[i] = message
+
+
+def _policy_summary(node, key, plan):
+    for row in node[key]:
+        labels = plan.labels.get(row.get('project_id'))
+        if not labels:continue
+        closure = row.get('closure', {})
+        financial = closure.get('financial', {})
+        incoming = financial.get('incoming', {})
+        for section in [closure, financial, incoming, *row.get('nodes', [])]:
+            _scrub_text(section.get('missing', []), labels)
+
+
+import hashlib, hmac, secrets
+_OPAQUE_KEY = secrets.token_bytes(32)
+HANDLERS.update(quotes=_record_list, source_record_history=_record_list, fields=_fields,
+                source_conflicts=_conflicts, policy_summary=_policy_summary)
+TERMINAL = frozenset(('quotes', 'source_record_history'))
+
+
+def _source_urls(node, key, plan):
+    node[key] = [value for value in node[key] if not (
+        isinstance(value, str) and (match := _URL_REC.search(value)) and match.group(1) in plan.hidden)]
+
+
+HANDLERS['source_urls'] = _source_urls

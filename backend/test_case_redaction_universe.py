@@ -29,7 +29,7 @@ def install(app,state):
         row=db.get(WorkspaceRow,'lark-boundary');row.data=storage.save(db,BusinessRow,row.id,state)
 
 
-PENDING={'policy_summary.[].closure.missing.[]'}
+PENDING=set()
 @pytest.mark.parametrize('path',[pytest.param(p,marks=pytest.mark.xfail(strict=True,reason='typed handler pending')) if p in PENDING else p for p in LEAK_PATHS])
 
 def test_known_holder(isolated_http,path):
@@ -155,3 +155,55 @@ def test_admitted_reference_order_and_ghost_whitelist(isolated_http):
     assert p['source_entity_ids']['source_confirmations']==[entity_id(c),entity_id(a)]
     # Contract ids remain outside phase 1; reference indexing must preserve them.
     assert p['source_entity_ids']['contract_items']
+
+
+def test_typed_holders_and_derived_business_values(isolated_http,monkeypatch):
+    from copy import deepcopy
+    from . import case_redaction as cr
+    from .sources import source_id
+    app,client,_,signin=isolated_http
+    state,records,pid=build_universe();install(app,state);signin('u-manager')
+    response=client.get('/api/workspace');assert response.status_code==200
+    public=response.json();needles=forbidden(state,records)
+    assert not any(n in response.text for n in needles),[(path,value) for path,value in walk(response.json()) if any(n in value for n in needles)]
+    p=next(p for p in public['projects'] if p['id']==pid)
+    missing=next(q for q in p['quotes'] if q.get('source_missing'))
+    assert missing['id'].startswith('removed-') and missing['review_available'] is False
+    assert missing['quote_code'] is None and missing['engineering_code'] is None
+    assert missing['source_url'] is None and missing['fields'] is None
+    qa=next(q for q in public['source_quotes'] if q['source_identity']['record_id']=='recQuoteA')
+    assert qa['fields']['此案確認單'][0]['record_ids']==['recCaseA','recGhostX']
+    hidden_quote=next(r for r in records if r['record_id']=='recQuoteB')
+    assert 'quote:'+source_id(hidden_quote) not in p['source_conflicts']
+    assert any(k.startswith('quote:') for k in p['source_conflicts'])
+    monkeypatch.setattr(cr,'apply',lambda out,plan:plan)
+    baseline=client.get('/api/workspace').json()
+    def business(rows):
+        return [(r['project_id'],r['closure']['status'],len(r['closure']['missing']),
+            r['closure']['financial']['incoming']['status']) for r in rows]
+    assert business(public['policy_summary'])==business(baseline['policy_summary'])
+    assert any('［不開放檢視］' in message for row in public['policy_summary'] for message in row['closure']['missing'])
+
+
+def test_registered_handler_primitives():
+    from . import case_redaction as cr
+    plan=cr.Plan(frozenset({'recAdmitted'}),frozenset({'recHiddenCase'}),frozenset({'C999999'}))
+    out={'unresolved':[{'record_id':'recGhostID','field':'keep'}],
+        'unresolved_quote_ids':['recGhostID'],
+        'fields':{'link':[{'record_ids':['recHiddenCase']},{'text':'C999999'},{'record_ids':['recAdmitted']} ]},
+        'source_conflicts':{'quote:recHiddenCase':['C999999'],'quote:recAdmitted':['keep','C999999']},
+        'quote_ids':['recAdmitted','recGhostID','recHiddenCase']}
+    cr.apply(out,plan)
+    assert out=={'unresolved':[{'record_id':'［不開放檢視］','field':'keep'}],
+        'unresolved_quote_ids':['［不開放檢視］'],
+        'fields':{'link':[{'record_ids':['recAdmitted']}]},
+        'source_conflicts':{'quote:recAdmitted':['keep']},'quote_ids':['recAdmitted']}
+    assert plan.fallback==0
+
+
+def test_policy_labels_do_not_match_admitted_code_prefixes():
+    from . import case_redaction as cr
+    plan=cr.Plan(frozenset(),frozenset(),frozenset({'Q1'}),labels={'p':['Q1']})
+    out={'policy_summary':[{'project_id':'p','closure':{'missing':['報價 Q1：x','報價 Q10：x']}}]}
+    cr.apply(out,plan)
+    assert out['policy_summary'][0]['closure']['missing']==['報價 ［不開放檢視］：x','報價 Q10：x']
