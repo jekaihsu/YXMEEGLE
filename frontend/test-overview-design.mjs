@@ -42,9 +42,20 @@ assert.equal(waitingText(),waiting,'full and shell render the same assigned wait
 assert.ok(waitingText().includes('原期限 2026/10/06')&&!waitingText().includes('Coworker assignment'));
 assert.ok(document.querySelector('.dh-hero').textContent.includes('2 項待處理'),'shell actionable count excludes waiting');
 
-w.projects=Array.from({length:300},(_,i)=>({...structuredClone(p),id:`p${i}`,code:`CASE-${String(i+1).padStart(3,'0')}`,name:`Road survey ${i+1}`}));
+w.projects=Array.from({length:300},(_,i)=>({...structuredClone(p),id:`p${i}`,code:`CASE-${String(i+1).padStart(3,'0')}`,name:`Road survey ${i+1}`,created_at:String(300-i).padStart(3,'0')}));
 await flush(()=>root.render(React.createElement(Projects,{c:{...c,route:{view:'projects'}}})));
 assert.equal(document.querySelectorAll('tbody tr').length,10);assert.ok(document.querySelector('.table-footer').textContent.includes('共 300 筆'));
 const row=document.querySelector('tbody tr');assert.equal(row.querySelector('.verification-cell').getAttribute('aria-label'),'已驗證');assert.ok(row.textContent.includes('受阻'));assert.ok(row.textContent.includes('即將到期'));assert.ok(row.querySelector('.deadline').classList.contains('is-upcoming'));assert.equal(row.querySelector('.numeric').textContent,'NT$ 120,000');
 await flush(()=>[...document.querySelectorAll('.pager button')].find(b=>b.textContent==='下一頁').click());assert.ok(document.querySelector('tbody').textContent.includes('CASE-011'));assert.ok(!document.querySelector('tbody').textContent.includes('CASE-001'));
+// Creation ordering is shared by shell requests and legacy rows.
+w.projects=[['old','2026-10-01'],['new','2026-10-13'],['tied','2026-10-13'],['empty','']].map(([id,created_at])=>({...structuredClone(p),id,code:id,created_at}));
+await flush(()=>root.render(React.createElement(Projects,{key:'created',c:{...c,route:{view:'projects'}}})));
+assert.equal(document.querySelector('[aria-label="案件排序"]').value,'created');
+const codes=()=>[...document.querySelectorAll('tbody .case-code')].map(e=>e.childNodes[0].textContent);
+assert.deepEqual(codes(),['tied','new','old','empty']);
+await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
+assert.deepEqual(codes(),['old','new','tied','empty']);
+const requests=[];globalThis.fetch=async url=>{requests.push(String(url));return new Response(JSON.stringify({items:[],total:0,facets:{all:0,formal:0,intake:0}}),{status:200})};
+await flush(()=>root.render(React.createElement(Projects,{key:'shell-created',c:{...c,w:{...w,scope:'shell'},route:{view:'projects'}}})));
+assert.ok(requests.some(url=>url.includes('sort=created&dir=desc')),requests.join(' | '));
 await flush(()=>root.unmount());dom.window.close();console.log('Overview design: ready action, separate assigned waiting parity, preserved original deadline, verification/deadline states and 300-case paging passed');

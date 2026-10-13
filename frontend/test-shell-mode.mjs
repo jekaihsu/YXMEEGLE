@@ -12,7 +12,7 @@ const path=new URL('./.shell-test-bundle.mjs',import.meta.url);await fs.writeFil
 let App;try{App=(await import(path.href)).default}finally{await fs.unlink(path)}
 const shell={...workspace,scope:'shell',attention:[{task_id:'tA',project_id:'pA',project_code:'PRIVATE_CASE_A',project_name:'PRIVATE_CASE_A',node_id:'nA',node_key:'sales',node_name:'NODE_A',assignee_id:workspace.users[0].id,status:'pending',due_date:'2026-10-01',title:'TASK_A'}],pending_approvals:[{id:'apA',title:'APPROVAL_A',type:'change',project_id:'pA'}],counts:{approvals_pending:3,daily_unmatched:535,my_overdue_tasks:1,my_active_tasks:2,active_tasks:30,overdue_tasks:1,due_today_tasks:0},home_waiting:[{task_id:'wait-paused',project_id:'pA',project_code:'PRIVATE_CASE_A',node_id:'nA',title:'WAIT_PAUSED',kind:'paused',reason:'任務暫停，原期限保留',original_due_date:'2026-10-01',due_date:null},{task_id:'wait-prerequisite',project_id:'pA',project_code:'PRIVATE_CASE_A',node_id:'nA',title:'WAIT_PREREQUISITE',kind:'prerequisite',reason:'指定前置成果尚未交付',due_date:'2026-10-01'},{task_id:'wait-upcoming',project_id:'pA',project_code:'PRIVATE_CASE_A',node_id:'nA',title:'WAIT_UPCOMING',kind:'upcoming',reason:'排定 2026/10/10 開始',due_date:'2026-10-12'},{task_id:'wait-proxy',project_id:'pA',project_code:'PRIVATE_CASE_A',node_id:'nA',title:'WAIT_PROXY',kind:'proxy',reason:'代理同事執行；有效至 2026/10/31',due_date:'2026-10-12'}],projects:workspace.projects.map((p,i)=>{
  const {nodes,files,comments,daily_reports,...summary}=p;
- return {...summary,concurrency_version:i+7,progress:{completed_nodes:i?0:4,approved_skipped_nodes:i?0:1,total_nodes:i?0:10},overdue_tasks:i?0:2,active_tasks:5,execution_status:i?'completed':'in_progress'};
+ return {...summary,created_at:i?'2026-10-01':'2026-10-02',concurrency_version:i+7,progress:{completed_nodes:i?0:4,approved_skipped_nodes:i?0:1,total_nodes:i?0:10},overdue_tasks:i?0:2,active_tasks:5,execution_status:i?'completed':'in_progress'};
 })};
 const json=(data,headers={})=>new Response(JSON.stringify(data),{status:200,headers});
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=projects'});
@@ -32,7 +32,7 @@ const overview=async(url)=>{
  const query=new URL(url,'http://x').searchParams;await overviewGate(query);
  const cards=current.projects,formal=p=>p.case_type!=='intake',tab=query.get('tab'),needle=(query.get('q')||'').toLowerCase(),sign=query.get('dir')==='desc'?-1:1;
  const keep={all:()=>true,formal,intake:p=>!formal(p),active:p=>p.execution_status!=='completed',overdue:p=>p.overdue_tasks>0,completed:p=>p.execution_status==='completed'}[tab];
- const key={due:p=>p.due_date||'9999',name:p=>p.name,progress:pct}[query.get('sort')];
+ const key={due:p=>p.due_date||'9999',name:p=>p.name,progress:pct,created:p=>p.created_at||''}[query.get('sort')];
  const hit=cards.filter(p=>keep(p)&&(!needle||(p.code+' '+p.name+' '+p.client).toLowerCase().includes(needle))&&(!query.get('owner')||p.pm_id===query.get('owner')))
   .sort((x,y)=>(key(x)<key(y)?-1:key(x)>key(y)?1:x.id<y.id?-1:1)*sign);
  const offset=Number(query.get('offset')),limit=Number(query.get('limit'));
@@ -61,7 +61,7 @@ try{
   assert.equal(document.querySelector('.notification-button i'),null);
  }
  await mount({workspace_shell:true});
- assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects?view=overview&tab=formal&sort=due&dir=asc&limit=10&offset=0']);
+ assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects?view=overview&tab=formal&sort=created&dir=desc&limit=10&offset=0']);
  assert.equal(window.shellContext.w.scope,'shell');assert.equal(rows().length,2);
  assert.ok(document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期 1'));
  assert.ok(document.querySelector('.notification-button i'));assert.equal(window.shellContext.unmatchedDaily(window.shellContext.w),535);
@@ -84,7 +84,7 @@ try{
  await flush(()=>button('交付已完成').click());assert.equal(rows().length,1);assert.ok(rows()[0].textContent.includes('CASE_B'));
  await flush(()=>button('全部紀錄').click());
  const sort=document.querySelector('[aria-label="案件排序"]');await flush(()=>{sort.value='progress';sort.dispatchEvent(new Event('change',{bubbles:true}))});
- assert.ok(rows()[0].textContent.includes('CASE_B'),'shell progress sorts without nodes');
+ assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'),'shell progress sorts descending without nodes');
  const cached=window.shellContext.w;await flush(()=>window.shellContext.refresh());
  assert.equal(lastShell().init.headers.get('If-None-Match'),etag);assert.equal(window.shellContext.w,cached,'304 reuses cached data');
  assert.equal(window.shellContext.error,'');assert.equal(rows().length,2);
@@ -109,7 +109,7 @@ try{
  assert.ok(requests.findLast(r=>r.url!==undefined&&!r.url.startsWith('/api/projects')).url==='/api/workspace?scope=shell','409 re-reads shell');assert.ok(window.shellContext.error.includes('conflict'));
 
  // P4-2: server-side paging for 25 cards (20 formal): page 1 asks for ten rows, filters reset to page 1, stale answers are dropped.
- const many=Array.from({length:25},(_,i)=>({...shell.projects[1],id:`c${i}`,code:`CODE_${String(i).padStart(2,'0')}`,name:`NAME_${i}`,case_type:i%5===0?'intake':'formal',due_date:`2026-11-${String(i+1).padStart(2,'0')}`}));
+ const many=Array.from({length:25},(_,i)=>({...shell.projects[1],id:`c${i}`,code:`CODE_${String(i).padStart(2,'0')}`,name:`NAME_${i}`,created_at:String(25-i).padStart(2,'0'),case_type:i%5===0?'intake':'formal',due_date:`2026-11-${String(i+1).padStart(2,'0')}`}));
  current={...shell,projects:many};etag='W/"shell-big"';
  await mount({workspace_shell:true});
  const pages=()=>requests.filter(r=>r.url.startsWith('/api/projects?view=overview')).map(r=>new URL(r.url,'http://x').searchParams);
