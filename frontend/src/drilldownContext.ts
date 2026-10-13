@@ -44,7 +44,7 @@ const EDGES: Readonly<Record<P2Route, readonly P2Route[]>> = {
 export type Reason =
   | 'not_string' | 'oversize' | 'bad_encoding' | 'bad_json' | 'bad_shape' | 'unknown_key' | 'unknown_version' | 'wrong_route'
   | 'bad_filter' | 'bad_sort' | 'bad_cursor' | 'bad_columns' | 'bad_selected' | 'bad_period' | 'period_not_allowed' | 'bad_kpi' | 'bad_stack'
-  | 'edge_not_allowed' | 'no_parent' | 'kpi_filter_not_representable' | 'kpi_filter_conflict' | 'corrupt_return_frame' | 'bad_link' | 'bad_route';
+  | 'edge_not_allowed' | 'no_parent' | 'kpi_filter_not_representable' | 'kpi_filter_conflict' | 'corrupt_return_frame' | 'bad_link' | 'bad_route' | 'unknown_param' | 'duplicate_param';
 export type Result<T> = {ok: true; value: T} | {ok: false; reason: Reason; value: P2Context};
 
 export const emptyFrame = (route: P2Route): Frame => ({route, filters: {}, sort: null, cursor: null, columns: null, selected: null, period: null, kpi: null});
@@ -192,6 +192,11 @@ export function parseHash(hash: unknown): Result<P2Context> {
   if (typeof hash !== 'string') return {ok: false, reason: 'not_string', value: defaultContext('overview')};
   if (hash.length > LIMITS.encodedLen + 64) return {ok: false, reason: 'oversize', value: defaultContext('overview')};
   const p = new URLSearchParams(hash.replace(/^#\/?/, ''));
+  // The envelope is exactly one `view` and at most one `ctx`; anything else rejects the whole hash (never partially applied).
+  for (const k of new Set(p.keys())) {
+    if (!['view', 'ctx'].includes(k)) return {ok: false, reason: 'unknown_param', value: defaultContext('overview')};
+    if (p.getAll(k).length > 1) return {ok: false, reason: 'duplicate_param', value: defaultContext('overview')};
+  }
   const view = p.get('view');
   if (!view || !(P2_ROUTES as readonly string[]).includes(view)) return {ok: false, reason: 'bad_route', value: defaultContext('overview')};
   const ctx = p.get('ctx');
