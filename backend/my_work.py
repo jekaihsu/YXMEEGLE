@@ -78,6 +78,49 @@ def _unknown_outcome_tasks(ws):
     return ids
 
 
+def _malformed(task):
+    """A task record the Home/queue helpers cannot index: bad id, status or owner shape."""
+    status, owner = task.get('status'), task.get('owner_id')
+    return (not _text(task.get('id')) or not (status is None or isinstance(status, str))
+            or not (owner is None or isinstance(owner, str)))
+
+
+def _projection(state, uid, viewer):
+    """Copy of ``state`` safe to hand to the Home/queue helpers, plus whether anything was indeterminate.
+
+    A record that is known to be someone else's (existing owner/delegation authority) and malformed is
+    removed, so it can neither crash the helpers nor change a flag, count, row or assignment; a viewer
+    prerequisite pointing at it then reads as missing, which stays blocked and visible. A malformed record
+    that may be the viewer's, and any non-dict container, is removed too but makes the page partial.
+    Well-formed records are shared untouched, so prerequisite and review-hash authority are unchanged.
+    """
+    partial = False
+    projects = []
+    for project in state.get('projects', []):
+        if not isinstance(project, dict) or not _text(project.get('id')) or not isinstance(project.get('nodes'), list):
+            partial = True; continue
+        nodes = []
+        for node in project['nodes']:
+            if not isinstance(node, dict) or not isinstance(node.get('tasks'), list):
+                partial = True; continue
+            tasks = []
+            for task in node['tasks']:
+                if not isinstance(task, dict): partial = True; continue
+                if _malformed(task):
+                    mine = task.get('owner_id') == uid
+                    if not mine:
+                        try:
+                            mine = bool(_proxy(state, project, task, viewer))
+                        except (KeyError, TypeError, ValueError, AttributeError):
+                            mine = True  # delegation data unreadable: it may be the viewer's
+                    partial = partial or mine
+                    continue
+                tasks.append(task)
+            nodes.append(dict(node, tasks=tasks) if len(tasks) != len(node['tasks']) else node)
+        projects.append(dict(project, nodes=nodes))
+    return dict(state, projects=projects), partial
+
+
 def _blocked(*states):
     return {'rows': [], 'readState': data_state(*states), 'assignment': 'unknown', 'canSeeAwaitingConfirmation': False}
 
@@ -101,7 +144,9 @@ def build_my_work_input(ws, viewer, read=None):
 
     partial = '_partial' in ws
     pre_filter = case_redaction.snapshot(ws)  # the redaction plan needs the original, unfiltered cases
-    state = filter_visible_cases(dict(ws))  # hidden cases vanish here, never as forbidden rows
+    visible = filter_visible_cases(dict(ws))  # hidden cases vanish here, never as forbidden rows
+    state, indeterminate = _projection(visible, uid, viewer)
+    partial = partial or indeterminate
     as_of = ws.get('as_of') or now()[:10]
     unknown_outcome = _unknown_outcome_tasks(state)
     rows, ever_assigned = [], False
@@ -178,9 +223,11 @@ def build_my_work_input(ws, viewer, read=None):
             # Existing authorization: home_queues only lists a confirmation the viewer may cast (can_vote,
             # current reviewer seat or handover target). No such item proves nothing, so the toggle stays off.
            'canSeeAwaitingConfirmation': bool(awaiting)}
-    environment = ws.get('environment', 'demo' if any(isinstance(p, dict) and p.get('source_kind') == 'demo' for p in ws.get('projects', [])) else 'production')
+    # Same default as backend/app.py public_ws: the explicit environment, else derived from the surviving
+    # (filtered) projects only, so a hidden demo case can never grant the test/demo exemption.
+    environment = visible.get('environment', 'demo' if any(isinstance(p, dict) and p.get('source_kind') == 'demo' for p in visible.get('projects', [])) else 'production')
     if environment not in ('test', 'demo'):
-        case_redaction.apply(out, case_redaction.make_plan(pre_filter, state))
+        case_redaction.apply(out, case_redaction.make_plan(pre_filter, visible))
         out['rows'] = [{k: v for k, v in r.items() if v is not None} for r in out['rows'] if r.get('id') is not None]
     for row in out['rows']:  # the consumer's table and search read the row level title; only a verified parent supplies it
         if row['parent'].get('verified') and row['parent'].get('case_title'): row['case_title'] = row['parent']['case_title']

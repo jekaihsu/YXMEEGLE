@@ -324,3 +324,80 @@ def test_f4_explicit_terminal_outcomes_take_precedence_over_loading():
     for read, state in cases:
         assert run(ws, read)['readState']['states'] == [state], read
     assert run(ws, {'loaded': False, 'admitted': True, 'failed': True})['readState'] == {'states': ['read_failed'], 'count': None}
+
+
+# ---- malformed records of other people: projection boundary (R1) ------------
+def _with_other(base, **extra):
+    ws = deepcopy(base)
+    ws['projects'][0]['nodes'][0]['tasks'].append(task(extra.pop('ident', 'other'), owner=extra.pop('owner', 'other'), **extra))
+    return ws
+
+
+@pytest.mark.parametrize('personal', [True, False])
+@pytest.mark.parametrize('bad', [{'ident': []}, {'ident': {}}, {'ident': None}, {'ident': ''}, {'status': []}, {'status': {}},
+                                 {'owner': []}, {'status': 5}])
+def test_known_other_malformed_record_changes_nothing(personal, bad):
+    base = workspace(project('p', 'Visible', [task('mine')] if personal else []))
+    assert run(_with_other(base, **bad)) == run(base)
+
+
+def test_known_other_malformed_record_in_a_second_node_and_project_changes_nothing():
+    base = workspace(project('p', 'Visible', [task('mine')]), project('q', 'Other case', []))
+    ws = deepcopy(base)
+    ws['projects'][1]['nodes'][0]['tasks'] += [task([], owner='other'), task('x', owner='other', status=[])]
+    assert run(ws) == run(base)
+
+
+def test_prerequisite_on_malformed_other_record_stays_visible_and_blocked():
+    base = workspace(project('p', 'Visible', [task('up', owner='other', status='completed', output='done'),
+                                              task('mine', status='pending', input_task_ids=['up'])]))
+    ws = deepcopy(base)
+    ws['projects'][0]['nodes'][0]['tasks'][0]['status'] = []  # the upstream record is now malformed
+    missing = deepcopy(base)
+    del missing['projects'][0]['nodes'][0]['tasks'][0]  # same as an unresolvable prerequisite: blocked, never satisfied
+    out = run(ws)
+    assert out == run(missing)
+    row = out['rows'][0]
+    assert out['readState'] == 'ready' and out['assignment'] == 'assigned'
+    assert row['id'] == 'mine' and row['workflow_state'] == 'pending' and row['ended'] is False
+
+
+def test_well_formed_prerequisite_still_authoritative():
+    ws = workspace(project('p', 'Visible', [task('up', owner='other', status='completed', output='done'),
+                                            task('mine', status='pending', input_task_ids=['up'])]))
+    ws2 = deepcopy(ws); ws2['projects'][0]['nodes'][0]['tasks'][0]['output'] = ''
+    assert ids(run(ws)) == ['mine'] and ids(run(ws2)) == ['mine']
+
+
+@pytest.mark.parametrize('bad', [{'ident': []}, {'status': []}])
+def test_viewer_owned_malformed_record_makes_page_partial(bad):
+    base = workspace(project('p', 'Visible', [task('mine')]))
+    out = run(_with_other(base, owner='viewer', **bad))
+    assert out['readState']['states'] == ['partial'] and out['readState']['count'] is None
+
+
+# ---- redaction environment default (R2) ------------------------------------
+def _secret(env='production'):
+    hidden = project('hidden', 'Hidden', [], code='C-RESTRICTED', case_visibility='excluded_history')
+    visible = project('p', 'C-RESTRICTED', [task('mine', title='C-RESTRICTED', input='C-RESTRICTED', output='C-RESTRICTED', status='paused')],
+                      code='C-VISIBLE')
+    ws = workspace(visible, hidden, environment=env)
+    ws['events'] = [{'id': 'ev', 'action': 'task_pause_for_change', 'project_id': 'p', 'node_id': 'p-n', 'task_id': 'mine',
+                     'message': 'C-RESTRICTED', 'created_at': '2026-10-14'}]
+    return ws
+
+
+def test_hidden_demo_project_does_not_disable_production_redaction_default():
+    ws = _secret(None); ws.pop('environment')
+    baseline = run(ws)
+    assert 'C-RESTRICTED' not in json.dumps(baseline)
+    ws['projects'][1]['source_kind'] = 'demo'
+    assert run(ws) == baseline
+
+
+def test_visible_demo_project_default_stays_unredacted_and_explicit_environments_hold():
+    ws = _secret(None); ws.pop('environment'); ws['projects'][0]['source_kind'] = 'demo'
+    assert 'C-RESTRICTED' in json.dumps(run(ws))
+    for env, leaks in (('test', True), ('demo', True), ('production', False)):
+        ws = _secret(env); ws['projects'][1]['source_kind'] = 'demo'
+        assert ('C-RESTRICTED' in json.dumps(run(ws))) is leaks
