@@ -33,6 +33,10 @@ def state(**over):
     return base
 
 
+def keys_of(population):
+    return [r['row_key'] for r in population]
+
+
 def walk(st, **kw):
     keys, cursor = [], None
     while True:
@@ -79,10 +83,10 @@ def test_mutation_version_dedupe_guard(monkeypatch):
 def test_unverified_case_link_stays_unresolved_even_when_name_matches():
     st = state()
     rows = {r['row_key']: r for r in build_confirmation_list(st, limit=100)['rows']}
-    r4, r5 = rows['b/t/r4@10'], rows['b/t/r5@2']
+    r4, r5 = rows['b/t/r4@i10'], rows['b/t/r5@i2']
     st['projects'].append(dict(id='p9', name='丙', code='C200', pm_id='u1', execution_system='workbench'))
     again = {r['row_key']: r for r in build_confirmation_list(st, limit=100)['rows']}
-    for r in (r4, r5, again['b/t/r4@10']):
+    for r in (r4, r5, again['b/t/r4@i10']):
         assert r['case_link']['state'] == 'unresolved' and r['case_link']['project_id'] is None
         assert r['case_link']['verification'] == 'receipt_missing'
         assert r['workflow_summary']['state'] == 'unknown' and r['admission']['state'] == 'unknown'
@@ -99,7 +103,7 @@ def test_mutation_name_join_guard(monkeypatch):
                 return pid, None
         return None, 'assignment_absent'
     monkeypatch.setattr(cl, '_case_link', joined)
-    row = next(r for r in build_confirmation_list(st, limit=100)['rows'] if r['row_key'] == 'b/t/r4@10')
+    row = next(r for r in build_confirmation_list(st, limit=100)['rows'] if r['row_key'] == 'b/t/r4@i10')
     assert row['case_link']['state'] == 'linked'      # the guard is what keeps this unresolved
 
 
@@ -111,7 +115,7 @@ def test_walking_cursor_pages_reconciles_to_population_for_every_combination():
               dict(sort={'column': 'pm', 'direction': 'desc'}), dict(filters={'pm': ['nobody']})]
     for kw in combos:
         keys = walk(st, **dict(kw))
-        assert keys == confirmation_population(st, kw.get('filters'), q=kw.get('q', ''), sort=kw.get('sort'))
+        assert keys == keys_of(confirmation_population(st, kw.get('filters'), q=kw.get('q', ''), sort=kw.get('sort')))
         assert len(keys) == len(set(keys))
     raw = {r['row_key'] for r in build_confirmation_list(st, limit=100)['rows']}
     assert set(walk(st)) == raw
@@ -127,7 +131,7 @@ def test_numeric_sort_and_clear_and_unknown_last():
     assert desc == ['10', '4', '4', '3', '2', None]
     cleared = build_confirmation_list(st, limit=100, sort={'column': 'case_number', 'direction': 'clear'})
     assert cleared['sort']['applied'] is None
-    assert [r['row_key'] for r in cleared['rows']][:2] == ['b/t/r1@3', 'b/t/r2@4']
+    assert [r['row_key'] for r in cleared['rows']][:2] == ['b/t/r1@i3', 'b/t/r2@i4']
 
 
 def test_default_order_is_source_order_and_not_time_based():
@@ -140,7 +144,7 @@ def test_default_order_is_source_order_and_not_time_based():
 def test_equal_sort_keys_page_stably_by_row_key():
     st = state()
     sort = {'column': 'case_number', 'direction': 'desc'}
-    assert walk(st, sort=sort, limit=1) == confirmation_population(st, sort=sort)
+    assert walk(st, sort=sort, limit=1) == keys_of(confirmation_population(st, sort=sort))
 
 
 def test_cursor_from_another_filter_set_is_rejected():
@@ -173,12 +177,12 @@ def test_limit_bounds():
 
 def test_deadline_filter_is_unavailable_and_hides_nothing():
     st = state()
-    full = confirmation_population(st)
+    full = keys_of(confirmation_population(st))
     page = build_confirmation_list(st, limit=100, filters={'deadline_from': '2026-01-01', 'deadline_to': '2026-01-02'})
     assert [r['row_key'] for r in page['rows']] == full
     status = page['filter_status']['deadline']
     assert status['status'] == 'unavailable' and status['reason'] and status['hides_rows'] is False
-    assert confirmation_population(st, {'deadline_from': '2026-01-01'}) == full
+    assert keys_of(confirmation_population(st, {'deadline_from': '2026-01-01'})) == full
     assert build_confirmation_list(st, filters={'deadline_from': 'soon'})['status'] == 422
 
 
@@ -230,10 +234,11 @@ def test_page_states_are_distinct():
     assert loading['page_state']['states'] == ['loading'] and loading['rows'] == []
     failed = build_confirmation_list(state(source_status={'status': 'error'}), limit=100)
     assert failed['page_state'] == {'states': ['read_failed'], 'count': None}
-    assert failed['totals_basis'] == 'retained_snapshot'
+    assert failed['totals_basis'] == 'undetermined'
     assert {r['source_status'] for r in failed['rows']} == {'stale'}
     assert {r['retention'] for r in failed['rows']} == {'snapshot'}
     stale = build_confirmation_list(state(source_status={'status': 'stale'}), limit=100)
+    assert stale['totals_basis'] == 'retained_snapshot'
     assert stale['page_state']['states'] == ['stale'] and stale['page_state']['count'] is None
     partial_empty = build_confirmation_list(state(source_status={'status': 'partial'}, source_confirmations=[]))
     assert partial_empty['page_state']['states'] == ['partial']        # not claimed as zero
@@ -276,3 +281,101 @@ def test_unsupported_filter_and_bad_malformed_identity():
                                            source_kind='confirmation', fields={}))
     page = build_confirmation_list(st, limit=100)
     assert page['totals']['authorized_source'] == 6 and page['diagnostics']['unkeyed_rows'] == 1
+
+
+# ---- P2-129B-FIX1 -------------------------------------------------------
+
+def test_population_returns_literal_project_ids_and_distinct_case_denominator():
+    pop = confirmation_population(state())
+    assert pop == [
+        {'row_key': 'b/t/r1@i3', 'project_id': 'p1'}, {'row_key': 'b/t/r2@i4', 'project_id': 'p2'},
+        {'row_key': 'b/t/r3@i4', 'project_id': 'p1'}, {'row_key': 'b/t/r4@i10', 'project_id': None},
+        {'row_key': 'b/t/r5@i2', 'project_id': None},      # p-hidden is not visible: unresolved, id not echoed
+        {'row_key': 'b/t/r6@u', 'project_id': None}]
+    assert len({r['project_id'] for r in pop if r['project_id']}) == 2          # distinct cases, not 3 rows for p1/p2
+    assert confirmation_population(state(), {'pm': ['u1']}) == [
+        {'row_key': 'b/t/r1@i3', 'project_id': 'p1'}, {'row_key': 'b/t/r3@i4', 'project_id': 'p1'}]
+    assert 'p-hidden' not in repr(pop)
+
+
+def test_population_is_none_not_a_list_when_source_unavailable():
+    for status in ('forbidden', 'loading', 'unlocated', 'unknown', 'error'):
+        assert confirmation_population(state(source_status={'status': status})) is None, status
+    assert confirmation_population({'environment': 'test', 'source_status': {'status': 'ready'}}) is None
+    assert confirmation_population(state(source_status={'status': 'ready'}, source_confirmations=[])) == []
+
+
+def test_typed_version_collision_int_3_vs_str_3_walks_all_pages():
+    st = state(source_confirmations=[entity('r1', 'C1', version=3), entity('r1', 'C1', version='3')])
+    page = build_confirmation_list(st, limit=1)
+    assert page['totals']['matching'] == 2 and page['rows'][0]['row_key'] == 'b/t/r1@i3'
+    second = build_confirmation_list(st, limit=1, cursor=page['next_cursor'])
+    assert [r['row_key'] for r in second['rows']] == ['b/t/r1@s3']
+    assert walk(st, limit=1) == ['b/t/r1@i3', 'b/t/r1@s3']
+    assert keys_of(confirmation_population(st)) == ['b/t/r1@i3', 'b/t/r1@s3']
+
+
+def test_delimiter_collision_record_with_at_sign_vs_version_walks_all_pages():
+    st = state(source_confirmations=[entity('r1@3', 'C1'), entity('r1', 'C1', version=3),
+                                     entity('r1', 'C1', version='x@y')])
+    assert walk(st, limit=1) == ['b/t/r1@3@u', 'b/t/r1@i3', 'b/t/r1@sx%40y']
+    assert keys_of(confirmation_population(st)) == ['b/t/r1@3@u', 'b/t/r1@i3', 'b/t/r1@sx%40y']
+    row = build_confirmation_list(st, limit=1)['rows'][0]
+    assert row['detail']['record_id'] == 'r1@3'                     # stored source id unchanged
+
+
+def test_unknown_read_never_exposes_proven_zero_or_population():
+    for st in (state(source_status={}, source_confirmations=[]), state(source_status={'status': 'error'}, source_confirmations=[])):
+        page = build_confirmation_list(st)
+        assert page['totals']['matching'] is None and page['totals']['authorized_source'] is None
+        assert page['totals']['loaded'] == 0 and page['totals_basis'] == 'undetermined'
+        assert confirmation_population(st) is None
+    with_rows = build_confirmation_list(state(source_status={}), limit=100)
+    assert with_rows['totals']['matching'] is None and with_rows['totals']['loaded'] == 6
+    assert {r['source_status'] for r in with_rows['rows']} == {'unknown'}
+
+
+def test_proven_empty_current_read_is_the_only_proven_zero():
+    page = build_confirmation_list(state(source_confirmations=[]))
+    assert page['totals'] == {'matching': 0, 'loaded': 0, 'authorized_source': 0}
+    assert page['totals_basis'] == 'current' and page['page_state'] == {'states': ['complete_empty'], 'count': 0}
+    for status in ('partial', 'stale'):
+        p = build_confirmation_list(state(source_status={'status': status}, source_confirmations=[]))
+        assert p['totals']['matching'] is None and p['totals']['authorized_source'] is None, status
+
+
+def test_retained_snapshot_carries_explicit_provenance():
+    ts = '2026-10-01T00:00:00+00:00'
+    failed = state(source_status={'status': 'error', 'last_success_at': ts})
+    page = build_confirmation_list(failed, limit=100)
+    assert page['totals'] == {'matching': 6, 'loaded': 6, 'authorized_source': 6}
+    assert page['totals_basis'] == 'retained_snapshot'
+    assert page['snapshot'] == {'state': 'proven', 'last_success_at': ts}
+    assert len(confirmation_population(failed)) == 6
+    unproven = build_confirmation_list(state(source_status={'status': 'error'}), limit=100)
+    assert unproven['snapshot'] == {'state': 'unproven', 'last_success_at': None}
+    assert unproven['totals']['matching'] is None and confirmation_population(state(source_status={'status': 'error'})) is None
+    assert build_confirmation_list(state(), limit=100)['snapshot'] is None
+    assert page['as_of'] is None                       # as_of is never substituted with business time
+
+
+def test_partial_import_retained_rows_are_snapshot_not_current():
+    page = build_confirmation_list(state(source_status={'status': 'partial'}), limit=100)
+    assert {r['source_status'] for r in page['rows']} == {'stale'}
+    assert {r['retention'] for r in page['rows']} == {'snapshot'}
+    assert page['totals_basis'] == 'partial_snapshot' and page['page_state']['states'] == ['partial']
+    ok = build_confirmation_list(state(), limit=100)
+    assert {r['source_status'] for r in ok['rows']} == {'located'} and {r['retention'] for r in ok['rows']} == {'current'}
+    assert all(r['source_modified']['value'] is None for r in page['rows'])
+
+
+def test_filtered_zero_on_partial_or_stale_keeps_source_uncertainty():
+    for status in ('partial', 'stale'):
+        page = build_confirmation_list(state(source_status={'status': status}), q='no-match')
+        assert page['page_state'] == {'states': [status], 'count': None}, status
+        assert page['totals']['matching'] == 0 and page['totals']['loaded'] == 0
+        assert page['totals_basis'] != 'current'
+    both = build_confirmation_list(state(source_status={'status': 'error', 'last_success_at': '2026-10-01T00:00:00+00:00'}), q='no-match')
+    assert both['page_state']['states'] == ['read_failed']
+    ok = build_confirmation_list(state(), q='no-match')
+    assert ok['page_state'] == {'states': ['filtered_empty'], 'count': 0} and ok['totals_basis'] == 'current'
