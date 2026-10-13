@@ -22,6 +22,10 @@ assert.equal(stamp('2026-10-13T08:54:22.133782+08:00'),want);
 assert.equal(taipeiTime('2026-10-13'),'2026/10/13');
 assert.equal(taipeiTime(null),'—');assert.equal(taipeiTime('garbage','無'),'無');
 assert.equal(parseInstant('2026-10-13T08:54:22.133782+08:00'),Date.parse('2026-10-13T00:54:22.133Z'));
+// VCC-119 round 2: naive space-separated datetimes are Taipei in every TZ; impossible calendar dates are rejected.
+for(const input of ['2026-10-13 08:54:22','2026-10-13 08:54:22.133782','  2026-10-13 08:54:22 '])assert.equal(taipeiTime(input),want,`${input} under ${process.env.TZ}`);
+for(const bad of ['2026-99-99','2026-02-30','2026-02-30T08:54:22+08:00','2026-02-30 08:54:22','2026-13-01T00:00:00Z','2026-10-13T25:00:00+08:00'])assert.equal(taipeiTime(bad,'無'),'無',bad);
+assert.equal(taipeiTime('2024-02-29T12:00:00+08:00'),'2024/02/29 12:00:00 (台北時間)');
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost'});
 for(const k of ['window','document','Event','FormData','location'])globalThis[k]=dom.window[k];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;Object.defineProperty(document,'hidden',{configurable:true,value:false});
