@@ -37,6 +37,7 @@ test('2 three independent timestamps; summary oldest relevant success or unknown
  assert.deepEqual([result.rows[0].last_attempt.value, result.rows[0].last_success.value, result.rows[0].source_updated.value], [iso(12), iso(5), iso(1)]);
  assert.deepEqual(result.rows[1].source_updated, {value: null, label: '狀態未知'});
  assert.equal(result.summary.last_success.value, iso(3));
+ assert.equal(view([...sources, healthy('older-irrelevant', {relevant: false, last_success: iso(1)})]).summary.last_success.value, iso(3));
  assert.equal(view([...sources, healthy('missing', {last_attempt: iso(13)})]).summary.last_success.value, null);
  assert.equal(view([]).summary.last_success.value, null);
  assert.equal(view([healthy('a', {last_success: iso(5)}), {authorized: true}]).summary.last_success.value, null);
@@ -47,15 +48,15 @@ test('2 three independent timestamps; summary oldest relevant success or unknown
 test('3 distinct stages; caller receipts never authoritative; definitions never success counts', () => {
  const receipt = {source_key: 'a', reference: 'synthetic-receipt'};
  const absent = view([healthy('a', {located: true, readable: false, presented: true, mapped: true, accepted: true, configured_definition_count: 37})]).rows[0];
- assert.deepEqual([absent.located, absent.readable, absent.mapped, absent.presented, absent.accepted, absent.mappingLabel], [true, false, false, true, false, '找不到資料來源']);
+ assert.deepEqual([absent.located, absent.readable, absent.mapped, absent.presented, absent.accepted, absent.mappingLabel], [true, false, false, true, false, '對應未驗證']);
  assert.deepEqual(absent.counts, {whole_table: null, view: null, loaded: null, excluded: null});
  assert.deepEqual(view([healthy('definitions-only', {configured_definition_count: 37})]).rows[0].counts,
   {whole_table: null, view: null, loaded: null, excluded: null});
  const present = view([healthy('a', {mapped: true, accepted: true, receipt, fields: [{field_id: 'f', yx_mapping: 'binding', receipt}]})]).rows[0];
  assert.deepEqual([present.mapped, present.accepted, present.receiptReference, present.fields[0].yxMapping], [false, false, null, null]);
  const wrong = view([healthy('b', {mapped: true, accepted: true, receipt, fields: [{yx_mapping: 'binding', receipt}]})]).rows[0];
- assert.deepEqual([wrong.mapped, wrong.accepted, wrong.fields[0].yxMapping, wrong.fields[0].mappingLabel], [false, false, null, '找不到資料來源']);
- assert.deepEqual([present.mappingLabel, present.fields[0].mappingLabel], ['找不到資料來源', '找不到資料來源']);
+ assert.deepEqual([wrong.mapped, wrong.accepted, wrong.fields[0].yxMapping, wrong.fields[0].mappingLabel], [false, false, null, '對應未驗證']);
+ assert.deepEqual([present.mappingLabel, present.fields[0].mappingLabel], ['對應未驗證', '對應未驗證']);
  assert.equal(view([healthy('a', {receipt, mapped: false, accepted: true})]).rows[0].accepted, false);
 });
 
@@ -113,7 +114,49 @@ test('8 C-STATE text labels; unknown never zero; malformed payloads fail closed'
  for (const badTime of ['2026-02-30T00:00:00Z', '2026-10-03', '2026-10-03T00:00:00', '2026-10-03T24:00:00Z', 0]) assert.equal(view([healthy('a', {source_updated: badTime})]).rows[0].source_updated.value, null);
  assert.deepEqual(keys(view([healthy('duplicate'), healthy('duplicate'), healthy('unique')])), ['unique']);
  assert.equal(view([problem('a', ['unknown'], {loaded_count: 0})]).rows[0].counts.loaded, null);
- assert.equal(view([healthy('a', {loaded_count: -1, whole_table_count: '37', view_count: 0})]).rows[0].counts.view, 0);
+ assert.deepEqual(view([healthy('a', {loaded_count: -1, whole_table_count: '37', view_count: 0, excluded_count: 1.5})]).rows[0].counts,
+  {whole_table: null, view: 0, loaded: null, excluded: null});
+});
+
+test('G2 loading and unlocated suppress every scoped count', () => {
+ for (const state of ['loading', 'unlocated']) {
+  const row = view([problem('a', [state], {whole_table_count: 9, view_count: 8, loaded_count: 5, excluded_count: 3})]).rows[0];
+  assert.deepEqual(row.counts, {whole_table: null, view: null, loaded: null, excluded: null});
+ }
+});
+
+test('G4 timestamp sorting compares instants across mixed offsets', () => {
+ for (const column of ['last_attempt', 'last_success', 'source_updated']) {
+  const sources = [healthy('x', {[column]: '2026-10-03T01:00:00+08:00'}), healthy('y', {[column]: '2026-10-02T20:00:00Z'})];
+  assert.deepEqual(keys(view(sources, {sort: {column, direction: 'asc'}})), ['x', 'y']);
+  assert.deepEqual(keys(view(sources, {sort: {column, direction: 'desc'}})), ['y', 'x']);
+ }
+});
+
+test('G5 present non-boolean stage flags are unknown and need attention', () => {
+ for (const stage of ['located', 'readable', 'presented']) {
+  for (const value of ['false', 0, 'no', null, undefined]) {
+   for (const source of [healthy('a', {[stage]: value}), problem('a', ['partial'], {[stage]: value})]) {
+    const row = view([source]).rows[0];
+    assert.deepEqual([row.statusLabel, row.needsAttention, row.dataState?.states, row[stage]], ['狀態未知', true, ['unknown'], null]);
+   }
+  }
+ }
+ for (const extra of [{}, {located: true, readable: true, presented: true}]) {
+  const row = view([healthy('a', extra)]).rows[0];
+  assert.deepEqual([row.statusLabel, row.needsAttention, row.dataState], ['資料正常', false, null]);
+ }
+});
+
+test('G6 source and field mappings use unverified mapping copy without authority', () => {
+ const sources = [healthy('healthy', {located: true, readable: true, presented: true}),
+  ...['loading', 'complete_empty', 'filtered_empty', 'unlocated', 'read_failed', 'partial', 'stale', 'unknown'].map(state => problem(state, [state]))];
+ for (const source of sources) {
+  const row = view([{...source, mapped: true, accepted: true, receipt: {source_key: source.key, reference: 'untrusted'},
+   fields: [{field_id: 'f', yx_mapping: 'untrusted'}, {}]}]).rows[0];
+  assert.deepEqual([row.mappingLabel, row.mapped, row.accepted, row.receiptReference], ['對應未驗證', false, false, null]);
+  assert.deepEqual(row.fields.map(field => [field.mappingLabel, field.yxMapping]), [['對應未驗證', null], ['對應未驗證', null]]);
+ }
 });
 
 test('F1 timestamp sorting never substitutes retrieval and keeps unknown last', () => {
@@ -147,7 +190,7 @@ test('F4 accepted is always false even with matched caller receipts and stage fl
    receipt: {source_key: 'a', reference: 'receipt', verified: true, version: 'V4'},
    fields: [{field_id: 'f', yx_mapping: 'binding', receipt: {source_key: 'a', reference: 'receipt'}}]})]).rows[0];
   assert.deepEqual([row.located, row.readable, row.presented, row.mapped, row.accepted, row.receiptReference, row.mappingLabel,
-   row.fields[0].yxMapping, row.fields[0].mappingLabel], [true, true, true, false, false, null, '找不到資料來源', null, '找不到資料來源']);
+   row.fields[0].yxMapping, row.fields[0].mappingLabel], [true, true, true, false, false, null, '對應未驗證', null, '對應未驗證']);
  }
 });
 

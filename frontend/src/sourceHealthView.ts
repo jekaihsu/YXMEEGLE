@@ -130,7 +130,11 @@ const guidance: Record<DataStateName, string> = {
 };
 
 function sourceRow(raw: Record<string, unknown>, key: string): SourceRow {
- const state = raw.data_state === undefined && raw.located === false ? parseDataState({states: ['unlocated']})
+ // Missing flags permit the explicit adapter fact; present malformed flags
+ // contradict it and any supplied state, so fail closed to unknown.
+ const contradictoryStage = ['located', 'readable', 'presented'].some(stage => Object.hasOwn(raw, stage) && typeof raw[stage] !== 'boolean');
+ const state = contradictoryStage ? parseDataState({states: ['unknown']})
+  : raw.data_state === undefined && raw.located === false ? parseDataState({states: ['unlocated']})
   : raw.data_state === undefined && raw.health === 'healthy' && raw.readable !== false && raw.presented !== false && raw.located !== false ? null : parseDataState(raw.data_state);
  const states: readonly DataStateName[] = state?.states ?? [];
  // VCC-117 evidence and verifier authority do not exist yet. No caller value
@@ -147,7 +151,7 @@ function sourceRow(raw: Record<string, unknown>, key: string): SourceRow {
   partial: states.includes('partial'), stale: states.includes('stale'),
   located: flag(raw.located), readable: flag(raw.readable), mapped,
   presented: flag(raw.presented), accepted,
-  mappingLabel: DATA_STATE_LABELS.unlocated,
+  mappingLabel: '對應未驗證',
   receiptReference: null,
   last_attempt: timestamp(raw.last_attempt), last_success: timestamp(raw.last_success), source_updated: timestamp(raw.source_updated),
   counts: {whole_table: hasKnownCounts ? count(raw.whole_table_count) : null, view: hasKnownCounts ? count(raw.view_count) : null,
@@ -158,7 +162,7 @@ function sourceRow(raw: Record<string, unknown>, key: string): SourceRow {
    const field = record(value);
    const mapping = null;
    return {name: text(field.name), type: text(field.type), fieldId: text(field.field_id), yxMapping: mapping,
-    mappingLabel: DATA_STATE_LABELS.unlocated};
+    mappingLabel: '對應未驗證'};
   }) : [],
   // An opaque handle is returned verbatim. The adapter must execute that same
   // authorized read; this module constructs no URL, scope or transport action.
