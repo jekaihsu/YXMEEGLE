@@ -306,3 +306,49 @@ def test_f5_visible_workflow_node_rows_resolve_in_reverse_navigation():
     assert t3.get('unresolved') is None  # r3 is linked to task t3 by identity
     t4 = next(t for r in d['sections']['workflow_nodes']['rows'] for t in r['tasks'] if t['key'].endswith('/t4'))
     assert t4['unresolved']['reason'] == 'no_authorized_parent_edge'
+
+
+# ---- P2-130B-FIX2 -------------------------------------------------------------------------
+
+def _f1_state(remove):
+    s = fixture('test')
+    s['contract_items'][1]['task_refs'] = [{'project_id': 'p', 'node_id': 'n1', 'task_id': 't2'}]
+    before = build_case_detail(s, 'p', confirmation_key='b/conf/c1')
+    s['source_work_items'] = ([] if remove == 'all' else
+                              [i for i in s['source_work_items'] if i['id'] != 'b/rep/r2'])
+    return s, before, build_case_detail(s, 'p', confirmation_key='b/conf/c1')
+
+
+def _count(d):
+    return d['header']['details']['relationship_counts']['work_items']
+
+
+def _assert_no_r2(s, d):
+    dump = json.dumps({k: d[k] for k in ('header', 'sections')}, ensure_ascii=False)
+    assert 'b/rep/r2' not in dump and '內業' not in dump
+    assert not [e for e in walk(d) if e['child_key'] == 'work_item:b/rep/r2']
+    assert parent_context(s, 'work_item:b/rep/r2')['states'] == ['unlocated']
+    gap = [u for u in _wi(d)['details']['unresolved_edges'] if u['parent_key'] == 'contract:b/con/k2']
+    assert gap and gap[0]['child_key'] is None
+    rows = {r['key']: r for r in d['sections']['contract_lines']['rows']}
+    assert rows['contract:b/con/k2']['work_item_links'] == 'unresolved'
+
+
+def test_fix2_last_imported_child_removed_with_surviving_task_ref_is_not_recreated():
+    s, before, d = _f1_state('r2')
+    assert (_count(before), _count(d)) == (3, 2)
+    _assert_no_r2(s, d)
+
+
+def test_fix2_whole_imported_collection_removed_with_status_intact_creates_nothing():
+    s, before, d = _f1_state('all')
+    assert (_count(before), _count(d)) == (3, 0)
+    _assert_no_r2(s, d)
+    assert 'b/rep/r1' not in json.dumps(d['header']['details']['complete_ids'])
+
+
+def test_fix2_legacy_fallback_only_when_project_not_in_imported_mode():
+    s, _, _ = _f1_state('all')
+    s['source_work_items_status'] = {}  # genuinely not imported -> exact legacy rule applies
+    d = build_case_detail(s, 'p', confirmation_key='b/conf/c1')
+    assert 'work_item:b/rep/r2' in [e['child_key'] for e in walk(d)]

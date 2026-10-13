@@ -93,7 +93,6 @@ def _tree(state, pid):
     status = (state.get('source_work_items_status') or {}).get(pid)
     imported = state.get('source_work_items_enabled', True) and status is not None
     incomplete = set((status or {}).get('incomplete_contract_ids') or [])
-    imported_contracts = {c for i in items.values() for c in i.get('contract_ids', [])}
     ct_unresolved = {}
     for ct in contracts:
         ckey = f"contract:{ct['id']}"
@@ -103,13 +102,15 @@ def _tree(state, pid):
             if cid in shown_conf:
                 edge('confirmation_contract', f'confirmation:{cid}', ckey, multi)
         linked = {}  # work-item id -> (label, source_url, contested)
-        if imported and (ct['id'] in imported_contracts or ct['id'] in incomplete):
-            # imported collection is the only authority for these children
+        if imported:
+            # authority is per project (import status), never per surviving child: only
+            # authorized imported rows may create work-item objects, edges or counts
             for iid, it in items.items():
                 if ct['id'] in it.get('contract_ids', []):
                     linked[iid] = (_text(it.get('category')), it.get('source_url'), len(it['contract_ids']) > 1)
             missing = bool(status.get('partial') or status.get('truncated') or ct['id'] in incomplete
-                           or any(items[i].get('source_missing') for i in linked))
+                           or any(items[i].get('source_missing') for i in linked)
+                           or (not linked and bool(ct.get('reporting_ids') or ct.get('task_refs'))))
         else:
             # legacy rule of case_navigation: task_ref -> task source identity -> reporting_ids
             missing = False
