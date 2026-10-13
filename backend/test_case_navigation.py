@@ -245,3 +245,39 @@ def test_scaled_workspace_omits_work_items_without_affecting_navigation(tmp_path
         navigation=client.get(f'/api/projects/{pid}/navigation')
         assert navigation.status_code==200
         assert sum(len(c['work_items']) for c in navigation.json()['confirmations'][0]['contracts'])>0
+
+
+def test_forward_missing_item_and_unattributable_item_are_incomplete():
+    from .test_source_work_items import imported
+    from .source_entities import update_entities
+    from .fixtures.f7_c115264 import CONTRACT,ITEM
+    for mode in ('missing','unattributable','renamed'):
+        state,records,tables,assignments=imported()
+        contract=next(r for r in records if r['kind']=='contract')
+        item=next(r for r in records if r['kind']=='reporting')
+        if mode=='unattributable':item['fields']['來源合約明細（日報關聯）'][0]['record_ids']=['recNOPE']
+        else:contract['fields']['合約填報工項（日報關聯）'][0]['record_ids'].append('recNOPE')
+        if mode=='renamed':
+            field=next(f for t in tables if t['table_id']==CONTRACT for f in t['field_schema'] if f['field_id']=='fldOFyOZgb')
+            field['field_name']='renamed-forward'
+            for r in records:
+                if r['table_id']==CONTRACT:r['fields']['renamed-forward']=r['fields'].pop('合約填報工項（日報關聯）')
+        update_entities(state,records,tables,assignments)
+        case=case_navigation(state,'p')['confirmations'][0]
+        assert case['contracts'][0]['unresolved'] is True
+        assert case['edge_states']['work_items']=='partial: source work items incomplete'
+        assert 'recNOPE' not in repr(case)
+
+
+def test_visible_contract_with_hidden_confirmation_items_is_incomplete():
+    from .test_source_work_items import imported
+    from .source_entities import entity_id
+    state,records,_,_=imported()
+    state.update(environment='production',source_visible_record_ids=[entity_id(r).replace('/','|') for r in records])
+    state['projects'][0]['case_visibility']='source_reference'
+    state['contract_items'][0]['confirmation_ids'].append('HIDDEN_CASE_ID')
+    case=case_navigation(state,'p')['confirmations'][0]
+    assert case['contracts'][0]['work_items']==[]
+    assert case['contracts'][0]['unresolved'] is True
+    assert case['edge_states']['work_items']=='partial: source work items incomplete'
+    assert 'HIDDEN_CASE_ID' not in repr(case)

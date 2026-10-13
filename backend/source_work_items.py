@@ -46,6 +46,22 @@ def update_work_items(ws,records,tables,assignments):
         if pid:ready[pid]={'partial':(r['base_token'],ITEM_TABLE) not in complete or
             (r['base_token'],CONTRACT_TABLE) not in complete}
     ws['source_work_items']=sorted(items.values(),key=lambda i:i['id'])
+    # Forward links catch absent rows even when no imported item can own a project.
+    for contract in ws.get('contract_items',[]):
+        origin=contract.get('source_identity') or {}
+        row=next((r for r in index.get((origin.get('base_token'),origin.get('record_id')),[])
+                  if r['table_id']==CONTRACT_TABLE),None)
+        if row is None:continue
+        forward,unknown=links(row,'fldOFyOZgb','reporting')
+        expected={entity_id(r) for r in forward}
+        linked=[i for i in items.values() if contract['id'] in i['contract_ids'] or i['id'] in expected]
+        incomplete=bool(unknown or expected-items.keys() or
+            any(i.get('project_id') is None or i.get('source_missing') for i in linked))
+        pid=contract.get('project_id')
+        if pid:
+            ready.setdefault(pid,{'partial':(row['base_token'],ITEM_TABLE) not in complete or
+                (row['base_token'],CONTRACT_TABLE) not in complete})
+            if incomplete:ready[pid].setdefault('incomplete_contract_ids',[]).append(contract['id'])
     ws['source_work_items_status']=ready
 
 

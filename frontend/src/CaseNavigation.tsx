@@ -25,6 +25,7 @@ export function CaseNavigation({projectId}:{projectId:string}){
    {caseRow.edge_states.work_items==='partial: 外業 work items not imported'&&<Row label="外業工作項尚未匯入"/>}
    {caseRow.edge_states.work_items==='partial: source work items truncated'&&<Row label="工作項僅顯示部分資料（讀取上限）"/>}
    {caseRow.edge_states.work_items==='partial: source work items incomplete'&&<Row label="工作項來源尚未完整核實"/>}
+   {caseRow.edge_states.work_items.startsWith('partial')&&!['partial: 外業 work items not imported','partial: source work items truncated','partial: source work items incomplete'].includes(caseRow.edge_states.work_items)&&<Row label="資料可能不完整"/>}
    {caseRow.edge_states.daily!=='linked'&&<Row label="尚無關聯日報"/>}
    {caseRow.edge_states.files!=='linked'&&<Row label="尚無文件（來源未建立關聯）"/>}
   </div>)}
