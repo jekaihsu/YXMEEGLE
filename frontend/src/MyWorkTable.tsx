@@ -3,6 +3,7 @@
 // Does NOT recompute any state, label, sort, or count.
 // No fetch and no writes.
 
+import { useRef, useEffect } from 'react';
 import type {
   MyWorkView,
   MyWorkMode,
@@ -28,6 +29,35 @@ export function MyWorkTable({
   onNavigate,
 }: MyWorkTableProps) {
   const selectedId = view.filters.selectedId;
+  const openingControlRef = useRef<HTMLElement | null>(null);
+  const lastOpenedTaskIdRef = useRef<string | null>(null);
+  const prevDrawerOpenRef = useRef(view.drawer.open);
+
+  if (view.drawer.open && view.drawer.task) {
+    lastOpenedTaskIdRef.current = view.drawer.task.id;
+  }
+
+  const restoreFocusToOpeningControl = () => {
+    const targetId = lastOpenedTaskIdRef.current;
+    if (openingControlRef.current && document.body.contains(openingControlRef.current)) {
+      openingControlRef.current.focus();
+    } else if (targetId) {
+      const el = document.getElementById(`my-work-row-btn-${targetId}`);
+      el?.focus();
+    }
+  };
+
+  const handleCloseDrawer = () => {
+    onSelect?.(null);
+    restoreFocusToOpeningControl();
+  };
+
+  useEffect(() => {
+    if (prevDrawerOpenRef.current && !view.drawer.open) {
+      restoreFocusToOpeningControl();
+    }
+    prevDrawerOpenRef.current = view.drawer.open;
+  }, [view.drawer.open]);
 
   // Banner text handles every C-STATE value, including view.pageState null (clean complete read).
   // Unknown count is never rendered as 0.
@@ -57,15 +87,14 @@ export function MyWorkTable({
           {view.showModeToggle && (
             <div
               className="my-work-mode-toggle"
-              role="tablist"
+              role="group"
               aria-label="工作模式切換"
             >
               {view.modes.map((m) => (
                 <button
                   key={m.mode}
                   type="button"
-                  role="tab"
-                  aria-selected={view.mode === m.mode}
+                  aria-pressed={view.mode === m.mode}
                   className={`my-work-mode-tab ${
                     view.mode === m.mode ? 'is-active' : ''
                   }`}
@@ -161,15 +190,12 @@ export function MyWorkTable({
                       className={`my-work-row ${
                         isSelected ? 'is-selected' : ''
                       } ${row.needsAttention ? 'needs-attention' : ''}`}
-                      role="button"
-                      tabIndex={0}
-                      aria-pressed={isSelected}
-                      aria-selected={isSelected}
-                      aria-label={`選取任務：${row.title}`}
                       onClick={() => onSelect?.(row.id)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
+                        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
                           e.preventDefault();
+                          openingControlRef.current = document.getElementById(`my-work-row-btn-${row.id}`);
+                          lastOpenedTaskIdRef.current = row.id;
                           onSelect?.(row.id);
                         }
                       }}
@@ -178,12 +204,23 @@ export function MyWorkTable({
                         <div className="my-work-cell-task">
                           <button
                             type="button"
+                            id={`my-work-row-btn-${row.id}`}
+                            data-row-select-id={row.id}
                             className="my-work-row-title-btn"
+                            aria-pressed={isSelected}
+                            aria-label={`選取任務：${row.title}`}
                             onClick={(e) => {
                               e.stopPropagation();
+                              openingControlRef.current = e.currentTarget;
+                              lastOpenedTaskIdRef.current = row.id;
                               onSelect?.(row.id);
                             }}
-                            aria-label={`選取任務 ${row.title}`}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                openingControlRef.current = e.currentTarget;
+                                lastOpenedTaskIdRef.current = row.id;
+                              }
+                            }}
                           >
                             <strong>{row.title}</strong>
                           </button>
@@ -264,6 +301,11 @@ export function MyWorkTable({
                                 e.stopPropagation();
                                 onNavigate?.(act.route);
                               }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.stopPropagation();
+                                }
+                              }}
                             >
                               {act.label}
                             </button>
@@ -313,7 +355,16 @@ export function MyWorkTable({
 
       {/* Detail Drawer: only after selection */}
       {view.drawer.open && view.drawer.task && (
-        <aside className="my-work-drawer" aria-label="任務詳情面板">
+        <aside
+          className="my-work-drawer"
+          aria-label="任務詳情面板"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.stopPropagation();
+              handleCloseDrawer();
+            }
+          }}
+        >
           <header className="my-work-drawer-header">
             <div className="my-work-drawer-title-group">
               <h3 className="my-work-drawer-title">{view.drawer.task.title}</h3>
@@ -324,7 +375,7 @@ export function MyWorkTable({
             <button
               type="button"
               className="my-work-drawer-close"
-              onClick={() => onSelect?.(null)}
+              onClick={handleCloseDrawer}
               aria-label="關閉詳情面板"
             >
               ×

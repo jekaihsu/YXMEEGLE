@@ -85,6 +85,11 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
+.my-work-mode-tab:focus-visible {
+  outline: 2px solid var(--accent, #2563eb);
+  outline-offset: 1px;
+}
+
 /* Search Box */
 .my-work-search-box {
   display: flex;
@@ -217,6 +222,10 @@
   outline: 2px solid var(--accent, #2563eb);
   outline-offset: -2px;
   background-color: color-mix(in srgb, var(--accent, #2563eb) 8%, var(--surface, #ffffff));
+}
+
+.my-work-row:focus-within {
+  background-color: color-mix(in srgb, var(--accent, #2563eb) 4%, var(--surface, #ffffff));
 }
 
 .my-work-row.is-selected {
