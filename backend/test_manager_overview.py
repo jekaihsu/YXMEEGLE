@@ -26,11 +26,11 @@ def workspace():
             # Fake population contains exactly the required two identity keys;
             # it does not smuggle business predicates or read metadata in rows.
             'confirmation_fixture': [
-                {'row_key': ['base-A', 'table-A', 'record-A', 'v3'], 'project_id': 'case-A'},
-                {'row_key': ['base-A', 'table-A', 'record-A', 'v4'], 'project_id': 'case-A'},
-                {'row_key': ['base-B', 'table-A', 'record-A', 'v4'], 'project_id': 'case-B'},
-                {'row_key': ['base-B', 'table-A', 'record-Z', 'v4'], 'project_id': None},
-                {'row_key': ['base-C', 'table-C', 'record-C', 'v4'], 'project_id': 'case-C'}]}
+                {'row_key': 'rk-01', 'project_id': 'case-A'},
+                {'row_key': 'rk-02', 'project_id': 'case-A'},
+                {'row_key': 'rk-03', 'project_id': 'case-B'},
+                {'row_key': 'rk-04', 'project_id': None},
+                {'row_key': 'rk-05', 'project_id': 'case-C'}]}
 
 
 def population(state, filters):
@@ -38,7 +38,7 @@ def population(state, filters):
     visible = {p['id']: p for p in state['projects']}
     rows = [r for r in state['confirmation_fixture'] if r['project_id'] is None or r['project_id'] in visible]
     if filters.get('version'):
-        rows = [r for r in rows if r['row_key'][-1] == filters['version']]
+        rows = [r for r in rows if {'rk-01': 'v3', 'rk-02': 'v4', 'rk-03': 'v4', 'rk-04': 'v4', 'rk-05': 'v4'}[r['row_key']] == filters['version']]
     if filters.get('pm_id'):
         rows = [r for r in rows if visible.get(r['project_id'], {}).get('pm_id') == filters['pm_id']]
     if filters.get('execution_status'):
@@ -101,7 +101,7 @@ def test_unresolved_is_reported_separately_and_never_counted_as_a_case():
     assert cards(result)['stable_cases']['value'] == 3
     assert result['snapshot']['unresolved']['value'] == 1
     assert result['snapshot']['unresolved']['rows'] == [
-        {'details': {'row_key': ['base-B', 'table-A', 'record-Z', 'v4'], 'mapping_state': 'receipt_missing'}}]
+        {'details': {'row_key': 'rk-04', 'mapping_state': 'receipt_missing'}}]
     state = workspace()
     state['confirmation_fixture'] = [state['confirmation_fixture'][3]]
     assert cards(overview(state))['stable_cases']['value'] is None  # no proven complete zero
@@ -251,3 +251,30 @@ def test_complete_claim_cannot_contradict_rows_and_ready_is_not_a_c_state():
     with pytest.raises(ValueError, match='unsupported state'):
         overview(population_state={'states': ['ready']})
     assert cards(overview())['stable_cases']['value'] == 3
+
+
+@pytest.mark.parametrize('states', [None, ('unknown',), ('loading',), ('read_failed',),
+                                  ('unlocated',), ('partial',), ('stale',), ('partial', 'stale'),
+                                  ('complete_empty',), ('filtered_empty',)])
+def test_unavailable_population_is_never_an_empty_denominator(states):
+    result = build(workspace(), population=lambda s, f: None,
+                   population_state=data_state(*states) if states else None, as_of=AS_OF)
+    expected = list(states) if states and states[0] not in ('complete_empty', 'filtered_empty') else ['unknown']
+    assert result['snapshot']['state']['states'] == expected
+    assert result['snapshot']['cases'] == []
+    assert result['snapshot']['unresolved']['value'] is None
+    for card in result['snapshot']['cards']:
+        assert card['value'] is None
+        assert card['reason']
+    for key in ('confirmation_versions', 'stable_cases'):
+        assert cards(result)[key]['state']['states'] == expected
+    assert cards(overview())['confirmation_versions']['value'] == 5
+
+
+@pytest.mark.parametrize('key', [None, '', ['unencoded', 'key'], {'raw_fields': 123}, 'rk-01'])
+def test_malformed_or_duplicate_population_identity_is_rejected(key):
+    state = workspace()
+    state['confirmation_fixture'][1]['row_key'] = key
+    with pytest.raises(ValueError, match='unique nonempty opaque string'):
+        overview(state)
+    assert cards(overview())['confirmation_versions']['value'] == 5
