@@ -105,8 +105,28 @@ def sweep(node, plan):
 
 
 def apply(out, plan):
+    out.pop('source_case_review', None)
+    for collection in ('source_confirmations', 'source_quotes', 'contract_items'):
+        for row in out.get(collection, ()):
+            row.pop('history', None)
     sweep(out, plan)
     if plan.fallback:
         import logging
         logging.getLogger(__name__).warning('case_redaction unregistered holder: %d hits', plan.fallback)
     return plan
+
+
+def _unresolved(node, key, plan):
+    values = node[key]
+    if isinstance(values, list):
+        node[key] = [PLACEHOLDER] * len(values)
+
+
+def _unresolved_records(node, key, plan):
+    for row in node[key] if isinstance(node[key], list) else ():
+        if isinstance(row, dict) and 'record_id' in row:
+            row['record_id'] = PLACEHOLDER
+
+
+HANDLERS.update(unresolved_confirmation_ids=_unresolved, unresolved_quote_ids=_unresolved,
+                unresolved=_unresolved_records)

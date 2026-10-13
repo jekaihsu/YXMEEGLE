@@ -196,7 +196,7 @@ def filter_private_workspace(state, user):
         state['handover_requests'] = [item for item in state.get('handover_requests', [])
             if ident and (ident in (item.get('from_id'), item.get('to_id'), item.get('requested_by'))
                           or ident in leads.get(item.get('project_id'), ()))]
-    if not actor or actor.get('role')!='manager':
+    if simulated and (not actor or actor.get('role')!='manager'):
         state.pop('source_case_review',None)
     # Background snapshots and source payloads are operational, not public case
     # data. A manager gets metadata through the same projection, never secrets.

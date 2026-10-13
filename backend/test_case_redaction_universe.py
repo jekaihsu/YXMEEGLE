@@ -29,7 +29,7 @@ def install(app,state):
         row=db.get(WorkspaceRow,'lark-boundary');row.data=storage.save(db,BusinessRow,row.id,state)
 
 
-PENDING={'policy_summary.[].closure.missing.[]','daily_reviews.[].entry.source_provenance.unresolved.[].record_id'}
+PENDING={'policy_summary.[].closure.missing.[]'}
 @pytest.mark.parametrize('path',[pytest.param(p,marks=pytest.mark.xfail(strict=True,reason='typed handler pending')) if p in PENDING else p for p in LEAK_PATHS])
 
 def test_known_holder(isolated_http,path):
@@ -82,3 +82,52 @@ def test_differential_planting_every_collection(isolated_http):
     # Scan probe slots independently of any legacy holders still awaiting L1/L2.
     probe_values=[s for path,s in walk(responses[0]) if any(k.startswith('zz_probe') for k in path)]
     assert not any(n in s for n in needles for s in probe_values)
+
+
+def test_history_scope_and_unresolved_are_response_only(isolated_http):
+    from copy import deepcopy
+    app,client,_,signin=isolated_http
+    state,records,pid=build_universe()
+    state['recurring']=[dict(id='routine-safe',project_id=pid,history=[{'id':'routine-event','evidence':'keep'}])]
+    state['approvals']=[dict(id='approval-safe',project_id=pid,type='confirmation',history=[{'id':'approval-event','message':'keep'}])]
+    install(app,state);signin('u-manager')
+    before=deepcopy(state)
+    response=client.get('/api/workspace');assert response.status_code==200
+    public=response.json()
+    assert public['recurring'][0]['history']==[{'id':'routine-event','evidence':'keep'}]
+    assert public['approvals'][0]['history']==[{'id':'approval-event','message':'keep'}]
+    assert 'source_case_review' not in public
+    for collection in ('source_quotes','source_confirmations','contract_items'):
+        assert all('history' not in r for r in public[collection])
+    qa=next(q for q in public['source_quotes'] if q['source_identity']['record_id']=='recQuoteA')
+    assert qa['unresolved_confirmation_ids']==['［不開放檢視］']
+    body=dict(action='comment_add',project_id=pid,version=public['version'],request_id='universe-storage',payload={'body':'hello'})
+    for result in (client.post('/api/actions',json=body),client.post('/api/actions',json=body)):
+        assert result.status_code==200,result.text
+        assert 'source_case_review' not in result.json()
+    with app.state.sessions() as db:
+        stored=storage.load(db,BusinessRow,db.get(WorkspaceRow,'lark-boundary'))
+    for collection in ('source_quotes','source_confirmations','contract_items','daily_reviews','source_case_review','source_visible_record_ids'):
+        assert stored[collection]==before[collection]
+    old=next(p for p in before['projects'] if p['id']==pid);new=next(p for p in stored['projects'] if p['id']==pid)
+    for key in ('quotes','source_record_history','source_record_ids','source_entity_ids','source_conflicts','daily_reports'):
+        assert new.get(key)==old.get(key)
+
+
+def test_builder_id_form_completeness():
+    import re
+    from .case_universe import walk
+    state,records,_=build_universe()
+    needles=forbidden(state,records)
+    ids={n for n in needles if n.startswith(('rec','src-'))}
+    from .source_entities import entity_id
+    from .source_case_policy import identity
+    from .sources import source_id
+    exact={x for r in records for x in (r['record_id'],entity_id(r),identity(r),source_id(r))}
+    exact.update(str(r['fields'][k]) for r in records for k in ('工程確認單編號','工程編號','報價編號') if r['fields'].get(k))
+    for path,value in walk(state):
+        if not any(n in value for n in ids):continue
+        explained=value in exact or bool(re.search(r'[?&]record=[^&#]+',value))
+        explained |= value.startswith(('quote:','work_item:')) and value.split(':',1)[1] in exact
+        explained |= all(part in exact for part in value.split('|'))
+        assert explained,(path,value)
