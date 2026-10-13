@@ -127,3 +127,5 @@ export function perfMark(name:string){
 }
 
 export const fetchPilotShadow=(signal?:AbortSignal)=>api<unknown>('/api/lark-pilot/shadow',{method:'GET',cache:'no-store',signal,timeoutMs:120000});
+
+export const fetchCaseNavigation=(projectId:string,signal?:AbortSignal)=>api<import('./CaseNavigation').Navigation>(`/api/projects/${encodeURIComponent(projectId)}/navigation`,{signal});
