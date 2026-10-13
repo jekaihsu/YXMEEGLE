@@ -22,7 +22,7 @@ def case_navigation(workspace, project_id):
             items={};missing=False
             for ref in contract.get('task_refs',[]):
                 if ref.get('project_id')!=project_id:continue
-                task=tasks.get((ref['node_id'],ref['task_id']))
+                task=tasks.get((ref.get('node_id'),ref.get('task_id')))
                 origin=(task or {}).get('source_identity') or {}
                 if not task or not all(origin.get(k) for k in ('base_token','table_id','record_id')):
                     missing=True;continue

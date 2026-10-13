@@ -89,3 +89,59 @@ def test_production_requires_admitted_source_identity():
             row['source_identity']=dict(base_token='b',table_id=table,record_id=row['id'])
     case=case_navigation(state,'p')['confirmations'][0]
     assert case['id']=='c' and [c['id'] for c in case['contracts']]==['contract0']
+
+
+def test_malformed_refs_are_unresolved():
+    for ref in ({'project_id':'p'},{'project_id':'p','node_id':'n'},
+                {'project_id':'p','task_id':'t0-0'}):
+        state=fixture();state['contract_items'][0]['task_refs']=[ref]
+        contract=case_navigation(state,'p')['confirmations'][0]['contracts'][0]
+        assert contract==dict(id='contract0',item_number='3',title='工項',unresolved=True,work_items=[])
+
+
+def test_duplicate_codes_never_merge_or_infer_edges():
+    state=fixture()
+    for contract in state['contract_items']:contract['fields']['工編號碼']='C115264-1'
+    orphan=deepcopy(state['contract_items'][0]);orphan.update(id='text-only',confirmation_ids=[])
+    state['contract_items'].append(orphan)
+    cases=case_navigation(state,'p')['confirmations']
+    assert [c['id'] for c in cases[0]['contracts']]==['contract0','contract1','contract2','contract3']
+    assert [len(c['work_items']) for c in cases[0]['contracts']]==[1,3,4,4]
+    assert cases[1]['contracts']==[]
+
+
+def test_populated_route_whitelist_and_hidden_cross_project(tmp_path):
+    from .test_public_case_http_boundaries import isolated_http
+    from .app import WorkspaceRow,BusinessRow
+    from . import storage
+    app,client,_,_=isolated_http.__wrapped__(tmp_path)
+    with app.state.sessions.begin() as db:
+        row=db.get(WorkspaceRow,'lark-boundary');state=storage.load(db,BusinessRow,row)
+        data=fixture()
+        for collection in ('source_confirmations','contract_items'):
+            for item in data[collection]:
+                item['project_id']='p2'
+                item['source_identity']=dict(base_token='b',table_id=collection,record_id=item['id'])
+                state['source_visible_record_ids'].append('b|'+collection+'|'+item['id'])
+                item.update(history=[{'secret':'HISTORY_SECRET'}],source_records=[{'secret':'PAYLOAD_SECRET'}])
+            state[collection]=data[collection]
+        for ref in state['contract_items'][0]['task_refs']:ref['project_id']='p2'
+        for contract in state['contract_items'][1:]:
+            for ref in contract['task_refs']:ref['project_id']='p2'
+        template=state['projects'][1]['nodes'][0]['tasks'][0]
+        state['projects'][1]['nodes'][0]['tasks']=[{**deepcopy(template),**task} for task in data['projects'][0]['nodes'][0]['tasks']]
+        for contract in state['contract_items']:
+            for ref in contract['task_refs']:ref['node_id']=state['projects'][1]['nodes'][0]['id']
+        state['source_confirmations'].append(dict(id='cross',project_id='p1',source_kind='confirmation',code='HIDDEN_SECRET'))
+        row.data=storage.save(db,BusinessRow,row.id,state)
+    response=client.get('/api/projects/p2/navigation')
+    assert response.status_code==200
+    cases=response.json()['confirmations']
+    assert [c['id'] for c in cases]==['c','empty']
+    assert [len(c['work_items']) for c in cases[0]['contracts']]==[1,3,4,4]
+    assert set(cases[0])=={'id','code','source_url','contracts','edge_states'}
+    assert set(cases[0]['contracts'][0])=={'id','item_number','title','unresolved','work_items'}
+    assert set(cases[0]['contracts'][0]['work_items'][0])=={'id','category','source_url'}
+    assert all(x not in response.text for x in ('amount','history','PAYLOAD_SECRET','HISTORY_SECRET','HIDDEN_SECRET','count'))
+    assert client.get('/api/projects/p1/navigation').status_code==404
+    app.state.engine.dispose()
