@@ -48,7 +48,7 @@
 .workspace .project-detail :is(.project-tabs,.ops-tabs)[data-scroll-after=true]{mask-image:linear-gradient(to right,var(--label) calc(100% - var(--sp-4)),transparent)}
 .workspace .project-detail :is(.project-tabs,.ops-tabs)[data-scroll-before=true]{mask-image:linear-gradient(to right,transparent,var(--label) var(--sp-4))}
 .workspace .project-detail :is(.project-tabs,.ops-tabs)[data-scroll-before=true][data-scroll-after=true]{mask-image:linear-gradient(to right,transparent,var(--label) var(--sp-4),var(--label) calc(100% - var(--sp-4)),transparent)}
-.workspace .project-detail .project-title{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--sp-2) var(--sp-4);align-items:center}
+.workspace .project-detail .project-title{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);gap:var(--sp-2) var(--sp-4);align-items:center}
 .workspace .project-detail .project-title>div{display:contents}
 .workspace .project-detail .project-title :is(.case-code,h1){grid-column:1/-1}
 .workspace .project-detail .project-meta{margin-top:0}
