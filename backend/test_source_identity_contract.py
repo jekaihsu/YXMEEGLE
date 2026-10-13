@@ -2,8 +2,13 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from .source_identity import SourceRef, resolve_edge
+from . import source_identity, v4_sources
+from .source_identity import (
+    EdgeType, SourceRef, build_native_edge_graph, children_of, edge_sources, edge_targets,
+    parents_of, resolve_edge, stable_identity,
+)
 from .source_entities import entity_id
+from .sources import source_id
 
 
 def test_source_ref_wraps_existing_entity_id_and_retains_components():
@@ -255,3 +260,286 @@ def test_non_sequence_registry_fails_instead_of_reporting_absent(registry):
 
     with pytest.raises(TypeError):
         resolve_edge(ref, registry)
+
+
+# Typed native edges (D1-D8). Records mimic native Lark rows: links hold record ids only.
+B = "base-A"
+CONTRACT_FIELD = "所屬成案確認單（日報關聯）"
+ITEM_FIELD = "來源合約明細（日報關聯）"
+
+
+def row(kind, table, record_id, **fields):
+    return {"kind": kind, "base_token": B, "table_id": table, "record_id": record_id, "fields": fields}
+
+
+def ref(table, record_id, version=None):
+    return SourceRef.from_entity({"base_token": B, "table_id": table, "record_id": record_id},
+                                 version=version)
+
+
+CONTRACT_TO_CONFIRMATION = EdgeType("contract_confirmation", "contract", CONTRACT_FIELD,
+                                    {"confirmation"}, "child_to_parent", "many")
+ITEM_TO_CONTRACT = EdgeType("item_contract", "reporting", ITEM_FIELD, {"contract"},
+                            "child_to_parent", "many")
+CONFIRMATION_TO_QUOTE = EdgeType("confirmation_quote", "confirmation", "所屬案件", {"quote"},
+                                 "child_to_parent", "one")
+DAILY_TO_COST = EdgeType("daily_cost", "daily", "所屬成本單", {"cost"}, "child_to_parent", "one")
+DAILY_TO_CASE = EdgeType("daily_case", "daily", "所屬案件", {"confirmation"}, "child_to_parent", "one")
+
+
+def chain_records():
+    return [
+        row("quote", "tblQ", "recQ1"),
+        row("confirmation", "tblC", "recC1", 所屬案件=["recQ1"], 工程確認單編號="C115001", name="same"),
+        row("confirmation", "tblC", "recC2", 工程確認單編號="C115001", name="same"),
+        row("contract", "tblL", "recL1", **{CONTRACT_FIELD: [{"record_ids": ["recC1"]}]}),
+        row("contract", "tblL", "recL2", **{CONTRACT_FIELD: ["recC1", "recC2"]}),
+        row("reporting", "tblW", "recW1", **{ITEM_FIELD: ["recL1"]}),
+        row("reporting", "tblW", "recW2", **{ITEM_FIELD: ["recL1", "recL2"]}),
+        row("reporting", "tblW", "recW3", **{ITEM_FIELD: ["recL1", "recMISSING"]}),
+    ]
+
+
+def chain_graph(**kwargs):
+    return build_native_edge_graph(
+        chain_records(), [CONTRACT_TO_CONFIRMATION, ITEM_TO_CONTRACT, CONFIRMATION_TO_QUOTE], **kwargs)
+
+
+def test_native_edges_reuse_existing_native_resolver():
+    assert source_identity.native_records is v4_sources.native_records
+
+
+def test_several_edge_types_on_one_record_do_not_conflict():
+    records = [
+        row("confirmation", "tblC", "recC1"),
+        row("cost", "tblK", "recK1"),
+        row("daily", "tblD", "recD1", 所屬案件=["recC1"], 所屬成本單=["recK1"]),
+    ]
+    graph = build_native_edge_graph(records, [DAILY_TO_CASE, DAILY_TO_COST])
+    daily = ref("tblD", "recD1")
+
+    case, cost = edge_targets(graph, daily, "daily_case"), edge_targets(graph, daily, "daily_cost")
+
+    assert (case["navigation"], case["target_keys"]) == ("linked", ("base-A/tblC/recC1",))
+    assert (cost["navigation"], cost["target_keys"]) == ("linked", ("base-A/tblK/recK1",))
+
+
+def test_one_to_many_and_many_to_many_return_all_targets():
+    graph = chain_graph()
+
+    assert edge_targets(graph, ref("tblW", "recW2"), "item_contract")["target_keys"] == (
+        "base-A/tblL/recL1", "base-A/tblL/recL2")
+    assert edge_targets(graph, ref("tblL", "recL2"), "contract_confirmation")["target_keys"] == (
+        "base-A/tblC/recC1", "base-A/tblC/recC2")
+    assert edge_sources(graph, ref("tblC", "recC1"), "contract_confirmation") == (
+        ("base-A", "tblL", "recL1", None), ("base-A", "tblL", "recL2", None))
+    assert edge_sources(graph, ref("tblL", "recL1"), "item_contract") == tuple(
+        ("base-A", "tblW", rid, None) for rid in ("recW1", "recW2", "recW3"))
+
+
+def test_forward_and_reverse_navigation_agree_by_construction():
+    graph = chain_graph()
+    linked = [i for i in graph.instances if i["navigation"] == "linked"]
+    assert len(linked) == 8
+    refs = {i["source_key"] for i in graph.instances} | {i["target_key"] for i in linked}
+    by_key = {key: SourceRef.from_entity(dict(zip(("base_token", "table_id", "record_id"), key.split("/"))))
+              for key in refs}
+
+    for key, node in by_key.items():
+        for edge_type, child, _ in children_of(graph, node):
+            assert (edge_type, key) in {(e, p) for e, p, _ in parents_of(graph, by_key[child])}
+        for edge_type, parent, _ in parents_of(graph, node):
+            assert (edge_type, key) in {(e, c) for e, c, _ in children_of(graph, by_key[parent])}
+    for instance in linked:
+        target = by_key[instance["target_key"]]
+        assert instance["source_version_key"] in edge_sources(graph, target, instance["edge_type"])
+
+    assert [c for _, c, _ in children_of(graph, ref("tblC", "recC1"))] == [
+        "base-A/tblL/recL1", "base-A/tblL/recL2"]
+    assert [p for _, p, _ in parents_of(graph, ref("tblL", "recL2"))] == [
+        "base-A/tblC/recC1", "base-A/tblC/recC2"]
+    assert [p for _, p, _ in parents_of(graph, ref("tblC", "recC1"))] == ["base-A/tblQ/recQ1"]
+
+
+def test_missing_native_target_stays_an_explicit_unresolved_row():
+    graph = chain_graph()
+
+    result = edge_targets(graph, ref("tblW", "recW3"), "item_contract")
+
+    assert result["navigation"] == "partial"
+    assert result["target_keys"] == ("base-A/tblL/recL1",)
+    assert [(u["reason"], u["target_key"], u["target_record_id"]) for u in result["unresolved"]] == [
+        ("native_target_unresolved", None, "recMISSING")]
+    assert any(i["target_record_id"] == "recMISSING" and i["navigation"] == "unresolved"
+               for i in graph.instances)
+
+
+def test_one_cardinality_ambiguous_contested_and_unresolved():
+    records = [
+        row("quote", "tblQ", "recQ1"), row("quote", "tblQ", "recQ2"),
+        row("confirmation", "tblC", "recC1", 所屬案件=["recQ1", "recQ2"]),
+        row("confirmation", "tblC", "recC2", 所屬案件=["recQ1", "recGONE"]),
+        row("confirmation", "tblC", "recC3", 所屬案件=["recGONE"]),
+        row("confirmation", "tblC", "recC4"),
+    ]
+    graph = build_native_edge_graph(records, [CONFIRMATION_TO_QUOTE])
+    result = {rid: edge_targets(graph, ref("tblC", rid), "confirmation_quote")
+              for rid in ("recC1", "recC2", "recC3", "recC4")}
+
+    assert (result["recC1"]["navigation"], result["recC1"]["target_keys"],
+            result["recC1"]["candidate_keys"]) == (
+        "ambiguous", (), ("base-A/tblQ/recQ1", "base-A/tblQ/recQ2"))
+    assert (result["recC2"]["navigation"], result["recC2"]["contested"],
+            result["recC2"]["target_keys"]) == ("contested", True, ("base-A/tblQ/recQ1",))
+    assert (result["recC3"]["navigation"], result["recC3"]["reason"]) == (
+        "unresolved", "native_target_unresolved")
+    assert (result["recC4"]["navigation"], result["recC4"]["reason"]) == ("unresolved", "no_native_link")
+
+
+def test_receipt_missing_unless_caller_supplies_receipt_ref_for_the_type():
+    plain = chain_graph()
+    accepted = chain_graph(receipts={"item_contract": "receipt-ref-opaque"})
+    item = ref("tblW", "recW1")
+
+    assert {i["verification"] for i in plain.instances} == {"receipt_missing"}
+    assert edge_targets(plain, item, "item_contract")["verification"] == "receipt_missing"
+    assert edge_targets(accepted, item, "item_contract")["verification"] == "accepted"
+    assert edge_targets(accepted, item, "item_contract")["receipt_ref"] == "receipt-ref-opaque"
+    assert edge_targets(accepted, ref("tblL", "recL1"), "contract_confirmation")[
+        "verification"] == "receipt_missing"
+    assert edge_targets(accepted, ref("tblW", "recW9"), "item_contract")["verification"] == "accepted"
+
+
+@pytest.mark.parametrize("receipts,error", [
+    ({"item_contract": ""}, ValueError), ({"item_contract": " "}, ValueError),
+    ({"item_contract": None}, ValueError), ({"undeclared": "r"}, ValueError),
+    ([("item_contract", "r")], TypeError), ("item_contract", TypeError),
+])
+def test_receipt_refs_must_be_non_blank_and_for_declared_types(receipts, error):
+    with pytest.raises(error):
+        chain_graph(receipts=receipts)
+
+
+def test_two_versions_of_one_record_stay_distinct():
+    v1, v2 = ref("tblW", "recW1", version=1), ref("tblW", "recW1", version=2)
+    graph_v1 = chain_graph(version=1)
+    graph_v2 = chain_graph(version=2)
+
+    assert v1.source_key == v2.source_key and v1.version_key != v2.version_key
+    assert len({v1.version_key, v2.version_key}) == 2
+    assert edge_targets(graph_v1, v1, "item_contract")["navigation"] == "linked"
+    assert edge_targets(graph_v1, v2, "item_contract")["reason"] == "version_not_in_graph"
+    assert children_of(graph_v1, v2) == parents_of(graph_v1, v2) == ()
+    assert {i["source_version_key"] for i in graph_v1.instances}.isdisjoint(
+        {i["source_version_key"] for i in graph_v2.instances})
+
+
+def test_slash_component_is_rejected_not_joined():
+    records = [
+        row("contract", "tblL", "recL1"),
+        {**row("contract", "tblL/x", "recL2"), "table_id": "tblL/x"},
+        {**row("reporting", "tblW", "recW1", **{ITEM_FIELD: ["recL2"]})},
+        {**row("reporting", "tblW", "recW2", **{ITEM_FIELD: ["recL1"]}), "base_token": "base-A/tblW"},
+    ]
+    graph = build_native_edge_graph(records, [ITEM_TO_CONTRACT])
+
+    assert [(r["reason"], r["base_token"]) for r in graph.rejected] == [("invalid_source_key", "base-A/tblW")]
+    result = edge_targets(graph, ref("tblW", "recW1"), "item_contract")
+    assert result["navigation"] == "unresolved"
+    assert result["reason"] == "invalid_target_key"
+    assert not any("/x/" in (i["target_key"] or "") or i["source_key"].count("/") != 2
+                   for i in graph.instances)
+
+
+def test_field_id_edge_uses_schema_and_unlocated_schema_is_unresolved():
+    by_id = EdgeType("item_contract_fid", "reporting", ITEM_FIELD, {"contract"},
+                     "child_to_parent", "many", source_table="tblW", field_id="fldItem")
+    records = chain_records()
+    schema = [{"base_token": B, "table_id": "tblW", "field_schema": [
+        {"field_id": "fldItem", "field_name": ITEM_FIELD, "property": {"table_id": "tblL"}}]}]
+    renamed = [{**schema[0], "field_schema": [{"field_id": "fldItem", "field_name": "other"}]}]
+    item = ref("tblW", "recW2")
+
+    linked = edge_targets(build_native_edge_graph(records, [by_id], tables=schema), item, "item_contract_fid")
+    unlocated = edge_targets(build_native_edge_graph(records, [by_id]), item, "item_contract_fid")
+    mismatch = edge_targets(build_native_edge_graph(records, [by_id], tables=renamed), item, "item_contract_fid")
+
+    assert linked["target_keys"] == ("base-A/tblL/recL1", "base-A/tblL/recL2")
+    assert (unlocated["navigation"], unlocated["reason"]) == ("unresolved", "field_schema_unlocated")
+    assert (mismatch["navigation"], mismatch["reason"]) == ("unresolved", "field_schema_mismatch")
+
+
+def test_names_and_case_numbers_create_no_edge_or_identity():
+    graph = chain_graph()
+    c1, c2 = ref("tblC", "recC1"), ref("tblC", "recC2")
+    assignments = {source_id({"base_token": B, "table_id": "tblC", "record_id": "recC1"}): "project-1"}
+
+    assert edge_targets(graph, c2, "confirmation_quote")["reason"] == "no_native_link"
+    assert stable_identity(c1, assignments) == {
+        "source_key": "base-A/tblC/recC1", "stable_id": "project-1",
+        "provenance": "assignment", "reason": None}
+    assert stable_identity(c2, assignments) == {
+        "source_key": "base-A/tblC/recC2", "stable_id": None, "provenance": None,
+        "reason": "assignment_absent"}
+
+
+@pytest.mark.parametrize("assignments,expected", [
+    ({}, "assignment_absent"),
+    ({source_id({"base_token": B, "table_id": "tblC", "record_id": "recC1"}): " "}, "assignment_invalid"),
+    ({"base-A/tblC/recC1": "project-1"}, "assignment_absent"),
+    ({"recC1": "project-1"}, "assignment_absent"),
+])
+def test_stable_identity_only_through_assignment_source_id(assignments, expected):
+    assert stable_identity(ref("tblC", "recC1"), assignments)["reason"] == expected
+
+
+@pytest.mark.parametrize("assignments", [None, [], "x", 7])
+def test_stable_identity_rejects_non_mapping_assignments(assignments):
+    with pytest.raises(TypeError):
+        stable_identity(ref("tblC", "recC1"), assignments)
+
+
+@pytest.mark.parametrize("kwargs,error", [
+    ({"direction": "up"}, ValueError), ({"cardinality": "few"}, ValueError),
+    ({"target_kinds": "contract"}, TypeError), ({"target_kinds": set()}, ValueError),
+    ({"target_kinds": {" contract"}}, ValueError), ({"edge_type": ""}, ValueError),
+    ({"source_field": " x"}, ValueError), ({"field_id": "fld/x"}, ValueError),
+    ({"source_table": ""}, ValueError),
+])
+def test_edge_type_declaration_is_validated(kwargs, error):
+    fields = dict(edge_type="t", source_kind="reporting", source_field=ITEM_FIELD,
+                  target_kinds={"contract"}, direction="child_to_parent", cardinality="many")
+    with pytest.raises(error):
+        EdgeType(**{**fields, **kwargs})
+
+
+def test_graph_inputs_fail_loudly():
+    with pytest.raises(ValueError):
+        build_native_edge_graph([], [ITEM_TO_CONTRACT, ITEM_TO_CONTRACT])
+    with pytest.raises(TypeError):
+        build_native_edge_graph({"recW1": chain_records()[0]}, [ITEM_TO_CONTRACT])
+    with pytest.raises(TypeError):
+        build_native_edge_graph(chain_records(), {"item_contract": ITEM_TO_CONTRACT})
+    with pytest.raises(TypeError):
+        build_native_edge_graph(["row"], [ITEM_TO_CONTRACT])
+    with pytest.raises(ValueError):
+        edge_targets(chain_graph(), ref("tblW", "recW1"), "undeclared")
+
+
+def test_parent_to_child_direction_navigates_the_same_way():
+    child_items = EdgeType("contract_items", "contract", "items", {"reporting"}, "parent_to_child", "many")
+    records = [row("reporting", "tblW", "recW1"), row("reporting", "tblW", "recW2"),
+               row("contract", "tblL", "recL1", items=["recW1", "recW2"])]
+    graph = build_native_edge_graph(records, [child_items], version=3)
+
+    assert [c for _, c, _ in children_of(graph, ref("tblL", "recL1", 3))] == [
+        "base-A/tblW/recW1", "base-A/tblW/recW2"]
+    assert parents_of(graph, ref("tblW", "recW2", 3)) == (
+        ("contract_items", "base-A/tblL/recL1", "receipt_missing"),)
+    assert children_of(graph, ref("tblW", "recW2", 3)) == ()
+
+
+@pytest.mark.parametrize("version", [True, "", " 1", 1.5])
+def test_graph_version_is_validated(version):
+    with pytest.raises(ValueError):
+        chain_graph(version=version)
