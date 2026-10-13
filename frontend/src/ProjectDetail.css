@@ -74,3 +74,7 @@
 .disabled-action-reason { color: var(--text-secondary); font-size: var(--fs-footnote); line-height: 1.5; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .project-detail .inspector-footer { flex-wrap: wrap; }
+
+@media(max-width:760px){
+ .workspace .project-detail :is(.node-actions,.co-actions,.heading-actions)>.disabled-action { width:100%; align-items:stretch; }
+}
