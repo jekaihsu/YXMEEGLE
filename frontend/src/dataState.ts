@@ -3,9 +3,12 @@
 // never exposes a name or count.
 export const DATA_STATES=['loading','complete_empty','filtered_empty','unlocated','forbidden','read_failed','partial','stale','unknown'] as const;
 export type DataStateName=typeof DATA_STATES[number];
-export type DataState=
- |{states:['forbidden']}
- |{states:DataStateName[];count:number|null;name?:string};
+// Forbidden is its own shape: count and name are `never`, so a forbidden value
+// carrying either is a compile error rather than a leak waiting to render.
+export type ForbiddenDataState={states:['forbidden'];count?:never;name?:never};
+export type ReadableStateName=Exclude<DataStateName,'forbidden'>;
+export type ReadableDataState={states:ReadableStateName[];count:number|null;name?:string};
+export type DataState=ForbiddenDataState|ReadableDataState;
 
 const COMBINABLE:ReadonlySet<DataStateName>=new Set(['partial','stale']);
 const EMPTY:ReadonlySet<DataStateName>=new Set(['complete_empty','filtered_empty']);
@@ -35,7 +38,7 @@ export function parseDataState(value:unknown):DataState{
  // Forbidden wins over anything sent alongside it, which is dropped unrendered.
  if(states.includes('forbidden'))return {states:['forbidden']};
  if(states.length>1&&!states.every(state=>COMBINABLE.has(state)))return unknown();
- const ordered=DATA_STATES.filter(state=>states.includes(state));
+ const ordered=DATA_STATES.filter((state):state is ReadableStateName=>state!=='forbidden'&&states.includes(state));
  if(count!==null&&count!==undefined&&!isCount(count))return unknown();
  const known=isCount(count)?count:null;
  if(EMPTY.has(ordered[0])&&known!==null&&known!==0)return unknown();
@@ -44,16 +47,26 @@ export function parseDataState(value:unknown):DataState{
  return typeof name==='string'&&name?{...result,name}:result;
 }
 
-const statesOf=(state:DataState):readonly DataStateName[]=>state.states;
+// Direct values can bypass the parser (casts, malformed input), so the helpers
+// re-check: unreadable states read as unknown, forbidden suppresses everything.
+const statesOf=(state:DataState):readonly DataStateName[]=>{
+ const states=(state as {states?:unknown}|null|undefined)?.states;
+ if(!Array.isArray(states)||!states.length||!states.every(isState))return ['unknown'];
+ return states.includes('forbidden')?['forbidden']:states;
+};
 export const hasDataState=(state:DataState,name:DataStateName)=>statesOf(state).includes(name);
 
 // null means "show no number": callers must not substitute 0.
 export function dataStateCount(state:DataState):number|null{
- return 'count' in state?state.count:null;
+ const states=statesOf(state);
+ const count=(state as {count?:unknown}|null|undefined)?.count;
+ if(states.includes('forbidden')||states.some(name=>UNCOUNTED.has(name)))return null;
+ return isCount(count)?count:null;
 }
 
 export function describeDataState(state:DataState):string{
- const label=statesOf(state).map(name=>DATA_STATE_LABELS[name]).join('・');
+ const states=statesOf(state);
+ const label=states.map(name=>DATA_STATE_LABELS[name]).join('・');
  const count=dataStateCount(state);
- return count===null||EMPTY.has(state.states[0])?label:`${label}（${count} 筆）`;
+ return count===null||EMPTY.has(states[0])?label:`${label}（${count} 筆）`;
 }

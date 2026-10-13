@@ -1,5 +1,10 @@
 // C-STATE: read states stay separate and never collapse into a zero count.
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {existsSync,mkdtempSync,rmSync,writeFileSync,readdirSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {dirname,join,resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 // Dependency-free: Node 24 strips the module's erasable TypeScript syntax.
 const module=await import('./src/dataState.ts');
 const {DATA_STATES,DATA_STATE_LABELS,parseDataState,dataStateCount,describeDataState,hasDataState}=module;
@@ -46,5 +51,39 @@ eq(describeDataState(parseDataState({states:['complete_empty']}))===describeData
 for(const state of ['loading','unlocated','read_failed'])eq(parseDataState({states:[state],count:0}),unknown,`${state} with a count is contradictory`);
 eq(parseDataState({states:['unlocated'],count:null,name:'案件 A'}),{states:['unlocated'],count:null,name:'案件 A'},'name is kept outside forbidden');
 eq(describeDataState(parseDataState({states:['stale'],count:0})),'資料待更新（0 筆）','a known stale zero renders as zero');
+
+// Direct values that skipped the parser must still never leak count or name.
+for(const direct of [{states:['forbidden'],count:3,name:'機密案件'},{states:['partial','forbidden'],count:2,name:'機密案件'}]){
+ eq(dataStateCount(direct),null,'unsafe forbidden cast has no count');
+ eq(describeDataState(direct),'沒有權限','unsafe forbidden cast renders no name or number');
+ eq(hasDataState(direct,'partial'),false,'unsafe forbidden cast hides other states');
+}
+for(const direct of [null,undefined,{},{states:'partial',count:3},{states:['ready'],count:3},{states:[],count:3},{states:['unknown'],count:0},{states:['loading'],count:5},{states:['partial'],count:-1},{states:['partial'],count:'3'},{states:['partial'],count:NaN}]){
+ const label=describeDataState(direct);
+ eq(dataStateCount(direct),null,`${JSON.stringify(direct)} direct value has no count`);
+ assert.ok(!/\d/.test(label),`${JSON.stringify(direct)} direct value renders no number`);checks++;
+}
+eq(describeDataState({states:['partial','stale'],count:0}),'部分資料・資料待更新（0 筆）','a direct known zero still renders');
+
+// Compile-time contract: forbidden values with count/name must not type-check.
+// Uses a sibling TypeScript binary when present; never installs anything.
+const here=dirname(fileURLToPath(import.meta.url));
+const tscCandidates=[join(here,'node_modules/.bin/tsc'),...(()=>{try{const root=resolve(here,'../..');return readdirSync(root).map(dir=>join(root,dir,'frontend/node_modules/.bin/tsc'))}catch{return []}})()];
+const tsc=tscCandidates.find(existsSync);
+if(!tsc)console.log('data state: tsc not found, type-level checks skipped');
+else{
+ const dir=mkdtempSync(join(tmpdir(),'data-state-types-'));
+ try{
+  const source=join(here,'src/dataState.ts');
+  const run=(name,body)=>{
+   const file=join(dir,name);
+   writeFileSync(file,`import type {DataState} from ${JSON.stringify(source)};\n${body}\n`);
+   try{execFileSync(tsc,['--noEmit','--strict','--target','ES2022','--module','ESNext','--moduleResolution','Bundler','--allowImportingTsExtensions','--skipLibCheck',file],{stdio:'pipe'});return true}catch(error){return String(error.stdout)}
+  };
+  eq(run('valid.ts',`export const ok:DataState[]=[{states:['forbidden']},{states:['partial','stale'],count:1,name:'a'},{states:['unknown'],count:null}];`),true,'valid states type-check');
+  for(const [label,body] of [['count','export const bad:DataState={states:["forbidden"],count:3};'],['name','export const bad:DataState={states:["forbidden"],name:"機密案件"};'],['null count','export const bad:DataState={states:["forbidden"],count:null};'],['mixed','export const bad:DataState={states:["forbidden","partial"],count:1};']])
+   assert.notEqual(run(`bad-${label.replace(' ','-')}.ts`,body),true,`forbidden with ${label} must not type-check`),checks++;
+ }finally{rmSync(dir,{recursive:true,force:true})}
+}
 
 console.log(`data state: ${checks} checks passed`);
