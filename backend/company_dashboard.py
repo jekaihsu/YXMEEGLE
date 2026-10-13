@@ -29,6 +29,26 @@ def actual_date(value):
     except ValueError:return None
 
 UNVERIFIED='待核對'
+DEADLINE_BUCKETS=('intake','formal_executing','formal_unverified','other')
+CLOSED_TASK=('superseded','not_applicable','skipped','cancelled','canceled')
+
+
+def deadline_bucket(project,relationship):
+    """Which stored project fact explains a past-due source deadline; the buckets are never merged."""
+    if relationship=='待確認單' or project.get('case_type')=='intake':return 'intake'
+    return {'執行中':'formal_executing','來源狀態待核對':'formal_unverified'}.get(project.get('source_status'),'other')
+
+
+def source_overdue(project,today):
+    """Open, dated, past-due tasks of a case the workbench does not run: kept as source data, not as anyone's workload."""
+    from .sop_contracts import disabled_task
+    count=0
+    for node in project.get('nodes',[]):
+        for task in node.get('tasks',[]):
+            if task.get('status') in CLOSED_TASK or task.get('status')=='completed' or disabled_task(task):continue
+            due=actual_date(task.get('due_date'))
+            count+=int(due is not None and due<today)
+    return count
 
 
 def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',attention='',lifecycle='',clock=None):
@@ -38,7 +58,7 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
     source_counts=Counter();execution_counts=Counter();lifecycle_state_counts=Counter();lifecycle_counts=Counter();missing=Counter(task_due_date=0,group=0,source_status=0)
     groups=defaultdict(lambda:Counter(cases=0,tasks_total=0,tasks_completed=0,tasks_overdue=0))
     rows=[]
-    native=Counter();seen_native=set()
+    native=Counter();seen_native=set();deadline_cases=Counter();deadline_tasks=Counter()
     for collection in ('approvals','node_skip_requests','financial_requests'):
         for item in workspace.get(collection,[]):
             receipt=item.get('native_receipt') or {}
@@ -67,6 +87,9 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
         lifecycle_state_counts[entry['state']]+=1;lifecycle_counts[entry['canonical'] or UNVERIFIED]+=1
         runnable=p.get('execution_allowed') is True
         totals['workbench_cases']+=int(runnable)
+        if not runnable:
+            late=source_overdue(p,today);key=deadline_bucket(p,entry['relationship'])
+            deadline_cases[key]+=int(late>0);deadline_tasks[key]+=late
         project_groups=set();counts=Counter(tasks_total=0,tasks_completed=0,tasks_overdue=0,pending_local_reviews=0,deliveries_confirmed=0)
         for node in p.get('nodes',[]):
             name=node.get('department') or GROUPS.get(node.get('key'))
@@ -109,6 +132,8 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
         'source':{'status':source.get('status','missing'),'last_success_at':source.get('last_sync'),
                   'mapping_status':source.get('mapping_status','unknown')},
         'totals':{**dict(totals),'source_status_counts':dict(source_counts),'execution_status_counts':dict(execution_counts),'lifecycle_state_counts':dict(lifecycle_state_counts),'lifecycle_counts':dict(lifecycle_counts)},
+        'source_deadlines':{'cases':sum(deadline_cases.values()),'tasks':sum(deadline_tasks.values()),
+            'buckets':[{'key':key,'cases':deadline_cases[key],'tasks':deadline_tasks[key]} for key in DEADLINE_BUCKETS]},
         'missing':dict(missing),'groups':[{'group':key,**dict(value)} for key,value in sorted(groups.items())],
         'cases':filtered[offset:offset+limit],'pagination':{'offset':offset,'limit':limit,'total':len(filtered),'has_more':offset+limit<len(filtered)},
         'metric_scope':'task progress counts only executable workbench cases; source business status is independent'}
