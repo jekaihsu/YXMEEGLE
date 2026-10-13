@@ -3,7 +3,7 @@ import json
 import pytest
 from .case_universe import build_universe, forbidden, walk
 from .test_public_case_http_boundaries import isolated_http
-from .app import WorkspaceRow, BusinessRow
+from .app import WorkspaceRow, BusinessRow, CacheRow
 from . import storage
 
 LEAK_PATHS=[
@@ -29,8 +29,7 @@ def install(app,state):
         row=db.get(WorkspaceRow,'lark-boundary');row.data=storage.save(db,BusinessRow,row.id,state)
 
 
-PENDING=set()
-@pytest.mark.parametrize('path',[pytest.param(p,marks=pytest.mark.xfail(strict=True,reason='typed handler pending')) if p in PENDING else p for p in LEAK_PATHS])
+@pytest.mark.parametrize('path',LEAK_PATHS)
 
 def test_known_holder(isolated_http,path):
     app,client,_,signin=isolated_http
@@ -213,6 +212,8 @@ def test_policy_labels_do_not_match_admitted_code_prefixes():
 def test_all_public_routes_and_receipt_replay(isolated_http,viewer,admit_hidden):
     app,client,_,signin=isolated_http
     state,records,pid=build_universe(admit_hidden);install(app,state);signin(viewer)
+    with app.state.sessions.begin() as db:
+        db.get(CacheRow,'lark-boundary').data={'configured':True,'status':'ready','tables':[],'records':records}
     needles=forbidden(state,records)
     from .source_case_policy import filter_visible_cases
     from copy import deepcopy
@@ -230,3 +231,78 @@ def test_all_public_routes_and_receipt_replay(isolated_http,viewer,admit_hidden)
         assert response.status_code==200,response.text
         assert not any(n in response.text for n in needles)
         assert app.state.case_redaction_stats.fallback==0
+
+
+def test_redaction_cost_on_scaled_production(isolated_http,monkeypatch):
+    import time,statistics
+    from . import case_redaction as cr
+    from .perf_fixture import build_scaled_workspace
+    app,client,_,signin=isolated_http
+    state=build_scaled_workspace();state['environment']='production'
+    for p in state['projects']:p.update(case_visibility='new_case',execution_system='workbench')
+    install(app,state);signin('u-manager')
+    sweep_times=[];request_times=[];apply=cr.apply
+    def count(value):
+        if type(value) is dict:return 1+sum(count(v) for v in value.values())
+        if type(value) is list:return 1+sum(count(v) for v in value)
+        return 0
+    def measure(out,plan):
+        baseline=count(out);start=time.perf_counter();result=apply(out,plan)
+        sweep_times.append(time.perf_counter()-start)
+        assert result.visited<=baseline*1.1
+        return result
+    monkeypatch.setattr(cr,'apply',measure)
+    for _ in range(3):
+        start=time.perf_counter();response=client.get('/api/workspace');request_times.append(time.perf_counter()-start)
+        assert response.status_code==200
+    assert statistics.median(sweep_times)<=statistics.median(request_times)*0.08
+    print('COST sweep_ms',statistics.median(sweep_times)*1000,'request_ms',statistics.median(request_times)*1000,
+          'visited',app.state.case_redaction_stats.visited)
+
+
+def test_redaction_runs_after_private_projection(isolated_http,monkeypatch):
+    from . import case_redaction as cr
+    app,client,_,signin=isolated_http
+    state,records,pid=build_universe();install(app,state);signin('u-pm')
+    apply=cr.apply
+    def check(out,plan):
+        assert all('capabilities' not in u for u in out['users'] if u['id']!='u-pm')
+        assert 'task_capabilities_checked_at' in out
+        assert not any(k=='source_fields' for path,k in walk(out))
+        return apply(out,plan)
+    monkeypatch.setattr(cr,'apply',check)
+    response=client.get('/api/workspace');assert response.status_code==200
+
+
+def test_projection_idempotence_and_node_provenance_storage(isolated_http):
+    from copy import deepcopy
+    from . import case_redaction as cr
+    from .source_case_policy import filter_visible_cases
+    app,client,_,signin=isolated_http
+    state,records,pid=build_universe();before=deepcopy(state)
+    out=deepcopy(state);filter_visible_cases(out)
+    cr.apply(out,cr.make_plan(cr.snapshot(state),out));once=deepcopy(out)
+    cr.apply(out,cr.make_plan(cr.snapshot(state),out));assert out==once
+    install(app,state);signin('u-manager');client.get('/api/workspace')
+    with app.state.sessions() as db:
+        stored=storage.load(db,BusinessRow,db.get(WorkspaceRow,'lark-boundary'))
+    assert stored['source_quotes']==before['source_quotes']
+    project=next(p for p in stored['projects'] if p['id']==pid)
+    original=next(p for p in before['projects'] if p['id']==pid)
+    assert [t.get('source_provenance') for n in project['nodes'] for t in n['tasks']]==[
+        t.get('source_provenance') for n in original['nodes'] for t in n['tasks']]
+
+
+def test_source_cache_excluded_history_keeps_rows_without_case_identity(isolated_http):
+    from .source_case_policy import identity
+    app,client,_,signin=isolated_http
+    state,records,_=build_universe()
+    hidden=next(r for r in records if r['record_id']=='recCaseB')
+    state['source_visible_record_ids'].append(identity(hidden));install(app,state);signin('u-manager')
+    with app.state.sessions.begin() as db:
+        db.get(CacheRow,'lark-boundary').data={'configured':True,'status':'ready','tables':[],'records':records}
+    response=client.get('/api/sources');assert response.status_code==200
+    assert not any(n in response.text for n in forbidden(state,records))
+    masked=next(r for r in response.json()['records'] if r['kind']=='confirmation' and r['record_id'] is None)
+    assert masked['fields']['工程確認單編號'] is None
+    assert app.state.case_redaction_stats.fallback==0

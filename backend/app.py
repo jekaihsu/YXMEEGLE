@@ -771,7 +771,13 @@ def create_app(overrides=None):
         # Shared by GET and POST sync: the raw snapshot stays in the internal cache.
         from .workspace_projection import public_source_cache
         from .source_case_policy import visible_source_snapshot
-        return public_source_cache(visible_source_snapshot(state,snapshot),user)
+        out=public_source_cache(visible_source_snapshot(state,snapshot),user)
+        if state.get('environment') not in ('test','demo'):
+            from . import case_redaction
+            from .source_case_policy import filter_visible_cases
+            visible=filter_visible_cases(dict(state))
+            app.state.case_redaction_stats=case_redaction.apply(out,case_redaction.make_plan(case_redaction.snapshot(state),visible))
+        return out
 
     @app.get('/api/sources')
     def sources(request:Request):

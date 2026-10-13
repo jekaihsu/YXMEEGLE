@@ -74,10 +74,13 @@ def sweep(node, plan):
         hit = HANDLERS.keys() & node.keys()
         for key in hit:
             HANDLERS[key](node, key, plan)
-        for key in list(node):
-            if key in hidden or key in codes or (':' in key and key.split(':', 1)[1] in hidden):
+        if not hidden.isdisjoint(node) or not codes.isdisjoint(node):
+            for key in hidden.intersection(node) | codes.intersection(node):
                 del node[key]; plan.fallback += 1
+        tainted_keys = []
         for key, value in node.items():
+            if ':' in key and key.split(':', 1)[1] in hidden:
+                tainted_keys.append(key); continue
             kind = type(value)
             if kind is str:
                 if value in hidden or value in codes:
@@ -92,6 +95,8 @@ def sweep(node, plan):
                         plan.fallback += 1
             elif kind in (dict, list) and key not in TERMINAL:
                 sweep(value, plan)
+        for key in tainted_keys:
+            del node[key]; plan.fallback += 1
     elif type(node) is list:
         kept = []
         for value in node:
@@ -179,7 +184,9 @@ def _record_list(node, key, plan):
 def _fields(node, key, plan):
     if not isinstance(node[key], dict):return
     for name, value in node[key].items():
-        if isinstance(value, list):
+        if isinstance(value, str) and (value in plan.hidden or value in plan.hidden_codes):
+            node[key][name] = None
+        elif isinstance(value, list):
             node[key][name] = [x for x in value if not (type(x) is str and (x in plan.hidden or x in plan.hidden_codes)
                 or isinstance(x, dict) and _names_hidden(x, plan))]
 
@@ -238,4 +245,4 @@ def _case_scalar(node, key, plan):
 
 
 # Lifecycle status/raw values remain intact; only diagnostic identities change.
-HANDLERS.update(source_id=_case_scalar, blank_sources=_refs)
+HANDLERS.update(source_id=_case_scalar, record_id=_case_scalar, blank_sources=_refs)
