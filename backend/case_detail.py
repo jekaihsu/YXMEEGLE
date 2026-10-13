@@ -28,6 +28,7 @@ SECTIONS = ('overview', 'versions', 'contract_lines', 'work_items', 'workflow_no
 NOT_VISIBLE = 'not_in_authorized_view'
 NO_PARENT = 'no_authorized_parent_edge'
 NO_TARGET = 'no_authorized_edge_target'
+CONTAINMENT = ('case_node', 'node_task')
 CARDINALITY_ONE = {'confirmation_contract', 'contract_work_item', 'work_item_task', 'case_confirmation'}
 
 
@@ -63,13 +64,20 @@ def _tree(state, pid):
 
     def edge(kind, parent, child, contested=False):
         edges.append({'edge_type': kind, 'parent_key': parent, 'child_key': child,
-                      'cardinality': 'one' if kind in CARDINALITY_ONE else 'many',
+                      'cardinality': 'one' if kind in CARDINALITY_ONE else
+                                     'containment' if kind in CONTAINMENT else 'many',
                       'contested': bool(contested), 'verification': RECEIPT_MISSING})
 
+    task_objs = {}
     for node in project.get('nodes', []):
+        nkey = f"node:{pid}/{node['id']}"
+        nodes[nkey] = {'kind': 'node', 'label': _text(node.get('name'))}
+        edge('case_node', f'case:{pid}', nkey)
         for task in node.get('tasks', []):
             key = _task_key(pid, node, task)
             task_keys[(node['id'], task['id'])] = key
+            task_objs[(node['id'], task['id'])] = task
+            edge('node_task', nkey, key)
             nodes[key] = {'kind': 'task', 'label': _text(task.get('title')), 'node_id': node['id']}
             if _ident(task):
                 task_category[_ident(task)] = task.get('category')
@@ -82,6 +90,11 @@ def _tree(state, pid):
         nodes[f"confirmation:{c['id']}"] = {'kind': 'confirmation', 'label': _text(c.get('code'))}
         edge('case_confirmation', f'case:{pid}', f"confirmation:{c['id']}")
     shown_conf = {c['id'] for c in confirmations}
+    status = (state.get('source_work_items_status') or {}).get(pid)
+    imported = state.get('source_work_items_enabled', True) and status is not None
+    incomplete = set((status or {}).get('incomplete_contract_ids') or [])
+    imported_contracts = {c for i in items.values() for c in i.get('contract_ids', [])}
+    ct_unresolved = {}
     for ct in contracts:
         ckey = f"contract:{ct['id']}"
         nodes[ckey] = {'kind': 'contract', 'label': _text(ct.get('title')), 'item_number': _text(ct.get('item_number'))}
@@ -89,17 +102,33 @@ def _tree(state, pid):
         for cid in ct.get('confirmation_ids', []):
             if cid in shown_conf:
                 edge('confirmation_contract', f'confirmation:{cid}', ckey, multi)
-        item_ids = {i for i, it in items.items() if ct['id'] in it.get('contract_ids', [])}
-        item_ids |= {i for i in ct.get('reporting_ids', []) if i in tasks_by_ident}
-        for iid in sorted(item_ids):
-            if f'work_item:{iid}' not in nodes:
-                it = items.get(iid)
-                label = _text((it or {}).get('category')) or _text(task_category.get(iid)) or 'unknown'
-                nodes[f'work_item:{iid}'] = {'kind': 'work_item', 'label': label,
-                                              'source_url': (it or {}).get('source_url')}
-            edge('contract_work_item', ckey, f'work_item:{iid}',
-                 len((items.get(iid) or {}).get('contract_ids', [])) > 1)
-    for iid, it in items.items():  # visible item without a visible contract: kept, parent unresolved
+        linked = {}  # work-item id -> (label, source_url, contested)
+        if imported and (ct['id'] in imported_contracts or ct['id'] in incomplete):
+            # imported collection is the only authority for these children
+            for iid, it in items.items():
+                if ct['id'] in it.get('contract_ids', []):
+                    linked[iid] = (_text(it.get('category')), it.get('source_url'), len(it['contract_ids']) > 1)
+            missing = bool(status.get('partial') or status.get('truncated') or ct['id'] in incomplete
+                           or any(items[i].get('source_missing') for i in linked))
+        else:
+            # legacy rule of case_navigation: task_ref -> task source identity -> reporting_ids
+            missing = False
+            for ref in ct.get('task_refs', []):
+                if ref.get('project_id') != pid:
+                    continue
+                task = task_objs.get((ref.get('node_id'), ref.get('task_id')))
+                ident = _ident(task) if task else None
+                if not ident or ident not in ct.get('reporting_ids', []):
+                    missing = True
+                    continue
+                linked[ident] = (_text(task.get('category')) or 'unknown', task.get('source_url'), False)
+            missing = missing or bool(set(ct.get('reporting_ids', [])) - linked.keys())
+        ct_unresolved[ckey] = bool(missing or ct.get('source_missing') or ct.get('unresolved_confirmation_ids'))
+        for iid in sorted(linked):
+            label, url, contested = linked[iid]
+            nodes.setdefault(f'work_item:{iid}', {'kind': 'work_item', 'label': label, 'source_url': url})
+            edge('contract_work_item', ckey, f'work_item:{iid}', contested)
+    for iid, it in (items.items() if imported else ()):  # visible item without a visible contract: kept, parent unresolved
         nodes.setdefault(f'work_item:{iid}', {'kind': 'work_item', 'label': _text(it.get('category')),
                                               'source_url': it.get('source_url')})
     for key in [k for k in nodes if k.startswith('work_item:')]:
@@ -120,7 +149,7 @@ def _tree(state, pid):
             seen.add(ident)
             unique.append(e)
     return {'project': project, 'nodes': nodes, 'edges': unique, 'confirmations': confirmations,
-            'contracts': contracts, 'items': items}
+            'contracts': contracts, 'items': items, 'ct_unresolved': ct_unresolved}
 
 
 def _children(tree, parent_key):
@@ -143,9 +172,9 @@ def parent_context(state, child_key):
                     'cardinality': e['cardinality'], 'contested': e['contested'],
                     'verification': e['verification']} for e in _parents(tree, child_key)]
         unresolved = []
-        if node['kind'] == 'case':
+        if node['kind'] in ('case', 'node'):
             states = []
-        elif not parents:
+        elif not [p for p in parents if p['edge_type'] not in CONTAINMENT]:
             states = ['unknown']
             unresolved.append({'child_key': child_key, 'reason': NO_PARENT, 'verification': RECEIPT_MISSING})
         else:
@@ -168,12 +197,15 @@ def _person(state, pid):
 
 def _section(states, rows, *, source_time, reason=None, details=None, stale=False):
     states = [s for s in states]
-    if stale and 'stale' not in states:
-        states.append('stale')
+    freshness = None
+    if stale:
+        freshness = 'stale'
+        if set(states) <= {'partial'}:  # only partial+stale may combine (C-STATE)
+            states.append('stale')
     if states:
         states = data_state(*states)['states']  # validates the combination
-    return {'states': states, 'reason': reason, 'source_time': source_time, 'rows': rows,
-            'details': details or {}}
+    return {'states': states, 'freshness': freshness, 'reason': reason, 'source_time': source_time,
+            'rows': rows, 'details': details or {}}
 
 
 def _row(tree, key, **extra):
@@ -182,7 +214,7 @@ def _row(tree, key, **extra):
     row = {'key': key, 'kind': node['kind'], 'label': node['label'], **extra,
            'parents': [{'edge_type': e['edge_type'], 'parent_key': e['parent_key'],
                         'contested': e['contested'], 'verification': e['verification']} for e in parents]}
-    if node['kind'] not in ('case',) and not parents:
+    if node['kind'] not in ('case', 'node') and not [e for e in parents if e['edge_type'] not in CONTAINMENT]:
         row['unresolved'] = {'reason': NO_PARENT, 'verification': RECEIPT_MISSING}
     return row
 
@@ -249,7 +281,8 @@ def build_case_detail(state, project_id, *, confirmation_key=None, as_of=None, s
         rows = []
         for ck in contract_keys:
             row = _row(tree, ck, item_number=tree['nodes'][ck]['item_number'],
-                       amount={'state': 'withheld', 'reason': 'G-AMT'})
+                       amount={'state': 'withheld', 'reason': 'G-AMT'},
+                       work_item_links='unresolved' if tree['ct_unresolved'].get(ck) else 'located')
             rows.append(row)
         unresolved = [] if rows else [_unresolved('confirmation_contract', skey)]
         return _section(['partial'] if rows else ['unknown'], rows, source_time=src, stale=stale,
@@ -263,7 +296,8 @@ def build_case_detail(state, project_id, *, confirmation_key=None, as_of=None, s
         rows = [_row(tree, k, source_url=tree['nodes'][k].get('source_url')) for k in keys]
         status = (state.get('source_work_items_status') or {}).get(project_id)
         partial = status is None or status.get('partial') or status.get('truncated')
-        unresolved = [_unresolved('contract_work_item', ck) for ck in contract_keys if not _children(tree, ck)]
+        unresolved = [_unresolved('contract_work_item', ck) for ck in contract_keys
+                      if not _children(tree, ck) or tree['ct_unresolved'].get(ck)]
         states = ['partial'] if rows and (partial or unresolved or orphan_items) else [] if rows else ['unknown']
         return _section(states, rows, source_time=src, stale=stale,
                         reason=None if rows else NO_TARGET, details={'unresolved_edges': unresolved})
@@ -273,8 +307,8 @@ def build_case_detail(state, project_id, *, confirmation_key=None, as_of=None, s
         for node in project.get('nodes', []):
             tasks = [_row(tree, _task_key(project_id, node, t), status=t.get('status'), task_id=t['id'])
                      for t in node.get('tasks', []) if _task_key(project_id, node, t) in tree['nodes']]
-            rows.append({'key': f"node:{project_id}/{node['id']}", 'kind': 'node', 'node_id': node['id'],
-                         'label': _text(node.get('name')), 'status': node.get('status'), 'tasks': tasks})
+            rows.append(_row(tree, f"node:{project_id}/{node['id']}", node_id=node['id'],
+                             status=node.get('status'), tasks=tasks))
         return _section([] if rows else ['unknown'], rows, source_time=src, stale=stale,
                         reason=None if rows else 'no_authorized_nodes',
                         details={'read_only': True, 'note': 'identity and state only; no completion action'})
