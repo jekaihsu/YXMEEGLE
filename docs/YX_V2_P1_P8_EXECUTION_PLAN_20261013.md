@@ -111,6 +111,16 @@ Orca Run `run_67505fe63eb0`. Worktrees live under `/Users/vc/orca/workspaces/YXM
 | P1-C2-REV | `task_ebfd09513665` / `ctx_99fa333231e4` | Claude Opus, high | `p1-c2-opus-review` / `ava-apple/p1-c2-opus-review` (from `44d93b4`) | read-only | Independent review of exact `44d93b4`; confirm or sharpen the §7 questions; no fixes |
 | P1-C1-REM-REV | created once P1-C1-REM reports | Codex `gpt-6.1-sol`, medium | review worktree at the P1-C1-REM SHA | read-only | Cross-model review of the remediation SHA |
 
+**Results (2026-10-13, all three settled, terminals released, worktrees kept):**
+
+- **P1-C1-REM** committed `0ed93e7609ab689e9ef5c22143fbc3b0be8fc470` on `ava-apple/p1-c1-remediation`. It changes only the two allowed files: direct helpers now reparse through `parseDataState`, and sparse or empty state arrays are rejected. Checks: 180 frontend checks pass, 18 backend tests pass, strict tsc passes. One intended behavior change: a direct `{states:['complete_empty']}` with no count now reads 0, which matches the backend.
+- **P1-C1-REM-REV** (Codex): **PASS, no findings** on `0ed93e7`. Report: `/Users/vc/orca/workspaces/YXMEEGLE/worker-evidence/task_3a4624cbce68/review.md`. 41 backend/frontend envelope comparisons agree, and reverting F1 or F2 fails the tests. **G-C1 now needs only coordinator acceptance of `0ed93e7`.**
+- **P1-C2-REV** (Claude Opus) on `44d93b4`: **DESIGN-DECISION-REQUIRED.** Report: `/Users/vc/orca/workspaces/YXMEEGLE/worker-evidence/task_ebfd09513665/review.md`.
+  - The hardening itself passes: F1–F4 are fixed, 30/30 tests pass, and it has minor items N1–N4.
+  - All eight §7 questions are confirmed. C-ID is a one-target, record-keyed resolver with no viewer context. It runs parallel to identity the repo already has: typed one-to-many native relations (`v4_sources.RELATIONS`/`native_records`, `source_entities.update_entities`, `source_work_items`) and the existing `project_id`/`assignments` case identity. As built, it cannot serve the P2 chains.
+  - The `/` key collision also affects `source_id` and would break `source_work_items.py:27`.
+  - **G-C2 is blocked on the owner's decisions 1–9 in that report.** No C-ID coder is started until they are made.
+
 No other coder is created for C1 or C2. Remaining P1 rows in `tasks.tsv` (127B1/B2/B3, 127F1/F2, 126B1/B2, 126F1/F2, INT, REV) are **held** until their gates in §5 pass. AGY has no authorized task yet because both of its UI tasks depend on accepted view models (127F1, 126F1), and those depend on accepted C-STATE.
 
 ---
