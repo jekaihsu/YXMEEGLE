@@ -179,3 +179,130 @@ def test_work_items_agree_with_existing_case_navigation_in_test_env():
     nav_c = {c['id']: c['id'] for c in nav[0]['contracts']}
     d = build_case_detail(state, 'p', confirmation_key='b/conf/c1')
     assert {r['key'].split(':', 1)[1] for r in d['sections']['contract_lines']['rows']} == set(nav_c)
+
+
+# ---- P2-130B-FIX1 -------------------------------------------------------------------------
+
+def _wi(d):
+    return d['sections']['work_items']
+
+
+def test_f1_child_revoked_alone_is_not_recreated_from_surviving_task():
+    state = fixture()
+    full = build_case_detail(state, 'p', confirmation_key='b/conf/c1')
+    state['source_work_items'] = [i for i in state['source_work_items'] if i['id'] != 'b/rep/r2']  # task t2 stays
+    d = build_case_detail(state, 'p', confirmation_key='b/conf/c1')
+    dump = json.dumps({k: d[k] for k in ('header', 'sections')}, ensure_ascii=False)
+    assert 'b/rep/r2' not in dump and '內業' not in dump
+    assert 'b/rep/r2' not in d['header']['details']['complete_ids']['work_items']
+    counts = (full['header']['details']['relationship_counts']['work_items'],
+              d['header']['details']['relationship_counts']['work_items'])
+    assert counts == (3, 2)
+    assert parent_context(state, 'work_item:b/rep/r2')['states'] == ['unlocated']
+    gap = [u for u in _wi(d)['details']['unresolved_edges'] if u['parent_key'] == 'contract:b/con/k2']
+    assert gap and gap[0]['child_key'] is None and 'r2' not in json.dumps(gap)
+    assert 'partial' in _wi(d)['states']
+
+
+def _legacy(task_ref_task='t2', reporting=('b/rep/r1',)):
+    s = fixture('test')
+    s['source_work_items'] = []
+    s['source_work_items_status'] = {}
+    s['contract_items'][0].update(task_refs=[{'project_id': 'p', 'node_id': 'n1', 'task_id': task_ref_task}],
+                                  reporting_ids=list(reporting))
+    s['contract_items'][1]['reporting_ids'] = []
+    return s
+
+
+def test_f2_legacy_task_ref_mismatch_stays_unresolved_like_case_navigation():
+    s = _legacy()  # ref -> t2 (r2) but reporting_ids lists r1
+    nav = case_navigation(deepcopy(s), 'p')['confirmations'][0]['contracts'][0]
+    d = build_case_detail(s, 'p', confirmation_key='b/conf/c1')
+    assert nav['work_items'] == [] and nav['unresolved']
+    assert [e for e in walk(d) if e['parent_key'] == 'contract:b/con/k1'] == []
+    assert any(u['parent_key'] == 'contract:b/con/k1' for u in _wi(d)['details']['unresolved_edges'])
+    assert 'b/rep/r1' not in json.dumps(d['header']['details']['complete_ids'])
+
+
+def test_f2_legacy_matching_ref_agrees_with_navigation_on_work_item_ids_and_unresolved():
+    for s in (_legacy('t1'), _legacy('t2'), _legacy('t1', ('b/rep/r1', 'b/rep/ghost'))):
+        nav = case_navigation(deepcopy(s), 'p')['confirmations'][0]['contracts']
+        d = build_case_detail(s, 'p', confirmation_key='b/conf/c1')
+        for c in nav:
+            ids = {w['id'] for w in c['work_items']}
+            mine = {e['child_key'].split(':', 1)[1] for e in walk(d)
+                    if e['parent_key'] == f"contract:{c['id']}" and e['edge_type'] == 'contract_work_item'}
+            assert mine == ids
+            row = next(r for r in d['sections']['contract_lines']['rows'] if r['key'] == f"contract:{c['id']}")
+            assert (row['work_item_links'] == 'unresolved') == c['unresolved']
+
+
+def test_f3_incomplete_contract_ids_and_source_missing_warn_even_with_survivors():
+    for variant in ('incomplete', 'missing'):
+        s = fixture()
+        s['source_work_items'] = s['source_work_items'][:2]  # drop orphan r3; k1/r1 and k2/r2 linked
+        if variant == 'incomplete':
+            s['source_work_items_status']['p']['incomplete_contract_ids'] = ['b/con/k1']
+        else:
+            s['source_work_items'][0]['source_missing'] = True
+        d = build_case_detail(s, 'p', confirmation_key='b/conf/c1')
+        assert _wi(d)['states'] == ['partial'], variant
+        assert [u['parent_key'] for u in _wi(d)['details']['unresolved_edges']] == ['contract:b/con/k1']
+        rows = {r['key']: r for r in d['sections']['contract_lines']['rows']}
+        assert rows['contract:b/con/k1']['work_item_links'] == 'unresolved'
+        assert rows['contract:b/con/k2']['work_item_links'] == 'located'
+        assert 'work_item:b/rep/r1' in [r['key'] for r in _wi(d)['rows']]
+
+
+def test_f3_clean_state_has_no_warning():
+    s = fixture()
+    s['source_work_items'] = s['source_work_items'][:2]
+    d = build_case_detail(s, 'p', confirmation_key='b/conf/c1')
+    assert _wi(d)['states'] == [] and _wi(d)['details']['unresolved_edges'] == []
+
+
+def test_f4_stale_unknown_keeps_unknown_reason_and_entry_point():
+    s = fixture()
+    s['source_status']['status'] = 'stale'
+    s['projects'][0]['files'] = []
+    d = build_case_detail(s, 'p', confirmation_key='b/conf/c1')
+    sec = d['sections']['reports_documents']
+    assert sec['states'] == ['unknown'] and sec['freshness'] == 'stale' and sec['reason'] == 'no_native_task_evidence_link'
+    assert sec['details']['entry_point']['tab'] == 'data'
+    for name, section in d['sections'].items():
+        assert 'read_failed' not in section['states'], name
+        assert section['freshness'] == 'stale'
+        assert not ({'unknown', 'stale'} <= set(section['states']))
+    s['projects'][0]['nodes'] = []
+    s['events'] = []
+    s['source_confirmations'] = []
+    d = build_case_detail(s, 'p')
+    assert d['sections']['versions']['states'] == ['unknown'] and d['sections']['versions']['freshness'] == 'stale'
+    assert d['sections']['history']['states'] == ['unknown'] and d['sections']['workflow_nodes']['states'] == ['unknown']
+
+
+def test_f4_partial_stale_still_combine_and_fresh_has_no_freshness():
+    d = build_case_detail(fixture(), 'p', confirmation_key='b/conf/c1',
+                          section_status={'work_items': {'state': 'stale'}})
+    assert d['sections']['work_items']['states'] == ['partial', 'stale']
+    assert d['sections']['versions']['freshness'] is None
+
+
+def test_f5_visible_workflow_node_rows_resolve_in_reverse_navigation():
+    state = fixture()
+    d = build_case_detail(state, 'p', confirmation_key='b/conf/c1')
+    keys = [r['key'] for r in d['sections']['workflow_nodes']['rows']]
+    assert 'node:p/n1' in keys
+    ctx = parent_context(state, 'node:p/n1')
+    assert ctx['states'] == [] and ctx['kind'] == 'node' and ctx['label'] == 'Node One'
+    assert ctx['parents'][0]['parent_key'] == 'case:p'
+    for row in d['sections']['workflow_nodes']['rows']:
+        assert parent_context(state, row['key'])['states'] != ['unlocated'], row['key']
+        for t in row['tasks']:
+            assert parent_context(state, t['key'])['states'] != ['unlocated']
+            assert any(p['parent_key'] == row['key'] for p in t['parents'])
+    # a task with no work item still shows its missing work-item parent
+    t3 = next(t for r in d['sections']['workflow_nodes']['rows'] for t in r['tasks'] if t['key'].endswith('/t3'))
+    assert t3.get('unresolved') is None  # r3 is linked to task t3 by identity
+    t4 = next(t for r in d['sections']['workflow_nodes']['rows'] for t in r['tasks'] if t['key'].endswith('/t4'))
+    assert t4['unresolved']['reason'] == 'no_authorized_parent_edge'
