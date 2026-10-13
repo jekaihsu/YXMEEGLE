@@ -195,6 +195,6 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  const fullBefore=fullReads();await goto('view=work');await goto('view=sources');
  assert.equal(fullReads(),fullBefore,'default work/sources pages do not read the full workspace');
  assert.ok(requests.some(r=>r.url==='/api/my-work')&&requests.some(r=>r.url==='/api/source-health'));
- assert.ok(document.querySelector('.workspace').textContent.includes('資料正常'),'null page_state renders the explicit healthy label');
+ assert.ok(!document.querySelector('.workspace').textContent.includes('資料正常'),'null page_state never renders a healthy label');assert.ok(document.querySelector('.workspace').textContent.includes('狀態未知'),'null page_state renders unknown');
  console.log('Shell mode: feature gating, server-side paging/filter reset/stale-response guard, lazy single-project detail, on-demand full workspace, summary-only render/filter/sort, badges, 304, identity cache, mutation/upload concurrency and 409 passed');
 }finally{await flush(()=>root.unmount());dom.window.close()}

@@ -40,14 +40,15 @@ assert.equal(m.buildMyWorkView(m.myWorkInput({status: 'ok', body: {rows: [], rea
 assert.equal(m.myWorkInput({status: 'ok', body: {rows: [], weeklyActivity: {items: [{id: 'x'}]}}}, f).weeklyActivity, undefined, 'weekly activity stays absent');
 
 const health = fetched => m.buildSourceHealthView(m.sourceHealthInput(fetched), {diagnosticCapability: false}).page;
-assert.equal(health({status: 'ok', body: {page_state: null, sources: []}}).healthy, true);
-assert.equal(health({status: 'ok', body: {sources: []}}).healthy, false, 'missing page_state is unknown, not healthy');
+assert.deepEqual(health({status: 'ok', body: {page_state: null, sources: []}}).states, ['unknown'], 'null page_state is unknown, never healthy');
+assert.equal(health({status: 'ok', body: {page_state: null, sources: []}}).statusLabel, '狀態未知');
+assert.equal('healthy' in health({status: 'ok', body: {page_state: null, sources: []}}), false);
 assert.deepEqual(health({status: 'ok', body: {sources: []}}).states, ['unknown']);
 assert.deepEqual(health({status: 'ok', body: {page_state: {states: ['stale'], count: null}, sources: []}}).states, ['stale']);
 assert.deepEqual(health({status: 'error', httpStatus: 403}).states, ['forbidden']);
 assert.deepEqual(health({status: 'error'}).states, ['read_failed']);
 assert.deepEqual(health({status: 'loading'}).states, ['loading']);
-assert.equal(health({status: 'ok', body: 'x'}).healthy, false);
+assert.deepEqual(health({status: 'ok', body: 'x'}).states, ['unknown']);
 
 // App wiring: pages are the defaults, legacy components stay mounted behind tab=legacy, nothing else is fetched
 const app = await fs.readFile(new URL('./src/App.tsx', import.meta.url), 'utf8');

@@ -80,9 +80,6 @@
 .source-health-banner.state-stale {
   border-left: 4px solid var(--warning, #f59e0b);
 }
-.source-health-banner.state-healthy {
-  border-left: 4px solid var(--success, #16a34a);
-}
 .source-health-banner.state-unknown {
   border-left: 4px solid var(--muted, #94a3b8);
 }

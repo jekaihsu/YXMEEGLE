@@ -98,7 +98,11 @@ def test_source_health_exposes_page_state_only_and_no_source_or_hidden_value(htt
     assert set(body) <= {'page_state', 'sources', 'error'} and body['sources'] == []
     for sentinel in (BASE, TABLE, 'NAME_SENTINEL', 'OLD_CASE_SENTINEL', 'Current case', 'recOld', 'recNew', 'diagnostic'):
         assert sentinel not in response.text
-    assert body['page_state'] is None  # clean, complete, fresh read: the explicit healthy fact
+    # None is derived from the cached snapshot, not from proof of a complete read of THIS request; the route adds no
+    # healthy/clean/complete field, so the client must treat it as unknown.
+    assert body['page_state'] is None
+    assert not {'healthy', 'health', 'complete', 'clean', 'status', 'label'} & set(body)
+    assert '資料正常' not in response.text
 
 
 def test_source_health_unknown_is_not_zero_or_empty(http, monkeypatch):
