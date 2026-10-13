@@ -113,9 +113,9 @@ test('7. actions are navigation only for existing+authorized entries; unknown ou
  ok(!JSON.stringify(Object.values(MY_WORK_LABELS.actions)).match(/Complete|Approve|完成|核准/),'no write-style labels exist');
 });
 test('8. text status labels and stable sort; retrieval time is not a key',()=>{
- const rows=[row('c'),row('b',{pending_reason:'等待客戶'}),row('a',{attention:true}),row('d',{attention:true,retrieved_at:'2000-01-01',updated_at:'1999'}),row('e',{retrieved_at:'2030-01-01'})];
+ const rows=[row('c'),row('z',{pending_reason:'等待客戶'}),row('a',{attention:true}),row('d',{attention:true,retrieved_at:'2000-01-01',updated_at:'1999'}),row('e',{retrieved_at:'2030-01-01'})];
  const v=view(rows);
- eq(ids(v),['a','d','b','c','e'],'attention, pending, rest; id tiebreak');
+ eq(ids(v),['a','d','z','c','e'],'attention, pending (sorts after ordinary ids), rest; id tiebreak');
  eq(ids(view([...rows].reverse())),ids(v),'input order does not matter');
  eq(ids(view(rows.map(r=>({...r,retrieved_at:'2099-01-01'})))),ids(v),'retrieval time does not affect order');
  ok(v.rows.every(r=>r.statusLabel&&/[一-鿿A-Za-z]/.test(r.statusLabel)),'every status has text');
@@ -151,6 +151,21 @@ test('9. FIX1: revocation hides weekly; stale/unknown never invented; missing fa
  eq([r.handoffLabel,r.statusLabel],['unknown','unknown'],'missing handoff/status facts read unknown');
  const known=view([row('a',{handoff_state:'已交接'})]).rows[0];
  eq([known.handoffLabel,known.statusLabel],['已交接',MY_WORK_LABELS.normal],'known facts still shown');
+});
+test('10. FIX2: task-level revocation applies to every dataset; status needs a known vocabulary value',()=>{
+ const items=[{id:'SECRET-ID',title:'SECRET-NAME',date:'2026-10-13'},{id:'OPEN-ID',title:'OPEN-NAME',date:'2026-10-13'}];
+ const mk=forbidden=>view([row('SECRET-ID',{title:'SECRET-NAME',...(forbidden?{forbidden:true}:{})}),row('OPEN-ID',{title:'OPEN-NAME'})],{weeklyActivity:{items},filters:{selectedId:'SECRET-ID'}});
+ eq(mk(false).weekly.items.map(i=>i.id),['SECRET-ID','OPEN-ID'],'control: not revoked keeps weekly');
+ const d=mk(true);
+ eq(d.weekly.items.map(i=>i.id),['OPEN-ID'],'revoked task removed from weekly, others kept');
+ ok(!JSON.stringify(d).includes('SECRET'),'revoked task leaks nowhere');
+ eq([d.drawer.open,d.filters.selectedId],[false,null],'selection cleared');
+ const dup=view([row('SECRET-ID'),row('SECRET-ID',{forbidden:true})],{weeklyActivity:{items}});
+ eq([ids(dup),dup.weekly.items.map(i=>i.id)],[[],['OPEN-ID']],'revocation wins over a duplicate allowed row');
+ const bare={id:'a',ended:false};
+ const label=extra=>view([{...bare,...extra}]).rows[0].statusLabel;
+ for(const extra of [{workflow_state:'unknown'},{queue:'unknown'},{workflow_state:'garbage'},{workflow_state:'  '},{attention:false}])eq(label(extra),'unknown','not established: '+JSON.stringify(extra));
+ for(const extra of [{workflow_state:'in_progress'},{workflow_state:'進行中'},{queue:'active'}])eq(label(extra),MY_WORK_LABELS.normal,'recognised: '+JSON.stringify(extra));
 });
 let failed=0;
 for(const [name,fn] of tests){try{await fn();console.log(`ok - ${name}`)}catch(e){failed++;console.log(`not ok - ${name}\n${e.message}`)}}

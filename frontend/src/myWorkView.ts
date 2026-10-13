@@ -116,6 +116,9 @@ function parseActions(raw:unknown,outcome:OperationOutcome):MyWorkAction[]{
  return out;
 }
 
+// Known vocabulary meaning "being worked on". Anything else (including the literal 'unknown') establishes nothing.
+const IN_PROGRESS:ReadonlySet<string>=new Set(['in_progress','active','進行中']);
+
 type Parsed={row:MyWorkRow;detail:MyWorkDetail}|'forbidden'|'malformed';
 
 function parseRow(raw:unknown):Parsed{
@@ -130,8 +133,8 @@ function parseRow(raw:unknown):Parsed{
  // Only a verified formal field is a due date; every other date stays unknown.
  const dueLabel=due&&due.verified_formal===true&&str(due.value)?str(due.value):MY_WORK_LABELS.unknown;
  const outcome=parseOutcome(r.operation_outcome);
- // 進行中 is only claimed from a stated workflow/queue/attention fact, never from absence.
- const statusKnown=!!str(r.workflow_state)||!!str(r.queue)||typeof r.attention==='boolean';
+ // 進行中 is only claimed when a recognised workflow/queue value says so; strings are matched, never trusted by presence.
+ const statusKnown=IN_PROGRESS.has(str(r.workflow_state).toLowerCase())||IN_PROGRESS.has(str(r.queue).toLowerCase());
  const handoffText=str(r.handoff_state);
  const handoffLabel=awaiting?MY_WORK_LABELS.awaiting:handoffText||MY_WORK_LABELS.unknown;
  const parent=rec(r.parent);
@@ -191,13 +194,15 @@ export function buildMyWorkView(input:MyWorkInput):MyWorkView{
  const base:Omit<MyWorkView,'pageState'|'pageStateLabel'|'count'|'emptyReason'|'rows'|'drawer'|'filters'|'selectionDropped'>={
   mode,modes:(canAwait?MY_WORK_MODES:['todo' as MyWorkMode]).map(m=>({mode:m,label:MY_WORK_LABELS.modes[m]})),showModeToggle:canAwait,weekly,
  };
+ // One revocation set for every dataset: a task revoked at row level leaves the table, drawer and weekly output.
+ const revoked=new Set<string>();
  const finish=(pageState:DataState|null,rows:MyWorkRow[],emptyReason:MyWorkView['emptyReason'],selectedId:string|null,details:Map<string,MyWorkDetail>):MyWorkView=>{
   const task=selectedId?details.get(selectedId)??null:null;
   const kept=task?selectedId:null;
   const parsedState=pageState&&parseDataState(pageState);
   // A revoked/blocked page exposes no weekly ids, titles, dates or length.
   const blocked=!!parsedState&&parsedState.states.some(s=>BLOCKING.has(s));
-  const weeklyOut=blocked?{period:{start:null,end:null},items:[]}:weekly;
+  const weeklyOut=blocked?{period:{start:null,end:null},items:[]}:{...weekly,items:weekly.items.filter(i=>!revoked.has(i.id))};
   return {...base,weekly:weeklyOut,pageState:parsedState,pageStateLabel:parsedState?describeDataState(parsedState):null,count:parsedState?dataStateCount(parsedState):rows.length,emptyReason,rows,
    drawer:{open:!!task,task},filters:{search,mode,selectedId:kept},selectionDropped:!!wanted&&!task};
  };
@@ -215,12 +220,13 @@ export function buildMyWorkView(input:MyWorkInput):MyWorkView{
  const details=new Map<string,MyWorkDetail>();
  for(const raw of input.rows){
   const p=parseRow(raw);
-  if(p==='forbidden')continue;
+  if(p==='forbidden'){const id=str(rec(raw)?.id);if(id)revoked.add(id);continue}
   if(p==='malformed'){ if(!(rec(raw)?.ended===true))flags.add('partial'); continue; }
   if(details.has(p.row.id)){flags.add('partial');continue}
   if(!p.row.finishedKnown)flags.add('partial');
   details.set(p.row.id,p.detail);
  }
+ for(const id of revoked)details.delete(id);
  // The default set is every unfinished assigned task; the weekly period never touches it.
  const inMode=[...details.values()].filter(d=>d.awaitingMyConfirmation===(mode==='awaiting_my_confirmation'));
  const needle=search.toLowerCase();
