@@ -130,8 +130,10 @@ function parseRow(raw:unknown):Parsed{
  // Only a verified formal field is a due date; every other date stays unknown.
  const dueLabel=due&&due.verified_formal===true&&str(due.value)?str(due.value):MY_WORK_LABELS.unknown;
  const outcome=parseOutcome(r.operation_outcome);
+ // 進行中 is only claimed from a stated workflow/queue/attention fact, never from absence.
+ const statusKnown=!!str(r.workflow_state)||!!str(r.queue)||typeof r.attention==='boolean';
  const handoffText=str(r.handoff_state);
- const handoffLabel=awaiting?MY_WORK_LABELS.awaiting:handoffText||MY_WORK_LABELS.handoffNone;
+ const handoffLabel=awaiting?MY_WORK_LABELS.awaiting:handoffText||MY_WORK_LABELS.unknown;
  const parent=rec(r.parent);
  const verified=!!parent&&parent.verified===true;
  const parentCase=verified?text(parent?.case_title):MY_WORK_LABELS.unknown;
@@ -141,7 +143,7 @@ function parseRow(raw:unknown):Parsed{
  const row:MyWorkRow={
   id,title:text(r.title),caseTitle:text(r.case_title),workItemTitle:text(r.work_item_title),assignee:text(r.assignee_name),
   workflowLabel:text(r.workflow_state),
-  statusLabel:attention?MY_WORK_LABELS.attention:awaiting||pendingReason?MY_WORK_LABELS.pending:MY_WORK_LABELS.normal,
+  statusLabel:attention?MY_WORK_LABELS.attention:awaiting||pendingReason?MY_WORK_LABELS.pending:statusKnown?MY_WORK_LABELS.normal:MY_WORK_LABELS.unknown,
   nextDeliverable:text(r.next_deliverable),dueLabel,pendingReason:pendingReason||MY_WORK_LABELS.unknown,handoffLabel,
   awaitingMyConfirmation:awaiting,needsAttention:attention,finishedKnown,evidencePresent:evidence.length>0,
   outcomeNote:outcome==='unknown'?MY_WORK_LABELS.outcomeUnknown:null,
@@ -193,8 +195,11 @@ export function buildMyWorkView(input:MyWorkInput):MyWorkView{
   const task=selectedId?details.get(selectedId)??null:null;
   const kept=task?selectedId:null;
   const parsedState=pageState&&parseDataState(pageState);
-  return {...base,pageState:parsedState,pageStateLabel:parsedState?describeDataState(parsedState):null,count:parsedState?dataStateCount(parsedState):rows.length,emptyReason,rows,
-   drawer:{open:!!task,task},filters:{search,mode,selectedId:kept},selectionDropped:!!wanted&&!task,weekly};
+  // A revoked/blocked page exposes no weekly ids, titles, dates or length.
+  const blocked=!!parsedState&&parsedState.states.some(s=>BLOCKING.has(s));
+  const weeklyOut=blocked?{period:{start:null,end:null},items:[]}:weekly;
+  return {...base,weekly:weeklyOut,pageState:parsedState,pageStateLabel:parsedState?describeDataState(parsedState):null,count:parsedState?dataStateCount(parsedState):rows.length,emptyReason,rows,
+   drawer:{open:!!task,task},filters:{search,mode,selectedId:kept},selectionDropped:!!wanted&&!task};
  };
  const read=input.readState;
  const readState:DataState|'ready'=read===undefined?{states:['loading'],count:null}:read==='ready'?'ready':parseDataState(read);
@@ -229,8 +234,12 @@ export function buildMyWorkView(input:MyWorkInput):MyWorkView{
   if(partial)return finish({states:flagStates,count:null},rows,null,sel,visible);
   const filtered=!!needle&&inMode.length>0;
   if(!filtered&&input.assignment!=='assigned'&&input.assignment!=='unassigned')return finish({states:['unknown'],count:null},rows,null,sel,visible);
-  // C-STATE allows stale only with partial, so a stale snapshot with no rows reads as stale with a known zero.
-  const state:DataState=stale?{states:['stale'],count:0}:{states:[filtered?'filtered_empty':'complete_empty'],count:0};
+  // A stale snapshot is not a verified zero: keep a supplied count, else unknown, and never claim no_pending.
+  if(stale){
+   const known=readState!=='ready'&&typeof readState.count==='number'?readState.count:null;
+   return finish({states:['stale'],count:known},rows,null,sel,visible);
+  }
+  const state:DataState={states:[filtered?'filtered_empty':'complete_empty'],count:0};
   return finish(state,rows,filtered?null:input.assignment==='unassigned'?'unassigned':'no_pending',sel,visible);
  }
  // A clean read with rows has no page-level state to show; partial/stale carry their own.

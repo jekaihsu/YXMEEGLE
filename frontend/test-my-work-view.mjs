@@ -86,7 +86,9 @@ test('5. page states stay distinct; unknown is never zero; forbidden leaks nothi
  eq(state(view([row('a'),row('a')])),['partial'],'duplicate ids are partial');
  eq(state(view([row('a')])),null,'clean read has no page-level state');
  const stale=buildMyWorkView({rows:[],readState:{states:['stale'],count:null},assignment:'assigned'});
- eq([state(stale),stale.count],[['stale'],0],'stale snapshot keeps stale');
+ eq([state(stale),stale.count,stale.emptyReason],[['stale'],null,null],'stale with unknown count stays unknown, never zero or no_pending');
+ const known=buildMyWorkView({rows:[],readState:{states:['stale'],count:2},assignment:'assigned'});
+ eq([state(known),known.count,known.emptyReason],[['stale'],2,null],'a supplied known stale count passes through');
 });
 test('6. due date only when verified formal; evidence never completes',()=>{
  const v=view([row('a',{effective_due:{value:'2026-10-20',verified_formal:true}}),row('b',{effective_due:{value:'2026-10-20'}}),row('c',{due_date:'2026-10-20',estimated_due:'2026-10-21'}),row('d',{effective_due:{value:'2026-10-20',verified_formal:'true'}})]);
@@ -135,6 +137,21 @@ test('module stays pure: no React, fetch or routing',()=>{
  ok(!/types|api\./.test(src.match(/import[^;]*;/g).join('')),'imports only dataState');
 });
 
+test('9. FIX1: revocation hides weekly; stale/unknown never invented; missing facts read unknown',()=>{
+ const items=[{id:'SECRET-ID',title:'SECRET-NAME',date:'2026-10-13'}];
+ for(const s of ['forbidden','loading','unlocated','read_failed','unknown']){
+  const v=buildMyWorkView({readState:{states:[s],count:9,name:'SECRET-PAGE'},rows:[row('a')],weeklyActivity:{period:{start:'2026-10-12',end:'2026-10-18'},items}});
+  eq(v.weekly.items,[],s+' weekly items empty');
+  ok(!JSON.stringify(v).includes('SECRET'),s+' leaks nothing');
+  ok(!('count' in v.weekly),s+' weekly has no count');
+ }
+ eq(buildMyWorkView({rows:[row('a')],readState:'ready',assignment:'assigned',weeklyActivity:{items}}).weekly.items.map(i=>i.id),['SECRET-ID'],'ready read keeps weekly');
+ const bare={id:'a',ended:false};
+ const r=buildMyWorkView({readState:'ready',rows:[bare],assignment:'assigned'}).rows[0];
+ eq([r.handoffLabel,r.statusLabel],['unknown','unknown'],'missing handoff/status facts read unknown');
+ const known=view([row('a',{handoff_state:'已交接'})]).rows[0];
+ eq([known.handoffLabel,known.statusLabel],['已交接',MY_WORK_LABELS.normal],'known facts still shown');
+});
 let failed=0;
 for(const [name,fn] of tests){try{await fn();console.log(`ok - ${name}`)}catch(e){failed++;console.log(`not ok - ${name}\n${e.message}`)}}
 if(failed){console.log(`${failed} failed`);process.exit(1)}
