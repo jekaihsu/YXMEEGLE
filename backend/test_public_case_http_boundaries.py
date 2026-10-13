@@ -15,7 +15,8 @@ from . import storage,audit
 def isolated_http(tmp_path):
     app=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/boundaries.db','UPLOAD_DIR':str(tmp_path/'files'),
         'DEMO_MODE':'false','APP_ENV':'development','SESSION_SECRET':'boundary-only'*4,
-        'LARK_WORKER_ORGANIZATION':'boundary','LARK_ALLOWED_TENANTS':'boundary'})
+        'LARK_WORKER_ORGANIZATION':'boundary','LARK_ALLOWED_TENANTS':'boundary',
+        'WORKSPACE_SHELL_ENABLED':'true','INDEX_TABLES_ENABLED':'true'})
     state=upgrade(seed());state['environment']='production'
     for p in state['projects']:p.update(case_visibility='excluded_history',execution_system='meegle')
     old,new=state['projects'][:2];old['name']='OLD_CASE_SENTINEL';new.update(case_visibility='new_case',execution_system='workbench',name='Current case')
@@ -97,3 +98,50 @@ def test_malformed_input_json_is_422(isolated_http):
     _,client,_,_=isolated_http
     response=client.post('/api/projects/p2/nodes/p2-sales/inputs',content='{',headers={'Content-Type':'application/json'})
     assert response.status_code==422
+
+
+@pytest.mark.parametrize('viewer,admit_hidden', [('u-pm',False),('u-manager',False),('u-manager',True)])
+def test_workspace_contract_links_only_name_visible_confirmations(isolated_http,viewer,admit_hidden):
+    app,client,_,signin=isolated_http
+    with app.state.sessions.begin() as db:
+        row=db.get(WorkspaceRow,'lark-boundary');state=storage.load(db,BusinessRow,row)
+        state['source_confirmations']=[dict(id=f'base/confirmations/{rid}',project_id='p2',
+            source_kind='confirmation',code=code,
+            source_identity=dict(base_token='base',table_id='confirmations',record_id=rid))
+            for rid,code in [('recVISIBLEA','C115264'),('recHIDDENB','C999777')]]
+        state['source_visible_record_ids']+=['base|confirmations|recVISIBLEA','base|contracts|recContract']
+        if admit_hidden:state['source_visible_record_ids'].append('base|confirmations|recHIDDENB')
+        state['contract_items']=[dict(id='base/contracts/recContract',project_id='p2',title='Visible contract',
+            confirmation_ids=['base/confirmations/recVISIBLEA','base/confirmations/recHIDDENB'],
+            source_identity=dict(base_token='base',table_id='contracts',record_id='recContract'))]
+        row.data=storage.save(db,BusinessRow,row.id,state)
+    signin(viewer)
+    response=client.get('/api/workspace')
+    assert response.status_code==200,response.text
+    expected=['base/confirmations/recVISIBLEA']+(['base/confirmations/recHIDDENB'] if admit_hidden else [])
+    assert response.json()['contract_items']==[dict(id='base/contracts/recContract',project_id='p2',
+        title='Visible contract',confirmation_ids=expected,
+        source_identity=dict(base_token='base',table_id='contracts',record_id='recContract'))]
+    assert 'recVISIBLEA' in response.text and 'C115264' in response.text
+    assert ('recHIDDENB' in response.text)==admit_hidden
+    assert ('C999777' in response.text)==admit_hidden
+    with app.state.sessions() as db:
+        stored=storage.load(db,BusinessRow,db.get(WorkspaceRow,'lark-boundary'))
+        assert stored['contract_items'][0]['confirmation_ids']==['base/confirmations/recVISIBLEA','base/confirmations/recHIDDENB']
+
+
+@pytest.mark.parametrize('enabled',[False,True])
+def test_work_item_internal_flags_absent_from_public_routes(isolated_http,enabled):
+    app,client,_,_=isolated_http
+    with app.state.sessions.begin() as db:
+        row=db.get(WorkspaceRow,'lark-boundary');state=storage.load(db,BusinessRow,row)
+        state['source_work_items_enabled']=enabled
+        state['source_work_items_status']={'p2':{'partial':False}}
+        row.data=storage.save(db,BusinessRow,row.id,state)
+    for path in ('/api/workspace','/api/workspace?scope=shell','/api/projects/p2',
+                 '/api/projects','/api/sources','/api/session','/api/daily-reports'):
+        response=client.get(path)
+        assert response.status_code==200,(path,response.text)
+        assert 'source_work_items_enabled' not in response.text,path
+        assert 'source_work_items_status' not in response.text,path
+        if path.endswith('scope=shell'):assert response.json()['scope']=='shell'
