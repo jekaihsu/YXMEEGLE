@@ -416,8 +416,8 @@ def _clean_native_link(value, bad, path=()):
     Every malformed descendant is appended to ``bad`` as ``(path, item)``; ``path`` is the tuple of list
     indexes and link-key names leading to it from the field root, so repeated malformed values stay
     distinct occurrences. Valid branches (and the table_id they inherit) are kept. A dict whose own
-    ``table_id`` is malformed is dropped whole: no table is guessed for it. A dict with none of the
-    recognized link keys is malformed; ``None`` under a recognized key is an absent optional collection
+    ``table_id`` is malformed is dropped whole: no table is guessed for it. A dict with a well-typed
+    ``table_id`` and no link keys is context only (a no-op); a dict with no recognized key at all is malformed; ``None`` under a recognized key is an absent optional collection
     (a no-op), exactly as the native resolver sees it.
     """
     if isinstance(value, str):
@@ -436,8 +436,8 @@ def _clean_native_link(value, bad, path=()):
             return _DROP
         present = [k for k in _LINK_KEYS if k in value]
         if not present:
-            if "table_id" in value and not table:
-                return {}  # table-only container with a null/empty table_id: a no-op, as in native_records
+            if "table_id" in value:
+                return {}  # table-only container (any well-typed table_id): context only, a no-op as in native_records
             bad.append((path, value))
             return _DROP
         kept = {} if table is None else {"table_id": table}

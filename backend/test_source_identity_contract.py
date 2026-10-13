@@ -1000,6 +1000,21 @@ def test_table_only_nullable_container_is_native_noop(container):
     assert [r["reason"] for r in mine] == ["native_link"]
 
 
+@pytest.mark.parametrize("cardinality", ["one", "many"])
+@pytest.mark.parametrize("container", [
+    {"table_id": "tblX"}, {"table_id": "tblL"}, {"record_ids": [{"table_id": "tblX"}]}])
+def test_nonempty_table_only_container_is_native_noop(container, cardinality):
+    import dataclasses
+    edge = dataclasses.replace(ITEM_TO_CONTRACT, cardinality=cardinality)
+    targets, missing, graph, mine = _observe_link_value([container, "recL2"], edge=edge)
+    assert [r["record_id"] for r in targets] == ["recL2"] and missing == []
+    result = edge_targets(graph, ref("tblW", "recW1"), edge.edge_type)
+    assert result["target_keys"] == ("base-A/tblL/recL2",)
+    assert result["navigation"] == "linked" and result["unresolved"] == ()
+    assert result["verification"] == "receipt_missing" and result["receipt_ref"] is None
+    assert [r["reason"] for r in mine] == ["native_link"]
+
+
 @pytest.mark.parametrize("container", [{}, {"CUSTOMER_SECRET": None}, {"table_id": 5}, {"record_id": 5}])
 def test_unrecognized_or_malformed_containers_stay_malformed(container):
     _, _, graph, mine = _observe_link_value(["recL2", container])
