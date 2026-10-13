@@ -29,7 +29,9 @@ def test_source_ref_requires_complete_source_entity_identity():
         SourceRef.from_entity({"base_token": "base-A", "table_id": "table-B"})
 
 
-def test_only_independently_verified_exact_source_key_edge_resolves():
+def test_well_formed_verified_claim_is_unresolved_verifier_unavailable():
+    """Owner decision superseding D3: free-form verification strings are not authority (no VCC-117 receipt
+    schema/verifier exists), so a well-formed claim stays unresolved as verifier_unavailable."""
     ref = SourceRef.from_entity({"base_token": "base-A", "table_id": "table-B", "record_id": "r1"})
     edges = [{
         "source_key": ref.source_key,
@@ -41,9 +43,9 @@ def test_only_independently_verified_exact_source_key_edge_resolves():
 
     assert resolve_edge(ref, edges) == {
         "source_key": "base-A/table-B/r1",
-        "mapping_status": "resolved",
-        "mapping_reason": "independently_verified_edge",
-        "target_source_key": "base-X/table-Y/record-Z",
+        "mapping_status": "unresolved",
+        "mapping_reason": "verifier_unavailable",
+        "target_source_key": None,
     }
 
 
@@ -147,7 +149,9 @@ def test_absent_exact_edge_returns_edge_absent(edges):
     }
 
 
-def test_verified_target_resolves_despite_duplicate_and_unverified_edges():
+def test_duplicate_and_unverified_claims_do_not_resolve_either():
+    """Owner decision superseding D3: free-form verification strings are not authority (no VCC-117 receipt
+    schema/verifier exists), so a well-formed claim stays unresolved as verifier_unavailable."""
     ref = SourceRef.from_entity({"base_token": "base-A", "table_id": "table-B", "record_id": "r1"})
     verified = {
         "source_key": ref.source_key,
@@ -160,13 +164,15 @@ def test_verified_target_resolves_despite_duplicate_and_unverified_edges():
 
     assert resolve_edge(ref, [unverified, verified, dict(verified)]) == {
         "source_key": "base-A/table-B/r1",
-        "mapping_status": "resolved",
-        "mapping_reason": "independently_verified_edge",
-        "target_source_key": "base-X/table-Y/record-Z",
+        "mapping_status": "unresolved",
+        "mapping_reason": "verifier_unavailable",
+        "target_source_key": None,
     }
 
 
-def test_conflicting_verified_edges_remain_unresolved():
+def test_conflicting_verified_claims_remain_unresolved():
+    """Owner decision superseding D3: free-form verification strings are not authority (no VCC-117 receipt
+    schema/verifier exists), so a well-formed claim stays unresolved as verifier_unavailable."""
     ref = SourceRef.from_entity({"base_token": "base-A", "table_id": "table-B", "record_id": "r1"})
     edges = [
         {"source_key": ref.source_key, "target_source_key": target,
@@ -178,7 +184,7 @@ def test_conflicting_verified_edges_remain_unresolved():
     assert resolve_edge(ref, edges) == {
         "source_key": ref.source_key,
         "mapping_status": "unresolved",
-        "mapping_reason": "ambiguous_verified_edges",
+        "mapping_reason": "verifier_unavailable",
         "target_source_key": None,
     }
 
@@ -240,15 +246,18 @@ def test_padded_or_malformed_target_is_never_resolved(target):
     assert resolve_edge(ref, [edge])["target_source_key"] is None
 
 
-def test_padded_duplicate_does_not_create_false_ambiguity():
+def test_padded_duplicate_is_ignored_and_clean_claim_still_unverifiable():
+    """Owner decision superseding D3: free-form verification strings are not authority (no VCC-117 receipt
+    schema/verifier exists), so a well-formed claim stays unresolved as verifier_unavailable."""
     ref = SourceRef.from_entity({"base_token": "base-A", "table_id": "table-B", "record_id": "r1"})
     clean = {**VALID_EDGE, "source_key": ref.source_key}
     padded = {**clean, "target_source_key": "base-X/table-Y/record-Z "}
 
     result = resolve_edge(ref, [clean, padded])
 
-    assert result["mapping_status"] == "resolved"
-    assert result["target_source_key"] == "base-X/table-Y/record-Z"
+    assert result["mapping_status"] == "unresolved"
+    assert result["mapping_reason"] == "verifier_unavailable"
+    assert result["target_source_key"] is None
 
 
 @pytest.mark.parametrize("registry", [
@@ -396,28 +405,57 @@ def test_one_cardinality_ambiguous_contested_and_unresolved():
     assert (result["recC4"]["navigation"], result["recC4"]["reason"]) == ("unresolved", "no_native_link")
 
 
-def test_receipt_missing_unless_caller_supplies_receipt_ref_for_the_type():
-    plain = chain_graph()
-    accepted = chain_graph(receipts={"item_contract": "receipt-ref-opaque"})
+def test_every_edge_instance_and_type_is_receipt_missing():
+    """Owner decision superseding D3: no receipt schema/verifier exists, so nothing is ever accepted."""
+    graph = chain_graph()
     item = ref("tblW", "recW1")
 
-    assert {i["verification"] for i in plain.instances} == {"receipt_missing"}
-    assert edge_targets(plain, item, "item_contract")["verification"] == "receipt_missing"
-    assert edge_targets(accepted, item, "item_contract")["verification"] == "accepted"
-    assert edge_targets(accepted, item, "item_contract")["receipt_ref"] == "receipt-ref-opaque"
-    assert edge_targets(accepted, ref("tblL", "recL1"), "contract_confirmation")[
-        "verification"] == "receipt_missing"
-    assert edge_targets(accepted, ref("tblW", "recW9"), "item_contract")["verification"] == "accepted"
+    assert {i["verification"] for i in graph.instances} == {"receipt_missing"}
+    assert {i["receipt_ref"] for i in graph.instances} == {None}
+    for edge_type in graph.edge_types:
+        result = edge_targets(graph, item, edge_type)
+        assert (result["verification"], result["receipt_ref"]) == ("receipt_missing", None)
+    assert {v for _, _, v in parents_of(graph, item)} <= {"receipt_missing"}
+    assert {v for _, _, v in children_of(graph, ref("tblL", "recL1"))} <= {"receipt_missing"}
 
 
-@pytest.mark.parametrize("receipts,error", [
-    ({"item_contract": ""}, ValueError), ({"item_contract": " "}, ValueError),
-    ({"item_contract": None}, ValueError), ({"undeclared": "r"}, ValueError),
-    ([("item_contract", "r")], TypeError), ("item_contract", TypeError),
+@pytest.mark.parametrize("receipts", [
+    {"item_contract": "receipt-ref-opaque"}, {"item_contract": "x"}, {}, None, "item_contract",
 ])
-def test_receipt_refs_must_be_non_blank_and_for_declared_types(receipts, error):
-    with pytest.raises(error):
+def test_receipts_acceptance_path_is_removed(receipts):
+    """Owner decision superseding D3: a caller string must not be able to mark an edge accepted."""
+    with pytest.raises(TypeError):
         chain_graph(receipts=receipts)
+    assert not hasattr(chain_graph(), "receipts")
+
+
+@pytest.mark.parametrize("text", [
+    "accepted", "mapped", "verified", "resolved", "receipt-123", "VCC-117", "independently_verified", " x ", "1",
+])
+def test_no_input_string_can_yield_accepted_mapped_or_resolved(text):
+    """Owner decision superseding D3: whatever strings a caller supplies, nothing is accepted/mapped/resolved."""
+    key = ref("tblW", "recW1").source_key
+    edge = {"source_key": key, "target_source_key": "base-X/table-Y/record-Z",
+            "verification_status": text, "verified_by": text, "evidence_ref": text, "receipt_ref": text,
+            "mapping_status": "resolved", "verification": "accepted"}
+    legacy = resolve_edge(ref("tblW", "recW1"), [edge, {**edge, "verification_status": "independently_verified"}])
+    assert legacy["mapping_status"] == "unresolved" and legacy["target_source_key"] is None
+
+    records = [{**r, "fields": {**r["fields"], "receipt": text, "verification": text}} for r in chain_records()]
+    records = [{**r, "verification": "accepted", "receipt_ref": text} for r in records]
+    graph = build_native_edge_graph(
+        records, [CONTRACT_TO_CONFIRMATION, ITEM_TO_CONTRACT, CONFIRMATION_TO_QUOTE])
+    assert {i["verification"] for i in graph.instances} == {"receipt_missing"}
+    assert {i["receipt_ref"] for i in graph.instances} == {None}
+
+
+def test_native_navigation_still_works_while_receipt_missing():
+    graph = chain_graph()
+    forward = edge_targets(graph, ref("tblW", "recW2"), "item_contract")
+    assert (forward["navigation"], forward["verification"]) == ("linked", "receipt_missing")
+    assert forward["target_keys"] == (f"{B}/tblL/recL1", f"{B}/tblL/recL2")
+    assert edge_sources(graph, ref("tblL", "recL1"), "item_contract") == tuple(sorted(
+        (ref("tblW", r).version_key for r in ("recW1", "recW2", "recW3")), key=repr))
 
 
 def test_two_versions_of_one_record_stay_distinct():

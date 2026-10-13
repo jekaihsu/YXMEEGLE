@@ -3,9 +3,9 @@
 This module deliberately does not infer identity from display names, case
 numbers, or suffixes.  Two edge sources exist:
 
-* ``resolve_edge`` resolves one record key through a caller-supplied registry;
-  an edge is usable only when its independent verification state and evidence
-  are present.
+* ``resolve_edge`` is the legacy record-key lookup over a caller-supplied
+  registry.  It never returns ``resolved``: free-form verification strings are
+  not authority, so a well-formed claim is ``verifier_unavailable``.
 * ``build_native_edge_graph`` derives typed edge instances from the native
   Lark links already resolved by ``v4_sources.native_records``.  An edge type is
   declared once (``EdgeType``); instances are keyed by (source, edge type), so
@@ -13,16 +13,18 @@ numbers, or suffixes.  Two edge sources exist:
   kept as an explicit unresolved row.  Reverse navigation is built from the
   same forward instances, so parent->child and child->parent agree.
 
-Open evidence gates (not decided here):
+Unresolved gates (owner decision; nothing below is decided or invented here):
 
-* VCC-117 receipts are absent, and the receipt schema and verifier authority
-  are unresolved.  An edge type is ``accepted`` only when the caller supplies
-  an opaque, non-blank receipt ref for it; its content is not validated.  Every
-  other instance is ``receipt_missing``: navigable, never mapped or accepted.
-* Keys are the existing slash-joined ``entity_id``.  ``SourceRef`` rejects a
-  component that is empty, padded or contains '/', so a would-be collision is
-  an explicit unresolvable ref.  Whether real Lark tokens can contain '/' (and
-  how they should be encoded) is unverified.
+* VCC-117 receipts are absent.  The receipt schema and verifier authority are
+  unresolved, and no trustworthy read-only source evidence for them exists.  No
+  caller-supplied string is treated as a receipt or as enough to mark an edge
+  accepted, mapped or verified.  Every edge instance and edge type is
+  therefore ``receipt_missing`` (navigable by native edge id, never mapped or
+  accepted), and ``resolve_edge`` reports ``verifier_unavailable``.
+* Lark token encoding is unresolved.  Keys are the existing slash-joined
+  ``entity_id``; ``SourceRef`` rejects a component that is empty, padded or
+  contains '/' (D8), so a would-be collision is an explicit unresolvable ref.
+  Whether real Lark tokens can contain '/' and how to encode them is unverified.
 
 Permission boundary: nothing here takes a viewer or reports ``forbidden``.
 Callers must apply ``production_access``/``source_case_policy``/
@@ -119,14 +121,16 @@ def resolve_edge(source_ref, edge_registry):
     """Resolve an exact source key through independently verified registry edges.
 
     Registry entries use ``source_key`` and ``target_source_key`` as identity
-    endpoints.  Entries without an explicit independent verification status,
-    verifier, and evidence reference remain unresolved as ``edge_unverified``;
-    no exact entry is ``edge_absent``.  A target must itself be an exact,
-    unpadded ``base/table/record`` key.  Display fields are never consulted,
+    endpoints.  No exact entry is ``edge_absent``; an exact entry that is
+    malformed (status, verifier or evidence strings missing, or a bad target)
+    is ``edge_unverified``; a well-formed claim is ``verifier_unavailable``
+    because no verifier or receipt authority exists, so this never returns
+    ``resolved``.  A target must itself be an exact, unpadded
+    ``base/table/record`` key.  Display fields are never consulted,
     even if they happen to match.  A registry that is a mapping, string or
     scalar raises ``TypeError`` rather than reading as an absent edge.
     """
-    verified_targets = set()
+    well_formed_claims = 0
     exact_edge_present = False
     for edge in _sequence(edge_registry, "edge_registry"):
         if not isinstance(edge, dict) or edge.get("source_key") != source_ref.source_key:
@@ -139,24 +143,18 @@ def resolve_edge(source_ref, edge_registry):
             continue
         if not is_source_key(edge.get("target_source_key")):
             continue
-        verified_targets.add(edge["target_source_key"])
+        well_formed_claims += 1
 
-    if not verified_targets:
+    if not well_formed_claims:
         return unresolved_row(
             source_ref, reason="edge_unverified" if exact_edge_present else "edge_absent"
         )
-    if len(verified_targets) != 1:
-        return unresolved_row(source_ref, reason="ambiguous_verified_edges")
-    return {
-        "source_key": source_ref.source_key,
-        "mapping_status": "resolved",
-        "mapping_reason": "independently_verified_edge",
-        "target_source_key": next(iter(verified_targets)),
-    }
+    return unresolved_row(source_ref, reason="verifier_unavailable")
 
 
 EDGE_DIRECTIONS = ("parent_to_child", "child_to_parent")
 EDGE_CARDINALITIES = ("one", "many")
+RECEIPT_MISSING = "receipt_missing"
 
 
 def _optional_component(value, name):
@@ -208,25 +206,11 @@ class NativeEdgeGraph:
     """Edge instances of one record snapshot (``version``), with both indexes."""
 
     edge_types: dict
-    receipts: dict
     version: int | str | None
     instances: tuple
     rejected: tuple
     forward: dict
     reverse: dict
-
-
-def _receipts(receipts, edge_types):
-    if receipts is None:
-        return {}
-    if not isinstance(receipts, Mapping):
-        raise TypeError(f"receipts must map edge_type to a receipt ref, not {type(receipts).__name__}")
-    for edge_type, ref in receipts.items():
-        if edge_type not in edge_types:
-            raise ValueError(f"receipt for undeclared edge type {edge_type!r}")
-        if not (isinstance(ref, str) and ref.strip()):
-            raise ValueError(f"receipt ref for {edge_type!r} must be a non-blank str")
-    return dict(receipts)
 
 
 def _field_schemas(tables):
@@ -256,15 +240,15 @@ def _native_links(row, edge, index, schemas):
     return targets, missing, None
 
 
-def build_native_edge_graph(records, edge_types, *, tables=None, receipts=None, version=None):
+def build_native_edge_graph(records, edge_types, *, tables=None, version=None):
     """Derive typed edge instances for one snapshot of native source records.
 
     Each instance row carries ``edge_type``, ``source_key``,
     ``source_version_key`` and either a ``target_key`` (``navigation="linked"``)
     or the native target reference with ``navigation="unresolved"`` and a
-    reason.  ``verification`` is ``accepted`` only for an edge type with a
-    caller-supplied receipt ref; otherwise ``receipt_missing``.  A source row
-    whose identity cannot form a safe key is listed in ``rejected``.
+    reason.  ``verification`` is always ``receipt_missing`` and ``receipt_ref``
+    is None: there is no receipt schema or verifier, and no input can change that.
+    A source row whose identity cannot form a safe key is listed in ``rejected``.
     """
     if not _valid_version(version):
         raise ValueError("version must be an integer, a non-blank unpadded string, or None")
@@ -275,7 +259,6 @@ def build_native_edge_graph(records, edge_types, *, tables=None, receipts=None, 
         if edge.edge_type in declared:
             raise ValueError(f"edge type {edge.edge_type!r} is declared twice")
         declared[edge.edge_type] = edge
-    receipt_refs = _receipts(receipts, declared)
     schemas = _field_schemas(tables)
     rows = []
     for row in _sequence(records, "records"):
@@ -299,10 +282,9 @@ def build_native_edge_graph(records, edge_types, *, tables=None, receipts=None, 
                 rejected.append({"edge_type": edge.edge_type, "reason": "invalid_source_key",
                                  **{k: row.get(k) for k in ("base_token", "table_id", "record_id")}})
                 continue
-            verification = "accepted" if edge.edge_type in receipt_refs else "receipt_missing"
             common = {"edge_type": edge.edge_type, "source_key": ref.source_key,
-                      "source_version_key": ref.version_key, "verification": verification,
-                      "receipt_ref": receipt_refs.get(edge.edge_type)}
+                      "source_version_key": ref.version_key, "verification": RECEIPT_MISSING,
+                      "receipt_ref": None}
             targets, missing, schema_reason = _native_links(row, edge, index, schemas)
             found = []
             if schema_reason:
@@ -331,7 +313,7 @@ def build_native_edge_graph(records, edge_types, *, tables=None, receipts=None, 
         forward.setdefault((instance["source_version_key"], instance["edge_type"]), []).append(instance)
         if instance["target_key"] is not None:
             reverse.setdefault((instance["target_key"], instance["edge_type"]), []).append(instance)
-    return NativeEdgeGraph(declared, receipt_refs, version, tuple(instances.values()), tuple(rejected),
+    return NativeEdgeGraph(declared, version, tuple(instances.values()), tuple(rejected),
                            {k: tuple(v) for k, v in forward.items()},
                            {k: tuple(v) for k, v in reverse.items()})
 
@@ -350,14 +332,12 @@ def edge_targets(graph, source_ref, edge_type):
     resolved target and competing unresolved ones; ``contested`` is True),
     ``ambiguous`` (a one edge with several distinct resolved targets; no
     target is chosen) or ``unresolved``.  ``verification`` is independent of
-    navigation and is never ``accepted`` without a receipt ref.
+    navigation and is always ``receipt_missing``.
     """
     edge = _declared(graph, edge_type)
-    receipt_ref = graph.receipts.get(edge_type)
     result = {"source_key": source_ref.source_key, "source_version_key": source_ref.version_key,
               "edge_type": edge_type, "cardinality": edge.cardinality, "direction": edge.direction,
-              "verification": "accepted" if receipt_ref else "receipt_missing",
-              "receipt_ref": receipt_ref, "contested": False,
+              "verification": RECEIPT_MISSING, "receipt_ref": None, "contested": False,
               "target_keys": (), "candidate_keys": (), "unresolved": ()}
     if source_ref.version != graph.version:
         return {**result, "navigation": "unresolved", "reason": "version_not_in_graph"}
