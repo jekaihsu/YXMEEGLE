@@ -330,8 +330,22 @@ All rows branch from `7ae4a9d`, live in Orca `new-child` worktrees under `/Users
 | P2-128B Manager Overview read model | `task_680721c42b16` / `ctx_59f19ab6b2f1` | Codex `gpt-6.1-sol` medium | `p2-128b` / `ava-apple/p2-128b` | `backend/manager_overview.py`, `backend/test_manager_overview.py` | Opus commander | dispatched; `confirmation_population` is injected (protocol: rows with `row_key`, `project_id` or None) and bound to the reviewed 129B function at P2-INT |
 | P2-NAV return context | `task_dcf510090854` / `ctx_624d8d2efe24` | Claude `claude-sonnet-5-5` medium | `p2-nav` / `ava-apple/p2-nav` | `frontend/src/drilldownContext.ts`, `frontend/test-drilldown-context.mjs` | Codex `gpt-6.1-sol` medium | dispatched |
 
+**Review and fix record (P2 wave 1; reports under `worker-evidence/<task>/`, commander reviews and verifications under `worker-evidence/task_7bab31d03ad7/`):**
+
+| Row | Candidate chain | Reviews | Result |
+|---|---|---|---|
+| 129B | `e4fce38` → FIX1 `b04439d` (Sonnet `task_a95f8c126b93`) → FIX2 `d7498baa5b7dd2d0c2fb60ee1d59f62c198b7aa9` (`task_651d07c11d60`) | Codex `task_51df6473e67f` CHANGES-REQUESTED (5); Codex delta `task_1b16ab71fd82` CHANGES-REQUESTED (1 Medium, unknown-read retention) | FIX2 commander evidence-verified (parent: no third review cycle) |
+| 130B | `f3dd460` → FIX1 `b4accaa` (`task_6274b89cf7f4`) → FIX2 `9747c165175e6dbdda7b973aa3b366b04f8c6b65` (`task_22adf4b6a623`) | Codex `task_d0d1b4f82c78` CHANGES-REQUESTED (F1–F5); delta `task_dc035024832d` CHANGES-REQUESTED (F1); delta `task_66fdc4d7e733` running | commander evidence-verified; awaiting delta check |
+| 131B | `07443f4c0baf90dafe6106c06a6eba9fb902b264` | Opus commander PASS-WITH-FINDINGS (R1 Low, R2 INT obligation) | ready |
+| 132B | `3626478` → FIX1 `e0015ba9fe5e0161a6b096832d6543079f4be28d` (`task_532709293abf`) | Opus CHANGES-REQUESTED (F1 Medium) → delta PASS-WITH-FINDINGS (L1 Low) | ready |
+| 128B | `b480b4b8b33420ba0f9be638a3d74db507683598` | Opus commander PASS-WITH-FINDINGS (L1 residual gap, L2 polish); a duplicate reviewer `task_50cfda02b2f7` was stopped by the coordinator | ready |
+| NAV | `b3e1bc6` → FIX1 `a52908053ea42ebadb95b630e98330d86b42638d` (`task_8e3e989fa7a1`) | Codex `task_7cf92742dbbc` CHANGES-REQUESTED (F1 hash envelope; F2 → P2-INT); delta `task_47da52c6a9c3` PASS | ready |
+
+P2-F1 view models dispatched from `7ae4a9d` (new files only): 128F1 Sonnet `task_72dbe16e6f60`, 129F1 Codex `task_372a1b5fce1b`, 130F1 Codex `task_95c9f3e727b2`, 131F1 Sonnet `task_b4132a99398a`, 132F1 Sonnet `task_c8ad12122165`.
+
+**Proposed serial order for the root:** A1 129B → A2 130B → A3 131B → A4 132B → A5 128B → A6 NAV (focused test per merge; one full backend pytest and one frontend build/tsc at A6) → B P2-INT-B (Sonnet; `backend/app.py` + `backend/test_p2_int_routes.py`; exactly `GET /api/manager-overview`, `/api/confirmations`, `/api/case-detail/{project_id}`, `/api/contract-detail?key`, `/api/work-item-detail?key`) → C F1 ×5 → D AGY UI-a/UI-b → E P2-INT-F (Sonnet; frontend hub files plus new `P2Pages.tsx`; NAV F2 vocabulary adapter) → F P2-E2E (Codex). Specs: `spec-p2-int-b.txt`, `spec-p2-int-f.txt`.
+
 Held P2 rows (file sets fixed now, dispatched when their input is reviewed):
-- **P2-F1** view models, after the matching B contract is reviewed, alternating families: 129F1 Codex `frontend/src/confirmationListView.ts`; 130F1 Codex `caseDetailView.ts`; 131F1 Sonnet `contractDetailView.ts`; 132F1 Sonnet `workItemDetailView.ts`; 128F1 Sonnet `managerOverviewView.ts` (each + `frontend/test-<name>.mjs`).
 - **P2-UI-a / UI-b** AGY presentational components (file sets as in `tasks.tsv`), after the F1s are reviewed.
 - **P2-INT** Sonnet: the only writer of the hub files; registers only the five approved P2 GETs through the existing authorization chain (§4.4b). The root coordinator merges.
 - **P2-E2E** Codex: `backend/test_p2_reconciliation.py`, `frontend/test-p2-navigation.mjs`.
