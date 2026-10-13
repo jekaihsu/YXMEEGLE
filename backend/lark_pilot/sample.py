@@ -28,6 +28,8 @@ def empty_result():
             'records': {name: [] for name in CAPS}, 'table_states': {name: 'not_read' for name in CAPS},
             'counts': {name: None for name in CAPS},
             'table_fetched_at': {name: None for name in CAPS},
+            # Sanitized why-not-read per table; a missing key means the table was read or no reason applies.
+            'table_reasons': {},
             'receipt': {'identity_category': 'missing', 'config_present': False, 'outcome': 'unconfigured',
                         'endpoint': None, 'operation': None, 'permission_needed': None, 'requests': [],
                         'upstream_status': None, 'lark_code': None, 'error_kind': None}}
@@ -100,6 +102,7 @@ class PilotReader:
                     keys = sorted({key for row in previous for f in links
                                    for key in ids(row['fields'][f].get('value'))})
                     if not keys:
+                        result['table_reasons'][name] = 'no_linked_records'
                         continue
                 count = CAPS[name] if keys is None else min(CAPS[name], len(keys))
                 receipt.update(endpoint=TEMPLATE, operation='sample_' + name)
@@ -133,6 +136,9 @@ class PilotReader:
                                     'Lark 資料暫時無法讀取')
             if active:
                 result['table_states'][active] = 'forbidden' if denied else 'partial'
+                # A rejected linked (record_id filter) read means traversal is unavailable, not a failed read.
+                result['table_reasons'][active] = ('access_denied' if denied else 'traversal_unavailable'
+                    if active != 'cases' and kind == 'rejected' else 'read_failed')
             for rows in result['records'].values():
                 for row in rows:
                     row['freshness'] = 'partial'

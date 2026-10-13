@@ -100,3 +100,49 @@ def test_live_link_shape_link_record_ids_is_extracted():
     assert link(present, ['recA'], 'present')['state'] == 'dangling'
     assert link(live['fldvSpUqa9'], [], 'present') == {'state': 'unmapped', 'ids': []}
     assert link(field(live, 'fldJs4RTUm').get('value'), [], 'present')['state'] == 'unmapped'  # omitted field
+
+
+def cases_only(link_ids):
+    def handler(request):
+        res = lark_like(request)
+        if 'tblmSQrcCs9vPQZx' in request.url.path and b'record_id' in res.content:
+            return httpx.Response(200, json={'code': 0, 'data': {'has_more': False, 'items': [
+                {'record_id': 'rec_SYN_c', 'fields': {'工程確認單編號': 'SYN', '外業工作單': link_ids}}]}})
+        return res
+    return handler
+
+
+def test_cases_without_links_reason_is_no_linked_records_not_failure():
+    result = read_with(cases_only([]))
+    assert result['status'] == 'partial' and 'code' not in result and result['last_error'] is None
+    assert result['table_reasons'] == {'work_orders': 'no_linked_records', 'people': 'no_linked_records'}
+    assert result['table_states']['cases'] == 'present' and result['table_states']['work_orders'] == 'not_read'
+
+
+def test_linked_filter_rejected_1254018_reason_is_traversal_unavailable():
+    def handler(request):
+        if 'tbl5zPLS0ExWNEty' in request.url.path and b'"filter"' in request.content:
+            return httpx.Response(400, json={'code': 1254018, 'msg': 'SYN_body'})
+        return lark_like(request)
+    result = read_with(handler)
+    assert result['table_reasons']['work_orders'] == 'traversal_unavailable'
+    assert result['receipt']['lark_code'] == 1254018 and result['status'] == 'partial'
+
+
+def test_people_1254302_reason_is_access_denied_with_permission_needed():
+    def handler(request):
+        if 'tblfaCO2xPUNptQH' in request.url.path:
+            return httpx.Response(403, json={'code': 1254302, 'msg': 'RolePermNotAllow'})
+        return lark_like(request)
+    result = read_with(handler)
+    assert result['table_reasons']['people'] == 'access_denied'
+    assert result['receipt']['permission_needed'] and result['receipt']['lark_code'] == 1254302
+    assert result['table_states']['people'] == 'forbidden'
+
+
+def test_transport_failure_reason_is_read_failed():
+    def handler(request):
+        if 'tbl5zPLS0ExWNEty' in request.url.path:
+            return httpx.Response(200, json={'code': 0, 'data': {'items': [{'fields': {}}]}})
+        return lark_like(request)
+    assert read_with(handler)['table_reasons']['work_orders'] == 'read_failed'
