@@ -34,7 +34,7 @@ def test_overview_pages_equal_shell_cards_for_every_tab_and_sort(tmp_path):
         shell = client.get('/api/workspace?scope=shell').json()
         cards = {p['id']: p for p in shell['projects']}
         for tab in TABS:
-            for sort in ('due', 'name', 'progress'):
+            for sort in ('due', 'name', 'progress', 'created'):
                 for direction in ('asc', 'desc'):
                     first, items = everything(client, tab=tab, sort=sort, dir=direction)
                     assert first['facets'] == {'all': 30, 'formal': sum(p['case_type'] != 'intake' for p in cards.values()),
@@ -100,3 +100,52 @@ def test_overview_requires_ready_index_and_hides_invisible_cases(tmp_path, monke
         monkeypatch.setattr(workspace_environment, 'normalize_environment', lambda state, wid, cfg: state.update(environment='production') or state)
         body = client.get('/api/projects?view=overview&tab=all&limit=100').json()
         assert body['total'] == 5 == body['facets']['all'] and not {i['id'] for i in body['items']} & set(ids)
+
+
+def test_created_sort_order_filters_and_empty_last(tmp_path):
+    from .models import ProjectIndex
+    with scaled_client(tmp_path, 30, **ON) as (app, client):
+        with app.state.sessions.begin() as db:
+            rows = db.scalars(select(ProjectIndex).order_by(ProjectIndex.ordinal)).all()
+            ids = [r.project_id for r in rows]
+            for i, r in enumerate(rows):
+                r.created_at = '' if i >= 27 else f'2026-10-{i // 3 + 1:02d}T09:00:00+08:00'
+        for direction, expected in [('asc', ids), ('desc', ids[:27][::-1] + ids[27:][::-1])]:
+            response = client.get('/api/projects?view=overview&sort=created&dir=' + direction)
+            assert response.status_code == 200
+            first, items = everything(client, tab='all', sort='created', dir=direction)
+            assert [p['id'] for p in items] == expected
+            assert len(items) == first['total'] == 30
+            assert [p['id'] for p in everything(client, tab='all', sort='created', dir=direction)[1]] == expected
+            # Reverse physical insertion; only domain keys may determine ties.
+            with app.state.sessions.begin() as db:
+                values = [dict(r) for r in db.execute(select(ProjectIndex.__table__)).mappings()]
+                db.execute(ProjectIndex.__table__.delete())
+                db.execute(ProjectIndex.__table__.insert(), values[::-1])
+            assert [p['id'] for p in everything(client, tab='all', sort='created', dir=direction)[1]] == expected
+            for filters in [dict(tab=t) for t in ('formal', 'intake', 'active')] + [dict(tab='all', q=items[0]['code']), dict(tab='all', owner=items[0]['pm_id'])]:
+                baseline, selected = everything(client, sort='due', **filters)
+                page, ordered = everything(client, sort='created', dir=direction, **filters)
+                selected_ids = {p['id'] for p in selected}
+                assert [p['id'] for p in ordered] == [pid for pid in expected if pid in selected_ids]
+                assert (page['total'], page['facets']) == (baseline['total'], baseline['facets'])
+
+
+def test_created_sort_id_tie_and_mixed_formats(tmp_path):
+    from .models import ProjectIndex
+    with scaled_client(tmp_path, 4, **ON) as (app, client):
+        with app.state.sessions.begin() as db:
+            rows = db.scalars(select(ProjectIndex).order_by(ProjectIndex.project_id)).all()
+            ids = [r.project_id for r in rows]
+            for r in rows:
+                r.created_at = '2026-10-13T09:00:00+08:00'
+                r.ordinal = 0
+        for direction in ('asc', 'desc'):
+            expected = ids if direction == 'asc' else ids[::-1]
+            for _ in range(2):
+                assert [p['id'] for p in everything(client, tab='all', sort='created', dir=direction)[1]] == expected
+        with app.state.sessions.begin() as db:
+            for pid, stamp in zip(ids, ['2026-10-13', '2026-10-13T01:00:00Z', '2026-10-13T09:00:00+08:00', '']):
+                db.execute(update(ProjectIndex).where(ProjectIndex.project_id == pid).values(created_at=stamp))
+        assert [p['id'] for p in everything(client, tab='all', sort='created', dir='asc')[1]] == ids
+        assert [p['id'] for p in everything(client, tab='all', sort='created', dir='desc')[1]] == [ids[2], ids[1], ids[0], ids[3]]

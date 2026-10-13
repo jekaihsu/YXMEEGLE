@@ -156,7 +156,7 @@ def build(db,model,row,state,user,facts,today,approval_connection):
 
 
 TABS=('all','formal','intake','active','overdue','completed')
-SORTS=('due','name','progress')
+SORTS=('due','name','progress','created')
 
 
 def overview_page(db,model,row,state,today,*,q='',status='',owner='',tab='formal',sort='due',desc=False,offset=0,limit=10):
@@ -182,6 +182,11 @@ def overview_page(db,model,row,state,today,*,q='',status='',owner='',tab='formal
     if key is None: key=_binary(case((pi.c.due_date=='','9999'),else_=pi.c.due_date),db)
     elif sort=='name': key=_binary(key,db)
     order=[(o.desc() if desc else o.asc()) for o in (key,_binary(pi.c.project_id,db))]
+    if sort=='created':
+        # Missing creation dates stay last in either direction; ties use insertion order.
+        stamp=func.coalesce(pi.c.created_at,'')
+        order=[case((stamp=='',1),else_=0).asc()]+[(o.desc() if desc else o.asc())
+                for o in (_binary(stamp,db),pi.c.ordinal,_binary(pi.c.project_id,db))]
     rows=db.execute(select(pi).where(*where).order_by(*order).limit(limit).offset(offset)).mappings().all()
     counts=project_counts(db,ti,wid,today,[r['project_id'] for r in rows])
     return dict(total=total,offset=offset,limit=limit,facets=facets,items=[card(r,state,counts) for r in rows])
