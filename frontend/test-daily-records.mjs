@@ -39,7 +39,7 @@ const labels=Object.fromEntries([...document.querySelectorAll('.daily-cards arti
 for(const [id,,label] of cases){assert.ok(labels[id]?.includes(label),`${id} shows ${label}, got ${labels[id]}`);
  for(const other of ['原日報已核准','原日報已退回','原日報待檢核','原日報檢核待查證'])if(other!==label)assert.ok(!labels[id].includes(other),`${id} must not show ${other}`)}
 assert.equal(document.querySelectorAll('.daily-cards article').length,cases.length);
-assert.equal(Boolean(document.querySelector('.ops-notice')),mode==='workspace-fallback');
+assert.equal([...document.querySelectorAll('.ops-notice')].some(n=>n.textContent.includes('目前服務尚未提供全量日報查詢')),mode==='workspace-fallback');
 console.log(`Daily records (${mode}): ${cases.length} review states render explicit labels`);
 
 // Request-state regressions: offset, page label and items must agree.

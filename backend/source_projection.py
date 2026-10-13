@@ -104,8 +104,15 @@ def preserve_missing_sources(ws,records,complete_tables,previous_records):
 
 
 def daily_index(state,*,project_id=None,department=None,actor_id=None,date_from=None,date_to=None,
-                mapping_status=None,include_missing=False,status='all',q='',offset=0,limit=100):
-    """Call after server workspace authorization; returns no raw employee fields."""
+                mapping_status=None,include_missing=False,status='all',q='',offset=0,limit=100,
+                coverage_scope='workspace'):
+    """Call after server workspace authorization; returns no raw employee fields.
+
+    ``coverage_scope`` describes the caller's already-filtered case population.
+    It never changes which rows are authorized or selected.
+    """
+    if coverage_scope not in ('workspace', 'visible_cases'):
+        raise ValueError('invalid daily coverage scope')
     rows=[]; seen=set()
     groups=[(p,p.get('daily_reports',[])) for p in state.get('projects',[])]+[(None,state.get('daily_unmatched',[]))]
     for p,entries in groups:
@@ -134,4 +141,6 @@ def daily_index(state,*,project_id=None,department=None,actor_id=None,date_from=
             'summary':{'matched':sum(bool(r['project_id']) for r in rows),
                        'unmatched':sum(not r['project_id'] and not r['source_missing'] for r in rows),
                        'source_missing':sum(r['source_missing'] for r in rows)},
-            'last_sync':state.get('source_status',{}).get('last_sync')}
+            'last_sync':state.get('source_status',{}).get('last_sync'),
+            'coverage':{'scope':coverage_scope,'project_only':bool(project_id),
+                        'unmatched_available':coverage_scope=='workspace' and not project_id}}

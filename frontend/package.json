@@ -36,7 +36,8 @@
     "test:dev-tooling": "node --test --test-timeout=30000 test-dev-tooling.mjs",
     "test:live-read-regressions": "node test-live-read-regressions.mjs",
     "test:ops-sync": "node test-ops-sync-panel.mjs && node test-ops-flow-view.mjs",
-    "test:home-review-regressions": "node test-home-review-regressions.mjs"
+    "test:home-review-regressions": "node test-home-review-regressions.mjs",
+    "test:source-coverage-views": "node test-source-coverage-views.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",

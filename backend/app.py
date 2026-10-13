@@ -336,8 +336,10 @@ def create_app(overrides=None):
         result['approval_connection']=approval_connection(cfg,simulation_available=(mode=='demo' if mode is not None else wid.startswith('demo-')) or wid.startswith('test-'),definition_verification=verification)
         result.pop('native_definition_verification',None)
         from .case_cutover import project_execution_view
+        from .attachment_coverage import source_attachment_coverage
         for project in result['projects']:
             project.update(project_execution_view(result,project))
+            project['source_attachment_coverage']=source_attachment_coverage(project)
         return filter_private_workspace(result,user)
     def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None):
         require(bool(actor_id),'缺少操作人員身分',403)
@@ -520,8 +522,9 @@ def create_app(overrides=None):
         require(not (date_from and date_to) or date_from<=date_to,'結束日期不能早於開始日期',422)
         with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
         from .source_case_policy import filter_visible_cases
+        coverage_scope='workspace' if state.get('environment') in ('demo','test') else 'visible_cases'
         filter_visible_cases(state);filter_private_workspace(state,user)
-        return daily_index(state,project_id=project_id,department=department,actor_id=actor_id,date_from=date_from,date_to=date_to,status=status,q=q,offset=offset,limit=limit)
+        return daily_index(state,project_id=project_id,department=department,actor_id=actor_id,date_from=date_from,date_to=date_to,status=status,q=q,offset=offset,limit=limit,coverage_scope=coverage_scope)
 
     AUDIT_BATCH=100
 
