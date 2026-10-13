@@ -100,3 +100,15 @@
 The importer projection version forces backfill on the next normal refresh, even when the source snapshot is unchanged. Navigation uses it only for cases with collection readiness metadata; otherwise the prior task projection and 外業 warning remain. Partial snapshots and capped reads show explicit partial states and return `work_items_status.partial/truncated` booleans. Reads cap at 200 records and 24,000 serialized collection bytes; project SQL reads request at most 201 rows so overflow is detectable. Regression checks assert 24 queries, 165,000 raw bytes, 30,000 gzip bytes and collection size below the 10 MB workspace budget. These are local fixture checks, **not acceptance evidence**: acceptance requires replay of C115264 against the deployed application.
 
 Rollback sets workspace `source_work_items_enabled=false` or reverts the navigation reader; preserve the stored collection. Do not revert storage registration or delete cached rows as a rollback procedure. No new Lark scope, dependency, existing collection shape, amount/count display, or source writes are introduced.
+
+
+F7 reversible rollback verification (local only): load the full workspace with `storage.load`,
+record the count and sorted IDs of `source_work_items`, set the root
+`source_work_items_enabled` to `False`, and save with `storage.save` in a transaction.
+GET `/api/projects/{pid}/navigation` must use the old projection and its 外業 warning;
+reload storage and compare both count and IDs unchanged. Set the same root key to
+`True` and save again; GET navigation must restore the prior items. The HTTP regression
+`test_http_rollback_and_missing_links_preserve_rows_and_public_omission` exercises both
+transactions and checks the entire stored rows are unchanged. This does not add a flag
+setter; operational flag management remains a follow-up. Public `/api/workspace` omits
+both the root collection and its status; items are served only by project navigation.

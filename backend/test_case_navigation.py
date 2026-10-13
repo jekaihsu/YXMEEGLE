@@ -281,3 +281,68 @@ def test_visible_contract_with_hidden_confirmation_items_is_incomplete():
     assert case['contracts'][0]['unresolved'] is True
     assert case['edge_states']['work_items']=='partial: source work items incomplete'
     assert 'HIDDEN_CASE_ID' not in repr(case)
+
+
+def test_http_rollback_and_missing_links_preserve_rows_and_public_omission(tmp_path):
+    from .test_public_case_http_boundaries import isolated_http
+    from .test_source_work_items import imported
+    from .source_entities import entity_id,update_entities
+    from .app import WorkspaceRow,BusinessRow
+    from . import storage
+    app,client,_,_=isolated_http.__wrapped__(tmp_path)
+    source,records,tables,assignments=imported()
+    try:
+        def save_source():
+            with app.state.sessions.begin() as db:
+                row=db.get(WorkspaceRow,'lark-boundary');state=storage.load(db,BusinessRow,row)
+                for key in ('source_confirmations','contract_items','source_work_items'):
+                    state[key]=deepcopy(source[key])
+                    for item in state[key]:
+                        if item.get('project_id'):item['project_id']='p2'
+                state['source_work_items_status']={'p2':deepcopy(source['source_work_items_status']['p'])}
+                state['source_visible_record_ids']=[entity_id(r).replace('/','|') for r in records]
+                row.data=storage.save(db,BusinessRow,row.id,state)
+        save_source()
+        url='/api/projects/p2/navigation'
+        complete=client.get(url).json()
+        assert sum(len(c['work_items']) for c in complete['confirmations'][0]['contracts'])==12
+        with app.state.sessions() as db:
+            original=storage.load(db,BusinessRow,db.get(WorkspaceRow,'lark-boundary'))['source_work_items']
+        for enabled in (False,True):
+            with app.state.sessions.begin() as db:
+                row=db.get(WorkspaceRow,'lark-boundary');state=storage.load(db,BusinessRow,row)
+                state['source_work_items_enabled']=enabled
+                row.data=storage.save(db,BusinessRow,row.id,state)
+            response=client.get(url).json()
+            if enabled:assert response==complete
+            else:
+                assert response['confirmations'][0]['edge_states']['work_items']=='partial: 外業 work items not imported'
+                assert 'work_items_status' not in response
+            with app.state.sessions() as db:
+                stored=storage.load(db,BusinessRow,db.get(WorkspaceRow,'lark-boundary'))['source_work_items']
+                assert len(stored)==12 and [i['id'] for i in stored]==[i['id'] for i in original]
+                assert stored==original
+        item=next(r for r in records if r['kind']=='reporting')
+        item['fields']['來源合約明細（日報關聯）'][0]['record_ids']=['recNOPE']
+        update_entities(source,records,tables,assignments);save_source()
+        case=client.get(url).json()['confirmations'][0]
+        assert case['contracts'][0]['unresolved'] is True
+        assert case['edge_states']['work_items']=='partial: source work items incomplete'
+        workspace=client.get('/api/workspace')
+        assert workspace.status_code==200
+        assert 'source_work_items' not in workspace.json() and 'source_work_items_status' not in workspace.json()
+        assert 'recNOPE' not in repr(case)
+        # Hide one native item by its own admission; the visible contract stays partial.
+        source,records,tables,assignments=imported();save_source()
+        with app.state.sessions.begin() as db:
+            row=db.get(WorkspaceRow,'lark-boundary');state=storage.load(db,BusinessRow,row)
+            hidden=next(i for i in state['source_work_items'] if state['contract_items'][0]['id'] in i['contract_ids'])
+            state['source_visible_record_ids'].remove(hidden['id'].replace('/','|'))
+            row.data=storage.save(db,BusinessRow,row.id,state)
+        navigation=client.get(url)
+        case=navigation.json()['confirmations'][0]
+        assert case['contracts'][0]['work_items']==[] and case['contracts'][0]['unresolved'] is True
+        assert case['edge_states']['work_items']=='partial: source work items incomplete'
+        assert hidden['id'] not in navigation.text
+        assert 'source_work_items' not in client.get('/api/workspace').json()
+    finally:app.state.engine.dispose()
