@@ -1,4 +1,4 @@
-# YX v2 P1–P8 execution plan (2026-10-13, rev 3.1)
+# YX v2 P1–P8 execution plan (2026-10-13, rev 3.2)
 
 Owner: the single Claude commander. Parent task `task_6f78140157c0`, continued by `task_ec8184733081` (P1/P2 planning and reviews) and now by `task_67bb22a5d7b6` (P1–P8 execution). This plan does not create a second commander. Revision 3 adds the complete P3–P8 specs and issue IDs, records the C-ID architecture decisions, and replaces the old no-push/no-staging rule with the owner's serial merge, push and staging authorization (§4).
 
@@ -173,6 +173,34 @@ Settled children from earlier continuations stay recorded in `.runtime/task_ec81
 
 Their worktrees are preserved.
 
+### 4.4a Integration log (2026-10-14)
+
+| Order | Row | Reviewed SHA | Final review | yx-v2 merge | CI / push |
+|---|---|---|---|---|---|
+| 1 | C-STATE | `0ed93e7` | Codex `task_3a4624cbce68` PASS | `69f7d4a` | `local_ci` green; pushed with plan at `7870953` |
+| 2 | 127F1 Source Health view model | `2cd9a2c7aa1390c1a6d0db9e6f954cb4b9b4e69f` (2 correction rounds) | Opus `task_9968bba181e2` PASS-WITH-FINDINGS (H1/H2 low test notes) | `04e8388` | first run: 1 flaky two-process contention test (`test_ops_sync_workspace_store`, no backend diff, 5/5 isolated passes); rerun green, 3050 passed |
+| 3 | C-ID v2 | `78b495b` (Opus `1cc6f18`/`ad0bd9a` preserved, Sonnet `697593d`/`171a145`/`78b495b`) | Codex `task_e173b53f4708` PASS-WITH-FINDINGS (N1 nit; N2 inherited: `native_records` raises on malformed raw link table shapes, so a future input boundary must validate them) | `2ea1e53` | pre-push CI 3211 passed; **remote `ava-apple/yx-v2` = `2ea1e530cbdd74b1c85ea4c0824309e7751d3688`** |
+| 4 | 126F1 My Work view model | `0cbd2446ae88f6eb72ae348eebb4cde9e5c5afe3` (3 correction rounds; the third was authorized by the coordinator) | Codex `task_22a233bc69e4` PASS-WITH-FINDINGS (R1 nonblocking: no repo test pins `parent.verified===true`) | `b444931` | pushed with this plan revision |
+
+Review history, with every report under `worker-evidence/<task>/review.md`:
+- 126F1: `task_cbb71f8fae80`, `task_7d65050ebbbc` and `task_c8d663374cdb` were each CHANGES-REQUESTED; `task_22a233bc69e4` passed.
+- 127F1: `task_14e34b145b79` and `task_b8f63dad0a92` were CHANGES-REQUESTED; `task_9968bba181e2` passed.
+- C-ID: `task_442cb2c2f880` and `task_2b6bc084dbac` were CHANGES-REQUESTED; `task_e173b53f4708` passed.
+
+Commander decisions taken during review:
+- 127F1 G5: a present non-boolean stage flag fails closed.
+- 127F1 G6: the mapping label is `對應未驗證`, and mapped/accepted stay literal false/null.
+- 126F1: no derived in-progress status, and `workflow_state` is shown verbatim. The coordinator approved this.
+
+Residual nonblocking notes (H1/H2, N1/N2, R1) are carried to the F2 UI and B rows.
+
+**Next ready P1 rows (G-C1 and G-C2 reviews passed; coordinator acceptance pending):**
+- 127B1: Codex.
+- 126B1: Sonnet.
+- 127B3: Codex. It must output `receipt_missing` only, with no receipt acceptance.
+- AGY 127F2 and 126F2: presentational UI built on the integrated view models. They need G6 label copy and must handle `dataState:null`.
+- 127B2 stays blocked on G-DIAG.
+
 ### 4.5 Remaining P1 rows and owners
 
 | Row | Owner | Depends on |
@@ -193,7 +221,7 @@ Their worktrees are preserved.
 | Gate | Unblocks | Condition | State |
 |---|---|---|---|
 | G-C1 | 126F1, 127F1 | C-STATE reviewed and accepted | **Passed** (`0ed93e7`, integrated at `69f7d4a`) |
-| G-C2 | 127B1, 127B3, 126B1 | C2-V2 final SHA implements §7 D1–D8 + F6/N1–N4, Codex review passes, coordinator accepts | In progress |
+| G-C2 | 127B1, 127B3, 126B1 | C2-V2 final SHA implements §7 D1–D8 (D3 as revised) + F6/N1–N4, Codex review passes, coordinator accepts | **Review passed** (`78b495b`, Codex `task_e173b53f4708` PASS-WITH-FINDINGS); integrated at `2ea1e53`; awaiting coordinator acceptance |
 | G-RCPT | any field/edge shown as mapped/accepted | Supplied VCC-117 same-version source/schema/permission receipt per field and native edge type. Absent → `unlocated` / `receipt_missing`; no invented IDs | **Open, hard evidence gate** (no receipts in repo) |
 | G-RSCHEMA | trusting receipt content | Receipt schema, location and verifier authority defined by owner/VCC-117 | **Open, unresolved** |
 | G-TOKEN | asserting Lark token alphabet | Evidence on whether base/table/record tokens can contain `/`. Until then C-ID rejects such components (D8) | **Open, unresolved** |
