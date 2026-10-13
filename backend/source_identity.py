@@ -50,13 +50,16 @@ def resolve_edge(source_ref, edge_registry):
 
     Registry entries use ``source_key`` and ``target_source_key`` as identity
     endpoints.  Entries without an explicit independent verification status,
-    verifier, and evidence reference are ignored.  Display fields are never
-    consulted, even if they happen to match.
+    verifier, and evidence reference remain unresolved as ``edge_unverified``;
+    no exact entry is ``edge_absent``.  Display fields are never consulted,
+    even if they happen to match.
     """
     verified_targets = set()
+    exact_edge_present = False
     for edge in edge_registry or ():
         if not isinstance(edge, dict) or edge.get("source_key") != source_ref.source_key:
             continue
+        exact_edge_present = True
         if edge.get("verification_status") != "independently_verified":
             continue
         if not all(isinstance(edge.get(key), str) and edge[key].strip()
@@ -65,7 +68,9 @@ def resolve_edge(source_ref, edge_registry):
         verified_targets.add(edge["target_source_key"])
 
     if not verified_targets:
-        return unresolved_row(source_ref)
+        return unresolved_row(
+            source_ref, reason="edge_unverified" if exact_edge_present else "edge_absent"
+        )
     if len(verified_targets) != 1:
         return unresolved_row(source_ref, reason="ambiguous_verified_edges")
     return {
