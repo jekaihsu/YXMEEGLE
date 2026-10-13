@@ -581,3 +581,66 @@ def test_parent_to_child_direction_navigates_the_same_way():
 def test_graph_version_is_validated(version):
     with pytest.raises(ValueError):
         chain_graph(version=version)
+
+
+CLAIMS = ["accepted", "mapped", "resolved", "verified"]
+
+
+def _all_lookups(graph):
+    seen = []
+    for rf in (ref("tblW", "recW1"), ref("tblL", "recL1"), ref("tblC", "recC1"), ref("tblW", "recW3")):
+        seen += [v for _, _, v in parents_of(graph, rf) + children_of(graph, rf)]
+        for edge_type in graph.edge_types:
+            result = edge_targets(graph, rf, edge_type)
+            seen.append(result["verification"])
+            seen += [row["verification"] for row in result["unresolved"]]
+    return seen
+
+
+@pytest.mark.parametrize("claim", CLAIMS)
+def test_mutating_returned_graph_rows_cannot_promote_lookups(claim):
+    graph = chain_graph()
+    for container in (graph.instances, *graph.forward.values(), *graph.reverse.values()):
+        for instance in container:
+            try:
+                instance["verification"] = claim
+                instance["receipt_ref"] = f"VCC-117-{claim}"
+            except TypeError:
+                pass  # immutable rows are equally acceptable
+    assert parents_of(graph, ref("tblW", "recW1")) == (
+        ("item_contract", "base-A/tblL/recL1", "receipt_missing"),)
+    assert ("item_contract", "base-A/tblW/recW1", "receipt_missing") in children_of(graph, ref("tblL", "recL1"))
+    assert set(_all_lookups(graph)) == {"receipt_missing"}
+
+
+@pytest.mark.parametrize("claim", CLAIMS)
+def test_direct_graph_construction_cannot_inject_accepted_state(claim):
+    built = chain_graph()
+    forged = [{**row, "verification": claim, "receipt_ref": "VCC-117-free-form"} for row in built.instances]
+    graph = source_identity.NativeEdgeGraph(
+        built.edge_types, built.version, forged, built.rejected,
+        {k: tuple(dict(r, verification=claim) for r in v) for k, v in built.forward.items()},
+        {k: tuple(dict(r, verification=claim) for r in v) for k, v in built.reverse.items()})
+    assert set(_all_lookups(graph)) == {"receipt_missing"}
+    assert {row["verification"] for row in graph.instances} == {"receipt_missing"}
+    assert {row["receipt_ref"] for row in graph.instances} == {None}
+
+
+@pytest.mark.parametrize("instances", [[{"edge_type": "item_contract"}], ["x"],
+                                       [{"edge_type": "nope", "source_key": "a", "source_version_key": "a",
+                                         "navigation": "unresolved", "target_key": None}]])
+def test_direct_graph_construction_validates_instances(instances):
+    with pytest.raises((TypeError, ValueError)):
+        source_identity.NativeEdgeGraph({"item_contract": ITEM_TO_CONTRACT}, None, instances, (), {}, {})
+
+
+@pytest.mark.parametrize("component", ["base_token", "table_id", "record_id"])
+@pytest.mark.parametrize("bad", [["bad"], {"a": 1}, 5])
+def test_non_string_identity_component_is_rejected_not_hashed(component, bad):
+    rows = chain_records()
+    rows[-1] = {**rows[-1], component: bad}
+    graph = build_native_edge_graph(rows, [ITEM_TO_CONTRACT])
+    assert graph.rejected == ({"edge_type": "item_contract", "reason": "invalid_source_key",
+                               "base_token": rows[-1]["base_token"], "table_id": rows[-1]["table_id"],
+                               "record_id": rows[-1]["record_id"]},)
+    assert all(row["source_key"] != "base-A/tblW/recW3" for row in graph.instances)

@@ -212,6 +212,51 @@ class NativeEdgeGraph:
     forward: dict
     reverse: dict
 
+    def __post_init__(self):
+        """Normalise caller-built state: no supplied row or index can carry a verification label.
+
+        Rows are copied with ``verification``/``receipt_ref`` forced to the
+        unavailable-verifier state and both indexes are rebuilt from them, so
+        direct construction cannot inject an accepted state.
+        """
+        if not isinstance(self.edge_types, Mapping) or not all(
+                isinstance(k, str) and isinstance(v, EdgeType) for k, v in self.edge_types.items()):
+            raise TypeError("edge_types must map names to EdgeType declarations")
+        if not _valid_version(self.version):
+            raise ValueError("version must be an integer, a non-blank unpadded string, or None")
+        instances = tuple(self._clean(row) for row in _sequence(self.instances, "instances"))
+        for row in instances:
+            if row["edge_type"] not in self.edge_types:
+                raise ValueError(f"instance of undeclared edge type {row['edge_type']!r}")
+        forward, reverse = _index_instances(instances)
+        object.__setattr__(self, "edge_types", dict(self.edge_types))
+        object.__setattr__(self, "instances", instances)
+        object.__setattr__(self, "rejected", tuple(dict(row) for row in _sequence(self.rejected, "rejected")))
+        object.__setattr__(self, "forward", forward)
+        object.__setattr__(self, "reverse", reverse)
+
+    @staticmethod
+    def _clean(row):
+        if not isinstance(row, Mapping):
+            raise TypeError("instances must contain edge instance mappings")
+        missing = {"edge_type", "source_key", "source_version_key", "navigation", "target_key"} - set(row)
+        if missing:
+            raise ValueError(f"edge instance lacks {sorted(missing)}")
+        if row["navigation"] not in ("linked", "unresolved"):
+            raise ValueError("edge instance navigation must be linked or unresolved")
+        if row["navigation"] == "linked" and not isinstance(row["target_key"], str):
+            raise ValueError("linked edge instance needs a str target_key")
+        return {**row, "verification": RECEIPT_MISSING, "receipt_ref": None}
+
+
+def _index_instances(instances):
+    forward, reverse = {}, {}
+    for instance in instances:
+        forward.setdefault((instance["source_version_key"], instance["edge_type"]), []).append(instance)
+        if instance["target_key"] is not None:
+            reverse.setdefault((instance["target_key"], instance["edge_type"]), []).append(instance)
+    return ({k: tuple(v) for k, v in forward.items()}, {k: tuple(v) for k, v in reverse.items()})
+
 
 def _field_schemas(tables):
     schemas = {}
@@ -267,7 +312,9 @@ def build_native_edge_graph(records, edge_types, *, tables=None, version=None):
         rows.append(row)
     index = {}
     for row in rows:
-        index.setdefault((row.get("base_token"), row.get("record_id")), []).append(row)
+        base, record_id = row.get("base_token"), row.get("record_id")
+        if isinstance(base, str) and isinstance(record_id, str):
+            index.setdefault((base, record_id), []).append(row)  # others are rejected below, never hashed
 
     instances, rejected = {}, []
     for row in rows:
@@ -308,14 +355,7 @@ def build_native_edge_graph(records, edge_types, *, tables=None, version=None):
                 instance = {**common, **item}
                 instances[tuple((k, instance[k]) for k in sorted(instance))] = instance
 
-    forward, reverse = {}, {}
-    for instance in instances.values():
-        forward.setdefault((instance["source_version_key"], instance["edge_type"]), []).append(instance)
-        if instance["target_key"] is not None:
-            reverse.setdefault((instance["target_key"], instance["edge_type"]), []).append(instance)
-    return NativeEdgeGraph(declared, version, tuple(instances.values()), tuple(rejected),
-                           {k: tuple(v) for k, v in forward.items()},
-                           {k: tuple(v) for k, v in reverse.items()})
+    return NativeEdgeGraph(declared, version, tuple(instances.values()), tuple(rejected), {}, {})
 
 
 def _declared(graph, edge_type):
@@ -344,7 +384,8 @@ def edge_targets(graph, source_ref, edge_type):
     rows = graph.forward.get((source_ref.version_key, edge_type), ())
     linked = tuple(sorted({row["target_key"] for row in rows if row["navigation"] == "linked"}))
     unresolved = tuple(row for row in rows if row["navigation"] == "unresolved")
-    result["unresolved"] = unresolved
+    result["unresolved"] = tuple({**row, "verification": RECEIPT_MISSING, "receipt_ref": None}
+                                 for row in unresolved)
     if not linked:
         reason = unresolved[0]["reason"] if unresolved else "no_native_link"
         return {**result, "navigation": "unresolved", "reason": reason}
@@ -383,11 +424,11 @@ def _related(graph, ref, role):
     out = set()
     for edge_type, edge in graph.edge_types.items():
         if (role == "children") == (edge.direction == "parent_to_child"):
-            out.update((edge_type, row["target_key"], row["verification"])
+            out.update((edge_type, row["target_key"], RECEIPT_MISSING)
                        for row in graph.forward.get((ref.version_key, edge_type), ())
                        if row["navigation"] == "linked")
         else:
-            out.update((edge_type, row["source_key"], row["verification"])
+            out.update((edge_type, row["source_key"], RECEIPT_MISSING)
                        for row in graph.reverse.get((ref.source_key, edge_type), ()))
     return tuple(sorted(out))
 
