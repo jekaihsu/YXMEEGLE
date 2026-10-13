@@ -379,3 +379,25 @@ def test_filtered_zero_on_partial_or_stale_keeps_source_uncertainty():
     assert both['page_state']['states'] == ['read_failed']
     ok = build_confirmation_list(state(), q='no-match')
     assert ok['page_state'] == {'states': ['filtered_empty'], 'count': 0} and ok['totals_basis'] == 'current'
+
+
+def test_unknown_read_retained_rows_are_snapshot_never_current():
+    for source in ({}, {'status': 'unknown'}, {'status': 'unknown', 'last_success_at': '2026-10-01T00:00:00Z'}):
+        page = build_confirmation_list(state(source_status=source), limit=100)
+        assert len(page['rows']) == 6, source
+        assert {(r['source_status'], r['retention']) for r in page['rows']} == {('unknown', 'snapshot')}, source
+        assert page['totals']['matching'] is None and page['totals_basis'] == 'undetermined', source
+    healthy = build_confirmation_list(state(), limit=100)
+    assert {(r['source_status'], r['retention']) for r in healthy['rows']} == {('located', 'current')}
+
+
+def test_mutation_unknown_retention_guard():
+    import inspect
+    good = "'retention': 'current' if status == 'located' else 'snapshot',"
+    bad = "'retention': 'snapshot' if status in ('missing', 'stale') else 'current',"
+    src = inspect.getsource(cl)
+    assert good in src
+    mutant = {'__name__': 'backend.confirmation_list_mutant', '__package__': 'backend'}
+    exec(compile(src.replace(good, bad), 'mutant', 'exec'), mutant)
+    rows = mutant['build_confirmation_list'](state(source_status={}), limit=100)['rows']
+    assert {r['retention'] for r in rows} == {'current'}     # the guarded behaviour test would fail on this

@@ -239,7 +239,7 @@ def _build_rows(state, source_state):
                 else {'state': 'unknown', 'reason': 'case link unresolved'},
             'source_modified': {'state': 'unknown', 'value': None, 'reason': MODIFIED_REASON},
             'source_status': status,
-            'retention': 'snapshot' if status in ('missing', 'stale') else 'current',
+            'retention': 'current' if status == 'located' else 'snapshot',
             'case_link': {'state': 'linked' if project is not None else 'unresolved',
                           'project_id': pid, 'reason': reason, 'verification': 'receipt_missing'},
             'detail': {'source_context': {'base_token': ref.base, 'table_id': ref.table},
