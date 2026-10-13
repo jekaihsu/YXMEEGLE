@@ -152,6 +152,18 @@ for(const [reason,wording] of Object.entries(reasonCases))test(`VCC-119 per-tabl
  const data={...payload(),status:'partial',table_reasons:{work_orders:reason}};
  try{await render(React.createElement(PilotView,{data:parsePilot(data),now:Date.parse('2026-10-12T00:00:10Z')}));const text=document.body.textContent;assert.ok(text.includes(wording),text);assert.equal(text.includes('讀取失敗'),reason==='read_failed',text);assert.ok(text.includes('部分資料'));assert.ok(!text.includes('Lark 即時'))}finally{await clean()}
 });
+test('VCC-119 no_linked_records wording names the right parent per table',async()=>{
+ setup();
+ try{
+  const data=parsePilot({...payload(),status:'partial',table_states:{cases:'not_read',work_orders:'not_read',people:'not_read'},table_reasons:{work_orders:'no_linked_records',people:'no_linked_records'}});
+  await render(React.createElement(PilotView,{data,now:Date.parse('2026-10-12T00:00:10Z')}));
+  const text=document.body.textContent;
+  assert.ok(text.includes('案件目前沒有關聯的工單'),text);assert.ok(text.includes('工單目前沒有關聯的人員'),text);
+  assert.equal(text.split('案件目前沒有關聯的工單').length-1,1,text);
+  const people=[...document.querySelectorAll('section,article,div')].find(e=>e.textContent.includes('人員名單')&&e.textContent.includes('工單目前沒有關聯的人員')&&!e.textContent.includes('外業工作單'));
+  assert.ok(people&&!people.textContent.includes('案件目前沒有關聯的工單'));
+ }finally{await clean()}
+});
 test('VCC-119 old payload and unknown reason degrade to plain table state',async()=>{
  setup();
  try{assert.deepEqual(parsePilot(payload()).table_reasons,{});const data=parsePilot({...payload(),table_reasons:{work_orders:'SYN_new_reason',people:{x:1}}});assert.deepEqual(data.table_reasons,{});await render(React.createElement(PilotView,{data,now:Date.parse('2026-10-12T00:00:10Z')}));assert.ok(document.body.textContent.includes('尚未讀取'));assert.ok(!document.body.textContent.includes('SYN_new_reason'))}finally{await clean()}

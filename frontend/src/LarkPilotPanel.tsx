@@ -15,7 +15,8 @@ type FieldState=keyof typeof fieldNames;
 type Cell={state:'present';value:unknown}|{state:Exclude<FieldState,'present'>};
 type Count={requested:number;returned:number;omitted:number;has_more:boolean};
 const tableNames={present:'已讀取取樣',not_read:'尚未讀取',unmapped:'未對映',forbidden:'無法讀取',partial:'部分資料'};
-const reasonNames={no_linked_records:'案件目前沒有關聯的工單，未讀取',traversal_unavailable:'目前唯讀範圍無法依關聯讀取',access_denied:'應用尚無此資料表讀取權限（Lark 1254302）',read_failed:'此資料表讀取失敗',not_applicable:'不適用'};
+const noLinked:Record<keyof typeof groups,string>={cases:'不適用',work_orders:'案件目前沒有關聯的工單，未讀取',people:'工單目前沒有關聯的人員，未讀取'};
+const reasonNames={no_linked_records:'',traversal_unavailable:'目前唯讀範圍無法依關聯讀取',access_denied:'應用尚無此資料表讀取權限（Lark 1254302）',read_failed:'此資料表讀取失敗',not_applicable:'不適用'};
 type Row={record_id:string;fields:Record<string,Cell>};
 export type PilotData={status:State;source:Source;fetched_at:string|null;ttl_seconds:number;records:{cases:Row[];work_orders:Row[];people:Row[]};table_states:{cases:string;work_orders:string;people:string};table_reasons:Partial<Record<keyof typeof groups,keyof typeof reasonNames>>;table_fetched_at:Record<keyof typeof groups,string|null>;counts:Record<keyof typeof groups,Count|null>;code?:string};
 const object=(value:unknown):value is Record<string,unknown>=>typeof value==='object'&&value!==null&&!Array.isArray(value);
@@ -58,7 +59,7 @@ export function PilotView({data,now=Date.now()}:{data:PilotData;now?:number}){
   <p>{data.code&&errorMessages[data.code]||notices[state]}</p>
   {(Object.keys(groups) as (keyof typeof groups)[]).map(name=><div key={name}><h3>{groups[name]}</h3><p>{tableNames[data.table_states[name] as keyof typeof tableNames]} · {time(data.table_fetched_at[name])}</p>
    {!['blocked','error','unconfigured'].includes(data.status)&&data.table_states[name]==='present'&&data.counts[name]&&<p>本次取樣 {data.counts[name]!.returned} 筆{(data.counts[name]!.has_more||data.counts[name]!.omitted>0)&&` · 至少 ${Math.max(data.counts[name]!.omitted,data.counts[name]!.has_more?1:0)} 筆未納入取樣`}</p>}
-   {data.table_states[name]!=='present'?<p>{data.table_reasons[name]&&reasonNames[data.table_reasons[name]!]||tableNames[data.table_states[name] as keyof typeof tableNames]}</p>:data.records[name].length===0?<p>{state==='fresh'||state==='stale'?'本次取樣無紀錄':'本次讀取未完成'}</p>:
+   {data.table_states[name]!=='present'?<p>{data.table_reasons[name]&&(data.table_reasons[name]==='no_linked_records'?noLinked[name]:reasonNames[data.table_reasons[name]!])||tableNames[data.table_states[name] as keyof typeof tableNames]}</p>:data.records[name].length===0?<p>{state==='fresh'||state==='stale'?'本次取樣無紀錄':'本次讀取未完成'}</p>:
    <div className="lark-pilot-scroll" tabIndex={0} aria-label={`${groups[name]}試讀欄位，可左右捲動`}><table><thead><tr><th>紀錄識別</th><th>欄位識別</th><th>狀態</th><th>原始值</th></tr></thead><tbody>{data.records[name].flatMap(row=>Object.entries(row.fields).map(([id,cell])=><tr key={`${row.record_id}:${id}`}><td>{row.record_id}</td><td>{id}</td><td>{fieldNames[cell.state]}</td><td>{cell.state==='present'?show(cell.value):'—'}</td></tr>))}</tbody></table></div>}</div>)}
  </section>;
 }
