@@ -42,6 +42,8 @@ npm run test:session-epoch
 npm run test:api-response
 npm run test:perf
 npm run test:shell-mode
+npm run test:overview
+npm run test:contrast
 npm run test:case-navigation
 npm run test:search-input
 npm run test:project-disabled-reasons
