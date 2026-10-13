@@ -24,6 +24,7 @@ const cases=[
 const payload={as_of:'2026-10-06',checked_at:'2026-10-06T01:00:00Z',date_basis:'synthetic',source:{status:'ready',mapping_status:'ready',last_success_at:'2026-10-06T01:00:00Z'},
  totals:{cases:4,confirmed_cases:3,intake_records:1,workbench_cases:0,deliveries_confirmed:0,tasks_total:0,tasks_completed:0,tasks_overdue:0,pending_local_reviews:0,pending_native_reviews:0,
   source_status_counts:{已結案:1,執行中:2,待確認單:1},lifecycle_state_counts:{mapped:2,needs_verification:2},lifecycle_counts:{待核對:2,已結案:1,執行中:1},execution_status_counts:{pending:4}},
+ source_deadlines:{cases:82,tasks:652,buckets:[{key:'intake',cases:76,tasks:608},{key:'formal_executing',cases:5,tasks:40},{key:'formal_unverified',cases:1,tasks:4},{key:'other',cases:0,tasks:0}]},
  missing:{task_due_date:0,group:0,source_status:0},groups:[{group:'測試組',cases:4,tasks_total:0,tasks_completed:0,tasks_overdue:0}],cases,
  pagination:{offset:0,limit:40,total:4,has_more:false}};
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=company'});
@@ -42,6 +43,15 @@ const sourceAsOf='2026-10-07T10:02:11+08:00';
 await flush(()=>root.render(React.createElement(CompanyCockpit,{refreshVersion:0,freshness:{datasets:{sources:{as_of:sourceAsOf}}}})));
 ok(document.querySelector('.cockpit-freshness').textContent.includes('2026/10/06 09:00:00 (台北時間)'),'retained dashboard never claims a newer sources time');
 ok(['案件狀態','報價狀態','關聯'].every(h=>headers.includes(h)),'lifecycle, quote workflow and relationship are separate columns');
+const deadlines=document.querySelector('.cockpit-source-deadlines');
+ok(deadlines&&deadlines.querySelector('h2').textContent==='來源期限已過・未啟用執行','source-deadline group has its own heading');
+const dl=Object.fromEntries([...deadlines.querySelectorAll('[data-bucket]')].map(r=>[r.dataset.bucket,r.textContent]));
+ok(dl.intake.includes('待確認單')&&dl.intake.includes('608 項任務')&&dl.intake.includes('76 件案件'),'intake bucket counts: '+dl.intake);
+ok(dl.formal_executing.includes('執行中')&&dl.formal_executing.includes('40 項任務'),'formal 執行中 bucket counts separately: '+dl.formal_executing);
+ok(dl.formal_unverified.includes('待核對')&&dl.formal_unverified.includes('4 項任務'),'formal 待核對 bucket counts separately: '+dl.formal_unverified);
+ok(!dl.other,'empty remainder bucket is not shown');
+ok(!deadlines.textContent.includes('652 項任務'),'buckets are never merged into one number');
+ok(document.querySelector('.cockpit-delivery').textContent.includes('0')&&!document.querySelector('.cockpit-delivery').textContent.includes('608'),'source deadlines stay out of the workload panel');
 const rows=Object.fromEntries([...document.querySelectorAll('.cockpit-case-table tbody tr')].map(tr=>[tr.querySelector('th small').textContent.split(' · ')[0],[...tr.querySelectorAll('td')].map(td=>td.textContent)]));
 ok(rows['SYN-A'][0].startsWith('待核對')&&rows['SYN-A'][0].includes('尚未填寫案件狀態'),'blank lifecycle is review-required, not the raw 已結案');
 ok(!rows['SYN-A'][0].includes('已結案'),'raw source_status is never shown as lifecycle');
