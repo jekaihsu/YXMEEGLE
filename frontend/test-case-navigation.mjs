@@ -62,7 +62,7 @@ await render('future-partial');
 await reply({confirmations:[{id:'future',contracts:[],edge_states:{contracts:'linked',work_items:'partial: future reason',daily:'linked',files:'linked'}}]});
 assert.match(document.body.textContent,/資料可能不完整/);
 await render('empty');await reply({confirmations:[]});
-assert.match(document.body.textContent,/尚無工程確認單/);
+assert.equal(document.querySelector('[aria-label="合約明細與工作項"]'),null,'empty navigation leaves the parent contract section as the single empty message');
 await render('error');await reply({detail:'讀取失敗'},500);
 assert.match(document.querySelector('[role="alert"]').textContent,/讀取失敗/);
 const navigation=code=>({confirmations:[{id:code,code,contracts:[],edge_states:{contracts:'linked',work_items:'linked',daily:'linked',files:'linked'}}]});

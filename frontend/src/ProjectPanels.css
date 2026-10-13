@@ -14,3 +14,6 @@
 .sop-note{position:relative;padding:var(--sp-3) var(--sp-4);color:var(--label-2);font-size:var(--fs-subhead);overflow-wrap:anywhere}
 .sop-note::before{content:"";position:absolute;top:0;left:var(--sp-4);right:0;border-top:1px solid var(--sep)}
 .sop-applicability .ops-status{color:var(--accent);font-weight:600}
+
+/* Source empty states belong inline in their single section frame. */
+.workspace .project-detail .source-contract-index .empty{border:0;border-radius:0;box-shadow:none;background:none}

@@ -13,8 +13,9 @@ export function CaseNavigation({projectId}:{projectId:string}){
   return ()=>{current=false;controller.abort()};
  },[projectId]);
  const data=state.id===projectId?state.data:undefined,error=state.id===projectId?state.error:undefined;
+ if(data&&!data.confirmations.length&&!error)return null;
  return <section className="ds-section" aria-label="合約明細與工作項"><h2>合約明細與工作項</h2><div className="ds-group glass--flat" aria-live="polite">
-  {error?<p role="alert">{error}</p>:!data?<Row label="載入合約明細與工作項…"/>:!data.confirmations.length?<Row label="尚無工程確認單（來源待核對）"/>:data.confirmations.map(caseRow=><div key={caseRow.id}>
+  {error?<p role="alert">{error}</p>:!data?<Row label="載入合約明細與工作項…"/>:data.confirmations.map(caseRow=><div key={caseRow.id}>
    <Row label={<strong>{caseRow.code||'確認單案號待核對'}</strong>} value={sourceLink(caseRow.source_url,'開啟工程確認單來源')}/>
    {caseRow.edge_states.contracts!=='linked'&&<Row label="合約明細未建立關聯（來源待核對）"/>}
    {caseRow.contracts.map(contract=><div key={contract.id} className="sc-item" aria-label={`合約項次 ${contract.item_number||'待核對'}`}>
