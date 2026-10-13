@@ -73,12 +73,13 @@ def test_overview_search_owner_status_filters(tmp_path):
         assert everything(client, tab='all', q=code)[0]['facets']['all'] == 20  # facets ignore filters
 
 
-def test_overview_first_page_reads_ten_cards_only(tmp_path):
+@pytest.mark.parametrize('sort', ['due', 'created'])
+def test_overview_first_page_reads_ten_cards_only(tmp_path, sort):
     with scaled_client(tmp_path, 60, **ON) as (app, client):
         statements = []
         listener = lambda conn, cur, st, params, ctx, many: statements.append((st, params))
         event.listen(app.state.engine, 'before_cursor_execute', listener)
-        try: body = client.get('/api/projects?view=overview&limit=10').json()
+        try: body = client.get('/api/projects?view=overview&limit=10&sort=' + sort).json()
         finally: event.remove(app.state.engine, 'before_cursor_execute', listener)
         assert len(body['items']) == 10 and body['total'] == 60 and body['facets']['all'] == 60
         pages = [st for st, p in statements if 'FROM project_index' in st and 'LIMIT' in st]
