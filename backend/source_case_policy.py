@@ -242,6 +242,12 @@ def filter_visible_cases(state):
             if not related&visible:continue
             rows.append(row)
         state[key]=rows
+    contracts={r['id'] for r in state.get('contract_items',[])}
+    if 'source_work_items' in state:
+        state['source_work_items']=[r for r in state['source_work_items'] if r.get('project_id') in visible
+            and r.get('contract_ids') and set(r['contract_ids'])<=contracts
+            and r['id'].replace('/','|') in allowed_sources]
+        state['source_work_items_status']={pid:s for pid,s in state.get('source_work_items_status',{}).items() if pid in visible}
     if 'jobs' in state:
         state['jobs']=[job for job in state['jobs']
             if ((job.get('payload') or {}).get('project_id') in visible

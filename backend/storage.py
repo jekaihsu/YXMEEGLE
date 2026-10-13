@@ -7,7 +7,7 @@ All materialization happens within the caller's version-checked transaction.
 from copy import deepcopy
 from sqlalchemy import Column, String, Integer, JSON, ForeignKey, UniqueConstraint, select, delete
 
-COLLECTIONS=('users','projects','approvals','events','sop_templates','delegations','jobs','recurring','input_mappings','input_revisions','cost_allocations','daily_unmatched','daily_reviews','handover_requests','sop_requests','training_plans','capability_catalog','capability_awards','learning_standards','work_schedules','approved_leave_delegations','capability_bindings','learning_mappings','financial_requests','source_quotes','source_confirmations','contract_items')
+COLLECTIONS=('users','projects','approvals','events','sop_templates','delegations','jobs','recurring','input_mappings','input_revisions','cost_allocations','daily_unmatched','daily_reviews','handover_requests','sop_requests','training_plans','capability_catalog','capability_awards','learning_standards','work_schedules','approved_leave_delegations','capability_bindings','learning_mappings','financial_requests','source_quotes','source_confirmations','contract_items','source_work_items')
 PROJECT_CHILDREN=('files','comments','daily_reports','evidence','finance_versions','payment_batches','confirmation_issues','delivery_batches','quote_reviews')
 
 def models(base):
@@ -155,9 +155,15 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
             query=select(model.kind,model.parent_id,model.data).where(model.workspace_id==row.id,model.kind.in_(selected))
             for column,values in filters.items(): query=query.where(getattr(model,column).in_(values))
             return db.execute(query.order_by(model.ordinal))
-        top=kinds-{'projects'}
+        top=kinds-{'projects','source_work_items'}
         if top:
             for kind,parent,data in fetch(top,parent_id=('',)): result[kind].append(data)
+        if 'source_work_items' in kinds:
+            query=select(model.data).where(model.workspace_id==row.id,model.kind=='source_work_items')
+            if project_ids is not None:
+                from .source_work_items import MAX_ROWS
+                query=query.where(model.data['project_id'].as_string().in_(project_ids)).limit(MAX_ROWS+1)
+            result['source_work_items']=list(db.scalars(query.order_by(model.ordinal)))
         if 'projects' in kinds and project_ids != ():
             filters={'parent_id':('',)}
             if project_ids is not None: filters['entity_id']=project_ids

@@ -166,3 +166,5 @@ def update_entities(ws,records,complete_tables,assignments):
     for p in ws['projects']:
         p['source_entity_ids']={key:[r['id'] for r in rows.values() if r.get('project_id')==p['id'] or p['id'] in r.get('project_ids',[])]
                                 for key,rows in result.items()}
+    from .source_work_items import update_work_items
+    update_work_items(ws,records,complete_tables,assignments)
