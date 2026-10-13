@@ -33,6 +33,15 @@ for(const[name,t]of[['light',light],['dark',dark]]){
  const bg=resolve(declaration('.ds-button','background'),t),fg=resolve(declaration('.ds-button','color'),t);
  assert.ok(ratio(border,t.surface)>=3,`${name} secondary border: ${ratio(border,t.surface).toFixed(2)}`);
  assert.ok(ratio(fg,bg)>=4.5,`${name} secondary text: ${ratio(fg,bg).toFixed(2)}`);
+ const destructive='.ds-button[data-variant=destructive]';
+ const criticalBorder=resolve(declaration(destructive,'border-color'),t);
+ const criticalText=resolve(declaration(destructive,'color'),t);
+ assert.notEqual(criticalBorder,t.accent,`${name} destructive border must use the critical tone`);
+ for(const surface of ['surface','surface-2','bg']){
+  assert.ok(ratio(criticalBorder,t[surface])>=3,`${name} destructive border on ${surface}: ${ratio(criticalBorder,t[surface]).toFixed(2)}`);
+  assert.ok(ratio(criticalText,t[surface])>=4.5,`${name} destructive text on ${surface}: ${ratio(criticalText,t[surface]).toFixed(2)}`);
+ }
+ console.log(`${name} destructive boundary ${ratio(criticalBorder,t.surface).toFixed(2)}:1; text ${ratio(criticalText,bg).toFixed(2)}:1`);
  for(const tone of ['positive','warning','critical','accent']){
   const color=resolve(declaration(`.ds-badge[data-tone=${tone}]`,'color'),t);
   const r=ratio(color,t['surface-2']);assert.ok(r>=4.5,`${name} ${tone} badge: ${r.toFixed(2)}`);
