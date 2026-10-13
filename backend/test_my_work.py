@@ -9,6 +9,7 @@ import pytest
 
 from . import my_work
 from .my_work import build_my_work_input
+from .home_queues import home_queues
 from .operations import review_hash
 
 READY = {'loaded': True, 'admitted': True}
@@ -285,10 +286,12 @@ def test_f1_malformed_excluded_tasks_never_change_whole_output(bad):
 
 
 def test_f1_malformed_task_that_could_be_the_viewers_still_makes_the_page_partial():
+    # Superseded (FIX3): the viewer's own record is no longer removed; it stays as a conservative row.
     out = run(workspace(project('p', 'Visible', [task('mine'), task('broken', owner='viewer', input_task_ids=None)])))
-    assert ids(out) == ['mine'] and out['readState'] == {'states': ['partial'], 'count': None}
+    assert ids(out) == ['broken', 'mine'] and out['readState'] == {'states': ['partial'], 'count': None}
+    assert 'entry_points' not in next(r for r in out['rows'] if r['id'] == 'broken')
     unassigned = run(workspace(project('p', 'Visible', [task('broken', owner='viewer', input_task_ids=None)])))
-    assert unassigned['assignment'] == 'unknown'
+    assert unassigned['assignment'] == 'assigned' and ids(unassigned) == ['broken']
 
 
 def test_f2_hidden_case_code_is_redacted_from_all_five_holders_in_production():
@@ -333,19 +336,29 @@ def _with_other(base, **extra):
     return ws
 
 
+def _same_but_partial(polluted, baseline):
+    """FIX3: a malformed record a helper cannot evaluate may only add 'partial'; rows and toggle never change."""
+    a, b = run(polluted), run(baseline)
+    assert a['rows'] == b['rows'] and a['canSeeAwaitingConfirmation'] == b['canSeeAwaitingConfirmation']
+    if a != b:
+        assert a['readState'] == {'states': ['partial'], 'count': None} and a['assignment'] in (b['assignment'], 'unknown')
+
+
 @pytest.mark.parametrize('personal', [True, False])
 @pytest.mark.parametrize('bad', [{'ident': []}, {'ident': {}}, {'ident': None}, {'ident': ''}, {'status': []}, {'status': {}},
                                  {'owner': []}, {'status': 5}])
-def test_known_other_malformed_record_changes_nothing(personal, bad):
+def test_known_other_malformed_record_changes_no_row_or_toggle(personal, bad):
+    # Replaces the whole-output equality rule: where a helper crashes on the record the page is partial (fail closed).
     base = workspace(project('p', 'Visible', [task('mine')] if personal else []))
-    assert run(_with_other(base, **bad)) == run(base)
+    _same_but_partial(_with_other(base, **bad), base)
+    assert 'other' not in json.dumps(run(_with_other(base, **bad))['rows'])
 
 
-def test_known_other_malformed_record_in_a_second_node_and_project_changes_nothing():
+def test_known_other_malformed_record_in_a_second_node_and_project_changes_no_row():
     base = workspace(project('p', 'Visible', [task('mine')]), project('q', 'Other case', []))
     ws = deepcopy(base)
     ws['projects'][1]['nodes'][0]['tasks'] += [task([], owner='other'), task('x', owner='other', status=[])]
-    assert run(ws) == run(base)
+    _same_but_partial(ws, base)
 
 
 def test_prerequisite_on_malformed_other_record_stays_visible_and_blocked():
@@ -356,10 +369,11 @@ def test_prerequisite_on_malformed_other_record_stays_visible_and_blocked():
     missing = deepcopy(base)
     del missing['projects'][0]['nodes'][0]['tasks'][0]  # same as an unresolvable prerequisite: blocked, never satisfied
     out = run(ws)
-    assert out == run(missing)
+    assert out['rows'] == run(missing)['rows']  # superseded: the page itself is partial, not equal to the clean page
     row = out['rows'][0]
-    assert out['readState'] == 'ready' and out['assignment'] == 'assigned'
+    assert out['readState'] == {'states': ['partial'], 'count': None} and out['assignment'] == 'assigned'
     assert row['id'] == 'mine' and row['workflow_state'] == 'pending' and row['ended'] is False
+    assert [e['authorized'] for e in row['entry_points'] if e['kind'] == 'delivery'] == [False]
 
 
 def test_well_formed_prerequisite_still_authoritative():
@@ -374,6 +388,76 @@ def test_viewer_owned_malformed_record_makes_page_partial(bad):
     base = workspace(project('p', 'Visible', [task('mine')]))
     out = run(_with_other(base, owner='viewer', **bad))
     assert out['readState']['states'] == ['partial'] and out['readState']['count'] is None
+
+
+# ---- FIX3: authority only from the original records (R3 / R4) ----------------
+@pytest.mark.parametrize('env', ['test', 'production'])
+@pytest.mark.parametrize('owner', ['other', 'viewer'])
+def test_malformed_record_added_after_review_never_revives_stale_authority(env, owner):
+    ws = with_review(workspace(project('p', 'Visible', [task('mine')]), environment=env))
+    ws['projects'][0]['nodes'][0]['tasks'].append(task([], owner=owner))
+    assert home_queues(ws, ws['users'][0])['awaiting_confirmation'] == []
+    out = run(ws)
+    assert out['canSeeAwaitingConfirmation'] is False and not [r for r in out['rows'] if r.get('queue')]
+
+
+@pytest.mark.parametrize('env', ['test', 'production'])
+@pytest.mark.parametrize('owner', ['other', 'viewer'])
+def test_malformed_record_present_at_review_keeps_current_authority(env, owner):
+    ws = workspace(project('p', 'Visible', [task('mine'), task([], owner=owner)]), environment=env)
+    with_review(ws)
+    assert len(home_queues(ws, ws['users'][0])['awaiting_confirmation']) == 1
+    out = run(ws)
+    assert out['canSeeAwaitingConfirmation'] is True and len([r for r in out['rows'] if r.get('queue')]) == 1
+
+
+def test_authority_is_evaluated_on_unmutated_original_records(monkeypatch):
+    ws = with_review(workspace(project('p', 'Visible', [task('mine'), task([], owner='other')])))
+    original = ws['projects'][0]['nodes'][0]
+    seen = []
+    real = my_work.home_queues
+    monkeypatch.setattr(my_work, 'home_queues', lambda state, viewer: seen.append(state['projects'][0]['nodes'][0]) or real(state, viewer))
+    run(ws)
+    assert seen and all(node is original for node in seen)
+
+
+def test_unevaluable_project_gives_no_awaiting_rows_and_a_partial_page():
+    ws = with_review(workspace(project('p', 'Visible', [task('mine'), task('x', owner='other', status=[])])))
+    out = run(ws)
+    assert out['canSeeAwaitingConfirmation'] is False and not [r for r in out['rows'] if r.get('queue')]
+    assert out['readState'] == {'states': ['partial'], 'count': None} and ids(out) == ['mine']
+    assert 'Task x' not in json.dumps(out)
+
+
+def test_unevaluable_project_does_not_suppress_another_evaluable_project():
+    ws = workspace(project('p', 'Visible', [task('mine'), task('x', owner='other', status=[])]), project('q', 'Second', [task('t')]))
+    node = ws['projects'][1]['nodes'][0]
+    node['review_cycles'] = [{'id': 'cq', 'status': 'pending', 'mode': 'all', 'seats': {'owner': 'viewer'}, 'votes': [],
+                              'content_hash': review_hash(ws['projects'][1], node)}]
+    out = run(ws)
+    assert out['canSeeAwaitingConfirmation'] is True and [r['id'] for r in out['rows'] if r.get('queue')] == ['review:cq:owner']
+
+
+@pytest.mark.parametrize('status', [[], {}, 5])
+def test_viewer_owned_invalid_status_is_kept_as_a_conservative_row(status):
+    out = run(workspace(project('p', 'Visible', [task('own-valid-id', status=status)])))
+    assert out['readState'] == {'states': ['partial'], 'count': None} and out['assignment'] == 'assigned'
+    row, = out['rows']
+    assert row['id'] == 'own-valid-id' and row['title'] == 'Task own-valid-id' and row['parent'] == {'verified': False}
+    assert not ({'workflow_state', 'ended', 'entry_points', 'required_input', 'pending_reason'} & set(row))
+
+
+def test_viewer_owned_record_unreadable_by_the_index_is_kept_without_actions():
+    out = run(workspace(project('p', 'Visible', [task('own', input_task_ids=None)])))
+    row, = out['rows']
+    assert row['id'] == 'own' and 'entry_points' not in row and out['readState']['count'] is None
+
+
+def test_viewer_owned_sibling_with_unusable_id_never_adds_an_unverified_delivery_action():
+    ws = workspace(project('p', 'Visible', [task('mine'), task([], owner='viewer')]))
+    out = run(ws)
+    assert ids(out) == ['mine'] and out['readState'] == {'states': ['partial'], 'count': None}
+    assert [e['authorized'] for e in out['rows'][0]['entry_points'] if e['kind'] == 'delivery'] == [False]
 
 
 # ---- redaction environment default (R2) ------------------------------------
