@@ -3,6 +3,7 @@
 Legacy behaviour is reproduced by routing ``storage.load_partial`` to the full ``storage.load``.
 """
 import re
+from datetime import datetime, timezone
 
 import pytest
 
@@ -80,6 +81,10 @@ def test_owned_projection_matches_copying_projection(tmp_path, monkeypatch, path
     from . import app as app_module
     from .workspace_projection import public_copy
     with scaled_client(tmp_path, 12) as (app, client):
+        # Both requests must use the same freshness instant: age_seconds is
+        # integer-truncated and can otherwise cross a one-second boundary.
+        fixed_freshness_now = datetime.now(timezone.utc)
+        monkeypatch.setattr(app.state.live_read, 'clock', lambda: fixed_freshness_now)
         for uid in USERS:
             switch(client, uid)
             current = client.get(path)
