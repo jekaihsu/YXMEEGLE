@@ -14,6 +14,7 @@ export interface SourceHealthOptions {
  sort?: {column: SortColumn; direction: 'asc' | 'desc' | 'clear'};
 }
 export type SortColumn = 'name' | 'key' | 'last_attempt' | 'last_success' | 'source_updated';
+// Caller receipt metadata is untrusted and grants no mapping authority.
 export interface SourceReceipt {source_key: string; reference: string}
 export interface SourceInput {
  key: string;
@@ -58,18 +59,18 @@ export interface SourceRow {
  stale: boolean;
  located: boolean | null;
  readable: boolean | null;
- mapped: boolean;
+ mapped: false;
  presented: boolean | null;
- accepted: boolean;
+ accepted: false;
  mappingLabel: string;
- receiptReference: string | null;
+ receiptReference: null;
  last_attempt: Timestamp;
  last_success: Timestamp;
  source_updated: Timestamp;
  counts: {whole_table: number | null; view: number | null; loaded: number | null; excluded: number | null};
  identifiers: {base: string | null; table: string | null; view: string | null};
  cutoffRule: string | null;
- fields: {name: string | null; type: string | null; fieldId: string | null; yxMapping: string | null; mappingLabel: string}[];
+ fields: {name: string | null; type: string | null; fieldId: string | null; yxMapping: null; mappingLabel: string}[];
  retry: {handle: unknown} | null;
 }
 export interface PageHealth {
@@ -104,9 +105,17 @@ function timestamp(value: unknown): Timestamp {
  if (month < 1 || month > 12 || day < 1 || day > maxDay || hour > 23 || minute > 59 || second > 59 || !Number.isFinite(Date.parse(value))) return unknownTime();
  return {value, label: value};
 }
-function receiptReference(value: unknown, key: string): string | null {
- const receipt = record(value);
- return receipt.source_key === key ? text(receipt.reference) : null;
+function permitsSourceState(value: unknown): boolean {
+ if (value === undefined) return true;
+ const raw = record(value);
+ const parsed = parseDataState(value);
+ const states: readonly DataStateName[] = parsed.states;
+ if (raw.state === 'forbidden' || states.includes('forbidden')) return false;
+ // The parser deliberately collapses malformed input to unknown. Only the
+ // explicit valid unknown shape may expose metadata after that collapse.
+ if (states.includes('unknown')) return Array.isArray(raw.states) && raw.states.length === 1 &&
+  raw.states[0] === 'unknown' && (raw.count === undefined || raw.count === null);
+ return true;
 }
 const guidance: Record<DataStateName, string> = {
  loading: '請等待目前的讀取完成。',
@@ -114,7 +123,7 @@ const guidance: Record<DataStateName, string> = {
  filtered_empty: '請調整或清除篩選條件。',
  unlocated: '請聯絡管理員確認既有來源與對應證據。',
  forbidden: '請聯絡管理員確認既有存取權限。',
- read_failed: '請重試既有授權讀取，或聯絡管理員。',
+ read_failed: '請聯絡管理員確認既有授權讀取的失敗原因。',
  partial: '目前只顯示部分資料，請確認既有來源的讀取狀態。',
  stale: '目前資料待更新，請確認最近成功讀取時間。',
  unknown: '目前無法確認資料狀態，請聯絡管理員。',
@@ -122,12 +131,15 @@ const guidance: Record<DataStateName, string> = {
 
 function sourceRow(raw: Record<string, unknown>, key: string): SourceRow {
  const state = raw.data_state === undefined && raw.located === false ? parseDataState({states: ['unlocated']})
-  : raw.data_state === undefined && raw.health === 'healthy' ? null : parseDataState(raw.data_state);
+  : raw.data_state === undefined && raw.health === 'healthy' && raw.readable !== false && raw.presented !== false && raw.located !== false ? null : parseDataState(raw.data_state);
  const states: readonly DataStateName[] = state?.states ?? [];
- const reference = receiptReference(raw.receipt, key);
- const mapped = raw.mapped === true && reference !== null;
- const accepted = raw.accepted === true && reference !== null;
- const hasKnownCounts = !states.some(s => ['unknown', 'loading', 'unlocated', 'read_failed'].includes(s));
+ // VCC-117 evidence and verifier authority do not exist yet. No caller value
+ // can grant mapped/accepted status or expose receipt references/YX bindings.
+ const mapped = false;
+ const accepted = false;
+ // Empty-state scope counts are withheld until their consistency is verified.
+ const hasKnownCounts = !states.some(s => ['unknown', 'loading', 'unlocated', 'read_failed'].includes(s)) &&
+  !states.some(s => ['complete_empty', 'filtered_empty'].includes(s));
  return {
   key, name: text(raw.name), version: text(raw.version), dataState: state === null ? null : parseDataState({states, count: null}),
   statusLabel: state === null ? '資料正常' : states.map(s => DATA_STATE_LABELS[s]).join('・'),
@@ -135,8 +147,8 @@ function sourceRow(raw: Record<string, unknown>, key: string): SourceRow {
   partial: states.includes('partial'), stale: states.includes('stale'),
   located: flag(raw.located), readable: flag(raw.readable), mapped,
   presented: flag(raw.presented), accepted,
-  mappingLabel: reference === null ? DATA_STATE_LABELS.unlocated : mapped ? '已對應' : DATA_STATE_LABELS.unknown,
-  receiptReference: reference,
+  mappingLabel: DATA_STATE_LABELS.unlocated,
+  receiptReference: null,
   last_attempt: timestamp(raw.last_attempt), last_success: timestamp(raw.last_success), source_updated: timestamp(raw.source_updated),
   counts: {whole_table: hasKnownCounts ? count(raw.whole_table_count) : null, view: hasKnownCounts ? count(raw.view_count) : null,
    loaded: hasKnownCounts ? count(raw.loaded_count) : null, excluded: hasKnownCounts ? count(raw.excluded_count) : null},
@@ -144,10 +156,9 @@ function sourceRow(raw: Record<string, unknown>, key: string): SourceRow {
   cutoffRule: text(raw.cutoff_rule),
   fields: Array.isArray(raw.fields) ? Array.from(raw.fields, value => {
    const field = record(value);
-   const fieldReceipt = receiptReference(field.receipt, key);
-   const mapping = fieldReceipt !== null ? text(field.yx_mapping) : null;
+   const mapping = null;
    return {name: text(field.name), type: text(field.type), fieldId: text(field.field_id), yxMapping: mapping,
-    mappingLabel: fieldReceipt === null ? DATA_STATE_LABELS.unlocated : mapping !== null ? '已對應' : DATA_STATE_LABELS.unknown};
+    mappingLabel: DATA_STATE_LABELS.unlocated};
   }) : [],
   // An opaque handle is returned verbatim. The adapter must execute that same
   // authorized read; this module constructs no URL, scope or transport action.
@@ -162,10 +173,10 @@ export function buildSourceHealthView(input: unknown, options: SourceHealthOptio
   explanation: pageState.states.map(s => guidance[s]).join(' ')};
  if (options.diagnosticCapability !== true) return {page, diagnostic: null};
  const candidates = Array.isArray(raw.sources) ? Array.from(raw.sources, record) : [];
- // Drop forbidden metadata BEFORE selection, search, receipt parsing or summaries.
- // A raw forbidden marker still wins when the surrounding payload is malformed.
+ // Drop forbidden or malformed explicit states BEFORE metadata projection,
+ // selection, search or summaries. Missing state still supports adapter facts.
  const permitted = candidates.filter(source => source.authorized === true &&
-  !(Array.isArray(record(source.data_state).states) && (record(source.data_state).states as unknown[]).includes('forbidden')));
+  permitsSourceState(source.data_state));
  const keyed = permitted.filter(source => text(source.key) !== null);
  // Ambiguous duplicate keys have no stable selection/receipt identity; omit all
  // copies rather than choosing a potentially different permission scope.

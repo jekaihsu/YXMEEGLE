@@ -44,16 +44,19 @@ test('2 three independent timestamps; summary oldest relevant success or unknown
  assert.equal(view([healthy('offset', {last_success: '2026-10-03T01:00:00+08:00'}), healthy('utc', {last_success: iso(3)})]).summary.last_success.value, '2026-10-03T01:00:00+08:00');
 });
 
-test('3 distinct stages; source-bound receipts; definitions never success counts', () => {
+test('3 distinct stages; caller receipts never authoritative; definitions never success counts', () => {
  const receipt = {source_key: 'a', reference: 'synthetic-receipt'};
  const absent = view([healthy('a', {located: true, readable: false, presented: true, mapped: true, accepted: true, configured_definition_count: 37})]).rows[0];
  assert.deepEqual([absent.located, absent.readable, absent.mapped, absent.presented, absent.accepted, absent.mappingLabel], [true, false, false, true, false, '找不到資料來源']);
  assert.deepEqual(absent.counts, {whole_table: null, view: null, loaded: null, excluded: null});
+ assert.deepEqual(view([healthy('definitions-only', {configured_definition_count: 37})]).rows[0].counts,
+  {whole_table: null, view: null, loaded: null, excluded: null});
  const present = view([healthy('a', {mapped: true, accepted: true, receipt, fields: [{field_id: 'f', yx_mapping: 'binding', receipt}]})]).rows[0];
- assert.deepEqual([present.mapped, present.accepted, present.receiptReference, present.fields[0].yxMapping], [true, true, 'synthetic-receipt', 'binding']);
+ assert.deepEqual([present.mapped, present.accepted, present.receiptReference, present.fields[0].yxMapping], [false, false, null, null]);
  const wrong = view([healthy('b', {mapped: true, accepted: true, receipt, fields: [{yx_mapping: 'binding', receipt}]})]).rows[0];
  assert.deepEqual([wrong.mapped, wrong.accepted, wrong.fields[0].yxMapping, wrong.fields[0].mappingLabel], [false, false, null, '找不到資料來源']);
- assert.equal(view([healthy('a', {receipt, mapped: false, accepted: true})]).rows[0].mapped, false);
+ assert.deepEqual([present.mappingLabel, present.fields[0].mappingLabel], ['找不到資料來源', '找不到資料來源']);
+ assert.equal(view([healthy('a', {receipt, mapped: false, accepted: true})]).rows[0].accepted, false);
 });
 
 test('4 partial and stale independent and coexisting', () => {
@@ -113,20 +116,93 @@ test('8 C-STATE text labels; unknown never zero; malformed payloads fail closed'
  assert.equal(view([healthy('a', {loaded_count: -1, whole_table_count: '37', view_count: 0})]).rows[0].counts.view, 0);
 });
 
+test('F1 timestamp sorting never substitutes retrieval and keeps unknown last', () => {
+ const bothUnknown = [healthy('a', {last_attempt: iso(12)}), healthy('b', {last_attempt: iso(1)})];
+ for (const direction of ['asc', 'desc']) {
+  assert.deepEqual(keys(view(bothUnknown, {sort: {column: 'source_updated', direction}})), ['a', 'b']);
+  for (const column of ['last_attempt', 'last_success', 'source_updated']) {
+   const mixed = [healthy('a'), healthy('b', {[column]: iso(5)})];
+   assert.deepEqual(keys(view(mixed, {sort: {column, direction}})), ['b', 'a']);
+  }
+ }
+});
+
+test('F2 healthy text requires absence of every negative stage flag', () => {
+ const normal = view([healthy('a')]).rows[0];
+ assert.deepEqual([normal.statusLabel, normal.needsAttention, normal.dataState], ['資料正常', false, null]);
+ for (const stage of ['readable', 'presented', 'located']) {
+  const row = view([healthy('a', {[stage]: false})]).rows[0];
+  assert.deepEqual([row.statusLabel, row.needsAttention, row[stage]], [stage === 'located' ? '找不到資料來源' : '狀態未知', true, false]);
+ }
+});
+
+test('F3 read_failed suppresses every count rather than inventing an empty read', () => {
+ const row = view([problem('a', ['read_failed'], {whole_table_count: 9, view_count: 8, loaded_count: 5, excluded_count: 3})]).rows[0];
+ assert.deepEqual([row.statusLabel, row.counts], ['讀取失敗', {whole_table: null, view: null, loaded: null, excluded: null}]);
+});
+
+test('F4 accepted is always false even with matched caller receipts and stage flags', () => {
+ for (const mapped of [true, false, undefined]) {
+  const row = view([healthy('a', {located: true, readable: true, presented: true, mapped, accepted: true,
+   receipt: {source_key: 'a', reference: 'receipt', verified: true, version: 'V4'},
+   fields: [{field_id: 'f', yx_mapping: 'binding', receipt: {source_key: 'a', reference: 'receipt'}}]})]).rows[0];
+  assert.deepEqual([row.located, row.readable, row.presented, row.mapped, row.accepted, row.receiptReference, row.mappingLabel,
+   row.fields[0].yxMapping, row.fields[0].mappingLabel], [true, true, true, false, false, null, '找不到資料來源', null, '找不到資料來源']);
+ }
+});
+
+test('F5 empty states never present contradictory nonzero scope counts', () => {
+ for (const state of ['complete_empty', 'filtered_empty']) {
+  const row = view([problem('a', [state], {whole_table_count: 9, view_count: 8, loaded_count: 5, excluded_count: 3})]).rows[0];
+  assert.deepEqual([row.dataState.count, row.counts], [0, {whole_table: null, view: null, loaded: null, excluded: null}]);
+ }
+});
+
+test('F7 malformed and forbidden-looking states expose no metadata anywhere', () => {
+ const malformed = ['forbidden', {state: 'forbidden'}, null, {}, {states: 'forbidden'}, {states: []},
+  {states: ['partial', 'unknown']}, {states: ['partial'], count: -1}, {states: ['unknown'], count: 0},
+  {states: ['invalid']}, {states: ['stale', 'stale']}, {states: ['forbidden', 'invalid']},
+  {states: ['unknown'], state: 'forbidden'}];
+ for (const data_state of malformed) {
+  const secret = healthy('SECRET_KEY', {data_state, name: 'SECRET_NAME', last_success: iso(1), loaded_count: 991,
+   base_id: 'SECRET_ID', fields: [{field_id: 'SECRET_FIELD'}], read_authorized: true, retry_handle: 'SECRET_HANDLE'});
+  const sources = [healthy('visible', {last_success: iso(5)}), secret];
+  const result = view(sources, {selectedKey: 'SECRET_KEY'});
+  assert.deepEqual(keys(result), ['visible']);
+  assert.deepEqual([result.drawer, result.selectedKey, result.summary.last_success.value], [null, null, iso(5)]);
+  assert.doesNotMatch(JSON.stringify(result), /SECRET|991/);
+  assert.deepEqual(keys(view(sources, {search: 'SECRET'})), []);
+ }
+ assert.equal(view([problem('known-unknown', ['unknown'])]).rows[0].statusLabel, '狀態未知');
+});
+
+test('F8 ordinary read_failed guidance offers an available administrator action', () => {
+ const result = build({page_state: {states: ['read_failed']}, sources: []}, {diagnosticCapability: false});
+ assert.deepEqual(result, {page: {states: ['read_failed'], statusLabel: '讀取失敗', explanation: '請聯絡管理員確認既有授權讀取的失敗原因。'}, diagnostic: null});
+});
+
 let passed = 0;
 for (const [name, run] of tests) {
  if (process.env.SOURCE_HEALTH_TEST && !name.startsWith(process.env.SOURCE_HEALTH_TEST)) continue;
  run(); passed++; console.log(`PASS ${name}`);
 }
 
-// Actually execute two incorrect modules against these same behavioral assertions.
+// Actually execute incorrect modules against these same behavioral assertions.
 // Mutation files are temporary and never alter the checkout or install dependencies.
 if (!process.env.SOURCE_HEALTH_MODULE) {
  const {spawnSync} = await import('node:child_process');
  const source = readFileSync(new URL('./src/sourceHealthView.ts', import.meta.url), 'utf8');
  const mutations = [
+  ['unknown source update falls back to retrieval', 'const av = a[column].value, bv = b[column].value;', "const av = a[column].value ?? (column === 'source_updated' ? a.last_attempt.value : null), bv = b[column].value ?? (column === 'source_updated' ? b.last_attempt.value : null);", 'F1 '],
+  ['unknown timestamp sorts first', 'return av === null ? 1 : -1;', 'return av === null ? -1 : 1;', 'F1 '],
+  ['healthy label erased', "statusLabel: state === null ? '資料正常'", "statusLabel: state === null ? ''", 'F2 '],
+  ['failed read retains counts', "['unknown', 'loading', 'unlocated', 'read_failed']", "['unknown', 'loading', 'unlocated']", 'F3 '],
+  ['caller receipt reference echoed', 'receiptReference: null,', 'receiptReference: text(record(raw.receipt).reference),', '3 distinct'],
   ['retrieval substituted for source update', 'const column = sort.column;', "const column = sort.column === 'source_updated' ? 'last_attempt' : sort.column;", '1 attention-first'],
-  ['forbidden metadata leaked', "!(Array.isArray(record(source.data_state).states) && (record(source.data_state).states as unknown[]).includes('forbidden'))", 'true', '5 viewer split'],
+  ['caller string re-enables mapping authority', 'const mapped = false;', "const mapped = raw.mapped === true && record(raw.receipt).source_key === key && text(record(raw.receipt).reference) !== null;", '3 distinct'],
+  ['caller string re-enables acceptance', 'const accepted = false;', "const accepted = raw.accepted === true && text(record(raw.receipt).reference) !== null;", 'F4 '],
+  ['field caller string re-enables YX binding', 'const mapping = null;', 'const mapping = text(field.yx_mapping);', '3 distinct'],
+  ['forbidden metadata leaked', 'permitsSourceState(source.data_state)', 'true', '5 viewer split'],
  ];
  const dir = mkdtempSync(join(tmpdir(), 'source-health-mutations-'));
  try {
