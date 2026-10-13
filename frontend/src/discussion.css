@@ -198,3 +198,23 @@
   .project-discussion .comment{padding:var(--sp-4) 0}
   .project-discussion .comment-target{padding:var(--sp-3)}
 }
+
+/* Match the node-confirmation frame and keep the composer inline. */
+.workspace .project-detail .project-discussion{margin-top:var(--sp-6);padding:var(--sp-4);border:1px solid var(--sep);border-radius:var(--radius-l);box-shadow:none}
+.workspace .project-detail .project-discussion>.section-heading h2{font-size:var(--fs-headline);font-weight:600;letter-spacing:normal}
+.workspace .project-detail .project-discussion .comment-compose{padding:0;background:none;border:0;border-radius:0}
+.workspace .project-detail .project-discussion .comment-compose form{border:0;border-radius:0;background:none}
+.workspace .project-detail .project-discussion .comment-compose textarea{border-bottom:1px solid var(--sep)}
+@media(min-width:760px){.workspace .project-detail .project-discussion{padding:var(--sp-5)}}
+
+/* Case flow has one outer frame; its task table is a divided inner group. */
+.workspace .project-detail .node-section{border:1px solid var(--sep);border-radius:var(--radius-l);background:var(--surface);box-shadow:none}
+.workspace .project-detail .node-section-header{padding:var(--sp-4);border-bottom:1px solid var(--sep)}
+.workspace .project-detail .node-title h2{font-size:var(--fs-headline);font-weight:600}
+.workspace .project-detail .node-section>.table-scroll{border:0;border-top:1px solid var(--sep);border-radius:0;box-shadow:none}
+.workspace .project-detail .ops-review>.ds-section>.ds-group{padding:var(--sp-4);border:1px solid var(--sep);border-radius:var(--radius-l);box-shadow:none}
+.workspace .project-detail .ops-review .ds-group h3{font-size:var(--fs-headline);font-weight:600}
+@media(min-width:760px){
+ .workspace .project-detail .node-section-header,
+ .workspace .project-detail .ops-review>.ds-section>.ds-group{padding:var(--sp-5)}
+}
