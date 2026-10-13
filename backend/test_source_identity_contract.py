@@ -151,7 +151,7 @@ def test_verified_target_resolves_despite_duplicate_and_unverified_edges():
         "verified_by": "reviewer-1",
         "evidence_ref": "evidence-123",
     }
-    unverified = {**verified, "target_source_key": "other-target", "verified_by": ""}
+    unverified = {**verified, "target_source_key": "base-X/table-Y/other", "verified_by": ""}
 
     assert resolve_edge(ref, [unverified, verified, dict(verified)]) == {
         "source_key": "base-A/table-B/r1",
@@ -167,7 +167,7 @@ def test_conflicting_verified_edges_remain_unresolved():
         {"source_key": ref.source_key, "target_source_key": target,
          "verification_status": "independently_verified", "verified_by": "reviewer",
          "evidence_ref": "evidence"}
-        for target in ("target-1", "target-2")
+        for target in ("base-X/table-Y/t1", "base-X/table-Y/t2")
     ]
 
     assert resolve_edge(ref, edges) == {
@@ -176,3 +176,82 @@ def test_conflicting_verified_edges_remain_unresolved():
         "mapping_reason": "ambiguous_verified_edges",
         "target_source_key": None,
     }
+
+
+VALID_EDGE = {
+    "target_source_key": "base-X/table-Y/record-Z",
+    "verification_status": "independently_verified",
+    "verified_by": "reviewer-1",
+    "evidence_ref": "evidence-123",
+}
+
+
+@pytest.mark.parametrize("args", [
+    ("", "", "", "", "", None),
+    ("base-A/table-B/r1", "base-A", "table-B", "", "r1", True),
+    ("base-A/table-B/r1", "base-A", "table-B", "", "r1", False),
+    ("base-A/table-B/r1", "base-A", "table-B", "", "r1", 1.5),
+    ("base-A/table-B/r1", "base-A", "table-B", "", "r1", " "),
+    ("base-A/table-B/r1", "base-A", "table-B", None, "r1", None),
+    ("other/table-B/r1", "base-A", "table-B", "", "r1", None),
+    ("base-A/table-B/r1 ", "base-A", "table-B", "", "r1", None),
+    ("b/t/x/r", "b/t", "x", "", "r", None),
+    ("b/t/x/r", "b", "t/x", "", "r", None),
+    ("b/t/x/r", "b", "t", "", "x/r", None),
+    (" b/t/r", " b", "t", "", "r", None),
+    ("b/t/r ", "b", "t", "", "r ", None),
+    ("b/1/r", "b", 1, "", "r", None),
+])
+def test_direct_source_ref_construction_is_validated(args):
+    with pytest.raises(ValueError):
+        SourceRef(*args)
+
+
+@pytest.mark.parametrize("row", [
+    {"base_token": "b/t", "table_id": "x", "record_id": "r"},
+    {"base_token": "b", "table_id": "t/x", "record_id": "r"},
+    {"base_token": "b", "table_id": "t", "record_id": " r"},
+])
+def test_slash_or_padded_components_are_rejected_not_collided(row):
+    with pytest.raises(ValueError):
+        SourceRef.from_entity(row)
+
+
+@pytest.mark.parametrize("version", [True, False, 1.0, b"1", "", " 1"])
+def test_from_entity_rejects_bool_and_malformed_versions(version):
+    with pytest.raises(ValueError):
+        SourceRef.from_entity({"base_token": "b", "table_id": "t", "record_id": "r"}, version=version)
+
+
+@pytest.mark.parametrize("target", [
+    " base-X/table-Y/record-Z", "base-X/table-Y/record-Z ", "base-X/ table-Y/record-Z",
+    "guess", "base-X/table-Y", "base-X/table-Y/record-Z/extra", "base-X//record-Z", 7,
+])
+def test_padded_or_malformed_target_is_never_resolved(target):
+    ref = SourceRef.from_entity({"base_token": "base-A", "table_id": "table-B", "record_id": "r1"})
+    edge = {**VALID_EDGE, "source_key": ref.source_key, "target_source_key": target}
+
+    assert resolve_edge(ref, [edge])["mapping_reason"] == "edge_unverified"
+    assert resolve_edge(ref, [edge])["target_source_key"] is None
+
+
+def test_padded_duplicate_does_not_create_false_ambiguity():
+    ref = SourceRef.from_entity({"base_token": "base-A", "table_id": "table-B", "record_id": "r1"})
+    clean = {**VALID_EDGE, "source_key": ref.source_key}
+    padded = {**clean, "target_source_key": "base-X/table-Y/record-Z "}
+
+    result = resolve_edge(ref, [clean, padded])
+
+    assert result["mapping_status"] == "resolved"
+    assert result["target_source_key"] == "base-X/table-Y/record-Z"
+
+
+@pytest.mark.parametrize("registry", [
+    "base-A/table-B/r1", b"base-A/table-B/r1", 7, object(),
+    {"base-A/table-B/r1": {**VALID_EDGE, "source_key": "base-A/table-B/r1"}},
+])
+def test_non_sequence_registry_fails_instead_of_reporting_absent(registry):
+    ref = SourceRef.from_entity({"base_token": "base-A", "table_id": "table-B", "record_id": "r1"})
+
+    with pytest.raises(TypeError):
+        resolve_edge(ref, registry)
