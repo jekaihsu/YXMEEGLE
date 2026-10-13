@@ -33,7 +33,9 @@ before any output.  Stable business identity is only the existing
 ``project_id`` reached through the import ``assignments`` mapping.
 """
 from collections.abc import Iterable, Mapping
+from copy import deepcopy
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from .source_entities import entity_id
 from .sources import source_id
@@ -201,61 +203,160 @@ class EdgeType:
         _optional_component(self.field_id, "field_id")
 
 
+class _FrozenRow(Mapping):
+    """Read-only row holding exactly the declared ``FIELDS``; nothing else is stored or emitted.
+
+    Values are copied on the way in and out, so neither the caller's original
+    objects nor a returned value can change what the row holds.
+    """
+
+    __slots__ = ("_data",)
+    FIELDS = ()
+
+    def __init__(self, values):
+        object.__setattr__(self, "_data", MappingProxyType({k: deepcopy(values[k]) for k in self.FIELDS}))
+
+    def __setattr__(self, name, value):
+        raise AttributeError(f"{type(self).__name__} is immutable")
+
+    __delattr__ = __setattr__
+
+    def __getitem__(self, key):
+        if key not in self._data:
+            raise KeyError(key)
+        return deepcopy(self._data[key])
+
+    def __iter__(self):
+        return iter(self.FIELDS)
+
+    def __len__(self):
+        return len(self.FIELDS)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({dict(self)!r})"
+
+    def to_dict(self):
+        """A fresh plain dict of the declared fields."""
+        return {k: self[k] for k in self.FIELDS}
+
+
+class EdgeInstance(_FrozenRow):
+    """One immutable edge instance exposing only the declared instance schema.
+
+    ``verification`` and ``receipt_ref`` are not stored: they are produced from
+    ``RECEIPT_MISSING`` on every read, so no input can set or change them.
+    """
+
+    __slots__ = ()
+    STORED = ("edge_type", "source_key", "source_version_key", "navigation", "reason",
+              "target_key", "target_table_id", "target_record_id")
+    FIELDS = STORED + ("verification", "receipt_ref")
+
+    def __init__(self, values):
+        object.__setattr__(self, "_data", MappingProxyType(
+            {**{k: deepcopy(values[k]) for k in self.STORED},
+             "verification": RECEIPT_MISSING, "receipt_ref": None}))
+
+    @classmethod
+    def from_row(cls, row, version):
+        """Validate one caller row against the graph snapshot ``version``; extra fields are dropped."""
+        if not isinstance(row, Mapping):
+            raise TypeError("instances must contain edge instance mappings")
+        missing = {"edge_type", "source_key", "source_version_key", "navigation", "target_key"} - set(row)
+        if missing:
+            raise ValueError(f"edge instance lacks {sorted(missing)}")
+        navigation, target_key = row["navigation"], row["target_key"]
+        if navigation not in ("linked", "unresolved"):
+            raise ValueError("edge instance navigation must be linked or unresolved")
+        if not (isinstance(row["edge_type"], str) and row["edge_type"]):
+            raise ValueError("edge instance edge_type must be a non-empty str")
+        if not is_source_key(row["source_key"]):
+            raise ValueError("edge instance source_key must be a base/table/record key")
+        base, table, record_id = row["source_key"].split("/")
+        if row["source_version_key"] != (base, table, record_id, version):
+            raise ValueError("edge instance source_version_key must match source_key and the graph version")
+        if navigation == "linked" and not is_source_key(target_key):
+            raise ValueError("linked edge instance needs a base/table/record target_key")
+        if navigation == "unresolved" and target_key is not None:
+            raise ValueError("unresolved edge instance must have target_key None")
+        reason = row.get("reason", "native_link" if navigation == "linked" else "native_target_unresolved")
+        if not isinstance(reason, str):
+            raise ValueError("edge instance reason must be a str")
+        return cls({"edge_type": row["edge_type"], "source_key": row["source_key"],
+                    "source_version_key": row["source_version_key"], "navigation": navigation,
+                    "reason": reason, "target_key": target_key,
+                    "target_table_id": row.get("target_table_id"),
+                    "target_record_id": row.get("target_record_id")})
+
+    @property
+    def identity(self):
+        """Hashable identity; malformed diagnostics are compared by repr, never hashed raw."""
+        d = self._data
+        return tuple(repr(d[k]) if k.startswith("target_") and k != "target_key" else d[k]
+                     for k in self.STORED)
+
+
+class RejectedRow(_FrozenRow):
+    """Immutable diagnostic for a source row whose identity could not form a safe key."""
+
+    __slots__ = ()
+    FIELDS = ("edge_type", "reason", "base_token", "table_id", "record_id")
+
+    def __init__(self, values):
+        super().__init__({k: values.get(k) for k in self.FIELDS})
+
+
 @dataclass(frozen=True)
 class NativeEdgeGraph:
-    """Edge instances of one record snapshot (``version``), with both indexes."""
+    """Immutable edge instances of one record snapshot (``version``), with both indexes."""
 
-    edge_types: dict
+    edge_types: Mapping
     version: int | str | None
     instances: tuple
     rejected: tuple
-    forward: dict
-    reverse: dict
+    forward: Mapping
+    reverse: Mapping
 
     def __post_init__(self):
-        """Normalise caller-built state: no supplied row or index can carry a verification label.
+        """Validate and rebuild: rows become immutable ``EdgeInstance`` values, indexes are derived.
 
-        Rows are copied with ``verification``/``receipt_ref`` forced to the
-        unavailable-verifier state and both indexes are rebuilt from them, so
-        direct construction cannot inject an accepted state.
+        Caller-supplied ``forward``/``reverse`` are ignored.  Contradictory rows
+        (unresolved with a target, linked without a valid target, key/version
+        mismatch, undeclared edge type) raise ``ValueError``.
         """
         if not isinstance(self.edge_types, Mapping) or not all(
                 isinstance(k, str) and isinstance(v, EdgeType) for k, v in self.edge_types.items()):
             raise TypeError("edge_types must map names to EdgeType declarations")
         if not _valid_version(self.version):
             raise ValueError("version must be an integer, a non-blank unpadded string, or None")
-        instances = tuple(self._clean(row) for row in _sequence(self.instances, "instances"))
-        for row in instances:
-            if row["edge_type"] not in self.edge_types:
-                raise ValueError(f"instance of undeclared edge type {row['edge_type']!r}")
+        unique = {}
+        for row in _sequence(self.instances, "instances"):
+            instance = EdgeInstance.from_row(row, self.version)
+            if instance["edge_type"] not in self.edge_types:
+                raise ValueError(f"instance of undeclared edge type {instance['edge_type']!r}")
+            unique.setdefault(instance.identity, instance)
+        instances = tuple(unique.values())
         forward, reverse = _index_instances(instances)
-        object.__setattr__(self, "edge_types", dict(self.edge_types))
+        rejected = []
+        for row in _sequence(self.rejected, "rejected"):
+            if not isinstance(row, Mapping):
+                raise TypeError("rejected must contain row mappings")
+            rejected.append(RejectedRow(row))
+        object.__setattr__(self, "edge_types", MappingProxyType(dict(self.edge_types)))
         object.__setattr__(self, "instances", instances)
-        object.__setattr__(self, "rejected", tuple(dict(row) for row in _sequence(self.rejected, "rejected")))
+        object.__setattr__(self, "rejected", tuple(rejected))
         object.__setattr__(self, "forward", forward)
         object.__setattr__(self, "reverse", reverse)
-
-    @staticmethod
-    def _clean(row):
-        if not isinstance(row, Mapping):
-            raise TypeError("instances must contain edge instance mappings")
-        missing = {"edge_type", "source_key", "source_version_key", "navigation", "target_key"} - set(row)
-        if missing:
-            raise ValueError(f"edge instance lacks {sorted(missing)}")
-        if row["navigation"] not in ("linked", "unresolved"):
-            raise ValueError("edge instance navigation must be linked or unresolved")
-        if row["navigation"] == "linked" and not isinstance(row["target_key"], str):
-            raise ValueError("linked edge instance needs a str target_key")
-        return {**row, "verification": RECEIPT_MISSING, "receipt_ref": None}
 
 
 def _index_instances(instances):
     forward, reverse = {}, {}
     for instance in instances:
         forward.setdefault((instance["source_version_key"], instance["edge_type"]), []).append(instance)
-        if instance["target_key"] is not None:
+        if instance["navigation"] == "linked":
             reverse.setdefault((instance["target_key"], instance["edge_type"]), []).append(instance)
-    return ({k: tuple(v) for k, v in forward.items()}, {k: tuple(v) for k, v in reverse.items()})
+    return (MappingProxyType({k: tuple(v) for k, v in forward.items()}),
+            MappingProxyType({k: tuple(v) for k, v in reverse.items()}))
 
 
 def _field_schemas(tables):
@@ -316,7 +417,7 @@ def build_native_edge_graph(records, edge_types, *, tables=None, version=None):
         if isinstance(base, str) and isinstance(record_id, str):
             index.setdefault((base, record_id), []).append(row)  # others are rejected below, never hashed
 
-    instances, rejected = {}, []
+    instances, rejected = [], []
     for row in rows:
         for edge in declared.values():
             if row.get("kind") != edge.source_kind:
@@ -326,12 +427,11 @@ def build_native_edge_graph(records, edge_types, *, tables=None, version=None):
             try:
                 ref = SourceRef.from_entity(row, version=version)
             except ValueError:
-                rejected.append({"edge_type": edge.edge_type, "reason": "invalid_source_key",
-                                 **{k: row.get(k) for k in ("base_token", "table_id", "record_id")}})
+                rejected.append(RejectedRow({"edge_type": edge.edge_type, "reason": "invalid_source_key",
+                                             **{k: row.get(k) for k in ("base_token", "table_id", "record_id")}}))
                 continue
             common = {"edge_type": edge.edge_type, "source_key": ref.source_key,
-                      "source_version_key": ref.version_key, "verification": RECEIPT_MISSING,
-                      "receipt_ref": None}
+                      "source_version_key": ref.version_key}
             targets, missing, schema_reason = _native_links(row, edge, index, schemas)
             found = []
             if schema_reason:
@@ -351,11 +451,9 @@ def build_native_edge_graph(records, edge_types, *, tables=None, version=None):
                 found.append({"navigation": "unresolved", "reason": "native_target_unresolved",
                               "target_key": None, "target_table_id": item.get("table_id"),
                               "target_record_id": item.get("record_id")})
-            for item in found:
-                instance = {**common, **item}
-                instances[tuple((k, instance[k]) for k in sorted(instance))] = instance
+            instances.extend({**common, **item} for item in found)
 
-    return NativeEdgeGraph(declared, version, tuple(instances.values()), tuple(rejected), {}, {})
+    return NativeEdgeGraph(declared, version, instances, rejected, {}, {})
 
 
 def _declared(graph, edge_type):
@@ -384,8 +482,7 @@ def edge_targets(graph, source_ref, edge_type):
     rows = graph.forward.get((source_ref.version_key, edge_type), ())
     linked = tuple(sorted({row["target_key"] for row in rows if row["navigation"] == "linked"}))
     unresolved = tuple(row for row in rows if row["navigation"] == "unresolved")
-    result["unresolved"] = tuple({**row, "verification": RECEIPT_MISSING, "receipt_ref": None}
-                                 for row in unresolved)
+    result["unresolved"] = tuple(row.to_dict() for row in unresolved)
     if not linked:
         reason = unresolved[0]["reason"] if unresolved else "no_native_link"
         return {**result, "navigation": "unresolved", "reason": reason}

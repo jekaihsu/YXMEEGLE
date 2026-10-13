@@ -606,11 +606,103 @@ def test_mutating_returned_graph_rows_cannot_promote_lookups(claim):
                 instance["verification"] = claim
                 instance["receipt_ref"] = f"VCC-117-{claim}"
             except TypeError:
-                pass  # immutable rows are equally acceptable
+                pass  # immutable rows: the write raises
     assert parents_of(graph, ref("tblW", "recW1")) == (
         ("item_contract", "base-A/tblL/recL1", "receipt_missing"),)
     assert ("item_contract", "base-A/tblW/recW1", "receipt_missing") in children_of(graph, ref("tblL", "recL1"))
     assert set(_all_lookups(graph)) == {"receipt_missing"}
+    for container in (graph.instances, *graph.forward.values(), *graph.reverse.values()):
+        assert {i["verification"] for i in container} == {"receipt_missing"}
+        assert {i["receipt_ref"] for i in container} == {None}
+
+
+@pytest.mark.parametrize("field", ["verification", "receipt_ref", "mapping_status", "x"])
+def test_graph_state_is_immutable(field):
+    graph = chain_graph()
+    for action in (lambda: graph.instances[0].__setitem__(field, "accepted"),
+                   lambda: setattr(graph.instances[0], field, "accepted"),
+                   lambda: setattr(graph, "instances", ()),
+                   lambda: graph.forward.__setitem__("k", ()),
+                   lambda: graph.reverse.__setitem__("k", ()),
+                   lambda: graph.edge_types.__setitem__("k", None),
+                   lambda: graph.instances.append(1)):
+        with pytest.raises((TypeError, AttributeError)):
+            action()
+    assert field not in ("mapping_status", "x") or field not in graph.instances[0]
+
+
+@pytest.mark.parametrize("field,claim", [("mapping_status", "resolved"),
+                                         ("verification_status", "independently_verified")])
+def test_direct_rows_with_caller_fields_emit_only_declared_schema(field, claim):
+    built = chain_graph()
+    graph = source_identity.NativeEdgeGraph(
+        built.edge_types, built.version, [{**r, field: claim} for r in built.instances], (), {}, {})
+    assert all(field not in row for row in graph.instances)
+    result = edge_targets(graph, ref("tblW", "recW3"), "item_contract")
+    assert result["unresolved"] and all(field not in row for row in result["unresolved"])
+    assert {row["verification"] for row in result["unresolved"]} == {"receipt_missing"}
+
+
+def test_lookup_output_rows_are_detached_copies():
+    graph = chain_graph()
+    first = edge_targets(graph, ref("tblW", "recW3"), "item_contract")
+    first["unresolved"][0]["verification"] = "accepted"
+    first["unresolved"][0]["mapping_status"] = "resolved"
+    again = edge_targets(graph, ref("tblW", "recW3"), "item_contract")
+    assert again["unresolved"][0]["verification"] == "receipt_missing"
+    assert "mapping_status" not in again["unresolved"][0]
+
+
+@pytest.mark.parametrize("bad", [["bad"], {"a": 1}])
+@pytest.mark.parametrize("component", ["table_id", "base_token", "record_id"])
+def test_malformed_native_target_is_unresolved_and_does_not_abort_graph(component, bad):
+    rows = chain_records()
+    rows[3] = {**rows[3], component: bad}  # linked contract recL1
+    graph = build_native_edge_graph(rows, [ITEM_TO_CONTRACT])
+    result = edge_targets(graph, ref("tblW", "recW1"), "item_contract")
+    assert result["navigation"] == "unresolved"
+    assert result["unresolved"][0]["reason"] in ("invalid_target_key", "native_target_unresolved")
+    assert edge_targets(graph, ref("tblW", "recW2"), "item_contract")["target_keys"] == ("base-A/tblL/recL2",)
+    if component == "table_id":
+        assert result["unresolved"][0]["target_table_id"] == bad
+        assert edge_targets(graph, ref("tblW", "recW3"), "item_contract")["navigation"] == "unresolved"
+
+
+def _row(graph, key):
+    return next(r for r in graph.instances if r["source_key"] == key)
+
+
+@pytest.mark.parametrize("change", [
+    {"navigation": "unresolved"},                       # unresolved but keeps a target
+    {"navigation": "linked", "target_key": None},
+    {"navigation": "linked", "target_key": "not-a-key"},
+    {"navigation": "linked", "target_key": "a/b"},
+    {"navigation": "unresolved", "target_key": "base-A/tblL/recL1"},
+    {"source_key": "base-A/tblW"},
+    {"source_key": "base-A/tblW/recZZ"},                # disagrees with source_version_key
+    {"source_version_key": ("base-A", "tblW", "recW1", 9)},
+    {"source_version_key": "base-A/tblW/recW1"},
+    {"reason": 5},
+])
+def test_direct_construction_rejects_contradictory_rows(change):
+    built = chain_graph()
+    row = {**_row(built, "base-A/tblW/recW1"), **change}
+    with pytest.raises(ValueError):
+        source_identity.NativeEdgeGraph(built.edge_types, built.version, [row], (), {}, {})
+
+
+def test_reverse_index_only_from_linked_instances():
+    graph = chain_graph()
+    assert all(i["navigation"] == "linked" for rows in graph.reverse.values() for i in rows)
+    assert edge_sources(graph, ref("tblW", "recW3"), "item_contract") == ()
+
+
+def test_direct_construction_dedups_and_accepts_dict_rows_with_claims():
+    built = chain_graph()
+    rows = [{**r, "verification": "accepted"} for r in built.instances] * 2
+    graph = source_identity.NativeEdgeGraph(built.edge_types, built.version, rows, (), {}, {})
+    assert len(graph.instances) == len(built.instances)
+    assert {i["verification"] for i in graph.instances} == {"receipt_missing"}
 
 
 @pytest.mark.parametrize("claim", CLAIMS)
