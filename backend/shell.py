@@ -47,15 +47,22 @@ def home_population(db,model,row,state,user,facts,cards,as_of):
     selected=list(db.scalars(select(ti.c.project_id).where(ti.c.workspace_id==row.id,ti.c.project_id.in_(list(visible)),
         or_(ti.c.assignee_id==user['id'],ti.c.task_id.in_(sorted(facts['delegated']) or ['']))).distinct()))
     if not selected:return empty
-    loaded=storage.load_partial(db,model,row,collections=('users','delegations','approved_leave_delegations','approvals'),
-        project_ids=selected,project_children=('evidence','delivery_batches'))
-    # Task audit events explain pauses/returns. Keep them server-side and scoped
-    # to selected visible projects; only the canonical safe explanation leaves.
-    event_rows=db.scalars(select(model.data).where(model.workspace_id==row.id,model.kind=='events',
-        model.data['project_id'].as_string().in_(selected),
-        model.data['action'].as_string().in_(['task_pause_for_change','task_return'])))
-    full={**state,**{key:loaded[key] for key in ('users','delegations','approved_leave_delegations','approvals')},
-          'projects':loaded['projects'],'events':list(event_rows)}
+    loaded=storage.load_partial(db,model,row,project_ids=selected,project_children=('evidence','delivery_batches'))
+    # Batch authority collections and scoped task audit events in one read.
+    # Events never leave the server; only canonical assigned-task facts do.
+    collections=('users','delegations','approved_leave_delegations','approvals')
+    authority={key:[] for key in (*collections,'events')}
+    if row.data.get('storage_schema')==2:
+        scoped_events=and_(model.kind=='events',model.data['project_id'].as_string().in_(selected),
+                          model.data['action'].as_string().in_(['task_pause_for_change','task_return']))
+        records=db.execute(select(model.kind,model.data).where(model.workspace_id==row.id,
+            or_(and_(model.kind.in_(collections),model.parent_id==''),scoped_events)).order_by(model.ordinal))
+        for kind,data in records:authority[kind].append(data)
+    else:
+        authority.update({key:row.data.get(key,[]) for key in collections})
+        authority['events']=[event for event in row.data.get('events',[]) if event.get('project_id') in selected
+                             and event.get('action') in ('task_pause_for_change','task_return')]
+    full={**state,**authority,'projects':loaded['projects']}
     actor=next((person for person in full['users'] if person.get('id')==user['id'] and person.get('active',True)),None)
     active=overdue=due_today=0; attention=[]; waiting=[]; waiting_counts={}; per_kind={}
     for p in loaded['projects']:
@@ -72,16 +79,22 @@ def home_population(db,model,row,state,user,facts,cards,as_of):
                     if due==as_of[:10]:due_today+=1
                     if due and due<=as_of[:10]:attention.append(dict(task_id=t['id'],project_id=p['id'],node_id=n['id'],node_key=n.get('key') or '',
                         node_name=n.get('name') or '',assignee_id=t.get('owner_id') or '',status=t['status'],due_date=t.get('due_date') or '',
-                        project_code=p['code'],project_name=p.get('name') or '',title=t.get('title') or '',detail=detail))
+                        project_code=p['code'],project_name=p.get('name') or '',title=t.get('title') or '',detail=preview_facts(detail)))
                 kind=detail['kind']
                 if kind:
                     waiting_counts[kind]=waiting_counts.get(kind,0)+1
                     if per_kind.get(kind,0)<5:
                         per_kind[kind]=per_kind.get(kind,0)+1
                         waiting.append(dict(task_id=t['id'],project_id=p['id'],project_code=p['code'],node_id=n['id'],title=t.get('title') or '未命名任務',
-                            kind=kind,reason=detail['reason'],original_due_date=t.get('original_due_date'),due_date=t.get('due_date'),detail=detail))
+                            kind=kind,reason=detail['reason'],detail=preview_facts(detail)))
     attention.sort(key=lambda t:0 if t['due_date'][:10]<as_of[:10] else 1)
     return dict(active=active,overdue=overdue,due_today=due_today,attention=attention[:ATTENTION_LIMIT],waiting=waiting,waiting_counts=waiting_counts)
+
+
+def preview_facts(detail):
+    """Identity/title live once in the preview row; null optional facts are absent."""
+    return {key:value for key,value in detail.items() if key not in
+            ('task_id','project_id','project_code','node_id','title') and value is not None}
 
 
 def open_late(ti,today):
@@ -139,7 +152,7 @@ def build(db,model,row,state,user,facts,today,approval_connection):
                 calendar=state.get('calendar'),source_status=state.get('source_status'),file_categories=categories(state),approval_connection=approval_connection,
                 counts=dict(approvals_pending=pending,daily_unmatched=counters.get('daily_unmatched',0),my_overdue_tasks=home['overdue'],my_active_tasks=home['active'],
                             active_tasks=int(allc[0]),overdue_tasks=home['overdue'],due_today_tasks=home['due_today']),
-                projects=cards,attention=home['attention'],home_waiting=home['waiting'],home_waiting_counts=home['waiting_counts'],pending_approvals=pending_items,approvals=[],events=[])
+                projects=[{k:v for k,v in card.items() if k!='execution_status'} for card in cards],attention=home['attention'],home_waiting=home['waiting'],home_waiting_counts=home['waiting_counts'],pending_approvals=pending_items,approvals=[],events=[])
 
 
 TABS=('all','formal','intake','active','overdue','completed')

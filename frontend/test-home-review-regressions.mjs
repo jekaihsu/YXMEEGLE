@@ -39,6 +39,19 @@ const generated=spawnSync(python,['-c',py],{cwd:'..',encoding:'utf8',maxBuffer:1
 assert.equal(generated.status,0,generated.stderr||generated.error?.message);
 const {full,shell,viewer}=JSON.parse(generated.stdout);
 assert.equal(full.as_of,shell.as_of,'API payloads measure the same data date');
+assert.ok(shell.projects.every(p=>!Object.hasOwn(p,'execution_status')),'compact shell cards omit duplicate execution status');
+assert.ok(shell.projects.some(p=>p.status==='paused'),'status keeps the effective execution state for shell cards');
+for(const row of [...shell.attention,...shell.home_waiting])if(row.detail){
+ for(const key of ['task_id','project_id','project_code','node_id','title'])assert.ok(!Object.hasOwn(row.detail,key),`compact shell facts omit repeated ${key}`);
+ assert.ok(Object.hasOwn(row.detail,'risk')&&Object.hasOwn(row.detail,'blockers'),'compact shell retains readiness and risk facts');
+ for(const key of ['kind','reason','proxy','pause','correction'])if(Object.hasOwn(row.detail,key))assert.notEqual(row.detail[key],null,`compact shell omits null ${key}`);
+}
+
+for(const row of shell.home_waiting){
+ assert.ok(!Object.hasOwn(row,'due_date')&&!Object.hasOwn(row,'original_due_date'),'compact waiting row stores dates in risk only');
+ const fullTask=full.projects.flatMap(p=>p.nodes.flatMap(n=>n.tasks)).find(t=>t.id===row.task_id);
+ assert.deepEqual(row.detail.risk,fullTask.home_detail.risk,'compact waiting risk keeps every original/current/estimated date');
+}
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=dashboard'});
 for(const key of ['window','document','location','history','sessionStorage','localStorage','Event'])globalThis[key]=dom.window[key];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;

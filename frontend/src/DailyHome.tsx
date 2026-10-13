@@ -1,12 +1,12 @@
 import {useState, type ReactNode} from 'react';
 import {ArrowRight, CalendarDays, ChevronRight, CircleCheck, Clock3, GitBranch} from 'lucide-react';
-import {type HomeQueueItem,type HomeTaskDetail,type HomeWaitingItem,type Project} from './types';
+import {type HomeQueueItem,type HomeTaskFacts,type HomeWaitingItem,type Project} from './types';
 import {Ctx,TaskRow,active,operationallyBlocked,isTaskActor,taskReadiness,openGuidedTask,allTasks,isLate,date,openTask,nameOf,elapsed,NODE_NAMES,STATUS,progress,Empty,unmatchedDaily,num,EventList,FullWorkspaceGate} from './appCommon';
 import {Badge,Button,Page,Progress,Row} from './design';
 import {isHomeAssigned,isHomeProxy,isHomeExecutable,isHomeLate,isHomeDueToday} from './executableTasks';
 import './DailyHome.css';
 
-type Item={key:string;title:string;detail:string;facts?:HomeTaskDetail|null;late?:number;today?:boolean;blocked?:boolean;icon:ReactNode;onClick:()=>void};
+type Item={key:string;title:string;detail:string;facts?:HomeTaskFacts|null;late?:number;today?:boolean;blocked?:boolean;icon:ReactNode;onClick:()=>void};
 
 const uniqueRows=(rows:TaskRow[])=>{const seen=new Set<string>();return rows.filter(r=>{if(seen.has(r.t.id))return false;seen.add(r.t.id);return true})};
 
@@ -46,7 +46,7 @@ const waitingReason=(r:TaskRow,c:Ctx,kind:WaitingKind)=>{
  if(kind==='upcoming')return r.t.start_date&&futureStart(r,c.w.as_of)?`排定 ${date(r.t.start_date)} 開始`:`預計 ${date(r.t.due_date)} 到期`;
  return taskExecutionReason(r,c)||(r.t.can_execute!==true?'指派與執行資格待核對':taskReadiness(r,c)||'待前置條件完成');
 };
-function HomeFacts({detail}:{detail:HomeTaskDetail}){
+function HomeFacts({detail}:{detail:HomeTaskFacts}){
  const facts:string[]=[];
  if(detail.proxy){const p=detail.proxy;facts.push(`代理 ${p.principal_name}（${p.start_date} 至 ${p.end_date}；${p.basis||p.source||'依據待核對'}）`)}
  for(const reason of detail.blockers||[])if(reason!==detail.reason)facts.push(`作業條件：${reason}`);

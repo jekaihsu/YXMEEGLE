@@ -199,3 +199,30 @@ def test_index_endpoints_budget(tmp_path):
         raw, wire = len(shell.content), int(shell.headers['content-length'])
         print(f'shell: {stats["queries"]} queries, {raw} raw, {wire} gzip, {shell.headers["server-timing"]}')
         assert 0 < stats['queries'] <= INDEXED_SHELL_MAX[0] and raw <= INDEXED_SHELL_MAX[1] and wire <= INDEXED_SHELL_MAX[2]
+
+
+@pytest.mark.perf
+@pytest.mark.skipif(os.environ.get('YX_RUN_PERF') != '1', reason='set YX_RUN_PERF=1 to run company-scale perf checks')
+def test_indexed_shell_assigned_member_budget(tmp_path):
+    """The indexed shell budget must also hold for members with owned, ready tasks."""
+    from .test_shell import ON, switch
+    from .test_shell_dashboard_equivalence import half_enabled
+
+    measured = []
+    with scaled_client(tmp_path, 319, mutate=half_enabled, **ON) as (app, client):
+        for uid in ('ou_017', 'ou_020'):
+            switch(client, uid)
+            for encoding in ('identity', 'gzip'):
+                with count_queries(app.state.engine) as stats:
+                    response = client.get('/api/workspace?scope=shell',
+                                          headers={'Accept-Encoding': encoding})
+                assert response.status_code == 200
+                assert response.json()['counts']['my_active_tasks'] > 0
+                raw_bytes = len(response.content)
+                wire_bytes = int(response.headers['content-length'])
+                print(f'assigned shell {uid} {encoding}: {stats["queries"]} queries, '
+                      f'{raw_bytes} raw, {wire_bytes} wire bytes')
+                measured.append((uid, encoding, stats['queries'], raw_bytes, wire_bytes))
+    assert all(0 < queries <= INDEXED_SHELL_MAX[0] and raw <= INDEXED_SHELL_MAX[1]
+               and (encoding != 'gzip' or wire <= INDEXED_SHELL_MAX[2])
+               for uid, encoding, queries, raw, wire in measured), measured

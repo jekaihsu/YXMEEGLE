@@ -40,7 +40,12 @@ def test_overview_pages_equal_shell_cards_for_every_tab_and_sort(tmp_path):
                     assert first['facets'] == {'all': 30, 'formal': sum(p['case_type'] != 'intake' for p in cards.values()),
                                                'intake': sum(p['case_type'] == 'intake' for p in cards.values())}
                     assert len(items) == first['total'] == len({i['id'] for i in items})
-                    for item in items: assert item == cards[item['id']], (tab, sort)
+                    for item in items:
+                        # Shell omits the duplicate execution status; preserve
+                        # semantic parity while comparing every other field.
+                        card = cards[item['id']]
+                        assert item['execution_status'] == card['status']
+                        assert {key:value for key,value in item.items() if key!='execution_status'} == card, (tab, sort)
                     if sort == 'due':
                         keys = [(i['due_date'] or '9999', i['id']) for i in items]
                         assert keys == sorted(keys, reverse=direction == 'desc')
