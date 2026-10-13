@@ -340,6 +340,8 @@ def create_app(overrides=None):
         for project in result['projects']:
             project.update(project_execution_view(result,project))
             project['source_attachment_coverage']=source_attachment_coverage(project)
+        result.pop('source_work_items',None)
+        result.pop('source_work_items_status',None)
         return filter_private_workspace(result,user)
     def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None):
         require(bool(actor_id),'缺少操作人員身分',403)
