@@ -42,6 +42,11 @@ def etag(wid,user,version,today,users):
     return 'W/"shell-'+hashlib.sha256(key.encode()).hexdigest()[:32]+'"'
 
 
+def home_executable(ti,pi,owned):
+    """The one Home rule (mirrored by frontend/src/executableTasks.ts): open, assigned to the viewer, and the case is not paused for execution."""
+    return and_(ti.c.status.notin_(CLOSED),owned,pi.c.execution_status!='paused')
+
+
 def open_late(ti,today):
     openq=ti.c.status.notin_(CLOSED)
     return openq,and_(openq,ti.c.due_date!='',ti.c.due_date<today)
@@ -91,11 +96,13 @@ def build(db,model,row,state,user,facts,today,approval_connection):
     today_q=and_(openq,func.substr(ti.c.due_date,1,10)==as_of[:10])
     # Legacy Dashboard: every open task of every visible case (not only the user's own); the 'my' numbers stay the nav badge.
     owned=mine(ti,user,facts); one=lambda cond:func.coalesce(func.sum(case((cond,1),else_=0)),0)
-    allc=db.execute(select(one(openq),one(late),one(today_q),one(and_(openq,owned)),one(and_(late,owned))).select_from(joined).where(ti.c.workspace_id==wid,*vis)).one()
+    # Home overdue / due-today / attention use the shared executable rule; the active total still spans every open task.
+    home=home_executable(ti,pi,owned)
+    allc=db.execute(select(one(openq),one(and_(late,home)),one(and_(today_q,home)),one(and_(openq,owned)),one(and_(late,home))).select_from(joined).where(ti.c.workspace_id==wid,*vis)).one()
     my_active,my_late=allc[3],allc[4]
     # [...overdue, ...dueToday] in workspace order: project, node, task ordinal
     attention=[dict(r._mapping) for r in db.execute(select(ti.c.task_id,ti.c.project_id,ti.c.node_id,ti.c.node_key,ti.c.node_name,ti.c.assignee_id,ti.c.status,ti.c.due_date,pi.c.code.label('project_code'),pi.c.name.label('project_name'))
-        .select_from(joined).where(ti.c.workspace_id==wid,or_(late,today_q),*vis)
+        .select_from(joined).where(ti.c.workspace_id==wid,home,or_(late,today_q),*vis)
         .order_by(case((late,0),else_=1),pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))]
     if attention:
         titles={r.entity_id:(r.data or {}).get('title') for r in db.execute(select(model.entity_id,model.data).where(model.workspace_id==wid,model.kind=='tasks',model.entity_id.in_([a['task_id'] for a in attention])))}

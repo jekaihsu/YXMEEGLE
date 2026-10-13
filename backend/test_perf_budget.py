@@ -39,7 +39,7 @@ def count_queries(engine):
 
 
 @contextmanager
-def scaled_client(tmp_path, n_projects, upgraded=False, **extra):
+def scaled_client(tmp_path, n_projects, upgraded=False, mutate=None, **extra):
     app = create_app({**{
         'DATABASE_URL': f'sqlite:///{tmp_path}/perf.db',
         'UPLOAD_DIR': str(tmp_path / 'uploads'),
@@ -55,6 +55,7 @@ def scaled_client(tmp_path, n_projects, upgraded=False, **extra):
             with app.state.sessions.begin() as db:
                 row = db.get(WorkspaceRow, wid)
                 state = build_scaled_workspace(n_projects)
+                if mutate: mutate(state)
                 if upgraded:  # what persist_mutation saves; lets index summaries be computed
                     from .policy import upgrade
                     upgrade(state)
