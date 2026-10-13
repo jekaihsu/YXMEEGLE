@@ -17,3 +17,5 @@
 
 /* Source empty states belong inline in their single section frame. */
 .workspace .project-detail .source-contract-index .empty{border:0;border-radius:0;box-shadow:none;background:none}
+.workspace .project-detail .source-contract-index{padding:0;border:0;border-radius:0;background:none;margin:0 0 var(--sp-6)}
+.workspace .project-detail .source-contract-index>.ds-group{border:0;border-radius:0;box-shadow:none;border-top:1px solid var(--sep)}
