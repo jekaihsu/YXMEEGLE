@@ -9,7 +9,7 @@ import pytest
 
 from . import my_work
 from .my_work import build_my_work_input
-from .home_queues import home_queues
+from .home_queues import CLOSED_TASKS, home_queues
 from .operations import review_hash
 
 READY = {'loaded': True, 'admitted': True}
@@ -485,3 +485,82 @@ def test_visible_demo_project_default_stays_unredacted_and_explicit_environments
     for env, leaks in (('test', True), ('demo', True), ('production', False)):
         ws = _secret(env); ws['projects'][1]['source_kind'] = 'demo'
         assert ('C-RESTRICTED' in json.dumps(run(ws))) is leaks
+
+
+# ---- FIX4: per-node fail-closed, closed status, unknown outcome, assignment without identity -------
+@pytest.mark.parametrize('placement', ['first', 'last'])
+def test_bad_sibling_node_does_not_suppress_authorized_good_node(placement):
+    ws = with_review(workspace(project('p', 'Visible', [task('mine')])))
+    p = ws['projects'][0]
+    good = p['nodes'][0]
+    good['id'] = 'good-node'
+    good['review_cycles'][0]['content_hash'] = review_hash(p, good)
+    bad = deepcopy(good)
+    bad.update(id='bad-node', tasks=[task('SECRET-ID', owner='other', status=[])], review_cycles=[])
+    p['nodes'] = [bad, good] if placement == 'first' else [good, bad]
+    expected = home_queues(dict(ws, projects=[dict(p, nodes=[good])]), ws['users'][0])['awaiting_confirmation']
+    assert [x['id'] for x in expected] == ['review:cy:owner']
+    out = run(ws)
+    assert 'SECRET-ID' not in json.dumps(out)
+    assert [r['id'] for r in out['rows'] if r.get('queue')] == ['review:cy:owner']
+    assert out['canSeeAwaitingConfirmation'] is True
+    assert out['readState'] == {'states': ['partial'], 'count': None}
+
+
+def test_bad_task_in_the_review_node_itself_only_loses_that_node():
+    ws = with_review(workspace(project('p', 'Visible', [task('mine'), task('SECRET-ID', owner='other', status=[])])))
+    out = run(ws)
+    assert not [r for r in out['rows'] if r.get('queue')]
+    assert out['canSeeAwaitingConfirmation'] is False and out['readState']['count'] is None
+    assert 'SECRET-ID' not in json.dumps(out)
+
+
+def test_handover_acceptance_survives_unrelated_bad_task():
+    ws = workspace(project('p', 'Visible', [task('SECRET-ID', owner='other', status=[])]))
+    ws['handover_requests'] = [{'id': 'accept-me', 'project_id': 'p', 'status': 'awaiting_acceptance',
+                                'to_id': 'viewer', 'from_id': 'other'}]
+    out = run(ws)
+    assert [r['id'] for r in out['rows'] if r.get('queue')] == ['handover:accept-me']
+    assert out['canSeeAwaitingConfirmation'] is True
+    assert out['readState'] == {'states': ['partial'], 'count': None}
+    assert 'SECRET-ID' not in json.dumps(out)
+
+
+def test_awaiting_evaluation_never_mutates_the_workspace():
+    ws = with_review(workspace(project('p', 'Visible', [task('mine')])))
+    before = deepcopy(ws)
+    run(ws)
+    assert ws == before
+
+
+@pytest.mark.parametrize('status', sorted(CLOSED_TASKS))
+def test_explicitly_closed_task_never_reenters_table_on_projection_failure(status):
+    out = run(workspace(project('p', 'Visible', [task('closed', status=status, input_task_ids=None)])))
+    assert out['rows'] == []
+    assert out['assignment'] == 'assigned'
+
+
+def test_unknown_operation_result_survives_conservative_personal_row():
+    ws = workspace(project('p', 'Visible', [task('own', status=[])]))
+    ws['jobs'] = [{'id': 'job', 'kind': 'mention', 'status': 'outcome_unknown', 'payload': {'task_id': 'own'}}]
+    out = run(ws)
+    assert out['rows'][0]['id'] == 'own'
+    assert out['rows'][0].get('operation_outcome') == 'unknown'
+
+
+def test_unknown_operation_result_survives_projection_failure_row():
+    ws = workspace(project('p', 'Visible', [task('own', input_task_ids=None)]))
+    ws['jobs'] = [{'id': 'job', 'kind': 'mention', 'status': 'outcome_unknown', 'payload': {'task_id': 'own'}}]
+    assert [r.get('operation_outcome') for r in run(ws)['rows']] == ['unknown']
+
+
+@pytest.mark.parametrize('ident', [None, '', [], {}])
+def test_known_viewer_assignment_survives_missing_task_identity(ident):
+    out = run(workspace(project('p', 'Visible', [task(ident)])))
+    assert out['rows'] == [] and out['readState'] == {'states': ['partial'], 'count': None}
+    assert out['assignment'] == 'assigned'
+
+
+def test_missing_identity_of_other_owner_task_asserts_no_assignment():
+    out = run(workspace(project('p', 'Visible', [task(None, owner='other')])))
+    assert out['rows'] == [] and out['assignment'] != 'assigned'

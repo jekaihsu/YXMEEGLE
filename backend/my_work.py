@@ -19,8 +19,8 @@ response redactor (plan built from the pre-filter workspace, exactly as backend/
 except in the test/demo environments. The redactor's residual limits remain VCC-125.
 
 Authority boundary: assignment, review hashes, cycle hashes, seats, ``can_vote`` and handover targets are only
-ever evaluated by the existing helpers on the original visible records, never on a mutated copy. A project the
-queue cannot evaluate yields no awaiting row (and no toggle) and a partial page; a copy with malformed records
+ever evaluated by the existing helpers on the original visible records, never on a mutated copy. A node or section
+the queue cannot evaluate yields no awaiting row for it and a partial page, while evaluable siblings keep their result; a copy with malformed records
 dropped is used solely to index prerequisites, and then no delivery action is offered. A viewer-owned record is
 never removed: it stays as a conservative row (literal id/title, no unsupported field, no action).
 
@@ -111,26 +111,45 @@ def _index_copy(state):
 
 
 def _awaiting(state, viewer):
-    """Awaiting confirmations from the existing queue, evaluated per project on the original records.
+    """Awaiting confirmations from the existing queue, evaluated per node / section on the original records.
 
-    A project the queue cannot evaluate (malformed data) contributes nothing and makes the page partial: no
-    awaiting row, and therefore no toggle, is derived from it.
+    ``home_queues`` is called on views that only restrict which whole original nodes (and project-level sections)
+    it sees; no node's task list is ever altered, so each evaluable node keeps exactly its canonical review hash,
+    seats and ``can_vote`` result. A node or section the queue cannot evaluate contributes nothing and makes the
+    page partial, without touching any evaluable sibling: node reviews come from a one-node view, delivery
+    reviews from the whole-project view (they depend on every node), handover acceptance from a node-less view.
     """
     items, partial = [], False
+
+    def collect(view_project, kinds, **overrides):
+        try:
+            queue = home_queues(dict(state, projects=[view_project], **overrides), viewer).get('awaiting_confirmation', [])
+        except Exception:
+            return None
+        return [item for item in queue if item.get('kind') in kinds]
+
     for project in state.get('projects', []):
         if not isinstance(project, dict) or not _text(project.get('id')) or not isinstance(project.get('nodes'), list):
             partial = True; continue
-        try:
-            items += home_queues(dict(state, projects=[project]), viewer).get('awaiting_confirmation', [])
-        except Exception:
-            partial = True
+        for node in project['nodes']:
+            if not isinstance(node, dict): partial = True; continue
+            got = collect(dict(project, nodes=[node], delivery_batches=[]), ('node_review',), handover_requests=[])
+            if got is None: partial = True
+            else: items += got
+        got = collect(project, ('delivery_review',), handover_requests=[])
+        if got is None: partial = True
+        else: items += got
+        got = collect(dict(project, nodes=[], delivery_batches=[]), ('handover_acceptance',))
+        if got is None: partial = True
+        else: items += got
     return sorted(items, key=lambda item: (item['project_id'], item.get('node_id', ''), item.get('task_id', ''), item['id'])), partial
 
 
-def _conservative_row(task, status):
+def _conservative_row(task, status, unknown_outcome):
     """A viewer-owned record that cannot be fully read: known literal id and title only, no action."""
     row = {'id': task['id'], 'title': _text(task.get('title')), 'parent': {'verified': False}}
     if isinstance(status, str): row['workflow_state'] = _text(status)
+    if task['id'] in unknown_outcome: row['operation_outcome'] = 'unknown'
     return {k: v for k, v in row.items() if v is not None}
 
 
@@ -180,11 +199,13 @@ def build_my_work_input(ws, viewer, read=None):
                     except (KeyError, TypeError, ValueError, AttributeError):
                         partial = True; continue  # delegation data unreadable: it may be the viewer's
                     if not mine: continue
-                if not _text(task.get('id')): partial = True; continue  # no literal id to show
+                ever_assigned = True  # established owner/delegation fact, independent of identity or display data
+                if not _text(task.get('id')): partial = True; continue  # no literal id to show: no row, no invented id
                 status = task.get('status')
+                if isinstance(status, str) and status in CLOSED_TASKS: continue  # known terminal status, whatever else fails
                 if not (status is None or isinstance(status, str)):
-                    partial = True; ever_assigned = True  # unsupported status: keep the record, assert nothing
-                    rows.append(_conservative_row(task, status)); continue
+                    partial = True  # unsupported status: keep the record, assert nothing
+                    rows.append(_conservative_row(task, status, unknown_outcome)); continue
                 degraded = False
                 try:
                     home = build_home_task(state, project, node, task, viewer, as_of)
@@ -199,11 +220,8 @@ def build_my_work_input(ws, viewer, read=None):
                         itask = next(t for t in inode['tasks'] if t is task)
                         home = build_home_task(index, ip, inode, itask, viewer, as_of)
                     except (StopIteration, KeyError, TypeError, ValueError, AttributeError):
-                        ever_assigned = True
-                        rows.append(_conservative_row(task, status)); continue
+                        rows.append(_conservative_row(task, status, unknown_outcome)); continue
                 if not home['assigned']: continue  # another person's task: no id, title or count
-                ever_assigned = True
-                if status in CLOSED_TASKS: continue
                 verified = _parent_verified(state, project, node, task)
                 row = {'id': task['id'], 'title': _text(task.get('title')), 'workflow_state': _text(status),
                        'effective_due': _effective_due(task), 'parent': {'verified': verified}}
