@@ -36,6 +36,9 @@ assert.match(document.body.textContent,/尚無文件（來源未建立關聯）/
 assert.equal(document.querySelectorAll('a').length,2);
 assert.equal(document.querySelector('a').href,'https://example.test/source');
 assert.ok(!/金額|日報數|文件數/.test(document.body.textContent));
+await render('missing-id');
+await reply({confirmations:[{id:'missing',contracts:[{item_number:'1',title:'Missing id',unresolved:false,work_items:[]}],edge_states:{contracts:'linked',work_items:'linked',daily:'linked',files:'linked'}}]});
+assert.equal(document.querySelector('[aria-label="合約項次 1"]').textContent,'項次 1 · Missing id工作項尚未建立關聯（來源待核對）');
 await render('empty-links');
 await reply({confirmations:[{id:'empty',contracts:[],edge_states:{contracts:'unlinked/unknown',work_items:'partial',daily:'unlinked/unknown',files:'unlinked/unknown'}}]});
 assert.match(document.body.textContent,/合約明細未建立關聯（來源待核對）/);
@@ -65,4 +68,4 @@ await act(async()=>root.unmount());
 await reply(navigation('Unmount stale'),200,pending);
 assert.equal(document.getElementById('root').textContent,'');
 assert.equal(stateWrites,writesBeforeUnmount);
-console.log('Case navigation: 25 assertions passed');
+console.log('Case navigation: 26 assertions passed');

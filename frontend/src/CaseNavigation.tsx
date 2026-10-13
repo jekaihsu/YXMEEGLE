@@ -18,7 +18,7 @@ export function CaseNavigation({projectId}:{projectId:string}){
    <Row label={<strong>{caseRow.code||'確認單案號待核對'}</strong>} value={sourceLink(caseRow.source_url,'開啟工程確認單來源')}/>
    {caseRow.edge_states.contracts!=='linked'&&<Row label="合約明細未建立關聯（來源待核對）"/>}
    {caseRow.contracts.map(contract=><div key={contract.id} className="sc-item" aria-label={`合約項次 ${contract.item_number||'待核對'}`}>
-    <Row label={`項次 ${contract.item_number||'待核對'} · ${contract.title||'合約工項'} · …${contract.id.slice(-4)}`} detail={contract.unresolved?<span role="status">合約關聯待核對（來源關聯未解析）</span>:undefined}/>
+    <Row label={`項次 ${contract.item_number||'待核對'} · ${contract.title||'合約工項'}${contract.id?` · …${(contract.id||'').slice(-4)}`:''}`} detail={contract.unresolved?<span role="status">合約關聯待核對（來源關聯未解析）</span>:undefined}/>
     {contract.work_items.map(item=><Row key={item.id} label={`工作項 · ${item.category}`} value={sourceLink(item.source_url,`開啟${item.category}工作項來源`)}/>)}
     {!contract.work_items.length&&<Row label="工作項尚未建立關聯（來源待核對）"/>}
    </div>)}
