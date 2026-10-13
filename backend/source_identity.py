@@ -227,21 +227,48 @@ class _FrozenRow(Mapping):
         return deepcopy(self._data[key])
 
     def __iter__(self):
-        return iter(self.FIELDS)
+        return iter(self._data)
 
     def __len__(self):
-        return len(self.FIELDS)
+        return len(self._data)
 
     def __repr__(self):
         return f"{type(self).__name__}({dict(self)!r})"
 
     def to_dict(self):
         """A fresh plain dict of the declared fields."""
-        return {k: self[k] for k in self.FIELDS}
+        return {k: self[k] for k in self._data}
+
+
+def _valid_locator(locator):
+    """A locator is a tuple of non-negative list indexes and recognized link-key names only."""
+    return isinstance(locator, tuple) and all(
+        type(c) is int and c >= 0 or type(c) is str and c in _LINK_KEYS for c in locator)
+
+
+def _require_canonical_version_key(source_key, supplied, canonical=None):
+    """Reject any source_version_key that is not exactly (base, table, record, version) for ``source_key``.
+
+    ``canonical`` (the graph-snapshot key) is additionally enforced when known; ``version`` is exactly an int/str/None, so ``True``/``1.0`` never
+    pass for ``1``, nor ``False``/``0.0`` for ``0``.
+    """
+    ok = (isinstance(supplied, tuple) and len(supplied) == 4 and is_source_key(source_key)
+          and tuple(supplied[:3]) == tuple(source_key.split("/"))
+          and all(type(c) is str for c in supplied[:3]) and type(supplied[3]) in (int, str, type(None)))
+    if ok and canonical is not None:
+        ok = supplied == canonical and all(type(a) is type(b) for a, b in zip(supplied, canonical))
+    if not ok:
+        raise ValueError("edge instance source_version_key must match source_key and the graph version")
 
 
 class EdgeInstance(_FrozenRow):
     """One immutable edge instance exposing only the declared instance schema.
+
+    Only ``malformed_native_link`` diagnostics carry a ``locator`` key (and identity component): the
+    tuple of list indexes (int) and link-key names (str) from the source field root to the malformed
+    value, so each malformed occurrence stays a distinct diagnostic. It never holds a caller value.
+    Every other row has exactly the base fields and identity. A malformed diagnostic is always
+    unresolved with a null target.
 
     ``verification`` and ``receipt_ref`` are not stored: they are produced from
     ``RECEIPT_MISSING`` on every read, so no input can set or change them.
@@ -250,12 +277,22 @@ class EdgeInstance(_FrozenRow):
     __slots__ = ()
     STORED = ("edge_type", "source_key", "source_version_key", "navigation", "reason",
               "target_key", "target_table_id", "target_record_id")
-    FIELDS = STORED + ("verification", "receipt_ref")
+    FIELDS = STORED + ("locator", "verification", "receipt_ref")
 
     def __init__(self, values):
+        data = {k: deepcopy(values[k]) for k in self.STORED}
+        _require_canonical_version_key(data["source_key"], data["source_version_key"])
+        if data["reason"] == "malformed_native_link":
+            if data["navigation"] != "unresolved" or data["target_key"] is not None:
+                raise ValueError("malformed native link diagnostics must be unresolved with a null target_key")
+            locator = values.get("locator")
+            if locator is not None and not _valid_locator(locator):
+                raise ValueError("edge instance locator must be None or a malformed-link index/key path")
+            data["locator"] = deepcopy(locator)
+        elif values.get("locator") is not None:
+            raise ValueError("only malformed native link diagnostics carry a locator")
         object.__setattr__(self, "_data", MappingProxyType(
-            {**{k: deepcopy(values[k]) for k in self.STORED},
-             "verification": RECEIPT_MISSING, "receipt_ref": None}))
+            {**data, "verification": RECEIPT_MISSING, "receipt_ref": None}))
 
     @classmethod
     def from_row(cls, row, version):
@@ -273,8 +310,8 @@ class EdgeInstance(_FrozenRow):
         if not is_source_key(row["source_key"]):
             raise ValueError("edge instance source_key must be a base/table/record key")
         base, table, record_id = row["source_key"].split("/")
-        if row["source_version_key"] != (base, table, record_id, version):
-            raise ValueError("edge instance source_version_key must match source_key and the graph version")
+        canonical_key = (base, table, record_id, version)
+        _require_canonical_version_key(row["source_key"], row["source_version_key"], canonical_key)
         if navigation == "linked" and not is_source_key(target_key):
             raise ValueError("linked edge instance needs a base/table/record target_key")
         if navigation == "unresolved" and target_key is not None:
@@ -283,17 +320,17 @@ class EdgeInstance(_FrozenRow):
         if not isinstance(reason, str):
             raise ValueError("edge instance reason must be a str")
         return cls({"edge_type": row["edge_type"], "source_key": row["source_key"],
-                    "source_version_key": row["source_version_key"], "navigation": navigation,
+                    "source_version_key": canonical_key, "navigation": navigation,
                     "reason": reason, "target_key": target_key,
                     "target_table_id": row.get("target_table_id"),
-                    "target_record_id": row.get("target_record_id")})
+                    "target_record_id": row.get("target_record_id"), "locator": row.get("locator")})
 
     @property
     def identity(self):
         """Hashable identity; malformed diagnostics are compared by repr, never hashed raw."""
         d = self._data
         return tuple(repr(d[k]) if k.startswith("target_") and k != "target_key" else d[k]
-                     for k in self.STORED)
+                     for k in d if k not in ("verification", "receipt_ref"))
 
 
 class RejectedRow(_FrozenRow):
@@ -370,8 +407,87 @@ def _field_schemas(tables):
     return schemas
 
 
+_LINK_KEYS = ("record_id", "record_ids", "link_record_ids")
+
+
+def _clean_native_link(value, bad, path=()):
+    """Mirror ``v4_sources.native_records.visit`` and return ``value`` minus malformed descendants.
+
+    Every malformed descendant is appended to ``bad`` as ``(path, item)``; ``path`` is the tuple of list
+    indexes and link-key names leading to it from the field root, so repeated malformed values stay
+    distinct occurrences. Valid branches (and the table_id they inherit) are kept. A dict whose own
+    ``table_id`` is malformed is dropped whole: no table is guessed for it. A dict with a well-typed
+    ``table_id`` and no link keys is context only (a no-op); a dict with no recognized key at all is malformed; ``None`` under a recognized key is an absent optional collection
+    (a no-op), exactly as the native resolver sees it.
+    """
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        kept = []
+        for i, item in enumerate(value):
+            cleaned = _clean_native_link(item, bad, path + (i,))
+            if cleaned is not _DROP:
+                kept.append(cleaned)
+        return kept
+    if isinstance(value, dict):
+        table = value.get("table_id")
+        if table is not None and not isinstance(table, str):
+            bad.append((path, value))
+            return _DROP
+        present = [k for k in _LINK_KEYS if k in value]
+        if not present:
+            if "table_id" in value:
+                return {}  # table-only container (any well-typed table_id): context only, a no-op as in native_records
+            bad.append((path, value))
+            return _DROP
+        kept = {} if table is None else {"table_id": table}
+        for key in present:
+            if value[key] is None:
+                kept[key] = None
+                continue
+            cleaned = _clean_native_link(value[key], bad, path + (key,))
+            if cleaned is not _DROP:
+                kept[key] = cleaned
+        return kept
+    bad.append((path, value))
+    return _DROP
+
+
+_DROP = object()
+
+
+def _split_native_links(value):
+    """Split a raw link value into (well-formed value, malformed items); nothing is guessed."""
+    if value is None:
+        return None, []
+    bad = []
+    clean = _clean_native_link(value, bad)
+    return (None if clean is _DROP else clean), bad
+
+
+def _malformed_link_row(located):
+    locator, item = located
+    table = item.get("table_id") if isinstance(item, dict) else None
+    record = {k: item[k] for k in _LINK_KEYS if k in item} if isinstance(item, dict) else item
+    return {"navigation": "unresolved", "reason": "malformed_native_link", "target_key": None,
+            "target_table_id": table, "target_record_id": record, "locator": locator}
+
+
 def _native_links(row, edge, index, schemas):
-    """Return (targets, missing, reason) from the existing native resolver."""
+    """Return (targets, missing, reason, malformed) from the existing native resolver."""
+    fields = row.get("fields")
+    field = edge.source_field
+    if isinstance(fields, Mapping) and field in fields:
+        clean, malformed = _split_native_links(fields[field])
+        if malformed:
+            row = {**row, "fields": {**fields, field: clean}}
+    else:
+        malformed = []
+    targets, missing, reason = _resolve_native_links(row, edge, index, schemas)
+    return targets, missing, reason, malformed
+
+
+def _resolve_native_links(row, edge, index, schemas):
     if edge.field_id is None:
         targets, missing = native_records(row, edge.source_field, index, edge.target_kinds)
         return targets, missing, None
@@ -432,7 +548,7 @@ def build_native_edge_graph(records, edge_types, *, tables=None, version=None):
                 continue
             common = {"edge_type": edge.edge_type, "source_key": ref.source_key,
                       "source_version_key": ref.version_key}
-            targets, missing, schema_reason = _native_links(row, edge, index, schemas)
+            targets, missing, schema_reason, malformed = _native_links(row, edge, index, schemas)
             found = []
             if schema_reason:
                 found.append({"navigation": "unresolved", "reason": schema_reason,
@@ -447,6 +563,7 @@ def build_native_edge_graph(records, edge_types, *, tables=None, version=None):
                     continue
                 found.append({"navigation": "linked", "reason": "native_link", "target_key": target_key,
                               "target_table_id": target["table_id"], "target_record_id": target["record_id"]})
+            found.extend(_malformed_link_row(item) for item in malformed)
             for item in missing:
                 found.append({"navigation": "unresolved", "reason": "native_target_unresolved",
                               "target_key": None, "target_table_id": item.get("table_id"),

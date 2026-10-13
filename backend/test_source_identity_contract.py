@@ -736,3 +736,310 @@ def test_non_string_identity_component_is_rejected_not_hashed(component, bad):
                                "base_token": rows[-1]["base_token"], "table_id": rows[-1]["table_id"],
                                "record_id": rows[-1]["record_id"]},)
     assert all(row["source_key"] != "base-A/tblW/recW3" for row in graph.instances)
+
+
+# C-ID residuals N1 (equal-but-noncanonical version components) and N2 (malformed raw native links).
+@pytest.mark.parametrize("version,bad", [(1, True), (1, 1.0), (0, False), (0, 0.0), ("1", 1), (1, "1")])
+def test_direct_instance_rejects_equal_but_type_mismatched_version_component(version, bad):
+    built = chain_graph(version=version)
+    forged = dict(built.instances[0])
+    forged["source_version_key"] = (*forged["source_version_key"][:3], bad)
+    with pytest.raises(ValueError, match="source_version_key"):
+        source_identity.NativeEdgeGraph(built.edge_types, version, [forged], (), {}, {})
+    with pytest.raises(ValueError, match="source_version_key"):
+        source_identity.EdgeInstance.from_row(forged, version)
+
+
+def test_direct_instance_with_canonical_key_keeps_exact_types():
+    built = chain_graph(version=1)
+    graph = source_identity.NativeEdgeGraph(built.edge_types, 1, [dict(r) for r in built.instances], (), {}, {})
+    key = graph.instances[0]["source_version_key"]
+    assert key == built.instances[0]["source_version_key"]
+    assert [type(c) for c in key] == [str, str, str, int]
+
+
+@pytest.mark.parametrize("shape,bad", [("table_id", b) for b in (["bad"], {"a": 1}, 5, [5])]
+                         + [(k, b) for k in ("record_id", "record_ids", "link_record_ids")
+                            for b in ({"a": 1}, 5, [5])])
+def test_malformed_raw_native_link_is_explicit_unresolved_and_isolated(shape, bad):
+    records = chain_records()
+    if shape == "table_id":
+        malformed = {"record_id": "recL1", "table_id": bad}
+    else:
+        malformed = {shape: bad, "table_id": "tblL"}
+    records[5]["fields"][ITEM_FIELD] = ["recL2", malformed]  # recL2 is a valid sibling link
+    graph = build_native_edge_graph(records, [ITEM_TO_CONTRACT])
+    mine = [r for r in graph.instances if r["source_key"] == "base-A/tblW/recW1"]
+    reasons = sorted(r["reason"] for r in mine)
+    assert reasons == ["malformed_native_link", "native_link"]
+    assert {r["target_key"] for r in mine} == {None, "base-A/tblL/recL2"}
+    bad_row = next(r for r in mine if r["reason"] == "malformed_native_link")
+    assert bad_row["navigation"] == "unresolved" and bad_row["verification"] == "receipt_missing"
+    # other sources in the same graph still resolve, and nothing was guessed for the bad item
+    other = [r for r in graph.instances if r["source_key"] == "base-A/tblW/recW2"]
+    assert {r["target_key"] for r in other} == {"base-A/tblL/recL1", "base-A/tblL/recL2"}
+    assert all(r["verification"] == "receipt_missing" for r in graph.instances)
+
+
+def test_malformed_bare_scalar_link_value_is_flagged_not_dropped():
+    records = chain_records()
+    records[5]["fields"][ITEM_FIELD] = 5
+    graph = build_native_edge_graph(records, [ITEM_TO_CONTRACT])
+    mine = [r for r in graph.instances if r["source_key"] == "base-A/tblW/recW1"]
+    assert [r["reason"] for r in mine] == ["malformed_native_link"]
+
+
+def test_valid_absent_native_target_keeps_unresolved_semantics():
+    graph = chain_graph()
+    missing = [r for r in graph.instances
+               if r["source_key"] == "base-A/tblW/recW3" and r["navigation"] == "unresolved"]
+    assert [(r["reason"], r["target_record_id"]) for r in missing] == [("native_target_unresolved", "recMISSING")]
+
+
+# P1-C2-N-FIX1: reviewer regressions (task_a99046fad671) for the standalone constructor and nested links.
+@pytest.mark.parametrize("version,bad", [(1, True), (1, 1.0), (0, False), (0, 0.0), (1, [1]), (1, 2.5)])
+def test_standalone_edge_instance_rejects_noncanonical_version_component(version, bad):
+    row = dict(chain_graph(version=version).instances[0])
+    row["source_version_key"] = (*row["source_version_key"][:3], bad)
+    with pytest.raises(ValueError, match="source_version_key"):
+        source_identity.EdgeInstance(row)
+
+
+@pytest.mark.parametrize("key", [None, ("base-A", "tblW", "recW1"), ["base-A", "tblW", "recW1", 1],
+                                 ("base-A", "tblW", "recOTHER", 1), ("base-A", "tblW", "recW1", 1, 2)])
+def test_standalone_edge_instance_rejects_structurally_wrong_key(key):
+    row = dict(chain_graph(version=1).instances[0])
+    row["source_version_key"] = key
+    with pytest.raises(ValueError, match="source_version_key"):
+        source_identity.EdgeInstance(row)
+
+
+def test_standalone_edge_instance_with_canonical_key_keeps_exact_types():
+    built = chain_graph(version=1).instances[0]
+    inst = source_identity.EdgeInstance(dict(built))
+    assert [type(c) for c in inst["source_version_key"]] == [str, str, str, int]
+    assert inst["verification"] == "receipt_missing" and inst["receipt_ref"] is None
+
+
+def _mine(value):
+    records = chain_records()
+    records[5]["fields"][ITEM_FIELD] = value
+    graph = build_native_edge_graph(records, [ITEM_TO_CONTRACT])
+    return [r for r in graph.instances if r["source_key"] == "base-A/tblW/recW1"]
+
+
+@pytest.mark.parametrize("value,linked,malformed", [
+    ([["recL2", {"record_id": "recL1", "table_id": ["bad"]}]], ["base-A/tblL/recL2"], 1),
+    ({"table_id": "tblL", "record_ids": ["recL2", {"record_id": 5}]}, ["base-A/tblL/recL2"], 1),
+    ({"table_id": "tblL", "record_ids": ["recL2", 5, [7, "recL1"]]}, ["base-A/tblL/recL1", "base-A/tblL/recL2"], 2),
+    ({"table_id": "tblL", "link_record_ids": [{"record_ids": ["recL1", None, {"x": 1}]}, "recL2"]},
+     ["base-A/tblL/recL1", "base-A/tblL/recL2"], 2),
+])
+def test_nested_malformed_descendant_keeps_valid_branches_and_table_context(value, linked, malformed):
+    mine = _mine(value)
+    assert sorted(r["target_key"] for r in mine if r["navigation"] == "linked") == linked
+    assert [r["reason"] for r in mine].count("malformed_native_link") == malformed
+    assert all(r["verification"] == "receipt_missing" for r in mine)
+
+
+def test_nested_valid_branch_keeps_inherited_table_context_for_wrong_table():
+    # recL1 only lives in tblL; an inherited bogus-but-valid table must still yield native 'unresolved'.
+    mine = _mine({"table_id": "tblOTHER", "record_ids": ["recL1", {"record_id": 5}]})
+    assert [r["navigation"] for r in mine if r["reason"] != "malformed_native_link"] == ["unresolved"]
+    assert sum(r["reason"] == "malformed_native_link" for r in mine) == 1
+
+
+@pytest.mark.parametrize("value", [
+    {"record_id": "recL1", "record_ids": None},
+    {"record_id": "recL1", "record_ids": None, "link_record_ids": None, "table_id": None},
+])
+def test_nullable_unused_collection_resolves_like_native_records(value):
+    mine = _mine(value)
+    assert [r["target_key"] for r in mine if r["navigation"] == "linked"] == ["base-A/tblL/recL1"]
+    assert all(r["reason"] != "malformed_native_link" for r in mine)
+
+
+@pytest.mark.parametrize("value", [
+    "recL1", ["recL1", "recL2"], {"record_id": "recL1", "table_id": "tblL"}, {"record_ids": ["recL1", "recL2"]},
+    {"link_record_ids": ["recL2"], "table_id": ""}, [{"record_id": "recL1"}, ["recL2"]],
+    {"table_id": None, "record_id": "recL1"}, {"record_ids": []}, [], None, ["notrec", "recL1"],
+])
+def test_valid_native_shapes_match_native_records_exactly(value):
+    records = chain_records()
+    records[5]["fields"][ITEM_FIELD] = value
+    row = records[5]
+    index = {}
+    for rec in records:
+        index.setdefault((rec["base_token"], rec["record_id"]), []).append(rec)
+    expected, _ = v4_sources.native_records(row, ITEM_FIELD, index, ITEM_TO_CONTRACT.target_kinds)
+    got = [r["target_key"] for r in _mine(value) if r["navigation"] == "linked"]
+    assert sorted(got) == sorted(f"{e['base_token']}/{e['table_id']}/{e['record_id']}" for e in expected)
+    assert all(r["reason"] != "malformed_native_link" for r in _mine(value))
+
+
+# --- REV2 correction: nullable link containers and malformed occurrence multiplicity ---
+
+def _observe_link_value(value, context=None, edge=None):
+    import dataclasses
+    edge = edge or ITEM_TO_CONTRACT
+    rows = chain_records()
+    rows[5]["fields"][ITEM_FIELD] = value
+    rows[5]["linked_tables"] = {ITEM_FIELD: context}
+    index = {}
+    for row in rows:
+        index.setdefault((row["base_token"], row["record_id"]), []).append(row)
+    targets, missing = v4_sources.native_records(rows[5], ITEM_FIELD, index, edge.target_kinds)
+    graph = build_native_edge_graph(rows, [edge])
+    mine = [r for r in graph.instances if r["source_key"] == "base-A/tblW/recW1"]
+    return targets, missing, graph, mine
+
+
+@pytest.mark.parametrize("container", [
+    {"record_ids": None}, {"record_id": None, "record_ids": None, "link_record_ids": None}])
+def test_all_null_recognized_link_keys_are_a_canonical_noop(container):
+    import dataclasses
+    edge = dataclasses.replace(ITEM_TO_CONTRACT, cardinality="one")
+    targets, missing, graph, mine = _observe_link_value([container, "recL2"], edge=edge)
+    assert [r["record_id"] for r in targets] == ["recL2"] and missing == []
+    assert edge_targets(graph, ref("tblW", "recW1"), edge.edge_type)["navigation"] == "linked"
+    assert [r["reason"] for r in mine] == ["native_link"]
+    assert parents_of(graph, ref("tblW", "recW1")) == (
+        (edge.edge_type, "base-A/tblL/recL2", "receipt_missing"),)
+
+
+@pytest.mark.parametrize("bad,paths", [
+    (5, [(1,), (2, 0)]), ({}, [(1,), (2, 0)]),
+    ({"record_id": 5}, [(1, "record_id"), (2, 0, "record_id")])])
+def test_each_repeated_malformed_descendant_is_its_own_diagnostic(bad, paths):
+    _, _, graph, mine = _observe_link_value(["recL2", bad, [bad]])
+    assert [r["target_key"] for r in mine if r["navigation"] == "linked"] == ["base-A/tblL/recL2"]
+    found = [r for r in mine if r["reason"] == "malformed_native_link"]
+    assert [r["locator"] for r in found] == paths
+    assert all("locator" not in r for r in mine if r["reason"] != "malformed_native_link")
+
+
+def test_malformed_locator_is_structural_only_and_validated():
+    _, _, graph, mine = _observe_link_value(
+        {"record_ids": ["recL2", {"record_id": ["secret", 5]}, "x"], "table_id": "tblL"})
+    found = [r for r in mine if r["reason"] == "malformed_native_link"]
+    assert [r["locator"] for r in found] == [("record_ids", 1, "record_id", 1)]
+    row = found[0].to_dict()
+    for forged in ("secret", ("secret",), (-1,), (True,), ["record_ids"]):
+        with pytest.raises(ValueError):
+            source_identity.EdgeInstance.from_row({**row, "locator": forged}, None)
+    with pytest.raises(ValueError):
+        source_identity.EdgeInstance.from_row({**row, "reason": "native_link", "locator": (1,)}, None)
+    assert source_identity.NativeEdgeGraph(graph.edge_types, None, [row, dict(row)], (), {}, {}).instances \
+        == (source_identity.EdgeInstance.from_row(row, None),)
+
+
+def test_valid_native_edges_still_deduplicate():
+    _, _, graph, mine = _observe_link_value(["recL2", ["recL2"], {"record_id": "recL2"}])
+    assert [r["target_key"] for r in mine] == ["base-A/tblL/recL2"]
+
+
+def test_valid_recursive_shapes_match_native_resolver_with_and_without_malformed_sibling():
+    import random
+    rng = random.Random(125)
+
+    def value(depth):
+        if depth == 0:
+            return rng.choice(["recL1", "recL2", "recMISSING", "nonrecord"])
+        mode = rng.randrange(3)
+        if mode == 0:
+            return value(0)
+        if mode == 1:
+            return [value(depth - 1) for _ in range(rng.randrange(4))]
+        out = {"table_id": rng.choice([None, "", "tblL", "tblOTHER"])}
+        for k in rng.sample(["record_id", "record_ids", "link_record_ids"], rng.randrange(1, 4)):
+            out[k] = rng.choice([None, value(depth - 1)]) if rng.randrange(4) == 0 else value(depth - 1)
+        return out
+
+    for _ in range(150):
+        raw, context = value(4), rng.choice([None, "", "tblL", "tblOTHER"])
+        for malformed in (False, True):
+            targets, missing, _, mine = _observe_link_value([raw, 5] if malformed else raw, context)
+            assert {r["target_key"] for r in mine if r["navigation"] == "linked"} == {
+                f"{r['base_token']}/{r['table_id']}/{r['record_id']}" for r in targets}, (raw, context)
+            assert {(r["target_table_id"], r["target_record_id"]) for r in mine
+                    if r["reason"] == "native_target_unresolved"} == {
+                (r["table_id"], r["record_id"]) for r in missing}, (raw, context)
+            assert sum(r["reason"] == "malformed_native_link" for r in mine) == int(malformed)
+
+
+def _malformed_row(value=5):
+    _, _, graph, mine = _observe_link_value(["recL2", value])
+    return graph, next(r.to_dict() for r in mine if r["reason"] == "malformed_native_link")
+
+
+@pytest.mark.parametrize("path", ["from_row", "instance", "graph"])
+@pytest.mark.parametrize("forge", [
+    {"navigation": "linked", "target_key": "base-A/tblL/recL1"},
+    {"target_key": "base-A/tblL/recL1"}, {"navigation": "linked"}])
+def test_malformed_diagnostic_cannot_be_promoted_to_linked(path, forge):
+    graph, row = _malformed_row()
+    forged = {**row, **forge, "verification": "verified", "receipt_ref": "caller-string"}
+    with pytest.raises(ValueError):
+        if path == "from_row":
+            source_identity.EdgeInstance.from_row(forged, None)
+        elif path == "instance":
+            source_identity.EdgeInstance(forged)
+        else:
+            source_identity.NativeEdgeGraph(graph.edge_types, None, [forged], (), {}, {})
+    assert row["navigation"] == "unresolved" and row["target_key"] is None
+
+
+@pytest.mark.parametrize("container", [
+    {"table_id": None}, {"table_id": ""}, {"table_id": None, "record_ids": None}])
+def test_table_only_nullable_container_is_native_noop(container):
+    import dataclasses
+    edge = dataclasses.replace(ITEM_TO_CONTRACT, cardinality="one")
+    targets, missing, graph, mine = _observe_link_value([container, "recL2"], edge=edge)
+    assert [r["record_id"] for r in targets] == ["recL2"] and missing == []
+    assert edge_targets(graph, ref("tblW", "recW1"), edge.edge_type)["navigation"] == "linked"
+    assert [r["reason"] for r in mine] == ["native_link"]
+
+
+@pytest.mark.parametrize("cardinality", ["one", "many"])
+@pytest.mark.parametrize("container", [
+    {"table_id": "tblX"}, {"table_id": "tblL"}, {"record_ids": [{"table_id": "tblX"}]}])
+def test_nonempty_table_only_container_is_native_noop(container, cardinality):
+    import dataclasses
+    edge = dataclasses.replace(ITEM_TO_CONTRACT, cardinality=cardinality)
+    targets, missing, graph, mine = _observe_link_value([container, "recL2"], edge=edge)
+    assert [r["record_id"] for r in targets] == ["recL2"] and missing == []
+    result = edge_targets(graph, ref("tblW", "recW1"), edge.edge_type)
+    assert result["target_keys"] == ("base-A/tblL/recL2",)
+    assert result["navigation"] == "linked" and result["unresolved"] == ()
+    assert result["verification"] == "receipt_missing" and result["receipt_ref"] is None
+    assert [r["reason"] for r in mine] == ["native_link"]
+
+
+@pytest.mark.parametrize("container", [{}, {"CUSTOMER_SECRET": None}, {"table_id": 5}, {"record_id": 5}])
+def test_unrecognized_or_malformed_containers_stay_malformed(container):
+    _, _, graph, mine = _observe_link_value(["recL2", container])
+    assert sum(r["reason"] == "malformed_native_link" for r in mine) == 1
+
+
+@pytest.mark.parametrize("locator", [
+    ("CUSTOMER_SECRET",), (["caller"],), ({"a": 1},), (True,), (-1,), ["record_ids"], "record_ids", (1.0,)])
+def test_direct_instance_rejects_caller_value_locator(locator):
+    _, row = _malformed_row()
+    with pytest.raises((ValueError, TypeError)):
+        source_identity.EdgeInstance({**row, "locator": locator})
+    with pytest.raises((ValueError, TypeError)):
+        source_identity.EdgeInstance({**row, "reason": "native_link", "locator": (1,)})
+    assert hash(source_identity.EdgeInstance(row).identity) is not None
+
+
+def test_ordinary_rows_keep_exact_pre_locator_shape_and_identity():
+    graph = _observe_link_value("recL2")[2]
+    row = next(r for r in graph.instances if r["reason"] == "native_link")
+    assert tuple(row) == ("edge_type", "source_key", "source_version_key", "navigation", "reason",
+                          "target_key", "target_table_id", "target_record_id", "verification", "receipt_ref")
+    assert len(row.identity) == 8 and "locator" not in row.to_dict()
+    assert row.identity == (row["edge_type"], row["source_key"], row["source_version_key"], "linked",
+                            "native_link", row["target_key"], repr(row["target_table_id"]),
+                            repr(row["target_record_id"]))
+    _, bad = _malformed_row()
+    assert "locator" in bad and len(source_identity.EdgeInstance(bad).identity) == 9
