@@ -15,8 +15,9 @@ const delegation={project_id:'case',principal_id:'coworker',delegate_id:'viewer'
 const w={as_of,delegations:[delegation]};
 const task=(id,owner_id,can_execute=false)=>({id,owner_id,can_execute,status:'pending'});
 for(const status of ['pending','paused','rework'])assert.equal(isHomeAssigned({...task('own','viewer'),status},w,'viewer'),true,`own ${status} assignment remains visible`);
-assert.equal(isHomeAssigned(task('proxy','coworker',true),w,'viewer'),true,'explicit active task proxy is mine');
-assert.equal(isHomeProxy(task('proxy','coworker',true),w,'viewer'),true,'proxy is labeled separately');
+assert.equal(isHomeAssigned({...task('proxy','coworker',true),assigned_to_viewer:true},w,'viewer'),true,'server-verified active proxy is mine');
+assert.equal(isHomeProxy({...task('proxy','coworker',true),assigned_to_viewer:true},w,'viewer'),true,'verified proxy is labeled separately');
+assert.equal(isHomeAssigned(task('proxy','coworker',true),w,'viewer'),false,'raw delegation alone cannot certify a proxy assignment');
 assert.equal(isHomeAssigned({...task('proxy','coworker',false),assigned_to_viewer:true},w,'viewer'),true,'server-verified proxy assignment stays visible while execution is blocked');
 assert.equal(isHomeAssigned(task('other','coworker',true),w,'viewer'),false,'coworker execution flag is not assignment');
 assert.equal(isHomeAssigned(task('blank','',false),w,'viewer'),false,'unassigned work is not mine');

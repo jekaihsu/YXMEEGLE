@@ -35,7 +35,8 @@
     "test:work-assigned-visibility": "node test-work-assigned-visibility.mjs",
     "test:dev-tooling": "node --test --test-timeout=30000 test-dev-tooling.mjs",
     "test:live-read-regressions": "node test-live-read-regressions.mjs",
-    "test:ops-sync": "node test-ops-sync-panel.mjs && node test-ops-flow-view.mjs"
+    "test:ops-sync": "node test-ops-sync-panel.mjs && node test-ops-flow-view.mjs",
+    "test:home-review-regressions": "node test-home-review-regressions.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",

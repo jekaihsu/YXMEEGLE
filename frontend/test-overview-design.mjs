@@ -21,7 +21,7 @@ const root=createRoot(document.getElementById('root'));
 const flush=async fn=>act(async()=>{fn?.();await new Promise(r=>setTimeout(r,30))});
 await flush(()=>root.render(React.createElement(Dashboard,{c})));
 assert.equal(document.querySelector('.dh-hero h2').textContent,'Next survey');
-const inbox=document.querySelector('.work-inbox');assert.ok(inbox.textContent.includes('Overdue survey'));assert.ok(inbox.textContent.includes('逾期 3 天'));assert.equal(inbox.querySelector('.heading-count').textContent,'1','only actionable overdue belongs in attention');assert.ok(!inbox.textContent.includes('Blocked survey')&&!inbox.textContent.includes('Coworker assignment')&&!inbox.textContent.includes('Source only'));const cap=inbox.textContent;assert.ok(cap.includes('本人可執行逾期 1'));assert.ok(!cap.includes('非本人')&&!cap.includes('受阻'));
+const inbox=document.querySelector('.work-inbox');assert.ok(inbox.textContent.includes('Overdue survey'));assert.ok(inbox.textContent.includes('逾期 3 個曆日'));assert.equal(inbox.querySelector('.heading-count').textContent,'1','only actionable overdue belongs in attention');assert.ok(!inbox.textContent.includes('Blocked survey')&&!inbox.textContent.includes('Coworker assignment')&&!inbox.textContent.includes('Source only'));const cap=inbox.textContent;assert.ok(cap.includes('本人可執行逾期 1'));assert.ok(!cap.includes('非本人')&&!cap.includes('受阻'));
 const waitingText=()=>[...document.querySelectorAll('.dh-waiting')].map(section=>section.textContent).join(' | ');
 const waiting=waitingText();
 for(const title of ['Blocked survey','Source only A','Source only B','Next survey'])assert.ok(waiting.includes(title),`assigned waiting category includes ${title}`);
@@ -30,7 +30,7 @@ assert.ok(waiting.includes('等待前置條件2')&&waiting.includes('指派與�
 assert.ok(waiting.includes('即將開始1')&&!waiting.includes('Coworker assignment'),'upcoming is separate and coworker is excluded');
 await flush(()=>[...document.querySelectorAll('.dh-hero button')].find(b=>b.textContent.includes('繼續此任務')).click());assert.equal(calls.at(-1).focus,'ready');
 const shell={...w,scope:'shell',counts:{overdue_tasks:1,my_overdue_tasks:1,due_today_tasks:0,my_active_tasks:2,approvals_pending:0},attention:[p.nodes[0].tasks.find(t=>t.id==='late')].map(t=>({task_id:t.id,title:t.title,project_id:p.id,project_code:p.code,node_id:p.nodes[0].id,node_name:p.nodes[0].name,assignee_id:t.owner_id,status:t.status,due_date:t.due_date})),home_waiting:[
- {task_id:'blocked',project_id:p.id,project_code:p.code,node_id:p.nodes[0].id,title:'Blocked survey',kind:'paused',reason:'任務暫停，原期限保留',original_due_date:'2026-10-06',due_date:null},
+ {task_id:'blocked',project_id:p.id,project_code:p.code,node_id:p.nodes[0].id,title:'Blocked survey',kind:'paused',reason:'暫停原因待核對',original_due_date:'2026-10-06',due_date:null},
  {task_id:'src1',project_id:p.id,project_code:p.code,node_id:p.nodes[0].id,title:'Source only A',kind:'prerequisite',reason:'指派與執行資格待核對',due_date:'2026-09-01'},
  {task_id:'src2',project_id:p.id,project_code:p.code,node_id:p.nodes[0].id,title:'Source only B',kind:'prerequisite',reason:'指派與執行資格待核對',due_date:'2026-09-02'},
  {task_id:'ready',project_id:p.id,project_code:p.code,node_id:p.nodes[0].id,title:'Next survey',kind:'upcoming',reason:'預計 2026/10/10 到期',due_date:'2026-10-10'},

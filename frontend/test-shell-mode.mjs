@@ -71,7 +71,7 @@ try{
  // P4-1: the dashboard renders from counts, the attention list and cards; no tree scan and no full workspace.
  await flush(()=>{location.hash='view=dashboard';window.dispatchEvent(new window.Event('hashchange'))});
  const todo=document.querySelector('.work-inbox');
- assert.ok(todo.textContent.includes('TASK_A')&&todo.textContent.includes('逾期 1 天')&&todo.textContent.includes('APPROVAL_A')&&todo.textContent.includes('NODE_A')&&todo.textContent.includes(workspace.users[0].name)&&todo.textContent.includes('本人可執行逾期 1'));
+ assert.ok(todo.textContent.includes('TASK_A')&&todo.textContent.includes('逾期 1 個曆日')&&todo.textContent.includes('APPROVAL_A')&&todo.textContent.includes('NODE_A')&&todo.textContent.includes(workspace.users[0].name)&&todo.textContent.includes('本人可執行逾期 1'));
  assert.equal(todo.querySelector('.heading-count').textContent,'4');assert.ok(document.querySelector('.dh-hero').textContent.includes('2 項待處理'));
  const waitingSections=[...document.querySelectorAll('.dh-waiting')];assert.deepEqual(waitingSections.map(section=>section.querySelector('h2').textContent),['暫停中的指派1','等待前置條件1','即將開始1','代理工作1']);
  for(const title of ['WAIT_PAUSED','WAIT_PREREQUISITE','WAIT_UPCOMING','WAIT_PROXY'])assert.ok(waitingSections.some(section=>section.textContent.includes(title)),`shell waiting displays ${title}`);

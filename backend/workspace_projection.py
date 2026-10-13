@@ -159,30 +159,25 @@ def filter_private_workspace(state, user):
                                 or 'manage_handover' in actor.get('capabilities', [])))
     # Compute against the complete authority state, before hiding unrelated leave
     # records. The known project avoids scanning all tasks for every task.
-    from .workflow import is_owner, now
+    from .workflow import now
+    from .workflow_rules import confirmation_hash, activation_reasons
+    from .home_details import build_home_task
+    from .home_queues import home_queues
     state['task_capabilities_checked_at'] = now()
-    from .operations import delegation_valid
-    today = state['task_capabilities_checked_at'][:10]
-    active_people = {person['id'] for person in state.get('users', []) if person.get('active', True)}
-    proxy_assignments = {(delegation.get('project_id'), task_id, delegation.get('principal_id'))
-        for delegation in state.get('delegations', [])
-        if actor and delegation.get('delegate_id') == ident
-        and delegation.get('principal_id') in active_people
-        and delegation.get('seat') == 'owner' and delegation.get('scope') == 'tasks'
-        and delegation.get('status') == 'active'
-        and delegation.get('start_date', '') <= today <= delegation.get('end_date', '')
-        and delegation_valid(state, delegation, at_use=True)
-        for task_id in delegation.get('task_ids', [])}
+    state['home_queues'] = home_queues(state, actor)
     for project in state.get('projects', []):
         for node in project.get('nodes', []):
             for task in node.get('tasks', []):
-                task['can_execute'] = bool(actor and is_owner(actor, task, state, project=project))
-                task['assigned_to_viewer'] = bool(actor and (task.get('owner_id') == ident or
-                    (project['id'], task['id'], task.get('owner_id')) in proxy_assignments))
-                from .workflow_rules import confirmation_hash, activation_reasons, execution_reasons
+                home = build_home_task(state, project, node, task, actor, state.get('as_of') or now()[:10])
+                task['can_execute'] = home['can_execute']
+                task['assigned_to_viewer'] = home['assigned']
                 task['confirmation_hash'] = confirmation_hash(project, node, task)
                 task['activation_blockers'] = activation_reasons(state, project, node, task, clock=state.get('as_of'))
-                task['execution_blockers'] = execution_reasons(state, project, node, task)
+                task['execution_blockers'] = home['execution_blockers']
+                if home['assigned']:
+                    task['home_detail'] = home['detail']
+                else:
+                    task.pop('home_detail', None)
         # Operational source provenance remains server-side for reconciliation.
         # Browser pages use normalized business fields and explicit source URLs.
         _strip_source_payloads(project)

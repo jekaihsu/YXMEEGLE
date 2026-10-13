@@ -37,16 +37,9 @@ def etag(wid,user,version,today,users):
 
 
 def home_population(db,model,row,state,user,facts,cards,as_of):
-    """Use the same task and prerequisite facts as the full workspace Home.
-
-    The task index does not contain dependencies, permits, or source correction
-    state. Load visible project trees for this calculation; keep them out of the
-    slim response.
-    """
+    """Compute personal counts and preview details from canonical source facts."""
     from . import storage
-    from .workflow import is_owner, now
-    from .workflow_rules import activation_reasons, execution_reasons
-    from .operations import delegation_valid
+    from .home_details import build_home_task
     visible={p['id']:p for p in cards}
     empty=dict(active=0,overdue=0,due_today=0,attention=[],waiting=[],waiting_counts={})
     if not visible:return empty
@@ -55,51 +48,38 @@ def home_population(db,model,row,state,user,facts,cards,as_of):
         or_(ti.c.assignee_id==user['id'],ti.c.task_id.in_(sorted(facts['delegated']) or ['']))).distinct()))
     if not selected:return empty
     loaded=storage.load_partial(db,model,row,collections=('users','delegations','approved_leave_delegations','approvals'),
-        project_ids=selected,project_children=('evidence',))
-    full={**state,**{key:loaded[key] for key in ('users','delegations','approved_leave_delegations','approvals')},'projects':loaded['projects']}
+        project_ids=selected,project_children=('evidence','delivery_batches'))
+    # Task audit events explain pauses/returns. Keep them server-side and scoped
+    # to selected visible projects; only the canonical safe explanation leaves.
+    event_rows=db.scalars(select(model.data).where(model.workspace_id==row.id,model.kind=='events',
+        model.data['project_id'].as_string().in_(selected),
+        model.data['action'].as_string().in_(['task_pause_for_change','task_return'])))
+    full={**state,**{key:loaded[key] for key in ('users','delegations','approved_leave_delegations','approvals')},
+          'projects':loaded['projects'],'events':list(event_rows)}
+    actor=next((person for person in full['users'] if person.get('id')==user['id'] and person.get('active',True)),None)
     active=overdue=due_today=0; attention=[]; waiting=[]; waiting_counts={}; per_kind={}
-    names={u['id']:u.get('name') or u['id'] for u in full['users']}
-    current_day=now()[:10]
-    active_people={u['id'] for u in full['users'] if u.get('active',True)}
     for p in loaded['projects']:
-        card=visible[p['id']]; p['execution_status']=card['execution_status']
+        p['execution_status']=visible[p['id']]['execution_status']
         for n in p.get('nodes',[]):
             for t in n.get('tasks',[]):
                 if t['status'] in CLOSED:continue
-                ident=t['id']; owner=t.get('owner_id') or ''
-                delegation=next((d for d in full.get('delegations',[]) if d.get('delegate_id')==user['id'] and d.get('principal_id')==owner
-                    and d.get('project_id')==p['id'] and d.get('seat')=='owner' and d.get('scope')=='tasks' and ident in d.get('task_ids',[])
-                    and d.get('status')=='active' and d.get('start_date','')<=current_day<=d.get('end_date','')
-                    and owner in active_people and delegation_valid(full,d,at_use=True)),None)
-                assigned=user.get('active',True) and (owner==user['id'] or delegation is not None)
-                if not assigned:continue
-                authority=is_owner(user,t,full,project=p)
-                execution=execution_reasons(full,p,n,t)
-                activation=activation_reasons(full,p,n,t,clock=as_of) if t['status']=='pending' else []
-                start=str(t.get('start_date') or '')[:10]; future=bool(start and start>as_of[:10])
-                ready=bool(authority and card.get('execution_allowed') is not False and p['execution_status']!='paused' and p.get('case_type')!='intake'
-                    and t['status'] in ('pending','in_progress','rework') and not execution and not activation and not future)
-                if ready:
+                home=build_home_task(full,p,n,t,actor,as_of)
+                if not home['assigned']:continue
+                detail=home['detail']
+                if detail['actionable']:
                     active+=1; due=str(t.get('due_date') or '')[:10]
                     if due and due<as_of[:10]:overdue+=1
                     if due==as_of[:10]:due_today+=1
-                    if due and due<=as_of[:10]:attention.append(dict(task_id=ident,project_id=p['id'],node_id=n['id'],node_key=n.get('key') or '',
-                        node_name=n.get('name') or '',assignee_id=owner,status=t['status'],due_date=t.get('due_date') or '',
-                        project_code=p['code'],project_name=p.get('name') or '',title=t.get('title') or ''))
-                kind=reason=None
-                if p['execution_status']=='paused' or t['status']=='paused':kind,reason='paused','案件暫停，原期限保留' if p['execution_status']=='paused' else '任務暫停，原期限保留'
-                elif t['status']=='rework':kind,reason='correction','任務退回修正，需檢視待補內容'
-                elif delegation:kind,reason='proxy',f"代理 {names.get(owner,owner)}；{delegation['start_date']} 至 {delegation['end_date']}；{delegation.get('qualification_note') or delegation.get('source') or '代理紀錄待核對'}"
-                elif future:kind,reason='upcoming',f'排定 {start} 開始'
-                elif execution or activation or not authority or card.get('execution_allowed') is False:
-                    kind,reason='prerequisite',(execution or activation or [card.get('execution_readonly_reason') or '指派與執行條件待核對'])[0]
-                elif t.get('due_date') and str(t['due_date'])[:10]>as_of[:10]:kind,reason='upcoming',f"預計 {str(t['due_date'])[:10]} 到期"
+                    if due and due<=as_of[:10]:attention.append(dict(task_id=t['id'],project_id=p['id'],node_id=n['id'],node_key=n.get('key') or '',
+                        node_name=n.get('name') or '',assignee_id=t.get('owner_id') or '',status=t['status'],due_date=t.get('due_date') or '',
+                        project_code=p['code'],project_name=p.get('name') or '',title=t.get('title') or '',detail=detail))
+                kind=detail['kind']
                 if kind:
                     waiting_counts[kind]=waiting_counts.get(kind,0)+1
-                if kind and per_kind.get(kind,0)<5:
-                    per_kind[kind]=per_kind.get(kind,0)+1
-                    waiting.append(dict(task_id=ident,project_id=p['id'],project_code=p['code'],node_id=n['id'],title=t.get('title') or '未命名任務',
-                        kind=kind,reason=reason,original_due_date=t.get('original_due_date'),due_date=t.get('due_date')))
+                    if per_kind.get(kind,0)<5:
+                        per_kind[kind]=per_kind.get(kind,0)+1
+                        waiting.append(dict(task_id=t['id'],project_id=p['id'],project_code=p['code'],node_id=n['id'],title=t.get('title') or '未命名任務',
+                            kind=kind,reason=detail['reason'],original_due_date=t.get('original_due_date'),due_date=t.get('due_date'),detail=detail))
     attention.sort(key=lambda t:0 if t['due_date'][:10]<as_of[:10] else 1)
     return dict(active=active,overdue=overdue,due_today=due_today,attention=attention[:ATTENTION_LIMIT],waiting=waiting,waiting_counts=waiting_counts)
 
