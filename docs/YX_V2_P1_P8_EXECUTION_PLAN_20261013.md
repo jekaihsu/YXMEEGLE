@@ -1,12 +1,12 @@
-# YX v2 P1–P8 execution plan (2026-10-13, rev 3.2)
+# YX v2 P1–P8 execution plan (2026-10-13, rev 3.3 of 2026-10-14)
 
-Owner: the single Claude commander. Parent task `task_6f78140157c0`, continued by `task_ec8184733081` (P1/P2 planning and reviews) and now by `task_67bb22a5d7b6` (P1–P8 execution). This plan does not create a second commander. Revision 3 adds the complete P3–P8 specs and issue IDs, records the C-ID architecture decisions, and replaces the old no-push/no-staging rule with the owner's serial merge, push and staging authorization (§4).
+Owner: the single Claude commander. Parent task `task_6f78140157c0`, continued by `task_ec8184733081` (P1/P2 planning and reviews) then by `task_67bb22a5d7b6` (P1–P8 execution), and now by `task_97a32b5dcb2e` (P1/P2 continuation only; P3–P8 are not dispatched by this task). This plan does not create a second commander. Revision 3 adds the complete P3–P8 specs and issue IDs, records the C-ID architecture decisions, and replaces the old no-push/no-staging rule with the owner's serial merge, push and staging authorization (§4).
 
-**Status at rev 3:**
-- C-STATE is accepted and integrated into `ava-apple/yx-v2`.
-- The 126F1 and 127F1 view models and C-ID v2 are in flight.
-- P2 is held until every P1 gate passes. P3–P8 are specified and sequenced, but no later-phase coding is dispatched before the previous phase is accepted.
-- Staging deploys are blocked on Zeabur authentication (§10).
+**Status at rev 3.3 (2026-10-14, `ava-apple/yx-v2` = `416e1bdff6bf4ffaa1a2e54c956f7fab0efe6c52`):**
+- C-STATE, C-ID v2, the 127F1 Source Health view model and the 126F1 My Work view model are integrated. **None of them is wired to a route yet** (§4.4b). P1 interfaces are therefore not delivered; only helper/view-model artifacts exist.
+- In flight (§4.4c): the C-ID N1/N2 boundary fix, the 127B1 and 126B1 backend read models, and the AGY 127F2/126F2 presentational components.
+- P2 is held until G-P1-REV passes. P3–P8 are specified but out of scope for this continuation.
+- Staging: the parent has verified that its authenticated cloud browser can re-upload a reviewed project folder to the existing staging service. The old CLI-only blocker is retired (§10). The commander prepares the exact-SHA artifact; the parent performs the upload.
 
 VCC-125 remains a hard gate. Nothing in this plan claims production readiness or complete authorization coverage.
 
@@ -16,7 +16,7 @@ VCC-125 remains a hard gate. Nothing in this plan claims production readiness or
 
 | What | Where |
 |---|---|
-| P1/P2 interface specs (7 issues, v1.1) | `/Users/vc/Documents/Codex/2026-10-13/task-2/library-handoff/extracted/all-seven-interface-specs.md` |
+| P1/P2 interface specs (7 issues, v1.1) | `/Users/vc/Documents/Codex/2026-10-13/task-2/library-handoff/extracted/all-seven-interface-specs.md` (94885 bytes, SHA256 `2fc0ccf1201d13624dab40d4dab72206fb981306391eb1fcc053f2284c156c60`, re-read 2026-10-14). The `local_spec` paths inside `issue-id-mapping.json` point to an unreadable `/workspace/scratch/...` location; this extracted file is the readable authority. Owner-only ChatGPT Pages are not used to infer anything. |
 | P1/P2 issue → Page map and screenshots | same folder: `issue-id-mapping.json`, `*-actual-reference.jpg` |
 | P3–P8 interface specs (14 interfaces, v1.1) | `/Users/vc/Documents/Codex/2026-10-13/task-2/library-handoff/p3-p8-extracted/all-fourteen-interface-specs.md` (per-interface `*-spec.md` are identical copies) |
 | P3–P8 bundle | `yx-p3-p8-interface-handoff-20261013.zip`, SHA256 `37f928da7804a2d741a0c7f370b445dd38c5f697a3cf5ddfd9cad47c36ae1bae`, 820436 bytes, version 0. Hash and size re-verified by the commander on 2026-10-13. |
@@ -93,7 +93,7 @@ A blocked source, grant or undefined business rule stays explicitly blocked or d
 |---|---|---|
 | Commander (single) | Claude Opus `claude-opus-5-5` | Plan, specs, gates, architecture decisions from the specs, integration order, reports |
 | Logic and coding | Codex `gpt-6.1-sol`, medium, **and** Claude Sonnet `claude-sonnet-5-5`, medium | Backend read models, view models, reconciliation tests. Both families get real coding rows in every phase. |
-| Plans and reviews only | Claude Opus `claude-opus-5-5`, high | Planning and independent review of Codex-authored SHAs. **Opus writes no code**: per the owner's preference, relayed by the coordinator at 15:28Z, code changes use Claude Sonnet 5.5 medium, including hard identity, access and redaction contracts. |
+| Plans and reviews only | Claude Opus `claude-opus-5-5`, medium (high before rev 3.3) | Planning and independent review of Codex-authored SHAs. **Opus writes no code**: per the owner's preference, relayed by the coordinator at 15:28Z, code changes use Claude Sonnet 5.5 medium, including hard identity, access and redaction contracts. |
 | Reviews of Claude-authored code | Codex `gpt-6.1-sol`, medium | Independent review of Claude-authored SHAs |
 | Simple isolated UI | AGY (Antigravity), agent default | Presentational `.tsx`/`.css`, only after the view model is reviewed |
 | Integration | Commander, in `/Users/vc/orca/workspaces/YXMEEGLE/yx-v2` | The only writer of the shared hub files. Serial merges. |
@@ -125,14 +125,14 @@ The owner now expressly authorizes the following:
 2. An independent cross-model review of that exact SHA passes. Findings are fixed, and the fix is re-reviewed.
 3. The commander merges into `ava-apple/yx-v2` **serially, one candidate at a time**. Each merge is `--no-ff` and keeps reviewed SHAs (no rebase). After every merge, `scripts/local_ci.sh` runs on the result. A red result stops the queue. After a conflict resolution, the affected checks and the review rerun.
 4. After each independently accepted stage, the commander pushes `ava-apple/yx-v2` to `origin` with a normal push, never a force push. The commander records the local SHA and the `git ls-remote` remote SHA.
-5. After each accepted stage, the commander deploys only to the **verified existing Zeabur staging target** (§10) and records:
+5. After each accepted stage, the commander prepares the exact-SHA staging artifact, and the parent re-uploads it to the **verified existing Zeabur staging service** (§10). The record contains:
    - source SHA;
    - build/stage inventory hash;
    - deployed SHA;
    - `/api/health`;
    - authenticated browser evidence.
 
-   If the target cannot be authenticated or verified, the code stage stays ready, and the exact blocker is reported. No credential, scope or service is created or changed.
+   If the upload or the post-upload verification fails, the code stage stays ready, and the exact blocker is reported. No credential, scope or service is created or changed.
 6. **Never:** a production deploy, a merge to or push of `ava-apple/yx-company-system`, a force push, or rewriting a reviewed SHA.
 7. P2 merge order: 129, 130, 131, 132, 128, NAV, UI-a, UI-b, E2E. Later phases use the order given in §8.
 
@@ -201,6 +201,49 @@ Residual nonblocking notes (H1/H2, N1/N2, R1) are carried to the F2 UI and B row
 - AGY 127F2 and 126F2: presentational UI built on the integrated view models. They need G6 label copy and must handle `dataState:null`.
 - 127B2 stays blocked on G-DIAG.
 
+### 4.4b Actual wiring at `416e1bd` (verified 2026-10-14 by source inspection)
+
+| Interface | Existing route / component | Existing API | New artifacts and wiring state |
+|---|---|---|---|
+| VCC-126 My Work | `#work` → legacy `MyWork` in `frontend/src/App.tsx:126` (behind `FullWorkspaceGate`) | data from `GET /api/workspace` | `frontend/src/myWorkView.ts` is a **view model only**, imported by nothing but its test. `GET /api/my-work` and `/api/my-work/activity` do not exist; they are approved in the commander `tasks.tsv` P1-INT row |
+| VCC-127 Source Health | `#sources` → legacy `Sources` in `frontend/src/App.tsx:159` | `GET /api/sources` (`backend/app.py:782`) through `visible_source_snapshot` → `public_source_cache` field allowlist → `case_redaction.apply` | `frontend/src/sourceHealthView.ts` is a **view model only**. `GET /api/source-health` does not exist; it is approved in P1-INT |
+| C-STATE | — | — | `backend/data_state.py` and `frontend/src/dataState.ts`: used only by tests and the two view models |
+| C-ID | — | — | `backend/source_identity.py`: used only by its tests. No importer or route |
+
+Backend and source adapter gaps:
+- 127B1: a source-health projection from the existing source cache plus live-read freshness.
+- 126B1: a my-work projection from the existing workspace/home-queue state.
+- 126B2: weekly activity and actions.
+- 127B3: receipt-state exception lists (`receipt_missing` only).
+- 127B2: diagnostic access, gated by G-DIAG.
+- P1-INT: route registration, nav and replacing the legacy body.
+
+Authorization and data boundaries for P1-INT:
+- Every new GET goes through `identity` → `production_access.require_access` → `source_case_policy.filter_visible_cases` / `visible_source_snapshot` → the existing field allowlists (`public_source_cache`) → `case_redaction.apply`. No new grant, role or scope is added.
+- Unknown-versus-zero and C-STATE semantics are preserved end to end.
+
+**VCC-125 impact** (re-read 2026-10-14, Backlog). The residual leaks are on `/api/audit`, action 409 errors and `GET /api/projects/{id}`.
+- New P1 GETs must not reuse those paths.
+- My Work and Source Health may only *link* to the existing case route, and that route inherits the P2-3 leak.
+- Therefore no P1 route may claim complete authorization coverage, and VCC-125 stays a release gate.
+
+### 4.4c Continuation children (`task_97a32b5dcb2e`, Run `run_69a66146a98c`; records in `.runtime/task_97a32b5dcb2e/`)
+
+| ID | Orca task / dispatch | Agent / model | Worktree / branch (base `416e1bd`) | Exclusive files | Reviewer (other family) |
+|---|---|---|---|---|---|
+| P1-C2-N | `task_91d611b7f9d0` / `ctx_5b76505db52a` | Claude `claude-sonnet-5-5`, medium | `p1-c2-n` / `ava-apple/p1-c2-n` | `backend/source_identity.py`, `backend/test_source_identity_contract.py` | Codex `gpt-6.1-sol` medium |
+| P1-127B1 | `task_50231ff50986` / `ctx_bdb4d2fdef07` | Codex `gpt-6.1-sol`, medium | `p1-127b1` / `ava-apple/p1-127b1` | `backend/source_health.py`, `backend/test_source_health.py` | Claude Opus `claude-opus-5-5` medium |
+| P1-126B1 | `task_c94f5b3156f0` / `ctx_2709e42eedc0` | Claude `claude-sonnet-5-5`, medium | `p1-126b1` / `ava-apple/p1-126b1` | `backend/my_work.py`, `backend/test_my_work.py` | Codex `gpt-6.1-sol` medium |
+| P1-127F2 | `task_c85dcc2b9f77` / `ctx_6672e60bbf04` | AGY (antigravity), agent default | `p1-127f2` / `ava-apple/p1-127f2` | `frontend/src/SourceHealth.tsx`, `frontend/src/source-health.css` | Codex `gpt-6.1-sol` medium |
+| P1-126F2 | `task_de0e26027d09` / `ctx_075d4b849643` | AGY (antigravity), agent default | `p1-126f2` / `ava-apple/p1-126f2` | `frontend/src/MyWorkTable.tsx`, `frontend/src/my-work-table.css` | Codex `gpt-6.1-sol` medium |
+
+Held rows:
+- 127B3 (Codex): waits for C2-N acceptance, because N2 is its input boundary.
+- 126B2 (Codex): waits for 126B1.
+- 127B2 (Sonnet): waits for G-DIAG.
+
+P1 merge order: C2-N, 127B1, 126B1, 127B3, 126B2, F2 ×2, P1-INT (the commander wires the three approved GETs and the `#work`/`#sources` bodies), then P1-REV.
+
 ### 4.5 Remaining P1 rows and owners
 
 | Row | Owner | Depends on |
@@ -221,7 +264,7 @@ Residual nonblocking notes (H1/H2, N1/N2, R1) are carried to the F2 UI and B row
 | Gate | Unblocks | Condition | State |
 |---|---|---|---|
 | G-C1 | 126F1, 127F1 | C-STATE reviewed and accepted | **Passed** (`0ed93e7`, integrated at `69f7d4a`) |
-| G-C2 | 127B1, 127B3, 126B1 | C2-V2 final SHA implements §7 D1–D8 (D3 as revised) + F6/N1–N4, Codex review passes, coordinator accepts | **Review passed** (`78b495b`, Codex `task_e173b53f4708` PASS-WITH-FINDINGS); integrated at `2ea1e53`; awaiting coordinator acceptance |
+| G-C2 | 127B1, 126B1 (dispatched); 127B3 (held for C2-N) | C2-V2 final SHA implements §7 D1–D8 (D3 as revised) + F6/N1–N4, Codex review passes, coordinator accepts | Review passed (`78b495b`, Codex `task_e173b53f4708` PASS-WITH-FINDINGS); integrated at `2ea1e53`. Residual N1 (equal bool/float version components kept) and N2 (`native_records` raises on list/dict link `table_id`) are being fixed at the C-ID boundary by P1-C2-N; the protected `v4_sources.py` stays unchanged. Final C-ID acceptance follows the C2-N cross-review |
 | G-RCPT | any field/edge shown as mapped/accepted | Supplied VCC-117 same-version source/schema/permission receipt per field and native edge type. Absent → `unlocated` / `receipt_missing`; no invented IDs | **Open, hard evidence gate** (no receipts in repo) |
 | G-RSCHEMA | trusting receipt content | Receipt schema, location and verifier authority defined by owner/VCC-117 | **Open, unresolved** |
 | G-TOKEN | asserting Lark token alphabet | Evidence on whether base/table/record tokens can contain `/`. Until then C-ID rejects such components (D8) | **Open, unresolved** |
@@ -230,7 +273,7 @@ Residual nonblocking notes (H1/H2, N1/N2, R1) are carried to the F2 UI and B row
 | G-AMT | P2-131B amounts | Separate approval to show contract amounts (`QUOTE_FINANCE` re-verified) | Open |
 | G-RCODE | P2-132B work orders / node instances | R01/02/09/10 work-order and node models verified; until then `unlocated` + Source Health link | Open |
 | G-P(N) | phase N+1 | Phase N integration + real tests + independent review + responsive browser evidence + coordinator acceptance | Sequential (§2) |
-| G-STG | staging publication of any stage | Zeabur auth verified for the existing staging target (§10) | **Blocked**: CLI token returns 401 |
+| G-STG | staging publication of any stage | Exact-SHA artifact prepared from an accepted, pushed `yx-v2` SHA; the parent re-uploads it to the existing staging service through its verified authenticated browser (§10) | **Path available** (CLI 401 no longer the route). No accepted P1 stage is ready to stage yet |
 | G-VCC125 | any production release | VCC-125 closed; never waived | Open |
 
 Stop and escalate on any of these: a GET endpoint not listed in the task table, a change to an existing response shape, a missing diagnostic capability, contract amounts, payroll/HR data beyond the existing allowlists, or any field or edge without a receipt.
@@ -572,9 +615,12 @@ The reference is visual and UI/UX evidence only. Every per-page screenshot repor
 - Origin: `https://yongxiang-workbench-staging.zeabur.app`. `GET /api/health` → 200 `{"status":"ok","mode":"lark","database":"postgresql"}`.
 - The health endpoint does not expose a build SHA. The deployed SHA must come from the Zeabur deployment record or the stage inventory receipt (`stage_inventory`, `verify_stage_package`).
 
-**Blocker G-STG:** the local Zeabur credential (`~/.config/zeabur/cli.yaml`) is rejected. `zeabur auth status` and a read-only GraphQL `me` query both return **401 Unauthorized**. Per owner rules, no credential is created or changed.
+**Staging path (rev 3.3; replaces the CLI-only blocker):** the local Zeabur CLI credential still returns 401, but it is no longer the route. The parent has verified that its authenticated cloud browser can re-upload a reviewed project folder to the exact existing staging service. Steps:
+1. The commander exports the accepted, pushed `yx-v2` SHA with `git archive <sha>` into `worker-evidence/<task>/stage-<sha>/`. It records the SHA, a file-list SHA-256 inventory and the archive hash, and runs `scripts/local_ci.sh` on that SHA.
+2. The parent uploads exactly that folder to the existing staging service only (service ID in `scripts/verify_frozen_release_source.py` `SERVICES['staging']`).
+3. The commander or parent checks `/api/health` and captures authenticated browser evidence using an existing demo/staging account. The deployed SHA is taken from the upload record or the inventory, because health does not expose it.
 
-**Owner action:** re-authenticate the existing Zeabur CLI account (`zeabur auth login`) on this Mac mini. Until then, every stage stays merge- and push-ready with its exact SHA, and staging is reported as blocked.
+No credential, scope, service or production target is created or changed.
 
 **Isolated browser evidence:** run the local demo instance (SQLite + Vite on scratch ports, `DEMO_MODE`, synthetic data), never production data.
 - Capture desktop 1280×800 and narrow 390×844.
