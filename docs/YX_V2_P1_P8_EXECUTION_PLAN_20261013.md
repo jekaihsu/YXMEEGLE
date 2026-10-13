@@ -278,9 +278,15 @@ Binding decisions made during these rounds:
 **P1-INT** `task_c7e639e9e6ed` / `ctx_28c92afc7c3a`: Claude Sonnet 5.5 medium, worktree `p1-int`, branch `ava-apple/p1-int`, from `534c0f0`. It is the sole writer of the hub files and registers only `GET /api/source-health` and `GET /api/my-work`.
 
 | 10 | P1-INT route wiring | `6c926551e5c75e8f1392d2cd5b02f865a2a085a9`. Sonnet `task_c7e639e9e6ed` produced `0a7cbb3`, which labelled `page_state` null as 資料正常. That violated the owner's correction `msg_2da3335aa577`, so FIX1 `task_ac643adf1d11` restored null → unknown | Codex `task_606546259acc` PASS-WITH-FINDINGS, with isolated demo browser evidence in `worker-evidence/task_606546259acc/screens` | `6e1476efd4db68afc02f6cd8f37909b4bd6624f5` | `local_ci` exit 0 (3452 passed) |
-| 11 | P1-INT-FIX2/FIX3 | `c2d38b7ac7189847839b160e4df940bc20a90ff0`. N1/W1 by `task_d9a56995101d`; F1–F3 from the Opus P1-REV, fixed by `task_3e8884438106` | Opus P1-REV `task_05984fe4777c` on `6e1476e`: CHANGES-REQUESTED (F1 Medium: evidence unknown → none). Codex P1-FINAL-REV `task_089ad14fcd65` on `50ddfdb` is running | `50ddfdb50ab0b43e81e031c5a676ca5295d47830` | `local_ci` running; push only after CI and review |
+| 11 | P1-INT-FIX2/FIX3 | `c2d38b7ac7189847839b160e4df940bc20a90ff0`. N1/W1 by `task_d9a56995101d`; F1–F3 from the Opus P1-REV, fixed by `task_3e8884438106` | Opus P1-REV `task_05984fe4777c` on `6e1476e`: CHANGES-REQUESTED (F1 Medium: evidence unknown → none). Codex P1-FINAL-REV `task_089ad14fcd65` on `50ddfdb`: PASS-WITH-FINDINGS (W1b Low) | `50ddfdb50ab0b43e81e031c5a676ca5295d47830` | `local_ci` exit 0 (3453 passed). Codex P1-FINAL-REV `task_089ad14fcd65` **PASS-WITH-FINDINGS**: one Low, W1b (Back after navigating from a different row restores the selected row, never BODY). **Pushed** with a normal fast-forward: remote `ava-apple/yx-v2` = `50ddfdb` (`ls-remote` verified) |
 
 Push note: the remote reached `534c0f0` through a push that was not made by the commander, while the commander was holding pushes for the contention-flake decision.
+
+**Exact-SHA staging artifact (prepared, not deployed):** `worker-evidence/task_97a32b5dcb2e/stage-50ddfdb/`.
+- Contents: `git archive 50ddfdb` → `yx-v2-50ddfdb.tar` (SHA-256 `a9c9c15b94f0c132c9b0626010c75bd573661671e4581556f6e7bf9beb1f9957`) and the extracted `project/` folder.
+- Inventory: 833 files. The `stage_inventory.inventory_digest` value is `184bb78bc72d49e976c27c1cbf90134ce4613261df7ec5052b41c2238e8ae86b`, verified by `verify_stage_inventory`.
+- `scripts/verify_stage_package.py`: exit 0, all checks ok (receipt in the same folder).
+- The parent re-uploads `project/` to the existing staging service only after coordinator acceptance (§10). No credential, service or production change.
 
 **Routes now in code** (they become delivered only once P1-FINAL-REV and coordinator acceptance pass):
 - `GET /api/source-health` returns the page state only, with `diagnostic=False`. It passes `viewer_filtered=None` because `visible_source_snapshot` narrows rows.
