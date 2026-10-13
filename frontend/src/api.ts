@@ -60,7 +60,8 @@ export function normalizeRoute<T extends {view:string;tab?:string;section?:strin
  if(route.tab==='approvals')return {...route,tab:'flow',section:'approvals'};
  return route;
 }
-export function readRoute(){const p=new URLSearchParams(location.hash.replace(/^#\/?/,''));return normalizeRoute({view:p.get('view')||'dashboard',project:p.get('project')||undefined,node:p.get('node')||undefined,task:p.get('task')||undefined,tab:p.get('tab')||undefined,section:p.get('section')||undefined,completion:p.get('completion')||undefined,focus:p.get('focus')||undefined,comment:p.get('comment')||undefined,approval:p.get('approval')||undefined})}
+export function parseRoute(hash:string){const p=new URLSearchParams(hash.replace(/^#\/?/,''));return normalizeRoute({view:p.get('view')||'dashboard',project:p.get('project')||undefined,node:p.get('node')||undefined,task:p.get('task')||undefined,tab:p.get('tab')||undefined,section:p.get('section')||undefined,completion:p.get('completion')||undefined,focus:p.get('focus')||undefined,comment:p.get('comment')||undefined,approval:p.get('approval')||undefined,ctx:p.get('ctx')||undefined})}
+export const readRoute=()=>parseRoute(location.hash);
 
 type LiveResult={freshness:import('./types').Freshness};
 async function checkedLive(request:Promise<LiveResult>):Promise<LiveResult>{

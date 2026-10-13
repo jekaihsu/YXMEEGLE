@@ -42,6 +42,8 @@ let root;let features;let current=shell;let user=a;let etag='W/"shell-A:1"';let 
 globalThis.fetch=async(url,init)=>{
  requests.push({url,init});
  if(url==='/api/session')return json({user,users:[a,b],mode:'lark',environment:'production',workspace_id:'workspace-A',auth_configured:true,features});
+ if(url==='/api/my-work')return json({rows:[],readState:'ready',assignment:'unassigned',canSeeAwaitingConfirmation:false});
+ if(url==='/api/source-health')return json({page_state:null,sources:[]});
  if(url==='/api/workspace'){await fullGate();return json({...workspace,version:current.version});}
  if(url.startsWith('/api/projects?view=overview'))return overview(url);
  if(url.startsWith('/api/projects/'))return detail(url);
@@ -177,17 +179,22 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  const fullReads=()=>requests.filter(r=>r.url==='/api/workspace').length;
  assert.equal(fullReads(),0,'first paint never reads the full workspace');
  let openFull;const heldFull=new Promise(resolve=>{openFull=resolve});fullGate=()=>heldFull;
- await goto('view=work');assert.equal(fullReads(),1);assert.ok(document.querySelector('.workspace [role="status"]').textContent.includes('正在載入完整資料'),'loading state while the full read is pending');
+ await goto('view=work&tab=legacy');assert.equal(fullReads(),1);assert.ok(document.querySelector('.workspace [role="status"]').textContent.includes('正在載入完整資料'),'loading state while the full read is pending');
  assert.ok(document.querySelector('[aria-label="主要導覽"]'),'the shell stays usable while a screen loads');
  await flush(async()=>{openFull();await heldFull});fullGate=async()=>{};
  assert.ok(document.querySelector('.workspace').textContent.includes('TASK_A'),'my work renders the loaded task');
- for(const view of ['approvals','schedule','routines','admin','work'])await goto('view='+view);
+ for(const view of ['approvals','schedule','routines','admin','work&tab=legacy'])await goto('view='+view);
  assert.equal(fullReads(),1,'one full read per shell version, shared by every screen');
  await goto('view=dashboard');await flush(()=>[...document.querySelectorAll('.today-activity button')].find(b=>b.textContent==='載入近期活動').click());
  assert.equal(fullReads(),1);assert.ok(document.querySelector('.today-activity').textContent.includes('尚無操作紀錄'));
  current={...shell,version:5};etag='W/"shell-A:5"';await flush(()=>window.shellContext.refresh());await goto('view=approvals');
  assert.equal(fullReads(),2,'a newer shell version reads the full workspace again');
  await flush(()=>window.shellContext.run('case_execution_assign',{execution_system:'workbench'},{project_id:'pA'}));
- await goto('view=schedule');await goto('view=work');assert.equal(fullReads(),2,'after a mutation the app holds the full workspace and reads nothing');
+ await goto('view=schedule');await goto('view=work&tab=legacy');assert.equal(fullReads(),2,'after a mutation the app holds the full workspace and reads nothing');
+ // P1-INT: the default #work/#sources pages read their own GETs and never the full workspace.
+ const fullBefore=fullReads();await goto('view=work');await goto('view=sources');
+ assert.equal(fullReads(),fullBefore,'default work/sources pages do not read the full workspace');
+ assert.ok(requests.some(r=>r.url==='/api/my-work')&&requests.some(r=>r.url==='/api/source-health'));
+ assert.ok(!document.querySelector('.workspace').textContent.includes('資料正常'),'null page_state never renders a healthy label');assert.ok(document.querySelector('.workspace').textContent.includes('狀態未知'),'null page_state renders unknown');
  console.log('Shell mode: feature gating, server-side paging/filter reset/stale-response guard, lazy single-project detail, on-demand full workspace, summary-only render/filter/sort, badges, 304, identity cache, mutation/upload concurrency and 409 passed');
 }finally{await flush(()=>root.unmount());dom.window.close()}

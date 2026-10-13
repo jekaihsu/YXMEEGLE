@@ -792,6 +792,46 @@ def create_app(overrides=None):
             result=public_source_response(state,cache.data,user) if cache else {'configured':bool(configuration(cfg)),'last_sync':None,'status':'never','message':'尚未同步來源','tables':[],'records':[]}
         return {**result,'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
 
+    @app.get('/api/source-health')
+    def source_health(request:Request):
+        """Page state only (G-DIAG open: diagnostic=False). Same branches and visibility as GET /api/sources; no record values."""
+        from .source_health import build_source_health
+        data,user=identity(request)
+        app.state.live_read.ensure(data['wid'],'sources')
+        freshness=app.state.live_read.status(data['wid'])
+        if data['mode']!='lark' or data['wid'].startswith('test-'):
+            snapshot={'status':'requires_login','tables':[],'records':[]}
+        else:
+            with sessions() as db:
+                cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']))
+            if cache:
+                from .source_case_policy import visible_source_snapshot
+                snapshot=visible_source_snapshot(state,cache.data)
+                if state.get('environment') not in ('test','demo'):
+                    from . import case_redaction
+                    from .source_case_policy import filter_visible_cases
+                    visible=filter_visible_cases(dict(state))
+                    case_redaction.apply(snapshot,case_redaction.make_plan(case_redaction.snapshot(state),visible))
+            else: snapshot={'status':'never','tables':[],'records':[]}
+        # Exactly the POST /api/sources/sync predicate. viewer_filtered stays None: visible_source_snapshot narrows
+        # records to the admitted ids, so a zero count cannot be proven unfiltered.
+        read_authorized=data['mode']=='lark' and not data['wid'].startswith('test-') and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+        return build_source_health(snapshot,freshness['datasets']['sources'],diagnostic=False,read_authorized=read_authorized,viewer_filtered=None)
+
+    @app.get('/api/my-work')
+    def my_work(request:Request):
+        """Read model for the viewer; same full-workspace load as GET /api/workspace. my_work applies case_redaction itself."""
+        from .my_work import build_my_work_input
+        data,user=identity(request)
+        app.state.live_read.ensure(data['wid'],'sources')
+        read={'admitted':data.get('access_mode','normal')=='normal'}
+        try:
+            with phase(request,'load'),sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
+            read['loaded']=True
+        except Exception:
+            state={}; read['failed']=True
+        return build_my_work_input(state,user,read)
+
     @app.post('/api/sources/cutover-baseline')
     async def source_case_baseline(request:Request):
         data,user=identity(request)

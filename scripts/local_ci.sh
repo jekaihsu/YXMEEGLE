@@ -47,6 +47,9 @@ npm run test:contrast
 npm run test:case-navigation
 npm run test:project-disabled-reasons
 node test-company-route.mjs
+npm run test:integration-routes
+npm run test:my-work-view
+npm run test:source-health-view
 npm run build
 npm run test:dev-tooling
 

@@ -225,6 +225,17 @@ test('F8 ordinary read_failed guidance offers an available administrator action'
 });
 
 let passed = 0;
+test('H1 null page_state stays unknown and never yields a healthy/clean label; absent or malformed too', () => {
+ for (const nul of [{page_state: null, sources: []}, {sources: []}, {page_state: undefined, sources: []}, {page_state: 0, sources: []}, {page_state: {}, sources: []}, {page_state: {states: ['bogus']}, sources: []}, null, 'x']) {
+  const page = build(nul, options).page;
+  assert.deepEqual([page.states, page.statusLabel], [['unknown'], '狀態未知'], JSON.stringify(nul));
+  assert.equal('healthy' in page, false);
+  assert.doesNotMatch(JSON.stringify(page), /資料正常|已完成讀取/);
+ }
+ assert.deepEqual(build({page_state: null, sources: []}, {diagnosticCapability: false}).page.states, ['unknown']);
+ assert.deepEqual(build({page_state: {states: ['stale']}, sources: []}, options).page.states, ['stale']);
+});
+
 for (const [name, run] of tests) {
  if (process.env.SOURCE_HEALTH_TEST && !name.startsWith(process.env.SOURCE_HEALTH_TEST)) continue;
  run(); passed++; console.log(`PASS ${name}`);
