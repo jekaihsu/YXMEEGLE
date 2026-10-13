@@ -41,3 +41,8 @@ input::-webkit-datetime-edit{padding:0;line-height:1.4}
 input::-webkit-datetime-edit-fields-wrapper{padding:0}
 input::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.6;margin-inline-start:var(--sp-2)}
 input::-webkit-calendar-picker-indicator:hover{opacity:1}
+
+/* The case detail uses one accent ring, including legacy controls. */
+.workspace .project-detail :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.workspace .project-detail :is(.project-tabs,.ops-tabs,.table-scroll,.workflow-scroll) :focus-visible,
+.workspace .project-detail :is(.table-scroll,.workflow-scroll):focus-visible{outline-offset:-2px}
