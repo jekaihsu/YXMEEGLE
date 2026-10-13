@@ -91,7 +91,7 @@ def test_hidden_case_tasks_vanish_entirely_in_production():
 def test_native_task_parent_is_verified_and_only_case_title_is_emitted():
     row = run(workspace(project('p1', 'Case One', [task('t')])))['rows'][0]
     assert row['parent'] == {'verified': True, 'case_title': 'Case One'}
-    assert 'case_title' not in row and 'work_item_title' not in row  # row level titles would bypass verification
+    assert row['case_title'] == 'Case One' and 'work_item_title' not in row  # row title only from a verified parent
 
 
 def test_unverified_parent_is_false_with_unknown_titles_even_when_names_match():
@@ -101,9 +101,10 @@ def test_unverified_parent_is_false_with_unknown_titles_even_when_names_match():
                                                       {'project_id': 'other', 'node_id': 'p1-n', 'task_id': 'imp'}]}]
     row = run(ws)['rows'][0]
     assert row['parent'] == {'verified': False}
-    assert 'case_title' not in row and 'entry_points' not in row
+    assert 'case_title' not in row and 'entry_points' not in row  # unverified: no row level title either
     ws['contract_items'][0]['task_refs'].append({'project_id': 'p1', 'node_id': 'p1-n', 'task_id': 'imp'})
     assert run(ws)['rows'][0]['parent'] == {'verified': True, 'case_title': 'Case One'}
+    assert run(ws)['rows'][0]['case_title'] == 'Case One'
 
 
 def test_estimated_pending_requested_dates_never_become_effective():
@@ -155,7 +156,7 @@ def test_partial_and_stale_flags_are_independent_and_partial_never_claims_unassi
     empty = workspace(project('p1', 'Case One', [task('x', owner='other')]))
     empty['_partial'] = {}
     assert run(empty)['assignment'] == 'unknown'
-    broken = workspace(project('p1', 'Case One', [task('t'), {'title': 'no id'}]))
+    broken = workspace(project('p1', 'Case One', [task('t'), {'title': 'no id', 'owner_id': 'viewer'}]))  # could be the viewer's own work
     out = run(broken)
     assert ids(out) == ['t'] and out['readState'] == {'states': ['partial'], 'count': None}
 
@@ -245,15 +246,81 @@ def test_output_parses_through_build_my_work_view(tmp_path):
         "const d=JSON.parse(readFileSync(process.argv[2],'utf8'));const o={};\n"
         "for(const [k,v] of Object.entries(d)) o[k]=buildMyWorkView(v);\n"
         "const w=buildMyWorkView({...d.ready,canSeeAwaitingConfirmation:true,filters:{mode:'awaiting_my_confirmation'}});\n"
-        "console.log(JSON.stringify({views:o,awaiting:w.rows.map(r=>r.id)}));\n")
+        "const sr=buildMyWorkView({...d.ready,filters:{search:'Case One'}});\n"
+        "console.log(JSON.stringify({views:o,awaiting:w.rows.map(r=>r.id),search:sr.rows.map(r=>r.id)}));\n")
     done = subprocess.run([NODE, '--experimental-strip-types', str(script), str(src)], capture_output=True, text=True, cwd=tmp_path)
     assert done.returncode == 0, done.stderr
     got = json.loads(done.stdout)
     ready = got['views']['ready']
     assert [r['id'] for r in ready['rows']] == ['old'] and ready['rows'][0]['dueLabel'] == 'unknown'
-    assert ready['rows'][0]['caseTitle'] == 'unknown'  # row level title is never supplied
+    assert ready['rows'][0]['caseTitle'] == 'Case One'  # verified parent supplies the row title
+    assert got['search'] == ['old']
     assert ready['drawer']['task'] is None
     assert ready['pageState'] is None and got['awaiting'] == ['review:cy:owner']
     assert got['views']['unassigned']['emptyReason'] == 'unassigned'
     assert got['views']['forbidden']['pageState'] == {'states': ['forbidden']} and got['views']['forbidden']['rows'] == []
     assert got['views']['loading']['pageState']['states'] == ['loading']
+
+
+# ---- correction round 1 (Codex review task_ef2cc07991fb) ---------------------------
+def test_f1_restricted_task_cannot_change_page_flags_or_assignment():
+    baseline = workspace(project('p', 'Visible', []))
+    with_other = deepcopy(baseline)
+    with_other['projects'][0]['nodes'][0]['tasks'].append(task('restricted', owner='other', input_task_ids=None))
+    assert run(with_other) == run(baseline)
+
+
+@pytest.mark.parametrize('bad', [
+    {'owner': 'other', 'input_task_ids': None}, {'owner': 'other', 'title': ['x'], 'revision': 'bad'},
+    {'owner': 'ghost-not-a-user', 'input_task_ids': 7}, {'owner': None, 'input_task_ids': None},
+    {'owner': 'other', 'id': None}, {'owner': 'other', 'id': ''}])
+def test_f1_malformed_excluded_tasks_never_change_whole_output(bad):
+    for mine in ([], [task('mine')]):
+        baseline = workspace(project('p', 'Visible', mine))
+        polluted = deepcopy(baseline)
+        extra = task('restricted', **{k: v for k, v in bad.items() if k != 'id'})
+        if 'id' in bad: extra['id'] = bad['id']
+        polluted['projects'][0]['nodes'][0]['tasks'].append(extra)
+        assert run(polluted) == run(baseline)
+
+
+def test_f1_malformed_task_that_could_be_the_viewers_still_makes_the_page_partial():
+    out = run(workspace(project('p', 'Visible', [task('mine'), task('broken', owner='viewer', input_task_ids=None)])))
+    assert ids(out) == ['mine'] and out['readState'] == {'states': ['partial'], 'count': None}
+    unassigned = run(workspace(project('p', 'Visible', [task('broken', owner='viewer', input_task_ids=None)])))
+    assert unassigned['assignment'] == 'unknown'
+
+
+def test_f2_hidden_case_code_is_redacted_from_all_five_holders_in_production():
+    hidden = project('hidden', 'Hidden', [], code='C-RESTRICTED', case_visibility='excluded_history')
+    visible = project('p', 'C-RESTRICTED', [task('mine', title='C-RESTRICTED', input='C-RESTRICTED', output='C-RESTRICTED')], code='C-VISIBLE')
+    visible['events'] = [{'id': 'ev', 'task_id': 'mine', 'action': 'task_pause', 'message': 'C-RESTRICTED'}]
+    ws = workspace(visible, hidden, environment='production')
+    out = run(ws)
+    assert 'C-RESTRICTED' not in json.dumps(out, ensure_ascii=False)
+    assert ids(out) == ['mine']
+    assert 'C-RESTRICTED' in json.dumps(ws['projects'][0]['name'])  # input workspace is not mutated
+
+
+def test_f2_test_and_demo_environments_are_not_redacted():
+    hidden = project('hidden', 'Hidden', [], code='C-RESTRICTED', case_visibility='excluded_history')
+    visible = project('p', 'Visible', [task('mine', title='C-RESTRICTED')], code='C-VISIBLE')
+    assert run(workspace(visible, hidden, environment='test'))['rows'][0]['title'] == 'C-RESTRICTED'
+
+
+def test_f3_verified_case_title_is_row_level_and_absent_when_unverified():
+    row = run(workspace(project('p', 'Visible case', [task('mine')])))['rows'][0]
+    assert row['case_title'] == 'Visible case' and row['parent']['case_title'] == 'Visible case'
+
+
+def test_f4_explicit_terminal_outcomes_take_precedence_over_loading():
+    ws = workspace()
+    cases = [({'loaded': False, 'admitted': True, 'failed': True}, 'read_failed'),
+             ({'loaded': False, 'admitted': True, 'unlocated': True}, 'unlocated'),
+             ({'loaded': False, 'admitted': False}, 'forbidden'),
+             ({'loaded': False, 'admitted': False, 'failed': True}, 'forbidden'),
+             ({'loaded': False, 'admitted': True, 'failed': True, 'unlocated': True}, 'read_failed'),
+             ({'loaded': False, 'admitted': True}, 'loading'), ({'loaded': True}, 'unknown')]
+    for read, state in cases:
+        assert run(ws, read)['readState']['states'] == [state], read
+    assert run(ws, {'loaded': False, 'admitted': True, 'failed': True})['readState'] == {'states': ['read_failed'], 'count': None}

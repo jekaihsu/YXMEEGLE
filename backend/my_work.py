@@ -5,11 +5,28 @@ existing projections only (``filter_visible_cases``, ``build_home_task`` for
 assignment, ``home_queues`` for awaiting confirmation). Nothing is inferred:
 a parent case is verified only by an explicit relation, a due date is effective
 only from a verified formal field, and every other fact stays unknown (omitted).
+
+Read-input contract (``read``, supplied by the trusted caller; this module reads nothing):
+``admitted`` is the existing production_access verdict (True/False/missing), ``failed`` and
+``unlocated`` are terminal retrieval outcomes, ``loaded`` means a workspace was obtained,
+``stale`` marks retained rows. Explicit terminal outcomes win over progress, in this order:
+forbidden (``admitted`` is False) > read_failed > unlocated > loading (``loaded`` is not True)
+> unknown (``admitted`` missing). A failed initial retrieval with ``loaded`` False is
+therefore read_failed, never loading.
+
+Trusted publication boundary: the output is passed through the existing case_redaction
+response redactor (plan built from the pre-filter workspace, exactly as backend/app.py does),
+except in the test/demo environments. The redactor's residual limits remain VCC-125.
+
+``canSeeAwaitingConfirmation`` is the existing per-item authorization (``home_queues`` only
+lists a confirmation the viewer may cast). No role is inferred: a supervisor with zero such
+items sees no toggle until P1-INT proves an existing capability for it.
 """
 from urllib.parse import quote
 
+from . import case_redaction
 from .data_state import data_state
-from .home_details import build_home_task
+from .home_details import _proxy, build_home_task
 from .home_queues import CLOSED_TASKS, home_queues
 from .source_case_policy import filter_visible_cases
 from .workflow import now
@@ -73,16 +90,17 @@ def build_my_work_input(ws, viewer, read=None):
     ``unlocated`` and ``stale``. Missing information is never treated as success.
     """
     read = read if isinstance(read, dict) else {}
-    if read.get('loaded') is not True: return _blocked('loading')
     if read.get('admitted') is False: return _blocked('forbidden')
-    if read.get('admitted') is not True: return _blocked('unknown')
     if read.get('failed'): return _blocked('read_failed')
     if read.get('unlocated'): return _blocked('unlocated')
+    if read.get('loaded') is not True: return _blocked('loading')
+    if read.get('admitted') is not True: return _blocked('unknown')
     uid = (viewer or {}).get('id')
     if not uid or not any(u.get('id') == uid and u.get('active', True) for u in ws.get('users', [])):
         return _blocked('unknown')
 
     partial = '_partial' in ws
+    pre_filter = case_redaction.snapshot(ws)  # the redaction plan needs the original, unfiltered cases
     state = filter_visible_cases(dict(ws))  # hidden cases vanish here, never as forbidden rows
     as_of = ws.get('as_of') or now()[:10]
     unknown_outcome = _unknown_outcome_tasks(state)
@@ -95,7 +113,16 @@ def build_my_work_input(ws, viewer, read=None):
             tasks = node.get('tasks') if isinstance(node, dict) else None
             if not isinstance(tasks, list): partial = True; continue
             for task in tasks:
-                if not isinstance(task, dict) or not _text(task.get('id')): partial = True; continue
+                if not isinstance(task, dict): partial = True; continue
+                # Assignment first, from the existing owner/delegation authority: a task that cannot be the
+                # viewer's never reaches validation or the full projection, so it cannot alter any page flag.
+                if task.get('owner_id') != uid:
+                    try:
+                        mine = bool(_proxy(state, project, task, viewer))
+                    except (KeyError, TypeError, ValueError, AttributeError):
+                        partial = True; continue  # delegation data unreadable: it may be the viewer's
+                    if not mine: continue
+                if not _text(task.get('id')): partial = True; continue
                 try:
                     home = build_home_task(state, project, node, task, viewer, as_of)
                 except (KeyError, TypeError, ValueError, AttributeError):
@@ -146,8 +173,15 @@ def build_my_work_input(ws, viewer, read=None):
         read_state = data_state(*flags, count=None if partial else len(rows))
     else:
         read_state = 'ready'
-    return {'rows': sorted(rows, key=lambda r: r['id']), 'readState': read_state,
-            'assignment': 'assigned' if ever_assigned else 'unknown' if partial else 'unassigned',
+    out = {'rows': sorted(rows, key=lambda r: r['id']), 'readState': read_state,
+           'assignment': 'assigned' if ever_assigned else 'unknown' if partial else 'unassigned',
             # Existing authorization: home_queues only lists a confirmation the viewer may cast (can_vote,
             # current reviewer seat or handover target). No such item proves nothing, so the toggle stays off.
-            'canSeeAwaitingConfirmation': bool(awaiting)}
+           'canSeeAwaitingConfirmation': bool(awaiting)}
+    environment = ws.get('environment', 'demo' if any(isinstance(p, dict) and p.get('source_kind') == 'demo' for p in ws.get('projects', [])) else 'production')
+    if environment not in ('test', 'demo'):
+        case_redaction.apply(out, case_redaction.make_plan(pre_filter, state))
+        out['rows'] = [{k: v for k, v in r.items() if v is not None} for r in out['rows'] if r.get('id') is not None]
+    for row in out['rows']:  # the consumer's table and search read the row level title; only a verified parent supplies it
+        if row['parent'].get('verified') and row['parent'].get('case_title'): row['case_title'] = row['parent']['case_title']
+    return out
