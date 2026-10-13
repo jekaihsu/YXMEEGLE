@@ -57,6 +57,9 @@ button.ds-row:hover,a.ds-row:hover{background:var(--surface-2)}
 .ds-picker li>svg{flex-shrink:0;color:var(--accent)}
 
 /* Legacy case actions share the primitive boundary and disabled affordance. */
-.project-detail .button:not(.primary){background:var(--surface);border:1px solid var(--accent);color:var(--accent)}
+.workspace .project-detail .button:not(.primary){background:var(--surface);border:1px solid var(--accent);color:var(--accent)}
 .project-detail :is(button:disabled,fieldset:disabled button){opacity:.6;cursor:not-allowed}
 .ds-button[data-variant=plain]:hover{text-decoration:underline}
+
+/* Discussion initials need the same opaque surface as secondary controls. */
+.workspace .project-detail .project-discussion .avatar{--accent-fill:var(--surface)}

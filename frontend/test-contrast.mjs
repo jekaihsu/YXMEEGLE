@@ -27,6 +27,8 @@ const declaration=(selector,property)=>{
  const value=body.match(new RegExp(`(?:[;{])${property}:([^;}]*)`))?.[1];assert.ok(value,`${selector} ${property}`);return value;
 };
 for(const[name,t]of[['light',light],['dark',dark]]){
+ const avatarBg=resolve(declaration('.workspace .project-detail .project-discussion .avatar','--accent-fill'),t);
+ assert.ok(ratio(t.accent,avatarBg)>=4.5,`${name} discussion initials: ${ratio(t.accent,avatarBg).toFixed(2)}`);
  const border=resolve(declaration('.ds-button','border').split('solid ')[1],t);
  const bg=resolve(declaration('.ds-button','background'),t),fg=resolve(declaration('.ds-button','color'),t);
  assert.ok(ratio(border,t.surface)>=3,`${name} secondary border: ${ratio(border,t.surface).toFixed(2)}`);
