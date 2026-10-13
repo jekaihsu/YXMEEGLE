@@ -16,3 +16,4 @@ export function taipeiTime(value?:string|null,empty='—'):string{
  const p=Object.fromEntries(zone.formatToParts(new Date(ms)).map(x=>[x.type,x.value]));
  return `${p.year}/${p.month}/${p.day} ${p.hour}:${p.minute}:${p.second} ${TAIPEI_SUFFIX}`;
 }
+export function taipeiDate(value?:string|null,empty='—'):string{const text=taipeiTime(value,'');return text?text.slice(0,10):empty}
