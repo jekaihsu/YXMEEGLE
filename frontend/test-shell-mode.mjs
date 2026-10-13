@@ -84,7 +84,14 @@ try{
  await flush(()=>button('交付已完成').click());assert.equal(rows().length,1);assert.ok(rows()[0].textContent.includes('CASE_B'));
  await flush(()=>button('全部紀錄').click());
  const sort=document.querySelector('[aria-label="案件排序"]');await flush(()=>{sort.value='progress';sort.dispatchEvent(new Event('change',{bubbles:true}))});
- assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'),'shell progress sorts descending without nodes');
+ assert.ok(rows()[0].textContent.includes('CASE_B'),'shell progress defaults to ascending without nodes');
+ assert.ok(requests.at(-1).url.includes('sort=progress&dir=asc&limit=10&offset=0'));
+ await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
+ assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'),'explicit direction toggle still sorts descending');
+ for(const value of ['due','name','progress','created']){
+  await flush(()=>{sort.value=value;sort.dispatchEvent(new Event('change',{bubbles:true}))});
+  assert.ok(requests.at(-1).url.includes(`sort=${value}&dir=${value==='created'?'desc':'asc'}&limit=10&offset=0`),requests.at(-1).url);
+ }
  const cached=window.shellContext.w;await flush(()=>window.shellContext.refresh());
  assert.equal(lastShell().init.headers.get('If-None-Match'),etag);assert.equal(window.shellContext.w,cached,'304 reuses cached data');
  assert.equal(window.shellContext.error,'');assert.equal(rows().length,2);

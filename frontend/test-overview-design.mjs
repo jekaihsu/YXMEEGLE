@@ -62,6 +62,16 @@ assert.deepEqual(codes(),['later','equal','utc','early','empty','invalid']);
 await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
 assert.deepEqual(codes(),['early','utc','equal','later','invalid','empty']);
 assert.equal(document.querySelector('[aria-label="案件排序"] option[value="created"]').textContent,'最近加入');
+// Switching a sort discards the previous direction and uses its natural default.
+w.projects=[['z','2026-10-01','2026-10-01',0],['a','2026-10-13','2026-10-13',1]].map(([id,created_at,due_date,completed])=>({...structuredClone(p),id,code:id,name:id,created_at,due_date,nodes:[{...p.nodes[0],tasks:[{...base,status:completed?'completed':'in_progress'}]}]}));
+await flush(()=>root.render(React.createElement(Projects,{key:'switch-defaults',c:{...c,route:{view:'projects'}}})));
+assert.deepEqual(codes(),['a','z']);
+const selectSort=async value=>flush(()=>{const select=document.querySelector('[aria-label="案件排序"]');select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}))});
+for(const [sort,expected] of [['due',['z','a']],['name',['a','z']],['progress',['z','a']],['created',['a','z']]]){
+ await selectSort(sort);assert.deepEqual(codes(),expected,`${sort} natural direction`);
+ await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
+ assert.deepEqual(codes(),[...expected].reverse(),`${sort} explicit reverse`);
+}
 const requests=[];globalThis.fetch=async url=>{requests.push(String(url));return new Response(JSON.stringify({items:[],total:0,facets:{all:0,formal:0,intake:0}}),{status:200})};
 await flush(()=>root.render(React.createElement(Projects,{key:'shell-created',c:{...c,w:{...w,scope:'shell'},route:{view:'projects'}}})));
 assert.ok(requests.some(url=>url.includes('sort=created&dir=desc')),requests.join(' | '));
