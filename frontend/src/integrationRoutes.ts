@@ -38,14 +38,14 @@ export function myWorkInput(fetched: Fetched, filters: MyWorkFilters): MyWorkInp
  if (!body) return {filters, readState: {states: ['unknown'], count: null}};
  // weeklyActivity stays absent: /api/my-work/activity is not built (126B2).
  return {filters, rows: body.rows, readState: body.readState, assignment: body.assignment as MyWorkInput['assignment'],
-  canSeeAwaitingConfirmation: body.canSeeAwaitingConfirmation === true};
+  canSeeAwaitingConfirmation: body.canSeeAwaitingConfirmation === true, asOf: body.as_of};
 }
 
 export function sourceHealthInput(fetched: Fetched): {page_state: unknown; sources: unknown} {
  if (fetched.status === 'loading') return {page_state: {states: ['loading'], count: null}, sources: []};
  if (fetched.status === 'error') return {page_state: failureState(fetched), sources: []};
  const body = record(fetched.body);
- // A missing page_state key is unknown; only an explicit null is the clean-read fact (see sourceHealthView).
+ // A missing page_state key is unknown; an explicit null is passed through and also renders unknown (no per-request complete-read evidence exists).
  if (!body || !('page_state' in body)) return {page_state: {states: ['unknown'], count: null}, sources: []};
  return {page_state: body.page_state, sources: body.sources};
 }

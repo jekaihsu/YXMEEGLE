@@ -11,6 +11,7 @@ import type {
   MyWorkDetail,
   MyWorkAction,
 } from './myWorkView.ts';
+import { MY_WORK_LABELS } from './myWorkView.ts';
 import './my-work-table.css';
 
 export interface MyWorkTableProps {
@@ -19,6 +20,9 @@ export interface MyWorkTableProps {
   onModeChange?: (mode: MyWorkMode) => void;
   onSearch?: (search: string) => void;
   onNavigate?: (route: string) => void;
+  /** Set when remounted by browser Back from a row navigation: focus the selected row, else the heading. */
+  restoreFocus?: boolean;
+  onFocusRestored?: () => void;
 }
 
 export function MyWorkTable({
@@ -27,7 +31,10 @@ export function MyWorkTable({
   onModeChange,
   onSearch,
   onNavigate,
+  restoreFocus,
+  onFocusRestored,
 }: MyWorkTableProps) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const selectedId = view.filters.selectedId;
   const rowSelectButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const lastOpenedTaskIdRef = useRef<string | null>(null);
@@ -57,6 +64,17 @@ export function MyWorkTable({
     prevDrawerOpenRef.current = view.drawer.open;
   }, [view.drawer.open]);
 
+  const loading = (view.pageState?.states as readonly string[] | undefined)?.includes('loading') ?? false;
+  useEffect(() => {
+    if (!restoreFocus || loading) return;
+    const active = document.activeElement;
+    if (!active || active === document.body) {
+      const row = selectedId ? rowSelectButtonRefs.current.get(selectedId) : undefined;
+      (row ?? headingRef.current)?.focus();
+    }
+    onFocusRestored?.();
+  }, [restoreFocus, loading, selectedId, view.rows]);
+
   // Banner text handles every C-STATE value, including view.pageState null (clean complete read).
   // Unknown count is never rendered as 0.
   const bannerText =
@@ -75,7 +93,7 @@ export function MyWorkTable({
       <div className="my-work-main-panel">
         <header className="my-work-header">
           <div className="my-work-title-group">
-            <h2>我的工作</h2>
+            <h2 ref={headingRef} tabIndex={-1}>我的工作</h2>
             <p className="my-work-subtitle">所有尚待處理事項，不限建立週次</p>
           </div>
         </header>
@@ -136,6 +154,7 @@ export function MyWorkTable({
           data-state={bannerStateClass}
         >
           <span className="my-work-banner-state-text">{bannerText}</span>
+          <span className="my-work-banner-as-of"> · {view.dataAsOfLabel}</span>
           {view.selectionDropped && (
             <span className="my-work-selection-dropped-note">
               · 原選取項目已不再符合目前條件或已被移除
@@ -464,7 +483,9 @@ export function MyWorkTable({
             {/* Attached Evidence */}
             <section className="my-work-drawer-section">
               <h4>附加佐證</h4>
-              {view.drawer.task.evidence.length === 0 ? (
+              {view.drawer.task.evidence === null ? (
+                <p className="my-work-drawer-empty-text">{MY_WORK_LABELS.unknown}</p>
+              ) : view.drawer.task.evidence.length === 0 ? (
                 <p className="my-work-drawer-empty-text">無附加佐證</p>
               ) : (
                 <ul className="my-work-drawer-evidence-list">

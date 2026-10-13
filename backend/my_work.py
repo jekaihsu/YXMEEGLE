@@ -268,7 +268,8 @@ def build_my_work_input(ws, viewer, read=None):
            'assignment': 'assigned' if ever_assigned else 'unknown' if partial else 'unassigned',
             # Existing authorization: home_queues only lists a confirmation the viewer may cast (can_vote,
             # current reviewer seat or handover target). No such item proves nothing, so the toggle stays off.
-           'canSeeAwaitingConfirmation': bool(awaiting)}
+           'canSeeAwaitingConfirmation': bool(awaiting),
+           'as_of': as_of}  # the workspace as_of this read used; not source freshness
     # Same default as backend/app.py public_ws: the explicit environment, else derived from the surviving
     # (filtered) projects only, so a hidden demo case can never grant the test/demo exemption.
     environment = visible.get('environment', 'demo' if any(isinstance(p, dict) and p.get('source_kind') == 'demo' for p in visible.get('projects', [])) else 'production')
