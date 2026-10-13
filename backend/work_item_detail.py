@@ -109,12 +109,6 @@ def _evidence(state, item, nodes):
     for project in state.get('projects', []):
         if project['id'] != item.get('project_id'):
             continue
-        # daily_index only proves a case association. Never promote that to a
-        # work-item join (nor expose its points as completion or money).
-        for daily in project.get('daily_reports', []):
-            rows.append(dict(_pick(daily, ('id', 'date', 'description', 'source_missing')),
-                             kind='daily_report', relation_scope='case',
-                             work_item_relation='unlocated', evidence_only=True))
         for file in project.get('files', []):
             if file.get('node_id') in node_ids:
                 rows.append(dict(_pick(file, ('id', 'name', 'created_at', 'direction', 'version')),
@@ -162,6 +156,16 @@ def build_work_item_detail(state, work_item_key, *, as_of=None):
                        'pending_due': _unknown('requested_date_field_unlocated'),
                        'estimated_due': _unknown('estimated_date_field_unlocated'),
                        'source_updated_at': _unknown('source_updated_time_unlocated')}}
+    # Case association proves no work-item daily-report edge or population.
+    # Navigation only: no rows or count, including in the state envelope.
+    result['case_daily_reports'] = {
+        'read_state': {'states': ['unlocated']},
+        'reason': 'work-item daily-report edge unverified'}
+    if any(project.get('id') == item.get('project_id') for project in state.get('projects', [])):
+        # Existing project daily tab: frontend/src/ProjectDetail.tsx:60,81;
+        # DailyRecords queries GET /api/daily-reports (backend/app.py:520-521).
+        result['case_daily_reports']['link'] = {
+            'view': 'project', 'project_id': item['project_id'], 'tab': 'daily'}
     for name, build in (('parents', lambda: _parents(state, item)),
                         ('nodes', lambda: _nodes(state, item))):
         try:
