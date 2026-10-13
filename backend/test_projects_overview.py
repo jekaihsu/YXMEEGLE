@@ -150,3 +150,13 @@ def test_created_sort_id_tie_and_mixed_formats(tmp_path):
                 db.execute(update(ProjectIndex).where(ProjectIndex.project_id == pid).values(created_at=stamp))
         assert [p['id'] for p in everything(client, tab='all', sort='created', dir='asc')[1]] == ids
         assert [p['id'] for p in everything(client, tab='all', sort='created', dir='desc')[1]] == [ids[2], ids[1], ids[0], ids[3]]
+
+
+def test_created_sort_null_source_values_are_indexed_as_empty(tmp_path):
+    def missing_dates(state):
+        for p, stamp in zip(state['projects'], [None, '', '2026-10-01', '2026-10-13']):
+            p['created_at'] = stamp
+    with scaled_client(tmp_path, 4, mutate=missing_dates, **ON) as (app, client):
+        ids = [p['id'] for p in client.get('/api/workspace').json()['projects']]
+        assert [p['id'] for p in everything(client, tab='all', sort='created', dir='asc')[1]] == [ids[2], ids[3], ids[0], ids[1]]
+        assert [p['id'] for p in everything(client, tab='all', sort='created', dir='desc')[1]] == [ids[3], ids[2], ids[1], ids[0]]
