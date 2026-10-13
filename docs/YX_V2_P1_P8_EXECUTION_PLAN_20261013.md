@@ -327,10 +327,10 @@ All rows branch from `7ae4a9d`, live in Orca `new-child` worktrees under `/Users
 | P2-130B Case/Confirmation Detail read model | `task_7dadd7a6da03` / `ctx_c4c7409a7885` | Claude `claude-sonnet-5-5` medium | `p2-130b` / `ava-apple/p2-130b` | `backend/case_detail.py`, `backend/test_case_detail.py` | Codex `gpt-6.1-sol` medium | dispatched |
 | P2-131B Contract Detail read model | `task_1c6df5239e18` / `ctx_a8cd8bf90fd1` | Codex `gpt-6.1-sol` medium | `p2-131b` / `ava-apple/p2-131b` | `backend/contract_detail.py`, `backend/test_contract_detail.py` | Opus commander | dispatched |
 | P2-132B Work Item Detail read model | `task_dd50a157ceec` / `ctx_43dee71a62c5` | Codex `gpt-6.1-sol` medium | `p2-132b` / `ava-apple/p2-132b` | `backend/work_item_detail.py`, `backend/test_work_item_detail.py` | Opus commander | dispatched |
+| P2-128B Manager Overview read model | `task_680721c42b16` / `ctx_59f19ab6b2f1` | Codex `gpt-6.1-sol` medium | `p2-128b` / `ava-apple/p2-128b` | `backend/manager_overview.py`, `backend/test_manager_overview.py` | Opus commander | dispatched; `confirmation_population` is injected (protocol: rows with `row_key`, `project_id` or None) and bound to the reviewed 129B function at P2-INT |
 | P2-NAV return context | `task_dcf510090854` / `ctx_624d8d2efe24` | Claude `claude-sonnet-5-5` medium | `p2-nav` / `ava-apple/p2-nav` | `frontend/src/drilldownContext.ts`, `frontend/test-drilldown-context.mjs` | Codex `gpt-6.1-sol` medium | dispatched |
 
 Held P2 rows (file sets fixed now, dispatched when their input is reviewed):
-- **P2-128B** Manager Overview read model, Codex: `backend/manager_overview.py` + test. Waits for the reviewed 129B `confirmation_population`, so each KPI equals its drilldown denominator.
 - **P2-F1** view models, after the matching B contract is reviewed, alternating families: 129F1 Codex `frontend/src/confirmationListView.ts`; 130F1 Codex `caseDetailView.ts`; 131F1 Sonnet `contractDetailView.ts`; 132F1 Sonnet `workItemDetailView.ts`; 128F1 Sonnet `managerOverviewView.ts` (each + `frontend/test-<name>.mjs`).
 - **P2-UI-a / UI-b** AGY presentational components (file sets as in `tasks.tsv`), after the F1s are reviewed.
 - **P2-INT** Sonnet: the only writer of the hub files; registers only the five approved P2 GETs through the existing authorization chain (§4.4b). The root coordinator merges.
