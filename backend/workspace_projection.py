@@ -161,13 +161,28 @@ def filter_private_workspace(state, user):
     # records. The known project avoids scanning all tasks for every task.
     from .workflow import is_owner, now
     state['task_capabilities_checked_at'] = now()
+    from .operations import delegation_valid
+    today = state['task_capabilities_checked_at'][:10]
+    active_people = {person['id'] for person in state.get('users', []) if person.get('active', True)}
+    proxy_assignments = {(delegation.get('project_id'), task_id, delegation.get('principal_id'))
+        for delegation in state.get('delegations', [])
+        if actor and delegation.get('delegate_id') == ident
+        and delegation.get('principal_id') in active_people
+        and delegation.get('seat') == 'owner' and delegation.get('scope') == 'tasks'
+        and delegation.get('status') == 'active'
+        and delegation.get('start_date', '') <= today <= delegation.get('end_date', '')
+        and delegation_valid(state, delegation, at_use=True)
+        for task_id in delegation.get('task_ids', [])}
     for project in state.get('projects', []):
         for node in project.get('nodes', []):
             for task in node.get('tasks', []):
                 task['can_execute'] = bool(actor and is_owner(actor, task, state, project=project))
-                from .workflow_rules import confirmation_hash, activation_reasons
+                task['assigned_to_viewer'] = bool(actor and (task.get('owner_id') == ident or
+                    (project['id'], task['id'], task.get('owner_id')) in proxy_assignments))
+                from .workflow_rules import confirmation_hash, activation_reasons, execution_reasons
                 task['confirmation_hash'] = confirmation_hash(project, node, task)
-                task['activation_blockers'] = activation_reasons(state, project, node, task)
+                task['activation_blockers'] = activation_reasons(state, project, node, task, clock=state.get('as_of'))
+                task['execution_blockers'] = execution_reasons(state, project, node, task)
         # Operational source provenance remains server-side for reconciliation.
         # Browser pages use normalized business fields and explicit source URLs.
         _strip_source_payloads(project)
@@ -208,7 +223,7 @@ def filter_private_workspace(state, user):
 
 def _strip_source_payloads(value):
     if isinstance(value, dict):
-        for key in ('source_fields','source_records','raw_fields','_business_authority'):
+        for key in ('source_fields','source_records','raw_fields','_business_authority','change_explanation'):
             value.pop(key, None)
         # Quote snapshots carry an unbounded copy of source fields as `fields`.
         if 'fields' in value and isinstance(value['fields'],dict):

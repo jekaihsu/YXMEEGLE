@@ -10,7 +10,7 @@ import {a,b,workspace} from './session-epoch-fixture.mjs';
 const bundle=await build({entryPoints:['src/App.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'},plugins:[{name:'observe-shell',setup(build){build.onLoad({filter:/\/App\.tsx$/},async({path})=>({contents:"import {unmatchedDaily} from './appCommon';\n"+(await fs.readFile(path,'utf8')).replace(' const overdue=w?',' window.shellContext={w,s,error,run,upload,refresh,unmatchedDaily};\n const overdue=w?'),loader:'tsx'}))}}]});
 const path=new URL('./.shell-test-bundle.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);
 let App;try{App=(await import(path.href)).default}finally{await fs.unlink(path)}
-const shell={...workspace,scope:'shell',attention:[{task_id:'tA',project_id:'pA',project_code:'PRIVATE_CASE_A',project_name:'PRIVATE_CASE_A',node_id:'nA',node_key:'sales',node_name:'NODE_A',assignee_id:workspace.users[0].id,status:'pending',due_date:'2026-10-01',title:'TASK_A'}],pending_approvals:[{id:'apA',title:'APPROVAL_A',type:'change',project_id:'pA'}],counts:{approvals_pending:3,daily_unmatched:535,my_overdue_tasks:4,my_active_tasks:12,active_tasks:30,overdue_tasks:4,due_today_tasks:2},projects:workspace.projects.map((p,i)=>{
+const shell={...workspace,scope:'shell',attention:[{task_id:'tA',project_id:'pA',project_code:'PRIVATE_CASE_A',project_name:'PRIVATE_CASE_A',node_id:'nA',node_key:'sales',node_name:'NODE_A',assignee_id:workspace.users[0].id,status:'pending',due_date:'2026-10-01',title:'TASK_A'}],pending_approvals:[{id:'apA',title:'APPROVAL_A',type:'change',project_id:'pA'}],counts:{approvals_pending:3,daily_unmatched:535,my_overdue_tasks:1,my_active_tasks:2,active_tasks:30,overdue_tasks:1,due_today_tasks:0},home_waiting:[{task_id:'wait-paused',project_id:'pA',project_code:'PRIVATE_CASE_A',node_id:'nA',title:'WAIT_PAUSED',kind:'paused',reason:'任務暫停，原期限保留',original_due_date:'2026-10-01',due_date:null},{task_id:'wait-prerequisite',project_id:'pA',project_code:'PRIVATE_CASE_A',node_id:'nA',title:'WAIT_PREREQUISITE',kind:'prerequisite',reason:'指定前置成果尚未交付',due_date:'2026-10-01'},{task_id:'wait-upcoming',project_id:'pA',project_code:'PRIVATE_CASE_A',node_id:'nA',title:'WAIT_UPCOMING',kind:'upcoming',reason:'排定 2026/10/10 開始',due_date:'2026-10-12'},{task_id:'wait-proxy',project_id:'pA',project_code:'PRIVATE_CASE_A',node_id:'nA',title:'WAIT_PROXY',kind:'proxy',reason:'代理同事執行；有效至 2026/10/31',due_date:'2026-10-12'}],projects:workspace.projects.map((p,i)=>{
  const {nodes,files,comments,daily_reports,...summary}=p;
  return {...summary,concurrency_version:i+7,progress:{completed_nodes:i?0:4,approved_skipped_nodes:i?0:1,total_nodes:i?0:10},overdue_tasks:i?0:2,active_tasks:5,execution_status:i?'completed':'in_progress'};
 })};
@@ -63,7 +63,7 @@ try{
  await mount({workspace_shell:true});
  assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects?view=overview&tab=formal&sort=due&dir=asc&limit=10&offset=0']);
  assert.equal(window.shellContext.w.scope,'shell');assert.equal(rows().length,2);
- assert.ok(document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期 4'));
+ assert.ok(document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期 1'));
  assert.ok(document.querySelector('.notification-button i'));assert.equal(window.shellContext.unmatchedDaily(window.shellContext.w),535);
  assert.equal(rows()[0].querySelector('.stage-chips').textContent,'—'); // 目前作業 no longer repeats the workflow badge shown in the status column
  assert.equal(rows()[0].querySelector('.progress-cell span').textContent,'40%');
@@ -71,10 +71,13 @@ try{
  // P4-1: the dashboard renders from counts, the attention list and cards; no tree scan and no full workspace.
  await flush(()=>{location.hash='view=dashboard';window.dispatchEvent(new window.Event('hashchange'))});
  const todo=document.querySelector('.work-inbox');
- assert.ok(todo.textContent.includes('TASK_A')&&todo.textContent.includes('逾期 1 天')&&todo.textContent.includes('APPROVAL_A')&&todo.textContent.includes('NODE_A')&&todo.textContent.includes(workspace.users[0].name)&&todo.textContent.includes('本人可執行逾期 4 · 當日到期 2'));
- assert.equal(todo.querySelector('.heading-count').textContent,'9');assert.ok(document.querySelector('.today-aside').textContent.includes('535 筆日報待配對'));
+ assert.ok(todo.textContent.includes('TASK_A')&&todo.textContent.includes('逾期 1 天')&&todo.textContent.includes('APPROVAL_A')&&todo.textContent.includes('NODE_A')&&todo.textContent.includes(workspace.users[0].name)&&todo.textContent.includes('本人可執行逾期 1'));
+ assert.equal(todo.querySelector('.heading-count').textContent,'4');assert.ok(document.querySelector('.dh-hero').textContent.includes('2 項待處理'));
+ const waitingSections=[...document.querySelectorAll('.dh-waiting')];assert.deepEqual(waitingSections.map(section=>section.querySelector('h2').textContent),['暫停中的指派1','等待前置條件1','即將開始1','代理工作1']);
+ for(const title of ['WAIT_PAUSED','WAIT_PREREQUISITE','WAIT_UPCOMING','WAIT_PROXY'])assert.ok(waitingSections.some(section=>section.textContent.includes(title)),`shell waiting displays ${title}`);
+ assert.ok(waitingSections[0].textContent.includes('原期限 2026/10/01'),'paused source deadline remains visible');assert.ok(document.querySelector('.today-aside').textContent.includes('535 筆日報待配對'));
  assert.ok(document.querySelector('.project-preview-row').textContent.includes('PRIVATE_CASE_A'));
- assert.ok(!requests.some(r=>r.url==='/api/workspace'),'dashboard never loads the full workspace');
+ assert.ok(!requests.some(r=>r.url==='/api/workspace'),'dashboard waiting groups render without a full workspace read');
  await flush(()=>{location.hash='view=projects';window.dispatchEvent(new window.Event('hashchange'))});
  await flush(()=>button('需要關注').click());assert.equal(rows().length,1);assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'));
  await flush(()=>button('執行中').click());assert.equal(rows().length,1);assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'));

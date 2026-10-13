@@ -33,6 +33,7 @@ def update_attachments(ws,records,complete_tables=None,project_by_source=None):
     project_by_source=project_by_source or {}
     old={a['id']:deepcopy(a) for a in ws.get('source_attachment_index',[])}
     current={}
+    present_source_ids={source_id(r) for r in records}
     for r in records:
         rid=source_id(r)
         url=f"https://yong-xiang-survey.jp.larksuite.com/base/{r['base_token']}?table={r['table_id']}&record={r['record_id']}"
@@ -46,12 +47,24 @@ def update_attachments(ws,records,complete_tables=None,project_by_source=None):
                     'size':item.get('size'),'mime_type':item.get('type'),'source_url':url,
                     'source_field':field,'source_record_id':rid,'base_token':r['base_token'],
                     'table_id':r['table_id'],'project_id':project_by_source.get(rid),
+                    'mapping_status':'matched' if project_by_source.get(rid) else 'unmatched',
                     'status':'indexed','verified':False,'category_id':'other'}
     complete={(t.get('base_token'),t.get('table_id')):t for t in complete_tables or [] if t.get('status')=='ready'}
     for ident,item in old.items():
         if ident in current: continue
+        # A visible source row without this file token cannot establish that
+        # the historical metadata still belongs to a case. Keep the index for
+        # audit, but remove its current case association. An absent source in a
+        # partial read provides no new evidence, so retain its prior association.
+        observed_source=item.get('source_record_id') in present_source_ids
+        if observed_source:
+            item['project_id']=None
+        item['mapping_status']='matched' if item.get('project_id') else 'unmatched'
         table=complete.get((item.get('base_token'),item.get('table_id')), {})
-        if item.get('source_field') in table.get('attachment_fields',[]): item['status']='source_missing'
+        if item.get('source_field') in table.get('attachment_fields',[]):
+            item['status']='source_missing'
+        elif observed_source:
+            item['status']='metadata_unavailable'
         current[ident]=item
     ws['source_attachment_index']=list(current.values())
     for p in ws['projects']:

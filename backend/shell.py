@@ -31,20 +31,77 @@ def prepare(state,user,today):
     return facts
 
 
-def mine(ti,user,facts):
-    """Condition selecting tasks whose can_execute is true for user (owner, valid delegate, or business override)."""
-    if facts['override']: return ti.c.assignee_id.in_(facts['active'])
-    return or_(and_(ti.c.assignee_id==user['id'],ti.c.assignee_id.in_(facts['active'])),ti.c.task_id.in_(sorted(facts['delegated']) or ['']))
-
-
 def etag(wid,user,version,today,users):
     key=json.dumps([wid,user['id'],user.get('authz_version',0),user.get('role'),sorted(user.get('capabilities',[])),user.get('active',True),can_business_override(user),version,today,users],sort_keys=True,default=str)
     return 'W/"shell-'+hashlib.sha256(key.encode()).hexdigest()[:32]+'"'
 
 
-def home_executable(ti,pi,owned):
-    """The one Home rule (mirrored by frontend/src/executableTasks.ts): open, assigned to the viewer, and the case is not paused for execution."""
-    return and_(ti.c.status.notin_(CLOSED),owned,pi.c.execution_status!='paused')
+def home_population(db,model,row,state,user,facts,cards,as_of):
+    """Use the same task and prerequisite facts as the full workspace Home.
+
+    The task index does not contain dependencies, permits, or source correction
+    state. Load visible project trees for this calculation; keep them out of the
+    slim response.
+    """
+    from . import storage
+    from .workflow import is_owner, now
+    from .workflow_rules import activation_reasons, execution_reasons
+    from .operations import delegation_valid
+    visible={p['id']:p for p in cards}
+    empty=dict(active=0,overdue=0,due_today=0,attention=[],waiting=[],waiting_counts={})
+    if not visible:return empty
+    _,ti,_=index_tables.tables(model)
+    selected=list(db.scalars(select(ti.c.project_id).where(ti.c.workspace_id==row.id,ti.c.project_id.in_(list(visible)),
+        or_(ti.c.assignee_id==user['id'],ti.c.task_id.in_(sorted(facts['delegated']) or ['']))).distinct()))
+    if not selected:return empty
+    loaded=storage.load_partial(db,model,row,collections=('users','delegations','approved_leave_delegations','approvals'),
+        project_ids=selected,project_children=('evidence',))
+    full={**state,**{key:loaded[key] for key in ('users','delegations','approved_leave_delegations','approvals')},'projects':loaded['projects']}
+    active=overdue=due_today=0; attention=[]; waiting=[]; waiting_counts={}; per_kind={}
+    names={u['id']:u.get('name') or u['id'] for u in full['users']}
+    current_day=now()[:10]
+    active_people={u['id'] for u in full['users'] if u.get('active',True)}
+    for p in loaded['projects']:
+        card=visible[p['id']]; p['execution_status']=card['execution_status']
+        for n in p.get('nodes',[]):
+            for t in n.get('tasks',[]):
+                if t['status'] in CLOSED:continue
+                ident=t['id']; owner=t.get('owner_id') or ''
+                delegation=next((d for d in full.get('delegations',[]) if d.get('delegate_id')==user['id'] and d.get('principal_id')==owner
+                    and d.get('project_id')==p['id'] and d.get('seat')=='owner' and d.get('scope')=='tasks' and ident in d.get('task_ids',[])
+                    and d.get('status')=='active' and d.get('start_date','')<=current_day<=d.get('end_date','')
+                    and owner in active_people and delegation_valid(full,d,at_use=True)),None)
+                assigned=user.get('active',True) and (owner==user['id'] or delegation is not None)
+                if not assigned:continue
+                authority=is_owner(user,t,full,project=p)
+                execution=execution_reasons(full,p,n,t)
+                activation=activation_reasons(full,p,n,t,clock=as_of) if t['status']=='pending' else []
+                start=str(t.get('start_date') or '')[:10]; future=bool(start and start>as_of[:10])
+                ready=bool(authority and card.get('execution_allowed') is not False and p['execution_status']!='paused' and p.get('case_type')!='intake'
+                    and t['status'] in ('pending','in_progress','rework') and not execution and not activation and not future)
+                if ready:
+                    active+=1; due=str(t.get('due_date') or '')[:10]
+                    if due and due<as_of[:10]:overdue+=1
+                    if due==as_of[:10]:due_today+=1
+                    if due and due<=as_of[:10]:attention.append(dict(task_id=ident,project_id=p['id'],node_id=n['id'],node_key=n.get('key') or '',
+                        node_name=n.get('name') or '',assignee_id=owner,status=t['status'],due_date=t.get('due_date') or '',
+                        project_code=p['code'],project_name=p.get('name') or '',title=t.get('title') or ''))
+                kind=reason=None
+                if p['execution_status']=='paused' or t['status']=='paused':kind,reason='paused','案件暫停，原期限保留' if p['execution_status']=='paused' else '任務暫停，原期限保留'
+                elif t['status']=='rework':kind,reason='correction','任務退回修正，需檢視待補內容'
+                elif delegation:kind,reason='proxy',f"代理 {names.get(owner,owner)}；{delegation['start_date']} 至 {delegation['end_date']}；{delegation.get('qualification_note') or delegation.get('source') or '代理紀錄待核對'}"
+                elif future:kind,reason='upcoming',f'排定 {start} 開始'
+                elif execution or activation or not authority or card.get('execution_allowed') is False:
+                    kind,reason='prerequisite',(execution or activation or [card.get('execution_readonly_reason') or '指派與執行條件待核對'])[0]
+                elif t.get('due_date') and str(t['due_date'])[:10]>as_of[:10]:kind,reason='upcoming',f"預計 {str(t['due_date'])[:10]} 到期"
+                if kind:
+                    waiting_counts[kind]=waiting_counts.get(kind,0)+1
+                if kind and per_kind.get(kind,0)<5:
+                    per_kind[kind]=per_kind.get(kind,0)+1
+                    waiting.append(dict(task_id=ident,project_id=p['id'],project_code=p['code'],node_id=n['id'],title=t.get('title') or '未命名任務',
+                        kind=kind,reason=reason,original_due_date=t.get('original_due_date'),due_date=t.get('due_date')))
+    attention.sort(key=lambda t:0 if t['due_date'][:10]<as_of[:10] else 1)
+    return dict(active=active,overdue=overdue,due_today=due_today,attention=attention[:ATTENTION_LIMIT],waiting=waiting,waiting_counts=waiting_counts)
 
 
 def open_late(ti,today):
@@ -89,29 +146,20 @@ def build(db,model,row,state,user,facts,today,approval_connection):
         pending=len(shown) if hidden else pending
         pending_items=[dict(id=a['id'],title=a.get('title',''),type=a.get('type',''),project_id=a['project_id']) for a in shown[:PENDING_SHOWN]]
     as_of=today if not rows or any(r['source_kind']=='lark' for r in rows) else state.get('as_of',today)  # the date the legacy dashboard measures lateness against
-    openq,late=open_late(ti,as_of)
+    openq,_=open_late(ti,as_of)
     per_project=project_counts(db,ti,wid,as_of)
     cards=[card(r,state,per_project) for r in rows]
     joined=ti.join(pi,and_(pi.c.workspace_id==ti.c.workspace_id,pi.c.project_id==ti.c.project_id))
-    today_q=and_(openq,func.substr(ti.c.due_date,1,10)==as_of[:10])
-    # Legacy Dashboard: every open task of every visible case (not only the user's own); the 'my' numbers stay the nav badge.
-    owned=mine(ti,user,facts); one=lambda cond:func.coalesce(func.sum(case((cond,1),else_=0)),0)
-    # Home overdue / due-today / attention use the shared executable rule; the active total still spans every open task.
-    home=home_executable(ti,pi,owned)
-    allc=db.execute(select(one(openq),one(and_(late,home)),one(and_(today_q,home)),one(and_(openq,owned)),one(and_(late,home))).select_from(joined).where(ti.c.workspace_id==wid,*vis)).one()
-    my_active,my_late=allc[3],allc[4]
-    # [...overdue, ...dueToday] in workspace order: project, node, task ordinal
-    attention=[dict(r._mapping) for r in db.execute(select(ti.c.task_id,ti.c.project_id,ti.c.node_id,ti.c.node_key,ti.c.node_name,ti.c.assignee_id,ti.c.status,ti.c.due_date,pi.c.code.label('project_code'),pi.c.name.label('project_name'))
-        .select_from(joined).where(ti.c.workspace_id==wid,home,or_(late,today_q),*vis)
-        .order_by(case((late,0),else_=1),pi.c.ordinal,ti.c.node_ordinal,ti.c.ordinal,ti.c.task_id).limit(ATTENTION_LIMIT))]
-    if attention:
-        titles={r.entity_id:(r.data or {}).get('title') for r in db.execute(select(model.entity_id,model.data).where(model.workspace_id==wid,model.kind=='tasks',model.entity_id.in_([a['task_id'] for a in attention])))}
-        for a in attention: a['title']=titles.get(a['task_id'],'')
+    one=lambda cond:func.coalesce(func.sum(case((cond,1),else_=0)),0)
+    # All-case active total remains a portfolio measure. Personal counts use the
+    # full readiness facts needed to distinguish assigned from actionable now.
+    allc=db.execute(select(one(openq)).select_from(joined).where(ti.c.workspace_id==wid,*vis)).one()
+    home=home_population(db,model,row,state,user,facts,cards,as_of)
     return dict(scope='shell',version=row.version,as_of=as_of,workspace_id=wid,environment=env,users=state['users'],
                 calendar=state.get('calendar'),source_status=state.get('source_status'),file_categories=categories(state),approval_connection=approval_connection,
-                counts=dict(approvals_pending=pending,daily_unmatched=counters.get('daily_unmatched',0),my_overdue_tasks=int(my_late),my_active_tasks=int(my_active),
-                            active_tasks=int(allc[0]),overdue_tasks=int(allc[1]),due_today_tasks=int(allc[2])),
-                projects=cards,attention=attention,pending_approvals=pending_items,approvals=[],events=[])
+                counts=dict(approvals_pending=pending,daily_unmatched=counters.get('daily_unmatched',0),my_overdue_tasks=home['overdue'],my_active_tasks=home['active'],
+                            active_tasks=int(allc[0]),overdue_tasks=home['overdue'],due_today_tasks=home['due_today']),
+                projects=cards,attention=home['attention'],home_waiting=home['waiting'],home_waiting_counts=home['waiting_counts'],pending_approvals=pending_items,approvals=[],events=[])
 
 
 TABS=('all','formal','intake','active','overdue','completed')

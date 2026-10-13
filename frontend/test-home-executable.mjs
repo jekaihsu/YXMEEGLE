@@ -27,7 +27,7 @@ const shell={...full,scope:'shell',projects:projects.map(({nodes,files,comments,
  counts:{approvals_pending:0,daily_unmatched:0,my_overdue_tasks:2,my_active_tasks:3,active_tasks:9,overdue_tasks:2,due_today_tasks:1},
  attention:['lv-late1','lv-late2','lv-today'].map(id=>({task_id:id,project_id:'p2',project_code:'P2',node_id:'p2-sales',node_key:'sales',node_name:'報價',assignee_id:ME,status:'pending',due_date:id==='lv-today'?'2026-10-07':'2026-10-01',title:id}))};
 const read=async(Component,w)=>{const host=document.getElementById('root');host.innerHTML='';const root=createRoot(host);const c={w,s:{mode:'demo',user:{id:ME,role:'member'}},go(){},route:{view:'dashboard'}};
- await act(async()=>{root.render(React.createElement(Component,{c}))});const inbox=host.querySelector('.work-inbox');const out={count:inbox.querySelector('.heading-count').textContent,caption:inbox.querySelector('h2 small')?.textContent||''};await act(async()=>root.unmount());return out};
+ await act(async()=>{root.render(React.createElement(Component,{c}))});const inbox=host.querySelector('.work-inbox');const out={count:inbox.querySelector('.heading-count').textContent,caption:inbox.querySelector('h2 small')?.textContent||'',html:host.innerHTML};await act(async()=>root.unmount());return out};
 let checks=0;const ok=(cond,msg)=>{assert.ok(cond,msg);checks++};
 const dash=await read(Dashboard,full),sh=await read(ShellDashboard,shell);
 ok(dash.count==='3'&&sh.count==='3',`Dashboard and Shell attention count are both 3 (paused/unassigned/other/closed excluded): ${dash.count} | ${sh.count}`);
@@ -36,6 +36,11 @@ ok(dash.caption.includes('當日到期 1')&&sh.caption.includes('當日到期 1'
 ok(!dash.caption.includes('非本人')&&!sh.caption.includes('非本人'),'no other-people lateness in Home captions');
 ok(homeOverdueCount(full)===2&&homeOverdueCount(shell)===2,'sidebar badge: full rule === shell count === 2');
 ok(homeOverdueCount({...full,projects:[projects[0],projects[2]]})===0,'paused and template-only cases give a zero badge');
+ok(dash.html.includes('pz-late1')&&dash.html.includes('暫停'),'assigned paused task remains visible with its reason');
+ok(!dash.html.includes('lv-other')&&!dash.html.includes('lv-unassigned'),'coworker and unassigned work are not presented as mine');
+const waiting=structuredClone(full);waiting.projects[1].nodes[0].tasks.push({...task('waiting-input',ME,null),input_task_ids:['lv-done'],activation_blockers:['待前置成果交付']});
+const waitingDash=await read(Dashboard,waiting);
+ok(waitingDash.html.includes('waiting-input')&&waitingDash.html.includes('待前置成果交付'),'assigned prerequisite work stays visible with an explanation');
 const app=await fs.readFile('src/App.tsx','utf8');
-ok(app.includes('homeOverdueCount(w)'),'App sidebar badge uses the shared helper');
+ok(app.includes('homeOverdueCount(w,s?.user?.id'),'App sidebar badge uses the shared helper with viewer identity');
 console.log(`home executable rule checks passed: ${checks}`);

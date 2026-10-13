@@ -32,6 +32,7 @@
     "test:contrast": "node test-contrast.mjs",
     "test:shell-mode": "node test-shell-mode.mjs",
     "test:home-executable": "node test-home-executable.mjs",
+    "test:work-assigned-visibility": "node test-work-assigned-visibility.mjs",
     "test:dev-tooling": "node --test --test-timeout=30000 test-dev-tooling.mjs",
     "test:live-read-regressions": "node test-live-read-regressions.mjs",
     "test:ops-sync": "node test-ops-sync-panel.mjs && node test-ops-flow-view.mjs"

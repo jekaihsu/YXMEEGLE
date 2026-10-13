@@ -40,3 +40,13 @@ def test_unknown_states_land_in_the_remainder_bucket_and_enabled_or_future_work_
     group = overview({'projects': cases}, clock=CLOCK)['source_deadlines']
     buckets = {b['key']: (b['cases'], b['tasks']) for b in group['buckets']}
     assert buckets == {'intake': (1, 1), 'formal_executing': (0, 0), 'formal_unverified': (0, 0), 'other': (1, 1)}
+
+
+def test_manually_entered_task_date_is_counted_without_claiming_quote_provenance():
+    project = case('manual', source_status='執行中')
+    task = project['nodes'][0]['tasks'][0]
+    assert 'source_identity' not in task  # A stored task date can exist without a quote-row link.
+    result = overview({'projects': [project]}, clock=CLOCK)
+    bucket = next(row for row in result['source_deadlines']['buckets'] if row['key'] == 'formal_executing')
+    assert bucket == {'key': 'formal_executing', 'cases': 1, 'tasks': 1}
+    assert result['date_basis'] == 'Asia/Taipei; actual task due_date only'

@@ -34,13 +34,13 @@ CLOSED_TASK=('superseded','not_applicable','skipped','cancelled','canceled')
 
 
 def deadline_bucket(project,relationship):
-    """Which stored project fact explains a past-due source deadline; the buckets are never merged."""
+    """Group past-due stored task dates by case relationship and status, without inferring date provenance."""
     if relationship=='待確認單' or project.get('case_type')=='intake':return 'intake'
     return {'執行中':'formal_executing','來源狀態待核對':'formal_unverified'}.get(project.get('source_status'),'other')
 
 
 def source_overdue(project,today):
-    """Open, dated, past-due tasks of a case the workbench does not run: kept as source data, not as anyone's workload."""
+    """Count open, dated, past-due tasks on a case the workbench does not run; date origin is unknown."""
     from .sop_contracts import disabled_task
     count=0
     for node in project.get('nodes',[]):

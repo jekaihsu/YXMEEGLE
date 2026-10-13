@@ -52,18 +52,47 @@ def test_shell_shape_counts_and_no_trees(tmp_path):
 
 
 @pytest.mark.parametrize('uid', ['u-manager', 'u-pm', 'ou_020', 'ou_030'])
-def test_shell_my_counts_equal_legacy_can_execute(tmp_path, uid):
+def test_shell_my_counts_equal_ready_assigned_tasks(tmp_path, uid):
     with scaled_client(tmp_path, 12, **ON) as (app, client):
         switch(client, uid)
         full = client.get('/api/workspace').json(); shell = client.get('/api/workspace?scope=shell').json()
-        rows = [t for p in full['projects'] for n in p['nodes'] for t in n['tasks'] if t['can_execute']]
-        late = lambda t: bool(t['due_date']) and t['due_date'][:10] < shell['as_of'] and t['status'] not in ('completed', 'superseded')
-        assert shell['counts']['my_overdue_tasks'] == sum(map(late, rows))
-        assert shell['counts']['my_active_tasks'] == sum(t['status'] not in ('completed', 'superseded') for t in rows)
+        from .test_shell_dashboard_equivalence import actionable
+        rows = [(p, t) for p in full['projects'] for n in p['nodes'] for t in n['tasks'] if actionable(full, p, t, uid)]
+        late = [(p, t) for p, t in rows if t.get('due_date') and t['due_date'][:10] < shell['as_of']]
+        due_today = [(p, t) for p, t in rows if (t.get('due_date') or '')[:10] == shell['as_of']]
+        assert shell['counts']['my_overdue_tasks'] == shell['counts']['overdue_tasks'] == len(late)
+        assert shell['counts']['my_active_tasks'] == len(rows)
+        assert shell['counts']['due_today_tasks'] == len(due_today)
         assert shell['counts']['approvals_pending'] == sum(a['status'] == 'pending' for a in full['approvals'])
         assert shell['counts']['daily_unmatched'] == len(full['daily_unmatched'])
-        # the attention list is the dashboard's, not the user's own: see test_shell_dashboard_equivalence.py
+        # Attention contains only ready, assigned tasks with due dates.
         assert all(a['task_id'] for a in shell['attention']) and len(shell['attention']) <= 5
+
+
+def test_shell_counts_ready_assignment_but_not_missing_prerequisite(tmp_path, monkeypatch):
+    monkeypatch.setattr(backend_app, 'now', lambda: '2026-10-07T09:00:00+08:00')
+    def ready_and_blocked(state):
+        for project in state['projects']:
+            project['execution_status'] = 'paused'
+        project = state['projects'][0]
+        project['source_lifecycle'] = dict(state='mapped', reasons=[], canonical='執行中', relationship='已關聯確認單')
+        project['execution_status'] = 'in_progress'
+        for node in project['nodes']:
+            node['status'] = 'pending'
+            for task in node['tasks']: task['status'] = 'completed'
+        ready, blocked = project['nodes'][0]['tasks'][:2]
+        ready.update(status='in_progress', due_date='2026-10-01', start_date='2026-09-21')
+        blocked.update(status='pending', due_date='2026-10-01', start_date='2026-09-21',
+                       input_task_ids=['missing-prerequisite'])
+    with scaled_client(tmp_path, 3, mutate=ready_and_blocked, **ON) as (app, client):
+        switch(client, 'ou_015')
+        full = client.get('/api/workspace').json(); shell = client.get('/api/workspace?scope=shell').json()
+        ready, blocked = full['projects'][0]['nodes'][0]['tasks'][:2]
+        assert ready['can_execute'] is True and not ready['execution_blockers']
+        assert blocked['can_execute'] is True and blocked['activation_blockers']
+        assert shell['counts']['my_active_tasks'] == shell['counts']['my_overdue_tasks'] == 1
+        assert [item['task_id'] for item in shell['attention']] == [ready['id']]
+        assert blocked['id'] not in {item['task_id'] for item in shell['attention']}
 
 
 def test_shell_overdue_uses_taipei_today(tmp_path, monkeypatch):
@@ -90,9 +119,15 @@ def test_shell_hides_invisible_cases_from_cards_and_counts(tmp_path, monkeypatch
     from . import workspace_environment
     from sqlalchemy import update
     from .models import ProjectIndex
-    with scaled_client(tmp_path, 8, **ON) as (app, client):
+    def ready_first(state):
+        project = state['projects'][0]
+        project['source_lifecycle'] = dict(state='mapped', reasons=[], canonical='執行中', relationship='已關聯確認單')
+        project['execution_status'] = 'in_progress'
+        project['nodes'][0]['status'] = 'pending'
+    with scaled_client(tmp_path, 8, mutate=ready_first, **ON) as (app, client):
         switch(client, 'ou_015')
         everything = client.get('/api/workspace?scope=shell').json()
+        assert everything['counts']['my_active_tasks'] > 0
         with app.state.sessions.begin() as db:
             db.execute(update(ProjectIndex).where(ProjectIndex.project_id == 'p001').values(case_visibility='excluded_history'))
         monkeypatch.setattr(workspace_environment, 'normalize_environment', lambda state, wid, cfg: state.update(environment='production') or state)
