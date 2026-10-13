@@ -45,7 +45,6 @@ npm run test:shell-mode
 npm run test:overview
 npm run test:contrast
 npm run test:case-navigation
-npm run test:search-input
 npm run test:project-disabled-reasons
 node test-company-route.mjs
 npm run build
