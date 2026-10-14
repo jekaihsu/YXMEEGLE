@@ -191,7 +191,7 @@ def test_oauth_verified_identity_tenant_and_role_isolation(tmp_path,monkeypatch)
     response=client.get('/api/auth/lark/callback',params={'state':state,'code':'valid'},follow_redirects=False); assert response.status_code==307
     assert client.get('/api/session').json()['user']['role']=='manager'
     assert client.get('/api/workspace').status_code==200
-    assert client.get('/api/session').json()['access_mode']=='tenant-read'
+    assert client.get('/api/session').json()['access_mode']=='recovery'
     # OAuth bootstrap permits read views; writes still need the existing authority. Simulate
     # a fresh authoritative roster result before exercising ordinary isolation.
     from .app import PersonRow

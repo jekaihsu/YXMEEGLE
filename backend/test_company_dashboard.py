@@ -104,7 +104,7 @@ def test_tenant_manager_can_read_company_dashboard_without_fresh_roster(staff):
     app,client,login,change=staff
     change({'role':'manager','bootstrap_admin':True,'directory_last_seen_at':'2000-01-01T00:00:00Z'})
     assert login().status_code==307
-    assert client.get('/api/session').json()['access_mode']=='tenant-read'
+    assert client.get('/api/session').json()['access_mode']=='recovery'
     assert client.get('/api/company-dashboard').status_code==200
     assert client.post('/api/workspace/switch',json={'environment':'test'}).status_code==403
 
