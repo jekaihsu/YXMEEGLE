@@ -1452,6 +1452,8 @@ def create_app(overrides=None):
     register_pilot(app, identity=identity, authorize=authorize_live, cfg=cfg)
     from .runtime_health import register as register_runtime_health
     register_runtime_health(app,identity,sessions,CacheRow,cfg,workspace_model=WorkspaceRow,coordinator=app.state.live_read)
+    from .settings_overview import register as register_settings_overview
+    register_settings_overview(app,identity,load,sessions,WorkspaceRow,CacheRow,cfg)
 
     @app.post('/api/attendance/sync')
     async def sync_attendance(request:Request):
