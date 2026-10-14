@@ -2,6 +2,8 @@
 import os
 import re
 import time
+from contextvars import ContextVar
+from threading import Lock
 from urllib.parse import urlsplit, unquote
 
 import httpx
@@ -9,15 +11,19 @@ import httpx
 from .. import capability_write_policy
 from ..sources import API
 from .config import LiveReadConfig
-from .rate_limit import BudgetExceeded, RETRY_CODES, RetryPolicy, process_bucket
+from .rate_limit import BudgetExceeded, RETRY_CODES, RetryPolicy, process_bucket, table_bucket, read_slots
 from .token_cache import TokenError, process_token_cache
 
 ALLOWED_POSTS = (r'/bitable/v1/apps/[^/]+/tables/[^/]+/records/search',
+                 r'/bitable/v1/apps/[^/]+/tables/[^/]+/records/batch_get',
                  r'/attendance/v1/user_daily_shifts/query',
                  r'/attendance/v1/user_tasks/query', r'/attendance/v1/user_approvals/query')
 ALLOWED_GETS = (r'/bitable/v1/apps/[^/]+(?:/.*)?',
                 r'/contact/v3/users/batch', r'/attendance/v1/shifts/[^/]+',
                 r'/attendance/v1/groups')
+
+
+refresh_context = ContextVar('live_read_budget', default=None)
 
 
 class ReadFailure(RuntimeError):
@@ -48,9 +54,14 @@ class LiveLarkClient:
         self.token_cache = token_cache or process_token_cache
         self.bucket = bucket or process_bucket(self.config.max_rps)
         self.allowed_posts = allowed_posts
+        self._shared_limits = bucket is None
+        self._metrics_lock = Lock()
+        self.context = refresh_context.get()
         self.client = httpx.Client(transport=transport, follow_redirects=False)
         self.started = clock()
         self.deadline = self.started + min(self.config.budget_seconds, self.config.lease_seconds - 10)
+        if self.context:
+            self.deadline = min(self.deadline, self.context['deadline'])
         self.calls = self.retries = 0
         self.duration_ms = 0
         self.deny_network = transport is None and cfg.get(
@@ -96,6 +107,8 @@ class LiveLarkClient:
             raise ReadBlocked('Real Lark transport is disabled')
         if self.cfg.get('LARK_WORKER_IDENTITY') != 'application':
             raise ReadBlocked('Lark application identity is required')
+        if clean_path.startswith('/attendance/'):
+            self.deadline = min(self.deadline, self.started + self.config.dataset_budget('attendance'))
         try:
             return self._request(method, path, **kwargs)
         except TokenError as exc:
@@ -114,16 +127,28 @@ class LiveLarkClient:
             if auth:
                 token = self._token()
                 headers['Authorization'] = 'Bearer ' + token
+            local_bucket = table_bucket(self.cfg, path, self.config.table_rps) if self._shared_limits else None
+            if local_bucket:
+                local_bucket.acquire(self.deadline)
             self.bucket.acquire(self.deadline)
             remaining = self.deadline - self.clock()
             if remaining <= 0:
                 raise BudgetExceeded('Lark read budget exhausted')
-            options = dict(kwargs, headers=headers, timeout=min(25, remaining), follow_redirects=False)
-            self.calls += 1
+            options = dict(kwargs, headers=headers, timeout=min(self.config.request_timeout_seconds, remaining), follow_redirects=False)
+            with self._metrics_lock:
+                self.calls += 1
+            if self.context:
+                with self.context['lock']:
+                    self.context['calls'] += 1
+            if not read_slots.acquire(timeout=max(0, self.deadline - self.clock())):
+                raise BudgetExceeded('Lark read budget exhausted')
             try:
+                options['timeout'] = min(self.config.request_timeout_seconds, max(.001, self.deadline - self.clock()))
                 response = self.client.request(method, API + path, **options)
             except httpx.HTTPError:
                 raise ReadFailure('Lark read transport failed', kind='transient') from None
+            finally:
+                read_slots.release()
             if self.clock() >= self.deadline:
                 raise BudgetExceeded('Lark read budget exhausted')
             try:
@@ -156,7 +181,7 @@ class LiveLarkClient:
                 raise ReadBlocked('Lark authorization or resource access denied', upstream_status=response.status_code,
                                   lark_code=code, kind='permission_denied')
             if retryable and attempt < RetryPolicy.max_attempts:
-                delay = RetryPolicy.after(response, attempt)
+                delay = RetryPolicy.after(response, attempt, jitter=self.config.enabled)
                 if response.status_code == 429 or code == 99991400:
                     delay = max(1, delay)
                     self.bucket.penalize(self.clock() + delay)
@@ -173,4 +198,12 @@ class LiveLarkClient:
                                   kind='field_not_found' if code == 1254045 else 'rejected')
             if not isinstance(body, dict) or not body:
                 raise ReadFailure('Lark response is incomplete')
+            if self.context and isinstance(body.get('data'), dict) and (
+                    '/records' in path or path.endswith('/query') or path == '/contact/v3/users/batch'):
+                data = body['data']
+                rows = data.get('items', data.get('records', data.get('user_daily_shifts', [])))
+                with self.context['lock']:
+                    if isinstance(rows, list):
+                        self.context['pages'] += 1
+                        self.context['records'] += len(rows)
             return response

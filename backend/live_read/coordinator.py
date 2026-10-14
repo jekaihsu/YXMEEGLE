@@ -7,6 +7,7 @@ from threading import Lock, BoundedSemaphore, Event, Thread
 from time import monotonic, sleep
 from uuid import uuid4
 import logging
+import hashlib
 
 from fastapi import HTTPException
 
@@ -14,7 +15,7 @@ from sqlalchemy import update, event
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import IntegrityError
 
-from .client import ReadBlocked, ReadNeedsPermission
+from .client import ReadBlocked, ReadNeedsPermission, refresh_context
 from .config import LiveReadConfig
 from .status import DATASETS, TAIPEI, freshness, timestamp, ttl_seconds
 
@@ -60,7 +61,13 @@ class RefreshCoordinator:
         return timestamp(self.clock())
 
     def _key(self, wid, dataset):
-        return f'live:{wid}:{dataset}'
+        version = self.cfg.get('LARK_AUTHZ_VERSION', '0')
+        app = self.cfg.get('LARK_APP_ID', '')
+        tenant = self.cfg.get('LARK_WORKER_ORGANIZATION', '')
+        if version == '0' and not app and not tenant:
+            return f'live:{wid}:{dataset}'
+        scope = hashlib.sha256(f'{tenant}|{app}|{version}'.encode()).hexdigest()[:16]
+        return f'live:{wid}:{scope}:{dataset}'
 
     def _read(self, key):
         with self.Session() as db:
@@ -150,7 +157,7 @@ class RefreshCoordinator:
         began = monotonic()
         # Bound the read by the existing budget and allow at most one existing
         # lease for apply/import, measured from the claim (not worker start).
-        horizon = started + timedelta(seconds=(self.config.budget_seconds
+        horizon = started + timedelta(seconds=(self.config.dataset_budget(dataset)
                                                + self.config.lease_seconds))
         deadline = began + max(0, (horizon - self._now()).total_seconds())
         stopped, lost = Event(), Event()
@@ -182,6 +189,10 @@ class RefreshCoordinator:
                     # loss. Retry next tick; the commit fence remains authority.
                     logger.warning('%s', type(exc).__name__)
 
+        metrics = dict(deadline=began + self.config.dataset_budget(dataset), lock=Lock(),
+                       calls=0, pages=0, records=0)
+        budget_context = refresh_context.set(metrics)
+        outcome = 'failed'
         renewal = Thread(target=renew, name=f'live-read-lease:{key}', daemon=True)
         try:
             refresher = self.refreshers[dataset]
@@ -205,8 +216,11 @@ class RefreshCoordinator:
                         last_error=None, error_at=None, error_code=None, missing_scopes=[], lease_until=None, revision=str(uuid4()))
             if 'snapshot' in result:
                 data['snapshot'] = result['snapshot']
+            data['complete'] = result.get('complete', True)
+            data['readState'] = 'complete' if data['complete'] else 'partial'
             if not self._replace(key, claimed['revision'], data):
                 raise LeaseLost('Live-read lease ownership lost')
+            outcome = data['readState']
         except Exception as exc:
             # Once ownership is lost, no later success or failure transaction may
             # publish under this claim, even if the callable ignored its fence.
@@ -216,18 +230,29 @@ class RefreshCoordinator:
             while cause.__cause__ is not None:
                 cause=cause.__cause__
             permission=cause if isinstance(cause,ReadNeedsPermission) else None
-            blocked = isinstance(exc, ReadBlocked) or (isinstance(exc, HTTPException) and exc.status_code == 403)
+            blocked = isinstance(cause, ReadBlocked) or (isinstance(exc, HTTPException) and exc.status_code == 403)
             error_code = 'ReadNeedsPermission' if permission else 'ReadBlocked' if blocked else type(exc).__name__
             detail = exc.detail if isinstance(exc, HTTPException) and isinstance(exc.detail, str) else ''
             logger.warning('Live-read refresh failed: dataset=%s %s status=%s detail=%s duration_ms=%d',
                            dataset, error_code, getattr(exc, 'status_code', None), detail[:160],
                            int((monotonic()-began)*1000))
             if not isinstance(exc, LeaseLost):
-                if not self._replace(key, claimed['revision'], dict(claimed, lease_until=None,
-                                    revision=str(uuid4()), last_error='Lark refresh failed',
+                retained = dict(claimed)
+                denied = blocked and (permission is None or cause.upstream_status in (401, 403)
+                                      or cause.lark_code in (99991672, 1254302))
+                if denied:
+                    for field in ('snapshot', 'fingerprint'):
+                        retained.pop(field, None)
+                if not self._replace(key, claimed['revision'], dict(retained, lease_until=None,
+                                    revision=str(uuid4()), complete=False if permission or blocked else retained.get('complete', True), last_error='Lark refresh failed',
                                     error_code=error_code, missing_scopes=permission.missing_scopes if permission else [], error_at=self._now().isoformat())):
                     logger.warning('Live-read lease ownership lost while recording failure')
             raise exc
+        finally:
+            refresh_context.reset(budget_context)
+            logger.info('live_read dataset=%s duration_ms=%d pages=%d calls=%d records=%d outcome=%s',
+                        dataset, int((monotonic() - began) * 1000), metrics['pages'],
+                        metrics['calls'], metrics['records'], outcome)
 
     def close(self):
         self.executor.shutdown(wait=True)
@@ -333,4 +358,8 @@ class RefreshCoordinator:
         return self._dataset_status(dataset, self._read(key))
 
     def _dataset_status(self, dataset, row):
-        return freshness({dataset: row}, self.config, self._now(), True)['datasets'][dataset]
+        status = freshness({dataset: row}, self.config, self._now(), True)['datasets'][dataset]
+        status['complete'] = bool(row.get('as_of')) and row.get('complete', True) and status['status'] not in ('blocked', 'needs-permission')
+        status['readState'] = ('complete' if status['complete'] else 'partial' if row.get('as_of') else 'unknown')
+        status['stale'] = status['status'] != 'fresh'
+        return status
