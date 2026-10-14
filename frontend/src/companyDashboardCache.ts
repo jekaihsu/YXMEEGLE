@@ -31,12 +31,12 @@ function panelReader<T>(){
   return JSON.stringify([current,scope,url]);
  }
  const cached=(url:string,scope='')=>panels.get(key(url,scope));
- const read=(url:string,signal:AbortSignal,scope=''):Promise<T>=>{
+ const read=(url:string,signal:AbortSignal,scope='',{timeoutMs=15000}:{timeoutMs?:number}={}):Promise<T>=>{
   const ident=key(url,scope),started=getSessionEpoch();
   let entry=pending.get(ident);
   if(!entry){
    const controller=new AbortController();
-   const promise=api<T>(url,{signal:controller.signal,cache:'no-store',timeoutMs:15000},()=>started===getSessionEpoch())
+   const promise=api<T>(url,{signal:controller.signal,cache:'no-store',timeoutMs},()=>started===getSessionEpoch())
     .then(body=>{if(!controller.signal.aborted&&started===getSessionEpoch()){
      panels.set(ident,body);
      if(panels.size>32){const oldest=panels.keys().next();if(!oldest.done)panels.delete(oldest.value)}

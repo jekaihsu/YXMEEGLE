@@ -1,3 +1,4 @@
+import {fakeClock} from './fake-clock-fixture.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {build} from 'esbuild';
@@ -25,6 +26,7 @@ const dom = new JSDOM('<div id="root"></div>', {url: 'http://localhost/#view=con
 for (const key of ['window', 'document', 'location', 'history', 'HTMLElement', 'Event'])
  Object.defineProperty(globalThis, key, {configurable: true, value: dom.window[key]});
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+const clock=fakeClock(dom.window);
 let finish;
 globalThis.fetch = () => new Promise(resolve => {finish = resolve;});
 const root = createRoot(document.getElementById('root'));
@@ -36,6 +38,8 @@ try {
  assert.match(content, /讀取中/);
  assert.ok(!content.includes('confirmation list body is malformed or unavailable'));
  assert.equal(document.querySelectorAll('tbody tr').length, 1);
+ await act(async()=>clock.advance(15001));
+ assert.match(document.querySelector('main').textContent,/讀取中/,'P2 remains pending beyond fifteen seconds');
  console.log('PASS pending confirmations render loading without malformed-body fallback');
  await act(async () => {finish(new Response(JSON.stringify(fixture)));});
  assert.equal(document.querySelectorAll('tbody tr').length, 6);
@@ -45,4 +49,4 @@ try {
  assert.match(loaded, /已載入筆數：6/);
  assert.ok(!loaded.includes('confirmation list body is malformed or unavailable'));
  console.log('PASS completed backend snapshot renders six rows, counts and last-success time');
-} finally {await act(async () => root.unmount()); dom.window.close();}
+} finally {await act(async () => root.unmount());clock.restore(); dom.window.close();}
