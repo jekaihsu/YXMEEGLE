@@ -23,8 +23,6 @@
 .operations.operations .ops-review{padding:0;background:none;border:0}
 .operations :is(.ops-review,.finance-readonly)>.ds-section>.ds-group{padding:var(--sp-4)}
 .operations .ops-input{padding:var(--sp-4) 0;border:0;border-bottom:1px solid var(--separator);background:none}
-.operations :is(.button,.ds-button){min-height:var(--sp-8);padding:var(--sp-2) var(--sp-5);border:0;border-radius:var(--radius-pill);font:inherit;white-space:normal;background:var(--surface-2);color:var(--accent);box-shadow:none}
-.operations .button.primary{background:var(--accent);color:var(--on-accent)}
 .operations :is(.error-banner,.late-text){color:var(--critical);background:var(--surface-2);border-color:var(--separator)}
 .operations .flow-operation-picker{border:0}
 .operations .flow-operation-picker label{max-width:none}
@@ -38,7 +36,6 @@
 
 .operations h1{font-size:var(--fs-large-title)}
 .operations h3{font-size:var(--fs-headline);color:var(--label)}
-.operations .text-button{background:none;color:var(--accent)}
 .operations .ds-badge{white-space:normal}
 
 /* Keep routine identities and dates readable while the history scrolls on phones. */

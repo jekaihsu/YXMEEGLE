@@ -50,7 +50,11 @@ body{background-color:var(--bg);background-image:var(--bg-tint);background-attac
  .app-shell .toast{bottom:calc(var(--sp-9) + env(safe-area-inset-bottom))}
 }
 /* The top bar is a single 64px glass strip aligned with the sidebar brand row; the page gutter matches the workspace. */
-.app-shell .topbar.glass--bar{height:64px;padding:0 var(--page-padding);border-bottom:1px solid var(--glass-border)}
+.app-shell .topbar.glass--bar{height:64px;padding:0 var(--page-padding);border-bottom:1px solid var(--glass-border);flex-wrap:nowrap;gap:var(--space-3)}
+.app-shell .topbar-right{display:flex;align-items:center;gap:var(--space-3);flex-wrap:nowrap;min-width:0}
+.app-shell .topbar .user-button{width:auto;flex:none;min-height:44px;padding:0 var(--space-3);border:0;border-radius:var(--radius-control)}
+.app-shell .topbar .user-button:hover{background:color-mix(in srgb,var(--label) 7%,transparent)}
+.app-shell .sidebar .user-button{padding:var(--space-3);border-radius:0}
 .app-shell .workspace{padding:var(--page-padding)}
 .app-shell .sidebar-projects,.app-shell .user-button{border-top:1px solid var(--glass-border)}
 /* Mobile top bar stays on one line: freshness text shrinks and truncates instead of wrapping under the title. */

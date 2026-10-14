@@ -26,4 +26,5 @@
 @layer pages{
 .workspace .owned-view:not(.owned-state){padding:var(--card-padding);margin:0 0 var(--panel-gap)}
 .workspace .owned-view:not(.owned-state) .ds-section{margin-bottom:0}
+.owned-view>button:not([class]){min-height:44px;padding:0 var(--space-3);border:1px solid transparent;border-radius:var(--radius-control);background:transparent;color:var(--accent);font-size:var(--fs-subhead);font-weight:500}
 }

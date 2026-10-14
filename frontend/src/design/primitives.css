@@ -9,7 +9,8 @@
 .ds-section{margin-bottom:var(--sp-6)}
 .ds-section>h2{font-size:var(--fs-footnote);font-weight:600;color:var(--label-2);text-transform:uppercase;letter-spacing:.04em;padding:0 var(--sp-4) var(--sp-2)}
 .ds-group{overflow:hidden}
-.ds-footer{font-size:var(--fs-footnote);color:var(--label-2);padding:var(--sp-2) var(--sp-4) 0}
+.ds-footer{font-size:var(--fs-footnote);color:var(--label-2);padding:0}
+.ds-section>.ds-footer{padding:var(--space-2) var(--space-4) 0}
 .ds-row{display:flex;align-items:center;gap:var(--sp-3);width:100%;min-height:44px;padding:var(--sp-3) var(--sp-4);text-align:left;font-size:var(--fs-body);position:relative;transition:background var(--dur-fast) var(--ease)}
 .ds-row+.ds-row::before{content:"";position:absolute;top:0;left:var(--sp-4);right:0;border-top:1px solid var(--sep)}
 button.ds-row:hover,a.ds-row:hover{background:var(--surface-2)}

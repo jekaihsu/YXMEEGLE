@@ -17,7 +17,7 @@
  --glass-shadow-raised:0 2px 4px rgb(21 35 51/.06),0 14px 32px rgb(21 35 51/.12);
  --glass-shadow-flat:0 1px 2px rgb(21 35 51/.05),0 4px 12px rgb(21 35 51/.05);
  --bg-tint:radial-gradient(56rem 36rem at 6% -8%,rgb(12 84 148/.14),transparent 70%),radial-gradient(48rem 34rem at 104% 2%,rgb(14 148 160/.1),transparent 70%),radial-gradient(60rem 40rem at 50% 112%,rgb(98 92 190/.08),transparent 70%);
- --positive:#1a6f35;--warning:#8f4a00;--critical:#c4001a;--on-critical:#fff;
+ --positive:#14602c;--warning:#7d4000;--critical:#aa0016;--on-critical:#fff;
  --status-ok-fg:#14532d;--status-ok-bg:#dcfce7;
  --status-warn-fg:#713f12;--status-warn-bg:#fef3c7;
  --status-error-fg:#991b1b;--status-error-bg:#fee2e2;
@@ -57,7 +57,7 @@ html{font-size:calc(100% * var(--text-scale))}
  --glass-shadow-raised:0 2px 4px rgb(0 0 0/.34),0 14px 32px rgb(0 0 0/.4);
  --glass-shadow-flat:0 1px 2px rgb(0 0 0/.3),0 4px 12px rgb(0 0 0/.2);
  --bg-tint:radial-gradient(56rem 36rem at 6% -8%,rgb(94 163 224/.16),transparent 70%),radial-gradient(48rem 34rem at 104% 2%,rgb(20 184 166/.1),transparent 70%),radial-gradient(60rem 40rem at 50% 112%,rgb(129 120 235/.1),transparent 70%);
- --positive:#4ade80;--warning:#fbbf24;--critical:#ff7a70;--on-critical:#2b0d0a;
+ --positive:#4ade80;--warning:#fbbf24;--critical:#ff8a80;--on-critical:#2b0d0a;
  --focus-ring:#b8d8ff;
 }
 @media(prefers-color-scheme:dark){
@@ -75,7 +75,7 @@ html{font-size:calc(100% * var(--text-scale))}
   --glass-shadow-raised:0 2px 4px rgb(0 0 0/.34),0 14px 32px rgb(0 0 0/.4);
   --glass-shadow-flat:0 1px 2px rgb(0 0 0/.3),0 4px 12px rgb(0 0 0/.2);
   --bg-tint:radial-gradient(56rem 36rem at 6% -8%,rgb(94 163 224/.16),transparent 70%),radial-gradient(48rem 34rem at 104% 2%,rgb(20 184 166/.1),transparent 70%),radial-gradient(60rem 40rem at 50% 112%,rgb(129 120 235/.1),transparent 70%);
-  --positive:#4ade80;--warning:#fbbf24;--critical:#ff7a70;--on-critical:#2b0d0a;
+  --positive:#4ade80;--warning:#fbbf24;--critical:#ff8a80;--on-critical:#2b0d0a;
   --focus-ring:#b8d8ff;
  }
 }

@@ -50,35 +50,6 @@
   gap: var(--space-4);
   padding: var(--space-4);
 }
-.my-work-toolbar label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  flex: 1 1 12rem;
-  min-width: 0;
-  font-size: var(--fs-footnote);
-  font-weight: 600;
-  color: var(--label-2);
-}
-.work-page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
-}
-.work-page > h1 {
-  margin: 0;
-  font-size: var(--fs-large-title);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-}
-.work-page > p,
-.work-page > small {
-  margin: 0;
-  color: var(--label-2);
-  font-size: var(--fs-subhead);
-}
 .my-work-table details > summary {
   min-height: 44px;
   display: flex;
@@ -688,5 +659,4 @@
 }
 
 .my-work-table td .avatar{vertical-align:middle;margin-right:var(--space-2)}
-.owned-view>button:not([class]){min-height:44px;padding:0 var(--space-3);border:1px solid transparent;border-radius:var(--radius-control);background:transparent;color:var(--accent);font-size:var(--fs-subhead);font-weight:500}
 }

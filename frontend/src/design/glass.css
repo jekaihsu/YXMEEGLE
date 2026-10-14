@@ -18,7 +18,7 @@
  background:var(--glass-fill);border:1px solid var(--glass-border);border-radius:var(--radius-card);box-shadow:var(--glass-highlight),var(--glass-shadow);
  -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
 }
-.workspace :is(.glass--flat,.ds-group,.table-scroll,.portfolio-index,.my-work-table-scroll,.tl-sheet,.approval-list,.na-summary,.na-list,.node-section,.project-discussion,.p2-banner,.p2-side-panel,.p2-card,.people-surface,.source-connection,.ds-section.dh-personal-queue,.my-work-toolbar,.owned-view:not(.owned-state),section.empty,.p2-drawer,.source-health-drawer,.my-work-drawer,.cockpit-table-scroll,.cockpit-source-detail,.inbox-row,.inbox-clear,.empty>span){
+.workspace :is(.glass--flat,.ds-group,.table-scroll,.portfolio-index,.my-work-table-scroll,.tl-sheet,.approval-list,.na-summary,.na-list,.node-section,.project-discussion,.p2-banner,.p2-side-panel,.p2-card,.people-surface,.source-connection,.ds-section.dh-personal-queue,.my-work-toolbar,.owned-view:not(.owned-state),section.empty,.p2-drawer,.source-health-drawer,.my-work-drawer,.cockpit-table-scroll,.inbox-row,.inbox-clear,.empty>span){
  background:var(--glass-fill-strong);border:1px solid var(--glass-border);border-radius:var(--radius-card);box-shadow:var(--glass-highlight),var(--glass-shadow-flat);
  -webkit-backdrop-filter:none;backdrop-filter:none;
 }
@@ -48,4 +48,5 @@
 .ds-sheet.glass,.file-sheet{border-radius:var(--radius-dialog) var(--radius-dialog) 0 0}
 @media(max-width:760px){.task-inspector{border-radius:0}}
 .modal-backdrop,.drawer-backdrop{background:var(--scrim)}
+.workspace .cockpit-overview-grid .cockpit-source-detail{background:transparent;border:0;border-top:1px solid var(--sep);border-radius:0;box-shadow:none}
 }

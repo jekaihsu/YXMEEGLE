@@ -11,7 +11,7 @@
  --btn-fill-primary-hover:linear-gradient(180deg,var(--accent),var(--accent-hover));
  --btn-shadow:var(--glass-highlight),0 1px 2px rgb(21 35 51/.08);
  --btn-shadow-active:inset 0 1px 2px rgb(21 35 51/.16);
- --field-border:color-mix(in srgb,var(--label-2) 58%,var(--surface));
+ --field-border:color-mix(in srgb,var(--label-2) 70%,var(--surface));
 }
 :root[data-theme=dark]{--btn-shadow:var(--glass-highlight),0 1px 2px rgb(0 0 0/.4);--btn-shadow-active:inset 0 1px 2px rgb(0 0 0/.5)}
 @media(prefers-color-scheme:dark){:root:not([data-theme=light]):not([data-theme=dark]){--btn-shadow:var(--glass-highlight),0 1px 2px rgb(0 0 0/.4);--btn-shadow-active:inset 0 1px 2px rgb(0 0 0/.5)}}

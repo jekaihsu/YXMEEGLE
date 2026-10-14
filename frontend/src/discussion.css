@@ -103,12 +103,6 @@
   line-height:1.5;
 }
 
-.project-discussion .comment-compose form>div:last-of-type .button{
-  flex:0 0 auto;
-  min-height:36px;
-  padding:var(--sp-2) var(--sp-4);
-  border-radius:var(--radius-s);
-}
 
 .project-discussion .comment{
   align-items:flex-start;

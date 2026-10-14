@@ -205,4 +205,16 @@ button.resource-cell:focus-visible{outline:2px solid var(--accent);outline-offse
 .workspace section.empty{display:flex;flex-direction:column;align-items:center;gap:var(--space-3);padding:var(--space-8) var(--space-6);text-align:center;max-width:36rem;margin:var(--space-8) auto}
 .workspace section.empty h1,.workspace section.empty h2{margin:0}
 .workspace section.empty p{margin:0;color:var(--label-2);font-size:var(--fs-subhead)}
+
+/* Work page shell and filter labels. Here, not in the lazy my-work-table sheet, so the page frame is styled before the table chunk arrives. */
+.my-work-toolbar label {display: flex;flex-direction: column;gap: var(--space-1);flex: 1 1 12rem;min-width: 0;font-size: var(--fs-footnote);font-weight: 600;color: var(--label-2);
+}
+.work-page {display: flex;flex-direction: column;gap: var(--space-4);min-width: 0;
+}
+.work-page > h1 {margin: 0;font-size: var(--fs-large-title);font-weight: 600;letter-spacing: -0.02em;line-height: 1.2;
+}
+.work-page > p,
+.work-page > small {margin: 0;color: var(--label-2);font-size: var(--fs-subhead);
+}
+
 }
