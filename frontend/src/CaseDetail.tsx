@@ -99,9 +99,11 @@ export function CaseDetail({
   currentSort,
 }: CaseDetailProps) {
   const instanceId = useId();
+  const sectionId = (key: string) => `${instanceId}-section-${key}`;
   const rootRef = useRef<HTMLDivElement>(null);
   const rowSelectButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const prevDrawerKeyRef = useRef<string | null>(view.drawer?.row.key ?? null);
+  const pendingNavRef = useRef<string | null>(null);
 
   const restoreFocus = (targetKey: string | null) => {
     if (targetKey) {
@@ -131,6 +133,30 @@ export function CaseDetail({
       restoreFocus(prevKey);
     }
   }, [view.drawer]);
+
+  useEffect(() => {
+    if (
+      pendingNavRef.current &&
+      view.drawer &&
+      view.drawer.row.key === pendingNavRef.current
+    ) {
+      const nav = view.drawer.navigation;
+      pendingNavRef.current = null;
+      if (nav) {
+        onNavigate?.(nav);
+      }
+    }
+  }, [view.drawer, onNavigate]);
+
+  const handleRowNavigate = (row: DetailRow) => {
+    const isSelected = view.drawer?.row.key === row.key;
+    if (isSelected && view.drawer?.navigation) {
+      onNavigate?.(view.drawer.navigation);
+    } else {
+      pendingNavRef.current = row.key;
+      onSelect?.(row.key);
+    }
+  };
 
   const setRowBtnRef = (key: string, el: HTMLButtonElement | null) => {
     if (el) {
@@ -257,7 +283,10 @@ export function CaseDetail({
               ref={el => setRowBtnRef(row.key, el)}
               className="p2-btn p2-btn-sm p2-btn-select"
               aria-expanded={isSelected}
-              onClick={() => onSelect?.(isSelected ? null : row.key)}
+              onClick={() => {
+                pendingNavRef.current = null;
+                onSelect?.(isSelected ? null : row.key);
+              }}
               aria-label={`${isSelected ? '收合' : '檢視'} ${row.title.text}`}
             >
               {isSelected ? '收合' : '詳情'}
@@ -266,13 +295,7 @@ export function CaseDetail({
               <button
                 type="button"
                 className="p2-btn p2-btn-sm p2-btn-primary"
-                onClick={() => {
-                  if (isSelected && view.drawer?.navigation) {
-                    onNavigate?.(view.drawer.navigation);
-                  } else {
-                    onSelect?.(row.key);
-                  }
-                }}
+                onClick={() => handleRowNavigate(row)}
                 aria-label={`前往合約 ${row.title.text}`}
               >
                 前往合約
@@ -282,13 +305,7 @@ export function CaseDetail({
               <button
                 type="button"
                 className="p2-btn p2-btn-sm p2-btn-primary"
-                onClick={() => {
-                  if (isSelected && view.drawer?.navigation) {
-                    onNavigate?.(view.drawer.navigation);
-                  } else {
-                    onSelect?.(row.key);
-                  }
-                }}
+                onClick={() => handleRowNavigate(row)}
                 aria-label={`前往工項 ${row.title.text}`}
               >
                 前往工項
@@ -304,7 +321,7 @@ export function CaseDetail({
     return (
       <section
         key={section.key}
-        id={`section-${section.key}`}
+        id={sectionId(section.key)}
         className="p2-card p2-section-card"
         aria-label={section.title}
       >
@@ -343,19 +360,7 @@ export function CaseDetail({
         {section.rows.length === 0 ? (
           <div className="p2-section-empty">
             <p className="p2-empty-message">
-              {section.states.includes('forbidden')
-                ? '沒有權限'
-                : section.states.includes('read_failed')
-                ? '讀取失敗'
-                : section.states.includes('loading')
-                ? '讀取中'
-                : section.states.includes('unlocated')
-                ? '找不到資料來源'
-                : section.states.includes('filtered_empty')
-                ? '沒有符合篩選條件的資料'
-                : section.states.includes('complete_empty')
-                ? '尚無資料'
-                : '尚無資料'}
+              {section.label}
             </p>
           </div>
         ) : (
@@ -632,7 +637,7 @@ export function CaseDetail({
           {view.sections.map(section => (
             <li key={`nav-${section.key}`} className="p2-inpage-nav-item">
               <a
-                href={`#section-${section.key}`}
+                href={`#${sectionId(section.key)}`}
                 className="p2-inpage-nav-link"
                 aria-label={`前往 ${section.title} 章節`}
               >
@@ -675,10 +680,9 @@ export function CaseDetail({
                           ? 'is-selected'
                           : ''
                       }`}
-                      aria-expanded={
-                        view.tree.expanded?.key === view.tree.root.key
-                      }
+                      aria-expanded={view.tree.children.length > 0}
                       onClick={() => {
+                        pendingNavRef.current = null;
                         const isSel =
                           view.drawer?.row.key === view.tree.root!.key;
                         onSelect?.(isSel ? null : view.tree.root!.key);
@@ -686,9 +690,7 @@ export function CaseDetail({
                       aria-label={`案件根節點 ${view.tree.root.title.text}`}
                     >
                       <span className="p2-tree-icon" aria-hidden="true">
-                        {view.tree.expanded?.key === view.tree.root.key
-                          ? '▼'
-                          : '▶'}
+                        {view.tree.children.length > 0 ? '▼' : '▶'}
                       </span>
                       <span className="p2-badge p2-badge-root">案件</span>
                       <span className="p2-tree-label">
@@ -720,9 +722,10 @@ export function CaseDetail({
                                 isExpanded ? 'is-expanded' : ''
                               } ${isSelected ? 'is-selected' : ''}`}
                               aria-expanded={isExpanded}
-                              onClick={() =>
-                                onSelect?.(isSelected ? null : child.key)
-                              }
+                              onClick={() => {
+                                pendingNavRef.current = null;
+                                onSelect?.(isSelected ? null : child.key);
+                              }}
                               aria-label={`${
                                 isExpanded ? '收合' : '展開'
                               } ${child.title.text}`}
@@ -767,11 +770,12 @@ export function CaseDetail({
                                         className={`p2-tree-node-btn p2-tree-sub-btn ${
                                           isSubSelected ? 'is-selected' : ''
                                         }`}
-                                        onClick={() =>
+                                        onClick={() => {
+                                          pendingNavRef.current = null;
                                           onSelect?.(
                                             isSubSelected ? null : sub.key
-                                          )
-                                        }
+                                          );
+                                        }}
                                         aria-label={`檢視 ${sub.title.text}`}
                                       >
                                         <span className="p2-badge">
@@ -824,6 +828,7 @@ export function CaseDetail({
                   className="p2-btn p2-btn-sm p2-btn-close"
                   onClick={() => {
                     const keyToRestore = view.drawer?.row.key ?? null;
+                    pendingNavRef.current = null;
                     onSelect?.(null);
                     restoreFocus(keyToRestore);
                   }}
@@ -1000,11 +1005,8 @@ export function CaseDetail({
           <section className="p2-card p2-side-card" aria-label="關聯警示">
             <div className="p2-card-header">
               <h3 className="p2-section-title">關聯警示</h3>
-              <span className="p2-badge">{view.side.warnings.length}</span>
             </div>
-            {view.side.warnings.length === 0 ? (
-              <p className="p2-side-empty">目前無關聯警示</p>
-            ) : (
+            {view.side.warnings.length > 0 && (
               <ul className="p2-warnings-list">
                 {view.side.warnings.map(w => (
                   <li key={w.key} className="p2-warning-item">
