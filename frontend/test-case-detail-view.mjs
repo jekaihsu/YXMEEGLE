@@ -52,7 +52,7 @@ test('forbidden rows, nested tasks, IDs, labels, times and count hints disappear
  const versions=fixture(); versions.sections.versions.states=['forbidden']; assert.equal(header(build(versions),'確認單版本').text,'—');
 });
 test('malformed body fails closed without retaining otherwise valid header facts',()=>{
- for(const mutate of [b=>b.sections.work_items.rows.push(null),b=>b.sections.history.rows[0].revision={},b=>b.header.pm.name=42,b=>b.sections.versions.source_time=[],b=>b.sections.contract_lines.states=['partial','unknown'],b=>b.header.details.edges[0].contested='yes',b=>delete b.sections.overview,b=>b.sections.work_items.rows[0].parents=[null]]){
+ for(const mutate of [b=>b.sections.work_items.rows.push(null),b=>b.sections.history.rows[0].revision={},b=>b.header.pm.name=42,b=>b.sections.versions.source_time=[],b=>b.sections.contract_lines.states=['partial','unknown'],b=>b.header.details.edges[0].contested='yes',b=>b.sections.versions.rows[0].kind='contract',b=>delete b.sections.overview,b=>b.sections.work_items.rows[0].parents=[null]]){
   const b=fixture(); mutate(b); const v=build(b); assert.deepEqual(v.page,{states:['unknown'],label:'狀態未知',reason:'malformed_case_detail_body'}); assert.deepEqual(v.header,[]); assert.equal(v.drawer,null);
  }
  assert.equal(build(fixture()).header[0].text,'測試案件');
@@ -99,6 +99,10 @@ test('UI filter and sort preserve selection and do not search technical IDs',()=
  assert.deepEqual(sec(build(b,{filters:{search:'v1'}}),'versions').rows.map(r=>r.title.text),[]);
  const second=clone(b.sections.versions.rows[0]); second.key='confirmation:v2'; second.label='版 B'; b.sections.versions.rows.push(second);
  assert.deepEqual(sec(build(b,{sort:{key:'title',dir:'desc'}}),'versions').rows.map(r=>r.title.text),['版 B','版 A']);
+});
+test('history variant allowlists ignore injected generic row fields',()=>{
+ const b=fixture(); Object.assign(b.sections.history.rows[0],{key:'contract:HIDDEN',kind:'contract',label:'SECRET_HISTORY',action:'INJECTED_ACTION',source_url:'https://secret.invalid',tasks:[],amount:{state:'withheld',reason:'G-AMT',value:9001}});
+ const v=build(b); assert.equal(sec(v,'history').rows[0].title.text,'r0'); assert.equal(/HIDDEN|SECRET_HISTORY|INJECTED_ACTION|secret.invalid|9001/.test(JSON.stringify(v)),false);
 });
 test('source fetch time is never substituted; unsafe URLs remain unlocated',()=>{
  const b=fixture(); b.sections.overview.source_time.value=null; b.header.source_link.url='javascript:alert(1)';

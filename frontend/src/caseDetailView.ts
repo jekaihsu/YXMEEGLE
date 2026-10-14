@@ -59,7 +59,7 @@ function validRow(v: unknown, history = false, depth = 0): boolean {
 function validSection(v: unknown, name: string): boolean {
  return rec(v) && withStates(v) && (v.freshness === null || v.freshness === 'stale') && nullable(v.reason) &&
  rec(v.source_time) && nullable(v.source_time.value) && v.source_time.basis === 'source_sync_completed' && nullable(v.source_time.fetched_at) &&
- array(v.rows, r => validRow(r, name === 'history')) && rec(v.details) &&
+ array(v.rows, r => validRow(r, name === 'history') && (name === 'history' || r.kind === ({versions: 'confirmation', contract_lines: 'contract', work_items: 'work_item', workflow_nodes: 'node', reports_documents: 'evidence'} as Record<string, string>)[name])) && rec(v.details) &&
  optional(v.details, 'unresolved_edges', x => array(x, edge)) &&
  optional(v.details, 'entry_point', x => rec(x) && x.view === 'project' && str(x.project) && x.tab === 'data' && x.section === 'files') &&
  optional(v.details, 'case_identity', str) && optional(v.details, 'read_only', x => x === true) && optional(v.details, 'note', str);
@@ -139,7 +139,7 @@ export function buildCaseDetailView(input: unknown, options: CaseDetailOptions =
  try {
   sections = names.map(n => {
    const s = b.sections[n], blocked = s.states.some((x: string) => ['forbidden','loading','read_failed','unlocated'].includes(x));
-   return {key: n, title: TITLES[n], ...state(s.states, s.reason), sourceTime: blocked && s.states.includes('forbidden') ? field('來源同步完成時間', null, 'forbidden') : field('來源同步完成時間', s.source_time.value, 'source_time_unknown'), freshness: s.freshness === 'stale' || s.states.includes('stale') ? DATA_STATE_LABELS.stale : null, rows: blocked ? [] : s.rows.map(row)};
+   return {key: n, title: TITLES[n], ...state(s.states, s.reason), sourceTime: blocked && s.states.includes('forbidden') ? field('來源同步完成時間', null, 'forbidden') : field('來源同步完成時間', s.source_time.value, 'source_time_unknown'), freshness: s.freshness === 'stale' || s.states.includes('stale') ? DATA_STATE_LABELS.stale : null, rows: blocked ? [] : s.rows.map((r: Rec) => row(n === 'history' ? str(r.confirmation_key) ? {confirmation_key: r.confirmation_key, revision: r.revision, replaced_at: r.replaced_at} : {event_id: r.event_id, action: r.action, created_at: r.created_at} : r))};
   });
  } catch {return blank('duplicate_identity');}
  const warnings: DetailRow[] = [];
