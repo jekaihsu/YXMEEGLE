@@ -20,7 +20,7 @@ def stale(app, oid='u-manager', **fields):
         p.data = {**p.data, 'directory_last_seen_at': (datetime.now(timezone.utc) - timedelta(seconds=901)).isoformat(), **fields}
 
 
-def oauth(monkeypatch, *, open_id='u-tenant', tenant='company', scope=''):
+def oauth(monkeypatch, *, open_id='u-tenant', tenant='company', scope='', avatar_fields=None):
     class OAuth:
         def __init__(self, **kwargs): pass
         def __enter__(self): return self
@@ -28,7 +28,7 @@ def oauth(monkeypatch, *, open_id='u-tenant', tenant='company', scope=''):
         def post(self, url, **kwargs):
             return httpx.Response(200, json={'access_token': 'synthetic', 'expires_in': 3600, 'scope': scope}, request=httpx.Request('POST', url))
         def get(self, url, **kwargs):
-            return httpx.Response(200, json={'data': {'open_id': open_id, 'name': 'Synthetic', 'tenant_key': tenant}}, request=httpx.Request('GET', url))
+            return httpx.Response(200, json={'data': {'open_id': open_id, 'name': 'Synthetic', 'tenant_key': tenant, **(avatar_fields or {})}}, request=httpx.Request('GET', url))
     monkeypatch.setattr('backend.app.httpx.Client', OAuth)
 
 
@@ -243,3 +243,19 @@ def test_tenant_only_identity_cannot_read_test_workspace(tmp_path, monkeypatch):
     client.cookies.set('meegle_session', app.state.signer.dumps({**cookie, 'wid': 'test-lark-company'}))
     assert client.get('/api/workspace').status_code == 403
     assert client.get('/api/session').json()['user'] is None
+
+
+@pytest.mark.parametrize('existing', [False, True])
+@pytest.mark.parametrize('avatar_fields,expected', [
+    ({'avatar_url': 'https://s16-imfile-sg.feishucdn.com/photo'}, 'https://s16-imfile-sg.feishucdn.com/photo'),
+    ({'avatar_url': 'https://evil.test/photo', 'avatar_thumb': 'https://s16-imfile-sg.feishucdn.com/thumb'}, 'https://s16-imfile-sg.feishucdn.com/thumb'),
+    ({'avatar_url': 'https://evil.test/photo'}, None),
+])
+def test_oauth_avatar_reaches_session(tmp_path, monkeypatch, existing, avatar_fields, expected):
+    app, _ = production_client(tmp_path)
+    oauth(monkeypatch, open_id='u-manager' if existing else 'u-tenant', avatar_fields=avatar_fields)
+    client = TestClient(app)
+    assert finish(client, begin(client)).status_code == 307
+    person = client.get('/api/session').json()['user']
+    assert person.get('avatar_url') == expected
+    assert person['name'] == ('張智偉' if existing else 'Synthetic')

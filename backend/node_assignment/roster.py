@@ -26,8 +26,11 @@ class Roster:
         return sorted((p for p in self.people.values() if p.member_of(key)), key=lambda p: (p.name, p.open_id))
 
     def public(self, person: Person, key: NodeKey):
-        return {'open_id': person.open_id, 'name': person.name,
-                'departments': [d for d in NODE_DEPARTMENTS[key] if d in person.departments]}
+        result = {'open_id': person.open_id, 'name': person.name,
+                  'departments': [d for d in NODE_DEPARTMENTS[key] if d in person.departments]}
+        if person.avatar_url:
+            result['avatar_url'] = person.avatar_url
+        return result
 
 
 def parse_roster(records) -> Roster:
@@ -44,7 +47,7 @@ def parse_roster(records) -> Roster:
         rank = text(values.get(PEOPLE_FIELDS['rank'][0])).strip() or None
         people.append(Person(account.open_id, text(values.get(PEOPLE_FIELDS['name'][0])).strip() or account.name,
                              frozenset(canon(PEOPLE_FIELDS['departments'][1], values.get(PEOPLE_FIELDS['departments'][0]))),
-                             rank, values.get(PEOPLE_FIELDS['employed'][0]) is True))
+                             rank, values.get(PEOPLE_FIELDS['employed'][0]) is True, account.avatar_url))
     # One Lark account on two roster rows could grant either row's rank; trust neither.
     ambiguous = frozenset(ident for ident, count in counts.items() if count > 1)
     return Roster({p.open_id: p for p in people if p.open_id not in ambiguous}, ambiguous)

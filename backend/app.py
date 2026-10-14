@@ -28,6 +28,7 @@ from .operations import apply_operation, project_summary, capable, review_hash, 
 from . import storage
 from .learning import apply_learning
 from .approval_capabilities import approval_connection
+from .avatar import avatar_url
 from .workspace_projection import public_copy, strip_migration_archive, filter_private_workspace, public_person
 from .production_access import require_admission, require_access, test_profile,company_admin_grant,set_company_admin_authority
 from . import audit
@@ -1273,6 +1274,10 @@ def create_app(overrides=None):
                 reconcile_company_admin(db,org,user)
                 if isinstance(info.get('user_id'),str) and info['user_id']:
                     user['attendance_identity']={'employee_type':'employee_id','employee_id':info['user_id'],'open_id':oid,'app_id':cfg['LARK_APP_ID'],'tenant':tenant,'verified_at':now(),'source':'oauth_user_info'}
+                photo = avatar_url(info.get('avatar_url')) or avatar_url(info.get('avatar_thumb')) or avatar_url(user.get('avatar_url'))
+                user.pop('avatar_url', None)
+                if photo:
+                    user['avatar_url'] = photo
                 profile.data=deepcopy(user)
             else:
                 user['oauth_identity']={'source':'oauth_user_info','app_id':cfg['LARK_APP_ID'],'tenant':tenant,'open_id':oid,'verified_at':now()}
@@ -1280,6 +1285,9 @@ def create_app(overrides=None):
                 reconcile_company_admin(db,org,user)
                 if isinstance(info.get('user_id'),str) and info['user_id']:
                     user['attendance_identity']={'employee_type':'employee_id','employee_id':info['user_id'],'open_id':oid,'app_id':cfg['LARK_APP_ID'],'tenant':tenant,'verified_at':now(),'source':'oauth_user_info'}
+                photo = avatar_url(info.get('avatar_url')) or avatar_url(info.get('avatar_thumb'))
+                if photo:
+                    user['avatar_url'] = photo
                 db.add(PersonRow(organization_id=org,person_id=oid,data=user))
         # Company OAuth always enters the real company workspace. Historical
         # manager preferences must not silently turn a fresh login into a test.

@@ -1,4 +1,5 @@
 """Response-only privacy projection; authoritative storage remains intact."""
+from .avatar import avatar_url
 from copy import deepcopy
 import json
 
@@ -9,6 +10,8 @@ def public_person(person, *, include_authority=False):
     if include_authority:
         fields |= {'capabilities','authz_version'}
     result = {key: deepcopy(value) for key, value in person.items() if key in fields}
+    if photo := avatar_url(person.get('avatar_url')):
+        result['avatar_url'] = photo
     if include_authority:
         from .business_policy import can_business_override
         result['can_business_override'] = can_business_override(person)
