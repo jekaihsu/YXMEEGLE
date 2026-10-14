@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer pages{
 /* Approval titles carry the hierarchy; status remains visible beside metadata. */
 .workspace .approval-list{overflow:hidden;border:.5px solid var(--separator);border-radius:var(--radius-card);background:var(--surface)}

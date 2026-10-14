@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer pages{
 .file-screen.file-workspace,.file-sheet.file-sheet{color:var(--label);font:var(--fs-body)/1.6 var(--font);min-width:0}
 .file-screen.file-workspace .section-heading{align-items:flex-start;gap:var(--sp-4);flex-wrap:wrap}

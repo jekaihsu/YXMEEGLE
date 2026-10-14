@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer pages{
 /* Board: every card shows and the page scrolls; lanes stretch to the tallest so the columns read as one surface. */
 .mwb-scroll{overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:var(--sp-2)}
@@ -20,19 +20,19 @@
 .mwb-empty{margin:0;padding:var(--sp-3) var(--sp-2);font-size:var(--fs-footnote);color:var(--label-2)}
 
 /* Card: status + title first, then where it belongs, then why it is here, then case progress. */
-.mwb-card{flex-shrink:0;display:flex;flex-direction:column;gap:var(--sp-2);width:100%;padding:var(--sp-3) var(--sp-4) var(--sp-3) var(--sp-3);text-align:left;border:.5px solid var(--glass-border);border-radius:var(--radius-m);background:var(--surface);color:var(--label);box-shadow:0 1px 2px color-mix(in srgb,#000 6%,transparent);cursor:pointer;transition:border-color var(--dur-fast) var(--ease),box-shadow var(--dur-fast) var(--ease)}
+.mwb-card{flex-shrink:0;display:flex;flex-direction:column;gap:var(--sp-2);width:100%;padding:var(--sp-3) var(--sp-4) var(--sp-3) var(--sp-3);text-align:left;border:1px solid var(--glass-border);border-radius:var(--radius-m);background:var(--surface);color:var(--label);box-shadow:0 1px 2px color-mix(in srgb,#000 6%,transparent);cursor:pointer;transition:border-color var(--dur-fast) var(--ease),box-shadow var(--dur-fast) var(--ease)}
 .mwb-card:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--sep));box-shadow:0 2px 8px color-mix(in srgb,#000 10%,transparent)}
 .mwb-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .mwb-title{display:flex;align-items:flex-start;gap:var(--sp-2)}
 .mwb-title>svg{flex-shrink:0;width:16px;height:16px;margin-top:2px}
 .mwb-title>strong{font-size:var(--fs-subhead);font-weight:600;line-height:1.35}
-.mwb-meta{display:flex;justify-content:space-between;gap:var(--sp-2);padding-left:24px;font-size:var(--fs-caption);color:var(--label-2);font-variant-numeric:tabular-nums}
+.mwb-meta{display:flex;justify-content:space-between;gap:var(--sp-2);padding-left:var(--space-6);font-size:var(--fs-caption);color:var(--label-2);font-variant-numeric:tabular-nums}
 .mwb-meta>span{white-space:nowrap}.mwb-meta>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
-.mwb-tags{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-1) var(--sp-2);padding-left:24px}
-.mwb-tag{font-style:normal;font-size:var(--fs-caption);font-weight:600;padding:1px 8px;border-radius:var(--radius-pill);line-height:1.6}
+.mwb-tags{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-1) var(--sp-2);padding-left:var(--space-6)}
+.mwb-tag{font-style:normal;font-size:var(--fs-caption);font-weight:600;padding:1px var(--space-2);border-radius:var(--radius-pill);line-height:1.6}
 .mwb-tag.critical{color:var(--critical);background:color-mix(in srgb,var(--critical) 12%,transparent)}
 .mwb-tag.warning{color:var(--warning);background:color-mix(in srgb,var(--warning) 12%,transparent)}
-.mwb-foot{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);margin-left:24px;padding-top:var(--sp-2);border-top:.5px solid var(--sep)}
+.mwb-foot{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);margin-left:var(--space-6);padding-top:var(--sp-2);border-top:.5px solid var(--sep)}
 .mwb-progress{display:flex;align-items:center;gap:var(--sp-2);white-space:nowrap;min-width:0;font-size:var(--fs-caption);color:var(--label-2);font-variant-numeric:tabular-nums}
 .mwb-progress>i{display:block;width:48px;min-width:20px;flex-shrink:1;height:4px;border-radius:2px;background:color-mix(in srgb,var(--label) 12%,transparent);overflow:hidden}
 .mwb-progress>i>b{display:block;height:100%;border-radius:2px;background:var(--accent)}

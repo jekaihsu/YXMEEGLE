@@ -16,32 +16,39 @@
 :root[data-theme=dark]{--btn-shadow:var(--glass-highlight),0 1px 2px rgb(0 0 0/.4);--btn-shadow-active:inset 0 1px 2px rgb(0 0 0/.5)}
 @media(prefers-color-scheme:dark){:root:not([data-theme=light]):not([data-theme=dark]){--btn-shadow:var(--glass-highlight),0 1px 2px rgb(0 0 0/.4);--btn-shadow-active:inset 0 1px 2px rgb(0 0 0/.5)}}
 
+/* Pages may set --btn-fg on a container to recolour its secondary and plain buttons; every other paint stays here. */
 /* Secondary (default), primary, plain (ghost) and destructive buttons share height, radius and states. */
-:is(.button,.ds-button,.p2-btn,.source-health-btn-retry,.my-work-action-button){
+:is(.button,.ds-button,[class*="p2-btn"],.p2-page-btn,.p2-drawer-close-btn,[class*="source-health-btn"],.source-health-drawer-retry-btn,.source-health-drawer-close-btn,.my-work-action-button){
  box-sizing:border-box;min-height:var(--control-height);padding:var(--control-pad-block) var(--button-pad-inline);
  border:1px solid var(--btn-border);border-radius:var(--radius-control);
- background:var(--btn-fill);color:var(--accent);box-shadow:var(--btn-shadow);
+ background:var(--btn-fill);color:var(--btn-fg,var(--accent));box-shadow:var(--btn-shadow);
  font-weight:500;line-height:1.3;text-decoration:none;cursor:pointer;transform:none;filter:none;
  transition:background var(--dur-fast) var(--ease),border-color var(--dur-fast) var(--ease),box-shadow var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease);
 }
-:is(.button,.ds-button,.p2-btn,.source-health-btn-retry,.my-work-action-button):hover{background:var(--btn-fill-hover);border-color:var(--accent);transform:none}
-:is(.button,.ds-button,.p2-btn,.source-health-btn-retry,.my-work-action-button):active{background:color-mix(in srgb,var(--accent) 10%,var(--surface));box-shadow:var(--btn-shadow-active);transform:none}
+:is(.button,.ds-button,[class*="p2-btn"],.p2-page-btn,.p2-drawer-close-btn,[class*="source-health-btn"],.source-health-drawer-retry-btn,.source-health-drawer-close-btn,.my-work-action-button):hover{background:var(--btn-fill-hover);border-color:var(--accent);transform:none}
+:is(.button,.ds-button,[class*="p2-btn"],.p2-page-btn,.p2-drawer-close-btn,[class*="source-health-btn"],.source-health-drawer-retry-btn,.source-health-drawer-close-btn,.my-work-action-button):active{background:color-mix(in srgb,var(--accent) 10%,var(--surface));box-shadow:var(--btn-shadow-active);transform:none}
 :is(.button.primary,.ds-button[data-variant=primary],.p2-btn-primary){
  background:var(--btn-fill-primary);color:var(--on-accent);border-color:var(--accent-hover);
  box-shadow:inset 0 1px 0 rgb(255 255 255/.28),0 1px 2px rgb(12 84 148/.3),0 4px 10px rgb(12 84 148/.18);
 }
 :is(.button.primary,.ds-button[data-variant=primary],.p2-btn-primary):hover{background:var(--btn-fill-primary-hover);border-color:var(--accent-hover);color:var(--on-accent)}
 :is(.button.primary,.ds-button[data-variant=primary],.p2-btn-primary):active{background:var(--accent-hover);box-shadow:inset 0 1px 2px rgb(0 0 0/.28)}
-:is(.ds-button[data-variant=plain],.p2-btn-plain,.text-button){
- background:transparent;border-color:transparent;box-shadow:none;color:var(--accent);
+:is(.ds-button[data-variant=plain],.p2-btn-plain,.p2-btn-close,.p2-drawer-close-btn,.source-health-drawer-close-btn,.text-button,.p2-sort-btn,.source-health-sort-btn,.p2-row-title-btn,.my-work-row-title-btn,.cockpit-group-button,.people-text-button){
+ background:transparent;border-color:transparent;box-shadow:none;color:var(--btn-fg,var(--accent));
 }
-:is(.ds-button[data-variant=plain],.p2-btn-plain,.text-button):hover{background:var(--accent-fill);border-color:transparent;text-decoration:none}
-:is(.ds-button[data-variant=plain],.p2-btn-plain,.text-button):active{background:color-mix(in srgb,var(--accent) 18%,transparent);box-shadow:none}
+:is(.ds-button[data-variant=plain],.p2-btn-plain,.p2-btn-close,.p2-drawer-close-btn,.source-health-drawer-close-btn,.text-button,.p2-sort-btn,.source-health-sort-btn,.p2-row-title-btn,.my-work-row-title-btn,.cockpit-group-button,.people-text-button):hover{background:var(--accent-fill);border-color:transparent;text-decoration:none}
+:is(.ds-button[data-variant=plain],.p2-btn-plain,.p2-btn-close,.p2-drawer-close-btn,.source-health-drawer-close-btn,.text-button,.p2-sort-btn,.source-health-sort-btn,.p2-row-title-btn,.my-work-row-title-btn,.cockpit-group-button,.people-text-button):active{background:color-mix(in srgb,var(--accent) 18%,transparent);box-shadow:none}
 .ds-button[data-variant=destructive]{color:color-mix(in srgb,var(--critical) 80%,var(--label));border-color:var(--critical)}
 .ds-button[data-variant=destructive]:hover{background:color-mix(in srgb,var(--critical) 10%,var(--surface));border-color:var(--critical)}
+:is(.p2-sort-btn,.source-health-sort-btn,.p2-row-title-btn,.my-work-row-title-btn,.cockpit-group-button,.people-text-button){min-height:var(--control-height);padding:0 var(--space-2);border-radius:var(--radius-control);font-weight:600;color:var(--btn-fg,var(--label))}
+:is(.p2-row-title-btn,.my-work-row-title-btn,.cockpit-group-button,.people-text-button){padding-inline:0;color:var(--btn-fg,var(--accent))}
+:is(.p2-row-title-btn,.my-work-row-title-btn,.cockpit-group-button,.people-text-button):hover{background:transparent;text-decoration:underline;text-underline-offset:3px}
 .button.compact{min-height:var(--control-height);padding-inline:var(--control-pad-inline)}
 .ds-button[data-variant=plain]{padding-inline:var(--control-pad-inline)}
 .text-button{min-height:var(--control-height);padding:var(--space-2) var(--space-3);border-radius:var(--radius-control)}
+
+/* Toggle buttons (aria-pressed) keep their label and show the selected state by fill, border and weight. */
+:is(.button,.ds-button)[aria-pressed=true]{background:color-mix(in srgb,var(--accent) 14%,var(--surface));border-color:var(--accent);font-weight:600}
 
 /* Icon buttons are 44px squares with the same radius and states. */
 .icon-button{
@@ -54,10 +61,10 @@
 .icon-button.bordered:hover{background:var(--btn-fill-hover);border-color:var(--accent)}
 
 /* Keyboard focus is always a 2px ring with an offset, on glass and on solid backgrounds. */
-:is(.button,.ds-button,.p2-btn,.icon-button,.text-button,.source-health-btn-retry,.my-work-action-button,a,summary,select,input,textarea,[tabindex]):focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+:is(.button,.ds-button,[class*="p2-btn"],.p2-page-btn,.p2-drawer-close-btn,[class*="source-health-btn"],.source-health-drawer-retry-btn,.source-health-drawer-close-btn,.my-work-action-button,.icon-button,.text-button,.p2-sort-btn,.source-health-sort-btn,.p2-row-title-btn,.my-work-row-title-btn,a,summary,select,input,textarea,[tabindex]):focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
 
 /* Disabled controls read as inactive by fill and text, not by transparency alone. */
-:is(.button,.ds-button,.p2-btn,.icon-button,.text-button,.source-health-btn-retry,.my-work-action-button):is(:disabled,[aria-disabled=true]){
+:is(.button,.ds-button,[class*="p2-btn"],.p2-page-btn,.p2-drawer-close-btn,[class*="source-health-btn"],.source-health-drawer-retry-btn,.source-health-drawer-close-btn,.my-work-action-button,.icon-button,.text-button,.p2-sort-btn,.source-health-sort-btn,.p2-row-title-btn,.my-work-row-title-btn):is(:disabled,[aria-disabled=true]){
  background:var(--surface-2);color:var(--label-2);border-color:var(--sep);box-shadow:none;opacity:.72;cursor:not-allowed;filter:none;transform:none;
 }
 :is(.text-button,.ds-button[data-variant=plain],.icon-button:not(.bordered)):is(:disabled,[aria-disabled=true]){background:transparent;border-color:transparent}
@@ -78,13 +85,11 @@
 
 /* Fields: opaque enough to read on glass, 1px boundary at 3:1, 12px radius. */
 input:not([type=checkbox],[type=radio],[type=range],[type=color],[type=hidden]),select,textarea{
- padding:var(--control-pad-block) var(--control-pad-inline);
  border:1px solid var(--field-border);border-radius:var(--radius-control);background:color-mix(in srgb,var(--surface) 88%,transparent);color:var(--label);
  transition:border-color var(--dur-fast) var(--ease),box-shadow var(--dur-fast) var(--ease);
 }
 input:not([type=checkbox],[type=radio],[type=range],[type=color],[type=hidden]),select{min-height:var(--control-height)}
-select{padding-inline-end:var(--space-8)}
-textarea{min-height:var(--control-height);padding-block:var(--space-3)}
+textarea{min-height:var(--control-height)}
 input:not([type=checkbox],[type=radio],[type=range],[type=color],[type=hidden]):hover,select:hover,textarea:hover{border-color:var(--label-2)}
 input:not([type=checkbox],[type=radio],[type=range],[type=color],[type=hidden]):focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--focus-ring);outline-offset:1px;border-color:var(--focus-ring)}
 input::placeholder,textarea::placeholder{color:var(--label-2);opacity:.9}

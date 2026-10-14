@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer pages{
 .company-cockpit{max-width:1080px;margin:0 auto;min-width:0;color:var(--label);font-family:var(--font);font-size:var(--fs-body);line-height:1.5}
 .cockpit-heading,.cockpit-section-title,.cockpit-freshness,.cockpit-pagination{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--sp-4);align-items:baseline}
@@ -94,7 +94,7 @@
 .company-cockpit tbody tr:last-child :is(th,td){border-bottom:0}
 .company-cockpit .cockpit-case-table th:first-child{min-width:15rem}
 .company-cockpit .cockpit-case-table a{gap:var(--sp-2);padding:0}
-.company-cockpit .cockpit-group-button{padding-left:0!important}
+.company-cockpit .cockpit-group-button{padding-left:0 !important}
 .cockpit-filters{gap:var(--sp-4);margin-bottom:var(--sp-5)}
 .cockpit-cases-title,#cockpit-cases-title{scroll-margin-top:6rem}
 @media(max-width:1100px){.cockpit-overview-grid{grid-template-columns:1fr}}

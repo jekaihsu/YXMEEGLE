@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer pages{
 .category-screen.file-category-settings{margin:var(--sp-7) 0;padding:0;border:0;border-radius:0;box-shadow:none;background:none;color:var(--label);font:var(--fs-body)/1.6 var(--font);min-width:0}
 .category-screen.file-category-settings>h2{font-size:var(--fs-title1);color:var(--label);font-weight:600}

@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer pages{
 .lark-pilot { margin-block: 1.5rem; padding: 1rem; border: 1px solid var(--sep); border-radius: 12px; color: var(--label); }
 .lark-pilot h3 { margin-block: 1rem .5rem; }

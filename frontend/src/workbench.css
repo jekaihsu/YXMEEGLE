@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer legacy{
 /* Workbench composition — explicit layout, restrained surfaces and readable hierarchy. */
 

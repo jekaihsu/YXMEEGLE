@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer pages{
 /* My Work Presentational Styles (VCC-126) */
 
@@ -6,7 +6,7 @@
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  gap: 20px;
+  gap: var(--space-6);
   width: 100%;
   box-sizing: border-box;
   font-family: inherit;
@@ -18,14 +18,14 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 /* Header & Title */
 .my-work-header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .my-work-title-group h2 {
@@ -36,7 +36,7 @@
 }
 
 .my-work-subtitle {
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
   font-size: 0.875rem;
   color: var(--label-2, #64748b);
 }
@@ -47,8 +47,8 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   background: var(--surface-2, #f8fafc);
   border: 1px solid var(--line, #e2e8f0);
   border-radius: 8px;
@@ -65,7 +65,7 @@
 }
 
 .my-work-mode-tab {
-  padding: 6px 14px;
+  padding: var(--space-2) var(--space-4);
   font-size: 0.875rem;
   font-weight: 500;
   border: none;
@@ -104,7 +104,7 @@
 
 .my-work-search-input {
   width: 100%;
-  padding: 6px 30px 6px 10px;
+  padding: var(--space-2) var(--space-8) var(--space-2) var(--space-3);
   font-size: 0.875rem;
   border: 1px solid var(--line, #e2e8f0);
   border-radius: 6px;
@@ -126,7 +126,7 @@
   font-size: 1rem;
   color: var(--label-2, #64748b);
   cursor: pointer;
-  padding: 0 4px;
+  padding: 0 var(--space-1);
   line-height: 1;
 }
 
@@ -135,7 +135,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: var(--space-3) var(--space-4);
   border-radius: 6px;
   font-size: 0.875rem;
   background: var(--surface-2, #f8fafc);
@@ -172,7 +172,7 @@
 .my-work-selection-dropped-note {
   font-size: 0.8125rem;
   color: var(--warning, #b45309);
-  margin-left: 8px;
+  margin-left: var(--space-2);
 }
 
 /* Table Scroll & Data Table */
@@ -196,7 +196,7 @@
 }
 
 .my-work-table th {
-  padding: 10px 12px;
+  padding: var(--space-3) var(--space-3);
   background: var(--surface-2, #f8fafc);
   color: var(--label-2, #64748b);
   font-weight: 600;
@@ -205,7 +205,7 @@
 }
 
 .my-work-table td {
-  padding: 10px 12px;
+  padding: var(--space-3) var(--space-3);
   border-bottom: 1px solid var(--line, #e2e8f0);
   vertical-align: middle;
 }
@@ -273,8 +273,8 @@
 }
 
 .my-work-outcome-note {
-  margin-top: 4px;
-  padding: 4px 8px;
+  margin-top: var(--space-1);
+  padding: var(--space-1) var(--space-2);
   font-size: 0.75rem;
   background: color-mix(in srgb, var(--warning, #eab308) 15%, var(--surface, #ffffff));
   border-left: 2px solid var(--warning, #eab308);
@@ -300,7 +300,7 @@
 /* Status Labels (Text Status Labels, Not Colour Alone) */
 .my-work-status-text {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 2px var(--space-2);
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
@@ -338,11 +338,11 @@
 .my-work-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .my-work-action-button {
-  padding: 4px 10px;
+  padding: var(--space-1) var(--space-3);
   font-size: 0.75rem;
   font-weight: 500;
   border: 1px solid var(--line, #cbd5e1);
@@ -367,7 +367,7 @@
 
 /* Empty State */
 .my-work-empty-container {
-  padding: 48px 24px;
+  padding: 48px var(--space-6);
   text-align: center;
   border: 1px solid var(--line, #e2e8f0);
   border-radius: 8px;
@@ -391,7 +391,7 @@
 
 /* Weekly Activity Section */
 .my-work-weekly-section {
-  padding: 16px;
+  padding: var(--space-4);
   border: 1px solid var(--line, #e2e8f0);
   border-radius: 8px;
   background: var(--surface, #ffffff);
@@ -401,9 +401,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
   border-bottom: 1px solid var(--line, #e2e8f0);
-  padding-bottom: 8px;
+  padding-bottom: var(--space-2);
 }
 
 .my-work-weekly-header h3 {
@@ -429,13 +429,13 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .my-work-weekly-list li {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   font-size: 0.8125rem;
 }
 
@@ -471,14 +471,14 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 16px;
+  padding: var(--space-4);
   border-bottom: 1px solid var(--line, #e2e8f0);
 }
 
 .my-work-drawer-title-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   min-width: 0;
 }
 
@@ -502,7 +502,7 @@
   font-size: 1.25rem;
   color: var(--label-2, #64748b);
   cursor: pointer;
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   line-height: 1;
   border-radius: 4px;
 }
@@ -517,16 +517,16 @@
 }
 
 .my-work-drawer-body {
-  padding: 16px;
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-6);
   overflow-y: auto;
   max-height: calc(100vh - 200px);
 }
 
 .my-work-drawer-outcome-note {
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   background: color-mix(in srgb, var(--warning, #eab308) 15%, var(--surface, #ffffff));
   border-left: 3px solid var(--warning, #eab308);
   font-size: 0.8125rem;
@@ -536,18 +536,18 @@
 }
 
 .my-work-drawer-section h4 {
-  margin: 0 0 10px;
+  margin: 0 0 var(--space-3);
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--label-2, #64748b);
   border-bottom: 1px solid var(--line, #e2e8f0);
-  padding-bottom: 4px;
+  padding-bottom: var(--space-1);
 }
 
 .my-work-drawer-dl {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0;
 }
 
@@ -555,7 +555,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
+  gap: var(--space-3);
   font-size: 0.8125rem;
 }
 
@@ -588,19 +588,19 @@
 .my-work-drawer-evidence-list {
   list-style: none;
   padding: 0;
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .my-work-drawer-evidence-list li {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-size: 0.8125rem;
-  padding: 4px 6px;
+  padding: var(--space-1) var(--space-2);
   background: var(--surface-2, #f8fafc);
   border-radius: 4px;
 }
@@ -616,7 +616,7 @@
 }
 
 .my-work-evidence-notice {
-  margin: 6px 0 0;
+  margin: var(--space-2) 0 0;
   font-size: 0.75rem;
   color: var(--label-2, #64748b);
   line-height: 1.4;
@@ -625,7 +625,7 @@
 .my-work-drawer-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 /* Responsive Narrow Screen Rule (<= 600px): Drawer below the table */
@@ -642,7 +642,7 @@
   .my-work-drawer {
     order: 2;
     width: 100%;
-    margin-top: 16px;
+    margin-top: var(--space-4);
   }
 
   .my-work-toolbar {

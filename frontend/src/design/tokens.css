@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer tokens{
 /* Design tokens. Screens use these variables only; appearance is driven by data-theme / data-text on <html>. */
 :root{

@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer pages{
 /* Project discussion: a quiet panel with a clear composer and scannable history. */
 .project-discussion{
@@ -152,7 +152,7 @@
 
 .project-discussion .mention-inline{
   display:inline;
-  padding:2px 6px;
+  padding:2px var(--space-2);
   color:var(--accent);
   background:var(--accent-fill);
   border-radius:var(--radius-pill);

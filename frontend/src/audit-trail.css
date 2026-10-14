@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer pages{
 .audit-screen.audit-trail{color:var(--label);font:var(--fs-body)/1.6 var(--font)}
 .audit-screen.audit-trail>h2{font-size:var(--fs-title1);font-weight:600}

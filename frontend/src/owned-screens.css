@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer pages{
 .owned-view.owned-view{font-size:var(--fs-subhead);color:var(--label);min-width:0;overflow-wrap:anywhere
 & h1{font-size:var(--fs-large-title);color:var(--label)}& h2{font-size:var(--fs-title2);color:var(--label)}

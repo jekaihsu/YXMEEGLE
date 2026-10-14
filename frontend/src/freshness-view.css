@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer pages{
 .freshness-view.data-freshness{font-size:var(--fs-footnote);color:var(--label-2);background:none;padding:0}
 .freshness-view summary{min-height:var(--sp-8);display:flex;align-items:center;color:var(--accent)}

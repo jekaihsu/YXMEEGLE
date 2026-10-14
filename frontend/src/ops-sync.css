@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer pages{
 .ops-sync .ops-sync-notice{border-inline-start:3px solid var(--warning);padding-inline-start:var(--sp-3);color:var(--label)}
 .ops-sync .ops-sync-item{display:grid;gap:var(--sp-2);padding:var(--sp-4);border-bottom:1px solid var(--separator)}

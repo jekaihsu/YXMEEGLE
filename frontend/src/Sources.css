@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer pages{
 /* Connection details use the same neutral surface and insets as the home hero. */
 .workspace .source-connection{padding:var(--sp-6) var(--sp-7);gap:var(--sp-4);border:.5px solid var(--separator);border-radius:var(--radius-card);background:var(--surface);box-shadow:none}

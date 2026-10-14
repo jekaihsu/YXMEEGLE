@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer polish{
 /* Cross-screen polish: consistent page heads, spacing and tables. Scoped under .workspace so it wins over legacy rules. */
 .workspace .operations>h1{font-size:var(--fs-large-title);font-weight:600;letter-spacing:-.02em;line-height:1.2}
@@ -18,11 +18,11 @@
 .workspace .operations .ds-group>h2{margin:0;padding:var(--sp-4) var(--sp-4) var(--sp-2);font-size:var(--fs-title2)}
 .workspace .operations .ds-group>.data-table{background:none}
 /* Flow: quieter stage chips, no heavy borders or shadows. */
-.workspace .major-approval-summary{border:0;border-left:0;border-radius:var(--radius-card);background:var(--glass-fill);box-shadow:none;outline:.5px solid var(--glass-border)}
+.workspace .major-approval-summary{border:0;border-left:0;border-radius:var(--radius-card);background:var(--glass-fill);box-shadow:none;outline:1px solid var(--glass-border)}
 .workspace .workflow{border:0;background:none;box-shadow:none;padding:0}
 .workspace .workflow-scroll{border:0;border-radius:0;background:none;padding:2px}
-.workspace .workflow .production-group{background:none;border:.5px solid var(--glass-border);border-radius:var(--radius-m)}
-.workspace .stage-button{border:.5px solid var(--glass-border);box-shadow:none;background:var(--surface);color:var(--label);border-radius:var(--radius-m)}
+.workspace .workflow .production-group{background:none;border:1px solid var(--glass-border);border-radius:var(--radius-m)}
+.workspace .stage-button{border:1px solid var(--glass-border);box-shadow:none;background:var(--surface);color:var(--label);border-radius:var(--radius-m)}
 .workspace .stage-button.in_progress{background:var(--accent-fill);border-color:var(--accent)}
 .workspace .stage-button.completed{background:var(--surface-2);border-color:var(--glass-border);color:var(--label)}
 .workspace .stage-button.completed strong,.workspace .stage-button.completed .stage-button-bottom{color:var(--label)}
@@ -41,7 +41,7 @@
 /* Schedule: each day scrolls inside a fixed height instead of stretching the page. */
 .workspace .calendar-day{min-height:0}
 .workspace .calendar-tasks{max-height:min(32rem,60vh);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;display:flex;flex-direction:column;gap:var(--sp-2)}
-.workspace .calendar-task{border:.5px solid var(--glass-border);box-shadow:none;border-radius:var(--radius-m);background:var(--surface);flex:none}
+.workspace .calendar-task{border:1px solid var(--glass-border);box-shadow:none;border-radius:var(--radius-m);background:var(--surface);flex:none}
 .workspace .calendar-task small{color:var(--label-2)}
 .workspace .calendar-day>header{position:sticky;top:0;z-index:1}
 /* Cockpit: header-only tables add noise when there is no data, so hide the empty table and keep the explanatory note. */
@@ -186,13 +186,13 @@ button.resource-cell:focus-visible{outline:2px solid var(--accent);outline-offse
 .modal .completion-task-actions{padding-top:var(--sp-2);border-top:0}
 /* Toolbar rows: pill groups sit at the same 44px as the search, select and date controls beside them. */
 .app-shell .workspace :is(.mywork-controls>.tabbar,.schedule-toolbar>.ds-segmented){margin:0;height:var(--control-height);box-sizing:border-box;align-items:stretch}
-.app-shell .workspace :is(.mywork-controls>.tabbar,.schedule-toolbar>.ds-segmented)>button{min-height:0!important;padding-block:0!important}
+.app-shell .workspace :is(.mywork-controls>.tabbar,.schedule-toolbar>.ds-segmented)>button{min-height:0!important;padding-block:0 !important}
 .ds-segmented button{display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2)}
 .workspace .schedule-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3)}
 .workspace .schedule-toolbar-actions{display:flex;align-items:center;gap:var(--sp-4);margin-left:auto}
 .workspace .schedule-toolbar>.schedule-toolbar-actions+select{margin-left:0}
 .app-shell .workspace .schedule-toolbar-actions>.ds-segmented{height:var(--control-height);box-sizing:border-box;align-items:stretch}
-.app-shell .workspace .schedule-toolbar-actions>.ds-segmented>button{min-height:0!important;padding-block:0!important}
+.app-shell .workspace .schedule-toolbar-actions>.ds-segmented>button{min-height:0!important;padding-block:0 !important}
 @media(max-width:760px){.workspace .mywork-controls .search-field:last-child{grid-column:1/-1}}
 .workspace .mywork-controls .table-toolbar>.ds-picker{flex:0 0 12rem}
 .workspace .schedule-toolbar>.ds-picker>button{min-width:8.5rem}

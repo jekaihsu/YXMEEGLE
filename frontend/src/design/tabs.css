@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer components{
 /* Shared section navigation: case, case filters, My Work, Changes and Admin. */
 .app-shell .workspace :is(.tabbar,.ops-tabs){display:flex;flex-wrap:nowrap;gap:2px;padding:2px;width:fit-content;max-width:100%;margin:0 0 var(--sp-5);overflow-x:auto;scrollbar-width:thin}

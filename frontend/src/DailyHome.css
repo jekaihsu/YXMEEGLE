@@ -1,4 +1,4 @@
-@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer pages{
 /* Daily home: one hero, grouped rows, tokens only. */
 .workspace .today-layout{display:grid;grid-template-columns:minmax(0,1fr) 20rem;gap:var(--sp-7);align-items:start}
@@ -76,4 +76,25 @@
 /* Task names can contain unbroken file references on both home and case heroes. */
 .dh-hero h2{overflow-wrap:anywhere;line-height:1.35}
 .dh-blocked>span:first-child{min-width:0;overflow-wrap:anywhere}
+
+/* Home panels. Each queue (assigned, confirmation, delegated, proxy, local) is one flat glass card with a 24px inset;
+   its rows are separated by hairlines instead of nested boxes. */
+.workspace .today-main>.ds-section.dh-personal-queue{margin:0 0 var(--panel-gap);padding:var(--card-padding);display:flex;flex-direction:column;gap:var(--space-2)}
+.workspace .today-main>.ds-section.dh-personal-queue>h2{margin:0;padding:0;display:block;font-size:var(--fs-headline);font-weight:600;line-height:1.4;color:var(--label);text-transform:none;letter-spacing:0}
+.workspace .today-main>.ds-section.dh-personal-queue>p{margin:0;font-size:var(--fs-subhead);color:var(--label-2)}
+.workspace .today-main>.ds-section.dh-personal-queue>.my-work-banner-as-of{font-size:var(--fs-footnote);color:var(--label-2)}
+.workspace .today-main>.ds-section.dh-personal-queue>.ds-group:empty{display:none}
+.workspace .today-main>.ds-section.dh-personal-queue>.ds-group{margin-top:var(--space-2)}
+.workspace .today-main>.ds-section.dh-personal-queue>.ds-button{align-self:flex-start;margin-top:var(--space-2);margin-left:calc(var(--space-3) * -1)}
+.workspace .today-main .ds-group>.dh-personal-queue+.dh-personal-queue{border-top:1px solid var(--sep)}
+.workspace .today-main .ds-group>.dh-personal-queue .ds-row{min-height:0;padding:var(--space-4) 0;align-items:flex-start;gap:var(--space-4)}
+.workspace .today-main .ds-group>.dh-personal-queue .ds-row-main{gap:var(--space-1)}
+.workspace .today-main .ds-group>.dh-personal-queue .ds-row-main>.text-button{align-self:flex-start;min-height:0;padding:0;justify-content:flex-start;text-align:left;--btn-fg:var(--label);font-size:var(--fs-body)}
+.workspace .today-main .ds-group>.dh-personal-queue .ds-row-main>.text-button:hover{background:none;--btn-fg:var(--accent)}
+.workspace .today-main .ds-group>.dh-personal-queue .ds-row-main>span{font-size:var(--fs-subhead)}
+.workspace .today-main .ds-group>.dh-personal-queue .ds-row>.text-button{flex:none;align-self:center}
+.workspace .today-main .ds-group>.dh-personal-queue .avatar{margin-right:var(--space-1);vertical-align:middle}
+.workspace .ds-page>[role=group]{display:flex;flex-wrap:wrap;gap:var(--space-2);margin-bottom:var(--space-4)}
+.workspace .today-main details{margin:0 0 var(--panel-gap)}
+.workspace .today-main details>summary{color:var(--label-2)}
 }
