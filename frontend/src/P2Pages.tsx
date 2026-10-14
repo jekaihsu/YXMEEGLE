@@ -37,7 +37,7 @@ function useP2Read(url: string | null, retry: number, version: unknown, userId: 
   if (!url) return;
   const epoch = getSessionEpoch();
   const controller = new AbortController();
-  readPanel(url, controller.signal,String(userId),{timeoutMs:60000})
+  readPanel(url, controller.signal,String(userId),{timeoutMs:60000,reloadVersion:JSON.stringify([version,retry])})
    .then(body => {if (!controller.signal.aborted && epoch === getSessionEpoch()) setState({key, fetched: {status: 'ok', body}})})
    .catch(error => {
     if (controller.signal.aborted || epoch !== getSessionEpoch()) return;

@@ -101,7 +101,7 @@ export function useHomePanels(c:Ctx, query:HomeQuery, enabled=true, full=false):
    controller?.abort();controller=new AbortController();
    const signal=controller.signal;
    setState(previous=>({key,scope,read:{body:cachedSnapshot(key) ?? (previous.scope===scope?previous.read.body:null),pending:true,error:null}}));
-   readPanel(url,signal,scope,{timeoutMs:35000}).then(parseHomeResponse).then(body => {
+   readPanel(url,signal,scope,{timeoutMs:35000,reloadVersion:c.reloadVersion}).then(parseHomeResponse).then(body => {
     if (disposed || signal.aborted || epoch !== getSessionEpoch()) return;
     if (body.complete || body.items.length) {snapshots.set(key,{body,storedAt:Date.now()});if(snapshots.size>100)snapshots.delete(snapshots.keys().next().value!)}
     setState({key,scope,read:{body,pending:false,error:null}});
