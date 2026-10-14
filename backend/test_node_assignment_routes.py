@@ -630,3 +630,31 @@ def test_departed_assignee_cannot_patch_own_task(h, changes):
                    {'request_id': 'departed', 'expected_revision': task['revision'], **changes}, method='patch')
     assert (response.status_code, response.json().get('code')) == (403, 'forbidden')
     assert not any(view(h, 'ou_sales', 'sales')['tasks'][0]['can'].values())
+
+
+@pytest.mark.parametrize('landed', [False, True])
+def test_uncertain_task_create_does_not_reconcile_to_identical_older_task(h, landed):
+    body = {'request_id': 'first-task', 'title': 'identical task'}
+    first = act(h, 'ou_sales', '/nodes/sales/tasks', body)
+    assert first.status_code == 200, first.text
+    old_id = first.json()['record_id']
+
+    def timeout(request):
+        if landed:
+            token = request.url.params['client_token']
+            h.fake.tokens[token] = h.fake.add(TASKS, json.loads(request.content)['fields'])
+        raise httpx.ReadTimeout('uncertain task create', request=request)
+
+    h.fake.fault('POST', f'{TASKS}/records', timeout)
+    body['request_id'] = 'second-task'
+    failed = act(h, 'ou_sales', '/nodes/sales/tasks', body)
+    assert failed.json()['code'] == 'outcome_unknown'
+    h.client = h.build()  # Reconciliation must use the persisted receipt after a restart.
+    replay = act(h, 'ou_sales', '/nodes/sales/tasks', body)
+    assert replay.status_code == 200, replay.text
+    assert replay.json()['record_id'] != old_id
+    assert len(h.fake.tables[TASKS]) == 2
+    writes = len(h.fake.writes())
+    again = act(h, 'ou_sales', '/nodes/sales/tasks', body)
+    assert again.json() == replay.json()
+    assert len(h.fake.writes()) == writes

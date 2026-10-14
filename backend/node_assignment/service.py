@@ -286,6 +286,10 @@ class NodeAssignmentService:
                                       self.now_ms(), confirmation_record(ctx.project, self.config))
                 try:
                     plan = plan_fn(situation, resumed)
+                    if plan.kind == 'task_create':
+                        plan = replace(plan, client_token=resumed.client_token if resumed else str(uuid5(
+                            NAMESPACE_URL, f'{receipt}\0{akey}\0task-create')),
+                            pre_create_task_ids=resumed.pre_create_task_ids if resumed else None)
                 except Denied as exc:
                     record('denied', reason=str(exc))
                     raise Failure('forbidden', str(exc)) from None
@@ -359,6 +363,9 @@ class NodeAssignmentService:
         if plan.kind == 'task_create':
             if 'node' not in plan.changes:
                 plan = pin(replace(plan, changes={**plan.changes, 'node': [self._node_row(client, s, receipt).record_id]}))
+            if plan.pre_create_task_ids is None:
+                row = client.get(Table.NODES, plan.changes['node'][0])
+                plan = pin(replace(plan, pre_create_task_ids=parse_node(row).task_ids))
             fields = wire(TASK_FIELDS, plan.changes)
             plan = pin(replace(plan, record_id=client.create(Table.TASKS, fields, plan.client_token)))
             self._verify(client, Table.TASKS, TASK_FIELDS, plan.record_id, fields)
@@ -380,8 +387,12 @@ class NodeAssignmentService:
             row = snapshot.row(key)
             if row is None or 'node' not in plan.changes:
                 return 'not_applied', plan
-            matches = [r for r in client.batch_get(Table.TASKS, list(row.task_ids))
-                       if not mismatches(TASK_FIELDS, fields, r)] if row.task_ids else []
+            if plan.pre_create_task_ids is None:
+                raise Failure('outcome_unknown', '先前任務建立結果無法安全核對；請重新整理確認')
+            # Identical older tasks cannot be evidence that this request landed.
+            new_ids = [rid for rid in row.task_ids if rid not in plan.pre_create_task_ids]
+            matches = [r for r in client.batch_get(Table.TASKS, new_ids)
+                       if not mismatches(TASK_FIELDS, fields, r)] if new_ids else []
             if len(matches) > 1:
                 return 'conflict', plan
             if matches:
