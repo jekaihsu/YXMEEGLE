@@ -9,6 +9,8 @@ import json
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -19,7 +21,7 @@ import httpx
 from ..avatar import avatar_url
 from ..lark_adapter import RemoteFailure
 from ..live_read.config import LiveReadConfig
-from ..live_read.rate_limit import RETRY_CODES, BudgetExceeded, RetryPolicy, process_bucket
+from ..live_read.rate_limit import RETRY_CODES, BudgetExceeded, RetryPolicy, process_bucket, table_bucket, read_slots
 from ..live_read.token_cache import TokenError, process_token_cache
 from ..remote_policy import require_formal_write
 from ..sources import API, link_ids, text
@@ -261,6 +263,9 @@ class BitableClient:
         self.deadline = clock() + budget_seconds
         self.deny = transport is None and cfg.get('LARK_LIVE_READ_TRANSPORT') == 'deny'
         self.calls = 0
+        self._metrics_lock = Lock()
+        self._shared_limits = bucket is None
+        self.read_config = LiveReadConfig.from_env(cfg)
 
     def __enter__(self):
         return self
@@ -274,8 +279,13 @@ class BitableClient:
     def fields(self, table: Table):
         return self._pages('GET', self._root(table) + '/fields', params={})
 
-    def search(self, table: Table, conditions, conjunction='or'):
-        body = {'filter': {'conjunction': conjunction, 'conditions': conditions}, 'automatic_fields': False}
+    def search(self, table: Table, conditions, conjunction='or', *, field_names=None, sort=None, view_id=None):
+        body = {'filter': {'conjunction': conjunction, 'conditions': conditions}, 'automatic_fields': False,
+                'field_names': list(field_names) if field_names is not None else [name for name, _ in SCHEMAS[table].values()]}
+        if sort is not None:
+            body['sort'] = sort
+        if view_id is not None:
+            body['view_id'] = view_id
         return self._pages('POST', self._root(table) + '/records/search', params={'user_id_type': 'open_id'}, json=body)
 
     def list_records(self, table: Table, field_names):
@@ -289,24 +299,29 @@ class BitableClient:
         return record
 
     def batch_get(self, table: Table, record_ids):
-        found = []
-        for start in range(0, len(record_ids), 100):
-            chunk = record_ids[start:start + 100]
+        record_ids = list(dict.fromkeys(record_ids))
+        def read_chunk(chunk):
             try:
                 data = self._call('POST', self._root(table) + '/records/batch_get',
                                   json={'record_ids': chunk, 'user_id_type': 'open_id'})
             except Failure as exc:
                 if exc.extra.get('upstream_status') != 404:
                     raise
-                found.extend(self.get(table, rid) for rid in chunk)
-                continue
+                return [self.get(table, rid) for rid in chunk]
             records = data.get('records')
             if data.get('forbidden_record_ids'):
                 raise Failure('lark_permission', 'Lark 應用無權讀取部分任務紀錄', missing_scopes=['bitable:app:readonly'])
             if not isinstance(records, list) or any(not isinstance(r, dict) for r in records):
                 raise Failure('lark_error', 'Lark 任務批次讀取回應不完整；不顯示部分資料')
-            found.extend(records)
-        return found
+            if data.get('absent_record_ids'):
+                raise Failure('lark_error', 'Lark 關聯紀錄已不存在；不顯示完整資料')
+            returned = [r.get('record_id') for r in records]
+            if len(set(returned)) != len(returned) or set(returned) != set(chunk):
+                raise Failure('lark_error', 'Lark 批次讀取缺少或包含未要求的紀錄；不顯示完整資料')
+            return records
+        chunks = [record_ids[start:start + 100] for start in range(0, len(record_ids), 100)]
+        with ThreadPoolExecutor(max_workers=self.read_config.read_workers) as pool:
+            return [record for records in pool.map(read_chunk, chunks) for record in records]
 
     def create(self, table: Table, fields, client_token):
         self._writable(table)
@@ -373,21 +388,38 @@ class BitableClient:
             attempt += 1
             token = self._token()
             try:
+                local = table_bucket(self.cfg, path, self.read_config.table_rps) if self._shared_limits else None
+                if local:
+                    local.acquire(self.deadline)
                 self.bucket.acquire(self.deadline)
             except BudgetExceeded:
                 raise Failure('lark_unavailable', 'Lark 請求額度暫時用盡，請稍後再試') from None
             if write:
                 self.before_write()
-            self.calls += 1
+            with self._metrics_lock:
+                self.calls += 1
+            remaining = self.deadline - self.clock()
+            if remaining <= 0:
+                raise Failure('lark_unavailable', 'Lark 讀取已超過時間預算')
+            if not write and not read_slots.acquire(timeout=max(0, remaining)):
+                raise Failure('lark_unavailable', 'Lark 讀取已超過時間預算')
             try:
-                response = self.http.request(method, API + path, params=params, json=json, timeout=15,
-                                             headers={'Authorization': 'Bearer ' + token})
+                try:
+                    remaining = max(.001, self.deadline - self.clock())
+                    response = self.http.request(method, API + path, params=params, json=json,
+                                                 timeout=15 if write else min(self.read_config.request_timeout_seconds, remaining),
+                                                 headers={'Authorization': 'Bearer ' + token})
+                finally:
+                    if not write:
+                        read_slots.release()
             except httpx.HTTPError:
                 if write:
                     raise Failure('outcome_unknown', 'Lark 寫入結果未知；請以同一 request_id 重送以核對結果') from None
                 if self._backoff(None, attempt):
                     continue
                 raise Failure('lark_unavailable', 'Lark 暫時無法連線') from None
+            if not write and self.clock() >= self.deadline:
+                raise Failure('lark_unavailable', 'Lark 讀取已超過時間預算')
             try:
                 body = response.json()
             except ValueError:
@@ -419,7 +451,14 @@ class BitableClient:
     def _backoff(self, response, attempt):
         if attempt >= RetryPolicy.max_attempts:
             return False
-        delay = RetryPolicy.after(response, attempt) if response is not None else 2 ** (attempt - 1)
+        delay = RetryPolicy.after(response, attempt, jitter=True) if response is not None else 2 ** (attempt - 1)
+        if response is not None:
+            try:
+                body = response.json()
+            except ValueError:
+                body = {}
+            if response.status_code == 429 or (isinstance(body, dict) and body.get('code') in RETRY_CODES):
+                self.bucket.penalize(self.clock() + delay)
         if self.clock() + delay >= self.deadline:
             return False
         self.sleep(delay)
