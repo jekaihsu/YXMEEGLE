@@ -152,11 +152,10 @@ class PeopleDirectoryService:
         return (self.cfg['LARK_APP_ID'],self.cfg['LARK_WORKER_ORGANIZATION'])
 
     def _state(self,db,row,collections=None):
-        # Permission checks run before every Lark request and applies touch a few rows;
-        # naming the collections avoids loading and diffing every project. upgrade() adds the
-        # SOP draft candidate and a system event when it cannot see the templates, so load them.
+        # Partial saves cannot persist a generated SOP candidate with its audit event.
         state=upgrade(storage.load(db,self.B,row) if collections is None
-                      else storage.load_partial(db,self.B,row,collections=(*collections,'sop_templates')))
+                      else storage.load_partial(db,self.B,row,collections=(*collections,'sop_templates')),
+                      generate_sop_candidate=collections is None)
         profiles={p.person_id:deepcopy(p.data) for p in db.scalars(select(self.P).where(self.P.organization_id==row.id))}
         old={u['id'] for u in state['users']}
         state['users']=[profiles.get(u['id'],u) for u in state['users']]+[u for ident,u in profiles.items() if ident not in old]

@@ -346,3 +346,30 @@ def test_legacy_roster_timer_defaults_to_300_seconds(directory_service, flag):
     h.clock[0] = '2026-09-27T10:05:00+08:00'
     assert service.run_due(h.wid)['sync_revision'] == 2
     assert len(calls) == 2
+
+
+def test_partial_roster_sync_does_not_generate_unpersisted_sop_candidates(directory_service):
+    from .policy import upgrade, template
+
+    h, service, calls = directory_service
+    with h.sessions.begin() as db:
+        row = db.get(h.W, h.wid)
+        state = storage.load(db, h.B, row)
+        old = template()
+        old.update(id='older-normalized-sop', status='published')
+        state['sop_templates'] = [old]
+        row.data = storage.save(db, h.B, h.wid, state)
+    before = h.read()[0]
+    for revision in (1, 2):
+        assert service.sync(h.wid, 'u-manager')['sync_revision'] == revision
+    after = h.read()[0]
+    assert [e['action'] for e in after['events'] if e['action'] == 'sop_candidate_available'] == []
+    assert sum(e['action'] == 'people_directory_sync' for e in after['events']) == 2
+    for collection in set(storage.COLLECTIONS) - {'users', 'events'}:
+        assert after.get(collection) == before.get(collection)
+    upgraded = upgrade(deepcopy(after))
+    assert [t['id'] for t in upgraded['sop_templates']] == ['older-normalized-sop', template()['id']]
+    assert upgraded['sop_templates'][-1]['generated_candidate'] is True
+    assert sum(e['action'] == 'sop_candidate_available' for e in upgraded['events']) == 1
+    upgrade(upgraded)
+    assert sum(e['action'] == 'sop_candidate_available' for e in upgraded['events']) == 1
