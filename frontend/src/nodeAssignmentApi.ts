@@ -6,33 +6,35 @@ export type NodePermissions = Partial<Record<NodeAction, boolean>>;
 export interface AssignmentPerson {open_id: string; name: string}
 export interface AssignablePerson extends AssignmentPerson {departments: string[]}
 export interface AssignmentNode {
-  key: string; label: string; status: string; derived_status: string;
+  key: string; label: string; status: string | null; derived_status: string; record_id: string | null; revision: string | null;
+  departments: string[]; assignment_method: string | null; started_at: string | null; finished_at: string | null;
   tasks: {done: number; total: number}; progress: number;
   owners: AssignmentPerson[]; assigned_by: AssignmentPerson | null; approver: AssignmentPerson | null;
   approved_at: string | null; reject_reason: string | null; deadline: string | null; warnings: string[];
 }
 export interface AssignmentTask {
   id: string; title: string; detail: string; assignee: AssignmentPerson | null;
-  assigned_by: AssignmentPerson | null; department: string; deadline: string | null; status: string; completed_at: string | null;
+  assigned_by: AssignmentPerson | null; department: string; deadline: string | null; status: string; revision: string; record_id: string; done_at: string | null; created_at: string | null;
+  can: Record<'edit_status' | 'cancel' | 'assign' | 'claim' | 'edit_details', boolean>;
 }
 export interface NodeAssignmentList {
   code: string; summary: {done: number; total: number; current_node: string | null};
-  nodes: AssignmentNode[]; stale: boolean; can: Record<string, NodePermissions>;
+  nodes: AssignmentNode[]; stale: boolean; writes_enabled: boolean; writes_disabled_reason: string | null; roster: {available: boolean; stale: boolean}; warnings: string[]; can: Record<string, NodePermissions>;
 }
-export interface NodeAssignmentDetail {node: AssignmentNode; tasks: AssignmentTask[]; assignable_people: AssignablePerson[]}
-export interface NewAssignmentTask {title: string; detail: string; assignee: string; department: string; deadline: string}
+export interface NodeAssignmentDetail extends Pick<NodeAssignmentList, 'summary' | 'writes_enabled' | 'writes_disabled_reason' | 'roster' | 'warnings'> {can: NodePermissions; record_id: string | null; node: AssignmentNode; tasks: AssignmentTask[]; assignable_people: AssignablePerson[]}
+export interface NewAssignmentTask {title: string; detail: string; assignee_open_id: string; department: string; deadline: string}
 export type AssignmentMutation =
-  | {action: 'claim' | 'complete' | 'approve'; nodeKey: string}
-  | {action: 'assign'; nodeKey: string; assignees: string[]}
-  | {action: 'reject'; nodeKey: string; reason: string}
+  | {action: 'claim' | 'complete' | 'approve'; nodeKey: string; expected_revision: string | null}
+  | {action: 'assign'; nodeKey: string; owner_open_ids: string[]; expected_revision: string | null}
+  | {action: 'reject'; nodeKey: string; reason: string; expected_revision: string | null}
   | {action: 'create_task'; nodeKey: string; task: NewAssignmentTask}
-  | {action: 'update_task'; nodeKey: string; taskId: string; patch: Partial<Pick<NewAssignmentTask, 'assignee' | 'deadline' | 'detail'>> & {status?: string}};
+  | {action: 'update_task'; nodeKey: string; taskId: string; expected_revision: string; patch: Partial<Pick<NewAssignmentTask, 'assignee_open_id' | 'deadline' | 'detail'>> & {status?: string}};
 
 const NODE_LABELS: Record<string, string> = {
   not_started: '未開始', pending: '待處理', in_progress: '進行中', pending_review: '待審核', completed: '已完成', skipped: '略過',
   awaiting_review: '待審核', 未開始: '未開始', 待處理: '待處理', 進行中: '進行中', 待審核: '待審核', 已完成: '已完成', 略過: '略過',
 };
-export const TASK_STATUS_OPTIONS = [['pending', '待處理'], ['in_progress', '進行中'], ['completed', '已完成'], ['cancelled', '取消']] as const;
+export const TASK_STATUS_OPTIONS = [['待處理', '待處理'], ['進行中', '進行中'], ['已完成', '已完成'], ['取消', '取消']] as const;
 export const nodeStatusLabel = (status: string) => NODE_LABELS[status] || '狀態待確認';
 export const taskStatusLabel = (status: string) => TASK_STATUS_OPTIONS.find(([key, label]) => key === status || label === status)?.[1] || (status === 'canceled' ? '取消' : '狀態待確認');
 export const taskStatusValue = (status: string) => TASK_STATUS_OPTIONS.find(([key, label]) => key === status || label === status)?.[0] || (status === 'canceled' ? 'cancelled' : '');
@@ -57,7 +59,9 @@ function optionalPerson(value: unknown): AssignmentPerson | null {return value =
 function node(value: unknown): AssignmentNode {
   const n = record(value), tasks = record(n.tasks);
   return {
-    key: text(n.key), label: text(n.label), status: text(n.status), derived_status: text(n.derived_status),
+    record_id: optionalText(n.record_id), revision: optionalText(n.revision), departments: array(n.departments, text),
+    assignment_method: optionalText(n.assignment_method), started_at: optionalText(n.started_at), finished_at: optionalText(n.finished_at),
+    key: text(n.key), label: text(n.label), status: optionalText(n.status), derived_status: text(n.derived_status),
     tasks: {done: count(tasks.done), total: count(tasks.total)}, progress: count(n.progress), owners: array(n.owners, person),
     assigned_by: optionalPerson(n.assigned_by), approver: optionalPerson(n.approver), approved_at: optionalText(n.approved_at),
     reject_reason: optionalText(n.reject_reason), deadline: optionalText(n.deadline), warnings: array(n.warnings, text),
@@ -66,7 +70,23 @@ function node(value: unknown): AssignmentNode {
 function task(value: unknown): AssignmentTask {
   const t = record(value);
   return {id: text(t.id), title: text(t.title), detail: optionalText(t.detail) || '', assignee: optionalPerson(t.assignee),
-    assigned_by: optionalPerson(t.assigned_by), department: optionalText(t.department) || '', deadline: optionalText(t.deadline), status: text(t.status), completed_at: optionalText(t.completed_at)};
+    assigned_by: optionalPerson(t.assigned_by), department: optionalText(t.department) || '', deadline: optionalText(t.deadline), status: text(t.status), record_id: text(t.id), revision: text(t.revision), done_at: optionalText(t.done_at), created_at: optionalText(t.created_at),
+    can: taskPermissions(t.can)};
+}
+function permissions(value: unknown): NodePermissions {
+  const p = record(value);
+  return {claim: p.claim === true, assign: p.assign === true, complete: p.complete === true, approve: p.approve === true, reject: p.reject === true, create_task: p.create_task === true};
+}
+function taskPermissions(value: unknown): AssignmentTask['can'] {
+  const p = record(value);
+  return {edit_status: p.edit_status === true, cancel: p.cancel === true, assign: p.assign === true, claim: p.claim === true, edit_details: p.edit_details === true};
+}
+function envelope(result: Record<string, unknown>) {
+  const summary = record(result.summary), roster = record(result.roster);
+  if (typeof result.writes_enabled !== 'boolean' || typeof roster.available !== 'boolean' || typeof roster.stale !== 'boolean') throw malformed();
+  return {summary: {done: count(summary.done), total: count(summary.total), current_node: optionalText(summary.current_node)},
+    writes_enabled: result.writes_enabled, writes_disabled_reason: optionalText(result.writes_disabled_reason),
+    roster: {available: roster.available, stale: roster.stale}, warnings: array(result.warnings, text)};
 }
 const basePath = (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/node-assignments`;
 async function request(url: string, init: RequestInit, isCurrent: () => boolean): Promise<unknown> {
@@ -90,48 +110,55 @@ async function request(url: string, init: RequestInit, isCurrent: () => boolean)
 export async function fetchNodeAssignments(projectId: string, signal: AbortSignal, isCurrent: () => boolean): Promise<NodeAssignmentList> {
   const result = record(await request(basePath(projectId), {signal, cache: 'no-store'}, isCurrent));
   if (result.code === 'disabled') throw new NodeAssignmentError(404, '', 'disabled');
-  const summary = record(result.summary), permissions = record(result.can);
+  const actions = record(result.can);
   if (typeof result.stale !== 'boolean') throw malformed();
   const can: Record<string, NodePermissions> = {};
-  for (const [key, value] of Object.entries(permissions)) {
-    const p = record(value);
-    can[key] = {claim: p.claim === true, assign: p.assign === true, complete: p.complete === true, approve: p.approve === true, reject: p.reject === true, create_task: p.create_task === true};
-  }
+  for (const [key, value] of Object.entries(actions)) can[key] = permissions(value);
   const nodes = array(result.nodes, node);
   if (new Set(nodes.map(n => n.key)).size !== nodes.length) throw malformed();
-  return {code: text(result.code), summary: {done: count(summary.done), total: count(summary.total), current_node: optionalText(summary.current_node)},
+  return {code: text(result.code), ...envelope(result),
     nodes: NODE_ASSIGNMENT_ORDER.flatMap(key => nodes.filter(n => n.key === key)), stale: result.stale, can};
 }
 export async function fetchNodeAssignmentDetail(projectId: string, key: string, signal: AbortSignal, isCurrent: () => boolean): Promise<NodeAssignmentDetail> {
   const result = record(await request(`${basePath(projectId)}/nodes/${encodeURIComponent(key)}`, {signal, cache: 'no-store'}, isCurrent));
+  return parseDetail(result, key);
+}
+function parseDetail(result: Record<string, unknown>, key: string): NodeAssignmentDetail {
   const parsedNode = node(result.node);
   if (parsedNode.key !== key) throw malformed();
   const people = array(result.assignable_people, value => {
     const p = record(value); return {...person(p), departments: array(p.departments, text)};
   });
   const named = (p: AssignmentPerson | null) => p && p.name === '姓名待確認' ? people.find(candidate => candidate.open_id === p.open_id) || p : p;
-  return {node: {...parsedNode, assigned_by: named(parsedNode.assigned_by), approver: named(parsedNode.approver)},
+  return {...envelope(result), can: permissions(result.can), record_id: optionalText(result.record_id), node: {...parsedNode, assigned_by: named(parsedNode.assigned_by), approver: named(parsedNode.approver)},
     tasks: array(result.tasks, task).map(t => ({...t, assignee: named(t.assignee), assigned_by: named(t.assigned_by)})), assignable_people: people};
 }
-function requestId(): string {
+export function requestId(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   bytes[6] = (bytes[6] & 15) | 64; bytes[8] = (bytes[8] & 63) | 128;
   const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
-export async function mutateNodeAssignment(projectId: string, mutation: AssignmentMutation, signal: AbortSignal, isCurrent: () => boolean): Promise<void> {
+export async function mutateNodeAssignment(projectId: string, mutation: AssignmentMutation, signal: AbortSignal, isCurrent: () => boolean, id = requestId()): Promise<NodeAssignmentDetail> {
   const nodePath = `${basePath(projectId)}/nodes/${encodeURIComponent(mutation.nodeKey)}`;
   let url: string, body: object, method = 'POST';
   switch (mutation.action) {
-    case 'assign': url = `${nodePath}/assign`; body = {assignees: mutation.assignees}; break;
+    case 'assign': url = `${nodePath}/assign`; body = {owner_open_ids: mutation.owner_open_ids}; break;
     case 'reject': url = `${nodePath}/reject`; body = {reason: mutation.reason}; break;
-    case 'create_task': url = `${nodePath}/tasks`; body = mutation.task; break;
-    case 'update_task': url = `${basePath(projectId)}/tasks/${encodeURIComponent(mutation.taskId)}`; body = mutation.patch; method = 'PATCH'; break;
+    case 'create_task': url = `${nodePath}/tasks`; body = Object.fromEntries(Object.entries(mutation.task).filter(([key, value]) => key === 'title' || value !== '')); break;
+    case 'update_task': url = `${nodePath}/tasks/${encodeURIComponent(mutation.taskId)}`; body = mutation.patch; method = 'PATCH'; break;
     default: url = `${nodePath}/${mutation.action}`; body = {};
   }
-  await request(url, {signal, method, body: JSON.stringify({...body, request_id: requestId()})}, isCurrent);
+  if (mutation.action !== 'create_task') body = {...body, expected_revision: mutation.expected_revision};
+  return parseDetail(record(await request(url, {signal, method, body: JSON.stringify({...body, request_id: id})}, isCurrent)), mutation.nodeKey);
 }
-export const assignmentErrorMessage = (error: unknown) => error instanceof NodeAssignmentError && error.code === 'lark_permission'
-  ? 'Lark 權限不足，請聯絡管理員' : error instanceof Error ? error.message : '節點資料讀取失敗，請稍後重試。';
+const ERROR_MESSAGES: Record<string, string> = {
+  revision_conflict: '資料已被他人更新，已為你重新載入', illegal_transition: '目前狀態不允許此操作，請重新讀取後再試。',
+  forbidden: '目前沒有此操作權限。', writes_disabled: '節點修改已停用，請聯絡管理員。', rate_limited: '操作過於頻繁，請稍後重試。',
+  busy: '其他操作尚未完成，請稍後重試。', outcome_unknown: '尚無法確認儲存結果，請重試此操作。', readback_mismatch: '尚無法確認儲存結果，請重試此操作。',
+  lark_permission: 'Lark 權限不足，請聯絡管理員', lark_unavailable: 'Lark 暫時無法使用，請稍後重試。', roster_unavailable: '無法確認最新人員名單，請稍後重試。',
+};
+export const assignmentErrorMessage = (error: unknown) => error instanceof NodeAssignmentError && error.code && ERROR_MESSAGES[error.code]
+  ? ERROR_MESSAGES[error.code] : error instanceof Error ? error.message : '節點資料讀取失敗，請稍後重試。';
 export const assignmentsDisabled = (error: unknown) => error instanceof NodeAssignmentError && (error.status === 404 || error.code === 'disabled');

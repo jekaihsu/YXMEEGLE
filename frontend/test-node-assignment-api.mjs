@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import fs from 'node:fs/promises';
 import {build} from 'esbuild';
-import {assignmentFixture} from './fixtures/node-assignments.mjs';
+import {assignmentFixture, documentedAssignmentFixture} from './fixtures/node-assignments.mjs';
 
 const bundle = await build({entryPoints: [new URL('./src/nodeAssignmentApi.ts', import.meta.url).pathname], bundle: true, write: false, platform: 'node', format: 'esm'});
 const path = new URL('./.node-assignment-api-test.mjs', import.meta.url);
@@ -25,23 +25,23 @@ test('list parses into chain order and preserves literal progress', async () => 
   assert.equal(requests.at(-1).url, '/api/projects/p%2F1/node-assignments');
 });
 test('mutations encode identifiers and send fresh UUIDs', async () => {
-  requests = []; response = {status: 200, body: {code: 'ok'}};
-  await api.mutateNodeAssignment('p1', {action: 'claim', nodeKey: 'control'}, signal, () => true);
-  await api.mutateNodeAssignment('p1', {action: 'assign', nodeKey: 'control', assignees: ['ou_anna']}, signal, () => true);
-  await api.mutateNodeAssignment('p1', {action: 'update_task', nodeKey: 'control', taskId: 'task/1', patch: {status: 'completed'}}, signal, () => true);
+  requests = []; response = {status: 200, body: assignmentFixture().detail};
+  await api.mutateNodeAssignment('p1', {action: 'claim', nodeKey: 'control', expected_revision: '3f2a9c0d1b7e4a55'}, signal, () => true);
+  await api.mutateNodeAssignment('p1', {action: 'assign', nodeKey: 'control', expected_revision: '3f2a9c0d1b7e4a55', owner_open_ids: ['ou_anna']}, signal, () => true);
+  await api.mutateNodeAssignment('p1', {action: 'update_task', nodeKey: 'control', expected_revision: '3f2a9c0d1b7e4a55', taskId: 'task/1', patch: {status: '已完成'}}, signal, () => true);
   assert.deepEqual(requests.map(r => [r.method, r.url]), [
     ['POST', '/api/projects/p1/node-assignments/nodes/control/claim'],
     ['POST', '/api/projects/p1/node-assignments/nodes/control/assign'],
-    ['PATCH', '/api/projects/p1/node-assignments/tasks/task%2F1'],
+    ['PATCH', '/api/projects/p1/node-assignments/nodes/control/tasks/task%2F1'],
   ]);
-  assert.deepEqual(requests[1].body.assignees, ['ou_anna']);
-  assert.equal(requests[2].body.status, 'completed');
+  assert.deepEqual(requests[1].body.owner_open_ids, ['ou_anna']);
+  assert.equal(requests[2].body.status, '已完成');
   for (const r of requests) assert.match(r.body.request_id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.equal(new Set(requests.map(r => r.body.request_id)).size, 3);
 });
 test('422 errors preserve field messages', async () => {
   response = {status: 422, body: {code: 'validation', detail: [{loc: ['body', 'deadline'], msg: '期限必須為日期'}]}};
-  await assert.rejects(api.mutateNodeAssignment('p1', {action: 'claim', nodeKey: 'control'}, signal, () => true), error => {
+  await assert.rejects(api.mutateNodeAssignment('p1', {action: 'claim', nodeKey: 'control', expected_revision: '3f2a9c0d1b7e4a55'}, signal, () => true), error => {
     assert.equal(error.message, '請檢查欄位內容後再試。');
     assert.deepEqual(error.fields, {deadline: '期限必須為日期'}); return true;
   });
@@ -65,4 +65,27 @@ test('detail resolves person IDs to names and hides unresolved technical IDs', a
   response = {status: 200, body: detail};
   const parsed = await api.fetchNodeAssignmentDetail('p1', 'control', signal, () => true);
   assert.equal(parsed.tasks[0].assignee.name, '陳威廷'); assert.equal(parsed.node.assigned_by.name, '林安娜'); assert.equal(parsed.node.approver.name, '姓名待確認');
+});
+
+test('parses the exact documented overview and detail JSON', async () => {
+  const fixture = documentedAssignmentFixture(); response = {status: 200, body: fixture.list};
+  const list = await api.fetchNodeAssignments('p1', signal, () => true);
+  assert.deepEqual(list.nodes[0], fixture.list.nodes[0]); assert.deepEqual(list.roster, {available: true, stale: false});
+  response.body = fixture.detail;
+  const detail = await api.fetchNodeAssignmentDetail('p1', 'field', signal, () => true);
+  assert.deepEqual(detail.can, fixture.list.can.field);
+  assert.deepEqual(detail.tasks[0], {...fixture.detail.tasks[0], record_id: fixture.detail.tasks[0].id});
+});
+test('missing node rows preserve null revisions and send null expected_revision', async () => {
+  const fixture = assignmentFixture(); const node = fixture.list.nodes.find(n => n.key === 'settlement'); node.status = null;
+  response = {status: 200, body: fixture.list};
+  const list = await api.fetchNodeAssignments('p1', signal, () => true); assert.equal(list.nodes[8].revision, null); assert.equal(list.nodes[8].record_id, null); assert.equal(list.nodes[8].status, null);
+  response.body = {...fixture.detail, node};
+  await api.mutateNodeAssignment('p1', {action: 'claim', nodeKey: 'settlement', expected_revision: null}, signal, () => true);
+  assert.equal(requests.at(-1).body.expected_revision, null);
+});
+test('mutation returns the parsed full detail envelope', async () => {
+  const fixture = assignmentFixture(); response = {status: 200, body: {...fixture.detail, record_id: 'recTask1'}};
+  const detail = await api.mutateNodeAssignment('p1', {action: 'update_task', nodeKey: 'control', taskId: 'recTask1', expected_revision: '9b0c1d2e3f405162', patch: {status: '已完成'}}, signal, () => true);
+  assert.equal(detail.record_id, 'recTask1'); assert.equal(detail.node.revision, '3f2a9c0d1b7e4a55'); assert.equal(detail.tasks[0].revision, '9b0c1d2e3f405162'); assert.equal(requests.at(-1).body.expected_revision, '9b0c1d2e3f405162');
 });
