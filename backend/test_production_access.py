@@ -17,6 +17,7 @@ def company(tmp_path, overrides=None):
                     'LARK_REDIRECT_URI':'https://example.test/api/auth/lark/callback','LARK_ALLOWED_TENANTS':'company',
                     'LARK_WORKER_ORGANIZATION':'company', **(overrides or {})})
     state=upgrade(seed()); state['environment']='production'
+    for project in state.get('projects', []): project['source_kind']='lark'
     for u in state['users']:
         u.update(identity_app_id='app1',directory_status='employed',directory_missing=False,directory_last_seen_at=datetime.now(timezone.utc).isoformat(),
                  directory_source={'app_id':'app1','record_id':'rec-'+u['id']})

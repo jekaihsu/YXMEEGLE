@@ -26,6 +26,7 @@ def http(tmp_path):
                       'DEMO_MODE': 'false', 'APP_ENV': 'development', 'SESSION_SECRET': 'p1-int-only' * 4,
                       'LARK_WORKER_ORGANIZATION': 'boundary', 'LARK_ALLOWED_TENANTS': 'boundary'})
     state = upgrade(seed()); state['environment'] = 'production'
+    for project in state.get('projects', []): project['source_kind']='lark'
     for p in state['projects']: p.update(case_visibility='excluded_history', execution_system='meegle')
     old, new = state['projects'][:2]
     old['name'] = 'OLD_CASE_SENTINEL'; old['nodes'][0]['tasks'][0].update(status='in_progress', title='OLD_CASE_SENTINEL task')

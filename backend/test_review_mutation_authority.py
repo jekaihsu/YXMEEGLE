@@ -11,6 +11,7 @@ from .business_policy import ORDINARY_BACKUP_SCOPE
 
 def prepare(staff):
     app, client, login, change = staff
+    app.state.cfg['FEATURE_CHANGE_EXTENSION']='true'
     change({'role': 'manager'})
     app.state.cfg['LARK_COMPANY_ADMIN_GRANTS_JSON'] = json.dumps([{
         'open_id': 'ou_staff', 'app_id': 'staff-app', 'tenant': 'company', 'role': 'manager',
@@ -23,7 +24,7 @@ def prepare(staff):
         row = db.get(WorkspaceRow, 'lark-company')
         state = storage.load(db, BusinessRow, row)
         project = seed()['projects'][0]
-        project.update(case_visibility='new_case', execution_system='workbench')
+        project.update(source_kind='lark', case_visibility='new_case', execution_system='workbench')
         project['files'] = [{'id': 'local-file', 'name': 'report.txt', 'node_id': 'p1-control',
                              'direction': 'output', 'version': '1', 'storage': 'local'}]
         state['projects'] = [project]

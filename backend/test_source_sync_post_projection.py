@@ -41,7 +41,9 @@ def api(tmp_path,monkeypatch):
     app.state.live_read.clock=lambda:checked_at
     monkeypatch.setattr(source_sync,'application_adapter',lambda config:SimpleNamespace(token='application-token',client=SimpleNamespace(close=lambda:None)))
     app.state.source_sync.fetcher=lambda token:synthetic_snapshot()
-    state=seed(); state.update(environment='production',version=1,users=[person(k,*v) for k,v in ROLES.items()],source_status={'sync_revision':0})
+    state=seed();
+    for project in state['projects']: project['source_kind']='lark'
+    state.update(environment='production',version=1,users=[person(k,*v) for k,v in ROLES.items()],source_status={'sync_revision':0})
     with app.state.sessions.begin() as db:
         db.add(WorkspaceRow(id='lark-tenant',version=1,data=state))
         for u in state['users']: db.add(PersonRow(organization_id='lark-tenant',person_id=u['id'],data=u))

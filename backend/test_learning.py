@@ -140,6 +140,7 @@ def test_training_return_retains_prior_submission(state,legacy_learning_enabled)
 
 def test_settings_accept_shift_policy_but_reject_fixed_cutoff(state):
     from .operations import apply_operation
+    state['features']={'routines':True}
     manager=next(u for u in state['users'] if u['role']=='manager')
     apply_operation(state,manager,{'action':'admin_settings','payload':{'digest_time':'09:30'}})
     assert state['settings']['digest_time']=='09:30'

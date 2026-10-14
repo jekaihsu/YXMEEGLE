@@ -20,6 +20,7 @@ def test_pages_return_immediately_while_refresh_is_slow_or_failing(tmp_path, fai
                       'LARK_APP_ID': 'a', 'LARK_APP_SECRET': 's'})
     live = seed()
     live['environment'] = 'production'
+    for project in live.get('projects', []): project['source_kind']='lark'
     with app.state.sessions.begin() as db:
         db.add(WorkspaceRow(id='lark-test', version=1, data=live))
         db.add(AuthRow(id='s1', data={'wid': 'lark-test', 'expires': time() + 3600, 'access_token': 'x'}))

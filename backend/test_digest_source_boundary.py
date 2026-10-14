@@ -11,7 +11,7 @@ from .test_source_sync import harness
 
 @pytest.mark.parametrize('scenario',['allowed','legacy','baseline','mixed','unknown','pending','mid_send'])
 def test_production_digest_source_gate(harness,tmp_path,scenario):
-    h=harness;state,_=h.read();p=state['projects'][0]
+    h=harness;h.cfg['FEATURE_ROUTINES']='true';state,_=h.read();p=state['projects'][0]
     p.update(case_visibility='new_case',execution_system='workbench')
     actor=next(u for u in state['users'] if u['id']=='u-manager')
     actor.update(identity_app_id=h.cfg['LARK_APP_ID'],directory_status='employed',directory_missing=False,

@@ -17,7 +17,7 @@ WID='lark-test'
 
 @pytest.fixture
 def live(tmp_path,monkeypatch):
-    cfg={'DATABASE_URL':f'sqlite:///{tmp_path}/native.db','UPLOAD_DIR':str(tmp_path/'uploads'),
+    cfg={'FEATURE_CHANGE_EXTENSION':'true','DATABASE_URL':f'sqlite:///{tmp_path}/native.db','UPLOAD_DIR':str(tmp_path/'uploads'),
          'SESSION_SECRET':'native-test-secret'*3,'APP_ENV':'development','DEMO_MODE':'false',
          'LARK_APP_ID':'app1','LARK_WORKER_IDENTITY':'application','LARK_WORKER_ORGANIZATION':'test','LARK_ALLOWED_TENANTS':'test',
          'LARK_NATIVE_APPROVAL_SUBMIT_ENABLED':'true'}
@@ -33,6 +33,7 @@ def live(tmp_path,monkeypatch):
     monkeypatch.setattr(native_routes,'NativeApprovalService',lambda c:NativeApprovalService(c,lambda _:Adapter()))
     app=create_app(cfg)
     data=seed();data['environment']='production'
+    for project in data.get('projects', []): project['source_kind']='lark'
     for project in data['projects']:
         project.update(source_kind='lark',execution_system='workbench',case_visibility='new_case',pm_id='ou_pm',supervisor_id='ou_sup')
     for old,new in (('u-pm','ou_pm'),('u-manager','ou_sup')):
