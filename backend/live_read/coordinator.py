@@ -234,10 +234,10 @@ class RefreshCoordinator:
         if self.roster_executor is not self.executor:
             self.roster_executor.shutdown(wait=True)
 
-    def ensure(self, wid, dataset, *, wait=False, force=False):
+    def ensure(self, wid, dataset, *, wait=False, force=False, timeout=None):
         if dataset not in DATASETS:
             raise ValueError('Unknown live-read dataset')
-        deadline = monotonic() + self.config.blocking_timeout_seconds
+        deadline = monotonic() + (self.config.blocking_timeout_seconds if timeout is None else timeout)
         while True:
             try:
                 result = self._ensure_once(wid, dataset, wait=wait, force=force, deadline=deadline)

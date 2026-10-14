@@ -17,7 +17,7 @@ class PeopleAttendance(RefreshCoordinator):
 
     def _weekly(self, key):
         wid, monday = key.rsplit('|', 1)
-        state = self.live.ensure(wid, 'roster', wait=True)
+        state = self.live.ensure(wid, 'roster', wait=True, timeout=self.config.budget_seconds)
         if state['status'] != 'fresh':
             raise ReadFailure('Roster has not been read')
         return self.live.refreshers['attendance'].weekly(wid, week_window(monday))
