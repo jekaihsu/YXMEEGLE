@@ -1,6 +1,9 @@
 """Company-readable business counters from the existing safe workspace projection."""
 from collections import Counter,defaultdict
 from datetime import date,datetime,timezone
+from decimal import Decimal, InvalidOperation
+import hashlib
+import json
 from zoneinfo import ZoneInfo
 from .source_lifecycle import declared
 from .case_cutover import admission_fields
@@ -21,12 +24,30 @@ def verified_native_pending(item):
     if bound.get('external_status') in ('APPROVED','REJECTED','CANCELED','DELETED','UNVERIFIED'):return False
     return receipt.get('external_status')=='PENDING'
 
-def actual_date(value):
-    if not isinstance(value,str):return None
+def numeric_value(value):
+    if value is None or isinstance(value, bool): return None
     try:
-        parsed=date.fromisoformat(value)
-        return parsed if parsed.isoformat()==value else None
-    except ValueError:return None
+        number = Decimal(str(value).strip().replace(',', ''))
+        return number if number.is_finite() else None
+    except InvalidOperation: return None
+
+
+def source_instant(value):
+    if value is None or isinstance(value, bool): return None
+    if isinstance(value, (int, float)) or isinstance(value, str) and value.isdigit() and len(value) == 13:
+        try: return datetime.fromtimestamp(float(value) / 1000, timezone.utc)
+        except (ValueError, OverflowError, OSError): return None
+    if not isinstance(value, str): return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace('Z', '+00:00'))
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=ZoneInfo('Asia/Taipei'))
+    except ValueError: return None
+
+
+def actual_date(value):
+    parsed = source_instant(value)
+    return parsed.astimezone(ZoneInfo('Asia/Taipei')).date() if parsed else None
+
 
 UNVERIFIED='待核對'
 DEADLINE_BUCKETS=('intake','formal_executing','formal_unverified','other')
@@ -51,7 +72,8 @@ def source_overdue(project,today):
     return count
 
 
-def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',attention='',lifecycle='',clock=None):
+def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',attention='',lifecycle='',clock=None,sort='urgency',direction='asc',owner=''):
+    if sort not in ('urgency','code','name','due') or direction not in ('asc','desc'): raise ValueError('unsupported company sort')
     clock=clock or datetime.now(timezone.utc);today=clock.astimezone(ZoneInfo('Asia/Taipei')).date()
     totals=Counter(cases=0,confirmed_cases=0,intake_records=0,workbench_cases=0,tasks_total=0,tasks_completed=0,tasks_overdue=0,
                    pending_local_reviews=0,pending_native_reviews=0,deliveries_confirmed=0)
@@ -61,6 +83,7 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
     native=Counter();seen_native=set();deadline_cases=Counter();deadline_tasks=Counter()
     for collection in ('approvals','node_skip_requests','financial_requests'):
         for item in workspace.get(collection,[]):
+            if collection=='approvals' and item.get('kind') in ('change','extension'): continue
             receipt=item.get('native_receipt') or {}
             binding=item.get('native_binding') or {}
             ident=receipt.get('instance_code') or binding.get('instance_code')
@@ -90,6 +113,7 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
         if not runnable:
             late=source_overdue(p,today);key=deadline_bucket(p,entry['relationship'])
             deadline_cases[key]+=int(late>0);deadline_tasks[key]+=late
+        next_dates=[]
         project_groups=set();counts=Counter(tasks_total=0,tasks_completed=0,tasks_overdue=0,pending_local_reviews=0,deliveries_confirmed=0)
         for node in p.get('nodes',[]):
             name=node.get('department') or GROUPS.get(node.get('key'))
@@ -105,6 +129,7 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
                 if disabled_task(task):continue
                 complete=task.get('status')=='completed';due=actual_date(task.get('due_date'))
                 overdue=not complete and due is not None and due<today
+                if not complete and due is not None: next_dates.append(due)
                 counts['tasks_total']+=1;counts['tasks_completed']+=int(complete);counts['tasks_overdue']+=int(overdue)
                 if not complete and due is None:missing['task_due_date']+=1
                 if name:
@@ -117,17 +142,31 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
         counts['pending_native_reviews']=native[p['id']]
         totals.update(counts)
         rows.append({'id':p['id'],'code':p.get('code',''),'name':p.get('name',''),'case_type':p.get('case_type','unknown'),'group':'、'.join(sorted(project_groups)) or '未分組',
+                     'pm_id':p.get('pm_id'),'next_due':min(next_dates).isoformat() if next_dates else None,'deadline_basis':'local_workflow',
                      'groups':sorted(project_groups),'source_status':status,'source_lifecycle':entry,'execution_status':execution,
                      **admission_fields(p,runnable),
                      'workbench_execution_enabled':runnable,**dict(counts)})
     filtered=[r for r in rows if (not q or q.casefold() in (r['code']+' '+r['name']).casefold())
         and (not group or group in r['groups'] or group=='未分組' and not r['groups'])
+        and (not owner or r['pm_id']==owner)
         and (not source_status or r['source_status']==source_status)
         and (not lifecycle or (r['source_lifecycle']['canonical'] or UNVERIFIED)==lifecycle)
         and (not attention or attention=='overdue' and r['tasks_overdue']>0
              or attention=='review' and r['pending_local_reviews']+r['pending_native_reviews']>0)]
     filtered.sort(key=lambda r:(r['code'],r['id']))
+    if sort == 'urgency':
+        filtered.sort(key=lambda r:(-int(r['tasks_overdue']>0),-int(r['pending_local_reviews']+r['pending_native_reviews']>0),
+                                   -int(r['execution_status'] in ('paused','blocked')),
+                                   r['next_due'] is None,r['next_due'] or '',r['code'],r['id']))
+    elif sort == 'due':
+        known=[r for r in filtered if r['next_due'] is not None]
+        known.sort(key=lambda r:r['next_due'],reverse=direction=='desc')
+        filtered=known+[r for r in filtered if r['next_due'] is None]
+    else:
+        filtered.sort(key=lambda r:r[sort].casefold(),reverse=direction=='desc')
     source=workspace.get('source_status') or {}
+    complete=source.get('status')=='ready' and not source.get('partial') and not source.get('truncated') and not workspace.get('_partial')
+    snapshot_version=hashlib.sha256(json.dumps([workspace.get('version'),source.get('last_sync'),rows],sort_keys=True,default=str).encode()).hexdigest()[:24]
     return {'as_of':today.isoformat(),'checked_at':clock.isoformat(),'date_basis':'Asia/Taipei; actual task due_date only',
         'source':{'status':source.get('status','missing'),'last_success_at':source.get('last_sync'),
                   'mapping_status':source.get('mapping_status','unknown')},
@@ -135,5 +174,9 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
         'source_deadlines':{'cases':sum(deadline_cases.values()),'tasks':sum(deadline_tasks.values()),
             'buckets':[{'key':key,'cases':deadline_cases[key],'tasks':deadline_tasks[key]} for key in DEADLINE_BUCKETS]},
         'missing':dict(missing),'groups':[{'group':key,**dict(value)} for key,value in sorted(groups.items())],
+        'count_scope':'authorized_workspace_snapshot','filter_scope':'matching_loaded_source_cases','complete':complete,
+        'snapshot_version':snapshot_version,'source_as_of':source.get('last_sync'),
+        'query_echo':{'q':q,'group':group,'source_status':source_status,'attention':attention,'lifecycle':lifecycle,'sort':sort,'direction':direction,'owner':owner},
+        'total_count':len(filtered) if complete else None,'loaded_count':len(filtered),
         'cases':filtered[offset:offset+limit],'pagination':{'offset':offset,'limit':limit,'total':len(filtered),'has_more':offset+limit<len(filtered)},
         'metric_scope':'task progress counts only executable workbench cases; source business status is independent'}

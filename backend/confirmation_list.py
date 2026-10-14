@@ -36,6 +36,7 @@ from .case_cutover import admission_fields, execution_allowed
 from .data_state import data_state
 from .source_identity import SourceRef
 from .sources import text
+from .company_dashboard import numeric_value, source_instant
 
 DEFAULT_COLUMNS = ('case_number', 'project_name', 'confirmation_version', 'pm', 'admission_state',
                    'effective_due', 'workflow_summary', 'source_modified', 'source_status')
@@ -89,9 +90,9 @@ def _case_link(entity, projects):
     return pid, None
 
 
-def _binding(q, filters, sort):
+def _binding(q, filters, sort, context):
     """Opaque identity of the filter/sort set a cursor belongs to (page size excluded)."""
-    blob = json.dumps([q, filters, sort], sort_keys=True, ensure_ascii=False, separators=(',', ':'))
+    blob = json.dumps([q, filters, sort, context], sort_keys=True, ensure_ascii=False, separators=(',', ':'))
     return hashlib.sha256(blob.encode()).hexdigest()[:24]
 
 
@@ -106,7 +107,7 @@ def _decode_cursor(cursor, binding):
         key, bound = raw['k'], raw['b']
     except (ValueError, KeyError, TypeError, binascii.Error):
         raise ListError('cursor_invalid', 'cursor is malformed')
-    if not isinstance(key, str) or not _cursor_matches(binding, bound):
+    if not isinstance(key, str) or binding is not None and not _cursor_matches(binding, bound):
         raise ListError('cursor_filter_mismatch', 'cursor was issued for a different filter or sort set')
     return key
 
@@ -153,11 +154,7 @@ def _normalize_sort(sort):
 
 
 def _numeric(value):
-    if isinstance(value, int) and not isinstance(value, bool):
-        return value
-    if isinstance(value, str) and value.isdigit():
-        return int(value)
-    return None
+    return numeric_value(value)
 
 
 def _source_state(state):
@@ -244,7 +241,7 @@ def _build_rows(state, source_state):
                           'project_id': pid, 'reason': reason, 'verification': 'receipt_missing'},
             'detail': {'source_context': {'base_token': ref.base, 'table_id': ref.table},
                        'record_id': ref.record_id, 'non_default': True},
-            '_order': order, '_version': version,
+            '_order': order, '_version': version, '_created': source_instant(fields.get('建立時間')),
         })
     return rows, {'unkeyed_rows': unkeyed, 'duplicate_versions_collapsed': collapsed}
 
@@ -255,7 +252,7 @@ def _sort_value(row, column):
     if column == 'project_name':
         return row['project_name']
     if column == 'confirmation_version':
-        return row['_version']
+        return _numeric(row['_version'])
     if column == 'pm':
         return row['pm']['name'] or row['pm']['id']
     return row['admission']['state'] if row['admission']['state'] != 'unknown' else None
@@ -264,6 +261,10 @@ def _sort_value(row, column):
 def _ordered(rows, sort):
     base = sorted(rows, key=lambda r: (r['_order'], r['row_key']))
     if sort is None:
+        if any(r['_created'] is not None for r in rows):
+            dated=[r for r in sorted(rows,key=lambda r:r['row_key']) if r['_created'] is not None]
+            dated.sort(key=lambda r:r['_created'],reverse=True)
+            return dated+[r for r in sorted(rows,key=lambda r:r['row_key']) if r['_created'] is None]
         return base
     column, desc = sort['column'], sort['direction'] == 'desc'
     known = [r for r in sorted(rows, key=lambda r: r['row_key']) if _sort_value(r, column) not in (None, '')]
@@ -379,7 +380,7 @@ def _public(row):
     return {k: v for k, v in row.items() if not k.startswith('_')}
 
 
-def build_confirmation_list(state, *, q='', filters=None, sort=None, cursor=None, limit=50, as_of=None):
+def build_confirmation_list(state, *, q='', filters=None, sort=None, cursor=None, limit=50, as_of=None, cursor_context=None):
     """One page of the Confirmation List over the caller-narrowed ``state``."""
     source_state = _source_state(state)
     if source_state == 'forbidden':
@@ -390,7 +391,12 @@ def build_confirmation_list(state, *, q='', filters=None, sort=None, cursor=None
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_LIMIT:
             raise ListError('limit_invalid', f'limit must be an integer from 1 to {MAX_LIMIT}')
         norm_filters, norm_sort = _normalize_filters(filters), _normalize_sort(sort)
-        binding = _binding(q.strip(), norm_filters, norm_sort)
+        context = cursor_context or state.get('query_context')
+        if context is None and state.get('environment') not in ('demo','test'):
+            if cursor: _decode_cursor(cursor, None)
+            if cursor: return _error(ListError('cursor_expired', 'authorized cursor context is unavailable'), 409)
+        snapshot_version = hashlib.sha256(json.dumps([state.get('version'),state.get('source_status'),state.get('source_confirmations')],sort_keys=True,default=str).encode()).hexdigest()[:24]
+        binding = _binding(q.strip(), norm_filters, norm_sort, [context,snapshot_version])
         after = _decode_cursor(cursor, binding) if cursor else None
     except ListError as err:
         return _error(err)
@@ -415,9 +421,14 @@ def build_confirmation_list(state, *, q='', filters=None, sort=None, cursor=None
                 'requested': {k: v for k, v in norm_filters.items() if k.startswith('deadline_')}}
     return {
         'status': 200, 'as_of': as_of,
+        'count_scope':'authorized_source_versions','filter_scope':'matching_loaded_versions',
+        'complete':source_state=='ok','snapshot_version':snapshot_version,'source_as_of':as_of,
+        'total_count':len(matching) if source_state=='ok' else None,
+        'query_echo':{'query_hash':hashlib.sha256(q.strip().encode()).hexdigest(),'filters':norm_filters,'sort':norm_sort},
+        'pagination_available':context is not None or state.get('environment') in ('demo','test'),
         'page_state': _page_state(source_state, len(rows), len(matching), _independent_stale(state, source_state)),
         'rows': [_public(r) for r in page],
-        'next_cursor': _encode_cursor(binding, page[-1]['row_key']) if more and page else None,
+        'next_cursor': _encode_cursor(binding, page[-1]['row_key']) if more and page and (context is not None or state.get('environment') in ('demo','test')) else None,
         # A noncurrent read never proves a filtered zero: the matching denominator stays undetermined.
         'totals': {'matching': len(matching) if known and (matching or source_state == 'ok') else None, 'loaded': len(page),
                    'authorized_source': len(rows) if known else None},
