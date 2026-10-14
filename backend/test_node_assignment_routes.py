@@ -593,3 +593,26 @@ def test_audit_records_actor_change_and_request_without_secrets(h):
     assert change['kind'] == 'node_task' and change['after']['assignee'] == ['ou_member']
     text = json.dumps(data, ensure_ascii=False)
     assert 't-synthetic' not in text and 'client_token' not in text and 'synthetic' not in text
+
+
+def test_delayed_node_create_replay_uses_same_token(h):
+    pending = []
+
+    def timeout(request):
+        pending.append((request.url.params['client_token'], json.loads(request.content)['fields']))
+        raise httpx.ReadTimeout('uncertain create', request=request)
+
+    def land_first(request):
+        token, fields = pending[0]
+        rid = h.fake.add(NODES, fields)
+        h.fake.tokens[token] = rid
+        return None
+
+    h.fake.fault('POST', f'{NODES}/records', timeout)
+    body = {'request_id': 'delayed-node'}
+    first = act(h, 'ou_sales', '/nodes/sales/claim', body)
+    assert first.json()['code'] == 'outcome_unknown'
+    h.fake.fault('POST', f'{NODES}/records', land_first)
+    replay = act(h, 'ou_sales', '/nodes/sales/claim', body)
+    assert replay.status_code == 200, replay.text
+    assert len(h.fake.tables[NODES]) == 1

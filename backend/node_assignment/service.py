@@ -18,7 +18,7 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlsplit
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid5
 
 from sqlalchemy.exc import IntegrityError
 
@@ -319,7 +319,7 @@ class NodeAssignmentService:
                           record_ids=[r.record_id for r in rows])
         return rows
 
-    def _node_row(self, client, s: Situation):
+    def _node_row(self, client, s: Situation, receipt):
         """Search first, create once, then search again so a racing duplicate is reported, not picked."""
         row = s.snapshot.row(s.key)
         if row is not None:
@@ -333,7 +333,7 @@ class NodeAssignmentService:
         if s.confirmation_record:
             initial['confirmation'] = [s.confirmation_record]
         try:
-            client.create(Table.NODES, wire(NODE_FIELDS, initial), str(uuid4()))
+            client.create(Table.NODES, wire(NODE_FIELDS, initial), str(uuid5(NAMESPACE_URL, f'{receipt}\0{akey}\0node-create')))
         except Failure as exc:
             if exc.code != 'outcome_unknown':
                 raise
@@ -354,11 +354,11 @@ class NodeAssignmentService:
             return updated
 
         if plan.kind == 'node' and plan.record_id is None:
-            row = self._node_row(client, s)
+            row = self._node_row(client, s, receipt)
             plan = pin(replace(plan, record_id=row.record_id, base_revision=row.revision))
         if plan.kind == 'task_create':
             if 'node' not in plan.changes:
-                plan = pin(replace(plan, changes={**plan.changes, 'node': [self._node_row(client, s).record_id]}))
+                plan = pin(replace(plan, changes={**plan.changes, 'node': [self._node_row(client, s, receipt).record_id]}))
             fields = wire(TASK_FIELDS, plan.changes)
             plan = pin(replace(plan, record_id=client.create(Table.TASKS, fields, plan.client_token)))
             self._verify(client, Table.TASKS, TASK_FIELDS, plan.record_id, fields)
