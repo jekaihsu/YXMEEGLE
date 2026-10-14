@@ -223,7 +223,7 @@ def create_app(overrides=None):
         response.headers['X-Content-Type-Options']='nosniff'
         response.headers['Referrer-Policy']='same-origin'
         if request.url.path.startswith('/api'): response.headers['Cache-Control']='no-store'
-        if (request.method,request.url.path) in TIMED_ROUTES:
+        if (request.method,request.url.path) in TIMED_ROUTES or (request.method=='GET' and re.fullmatch(r'/api/projects/[^/]+',request.url.path)):
             # Durations only. 'serialize' is the unmeasured remainder (response encoding and framework time).
             phases=dict(request.scope.get('phases',{})); total=perf_counter()-started
             phases['serialize']=max(total-sum(phases.values()),0)
