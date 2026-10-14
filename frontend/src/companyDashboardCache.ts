@@ -24,32 +24,33 @@ type PendingRead<T>={promise:Promise<T>;controller:AbortController;readers:Set<A
 function panelReader<T>(){
  const panels=new Map<string,T>();
  const pending=new Map<string,PendingRead<T>>();
+ const latest=new Map<string,AbortController>();
  let epoch=-1;
  function key(url:string,scope:string){
   const current=getSessionEpoch();
-  if(current!==epoch){for(const read of pending.values())read.controller.abort();pending.clear();panels.clear();epoch=current}
+  if(current!==epoch){for(const read of pending.values())read.controller.abort();pending.clear();panels.clear();latest.clear();epoch=current}
   return JSON.stringify([current,scope,url]);
  }
  const cached=(url:string,scope='')=>panels.get(key(url,scope));
- const read=(url:string,signal:AbortSignal,scope=''):Promise<T>=>{
-  const ident=key(url,scope),started=getSessionEpoch();
-  let entry=pending.get(ident);
+ const read=(url:string,signal:AbortSignal,scope='',{timeoutMs=15000,reloadVersion=0}:{timeoutMs?:number;reloadVersion?:unknown}={}):Promise<T>=>{
+  const ident=key(url,scope),flight=JSON.stringify([ident,reloadVersion]),started=getSessionEpoch();
+  let entry=pending.get(flight);
   if(!entry){
-   const controller=new AbortController();
-   const promise=api<T>(url,{signal:controller.signal,cache:'no-store',timeoutMs:15000},()=>started===getSessionEpoch())
-    .then(body=>{if(!controller.signal.aborted&&started===getSessionEpoch()){
+   const controller=new AbortController();latest.set(ident,controller);
+   const promise=api<T>(url,{signal:controller.signal,cache:'no-store',timeoutMs},()=>started===getSessionEpoch())
+    .then(body=>{if(!controller.signal.aborted&&started===getSessionEpoch()&&latest.get(ident)===controller){
      panels.set(ident,body);
      if(panels.size>32){const oldest=panels.keys().next();if(!oldest.done)panels.delete(oldest.value)}
     }return body})
-    .catch(error=>{if(error instanceof ApiError&&(error.status===401||error.status===403))panels.delete(ident);throw error})
-    .finally(()=>{if(pending.get(ident)?.controller===controller)pending.delete(ident)});
-   entry={promise,controller,readers:new Set()};pending.set(ident,entry);
+    .catch(error=>{if(latest.get(ident)===controller&&error instanceof ApiError&&(error.status===401||error.status===403))panels.delete(ident);throw error})
+    .finally(()=>{if(pending.get(flight)?.controller===controller)pending.delete(flight)});
+   entry={promise,controller,readers:new Set()};pending.set(flight,entry);
   }
   const shared=entry;
   shared.readers.add(signal);
   const release=()=>{
    shared.readers.delete(signal);
-   if(!shared.readers.size&&pending.get(ident)===shared){pending.delete(ident);shared.controller.abort()}
+   if(!shared.readers.size&&pending.get(flight)===shared){pending.delete(flight);shared.controller.abort()}
   };
   signal.addEventListener('abort',release,{once:true});
   if(signal.aborted)release();

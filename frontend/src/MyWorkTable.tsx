@@ -547,7 +547,7 @@ export default MyWorkTable;
 
 export function AssignmentTable({items,onNavigate,compact=false}:{items:import('./useHomePanels').HomeItem[];onNavigate:(target:import('./useHomePanels').HomeTarget)=>void;compact?:boolean}) {
  const [expanded,setExpanded] = useState<string|null>(null);
- if (!compact) return <div className="my-work-table-scroll" tabIndex={0} aria-label="工作表格，可左右捲動"><table className="my-work-table">
+ if (!compact) return <div className="my-work-table-scroll" role="region" tabIndex={0} aria-label="工作表格，可左右捲動"><table className="my-work-table">
   <thead><tr><th scope="col">工作與案件</th><th scope="col">負責人</th><th scope="col">期限</th><th scope="col">狀態</th><th scope="col">下一步</th><th scope="col">操作</th></tr></thead>
   <tbody>{items.map(item=><tr key={item.id}>
    <td><details><summary>{item.title}</summary><p>{item.detail || '來源未提供內容'}</p><AssignmentChildren item={item} onNavigate={onNavigate}/><p>指派人 {item.assigned_by?.name || '來源未提供'}{item.assignment_method ? ` · ${item.assignment_method}` : ''}</p><p>原始期限 {item.original_deadline || '未提供'}</p><p>{item.deadline_basis==='related_tasks_max' ? '節點期限取關聯任務的最晚截止日' : item.deadline_basis==='lark_task_deadline' ? '期限來自 Lark 任務截止日' : '期限來自本地工作流程'}</p></details><small>{item.kind==='node_assignment' ? '節點責任' : item.origin==='local_workflow' ? '本地 SOP' : 'Lark 任務'} · {item.case.code || '案號待核對'} · {item.case.name || '案件關聯待核對'}</small></td>
@@ -555,7 +555,7 @@ export function AssignmentTable({items,onNavigate,compact=false}:{items:import('
    <td>{item.deadline || '未排期限'}{item.next_due && item.next_due!==item.deadline && <small>下一任務期限 {item.next_due}</small>}</td>
    <td>{item.source_status || WORK_STATUS[item.status] || '來源未提供'}</td>
    <td>{item.overdue && <span>{item.can_execute ? '逾期' : '期限已過，等待條件'} · </span>}{item.blocked_reasons.join('、') || (item.can_execute ? '可前往作業' : item.status==='done' ? '已完成' : '請檢視作業條件')}</td>
-   <td>{item.target ? <button type="button" className="text-button" onClick={()=>{if(item.target)onNavigate(item.target)}}>開啟案件</button> : <a href="#view=projects">案件關聯待核對</a>}</td>
+   <td>{item.target ? <button type="button" className="text-button" onClick={()=>{if(item.target)onNavigate(homeTarget(item.target))}}>開啟案件</button> : <a href="#view=projects">案件關聯待核對</a>}</td>
   </tr>)}</tbody>
  </table></div>;
  return <div className={compact ? 'ds-group glass--flat' : 'my-work-table-scroll'}>
@@ -569,7 +569,7 @@ export function AssignmentTable({items,onNavigate,compact=false}:{items:import('
      <small>{item.blocked_reasons.join('、') || (item.can_execute ? '可前往作業' : item.status==='done' ? '已完成' : '請檢視作業條件')}</small>
      <span>{item.assignees.map(person=><span key={person.id}><Avatar small user={{name:person.name,avatar_url:person.avatar_url ?? undefined}}/>{person.name || '姓名未提供'} </span>)}</span>
     </span>
-    {item.target && <button type="button" className="text-button" onClick={()=>{if(item.target)onNavigate(item.target)}}>開啟案件</button>}
+    {item.target && <button type="button" className="text-button" onClick={()=>{if(item.target)onNavigate(homeTarget(item.target))}}>開啟案件</button>}
    </div>
    {expanded===item.id && <div className="my-work-drawer-section">
     <p>{item.detail || '來源未提供內容'}</p>
@@ -583,9 +583,12 @@ export function AssignmentTable({items,onNavigate,compact=false}:{items:import('
   </section>)}
  </div>;
 }
+function homeTarget({assignment_node,assignment_task,...target}:import('./useHomePanels').HomeTarget){
+ return {...target,node:assignment_node ?? target.node,task:assignment_task ?? target.task};
+}
 const WORK_STATUS:Record<string,string> = {not_started:'未開始',todo:'待處理',in_progress:'進行中',in_review:'待審核',rework:'退回修正',done:'已完成',pending:'待處理',paused:'暫停中'};
 
 function AssignmentChildren({item,onNavigate}:{item:import('./useHomePanels').HomeItem;onNavigate:(target:import('./useHomePanels').HomeTarget)=>void}) {
  if (!item.children?.length) return null;
- return <ul>{item.children.map(task=><li key={task.id}>{task.title} · {task.status} · {task.deadline || '未排期限'} · {task.assignee?.name || '未指派'}<p>{task.detail || '來源未提供內容'}</p>{item.target && <button type="button" className="text-button" onClick={()=>{if(item.target)onNavigate({...item.target,assignment_task:task.id})}}>開啟任務</button>}</li>)}</ul>;
+ return <ul>{item.children.map(task=><li key={task.id}>{task.title} · {task.status} · {task.deadline || '未排期限'} · {task.assignee?.name || '未指派'}<p>{task.detail || '來源未提供內容'}</p>{item.target && <button type="button" className="text-button" onClick={()=>{if(item.target)onNavigate({...homeTarget(item.target),task:task.id})}}>開啟任務</button>}</li>)}</ul>;
 }

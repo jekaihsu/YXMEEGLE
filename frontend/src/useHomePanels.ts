@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react';
-import {api, ApiError, getSessionEpoch, getPendingMutations} from './api';
+import {ApiError, getSessionEpoch, getPendingMutations} from './api';
+import {readPanel} from './companyDashboardCache';
 import type {Ctx} from './appCommon';
 
 export const HOME_PANELS = ['assigned', 'proxy', 'confirmation', 'delegated', 'completed', 'local'] as const;
@@ -33,7 +34,6 @@ function cachedSnapshot(key:string):HomeResponse|null {
  if(Date.now()-Math.min(sourceTime,saved.storedAt)>900000){snapshots.delete(key);return null}
  return saved.body;
 }
-const flights = new Map<string,Promise<HomeResponse>>();
 let cacheEpoch = -1;
 const object = (v:unknown):v is Record<string,unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 const nullableText = (v:unknown):v is string|null => v === null || typeof v === 'string';
@@ -85,37 +85,39 @@ export function homePanelUrl(query:HomeQuery, full=false) {
 }
 export function useHomePanels(c:Ctx, query:HomeQuery, enabled=true, full=false):PanelRead {
  const epoch = getSessionEpoch();
- if (cacheEpoch !== epoch) {snapshots.clear();flights.clear();cacheEpoch=epoch}
- const url = homePanelUrl({...query,limit:query.limit ?? (full ? 50 : 25)},full || c.s.access_mode==='tenant-read');
- const key = JSON.stringify([epoch,c.s.workspace_id,c.s.user,c.s.features,c.w.version,url]);
- const [state,setState] = useState<{key:string; read:PanelRead}>(() => ({key,read:{body:cachedSnapshot(key),pending:true,error:null}}));
+ if (cacheEpoch !== epoch) {snapshots.clear();cacheEpoch=epoch}
+ const [search,setSearch]=useState(query.q);
+ useEffect(()=>{const timer=window.setTimeout(()=>setSearch(query.q),250);return()=>window.clearTimeout(timer)},[query.q]);
+ const url = homePanelUrl({...query,q:search,limit:query.limit ?? (full ? 50 : 25)},full || c.s.access_mode==='tenant-read');
+ const scope=JSON.stringify([epoch,c.s.workspace_id,c.s.user,c.s.features,query.panel,query.scope,full]);
+ const key = JSON.stringify([scope,url]);
+ const [state,setState] = useState<{key:string;scope:string;read:PanelRead}>(() => ({key,scope,read:{body:cachedSnapshot(key),pending:true,error:null}}));
  useEffect(() => {
   if (!enabled) return;
   let disposed = false;
+  let controller:AbortController|undefined;
   const load = () => {
    if (document.visibilityState === 'hidden' || getPendingMutations() > 0) return;
-   let flight = flights.get(key);
-   if (!flight) {
-    flight = api<unknown>(url,{timeoutMs:35000,cache:'no-store'}).then(parseHomeResponse);
-    flights.set(key,flight);
-    const cleanup = () => {if(flights.get(key)===flight)flights.delete(key)};
-    flight.then(cleanup,cleanup);
-   }
-   flight.then(body => {
-    if (disposed || epoch !== getSessionEpoch()) return;
+   controller?.abort();controller=new AbortController();
+   const signal=controller.signal;
+   setState(previous=>({key,scope,read:{body:cachedSnapshot(key) ?? (previous.scope===scope?previous.read.body:null),pending:true,error:null}}));
+   readPanel(url,signal,scope,{timeoutMs:35000,reloadVersion:c.reloadVersion}).then(parseHomeResponse).then(body => {
+    if (disposed || signal.aborted || epoch !== getSessionEpoch()) return;
     if (body.complete || body.items.length) {snapshots.set(key,{body,storedAt:Date.now()});if(snapshots.size>100)snapshots.delete(snapshots.keys().next().value!)}
-    setState({key,read:{body,pending:false,error:null}});
+    setState({key,scope,read:{body,pending:false,error:null}});
    }).catch(error => {
-    if (disposed || epoch !== getSessionEpoch()) return;
-    if (error instanceof ApiError && (error.status===401 || error.status===403)) snapshots.delete(key);
-    setState({key,read:{body:cachedSnapshot(key),pending:false,error:error instanceof ApiError && error.status===409 ? '清單已更新，請回第一頁' : '更新失敗'}});
+    if (disposed || signal.aborted || epoch !== getSessionEpoch()) return;
+    const denied=error instanceof ApiError && (error.status===401 || error.status===403);
+    if (denied) snapshots.delete(key);
+    setState(previous=>({key,scope,read:{body:denied?null:cachedSnapshot(key) ?? (previous.scope===scope?previous.read.body:null),pending:false,error:error instanceof ApiError && error.status===409 ? '清單已更新，請回第一頁' : '更新失敗'}}));
    });
   };
   load();
   const timer = window.setInterval(load,60000);
   const visible = () => {if(document.visibilityState==='visible')load()};
   document.addEventListener('visibilitychange',visible);
-  return () => {disposed=true;window.clearInterval(timer);document.removeEventListener('visibilitychange',visible)};
- }, [key,url,enabled,c.reloadVersion,c.w.version]);
- return state.key === key ? state.read : {body:cachedSnapshot(key),pending:true,error:null};
+  return () => {disposed=true;controller?.abort();window.clearInterval(timer);document.removeEventListener('visibilitychange',visible)};
+ }, [key,url,scope,enabled,c.reloadVersion,c.w.version]);
+ const read=state.key===key?state.read:{body:cachedSnapshot(key) ?? (state.scope===scope?state.read.body:null),pending:true,error:null};
+ return query.q===search?read:{...read,pending:true};
 }

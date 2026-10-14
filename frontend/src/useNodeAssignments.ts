@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {getSessionEpoch} from './api';
+import {getSessionEpoch, getPendingMutations} from './api';
 import {assignmentErrorMessage, assignmentsDisabled, fetchNodeAssignments, fetchNodeAssignmentDetail, mutateNodeAssignment, NodeAssignmentError, requestId, type AssignmentMutation, type NodeAssignmentDetail, type NodeAssignmentList} from './nodeAssignmentApi';
 
 let cacheEpoch = getSessionEpoch();
@@ -48,10 +48,10 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
   const retryAttempt = useRef<{mutation: AssignmentMutation; id: string} | null>(null);
   const listRequest = useRef(0), mutating = useRef(false);
   const current = useCallback(() => !lifecycle.current.controller.signal.aborted && lifecycle.current.epoch === getSessionEpoch(), []);
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (silent = false) => {
     if (!enabled) return;
     const sequence = ++listRequest.current;
-    setRefreshing(true);
+    if (!silent) setRefreshing(true);
     try {
       const data = await prefetchNodeAssignments(projectId);
       if (current() && sequence === listRequest.current) {
@@ -63,13 +63,13 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
           lists.set(projectId, merged);
           return {kind: 'ready', data: merged};
         });
-        setRevision(r => r + 1);
+        if (!silent) setRevision(r => r + 1);
       }
     } catch (failure) {
       if (current() && sequence === listRequest.current) setState(previous => assignmentsDisabled(failure) ? {kind: 'disabled'} : {
         kind: 'error', message: assignmentErrorMessage(failure), data: failure instanceof NodeAssignmentError && [401, 403].includes(failure.status) ? undefined : 'data' in previous ? previous.data : undefined,
       });
-    } finally {if (current() && sequence === listRequest.current) setRefreshing(false)}
+    } finally {if (!silent && current() && sequence === listRequest.current) setRefreshing(false)}
   }, [projectId, current, enabled]);
   useEffect(() => {
     retryAttempt.current = null;
@@ -81,11 +81,11 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
     return () => {controller.abort(); listRequest.current++};
   }, [reload]);
   useEffect(() => {
-    const refresh = () => {if (enabled && document.visibilityState !== 'hidden' && !mutating.current) void reload()};
+    const refresh = () => {if (enabled && document.visibilityState !== 'hidden' && !refreshing && !mutating.current && !getPendingMutations() && !document.activeElement?.closest('.node-assignments')) void reload(true)};
     const timer = window.setInterval(refresh, 60000);
     document.addEventListener('visibilitychange', refresh);
     return () => {window.clearInterval(timer); document.removeEventListener('visibilitychange', refresh)};
-  }, [enabled, reload]);
+  }, [enabled, reload, refreshing]);
   const mutate = async (mutation: AssignmentMutation): Promise<boolean> => {
     if (mutating.current || !current()) return false;
     const scope = lifecycle.current;

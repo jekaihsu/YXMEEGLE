@@ -1,3 +1,4 @@
+import {fakeClock} from './fake-clock-fixture.mjs';
 import assert from 'node:assert/strict';
 import {test, afterEach} from 'node:test';
 import fs from 'node:fs/promises';
@@ -422,4 +423,25 @@ test('flow owners use the shared avatar and recover to the initial on image fail
   await act(async () => img.dispatchEvent(new Event('error')));
   assert.equal(avatar.textContent, '王');
   assert.equal(avatar.querySelector('img'), null);
+});
+
+test('automatic refresh preserves a focused status select and never blocks idle controls',async()=>{
+ const clock=fakeClock(dom.window);
+ try{
+  await mount();await expand();
+  const select=document.querySelector('.na-task-status select');assert.ok(select);
+  select.focus();const count=requests.length;
+  await act(async()=>clock.advance(60000));
+  assert.equal(requests.length,count,'focused node panel skips polling');
+  assert.equal(document.activeElement,select);assert.equal(select.disabled,false);
+  select.blur();let finish;const original=globalThis.fetch;
+  globalThis.fetch=(url,init)=>url.endsWith('/node-assignments')?new Promise(resolve=>{finish=resolve}):original(url,init);
+  await act(async()=>clock.advance(60000));
+  assert.equal(select.disabled,false,'idle background read does not block status edits');
+  await act(async()=>finish(reply(fixture.list)));
+  await click(button('重新讀取'));
+  await act(async()=>document.dispatchEvent(new Event('visibilitychange')));
+  await act(async()=>finish(reply(fixture.list)));
+  assert.equal(button('重新讀取')?.disabled,false,'visibility polling cannot leave manual refresh stuck');
+ }finally{clock.restore()}
 });

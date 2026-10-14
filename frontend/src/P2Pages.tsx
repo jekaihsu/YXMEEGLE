@@ -37,7 +37,7 @@ function useP2Read(url: string | null, retry: number, version: unknown, userId: 
   if (!url) return;
   const epoch = getSessionEpoch();
   const controller = new AbortController();
-  readPanel(url, controller.signal,String(userId))
+  readPanel(url, controller.signal,String(userId),{timeoutMs:60000,reloadVersion:JSON.stringify([version,retry])})
    .then(body => {if (!controller.signal.aborted && epoch === getSessionEpoch()) setState({key, fetched: {status: 'ok', body}})})
    .catch(error => {
     if (controller.signal.aborted || epoch !== getSessionEpoch()) return;
@@ -236,7 +236,7 @@ function ConfirmationsBody({context, body, loading, open, setNotice}: {context: 
   const request=p2Request({...context,cursor});
   if(!request.ok||!proximity.current)return;
   const controller=new AbortController();
-  const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){observer.disconnect();void readPanel(request.url,controller.signal,memoryOwner.split('|').slice(1).join('|')).catch(()=>{})}},{rootMargin:'600px'});
+  const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){observer.disconnect();void readPanel(request.url,controller.signal,memoryOwner.split('|').slice(1).join('|'),{timeoutMs:60000}).catch(()=>{})}},{rootMargin:'600px'});
   observer.observe(proximity.current);
   return()=>{observer.disconnect();controller.abort()};
  },[view.pagination.next.cursor,pending,loading,context]);
