@@ -547,7 +547,7 @@ export default MyWorkTable;
 
 export function AssignmentTable({items,onNavigate,compact=false}:{items:import('./useHomePanels').HomeItem[];onNavigate:(target:import('./useHomePanels').HomeTarget)=>void;compact?:boolean}) {
  const [expanded,setExpanded] = useState<string|null>(null);
- if (!compact) return <div className="my-work-table-scroll" tabIndex={0} aria-label="工作表格，可左右捲動"><table className="my-work-table">
+ if (!compact) return <div className="my-work-table-scroll" role="region" tabIndex={0} aria-label="工作表格，可左右捲動"><table className="my-work-table">
   <thead><tr><th scope="col">工作與案件</th><th scope="col">負責人</th><th scope="col">期限</th><th scope="col">狀態</th><th scope="col">下一步</th><th scope="col">操作</th></tr></thead>
   <tbody>{items.map(item=><tr key={item.id}>
    <td><details><summary>{item.title}</summary><p>{item.detail || '來源未提供內容'}</p><AssignmentChildren item={item} onNavigate={onNavigate}/><p>指派人 {item.assigned_by?.name || '來源未提供'}{item.assignment_method ? ` · ${item.assignment_method}` : ''}</p><p>原始期限 {item.original_deadline || '未提供'}</p><p>{item.deadline_basis==='related_tasks_max' ? '節點期限取關聯任務的最晚截止日' : item.deadline_basis==='lark_task_deadline' ? '期限來自 Lark 任務截止日' : '期限來自本地工作流程'}</p></details><small>{item.kind==='node_assignment' ? '節點責任' : item.origin==='local_workflow' ? '本地 SOP' : 'Lark 任務'} · {item.case.code || '案號待核對'} · {item.case.name || '案件關聯待核對'}</small></td>

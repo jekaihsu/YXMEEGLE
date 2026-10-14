@@ -11,7 +11,7 @@ HTMLElement.prototype.scrollIntoView=function(){};
 window.scrollTo=()=>{};
 window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
-const bundle=await build({stdin:{contents:"export {default as App} from './src/App';export {parseRoute} from './src/api';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {default as App} from './src/App';export {AssignmentTable} from './src/MyWorkTable';export {parseRoute} from './src/api';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const file=new URL('./.home-target-test.mjs',import.meta.url);await fs.writeFile(file,bundle.outputFiles[0].text);let ui;try{ui=await import(file.href)}finally{await fs.unlink(file)}
 const {project,user,workspace}=projectFixture();const fixture=assignmentFixture();
 fixture.detail.tasks.push({...fixture.detail.tasks[0],id:'recTask2',title:'子任務核對'});
@@ -42,5 +42,8 @@ try{
  assert.equal(ui.parseRoute(location.hash).node,'field','child target retains its node');
  assert.equal(ui.parseRoute(location.hash).task,'recTask2','child target overrides the parent task');
  assert.equal(document.activeElement.getAttribute('data-assignment-task'),'recTask2');
+ for(const tab of document.querySelectorAll('.project-tabs button'))assert.equal(window.getComputedStyle(tab).minWidth,'44px','project tabs retain the 44px width floor');
+ await flush(()=>root.render(React.createElement(ui.AssignmentTable,{items:[],onNavigate(){}})));
+ assert.equal(document.querySelector('[aria-label="工作表格，可左右捲動"]').getAttribute('role'),'region');
  console.log('PASS home panel click through real App go and parseRoute expands field and focuses recTask1');
 }finally{await act(async()=>root.unmount())}

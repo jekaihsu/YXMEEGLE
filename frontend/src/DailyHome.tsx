@@ -171,7 +171,7 @@ export function PanelStatus({read}:{read:PanelRead}) {
  const body=read.body;
  if (!body) return read.pending ? <Skeleton lines={3}/> : <p role="status">工作來源暫時無法讀取</p>;
  const time=body.as_of ? new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(body.as_of)) : null;
- if(!time && !read.pending && !read.error && body.readState!=='partial' && body.freshness.status!=='stale')return null;
+ if(!time && !read.pending && !read.error && body.complete && body.readState!=='partial' && body.freshness.status!=='stale')return null;
  return <small className="my-work-banner-as-of">{time ? `更新於 ${time}` : '尚無成功讀取時間'}{read.pending ? ' · 正在更新清單' : read.error ? ' · 上次資料，更新失敗' : body.freshness.status==='stale' ? ' · 上次資料' : ''}{!body.complete ? ' · 來源尚未完整' : ''}</small>;
 }
 export function HomePanelSection({c,panel,title,scope='mine',onManager}:{c:Ctx;panel:HomePanel;title:string;scope?:'mine'|'team';onManager?:(allowed:boolean)=>void}) {
