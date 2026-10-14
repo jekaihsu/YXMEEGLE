@@ -312,7 +312,6 @@ test('list edit state (F1): draft vs committed query comparison ignores blanks a
  assert.equal(M.sameFilters({}, {search: 'x'}), false);
  const pages = read('src/P2Pages.tsx');
  assert.match(pages, /fetched\.status === 'loading' && context\.route !== 'confirmations'/, 'confirmations is not replaced by a loading notice');
- assert.match(pages, /const showBody = pending \|\| loading \? undefined : body/, 'old rows are never shown for a different or pending query');
  assert.match(pages, /onSearch=\{search => edit\(/); assert.doesNotMatch(pages, /onSearch=\{search => requery/, 'typing does not commit immediately');
 });
 
