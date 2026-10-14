@@ -228,7 +228,7 @@ def test_test_session_never_calls_roster_even_when_person_is_stale(tmp_path):
     assert app.state.live_read.queue_depth==0
 
 
-@pytest.mark.parametrize('kind,expected', [('bootstrap', 'tenant-read'), ('grant', 'normal'), ('member', 'tenant-read'), ('fresh_member', 'normal')])
+@pytest.mark.parametrize('kind,expected', [('bootstrap', 'recovery'), ('grant', 'normal'), ('member', 'tenant-read'), ('fresh_member', 'normal')])
 def test_oauth_failed_roster_preserves_access_policy(tmp_path,monkeypatch,kind,expected):
     from urllib.parse import parse_qs,urlparse
     from sqlalchemy import select

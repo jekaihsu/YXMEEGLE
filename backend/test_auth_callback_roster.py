@@ -118,6 +118,7 @@ def test_cookie_attributes_signature_public_origin_and_replay(tmp_path,monkeypat
     client=TestClient(app,base_url='https://internal')
     headers={'x-forwarded-host':'public.example','x-forwarded-proto':'https'}
     state=begin(client,'/people?tab=all',headers)
+    state_cookie=client.cookies['lark_oauth_state']
     response=client.get('/api/auth/lark/callback',params={'state':state,'code':'synthetic'},headers=headers,follow_redirects=False)
     assert response.headers['location']=='https://public.example/people?tab=all'
     cookie=next(c for c in response.headers.get_list('set-cookie') if c.startswith('meegle_session='))
@@ -127,7 +128,9 @@ def test_cookie_attributes_signature_public_origin_and_replay(tmp_path,monkeypat
     with app.state.sessions() as db:
         data=app.state.signer.loads(raw);auth=db.get(AuthRow,data['sid']).data
         assert auth['expires']-auth['token_expires']>600000
-    assert finish(client,state).status_code==400
+    client.cookies.set('lark_oauth_state',state_cookie)
+    replay=finish(client,state)
+    assert replay.status_code==400 and '已使用' in replay.json()['detail']
     client.cookies.clear();client.cookies.set('meegle_session',raw[:raw.rfind('.')+1]+('A' if raw[raw.rfind('.')+1]!='A' else 'B')+raw[raw.rfind('.')+2:])
     assert client.get('/api/workspace').status_code==401
 
@@ -225,3 +228,18 @@ def test_bootstrap_manager_keeps_roster_recovery_after_oauth(tmp_path, monkeypat
     assert calls == [('lark-company', 'u-manager')]
     assert client.get('/api/admin/runtime-health').status_code == 200
     assert client.post('/api/actions', json={'action': 'admin_person', 'version': 1, 'request_id': 'recovery'}).status_code == 403
+
+
+def test_tenant_only_identity_cannot_read_test_workspace(tmp_path, monkeypatch):
+    app, _ = production_client(tmp_path, enabled=False)
+    oauth(monkeypatch)
+    client = TestClient(app)
+    assert finish(client, begin(client)).status_code == 307
+    cookie = app.state.signer.loads(client.cookies['meegle_session'])
+    with app.state.sessions.begin() as db:
+        auth = db.get(AuthRow, cookie['sid'])
+        auth.data = {**auth.data, 'wid': 'test-lark-company'}
+    client.cookies.clear()
+    client.cookies.set('meegle_session', app.state.signer.dumps({**cookie, 'wid': 'test-lark-company'}))
+    assert client.get('/api/workspace').status_code == 403
+    assert client.get('/api/session').json()['user'] is None

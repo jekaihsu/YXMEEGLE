@@ -921,6 +921,7 @@ def create_app(overrides=None):
         pre=case_redaction.snapshot(state)
         filter_visible_cases(state)
         filter_private_workspace(state,user)
+        restrict_hr(state,user)
         if state.get('environment') not in ('test','demo'):
             case_redaction.apply(state,case_redaction.make_plan(pre,state))
         states=(page or {}).get('states') if isinstance(page,dict) else None

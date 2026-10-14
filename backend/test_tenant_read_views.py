@@ -83,3 +83,34 @@ def test_tenant_patterns_do_not_accept_extra_segments(tenant_views, path):
     assert not tenant_read_allowed(user, app.state.cfg, 'lark-company', 'GET', path)
     assert tenant_read_allowed(user, app.state.cfg, 'lark-company', 'GET', '/api/projects/id')
     assert not tenant_read_allowed(user, app.state.cfg, 'lark-company', 'POST', '/api/projects/id')
+
+
+@pytest.mark.parametrize('template', ['/api/manager-overview', '/api/confirmations', '/api/case-detail/{vis}',
+                                     '/api/contract-detail?key={contract}', '/api/work-item-detail?key={work}'])
+def test_hr_viewers_controls_person_labels_in_p2_views(tenant_views, template):
+    from .app import PersonRow
+    app, client, ids = tenant_views
+    with app.state.sessions.begin() as db:
+        person = db.get(PersonRow, ('lark-company', 'u-pm'))
+        person.data = {**person.data, 'name': 'HR_PRIVATE_PM_SENTINEL'}
+        row = db.get(WorkspaceRow, 'lark-company')
+        state = storage.load(db, BusinessRow, row)
+        task = next(p for p in state['projects'] if p['id'] == ids['vis'])['nodes'][0]['tasks'][0]
+        task.update(owner_id='u-pm', source_identity={'base_token': B, 'table_id': WT, 'record_id': 'recW1'})
+        row.data = storage.save(db, BusinessRow, row.id, state)
+    # Manager overview resolves the current stored PM name from users.
+    full = client.get('/api/manager-overview')
+    assert full.status_code == 200 and 'HR_PRIVATE_PM_SENTINEL' in full.text
+    if template.startswith('/api/work-item-detail'):
+        assert 'HR_PRIVATE_PM_SENTINEL' in client.get(template.format(**ids)).text
+    app.state.cfg['HR_VIEWERS'] = 'someone-else'
+    response = client.get(template.format(**ids))
+    assert response.status_code == 200, response.text
+    assert 'HR_PRIVATE_PM_SENTINEL' not in response.text
+    assert_no_amount(response)
+    if template == '/api/manager-overview':
+        case = next(c for c in response.json()['snapshot']['cases'] if c['project_id'] == ids['vis'])
+        assert case['responsible']['value'] is None
+        assert case['details']['pm_id'] is None
+    app.state.cfg['HR_VIEWERS'] = 'u-tenant'
+    assert 'HR_PRIVATE_PM_SENTINEL' in client.get('/api/manager-overview').text
