@@ -38,20 +38,23 @@ export function useNodeAssignments(projectId: string) {
     const scope = lifecycle.current;
     const mutationCurrent = () => !scope.controller.signal.aborted && scope.epoch === getSessionEpoch();
     const attempt = retryAttempt.current && JSON.stringify(retryAttempt.current.mutation) === JSON.stringify(mutation) ? retryAttempt.current : {mutation, id: requestId()};
-    retryAttempt.current = null;
+    retryAttempt.current = attempt;
     mutating.current = true; setPending(mutation.action); setError(null); setNotice('');
     try {
       await mutateNodeAssignment(projectId, mutation, scope.controller.signal, mutationCurrent, attempt.id);
+      retryAttempt.current = null;
       if (!mutationCurrent()) return false;
       setNotice('已儲存變更。'); await reload(); return true;
     } catch (failure) {
+      const uncertain = !(failure instanceof NodeAssignmentError) || failure.status === 408 || failure.code === 'client_timeout' || failure.code === 'outcome_unknown' || failure.code === 'readback_mismatch';
+      if (!uncertain) retryAttempt.current = null;
       if (!mutationCurrent()) return false;
       if (assignmentsDisabled(failure)) {setState({kind: 'disabled'}); return false}
       if (failure instanceof NodeAssignmentError && failure.code === 'revision_conflict') {
         setNotice('資料已被他人更新，已為你重新載入'); await reload();
       } else {
-        if (failure instanceof NodeAssignmentError && (failure.code === 'outcome_unknown' || failure.code === 'readback_mismatch')) retryAttempt.current = attempt;
         setError(failure instanceof NodeAssignmentError ? failure : new NodeAssignmentError(0, assignmentErrorMessage(failure)));
+        if (failure instanceof NodeAssignmentError && failure.status === 404) await reload();
       }
       return false;
     } finally {mutating.current = false; if (mutationCurrent()) setPending('')}

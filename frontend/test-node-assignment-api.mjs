@@ -89,3 +89,12 @@ test('mutation returns the parsed full detail envelope', async () => {
   const detail = await api.mutateNodeAssignment('p1', {action: 'update_task', nodeKey: 'control', taskId: 'recTask1', expected_revision: '9b0c1d2e3f405162', patch: {status: '已完成'}}, signal, () => true);
   assert.equal(detail.record_id, 'recTask1'); assert.equal(detail.node.revision, '3f2a9c0d1b7e4a55'); assert.equal(detail.tasks[0].revision, '9b0c1d2e3f405162'); assert.equal(requests.at(-1).body.expected_revision, '9b0c1d2e3f405162');
 });
+
+test('string invalid detail survives and ordinary 404 does not disable assignments', async () => {
+  for (const [status, code, detail] of [[422, 'invalid', '請選擇任務所屬部門'], [404, 'not_found', '沒有這個任務']]) {
+    response = {status, body: {code, detail}};
+    await assert.rejects(api.mutateNodeAssignment('p1', {action: 'claim', nodeKey: 'control', expected_revision: null}, signal, () => true), error => {
+      assert.equal(error.message, detail); assert.equal(api.assignmentsDisabled(error), false); return true;
+    });
+  }
+});

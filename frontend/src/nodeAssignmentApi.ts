@@ -94,9 +94,11 @@ async function request(url: string, init: RequestInit, isCurrent: () => boolean)
   catch (error) {
     if (!(error instanceof ApiError)) throw error;
     const fields: Record<string, string> = {};
+    let message = error.message;
     if (error.status === 422) {
       let detail: unknown;
       try {detail = JSON.parse(error.message)} catch {detail = error.message}
+      message = typeof detail === 'string' ? detail : '請檢查欄位內容後再試。';
       if (Array.isArray(detail)) for (const item of detail) {
         if (item && typeof item === 'object' && 'loc' in item && Array.isArray(item.loc) && 'msg' in item && typeof item.msg === 'string') {
           const field = item.loc.at(-1); if (typeof field === 'string') fields[field] = item.msg;
@@ -104,7 +106,7 @@ async function request(url: string, init: RequestInit, isCurrent: () => boolean)
       }
       else if (detail && typeof detail === 'object') for (const [field, message] of Object.entries(detail)) if (typeof message === 'string') fields[field] = message;
     }
-    throw new NodeAssignmentError(error.status, error.status === 422 ? '請檢查欄位內容後再試。' : error.message, error.code, fields);
+    throw new NodeAssignmentError(error.status, message, error.code, fields);
   }
 }
 export async function fetchNodeAssignments(projectId: string, signal: AbortSignal, isCurrent: () => boolean): Promise<NodeAssignmentList> {
@@ -161,4 +163,4 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 export const assignmentErrorMessage = (error: unknown) => error instanceof NodeAssignmentError && error.code && ERROR_MESSAGES[error.code]
   ? ERROR_MESSAGES[error.code] : error instanceof Error ? error.message : '節點資料讀取失敗，請稍後重試。';
-export const assignmentsDisabled = (error: unknown) => error instanceof NodeAssignmentError && (error.status === 404 || error.code === 'disabled');
+export const assignmentsDisabled = (error: unknown) => error instanceof NodeAssignmentError && error.code === 'disabled';

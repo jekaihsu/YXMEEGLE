@@ -26,7 +26,7 @@ async function mount(options = {}) {
   if (options.change) options.change(fixture);
   globalThis.fetch = async (url, init = {}) => {
     const request = {url, method: init.method || 'GET', body: init.body ? JSON.parse(init.body) : null}; requests.push(request);
-    if (request.method !== 'GET') {if (holdMutation) await holdMutation; return mutationReply ? reply(mutationReply.body, mutationReply.status) : reply({...fixture.detail, record_id: fixture.detail.node.record_id})}
+    if (request.method !== 'GET') {if (holdMutation) await holdMutation; if (options.mutationFailure) throw options.mutationFailure(); return mutationReply ? reply(mutationReply.body, mutationReply.status) : reply({...fixture.detail, record_id: fixture.detail.node.record_id})}
     if (url.includes('/node-assignments/nodes/')) return detailReply ? reply(detailReply.body, detailReply.status) : reply({...fixture.detail, can: fixture.list.can.control, node: fixture.list.nodes.find(n => url.endsWith(`/nodes/${n.key}`))});
     if (url.endsWith('/node-assignments')) return listReply ? reply(listReply.body, listReply.status) : reply(fixture.list);
     return reply({detail: 'disabled'}, 404);
@@ -212,8 +212,9 @@ test('initial loading leaves the legacy flow available', async () => {
   await mount(); let release; const waiting = new Promise(resolve => {release = resolve});
   globalThis.fetch = async () => {await waiting; return reply(assignmentFixture().list)};
   await act(async () => root.render(React.createElement(ui.NodeAssignments, {key: 'loading', projectId: 'p1', legacy: React.createElement('div', {id: 'legacy-flow'}, '原有案件流程與任務')})));
-  assert.equal(document.querySelector('.na-loading').textContent, '正在讀取節點指派…'); assert.equal(document.getElementById('legacy-flow').textContent, '原有案件流程與任務');
-  await act(async () => release()); assert.equal(document.querySelector('.na-summary-count').textContent, '4/9');
+  try {assert.ok(!document.querySelector('.na-loading')); assert.equal(document.getElementById('legacy-flow').textContent, '原有案件流程與任務')}
+  finally {await act(async () => release())}
+  await act(async () => {}); assert.equal(document.querySelector('.na-summary-count').textContent, '4/9');
 });
 test('write gate disables mutations and displays the server reason', async () => {
   await mount({change: f => {f.list.writes_enabled = false; f.list.writes_disabled_reason = 'external_enabled 已關閉'}}); await expand();
@@ -255,4 +256,49 @@ test('node revisions come from detail and refresh before the next action', async
   await expand(); await click(button('認領節點')); assert.equal(mutations()[0].body.expected_revision, 'aaaaaaaaaaaaaaaa');
   fixture.list.nodes.find(n => n.key === 'control').revision = 'bbbbbbbbbbbbbbbb';
   await click(button('重新讀取')); await click(button('完成節點')); assert.equal(mutations()[1].body.expected_revision, 'bbbbbbbbbbbbbbbb');
+});
+
+test('non-assignable owners are excluded from assignment submissions', async () => {
+  await mount({change: f => {f.detail.assignable_people = f.detail.assignable_people.slice(0, 1)}}); await expand(); await click(button('指派負責人'));
+  await click(button('儲存指派')); assert.deepEqual(mutations()[0].body.owner_open_ids, ['ou_anna']);
+});
+test('managers can create unassigned tasks in a node department', async () => {
+  await mount({change: f => {f.detail.node.departments = ['外業', '水深A']}}); await expand(); await click(button('新增任務'));
+  assert.ok(text().includes('未選擇則建立未指派任務')); assert.equal(text().includes('未選擇則由自己負責'), false);
+  assert.deepEqual([...formControl('部門').options].map(o => o.value), ['', '外業', '水深A']);
+  await input(formControl('任務名稱'), '未指派任務'); await input(formControl('部門'), '水深A'); await click(button('建立任務'));
+  assert.equal(mutations()[0].body.department, '水深A'); assert.equal('assignee_open_id' in mutations()[0].body, false);
+});
+test('missing tasks show the server message and refresh without disabling the panel', async () => {
+  await mount({mutationReply: {status: 404, body: {code: 'not_found', detail: '此節點沒有這個任務，請重新整理'}}}); await expand(); await input(document.querySelector('.na-task-status select'), '已完成');
+  assert.equal(document.querySelectorAll('.na-row').length, 9); assert.ok(text().includes('此節點沒有這個任務，請重新整理'));
+  assert.equal(requests.filter(r => r.url.endsWith('/node-assignments')).length, 2);
+});
+test('string validation detail is displayed in the task form', async () => {
+  await mount({mutationReply: {status: 422, body: {code: 'invalid', detail: '請選擇任務所屬部門'}}}); await expand(); await click(button('新增任務'));
+  await input(formControl('任務名稱'), '任務'); await click(button('建立任務')); assert.ok(text().includes('請選擇任務所屬部門'));
+});
+for (const kind of ['timeout', 'network', 'abort']) test(`${kind} retries retain the ID for the same form and replace it for changed values`, async () => {
+  let fail = true;
+  const timer = globalThis.setTimeout;
+  if (kind === 'timeout') globalThis.setTimeout = (fn, ms, ...args) => timer(fn, ms === 20000 ? 1 : ms, ...args);
+  try {
+    await mount({mutationFailure: () => kind === 'abort' ? new DOMException('aborted', 'AbortError') : new TypeError('Failed to fetch')});
+    const fetch = globalThis.fetch;
+    globalThis.fetch = (url, init) => init?.method === 'POST' && kind === 'timeout' && fail ? new Promise(() => {requests.push({url, method: 'POST', body: JSON.parse(init.body)})}) : fetch(url, init);
+    await expand(); await click(button('新增任務')); await input(formControl('任務名稱'), '任務'); await click(button('建立任務'));
+    if (kind === 'timeout') await act(async () => {await new Promise(resolve => timer(resolve, 10))});
+    await click(button('建立任務'));
+    if (kind === 'timeout') await act(async () => {await new Promise(resolve => timer(resolve, 10))});
+    assert.deepEqual(mutations()[1].body, mutations()[0].body);
+    await input(formControl('任務名稱'), '不同任務'); await click(button('建立任務'));
+    if (kind === 'timeout') await act(async () => {await new Promise(resolve => timer(resolve, 10))});
+    assert.notEqual(mutations()[2].body.request_id, mutations()[0].body.request_id); fail = false;
+  } finally {globalThis.setTimeout = timer}
+});
+for (const status of [403, 409, 422]) test(`definitive ${status} clears the retained attempt`, async () => {
+  await mount({mutationReply: {status: 502, body: {code: 'outcome_unknown', detail: '未知'}}}); await expand(); await click(button('認領節點'));
+  mutationReply = {status, body: {code: 'invalid', detail: '拒絕'}}; await click(button('認領節點'));
+  assert.equal(mutations()[1].body.request_id, mutations()[0].body.request_id);
+  await click(button('認領節點')); assert.notEqual(mutations()[2].body.request_id, mutations()[0].body.request_id);
 });
