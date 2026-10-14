@@ -5,10 +5,11 @@ import {buildManagerOverviewView} from './managerOverviewView';
 import {buildSourceHealthView} from './sourceHealthView';
 import {buildConfirmationListView} from './confirmationListView';
 import {myWorkInput, sourceHealthInput} from './integrationRoutes';
-import {buildPmGlanceView, pmGlanceVisible, staleReaders, TILE_STATE_LABELS} from './pmGlanceView';
+import {buildPmGlanceView, staleReaders, TILE_STATE_LABELS} from './pmGlanceView';
 import type {TileReader} from './pmGlanceView';
 import type {Fetched} from './IntegratedPages';
 import type {Ctx} from './appCommon';
+import {pmGlanceVisible} from './pmGlanceConfig';
 import './pm-glance.css';
 
 const bodyOf = (read: Fetched): unknown => read.status === 'ok' ? read.body : undefined;

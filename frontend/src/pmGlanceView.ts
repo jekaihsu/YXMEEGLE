@@ -5,10 +5,6 @@ import type {SourceHealthView} from './sourceHealthView';
 import type {ConfirmationListView} from './confirmationListView';
 import {encodeReturnContext} from './myWorkView.ts';
 
-// Replace '*' with ['pm'] when the owner enables PM-only access.
-export const PM_GLANCE_ROLES: readonly string[] = ['*'];
-export const pmGlanceVisible = (role: string | undefined, roles = PM_GLANCE_ROLES): boolean =>
- !!role && (roles.includes('*') || roles.includes(role));
 export type TileState = 'ok' | 'stale' | 'failed' | 'needs-permission' | 'unknown';
 export type TileReader = 'work' | 'overview' | 'sources' | 'confirmations';
 export type GlanceTile = {

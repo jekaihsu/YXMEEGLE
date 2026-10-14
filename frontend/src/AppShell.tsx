@@ -1,7 +1,7 @@
 import { Bell, CalendarDays, ChevronDown, ChevronRight, Loader2, Menu, Network, RefreshCw, TriangleAlert, X } from 'lucide-react';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { BarChart3, ClipboardList, Clock3, FolderOpen, Gauge, GitBranch, LayoutDashboard, ListTodo, PanelLeftClose, Settings2 } from 'lucide-react';
-import {pmGlanceVisible} from './pmGlanceView';
+import {pmGlanceVisible} from './pmGlanceConfig';
 import { DataFreshness } from './DataFreshness';
 import { getSessionEpoch } from './api';
 import { useDialogFocus } from './useDialogFocus';

@@ -16,8 +16,7 @@ import {MentionInbox} from './MentionInbox';
 import {Picker,Segmented} from './design';
 import {AppearanceControl} from './design/AppearanceControl';
 import {AppShell, Avatar, ROLE} from './AppShell';
-import {PmGlancePage} from './PmGlance';
-import {pmGlanceVisible} from './pmGlanceView';
+import {pmGlanceVisible} from './pmGlanceConfig';
 import {LegacyTabs, SourceHealthPage, WorkPage} from './IntegratedPages';
 import {isLegacyTab} from './integrationRoutes.ts';
 import {isP2View, p2ActiveNav} from './p2RouteNames.ts';
@@ -40,6 +39,7 @@ const ProjectDetailGate = lazy(() => import('./ProjectDetail').then(module => ({
 const MyWorkBoard = lazy(() => import('./MyWorkBoard').then(module => ({default: module.MyWorkBoard})));
 const TaskTimeline = lazy(() => import('./TaskTimeline'));
 const MY_WORK_LAYOUT='yx.mywork.layout';
+const PmGlancePage = lazy(() => import('./PmGlance').then(module => ({default: module.PmGlancePage})));
 const P2Page = lazy(() => import('./P2Pages').then(module => ({default: module.P2Page})));
 const CompanyCockpit = lazy(() => import('./CompanyCockpit').then(module => ({default: module.CompanyCockpit})));
 
@@ -111,7 +111,7 @@ export default function App(){
   {toast&&<div className="toast glass" role="status" aria-live="polite"><CircleCheck size={18}/>{toast}</div>}
   {sessionOpen&&s&&<Modal title={s.mode==='demo'?'切換示範角色':'目前登入身份'} subtitle="角色會影響可操作的案件、節點及子任務。" onClose={()=>setSessionOpen(false)}><div className="modal-body"><AppearanceControl/></div>{s.mode==='demo'?<div className="role-list">{s.users.map(u=><button key={u.id} disabled={busy} className={`role-option ${u.id===s.user?.id?'selected':''}`} onClick={()=>void switchUser(u.id)}><Avatar user={u}/><span><strong>{u.name}</strong><small>{u.department} · {ROLE[u.role]||u.role}</small></span>{u.id===s.user?.id?<Check size={18}/>:<ChevronRight size={16}/>}</button>)}</div>:<div className="modal-body"><p>目前為 Lark 登入，使用者身份由登入帳號決定。</p><p>{s.environment==='test'?'目前在獨立測試區，來源與正式案件分開。':'目前在公司正式工作區。'}</p><button className="button" onClick={()=>{setSessionOpen(false);go({view:'admin',tab:'settings'})}}>切換工作區</button><button className="button" disabled={busy} onClick={()=>void logout()}>登出</button></div>}</Modal>}
   </>}>
-   {c&&<>{route.view==='pm-glance'&&<PmGlancePage c={c}/>}{route.view==='company'&&<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在準備公司駕駛艙…</p></div>}><CompanyCockpit refreshVersion={workspaceReload} role={c.s.user?.role} freshness={c.w.freshness}/></Suspense>}{route.view==='dashboard'&&(c.w.scope==='shell'?<ShellDashboard c={c}/>:<Dashboard c={c}/>)}{route.view==='projects'&&<Projects c={c}/>}{route.view==='work'&&(isLegacyTab(route,'work')?<><LegacyTabs c={c} view="work"/><FullWorkspaceGate c={c}>{fc=><MyWork c={fc}/>}</FullWorkspaceGate></>:<WorkPage c={c}/>)}{route.view==='people'&&<PeopleAttendancePanel c={c}/>} {route.view==='schedule'&&<FullWorkspaceGate c={c}>{fc=><Schedule c={fc}/>}</FullWorkspaceGate>}{route.view==='project'&&<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在開啟案件…</p></div>}><ProjectDetailGate c={c}/></Suspense>}{route.view==='approvals'&&<FullWorkspaceGate c={c}>{fc=><Approvals c={fc}/>}</FullWorkspaceGate>}{route.view==='sources'&&(isLegacyTab(route,'sources')?<><LegacyTabs c={c} view="sources"/><Sources c={c}/></>:<SourceHealthPage c={c}/>)}<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在載入頁面…</p></div>}>{isP2View(route.view)&&<P2Page c={c}/>}</Suspense>{route.view==='admin'&&<FullWorkspaceGate c={c}>{fc=><Administration c={fc}/>}</FullWorkspaceGate>} {route.view==='routines'&&<FullWorkspaceGate c={c}>{fc=><Routines c={fc}/>}</FullWorkspaceGate>}</>}
+   {c&&<>{route.view==='company'&&<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在準備公司駕駛艙…</p></div>}><CompanyCockpit refreshVersion={workspaceReload} role={c.s.user?.role} freshness={c.w.freshness}/></Suspense>}{route.view==='dashboard'&&(c.w.scope==='shell'?<ShellDashboard c={c}/>:<Dashboard c={c}/>)}{route.view==='projects'&&<Projects c={c}/>}{route.view==='work'&&(isLegacyTab(route,'work')?<><LegacyTabs c={c} view="work"/><FullWorkspaceGate c={c}>{fc=><MyWork c={fc}/>}</FullWorkspaceGate></>:<WorkPage c={c}/>)}{route.view==='people'&&<PeopleAttendancePanel c={c}/>} {route.view==='schedule'&&<FullWorkspaceGate c={c}>{fc=><Schedule c={fc}/>}</FullWorkspaceGate>}{route.view==='project'&&<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在開啟案件…</p></div>}><ProjectDetailGate c={c}/></Suspense>}{route.view==='approvals'&&<FullWorkspaceGate c={c}>{fc=><Approvals c={fc}/>}</FullWorkspaceGate>}{route.view==='sources'&&(isLegacyTab(route,'sources')?<><LegacyTabs c={c} view="sources"/><Sources c={c}/></>:<SourceHealthPage c={c}/>)}<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在載入頁面…</p></div>}>{route.view==='pm-glance'&&<PmGlancePage c={c}/>}{isP2View(route.view)&&<P2Page c={c}/>}</Suspense>{route.view==='admin'&&<FullWorkspaceGate c={c}>{fc=><Administration c={fc}/>}</FullWorkspaceGate>} {route.view==='routines'&&<FullWorkspaceGate c={c}>{fc=><Routines c={fc}/>}</FullWorkspaceGate>}</>}
  </AppShell></DraftNamespace.Provider>
 }
 
