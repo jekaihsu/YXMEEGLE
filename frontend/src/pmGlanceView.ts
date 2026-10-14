@@ -3,10 +3,14 @@ import type {MyWorkView} from './myWorkView.ts';
 import type {ManagerOverviewView} from './managerOverviewView';
 import type {SourceHealthView} from './sourceHealthView';
 import type {ConfirmationListView} from './confirmationListView';
+import {attendanceValue, attendanceStatusLabel} from './peopleAttendance.ts';
+import type {PeopleAttendance} from './peopleAttendance.ts';
+import {taipeiTime} from './taipeiTime.ts';
 import {encodeReturnContext} from './myWorkView.ts';
 
 export type TileState = 'ok' | 'stale' | 'failed' | 'needs-permission' | 'unknown';
-export type TileReader = 'work' | 'overview' | 'sources' | 'confirmations';
+export type TileReader = 'work' | 'overview' | 'sources' | 'confirmations' | 'attendance';
+export type AttendanceRead = {kind: 'loading'} | {kind: 'ready'; view: PeopleAttendance} | {kind: 'failed'};
 export type GlanceTile = {
  id: string; title: string; value: string; asOf: string; state: TileState; reason: string;
  href: string; reader: TileReader | null;
@@ -25,9 +29,24 @@ export function tileState(states: readonly DataStateName[] | undefined): TileSta
 const workHref = (mode: MyWorkView['mode']) => `#view=work&ctx=${encodeURIComponent(encodeReturnContext({mode}))}`;
 const countText = (count: number | null, state: TileState): string =>
  (state === 'ok' || state === 'stale') && count !== null ? String(count) : '—';
+const ATTENDANCE_TILE_STATES: Record<PeopleAttendance['status'], TileState> = {
+ loading: 'unknown', ok: 'ok', incomplete: 'unknown', stale: 'stale', 'needs-permission': 'needs-permission', 'not-connected': 'unknown', 'read-failed': 'failed',
+};
+export function attendanceTiles(read: AttendanceRead): GlanceTile[] {
+ const view = read.kind === 'ready' ? read.view : undefined;
+ const state = read.kind === 'failed' ? 'failed' : view ? ATTENDANCE_TILE_STATES[view.status] : 'unknown';
+ const reason = read.kind === 'failed' ? '讀取失敗，請開啟人員與出勤明細。' : view ?
+  [attendanceStatusLabel[view.status], view.week_start && view.week_end ? `${view.week_start} 至 ${view.week_end}` : '', view.incomplete ? '資料不完整，空白不代表沒有請假或出差。' : '',
+   view.refreshing ? '正在更新' : '', view.missing_scopes.length ? `缺少唯讀權限：${view.missing_scopes.join('、')}` : ''].filter(Boolean).join(' · ') : '讀取中';
+ const metrics: [string, string, number | null | undefined][] = [['leave', '本週請假', view?.summary.on_leave], ['trips', '本週出差', view?.summary.on_trip]];
+ return metrics.map(([id, title, value]) => ({
+  id, title, state, value: state === 'ok' || state === 'stale' ? attendanceValue(value) : '—',
+  asOf: `資料日期 ${taipeiTime(view?.as_of)}`, reason, href: '#view=people', reader: 'attendance',
+ }));
+}
 export function buildPmGlanceView(input: {
  work: MyWorkView; awaiting: MyWorkView; overview: ManagerOverviewView;
- sources: SourceHealthView; confirmations: ConfirmationListView;
+ sources: SourceHealthView; confirmations: ConfirmationListView; attendance: AttendanceRead;
 }): GlanceTile[] {
  const {work, awaiting, overview, sources, confirmations} = input;
  const workTile = (view: MyWorkView, id: string, title: string): GlanceTile => {
@@ -51,8 +70,7 @@ export function buildPmGlanceView(input: {
   workTile(work, 'work', '我的工作'),
   {id: 'sources', title: '來源新鮮度', state: sourceState, value: '—', asOf: '資料日期 —', reason: sources.page.statusLabel + '。' + sources.page.explanation,
    href: '#view=sources', reader: 'sources'},
-  unavailable('leave', '本週請假', '#view=schedule', '人員與出勤資料尚未提供（not available yet）。'),
-  unavailable('trips', '本週出差', '#view=schedule', '人員與出勤資料尚未提供（not available yet）。'),
+  ...attendanceTiles(input.attendance),
   unavailable('workload', '各組工作量', '#view=overview', '各組工作量尚未可確認。'),
   {id: 'confirmations', title: '工程確認單', state: listState,
    value: (listState === 'ok' || listState === 'stale') && confirmations.footer.matching.reason === null ? confirmations.footer.matching.label : '—',

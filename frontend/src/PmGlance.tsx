@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {useFetched} from './IntegratedPages';
 import {buildMyWorkView} from './myWorkView';
 import {buildManagerOverviewView} from './managerOverviewView';
@@ -10,6 +10,9 @@ import type {TileReader} from './pmGlanceView';
 import type {Fetched} from './IntegratedPages';
 import type {Ctx} from './appCommon';
 import {pmGlanceVisible} from './pmGlanceConfig';
+import {useViewData} from './viewData';
+import {fetchPeopleAttendance, parsePeopleAttendance, taipeiWeek} from './peopleAttendance';
+import {ApiError} from './api';
 import './pm-glance.css';
 
 const bodyOf = (read: Fetched): unknown => read.status === 'ok' ? read.body : undefined;
@@ -18,13 +21,26 @@ export function PmGlancePage({c}: {c: Ctx}) {
  return pmGlanceVisible(c.s.user?.role) ? <GlanceReads c={c}/> : <p role="status">此角色尚未開放 PM 一覽。</p>;
 }
 function GlanceReads({c}: {c: Ctx}) {
- const [retries, setRetries] = useState<Record<TileReader, number>>({work: 0, overview: 0, sources: 0, confirmations: 0});
+ const [retries, setRetries] = useState<Record<TileReader, number>>({work: 0, overview: 0, sources: 0, confirmations: 0, attendance: 0});
  const version = c.reloadVersion ?? c.w.version;
  const user = c.s.user?.id;
  const work = useFetched('/api/my-work', `${version}|${retries.work}`, user);
  const overview = useFetched('/api/manager-overview', `${version}|${retries.overview}`, user);
  const sources = useFetched('/api/source-health', `${version}|${retries.sources}`, user);
  const confirmations = useFetched('/api/confirmations', `${version}|${retries.confirmations}`, user);
+ const week = taipeiWeek();
+ const attendance = useViewData(`people-attendance:${user}:${week}`, async (signal, current) => {
+  try {return await fetchPeopleAttendance({week, signal, current})}
+  catch (error) {
+   if (error instanceof ApiError && error.status === 403) return parsePeopleAttendance({status: 'needs-permission'});
+   throw error;
+  }
+ }, [version, retries.attendance]);
+ useEffect(() => {
+  if (attendance.loading || attendance.error || !attendance.data || !(attendance.data.refreshing || attendance.data.status === 'loading')) return;
+  const timer = setTimeout(attendance.reload, 2000);
+  return () => clearTimeout(timer);
+ }, [attendance.data, attendance.loading, attendance.error, attendance.reload]);
  const manager = buildManagerOverviewView({body: bodyOf(overview)});
  if (overview.status !== 'ok') {
   // The existing model owns unknown counts; transport supplies only its failure state.
@@ -32,6 +48,7 @@ function GlanceReads({c}: {c: Ctx}) {
    overview.status === 'error' ? {states: ['read_failed'], count: null} : {states: ['loading'], count: null};
  }
  const tiles = buildPmGlanceView({
+  attendance: attendance.error ? {kind: 'failed'} : attendance.data ? {kind: 'ready', view: attendance.data} : {kind: 'loading'},
   work: buildMyWorkView(myWorkInput(work, {mode: 'todo', search: '', selectedId: null})),
   awaiting: buildMyWorkView(myWorkInput(work, {mode: 'awaiting_my_confirmation', search: '', selectedId: null})),
   overview: manager,
