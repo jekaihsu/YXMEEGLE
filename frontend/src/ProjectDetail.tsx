@@ -17,7 +17,7 @@ import {TaskBatchCompletion} from './TaskBatchCompletion';
 import {draftKey, useDraft} from './drafts';
 import {lifecycleGate} from './sourceLifecycle';
 import {type Approval, type Node, type Project, type Task, type Workspace} from './types';
-import {Ctx,active,progress,date,nameOf,money,points,openTask,TaskIcon,isLate,shortDate,Empty,EventList,ProjectSlice,Badge,NODE_NAMES,elapsed,isProjectLead,Primary,TaskTable,safeUrl,num,taskReadiness,isTaskActor,allTasks,Modal,STATUS,Field,TaskRow,OwnerSelect,eventMessage,stamp,unmatchedDaily} from './appCommon';
+import {Ctx,active,progress,date,nameOf,money,points,sourceTaskNote,openTask,TaskIcon,isLate,shortDate,Empty,EventList,ProjectSlice,Badge,NODE_NAMES,elapsed,isProjectLead,Primary,TaskTable,safeUrl,num,taskReadiness,isTaskActor,allTasks,Modal,STATUS,Field,TaskRow,OwnerSelect,eventMessage,stamp,unmatchedDaily} from './appCommon';
 import {NextAction} from './DailyHome';
 import {Badge as Tag,DisabledActionReasons,Button,Progress,Row,Section,Skeleton,Stat} from './design';
 import './ProjectDetail.css';
@@ -33,7 +33,7 @@ export function CaseOverview({c,p}:{c:Ctx;p:Project}){
  const overdueCount=tasks.filter(r=>isLate(r.t,c.w.as_of)).length;
  const facts:[string,string][]=[['案件性質',p.case_type==='intake'?'待確認接案':'正式案件'],['有效期限',date(p.due_date)],['專案經理',nameOf(c.w,p.pm_id)],['合約金額',money(p.contract_amount)],...(p.parent_code?[['母案',p.parent_code] as [string,string]]:[])];
  return <div className="case-overview"><NextAction c={c} rows={p.nodes.flatMap(n=>n.tasks.map(t=>({p,n,t})))}/>
- <Section title={overdueCount?`待處理任務 · ${overdueCount} 項逾期`:"待處理任務"}>{tasks.slice(0,4).map(r=><Row key={r.t.id} icon={<TaskIcon status={r.t.status}/>} label={r.t.title} detail={`${r.n.name} · ${nameOf(c.w,r.t.owner_id)}`} value={isLate(r.t,c.w.as_of)?<Tag tone="critical">{shortDate(r.t.due_date)}</Tag>:shortDate(r.t.due_date)} onClick={()=>openTask(c,r)}/>)}{!tasks.length&&<Empty title="目前沒有待處理任務"/>}<Row label="全部任務" icon={<ArrowUpRight size={17}/>} onClick={()=>navigate('flow')}/></Section>
+ <Section title={overdueCount?`待處理任務 · ${overdueCount} 項逾期`:"待處理任務"}>{tasks.slice(0,4).map(r=><Row key={r.t.id} icon={<TaskIcon status={r.t.status}/>} label={r.t.title} detail={[r.n.name,nameOf(c.w,r.t.owner_id),sourceTaskNote(r.t)].filter(Boolean).join(' · ')} value={isLate(r.t,c.w.as_of)?<Tag tone="critical">{shortDate(r.t.due_date)}</Tag>:shortDate(r.t.due_date)} onClick={()=>openTask(c,r)}/>)}{!tasks.length&&<Empty title="目前沒有待處理任務"/>}<Row label="全部任務" icon={<ArrowUpRight size={17}/>} onClick={()=>navigate('flow')}/></Section>
  <Section title="案件摘要"><div className="co-progress"><Stat label="任務完成度" value={<>{progress(p)}<small>%</small></>}/><Progress value={progress(p)} label="任務完成度"/><p>{completed} / {total.length} 項任務完成</p></div>{facts.map(([k,v])=><Row key={k} label={k} value={v}/>)}<div className="co-actions"><Button variant="primary" onClick={()=>navigate('flow')}>流程與交付<ArrowRight size={16}/></Button><Button onClick={()=>navigate('quotes')}>報價（{projectQuotes(c.w,p).length}）</Button></div></Section>
  <ProjectReadiness w={c.w} p={p}/>
  <Section title="案件活動"><EventList c={c} project={p.id} limit={3}/><Row label="全部" icon={<ArrowUpRight size={17}/>} onClick={()=>navigate('logs')}/></Section>
