@@ -5,6 +5,8 @@
   flex-direction: column;
   gap: var(--sp-5, 20px);
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
   font-family: var(--font, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
   color: var(--label, #1d1d1f);
@@ -21,6 +23,9 @@
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   background: var(--surface, #ffffff);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .p2-banner.state-loading {
@@ -129,6 +134,9 @@
   align-items: center;
   padding: var(--sp-2, 8px) 0;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .p2-breadcrumb-list {
@@ -140,12 +148,17 @@
   margin: 0;
   padding: 0;
   font-size: var(--fs-subhead, 0.9375rem);
+  max-width: 100%;
+  min-width: 0;
 }
 
 .p2-breadcrumb-item {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--sp-2, 8px);
+  max-width: 100%;
+  min-width: 0;
 }
 
 .p2-breadcrumb-separator {
@@ -177,16 +190,19 @@
 
 .p2-breadcrumb-text {
   color: var(--label-2, #6e6e73);
+  overflow-wrap: anywhere;
 }
 
 .p2-breadcrumb-current {
   color: var(--label, #1d1d1f);
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .p2-breadcrumb-unresolved {
   color: var(--warning, #b25000);
   font-style: italic;
+  overflow-wrap: anywhere;
 }
 
 .p2-crumb-reason {
@@ -203,6 +219,9 @@
   background: var(--surface, #ffffff);
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   border-radius: var(--radius-m, 12px);
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .p2-header-title-row {
@@ -210,6 +229,8 @@
   align-items: center;
   flex-wrap: wrap;
   gap: var(--sp-3, 12px);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .p2-header-title {
@@ -217,6 +238,7 @@
   font-size: var(--fs-title2, 1.375rem);
   font-weight: 700;
   color: var(--label, #1d1d1f);
+  overflow-wrap: anywhere;
 }
 
 .p2-line-number-badge {
@@ -250,6 +272,10 @@
   grid-template-columns: 280px minmax(0, 1fr);
   gap: var(--sp-5, 20px);
   align-items: start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .p2-layout-with-drawer {
@@ -257,6 +283,9 @@
   gap: var(--sp-5, 20px);
   align-items: flex-start;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .p2-primary-column {
@@ -265,6 +294,9 @@
   gap: var(--sp-5, 20px);
   flex: 1 1 0;
   min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .p2-side-column {
@@ -272,7 +304,10 @@
   flex-direction: column;
   gap: var(--sp-5, 20px);
   width: 300px;
+  max-width: 100%;
+  min-width: 0;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 /* Sibling Directory Sidebar */
@@ -284,6 +319,9 @@
   background: var(--surface, #ffffff);
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   border-radius: var(--radius-m, 12px);
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .p2-directory-note {
@@ -372,6 +410,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-4, 16px);
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .p2-card-header {
@@ -380,6 +421,8 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--sp-3, 12px);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .p2-card-header-left {
@@ -463,9 +506,13 @@
 /* Semantic Table */
 .p2-table-wrapper {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   border-radius: var(--radius-s, 8px);
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
 }
 
 .p2-table-wrapper:focus-visible {
@@ -579,6 +626,11 @@
   padding-bottom: 0;
   margin-bottom: var(--sp-4, 16px);
   overflow-x: auto;
+  max-width: 100%;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
 }
 
 .p2-tab {
@@ -618,6 +670,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-5, 20px);
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .p2-tabpanel:focus,
@@ -848,6 +903,8 @@
 /* Selection-only Drawer */
 .p2-drawer {
   width: 340px;
+  max-width: 100%;
+  min-width: 0;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -867,6 +924,8 @@
   gap: var(--sp-3, 12px);
   border-bottom: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   padding-bottom: var(--sp-3, 12px);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .p2-drawer-title {
@@ -874,18 +933,23 @@
   font-size: var(--fs-headline, 1.0625rem);
   font-weight: 600;
   color: var(--label, #1d1d1f);
+  overflow-wrap: anywhere;
 }
 
 .p2-drawer-body {
   display: flex;
   flex-direction: column;
   gap: var(--sp-4, 16px);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .p2-drawer-section {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2, 8px);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .p2-drawer-section-title {
@@ -895,6 +959,7 @@
   color: var(--label-2, #6e6e73);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  overflow-wrap: anywhere;
 }
 
 .p2-drawer-def {
@@ -902,6 +967,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-2, 8px);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .p2-drawer-def div {
@@ -910,14 +977,19 @@
   justify-content: space-between;
   gap: var(--sp-3, 12px);
   font-size: var(--fs-subhead, 0.9375rem);
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .p2-drawer-def dt {
   color: var(--label-2, #6e6e73);
+  overflow-wrap: anywhere;
 }
 
 .p2-drawer-def dd {
   margin: 0;
+  color: var(--label, #1d1d1f);
   font-weight: 500;
   overflow-wrap: anywhere;
 }
@@ -1022,21 +1094,39 @@
   border: 0;
 }
 
-/* Responsive Narrow Screen Rule (<= 600px): Drawer moves below the table */
-@media (max-width: 600px) {
+/* Responsive Narrow Screen Rule:
+   At narrow widths (<= 900px), bounded grid tracks (minmax(0, 1fr)) and column layouts
+   keep primary columns, tables, tablists, and the below-table drawer within available space. */
+@media (max-width: 900px) {
   .p2-main-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .p2-layout-with-drawer {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .p2-drawer {
     width: 100%;
+    order: 2;
   }
 
   .p2-side-column {
     width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .p2-card {
+    padding: var(--sp-4, 16px);
+  }
+
+  .p2-drawer {
+    padding: var(--sp-4, 16px);
+  }
+
+  .p2-header {
+    padding: var(--sp-3, 12px) var(--sp-4, 16px);
   }
 }
