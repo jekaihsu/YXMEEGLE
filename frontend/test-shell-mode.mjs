@@ -64,13 +64,12 @@ try{
   assert.equal(document.querySelector('.notification-button i'),null);
  }
  await mount({workspace_shell:true});
- assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects?view=overview&tab=formal&sort=created&dir=desc&limit=10&offset=0']);
+ assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects?view=overview&tab=formal&sort=due&dir=asc&limit=50&offset=0']);
  assert.equal(window.shellContext.w.scope,'shell');assert.equal(rows().length,2);
  assert.ok(document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期 1'));
  assert.equal(document.querySelector('.notification-button'),null);assert.equal(window.shellContext.unmatchedDaily(window.shellContext.w),535);
  assert.equal(rows()[0].querySelector('.stage-chips').textContent,'—'); // 目前作業 no longer repeats the workflow badge shown in the status column
- assert.equal(rows()[0].querySelector('.progress-cell span').textContent,'40%');
- assert.equal(rows()[1].querySelector('.progress-cell span').textContent,'0%');
+ assert.deepEqual([...document.querySelectorAll('.projects-table thead th')].map(th=>th.textContent),['案件名稱','來源 · 工作台 · 關注','執行歸屬 · 專案經理','目前作業','有效期限','']);
  // P4-1: the dashboard renders from counts, the attention list and cards; no tree scan and no full workspace.
  await flush(()=>{location.hash='view=dashboard';window.dispatchEvent(new window.Event('hashchange'))});
  const todo=document.querySelector('.work-inbox');
@@ -86,14 +85,14 @@ try{
  await flush(()=>button('執行中').click());assert.equal(rows().length,1);assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'));
  await flush(()=>button('交付已完成').click());assert.equal(rows().length,1);assert.ok(rows()[0].textContent.includes('CASE_B'));
  await flush(()=>button('全部紀錄').click());
- const sort=document.querySelector('[aria-label="案件排序"]');await flush(()=>{sort.value='progress';sort.dispatchEvent(new Event('change',{bubbles:true}))});
- assert.ok(rows()[0].textContent.includes('CASE_B'),'shell progress defaults to ascending without nodes');
- assert.ok(requests.at(-1).url.includes('sort=progress&dir=asc&limit=10&offset=0'));
+ const sort=document.querySelector('[aria-label="案件排序"]');await flush(()=>{sort.value='created';sort.dispatchEvent(new Event('change',{bubbles:true}))});
+ assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'),'shell created sort defaults to descending without nodes');
+ assert.ok(requests.at(-1).url.includes('sort=created&dir=desc&limit=50&offset=0'));
  await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
- assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'),'explicit direction toggle still sorts descending');
- for(const value of ['due','name','progress','created']){
+ assert.ok(rows()[0].textContent.includes('CASE_B'),'explicit direction toggle sorts ascending');
+ for(const value of ['due','name','created']){
   await flush(()=>{sort.value=value;sort.dispatchEvent(new Event('change',{bubbles:true}))});
-  assert.ok(requests.at(-1).url.includes(`sort=${value}&dir=${value==='created'?'desc':'asc'}&limit=10&offset=0`),requests.at(-1).url);
+  assert.ok(requests.at(-1).url.includes(`sort=${value}&dir=${value==='created'?'desc':'asc'}&limit=50&offset=0`),requests.at(-1).url);
  }
  const cached=window.shellContext.w;await flush(()=>window.shellContext.refresh());
  assert.equal(lastShell().init.headers.get('If-None-Match'),etag);assert.equal(window.shellContext.w,cached,'304 reuses cached data');
@@ -118,13 +117,16 @@ try{
  failMutation=true;await flush(()=>window.shellContext.run('case_execution_assign',{}, {project_id:'pA'}));
  assert.ok(requests.findLast(r=>r.url!==undefined&&!r.url.startsWith('/api/projects')).url==='/api/workspace?scope=shell','409 re-reads shell');assert.ok(window.shellContext.error.includes('conflict'));
 
- // P4-2: server-side paging for 25 cards (20 formal): page 1 asks for ten rows, filters reset to page 1, stale answers are dropped.
+ // Select ten rows so the small fixture still exercises a second page.
  const many=Array.from({length:25},(_,i)=>({...shell.projects[1],id:`c${i}`,code:`CODE_${String(i).padStart(2,'0')}`,name:`NAME_${i}`,created_at:String(25-i).padStart(2,'0'),case_type:i%5===0?'intake':'formal',due_date:`2026-11-${String(i+1).padStart(2,'0')}`}));
  current={...shell,projects:many};etag='W/"shell-big"';
  await mount({workspace_shell:true});
  const pages=()=>requests.filter(r=>r.url.startsWith('/api/projects?view=overview')).map(r=>new URL(r.url,'http://x').searchParams);
- assert.equal(pages().length,1);assert.equal(pages()[0].get('limit'),'10');assert.equal(pages()[0].get('offset'),'0');
- assert.equal(rows().length,10);assert.ok(rows()[0].textContent.includes('CODE_01'));assert.ok(document.querySelector('.table-footer').textContent.includes('共 20 筆 · 第 1 / 2 頁'));
+ assert.equal(pages().length,1);assert.equal(pages()[0].get('limit'),'50');assert.equal(pages()[0].get('offset'),'0');
+ assert.equal(rows().length,20);
+ await flush(()=>{const size=document.querySelector('[aria-label="每頁筆數"]');size.value='10';size.dispatchEvent(new Event('change',{bubbles:true}))});
+ assert.equal(pages().at(-1).get('limit'),'10');assert.equal(pages().at(-1).get('offset'),'0');
+ assert.equal(rows().length,10);assert.ok(rows()[0].textContent.includes('CODE_01'));assert.ok(document.querySelector('.table-footer').textContent.includes('符合條件 20 筆 · 本頁已載入 10 筆 · 部分資料，總數未知 · 第 1 頁'));
  assert.ok(!document.querySelector('.projects-table thead').textContent.includes('合約金額'),'contract amount is not in shell cards');
  // The formal-case count moved from the removed .portfolio-index block onto the 正式案件 filter tab.
  assert.equal([...document.querySelectorAll('.portfolio-surface .tabbar button')].find(b=>b.textContent.startsWith('正式案件'))?.querySelector('span')?.textContent,'20');
