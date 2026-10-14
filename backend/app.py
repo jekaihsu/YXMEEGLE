@@ -190,6 +190,21 @@ def create_app(overrides=None):
             phases=request.scope.setdefault('phases',{}); phases[name]=phases.get(name,0)+perf_counter()-started
 
     @app.middleware('http')
+    async def callback_state_cleanup(request,call_next):
+        if request.url.path!='/api/auth/lark/callback': return await call_next(request)
+        try:
+            response=await call_next(request)
+        except Exception as exc:
+            import logging
+            from fastapi.responses import JSONResponse
+            logging.getLogger(__name__).warning('oauth_callback_failed error_class=%s',type(exc).__name__)
+            response=(RedirectResponse('/?auth_error=provider_unavailable',status_code=303)
+                      if 'text/html' in request.headers.get('accept','') else
+                      JSONResponse({'code':'provider_unavailable','detail':'Lark 登入暫時無法完成，請稍後重新登入'},status_code=503))
+        response.delete_cookie('lark_oauth_state')
+        return response
+
+    @app.middleware('http')
     async def origin_guard(request,call_next):
         started=perf_counter()
         if request.method in ('POST','PUT','PATCH','DELETE'):
