@@ -4,6 +4,7 @@ import json
 import logging
 import threading
 import time
+from collections import OrderedDict
 from concurrent.futures import Future
 from dataclasses import dataclass
 from typing import Any
@@ -53,18 +54,32 @@ def permission_failure(exc):
 
 
 class StaleCache:
-    def __init__(self, ttl, stale_max, clock=time.time):
+    def __init__(self, ttl, stale_max, clock=time.time, *, max_entries=32):
         self.ttl, self.stale_max, self.clock = ttl, stale_max, clock
-        self._entries = {}
+        if max_entries < 1:
+            raise ValueError("max_entries must be positive")
+        self.max_entries = max_entries
+        self._entries = OrderedDict()
         self._lock = threading.Lock()
         self._flights = {}
         self._versions = {}
+
+    def _evict(self, now):
+        expired = [key for key, entry in self._entries.items()
+                   if now - entry.fetched_at > self.stale_max]
+        for key in expired:
+            self._entries.pop(key)
+        while len(self._entries) > self.max_entries:
+            self._entries.popitem(last=False)
 
     def get(self, key, load, *, max_age=None, allow_stale=True, revalidate=False) -> Cached:
         now = self.clock()
         window = self.ttl if max_age is None else max_age
         with self._lock:
+            self._evict(now)
             entry = self._entries.get(key)
+            if entry:
+                self._entries.move_to_end(key)
             if entry and now - entry.fetched_at <= window:
                 return entry
             stale = allow_stale and entry and now - entry.fetched_at <= self.stale_max
@@ -86,6 +101,8 @@ class StaleCache:
                 with self._lock:
                     if self._versions.get(key, 0) == version and fresh.complete:
                         self._entries[key] = fresh
+                        self._entries.move_to_end(key)
+                        self._evict(self.clock())
                 future.set_result(fresh)
             except Exception as exc:
                 if permission_failure(exc):
@@ -98,6 +115,7 @@ class StaleCache:
                 with self._lock:
                     if self._flights.get(key) is future:
                         self._flights.pop(key, None)
+                        self._versions.pop(key, None)
                 if background:
                     _background_slots.release()
 
@@ -117,12 +135,16 @@ class StaleCache:
 
     def put(self, key, value):
         with self._lock:
-            self._versions[key] = self._versions.get(key, 0) + 1
+            if key in self._flights:
+                self._versions[key] = self._versions.get(key, 0) + 1
             self._entries[key] = Cached(value, False, self.clock())
+            self._entries.move_to_end(key)
+            self._evict(self.clock())
 
     def drop(self, key):
         with self._lock:
-            self._versions[key] = self._versions.get(key, 0) + 1
+            if key in self._flights:
+                self._versions[key] = self._versions.get(key, 0) + 1
             self._entries.pop(key, None)
 
     def drop_scope(self, key):
@@ -133,5 +155,6 @@ class StaleCache:
             keys = set(self._entries) | set(self._flights)
             for candidate in keys:
                 if isinstance(candidate, tuple) and candidate[0] == key[0]:
-                    self._versions[candidate] = self._versions.get(candidate, 0) + 1
+                    if candidate in self._flights:
+                        self._versions[candidate] = self._versions.get(candidate, 0) + 1
                     self._entries.pop(candidate, None)
