@@ -3,7 +3,7 @@ import {api, ApiError} from './api';
 export const NODE_ASSIGNMENT_ORDER = ['sales', 'pm', 'confirmation', 'field', 'control', 'mapping', 'report', 'pricing', 'settlement'] as const;
 export type NodeAction = 'claim' | 'assign' | 'complete' | 'approve' | 'reject' | 'create_task';
 export type NodePermissions = Partial<Record<NodeAction, boolean>>;
-export interface AssignmentPerson {open_id: string; name: string}
+export interface AssignmentPerson {open_id: string; name: string; avatar_url?: string}
 export interface AssignablePerson extends AssignmentPerson {departments: string[]}
 export interface AssignmentNode {
   key: string; label: string; status: string | null; derived_status: string; record_id: string | null; revision: string | null;
@@ -54,7 +54,7 @@ function count(value: unknown): number {if (typeof value !== 'number' || !Number
 function array<T>(value: unknown, parse: (item: unknown) => T): T[] {if (!Array.isArray(value)) throw malformed(); return value.map(parse)}
 function person(value: unknown): AssignmentPerson {
   if (typeof value === 'string') return {open_id: value, name: '姓名待確認'};
-  const p = record(value); return {open_id: text(p.open_id), name: text(p.name)};
+  const p = record(value); return {open_id: text(p.open_id), name: text(p.name), ...(typeof p.avatar_url === 'string' ? {avatar_url: p.avatar_url} : {})};
 }
 function optionalPerson(value: unknown): AssignmentPerson | null {return value == null || value === '' ? null : person(value)}
 function node(value: unknown): AssignmentNode {

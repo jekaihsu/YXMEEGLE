@@ -411,3 +411,15 @@ test('graph groups parallel production cards and exposes colors, owners, progres
   assert.ok(card.classList.contains('is-selected'));
   assert.ok(document.querySelector('[aria-label="外業節點明細"]'));
 });
+
+
+test('flow owners use the shared avatar and recover to the initial on image failure', async () => {
+  await mount({change: fixture => {fixture.list.nodes[1].owners = [{open_id: 'ou_photo', name: '王怡婷', avatar_url: 'https://s16-imfile-sg.feishucdn.com/photo'}]}});
+  const img = document.querySelector('.na-flow-card .na-avatar img');
+  assert.equal(img.getAttribute('src'), 'https://s16-imfile-sg.feishucdn.com/photo');
+  assert.equal(img.getAttribute('alt'), '王怡婷');
+  const avatar = img.parentElement;
+  await act(async () => img.dispatchEvent(new Event('error')));
+  assert.equal(avatar.textContent, '王');
+  assert.equal(avatar.querySelector('img'), null);
+});
