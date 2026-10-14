@@ -21,6 +21,7 @@ export const WORK_ITEM_LABELS={
  tabs:{work_content:'工作內容',work_orders:'工單',nodes:'工作流程節點／SOP',deliverables:'交付物',history:'歷程'} as Record<WorkItemTab,string>,
  crumb:{confirmation:'確認單',contractLine:'合約項目',workItem:'工作項'},
  confirmationUnresolved:'確認單：未定位',
+ contractLineUnresolved:'合約項目：未定位',
  sourceHealth:'前往來源健康',
  dailyReports:'案件日報',
  dailyReportsNote:'日報與工作項的對應尚未驗證，僅提供連結',
@@ -67,7 +68,7 @@ export type Link={label:string;target:{view:'sources'}|{view:'project';projectId
 export type DrawerField={label:string;value:string};
 export type DrawerModel={kind:'work_item'|'parent'|'node'|'deliverable';key:string;fields:DrawerField[]};
 
-export type BreadcrumbPath={confirmations:{text:string;verification:string}[];confirmationUnresolved:boolean;contractLine:string;workItem:string;verification:string};
+export type BreadcrumbPath={confirmations:{text:string;verification:string}[];confirmationUnresolved:boolean;contractLine:string;contractLineUnresolved:boolean;reason:string|null;workItem:string;verification:string};
 export type NodeRow={key:string;nodeName:Cell;taskTitle:Cell;status:Cell;completedAt:Cell;input:Cell;output:Cell;required:Cell;
  responsible:Cell;round:Cell;verification:string;operationNote:string|null;reworkRounds:{label:string;status:Cell;output:Cell;completedAt:Cell}[]};
 export type DeliverableRow={key:string;name:Cell;date:Cell;direction:Cell;version:Cell;scope:string;evidenceOnly:true;note:string};
@@ -85,12 +86,12 @@ export type WorkItemView={
  planActual:{state:SectionState;available:false;label:string;reason:string};
  workOrders:{state:SectionState;verification:string;rows:[];emptyRow:string;reason:string;sourceHealthLink:Link|null};
  parents:Section<{key:string;title:Cell;itemNumber:Cell;verification:string;sourceMissing:boolean;
-  confirmations:{text:string;verification:string}[];confirmationUnresolved:boolean}>;
+  confirmations:{text:string;verification:string}[];confirmationUnresolved:boolean}>&{unresolved:{label:string;reason:string}[]};
  nodes:Section<NodeRow>;
  deliverables:Section<DeliverableRow>&{sortDir:'asc'|'desc'};
  history:{state:SectionState;rounds:{key:string;nodeName:Cell;label:string;status:Cell;output:Cell;completedAt:Cell}[];
   completedExpanded:boolean;completed:{key:string;nodeName:Cell;taskTitle:Cell;completedAt:Cell}[]|null};
- side:{responsible:string[];responsibleCell:Cell;operationScope:Cell;
+ side:{state:SectionState;responsible:string[];responsibleCell:Cell;operationScope:Cell;
   dates:{effectiveDue:Cell;pendingDue:Cell;estimatedDue:Cell;sourceUpdatedAt:Cell};warnings:string[]};
  // Link only: no state count, no rows (the edge is unverified).
  caseDailyReports:{label:string;note:string;link:Link|null};
@@ -152,6 +153,8 @@ function parseNodes(rows:unknown[]){
  for(const raw of rows){
   const r=rec(raw);const id=r&&rec(r.instance_identity);const node=r&&rec(r.node);const task=r&&rec(r.task);
   if(!r||!id||!node||!task||!str(id.project_id)||!str(id.node_id)||!str(id.task_id)||!str(node.id)||!str(task.id))return null;
+  // The display instance must be the node/task it represents: identities may not disagree.
+  if(str(id.node_id)!==str(node.id)||str(id.task_id)!==str(task.id))return null;
   if(id.sop_round!==null&&id.sop_round!==undefined&&!isRound(id.sop_round))return null;
   if(!NODE_TEXT(node.name)||!NODE_TEXT(task.title)||!NODE_TEXT(task.status))return null;
   const key=`node:${str(id.project_id)}/${str(id.node_id)}/${str(id.task_id)}/${isRound(id.sop_round)?id.sop_round:'-'}`;
@@ -161,6 +164,12 @@ function parseNodes(rows:unknown[]){
   for(const h of history){
    const hr=rec(h);const before=hr&&rec(hr.before);
    if(!hr||!before||!isRound(hr.opened_round))return null;
+   const hid=rec(hr.instance_identity);
+   if(hr.instance_identity!==undefined&&!hid)return null;
+   if(hid){
+    for(const [k,want] of [['project_id',id.project_id],['node_id',id.node_id],['task_id',id.task_id]] as const)if(hid[k]!==undefined&&str(hid[k])!==str(want))return null;
+    if(hid.before_opened_round!==undefined&&hid.before_opened_round!==hr.opened_round)return null;
+   }
    rounds.push({label:WORK_ITEM_LABELS.roundBefore(hr.opened_round),status:textCell(before.status),output:textCell(before.output),completedAt:textCell(before.completed_at)});
   }
   const owner=rec(r.responsible_person);
@@ -224,9 +233,9 @@ export function buildWorkItemDetailView(input:WorkItemInput):WorkItemView{
   workContent:{state:sectionState({states:['unknown']}),quantity:unknownCell(),unit:unknownCell(),amounts:withheld()},
   planActual:planActual(null),
   workOrders:{state:sectionState({states:['unlocated']}),verification:VERIFICATION,rows:[],emptyRow:DATA_STATE_LABELS.unlocated,reason:REASONS['G-RCODE: R01/R02/R09/R10 work-order models unverified'],sourceHealthLink:null},
-  parents:EMPTY_SECTION('unknown'),nodes:EMPTY_SECTION('unknown'),deliverables:{...EMPTY_SECTION('unknown'),sortDir},
+  parents:{...EMPTY_SECTION('unknown'),unresolved:[]},nodes:EMPTY_SECTION('unknown'),deliverables:{...EMPTY_SECTION('unknown'),sortDir},
   history:{state:sectionState({states:['unknown']}),rounds:[],completedExpanded:ui.historyExpanded,completed:null},
-  side:{responsible:[],responsibleCell:unknownCell(),operationScope:unknownCell(),dates:{effectiveDue:unknownCell(),pendingDue:unknownCell(),estimatedDue:unknownCell(),sourceUpdatedAt:unknownCell()},warnings:[]},
+  side:{state:sectionState({states:['unknown']}),responsible:[],responsibleCell:unknownCell(),operationScope:unknownCell(),dates:{effectiveDue:unknownCell(),pendingDue:unknownCell(),estimatedDue:unknownCell(),sourceUpdatedAt:unknownCell()},warnings:[]},
   caseDailyReports:{label:WORK_ITEM_LABELS.dailyReports,note:WORK_ITEM_LABELS.dailyReportsNote,link:null},
   drawer:{open:false,model:null},selectionDropped:ui.selectedKey!==null,ui:{...ui,selectedKey:null},
  });
@@ -237,13 +246,18 @@ export function buildWorkItemDetailView(input:WorkItemInput):WorkItemView{
  // Content renders only for partial/stale (the backend never proves a complete population).
  if(!page.states.every(s=>s==='partial'||s==='stale'))return base(onlyState('unknown',null,page));
  const header=rec(body.header);
+ // Every mandatory top-level section must be present as an object; otherwise the page is unknown.
+ if(!['work_content','plan_actual','work_orders','side','case_daily_reports','parents','nodes','deliverables'].every(k=>rec(body[k])!==null))return base(onlyState('unknown','malformed_body'));
  if(!header||!isKey(header.id)||!rec(header.source_identity))return base(onlyState('unknown','malformed_body'));
  const sid=rec(header.source_identity)!;
  const [bt,tb,rid]=String(header.id).split('/');
  // The identity object must restate exactly the key; otherwise two identities disagree.
  if(sid.base_token!==bt||sid.table_id!==tb||sid.record_id!==rid)return base(onlyState('unknown','malformed_body'));
 
- const parents=sectionOf(body.parents,parseParents);
+ const parentsBase=sectionOf(body.parents,parseParents);
+ const parentsRaw=rec(body.parents);
+ const unresolvedRaw=!isForbidden(parentsBase.state)&&Array.isArray(parentsRaw?.unresolved)?parentsRaw!.unresolved as unknown[]:[];
+ const parents={...parentsBase,unresolved:unresolvedRaw.map(u=>({label:WORK_ITEM_LABELS.contractLineUnresolved,reason:reasonText(rec(u)?.reason)}))};
  const nodes=sectionOf(body.nodes,parseNodes);
  const dl=sectionOf(body.deliverables,parseDeliverables);
  const deliverables={...dl,rows:sortDeliverables(dl.rows,sortDir),sortDir};
@@ -258,11 +272,18 @@ export function buildWorkItemDetailView(input:WorkItemInput):WorkItemView{
  const itemName=name.text;
 
  const breadcrumbs:BreadcrumbPath[]=parents.rows.map(p=>({confirmations:p.confirmations,confirmationUnresolved:p.confirmationUnresolved,
-  contractLine:p.title.text,workItem:itemName,verification:VERIFICATION}));
+  contractLine:p.title.text,contractLineUnresolved:false,reason:null,workItem:itemName,verification:VERIFICATION}));
+ // No parent could be located: keep the Work Item endpoint with an explicit unresolved path (no target, no ID).
+ // A forbidden parents section yields nothing: no placeholder hints at a hidden object.
+ if(!breadcrumbs.length&&!isForbidden(parents.state))breadcrumbs.push({confirmations:[],confirmationUnresolved:true,
+  contractLine:WORK_ITEM_LABELS.contractLineUnresolved,contractLineUnresolved:true,reason:parents.unresolved[0]?.reason??parents.reason??WORK_ITEM_LABELS.reasonUnspecified,workItem:itemName,verification:VERIFICATION});
 
  // work content / side: quantity, unit, dates are unproven fields -> always unknown (body values are ignored).
  const wc=rec(body.work_content);
- const side=rec(body.side);
+ const sideRaw=rec(body.side);
+ const sideState=sectionState(sideRaw?.read_state);
+ // A forbidden side section yields no names, warnings or dates, whatever else the body carries.
+ const side=isForbidden(sideState)?null:sideRaw;
  const people=Array.isArray(side?.responsible_people)?side!.responsible_people as unknown[]:[];
  const seenPeople=new Set<string>();const responsible:string[]=[];
  for(const p of people){const r=rec(p);const n=str(r?.name);const id=str(r?.id);if(n&&id&&!seenPeople.has(id)){seenPeople.add(id);responsible.push(n)}}
@@ -302,7 +323,7 @@ export function buildWorkItemDetailView(input:WorkItemInput):WorkItemView{
    emptyRow:DATA_STATE_LABELS.unlocated,reason:reasonText(wo?.reason),sourceHealthLink:sourceHealthLink(wo?.source_health_link)},
   parents,nodes,deliverables,
   history:{state:nodes.state,rounds,completedExpanded:ui.historyExpanded,completed:ui.historyExpanded?completed:null},
-  side:{responsible,responsibleCell:responsible.length?{state:'known',text:responsible.join('、')}:unknownCell(),
+  side:{state:sideState,responsible,responsibleCell:responsible.length?{state:'known',text:responsible.join('、')}:unknownCell(),
    operationScope:unknownCell(),dates:{effectiveDue:dateCell('effective_due'),pendingDue:dateCell('pending_due'),estimatedDue:dateCell('estimated_due'),sourceUpdatedAt:dateCell('source_updated_at')},warnings},
   caseDailyReports:{label:WORK_ITEM_LABELS.dailyReports,note:WORK_ITEM_LABELS.dailyReportsNote,link:projectLink(cdr?.link)},
   drawer:{open:model!==null,model},selectionDropped:ui.selectedKey!==null&&model===null,
