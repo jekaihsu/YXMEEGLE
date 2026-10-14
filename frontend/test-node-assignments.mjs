@@ -1,0 +1,195 @@
+import assert from 'node:assert/strict';
+import {test, afterEach} from 'node:test';
+import fs from 'node:fs/promises';
+import {build} from 'esbuild';
+import {JSDOM} from 'jsdom';
+import {assignmentFixture, projectFixture} from './fixtures/node-assignments.mjs';
+
+const dom = new JSDOM('<div id="root"></div>', {url: 'http://localhost/'});
+for (const key of ['window', 'document', 'location', 'history', 'sessionStorage', 'Event', 'HTMLElement', 'HTMLInputElement', 'HTMLTextAreaElement', 'HTMLSelectElement', 'navigator']) Object.defineProperty(globalThis, key, {value: dom.window[key], configurable: true});
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+globalThis.requestAnimationFrame = fn => setTimeout(fn, 0);
+globalThis.cancelAnimationFrame = clearTimeout;
+HTMLElement.prototype.scrollIntoView = function () {};
+const React = await import('react');
+const {act} = React;
+const {createRoot} = await import('react-dom/client');
+const bundle = await build({stdin: {contents: "export {NodeAssignments} from './src/NodeAssignments'; export {ProjectDetail} from './src/ProjectDetail'; export {invalidateSessionEpoch} from './src/api';", resolveDir: new URL('.', import.meta.url).pathname}, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
+const path = new URL('./.node-assignments-test.mjs', import.meta.url);
+await fs.writeFile(path, bundle.outputFiles[0].text);
+let ui;
+try {ui = await import(path.href)} finally {await fs.unlink(path)}
+let root, fixture, requests, listReply, detailReply, mutationReply, holdMutation;
+const reply = (body, status = 200) => new Response(JSON.stringify(body), {status, headers: {'Content-Type': 'application/json'}});
+async function mount(options = {}) {
+  fixture = assignmentFixture(); requests = []; listReply = options.listReply; detailReply = options.detailReply; mutationReply = options.mutationReply; holdMutation = null;
+  if (options.change) options.change(fixture);
+  globalThis.fetch = async (url, init = {}) => {
+    const request = {url, method: init.method || 'GET', body: init.body ? JSON.parse(init.body) : null}; requests.push(request);
+    if (request.method !== 'GET') {if (holdMutation) await holdMutation; return mutationReply ? reply(mutationReply.body, mutationReply.status) : reply({code: 'ok'})}
+    if (url.includes('/node-assignments/nodes/')) return detailReply ? reply(detailReply.body, detailReply.status) : reply({...fixture.detail, node: fixture.list.nodes.find(n => url.endsWith(`/nodes/${n.key}`))});
+    if (url.endsWith('/node-assignments')) return listReply ? reply(listReply.body, listReply.status) : reply(fixture.list);
+    return reply({detail: 'disabled'}, 404);
+  };
+  root = createRoot(document.getElementById('root'));
+  await act(async () => root.render(React.createElement(ui.NodeAssignments, {projectId: 'p1', legacy: React.createElement('div', {id: 'legacy-flow'}, '原有案件流程與任務')})));
+}
+afterEach(async () => {if (root) {await act(async () => root.unmount()); root = null}});
+const text = () => document.body.textContent;
+const button = label => [...document.querySelectorAll('button')].find(b => b.textContent.trim() === label);
+const click = async element => {assert.ok(element, 'the requested control exists'); await act(async () => element.click())};
+const expand = async () => click(document.querySelector('.na-row[aria-label^="控制節點"]'));
+const mutations = () => requests.filter(r => r.method !== 'GET');
+async function input(element, value) {
+  assert.ok(element, 'the requested input exists');
+  const prototype = element.tagName === 'SELECT' ? HTMLSelectElement.prototype : element.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  await act(async () => {Object.getOwnPropertyDescriptor(prototype, 'value').set.call(element, value); element.dispatchEvent(new Event(element.tagName === 'SELECT' ? 'change' : 'input', {bubbles: true}))});
+}
+const formControl = label => [...document.querySelectorAll('.na-form label')].find(l => l.firstElementChild?.textContent.startsWith(label))?.querySelector('input,textarea,select');
+const uuid = value => assert.match(value, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+
+test('renders nine rows in chain order with literal task progress and 4/9 summary', async () => {
+  await mount();
+  assert.deepEqual([...document.querySelectorAll('.na-node-cell strong')].map(n => n.textContent), ['業務', 'PM', '確認單', '外業', '控制', '圖資', '報告', '計價', '結算']);
+  assert.deepEqual([...document.querySelectorAll('.na-progress-cell strong')].map(n => n.textContent), ['3/3', '3/3', '3/3', '3/3', '2/5', '0/0', '0/0', '0/0', '0/0']);
+  assert.equal(document.querySelector('.na-summary-count').textContent, '4/9');
+  assert.equal(document.querySelector('.na-summary strong').textContent, '進行中');
+  assert.equal(document.querySelector('.na-overview').querySelectorAll('li').length, 9);
+  assert.equal(document.querySelector('[aria-current="step"]').textContent, '5控制進行中');
+  assert.equal(document.getElementById('legacy-flow'), null);
+  await click(document.querySelector('.na-summary'));
+  assert.equal(document.activeElement.getAttribute('aria-label'), '案件節點清單');
+});
+test('expands inline into owners and tasks and collapses with its native button', async () => {
+  await mount(); await expand();
+  const detail = document.querySelector('[aria-label="控制節點明細"]');
+  assert.equal(detail.querySelector('.na-people').textContent, '林林安娜陳陳威廷');
+  assert.equal(detail.querySelector('.na-task-body strong').textContent, '控制點成果核對');
+  assert.equal(detail.querySelector('.na-task-body p').textContent, '核對現場紀錄與座標。');
+  assert.equal(detail.querySelector('select').value, 'in_progress');
+  assert.equal(document.querySelector('.na-row[aria-expanded="true"]').getAttribute('aria-controls'), detail.parentElement.id);
+  await expand(); assert.equal(document.querySelector('[aria-label="控制節點明細"]'), null);
+});
+test('claim sends the node request with a UUID and refetches list and detail', async () => {
+  await mount(); await expand(); await click(button('認領節點'));
+  assert.equal(mutations()[0].url, '/api/projects/p1/node-assignments/nodes/control/claim');
+  assert.equal(mutations()[0].method, 'POST'); uuid(mutations()[0].body.request_id);
+  assert.deepEqual(Object.keys(mutations()[0].body), ['request_id']);
+  assert.equal(requests.filter(r => r.url.endsWith('/node-assignments') && r.method === 'GET').length, 2);
+  assert.equal(requests.filter(r => r.url.endsWith('/nodes/control') && r.method === 'GET').length, 2);
+  assert.equal(document.querySelector('.na-notice').textContent, '已儲存變更。');
+});
+test('assign selects people and sends IDs with another fresh UUID', async () => {
+  await mount(); await expand(); await click(button('認領節點')); await click(button('指派負責人'));
+  const checkboxes = document.querySelectorAll('.na-person-options input');
+  await click(checkboxes[1]); await click(button('儲存指派'));
+  assert.equal(mutations()[1].url, '/api/projects/p1/node-assignments/nodes/control/assign');
+  assert.deepEqual(mutations()[1].body.assignees, ['ou_anna']); uuid(mutations()[1].body.request_id);
+  assert.notEqual(mutations()[1].body.request_id, mutations()[0].body.request_id);
+  assert.equal(requests.filter(r => r.url.endsWith('/node-assignments') && r.method === 'GET').length, 3);
+});
+test('assignment requires at least one owner', async () => {
+  await mount(); await expand(); await click(button('指派負責人'));
+  for (const checkbox of document.querySelectorAll('.na-person-options input')) await click(checkbox);
+  await click(button('儲存指派'));
+  assert.equal(document.querySelector('.na-field-error').textContent, '請至少選擇一位負責人。'); assert.equal(mutations().length, 0);
+});
+test('task creation validates required fields before sending', async () => {
+  await mount(); await expand(); await click(button('新增任務')); await click(button('建立任務'));
+  assert.deepEqual([...document.querySelectorAll('.na-field-error')].map(e => e.textContent), ['請填寫任務名稱。', '請選擇負責人。', '請選擇部門。', '請選擇期限。']);
+  assert.equal(mutations().length, 0);
+  for (const element of document.querySelectorAll('[aria-invalid="true"]')) assert.ok(document.getElementById(element.getAttribute('aria-describedby')));
+});
+test('creates a task with literal fields and a date-only deadline', async () => {
+  await mount(); await expand(); await click(button('新增任務'));
+  await input(formControl('任務名稱'), '  新控制點核對  '); await input(formControl('任務說明'), '完成現場紀錄');
+  await input(formControl('負責人'), 'ou_anna'); await input(formControl('部門'), '測量部'); await input(formControl('期限'), '2026-10-23');
+  await click(button('建立任務'));
+  const request = mutations()[0];
+  assert.equal(request.url, '/api/projects/p1/node-assignments/nodes/control/tasks'); uuid(request.body.request_id);
+  const {request_id, ...payload} = request.body;
+  assert.deepEqual(payload, {title: '新控制點核對', detail: '完成現場紀錄', assignee: 'ou_anna', department: '測量部', deadline: '2026-10-23'});
+  assert.equal(document.querySelector('.na-form'), null);
+});
+test('updates task status using PATCH and refetches', async () => {
+  await mount(); await expand(); await input(document.querySelector('.na-task-status select'), 'completed');
+  const request = mutations()[0]; assert.equal(request.method, 'PATCH'); assert.equal(request.url, '/api/projects/p1/node-assignments/tasks/task_1'); assert.equal(request.body.status, 'completed'); uuid(request.body.request_id);
+  assert.equal(requests.filter(r => r.url.endsWith('/node-assignments') && r.method === 'GET').length, 2);
+});
+test('permission-denied controls are disabled and explain why', async () => {
+  await mount({change: f => {f.list.can.control = {claim: false, assign: false, complete: false, approve: false, reject: false, create_task: false}}}); await expand();
+  for (const label of ['認領節點', '指派負責人', '新增任務', '完成節點', '核准', '退回']) {
+    const control = button(label); assert.equal(control.disabled, true); assert.equal(document.getElementById(control.getAttribute('aria-describedby')).textContent, '目前沒有此操作權限，或節點狀態不允許此操作。');
+    assert.equal(control.parentElement.getAttribute('tabindex'), '0');
+  }
+  assert.equal(document.querySelector('.na-task-status select').disabled, true); assert.equal(mutations().length, 0);
+});
+test('409 refetches and shows someone else changed this message', async () => {
+  await mount({mutationReply: {status: 409, body: {code: 'conflict', detail: 'version changed'}}}); await expand(); await click(button('認領節點'));
+  assert.equal(document.querySelector('.na-notice').textContent, '有人已更新此節點，已重新讀取最新資料，請確認後再試。');
+  assert.equal(requests.filter(r => r.url.endsWith('/node-assignments') && r.method === 'GET').length, 2);
+});
+test('422 maps server field errors onto the open form', async () => {
+  await mount({mutationReply: {status: 422, body: {code: 'validation', detail: [{loc: ['body', 'reason'], msg: '請補充交付項目'}]}}}); await expand(); await click(button('退回'));
+  await input(document.querySelector('.na-form textarea'), '成果缺少'); await click(button('確認退回'));
+  assert.equal(document.querySelector('.na-error').textContent, '請檢查欄位內容後再試。');
+  assert.equal(document.querySelector('.na-field-error').textContent, '請補充交付項目');
+  assert.equal(document.querySelector('.na-form textarea').value, '成果缺少');
+});
+test('node complete approve and reject send the requested action', async () => {
+  await mount(); await expand(); await click(button('完成節點')); await click(button('核准')); await click(button('退回')); await click(button('確認退回'));
+  assert.equal(document.querySelector('.na-field-error').textContent, '請填寫退回原因。');
+  await input(document.querySelector('.na-form textarea'), '  請補齊成果  '); await click(button('確認退回'));
+  assert.deepEqual(mutations().map(r => r.url), ['/api/projects/p1/node-assignments/nodes/control/complete', '/api/projects/p1/node-assignments/nodes/control/approve', '/api/projects/p1/node-assignments/nodes/control/reject']);
+  assert.equal(mutations()[2].body.reason, '請補齊成果'); assert.equal(new Set(mutations().map(r => r.body.request_id)).size, 3);
+});
+test('pending mutation disables controls and prevents repeat submissions', async () => {
+  await mount(); await expand(); let release; holdMutation = new Promise(resolve => {release = resolve});
+  await click(button('認領節點')); assert.equal(button('認領節點').disabled, true); assert.ok(text().includes('儲存中…'));
+  await click(button('認領節點')); assert.equal(mutations().length, 1);
+  await act(async () => release()); assert.equal(button('認領節點').disabled, false);
+});
+test('Lark permission read errors show the specific message and preserve legacy flow', async () => {
+  await mount({listReply: {status: 403, body: {code: 'lark_permission', detail: 'missing scope'}}});
+  assert.equal(document.querySelector('.na-error span').textContent, 'Lark 權限不足，請聯絡管理員');
+  assert.equal(document.getElementById('legacy-flow').textContent, '原有案件流程與任務');
+});
+test('Lark permission mutation errors keep the node list usable', async () => {
+  await mount({mutationReply: {status: 403, body: {code: 'lark_permission', detail: 'missing scope'}}}); await expand(); await click(button('認領節點'));
+  assert.equal(document.querySelector('.na-error span').textContent, 'Lark 權限不足，請聯絡管理員'); assert.equal(document.querySelectorAll('.na-row').length, 9); assert.equal(button('認領節點').disabled, false);
+});
+test('stale response displays the synchronization banner', async () => {
+  await mount({change: f => {f.list.stale = true}});
+  assert.equal(document.querySelector('.na-stale span').textContent, '目前顯示上次同步的資料，Lark 資料可能尚未更新。');
+});
+test('feature disabled by 404 or code leaves the original flow unchanged', async () => {
+  for (const listReply of [{status: 404, body: {code: 'disabled', detail: 'disabled'}}, {status: 200, body: {code: 'disabled'}}]) {
+    await mount({listReply}); assert.equal(document.getElementById('root').innerHTML, '<div id="legacy-flow">原有案件流程與任務</div>'); await act(async () => root.unmount()); root = null;
+  }
+});
+test('empty nodes and empty tasks show explicit empty states', async () => {
+  await mount({change: f => {f.list.nodes = []; f.list.summary = {done: 0, total: 0, current_node: null}}});
+  assert.equal(document.querySelector('.na-empty').textContent, '尚未建立節點指派。重新讀取後再確認。');
+  await act(async () => root.unmount()); root = null;
+  await mount({change: f => {f.detail.tasks = []}}); await expand(); assert.equal(document.querySelector('.na-empty').textContent, '此節點尚無任務。新增任務後即可追蹤交付進度。');
+});
+test('detail failure stays local and can retry', async () => {
+  await mount({detailReply: {status: 500, body: {detail: '節點讀取失敗'}}}); await expand();
+  assert.equal(document.querySelector('.na-detail .na-error span').textContent, '節點讀取失敗'); assert.equal(document.querySelectorAll('.na-row').length, 9);
+  detailReply = null; await click(button('重試')); assert.equal(document.querySelector('.na-task-body strong').textContent, '控制點成果核對');
+});
+test('completed case summary displays 已完成', async () => {
+  await mount({change: f => {f.list.summary.done = 9}}); assert.equal(document.querySelector('.na-summary-count').textContent, '9/9'); assert.equal(document.querySelector('.na-summary strong').textContent, '已完成');
+});
+test('ProjectDetail integration leaves original stages and selected-node section intact on 404', async () => {
+  await mount({listReply: {status: 404, body: {code: 'disabled', detail: 'disabled'}}});
+  const {workspace, user} = projectFixture();
+  const c = {w: workspace, s: {user, users: [user], mode: 'demo', auth_configured: false}, route: {view: 'project', project: 'p1', tab: 'flow', node: 'node_control'}, busy: false, go() {}, notify() {}, registerDrafts() {}, run: async () => undefined, refresh: async () => {}};
+  await act(async () => root.render(React.createElement(ui.ProjectDetail, {c})));
+  assert.deepEqual([...document.querySelectorAll('.stage-button strong')].map(n => n.textContent), ['業務', 'PM', '確認單', '外業', '控制', '圖資', '報告', '計價', '結算']);
+  assert.equal(document.querySelector('.flow-heading h2').textContent, '案件流程');
+  assert.equal(document.querySelector('.node-section .node-title h2').textContent, '控制進行中');
+  assert.equal(document.querySelector('.flow-operations h2').textContent, '本階段交付與確認');
+  assert.equal(document.querySelector('.node-assignments'), null); assert.equal(document.querySelector('.na-loading'), null);
+  assert.equal(document.querySelector('.project-discussion h2').textContent, '案件討論');
+});
