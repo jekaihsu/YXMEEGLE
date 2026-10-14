@@ -792,11 +792,9 @@ def create_app(overrides=None):
             result=public_source_response(state,cache.data,user) if cache else {'configured':bool(configuration(cfg)),'last_sync':None,'status':'never','message':'尚未同步來源','tables':[],'records':[]}
         return {**result,'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
 
-    @app.get('/api/source-health')
-    def source_health(request:Request):
-        """Page state only (G-DIAG open: diagnostic=False). Same branches and visibility as GET /api/sources; no record values."""
+    def source_health_page(data,user):
+        """The GET /api/source-health computation, shared so the manager overview binds the identical page state."""
         from .source_health import build_source_health
-        data,user=identity(request)
         app.state.live_read.ensure(data['wid'],'sources')
         freshness=app.state.live_read.status(data['wid'])
         if data['mode']!='lark' or data['wid'].startswith('test-'):
@@ -817,6 +815,120 @@ def create_app(overrides=None):
         # records to the admitted ids, so a zero count cannot be proven unfiltered.
         read_authorized=data['mode']=='lark' and not data['wid'].startswith('test-') and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
         return build_source_health(snapshot,freshness['datasets']['sources'],diagnostic=False,read_authorized=read_authorized,viewer_filtered=None)
+
+    @app.get('/api/source-health')
+    def source_health(request:Request):
+        """Page state only (G-DIAG open: diagnostic=False). Same branches and visibility as GET /api/sources; no record values."""
+        data,user=identity(request)
+        return source_health_page(data,user)
+
+    # ---- P2 read routes (VCC-128..132). Read-only; every handler works on one visibility-narrowed state. ----
+    P2_NOT_FOUND='找不到這個項目'
+    P2_LIST_PARAMS=frozenset({'q','source_version','pm','admission_state','deadline_from','deadline_to','sort','direction','cursor','limit'})
+    P2_FILTER_PARAMS=('source_version','pm','admission_state','deadline_from','deadline_to')
+    P2_SOURCE_STATUS={'forbidden':'forbidden','read_failed':'error','loading':'loading','unlocated':'unlocated','partial':'partial','stale':'stale'}
+
+    def p2_narrowed_state(data,user,page):
+        """identity -> load -> filter_visible_cases -> filter_private_workspace -> case_redaction (non test/demo).
+
+        Unlike public_ws this keeps source_work_items/status, but only as narrowed by filter_visible_cases.
+        ``source_status`` is derived from the Source Health page state of this request, never from fetch time.
+        """
+        from .source_case_policy import filter_visible_cases
+        from . import case_redaction
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
+        pre=case_redaction.snapshot(state)
+        filter_visible_cases(state)
+        filter_private_workspace(state,user)
+        if state.get('environment') not in ('test','demo'):
+            case_redaction.apply(state,case_redaction.make_plan(pre,state))
+        states=(page or {}).get('states') if isinstance(page,dict) else None
+        if page is None: status='fresh'
+        elif states and 'partial' in states: status='partial'
+        else: status=P2_SOURCE_STATUS.get(states[0]) if states else None
+        state.pop('source_status',None)
+        if status: state['source_status']={'status':status}
+        state['as_of']=now()[:10]
+        return state
+
+    def p2_read(data,user):
+        health=source_health_page(data,user)
+        return data,user,health,p2_narrowed_state(data,user,health.get('page_state'))
+
+    def p2_list_args(request,allowed=P2_LIST_PARAMS):
+        query=request.query_params
+        require(set(query.keys())<=allowed,'查詢參數錯誤',422)
+        for key in query.keys():
+            values=query.getlist(key)
+            require(len(values)<=(20 if key in ('source_version','pm','admission_state') else 1) and all(len(v)<=(240 if key=='q' else 512 if key=='cursor' else 120) for v in values),'查詢參數過長',422)
+        filters={k:(query.getlist(k) if k in ('source_version','pm','admission_state') else query.get(k)) for k in P2_FILTER_PARAMS if k in query}
+        limit=query.get('limit')
+        if limit is not None:
+            require(limit.isascii() and limit.isdigit() and len(limit)<=4,'limit 錯誤',422)
+        return {'q':query.get('q',''),'filters':filters,'cursor':query.get('cursor') or None,
+                'sort':{'column':query.get('sort'),'direction':query.get('direction') or 'asc'} if query.get('sort') else None,
+                'limit':int(limit) if limit is not None else 50}
+
+    def p2_list_page(state,args,as_of):
+        from .confirmation_list import build_confirmation_list
+        result=build_confirmation_list(state,as_of=as_of,**args)
+        if result.get('status')==403: raise HTTPException(403,'沒有權限')
+        if result.get('status')!=200: raise HTTPException(result.get('status',422),result.get('detail') or '查詢參數錯誤')
+        return result
+
+    @app.get('/api/confirmations')
+    def confirmations(request:Request):
+        data,user=identity(request)
+        args=p2_list_args(request)
+        _,_,_,state=p2_read(data,user)
+        return p2_list_page(state,args,state['as_of'])
+
+    @app.get('/api/manager-overview')
+    def manager_overview(request:Request):
+        from .manager_overview import build_manager_overview
+        from .confirmation_list import confirmation_population
+        data,user=identity(request)
+        args=p2_list_args(request,frozenset(P2_FILTER_PARAMS))
+        _,_,health,state=p2_read(data,user)
+        # The same read that feeds the population supplies its C-STATE; this also validates the filters (422).
+        page=p2_list_page(state,{'q':'','filters':args['filters'],'cursor':None,'sort':None,'limit':1},state['as_of'])
+        envelope=page['page_state']
+        return build_manager_overview(state,population=confirmation_population,filters=args['filters'],
+            population_state={'states':envelope['states'],'count':envelope.get('count')} if envelope else None,
+            source_health=health,as_of=state['as_of'])
+
+    @app.get('/api/case-detail/{project_id}')
+    def case_detail(request:Request,project_id:str,confirmation_key:str|None=None):
+        from .case_detail import build_case_detail
+        data,user=identity(request)
+        require(len(project_id)<=200 and (confirmation_key is None or len(confirmation_key)<=300),'查詢參數過長',422)
+        require(set(request.query_params.keys())<={'confirmation_key'},'查詢參數錯誤',422)
+        _,_,_,state=p2_read(data,user)
+        from .source_case_policy import visible_project
+        require(any(p['id']==project_id and visible_project(state,p) for p in state.get('projects',[])),P2_NOT_FOUND,404)
+        result=build_case_detail(state,project_id,confirmation_key=confirmation_key,as_of=state['as_of'])
+        require(result.get('header') is not None,P2_NOT_FOUND,404)
+        return result
+
+    @app.get('/api/contract-detail')
+    def contract_detail(request:Request,key:str=''):
+        from .contract_detail import build_contract_detail
+        data,user=identity(request)
+        require(0<len(key)<=300 and set(request.query_params.keys())<={'key'},'查詢參數錯誤',422)
+        _,_,_,state=p2_read(data,user)
+        result=build_contract_detail(state,key,as_of=state['as_of'])
+        require(result.get('page_state',{}).get('states')!=['unlocated'],P2_NOT_FOUND,404)
+        return result
+
+    @app.get('/api/work-item-detail')
+    def work_item_detail(request:Request,key:str=''):
+        from .work_item_detail import build_work_item_detail
+        data,user=identity(request)
+        require(0<len(key)<=300 and set(request.query_params.keys())<={'key'},'查詢參數錯誤',422)
+        _,_,_,state=p2_read(data,user)
+        result=build_work_item_detail(state,key,as_of=state['as_of'])
+        require('header' in result,P2_NOT_FOUND,404)
+        return result
 
     @app.get('/api/my-work')
     def my_work(request:Request):
