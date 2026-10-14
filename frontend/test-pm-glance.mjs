@@ -37,14 +37,15 @@ assert.equal(pmGlanceVisible('member'), true); assert.equal(pmGlanceVisible(unde
 assert.equal(pmGlanceVisible('member', ['pm']), false); assert.equal(pmGlanceVisible('pm', ['pm']), true);
 assert.ok(unknown.every(tile => /^#view=(work|overview|sources|schedule|confirmations)(&|$)/.test(tile.href)));
 
-const bundle = await build({entryPoints: ['./src/PmGlance.tsx'], bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
+const bundle = await build({stdin: {contents: "export {PmGlancePage} from './src/PmGlance.tsx'; export {AppShell} from './src/AppShell.tsx';", resolveDir: process.cwd(), loader: 'tsx'}, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
 const file = new URL('./.pm-glance-test.mjs', import.meta.url);
 await fs.writeFile(file, bundle.outputFiles[0].text);
-let PmGlancePage;
-try {({PmGlancePage} = await import(file.href))} finally {await fs.unlink(file)}
+let PmGlancePage, AppShell;
+try {({PmGlancePage, AppShell} = await import(file.href))} finally {await fs.unlink(file)}
 const dom = new JSDOM('<div id="root"></div>', {url: 'http://localhost/#view=pm-glance', pretendToBeVisual: true});
 for (const key of ['window', 'document', 'location', 'history', 'Event', 'HTMLElement']) Object.defineProperty(globalThis, key, {value: dom.window[key], configurable: true});
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+dom.window.scrollTo = () => {};
 const requests = [];
 let sourceStale = true;
 globalThis.fetch = async (url, options) => {
@@ -58,8 +59,11 @@ globalThis.fetch = async (url, options) => {
 };
 const root = createRoot(document.getElementById('root'));
 const settle = () => act(async () => {await new Promise(r => setTimeout(r, 30))});
-await act(async () => root.render(React.createElement(PmGlancePage, {c: {w: {version: 1}, s: {user: {id: 'test', role: 'pm'}}}})));
+const session = {user: {id: 'test', role: 'pm'}, mode: 'lark'};
+const workspace = {version: 1, projects: [], approvals: [], freshness: {enabled: true, server_time: '2026-10-14T01:00:00Z', datasets: {}}};
+await act(async () => root.render(React.createElement(AppShell, {s: session, w: workspace, route: {view: 'pm-glance'}, ready: true, asOfLabel: '2026-10-14', guardedRefresh: () => {}, go: () => {}}, React.createElement(PmGlancePage, {c: {w: workspace, s: session}}))));
 await settle();
+assert.equal(document.querySelectorAll('.topbar button[aria-label="重新整理資料"], .topbar .data-freshness button').length, 0, 'PM shell exposes only the stale-tile refresh, not the global POST refresh');
 assert.equal(requests.length, 4); assert.ok(requests.every(r => r.method === 'GET'));
 assert.deepEqual(requests.map(r => r.url).sort(), ['/api/confirmations', '/api/manager-overview', '/api/my-work', '/api/source-health']);
 assert.equal(document.querySelector('[data-tile="overdue"]').dataset.state, 'failed');
