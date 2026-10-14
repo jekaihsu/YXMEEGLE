@@ -178,8 +178,8 @@ TENANT_READ_ROUTES=frozenset({
     '/api/work-item-detail','/api/daily-reports',
 })
 
+# Legacy project detail carries raw amounts; use the P2 case projection instead.
 TENANT_READ_PATTERNS=(
-    re.compile(r'/api/projects/[^/]+'),
     re.compile(r'/api/projects/[^/]+/navigation'),
     re.compile(r'/api/case-detail/[^/]+'),
 )

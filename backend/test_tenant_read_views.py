@@ -12,7 +12,7 @@ from .test_production_access import company
 from .test_p2_int_routes import build_state, fresh_cache, B, KT, WT, assert_no_amount, HIDDEN_NAME
 
 READS = [
-    '/api/projects', '/api/projects/{vis}', '/api/projects/{vis}/navigation',
+    '/api/projects', '/api/projects/{vis}/navigation',
     '/api/my-work', '/api/confirmations', '/api/case-detail/{vis}',
     '/api/contract-detail?key={contract}', '/api/work-item-detail?key={work}', '/api/daily-reports',
 ]
@@ -81,7 +81,7 @@ def test_tenant_patterns_do_not_accept_extra_segments(tenant_views, path):
     with app.state.sessions() as db:
         user = db.get(PersonRow, ('lark-company', 'u-tenant')).data
     assert not tenant_read_allowed(user, app.state.cfg, 'lark-company', 'GET', path)
-    assert tenant_read_allowed(user, app.state.cfg, 'lark-company', 'GET', '/api/projects/id')
+    assert tenant_read_allowed(user, app.state.cfg, 'lark-company', 'GET', '/api/projects/id/navigation')
     assert not tenant_read_allowed(user, app.state.cfg, 'lark-company', 'POST', '/api/projects/id')
 
 
@@ -114,3 +114,15 @@ def test_hr_viewers_controls_person_labels_in_p2_views(tenant_views, template):
         assert case['details']['pm_id'] is None
     app.state.cfg['HR_VIEWERS'] = 'u-tenant'
     assert 'HR_PRIVATE_PM_SENTINEL' in client.get('/api/manager-overview').text
+
+
+def test_legacy_project_detail_stays_denied_because_it_has_unredacted_amounts(tenant_views):
+    app, client, ids = tenant_views
+    response = client.get('/api/projects/' + ids['vis'])
+    assert response.status_code == 403
+    assert_no_amount(response)
+    # The reviewed P2 case projection is usable and explicitly withholds amounts.
+    response = client.get('/api/case-detail/' + ids['vis'])
+    assert response.status_code == 200
+    assert_no_amount(response)
+    assert_privileged_routes_denied(app, client)
