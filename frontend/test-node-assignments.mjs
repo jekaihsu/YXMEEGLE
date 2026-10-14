@@ -360,16 +360,16 @@ test('cached reopen paints instantly and session invalidation removes cached dat
   assert.equal(document.getElementById('legacy-flow'), null);
   await act(async () => release());
 });
-test('prefetch on project mount shares the request with the flow hook', async () => {
+test('no request on another tab; opening flow makes one shared request', async () => {
   await mount(); ui.invalidateSessionEpoch(); requests = [];
   const {workspace, user} = projectFixture();
   let release;
   globalThis.fetch = async url => {if (!url.endsWith('/node-assignments')) return reply({items: [], total: 0}); requests.push({url, method: 'GET'}); await new Promise(resolve => {release = resolve}); return reply(fixture.list)};
   const c = {w: workspace, s: {features: {node_assignment: true}, user, users: [user], mode: 'demo', auth_configured: false}, route: {view: 'project', project: 'p1', tab: 'logs'}, busy: false, go() {}, notify() {}, registerDrafts() {}, run: async () => undefined, refresh: async () => {}};
   await act(async () => root.render(React.createElement(ui.ProjectDetail, {c})));
-  assert.equal(requests.length, 1);
+  assert.equal(requests.length, 0, 'no node-assignment request while another tab is open');
   await act(async () => root.render(React.createElement(ui.ProjectDetail, {c: {...c, route: {...c.route, tab: 'flow'}}})));
-  assert.equal(requests.length, 1);
+  assert.equal(requests.length, 1, 'opening flow issues exactly one shared request');
   assert.equal(document.querySelectorAll('.is-skeleton').length, 9);
   assert.equal(document.querySelector('.workflow'), null);
   await act(async () => release());
