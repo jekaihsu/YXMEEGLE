@@ -179,7 +179,12 @@ def daily_source_version(entry):
     return provenance_hash(provenance)
 
 
-def daily_mapping_version(entry):
+# The v3 projection added only 出工人. Older approvals bind every other daily
+# field, including fields outside the configured projection, so keep that hash.
+DAILY_MAPPING_LEGACY_ADDITIONS = {'sources-v3-daily-client-20261014': frozenset({'出工人'})}
+
+
+def daily_mapping_version(entry, *, excluded_daily_fields=frozenset()):
     """Case pairing binds identities/links, independently of delivered content."""
     provenance=deepcopy(entry.get('source_provenance'))
     identity_fields={'工程確認單編號','所屬案件','SourceID','報價編號','工程編號',
@@ -187,9 +192,12 @@ def daily_mapping_version(entry):
     if not provenance:
         # Legacy rows cannot prove which fields are identity-bearing; retain
         # their full supplied source content instead of guessing a safe subset.
-        return provenance_hash({'id':entry.get('id'),'fields':entry.get('source_fields',{})})
+        return provenance_hash({'id':entry.get('id'),'fields':{k:v for k,v in entry.get('source_fields',{}).items() if k not in excluded_daily_fields}})
     for record in provenance.get('records',[]):
-        if record.get('kind') in ('daily','cost'):continue
+        if record.get('kind')=='daily':
+            record['fields']={k:v for k,v in record.get('fields',{}).items() if k not in excluded_daily_fields}
+            continue
+        if record.get('kind')=='cost':continue
         allowed=identity_fields|set(RELATIONS.get(record.get('kind'),{}))
         record['fields']={k:v for k,v in record.get('fields',{}).items() if k in allowed}
     return provenance_hash(provenance)
@@ -462,6 +470,11 @@ def import_v4(ws, records, complete_tables=None):
         entry['source_version']=daily_source_version(entry)
         entry['mapping_version']=daily_mapping_version(entry)
         for review in ws['daily_reviews']:
+            if (review['daily_id']==ident and review['status']=='approved'
+                    and review_mapping_version(review)!=entry['mapping_version']
+                    and any(review_mapping_version(review)==daily_mapping_version(entry,excluded_daily_fields=fields)
+                            for fields in DAILY_MAPPING_LEGACY_ADDITIONS.values())):
+                review['mapping_version']=entry['mapping_version']
             if (review['daily_id']==ident and review['status'] in ('pending','approved')
                     and not review_mapping_version(review) and review.get('source_version')==entry['source_version']):
                 review['mapping_version']=entry['mapping_version']

@@ -130,3 +130,43 @@ def test_direct_case_with_unresolved_selected_work_item_requires_upstream_repair
     records[-1]['fields']['來源合約明細（日報關聯）']=link('contract','recContractA')
     stats=import_sources(state,records+[item])
     assert stats['daily_imported']==1 and reports(state)[0]['case_code']=='C115901'
+
+
+@pytest.mark.parametrize('stored_version',[True,False])
+def test_projection_crew_addition_preserves_manual_approval(stored_version):
+    state,records=setup();item=daily();other=row('daily','recOther',{'日期':'2026-09-27','組別':'控制'})
+    matched=row('daily','recMatched',{'日期':'2026-09-27','組別':'控制','所屬案件':link('confirmation','recCaseB')})
+    records.append(matched)
+    import_sources(state,records+[item,other]);entry=deepcopy(state['daily_unmatched'][0])
+    project=next(p for p in state['projects'] if p['code']=='C115901')
+    review={'id':'manual-review','daily_id':source_id(item),'project_id':project['id'],'status':'approved','entry':entry}
+    if stored_version:review['mapping_version']=entry['mapping_version']
+    state['daily_reviews'].append(review)
+    import_sources(state,records+[item,other])
+    other_before=deepcopy(state['daily_unmatched'])
+    matched_before=deepcopy(next(d for d in reports(state) if d['id']==source_id(matched)))
+    item['fields']['出工人']='甲、乙'
+    import_sources(state,records+[item,other])
+    assert review['status']=='approved'
+    assert [(d['case_code'],d['person'],d['match_basis']) for d in reports(state) if d['id']==source_id(item)]==[('C115901','甲、乙','manual_review')]
+    assert state['daily_unmatched']==other_before
+    assert next(d for d in reports(state) if d['id']==source_id(matched))==matched_before
+    assert review['mapping_version']==next(d for d in reports(state) if d['id']==source_id(item))['mapping_version']
+    assert review['mapping_version']!=entry['mapping_version']
+    import_sources(state,records+[item,other])
+    assert review['status']=='approved'
+
+
+@pytest.mark.parametrize('field,value',[('備註','changed content'),('內業工項',link('reporting','recUnknown')),('所屬案件',link('confirmation','recUnknown')),('出工人','丙')])
+def test_projection_compatibility_still_invalidates_real_changes(field,value):
+    state,records=setup();item=daily(**({'出工人':'甲'} if field=='出工人' else {}))
+    import_sources(state,records+[item]);entry=deepcopy(state['daily_unmatched'][0])
+    project=next(p for p in state['projects'] if p['code']=='C115901')
+    review={'id':'manual-review','daily_id':source_id(item),'project_id':project['id'],'status':'approved','entry':entry,'mapping_version':entry['mapping_version']}
+    state['daily_reviews'].append(review)
+    item['fields']['出工人']='甲、乙'
+    item['fields'][field]=value
+    import_sources(state,records+[item])
+    assert review['status']=='invalidated'
+    assert reports(state)==[]
+    assert [d['id'] for d in state['daily_unmatched']]==[source_id(item)]
