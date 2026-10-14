@@ -44,6 +44,8 @@ def _state(snapshot, freshness, table=None, *, viewer_filtered=None):
         return data_state('read_failed')
     # Only an active refresh (lease) supersedes a retained historical last_error.
     if freshness.get('status') == 'refreshing':
+        if status in ('ready', 'partial') and _time((table or {}).get('last_sync', snapshot.get('last_sync'))):
+            return data_state(*(['partial'] if status == 'partial' else []), 'stale')
         return data_state('loading')
     if freshness.get('last_error') or freshness.get('status') in ('error', 'blocked'):
         return data_state('read_failed')

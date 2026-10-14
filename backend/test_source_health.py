@@ -157,7 +157,7 @@ def test_empty_visible_read_loading_and_blocked_stay_distinct():
     value = snapshot()
     value['tables'][0]['count'] = 0
     assert build(value)['page_state'] == {'states': ['unknown'], 'count': None}
-    assert build(value, {'status': 'refreshing'})['page_state']['states'] == ['loading']
+    assert build(value, {'status': 'refreshing'})['page_state']['states'] == ['stale']
     blocked = build(value, {'status': 'blocked'}, diagnostic=True)
     assert blocked['page_state'] == {'states': ['read_failed'], 'count': None}
     assert blocked['error'] == 'blocked'
@@ -346,14 +346,14 @@ HISTORICAL = {'last_error': 'SYNTHETIC_PRIOR_FAILURE'}
 def test_active_refresh_wins_over_historical_last_error(base):
     freshness = dict(base, status='refreshing', **HISTORICAL)
     result = build(snapshot(), freshness, diagnostic=True)
-    assert result['page_state'] == {'states': ['loading'], 'count': None}
+    assert result['page_state'] == {'states': ['stale'], 'count': None}
     assert 'error' not in result
-    # Retained rows are neither healthy nor current while loading.
-    assert result['sources'][0]['data_state'] == {'states': ['loading'], 'count': None}
+    # Retained rows remain explicitly stale during revalidation.
+    assert result['sources'][0]['data_state'] == {'states': ['stale'], 'count': None}
     assert 'health' not in result['sources'][0]
     assert result['sources'][0]['last_success'] == '2026-10-10T08:00:00.000+08:00'
     assert 'SYNTHETIC_PRIOR' not in json.dumps(result)
-    assert build(snapshot(), freshness)['page_state'] == {'states': ['loading'], 'count': None}
+    assert build(snapshot(), freshness)['page_state'] == {'states': ['stale'], 'count': None}
 
 
 @pytest.mark.parametrize('freshness', [
@@ -450,3 +450,18 @@ def test_six_and_half_day_old_cache_without_lease_is_never_healthy(freshness):
     assert result['page_state'] == {'states': ['stale'], 'count': None}
     assert result['page_state'] is not None
     assert 'health' not in result['sources'][0]
+
+
+def test_revalidation_keeps_successful_source_snapshot_available_to_p2():
+    from .confirmation_list import build_confirmation_list
+    value = snapshot()
+    health = build(value, {'status': 'refreshing', 'as_of': OLD})
+    assert health['page_state'] == {'states': ['stale'], 'count': None}
+    assert health['sources'] == []
+    from .test_confirmation_list import entity
+    page = build_confirmation_list({'environment': 'test',
+                                    'source_status': {'status': health['page_state']['states'][0]},
+                                    'source_confirmations': [entity('r1', 'C100')], 'projects': []})
+    assert page['page_state']['states'] == ['stale']
+    assert [row['case_number'] for row in page['rows']] == ['C100']
+    assert page['amounts']['state'] == 'withheld'
