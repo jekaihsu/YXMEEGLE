@@ -242,6 +242,8 @@ function parseSnapshot(raw:unknown){
  // An explicit empty population cannot coexist with case or unresolved rows.
  if(EMPTY.has(state.states[0])&&(cases.length||rows.length))bad();
  if(EMPTY.has(ustate.states[0])&&rows.length)bad();
+ // The cards measure the same population: an empty snapshot cannot carry a positive count (zero and dash cards are fine).
+ if(EMPTY.has(state.states[0])&&cards.some(c=>c.known&&c.valueText!=='0'))bad();
  return {state,filters,cases,details,cards,
   bucketNote:optStr(s.bucket_policy),
   unresolved:{countText:um.text,known:um.known,stateLabel:labelOf(ustate),reason:reqStr(u.reason),rows}};

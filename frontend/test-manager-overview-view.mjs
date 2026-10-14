@@ -205,6 +205,22 @@ test('19. 128-R2: contradictory or malformed state invalidates the snapshot',()=
  eq(cardOf(v(),'pending_decisions').valueText,'—','plain unknown state still accepted');
 });
 
+test('20. 128-R2 residual: an empty snapshot that retains a positive population card is invalid; zero and dash cards stay',()=>{
+ for(const state of ['complete_empty','filtered_empty']){
+  const b=body();b.snapshot.state=st([state],0);b.snapshot.cases=[];
+  b.snapshot.unresolved={state:st(['complete_empty'],0),value:0,reason:'empty',rows:[]};
+  ok(b.snapshot.cards.some(c=>typeof c.value==='number'&&c.value>0),'fixture keeps real positive cards');
+  const view=v(b);
+  eq([view.snapshot.state.states,view.snapshot.cases,view.snapshot.cards,view.snapshot.reason],[['unknown'],[],[],L.invalidBody],state+' with positive cards fails closed');
+  ok(!JSON.stringify(view.snapshot).includes('"valueText":"3"'),'no positive count rendered beside an empty state');
+  const ok0=body();ok0.snapshot.state=st([state],0);ok0.snapshot.cases=[];
+  ok0.snapshot.cards=[card('confirmation_versions','confirmation_version',0,st(['complete_empty'],0),'Complete'),card('pending_decisions','stable_case',null,st([unk]),'n/a')];
+  ok0.snapshot.unresolved={state:st(['complete_empty'],0),value:0,reason:'empty',rows:[]};
+  const g=v(ok0);eq(g.snapshot.state.states,[state],'zero and unavailable cards keep the empty state');
+  eq(cardOf(g,'confirmation_versions').valueText,'0','known zero renders');
+ }
+});
+
 // ---- mutation checks: break each guard in a temp copy and require the behavior it protects to break ----
 const src=readFileSync(new URL('./src/managerOverviewView.ts',import.meta.url),'utf8');
 const dir=mkdtempSync(join(tmpdir(),'mo-mut-'));copyFileSync(new URL('./src/dataState.ts',import.meta.url),join(dir,'dataState.ts'));
@@ -260,6 +276,13 @@ test('M9. mutation: malformed-state and empty-consistency guards removed -> cont
  const c=await mutated("if(EMPTY.has(state.states[0])&&(cases.length||rows.length))bad();","");
  const e=body();e.snapshot.state=st(['complete_empty'],0);e.snapshot.cards=[];e.snapshot.unresolved={value:0,state:st(['complete_empty'],0),reason:'x',rows:[]};
  eq(c({body:e}).snapshot.cases.length,2,'mutant keeps cases beside complete_empty');
+});
+
+test('M10. mutation: empty-state positive-card guard removed -> positive count beside empty state (test 20 would fail)',async()=>{
+ const c=await mutated("if(EMPTY.has(state.states[0])&&cards.some(c=>c.known&&c.valueText!=='0'))bad();","");
+ const e=body();e.snapshot.state=st(['complete_empty'],0);e.snapshot.cases=[];e.snapshot.unresolved={value:0,state:st(['complete_empty'],0),reason:'x',rows:[]};
+ eq(c({body:e}).snapshot.state.states,['complete_empty'],'mutant keeps the empty state');
+ ok(c({body:e}).snapshot.cards.some(x=>x.valueText==='3'),'mutant shows a positive card beside the empty state');
 });
 
 let failed=0;
