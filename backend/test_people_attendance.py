@@ -158,3 +158,13 @@ def test_tenant_reader_uses_same_route_and_hr_list(tmp_path,monkeypatch):
     app.state.cfg['HR_VIEWERS']='u-tenant'
     assert client.get('/api/people/attendance').status_code==200
     assert client.post('/api/people/attendance').status_code in (403,405)
+
+
+@pytest.mark.parametrize('attempt,expected,refreshing',[('busy','loading',True),('refreshing','loading',True),('error','read-failed',False)])
+def test_unread_week_preserves_retry_or_failure(harness,monkeypatch,attempt,expected,refreshing):
+    _,live,_,_,_=harness
+    reader=PeopleAttendance(live.Session,live.CacheRow,live,live.cfg,executor=SynchronousExecutor())
+    monkeypatch.setattr(reader,'ensure',lambda *args,**kwargs:{'status':attempt})
+    view=reader.view('lark-company')
+    assert view['status']==expected and view['refreshing'] is refreshing
+    assert not view['incomplete'] and view['summary']['on_trip'] is None

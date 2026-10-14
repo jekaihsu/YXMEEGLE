@@ -30,15 +30,19 @@ class PeopleAttendance(RefreshCoordinator):
         result = empty_view(days)
         if not self._enabled(wid):
             return dict(result, status='not-connected')
-        self.ensure(key, 'attendance')
+        attempt = self.ensure(key, 'attendance')
         row = self._read(self._key(key, 'attendance'))
         snapshot = deepcopy(row.get('snapshot'))
         if snapshot:
             result = snapshot
         state = self._dataset_status('attendance', row)
         result.update(incomplete=result['status'] == 'incomplete', as_of=state['as_of'], missing_scopes=state.get('missing_scopes', []),
-                      refreshing=state['status'] == 'refreshing')
-        if state['status'] in ('needs-permission', 'blocked', 'error'):
+                      refreshing=state['status'] == 'refreshing' or attempt['status'] in ('busy', 'refreshing'))
+        if not snapshot and attempt['status'] == 'error':
+            result.update(status='read-failed', incomplete=False, refreshing=False)
+        elif not snapshot and result['refreshing']:
+            result.update(status='loading', incomplete=False)
+        elif state['status'] in ('needs-permission', 'blocked', 'error'):
             result['status'] = 'needs-permission' if state['status'] == 'needs-permission' else 'read-failed'
             result['summary'] = empty_view(days)['summary']
         elif snapshot and state['status'] in ('stale', 'refreshing'):

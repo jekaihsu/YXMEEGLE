@@ -4,7 +4,7 @@
 
 VCC-148 should import `fetchPeopleAttendance`, `PeopleAttendance`, and `attendanceValue` from `frontend/src/peopleAttendance.ts`. This is the same reader and cache as the People tab. The response includes:
 
-- `status`: ok, incomplete, stale, needs-permission, not-connected, or read-failed.
+- `status`: loading, ok, incomplete, stale, needs-permission, not-connected, or read-failed.
 - `as_of`, `missing_scopes`, `refreshing`, and `incomplete`.
 - `summary`: nullable people, in_service, on_leave, on_trip, and trips counts. Leave/trip counts are distinct people with approvals overlapping the selected week, including future dates.
 - `people`: id, name, group, in_service, and seven nullable daily attendance labels.
