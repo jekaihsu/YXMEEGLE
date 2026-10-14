@@ -43,6 +43,11 @@ def new_project(code, first, sop, case_type='formal'):
     return dict(id=pid,code=code,name=text(first['fields'].get('工程名稱')) or code,client='',pm_id='',status='pending',priority='medium',due_date=None,original_due_date=None,created_at=now(),started_at=None,description='',contract_amount=None,estimated_points=None,source_kind='lark',source_model='v4',case_type=case_type,revision=1,nodes=nodes(pid,sop),files=[],comments=[],daily_reports=[],source_url=url(first),sop_version=sop['id'])
 
 
+def quote_companies(quotes):
+    """Distinct 行號單位 values; the project client is only known when they agree."""
+    return sorted({name for q in quotes if (name:=text(q['fields'].get('行號單位')).strip())})
+
+
 def quote_snapshot(record):
     f=record['fields']
     return dict(id=source_id(record),quote_code=normalized_case(f.get('報價編號')),engineering_code=normalized_case(f.get('工程編號')),source_url=url(record),amount=number(f.get('契約價格(未稅)')),fields=deepcopy(f))
@@ -317,6 +322,9 @@ def import_v4(ws, records, complete_tables=None):
         for field in ('工程名稱','合約總額','預估總成本','實際總成本','狀態'):
             vals={text(r['fields'].get(field)) for r in group if text(r['fields'].get(field))}
             if len(vals)>1: conflicts[field]=sorted(vals)
+        companies=quote_companies(linked_quotes[code])
+        if len(companies)>1: conflicts['行號單位']=companies
+        p['client']=companies[0] if len(companies)==1 else ''
         p['source_conflicts']=conflicts
         if '工程名稱' not in conflicts: p['name']=unique_value(text(r['fields'].get('工程名稱')) for r in group) or p['name']
         remote=unique_value(text(r['fields'].get('狀態')) for r in group)
@@ -360,6 +368,7 @@ def import_v4(ws, records, complete_tables=None):
             p=new_project(snapshot['quote_code'] or ident,q,sop,'intake'); ws['projects'].append(p)
         p.update(case_type='intake',source_model='v4',intake_status=reason,quotes=[snapshot],source_url=url(q),source_record_ids=[ident],source_records=[{'id':ident,'kind':'quote','fields':deepcopy(q['fields']),'url':url(q)}],source_identity={k:q[k] for k in ('base_token','table_id','record_id')},parent_code=None)
         p['source_conflicts']={'confirmation':possible} if possible else {}
+        p['client']=next(iter(quote_companies([q])),'')
         p['name']=text(q['fields'].get('工程名稱')) or p['name']
         p['source_status']='待確認單'; p['status']='pending'
         p['source_lifecycle']=summarize([],[q])
@@ -430,16 +439,21 @@ def import_v4(ws, records, complete_tables=None):
                 else: unresolved_case=True
                 if (r['base_token'],rid) in report_fields: linked.append(report_fields[(r['base_token'],rid)])
         if not candidates and not code and not any(link_ids(f.get(k)) for k in ('所屬案件','內業工項','合約工項')):
-            code=normalized_case(f.get(PROVISIONAL_CASE_FIELD) or f.get('可能確認單工作編號')); candidates=dict(aliases.get(code,{})); basis='provisional_case_code'
+            code=normalized_case(f.get(PROVISIONAL_CASE_FIELD) or f.get('可能確認單工作編號')); candidates=dict(aliases.get(code,{}))
+            if code: basis='provisional_case_code'
         costrecords,_=native_records(r,'所屬成本單',record_index,{'cost'})
         costfields=[c['fields'] for c in costrecords]
         dates={day(f.get(k),formula_serial=k in ('工作日期-薪資','工作日期-營業額明細')) for k in ('工作日期-薪資','工作日期-營業額明細','日期')}|{day(c.get(k)) for c in costfields for k in ('工作日期','出工日期','日期')}; dates.discard('')
         rawgroup=unique_value([text(f.get('組別'))]+[text(c.get('內業組別') or c.get('組別') or c.get('所屬組別')) for c in costfields])
         department=canonical_department(text(f.get('營業額組別-明細') or r.get('department')) or unique_value(text(x.get('工項類別')) for x in linked) or rawgroup)
-        people=[text(f.get('姓名') or f.get('填寫人') or f.get('人員'))]
-        for c in [f]+costfields:
-            for k in ('填報帳號','組長帳號-津貼自動化','組員帳號-津貼自動化'):
-                v=c.get(k); people.extend(text(x) for x in v) if isinstance(v,list) else people.append(text(v))
+        # 出工人 (組長＋組員) and 姓名 name who worked. The account fields are only the fallback: 填報帳號 is
+        # whoever created the cost row, and the 組員 user field omits crew without a Lark account.
+        crew=[n for n in (s.strip() for s in re.split('[,，、]',text(f.get('出工人')))) if n and not n.startswith('⚠')]
+        people=crew or [text(f.get('姓名') or f.get('填寫人') or f.get('人員'))]
+        if not any(people):
+            for c in [f]+costfields:
+                for k in ('填報帳號','組長帳號-津貼自動化','組員帳號-津貼自動化'):
+                    v=c.get(k); people.extend(text(x) for x in v) if isinstance(v,list) else people.append(text(v))
         entry=dict(id=ident,date=unique_value(dates),department=department,source_department=rawgroup,case_code=code,source_case_code=code,person='、'.join(dict.fromkeys(x for x in people if x)),description=text(f.get('工作內容') or f.get('工項說明') or f.get('本明細適用工項') or f.get('備註')) or '、'.join(text(x.get('工項名稱')) for x in linked),points=number(f.get('最終營業額點數') if f.get('最終營業額點數') is not None else f.get('營業額點數')),source_url=url(r),match_basis=basis,mapping_status='conflicting_dates' if len(dates)>1 else 'missing_date' if not dates else 'missing_department' if not department else 'provisional_case_code' if basis=='provisional_case_code' else 'ready',source_fields=deepcopy(f))
         entry['review']=daily_review(r,costfields)
         entry['source_identity']={k:r[k] for k in ('base_token','table_id','record_id')}
@@ -456,6 +470,8 @@ def import_v4(ws, records, complete_tables=None):
         approved=next((m for m in reversed(ws['daily_reviews']) if m['daily_id']==ident and m['status']=='approved' and review_mapping_version(m)==entry['mapping_version']),None)
         if approved:
             candidates={p['id']:p for p in ws['projects'] if p['id']==approved['project_id']}; entry['match_basis']='manual_review'; unresolved_case=False
+            # The provisional label is evaluated after date and group checks, so it only ever stood in for 'ready'.
+            if entry['mapping_status']=='provisional_case_code': entry['mapping_status']='ready'
         # Date/department quality applies to all source rows, including unmatched
         # rows. Counting it only after a match makes a broken source look healthy.
         for k,condition in [('daily_provisional',basis=='provisional_case_code' and bool(code)),('daily_missing_date',not dates),('daily_missing_department',not department),('daily_conflicting_dates',len(dates)>1)]: stats[k]+=int(condition)

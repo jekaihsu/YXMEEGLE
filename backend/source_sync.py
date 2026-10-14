@@ -13,7 +13,7 @@ from .lark_adapter import application_adapter
 
 
 # Bump when import_sources or source-reference policy changes its projection.
-SOURCE_PROJECTION_VERSION = 'sources-v2-work-items-20261013'
+SOURCE_PROJECTION_VERSION = 'sources-v3-daily-client-20261014'
 PROJECTION_FIELDS = ('projects', 'archived_projects', 'source_quotes', 'source_confirmations',
                      'contract_items', 'source_work_items', 'source_work_items_status', 'daily_unmatched', 'daily_reviews', 'sop_templates',
                      'users', 'settings', 'source_identity_conflicts', 'source_case_baseline',
