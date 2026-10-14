@@ -2,7 +2,7 @@ import {taipeiTime} from './taipeiTime';
 import {Section,Button,Badge} from './design';
 import './owned-screens.css';
 import {ageFreshness,datasetNotice} from './freshness';
-import {useRef,useState} from 'react';
+import {lazy,Suspense,useRef,useState} from 'react';
 import {api,getSessionEpoch,liveRefresh} from './api';
 import type {Freshness,DatasetFreshness} from './types';
 import type {Context} from './Operations';
@@ -54,4 +54,7 @@ export function PeopleDirectoryPanel({c}:{c:Context}){
  </Section></section>;
 }
 
-export {PeopleAttendancePanel} from './PeopleAttendancePanel';
+const WeeklyPeoplePanel=lazy(()=>import('./PeopleAttendancePanel').then(module=>({default:module.PeopleAttendancePanel})));
+export function PeopleAttendancePanel({c}:{c:Context}){
+ return <Suspense fallback={<p role="status">正在載入人員與出勤…</p>}><WeeklyPeoplePanel c={c}/></Suspense>;
+}
