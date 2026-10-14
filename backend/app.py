@@ -158,6 +158,7 @@ def create_app(overrides=None):
             response=RedirectResponse('/?auth_error='+code,status_code=303)
             response.delete_cookie('lark_oauth_state'); return response
         body = {'detail': exc.detail}
+        if getattr(exc,'code',None)=='user_token_expired': body['code']=exc.code
         if request.url.path == '/api/lark-pilot/shadow':
             body['code'] = getattr(exc, 'code', 'pilot_method_not_allowed' if exc.status_code == 405 else 'pilot_read_failed')
         response=JSONResponse(body,status_code=exc.status_code,headers=exc.headers)
@@ -349,6 +350,15 @@ def create_app(overrides=None):
                     access=require_access(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'),allow_recovery=(request.method,request.url.path) in recovery_routes)
                 data={**data,'access_mode':access}
         return data,user
+
+    def user_access_token(db,data):
+        auth=db.get(AuthRow,data['sid'])
+        expiry=auth.data.get('token_expires') if auth else None
+        if type(expiry) not in (int,float) or not expiry>datetime.now(timezone.utc).timestamp():
+            exc=HTTPException(401,'Lark 授權已過期，請重新登入')
+            exc.code='user_token_expired'
+            raise exc
+        return auth.data['access_token']
 
     def hr_visible(user):
         from .production_access import hr_view_allowed
@@ -1068,7 +1078,7 @@ def create_app(overrides=None):
                 cache=db.get(CacheRow,data['wid']); state=load(db,db.get(WorkspaceRow,data['wid']))
             freshness=app.state.live_read.status(data['wid'])
             return {**public_source_response(state,cache.data,user),'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
-        with sessions() as db: auth=db.get(AuthRow,data['sid']); token=auth.data['access_token']
+        with sessions() as db: token=user_access_token(db,data)
         snapshot=app.state.source_sync.sync(data['wid'],user['id'],token)
         with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
         freshness=app.state.live_read.status(data['wid'])
@@ -1082,7 +1092,7 @@ def create_app(overrides=None):
         instance_code=str(body.get('instance_code','')); require(bool(re.fullmatch(r'[A-Za-z0-9_-]{6,128}',instance_code)),'請提供有效 Lark 審批實例 ID',400)
         with sessions() as db:
             ws=load(db,db.get(WorkspaceRow,data['wid'])); approval=find(ws['approvals'],approval_id,'申請'); p=find(ws['projects'],approval['project_id'],'案件'); require(is_pm(user,p))
-            token=db.get(AuthRow,data['sid']).data['access_token']
+            token=user_access_token(db,data)
         try:
             with httpx.Client(timeout=25) as client:
                 response=client.get(API+'/approval/v4/instances/detail',headers={'Authorization':'Bearer '+token},params={'instance_code':instance_code,'locale':'zh-TW','user_id_type':'open_id'})
@@ -1117,7 +1127,7 @@ def create_app(overrides=None):
         require(capable(user,'manage_training') or capable(user,'manage_sources'),'需要訓練或來源管理權限',403)
         body=await json_object(request)
         require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
-        with sessions() as db: token=db.get(AuthRow,data['sid']).data['access_token']
+        with sessions() as db: token=user_access_token(db,data)
         adapter=LarkAdapter(token)
         try: catalog,bindings=read_capabilities(adapter)
         except RemoteFailure as exc: raise HTTPException(502,str(exc))
@@ -1152,7 +1162,7 @@ def create_app(overrides=None):
         require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
         code=str(body.get('instance_code',''))
         require(bool(re.fullmatch(r'[A-Za-z0-9_-]{6,128}',code)),'審批實例編號格式錯誤',422)
-        with sessions() as db: token=db.get(AuthRow,data['sid']).data['access_token']
+        with sessions() as db: token=user_access_token(db,data)
         adapter=LarkAdapter(token)
         try:
             remote=adapter.request('GET','/approval/v4/instances/detail',params={'instance_code':code,'user_id_type':'open_id','locale':'zh-TW'})

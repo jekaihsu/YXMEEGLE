@@ -45,7 +45,7 @@ def api(tmp_path,monkeypatch):
     with app.state.sessions.begin() as db:
         db.add(WorkspaceRow(id='lark-tenant',version=1,data=state))
         for u in state['users']: db.add(PersonRow(organization_id='lark-tenant',person_id=u['id'],data=u))
-        db.add(AuthRow(id='auth',data={'wid':'lark-tenant','expires':time.time()+3600,'access_token':'unused'}))
+        db.add(AuthRow(id='auth',data={'wid':'lark-tenant','expires':time.time()+3600,'token_expires':time.time()+3600,'access_token':'unused'}))
     def client(uid):
         c=TestClient(app); c.cookies.set('meegle_session',app.state.signer.dumps({'mode':'lark','uid':uid,'wid':'lark-tenant','sid':'auth'})); return c
     return app,client

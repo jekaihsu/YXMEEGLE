@@ -76,6 +76,12 @@ async function scenario(kind,change,status=200,body){
   assert.ok(!document.body.textContent.includes('檔案已上傳'));
   await flush(async()=>{newRelease(json({...current,version:2}));await newer});
   assert.equal(window.epochContext.w.version,2);
+ }else if(status===401){
+  await flush(async()=>{oldRelease(json({code:'user_token_expired',detail:'Lark 授權已過期，請重新登入'},401));await pending});
+  assert.equal(window.epochContext.w,undefined);
+  assert.equal(window.epochContext.s.user,null);
+  assert.match(document.querySelector('.login-card').textContent,/請重新登入/);
+  assert.equal(document.querySelector('.login-card a').textContent,'使用 Lark 登入');
  }else if(body!==undefined){
   const before=window.epochContext.w;
   let result;await flush(async()=>{oldRelease(new Response(body,{status}));result=await pending});
@@ -102,6 +108,7 @@ for(const kind of ['run','upload']){
  for(const change of ['actor','workspace','environment','mode','recovery','logout','expiry'])await scenario(kind,change);
  for(const status of [401,409,500])await scenario(kind,'actor',status);
  await scenario(kind,null);
+ await scenario(kind,null,401);
  for(const body of ['', '   \n', '<html>proxy fallback</html>', '{"broken":', 'null'])await scenario(kind,null,200,body);
 }
 for(const change of ['actor','workspace','environment','mode','recovery','logout','expiry'])await scenario('switch',change,401);

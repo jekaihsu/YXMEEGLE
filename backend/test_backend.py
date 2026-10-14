@@ -347,7 +347,7 @@ def test_native_approval_refresh_uses_official_user_endpoint(app,monkeypatch):
         project.update(case_visibility='new_case',execution_system='workbench')
     with app.state.sessions.begin() as db:
         db.add(WorkspaceRow(id='lark-approval-test',version=1,data=live))
-        db.add(AuthRow(id='approval-session',data={'wid':'lark-approval-test','expires':time.time()+3600,'access_token':'user-token'}))
+        db.add(AuthRow(id='approval-session',data={'wid':'lark-approval-test','expires':time.time()+3600,'token_expires':time.time()+3600,'access_token':'user-token'}))
     c=TestClient(app); c.cookies.set('meegle_session',app.state.signer.dumps({'mode':'lark','uid':'u-pm','wid':'lark-approval-test','sid':'approval-session'}))
     aid=proposal(c); requests=[]
     class ReadClient:
