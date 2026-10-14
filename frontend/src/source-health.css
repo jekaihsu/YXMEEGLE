@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 /* Source Health (A04) Component Styles */
 
 .source-health-root {
@@ -564,4 +566,5 @@
     order: 2; /* Below the table */
     margin-top: 16px;
   }
+}
 }

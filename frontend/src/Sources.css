@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 /* Connection details use the same neutral surface and insets as the home hero. */
 .workspace .source-connection{padding:var(--sp-6) var(--sp-7);gap:var(--sp-4);border:.5px solid var(--separator);border-radius:var(--radius-card);background:var(--surface);box-shadow:none}
 .workspace .source-connection>div:nth-child(2){min-width:0}
@@ -28,4 +30,5 @@
  .workspace .source-record-filters{flex-wrap:wrap;width:100%;gap:var(--sp-3)}
  .workspace .source-record-filters>select{flex:1 1 10rem;min-width:0;max-width:100%}
  .workspace .source-record-filters>.search-field{flex:1 1 16rem;max-width:100%}
+}
 }

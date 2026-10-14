@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 /* P2 Lists Presentational Styles (VCC-129 Confirmation List & VCC-128 Manager Overview) */
 
 :root {
@@ -1471,4 +1473,5 @@ thead th.p2-col-sticky-2 {
   .p2-cards-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
 }

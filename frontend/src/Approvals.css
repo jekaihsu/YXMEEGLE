@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 /* Approval titles carry the hierarchy; status remains visible beside metadata. */
 .workspace .approval-list{overflow:hidden;border:.5px solid var(--separator);border-radius:var(--radius-card);background:var(--surface)}
 .workspace .approval-row{padding:var(--sp-4) var(--sp-5);gap:var(--sp-3);color:var(--label)}
@@ -14,4 +16,5 @@
  .workspace .approval-row-main{grid-column:2/-1;grid-row:1}
  .workspace .approval-row>.ds-badge{grid-column:2;justify-self:start}
  .workspace .approval-row>svg{grid-column:3;align-self:center}
+}
 }

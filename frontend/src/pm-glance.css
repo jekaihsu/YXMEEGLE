@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 .pm-glance {max-width:1240px;margin:0 auto;color:var(--label)}
 .pm-glance-head {display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:16px}
 .pm-glance-head h1 {font-size:30px;margin:8px 0}
@@ -40,3 +42,4 @@
 @media(max-width:640px) {.pm-glance-source-grid {grid-template-columns:minmax(0,1fr)}}
 .pm-glance-tile.state-ok .pm-glance-state {color:color-mix(in srgb,var(--positive) 80%,var(--label))}
 .pm-glance-tile.state-failed .pm-glance-state {color:color-mix(in srgb,var(--critical) 80%,var(--label))}
+}

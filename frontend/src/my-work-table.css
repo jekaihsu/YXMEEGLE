@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 /* My Work Presentational Styles (VCC-126) */
 
 .my-work-container {
@@ -651,4 +653,5 @@
   .my-work-search-box {
     max-width: 100%;
   }
+}
 }

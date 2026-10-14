@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 .node-assignments{container-type:inline-size;color:var(--label);margin:var(--sp-6) 0;min-width:0}
 .na-heading{display:flex;justify-content:space-between;align-items:center;gap:var(--sp-5);margin-bottom:var(--sp-5)}
 .na-heading h2{font-size:var(--fs-title1);letter-spacing:-.02em;line-height:1.4}.na-heading p:not(.na-eyebrow){color:var(--label-2);font-size:var(--fs-footnote);margin-top:var(--sp-1)}
@@ -44,3 +46,4 @@
 .na-card-done .na-progress-track>span{background:var(--positive)}.na-card-review .na-progress-track>span{background:var(--warning)}
 .na-card-top{flex-direction:column;align-items:flex-start;min-height:48px}.na-flow-legend{margin:16px 0 24px}
 @container(max-width:700px){.na-card-top{flex-direction:row;align-items:center;min-height:0}}
+}

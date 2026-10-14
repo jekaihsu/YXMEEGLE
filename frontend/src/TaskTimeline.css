@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 /* Gantt-style timeline. Two panes side by side: a fixed task list (name · owner · due) and a calendar that is the only
    thing scrolling sideways. The page itself scrolls vertically; the date header sticks under the app top bar.
    Row heights are fixed in both panes so each bar lines up with its task. */
@@ -124,4 +126,5 @@
  .tl-owner .avatar{display:none}
  .tl-group-name small{display:none}
  .tl-nav{margin-left:0}
+}
 }

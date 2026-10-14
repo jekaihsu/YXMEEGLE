@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer tokens{
 /* Design tokens. Screens use these variables only; appearance is driven by data-theme / data-text on <html>. */
 :root{
  color-scheme:light;
@@ -13,6 +15,7 @@
  --glass-highlight:inset 0 1px 0 rgb(255 255 255/.85);
  --glass-shadow:0 1px 2px rgb(21 35 51/.05),0 8px 24px rgb(21 35 51/.08);
  --glass-shadow-raised:0 2px 4px rgb(21 35 51/.06),0 14px 32px rgb(21 35 51/.12);
+ --glass-shadow-flat:0 1px 2px rgb(21 35 51/.05),0 4px 12px rgb(21 35 51/.05);
  --bg-tint:radial-gradient(56rem 36rem at 6% -8%,rgb(12 84 148/.14),transparent 70%),radial-gradient(48rem 34rem at 104% 2%,rgb(14 148 160/.1),transparent 70%),radial-gradient(60rem 40rem at 50% 112%,rgb(98 92 190/.08),transparent 70%);
  --positive:#1a6f35;--warning:#8f4a00;--critical:#c4001a;
  --status-ok-fg:#14532d;--status-ok-bg:#dcfce7;
@@ -52,6 +55,7 @@ html{font-size:calc(100% * var(--text-scale))}
  --glass-highlight:inset 0 1px 0 rgb(255 255 255/.1);
  --glass-shadow:0 1px 2px rgb(0 0 0/.3),0 8px 24px rgb(0 0 0/.28);
  --glass-shadow-raised:0 2px 4px rgb(0 0 0/.34),0 14px 32px rgb(0 0 0/.4);
+ --glass-shadow-flat:0 1px 2px rgb(0 0 0/.3),0 4px 12px rgb(0 0 0/.2);
  --bg-tint:radial-gradient(56rem 36rem at 6% -8%,rgb(94 163 224/.16),transparent 70%),radial-gradient(48rem 34rem at 104% 2%,rgb(20 184 166/.1),transparent 70%),radial-gradient(60rem 40rem at 50% 112%,rgb(129 120 235/.1),transparent 70%);
  --positive:#4ade80;--warning:#fbbf24;--critical:#ff7a70;
  --focus-ring:#b8d8ff;
@@ -69,6 +73,7 @@ html{font-size:calc(100% * var(--text-scale))}
   --glass-highlight:inset 0 1px 0 rgb(255 255 255/.1);
   --glass-shadow:0 1px 2px rgb(0 0 0/.3),0 8px 24px rgb(0 0 0/.28);
   --glass-shadow-raised:0 2px 4px rgb(0 0 0/.34),0 14px 32px rgb(0 0 0/.4);
+  --glass-shadow-flat:0 1px 2px rgb(0 0 0/.3),0 4px 12px rgb(0 0 0/.2);
   --bg-tint:radial-gradient(56rem 36rem at 6% -8%,rgb(94 163 224/.16),transparent 70%),radial-gradient(48rem 34rem at 104% 2%,rgb(20 184 166/.1),transparent 70%),radial-gradient(60rem 40rem at 50% 112%,rgb(129 120 235/.1),transparent 70%);
   --positive:#4ade80;--warning:#fbbf24;--critical:#ff7a70;
   --focus-ring:#b8d8ff;
@@ -84,3 +89,4 @@ html{font-size:calc(100% * var(--text-scale))}
 @media(prefers-reduced-motion:reduce){:root{--dur-fast:0ms;--dur-base:0ms;--dur-slow:0ms}}
 .appearance-control{display:flex;flex-wrap:wrap;gap:var(--sp-4) var(--sp-7);margin-bottom:var(--sp-6)}
 .appearance-field{display:flex;align-items:center;gap:var(--sp-3)}.appearance-field>span{font-size:var(--fs-footnote);color:var(--label-2)}
+}

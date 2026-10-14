@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 /* Project detail chrome and overview. Selectors are scoped to .project-detail to win over legacy rules. */
 .project-detail .project-topline{display:flex;justify-content:space-between;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-4)}
 .project-detail .project-tools{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap}
@@ -77,4 +79,5 @@
 
 @media(max-width:760px){
  .workspace .project-detail :is(.node-actions,.co-actions,.heading-actions)>.disabled-action { width:100%; align-items:stretch; }
+}
 }

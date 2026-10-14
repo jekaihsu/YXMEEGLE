@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 /* P2 Detail Shared Styles (VCC-131 Contract Detail & VCC-132 Work Item Detail) */
 
 .p2-detail-root {
@@ -1129,4 +1131,5 @@
   .p2-header {
     padding: var(--sp-3, 12px) var(--sp-4, 16px);
   }
+}
 }

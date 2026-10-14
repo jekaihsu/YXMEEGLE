@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 /* Projects list: one hero (the two counts), a quiet toolbar and a borderless grouped table. Selectors are scoped to beat legacy rules. */
 .portfolio-page{display:flex;flex-direction:column;gap:var(--sp-5)}
 .portfolio-page .portfolio-index{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;border:.5px solid var(--glass-border);border-radius:var(--radius-card);background:var(--glass-fill);overflow:hidden}
@@ -123,3 +125,4 @@
 .workspace .portfolio-page .projects-table :is(th,td){text-align:left!important}
 .workspace .portfolio-page .projects-table .progress-cell{justify-content:flex-start}
 .workspace .portfolio-page .projects-table .progress-cell>span{text-align:left;min-width:2.5rem}
+}

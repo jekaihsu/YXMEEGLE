@@ -1,33 +1,104 @@
-/* Shared sizing policy also covers lazy-loaded screens and legacy overrides.
-   Only control sizing is authoritative; page layout and appearance stay local. */
-:is(.button,.ds-button){
- min-height:var(--control-height)!important;
- padding:var(--control-pad-block) var(--button-pad-inline)!important;
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
+/* Control system. This layer sits above page files, so one rule set sizes and paints every button, field and tab
+   without !important. Pages keep font size, width, alignment and spacing between controls.
+   Buttons are translucent fills with a top highlight and a 1px border. They never blur on their own. */
+@layer controls{
+:root{
+ --btn-border:color-mix(in srgb,var(--accent) 72%,var(--surface));
+ --btn-fill:linear-gradient(180deg,color-mix(in srgb,var(--surface) 92%,transparent),color-mix(in srgb,var(--surface) 62%,transparent));
+ --btn-fill-hover:linear-gradient(180deg,var(--surface),color-mix(in srgb,var(--surface) 82%,transparent));
+ --btn-fill-primary:linear-gradient(180deg,color-mix(in srgb,var(--accent) 88%,#fff),var(--accent));
+ --btn-fill-primary-hover:linear-gradient(180deg,var(--accent),var(--accent-hover));
+ --btn-shadow:var(--glass-highlight),0 1px 2px rgb(21 35 51/.08);
+ --btn-shadow-active:inset 0 1px 2px rgb(21 35 51/.16);
+ --field-border:color-mix(in srgb,var(--label-2) 58%,var(--surface));
 }
-:is(.button.compact,.ds-button[data-variant=plain]){padding-inline:var(--control-pad-inline)!important}
-:is(.tabbar,.project-tabs,.ops-tabs,.segmented,.ds-segmented)>button{
- min-height:var(--control-height)!important;
- padding:var(--control-pad-block) var(--control-pad-inline)!important;
+:root[data-theme=dark]{--btn-shadow:var(--glass-highlight),0 1px 2px rgb(0 0 0/.4);--btn-shadow-active:inset 0 1px 2px rgb(0 0 0/.5)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]):not([data-theme=dark]){--btn-shadow:var(--glass-highlight),0 1px 2px rgb(0 0 0/.4);--btn-shadow-active:inset 0 1px 2px rgb(0 0 0/.5)}}
+
+/* Secondary (default), primary, plain (ghost) and destructive buttons share height, radius and states. */
+:is(.button,.ds-button,.p2-btn,.source-health-btn-retry,.my-work-action-button){
+ box-sizing:border-box;min-height:var(--control-height);padding:var(--control-pad-block) var(--button-pad-inline);
+ border:1px solid var(--btn-border);border-radius:var(--radius-control);
+ background:var(--btn-fill);color:var(--accent);box-shadow:var(--btn-shadow);
+ font-weight:500;line-height:1.3;text-decoration:none;cursor:pointer;transform:none;filter:none;
+ transition:background var(--dur-fast) var(--ease),border-color var(--dur-fast) var(--ease),box-shadow var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease);
 }
-input:not([type=checkbox],[type=radio],[type=range],[type=color],[type=hidden]),select,textarea{
- padding:var(--control-pad-block) var(--control-pad-inline)!important;
+:is(.button,.ds-button,.p2-btn,.source-health-btn-retry,.my-work-action-button):hover{background:var(--btn-fill-hover);border-color:var(--accent);transform:none}
+:is(.button,.ds-button,.p2-btn,.source-health-btn-retry,.my-work-action-button):active{background:color-mix(in srgb,var(--accent) 10%,var(--surface));box-shadow:var(--btn-shadow-active);transform:none}
+:is(.button.primary,.ds-button[data-variant=primary],.p2-btn-primary){
+ background:var(--btn-fill-primary);color:var(--on-accent);border-color:var(--accent-hover);
+ box-shadow:inset 0 1px 0 rgb(255 255 255/.28),0 1px 2px rgb(12 84 148/.3),0 4px 10px rgb(12 84 148/.18);
 }
-input:not([type=checkbox],[type=radio],[type=range],[type=color],[type=hidden]),select{min-height:var(--control-height)!important}
-select{padding-inline-end:var(--sp-7)!important}
-textarea{min-height:var(--control-height);padding-block:var(--sp-3)!important}
-/* Search wrappers provide the horizontal inset around icons and clear buttons. */
-.search-field input{padding-inline:0!important;min-width:0}
+:is(.button.primary,.ds-button[data-variant=primary],.p2-btn-primary):hover{background:var(--btn-fill-primary-hover);border-color:var(--accent-hover);color:var(--on-accent)}
+:is(.button.primary,.ds-button[data-variant=primary],.p2-btn-primary):active{background:var(--accent-hover);box-shadow:inset 0 1px 2px rgb(0 0 0/.28)}
+:is(.ds-button[data-variant=plain],.p2-btn-plain,.text-button){
+ background:transparent;border-color:transparent;box-shadow:none;color:var(--accent);
+}
+:is(.ds-button[data-variant=plain],.p2-btn-plain,.text-button):hover{background:var(--accent-fill);border-color:transparent;text-decoration:none}
+:is(.ds-button[data-variant=plain],.p2-btn-plain,.text-button):active{background:color-mix(in srgb,var(--accent) 18%,transparent);box-shadow:none}
+.ds-button[data-variant=destructive]{color:color-mix(in srgb,var(--critical) 80%,var(--label));border-color:var(--critical)}
+.ds-button[data-variant=destructive]:hover{background:color-mix(in srgb,var(--critical) 10%,var(--surface));border-color:var(--critical)}
+.button.compact{min-height:var(--control-height);padding-inline:var(--control-pad-inline)}
+.ds-button[data-variant=plain]{padding-inline:var(--control-pad-inline)}
+.text-button{min-height:var(--control-height);padding:var(--space-2) var(--space-3);border-radius:var(--radius-control)}
+
+/* Icon buttons are 44px squares with the same radius and states. */
 .icon-button{
- min-width:var(--control-height);min-height:var(--control-height)!important;height:auto!important;
- padding:var(--control-pad-block)!important;
+ box-sizing:border-box;min-width:var(--control-height);min-height:var(--control-height);height:auto;padding:var(--space-2);
+ border:1px solid transparent;border-radius:var(--radius-control);background:transparent;color:var(--label);box-shadow:none;
 }
-.text-button{min-height:var(--control-height)!important;padding:var(--sp-2)!important}
+.icon-button:hover{background:color-mix(in srgb,var(--label) 7%,transparent);color:var(--label)}
+.icon-button:active{background:color-mix(in srgb,var(--label) 12%,transparent)}
+.icon-button.bordered{border-color:var(--btn-border);background:var(--btn-fill);box-shadow:var(--btn-shadow);color:var(--accent)}
+.icon-button.bordered:hover{background:var(--btn-fill-hover);border-color:var(--accent)}
+
+/* Keyboard focus is always a 2px ring with an offset, on glass and on solid backgrounds. */
+:is(.button,.ds-button,.p2-btn,.icon-button,.text-button,.source-health-btn-retry,.my-work-action-button,a,summary,select,input,textarea,[tabindex]):focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+
+/* Disabled controls read as inactive by fill and text, not by transparency alone. */
+:is(.button,.ds-button,.p2-btn,.icon-button,.text-button,.source-health-btn-retry,.my-work-action-button):is(:disabled,[aria-disabled=true]){
+ background:var(--surface-2);color:var(--label-2);border-color:var(--sep);box-shadow:none;opacity:.72;cursor:not-allowed;filter:none;transform:none;
+}
+:is(.text-button,.ds-button[data-variant=plain],.icon-button:not(.bordered)):is(:disabled,[aria-disabled=true]){background:transparent;border-color:transparent}
+/* Loading keeps its own colour; the spinner and progress cursor carry the state. */
+:is(.button,.ds-button):disabled:has(>.spin),:is(.button,.ds-button)[aria-busy=true]{cursor:progress;opacity:1}
+:is(.button.primary,.ds-button[data-variant=primary]):disabled:has(>.spin),:is(.button.primary,.ds-button[data-variant=primary])[aria-busy=true]{background:var(--btn-fill-primary);color:var(--on-accent);border-color:var(--accent-hover);opacity:.85}
+
+/* Segmented controls and tab rows: a glass track with 12px segments. */
+:is(.tabbar,.project-tabs,.ops-tabs,.segmented,.ds-segmented)>button{
+ box-sizing:border-box;min-height:var(--control-height);padding:var(--control-pad-block) var(--control-pad-inline);border-radius:var(--radius-control);
+}
+.ds-segmented.glass--flat,.app-shell .workspace :is(.tabbar,.ops-tabs){border-radius:calc(var(--radius-control) + 2px)}
+.app-shell .workspace :is(.tabbar,.ops-tabs){background:var(--glass-fill-strong);border:1px solid var(--glass-border);box-shadow:var(--glass-highlight)}
+.app-shell .workspace :is(.tabbar,.ops-tabs)>button{border-radius:var(--radius-control)}
+.app-shell .workspace :is(.tabbar,.ops-tabs)>button:hover:not(.active){background:color-mix(in srgb,var(--label) 6%,transparent)}
+.app-shell .workspace :is(.tabbar,.ops-tabs)>button.active,.ds-segmented button[aria-checked=true]{background:var(--surface);color:var(--accent);box-shadow:0 1px 3px rgb(21 35 51/.14),var(--glass-highlight)}
+.ds-segmented button{border-radius:var(--radius-control)}
+
+/* Fields: opaque enough to read on glass, 1px boundary at 3:1, 12px radius. */
+input:not([type=checkbox],[type=radio],[type=range],[type=color],[type=hidden]),select,textarea{
+ padding:var(--control-pad-block) var(--control-pad-inline);
+ border:1px solid var(--field-border);border-radius:var(--radius-control);background:color-mix(in srgb,var(--surface) 88%,transparent);color:var(--label);
+ transition:border-color var(--dur-fast) var(--ease),box-shadow var(--dur-fast) var(--ease);
+}
+input:not([type=checkbox],[type=radio],[type=range],[type=color],[type=hidden]),select{min-height:var(--control-height)}
+select{padding-inline-end:var(--space-8)}
+textarea{min-height:var(--control-height);padding-block:var(--space-3)}
+input:not([type=checkbox],[type=radio],[type=range],[type=color],[type=hidden]):hover,select:hover,textarea:hover{border-color:var(--label-2)}
+input:not([type=checkbox],[type=radio],[type=range],[type=color],[type=hidden]):focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--focus-ring);outline-offset:1px;border-color:var(--focus-ring)}
+input::placeholder,textarea::placeholder{color:var(--label-2);opacity:.9}
+:is(input,select,textarea):disabled{background:var(--surface-2);color:var(--label-2);cursor:not-allowed}
+.search-field{border-radius:var(--radius-control)}
+.search-field input{padding-inline:0;min-width:0;border:0;background:transparent;box-shadow:none}
+.search-field:focus-within{border-color:var(--focus-ring);box-shadow:0 0 0 1px var(--focus-ring)}
+.search-field input:focus-visible{outline:none}
 /* Safari keeps its native macOS control look (ignoring radius, padding and background) unless appearance is off,
    so selects draw their own chevron and date/time fields reset WebKit's inner layout. The grey chevron reads in both themes. */
 select:not([multiple]){
  -webkit-appearance:none;appearance:none;
- background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")!important;
- background-repeat:no-repeat!important;background-position:right var(--sp-3) center!important;background-size:12px!important;
+ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+ background-repeat:no-repeat;background-position:right var(--space-3) center;background-size:12px;
  text-overflow:ellipsis;cursor:pointer;
 }
 select:disabled{cursor:not-allowed;opacity:.6}
@@ -39,10 +110,10 @@ input:is([type=date],[type=time],[type=datetime-local],[type=month]){
 input::-webkit-date-and-time-value{text-align:left;margin:0;min-height:1.4em}
 input::-webkit-datetime-edit{padding:0;line-height:1.4}
 input::-webkit-datetime-edit-fields-wrapper{padding:0}
-input::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.6;margin-inline-start:var(--sp-2)}
+input::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.6;margin-inline-start:var(--space-2)}
 input::-webkit-calendar-picker-indicator:hover{opacity:1}
 
 /* The case detail uses one accent ring, including legacy controls. */
-.workspace .project-detail :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .workspace .project-detail :is(.project-tabs,.ops-tabs,.table-scroll,.workflow-scroll) :focus-visible,
 .workspace .project-detail :is(.table-scroll,.workflow-scroll):focus-visible{outline-offset:-2px}
+}

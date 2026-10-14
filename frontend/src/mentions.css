@@ -1,4 +1,6 @@
+@layer tokens,legacy,components,pages,controls,polish;
 @import './freshness-view.css';
+@layer pages{
 .mention-composer.mention-composer textarea,.mention-picker input{width:100%;box-sizing:border-box;min-height:var(--sp-8);padding:var(--sp-3);border:1px solid var(--separator);border-radius:var(--radius-s);background:var(--surface);color:var(--label);font:inherit}
 .mention-actions{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;margin-top:var(--sp-3)}
 .mention-actions small{flex:1;min-width:min(100%,16rem);color:var(--label-2);font-size:var(--fs-footnote)}
@@ -17,3 +19,4 @@
 
 .mention-composer.mention-composer :focus-visible{outline:2px solid var(--accent);box-shadow:none}
 .mention-composer ::placeholder{color:var(--label-2)}
+}

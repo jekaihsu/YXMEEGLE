@@ -1,4 +1,7 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 .completion-celebration{position:fixed;right:var(--sp-4);bottom:var(--sp-4);z-index:120;display:flex;align-items:center;gap:var(--sp-3);max-width:min(34rem,calc(100vw - var(--sp-7)));padding:var(--sp-4);color:var(--label)}
 .celebration-check{display:grid;place-items:center;flex-shrink:0;width:var(--sp-8);height:var(--sp-8);border-radius:var(--radius-pill);background:var(--accent);color:var(--on-accent)}
 .celebration-copy{min-width:0;overflow-wrap:anywhere}.celebration-copy>span{color:var(--accent)}.celebration-copy>strong{display:block;font-size:var(--fs-title2);line-height:1.4}.celebration-copy>p,.celebration-copy>span{font-size:var(--fs-footnote)}.celebration-copy>p{color:var(--label-2)}
 .celebration-close{flex-shrink:0}
+}

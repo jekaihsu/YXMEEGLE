@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 .ops-sync .ops-sync-notice{border-inline-start:3px solid var(--warning);padding-inline-start:var(--sp-3);color:var(--label)}
 .ops-sync .ops-sync-item{display:grid;gap:var(--sp-2);padding:var(--sp-4);border-bottom:1px solid var(--separator)}
 .ops-sync .ops-sync-item header{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3)}
@@ -15,3 +17,4 @@
 .ops-flow .ops-flow-proposals li{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center}
 .ops-flow .ops-flow-denial{display:grid;gap:var(--sp-2)}
 .ops-flow .ops-flow-notice{border-inline-start:3px solid var(--accent);padding-inline-start:var(--sp-3)}
+}

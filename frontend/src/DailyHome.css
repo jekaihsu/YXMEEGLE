@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 /* Daily home: one hero, grouped rows, tokens only. */
 .workspace .today-layout{display:grid;grid-template-columns:minmax(0,1fr) 20rem;gap:var(--sp-7);align-items:start}
 .today-main,.today-aside{min-width:0}
@@ -74,3 +76,4 @@
 /* Task names can contain unbroken file references on both home and case heroes. */
 .dh-hero h2{overflow-wrap:anywhere;line-height:1.35}
 .dh-blocked>span:first-child{min-width:0;overflow-wrap:anywhere}
+}

@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer legacy{
 .project-tabs.tabbar{display:flex;flex-wrap:wrap;gap:6px 24px;overflow:visible;min-height:48px}
 .project-tabs.tabbar>button{min-height:48px;margin:0;padding:12px 0;white-space:normal}
 .project-tabs.tabbar>button.active:after{bottom:0}
@@ -29,3 +31,4 @@ fieldset.node-actions{border:0;padding:0;margin:0;min-width:0}
 .native-approval-controls .inline-actions .button{min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere;height:auto;line-height:1.4}
 .native-approval-controls .form-error{overflow-wrap:anywhere}
 @media(max-width:480px){.native-approval-controls .inline-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}.native-approval-controls .inline-actions .button{width:100%;justify-content:center;text-align:center}}
+}

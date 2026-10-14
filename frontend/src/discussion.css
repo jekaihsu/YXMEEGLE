@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,controls,polish;
+@layer pages{
 /* Project discussion: a quiet panel with a clear composer and scannable history. */
 .project-discussion{
   margin-top:var(--sp-7);
@@ -217,4 +219,5 @@
 @media(min-width:760px){
  .workspace .project-detail .node-section-header,
  .workspace .project-detail .ops-review>.ds-section>.ds-group{padding:var(--sp-5)}
+}
 }

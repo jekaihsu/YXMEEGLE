@@ -1,5 +1,7 @@
-/* VCC-130 Case and Confirmation Detail Styles */
+@layer tokens,legacy,components,pages,controls,polish;
 @import './p2-detail.css';
+@layer pages{
+/* VCC-130 Case and Confirmation Detail Styles */
 
 /* Root and in-page navigation */
 .p2-case-root {
@@ -461,4 +463,5 @@
   .p2-case-root .p2-drawer {
     width: 100%;
   }
+}
 }
