@@ -184,6 +184,9 @@ def overview_page(db,model,row,state,today,*,q='',status='',owner='',tab='formal
     if key is None: key=_binary(case((pi.c.due_date=='','9999'),else_=pi.c.due_date),db)
     elif sort=='name': key=_binary(key,db)
     order=[(o.desc() if desc else o.asc()) for o in (key,_binary(pi.c.project_id,db))]
+    if sort=='due' and not desc:
+        # Default urgency order: cases with overdue open tasks first, then nearest deadline, unknown deadlines last.
+        order=[case((pi.c.project_id.in_(select(over.c.pid)),0),else_=1).asc()]+order
     if sort=='created':
         # App import/add time, not source recency. Parse offsets; invalid values stay last.
         if db.get_bind().dialect.name=='postgresql':

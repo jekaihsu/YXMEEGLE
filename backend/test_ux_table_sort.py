@@ -1,3 +1,4 @@
+from sqlalchemy import select
 from datetime import datetime, timezone
 
 from .company_dashboard import actual_date, overview
@@ -61,3 +62,22 @@ def test_company_sort_happens_before_paging_and_local_due_is_labelled():
     assert page['total_count'] is None
     assert page['pagination']['total']==3
     assert [r['code'] for r in overview(st,offset=1,limit=2,clock=datetime(2026,10,15,tzinfo=timezone.utc))['cases']]==['B','C']
+
+
+def test_shell_default_due_sort_puts_overdue_cases_first(tmp_path):
+    from sqlalchemy import update
+    from . import index_tables
+    from .models import ProjectIndex
+    from .test_perf_budget import scaled_client
+    from .test_shell import ON
+    with scaled_client(tmp_path, 4, **ON) as (app, client):
+        with app.state.sessions.begin() as db:
+            rows = db.scalars(select(ProjectIndex).order_by(ProjectIndex.project_id)).all()
+            ids = [r.project_id for r in rows]
+            for r, due in zip(rows, ['2026-12-01', '2026-11-01', '2026-10-01', '']):
+                r.due_date = due
+            ti = index_tables.tables(ProjectIndex)[1]
+            db.execute(update(ti).where(ti.c.project_id == ids[0]).values(status='in_progress', due_date='2000-01-01'))
+            db.execute(update(ti).where(ti.c.project_id.in_(ids[1:])).values(status='completed'))
+        page = client.get('/api/projects', params={'view': 'overview', 'tab': 'all', 'sort': 'due', 'dir': 'asc', 'limit': 10}).json()
+        assert [p['id'] for p in page['items']] == [ids[0], ids[2], ids[1], ids[3]]
