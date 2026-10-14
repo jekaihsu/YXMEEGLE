@@ -101,6 +101,8 @@ const guards = {
    badState: mutated(body(), b => { b.work_items.state = {states: ['complete_empty', 'partial'], count: 0}; }),
    emptyWithRows: mutated(body(), b => { b.work_items.state = st(['complete_empty']); }),
    countMismatch: mutated(body(), b => { b.work_items.state = st(['partial'], 7); }),
+   // 131-R1: rows removed but the positive count kept on both work_items.state and details.relationship_count
+   emptyRowsPositiveCount: mutated(body(), b => { b.work_items.rows = []; }),
    dupChild: mutated(body(), b => { b.work_items.rows[1] = b.work_items.rows[0]; }),
    siblingIsSelf: mutated(body(), b => { b.siblings.rows[0].identity = ref('c1', 1); }),
    orderClaim: mutated(body(), b => { b.work_items.order = 'verified_source_order'; }),
@@ -291,6 +293,8 @@ const mutations = [
   "if (o.source_key !== `${base}/${table}/${recordId}` || typeof o.view !== 'string') return bad(path);", "if (typeof o.view !== 'string') return bad(path);"],
  ['M4b extra keys tolerated -> fail-closed guard', 'malformedFailClosed',
   "if (own.length !== keys.length || !keys.every(key => Object.hasOwn(v, key))) return bad(path);", "if (!keys.every(key => Object.hasOwn(v, key))) return bad(path);"],
+ ['M4d positive count with zero rows trusted -> fail-closed guard (131-R1)', 'malformedFailClosed',
+  "if ('count' in wiState", "if (false && 'count' in wiState"],
  ['M4c mapping claim trusted -> fail-closed guard', 'malformedFailClosed',
   "if (mapping.states.length !== 1 || mapping.states[0] !== 'unlocated') bad('details.mapping_state');", ""],
 ];
