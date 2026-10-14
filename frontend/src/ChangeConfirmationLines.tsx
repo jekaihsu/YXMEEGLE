@@ -8,6 +8,7 @@ import './NativeApproval.css';
 type Context={w:Workspace;s:Session;busy:boolean;refresh:()=>Promise<void>};
 export function ChangeConfirmationLines({c,p,item}:{c:Context;p:Project;item:Approval}){
  const[party,setParty]=useState<'supervisor'|'client'>(()=>c.s.user?.id===(p.nodes.find(n=>n.id===item.node_id)?.supervisor_id||p.supervisor_id)?'supervisor':'client');const[reason,setReason]=useState('');const[evidence,setEvidence]=useState<string[]>([]);const[busy,setBusy]=useState(false);const[message,setMessage]=useState('');
+ if(c.s.features?.change_extension!==true)return <p className="na-note">變更與展延尚未開放</p>;
  const a=item as Approval&{native_binding?:any;native_receipt?:any;change_confirmations?:Record<string,any>};
  const supervisor=p.nodes.find(n=>n.id===a.node_id)?.supervisor_id||p.supervisor_id;const actor=c.s.user?.id;
  const canSupervisor=!!actor&&actor===supervisor;const canClient=!!actor&&[p.pm_id,supervisor].includes(actor);

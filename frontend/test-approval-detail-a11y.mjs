@@ -18,7 +18,7 @@ globalThis.fetch=async()=>{duringRequest?.();if(gate)await gate;return new Respo
 const project={id:'p1',code:'P1',concurrency_version:1,execution_allowed:true,pm_id:'u1',admin_id:'u1',nodes:[]};
 const w={version:1,projects:[project],users:[],environment:'production',approval_connection:{native_submit:{by_type:{extension:{available:true,simulation_available:true}}}}};
 let approval={id:'a1',project_id:'p1',type:'extension',status:'pending',title:'T',reason:'R',created_by:'u1',created_at:'2026-01-01T00:00:00Z',task_ids:[],dates:[],lark_status:'pending',history:[]};
-let session={mode:'lark',user:{id:'u1',role:'manager'}};
+let session={mode:'lark',features:{change_extension:true},user:{id:'u1',role:'manager'}};
 const runs=[];let runResult={};
 const root=createRoot(document.getElementById('root'));
 let refreshed=0;
