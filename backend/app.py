@@ -228,8 +228,9 @@ def create_app(overrides=None):
     SESSION_MAX_AGE=7*24*3600
 
     def public_origin(request):
-        if cfg.get('APP_URL'): return cfg['APP_URL'].rstrip('/')
-        require(not production,'Production Lark login requires APP_URL',503)
+        origin=(cfg.get('APP_URL') or '').strip() or (cfg.get('PUBLIC_ORIGIN') or '').strip()
+        if origin: return origin.rstrip('/')
+        require(not production,'Production Lark login requires APP_URL or PUBLIC_ORIGIN',503)
         host=(request.headers.get('x-forwarded-host') or request.headers.get('host') or '').split(',')[0].strip()
         proto=request.headers.get('x-forwarded-proto',request.url.scheme).split(',')[0].strip()
         return f'{proto}://{host}' if host else str(request.base_url).rstrip('/')
