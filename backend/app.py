@@ -391,7 +391,7 @@ def create_app(overrides=None):
             out['people_directory_status']={'status':'restricted','message':'不在人事資料查看名單（HR_VIEWERS）'}
             out['attendance_schedule_status']={'status':'restricted','message':'不在人事資料查看名單（HR_VIEWERS）'}
 
-    def public_ws(data,wid,user,mode=None,owned=False):
+    def public_ws(data,wid,user,mode=None,owned=False,task_details=True):
         """owned=True: caller passes a fresh load nobody else uses; it is projected in place (no deepcopy)."""
         file_categories=categories(data); verification=data.get('native_definition_verification')
         result=strip_migration_archive(data) if owned else public_copy(data)
@@ -404,7 +404,11 @@ def create_app(overrides=None):
         if not result['projects'] or any(p.get('source_kind')=='lark' for p in result['projects']): result['as_of']=now()[:10]
         upgrade(result)
         result['environment']=result.get('environment','demo' if any(p.get('source_kind')=='demo' for p in result['projects']) else 'production')
-        result['policy_summary']=[project_summary(result,p) for p in result['projects']]
+        if task_details:
+            result['policy_summary']=[project_summary(result,p) for p in result['projects']]
+        else:
+            from .operations import refresh_project_state
+            for project in result['projects']: refresh_project_state(project,result)
         # Workspace namespaces are assigned by the server. Match /api/actions:
         # signed demo sessions and test namespaces may simulate, never submit.
         result['approval_connection']=approval_connection(cfg,simulation_available=(mode=='demo' if mode is not None else wid.startswith('demo-')) or wid.startswith('test-'),definition_verification=verification)
@@ -413,11 +417,11 @@ def create_app(overrides=None):
         from .attachment_coverage import source_attachment_coverage
         for project in result['projects']:
             project.update(project_execution_view(result,project))
-            project['source_attachment_coverage']=source_attachment_coverage(project)
+            if task_details: project['source_attachment_coverage']=source_attachment_coverage(project)
         result.pop('source_work_items',None)
         result.pop('source_work_items_status',None)
         result.pop('source_work_items_enabled',None)
-        out=filter_private_workspace(result,user)
+        out=filter_private_workspace(result,user,task_details=task_details)
         restrict_hr(out,user)
         if out.get('environment') not in ('test','demo'):
             app.state.case_redaction_stats=case_redaction.apply(out,case_redaction.make_plan(pre,out))
@@ -548,7 +552,7 @@ def create_app(overrides=None):
         data,user=identity(request)
         require(offset>=0 and 1<=limit<=250 and attention in ('','overdue','review'),'駕駛艙查詢參數錯誤',422)
         require(len(q)<=240 and len(group)<=120 and len(source_status)<=120 and len(lifecycle)<=120,'查詢文字過長',422)
-        with sessions() as db: safe=public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'],owned=True)
+        with sessions() as db: safe=public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'],owned=True,task_details=False)
         from .company_dashboard import overview
         return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle)
 

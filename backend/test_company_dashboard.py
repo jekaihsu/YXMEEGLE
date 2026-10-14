@@ -149,3 +149,25 @@ def test_unverified_lifecycle_summaries_never_count_or_filter_as_canonical():
     forged_row=next(r for r in review if r['id']=='forged-reasons')['source_lifecycle']
     assert forged_row['canonical'] is None and forged_row['state']=='needs_verification'
     assert forged_row['reasons']==['conflict'] and forged_row['source_canonical']=='已結案'
+
+
+def test_cockpit_skips_personal_actions_but_preserves_full_workspace_metrics(tmp_path, monkeypatch):
+    from .test_perf_budget import scaled_client
+    from .company_dashboard import overview
+    from . import home_details, home_queues
+    with scaled_client(tmp_path, 6, upgraded=True) as (app, client):
+        full = client.get('/api/workspace').json()
+        expected = overview(full, limit=40)
+        def unused(*args, **kwargs):
+            raise AssertionError('The cockpit must not build personal actions')
+        monkeypatch.setattr(home_details, 'build_home_task', unused)
+        monkeypatch.setattr(home_queues, 'home_queues', unused)
+        response = client.get('/api/company-dashboard?limit=40')
+        assert response.status_code == 200
+        actual = response.json()
+        actual.pop('checked_at')
+        expected.pop('checked_at')
+        assert actual == expected
+        assert actual['totals']['cases'] == 6
+        assert actual['totals']['tasks_total'] == 132
+        assert actual['totals']['tasks_completed'] == 35
