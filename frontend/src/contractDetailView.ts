@@ -372,7 +372,8 @@ function build(body: unknown, options: ContractDetailOptions): ContractDetailVie
  if (typeof wi.order !== 'string' || !wi.order.includes('original_source_order_unlocated')) bad('work_items.order');
  const wiRaw = arr(wi.rows, 'work_items.rows');
  if (wiRaw.length && !isPartialStale(wiState)) bad('work_items.state');
- if (wiRaw.length && 'count' in wiState && wiState.count !== null && wiState.count !== wiRaw.length) bad('work_items.state');
+ // A known child count must equal the rows actually present, including zero rows.
+ if ('count' in wiState && wiState.count !== null && wiState.count !== wiRaw.length) bad('work_items.state');
  interface Child {row: WorkItemRow; categoryRaw: string | null; child: Identity}
  const children: Child[] = [];
  const seenChildren = new Set<string>();
