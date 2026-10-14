@@ -45,7 +45,8 @@
     "test:project-disabled-reasons": "node test-project-disabled-reasons.mjs",
     "test:search-input": "node test-search-input.mjs",
     "test:p2-routes": "node test-p2-routes.mjs",
-    "test:people-attendance": "node test-people-attendance.mjs"
+    "test:people-attendance": "node test-people-attendance.mjs",
+    "test:pm-glance": "node test-pm-glance.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",

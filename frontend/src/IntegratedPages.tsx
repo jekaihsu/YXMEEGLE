@@ -11,17 +11,17 @@ import {filtersFromRoute, hashOfRoute, isLegacyTab, myWorkInput, sourceHealthInp
 import {Segmented} from './design';
 import type {Ctx} from './appCommon';
 
-type Fetched = {status: 'loading'} | {status: 'ok'; body: unknown} | {status: 'error'; httpStatus?: number};
+export type Fetched = {status: 'loading'} | {status: 'ok'; body: unknown} | {status: 'error'; httpStatus?: number};
 
 // The body is keyed by url, version, session epoch and user: any change reads as loading, so a previous user's
 // rows are never shown while the refetch is in flight.
-function useFetched(url: string, version: unknown, userId: unknown): Fetched {
+export function useFetched(url: string, version: unknown, userId: unknown): Fetched {
  const key = `${url}|${String(version)}|${getSessionEpoch()}|${String(userId)}`;
  const [state, setState] = useState<{key: string; fetched: Fetched}>({key, fetched: {status: 'loading'}});
  useEffect(() => {
   const epoch = getSessionEpoch();
   const controller = new AbortController();
-  api<unknown>(url, {signal: controller.signal, cache: 'no-store'})
+  api<unknown>(url, {method: 'GET', signal: controller.signal, cache: 'no-store'})
    .then(body => {if (epoch === getSessionEpoch()) setState({key, fetched: {status: 'ok', body}})})
    .catch(error => {
     if (controller.signal.aborted || epoch !== getSessionEpoch()) return;

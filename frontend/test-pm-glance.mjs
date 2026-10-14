@@ -1,0 +1,68 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {build} from 'esbuild';
+import {JSDOM} from 'jsdom';
+import React, {act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {buildPmGlanceView, tileState, staleReaders, pmGlanceVisible} from './src/pmGlanceView.ts';
+import {buildMyWorkView} from './src/myWorkView.ts';
+import {buildManagerOverviewView} from './src/managerOverviewView.ts';
+import {buildSourceHealthView} from './src/sourceHealthView.ts';
+import {buildConfirmationListView} from './src/confirmationListView.ts';
+
+const work = (readState, canSeeAwaitingConfirmation = true) => buildMyWorkView({readState, rows: [], assignment: 'assigned', canSeeAwaitingConfirmation, asOf: '2026-10-14T01:00:00Z'});
+const input = w => ({work: w, awaiting: buildMyWorkView({readState: w.pageState, rows: [], assignment: 'assigned', canSeeAwaitingConfirmation: true, filters: {mode: 'awaiting_my_confirmation'}}), overview: buildManagerOverviewView({}), sources: buildSourceHealthView({}, {diagnosticCapability: false}), confirmations: buildConfirmationListView(undefined)});
+for (const [states, expected] of [[['read_failed'], 'failed'], [['forbidden'], 'needs-permission'], [['unknown'], 'unknown'], [['stale'], 'stale'], [['partial'], 'unknown'], [['partial', 'stale'], 'stale'], [['complete_empty'], 'ok'], [['loading'], 'unknown']]) assert.equal(tileState(states), expected);
+for (const name of ['unknown', 'read_failed', 'forbidden', 'loading', 'unlocated', 'partial']) {
+ const tiles = buildPmGlanceView(input(work({states: [name], count: null})));
+ assert.equal(tiles.find(t => t.id === 'work').value, '—', name);
+ assert.ok(tiles.every(t => t.asOf && t.href && t.state));
+}
+assert.equal(buildPmGlanceView(input(work({states: ['complete_empty'], count: 0}))).find(t => t.id === 'work').value, '0');
+const unknown = buildPmGlanceView(input(work({states: ['unknown'], count: null})));
+for (const id of ['leave', 'trips', 'workload', 'overdue']) assert.equal(unknown.find(t => t.id === id).value, '—');
+for (const id of ['leave', 'trips']) assert.match(unknown.find(t => t.id === id).reason, /not available yet/);
+const gated = input(work('ready', false)); gated.awaiting = gated.work;
+assert.equal(buildPmGlanceView(gated).find(t => t.id === 'awaiting').value, '—', 'a gated awaiting mode never counts todo work');
+assert.deepEqual(staleReaders(unknown), []);
+assert.deepEqual(staleReaders([{state: 'stale', reader: 'work'}, {state: 'stale', reader: 'work'}, {state: 'failed', reader: 'overview'}, {state: 'ok', reader: 'sources'}]), ['work']);
+assert.equal(pmGlanceVisible('member'), true); assert.equal(pmGlanceVisible(undefined), false);
+assert.equal(pmGlanceVisible('member', ['pm']), false); assert.equal(pmGlanceVisible('pm', ['pm']), true);
+assert.ok(unknown.every(tile => /^#view=(work|overview|sources|schedule|confirmations)(&|$)/.test(tile.href)));
+
+const bundle = await build({entryPoints: ['./src/PmGlance.tsx'], bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
+const file = new URL('./.pm-glance-test.mjs', import.meta.url);
+await fs.writeFile(file, bundle.outputFiles[0].text);
+let PmGlancePage;
+try {({PmGlancePage} = await import(file.href))} finally {await fs.unlink(file)}
+const dom = new JSDOM('<div id="root"></div>', {url: 'http://localhost/#view=pm-glance', pretendToBeVisual: true});
+for (const key of ['window', 'document', 'location', 'history', 'Event', 'HTMLElement']) Object.defineProperty(globalThis, key, {value: dom.window[key], configurable: true});
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+const requests = [];
+let sourceStale = true;
+globalThis.fetch = async (url, options) => {
+ requests.push({url, method: options.method});
+ let body = {};
+ if (url === '/api/my-work') body = {readState: 'ready', rows: [], assignment: 'assigned', canSeeAwaitingConfirmation: true, as_of: '2026-10-14'};
+ if (url === '/api/source-health') body = {page_state: {states: [sourceStale ? 'stale' : 'unknown'], count: null}, sources: [{authorized: true, amount: 987654321, last_success: 'PRIVATE_TIME', name: 'PRIVATE_SOURCE'}]};
+ if (url === '/api/manager-overview') return new Response('{}', {status: 503, headers: {'Content-Type': 'application/json'}});
+ if (url === '/api/confirmations') return new Response('{}', {status: 403, headers: {'Content-Type': 'application/json'}});
+ return new Response(JSON.stringify(body), {headers: {'Content-Type': 'application/json'}});
+};
+const root = createRoot(document.getElementById('root'));
+const settle = () => act(async () => {await new Promise(r => setTimeout(r, 30))});
+await act(async () => root.render(React.createElement(PmGlancePage, {c: {w: {version: 1}, s: {user: {id: 'test', role: 'pm'}}}})));
+await settle();
+assert.equal(requests.length, 4); assert.ok(requests.every(r => r.method === 'GET'));
+assert.deepEqual(requests.map(r => r.url).sort(), ['/api/confirmations', '/api/manager-overview', '/api/my-work', '/api/source-health']);
+assert.equal(document.querySelector('[data-tile="overdue"]').dataset.state, 'failed');
+assert.equal(document.querySelector('[data-tile="confirmations"]').dataset.state, 'needs-permission');
+assert.doesNotMatch(document.body.textContent, /987654321|PRIVATE_TIME|PRIVATE_SOURCE/);
+assert.equal(document.querySelectorAll('[data-tile]').length, 8);
+sourceStale = false;
+await act(async () => document.querySelector('.pm-glance-head button').click());
+await settle();
+assert.equal(requests.length, 5); assert.equal(requests.at(-1).url, '/api/source-health', 'refresh re-reads only stale tiles');
+assert.equal(document.querySelector('.pm-glance-head button').disabled, true);
+await act(async () => root.unmount());
+console.log('PM glance: state, unknown/zero, gating, privacy, existing GETs, and selective refresh passed');
