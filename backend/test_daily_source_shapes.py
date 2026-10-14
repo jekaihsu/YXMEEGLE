@@ -87,3 +87,37 @@ def test_indoor_person_is_the_worker_not_the_account_that_created_the_cost_row()
 def test_indoor_person_falls_back_to_creator_account_when_name_formula_is_empty():
     entry, _ = only_daily(indoor_rows(姓名=None))
     assert entry['person'] == '建檔帳號'
+
+
+PROVISIONAL = '可能的確認單工編(若暫無確認單才需填寫)'
+
+
+def test_row_without_any_case_reference_is_not_labelled_provisional():
+    entry, stats = only_daily(indoor_rows())
+    assert entry['case_mapping_status'] == 'missing_reference'
+    assert entry['match_basis'] == 'source_case_or_link'
+    assert entry['mapping_status'] == 'ready'
+    assert stats['daily_provisional'] == 0
+
+
+def test_unmatched_provisional_code_stays_provisional():
+    entry, stats = only_daily(indoor_rows(**{PROVISIONAL: 'C115211-1'}))
+    assert entry['case_mapping_status'] == 'unresolved_reference'
+    assert entry['match_basis'] == 'provisional_case_code'
+    assert entry['mapping_status'] == 'provisional_case_code'
+    assert stats['daily_provisional'] == 1
+
+
+def test_manual_pairing_is_not_reported_as_provisional_pairing():
+    confirmation = row('tblmSQrcCs9vPQZx', 'confirmation', 'recvsZzR9xfEVx', {'工程確認單編號': 'C115236'})
+    rows = [confirmation, *indoor_rows(**{PROVISIONAL: 'C115211-1'})]
+    state = seed(True)
+    import_sources(state, rows)
+    entry = state['daily_unmatched'][0]
+    project = next(p for p in state['projects'] if p['code'] == 'C115236')
+    state['daily_reviews'].append({'id': 'review-1', 'daily_id': entry['id'], 'project_id': project['id'],
+                                   'status': 'approved', 'mapping_version': entry['mapping_version']})
+    import_sources(state, rows)
+    paired = project['daily_reports'][0]
+    assert paired['match_basis'] == 'manual_review'
+    assert paired['mapping_status'] == 'ready'

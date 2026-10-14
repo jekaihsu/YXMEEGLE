@@ -430,7 +430,8 @@ def import_v4(ws, records, complete_tables=None):
                 else: unresolved_case=True
                 if (r['base_token'],rid) in report_fields: linked.append(report_fields[(r['base_token'],rid)])
         if not candidates and not code and not any(link_ids(f.get(k)) for k in ('所屬案件','內業工項','合約工項')):
-            code=normalized_case(f.get(PROVISIONAL_CASE_FIELD) or f.get('可能確認單工作編號')); candidates=dict(aliases.get(code,{})); basis='provisional_case_code'
+            code=normalized_case(f.get(PROVISIONAL_CASE_FIELD) or f.get('可能確認單工作編號')); candidates=dict(aliases.get(code,{}))
+            if code: basis='provisional_case_code'
         costrecords,_=native_records(r,'所屬成本單',record_index,{'cost'})
         costfields=[c['fields'] for c in costrecords]
         dates={day(f.get(k),formula_serial=k in ('工作日期-薪資','工作日期-營業額明細')) for k in ('工作日期-薪資','工作日期-營業額明細','日期')}|{day(c.get(k)) for c in costfields for k in ('工作日期','出工日期','日期')}; dates.discard('')
@@ -460,6 +461,8 @@ def import_v4(ws, records, complete_tables=None):
         approved=next((m for m in reversed(ws['daily_reviews']) if m['daily_id']==ident and m['status']=='approved' and review_mapping_version(m)==entry['mapping_version']),None)
         if approved:
             candidates={p['id']:p for p in ws['projects'] if p['id']==approved['project_id']}; entry['match_basis']='manual_review'; unresolved_case=False
+            # The provisional label is evaluated after date and group checks, so it only ever stood in for 'ready'.
+            if entry['mapping_status']=='provisional_case_code': entry['mapping_status']='ready'
         # Date/department quality applies to all source rows, including unmatched
         # rows. Counting it only after a match makes a broken source look healthy.
         for k,condition in [('daily_provisional',basis=='provisional_case_code' and bool(code)),('daily_missing_date',not dates),('daily_missing_department',not department),('daily_conflicting_dates',len(dates)>1)]: stats[k]+=int(condition)
