@@ -215,7 +215,8 @@ function ConfirmationsBody({context, body, loading, open, setNotice}: {context: 
  };
  const edit = (filters: Record<string, string>) => {const next = withoutEmpty(filters); setDraft(next); commit(next);};
  const pending = !sameFilters(draft, context.filters);
- const showBody = pending || loading ? undefined : body;
+ const showBody = pending || loading ? {status: 200, page_state: {states: ['loading'], count: null},
+  rows: [], next_cursor: null, totals: {matching: null, loaded: 0, authorized_source: null}} : body;
  const view = useMemo(() => buildConfirmationListView(showBody, {filters: draft, sort: context.sort, cursor: context.cursor, columns: context.columns, selected: context.selected,
   cursorHistory: boundHistory(cursorStore, context.filters, context.sort, context.cursor)}), [showBody, draft, context]);
  // Any change to the query (sort) restarts at page one and drops the selection.
