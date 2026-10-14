@@ -45,7 +45,7 @@
 :is(.p2-row-title-btn,.my-work-row-title-btn,.cockpit-group-button,.people-text-button):hover{background:transparent;text-decoration:underline;text-underline-offset:3px}
 .button.compact{min-height:var(--control-height);padding-inline:var(--control-pad-inline)}
 .ds-button[data-variant=plain]{padding-inline:var(--control-pad-inline)}
-.text-button{min-height:var(--control-height);padding:var(--space-2) var(--space-3);border-radius:var(--radius-control)}
+.text-button{min-height:var(--control-height);padding:var(--btn-pad,var(--space-2) var(--space-3));border-radius:var(--radius-control)}
 
 /* Toggle buttons (aria-pressed) keep their label and show the selected state by fill, border and weight. */
 :is(.button,.ds-button)[aria-pressed=true]{background:color-mix(in srgb,var(--accent) 14%,var(--surface));border-color:var(--accent);font-weight:600}

@@ -89,7 +89,7 @@
 .workspace .today-main .ds-group>.dh-personal-queue+.dh-personal-queue{border-top:1px solid var(--sep)}
 .workspace .today-main .ds-group>.dh-personal-queue .ds-row{min-height:0;padding:var(--space-4) 0;align-items:flex-start;gap:var(--space-4)}
 .workspace .today-main .ds-group>.dh-personal-queue .ds-row-main{gap:var(--space-1)}
-.workspace .today-main .ds-group>.dh-personal-queue .ds-row-main>.text-button{align-self:flex-start;min-height:0;padding:0;justify-content:flex-start;text-align:left;--btn-fg:var(--label);font-size:var(--fs-body)}
+.workspace .today-main .ds-group>.dh-personal-queue .ds-row-main>.text-button{align-self:flex-start;--btn-pad:0;justify-content:flex-start;text-align:left;--btn-fg:var(--label);font-size:var(--fs-body)}
 .workspace .today-main .ds-group>.dh-personal-queue .ds-row-main>.text-button:hover{background:none;--btn-fg:var(--accent)}
 .workspace .today-main .ds-group>.dh-personal-queue .ds-row-main>span{font-size:var(--fs-subhead)}
 .workspace .today-main .ds-group>.dh-personal-queue .ds-row>.text-button{flex:none;align-self:center}
