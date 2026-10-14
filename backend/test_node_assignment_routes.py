@@ -658,3 +658,51 @@ def test_uncertain_task_create_does_not_reconcile_to_identical_older_task(h, lan
     again = act(h, 'ou_sales', '/nodes/sales/tasks', body)
     assert again.json() == replay.json()
     assert len(h.fake.writes()) == writes
+
+
+def test_create_tokens_are_stable_distinct_uuid4(h):
+    from uuid import UUID
+    response = act(h, 'ou_sales', '/nodes/sales/tasks', {'request_id': 'tokens', 'title': 'task'})
+    assert response.status_code == 200, response.text
+    assert len(h.fake.tokens) == 2
+    assert all(UUID(token).version == 4 for token in h.fake.tokens)
+    from .node_assignment.service import create_token
+
+    tokens = [create_token(*args) for args in [
+        ('receipt', 'key', 'node-create'), ('receipt', 'key', 'task-create'),
+        ('other', 'key', 'node-create'), ('receipt', 'other', 'node-create'),
+    ]]
+    assert all(UUID(token).version == 4 for token in tokens)
+    assert len(set(tokens)) == len(tokens)
+    assert tokens[0] == create_token('receipt', 'key', 'node-create')
+
+
+def test_task_baseline_failure_before_create_can_retry_after_restart(h):
+    h.fake.fault('GET', f'{NODES}/records/receVb70009', lambda request: httpx.Response(503), times=3)
+    body = {'request_id': 'baseline-retry', 'title': 'task'}
+    failed = act(h, 'ou_sales', '/nodes/sales/tasks', body)
+    assert failed.json()['code'] == 'lark_unavailable', failed.text
+    assert len(h.fake.tables[NODES]) == 1
+    assert not h.fake.tables[TASKS]
+    h.client = h.build()
+    replay = act(h, 'ou_sales', '/nodes/sales/tasks', body)
+    assert replay.status_code == 200, replay.text
+    assert len(h.fake.tables[NODES]) == len(h.fake.tables[TASKS]) == 1
+
+
+def test_sent_task_create_without_baseline_still_fails_closed(h, monkeypatch):
+    from dataclasses import replace
+    from .node_assignment.service import Plan
+
+    def timeout(request):
+        raise httpx.ReadTimeout('uncertain task create', request=request)
+
+    h.fake.fault('POST', f'{TASKS}/records', timeout)
+    body = {'request_id': 'missing-baseline', 'title': 'task'}
+    assert act(h, 'ou_sales', '/nodes/sales/tasks', body).json()['code'] == 'outcome_unknown'
+    original = Plan.from_json
+    monkeypatch.setattr(Plan, 'from_json', lambda value: replace(original(value), pre_create_task_ids=None))
+    writes = len(h.fake.writes())
+    replay = act(h, 'ou_sales', '/nodes/sales/tasks', body)
+    assert (replay.status_code, replay.json()['code']) == (502, 'outcome_unknown')
+    assert len(h.fake.writes()) == writes

@@ -18,7 +18,7 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlsplit
-from uuid import NAMESPACE_URL, uuid5
+from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 
@@ -53,6 +53,11 @@ class Context:
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+
+
+def create_token(receipt, assignment, purpose):
+    raw = hashlib.sha256(f'{receipt}\0{assignment}\0{purpose}'.encode()).digest()[:16]
+    return str(UUID(bytes=raw, version=4))
 
 
 def case_code(project):
@@ -287,8 +292,7 @@ class NodeAssignmentService:
                 try:
                     plan = plan_fn(situation, resumed)
                     if plan.kind == 'task_create':
-                        plan = replace(plan, client_token=resumed.client_token if resumed else str(uuid5(
-                            NAMESPACE_URL, f'{receipt}\0{akey}\0task-create')),
+                        plan = replace(plan, client_token=resumed.client_token if resumed else create_token(receipt, akey, 'task-create'),
                             pre_create_task_ids=resumed.pre_create_task_ids if resumed else None)
                 except Denied as exc:
                     record('denied', reason=str(exc))
@@ -300,8 +304,11 @@ class NodeAssignmentService:
                 try:
                     plan = self._execute(client, situation, plan, receipt, fingerprint, pinned)
                 except Failure as exc:
-                    # Keep the receipt once a row was created for it, so a replay resumes from that row.
-                    if exc.code not in UNCERTAIN and not pinned:
+                    # Preserve pinned writes unless task creation has not yet been attempted.
+                    # Without a baseline, execution has not reached the task-create call.
+                    before_task_create = plan.kind == 'task_create' and all(
+                        saved.pre_create_task_ids is None for saved in pinned)
+                    if exc.code not in UNCERTAIN and (not pinned or before_task_create):
                         self.receipts.drop(receipt)
                     record('failed', code=exc.code, changes=self._changes(ctx, akey, plan))
                     raise
@@ -337,7 +344,7 @@ class NodeAssignmentService:
         if s.confirmation_record:
             initial['confirmation'] = [s.confirmation_record]
         try:
-            client.create(Table.NODES, wire(NODE_FIELDS, initial), str(uuid5(NAMESPACE_URL, f'{receipt}\0{akey}\0node-create')))
+            client.create(Table.NODES, wire(NODE_FIELDS, initial), create_token(receipt, akey, 'node-create'))
         except Failure as exc:
             if exc.code != 'outcome_unknown':
                 raise
