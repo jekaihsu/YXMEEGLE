@@ -14,7 +14,7 @@ export function RuntimeHealthPanel({w,s}:{w:{environment?:string;workspace_id?:s
  const[health,setHealth]=useState<Health|null>(null);const[error,setError]=useState('');const[loading,setLoading]=useState(false);const[reload,setReload]=useState(0);
  const allowed=s.mode==='lark'&&w.environment==='production'&&s.user?.role==='manager';
  useEffect(()=>{if(!allowed){setHealth(null);return}const abort=new AbortController();setLoading(true);setHealth(null);setError('');void api<Health>('/api/admin/runtime-health',{signal:abort.signal}).then(result=>{if(!result.worker||!result.backup||!result.directory)throw Error('維護狀態回應不完整');setHealth(result)}).catch(e=>{if(!abort.signal.aborted)setError((e as Error).message)}).finally(()=>{if(!abort.signal.aborted)setLoading(false)});return()=>abort.abort()},[allowed,reload,w.workspace_id]);
- if(!allowed)return null;
+ if(!allowed)return <p role="status">背景工作與備份維護資訊僅供正式工作區管理員查看。</p>;
  return <section aria-label="系統維護狀態" className="owned-view">
   <div className="section-heading"><div><h2>系統維護狀態</h2><p>名冊有效時間、背景工作與備份排程，時間以台灣時區顯示。</p></div><Button disabled={loading} onClick={()=>setReload(x=>x+1)}>{loading?'讀取中…':'更新維護狀態'}</Button></div>
   {error&&<p role="alert" className="owned-alert">維護狀態未能讀取：{error}</p>}
