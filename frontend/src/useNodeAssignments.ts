@@ -1,12 +1,27 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {getSessionEpoch} from './api';
-import {assignmentErrorMessage, assignmentsDisabled, fetchNodeAssignments, mutateNodeAssignment, NodeAssignmentError, requestId, type AssignmentMutation, type NodeAssignmentList} from './nodeAssignmentApi';
+import {assignmentErrorMessage, assignmentsDisabled, fetchNodeAssignments, fetchNodeAssignmentDetail, mutateNodeAssignment, NodeAssignmentError, requestId, type AssignmentMutation, type NodeAssignmentDetail, type NodeAssignmentList} from './nodeAssignmentApi';
 
 let cacheEpoch = getSessionEpoch();
 const lists = new Map<string, NodeAssignmentList>();
 const requests = new Map<string, Promise<NodeAssignmentList>>();
+const details = new Map<string, {data: NodeAssignmentDetail; readAt: number}>();
+const detailRequests = new Map<string, Promise<NodeAssignmentDetail>>();
 function syncEpoch() {
-  if (cacheEpoch !== getSessionEpoch()) {lists.clear(); requests.clear(); cacheEpoch = getSessionEpoch()}
+  if (cacheEpoch !== getSessionEpoch()) {lists.clear(); requests.clear(); details.clear(); detailRequests.clear(); cacheEpoch = getSessionEpoch()}
+}
+export function prefetchNodeAssignmentDetail(projectId: string, nodeKey: string, expectedRevision?: string | null): Promise<NodeAssignmentDetail> {
+  syncEpoch();
+  const key = `${projectId}/${nodeKey}`, cached = details.get(key), pending = detailRequests.get(key);
+  if (pending) return pending;
+  if (cached && Date.now() - cached.readAt < 60000 && (expectedRevision === undefined || cached.data.node.revision === expectedRevision)) return Promise.resolve(cached.data);
+  const epoch = getSessionEpoch();
+  const request = fetchNodeAssignmentDetail(projectId, nodeKey, new AbortController().signal, () => epoch === getSessionEpoch()).then(data => {
+    if (epoch === getSessionEpoch() && detailRequests.get(key) === request) details.set(key, {data, readAt: Date.now()});
+    return data;
+  }).catch(error => {if (epoch === getSessionEpoch()) details.delete(key); throw error}).finally(() => {if (detailRequests.get(key) === request) detailRequests.delete(key)});
+  detailRequests.set(key, request);
+  return request;
 }
 function cached(projectId: string) {syncEpoch(); return lists.get(projectId)}
 export function prefetchNodeAssignments(projectId: string): Promise<NodeAssignmentList> {
@@ -17,7 +32,7 @@ export function prefetchNodeAssignments(projectId: string): Promise<NodeAssignme
   const request = fetchNodeAssignments(projectId, new AbortController().signal, () => epoch === getSessionEpoch()).then(data => {
     if (epoch === getSessionEpoch() && requests.get(projectId) === request) lists.set(projectId, data);
     return data;
-  }).catch(failure => {if (epoch === getSessionEpoch() && assignmentsDisabled(failure)) lists.delete(projectId); throw failure}).finally(() => {if (requests.get(projectId) === request) requests.delete(projectId)});
+  }).catch(failure => {if (epoch === getSessionEpoch() && (assignmentsDisabled(failure) || failure instanceof NodeAssignmentError && [401, 403].includes(failure.status))) lists.delete(projectId); throw failure}).finally(() => {if (requests.get(projectId) === request) requests.delete(projectId)});
   requests.set(projectId, request);
   return request;
 }
@@ -52,7 +67,7 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
       }
     } catch (failure) {
       if (current() && sequence === listRequest.current) setState(previous => assignmentsDisabled(failure) ? {kind: 'disabled'} : {
-        kind: 'error', message: assignmentErrorMessage(failure), data: 'data' in previous ? previous.data : undefined,
+        kind: 'error', message: assignmentErrorMessage(failure), data: failure instanceof NodeAssignmentError && [401, 403].includes(failure.status) ? undefined : 'data' in previous ? previous.data : undefined,
       });
     } finally {if (current() && sequence === listRequest.current) setRefreshing(false)}
   }, [projectId, current, enabled]);
@@ -65,6 +80,12 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
     const controller = lifecycle.current.controller;
     return () => {controller.abort(); listRequest.current++};
   }, [reload]);
+  useEffect(() => {
+    const refresh = () => {if (enabled && document.visibilityState !== 'hidden' && !mutating.current) void reload()};
+    const timer = window.setInterval(refresh, 60000);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {window.clearInterval(timer); document.removeEventListener('visibilitychange', refresh)};
+  }, [enabled, reload]);
   const mutate = async (mutation: AssignmentMutation): Promise<boolean> => {
     if (mutating.current || !current()) return false;
     const scope = lifecycle.current;
@@ -77,6 +98,8 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
       retryAttempt.current = null;
       if (!mutationCurrent()) return false;
       listRequest.current++; requests.delete(projectId);
+      const detailKey = `${projectId}/${mutation.nodeKey}`;
+      detailRequests.delete(detailKey); details.set(detailKey, {data: detail, readAt: Date.now()});
       setState(previous => {
         if (!mutationCurrent()) return previous;
         if (!('data' in previous) || !previous.data) return previous;

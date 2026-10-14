@@ -1,8 +1,10 @@
 """Pure projection of a case snapshot into the public JSON shape."""
+from datetime import datetime
+
 from .domain import (
     CHAIN, NODE_DEPARTMENTS, NODE_LABELS, NodeKey, NodeStatus, TaskFacts, TaskStatus, derive_chain,
     node_permissions, progress, summarize, task_counts, task_permissions)
-from .lark_table import CaseSnapshot, NodeRow, TaskRow, iso_time
+from .lark_table import CaseSnapshot, NodeRow, TaskRow, TAIPEI, iso_time
 from .operations import facts_of, mirror
 
 NO_ACTIONS = {'claim': False, 'assign': False, 'complete': False, 'approve': False, 'reject': False,
@@ -35,6 +37,7 @@ def node_view(key: NodeKey, snapshot: CaseSnapshot, status: NodeStatus, now_ms):
     tasks = snapshot.node_tasks(key)
     counts = task_counts(t.status for t in tasks)
     live_deadlines = [t.deadline for t in tasks if t.deadline and t.status is not TaskStatus.CANCELLED]
+    open_deadlines = [t.deadline for t in tasks if t.deadline and t.status not in (TaskStatus.CANCELLED, TaskStatus.DONE)]
     view = {
         'key': key.value, 'label': NODE_LABELS[key], 'departments': list(NODE_DEPARTMENTS[key]),
         'record_id': row.record_id if row else None, 'revision': row.revision if row else None,
@@ -47,6 +50,10 @@ def node_view(key: NodeKey, snapshot: CaseSnapshot, status: NodeStatus, now_ms):
         'reject_reason': row.reject_reason if row and row.rejected else None,
         'started_at': iso_time(row and row.started_at), 'finished_at': iso_time(row and row.finished_at),
         'deadline': max(live_deadlines) if live_deadlines else None,
+        'next_due': min(open_deadlines) if open_deadlines else None,
+        'deadline_basis': 'related_tasks_max',
+        'assignment_key': row.assignment_key if row else None,
+        'origin': 'lark',
         'warnings': node_warnings(key, row, len(rows) > 1, status, tasks, now_ms),
     }
     if len(rows) > 1:
@@ -59,6 +66,14 @@ def task_view(task: TaskRow, allowed):
             'assignee': _user(task.assignee), 'assigned_by': _user(task.assigned_by), 'department': task.department or None,
             'deadline': task.deadline, 'status': task.status.value, 'done_at': iso_time(task.done_at),
             'created_at': iso_time(task.created_at), 'can': allowed}
+
+
+def task_sort_key(task: TaskRow, now_ms):
+    today = datetime.fromtimestamp(now_ms / 1000, TAIPEI).date().isoformat()
+    open_task = task.status not in (TaskStatus.DONE, TaskStatus.CANCELLED)
+    overdue = open_task and task.deadline is not None and task.deadline < today
+    priority = {TaskStatus.IN_PROGRESS: 0, TaskStatus.TODO: 1, TaskStatus.DONE: 2, TaskStatus.CANCELLED: 3}
+    return (not overdue, task.deadline is None, task.deadline or '', priority[task.status], task.record_id)
 
 
 def _can(actor, key, status, snapshot, writes_enabled):
@@ -86,7 +101,7 @@ def node_detail(snapshot: CaseSnapshot, skipped, actor, roster, key: NodeKey, wr
     statuses, case = case_view(snapshot, skipped, actor, writes_enabled, now_ms)
     status = statuses[key]
     tasks = []
-    for task in snapshot.node_tasks(key):
+    for task in sorted(snapshot.node_tasks(key), key=lambda t: task_sort_key(t, now_ms)):
         allowed = task_permissions(actor, key, status, TaskFacts(
             task.status, task.assignee and task.assignee.open_id, task.assigned_by and task.assigned_by.open_id))
         tasks.append(task_view(task, allowed.__dict__ if writes_enabled else {k: False for k in allowed.__dict__}))

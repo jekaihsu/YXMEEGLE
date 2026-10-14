@@ -11,6 +11,7 @@ export interface AssignmentNode {
   tasks: {done: number; total: number}; progress: number;
   owners: AssignmentPerson[]; assigned_by: AssignmentPerson | null; approver: AssignmentPerson | null;
   approved_at: string | null; reject_reason: string | null; deadline: string | null; warnings: string[];
+  next_due?: string | null; deadline_basis?: string; assignment_key?: string | null; origin?: 'lark';
 }
 export interface AssignmentTask {
   id: string; title: string; detail: string; assignee: AssignmentPerson | null;
@@ -18,11 +19,12 @@ export interface AssignmentTask {
   can: Record<'edit_status' | 'cancel' | 'assign' | 'claim' | 'edit_details', boolean>;
 }
 export interface NodeAssignmentList {
+  fetched_at?: string | null; stale_reason?: string | null;
   code: string; summary: {done: number; total: number; current_node: string | null};
   node_details?: Record<string, Pick<NodeAssignmentDetail, 'tasks' | 'assignable_people'>>;
   nodes: AssignmentNode[]; stale: boolean; writes_enabled: boolean; writes_disabled_reason: string | null; roster: {available: boolean; stale: boolean}; warnings: string[]; can: Record<string, NodePermissions>;
 }
-export interface NodeAssignmentDetail extends Pick<NodeAssignmentList, 'summary' | 'writes_enabled' | 'writes_disabled_reason' | 'roster' | 'warnings'> {can: NodePermissions; record_id: string | null; node: AssignmentNode; tasks: AssignmentTask[]; assignable_people: AssignablePerson[]}
+export interface NodeAssignmentDetail extends Pick<NodeAssignmentList, 'summary' | 'writes_enabled' | 'writes_disabled_reason' | 'roster' | 'warnings' | 'fetched_at' | 'stale_reason'> {can: NodePermissions; record_id: string | null; node: AssignmentNode; tasks: AssignmentTask[]; assignable_people: AssignablePerson[]}
 export interface NewAssignmentTask {title: string; detail: string; assignee_open_id: string; department: string; deadline: string}
 export type AssignmentMutation =
   | {action: 'claim' | 'complete' | 'approve'; nodeKey: string; expected_revision: string | null}
@@ -66,6 +68,10 @@ function node(value: unknown): AssignmentNode {
     tasks: {done: count(tasks.done), total: count(tasks.total)}, progress: count(n.progress), owners: array(n.owners, person),
     assigned_by: optionalPerson(n.assigned_by), approver: optionalPerson(n.approver), approved_at: optionalText(n.approved_at),
     reject_reason: optionalText(n.reject_reason), deadline: optionalText(n.deadline), warnings: array(n.warnings, text),
+    ...('next_due' in n ? {next_due: optionalText(n.next_due)} : {}),
+    ...('assignment_key' in n ? {assignment_key: optionalText(n.assignment_key)} : {}),
+    ...('deadline_basis' in n ? {deadline_basis: text(n.deadline_basis)} : {}),
+    ...(n.origin === 'lark' ? {origin: 'lark' as const} : {}),
   };
 }
 function task(value: unknown): AssignmentTask {
@@ -86,6 +92,8 @@ function envelope(result: Record<string, unknown>) {
   const summary = record(result.summary), roster = record(result.roster);
   if (typeof result.writes_enabled !== 'boolean' || typeof roster.available !== 'boolean' || typeof roster.stale !== 'boolean') throw malformed();
   return {summary: {done: count(summary.done), total: count(summary.total), current_node: optionalText(summary.current_node)},
+    ...('fetched_at' in result ? {fetched_at: optionalText(result.fetched_at)} : {}),
+    ...('stale_reason' in result ? {stale_reason: optionalText(result.stale_reason)} : {}),
     writes_enabled: result.writes_enabled, writes_disabled_reason: optionalText(result.writes_disabled_reason),
     roster: {available: roster.available, stale: roster.stale}, warnings: array(result.warnings, text)};
 }
@@ -178,3 +186,20 @@ const ERROR_MESSAGES: Record<string, string> = {
 export const assignmentErrorMessage = (error: unknown) => error instanceof NodeAssignmentError && error.code && ERROR_MESSAGES[error.code]
   ? ERROR_MESSAGES[error.code] : error instanceof Error ? error.message : '節點資料讀取失敗，請稍後重試。';
 export const assignmentsDisabled = (error: unknown) => error instanceof NodeAssignmentError && error.code === 'disabled';
+
+export function assignmentTarget(route: {node?: string; task?: string}, nodes: {id: string; key: string}[] = []) {
+  const key = NODE_ASSIGNMENT_ORDER.find(key => key === route.node);
+  if (key) return {nodeKey: key, taskId: route.task || ''};
+  if (route.task && /^rec[A-Za-z0-9]+$/.test(route.task)) {
+    const legacyNode = nodes.find(n => n.id === route.node);
+    return {nodeKey: legacyNode?.key || '', taskId: route.task};
+  }
+  return undefined;
+}
+
+export function sortAssignmentTasks(tasks: AssignmentTask[], today = new Intl.DateTimeFormat('en-CA', {timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date())) {
+  const priority: Record<string, number> = {'進行中': 0, '待處理': 1, '已完成': 2, '取消': 3};
+  const overdue = (t: AssignmentTask) => !!t.deadline && t.deadline.slice(0, 10) < today && !['已完成', '取消'].includes(t.status);
+  return [...tasks].sort((a, b) => Number(overdue(b)) - Number(overdue(a)) || Number(!a.deadline) - Number(!b.deadline)
+    || (a.deadline || '').localeCompare(b.deadline || '') || (priority[a.status] ?? 4) - (priority[b.status] ?? 4) || a.id.localeCompare(b.id));
+}

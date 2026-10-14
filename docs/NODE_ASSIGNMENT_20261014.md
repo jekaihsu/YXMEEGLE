@@ -164,3 +164,27 @@ A manager is an employed 經理 whose 所屬組別 meets the node's departments,
 ## Write safety
 
 Each write runs under a lock for its 指派鍵, re-checks the session and a fresh roster inside the lock, and plans against a fresh Lark read. A missing node row is created with the workflow's 指派鍵 by search, create once, search again; a second row is reported as `duplicate_assignment_key`. A pending receipt is stored before the first remote write. Every write is read back and compared. An uncertain create or update stays pending, and a replay of the same `request_id` reconciles it by reading instead of sending it again. Each success, denial and failure writes an audit row with actor, request ID, and before and after values, without tokens.
+
+## Case detail links and projection additions
+
+The canonical home target uses the existing hash route.
+
+```text
+#view=project&project=<stable-project-id>&tab=flow&node=<node-key>&task=<lark-task-record-id>
+```
+
+Encode every value with `encodeURIComponent`. `project` is the authorized workspace project ID. It is not a case code or confirmation record ID. `node` is one of the nine keys listed in Routes. `task` is optional and is the task's Lark `rec...` record ID. `tab=tasks` opens the task list with the same target contract.
+
+The case page expands the selected Lark node, scrolls its detail into view, and gives keyboard focus to that detail. When `task` is present, it scrolls to the task, focuses its row, and expands its source details. Reduced motion uses immediate scrolling. A task-only hash can discover the node from the overview's authorized `node_details`. Send both identifiers from home so that older overview payloads also locate the node.
+
+Legacy `node=<workspace-node-id>&task=<workspace-task-id>` links retain the local task inspector. A Lark node key selects the assignment panel and does not open the local completion dialog. A missing remote task shows a scoped error. A disabled assignment feature shows an unavailable message and labels the remaining local workflow separately. Neither case visibility nor mutation authorization changes.
+
+The top-level router still reads the hash. This change does not add `assignment_node` or `assignment_task` aliases and does not add query-only routing. Link creators must use the hash contract above.
+
+Node responses add `assignment_key`, `origin=lark`, `deadline_basis=related_tasks_max`, and `next_due`. `deadline` keeps the latest deadline among non-cancelled related tasks, including completed tasks. `next_due` is the earliest deadline among tasks that are neither completed nor cancelled. Both values are null when the relevant set has no date. Nodes have no native 截止日 field.
+
+Task details sort all authorized tasks before rendering. Open overdue tasks come first using the Taipei calendar date. Deadline ascending follows, with null dates last. Status priority is 進行中, 待處理, 已完成, 取消. Record ID is the stable final tie-breaker. The client uses the same ordering for the combined task tab.
+
+The client preserves `fetched_at` and `stale_reason`. Panels identify `fetched_at` as the workbench read time, not the Lark modification time. The nine-node summary and each node's task counts remain the existing Lark read model. Local SOP templates appear in an expandable section and do not change those counts.
+
+Assignment reads start when flow, tasks, or assignment participants become visible. Hover or keyboard focus can prefetch after 150 ms. Save Data and slow 2G connections disable extra prefetch. Overview responses still contain the existing embedded `node_details`. This stream does not change the service to omit those fields. Successful writes still use version checks, idempotent request IDs, remote readback, and the existing server permissions.
