@@ -116,7 +116,7 @@ export function buildCaseDetailView(input: unknown, options: CaseDetailOptions =
   return `row:${hash.toString(16)}`;
  };
  const row = (r: Rec): DetailRow => {
-  const key = opaque(r.key ?? JSON.stringify(r));
+  const key = opaque(r.key ?? JSON.stringify(r.confirmation_key ? [r.confirmation_key, r.revision, r.replaced_at] : [r.event_id, r.action, r.created_at]));
   if (rawByOpaque.has(key)) throw new Error('duplicate_identity');
   const unresolved = !!r.unresolved || r.work_item_links === 'unresolved';
   const out: DetailRow = {key, kind: r.kind ?? 'history', title: field('名稱', r.label ?? r.action ?? r.revision?.toString()),
@@ -182,7 +182,7 @@ export function buildCaseDetailView(input: unknown, options: CaseDetailOptions =
  return {page: state([], null), header, sourceLink: sourceForbidden ? sourceLink(null) : sourceLink(h.source_link.url), sections,
   tree: {root, children: treeChildren, expanded: options.selected === 'case' ? {key: 'case', children: treeChildren} : selectedRaw?.key ? {key: selectedRow!.key, children: childrenOf(selectedRaw.key)} : null},
   side: {relationshipCompleteness: field('關係完整性', null, 'receipt_missing'), warnings, sourceTimes: sections.map(s => ({section: s.title, time: s.sourceTime, freshness: s.freshness})), responsibility, operations: '唯讀'},
-  drawer: selectedRow && selectedRaw ? {selectionOnly: true, row: selectedRow, identifiers: {case_identity: b.project_id, record_key: selectedRaw.key ?? null, node_id: selectedRaw.node_id ?? null, task_id: selectedRaw.task_id ?? null, confirmation_key: selectedRaw.confirmation_key ?? null, event_id: selectedRaw.event_id ?? null},
+  drawer: selectedRow && selectedRaw ? {selectionOnly: true, row: selectedRow, identifiers: {case_identity: b.project_id, record_key: selectedRaw.key ?? null, node_id: selectedRaw.node_id ?? null, task_id: selectedRaw.task_id ?? null, confirmation_key: viewByKey.has(selectedRaw.confirmation_key) ? selectedRaw.confirmation_key : null, event_id: selectedRaw.event_id ?? null},
    parents: (selectedRaw.parents ?? []).map((p: Rec) => ({label: viewByKey.get(p.parent_key)?.title.text ?? (p.parent_key === caseKey ? root.title.text : '—'), verification: '對應未驗證'})),
    relationshipCounts: suppressed ? null : {confirmations: counts.confirmations, contracts: counts.contracts, work_items: counts.work_items, tasks: counts.tasks}, countBasis: suppressed ? null : counts.basis,
    navigation: selectedRaw.key && ['confirmation','contract','work_item'].includes(selectedRow.kind) ? {route: selectedRow.kind === 'work_item' ? 'workitem' : selectedRow.kind as 'confirmation' | 'contract', nativeKey: selectedRaw.key} : null,
