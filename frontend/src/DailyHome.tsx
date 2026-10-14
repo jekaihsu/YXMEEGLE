@@ -1,10 +1,13 @@
-import {useState, type ReactNode} from 'react';
+import {useState, useEffect, lazy, Suspense, type ReactNode} from 'react';
 import {ArrowRight, CalendarDays, ChevronRight, CircleCheck, Clock3, GitBranch} from 'lucide-react';
 import {type HomeQueueItem,type HomeTaskFacts,type HomeWaitingItem,type Project} from './types';
 import {Ctx,TaskRow,active,operationallyBlocked,isTaskActor,taskReadiness,openGuidedTask,allTasks,isLate,date,openTask,nameOf,elapsed,NODE_NAMES,STATUS,progress,Empty,unmatchedDaily,num,EventList,FullWorkspaceGate} from './appCommon';
 import {Badge,Button,Page,Progress,Row} from './design';
 import {isHomeAssigned,isHomeProxy,isHomeExecutable,isHomeLate,isHomeDueToday} from './executableTasks';
 import './DailyHome.css';
+import {useHomePanels, type HomePanel, type PanelRead} from './useHomePanels';
+const AssignmentTable=lazy(()=>import('./MyWorkTable').then(module=>({default:module.AssignmentTable})));
+import {Skeleton} from './design';
 
 type Item={key:string;title:string;detail:string;facts?:HomeTaskFacts|null;late?:number;today?:boolean;blocked?:boolean;icon:ReactNode;onClick:()=>void};
 
@@ -124,10 +127,10 @@ const countLine=(parts:[string,number][])=>parts.filter(([,n])=>n>0).map(([l,n])
 
 const Head=({c,children}:{c:Ctx;children:ReactNode})=><Page eyebrow={`${date(c.w.as_of)} · 資料日期`} title="工作總覽" subtitle="先掌握待處理工作，再查看案件進度。" actions={<><Button onClick={()=>c.go({view:'schedule'})}><CalendarDays size={16}/>查看排程</Button></>}>{children}</Page>;
 
-export function Dashboard({c}:{c:Ctx}){
+function LegacyDashboard({c}:{c:Ctx}){
  // Home counts only the viewer's executable work on cases that are not paused (executableTasks.ts); source deadlines elsewhere stay visible on the Company view.
  const all=allTasks(c.w);const assigned=all.filter(r=>isHomeAssigned(r.t,c.w,c.s.user?.id||'')&&active(r.t));
- const rows=assigned.filter(r=>homeActionable(r,c));const overdue=rows.filter(r=>isHomeLate(r.t,c.w.as_of));const pending=c.w.approvals.filter(a=>a.status==='pending');const dueToday=rows.filter(r=>isHomeDueToday(r.t,c.w.as_of));
+ const rows=assigned.filter(r=>homeActionable(r,c));const overdue=rows.filter(r=>isHomeLate(r.t,c.w.as_of));const pending=c.w.approvals.filter(a=>a.status==='pending'&&(c.w.environment!=='production'||c.w.features?.change_extension!==false));const dueToday=rows.filter(r=>isHomeDueToday(r.t,c.w.as_of));
  const waiting=assigned.flatMap(r=>{const kind=waitingKind(r,c);return kind?[{task_id:r.t.id,project_id:r.p.id,project_code:r.p.code,node_id:r.n.id,title:r.t.title,reason:waitingReason(r,c,kind),kind,original_due_date:r.t.original_due_date,due_date:r.t.due_date,detail:r.t.home_detail}]:[]});
  const formal=c.w.projects.filter(p=>p.case_type!=='intake');const intakes=c.w.projects.filter(p=>p.case_type==='intake');
  const late=(p:Project)=>p.nodes.flatMap(n=>n.tasks).filter(t=>isLate(t,c.w.as_of)).length;
@@ -142,7 +145,7 @@ export function Dashboard({c}:{c:Ctx}){
   <Portfolio c={c} formal={formal} rows={focus.map(p=>({p,percent:progress(p),stage:p.nodes.filter(n=>['in_progress','paused'].includes(n.status)).map(n=>NODE_NAMES[n.key]||n.name).join('、')||STATUS[p.status]||p.status}))}/></div>
   <Aside c={c} formal={formal.length} intakes={intakes.length} activity={<section className="today-activity ds-section"><h2>近期活動</h2><div className="ds-group glass--flat"><EventList c={c} limit={3}/></div></section>} daily={<>{reports.slice(0,3).map(r=><Row key={r.id} label={r.case_code} detail={`${r.department} · ${r.person}`} onClick={()=>c.go({view:'project',project:r.p.id,tab:'daily'})}/>)}{!reports.length&&<Row label={c.s.mode==='lark'&&(c.w.source_status.status!=='ready'||unmatchedDaily(c.w)>0)?'日報來源待核對，尚無已配對紀錄':'資料日期內尚無已配對日報'}/>}</>}/></div></Head>
 }
-export function ShellDashboard({c}:{c:Ctx}){
+function LegacyShellDashboard({c}:{c:Ctx}){
  // Built from the shell response only: counts, the server's needs-attention list and project cards. No task, node or event scan.
  const counts=c.w.counts||{approvals_pending:0,daily_unmatched:0,my_overdue_tasks:0,my_active_tasks:0};const attention=c.w.attention||[];const pending=c.w.pending_approvals||[];const overdue=counts.overdue_tasks??0,dueToday=counts.due_today_tasks??0;
  const blocked=attention.filter(a=>['paused','blocked'].includes(a.status));
@@ -162,3 +165,46 @@ function ShellActivity({c}:{c:Ctx}){
  const[open,setOpen]=useState(false);
  return <section className="today-activity ds-section"><h2>近期活動</h2><div className="ds-group glass--flat">{open?<FullWorkspaceGate c={c}>{fc=><EventList c={fc} limit={3}/>}</FullWorkspaceGate>:<Row label={<span>載入近期活動</span>} onClick={()=>setOpen(true)}/>}</div></section>
 }
+
+
+export function PanelStatus({read}:{read:PanelRead}) {
+ const body=read.body;
+ if (!body) return read.pending ? <Skeleton lines={3}/> : <p role="status">工作來源暫時無法讀取</p>;
+ const time=body.as_of ? new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(body.as_of)) : null;
+ if(!time && !read.error && body.readState!=='partial' && body.freshness.status!=='stale')return null;
+ return <small className="my-work-banner-as-of">{time ? `更新於 ${time}` : '尚無成功讀取時間'}{read.error ? ' · 上次資料，更新失敗' : body.freshness.status==='stale' ? ' · 上次資料' : ''}{!body.complete ? ' · 來源尚未完整' : ''}</small>;
+}
+export function HomePanelSection({c,panel,title,scope='mine',onManager}:{c:Ctx;panel:HomePanel;title:string;scope?:'mine'|'team';onManager?:(allowed:boolean)=>void}) {
+ const read=useHomePanels(c,{panel,scope});
+ useEffect(()=>{if(read.body?.manager_view_available!==null && read.body?.manager_view_available!==undefined)onManager?.(read.body.manager_view_available)},[read.body?.manager_view_available,onManager]);
+ const counts=read.body?.counts;
+ return <section className="ds-section dh-personal-queue" aria-label={title}>
+  <h2>{title}</h2>
+  {counts && panel==='assigned' && <p>節點責任 {counts.node_assignments ?? '未知'} 項 · 任務 {counts.tasks ?? '未知'} 項</p>}
+  <PanelStatus read={read}/>
+  {read.body && <><Suspense fallback={<Skeleton lines={3}/>}><AssignmentTable compact items={read.body.items} onNavigate={c.go}/></Suspense>
+   {!read.body.items.length && <p>{read.body.complete ? '目前沒有已核實的事項' : read.body.readState==='disabled' ? '工作來源尚未啟用' : '工作來源待核對'}</p>}
+   <Button variant="plain" onClick={()=>c.go({view:'work',tab:panel,ctx:new URLSearchParams({scope}).toString()})}>查看完整表格</Button>
+  </>}
+ </section>;
+}
+function AssignedHome({c}:{c:Ctx}) {
+ const [completed,setCompleted]=useState(false);
+ const [team,setTeam]=useState(false);
+ const [manager,setManager]=useState(false);
+ return <Page title="我的工作總覽" subtitle="先處理到期工作，再確認待覆核與交辦進度。" actions={<Button onClick={()=>c.go({view:'projects'})}>我的案件<ArrowRight size={16}/></Button>}>
+  {manager && <div role="group" aria-label="工作範圍"><Button aria-pressed={!team} onClick={()=>setTeam(false)}>我的工作</Button><Button aria-pressed={team} onClick={()=>setTeam(true)}>同組</Button></div>}
+  <div className="today-layout"><div className="today-main">
+   <HomePanelSection c={c} panel="assigned" title={team ? '同組工作' : '指派給我'} scope={team ? 'team' : 'mine'} onManager={setManager}/>
+   <HomePanelSection c={c} panel="confirmation" title="待我確認"/>
+   <HomePanelSection c={c} panel="delegated" title="我交辦的"/>
+   <HomePanelSection c={c} panel="proxy" title="代理給我"/>
+   <HomePanelSection c={c} panel="local" title="本地 SOP 工作"/>
+   <details open={completed} onToggle={e=>setCompleted(e.currentTarget.open)}><summary>已完成</summary>{completed && <HomePanelSection c={c} panel="completed" title="已完成工作"/>}</details>
+  </div><aside className="today-aside">
+   <section className="ds-section"><h2>我的案件</h2><div className="ds-group glass--flat"><Row label="開啟案件列表" detail="依案號、案名尋找案件" onClick={()=>c.go({view:'projects'})}/></div></section>
+  </aside></div>
+ </Page>;
+}
+export function Dashboard({c}:{c:Ctx}) {return c.s?.features && ('change_extension' in c.s.features || 'node_assignment' in c.s.features) ? <AssignedHome c={c}/> : <LegacyDashboard c={c}/>}
+export function ShellDashboard({c}:{c:Ctx}) {return c.s?.features && ('change_extension' in c.s.features || 'node_assignment' in c.s.features) ? <AssignedHome c={c}/> : <LegacyShellDashboard c={c}/>}
