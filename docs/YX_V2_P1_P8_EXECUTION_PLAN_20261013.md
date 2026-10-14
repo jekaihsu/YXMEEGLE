@@ -1,6 +1,31 @@
-# YX v2 P1–P8 execution plan (2026-10-13, rev 3.7 of 2026-10-14)
+# YX v2 P1–P8 execution plan (2026-10-13, rev 3.8 of 2026-10-14)
 
 Owner: the single Claude commander. Parent task `task_6f78140157c0`, continued by `task_ec8184733081` (P1/P2 planning and reviews) then by `task_67bb22a5d7b6` (P1–P8 execution), then by `task_97a32b5dcb2e` (P1 continuation), and now by `task_7bab31d03ad7` (P2 onward, one phase at a time). This plan does not create a second commander. Revision 3 adds the complete P3–P8 specs and issue IDs, records the C-ID architecture decisions, and replaces the old no-push/no-staging rule with the owner's serial merge, push and staging authorization (§4).
+
+**Rev 3.8 — P2 closed by owner direction (2026-10-14).** The owner instructed the commander directly to close P2 as soon as possible, merge all work into `ava-apple/yx-v2`, and then stop. The commander performed this final integration itself as the single writer; the root was notified to pause. The P2 code state is complete on yx-v2, but P2 is **closed with documented gaps, not accepted**: P2-E2E and staging/browser acceptance were not run.
+
+- **Integrated on yx-v2 in this close-out** (each blob verified byte-identical to the reviewed or fixed SHA):
+  - P2-INT-F route wiring `0681c23` and FIX1 `246f807` (Sonnet). Codex REV `task_ce35b757bdbc` returned CHANGES-REQUESTED for F1/F2; both are fixed, with browser checks 17/17 and 10 failing at base.
+  - UI-a FIX2 `1dea1cc` (AGY): narrow overflow F3. At 390 px, confirmations went from 858/777 px to 390 px and overview from 844 px to 390 px; 36/36 measured rows pass.
+  - UI-b FIX2 `b6553b8` (AGY): narrow overflow F4. Contract went from 676 px to the viewport width and work item from 544–697 px to the viewport width, at all widths from 320 to 1280 px.
+  - These three fixes are accepted on their authors' failing-first browser evidence plus commander checks of the evidence. **No independent delta recheck** was run on them, because the owner directed an immediate close.
+- **Earlier on yx-v2** (root integration, through `1377b7e`):
+  - Backend: 128B–132B and their fixes; P2-INT-B (5 GETs).
+  - Frontend: NAV; F1 view models ×5; UI-a/b/c.
+  - P1 fixes found during P2: P1-SH-STATE, P1-LEASE, P1-AUTH-CB.
+- **Not done:**
+  - P2-E2E (cross-page reconciliation, revocation, navigation).
+  - Responsive and browser acceptance on staging.
+  - The overview's list-filter vocabulary: NAV and the 128F1 view model cannot yet carry multi-select list filters. Invalid contexts are refused, never broadened.
+- **Documented gaps:**
+  - G-AMT: amounts are withheld.
+  - VCC-123: due dates are unknown.
+  - G-RCODE: work orders are unlocated.
+  - Plan/actual is unavailable.
+  - I1: healthy overview cards show "partial", because C-STATE has no complete-nonempty value.
+  - English reason copy remains in places.
+  - VCC-125 is open, and there is no release or authorization-complete claim.
+- P3–P8 have not started. Per the owner's instruction, the commander stops after this close-out.
 
 **Rev 3.7 owner direction (2026-10-14, base `ava-apple/yx-v2` = `7ae4a9d47a85dc2a35b0f994a3eced7e06ab3f41`, clean, equal to `origin`):**
 - **P2 starts now without staging acceptance.** G-P1-REV no longer blocks P2; P1 stays integrated with its documented gaps (§4.4d). P3 starts only after P2 acceptance, then P4–P8 one phase at a time, each after the prior phase passes.
@@ -81,7 +106,7 @@ Shared Pages: [phase index](https://chatgpt.com/space/page_0cb44163425c8191bd8d8
 | Phase | Scope | Status | Starts only after |
 |---|---|---|---|
 | **P1** | VCC-126, VCC-127, C-STATE, C-ID | **Integrated with documented gaps** (§4.4d) | Owner authorization (given) |
-| **P2** | VCC-128..132 | **In progress** (rev 3.7, wave 1 §4.6) | Owner direction 2026-10-14: starts now without staging acceptance |
+| **P2** | VCC-128..132 | **Closed with documented gaps** (rev 3.8; E2E and staging acceptance not run) | Owner direction 2026-10-14: starts now without staging acceptance |
 | **P3** | VCC-133, VCC-134 | Specified, not dispatched | P2 accepted (integration + real tests + independent review + responsive browser) |
 | **P4** | VCC-135..139 | Specified, not dispatched | P3 accepted |
 | **P5** | VCC-140, VCC-141 | Specified, not dispatched | P4 accepted |
