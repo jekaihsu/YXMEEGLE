@@ -1,6 +1,6 @@
 // P2-INT-F pages: #view=overview | confirmations | confirmation | contract | workitem (VCC-128..132).
 // Read-only. Transport only: every state text comes from the view models or dataState labels. All navigation and
-// return context is built by drilldownContext.ts (drill / back / backTo / linkOut) through integrationRoutes.ts.
+// return context is built by drilldownContext.ts (drill / back / backTo / linkOut) through p2Routes.ts.
 // Not changed: the legacy #project, #projects, #work and #sources views stay reachable from the left navigation.
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {fetchP2, ApiError, getSessionEpoch, parseRoute} from './api';
@@ -19,8 +19,8 @@ import {DATA_STATE_LABELS} from './dataState.ts';
 import {backTo, breadcrumbs, drill, linkOut} from './drilldownContext.ts';
 import type {P2Context, P2Route, SortSpec} from './drilldownContext.ts';
 import {boundHistory, caseNavigate, caseSelection, confirmationKeyOfRow, detailNavigate, kpiDrill, p2Back, p2Failure,
- p2Gate, p2Request, p2RouteOfContext, recordPage, sameFilters} from './integrationRoutes.ts';
-import type {HistoryStore, P2Failure} from './integrationRoutes.ts';
+ p2Gate, p2Request, p2RouteOfContext, recordPage, sameFilters} from './p2Routes.ts';
+import type {HistoryStore, P2Failure} from './p2Routes.ts';
 import type {Ctx} from './appCommon';
 import type {Route} from './types';
 

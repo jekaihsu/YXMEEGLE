@@ -323,14 +323,14 @@ async function run(M) {
  for (const [name, fn] of TESTS) {try {await fn(M);} catch (error) {failed.push([name, error]);}}
  return failed;
 }
-const real = await import(pathToFileURL(path.join(SRC, 'integrationRoutes.ts')).href);
+const real = await import(pathToFileURL(path.join(SRC, 'p2Routes.ts')).href);
 const realFailed = await run(real);
 for (const [name, error] of realFailed) console.error(`FAIL ${name}\n  ${String(error.stack || error).split('\n').slice(0, 6).join('\n  ')}`);
 if (realFailed.length) process.exit(1);
 console.log(`p2 routes: ${TESTS.length} tests passed`);
 
 // Mutants: each edit is a plausible regression of one guard; the suite must fail under every one.
-const source = fs.readFileSync(path.join(SRC, 'integrationRoutes.ts'), 'utf8').replace(/from '\.\/([A-Za-z]+\.ts)'/g, (_m, f) => `from '${pathToFileURL(path.join(SRC, f)).href}'`);
+const source = fs.readFileSync(path.join(SRC, 'p2Routes.ts'), 'utf8').replace(/from '\.\/([A-Za-z0-9]+\.ts)'/g, (_m, f) => `from '${pathToFileURL(path.join(SRC, f)).href}'`);
 const MUTANTS = [
  ['adapter drops deadline_to', "deadline_from: 'deadline_from', deadline_to: 'deadline_to',\n};\nconst LIST_BACKEND_TO_NAV", "deadline_from: 'deadline_from',\n};\nconst LIST_BACKEND_TO_NAV"],
  ['adapter drops unsupported keys instead of reporting', "if (!backend) {unsupported.push(key); continue;}\n  if (typeof value !== 'string' || !value.trim() || CONTROL.test(value)) {invalid.push(key); continue;}", "if (!backend) {continue;}\n  if (typeof value !== 'string' || !value.trim() || CONTROL.test(value)) {invalid.push(key); continue;}"],
