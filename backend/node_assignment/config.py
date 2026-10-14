@@ -13,7 +13,7 @@ class NodeAssignmentConfig:
     task_table: str = 'tblsoyGcC6K5AipF'
     people_table: str = 'tblfaCO2xPUNptQH'
     confirmation_table: str = 'tblmSQrcCs9vPQZx'
-    read_ttl_seconds: float = 20
+    read_ttl_seconds: float = 60
     roster_ttl_seconds: float = 120
     stale_max_seconds: float = 900
     lock_timeout_seconds: float = 10

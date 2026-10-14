@@ -14,7 +14,7 @@ The feature is off unless `NODE_ASSIGNMENT_ENABLED=true`. While off, every route
 | `NODE_ASSIGNMENT_TASK_TABLE_ID` | `tblsoyGcC6K5AipF` | 任務 |
 | `NODE_ASSIGNMENT_PEOPLE_TABLE_ID` | `tblfaCO2xPUNptQH` | V4 人員名單, read only |
 | `NODE_ASSIGNMENT_CONFIRMATION_TABLE_ID` | `tblmSQrcCs9vPQZx` | 工程確認單, used only to build the link |
-| `NODE_ASSIGNMENT_READ_TTL_SECONDS` | `20` (5 to 300) | Case read cache |
+| `NODE_ASSIGNMENT_READ_TTL_SECONDS` | `60` (5 to 300) | Case read cache |
 | `NODE_ASSIGNMENT_ROSTER_TTL_SECONDS` | `120` (30 to 900) | Roster cache; writes need a roster no older than this |
 | `NODE_ASSIGNMENT_STALE_MAX_SECONDS` | `900` (60 to 3600) | Oldest data served as stale after a Lark failure |
 | `NODE_ASSIGNMENT_LOCK_TIMEOUT_SECONDS` | `10` (1 to 30) | Wait for another write on the same node |
@@ -142,6 +142,12 @@ Task counts are done tasks over tasks that are not cancelled. The case summary c
 
 Rejecting a 待審核 or 已完成 node sets 退回原因 and clears 核准人, 核准時間 and 完成時間. The rejection holds the node at 進行中 until a task on it is completed again, which clears 退回原因. Reopening never writes to later nodes; the response warns `later_nodes_started` when a later node is 進行中, 待審核 or 已完成.
 
+Read caches use stale-while-revalidate: first reads load synchronously, with roster and case requests running concurrently through the shared rate bucket. Within the soft TTL reads are fresh; beyond it, entries up to `NODE_ASSIGNMENT_STALE_MAX_SECONDS` return immediately with `stale: true, stale_reason: "refreshing"` while one daemon refresh per key runs. Refresh failures are logged and do not fail that read. Older entries must load synchronously. Roster soft TTL remains 120 seconds; successful roster schema checks are cached for 10 minutes, failures are never cached. Writes still require a fresh case and a roster within its soft TTL, verify read-back, and replace the case cache after success.
+
+The overview adds `node_details`, keyed by all nine node keys, each containing `tasks` and `assignable_people` exactly as the node detail endpoint does (empty lists where applicable). People are visible only to actors who manage that node. Existing overview fields and the node detail endpoint remain unchanged.
+
+Read duration logs use `node_assignment read overview ms=<total> cache=<hit|stale|miss> lark_calls=<n>` (or `read detail`), without identities or tokens; calls count Bitable attempts, excluding token minting. Session responses expose `features.node_assignment: true` only when the deployment flag is enabled and application identity, organization, credentials and approved table targets are configured, independently of `workspace_shell`.
+
 ## Who may act
 
 | Action | Allowed for | From status |
@@ -153,7 +159,7 @@ Rejecting a 待審核 or 已完成 node sets 退回原因 and clears 核准人, 
 | approve | Manager | 待審核 |
 | reject | Manager | 待審核, 已完成 |
 
-A manager is an employed 經理 whose 所屬組別 meets the node's departments, any employed 副總 or 老闆, or a person with the server company-admin business grant (`can_business_override`). Assignees must be employed members of the node's departments. Open means any status except 已完成 and 略過; tasks are frozen once the node is 已完成 or 略過.
+A manager is an employed 經理 whose 所屬組別 meets the node's departments, any employed 副總 or 老闆, or a person with the server company-admin business grant (`can_business_override`). For ordinary node work, server-session system administrators (`manager` role or `can_manage_roles`) also manage every node as an explicit exception to independent business authority; this never substitutes financial/native approval seats. Assignees must be employed members of the node's departments. Open means any status except 已完成 and 略過; tasks are frozen once the node is 已完成 or 略過.
 
 ## Write safety
 

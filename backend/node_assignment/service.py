@@ -11,6 +11,7 @@ import json
 import logging
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from collections import deque
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -174,6 +175,7 @@ class NodeAssignmentService:
         self.roster_cache = StaleCache(self.config.roster_ttl_seconds, self.config.stale_max_seconds, clock)
         self.locks, self.rate = KeyedLocks(), RateLimit()
         self._schema_checked = {}
+        self._schema_lock = threading.Lock()
 
     # Policy
 
@@ -208,23 +210,33 @@ class NodeAssignmentService:
 
     # Reads
 
-    def _roster(self, *, fresh):
+    def _roster(self, *, fresh, calls=None):
+        caller = threading.get_ident()
         def load():
             with self.client() as client:
-                return fetch_roster(client)
+                try:
+                    return fetch_roster(client, self._check_roster_schema)
+                finally:
+                    if calls is not None and threading.get_ident() == caller:
+                        calls.append(client.calls)
         try:
-            return self.roster_cache.get('roster', load, allow_stale=not fresh)
+            return self.roster_cache.get('roster', load, allow_stale=not fresh, revalidate=not fresh)
         except Failure as exc:
             if fresh:
                 raise Failure('roster_unavailable', '無法確認最新人員名單，暫停節點指派修改', reason=exc.code) from None
             logger.warning('node_assignment roster unavailable code=%s', exc.code)
             return None
 
-    def _case(self, ctx: Context, code):
+    def _case(self, ctx: Context, code, calls=None):
+        caller = threading.get_ident()
         def load():
             with self.client() as client:
-                return read_case(client, code)
-        return self.case_cache.get((ctx.wid, code), load)
+                try:
+                    return read_case(client, code)
+                finally:
+                    if calls is not None and threading.get_ident() == caller:
+                        calls.append(client.calls)
+        return self.case_cache.get((ctx.wid, code), load, revalidate=True)
 
     def _envelope(self, ctx, cached, roster, body):
         block = self.write_block(ctx)
@@ -233,22 +245,44 @@ class NodeAssignmentService:
                 'roster': {'available': roster is not None, 'stale': bool(roster is None or roster.stale)},
                 'writes_enabled': block is None, 'writes_disabled_reason': block}
 
+    def _check_roster_schema(self, client, table):
+        with self._schema_lock:
+            if self.clock() - self._schema_checked.get(table, float('-inf')) > SCHEMA_RECHECK_SECONDS:
+                check_schema(client, table)
+                self._schema_checked[table] = self.clock()
+
+    def _read(self, ctx, key=None):
+        started, calls = time.monotonic(), []
+        cache_status = 'miss'
+        try:
+            code = self.open(ctx)
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                roster_future = pool.submit(self._roster, fresh=False, calls=calls)
+                case_future = pool.submit(self._case, ctx, code, calls)
+                roster, cached = roster_future.result(), case_future.result()
+            cache_status = 'stale' if cached.stale else ('miss' if calls else 'hit')
+            people = roster.value if roster else None
+            actor = actor_for(ctx.user, people)
+            skipped, enabled, now = self.skipped(ctx), self.write_block(ctx) is None, self.now_ms()
+            if key is not None:
+                body = node_detail(cached.value, skipped, actor, people, key, enabled, now)
+            else:
+                _, body = case_view(cached.value, skipped, actor, enabled, now)
+                body['node_details'] = {}
+                for node_key in NodeKey:
+                    detail = node_detail(cached.value, skipped, actor, people, node_key, enabled, now)
+                    body['node_details'][node_key.value] = {k: detail[k] for k in ('tasks', 'assignable_people')}
+            return self._envelope(ctx, cached, roster, body)
+        finally:
+            logger.info('node_assignment read %s ms=%d cache=%s lark_calls=%d',
+                        'detail' if key else 'overview', (time.monotonic() - started) * 1000,
+                        cache_status, sum(calls))
+
     def overview(self, ctx: Context):
-        code = self.open(ctx)
-        roster = self._roster(fresh=False)
-        cached = self._case(ctx, code)
-        actor = actor_for(ctx.user, roster.value if roster else None)
-        _, body = case_view(cached.value, self.skipped(ctx), actor, self.write_block(ctx) is None, self.now_ms())
-        return self._envelope(ctx, cached, roster, body)
+        return self._read(ctx)
 
     def detail(self, ctx: Context, key: NodeKey):
-        code = self.open(ctx)
-        roster = self._roster(fresh=False)
-        cached = self._case(ctx, code)
-        people = roster.value if roster else None
-        body = node_detail(cached.value, self.skipped(ctx), actor_for(ctx.user, people), people, key,
-                           self.write_block(ctx) is None, self.now_ms())
-        return self._envelope(ctx, cached, roster, body)
+        return self._read(ctx, key)
 
     # Writes
 

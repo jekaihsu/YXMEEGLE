@@ -34,7 +34,7 @@ def test_default_and_environment_configuration():
     config = NodeAssignmentConfig.from_env({'NODE_ASSIGNMENT_ENABLED': 'TRUE', 'NODE_ASSIGNMENT_TASK_TABLE_ID': '../x',
                                             'NODE_ASSIGNMENT_READ_TTL_SECONDS': 'nan', 'NODE_ASSIGNMENT_ROSTER_TTL_SECONDS': '5'})
     assert (config.enabled, config.task_table, config.read_ttl_seconds, config.roster_ttl_seconds) == (
-        True, 'tblsoyGcC6K5AipF', 20, 30)
+        True, 'tblsoyGcC6K5AipF', 60, 30)
 
 
 def row(open_id, name, groups, rank, employed=True):

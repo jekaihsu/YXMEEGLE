@@ -166,9 +166,10 @@ def h():
     state = {'environment': 'production', 'settings': {'external_enabled': True}}
     case = {'project': project()}
     who = ['ou_member']
+    user_fields = {}
 
     def identity(_request):
-        return {'mode': 'lark', 'wid': 'lark-company'}, {'id': who[0], 'active': True}
+        return {'mode': 'lark', 'wid': 'lark-company'}, {'id': who[0], 'active': True, **user_fields}
 
     def load_case(_data, _user, project_id):
         assert project_id == 'p1'
@@ -188,7 +189,7 @@ def h():
             return [(r.action, r.actor_id, r.data) for r in db.scalars(select(AuditRow).order_by(AuditRow.created_at))]
 
     yield SimpleNamespace(client=build(), build=build, fake=fake, clock=clock, state=state, case=case, who=who,
-                          audits=audits)
+                          audits=audits, user_fields=user_fields)
     engine.dispose()
 
 
@@ -385,10 +386,10 @@ def test_write_permission_error_maps_and_drops_the_pending_receipt(h):
 
 def test_reads_serve_stale_data_on_lark_failure_then_fail_clearly(h):
     act(h, 'ou_sales', '/nodes/sales/claim', {'request_id': 'seed'})
-    h.clock[0] += 60
+    h.clock[0] += 61
     h.fake.fault('POST', '/records/search', lambda request: httpx.Response(503, text='down'), times=3)
     stale = view(h)
-    assert (stale['stale'], stale['stale_reason']) == (True, 'lark_unavailable')
+    assert (stale['stale'], stale['stale_reason']) == (True, 'refreshing')
     assert node(stale, 'sales')['owners'] == [{'open_id': 'ou_sales', 'name': '周業務'}]
     h.clock[0] += 1000
     h.fake.fault('POST', '/records/search', lambda request: httpx.Response(503, text='down'), times=3)
@@ -706,3 +707,90 @@ def test_sent_task_create_without_baseline_still_fails_closed(h, monkeypatch):
     replay = act(h, 'ou_sales', '/nodes/sales/tasks', body)
     assert (replay.status_code, replay.json()['code']) == (502, 'outcome_unknown')
     assert len(h.fake.writes()) == writes
+
+
+def test_manager_session_without_roster_can_manage_ordinary_nodes(h):
+    h.user_fields['role'] = 'manager'
+    body = view(h, 'ou_admin')
+    assert body['can']['sales']['assign'] and body['can']['sales']['create_task']
+    assert not body['can']['sales']['claim']
+    assigned = act(h, 'ou_admin', '/nodes/sales/assign',
+                   {'request_id': 'admin-assign', 'owner_open_ids': ['ou_sales']})
+    assert assigned.status_code == 200, assigned.text
+    created = act(h, 'ou_admin', '/nodes/sales/tasks',
+                  {'request_id': 'admin-task', 'title': 'Review', 'assignee_open_id': 'ou_sales'})
+    assert created.status_code == 200, created.text
+    task = created.json()['tasks'][0]
+    edited = act(h, 'ou_admin', f"/nodes/sales/tasks/{task['id']}",
+                 {'request_id': 'admin-edit', 'expected_revision': task['revision'], 'status': '已完成'}, method='patch')
+    assert edited.status_code == 200, edited.text
+    ready = edited.json()
+    assert ready['can']['approve'] and ready['can']['reject']
+    approved = act(h, 'ou_admin', '/nodes/sales/approve',
+                   {'request_id': 'admin-approve', 'expected_revision': ready['node']['revision']})
+    assert approved.status_code == 200, approved.text
+    rejected = act(h, 'ou_admin', '/nodes/sales/reject',
+                   {'request_id': 'admin-reject', 'expected_revision': approved.json()['node']['revision'], 'reason': 'Rework'})
+    assert rejected.status_code == 200, rejected.text
+    completed = act(h, 'ou_admin', '/nodes/sales/complete',
+                    {'request_id': 'admin-complete', 'expected_revision': rejected.json()['node']['revision']})
+    assert completed.status_code == 200, completed.text
+    assert node(view(h, 'ou_admin'), 'sales')['derived_status'] == '已完成'
+
+
+@pytest.mark.parametrize('fields', [{'role': 'member'}, {'role': 'manager', 'manager_revoked': True},
+                                   {'role': 'manager', 'active': False}])
+def test_session_without_override_cannot_assign(h, fields):
+    h.user_fields.update(fields)
+    assert not view(h, 'ou_admin')['can']['sales']['assign']
+    response = act(h, 'ou_admin', '/nodes/sales/assign',
+                   {'request_id': 'denied', 'owner_open_ids': ['ou_sales']})
+    assert response.status_code == 403
+
+
+def test_overview_embeds_details_and_warm_reads_make_no_lark_calls(h, caplog):
+    import logging
+    caplog.set_level(logging.INFO)
+    body = view(h, 'ou_sm')
+    assert len(h.fake.requests) == 4  # token, people schema, people records, node search
+    assert len(body['node_details']) == 9
+    for key, embedded in body['node_details'].items():
+        detail = view(h, 'ou_sm', key)
+        assert embedded == {k: detail[k] for k in ('tasks', 'assignable_people')}
+    view(h, 'ou_sm')
+    assert len(h.fake.requests) == 4
+    assert 'cache=hit lark_calls=0' in caplog.text
+    assert 'cache=miss lark_calls=3' in caplog.text
+
+
+def test_roster_schema_success_cached_for_ten_minutes(h):
+    view(h)
+    h.clock[0] += 121
+    # Force the synchronous write roster refresh; schema remains cached.
+    act(h, 'ou_sales', '/nodes/sales/claim', {'request_id': 'roster-refresh'})
+    schema = lambda: sum(p.endswith(f'{PEOPLE}/fields') for _, p in h.fake.requests)
+    assert schema() == 1
+    h.clock[0] += 601
+    act(h, 'ou_sm', '/nodes/sales/assign', {'request_id': 'roster-recheck',
+                                         'owner_open_ids': ['ou_sales']})
+    assert schema() == 2
+
+
+def test_cold_roster_and_case_reads_overlap(h):
+    import threading
+    rendezvous = threading.Barrier(2)
+    def wait_for_other(_request):
+        rendezvous.wait(timeout=2)
+    h.fake.fault('GET', f'{PEOPLE}/fields', wait_for_other)
+    h.fake.fault('POST', f'{NODES}/records/search', wait_for_other)
+    view(h)
+
+
+def test_cold_detail_call_count_with_linked_task(h):
+    rid = h.fake.add(NODES, {'指派鍵': CODE + '|業務', '確認單編號': CODE, '節點': '業務', '狀態': '待處理'})
+    h.fake.add(TASKS, {'標題': 'Task', '節點指派': [rid], '狀態': '待處理'})
+    view(h, key='sales')
+    assert len(h.fake.requests) == 5  # adds task batch_get to the four-call cold fixture
+    view(h, key='sales')
+    view(h)
+    assert len(h.fake.requests) == 5

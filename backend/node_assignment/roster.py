@@ -50,6 +50,6 @@ def parse_roster(records) -> Roster:
     return Roster({p.open_id: p for p in people if p.open_id not in ambiguous}, ambiguous)
 
 
-def fetch_roster(client: BitableClient) -> Roster:
-    check_schema(client, Table.PEOPLE)
+def fetch_roster(client: BitableClient, schema_check=check_schema) -> Roster:
+    schema_check(client, Table.PEOPLE)
     return parse_roster(client.list_records(Table.PEOPLE, FIELD_NAMES))
