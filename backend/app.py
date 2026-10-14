@@ -345,7 +345,7 @@ def create_app(overrides=None):
                 if tenant_read:
                     from .production_access import access_mode
                     access=access_mode(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'))
-                    if access in ('denied','recovery'): access='tenant-read'
+                    if access=='denied': access='tenant-read'
                 else:
                     access=require_access(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'),allow_recovery=(request.method,request.url.path) in recovery_routes)
                 data={**data,'access_mode':access}

@@ -206,3 +206,22 @@ def test_departed_missing_or_inactive_person_loses_tenant_reads(tmp_path, monkey
     response = client.get('/api/workspace')
     assert response.status_code == 403
     assert client.get('/api/session').json()['user'] is None
+
+
+def test_bootstrap_manager_keeps_roster_recovery_after_oauth(tmp_path, monkeypatch):
+    app, _ = production_client(tmp_path, enabled=False)
+    stale(app, bootstrap_admin=True)
+    oauth(monkeypatch, open_id='u-manager')
+    client = TestClient(app)
+    assert finish(client, begin(client)).status_code == 307
+    session = client.get('/api/session').json()
+    assert session['access_mode'] == 'recovery' and session['user']['id'] == 'u-manager'
+    calls = []
+    def sync(wid, actor):
+        calls.append((wid, actor))
+        return {'status': 'ready'}
+    monkeypatch.setattr(app.state.people_directory, 'sync', sync)
+    assert client.post('/api/people/sync').status_code == 200
+    assert calls == [('lark-company', 'u-manager')]
+    assert client.get('/api/admin/runtime-health').status_code == 200
+    assert client.post('/api/actions', json={'action': 'admin_person', 'version': 1, 'request_id': 'recovery'}).status_code == 403
