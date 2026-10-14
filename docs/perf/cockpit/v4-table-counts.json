@@ -1,0 +1,215 @@
+{
+  "ok": true,
+  "identity": "user",
+  "data": {
+    "tables": [
+      {
+        "id": "tblmSQrcCs9vPQZx",
+        "name": "工程確認單",
+        "records_count": 106,
+        "rev": 88
+      },
+      {
+        "id": "tblobs4qPy2w9MZ6",
+        "name": "合約明細工項",
+        "records_count": 573,
+        "rev": 816
+      },
+      {
+        "id": "tblwQPYk3c9RvCU7",
+        "name": "合約填報工項",
+        "records_count": 701,
+        "rev": 672
+      },
+      {
+        "id": "tblfaCO2xPUNptQH",
+        "name": "人員名單",
+        "records_count": 67,
+        "rev": 10
+      },
+      {
+        "id": "tblg3Fo23T6Gos6S",
+        "name": "儀器費率",
+        "records_count": 144,
+        "rev": 3
+      },
+      {
+        "id": "tblTQv8l5ntnbwyp",
+        "name": "車輛",
+        "records_count": 20,
+        "rev": 3
+      },
+      {
+        "id": "tbl0aJddgw3u7Ldo",
+        "name": "人力成本方案",
+        "records_count": 18,
+        "rev": 3
+      },
+      {
+        "id": "tblQekGHgNHRVUHM",
+        "name": "行政工項標準",
+        "records_count": 63,
+        "rev": 4
+      },
+      {
+        "id": "tbl8wRYCUCvbSoJG",
+        "name": "外業成本單",
+        "records_count": 213,
+        "rev": 35
+      },
+      {
+        "id": "tbl5zPLS0ExWNEty",
+        "name": "外業工作單",
+        "records_count": 187,
+        "rev": 267
+      },
+      {
+        "id": "tblKwSDRg6WaGHYr",
+        "name": "內業成本單",
+        "records_count": 201,
+        "rev": 4
+      },
+      {
+        "id": "tblrCo8KeZiuJUNh",
+        "name": "內業工作單",
+        "records_count": 348,
+        "rev": 35
+      },
+      {
+        "id": "tbl7ngrBD2jSx6Cz",
+        "name": "行政成本單",
+        "records_count": 59,
+        "rev": 3
+      },
+      {
+        "id": "tblHsH4ocQSG08g5",
+        "name": "行政工作單",
+        "records_count": 188,
+        "rev": 8
+      },
+      {
+        "id": "tblF0siL1McvVvLC",
+        "name": "業務PM成本單",
+        "records_count": 143,
+        "rev": 1
+      },
+      {
+        "id": "tblyDYEM4QaiKPK6",
+        "name": "顧問成本單",
+        "records_count": 51,
+        "rev": 6
+      },
+      {
+        "id": "tbleQZfZ0EWTuthf",
+        "name": "內業每日費用",
+        "records_count": 1,
+        "rev": 1
+      },
+      {
+        "id": "tblV9Jyofp9gLAmL",
+        "name": "名目分類",
+        "records_count": 9,
+        "rev": 3
+      },
+      {
+        "id": "tblepBPXwx3txJTT",
+        "name": "約定帳戶",
+        "records_count": 36,
+        "rev": 4
+      },
+      {
+        "id": "tblC76IUep5pZSX6",
+        "name": "採購單",
+        "records_count": 0,
+        "rev": 1379
+      },
+      {
+        "id": "tblTr51I9RSrOZKa",
+        "name": "採購單-非審批",
+        "records_count": 4,
+        "rev": 6
+      },
+      {
+        "id": "tbligcwRyAGhxL2e",
+        "name": "支出單",
+        "records_count": 1,
+        "rev": 2801
+      },
+      {
+        "id": "tblpHFaVfmgZVkoD",
+        "name": "行政結算",
+        "records_count": 0,
+        "rev": 4
+      },
+      {
+        "id": "tblZz6Mkhv9gHrB2",
+        "name": "工作預排",
+        "records_count": 312,
+        "rev": 0
+      },
+      {
+        "id": "tblCEGiti083yotW",
+        "name": "日報稽核控制台",
+        "records_count": 1,
+        "rev": 0
+      },
+      {
+        "id": "tblbSIRYfNhN6FeS",
+        "name": "津貼申請",
+        "records_count": 0,
+        "rev": 1392
+      },
+      {
+        "id": "tblbxh8QQaY6N3DL",
+        "name": "津貼匯整明細",
+        "records_count": 287,
+        "rev": 4
+      },
+      {
+        "id": "tblC8181oxaBcT0d",
+        "name": "津貼匯整總表",
+        "records_count": 122,
+        "rev": 1
+      },
+      {
+        "id": "tblgFHzOvgbVRU3f",
+        "name": "外業組別營業額統計",
+        "records_count": 18,
+        "rev": 7
+      },
+      {
+        "id": "tblMJ8whiR9T76b7",
+        "name": "內勤人員營業額統計",
+        "records_count": 260,
+        "rev": 132
+      },
+      {
+        "id": "tblcPZPmezkyeVb7",
+        "name": "節點指派",
+        "records_count": 9,
+        "rev": 34
+      },
+      {
+        "id": "tblsoyGcC6K5AipF",
+        "name": "任務",
+        "records_count": 0,
+        "rev": 1
+      },
+      {
+        "id": "tbl3jzXUO8oyfvcu",
+        "name": "SOP 案件總覽",
+        "records_count": 1,
+        "rev": 25
+      }
+    ],
+    "total": 33
+  },
+  "_notice": {
+    "update": {
+      "command": "lark-cli update",
+      "current": "1.0.97",
+      "latest": "1.0.98",
+      "message": "lark-cli 1.0.98 available, current 1.0.97, run: lark-cli update"
+    }
+  }
+}
