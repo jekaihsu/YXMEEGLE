@@ -46,14 +46,14 @@ summary{min-height:44px;padding-block:var(--space-3);cursor:pointer;box-sizing:b
 
 /* Picker: pill trigger + floating list, sized like the other 44px controls. */
 .ds-picker{position:relative;display:inline-flex;flex:0 0 auto}
-.ds-picker>button{appearance:none;margin:0;font:inherit;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:space-between;gap:var(--sp-2);min-width:9rem;width:100%;height:var(--control-height);padding:0 var(--sp-3) 0 var(--sp-4);border:.5px solid var(--glass-border,var(--sep));border-radius:var(--radius-pill);background:var(--surface);color:var(--label);font-size:var(--fs-subhead);cursor:pointer;white-space:nowrap}
+.ds-picker>button{appearance:none;margin:0;font:inherit;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:space-between;gap:var(--sp-2);min-width:9rem;width:100%;height:var(--control-height);padding:0 var(--sp-3) 0 var(--sp-4);border:1px solid var(--field-border);border-radius:var(--radius-control);background:color-mix(in srgb,var(--surface) 88%,transparent);color:var(--label);font-size:var(--fs-subhead);cursor:pointer;white-space:nowrap}
 .ds-picker>button>span{overflow:hidden;text-overflow:ellipsis}
 .ds-picker>button>svg{flex-shrink:0;color:var(--label-2);transition:transform 200ms ease-out}
 .ds-picker.open>button>svg{transform:rotate(180deg)}
 .ds-picker>button:hover{background:color-mix(in srgb,var(--label) 4%,var(--surface))}
 .ds-picker>button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .ds-picker>ul{position:absolute;top:calc(100% + 6px);right:0;z-index:40;min-width:100%;max-height:min(20rem,60vh);overflow:auto;margin:0;padding:var(--space-1);list-style:none;box-sizing:border-box;
- border:.5px solid var(--sep);border-radius:12px;background:var(--surface);box-shadow:0 10px 30px rgba(0,0,0,.14),0 2px 6px rgba(0,0,0,.08)}
+ border:1px solid var(--glass-border);border-radius:var(--radius-control);background:var(--glass-fill-strong);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);box-shadow:var(--glass-highlight),var(--glass-shadow-raised)}
 .ds-picker>ul:focus{outline:none}
 .ds-picker li{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);min-height:38px;padding:0 var(--sp-3);border-radius:8px;font-size:var(--fs-subhead);color:var(--label);white-space:nowrap;cursor:pointer}
 .ds-picker li.active{background:color-mix(in srgb,var(--accent) 10%,transparent)}

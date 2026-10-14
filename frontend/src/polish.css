@@ -7,6 +7,7 @@
 .workspace .data-table th{padding:var(--sp-3) var(--sp-4);font-size:var(--fs-caption);font-weight:600;color:var(--label-2);text-align:left;white-space:nowrap}
 .workspace .data-table td{padding:var(--sp-3) var(--sp-4)}
 .workspace .operations h2{margin:var(--sp-6) 0 var(--sp-3)}
+.workspace .operations .owned-view:not(.owned-state)>h2:first-child{margin-top:0}
 .workspace .operations>h1~.table-scroll,.workspace .operations>p+.table-scroll{margin-top:var(--sp-4)}
 .workspace .data-table td,.workspace .data-table th{border-color:var(--sep)}
 @media(max-width:760px){
@@ -185,15 +186,18 @@ button.resource-cell:focus-visible{outline:2px solid var(--accent);outline-offse
 /* With the step's main action in the footer, the in-body row only holds the 完整任務內容 link. */
 .modal .completion-task-actions{padding-top:var(--sp-2);border-top:0}
 /* Toolbar rows: pill groups sit at the same 44px as the search, select and date controls beside them. */
-.app-shell .workspace :is(.mywork-controls>.tabbar,.schedule-toolbar>.ds-segmented){margin:0;height:var(--control-height);box-sizing:border-box;align-items:stretch}
-.app-shell .workspace :is(.mywork-controls>.tabbar,.schedule-toolbar>.ds-segmented)>button{min-height:0!important;padding-block:0 !important}
+.app-shell .workspace :is(.mywork-controls>.tabbar,.schedule-toolbar>.ds-segmented){margin:0}
 .ds-segmented button{display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2)}
 .workspace .schedule-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3)}
 .workspace .schedule-toolbar-actions{display:flex;align-items:center;gap:var(--sp-4);margin-left:auto}
 .workspace .schedule-toolbar>.schedule-toolbar-actions+select{margin-left:0}
-.app-shell .workspace .schedule-toolbar-actions>.ds-segmented{height:var(--control-height);box-sizing:border-box;align-items:stretch}
-.app-shell .workspace .schedule-toolbar-actions>.ds-segmented>button{min-height:0!important;padding-block:0 !important}
 @media(max-width:760px){.workspace .mywork-controls .search-field:last-child{grid-column:1/-1}}
 .workspace .mywork-controls .table-toolbar>.ds-picker{flex:0 0 12rem}
 .workspace .schedule-toolbar>.ds-picker>button{min-width:8.5rem}
+
+/* Section headings that carry a legend or actions wrap instead of squeezing the legend into a column. */
+@media(max-width:760px){
+ .workspace .section-heading{flex-wrap:wrap;gap:var(--space-2) var(--space-4)}
+ .workspace .flow-legend{flex-wrap:wrap}
+}
 }

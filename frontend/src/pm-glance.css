@@ -14,7 +14,7 @@
 .pm-glance-value {font-size:32px;font-variant-numeric:tabular-nums;margin:var(--space-3) 0 var(--space-1);color:var(--label)}
 .pm-glance-tile small {color:var(--label-2);overflow-wrap:anywhere}
 .pm-glance-tile p {font-size:13px;color:var(--label-2);line-height:1.55;overflow-wrap:anywhere;flex:1}
-.pm-glance-tile a {display:flex;justify-content:space-between;color:var(--accent);border-top:1px solid var(--sep);padding-top:var(--space-4);margin-top:var(--space-2);font-size:13px;font-weight:600}
+.pm-glance-tile a {display:flex;align-items:center;min-height:44px;justify-content:space-between;color:var(--accent);border-top:1px solid var(--sep);padding-top:var(--space-4);margin-top:var(--space-2);font-size:13px;font-weight:600}
 .pm-glance-tile a:focus-visible {outline:2px solid var(--accent);outline-offset:4px}
 .pm-glance-tile.state-failed {border-color:var(--critical)}
 .pm-glance-tile.state-failed .pm-glance-state {background:color-mix(in srgb,var(--critical) 10%,var(--surface));color:var(--critical)}

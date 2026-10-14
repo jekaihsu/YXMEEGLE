@@ -125,4 +125,5 @@
 .workspace .portfolio-page .projects-table :is(th,td){text-align:left!important}
 .workspace .portfolio-page .projects-table .progress-cell{justify-content:flex-start}
 .workspace .portfolio-page .projects-table .progress-cell>span{text-align:left;min-width:2.5rem}
+.portfolio-page a.cell-title.case-link{display:inline-flex;align-items:center;min-height:44px}
 }

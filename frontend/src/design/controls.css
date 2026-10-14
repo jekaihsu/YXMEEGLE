@@ -50,6 +50,11 @@
 /* Toggle buttons (aria-pressed) keep their label and show the selected state by fill, border and weight. */
 :is(.button,.ds-button)[aria-pressed=true]{background:color-mix(in srgb,var(--accent) 14%,var(--surface));border-color:var(--accent);font-weight:600}
 
+/* Buttons inside tab and segmented rows are tabs, not secondary buttons. */
+.app-shell :is(.tabbar,.project-tabs,.ops-tabs,.segmented,.ds-segmented,.flow-operation-picker)>button{background:transparent;border-color:transparent;box-shadow:none;color:var(--label);font-weight:500}
+.app-shell :is(.tabbar,.project-tabs,.ops-tabs,.segmented,.ds-segmented,.flow-operation-picker)>button:hover:not(.active,[aria-checked=true]){background:color-mix(in srgb,var(--label) 6%,transparent);border-color:transparent}
+.app-shell :is(.tabbar,.project-tabs,.ops-tabs,.segmented,.ds-segmented)>:is(button.active,button[aria-checked=true]){background:var(--surface);color:var(--accent);font-weight:600;border-color:var(--glass-border);box-shadow:0 1px 3px rgb(21 35 51/.14),var(--glass-highlight)}
+
 /* Icon buttons are 44px squares with the same radius and states. */
 .icon-button{
  box-sizing:border-box;min-width:var(--control-height);min-height:var(--control-height);height:auto;padding:var(--space-2);

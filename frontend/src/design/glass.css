@@ -18,14 +18,14 @@
  background:var(--glass-fill);border:1px solid var(--glass-border);border-radius:var(--radius-card);box-shadow:var(--glass-highlight),var(--glass-shadow);
  -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
 }
-.workspace :is(.glass--flat,.ds-group,.table-scroll,.portfolio-index,.my-work-table-scroll,.tl-sheet,.approval-list,.na-summary,.na-list,.node-section,.project-discussion,.p2-banner,.p2-side-panel,.p2-card,.people-surface,.source-connection,.ds-section.dh-personal-queue,.inbox-row,.inbox-clear,.empty>span){
+.workspace :is(.glass--flat,.ds-group,.table-scroll,.portfolio-index,.my-work-table-scroll,.tl-sheet,.approval-list,.na-summary,.na-list,.node-section,.project-discussion,.p2-banner,.p2-side-panel,.p2-card,.people-surface,.source-connection,.ds-section.dh-personal-queue,.my-work-toolbar,.owned-view:not(.owned-state),.cockpit-table-scroll,.cockpit-source-detail,.inbox-row,.inbox-clear,.empty>span){
  background:var(--glass-fill-strong);border:1px solid var(--glass-border);border-radius:var(--radius-card);box-shadow:var(--glass-highlight),var(--glass-shadow-flat);
  -webkit-backdrop-filter:none;backdrop-filter:none;
 }
 .workspace :is(.dh-hero,.pm-glance-tile,.p2-header,.cockpit-overview-grid>section,.cockpit-delivery,.cockpit-source,.major-approval-summary) :is(.glass--flat,.ds-group,.table-scroll,.p2-card){
  background:transparent;border-color:var(--sep);box-shadow:none;
 }
-.workspace .ds-section.dh-personal-queue .ds-group{background:transparent;border:0;box-shadow:none;border-radius:0}
+.workspace :is(.ds-section.dh-personal-queue,.owned-view:not(.owned-state)) .ds-group{background:transparent;border:0;box-shadow:none;border-radius:0}
 /* Rows inside a glass card let the card show through; only hover and selection add fill. */
 .workspace :is(.ds-group,.glass--flat,.my-work-table-scroll,.portfolio-index,.ds-section.dh-personal-queue,.file-screen,.audit-screen) :is(.ds-row,.file-version,.audit-entry,.source-attachment-index,.source-attachment-index article){background:transparent}
 .workspace :is(.ds-group,.glass--flat) :is(button.ds-row,a.ds-row):hover{background:color-mix(in srgb,var(--accent) 7%,transparent)}

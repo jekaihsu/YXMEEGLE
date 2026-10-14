@@ -12,8 +12,7 @@
 .cockpit-section-title>span,.cockpit-note,.cockpit-pagination,.cockpit-breakdown-title{font-size:var(--fs-footnote);color:var(--label-2)}
 .company-cockpit>section{margin-bottom:var(--sp-7)}
 .company-cockpit button.ds-row{border:0;cursor:pointer}
-.company-cockpit button.ds-row:hover{background:var(--surface-2)}
-.company-cockpit .ds-row{color:var(--label);background:var(--surface);overflow-wrap:anywhere}
+.company-cockpit .ds-row{color:var(--label);overflow-wrap:anywhere}
 .cockpit-health{padding:var(--sp-6);margin:var(--sp-5) 0 var(--sp-4)}
 .cockpit-health .ds-stat strong{font-size:calc(var(--fs-large-title) * 2);letter-spacing:-.04em}
 .company-cockpit .ds-row-value{color:var(--label);text-align:right;flex-shrink:0}
@@ -48,9 +47,7 @@
 .cockpit-case-table tbody tr:hover{background:var(--surface-2)}
 .cockpit-pagination{margin-top:var(--sp-4)}
 .cockpit-pagination>div{display:flex;flex-wrap:wrap;gap:var(--sp-2)}
-.company-cockpit .ds-button{border:0;white-space:normal}
-.company-cockpit.company-cockpit .button.ds-button{min-height:var(--sp-8);border:0;border-radius:var(--radius-pill);font-size:var(--fs-callout);font-weight:500;background:var(--surface-2);color:var(--accent);padding:var(--sp-2) var(--sp-5);box-shadow:none;transition:opacity var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease)}
-.company-cockpit .button:active{margin-top:0;transform:scale(.97)}
+.company-cockpit .ds-button{white-space:normal}
 .cockpit-error{padding:var(--sp-4);border-left:var(--sp-1) solid var(--warning);background:var(--surface);margin-bottom:var(--sp-5);font-size:var(--fs-subhead);overflow-wrap:anywhere}
 .cockpit-loading,.cockpit-empty{color:var(--label-2);font-size:var(--fs-subhead);padding:var(--sp-4) 0}
 .cockpit-skeleton-section{margin-bottom:var(--sp-7)}
@@ -105,5 +102,12 @@
  .cockpit-section-title{align-items:flex-start;flex-direction:column}
  .cockpit-table-scroll{padding:0 var(--sp-2)}
  .company-cockpit th,.company-cockpit td{padding:var(--sp-4)}
+}
+@media(max-width:760px){
+ .company-cockpit .ds-row{flex-wrap:wrap;padding:var(--space-4)}
+ .company-cockpit .ds-row-main{flex:1 1 100%}
+ .company-cockpit .ds-row-value{font-size:var(--fs-title2);text-align:left}
+ .cockpit-overview-grid{grid-template-columns:minmax(0,1fr)}
+ .cockpit-overview-grid>section{padding:var(--space-4)}
 }
 }

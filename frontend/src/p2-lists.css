@@ -194,14 +194,15 @@
 /* Toolbar & Filter Controls */
 .p2-toolbar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--surface, #ffffff);
-  border: 1px solid var(--sep, #e2e8f0);
-  border-radius: 6px;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--glass-fill-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--glass-highlight), var(--glass-shadow-flat);
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -211,140 +212,108 @@
 .p2-toolbar-left,
 .p2-toolbar-right {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: var(--space-4);
   min-width: 0;
   max-width: 100%;
+}
+
+.p2-toolbar-left {
+  flex: 1 1 28rem;
 }
 
 .p2-search-box {
   position: relative;
   display: inline-flex;
   align-items: center;
+  flex: 1 1 14rem;
   min-width: 0;
   max-width: 100%;
 }
 
 .p2-search-input {
-  width: 220px;
+  width: 100%;
   max-width: 100%;
   min-width: 0;
-  padding: var(--space-2) var(--space-6) var(--space-2) var(--space-3);
-  border: 1px solid var(--sep, #cbd5e1);
-  border-radius: 4px;
-  font-size: 0.8125rem;
-  background: var(--surface, #ffffff);
-  color: var(--label, #1e293b);
-  transition: border-color 0.15s;
+  padding-right: var(--space-8);
+  font-size: var(--fs-subhead);
   box-sizing: border-box;
-}
-
-.p2-search-input:focus-visible {
-  outline: 2px solid var(--accent, #0070f3);
-  outline-offset: 1px;
 }
 
 .p2-search-clear {
   position: absolute;
-  right: 6px;
+  right: var(--space-1);
   top: 50%;
   transform: translateY(-50%);
+  min-width: 44px;
+  min-height: 44px;
   border: none;
   background: transparent;
-  color: var(--label-2, #64748b);
+  color: var(--label-2);
   font-size: 1rem;
   line-height: 1;
-  padding: 2px var(--space-1);
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
 }
 
-.p2-search-clear:focus-visible {
-  outline: 2px solid var(--accent, #0070f3);
-}
-
-/* Active Filter Input Controls */
+/* Filter fields stack the label over the field, like every other filter row. */
 .p2-filter-field {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  flex: 1 1 10rem;
   min-width: 0;
   max-width: 100%;
-  flex-wrap: wrap;
 }
 
-.p2-filter-label {
-  font-size: 0.75rem;
-  color: var(--label-2, #64748b);
-  font-weight: 500;
-  white-space: nowrap;
+.p2-filter-label,
+.p2-deadline-filter-label {
+  font-size: var(--fs-footnote);
+  color: var(--label-2);
+  font-weight: 600;
 }
 
 .p2-filter-input {
-  width: 100px;
+  width: 100%;
   max-width: 100%;
   min-width: 0;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--sep, #cbd5e1);
-  border-radius: 4px;
-  font-size: 0.8125rem;
-  background: var(--surface, #ffffff);
-  color: var(--label, #1e293b);
-  transition: border-color 0.15s;
+  font-size: var(--fs-subhead);
   box-sizing: border-box;
 }
 
-.p2-filter-input:focus-visible {
-  outline: 2px solid var(--accent, #0070f3);
-  outline-offset: 1px;
-}
-
-/* Disabled Deadline Filter Control */
+/* Disabled deadline filter: kept visible with its reason, but clearly inactive. */
 .p2-deadline-filter-group {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-2);
-  border: 1px dashed var(--sep, #cbd5e1);
-  border-radius: 4px;
-  background: var(--surface-2, #f8fafc);
-  opacity: 0.8;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px dashed var(--field-border);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
   flex-wrap: wrap;
+  flex: 1 1 100%;
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
-}
-
-.p2-deadline-filter-label {
-  font-size: 0.75rem;
-  color: var(--label-2, #64748b);
-  font-weight: 500;
-  white-space: nowrap;
 }
 
 .p2-deadline-input {
-  width: 90px;
+  width: 9rem;
   max-width: 100%;
   min-width: 0;
-  padding: var(--space-1) var(--space-2);
-  font-size: 0.75rem;
-  border: 1px solid var(--sep, #cbd5e1);
-  border-radius: 3px;
-  background: #f1f5f9;
-  color: var(--muted, #94a3b8);
-  cursor: not-allowed;
   box-sizing: border-box;
 }
 
 .p2-deadline-reason {
-  font-size: 0.6875rem;
-  color: var(--label-2, #64748b);
+  flex: 1 1 14rem;
+  font-size: var(--fs-footnote);
+  color: var(--label-2);
   max-width: 100%;
   min-width: 0;
   white-space: normal;
   overflow-wrap: anywhere;
-  word-break: break-word;
 }
 
 /* Column Chooser */
