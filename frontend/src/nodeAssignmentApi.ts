@@ -1,0 +1,137 @@
+import {api, ApiError} from './api';
+
+export const NODE_ASSIGNMENT_ORDER = ['sales', 'pm', 'confirmation', 'field', 'control', 'mapping', 'report', 'pricing', 'settlement'] as const;
+export type NodeAction = 'claim' | 'assign' | 'complete' | 'approve' | 'reject' | 'create_task';
+export type NodePermissions = Partial<Record<NodeAction, boolean>>;
+export interface AssignmentPerson {open_id: string; name: string}
+export interface AssignablePerson extends AssignmentPerson {departments: string[]}
+export interface AssignmentNode {
+  key: string; label: string; status: string; derived_status: string;
+  tasks: {done: number; total: number}; progress: number;
+  owners: AssignmentPerson[]; assigned_by: AssignmentPerson | null; approver: AssignmentPerson | null;
+  approved_at: string | null; reject_reason: string | null; deadline: string | null; warnings: string[];
+}
+export interface AssignmentTask {
+  id: string; title: string; detail: string; assignee: AssignmentPerson | null;
+  assigned_by: AssignmentPerson | null; department: string; deadline: string | null; status: string; completed_at: string | null;
+}
+export interface NodeAssignmentList {
+  code: string; summary: {done: number; total: number; current_node: string | null};
+  nodes: AssignmentNode[]; stale: boolean; can: Record<string, NodePermissions>;
+}
+export interface NodeAssignmentDetail {node: AssignmentNode; tasks: AssignmentTask[]; assignable_people: AssignablePerson[]}
+export interface NewAssignmentTask {title: string; detail: string; assignee: string; department: string; deadline: string}
+export type AssignmentMutation =
+  | {action: 'claim' | 'complete' | 'approve'; nodeKey: string}
+  | {action: 'assign'; nodeKey: string; assignees: string[]}
+  | {action: 'reject'; nodeKey: string; reason: string}
+  | {action: 'create_task'; nodeKey: string; task: NewAssignmentTask}
+  | {action: 'update_task'; nodeKey: string; taskId: string; patch: Partial<Pick<NewAssignmentTask, 'assignee' | 'deadline' | 'detail'>> & {status?: string}};
+
+const NODE_LABELS: Record<string, string> = {
+  not_started: '未開始', pending: '待處理', in_progress: '進行中', pending_review: '待審核', completed: '已完成', skipped: '略過',
+  awaiting_review: '待審核', 未開始: '未開始', 待處理: '待處理', 進行中: '進行中', 待審核: '待審核', 已完成: '已完成', 略過: '略過',
+};
+export const TASK_STATUS_OPTIONS = [['pending', '待處理'], ['in_progress', '進行中'], ['completed', '已完成'], ['cancelled', '取消']] as const;
+export const nodeStatusLabel = (status: string) => NODE_LABELS[status] || '狀態待確認';
+export const taskStatusLabel = (status: string) => TASK_STATUS_OPTIONS.find(([key, label]) => key === status || label === status)?.[1] || (status === 'canceled' ? '取消' : '狀態待確認');
+export const taskStatusValue = (status: string) => TASK_STATUS_OPTIONS.find(([key, label]) => key === status || label === status)?.[0] || (status === 'canceled' ? 'cancelled' : '');
+
+export class NodeAssignmentError extends Error {
+  constructor(public status: number, message: string, public code?: string, public fields: Record<string, string> = {}) {super(message)}
+}
+const malformed = () => new NodeAssignmentError(502, '節點資料格式不正確，請稍後重試。');
+function record(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw malformed();
+  return Object.fromEntries(Object.entries(value));
+}
+function text(value: unknown): string {if (typeof value !== 'string') throw malformed(); return value}
+function optionalText(value: unknown): string | null {return value == null ? null : text(value)}
+function count(value: unknown): number {if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw malformed(); return value}
+function array<T>(value: unknown, parse: (item: unknown) => T): T[] {if (!Array.isArray(value)) throw malformed(); return value.map(parse)}
+function person(value: unknown): AssignmentPerson {
+  if (typeof value === 'string') return {open_id: value, name: '姓名待確認'};
+  const p = record(value); return {open_id: text(p.open_id), name: text(p.name)};
+}
+function optionalPerson(value: unknown): AssignmentPerson | null {return value == null || value === '' ? null : person(value)}
+function node(value: unknown): AssignmentNode {
+  const n = record(value), tasks = record(n.tasks);
+  return {
+    key: text(n.key), label: text(n.label), status: text(n.status), derived_status: text(n.derived_status),
+    tasks: {done: count(tasks.done), total: count(tasks.total)}, progress: count(n.progress), owners: array(n.owners, person),
+    assigned_by: optionalPerson(n.assigned_by), approver: optionalPerson(n.approver), approved_at: optionalText(n.approved_at),
+    reject_reason: optionalText(n.reject_reason), deadline: optionalText(n.deadline), warnings: array(n.warnings, text),
+  };
+}
+function task(value: unknown): AssignmentTask {
+  const t = record(value);
+  return {id: text(t.id), title: text(t.title), detail: optionalText(t.detail) || '', assignee: optionalPerson(t.assignee),
+    assigned_by: optionalPerson(t.assigned_by), department: optionalText(t.department) || '', deadline: optionalText(t.deadline), status: text(t.status), completed_at: optionalText(t.completed_at)};
+}
+const basePath = (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/node-assignments`;
+async function request(url: string, init: RequestInit, isCurrent: () => boolean): Promise<unknown> {
+  try {return await api<unknown>(url, {...init, timeoutMs: 20000}, isCurrent)}
+  catch (error) {
+    if (!(error instanceof ApiError)) throw error;
+    const fields: Record<string, string> = {};
+    if (error.status === 422) {
+      let detail: unknown;
+      try {detail = JSON.parse(error.message)} catch {detail = error.message}
+      if (Array.isArray(detail)) for (const item of detail) {
+        if (item && typeof item === 'object' && 'loc' in item && Array.isArray(item.loc) && 'msg' in item && typeof item.msg === 'string') {
+          const field = item.loc.at(-1); if (typeof field === 'string') fields[field] = item.msg;
+        }
+      }
+      else if (detail && typeof detail === 'object') for (const [field, message] of Object.entries(detail)) if (typeof message === 'string') fields[field] = message;
+    }
+    throw new NodeAssignmentError(error.status, error.status === 422 ? '請檢查欄位內容後再試。' : error.message, error.code, fields);
+  }
+}
+export async function fetchNodeAssignments(projectId: string, signal: AbortSignal, isCurrent: () => boolean): Promise<NodeAssignmentList> {
+  const result = record(await request(basePath(projectId), {signal, cache: 'no-store'}, isCurrent));
+  if (result.code === 'disabled') throw new NodeAssignmentError(404, '', 'disabled');
+  const summary = record(result.summary), permissions = record(result.can);
+  if (typeof result.stale !== 'boolean') throw malformed();
+  const can: Record<string, NodePermissions> = {};
+  for (const [key, value] of Object.entries(permissions)) {
+    const p = record(value);
+    can[key] = {claim: p.claim === true, assign: p.assign === true, complete: p.complete === true, approve: p.approve === true, reject: p.reject === true, create_task: p.create_task === true};
+  }
+  const nodes = array(result.nodes, node);
+  if (new Set(nodes.map(n => n.key)).size !== nodes.length) throw malformed();
+  return {code: text(result.code), summary: {done: count(summary.done), total: count(summary.total), current_node: optionalText(summary.current_node)},
+    nodes: NODE_ASSIGNMENT_ORDER.flatMap(key => nodes.filter(n => n.key === key)), stale: result.stale, can};
+}
+export async function fetchNodeAssignmentDetail(projectId: string, key: string, signal: AbortSignal, isCurrent: () => boolean): Promise<NodeAssignmentDetail> {
+  const result = record(await request(`${basePath(projectId)}/nodes/${encodeURIComponent(key)}`, {signal, cache: 'no-store'}, isCurrent));
+  const parsedNode = node(result.node);
+  if (parsedNode.key !== key) throw malformed();
+  const people = array(result.assignable_people, value => {
+    const p = record(value); return {...person(p), departments: array(p.departments, text)};
+  });
+  const named = (p: AssignmentPerson | null) => p && p.name === '姓名待確認' ? people.find(candidate => candidate.open_id === p.open_id) || p : p;
+  return {node: {...parsedNode, assigned_by: named(parsedNode.assigned_by), approver: named(parsedNode.approver)},
+    tasks: array(result.tasks, task).map(t => ({...t, assignee: named(t.assignee), assigned_by: named(t.assigned_by)})), assignable_people: people};
+}
+function requestId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 15) | 64; bytes[8] = (bytes[8] & 63) | 128;
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+export async function mutateNodeAssignment(projectId: string, mutation: AssignmentMutation, signal: AbortSignal, isCurrent: () => boolean): Promise<void> {
+  const nodePath = `${basePath(projectId)}/nodes/${encodeURIComponent(mutation.nodeKey)}`;
+  let url: string, body: object, method = 'POST';
+  switch (mutation.action) {
+    case 'assign': url = `${nodePath}/assign`; body = {assignees: mutation.assignees}; break;
+    case 'reject': url = `${nodePath}/reject`; body = {reason: mutation.reason}; break;
+    case 'create_task': url = `${nodePath}/tasks`; body = mutation.task; break;
+    case 'update_task': url = `${basePath(projectId)}/tasks/${encodeURIComponent(mutation.taskId)}`; body = mutation.patch; method = 'PATCH'; break;
+    default: url = `${nodePath}/${mutation.action}`; body = {};
+  }
+  await request(url, {signal, method, body: JSON.stringify({...body, request_id: requestId()})}, isCurrent);
+}
+export const assignmentErrorMessage = (error: unknown) => error instanceof NodeAssignmentError && error.code === 'lark_permission'
+  ? 'Lark 權限不足，請聯絡管理員' : error instanceof Error ? error.message : '節點資料讀取失敗，請稍後重試。';
+export const assignmentsDisabled = (error: unknown) => error instanceof NodeAssignmentError && (error.status === 404 || error.code === 'disabled');
