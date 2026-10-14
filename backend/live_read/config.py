@@ -19,6 +19,7 @@ class LiveReadConfig:
     roster_budget_seconds: float = 30
     source_budget_seconds: float = 60
     table_rps: float = 2
+    roster_grace_seconds: float = 86400
     read_workers: int = 3
     records_api: str = 'list'
 
@@ -51,6 +52,7 @@ class LiveReadConfig:
             roster_budget_seconds=number('ROSTER_BUDGET_SECONDS', 30, 1, 60),
             source_budget_seconds=number('SOURCE_BUDGET_SECONDS', 60, 1, 75),
             table_rps=number('TABLE_RPS', 2, .01, 2),
+            roster_grace_seconds=number('ROSTER_GRACE_SECONDS', 86400, 900, 7 * 86400),
             read_workers=int(number('READ_WORKERS', 3, 1, 3)),
             records_api=env.get('LARK_BITABLE_RECORDS_API', 'list')
             if env.get('LARK_BITABLE_RECORDS_API', 'list') in ('list', 'search') else 'list',

@@ -14,10 +14,10 @@ HTML = {'accept': 'text/html'}
 JSON = {'accept': 'application/json'}
 
 
-def stale(app, oid='u-manager', **fields):
+def stale(app, oid='u-manager', age=901, **fields):
     with app.state.sessions.begin() as db:
         p = db.get(PersonRow, ('lark-company', oid))
-        p.data = {**p.data, 'directory_last_seen_at': (datetime.now(timezone.utc) - timedelta(seconds=901)).isoformat(), **fields}
+        p.data = {**p.data, 'directory_last_seen_at': (datetime.now(timezone.utc) - timedelta(seconds=age)).isoformat(), **fields}
 
 
 def oauth(monkeypatch, *, open_id='u-tenant', tenant='company', scope='', avatar_fields=None):
@@ -43,7 +43,7 @@ def finish(client,saved_state,**params):
 
 @pytest.mark.parametrize('fields',[{}, {'directory_status':'employed'}])
 def test_stale_roster_and_failed_reads_never_block_login(tmp_path,monkeypatch,fields):
-    app,_=production_client(tmp_path);stale(app,role='member',authz_version=1,**fields)
+    app,_=production_client(tmp_path);stale(app,age=25*3600,role='member',authz_version=1,**fields)
     oauth(monkeypatch,open_id='u-manager')
     calls=[]
     def unavailable(*args,**kwargs):

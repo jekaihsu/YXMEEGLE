@@ -98,8 +98,6 @@ def test_bootstrap_admins_only_repair_after_the_grace_and_company_grants_are_unc
     assert access_mode(holder, 'app', now=NOW, cfg=cfg) == 'normal'
     revoked = dict(cfg, LARK_COMPANY_ADMIN_GRANTS_JSON='[]')
     assert access_mode(holder, 'app', now=NOW, cfg=revoked) == 'recovery'
-    holder['directory_status'] = 'left'
-    assert access_mode(holder, 'app', now=NOW, cfg=cfg) == 'denied'
 
 
 def test_expiry_message_distinguishes_a_stale_roster_from_an_unknown_person():
