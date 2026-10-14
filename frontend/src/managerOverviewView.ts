@@ -14,6 +14,9 @@ export const OVERVIEW_LABELS={
  withheld:'未核准顯示',
  invalidBody:'回應格式無效，已停止顯示此區塊',
  unfinished:'本機執行中（未完成）',
+ rowKeysUnknown:'確認單列：未知',
+ rowKeysNone:'確認單列：無',
+ rowKeysListed:'確認單列',
  unfinishedUnknown:'是否未完成：未知',
  yes:'是',no:'否',
  units:{confirmation_version:'確認單版本',stable_case:'案件（穩定身分）'} as Record<string,string>,
@@ -53,7 +56,7 @@ export type CaseRow={
  entry:{label:string;route:string}|null;
 };
 export type CaseDetail={
- id:string;rowKeys:string[];pmId:string|null;executionStatus:string|null;admission:Record<string,unknown>|null;
+ id:string;rowKeys:string[]|null;rowKeysText:string;rowKeysStateLabel:string|null;rowKeysReason:string|null;pmId:string|null;executionStatus:string|null;admission:Record<string,unknown>|null;
  mappingLabel:string;amounts:{text:string;reason:string};formula:string|null;
 };
 export type CardView={
@@ -151,8 +154,18 @@ function parseCase(raw:unknown):{row:CaseRow;detail:CaseDetail}{
  const ep=need(c.entry_point);
  if(ep.kind!=='case'||ep.read_only!==true)bad();
  const d=need(c.details);
+ // row_keys is a list (possibly empty: no confirmation rows) or null, and null only together with a no-count
+ // row_keys_state and a reason (population unavailable). Anything else, including state beside a list, is invalid.
  const rowKeys=d.row_keys;
- if(!Array.isArray(rowKeys)||!rowKeys.every(k=>typeof k==='string'&&k))bad();
+ let rowKeysState:string|null=null,rowKeysReason:string|null=null;
+ if(rowKeys===null){
+  const rs=stateOf(d.row_keys_state);
+  if(!UNCOUNTED.has(rs.states[0]))bad();
+  rowKeysState=labelOf(rs);rowKeysReason=reqStr(d.row_keys_reason);
+ }else{
+  if(!Array.isArray(rowKeys)||!rowKeys.every(k=>typeof k==='string'&&k))bad();
+  if(d.row_keys_state!==undefined||d.row_keys_reason!==undefined)bad();
+ }
  // No receipt authority (plan D3): the only accepted mapping state is receipt_missing, shown as 對應未驗證.
  if(d.mapping_state!=='receipt_missing')bad();
  const am=need(d.amounts);
@@ -179,7 +192,9 @@ function parseCase(raw:unknown):{row:CaseRow;detail:CaseDetail}{
   }
  }
  const detail:CaseDetail={
-  id,rowKeys:rowKeys as string[],pmId:optStr(d.pm_id),executionStatus:optStr(d.execution_status),admission,
+  id,rowKeys:rowKeys as string[]|null,
+  rowKeysText:rowKeys===null?OVERVIEW_LABELS.rowKeysUnknown:rowKeys.length?`${OVERVIEW_LABELS.rowKeysListed}`:OVERVIEW_LABELS.rowKeysNone,
+  rowKeysStateLabel:rowKeysState,rowKeysReason,pmId:optStr(d.pm_id),executionStatus:optStr(d.execution_status),admission,
   mappingLabel:OVERVIEW_LABELS.unverifiedMapping,
   amounts:{text:OVERVIEW_LABELS.withheld,reason:reqStr(am.reason)},
   formula:optStr(d.formula),

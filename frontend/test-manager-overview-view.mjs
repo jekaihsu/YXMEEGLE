@@ -221,6 +221,31 @@ test('20. 128-R2 residual: an empty snapshot that retains a positive population 
  }
 });
 
+test('21. 128b-4030811 X1: population unavailable keeps cases listed with row keys unknown plus reason; no-row case keeps []',()=>{
+ const RK_REASON='The confirmation population is unavailable; row keys are unknown.';
+ const none=body();none.snapshot.state=st([unk]);
+ none.snapshot.cases=['p1','p2'].map(pid=>{const c=caseRow(pid);c.details.row_keys=null;c.details.row_keys_state=st([unk]);c.details.row_keys_reason=RK_REASON;return c});
+ none.snapshot.cards=none.snapshot.cards.map(c=>card(c.id,c.unit,null,st([unk]),'Population unavailable.'));
+ none.snapshot.unresolved={value:null,state:st([unk]),reason:'Population unavailable.',rows:[]};
+ const a=v(none,{selectedId:'p1'});
+ eq(a.snapshot.cases.map(r=>r.id),['p1','p2'],'cases stay listed');eq(a.snapshot.state.states,[unk]);
+ eq(a.snapshot.cards.map(c=>[c.valueText,c.known]),[['—',false],['—',false],['—',false],['—',false]],'cards unknown, never 0');
+ const d=a.drawer.case;eq([d.rowKeys,d.rowKeysText,d.rowKeysReason],[null,L.rowKeysUnknown,RK_REASON]);ok(d.rowKeysStateLabel,'state label present');
+ // a case with no confirmation row (backend: unfinished project, available population, row_keys [])
+ const norow=body();norow.snapshot.cases[1].details.row_keys=[];
+ const b=v(norow,{selectedId:'p2'});
+ eq(b.snapshot.cases.length,2,'no-row case stays listed');eq([b.drawer.case.rowKeys,b.drawer.case.rowKeysText,b.drawer.case.rowKeysReason],[[],L.rowKeysNone,null]);
+ eq(v(norow,{selectedId:'p1'}).drawer.case.rowKeys,['rk-p1-1'],'listed keys still shown');
+ // strictness: null without a valid state/reason, or state beside a list, fails the whole snapshot closed
+ const mk=fn=>{const x=body();fn(x.snapshot.cases[0].details);return v(x)};
+ for(const [name,fn] of [['null without state',d=>{d.row_keys=null;d.row_keys_reason='r'}],['null without reason',d=>{d.row_keys=null;d.row_keys_state=st([unk])}],
+   ['null with blank reason',d=>{d.row_keys=null;d.row_keys_state=st([unk]);d.row_keys_reason=' '}],['null with malformed state',d=>{d.row_keys=null;d.row_keys_state={states:['bogus']};d.row_keys_reason='r'}],
+   ['null with a counted state',d=>{d.row_keys=null;d.row_keys_state=st(['complete_empty'],0);d.row_keys_reason='r'}],
+   ['list beside a state',d=>{d.row_keys_state=st([unk]);d.row_keys_reason='r'}],['non-list',d=>{d.row_keys='k1'}],['blank key',d=>{d.row_keys=['']}],['undefined row_keys',d=>{delete d.row_keys}]]){
+  const w=mk(fn);eq([w.snapshot.state.states,w.snapshot.cases],[[unk],[]],name+' fails closed');
+ }
+});
+
 // ---- mutation checks: break each guard in a temp copy and require the behavior it protects to break ----
 const src=readFileSync(new URL('./src/managerOverviewView.ts',import.meta.url),'utf8');
 const dir=mkdtempSync(join(tmpdir(),'mo-mut-'));copyFileSync(new URL('./src/dataState.ts',import.meta.url),join(dir,'dataState.ts'));
@@ -283,6 +308,12 @@ test('M10. mutation: empty-state positive-card guard removed -> positive count b
  const e=body();e.snapshot.state=st(['complete_empty'],0);e.snapshot.cases=[];e.snapshot.unresolved={value:0,state:st(['complete_empty'],0),reason:'x',rows:[]};
  eq(c({body:e}).snapshot.state.states,['complete_empty'],'mutant keeps the empty state');
  ok(c({body:e}).snapshot.cards.some(x=>x.valueText==='3'),'mutant shows a positive card beside the empty state');
+});
+
+test('M11. mutation: null row_keys without state/reason accepted -> strict row-keys guard (test 21) would fail',async()=>{
+ const b=await mutated("const rs=stateOf(d.row_keys_state);\n  if(!UNCOUNTED.has(rs.states[0]))bad();\n  rowKeysState=labelOf(rs);rowKeysReason=reqStr(d.row_keys_reason);","");
+ const x=body();x.snapshot.cases[0].details.row_keys=null;
+ eq(b({body:x}).snapshot.cases.length,2,'mutant accepts null row_keys with no state or reason');
 });
 
 let failed=0;
