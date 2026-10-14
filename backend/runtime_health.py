@@ -26,7 +26,7 @@ def directory_status(sessions,workspace_model,cfg,now,*,live_read=None):
                       recovery_hint='請檢查名冊來源唯讀權限，重新讀取公司名冊成功後再驗證同事登入。')
         if precise_age is None or precise_age<0: result['status']='missing' if success is None else 'invalid'
         elif precise_age>DIRECTORY_MAX_AGE_SECONDS: result['status']='stale'
-        elif roster['status'] in ('error','blocked','unconfigured'): result['status']='degraded'
+        elif roster['status'] in ('error','blocked','needs-permission','unconfigured'): result['status']='degraded'
         else:
             result['blocking']=False
             result['status']='warning' if age>=DIRECTORY_WARNING_AGE else 'ok'
