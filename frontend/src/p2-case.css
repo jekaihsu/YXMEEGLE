@@ -6,6 +6,38 @@
   width: 100%;
 }
 
+/* CaseDetail-scoped layout: flexible main content first, side column second */
+.p2-case-root .p2-main-layout {
+  grid-template-columns: minmax(0, 1fr) 300px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.p2-case-root .p2-layout-with-drawer {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.p2-case-root .p2-primary-column {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.p2-case-root .p2-side-column {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.p2-case-root .p2-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.p2-case-root .p2-table-wrapper {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .p2-inpage-nav {
   display: flex;
   align-items: center;
@@ -198,12 +230,6 @@
   font-style: italic;
 }
 
-.p2-tree-empty {
-  margin: 0;
-  font-size: var(--fs-subhead, 0.9375rem);
-  color: var(--label-2, #6e6e73);
-}
-
 /* Sections and Tables */
 .p2-section-card {
   scroll-margin-top: var(--sp-5, 20px);
@@ -388,6 +414,10 @@
 
 /* Responsive adjustments */
 @media (max-width: 600px) {
+  .p2-case-root .p2-main-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .p2-header-grid {
     grid-template-columns: 1fr;
   }
