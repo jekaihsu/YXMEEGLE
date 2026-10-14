@@ -511,3 +511,58 @@ def test_freshness_capture_is_inside_generation_fence(world):
     app.state.live_read.status = status_then_new_source
     body = client.get('/api/confirmations').json()
     assert len(calls) == 2 and body['as_of'] == body['snapshot']['last_success_at'] == new
+
+
+# ---- FIX3: explicit population_state and case/population filter split --------
+def spy_overview(monkeypatch):
+    from . import confirmation_list, manager_overview
+    seen = {'population_filters': [], 'build': []}
+    real_pop, real_build = confirmation_list.confirmation_population, manager_overview.build_manager_overview
+    def pop(state, filters, *a, **k):
+        seen['population_filters'].append(deepcopy(filters)); return real_pop(state, filters, *a, **k)
+    def build(state, **kw):
+        seen['build'].append({k: deepcopy(kw.get(k)) for k in ('filters', 'population_state')}); return real_build(state, **kw)
+    monkeypatch.setattr(confirmation_list, 'confirmation_population', pop)
+    monkeypatch.setattr(manager_overview, 'build_manager_overview', build)
+    return seen
+
+
+def test_healthy_read_passes_none_because_cstate_has_no_complete_nonempty_value(world, monkeypatch):
+    # Gap recorded: data_state.STATES has no complete-nonempty value, so None (never 'ready') is the only honest input.
+    _, client, _, _, _, _ = world
+    seen = spy_overview(monkeypatch)
+    listing = client.get('/api/confirmations').json()
+    body = client.get('/api/manager-overview').json()
+    assert listing['page_state'] is None and seen['build'][0]['population_state'] is None
+    assert body['snapshot']['state']['states'] == ['partial'] and all(c['state']['states'][0] != 'complete_empty' for c in body['snapshot']['cards'])
+
+
+@pytest.mark.parametrize('status,partial,expected', [('stale', False, ['stale']), ('stale', True, ['partial', 'stale'])])
+def test_noncurrent_read_passes_the_list_page_state_and_cards_agree(world, monkeypatch, status, partial, expected):
+    app, client, _, _, _, _ = world
+    cache_state(app, status, partial=partial)
+    seen = spy_overview(monkeypatch)
+    listing = client.get('/api/confirmations').json()['page_state']
+    body = client.get('/api/manager-overview').json()
+    assert seen['build'][0]['population_state']['states'] == listing['states'] == expected
+    assert body['snapshot']['state']['states'] == expected
+    assert body['snapshot']['cards'][0]['state']['states'] == expected
+
+
+def test_case_filters_never_reach_population_or_card_drilldown(world, monkeypatch):
+    _, client, _, _, _, _ = world
+    seen = spy_overview(monkeypatch)
+    resp = client.get('/api/manager-overview', params={'pm_id': 'u-pm', 'execution_status': 'in_progress', 'source_version': '2'})
+    assert resp.status_code == 200
+    assert seen['build'][0]['filters'] == {'source_version': ['2'], 'pm_id': 'u-pm', 'execution_status': 'in_progress'}
+    assert seen['population_filters'] == [{'source_version': ['2']}]
+    body = resp.json()
+    for card in body['snapshot']['cards']:
+        assert card['drilldown']['filters'] == {'source_version': ['2']}
+    assert body['snapshot']['filters']['pm_id'] == 'u-pm'
+
+
+@pytest.mark.parametrize('query', ['unknown=1', 'pm_id=a&pm_id=b', 'pm_id=' + 'x' * 121, 'execution_status=' + 'x' * 121])
+def test_manager_overview_case_filter_bounds_and_unknown_parameters_are_422(world, query):
+    _, client, _, _, _, _ = world
+    assert client.get('/api/manager-overview?' + query).status_code == 422

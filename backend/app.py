@@ -832,6 +832,7 @@ def create_app(overrides=None):
     # ---- P2 read routes (VCC-128..132). Read-only; every handler works on one visibility-narrowed state. ----
     P2_NOT_FOUND='找不到這個項目'
     P2_LIST_PARAMS=frozenset({'q','source_version','pm','admission_state','deadline_from','deadline_to','sort','direction','cursor','limit'})
+    P2_CASE_PARAMS=frozenset({'pm_id','execution_status'})
     P2_FILTER_PARAMS=('source_version','pm','admission_state','deadline_from','deadline_to')
     P2_SOURCE_STATUS={'forbidden':'forbidden','read_failed':'error','loading':'loading','unlocated':'unlocated','partial':'partial','stale':'stale'}
 
@@ -931,14 +932,24 @@ def create_app(overrides=None):
         from .manager_overview import build_manager_overview
         from .confirmation_list import confirmation_population
         data,user=identity(request)
-        args=p2_list_args(request,frozenset(P2_FILTER_PARAMS))
+        args=p2_list_args(request,frozenset(P2_FILTER_PARAMS)|P2_CASE_PARAMS)
+        # Case-level filters (project fields) go only to build_manager_overview; the list/population vocabulary stays separate.
+        case_filters={k:p2_one(request,k,120) for k in sorted(P2_CASE_PARAMS) if k in request.query_params}
         _,_,health,state=p2_read(data,user)
         # The same read that feeds the population supplies its C-STATE; this also validates the filters (422).
         page=p2_list_page(state,{'q':'','filters':args['filters'],'cursor':None,'sort':None,'limit':1},state['as_of'])
         envelope=page['page_state']
-        return build_manager_overview(state,population=confirmation_population,filters=args['filters'],
+        # C-STATE has no complete-nonempty value (data_state.py STATES), so a healthy read (page_state None) stays None
+        # (manager_overview then reports partial: completeness not asserted); any other state is passed through exactly.
+        def population(st,flt):
+            return confirmation_population(st,{k:v for k,v in flt.items() if k not in P2_CASE_PARAMS})
+        result=build_manager_overview(state,population=population,filters={**args['filters'],**case_filters},
             population_state={'states':envelope['states'],'count':envelope.get('count')} if envelope else None,
             source_health=health,as_of=state['as_of'])
+        # A KPI drilldown carries population filters only.
+        for card in (result.get('snapshot') or {}).get('cards',[]):
+            card['drilldown']['filters']={k:v for k,v in card['drilldown']['filters'].items() if k not in P2_CASE_PARAMS}
+        return result
 
     @app.get('/api/case-detail/{project_id}')
     def case_detail(request:Request,project_id:str):
