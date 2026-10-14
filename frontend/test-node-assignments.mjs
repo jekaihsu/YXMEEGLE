@@ -3,7 +3,7 @@ import {test, afterEach} from 'node:test';
 import fs from 'node:fs/promises';
 import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
-import {assignmentFixture, projectFixture} from './fixtures/node-assignments.mjs';
+import {assignmentFixture, projectFixture, visualAssignmentFixture} from './fixtures/node-assignments.mjs';
 
 const dom = new JSDOM('<div id="root"></div>', {url: 'http://localhost/'});
 for (const key of ['window', 'document', 'location', 'history', 'sessionStorage', 'Event', 'HTMLElement', 'HTMLInputElement', 'HTMLTextAreaElement', 'HTMLSelectElement', 'navigator']) Object.defineProperty(globalThis, key, {value: dom.window[key], configurable: true});
@@ -14,7 +14,7 @@ HTMLElement.prototype.scrollIntoView = function () {};
 const React = await import('react');
 const {act} = React;
 const {createRoot} = await import('react-dom/client');
-const bundle = await build({stdin: {contents: "export {NodeAssignments} from './src/NodeAssignments'; export {ProjectDetail} from './src/ProjectDetail'; export {invalidateSessionEpoch} from './src/api';", resolveDir: new URL('.', import.meta.url).pathname}, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
+const bundle = await build({stdin: {contents: "export {NodeAssignments} from './src/NodeAssignments'; export {ProjectDetail} from './src/ProjectDetail'; export {prefetchNodeAssignments} from './src/useNodeAssignments'; export {invalidateSessionEpoch} from './src/api';", resolveDir: new URL('.', import.meta.url).pathname}, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
 const path = new URL('./.node-assignments-test.mjs', import.meta.url);
 await fs.writeFile(path, bundle.outputFiles[0].text);
 let ui;
@@ -22,7 +22,7 @@ try {ui = await import(path.href)} finally {await fs.unlink(path)}
 let root, fixture, requests, listReply, detailReply, mutationReply, holdMutation;
 const reply = (body, status = 200) => new Response(JSON.stringify(body), {status, headers: {'Content-Type': 'application/json'}});
 async function mount(options = {}) {
-  fixture = assignmentFixture(); requests = []; listReply = options.listReply; detailReply = options.detailReply; mutationReply = options.mutationReply; holdMutation = null;
+  ui.invalidateSessionEpoch(); fixture = assignmentFixture(); requests = []; listReply = options.listReply; detailReply = options.detailReply; mutationReply = options.mutationReply; holdMutation = null;
   if (options.change) options.change(fixture);
   globalThis.fetch = async (url, init = {}) => {
     const request = {url, method: init.method || 'GET', body: init.body ? JSON.parse(init.body) : null}; requests.push(request);
@@ -32,7 +32,7 @@ async function mount(options = {}) {
     return reply({detail: 'disabled'}, 404);
   };
   root = createRoot(document.getElementById('root'));
-  await act(async () => root.render(React.createElement(ui.NodeAssignments, {projectId: 'p1', legacy: React.createElement('div', {id: 'legacy-flow'}, '原有案件流程與任務')})));
+  await act(async () => root.render(React.createElement(ui.NodeAssignments, {projectId: 'p1', enabled: true, legacy: React.createElement('div', {id: 'legacy-flow'}, '原有案件流程與任務')})));
 }
 afterEach(async () => {if (root) {await act(async () => root.unmount()); root = null}});
 const text = () => document.body.textContent;
@@ -54,8 +54,8 @@ test('renders nine rows in chain order with literal task progress and 4/9 summar
   assert.deepEqual([...document.querySelectorAll('.na-progress-cell strong')].map(n => n.textContent), ['3/3', '3/3', '3/3', '3/3', '2/5', '0/0', '0/0', '0/0', '0/0']);
   assert.equal(document.querySelector('.na-summary-count').textContent, '4/9');
   assert.equal(document.querySelector('.na-summary strong').textContent, '進行中');
-  assert.equal(document.querySelector('.na-overview').querySelectorAll('li').length, 9);
-  assert.equal(document.querySelector('[aria-current="step"]').textContent, '5控制進行中');
+  assert.equal(document.querySelectorAll('.na-flow-card').length, 9);
+  assert.match(document.querySelector('[aria-current="step"]').getAttribute('aria-label'), /控制節點，進行中，林安娜、陳威廷/);
   assert.equal(document.getElementById('legacy-flow'), null);
   await click(document.querySelector('.na-summary'));
   assert.equal(document.activeElement.getAttribute('aria-label'), '案件節點清單');
@@ -70,13 +70,13 @@ test('expands inline into owners and tasks and collapses with its native button'
   assert.equal(document.querySelector('.na-row[aria-expanded="true"]').getAttribute('aria-controls'), detail.parentElement.id);
   await expand(); assert.equal(document.querySelector('[aria-label="控制節點明細"]'), null);
 });
-test('claim sends the node request with a UUID and refetches list and detail', async () => {
+test('claim applies the mutation envelope and revalidates only the list', async () => {
   await mount(); await expand(); await click(button('認領節點'));
   assert.equal(mutations()[0].url, '/api/projects/p1/node-assignments/nodes/control/claim');
   assert.equal(mutations()[0].method, 'POST'); uuid(mutations()[0].body.request_id);
   assert.deepEqual(Object.keys(mutations()[0].body), ['expected_revision', 'request_id']);
   assert.equal(requests.filter(r => r.url.endsWith('/node-assignments') && r.method === 'GET').length, 2);
-  assert.equal(requests.filter(r => r.url.endsWith('/nodes/control') && r.method === 'GET').length, 2);
+  assert.equal(requests.filter(r => r.url.endsWith('/nodes/control') && r.method === 'GET').length, 1);
   assert.equal(document.querySelector('.na-notice').textContent, '已儲存變更。');
 });
 test('assign selects people and sends IDs with another fresh UUID', async () => {
@@ -149,10 +149,10 @@ test('pending mutation disables controls and prevents repeat submissions', async
   await click(button('認領節點')); assert.equal(mutations().length, 1);
   await act(async () => release()); assert.equal(button('認領節點').disabled, false);
 });
-test('Lark permission read errors show the specific message and preserve legacy flow', async () => {
+test('Lark permission read errors keep the graph skeleton', async () => {
   await mount({listReply: {status: 403, body: {code: 'lark_permission', detail: 'missing scope'}}});
   assert.equal(document.querySelector('.na-error span').textContent, 'Lark 權限不足，請聯絡管理員');
-  assert.equal(document.getElementById('legacy-flow').textContent, '原有案件流程與任務');
+  assert.equal(document.getElementById('legacy-flow'), null);
 });
 test('Lark permission mutation errors keep the node list usable', async () => {
   await mount({mutationReply: {status: 403, body: {code: 'lark_permission', detail: 'missing scope'}}}); await expand(); await click(button('認領節點'));
@@ -184,7 +184,7 @@ test('completed case summary displays 已完成', async () => {
 test('ProjectDetail integration leaves original stages and selected-node section intact on 404', async () => {
   await mount({listReply: {status: 404, body: {code: 'disabled', detail: 'disabled'}}});
   const {workspace, user} = projectFixture();
-  const c = {w: workspace, s: {user, users: [user], mode: 'demo', auth_configured: false}, route: {view: 'project', project: 'p1', tab: 'flow', node: 'node_control'}, busy: false, go() {}, notify() {}, registerDrafts() {}, run: async () => undefined, refresh: async () => {}};
+  const c = {w: workspace, s: {features: {node_assignment: true}, user, users: [user], mode: 'demo', auth_configured: false}, route: {view: 'project', project: 'p1', tab: 'flow', node: 'node_control'}, busy: false, go() {}, notify() {}, registerDrafts() {}, run: async () => undefined, refresh: async () => {}};
   await act(async () => root.render(React.createElement(ui.ProjectDetail, {c})));
   assert.deepEqual([...document.querySelectorAll('.stage-button strong')].map(n => n.textContent), ['業務', 'PM', '確認單', '外業', '控制', '圖資', '報告', '計價', '結算']);
   assert.equal(document.querySelector('.flow-heading h2').textContent, '案件流程');
@@ -195,7 +195,7 @@ test('ProjectDetail integration leaves original stages and selected-node section
 });
 test('ProjectDetail supports assignments when the legacy project has no nodes', async () => {
   await mount(); const {workspace, user} = projectFixture(); workspace.projects[0].nodes = [];
-  const c = {w: workspace, s: {user, users: [user], mode: 'demo', auth_configured: false}, route: {view: 'project', project: 'p1', tab: 'flow'}, busy: false, go() {}, notify() {}, registerDrafts() {}, run: async () => undefined, refresh: async () => {}};
+  const c = {w: workspace, s: {features: {node_assignment: true}, user, users: [user], mode: 'demo', auth_configured: false}, route: {view: 'project', project: 'p1', tab: 'flow'}, busy: false, go() {}, notify() {}, registerDrafts() {}, run: async () => undefined, refresh: async () => {}};
   await act(async () => root.render(React.createElement(ui.ProjectDetail, {c})));
   assert.equal(document.querySelectorAll('.na-row').length, 9); assert.equal(text().includes('尚未建立案件流程'), false); assert.equal(document.querySelector('.major-approval-summary h2').textContent, '重大事項審批');
 });
@@ -208,11 +208,11 @@ test('failed list refresh keeps rows but blocks stale mutation permissions until
   assert.equal(document.querySelector('.na-error span').textContent, '清單更新失敗'); assert.equal(document.querySelectorAll('.na-row').length, 9); assert.equal(button('認領節點').disabled, true);
   listReply = null; await click(button('重試')); assert.equal(button('認領節點').disabled, false); assert.equal(document.querySelector('.na-error'), null);
 });
-test('initial loading leaves the legacy flow available', async () => {
+test('initial loading shows the real graph skeleton without legacy', async () => {
   await mount(); let release; const waiting = new Promise(resolve => {release = resolve});
   globalThis.fetch = async () => {await waiting; return reply(assignmentFixture().list)};
-  await act(async () => root.render(React.createElement(ui.NodeAssignments, {key: 'loading', projectId: 'p1', legacy: React.createElement('div', {id: 'legacy-flow'}, '原有案件流程與任務')})));
-  try {assert.ok(!document.querySelector('.na-loading')); assert.equal(document.getElementById('legacy-flow').textContent, '原有案件流程與任務')}
+  await act(async () => root.render(React.createElement(ui.NodeAssignments, {key: 'loading', projectId: 'p2', enabled: true, legacy: React.createElement('div', {id: 'legacy-flow'}, '原有案件流程與任務')})));
+  try {assert.ok(!document.querySelector('.na-loading')); assert.equal(document.getElementById('legacy-flow'), null); assert.equal(document.querySelectorAll('.is-skeleton').length, 9)}
   finally {await act(async () => release())}
   await act(async () => {}); assert.equal(document.querySelector('.na-summary-count').textContent, '4/9');
 });
@@ -330,4 +330,84 @@ for (const code of ['lark_unconfigured', 'writes_disabled']) test(`pre-write ${c
   mutationReply = {status: 503, body: {code, detail: 'disabled'}};
   await click(button('認領節點')); await click(button('認領節點'));
   assert.notEqual(mutations()[2].body.request_id, mutations()[0].body.request_id);
+});
+
+test('absent or false session feature renders legacy with no assignment request', async () => {
+  await mount();
+  const {workspace, user} = projectFixture();
+  for (const features of [undefined, {node_assignment: false}]) {
+    requests = [];
+    const c = {w: workspace, s: {features, user, users: [user], mode: 'demo', auth_configured: false}, route: {view: 'project', project: 'p1', tab: 'flow'}, busy: false, go() {}, notify() {}, registerDrafts() {}, run: async () => undefined, refresh: async () => {}};
+    await act(async () => root.render(React.createElement(ui.ProjectDetail, {c})));
+    assert.ok(document.querySelector('.workflow'));
+    assert.equal(document.querySelector('.node-assignments'), null);
+    assert.equal(requests.length, 0);
+  }
+});
+test('cached reopen paints instantly and session invalidation removes cached data', async () => {
+  await mount();
+  await act(async () => root.unmount()); root = createRoot(document.getElementById('root'));
+  let release;
+  globalThis.fetch = async () => {await new Promise(resolve => {release = resolve}); return reply(fixture.list)};
+  const props = {projectId: 'p1', enabled: true, legacy: React.createElement('div', {id: 'legacy-flow'})};
+  await act(async () => root.render(React.createElement(ui.NodeAssignments, props)));
+  assert.equal(document.querySelectorAll('.na-flow-card:not(.is-skeleton)').length, 9);
+  assert.ok(text().includes('更新中…'));
+  await act(async () => release());
+  await act(async () => root.unmount()); ui.invalidateSessionEpoch(); root = createRoot(document.getElementById('root'));
+  await act(async () => root.render(React.createElement(ui.NodeAssignments, props)));
+  assert.equal(document.querySelectorAll('.is-skeleton').length, 9);
+  assert.equal(document.getElementById('legacy-flow'), null);
+  await act(async () => release());
+});
+test('prefetch on project mount shares the request with the flow hook', async () => {
+  await mount(); ui.invalidateSessionEpoch(); requests = [];
+  const {workspace, user} = projectFixture();
+  let release;
+  globalThis.fetch = async url => {if (!url.endsWith('/node-assignments')) return reply({items: [], total: 0}); requests.push({url, method: 'GET'}); await new Promise(resolve => {release = resolve}); return reply(fixture.list)};
+  const c = {w: workspace, s: {features: {node_assignment: true}, user, users: [user], mode: 'demo', auth_configured: false}, route: {view: 'project', project: 'p1', tab: 'logs'}, busy: false, go() {}, notify() {}, registerDrafts() {}, run: async () => undefined, refresh: async () => {}};
+  await act(async () => root.render(React.createElement(ui.ProjectDetail, {c})));
+  assert.equal(requests.length, 1);
+  await act(async () => root.render(React.createElement(ui.ProjectDetail, {c: {...c, route: {...c.route, tab: 'flow'}}})));
+  assert.equal(requests.length, 1);
+  assert.equal(document.querySelectorAll('.is-skeleton').length, 9);
+  assert.equal(document.querySelector('.workflow'), null);
+  await act(async () => release());
+});
+test('embedded detail expands without a GET and mutations paint before revalidation', async () => {
+  await mount({change: f => {f.list.node_details = {control: {tasks: f.detail.tasks, assignable_people: f.detail.assignable_people}}}});
+  await expand();
+  assert.equal(requests.filter(r => r.url.includes('/nodes/')).length, 0);
+  let release;
+  const original = globalThis.fetch;
+  fixture.detail.tasks[0].title = '已儲存的新成果';
+  globalThis.fetch = async (url, init) => {
+    if (!init?.method && url.endsWith('/node-assignments')) {requests.push({url, method: 'GET'}); await new Promise(resolve => {release = resolve}); return reply(fixture.list)}
+    return original(url, init);
+  };
+  await click(button('認領節點'));
+  assert.equal(document.querySelector('.na-task-body strong').textContent, '已儲存的新成果');
+  assert.equal(requests.filter(r => r.url.includes('/nodes/') && r.method === 'GET').length, 0);
+  await act(async () => release());
+});
+test('graph groups parallel production cards and exposes colors, owners, progress and overdue deadlines', async () => {
+  const visual = visualAssignmentFixture();
+  await mount({change: f => Object.assign(f, visual)});
+  assert.equal(document.querySelectorAll('.na-flow-group').length, 2);
+  assert.deepEqual([...document.querySelectorAll('.na-production-cards .na-card-top>strong')].map(n => n.textContent), ['外業', '控制', '圖資', '報告']);
+  assert.equal(document.querySelectorAll('.na-production-cards .na-flow-arrow').length, 0);
+  const card = document.querySelector('.na-flow-card[aria-current="step"]');
+  assert.ok(card.classList.contains('is-current'));
+  assert.ok(card.querySelector('.na-status-active'));
+  assert.ok(card.querySelector('.na-avatar').className.includes('na-person-color-'));
+  assert.ok(card.textContent.includes('3/5 項任務60%'));
+  assert.ok(card.querySelector('.is-overdue').textContent.includes('逾期'));
+  assert.ok(card.querySelector('.na-warning-dot'));
+  assert.equal(document.querySelectorAll('.na-flow-arrow.is-done').length, 3);
+  // Native buttons expose keyboard activation and the selected panel relationship.
+  card.focus(); assert.equal(document.activeElement, card);
+  await click(card);
+  assert.equal(card.getAttribute('aria-expanded'), 'true');
+  assert.ok(card.classList.contains('is-selected'));
+  assert.ok(document.querySelector('[aria-label="外業節點明細"]'));
 });

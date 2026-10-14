@@ -98,3 +98,21 @@ test('string invalid detail survives and ordinary 404 does not disable assignmen
     });
   }
 });
+
+test('overview parses embedded tasks and people, and supports older envelopes', async () => {
+  const f = assignmentFixture();
+  f.list.node_details = {control: {tasks: f.detail.tasks, assignable_people: f.detail.assignable_people}};
+  response = {status: 200, body: f.list};
+  const list = await api.fetchNodeAssignments('p1', signal, () => true);
+  const detail = api.overviewDetail(list, list.nodes[4]);
+  assert.equal(detail.tasks[0].title, '控制點成果核對');
+  assert.equal(detail.assignable_people[0].open_id, 'ou_anna');
+  assert.equal(detail.node.revision, list.nodes[4].revision);
+  assert.deepEqual(detail.can, list.can.control);
+  delete f.list.node_details;
+  response.body = f.list;
+  const older = await api.fetchNodeAssignments('p1', signal, () => true);
+  assert.equal(api.overviewDetail(older, older.nodes[4]), undefined);
+  f.list.node_details = {control: {tasks: 'invalid', assignable_people: []}};
+  await assert.rejects(api.fetchNodeAssignments('p1', signal, () => true), {message: '節點資料格式不正確，請稍後重試。'});
+});

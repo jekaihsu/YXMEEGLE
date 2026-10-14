@@ -2,9 +2,28 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import {getSessionEpoch} from './api';
 import {assignmentErrorMessage, assignmentsDisabled, fetchNodeAssignments, mutateNodeAssignment, NodeAssignmentError, requestId, type AssignmentMutation, type NodeAssignmentList} from './nodeAssignmentApi';
 
+let cacheEpoch = getSessionEpoch();
+const lists = new Map<string, NodeAssignmentList>();
+const requests = new Map<string, Promise<NodeAssignmentList>>();
+function syncEpoch() {
+  if (cacheEpoch !== getSessionEpoch()) {lists.clear(); requests.clear(); cacheEpoch = getSessionEpoch()}
+}
+function cached(projectId: string) {syncEpoch(); return lists.get(projectId)}
+export function prefetchNodeAssignments(projectId: string): Promise<NodeAssignmentList> {
+  syncEpoch();
+  const existing = requests.get(projectId);
+  if (existing) return existing;
+  const epoch = getSessionEpoch();
+  const request = fetchNodeAssignments(projectId, new AbortController().signal, () => epoch === getSessionEpoch()).then(data => {
+    if (epoch === getSessionEpoch() && requests.get(projectId) === request) lists.set(projectId, data);
+    return data;
+  }).catch(failure => {if (epoch === getSessionEpoch() && assignmentsDisabled(failure)) lists.delete(projectId); throw failure}).finally(() => {if (requests.get(projectId) === request) requests.delete(projectId)});
+  requests.set(projectId, request);
+  return request;
+}
 export type AssignmentListState = {kind: 'loading'} | {kind: 'disabled'} | {kind: 'ready'; data: NodeAssignmentList} | {kind: 'error'; message: string; data?: NodeAssignmentList};
-export function useNodeAssignments(projectId: string) {
-  const [state, setState] = useState<AssignmentListState>({kind: 'loading'});
+export function useNodeAssignments(projectId: string, enabled: boolean) {
+  const [state, setState] = useState<AssignmentListState>(() => {const data = enabled ? cached(projectId) : undefined; return !enabled ? {kind: 'disabled'} : data ? {kind: 'ready', data} : {kind: 'loading'}});
   const [refreshing, setRefreshing] = useState(false);
   const [revision, setRevision] = useState(0);
   const [pending, setPending] = useState('');
@@ -15,20 +34,33 @@ export function useNodeAssignments(projectId: string) {
   const listRequest = useRef(0), mutating = useRef(false);
   const current = useCallback(() => !lifecycle.current.controller.signal.aborted && lifecycle.current.epoch === getSessionEpoch(), []);
   const reload = useCallback(async () => {
+    if (!enabled) return;
     const sequence = ++listRequest.current;
     setRefreshing(true);
     try {
-      const data = await fetchNodeAssignments(projectId, lifecycle.current.controller.signal, current);
-      if (current() && sequence === listRequest.current) {setState({kind: 'ready', data}); setRevision(r => r + 1)}
+      const data = await prefetchNodeAssignments(projectId);
+      if (current() && sequence === listRequest.current) {
+        setState(previous => {
+          if (!current() || sequence !== listRequest.current) return previous;
+          const prior = 'data' in previous ? previous.data : undefined;
+          const node_details = data.node_details || (prior?.node_details && Object.fromEntries(data.nodes.flatMap(n => prior.nodes.find(p => p.key === n.key)?.revision === n.revision && prior.node_details?.[n.key] ? [[n.key, prior.node_details[n.key]]] : [])));
+          const merged = {...data, node_details};
+          lists.set(projectId, merged);
+          return {kind: 'ready', data: merged};
+        });
+        setRevision(r => r + 1);
+      }
     } catch (failure) {
       if (current() && sequence === listRequest.current) setState(previous => assignmentsDisabled(failure) ? {kind: 'disabled'} : {
         kind: 'error', message: assignmentErrorMessage(failure), data: 'data' in previous ? previous.data : undefined,
       });
     } finally {if (current() && sequence === listRequest.current) setRefreshing(false)}
-  }, [projectId, current]);
+  }, [projectId, current, enabled]);
   useEffect(() => {
     retryAttempt.current = null;
     lifecycle.current = {controller: new AbortController(), epoch: getSessionEpoch()};
+    const data = enabled ? cached(projectId) : undefined;
+    setState(!enabled ? {kind: 'disabled'} : data ? {kind: 'ready', data} : {kind: 'loading'});
     void reload();
     const controller = lifecycle.current.controller;
     return () => {controller.abort(); listRequest.current++};
@@ -41,10 +73,18 @@ export function useNodeAssignments(projectId: string) {
     retryAttempt.current = attempt;
     mutating.current = true; setPending(mutation.action); setError(null); setNotice('');
     try {
-      await mutateNodeAssignment(projectId, mutation, scope.controller.signal, mutationCurrent, attempt.id);
+      const detail = await mutateNodeAssignment(projectId, mutation, scope.controller.signal, mutationCurrent, attempt.id);
       retryAttempt.current = null;
       if (!mutationCurrent()) return false;
-      setNotice('已儲存變更。'); await reload(); return true;
+      listRequest.current++; requests.delete(projectId);
+      setState(previous => {
+        if (!mutationCurrent()) return previous;
+        if (!('data' in previous) || !previous.data) return previous;
+        const data = {...previous.data, writes_enabled: detail.writes_enabled, writes_disabled_reason: detail.writes_disabled_reason, roster: detail.roster, warnings: detail.warnings, summary: detail.summary, can: {...previous.data.can, [mutation.nodeKey]: detail.can}, nodes: previous.data.nodes.map(n => n.key === mutation.nodeKey ? detail.node : n), node_details: {...previous.data.node_details, [mutation.nodeKey]: {tasks: detail.tasks, assignable_people: detail.assignable_people}}};
+        lists.set(projectId, data);
+        return {kind: 'ready', data};
+      });
+      setNotice('已儲存變更。'); void reload(); return true;
     } catch (failure) {
       const uncertain = !(failure instanceof NodeAssignmentError) || failure.status === 408 || failure.code === 'client_timeout' || failure.code === 'outcome_unknown' || failure.code === 'readback_mismatch' || failure.code === 'busy' || (failure.status >= 500 && !['lark_unconfigured', 'writes_disabled', 'disabled'].includes(failure.code || ''));
       if (!uncertain) retryAttempt.current = null;

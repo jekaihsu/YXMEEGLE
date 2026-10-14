@@ -1,19 +1,46 @@
-import {useEffect, useId, useRef, useState, type FormEvent, type ReactNode} from 'react';
-import {ArrowRight, Check, ChevronDown, Clock3, Loader2, Plus, RefreshCw, ShieldCheck, TriangleAlert, UserPlus, Users} from 'lucide-react';
+import {useEffect, useMemo, useId, useRef, useState, type FormEvent, type ReactNode} from 'react';
+import {ArrowRight, ChevronDown, Clock3, Loader2, Plus, RefreshCw, ShieldCheck, TriangleAlert, UserPlus, Users} from 'lucide-react';
 import {getSessionEpoch} from './api';
-import {assignmentErrorMessage, assignmentsDisabled, fetchNodeAssignmentDetail, nodeStatusLabel, taskStatusLabel, taskStatusValue, TASK_STATUS_OPTIONS,
-  type AssignmentNode, type AssignmentPerson, type AssignmentMutation, type NewAssignmentTask, type NodeAssignmentDetail, type NodeAssignmentError, type NodePermissions} from './nodeAssignmentApi';
+import {NODE_ASSIGNMENT_ORDER, overviewDetail, assignmentErrorMessage, assignmentsDisabled, fetchNodeAssignmentDetail, nodeStatusLabel, taskStatusLabel, taskStatusValue, TASK_STATUS_OPTIONS,
+  type AssignmentNode, type AssignmentPerson, type AssignmentMutation, type NewAssignmentTask, type NodeAssignmentDetail, type NodeAssignmentError, type NodePermissions, type NodeAssignmentList} from './nodeAssignmentApi';
 import {useNodeAssignments} from './useNodeAssignments';
 import './NodeAssignments.css';
 
 const deadlineLabel = (value: string | null) => value ? value.slice(0, 10).replaceAll('-', '/') : '未排定';
+const statusTone = (status: string) => {const label = nodeStatusLabel(status); return label === '已完成' ? 'done' : label === '進行中' ? 'active' : label === '待審核' ? 'review' : label === '待處理' ? 'pending' : label === '略過' ? 'skipped' : 'quiet'};
 function StatusChip({status}: {status: string}) {
   const label = nodeStatusLabel(status);
-  const tone = label === '已完成' ? 'done' : label === '進行中' ? 'active' : label === '待審核' ? 'review' : 'quiet';
+  const tone = statusTone(status);
   return <span className={`na-status na-status-${tone}`}>{label}</span>;
 }
-function People({people}: {people: AssignmentPerson[]}) {
-  return <span className="na-people">{people.length ? people.map(p => <span className="na-person" key={p.open_id}><span className="na-avatar" aria-hidden="true">{p.name.slice(0, 1)}</span><span>{p.name}</span></span>) : <span className="na-muted">尚未指派</span>}</span>;
+function People({people, compact = false}: {people: AssignmentPerson[]; compact?: boolean}) {
+  return <span className="na-people">{people.length ? (compact ? people.slice(0, 3) : people).map(p => <span className="na-person" key={p.open_id}><span className={`na-avatar na-person-color-${personColor(p.open_id)}`} aria-hidden="true">{p.name.slice(0, 1)}</span><span>{p.name}</span></span>) : <span className="na-muted">尚未指派</span>}{compact && people.length > 3 && <span className="na-muted">+{people.length - 3}</span>}</span>;
+}
+const personColor = (id: string) => Array.from(id).reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0) % 6;
+const FLOW_LABELS: Record<string, string> = {sales: '業務', pm: 'PM', confirmation: '確認單', field: '外業', control: '控制', mapping: '圖資', report: '報告', pricing: '計價', settlement: '結算'};
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+function Overview({data, selected = '', onSelect}: {data?: NodeAssignmentList; selected?: string; onSelect?: (key: string) => void}) {
+  const card = (key: string) => {
+    const n = data?.nodes.find(n => n.key === key), label = n?.label || FLOW_LABELS[key];
+    const status = n ? nodeStatusLabel(n.derived_status) : '', done = status === '已完成' || status === '略過';
+    const overdue = !!n?.deadline && !done && new Date(n.deadline.length === 10 ? `${n.deadline}T23:59:59+08:00` : n.deadline).getTime() < Date.now();
+    const percent = n ? Math.round(Math.min(1, n.progress) * 100) : 0;
+    const hint = n ? actionHint(n, data?.writes_enabled ? data.can[key] || {} : {}) : '';
+    return <button key={key} className={`na-flow-card na-card-${statusTone(n?.derived_status || '')}${data?.summary.current_node === key ? ' is-current' : ''}${selected === key ? ' is-selected' : ''}${!data ? ' is-skeleton' : ''}`} disabled={!n} aria-current={data?.summary.current_node === key ? 'step' : undefined} aria-expanded={n ? selected === key : undefined} aria-label={`${label}節點，${status || '讀取中'}，${n?.owners.map(p => p.name).join('、') || '尚未指派'}`} onClick={() => onSelect?.(key)}>
+      <span className="na-card-top"><strong>{label}</strong>{n ? <StatusChip status={n.derived_status}/> : <span className="na-placeholder na-placeholder-status"/>}</span>
+      {n ? <People people={n.owners} compact/> : <span className="na-placeholder na-placeholder-people"/>}
+      <span className="na-card-progress">{n ? <><span>{n.tasks.done}/{n.tasks.total} 項任務</span><strong>{percent}%</strong></> : <span className="na-placeholder"/>}</span>
+      <span className="na-progress-track" aria-hidden="true"><span style={{width: `${percent}%`}}/></span>
+      <span className={`na-card-deadline${overdue ? ' is-overdue' : ''}`}>{n ? <><Clock3 size={12}/>{deadlineLabel(n.deadline)}{overdue && <strong>逾期</strong>}</> : <span className="na-placeholder"/>}</span>
+      {n && <span className="na-card-footer"><span className={hint ? 'needs-action' : 'na-muted'}>{hint || '檢視交接'}</span>{!!n.warnings.length && <span className="na-warning-dot" title={n.warnings.join('、')} aria-label="有節點警告"/>}</span>}
+    </button>;
+  };
+  const arrow = (keys: readonly string[]) => <ArrowRight className={`na-flow-arrow${data && keys.every(key => nodeStatusLabel(data.nodes.find(n => n.key === key)?.derived_status || '') === '已完成') ? ' is-done' : ''}`} size={18} aria-hidden="true"/>;
+  return <><div className="na-overview" aria-label="案件流程總覽" aria-busy={!data}>
+    <div className="na-flow-group na-leading" aria-label="接案與確認">{NODE_ASSIGNMENT_ORDER.slice(0, 3).map((key, i) => <div className="na-flow-unit" key={key}>{card(key)}{i < 2 && arrow([key])}</div>)}</div>
+    {arrow(['confirmation'])}<div className="na-production" aria-label="生產作業"><div className="na-production-label">生產作業 <span>· 依工項交接，可並行處理</span></div><div className="na-production-cards">{NODE_ASSIGNMENT_ORDER.slice(3, 7).map(card)}</div></div>
+    {arrow(NODE_ASSIGNMENT_ORDER.slice(3, 7))}<div className="na-flow-group na-ending" aria-label="計價與結算">{card('pricing')}{arrow(['pricing'])}{card('settlement')}</div>
+  </div><div className="na-flow-legend" aria-label="流程圖例">{['未開始', '待處理', '進行中', '待審核', '已完成', '略過'].map(status => <StatusChip key={status} status={status}/>)}<span>彩色頭像 · 節點負責人</span><span>外框 · 目前節點</span></div></>;
 }
 function ActionButton({allowed, busy, children, onClick, type = 'button', reason, primary = false}: {
   allowed: boolean; busy: boolean; children: ReactNode; onClick?: () => void; type?: 'button' | 'submit'; reason?: string; primary?: boolean;
@@ -36,29 +63,28 @@ function actionHint(n: AssignmentNode, can: NodePermissions): string {
   if (!n.owners.length && can.claim) return '待你認領';
   return can.complete ? '待你處理' : '';
 }
-export function NodeAssignments({projectId, legacy, before}: {projectId: string; legacy: ReactNode; before?: ReactNode}) {
-  const assignments = useNodeAssignments(projectId);
+export function NodeAssignments({projectId, enabled = false, legacy, before}: {projectId: string; enabled?: boolean; legacy: ReactNode; before?: ReactNode}) {
+  const assignments = useNodeAssignments(projectId, enabled);
   const [expanded, setExpanded] = useState('');
   const listRef = useRef<HTMLOListElement>(null);
   const listId = useId();
   const {state, refreshing, pending, notice, error} = assignments;
   const data = 'data' in state ? state.data : undefined;
+  const details = useMemo(() => data ? Object.fromEntries(data.nodes.map(n => [n.key, overviewDetail(data, n)])) : {}, [data]);
+  useEffect(() => {if (expanded) document.getElementById(`${listId}-${expanded}`)?.scrollIntoView({behavior: reducedMotion(), block: 'nearest'})}, [expanded, listId]);
   if (state.kind === 'disabled') return <>{legacy}</>;
   if (!data) return <>
     {state.kind === 'error' && <ErrorBanner message={state.message} retry={() => void assignments.reload()} busy={refreshing}/>}
-    {legacy}
+    {before}<section className="node-assignments" aria-label="案件節點指派"><header className="na-heading"><div><p className="na-eyebrow">流程與交付</p><h2>案件流程</h2><p role="status">正在讀取節點與交接進度…</p></div></header><Overview/></section>
   </>;
   const finished = data.summary.total > 0 && data.summary.done >= data.summary.total;
   const summaryLabel = finished ? '已完成' : '進行中';
-  const jumpToList = () => {listRef.current?.scrollIntoView({behavior: 'smooth', block: 'start'}); listRef.current?.focus({preventScroll: true})};
+  const jumpToList = () => {listRef.current?.scrollIntoView({behavior: reducedMotion(), block: 'start'}); listRef.current?.focus({preventScroll: true})};
   return <>{before}<section className="node-assignments" aria-label="案件節點指派">
     <header className="na-heading"><div><p className="na-eyebrow">流程與交付</p><h2>案件流程</h2><p>從接案到結算，掌握每一次交接。</p></div>
       <button className="na-summary" aria-controls={listId} onClick={jumpToList}><span className="na-summary-count">{data.summary.done}/{data.summary.total}</span><span><strong>{summaryLabel}</strong><small>節點完成 · 查看清單</small></span><ArrowRight size={18}/></button>
     </header>
-    <ol className="na-overview" tabIndex={0} aria-label="九個節點流程總覽，可左右捲動">{data.nodes.map((n, i) => <li key={n.key} aria-current={data.summary.current_node === n.key ? 'step' : undefined}>
-      <span className={`na-overview-node${nodeStatusLabel(n.derived_status) === '已完成' ? ' is-done' : ''}${data.summary.current_node === n.key ? ' is-current' : ''}`}><span className="na-overview-marker" aria-hidden="true">{nodeStatusLabel(n.derived_status) === '已完成' ? <Check size={12}/> : i + 1}</span>{n.label}<span className="na-sr-only">{nodeStatusLabel(n.derived_status)}</span></span>
-      {i < data.nodes.length - 1 && <ArrowRight size={13} className="na-arrow" aria-hidden="true"/>}
-    </li>)}</ol>
+    <Overview data={data} selected={expanded} onSelect={key => {setExpanded(key === expanded ? '' : key); assignments.clearFeedback()}}/>
     {!data.writes_enabled && <div className="na-banner na-stale" role="status">{data.writes_disabled_reason || '節點修改已停用。'}</div>}
     {data.stale && <div className="na-banner na-stale" role="status"><Clock3 size={17}/><span>目前顯示上次同步的資料，Lark 資料可能尚未更新。</span><button className="text-button" disabled={refreshing} onClick={() => void assignments.reload()}>重新讀取</button></div>}
     {state.kind === 'error' && <ErrorBanner message={state.message} retry={() => void assignments.reload()} busy={refreshing}/>}
@@ -75,7 +101,7 @@ export function NodeAssignments({projectId, legacy, before}: {projectId: string;
           <People people={n.owners}/><span className="na-deadline"><span className="na-mobile-label">下個期限 </span>{deadlineLabel(n.deadline)}</span>
           <span className={`na-hint${hint ? ' needs-action' : ''}`}>{hint || '檢視進度'}</span><ChevronDown size={17} className="na-chevron"/>
         </button>
-        {open && <div id={panelId}><NodeDetail key={n.key} projectId={projectId} node={n} revision={assignments.revision} listBlocked={!data.writes_enabled || refreshing || state.kind === 'error'} pending={pending} error={error} mutate={assignments.mutate} onAbandon={assignments.clearFeedback} onDisabled={() => void assignments.reload()}/></div>}
+        {open && <div id={panelId}><NodeDetail key={n.key} projectId={projectId} node={n} initialDetail={details[n.key]} revision={assignments.revision} listBlocked={!data.writes_enabled || refreshing || state.kind === 'error'} pending={pending} error={error} mutate={assignments.mutate} onAbandon={assignments.clearFeedback} onDisabled={() => void assignments.reload()}/></div>}
       </li>;
     })}</ol>
     {!data.nodes.length && <p className="na-empty">尚未建立節點指派。重新讀取後再確認。</p>}
@@ -84,15 +110,16 @@ export function NodeAssignments({projectId, legacy, before}: {projectId: string;
 
 type DetailState = {kind: 'loading'} | {kind: 'ready'; data: NodeAssignmentDetail; refreshing: boolean} | {kind: 'error'; message: string; data?: NodeAssignmentDetail};
 type Mutate = (mutation: AssignmentMutation) => Promise<boolean>;
-function NodeDetail({projectId, node, revision, listBlocked, pending, error, mutate, onAbandon, onDisabled}: {
-  projectId: string; node: AssignmentNode; revision: number; listBlocked: boolean; pending: string; error: NodeAssignmentError | null; mutate: Mutate; onAbandon: () => void; onDisabled: () => void;
+function NodeDetail({projectId, node, initialDetail, revision, listBlocked, pending, error, mutate, onAbandon, onDisabled}: {
+  projectId: string; node: AssignmentNode; initialDetail?: NodeAssignmentDetail; revision: number; listBlocked: boolean; pending: string; error: NodeAssignmentError | null; mutate: Mutate; onAbandon: () => void; onDisabled: () => void;
 }) {
-  const [state, setState] = useState<DetailState>({kind: 'loading'});
+  const [state, setState] = useState<DetailState>(() => initialDetail ? {kind: 'ready', data: initialDetail, refreshing: false} : {kind: 'loading'});
   const [retry, setRetry] = useState(0);
   const [form, setForm] = useState<'assign' | 'task' | 'reject' | ''>('');
   const [changedTask, setChangedTask] = useState('');
   const detailId = useId();
   useEffect(() => {
+    if (initialDetail) {setState({kind: 'ready', data: initialDetail, refreshing: false}); return}
     const controller = new AbortController(), epoch = getSessionEpoch();
     const current = () => !controller.signal.aborted && epoch === getSessionEpoch();
     setState(previous => 'data' in previous && previous.data ? {kind: 'ready', data: previous.data, refreshing: true} : {kind: 'loading'});
@@ -104,8 +131,8 @@ function NodeDetail({projectId, node, revision, listBlocked, pending, error, mut
       setState(previous => ({kind: 'error', message: assignmentErrorMessage(failure), data: 'data' in previous ? previous.data : undefined}));
     });
     return () => controller.abort();
-  }, [projectId, node.key, revision, retry]);
-  const data = 'data' in state ? state.data : undefined;
+  }, [projectId, node.key, revision, retry, initialDetail]);
+  const data = initialDetail || ('data' in state ? state.data : undefined);
   if (!data) return <section className="na-detail" aria-label={`${node.label}節點明細`}>{state.kind === 'loading' ? <p className="na-loading" role="status"><Loader2 size={16} className="spin"/>正在讀取負責人與任務…</p>
     : state.kind === 'error' && <ErrorBanner message={state.message} retry={() => setRetry(r => r + 1)}/>}</section>;
   const can = data.can;

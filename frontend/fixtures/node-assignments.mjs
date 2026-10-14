@@ -125,3 +125,22 @@ export function documentedAssignmentFixture() {
 }};
   return {list, detail};
 }
+
+export function embeddedAssignmentFixture() {
+  const fixture = assignmentFixture();
+  fixture.list.node_details = Object.fromEntries(fixture.list.nodes.map(n => [n.key, {tasks: n.key === 'control' ? fixture.detail.tasks : [], assignable_people: fixture.detail.assignable_people}]));
+  return fixture;
+}
+export function visualAssignmentFixture() {
+  const fixture = embeddedAssignmentFixture();
+  for (const n of fixture.list.nodes) {
+    const i = chain.findIndex(([key]) => key === n.key);
+    n.status = n.derived_status = i < 3 ? '已完成' : i === 3 ? '進行中' : i === 4 ? '待審核' : '未開始';
+    n.tasks = {done: i < 3 ? 3 : i === 3 ? 3 : i === 4 ? 5 : 0, total: i < 3 ? 3 : i < 5 ? 5 : 0};
+    n.progress = n.tasks.total ? n.tasks.done / n.tasks.total : 0;
+    n.deadline = i === 3 ? '2026-10-10' : i === 4 ? '2026-10-20' : null;
+    n.warnings = i === 3 ? ['交付期限已過，請確認排程。'] : [];
+  }
+  fixture.list.summary = {done: 3, total: 9, current_node: 'field'};
+  return fixture;
+}

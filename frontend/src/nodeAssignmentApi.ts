@@ -19,6 +19,7 @@ export interface AssignmentTask {
 }
 export interface NodeAssignmentList {
   code: string; summary: {done: number; total: number; current_node: string | null};
+  node_details?: Record<string, Pick<NodeAssignmentDetail, 'tasks' | 'assignable_people'>>;
   nodes: AssignmentNode[]; stale: boolean; writes_enabled: boolean; writes_disabled_reason: string | null; roster: {available: boolean; stale: boolean}; warnings: string[]; can: Record<string, NodePermissions>;
 }
 export interface NodeAssignmentDetail extends Pick<NodeAssignmentList, 'summary' | 'writes_enabled' | 'writes_disabled_reason' | 'roster' | 'warnings'> {can: NodePermissions; record_id: string | null; node: AssignmentNode; tasks: AssignmentTask[]; assignable_people: AssignablePerson[]}
@@ -88,6 +89,18 @@ function envelope(result: Record<string, unknown>) {
     writes_enabled: result.writes_enabled, writes_disabled_reason: optionalText(result.writes_disabled_reason),
     roster: {available: roster.available, stale: roster.stale}, warnings: array(result.warnings, text)};
 }
+function detailPayload(value: unknown) {
+  const d = record(value);
+  return {tasks: array(d.tasks, task), assignable_people: array(d.assignable_people, value => {
+    const p = record(value); return {...person(p), departments: array(p.departments, text)};
+  })};
+}
+export function overviewDetail(list: NodeAssignmentList, n: AssignmentNode): NodeAssignmentDetail | undefined {
+  const payload = list.node_details?.[n.key];
+  if (!payload) return undefined;
+  const named = (p: AssignmentPerson | null) => p && p.name === '姓名待確認' ? payload.assignable_people.find(candidate => candidate.open_id === p.open_id) || p : p;
+  return {...list, ...payload, node: {...n, assigned_by: named(n.assigned_by), approver: named(n.approver)}, record_id: n.record_id, can: list.can[n.key] || {}, tasks: payload.tasks.map(t => ({...t, assignee: named(t.assignee), assigned_by: named(t.assigned_by)}))};
+}
 const basePath = (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/node-assignments`;
 async function request(url: string, init: RequestInit, isCurrent: () => boolean): Promise<unknown> {
   try {return await api<unknown>(url, {...init, timeoutMs: 20000}, isCurrent)}
@@ -119,6 +132,7 @@ export async function fetchNodeAssignments(projectId: string, signal: AbortSigna
   const nodes = array(result.nodes, node);
   if (new Set(nodes.map(n => n.key)).size !== nodes.length) throw malformed();
   return {code: text(result.code), ...envelope(result),
+    node_details: result.node_details == null ? undefined : Object.fromEntries(Object.entries(record(result.node_details)).map(([key, value]) => [key, detailPayload(value)])),
     nodes: NODE_ASSIGNMENT_ORDER.flatMap(key => nodes.filter(n => n.key === key)), stale: result.stale, can};
 }
 export async function fetchNodeAssignmentDetail(projectId: string, key: string, signal: AbortSignal, isCurrent: () => boolean): Promise<NodeAssignmentDetail> {
