@@ -37,7 +37,7 @@ def test_pages_return_immediately_while_refresh_is_slow_or_failing(tmp_path, fai
     client.cookies.set('meegle_session', app.state.signer.dumps(
         {'mode': 'lark', 'uid': 'u-pm', 'wid': 'lark-test', 'sid': 's1'}))
     try:
-        for path in ('/api/session', '/api/workspace', '/api/workspace', '/api/session'):
+        for path in ('/api/session', '/api/workspace', '/api/company-dashboard', '/api/workspace', '/api/company-dashboard', '/api/session'):
             begun = monotonic()
             response = client.get(path)
             assert monotonic() - begun < 3, path
