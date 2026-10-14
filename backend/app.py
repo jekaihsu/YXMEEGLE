@@ -1095,6 +1095,7 @@ def create_app(overrides=None):
         """Read model for the viewer; same full-workspace load as GET /api/workspace. my_work applies case_redaction itself."""
         from .my_work import build_my_work_input
         data,user=identity(request)
+        if request.query_params: return app.state.home_panels.read_workspace(request,data,user)
         app.state.live_read.ensure(data['wid'],'sources')
         read={'admitted':data.get('access_mode','normal') in ('normal','tenant-read')}
         try:
@@ -1387,6 +1388,8 @@ def create_app(overrides=None):
     from .node_skip import valid_waiver
     app.state.node_assignment=register_node_assignment(app,identity=identity,load_case=node_assignment_case,sessions=sessions,
         receipt_model=Receipt,audit_model=AuditRow,cfg=cfg,skipped_nodes=valid_waiver)
+    from .home_panels import register as register_home_panels
+    app.state.home_panels=register_home_panels(app,identity=identity,load=load,sessions=sessions,workspace_model=WorkspaceRow,nodes=app.state.node_assignment)
     from .native_poller import NativeApprovalPoller
     app.state.native_poller=NativeApprovalPoller(sessions,WorkspaceRow,BusinessRow,PersonRow,cfg)
     from .source_sync import SourceSyncService

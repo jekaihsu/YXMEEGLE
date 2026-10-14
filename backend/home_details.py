@@ -17,6 +17,21 @@ CLOSED = ('completed', 'superseded')
 ACTION_STATUSES = ('pending', 'in_progress', 'rework')
 
 
+def local_work_instance(project, task):
+    if project.get('source_kind') in ('demo', 'mock', 'simulation') or task.get('origin') in ('simulation', 'sop_definition', 'lark'):
+        return False
+    if not task.get('owner_id') or (task.get('source_identity') or {}).get('table_id') in ('tblcPZPmezkyeVb7', 'tblsoyGcC6K5AipF'):
+        return False
+    from .home_queues import _valid_timestamp
+    history = task.get('assignment_history')
+    latest = history[-1] if isinstance(history, list) and history and isinstance(history[-1], dict) else {}
+    after = latest.get('after')
+    explicitly_assigned = bool(latest.get('actor_id') and _valid_timestamp(latest.get('at'))
+                               and isinstance(after, dict) and after.get('owner_id') == task['owner_id'])
+    template = task.get('owner_inherited') or task.get('sop_definition_version') or task.get('sop_task_key') or task.get('source_identity')
+    return explicitly_assigned or not template
+
+
 def _day(value):
     try:
         return date.fromisoformat(str(value)[:10]).isoformat() if value else None
