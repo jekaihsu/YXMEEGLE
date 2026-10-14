@@ -13,6 +13,10 @@ const MUTATIONS={
  'forbidden-absent':[["if(!page.states.every(s=>s==='partial'||s==='stale'))return base(onlyState('unknown',null,page));","if(page.states.includes('forbidden')===false&&false)return base(onlyState('unknown',null,page));"]],
  'fail-closed':[["if(!rows)return failed('unknown','malformed_section') as Section<T>;","if(!rows)return {state,rows:[],emptyRow:null,reason:null};"]],
  'receipt-missing':[["const VERIFICATION=WORK_ITEM_LABELS.receiptMissing;","const VERIFICATION='已驗證';"]],
+ 'side-forbidden':[["const side=isForbidden(sideState)?null:sideRaw;","const side=sideRaw;"]],
+ 'required-sections':[["if(!['work_content','plan_actual','work_orders','side','case_daily_reports','parents','nodes','deliverables'].every(k=>rec(body[k])!==null))return base(onlyState('unknown','malformed_body'));",""]],
+ 'identity-match':[["if(str(id.node_id)!==str(node.id)||str(id.task_id)!==str(task.id))return null;","if(false)return null;"],["if(hid[k]!==undefined&&str(hid[k])!==str(want))return null;","if(false)return null;"],["if(hid.before_opened_round!==undefined&&hid.before_opened_round!==hr.opened_round)return null;","if(false)return null;"]],
+ 'unresolved-parent':[["if(!breadcrumbs.length&&!isForbidden(parents.state))","if(false)"]],
  'evidence-only':[["r.evidence_only!==true||",""]],
 };
 let target='./src/workItemDetailView.ts';
@@ -215,6 +219,50 @@ test('20. history tab: completed history collapsed until expanded; round history
  const rows=[nodeRow('n1','t1',1,{task:task('t1',{completed_at:'2026-09-10'})})];
  const c=view({nodes:section('partial',rows)}),e=view({nodes:section('partial',rows)},{historyExpanded:true});
  eq([c.history.completed,e.history.completed.length],[null,1]);
+});
+test('21. 132-R1 forbidden side section: loaded owner, warnings and dates are not displayed',()=>{
+ const side=(state)=>({read_state:{states:[state]},effective_due:unk('VCC-123 formal deadline provenance unresolved'),pending_due:unk('requested_date_field_unlocated'),
+  estimated_due:unk('estimated_date_field_unlocated'),source_updated_at:unk('source_updated_time_unlocated'),
+  responsible_people:[{id:'u1',name:'Synthetic Owner'}],missing_edge_warnings:['native_parent_edge_absent']});
+ const ok0=view({side:side('unknown')});
+ eq(ok0.side.responsible,['Synthetic Owner']);
+ const v=view({side:side('forbidden'),nodes:{...section('forbidden',[nodeRow('n1','t1',1)])}});
+ eq([v.side.responsible,v.side.warnings,v.side.responsibleCell.state],[[],[],'unknown']);
+ eq(v.side.state.states,['forbidden']);
+ ok(!dump(v).includes('Synthetic Owner')&&!dump(v).includes('找不到原生上層關聯'.repeat(2)),'owner absent everywhere');
+ eq(v.nodes.rows.length,0);
+});
+test('22. 132-R2 incomplete body: header-only partial body is an unknown page with reason',()=>{
+ const full=body();
+ const only={read_state:full.read_state,header:full.header};
+ const v=build({body:only});
+ eq([v.hasContent,v.header,v.unknownReason],[false,null,'回應格式不符，無法採信']);
+ eq(v.pageState.states,['unknown']);
+ for(const k of ['work_content','plan_actual','work_orders','side','case_daily_reports','parents','nodes','deliverables']){
+  const b=body();delete b[k];
+  const r=build({body:b});eq([k,r.hasContent,r.header],[k,false,null]);
+ }
+});
+test('23. 132-R2 conflicting instance identity fails the whole node section closed (and drawer cannot open)',()=>{
+ const good=view();eq(good.nodes.rows.length,1);
+ const key=good.nodes.rows[0].key;
+ for(const row of [nodeRow('n1','t1',1,{instance_identity:{project_id:'p1',node_id:'n1',task_id:'different-task',sop_round:1}}),
+  nodeRow('n1','t1',1,{instance_identity:{project_id:'p1',node_id:'other-node',task_id:'t1',sop_round:1}}),
+  nodeRow('n1','t1',1,{history:[{instance_identity:{project_id:'p1',node_id:'n1',task_id:'zzz',before_opened_round:1},opened_round:1,before:{status:'done'}}]}),
+  nodeRow('n1','t1',1,{history:[{instance_identity:{project_id:'p1',node_id:'n1',task_id:'t1',before_opened_round:3},opened_round:1,before:{status:'done'}}]})]){
+  const v=view({nodes:section('partial',[row])},{selectedKey:key});
+  eq([v.nodes.rows.length,v.nodes.state.states,v.drawer.open],[0,['unknown'],false]);
+ }
+});
+test('24. 132-P1 missing parent: explicit unresolved path keeps Work Item endpoint, no navigation or ID',()=>{
+ const v=view({parents:{read_state:{states:['unlocated'],count:null},rows:[],reason:'native_parent_edge_absent',unresolved:[{reason:'native_parent_edge_absent'}]}});
+ eq(v.breadcrumbs.length,1);
+ const b=v.breadcrumbs[0];
+ eq([b.contractLineUnresolved,b.contractLine,b.workItem,b.confirmations,b.reason],[true,L.contractLineUnresolved,'工作項甲',[],'找不到原生上層關聯']);
+ eq(v.parents.unresolved,[{label:L.contractLineUnresolved,reason:'找不到原生上層關聯'}]);
+ ok(!dump(v.breadcrumbs).includes('c1')&&!('target' in b));
+ eq(view().breadcrumbs[0].contractLineUnresolved,false);
+ eq(view({parents:section('forbidden',[])}).breadcrumbs,[],'forbidden parents invent no placeholder');
 });
 
 let failed=0;
