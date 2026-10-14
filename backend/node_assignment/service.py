@@ -23,7 +23,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 
 from .. import audit
-from ..business_policy import can_business_override
+from ..business_policy import can_business_override, can_manage_roles
 from ..sources import normalized_case
 from .cache import Cached, StaleCache
 from .config import NodeAssignmentConfig
@@ -82,7 +82,7 @@ def confirmation_record(project, config: NodeAssignmentConfig):
 
 
 def actor_for(user, roster: Roster | None) -> Actor:
-    return Actor(roster.person(user['id']) if roster else None, user['id'], can_business_override(user))
+    return Actor(roster.person(user['id']) if roster else None, user['id'], can_business_override(user) or can_manage_roles(user))
 
 
 class KeyedLocks:
