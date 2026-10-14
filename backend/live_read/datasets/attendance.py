@@ -20,4 +20,19 @@ class AttendanceRefresher(DatasetRefresher):
         return dict(fingerprint=content_fingerprint(rows),
                     fetched_at=status['last_success_at'], lark=self.metrics(clients))
 
+    def weekly(self, wid, days):
+        from .weekly_attendance import fetch_week
+        service, clients = self.reader()
+        app_id, tenant = service._policy(wid)
+        with service.sessions() as db:
+            state = service._state(db, db.get(service.W, wid))
+        adapter = service.adapter_factory(service.cfg)
+        try:
+            snapshot = fetch_week(adapter, state['users'], app_id, tenant, days,
+                                  state.get('people_directory_status', {}).get('status') == 'ready')
+            return dict(fingerprint=content_fingerprint([snapshot]), snapshot=snapshot,
+                        lark=self.metrics(clients))
+        finally:
+            adapter.client.close()
+
     refresh = __call__
