@@ -63,7 +63,7 @@ try{
  const beforeRefresh=requests.filter(r=>r.url==='/api/workspace').length;
  await flush(()=>document.querySelector('[aria-label="重新整理資料"]').click());liveBody(['sources','attendance'],false);
  ok(requests.filter(r=>r.url==='/api/workspace').length===beforeRefresh+1,'manual refresh reads workspace once despite newer changed_at');
- location.hash='#view=sources';await flush(()=>window.dispatchEvent(new Event('hashchange')));
+ location.hash='#view=sources&tab=legacy';await flush(()=>window.dispatchEvent(new Event('hashchange')));
  ok(document.querySelector('.topbar .data-freshness'),'Sources keeps the shell chip');
  ok(document.querySelector('.dataset-as-of').textContent.includes('來源資料 as of'),'Sources shows as_of');
  await clickText('立即重新讀取 Lark');liveBody(['sources']);ok(![...document.querySelectorAll('button')].find(b=>b.textContent.includes('立即重新讀取 Lark')).disabled,'successful Sources refresh releases its busy state');
