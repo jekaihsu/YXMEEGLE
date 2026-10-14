@@ -8,16 +8,22 @@ import type {PeopleAttendance} from './peopleAttendance.ts';
 import {taipeiTime} from './taipeiTime.ts';
 import {encodeReturnContext} from './myWorkView.ts';
 
-export type TileState = 'ok' | 'stale' | 'failed' | 'needs-permission' | 'unknown';
+export type TileState = 'ok' | 'stale' | 'partial' | 'failed' | 'needs-permission' | 'unknown';
 export type TileReader = 'work' | 'overview' | 'sources' | 'confirmations' | 'attendance';
+export type CaseRead = {kind: 'loading'} | {kind: 'failed'} | {kind: 'needs-permission'} | {kind: 'ready'; count: number; asOf: string | null};
+export function parseCaseCount(body: unknown): number | null {
+ const count = body && typeof body === 'object' ? Reflect.get(body, 'total') : undefined;
+ return typeof count === 'number' && Number.isSafeInteger(count) && count >= 0 ? count : null;
+}
 export type AttendanceRead = {kind: 'loading'} | {kind: 'ready'; view: PeopleAttendance} | {kind: 'failed'};
 export type GlanceTile = {
  id: string; title: string; value: string; asOf: string; state: TileState; reason: string;
  href: string; reader: TileReader | null;
 };
 export const TILE_STATE_LABELS: Record<TileState, string> = {
- ok: '已讀取', stale: '資料待更新', failed: '讀取失敗', 'needs-permission': '需要權限', unknown: '未知',
+ ok: '已讀取', stale: '資料待更新', partial: '已讀取部分', failed: '讀取失敗', 'needs-permission': '需要權限', unknown: '未知',
 };
+export const SOURCE_TILE_IDS = new Set(['confirmations', 'source-cases', 'source-people', 'source-trips']);
 export function tileState(states: readonly DataStateName[] | undefined): TileState {
  if (states?.includes('forbidden')) return 'needs-permission';
  if (states?.includes('read_failed')) return 'failed';
@@ -46,7 +52,7 @@ export function attendanceTiles(read: AttendanceRead): GlanceTile[] {
 }
 export function buildPmGlanceView(input: {
  work: MyWorkView; awaiting: MyWorkView; overview: ManagerOverviewView;
- sources: SourceHealthView; confirmations: ConfirmationListView; attendance: AttendanceRead;
+ sources: SourceHealthView; confirmations: ConfirmationListView; attendance: AttendanceRead; cases: CaseRead;
 }): GlanceTile[] {
  const {work, awaiting, overview, sources, confirmations} = input;
  const workTile = (view: MyWorkView, id: string, title: string): GlanceTile => {
@@ -59,9 +65,24 @@ export function buildPmGlanceView(input: {
  const overdueState = overdue?.known ? overviewState : overviewState === 'ok' ? 'unknown' : overviewState;
  const sourceState = tileState(sources.page.states);
  const listState = tileState(confirmations.pageState?.states);
+ const cases = input.cases;
+ const attendanceView = input.attendance.kind === 'ready' ? input.attendance.view : undefined;
+ const recordsRead = attendanceView?.as_of && ['ok', 'incomplete', 'stale'].includes(attendanceView.status) ? attendanceView : undefined;
+ const recordTiles = ([['source-people', '已讀取名冊', recordsRead?.people.length],
+  ['source-trips', '本週出差／外出', recordsRead?.trips.length]] satisfies [string, string, number | undefined][])
+  .map(([id, title, count]): GlanceTile => ({
+   id, title, value: count !== undefined && (count > 0 || recordsRead?.status === 'ok') ? String(count) : '—',
+   state: input.attendance.kind === 'failed' ? 'failed' : !recordsRead ? attendanceView ? ATTENDANCE_TILE_STATES[attendanceView.status] : 'unknown' : recordsRead.status === 'stale' ? 'stale' : recordsRead.incomplete ? 'partial' : 'ok',
+   asOf: `資料日期 ${taipeiTime(recordsRead?.as_of)}`, href: '#view=people', reader: 'attendance',
+   reason: (id === 'source-people' ? '已載入名冊紀錄，非全公司在職人數。' : '本週已載入紀錄，非出差人數。') + (recordsRead?.incomplete ? '部分資料待核對。' : ''),
+  }));
  const unavailable = (id: string, title: string, href: string, reason: string): GlanceTile =>
   ({id, title, href, reason, value: '—', asOf: '資料日期 —', state: 'unknown', reader: null});
  return [
+  {id: 'source-cases', title: '案件與報價紀錄', state: cases.kind === 'ready' ? sourceState === 'stale' ? 'stale' : 'ok' : cases.kind === 'loading' ? 'unknown' : cases.kind,
+   value: cases.kind === 'ready' ? String(cases.count) : '—', asOf: `資料日期 ${taipeiTime(cases.kind === 'ready' ? cases.asOf : null)}`,
+   reason: '已載入案件與報價紀錄，非已啟用工作台案件數。', href: '#view=projects', reader: 'overview'},
+  ...recordTiles,
   awaiting.mode === 'awaiting_my_confirmation' ? workTile(awaiting, 'awaiting', '等待我確認') :
    {...unavailable('awaiting', '等待我確認', '#view=work', '現有我的工作未開放待確認佇列，待確認數量未知'),
     state: tileState(awaiting.pageState?.states) === 'ok' ? 'unknown' : tileState(awaiting.pageState?.states), reader: 'work'},
@@ -74,7 +95,7 @@ export function buildPmGlanceView(input: {
   unavailable('workload', '各組工作量', '#view=overview', '各組工作量尚未可確認。'),
   {id: 'confirmations', title: '工程確認單', state: listState,
    value: (listState === 'ok' || listState === 'stale') && confirmations.footer.matching.reason === null ? confirmations.footer.matching.label : '—',
-   asOf: `資料日期 ${confirmations.header.asOf.label}`, reason: confirmations.pageStateLabel ?? (confirmations.footer.matching.reason === null ? '目前篩選符合的確認單版本數；不是待確認工作數。' : '確認單母體尚未完整確認，總數未知。'),
+   asOf: `資料日期 ${taipeiTime(confirmations.header.asOf.label)}`, reason: confirmations.pageStateLabel ?? (confirmations.footer.matching.reason === null ? '已讀取確認單版本，非待確認工作數。' : '確認單母體尚未完整確認，總數未知。'),
    href: '#view=confirmations', reader: 'confirmations'},
  ];
 }

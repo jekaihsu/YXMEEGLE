@@ -26,3 +26,17 @@
  .pm-glance-tile {padding:18px}
  .pm-glance-head button {width:100%}
 }
+.pm-glance-section {margin-top:28px}
+.pm-glance-section>h2 {font-size:20px;margin:0 0 6px}
+.pm-glance-section-note {color:var(--label-2);font-size:13px;line-height:1.6;margin:0 0 16px}
+.pm-glance-source-grid {grid-template-columns:repeat(4,minmax(0,1fr))}
+.pm-glance-tile h3 {font-size:16px;margin:0;color:var(--label)}
+.pm-glance-tile.state-ok {border-top:3px solid var(--positive)}
+.pm-glance-tile.state-stale,.pm-glance-tile.state-partial,.pm-glance-tile.state-needs-permission {border-top:3px solid var(--warning)}
+.pm-glance-tile.state-failed {border-top:3px solid var(--critical)}
+.pm-glance-tile.state-partial .pm-glance-state {background:color-mix(in srgb,var(--warning) 10%,var(--surface));color:var(--warning)}
+.pm-glance-value-loading {background:var(--surface-2);border-radius:6px;max-width:88px;color:transparent}
+@media(max-width:1100px) {.pm-glance-source-grid {grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px) {.pm-glance-source-grid {grid-template-columns:minmax(0,1fr)}}
+.pm-glance-tile.state-ok .pm-glance-state {color:color-mix(in srgb,var(--positive) 80%,var(--label))}
+.pm-glance-tile.state-failed .pm-glance-state {color:color-mix(in srgb,var(--critical) 80%,var(--label))}
