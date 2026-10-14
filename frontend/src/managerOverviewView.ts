@@ -156,14 +156,16 @@ function parseCase(raw:unknown):{row:CaseRow;detail:CaseDetail}{
  const d=need(c.details);
  // row_keys is a list (possibly empty: no row in the current, usually partial, loaded population; never an absence claim) or null, and null only together with a no-count
  // row_keys_state and a reason (population unavailable). Anything else, including state beside a list, is invalid.
- const rowKeys=d.row_keys;
+ const rawRowKeys:unknown=d.row_keys;
+ let rowKeys:string[]|null=null;
  let rowKeysState:string|null=null,rowKeysReason:string|null=null;
- if(rowKeys===null){
+ if(rawRowKeys===null){
   const rs=stateOf(d.row_keys_state);
   if(!UNCOUNTED.has(rs.states[0]))bad();
   rowKeysState=labelOf(rs);rowKeysReason=reqStr(d.row_keys_reason);
  }else{
-  if(!Array.isArray(rowKeys)||!rowKeys.every(k=>typeof k==='string'&&k))bad();
+  if(!Array.isArray(rawRowKeys)||!rawRowKeys.every((k:unknown)=>typeof k==='string'&&k!==''))bad();
+  rowKeys=rawRowKeys as string[];   // narrowed by the Array.isArray and element-string guard just above
   if(d.row_keys_state!==undefined||d.row_keys_reason!==undefined)bad();
  }
  // No receipt authority (plan D3): the only accepted mapping state is receipt_missing, shown as 對應未驗證.
@@ -192,7 +194,7 @@ function parseCase(raw:unknown):{row:CaseRow;detail:CaseDetail}{
   }
  }
  const detail:CaseDetail={
-  id,rowKeys:rowKeys as string[]|null,
+  id,rowKeys,
   rowKeysText:rowKeys===null?OVERVIEW_LABELS.rowKeysUnknown:rowKeys.length?`${OVERVIEW_LABELS.rowKeysListed}`:OVERVIEW_LABELS.dash,
   rowKeysStateLabel:rowKeysState,rowKeysReason:rowKeys!==null&&!rowKeys.length?OVERVIEW_LABELS.rowKeysEmptyReason:rowKeysReason,pmId:optStr(d.pm_id),executionStatus:optStr(d.execution_status),admission,
   mappingLabel:OVERVIEW_LABELS.unverifiedMapping,
