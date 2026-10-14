@@ -47,17 +47,17 @@ const edge = (v: unknown) => rec(v) && str(v.edge_type) && str(v.parent_key) && 
 const parent = (v: unknown) => rec(v) && str(v.edge_type) && str(v.parent_key) && typeof v.contested === 'boolean' && str(v.verification);
 function validRow(v: unknown, history = false, depth = 0): boolean {
  if (!rec(v) || depth > 1) return false;
- if (history) return (str(v.confirmation_key) && scalar(v.revision) && nullable(v.replaced_at)) ||
-  (nullable(v.event_id) && nullable(v.action) && nullable(v.created_at));
+ if (history) return Object.hasOwn(v, 'confirmation_key') ? str(v.confirmation_key) && scalar(v.revision) && nullable(v.replaced_at) :
+  nullable(v.event_id) && nullable(v.action) && nullable(v.created_at);
  return str(v.key) && ['confirmation','contract','work_item','node','task','evidence'].includes(v.kind) && nullable(v.label) && array(v.parents, parent) &&
  ['code','source_url','item_number','status','node_id','task_id'].every(k => optional(v, k, nullable)) &&
  optional(v, 'revision', scalar) && optional(v, 'selected', x => typeof x === 'boolean') && optional(v, 'amount', withheld) &&
  optional(v, 'work_item_links', x => ['located','unresolved'].includes(x)) &&
  optional(v, 'unresolved', x => rec(x) && str(x.reason) && str(x.verification)) &&
- optional(v, 'tasks', x => array(x, r => validRow(r, false, depth + 1)));
+ optional(v, 'tasks', x => v.kind === 'node' && array(x, r => rec(r) && r.kind === 'task' && validRow(r, false, depth + 1)));
 }
 function validSection(v: unknown, name: string): boolean {
- return rec(v) && withStates(v) && (v.freshness === null || v.freshness === 'stale') && nullable(v.reason) &&
+ return rec(v) && withStates(v) && (!v.states.some((s: string) => ['complete_empty', 'filtered_empty'].includes(s)) || Array.isArray(v.rows) && v.rows.length === 0) && (v.freshness === null || v.freshness === 'stale') && nullable(v.reason) &&
  rec(v.source_time) && nullable(v.source_time.value) && v.source_time.basis === 'source_sync_completed' && nullable(v.source_time.fetched_at) &&
  array(v.rows, r => validRow(r, name === 'history') && (name === 'history' || r.kind === ({versions: 'confirmation', contract_lines: 'contract', work_items: 'work_item', workflow_nodes: 'node', reports_documents: 'evidence'} as Record<string, string>)[name])) && rec(v.details) &&
  optional(v.details, 'unresolved_edges', x => array(x, edge)) &&
@@ -165,7 +165,7 @@ export function buildCaseDetailView(input: unknown, options: CaseDetailOptions =
  const workflowForbidden = b.sections.workflow_nodes.states.includes('forbidden');
  const sourceForbidden = versionForbidden || h.source_link.states?.includes('forbidden');
  root.sourceLink = sourceForbidden ? sourceLink(null) : sourceLink(h.source_link.url);
- const personField = (label: string, p: Rec, forbidden = false) => field(label, forbidden || p.states?.includes('forbidden') ? null : p.name, forbidden || p.states?.includes('forbidden') ? 'forbidden' : p.reason);
+ const personField = (label: string, p: Rec, forbidden = false) => field(label, forbidden || p.states?.length ? null : p.name, forbidden || p.states?.includes('forbidden') ? 'forbidden' : p.reason);
  const responsibility = personField('負責人', h.responsible_person, workflowForbidden);
  const header = [field('專案', h.project_name), field('案件編號', h.case_number), field('確認單版本', versionForbidden ? null : h.selected_confirmation.code, versionForbidden ? 'forbidden' : h.selected_confirmation.reason),
   field('納入狀態', h.admission.execution_system_label), field('納入說明', h.admission.execution_readonly_reason ?? h.admission.explanation), personField('PM', h.pm), responsibility,
