@@ -2,22 +2,40 @@
 :root{
  color-scheme:light;
  --text-scale:1;
- --bg:#f5f5f7;--surface:#fff;--surface-2:#f5f5f7;
- --label:#1d1d1f;--label-2:#6e6e73;--sep:rgba(60,60,67,.18);
+ --bg:#eef2f7;--surface:#fff;--surface-2:#f1f4f8;
+ --label:#152333;--label-2:#465569;--sep:rgba(21,35,51,.14);
  --accent:#0c5494;--accent-hover:#0a4679;--on-accent:#fff;--accent-fg:var(--on-accent);--accent-fill:#0c54941f;
- --separator:#0000001a;--radius-card:18px;
- --glass-fill:rgb(255 255 255/.72);--glass-bar-fill:rgb(245 245 247/.82);--glass-blur:saturate(180%) blur(20px);--glass-border:#0000001a;--glass-highlight:inset 0 1px 0 rgb(255 255 255/.7);--glass-shadow:0 4px 20px #0000000d;
- --bg-tint:radial-gradient(60rem 40rem at 10% -10%,#0c54941f,transparent 70%),radial-gradient(50rem 36rem at 100% 0,#0c549414,transparent 70%);
- --positive:#248a3d;--warning:#b25000;--critical:#d70015;
+ --separator:#15233318;--radius-card:16px;
+ --glass-fill-a:rgb(255 255 255/.64);--glass-fill-strong-a:rgb(255 255 255/.88);--glass-bar-fill-a:rgb(247 250 253/.74);
+ --glass-fill-solid:#fff;--glass-bar-fill-solid:#f7fafd;
+ --glass-blur:saturate(160%) blur(16px);--glass-bar-blur:saturate(160%) blur(20px);
+ --glass-border:rgb(21 35 51/.12);--glass-border-strong:rgb(21 35 51/.2);
+ --glass-highlight:inset 0 1px 0 rgb(255 255 255/.85);
+ --glass-shadow:0 1px 2px rgb(21 35 51/.05),0 8px 24px rgb(21 35 51/.08);
+ --glass-shadow-raised:0 2px 4px rgb(21 35 51/.06),0 14px 32px rgb(21 35 51/.12);
+ --bg-tint:radial-gradient(56rem 36rem at 6% -8%,rgb(12 84 148/.14),transparent 70%),radial-gradient(48rem 34rem at 104% 2%,rgb(14 148 160/.1),transparent 70%),radial-gradient(60rem 40rem at 50% 112%,rgb(98 92 190/.08),transparent 70%);
+ --positive:#1a6f35;--warning:#8f4a00;--critical:#c4001a;
+ --status-ok-fg:#14532d;--status-ok-bg:#dcfce7;
+ --status-warn-fg:#713f12;--status-warn-bg:#fef3c7;
+ --status-error-fg:#991b1b;--status-error-bg:#fee2e2;
+ --status-info-fg:#1e3a8a;--status-info-bg:#dbeafe;
+ --status-unknown-fg:#334155;--status-unknown-bg:#e2e8f0;
+ --focus-ring:var(--accent);
  --font:-apple-system,"SF Pro Text","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
  --fs-large-title:2.125rem;--fs-title1:1.75rem;--fs-title2:1.375rem;--fs-headline:1.0625rem;--fs-body:1.0625rem;--fs-callout:1rem;--fs-subhead:.9375rem;--fs-footnote:.8125rem;--fs-caption:.75rem;
- --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-7:32px;--sp-8:44px;--sp-9:64px;
+ --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-6:24px;--space-8:32px;
+ --sp-1:var(--space-1);--sp-2:var(--space-2);--sp-3:var(--space-3);--sp-4:var(--space-4);--sp-5:20px;--sp-6:var(--space-6);--sp-7:var(--space-8);--sp-8:44px;--sp-9:64px;
+ --page-padding:32px;--section-gap:var(--space-8);--panel-gap:var(--space-6);--card-padding:var(--space-6);
  --control-height:44px;--control-pad-block:10px;--control-pad-inline:var(--sp-4);--button-pad-inline:var(--sp-5);
- --radius-s:8px;--radius-m:12px;--radius-l:18px;--radius-pill:999px;
+ --radius-s:8px;--radius-m:12px;--radius-l:var(--radius-card);--radius-pill:999px;--radius-control:12px;--radius-dialog:24px;
  /* legacy aliases for screens not yet migrated */
  --scrim:rgb(0 0 0/.4);--shadow-sm:0 1px 4px #0000000d;--shadow-lg:0 12px 40px #00000026;--accent-dark:var(--accent-hover);--accent-soft:color-mix(in srgb,var(--accent) 10%,var(--surface));--line:var(--sep);--muted:var(--label-2);--text-secondary:var(--label-2);--green:var(--positive);--amber:var(--warning);--red:var(--critical);
  --dur-fast:120ms;--dur-base:220ms;--dur-slow:360ms;--ease:cubic-bezier(.25,.1,.25,1);
 }
+:root{
+ --glass-fill:var(--glass-fill-a);--glass-fill-strong:var(--glass-fill-strong-a);--glass-bar-fill:var(--glass-bar-fill-a);
+}
+@media(max-width:767px){:root{--page-padding:16px;--card-padding:var(--space-4);--section-gap:var(--space-6)}}
 :root[data-text=s]{--text-scale:.9}
 :root[data-text=l]{--text-scale:1.125}
 :root[data-text=xl]{--text-scale:1.25}
@@ -25,24 +43,43 @@ html{font-size:calc(100% * var(--text-scale))}
 :root[data-theme=dark]{
  color-scheme:dark;
  --shadow-sm:0 1px 4px #0006;--shadow-lg:0 12px 40px #000a;
- --bg:#0a0a0a;--surface:#1a1a1a;--surface-2:#2c2c2e;
- --label:#f5f5f7;--label-2:#a1a1a6;--sep:#ffffff1a;--separator:#ffffff1a;
- --accent:#5ea3e0;--accent-hover:#7bb5e8;--on-accent:#04213b;--accent-fill:#5ea3e026;
- --glass-fill:rgb(28 28 30/.68);--glass-bar-fill:rgb(10 10 10/.78);--glass-border:#ffffff1a;--glass-highlight:inset 0 1px 0 rgb(255 255 255/.08);--glass-shadow:0 4px 20px #0006;
- --bg-tint:radial-gradient(60rem 40rem at 10% -10%,#5ea3e01f,transparent 70%),radial-gradient(50rem 36rem at 100% 0,#5ea3e014,transparent 70%);
- --positive:#30d158;--warning:#ff9f0a;--critical:#ff453a;
+ --bg:#101820;--surface:#18232e;--surface-2:#223140;
+ --label:#f1f5f9;--label-2:#cbd5e1;--sep:#ffffff24;--separator:#ffffff24;
+ --accent:#b8d8ff;--accent-hover:#d3e6ff;--on-accent:#102c49;--accent-fill:#b8d8ff26;
+ --glass-fill-a:rgb(24 35 46/.66);--glass-fill-strong-a:rgb(24 35 46/.9);--glass-bar-fill-a:rgb(16 24 32/.76);
+ --glass-fill-solid:#18232e;--glass-bar-fill-solid:#101820;
+ --glass-border:rgb(255 255 255/.14);--glass-border-strong:rgb(255 255 255/.26);
+ --glass-highlight:inset 0 1px 0 rgb(255 255 255/.1);
+ --glass-shadow:0 1px 2px rgb(0 0 0/.3),0 8px 24px rgb(0 0 0/.28);
+ --glass-shadow-raised:0 2px 4px rgb(0 0 0/.34),0 14px 32px rgb(0 0 0/.4);
+ --bg-tint:radial-gradient(56rem 36rem at 6% -8%,rgb(94 163 224/.16),transparent 70%),radial-gradient(48rem 34rem at 104% 2%,rgb(20 184 166/.1),transparent 70%),radial-gradient(60rem 40rem at 50% 112%,rgb(129 120 235/.1),transparent 70%);
+ --positive:#4ade80;--warning:#fbbf24;--critical:#ff7a70;
+ --focus-ring:#b8d8ff;
 }
 @media(prefers-color-scheme:dark){
  :root:not([data-theme=light]):not([data-theme=dark]){
   color-scheme:dark;
   --shadow-sm:0 1px 4px #0006;--shadow-lg:0 12px 40px #000a;
-  --bg:#0a0a0a;--surface:#1a1a1a;--surface-2:#2c2c2e;
-  --label:#f5f5f7;--label-2:#a1a1a6;--sep:#ffffff1a;--separator:#ffffff1a;
-  --accent:#5ea3e0;--accent-hover:#7bb5e8;--on-accent:#04213b;--accent-fill:#5ea3e026;
-  --glass-fill:rgb(28 28 30/.68);--glass-bar-fill:rgb(10 10 10/.78);--glass-border:#ffffff1a;--glass-highlight:inset 0 1px 0 rgb(255 255 255/.08);--glass-shadow:0 4px 20px #0006;
-  --bg-tint:radial-gradient(60rem 40rem at 10% -10%,#5ea3e01f,transparent 70%),radial-gradient(50rem 36rem at 100% 0,#5ea3e014,transparent 70%);
-  --positive:#30d158;--warning:#ff9f0a;--critical:#ff453a;
+  --bg:#101820;--surface:#18232e;--surface-2:#223140;
+  --label:#f1f5f9;--label-2:#cbd5e1;--sep:#ffffff24;--separator:#ffffff24;
+  --accent:#b8d8ff;--accent-hover:#d3e6ff;--on-accent:#102c49;--accent-fill:#b8d8ff26;
+  --glass-fill-a:rgb(24 35 46/.66);--glass-fill-strong-a:rgb(24 35 46/.9);--glass-bar-fill-a:rgb(16 24 32/.76);
+  --glass-fill-solid:#18232e;--glass-bar-fill-solid:#101820;
+  --glass-border:rgb(255 255 255/.14);--glass-border-strong:rgb(255 255 255/.26);
+  --glass-highlight:inset 0 1px 0 rgb(255 255 255/.1);
+  --glass-shadow:0 1px 2px rgb(0 0 0/.3),0 8px 24px rgb(0 0 0/.28);
+  --glass-shadow-raised:0 2px 4px rgb(0 0 0/.34),0 14px 32px rgb(0 0 0/.4);
+  --bg-tint:radial-gradient(56rem 36rem at 6% -8%,rgb(94 163 224/.16),transparent 70%),radial-gradient(48rem 34rem at 104% 2%,rgb(20 184 166/.1),transparent 70%),radial-gradient(60rem 40rem at 50% 112%,rgb(129 120 235/.1),transparent 70%);
+  --positive:#4ade80;--warning:#fbbf24;--critical:#ff7a70;
+  --focus-ring:#b8d8ff;
  }
+}
+/* Without blur support or with reduced transparency, glass becomes a solid surface with the same border and hierarchy. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+ :root{--glass-fill:var(--glass-fill-solid);--glass-fill-strong:var(--glass-fill-solid);--glass-bar-fill:var(--glass-bar-fill-solid);--glass-blur:none;--glass-bar-blur:none}
+}
+@media(prefers-reduced-transparency:reduce){
+ :root{--glass-fill:var(--glass-fill-solid);--glass-fill-strong:var(--glass-fill-solid);--glass-bar-fill:var(--glass-bar-fill-solid);--glass-blur:none;--glass-bar-blur:none}
 }
 @media(prefers-reduced-motion:reduce){:root{--dur-fast:0ms;--dur-base:0ms;--dur-slow:0ms}}
 .appearance-control{display:flex;flex-wrap:wrap;gap:var(--sp-4) var(--sp-7);margin-bottom:var(--sp-6)}
