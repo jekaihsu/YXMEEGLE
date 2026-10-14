@@ -539,3 +539,23 @@ def test_cancelled_future_releases_refresh_capacity(harness):
     assert c.ensure('lark-third', 'sources')['status'] == 'refreshing'
     for future in executor.jobs:
         future.cancel()
+
+
+@pytest.mark.parametrize('wrapped',[False,True])
+def test_missing_permission_preserves_last_good_and_scope_names(harness,wrapped):
+    from fastapi import HTTPException
+    from .live_read.client import ReadNeedsPermission
+    h=harness;c=h.make()
+    assert c.ensure(h.wid,'roster')['status']=='fresh'
+    def missing(wid):
+        try: raise ReadNeedsPermission(['bitable:app:readonly'])
+        except ReadNeedsPermission as exc:
+            if wrapped: raise HTTPException(502,'Company roster read failed') from exc
+            raise
+    h.readers['roster']=missing
+    c.ensure(h.wid,'roster',force=True)
+    state=c.status(h.wid)['datasets']['roster']
+    assert state['status']=='needs-permission'
+    assert state['missing_scopes']==['bitable:app:readonly']
+    assert state['as_of']=='2026-10-07T10:00:00+08:00'
+    assert state['last_error']=='Lark refresh failed'

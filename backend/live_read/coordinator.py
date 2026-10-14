@@ -14,7 +14,7 @@ from sqlalchemy import update, event
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlalchemy.exc import IntegrityError
 
-from .client import ReadBlocked
+from .client import ReadBlocked, ReadNeedsPermission
 from .config import LiveReadConfig
 from .status import DATASETS, TAIPEI, freshness, timestamp, ttl_seconds
 
@@ -202,7 +202,7 @@ class RefreshCoordinator:
             data = dict(claimed, as_of=started.isoformat(), fetched_at=result.get('fetched_at', finished),
                         fingerprint=fingerprint, changed_at=finished if changed else claimed.get('changed_at'),
                         lark=result.get('lark') or dict(calls=0, retries=0, duration_ms=int((monotonic()-began)*1000)),
-                        last_error=None, error_at=None, error_code=None, lease_until=None, revision=str(uuid4()))
+                        last_error=None, error_at=None, error_code=None, missing_scopes=[], lease_until=None, revision=str(uuid4()))
             if not self._replace(key, claimed['revision'], data):
                 raise LeaseLost('Live-read lease ownership lost')
         except Exception as exc:
@@ -210,8 +210,12 @@ class RefreshCoordinator:
             # publish under this claim, even if the callable ignored its fence.
             if lost.is_set() or monotonic() >= deadline or self._now() >= horizon:
                 exc = LeaseLost('Live-read lease ownership lost')
+            cause=exc
+            while cause.__cause__ is not None:
+                cause=cause.__cause__
+            permission=cause if isinstance(cause,ReadNeedsPermission) else None
             blocked = isinstance(exc, ReadBlocked) or (isinstance(exc, HTTPException) and exc.status_code == 403)
-            error_code = 'ReadBlocked' if blocked else type(exc).__name__
+            error_code = 'ReadNeedsPermission' if permission else 'ReadBlocked' if blocked else type(exc).__name__
             detail = exc.detail if isinstance(exc, HTTPException) and isinstance(exc.detail, str) else ''
             logger.warning('Live-read refresh failed: dataset=%s %s status=%s detail=%s duration_ms=%d',
                            dataset, error_code, getattr(exc, 'status_code', None), detail[:160],
@@ -219,7 +223,7 @@ class RefreshCoordinator:
             if not isinstance(exc, LeaseLost):
                 if not self._replace(key, claimed['revision'], dict(claimed, lease_until=None,
                                     revision=str(uuid4()), last_error='Lark refresh failed',
-                                    error_code=error_code, error_at=self._now().isoformat())):
+                                    error_code=error_code, missing_scopes=permission.missing_scopes if permission else [], error_at=self._now().isoformat())):
                     logger.warning('Live-read lease ownership lost while recording failure')
             raise exc
 
@@ -318,6 +322,8 @@ class RefreshCoordinator:
                         raise TimeoutError('Live-read refresh timed out')
                     sleep(min(0.2, max(0, deadline-monotonic())))
             final = self._dataset_status(dataset, self._read(key))
+            if final['status'] == 'needs-permission':
+                raise ReadNeedsPermission(final.get('missing_scopes',[]))
             if final['status'] == 'blocked':
                 raise ReadBlocked('Lark authorization or resource access denied')
             if final['status'] == 'error':

@@ -14,8 +14,8 @@ export interface DataFreshnessProps {
   refresh:()=>boolean|void|Promise<boolean|void>;
 }
 const names=datasetNames;
-export const statusNames={fresh:'已讀取',stale:'資料待更新',refreshing:'更新中',never:'尚未讀取',error:'讀取失敗',blocked:'權限不足',unconfigured:'尚未設定'};
-const priority=['blocked','error','refreshing','never','stale','fresh','unconfigured'] as const;
+export const statusNames={fresh:'已讀取',stale:'資料待更新',refreshing:'更新中',never:'尚未讀取',error:'讀取失敗','needs-permission':'需要權限',blocked:'權限不足',unconfigured:'尚未設定'};
+const priority=['needs-permission','blocked','error','refreshing','never','stale','fresh','unconfigured'] as const;
 export const time=(value:string|null)=>taipeiTime(value);
 
 export function DataFreshness({freshness,syncedAt,demo=false,mutationActive=false,dirtyDraft=false,refresh,onFreshness}:DataFreshnessProps){
@@ -68,15 +68,16 @@ export function DataFreshness({freshness,syncedAt,demo=false,mutationActive=fals
   if(state==='refreshing')label='更新中…';
   if(state==='never')label=`正在讀取 Lark ${names[deciding[0]?.[0]||'sources']}…`;
   if(state==='error')label=`${deciding.map(([key])=>names[key]).join('、')}：Lark 暫時無法讀取，${ageText}`;
+  if(state==='needs-permission')label=`需要權限：${[...new Set(deciding.flatMap(([,d])=>d.missing_scopes||[]))].join('、')||'尚待核對'} · ${ageText}`;
   if(state==='blocked')label=`${deciding.map(([key])=>names[key]).join('、')}：Lark 權限不足（1254302），請聯絡管理員`;
-  const color=state==='error'||state==='blocked'?'var(--critical)':state==='stale'?'var(--critical)':'var(--label-2)';
+  const color=state==='error'||state==='blocked'||state==='needs-permission'?'var(--critical)':state==='stale'?'var(--critical)':'var(--label-2)';
   const details=legacy?(dataAt?`資料時間 ${time(dataAt.as_of)}（已儲存的工作區資料，並非即時讀取） · 資料時間距今 ${dataAt.age_seconds==null?'—':Math.floor(dataAt.age_seconds)} 秒`:''):entries.map(([key,d])=>`${names[key]}：讀取驗證 ${time(d.as_of)} · 距今 ${d.age_seconds??'—'} 秒 · 有效 ${d.ttl_seconds} 秒`).join('\n');
   return <div className={`data-freshness freshness-view data-freshness-${state}`} data-state={state}>
     <span role="status" aria-live="polite" title={details} style={{color}}>
       {state==='refreshing'?<span className="spin" aria-hidden="true">◌ </span>:null}{state==='fresh'||state==='stale'||state==='error'?<><span aria-hidden="true">{label}</span><span className="sr-only">{state==='fresh'?'Lark 資料已讀取':state==='stale'?'Lark 資料待更新':`${deciding.map(([key])=>names[key]).join('、')}：Lark 暫時無法讀取，顯示先前資料`}</span></>:label}
       {requestError?<span> · {requestError}</span>:null}
     </span>
-    {!demo&&active?<details className="freshness-details"><summary>資料讀取詳情</summary><ul className="glass--flat">{entries.map(([key,d])=><li key={key}>{names[key]}：讀取驗證 {time(d.as_of)} · {d.age_seconds==null?'時間未知':`距今 ${Math.floor(d.age_seconds)} 秒`} · 有效時間 {d.ttl_seconds} 秒 · {statusNames[d.status]}</li>)}</ul></details>:null}
+    {!demo&&active?<details className="freshness-details"><summary>資料讀取詳情</summary><ul className="glass--flat">{entries.map(([key,d])=><li key={key}>{names[key]}：讀取驗證 {time(d.as_of)} · {d.age_seconds==null?'時間未知':`距今 ${Math.floor(d.age_seconds)} 秒`} · 有效時間 {d.ttl_seconds} 秒 · {statusNames[d.status]}{d.status==='needs-permission'?` · ${d.missing_scopes?.join('、')||'尚待核對'}`:''}</li>)}</ul></details>:null}
     {active?<button type="button" className="ds-button" data-variant="plain" onClick={reread} disabled={busy} aria-busy={busy}>{busy?'讀取中…':state==='error'?'重試':'重新整理'}</button>:null}
   </div>;
 }

@@ -390,3 +390,16 @@ def test_custom_allowlist_cannot_broaden_boundary_or_use_traversal(method, path)
 def test_budget_is_configurable_and_bounded_by_lease(env, expected):
     with LiveLarkClient(env, transport=httpx.MockTransport(lambda r: httpx.Response(200)), clock=lambda: 0) as client:
         assert client.deadline == expected
+
+
+@pytest.mark.parametrize('status',[200,403])
+def test_missing_scopes_have_explicit_safe_permission_state(status):
+    from .live_read.client import ReadNeedsPermission
+    _,handler=responses([httpx.Response(status,json={'code':99991672,
+        'msg':'missing [attendance:task:readonly] private upstream text',
+        'error':{'permission_violations':[{'subject':'contact:user.employee_id:readonly'},
+            {'subject':'private@example.test'}]}})])
+    with make_client(handler) as client, pytest.raises(ReadNeedsPermission) as caught:
+        client.request('GET',PATH)
+    assert caught.value.missing_scopes==['attendance:task:readonly','contact:user.employee_id:readonly']
+    assert str(caught.value)=='Lark application needs permission'

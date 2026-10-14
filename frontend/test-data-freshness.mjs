@@ -28,7 +28,7 @@ const render=(data,props={})=>flush(()=>root.render(React.createElement(DataFres
 const text=()=>document.querySelector('[role="status"]').textContent;
 let checks=0;const ok=(condition,message)=>{assert.ok(condition,message);checks++};
 try{
-  for(const [state,label] of Object.entries({fresh:'10:02:11',stale:'資料待更新',refreshing:'更新中',error:'Lark 暫時無法讀取',blocked:'Lark 權限不足（1254302）',unconfigured:'尚未設定',never:'正在讀取 Lark 來源…'})){
+  for(const [state,label] of Object.entries({fresh:'10:02:11',stale:'資料待更新',refreshing:'更新中',error:'Lark 暫時無法讀取',blocked:'Lark 權限不足（1254302）','needs-permission':'需要權限',unconfigured:'尚未設定',never:'正在讀取 Lark 來源…'})){
     const data=freshness(state);for(const d of Object.values(data.datasets))d.status=state;
     await render(data);
     ok(document.querySelector('.data-freshness').dataset.state===state&&text().includes(label),`${state} renders`);
@@ -61,5 +61,12 @@ try{
   }
   globalThis.fetch=fetchMock;await liveStatus();ok(requests.at(-1).url==='/api/live/status','explicit status helper remains available');
   await liveRefresh(['sources'],true);assert.deepEqual(JSON.parse(requests.at(-1).init.body),{datasets:['sources'],wait:true,force:false});checks++;
+  response=freshness('needs-permission');response.datasets.sources.missing_scopes=['attendance:task:readonly'];
+  globalThis.fetch=fetchMock;
+  assert.deepEqual((await liveStatus()).freshness.datasets.sources.missing_scopes,['attendance:task:readonly']);checks++;
+  await render(response);
+  ok(text().includes('attendance:task:readonly'),'missing scope names render without breaking the page');
+  globalThis.fetch=async()=>new Response(JSON.stringify({freshness:response}),{status:202});
+  assert.equal((await liveRefresh(['sources'])).freshness.datasets.sources.status,'needs-permission');checks++;
   console.log(`Data freshness: ${checks} checks passed`);
 }finally{await flush(()=>root.unmount());clock.restore();dom.window.close()}

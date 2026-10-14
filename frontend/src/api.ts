@@ -66,7 +66,7 @@ export const readRoute=()=>parseRoute(location.hash);
 type LiveResult={freshness:import('./types').Freshness};
 async function checkedLive(request:Promise<LiveResult>):Promise<LiveResult>{
  const result=await request;const value=result.freshness;
- const statuses=['fresh','stale','refreshing','error','blocked','unconfigured','never'];
+ const statuses=['fresh','stale','refreshing','error','blocked','needs-permission','unconfigured','never'];
  if(!value||!Number.isFinite(Date.parse(value.server_time))||typeof value.enabled!=='boolean'||!['sources','roster','attendance'].every(key=>{
   const d=value.datasets?.[key as import('./types').LiveDataset];
   return d&&statuses.includes(d.status)&&Number.isFinite(d.ttl_seconds)&&d.ttl_seconds>0&&(d.age_seconds===null||Number.isFinite(d.age_seconds));
@@ -79,7 +79,7 @@ export function liveRefresh(datasets:import('./types').LiveDataset[],wait=false,
  return checkedLive(api<LiveResult>('/api/live/refresh',{signal,timeoutMs:120000,method:'POST',body:JSON.stringify({datasets,wait,force:false})},()=>true,value=>{status=value})).then(result=>{
   if(status!==202)return result;
   // Accepted work is still in flight, even if the response includes an older fresh snapshot.
-  return {...result,freshness:{...result.freshness,datasets:Object.fromEntries(Object.entries(result.freshness.datasets).map(([key,d])=>[key,{...d,status:datasets.includes(key as import('./types').LiveDataset)&&!['error','blocked','unconfigured'].includes(d.status)?'refreshing':d.status}])) as import('./types').Freshness['datasets']}};
+  return {...result,freshness:{...result.freshness,datasets:Object.fromEntries(Object.entries(result.freshness.datasets).map(([key,d])=>[key,{...d,status:datasets.includes(key as import('./types').LiveDataset)&&!['error','blocked','needs-permission','unconfigured'].includes(d.status)?'refreshing':d.status}])) as import('./types').Freshness['datasets']}};
  });
 }
 

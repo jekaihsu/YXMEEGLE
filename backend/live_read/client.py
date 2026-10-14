@@ -31,6 +31,12 @@ class ReadBlocked(ReadFailure):
     status = 'blocked'
 
 
+class ReadNeedsPermission(ReadBlocked):
+    def __init__(self, scopes, **kwargs):
+        super().__init__('Lark application needs permission', **kwargs)
+        self.missing_scopes = sorted(set(scopes))
+
+
 class LiveLarkClient:
     def __init__(self, cfg, transport=None, *, clock=time.monotonic, sleep=time.sleep,
                  token_cache=None, bucket=None, allowed_posts=ALLOWED_POSTS):
@@ -132,6 +138,18 @@ class LiveLarkClient:
                 renewed = True
                 self.retries += 1
                 continue
+            if code == 99991672:
+                violations=(body.get('error') or {}).get('permission_violations') or []
+                candidates=[v.get('subject','') for v in violations if isinstance(v,dict)]
+                candidates+=re.findall(r'[a-z][a-z0-9_.]*(?::[a-z][a-z0-9_.]*)+',str(body.get('msg','')))
+                scopes=[v for v in candidates if isinstance(v,str) and re.fullmatch(
+                    r'[a-z][a-z0-9_.]*(?::[a-z][a-z0-9_.]*)+',v)]
+                if not scopes:
+                    scopes=(['bitable:app:readonly'] if '/bitable/' in path else
+                            ['contact:contact.base:readonly','contact:user.employee_id:readonly'] if '/contact/' in path else
+                            ['attendance:rule:readonly' if '/shifts/' in path else 'attendance:task:readonly'] if '/attendance/' in path else [])
+                raise ReadNeedsPermission(scopes, upstream_status=response.status_code,
+                                          lark_code=code, kind='needs-permission')
             if code == 1254302 or (response.status_code in (401, 403) and not invalid_token):
                 raise ReadBlocked('Lark authorization or resource access denied', upstream_status=response.status_code,
                                   lark_code=code, kind='permission_denied')

@@ -2,7 +2,8 @@ import type {SourceLifecycle} from './sourceLifecycle';
 export type LiveDataset = 'sources'|'roster'|'attendance';
 export interface DatasetFreshness {
   as_of:string|null; fetched_at:string|null; age_seconds:number|null; ttl_seconds:number;
-  status:'fresh'|'stale'|'refreshing'|'error'|'blocked'|'unconfigured'|'never';
+  status:'fresh'|'stale'|'refreshing'|'error'|'blocked'|'needs-permission'|'unconfigured'|'never';
+  missing_scopes?:string[];
   fingerprint:string|null; changed_at:string|null; last_error:string|null;
   lark:{calls:number;retries:number;duration_ms:number}; hard_max_age_seconds?:number;
 }
