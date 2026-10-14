@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from datetime import datetime, timedelta
 from contextvars import ContextVar
 from inspect import signature
-from threading import Lock, BoundedSemaphore
+from threading import Lock, BoundedSemaphore, Event, Thread
 from time import monotonic, sleep
 from uuid import uuid4
 import logging
@@ -126,14 +126,20 @@ class RefreshCoordinator:
                        lease_until=(now + timedelta(seconds=self.config.lease_seconds)).isoformat())
         return claimed if self._replace(key, row.get('revision'), claimed) else None
 
-    def _fence(self, db, key, claimed):
+    def _fence(self, db, key, claimed, *, deadline=None, horizon=None):
         now = self._now()
+        remaining = self.config.lease_seconds
+        if deadline is not None:
+            remaining = min(remaining, deadline - monotonic(),
+                            (horizon - now).total_seconds())
+            if remaining <= 0:
+                raise LeaseLost('Live-read refresh budget exhausted')
         stmt = update(self.CacheRow).where(
             self.CacheRow.id == key,
             self.CacheRow.data['revision'].as_string() == claimed['revision'],
             self.CacheRow.data['lease_until'].as_string() > now.isoformat(),
         ).values(data=dict(claimed, lease_until=(now + timedelta(
-            seconds=self.config.lease_seconds)).isoformat()))
+            seconds=remaining)).isoformat()))
         # The update takes the lease-row write lock through the apply commit;
         # another owner cannot claim between the fence and workspace commit.
         with db.no_autoflush:
@@ -142,15 +148,50 @@ class RefreshCoordinator:
 
     def _refresh(self, wid, dataset, key, claimed, started):
         began = monotonic()
+        # Bound the read by the existing budget and allow at most one existing
+        # lease for apply/import, measured from the claim (not worker start).
+        horizon = started + timedelta(seconds=(self.config.budget_seconds
+                                               + self.config.lease_seconds))
+        deadline = began + max(0, (horizon - self._now()).total_seconds())
+        stopped, lost = Event(), Event()
+
+        def check_lease():
+            if lost.is_set() or monotonic() >= deadline or self._now() >= horizon:
+                raise LeaseLost('Live-read lease ownership lost')
+
+        def fence(db):
+            check_lease()
+            # Keep a full lease for normal commits, capped only at the shared
+            # horizon so a late commit cannot extend a stuck refresh forever.
+            self._fence(db, key, claimed, deadline=deadline, horizon=horizon)
+
+        def renew():
+            interval = self.config.lease_seconds / 3
+            while not stopped.wait(min(interval, max(0, deadline - monotonic()))):
+                try:
+                    # The refresh's ContextVar is not inherited by this thread;
+                    # its own commit therefore cannot recursively run the fence.
+                    with self.Session.begin() as db:
+                        check_lease()
+                        self._fence(db, key, claimed, deadline=deadline, horizon=horizon)
+                except Exception:
+                    lost.set()
+                    return
+
+        renewal = Thread(target=renew, name=f'live-read-lease:{key}', daemon=True)
         try:
             refresher = self.refreshers[dataset]
-            fence = lambda db: self._fence(db, key, claimed)
             context = _active_fence.set(fence)
             try:
+                renewal.start()
                 options = {'fence': fence} if 'fence' in signature(refresher).parameters else {}
                 result = refresher(wid, **options)
             finally:
+                stopped.set()
+                if renewal.ident is not None:
+                    renewal.join()
                 _active_fence.reset(context)
+            check_lease()
             finished = self._now().isoformat()
             fingerprint = result['fingerprint']
             changed = fingerprint != claimed.get('fingerprint')
@@ -161,6 +202,10 @@ class RefreshCoordinator:
             if not self._replace(key, claimed['revision'], data):
                 raise LeaseLost('Live-read lease ownership lost')
         except Exception as exc:
+            # Once renewal fails, no later success or failure transaction may
+            # publish under this claim, even if the callable ignored its fence.
+            if lost.is_set() or monotonic() >= deadline or self._now() >= horizon:
+                exc = LeaseLost('Live-read lease ownership lost')
             blocked = isinstance(exc, ReadBlocked) or (isinstance(exc, HTTPException) and exc.status_code == 403)
             error_code = 'ReadBlocked' if blocked else type(exc).__name__
             detail = exc.detail if isinstance(exc, HTTPException) and isinstance(exc.detail, str) else ''
@@ -172,7 +217,7 @@ class RefreshCoordinator:
                                     revision=str(uuid4()), last_error='Lark refresh failed',
                                     error_code=error_code, error_at=self._now().isoformat())):
                     logger.warning('Live-read lease ownership lost while recording failure')
-            raise
+            raise exc
 
     def close(self):
         self.executor.shutdown(wait=True)
