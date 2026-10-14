@@ -3,6 +3,9 @@ from fastapi import HTTPException
 from copy import deepcopy
 from datetime import datetime,timezone
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 from .workflow import require
 from .business_policy import refresh_business_authority
@@ -101,6 +104,7 @@ def require_access(person,app_id,*,allow_recovery=False,now=None,cfg=None,tenant
         exc = HTTPException(403, '公司名冊已逾15分鐘未核實，請由維運管理員恢復同步' if verified
                             else '尚未核實在職名冊或帳號已停用')
         exc.code = 'access_roster_expired' if verified else 'access_not_admitted'
+        logger.info('access_denied', extra={'event': 'access_denied', 'denial_code': exc.code})
         raise exc
     return mode
 

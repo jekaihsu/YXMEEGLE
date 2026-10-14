@@ -109,3 +109,17 @@ def test_json_callers_get_503_when_unavailable_and_403_when_fresh_absent(tmp_pat
     app3, _ = production_client(tmp_path / 'c'); stale(app3, active=False)
     _, r = login(app3, monkeypatch, headers=JSON, refresh=unavailable)
     assert r.status_code == 403 and '停權' in r.json()['detail']
+
+
+def test_diagnostic_logs_are_identity_free(tmp_path, monkeypatch, caplog):
+    import logging
+    app, _ = production_client(tmp_path); stale(app, role='member', authz_version=1)
+    with caplog.at_level(logging.INFO):
+        _, response = login(app, monkeypatch, refresh=unavailable)
+    assert response.status_code == 303
+    records = [r for r in caplog.records if getattr(r, 'event', None)]
+    wait = next(r for r in records if r.event == 'oauth_roster_wait')
+    assert wait.result_class == 'RuntimeError' and wait.duration_ms >= 0
+    assert next(r for r in records if r.event == 'access_denied').denial_code == 'access_roster_expired'
+    assert 'u-manager' not in str([r.__dict__ for r in records])
+    assert 'Synthetic' not in str([r.__dict__ for r in records])

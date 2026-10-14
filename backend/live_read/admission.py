@@ -1,5 +1,9 @@
 """Roster freshness trigger; callers retain the existing access policy."""
 from datetime import datetime, timezone
+from time import perf_counter
+import logging
+
+logger = logging.getLogger(__name__)
 
 from ..production_access import roster_age_seconds
 from .config import LiveReadConfig
@@ -25,8 +29,17 @@ def ensure_roster_for_admission(coordinator, wid, person, *, now=None, callback=
     if age is not None and age < config.roster_ttl_seconds:
         return True
     wait = callback
+    started = perf_counter()
+    result_class = 'stale'
     try:
         result = coordinator.ensure(wid, 'roster', wait=wait, force=False)
-    except Exception:
+        result_class = 'fresh' if result.get('status') == 'fresh' else 'stale'
+    except Exception as exc:
+        result_class = type(exc).__name__
         return not wait
+    finally:
+        if callback:
+            logger.info('oauth_roster_wait', extra={'event': 'oauth_roster_wait',
+                        'duration_ms': round((perf_counter()-started)*1000, 2),
+                        'result_class': result_class})
     return not wait or result.get('status') == 'fresh'
