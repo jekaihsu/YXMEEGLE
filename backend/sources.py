@@ -87,13 +87,21 @@ def _fetch_sources(token,cfg=None,client=None, *, scope=None):
                         try:
                             if context:
                                 with context['lock']: context['calls'] += 1
-                            response = client.request(method, url, timeout=min(settings.request_timeout_seconds, max(.001, deadline - time.monotonic())), **kwargs)
+                            if method == 'GET' and not hasattr(client, 'request'):
+                                response = client.get(url, **kwargs)
+                            else:
+                                response = client.request(method, url, timeout=min(settings.request_timeout_seconds, max(.001, deadline - time.monotonic())), **kwargs)
                         finally:
                             read_slots.release()
                         if time.monotonic() >= deadline: raise BudgetExceeded('Lark read budget exhausted')
-                        code = response.json().get('code', 0)
+                        try:
+                            body = response.json()
+                        except ValueError:
+                            body = {}
+                        if not isinstance(body, dict): raise ValueError('Lark response is incomplete')
+                        code = body.get('code', 0)
                         if response.status_code in (401, 403) or code in (1254302, 99991672):
-                            raise HTTPException(403, 'Lark 來源存取權限已失效')
+                            raise HTTPException(403, f'Lark 來源存取權限已失效（{code}）')
                         if response.status_code != 429 and response.status_code < 500 and code not in RETRY_CODES:
                             return response
                         delay = RetryPolicy.after(response, attempt, jitter=True)

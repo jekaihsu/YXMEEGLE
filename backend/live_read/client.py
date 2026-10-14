@@ -182,7 +182,7 @@ class LiveLarkClient:
                                   lark_code=code, kind='permission_denied')
             if retryable and attempt < RetryPolicy.max_attempts:
                 delay = RetryPolicy.after(response, attempt, jitter=self.config.enabled)
-                if response.status_code == 429 or code == 99991400:
+                if response.status_code == 429 or code in RETRY_CODES:
                     delay = max(1, delay)
                     self.bucket.penalize(self.clock() + delay)
                 if self.clock() + delay >= self.deadline:

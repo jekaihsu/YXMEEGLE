@@ -155,8 +155,7 @@ class RefreshCoordinator:
 
     def _refresh(self, wid, dataset, key, claimed, started):
         began = monotonic()
-        # Bound the read by the existing budget and allow at most one existing
-        # lease for apply/import, measured from the claim (not worker start).
+        # Read deadlines and database apply leases protect different operations.
         horizon = started + timedelta(seconds=(self.config.dataset_budget(dataset)
                                                + self.config.lease_seconds))
         deadline = began + max(0, (horizon - self._now()).total_seconds())
@@ -189,7 +188,7 @@ class RefreshCoordinator:
                     # loss. Retry next tick; the commit fence remains authority.
                     logger.warning('%s', type(exc).__name__)
 
-        metrics = dict(deadline=began + self.config.dataset_budget(dataset), lock=Lock(),
+        metrics = dict(deadline=min(deadline, began + self.config.dataset_budget(dataset)), lock=Lock(),
                        calls=0, pages=0, records=0)
         budget_context = refresh_context.set(metrics)
         outcome = 'failed'
@@ -263,6 +262,9 @@ class RefreshCoordinator:
         if dataset not in DATASETS:
             raise ValueError('Unknown live-read dataset')
         deadline = monotonic() + (self.config.blocking_timeout_seconds if timeout is None else timeout)
+        parent = refresh_context.get()
+        if parent:
+            deadline = min(deadline, parent['deadline'])
         while True:
             try:
                 result = self._ensure_once(wid, dataset, wait=wait, force=force, deadline=deadline)

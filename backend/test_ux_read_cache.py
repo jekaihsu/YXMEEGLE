@@ -51,7 +51,7 @@ def test_scope_version_projection_filter_sort_and_view_isolate_snapshots():
              scope.key('table', sort=[{'field_name': 'name', 'desc': True}]), scope.key('table', view='view-b')]
     for i, key in enumerate(keys):
         cache.put(key, i)
-    assert [cache.get(key, lambda: -1).value for key in keys] == list(range(10))
+    assert [cache.get(key, lambda: -1).value for key in keys] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     assert scope.key('t', projection=['b', 'a']) == scope.key('t', projection=['a', 'b'])
 
 
@@ -193,6 +193,20 @@ def test_actual_upstream_permission_denial_clears_coordinator_snapshot(harness):
     c.ensure(h.wid, 'attendance', force=True)
     row = c._read(c._key(h.wid, 'attendance'))
     assert (row.get('snapshot'), row.get('fingerprint'), row['complete'], row['error_code']) == (None, None, False, 'ReadBlocked')
+
+
+
+def test_attendance_roster_dependency_inherits_short_total_deadline(harness):
+    h = harness
+    c = h.make()
+    c.config = replace(c.config, attendance_budget_seconds=.02)
+    c._claim(c._key(h.wid, 'roster'), c._now(), 'roster', False)
+    h.readers['attendance'] = lambda wid: c.ensure(wid, 'roster', wait=True, timeout=100)
+    began = time.monotonic()
+    with pytest.raises(TimeoutError, match='Live-read refresh timed out'):
+        c.ensure(h.wid, 'attendance', wait=True, timeout=1)
+    assert time.monotonic() - began < .5
+    assert c._read(c._key(h.wid, 'attendance'))['error_code'] == 'TimeoutError'
 
 
 def benchmark():
