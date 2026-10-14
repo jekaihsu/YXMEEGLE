@@ -4,6 +4,7 @@ import {getSessionEpoch} from './api';
 import {NODE_ASSIGNMENT_ORDER, overviewDetail, assignmentErrorMessage, assignmentsDisabled, fetchNodeAssignmentDetail, nodeStatusLabel, taskStatusLabel, taskStatusValue, TASK_STATUS_OPTIONS,
   type AssignmentNode, type AssignmentPerson, type AssignmentMutation, type NewAssignmentTask, type NodeAssignmentDetail, type NodeAssignmentError, type NodePermissions, type NodeAssignmentList} from './nodeAssignmentApi';
 import {useNodeAssignments} from './useNodeAssignments';
+import {Avatar} from './Avatar';
 import './NodeAssignments.css';
 
 const deadlineLabel = (value: string | null) => value ? value.slice(0, 10).replaceAll('-', '/') : '未排定';
@@ -14,7 +15,7 @@ function StatusChip({status}: {status: string}) {
   return <span className={`na-status na-status-${tone}`}>{label}</span>;
 }
 function People({people, compact = false}: {people: AssignmentPerson[]; compact?: boolean}) {
-  return <span className="na-people">{people.length ? (compact ? people.slice(0, 3) : people).map(p => <span className="na-person" key={p.open_id}><span className={`na-avatar na-person-color-${personColor(p.open_id)}`} aria-hidden="true">{p.name.slice(0, 1)}</span><span>{p.name}</span></span>) : <span className="na-muted">尚未指派</span>}{compact && people.length > 3 && <span className="na-muted">+{people.length - 3}</span>}</span>;
+  return <span className="na-people">{people.length ? (compact ? people.slice(0, 3) : people).map(p => <span className="na-person" key={p.open_id}><Avatar user={p} className={`na-avatar na-person-color-${personColor(p.open_id)}`}/><span>{p.name}</span></span>) : <span className="na-muted">尚未指派</span>}{compact && people.length > 3 && <span className="na-muted">+{people.length - 3}</span>}</span>;
 }
 const personColor = (id: string) => Array.from(id).reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0) % 6;
 const FLOW_LABELS: Record<string, string> = {sales: '業務', pm: 'PM', confirmation: '確認單', field: '外業', control: '控制', mapping: '圖資', report: '報告', pricing: '計價', settlement: '結算'};

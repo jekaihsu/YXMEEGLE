@@ -1,3 +1,4 @@
+import {Avatar} from './Avatar';
 import {useState} from 'react';
 import {Search,RefreshCw,Users,Plane,SlidersHorizontal} from 'lucide-react';
 import {useViewData,ViewSkeleton} from './viewData';
@@ -70,7 +71,7 @@ export function PeopleAttendancePanel({c}:{c:Context&{reloadVersion?:number}}){
   </section>
   <section className="people-surface" aria-labelledby="people-trips-title">
    <div className="people-section-heading"><div><h2 id="people-trips-title">本週出差／外出</h2><p>符合人員篩選的已讀取紀錄，不代表完整申請母體。</p></div><label>紀錄類型<select value={tripKind} onChange={event=>setTripKind(event.target.value)}><option value="">全部類型</option><option value="trip">出差</option><option value="out">外出</option></select></label></div>
-   {trips.length?<div className="people-table-scroll" role="region" aria-label="本週出差與外出紀錄，可左右捲動" tabIndex={0}><table className="data-table"><caption className="sr-only">本週出差與外出紀錄</caption><thead><tr>{['人員','組別','類型','起日','迄日'].map(title=><th scope="col" key={title}>{title}</th>)}</tr></thead><tbody>{trips.map((trip,index)=><tr key={`${trip.person_id}-${trip.kind}-${index}`}><th scope="row">{attendanceValue(trip.name)}</th><td>{attendanceValue(trip.group)}</td><td><span className="attendance-status attendance-away">{trip.kind==='trip'?'出差':'外出'}</span></td><td>{trip.start}</td><td>{trip.end}</td></tr>)}</tbody></table></div>:<p className="people-empty-note">{filtered?'目前篩選沒有出差／外出紀錄。':'目前快照沒有已讀取的出差／外出紀錄；不代表沒有申請。'}</p>}
+   {trips.length?<div className="people-table-scroll" role="region" aria-label="本週出差與外出紀錄，可左右捲動" tabIndex={0}><table className="data-table"><caption className="sr-only">本週出差與外出紀錄</caption><thead><tr>{['人員','組別','類型','起日','迄日'].map(title=><th scope="col" key={title}>{title}</th>)}</tr></thead><tbody>{trips.map((trip,index)=><tr key={`${trip.person_id}-${trip.kind}-${index}`}><th scope="row"><span className="person-cell"><Avatar small user={{name:trip.name??'未',avatar_url:view?.people.find(person=>person.id===trip.person_id)?.avatar_url}}/>{attendanceValue(trip.name)}</span></th><td>{attendanceValue(trip.group)}</td><td><span className="attendance-status attendance-away">{trip.kind==='trip'?'出差':'外出'}</span></td><td>{trip.start}</td><td>{trip.end}</td></tr>)}</tbody></table></div>:<p className="people-empty-note">{filtered?'目前篩選沒有出差／外出紀錄。':'目前快照沒有已讀取的出差／外出紀錄；不代表沒有申請。'}</p>}
   </section>
  </section>;
 }

@@ -6,6 +6,7 @@ import json
 import re
 from sqlalchemy import select, update
 
+from .avatar import avatar_url
 from . import storage
 from .workflow import require, now, event
 from .policy import upgrade
@@ -81,7 +82,8 @@ def fetch_directory(adapter, app_id):
         people.append({'id':ident,'name':name,'department':text(values.get(selected.get('department'))),
             'source_work_category':text(values.get(selected.get('work_category'))),
             'employment_status':employment,
-            'record_id':rid})
+            'record_id':rid,
+            **({'avatar_url': photo} if (photo := avatar_url(account.get('avatar_url'))) else {})})
     duplicates={ident for ident,count in account_counts.items() if count>1}
     for person in people:
         if person['id'] in duplicates: issues.append({'record_id':person['record_id'],'reason':'duplicate_account'})
@@ -109,6 +111,10 @@ def merge_directory(existing, snapshot):
                     '人員登入身分屬於另一應用，停止合併',409)
             stats['updated']+=1
         current['name']=person['name']; current['avatar']=person['name'][:1]
+        photo = avatar_url(person.get('avatar_url')) or avatar_url(current.get('avatar_url'))
+        current.pop('avatar_url', None)
+        if photo:
+            current['avatar_url'] = photo
         previous_category=current.get('source_work_category','')
         old_placeholder=f'來源內外勤：{previous_category}（待確認組別）' if previous_category else '待確認部門'
         category=person.get('source_work_category','')

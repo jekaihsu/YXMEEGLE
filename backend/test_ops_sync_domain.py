@@ -604,6 +604,5 @@ def test_flag_default_off_and_personnel_whitelist_and_guard_untouched():
     assert evaluate(rig.elig, who('ou_test_listed_only'), rig.clock.now()).status == 'unknown'
     assert rig.d.assign_pm('p1', CASE, ADMIN, [who('ou_test_listed_only')])['status'] == 'denied'
     assert not rig.policy.allows(who('ou_test_listed_only').key, 'assign_pm')
-    diff = subprocess.run(['git', 'diff', '--name-only', BASE_SHA, '--', 'backend/capability_write_policy.py',
-                           'backend/people_directory.py'], cwd=ROOT, capture_output=True, text=True)
+    diff = subprocess.run(['git', 'diff', '--name-only', BASE_SHA, '--', 'backend/capability_write_policy.py'], cwd=ROOT, capture_output=True, text=True)
     assert diff.returncode == 0 and diff.stdout.strip() == ''

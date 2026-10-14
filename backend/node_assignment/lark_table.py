@@ -16,6 +16,7 @@ from enum import Enum, StrEnum
 
 import httpx
 
+from ..avatar import avatar_url
 from ..lark_adapter import RemoteFailure
 from ..live_read.config import LiveReadConfig
 from ..live_read.rate_limit import RETRY_CODES, BudgetExceeded, RetryPolicy, process_bucket
@@ -102,9 +103,13 @@ def canon(kind, raw):
 class UserRef:
     open_id: str
     name: str
+    avatar_url: str | None = None
 
     def public(self):
-        return {'open_id': self.open_id, 'name': self.name}
+        result = {'open_id': self.open_id, 'name': self.name}
+        if self.avatar_url:
+            result['avatar_url'] = self.avatar_url
+        return result
 
 
 def users(raw):
@@ -114,7 +119,7 @@ def users(raw):
         if isinstance(item, dict):
             ident = item.get('id') or item.get('open_id')
             if isinstance(ident, str) and re.fullmatch(r'ou_[A-Za-z0-9]+', ident):
-                found.append(UserRef(ident, str(item.get('name') or '').strip()))
+                found.append(UserRef(ident, str(item.get('name') or '').strip(), avatar_url(item.get('avatar_url'))))
     return tuple(found)
 
 

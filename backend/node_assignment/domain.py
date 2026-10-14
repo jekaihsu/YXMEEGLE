@@ -190,6 +190,7 @@ class Person:
     departments: frozenset[str]
     rank: str | None
     employed: bool
+    avatar_url: str | None = None
 
     def member_of(self, key: NodeKey) -> bool:
         return self.employed and not self.departments.isdisjoint(NODE_DEPARTMENTS[key])
