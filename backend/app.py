@@ -214,7 +214,8 @@ def create_app(overrides=None):
 
     def public_origin(request):
         if cfg.get('APP_URL'): return cfg['APP_URL'].rstrip('/')
-        host=request.headers.get('x-forwarded-host') or request.headers.get('host')
+        require(not production,'Production Lark login requires APP_URL',503)
+        host=(request.headers.get('x-forwarded-host') or request.headers.get('host') or '').split(',')[0].strip()
         proto=request.headers.get('x-forwarded-proto',request.url.scheme).split(',')[0].strip()
         return f'{proto}://{host}' if host else str(request.base_url).rstrip('/')
 
@@ -1182,6 +1183,7 @@ def create_app(overrides=None):
     def lark_login(request:Request,next:str='/'):
         require(oauth_configured,'尚未設定 Lark 登入應用、回呼網址或租戶白名單',503)
         require(safe_next(next),'返回路徑不合法',422)
+        public_origin(request)  # Validate production configuration before creating a nonce.
         state=secrets.token_urlsafe(32)
         with sessions.begin() as db: db.add(AuthRow(id='oauth-'+state,data={'expires':datetime.now(timezone.utc).timestamp()+600,'next':next}))
         response=RedirectResponse('https://accounts.larksuite.com/open-apis/authen/v1/authorize?'+urlencode({'app_id':cfg['LARK_APP_ID'],'redirect_uri':cfg['LARK_REDIRECT_URI'],'state':state,'response_type':'code'}))
