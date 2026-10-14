@@ -19,6 +19,12 @@ for (const name of ['unknown', 'read_failed', 'forbidden', 'loading', 'unlocated
  assert.ok(tiles.every(t => t.asOf && t.href && t.state));
 }
 assert.equal(buildPmGlanceView(input(work({states: ['complete_empty'], count: 0}))).find(t => t.id === 'work').value, '0');
+const staleBody = {rows: [{id: 'awaiting-1', queue: 'awaiting_my_confirmation', ended: false}, {id: 'awaiting-2', queue: 'awaiting_my_confirmation', ended: false}], readState: {states: ['stale'], count: 2}, assignment: 'unassigned', canSeeAwaitingConfirmation: true};
+const staleQueues = input(buildMyWorkView(staleBody));
+staleQueues.awaiting = buildMyWorkView({...staleBody, filters: {mode: 'awaiting_my_confirmation'}});
+const staleTiles = buildPmGlanceView(staleQueues);
+assert.equal(staleTiles.find(t => t.id === 'work').value, '—', 'stale empty todo queue never inherits the combined population count');
+assert.equal(staleTiles.find(t => t.id === 'awaiting').value, '2');
 const unknown = buildPmGlanceView(input(work({states: ['unknown'], count: null})));
 for (const id of ['leave', 'trips', 'workload', 'overdue']) assert.equal(unknown.find(t => t.id === id).value, '—');
 for (const id of ['leave', 'trips']) assert.match(unknown.find(t => t.id === id).reason, /not available yet/);

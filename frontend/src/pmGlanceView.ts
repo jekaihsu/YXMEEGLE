@@ -36,7 +36,7 @@ export function buildPmGlanceView(input: {
  const {work, awaiting, overview, sources, confirmations} = input;
  const workTile = (view: MyWorkView, id: string, title: string): GlanceTile => {
   const state = tileState(view.pageState?.states);
-  return {id, title, state, value: countText(view.count, state), asOf: view.dataAsOfLabel === '資料日期 unknown' ? '資料日期 —' : view.dataAsOfLabel,
+  return {id, title, state, value: countText(state === 'stale' && view.rows.length === 0 ? null : view.count, state), asOf: view.dataAsOfLabel === '資料日期 unknown' ? '資料日期 —' : view.dataAsOfLabel,
    reason: view.pageStateLabel ?? (view.count === 0 ? '目前沒有待辦工作' : '完整讀取'), href: workHref(view.mode), reader: 'work'};
  };
  const overdue = overview.snapshot.cards.find(card => card.id === 'overdue_cases');
