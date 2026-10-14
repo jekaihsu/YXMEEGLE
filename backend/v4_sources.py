@@ -436,10 +436,14 @@ def import_v4(ws, records, complete_tables=None):
         dates={day(f.get(k),formula_serial=k in ('工作日期-薪資','工作日期-營業額明細')) for k in ('工作日期-薪資','工作日期-營業額明細','日期')}|{day(c.get(k)) for c in costfields for k in ('工作日期','出工日期','日期')}; dates.discard('')
         rawgroup=unique_value([text(f.get('組別'))]+[text(c.get('內業組別') or c.get('組別') or c.get('所屬組別')) for c in costfields])
         department=canonical_department(text(f.get('營業額組別-明細') or r.get('department')) or unique_value(text(x.get('工項類別')) for x in linked) or rawgroup)
-        people=[text(f.get('姓名') or f.get('填寫人') or f.get('人員'))]
-        for c in [f]+costfields:
-            for k in ('填報帳號','組長帳號-津貼自動化','組員帳號-津貼自動化'):
-                v=c.get(k); people.extend(text(x) for x in v) if isinstance(v,list) else people.append(text(v))
+        # 出工人 (組長＋組員) and 姓名 name who worked. The account fields are only the fallback: 填報帳號 is
+        # whoever created the cost row, and the 組員 user field omits crew without a Lark account.
+        crew=[n for n in (s.strip() for s in re.split('[,，、]',text(f.get('出工人')))) if n and not n.startswith('⚠')]
+        people=crew or [text(f.get('姓名') or f.get('填寫人') or f.get('人員'))]
+        if not any(people):
+            for c in [f]+costfields:
+                for k in ('填報帳號','組長帳號-津貼自動化','組員帳號-津貼自動化'):
+                    v=c.get(k); people.extend(text(x) for x in v) if isinstance(v,list) else people.append(text(v))
         entry=dict(id=ident,date=unique_value(dates),department=department,source_department=rawgroup,case_code=code,source_case_code=code,person='、'.join(dict.fromkeys(x for x in people if x)),description=text(f.get('工作內容') or f.get('工項說明') or f.get('本明細適用工項') or f.get('備註')) or '、'.join(text(x.get('工項名稱')) for x in linked),points=number(f.get('最終營業額點數') if f.get('最終營業額點數') is not None else f.get('營業額點數')),source_url=url(r),match_basis=basis,mapping_status='conflicting_dates' if len(dates)>1 else 'missing_date' if not dates else 'missing_department' if not department else 'provisional_case_code' if basis=='provisional_case_code' else 'ready',source_fields=deepcopy(f))
         entry['review']=daily_review(r,costfields)
         entry['source_identity']={k:r[k] for k in ('base_token','table_id','record_id')}
