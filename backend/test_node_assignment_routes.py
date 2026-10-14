@@ -794,3 +794,45 @@ def test_cold_detail_call_count_with_linked_task(h):
     view(h, key='sales')
     view(h)
     assert len(h.fake.requests) == 5
+
+
+@pytest.mark.parametrize('initial, revoked', [
+    ({'role': 'manager'}, {'role': 'member', 'manager_revoked': True}),
+    ({'role': 'member', 'capabilities': ['manage_roles']}, {'capabilities': []}),
+    ({'role': 'manager'}, {'active': False}),
+])
+def test_admin_demoted_during_case_read_cannot_assign(h, initial, revoked):
+    h.user_fields.update(initial)
+
+    def demote(_request):
+        h.user_fields.update(revoked)
+
+    h.fake.fault('POST', f'{NODES}/records/search', demote)
+    response = act(h, 'ou_admin', '/nodes/sales/assign',
+                   {'request_id': 'revoked-read', 'owner_open_ids': ['ou_sales']})
+    assert response.status_code == 403
+    assert response.json()['code'] == 'forbidden'
+    assert h.fake.writes() == []
+
+
+def test_admin_demoted_between_node_and_task_create_stops_second_write(h):
+    h.user_fields.update(role='manager')
+
+    def demote(_request):
+        h.user_fields.update(role='member', manager_revoked=True)
+
+    h.fake.fault('POST', f'{NODES}/records', demote)
+    body = {'request_id': 'revoked-create', 'title': 'Review', 'assignee_open_id': 'ou_sales'}
+    response = act(h, 'ou_admin', '/nodes/sales/tasks', body)
+    assert response.status_code == 403
+    assert response.json() == {
+        'detail': '操作權限已變更，部分寫入可能已完成；請以同一 request_id 重送以核對結果',
+        'code': 'forbidden', 'writes_started': True,
+    }
+    assert h.fake.writes() == [('POST', f'/open-apis/bitable/v1/apps/{BASE}/tables/{NODES}/records')]
+    assert h.fake.tables[TASKS] == {}
+    h.user_fields.update(role='manager', manager_revoked=False)
+    retried = act(h, 'ou_admin', '/nodes/sales/tasks', body)
+    assert retried.status_code == 200
+    assert len(h.fake.tables[NODES]) == 1
+    assert len(h.fake.tables[TASKS]) == 1
