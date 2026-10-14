@@ -174,9 +174,13 @@ class RefreshCoordinator:
                     with self.Session.begin() as db:
                         check_lease()
                         self._fence(db, key, claimed, deadline=deadline, horizon=horizon)
-                except Exception:
+                except LeaseLost:
                     lost.set()
                     return
+                except Exception as exc:
+                    # A transient database failure does not prove ownership
+                    # loss. Retry next tick; the commit fence remains authority.
+                    logger.warning('%s', type(exc).__name__)
 
         renewal = Thread(target=renew, name=f'live-read-lease:{key}', daemon=True)
         try:
@@ -202,7 +206,7 @@ class RefreshCoordinator:
             if not self._replace(key, claimed['revision'], data):
                 raise LeaseLost('Live-read lease ownership lost')
         except Exception as exc:
-            # Once renewal fails, no later success or failure transaction may
+            # Once ownership is lost, no later success or failure transaction may
             # publish under this claim, even if the callable ignored its fence.
             if lost.is_set() or monotonic() >= deadline or self._now() >= horizon:
                 exc = LeaseLost('Live-read lease ownership lost')

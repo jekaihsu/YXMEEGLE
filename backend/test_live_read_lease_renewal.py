@@ -6,6 +6,7 @@ from time import monotonic, sleep
 
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError, TimeoutError as PoolTimeout
 from sqlalchemy.orm import sessionmaker
 
 from .live_read.coordinator import LeaseLost, RefreshCoordinator
@@ -15,7 +16,7 @@ from .models import Base, CacheRow
 @pytest.fixture
 def coordinator(tmp_path):
     engine = create_engine(f'sqlite:///{tmp_path / "renewal.db"}',
-                           connect_args={'check_same_thread': False})
+                           connect_args={'check_same_thread': False, 'timeout': .2})
     Base.metadata.create_all(engine)
     c = RefreshCoordinator(sessionmaker(engine), CacheRow, {}, {})
     # Short synthetic durations; production config and its clamps are untouched.
@@ -84,14 +85,14 @@ def test_takeover_fences_old_owner_and_preserves_new_owner(coordinator):
     assert c._read('forbidden-old-result') == {}
 
 
-def test_failed_renewal_is_fatal_even_without_a_service_commit(coordinator, monkeypatch):
+def test_lost_renewal_is_fatal_even_without_a_service_commit(coordinator, monkeypatch):
     c = coordinator
     entered, release, failed = Event(), Event(), Event()
     original = c._fence
     def database_failure(db, key, claim, **options):
         if current_thread().name.startswith('live-read-lease:'):
             failed.set()
-            raise OSError('synthetic renewal database failure')
+            raise LeaseLost('synthetic ownership loss')
         return original(db, key, claim, **options)
     monkeypatch.setattr(c, '_fence', database_failure)
     def slow(wid):
@@ -107,6 +108,64 @@ def test_failed_renewal_is_fatal_even_without_a_service_commit(coordinator, monk
     with pytest.raises(LeaseLost):
         future.result(timeout=3)
     assert c._read(key) == claim
+    assert not any(t.name == f'live-read-lease:{key}' for t in threads())
+
+
+def test_apply_write_lock_does_not_lose_valid_lease(coordinator, caplog):
+    c = coordinator
+    c.config = replace(c.config, lease_seconds=.6, budget_seconds=.5)
+    def apply(wid):
+        sleep(.02)
+        with c.Session.begin() as db:
+            db.add(CacheRow(id='synthetic-lock-result', data={'value': 'committed'}))
+            db.flush()
+            sleep(.52)  # hold the write lock across the first renewal tick
+        return {'fingerprint': 'lock-success'}
+    key, _, future = start(c, apply)
+    future.result(timeout=3)
+    assert c._read('synthetic-lock-result') == {'value': 'committed'}
+    assert c._read(key)['fingerprint'] == 'lock-success'
+    assert c._read(key)['lease_until'] is None
+    assert [r.getMessage() for r in caplog.records] == ['OperationalError']
+
+
+@pytest.mark.parametrize('error', [
+    OSError('synthetic private database detail'),
+    PoolTimeout('synthetic private pool detail'),
+    OperationalError('synthetic private SQL', {}, Exception('private detail')),
+], ids=['os-error', 'pool-timeout', 'operational-error'])
+def test_transient_renewal_error_is_sanitized_and_retried(
+        coordinator, monkeypatch, caplog, error):
+    c = coordinator
+    c.config = replace(c.config, lease_seconds=.9)
+    original = c._fence
+    failed, renewed, release = Event(), Event(), Event()
+    def transient_failure(db, key, claim, **options):
+        if current_thread().name.startswith('live-read-lease:'):
+            if not failed.is_set():
+                failed.set()
+                raise error
+            result = original(db, key, claim, **options)
+            renewed.set()
+            return result
+        return original(db, key, claim, **options)
+    monkeypatch.setattr(c, '_fence', transient_failure)
+    def slow(wid):
+        assert release.wait(3)
+        with c.Session.begin() as db:
+            db.add(CacheRow(id='retry-result', data={'value': 'committed'}))
+        return {'fingerprint': 'retry-success'}
+    key, _, future = start(c, slow)
+    try:
+        assert failed.wait(1)
+        assert renewed.wait(1)
+    finally:
+        release.set()
+    future.result(timeout=3)
+    assert c._read('retry-result') == {'value': 'committed'}
+    assert c._read(key)['fingerprint'] == 'retry-success'
+    assert c._read(key)['lease_until'] is None
+    assert [r.getMessage() for r in caplog.records] == [type(error).__name__]
     assert not any(t.name == f'live-read-lease:{key}' for t in threads())
 
 
