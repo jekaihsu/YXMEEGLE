@@ -26,8 +26,8 @@ async function mount(options = {}) {
   if (options.change) options.change(fixture);
   globalThis.fetch = async (url, init = {}) => {
     const request = {url, method: init.method || 'GET', body: init.body ? JSON.parse(init.body) : null}; requests.push(request);
-    if (request.method !== 'GET') {if (holdMutation) await holdMutation; return mutationReply ? reply(mutationReply.body, mutationReply.status) : reply({code: 'ok'})}
-    if (url.includes('/node-assignments/nodes/')) return detailReply ? reply(detailReply.body, detailReply.status) : reply({...fixture.detail, node: fixture.list.nodes.find(n => url.endsWith(`/nodes/${n.key}`))});
+    if (request.method !== 'GET') {if (holdMutation) await holdMutation; return mutationReply ? reply(mutationReply.body, mutationReply.status) : reply({...fixture.detail, record_id: fixture.detail.node.record_id})}
+    if (url.includes('/node-assignments/nodes/')) return detailReply ? reply(detailReply.body, detailReply.status) : reply({...fixture.detail, can: fixture.list.can.control, node: fixture.list.nodes.find(n => url.endsWith(`/nodes/${n.key}`))});
     if (url.endsWith('/node-assignments')) return listReply ? reply(listReply.body, listReply.status) : reply(fixture.list);
     return reply({detail: 'disabled'}, 404);
   };
@@ -66,7 +66,7 @@ test('expands inline into owners and tasks and collapses with its native button'
   assert.equal(detail.querySelector('.na-people').textContent, '林林安娜陳陳威廷');
   assert.equal(detail.querySelector('.na-task-body strong').textContent, '控制點成果核對');
   assert.equal(detail.querySelector('.na-task-body p').textContent, '核對現場紀錄與座標。');
-  assert.equal(detail.querySelector('select').value, 'in_progress');
+  assert.equal(detail.querySelector('select').value, '進行中');
   assert.equal(document.querySelector('.na-row[aria-expanded="true"]').getAttribute('aria-controls'), detail.parentElement.id);
   await expand(); assert.equal(document.querySelector('[aria-label="控制節點明細"]'), null);
 });
@@ -74,7 +74,7 @@ test('claim sends the node request with a UUID and refetches list and detail', a
   await mount(); await expand(); await click(button('認領節點'));
   assert.equal(mutations()[0].url, '/api/projects/p1/node-assignments/nodes/control/claim');
   assert.equal(mutations()[0].method, 'POST'); uuid(mutations()[0].body.request_id);
-  assert.deepEqual(Object.keys(mutations()[0].body), ['request_id']);
+  assert.deepEqual(Object.keys(mutations()[0].body), ['expected_revision', 'request_id']);
   assert.equal(requests.filter(r => r.url.endsWith('/node-assignments') && r.method === 'GET').length, 2);
   assert.equal(requests.filter(r => r.url.endsWith('/nodes/control') && r.method === 'GET').length, 2);
   assert.equal(document.querySelector('.na-notice').textContent, '已儲存變更。');
@@ -84,7 +84,7 @@ test('assign selects people and sends IDs with another fresh UUID', async () => 
   const checkboxes = document.querySelectorAll('.na-person-options input');
   await click(checkboxes[1]); await click(button('儲存指派'));
   assert.equal(mutations()[1].url, '/api/projects/p1/node-assignments/nodes/control/assign');
-  assert.deepEqual(mutations()[1].body.assignees, ['ou_anna']); uuid(mutations()[1].body.request_id);
+  assert.deepEqual(mutations()[1].body.owner_open_ids, ['ou_anna']); uuid(mutations()[1].body.request_id);
   assert.notEqual(mutations()[1].body.request_id, mutations()[0].body.request_id);
   assert.equal(requests.filter(r => r.url.endsWith('/node-assignments') && r.method === 'GET').length, 3);
 });
@@ -92,11 +92,11 @@ test('assignment requires at least one owner', async () => {
   await mount(); await expand(); await click(button('指派負責人'));
   for (const checkbox of document.querySelectorAll('.na-person-options input')) await click(checkbox);
   await click(button('儲存指派'));
-  assert.equal(document.querySelector('.na-field-error').textContent, '請至少選擇一位負責人。'); assert.equal(mutations().length, 0);
+  assert.equal(document.querySelector('.na-field-error').textContent, '請選擇 1 至 20 位負責人。'); assert.equal(mutations().length, 0);
 });
 test('task creation validates required fields before sending', async () => {
   await mount(); await expand(); await click(button('新增任務')); await click(button('建立任務'));
-  assert.deepEqual([...document.querySelectorAll('.na-field-error')].map(e => e.textContent), ['請填寫任務名稱。', '請選擇負責人。', '請選擇部門。', '請選擇期限。']);
+  assert.deepEqual([...document.querySelectorAll('.na-field-error')].map(e => e.textContent), ['請填寫任務名稱。']);
   assert.equal(mutations().length, 0);
   for (const element of document.querySelectorAll('[aria-invalid="true"]')) assert.ok(document.getElementById(element.getAttribute('aria-describedby')));
 });
@@ -108,16 +108,16 @@ test('creates a task with literal fields and a date-only deadline', async () => 
   const request = mutations()[0];
   assert.equal(request.url, '/api/projects/p1/node-assignments/nodes/control/tasks'); uuid(request.body.request_id);
   const {request_id, ...payload} = request.body;
-  assert.deepEqual(payload, {title: '新控制點核對', detail: '完成現場紀錄', assignee: 'ou_anna', department: '測量部', deadline: '2026-10-23'});
+  assert.deepEqual(payload, {title: '新控制點核對', detail: '完成現場紀錄', assignee_open_id: 'ou_anna', department: '測量部', deadline: '2026-10-23'});
   assert.equal(document.querySelector('.na-form'), null);
 });
 test('updates task status using PATCH and refetches', async () => {
-  await mount(); await expand(); await input(document.querySelector('.na-task-status select'), 'completed');
-  const request = mutations()[0]; assert.equal(request.method, 'PATCH'); assert.equal(request.url, '/api/projects/p1/node-assignments/tasks/task_1'); assert.equal(request.body.status, 'completed'); uuid(request.body.request_id);
+  await mount(); await expand(); await input(document.querySelector('.na-task-status select'), '已完成');
+  const request = mutations()[0]; assert.equal(request.method, 'PATCH'); assert.equal(request.url, '/api/projects/p1/node-assignments/nodes/control/tasks/recTask1'); assert.equal(request.body.status, '已完成'); uuid(request.body.request_id);
   assert.equal(requests.filter(r => r.url.endsWith('/node-assignments') && r.method === 'GET').length, 2);
 });
 test('permission-denied controls are disabled and explain why', async () => {
-  await mount({change: f => {f.list.can.control = {claim: false, assign: false, complete: false, approve: false, reject: false, create_task: false}}}); await expand();
+  await mount({change: f => {f.list.can.control = {claim: false, assign: false, complete: false, approve: false, reject: false, create_task: false}; f.detail.tasks[0].can.edit_status = false; f.detail.tasks[0].can.cancel = false}}); await expand();
   for (const label of ['認領節點', '指派負責人', '新增任務', '完成節點', '核准', '退回']) {
     const control = button(label); assert.equal(control.disabled, true); assert.equal(document.getElementById(control.getAttribute('aria-describedby')).textContent, '目前沒有此操作權限，或節點狀態不允許此操作。');
     assert.equal(control.parentElement.getAttribute('tabindex'), '0');
@@ -125,8 +125,8 @@ test('permission-denied controls are disabled and explain why', async () => {
   assert.equal(document.querySelector('.na-task-status select').disabled, true); assert.equal(mutations().length, 0);
 });
 test('409 refetches and shows someone else changed this message', async () => {
-  await mount({mutationReply: {status: 409, body: {code: 'conflict', detail: 'version changed'}}}); await expand(); await click(button('認領節點'));
-  assert.equal(document.querySelector('.na-notice').textContent, '有人已更新此節點，已重新讀取最新資料，請確認後再試。');
+  await mount({mutationReply: {status: 409, body: {code: 'revision_conflict', detail: 'version changed'}}}); await expand(); await click(button('認領節點'));
+  assert.equal(document.querySelector('.na-notice').textContent, '資料已被他人更新，已為你重新載入');
   assert.equal(requests.filter(r => r.url.endsWith('/node-assignments') && r.method === 'GET').length, 2);
 });
 test('422 maps server field errors onto the open form', async () => {
@@ -200,8 +200,8 @@ test('ProjectDetail supports assignments when the legacy project has no nodes', 
   assert.equal(document.querySelectorAll('.na-row').length, 9); assert.equal(text().includes('尚未建立案件流程'), false); assert.equal(document.querySelector('.major-approval-summary h2').textContent, '重大事項審批');
 });
 test('task status validation attaches the server message to its select', async () => {
-  await mount({mutationReply: {status: 422, body: {code: 'validation', detail: {status: '請先補齊成果'}}}}); await expand(); await input(document.querySelector('.na-task-status select'), 'completed');
-  const select = document.querySelector('.na-task-status select'); assert.equal(select.getAttribute('aria-invalid'), 'true'); assert.equal(document.getElementById(select.getAttribute('aria-describedby')).textContent, '請先補齊成果'); assert.equal(select.value, 'in_progress');
+  await mount({mutationReply: {status: 422, body: {code: 'validation', detail: {status: '請先補齊成果'}}}}); await expand(); await input(document.querySelector('.na-task-status select'), '已完成');
+  const select = document.querySelector('.na-task-status select'); assert.equal(select.getAttribute('aria-invalid'), 'true'); assert.equal(document.getElementById(select.getAttribute('aria-describedby')).textContent, '請先補齊成果'); assert.equal(select.value, '進行中');
 });
 test('failed list refresh keeps rows but blocks stale mutation permissions until retry', async () => {
   await mount(); await expand(); listReply = {status: 500, body: {detail: '清單更新失敗'}}; await click(button('重新讀取'));
@@ -214,4 +214,45 @@ test('initial loading leaves the legacy flow available', async () => {
   await act(async () => root.render(React.createElement(ui.NodeAssignments, {key: 'loading', projectId: 'p1', legacy: React.createElement('div', {id: 'legacy-flow'}, '原有案件流程與任務')})));
   assert.equal(document.querySelector('.na-loading').textContent, '正在讀取節點指派…'); assert.equal(document.getElementById('legacy-flow').textContent, '原有案件流程與任務');
   await act(async () => release()); assert.equal(document.querySelector('.na-summary-count').textContent, '4/9');
+});
+test('write gate disables mutations and displays the server reason', async () => {
+  await mount({change: f => {f.list.writes_enabled = false; f.list.writes_disabled_reason = 'external_enabled 已關閉'}}); await expand();
+  assert.ok(text().includes('external_enabled 已關閉'));
+  for (const control of document.querySelectorAll('.na-detail button, .na-detail select')) assert.equal(control.disabled, true);
+  assert.equal(mutations().length, 0);
+});
+test('task permissions allow member status edits independently of node completion', async () => {
+  await mount({change: f => {f.list.can.control.complete = false; f.detail.tasks[0].can.cancel = false; f.detail.assignable_people = []}}); await expand();
+  assert.equal(button('完成節點').disabled, true);
+  const select = document.querySelector('.na-task-status select'); assert.equal(select.disabled, false);
+  assert.equal([...select.options].some(o => o.value === '取消'), false);
+  await input(select, '已完成'); assert.equal(mutations()[0].body.expected_revision, '9b0c1d2e3f405162');
+});
+test('members create self-assigned tasks with optional fields omitted', async () => {
+  await mount({change: f => {f.detail.assignable_people = []}}); await expand(); await click(button('新增任務'));
+  assert.equal(formControl('負責人'), undefined);
+  await input(formControl('任務名稱'), '自己的任務'); await click(button('建立任務'));
+  const {request_id, ...body} = mutations()[0].body; uuid(request_id); assert.deepEqual(body, {title: '自己的任務'});
+});
+test('uncertain outcomes retry the exact request ID and body, then a new action gets a new ID', async () => {
+  for (const code of ['outcome_unknown', 'readback_mismatch']) {
+    await mount({mutationReply: {status: code === 'outcome_unknown' ? 502 : 409, body: {code, detail: 'uncertain'}}}); await expand(); await click(button('認領節點'));
+    assert.ok(text().includes('請重試此操作')); assert.equal(requests.filter(r => r.url.endsWith('/node-assignments')).length, 1);
+    mutationReply = null; await click(button('重試'));
+    assert.deepEqual(mutations()[1].body, mutations()[0].body);
+    await click(button('認領節點')); assert.notEqual(mutations()[2].body.request_id, mutations()[0].body.request_id);
+    await act(async () => root.unmount()); root = null;
+  }
+});
+test('illegal transitions do not masquerade as revision conflicts', async () => {
+  await mount({mutationReply: {status: 409, body: {code: 'illegal_transition', detail: 'invalid status'}}}); await expand(); await click(button('完成節點'));
+  assert.ok(text().includes('目前狀態不允許此操作')); assert.equal(document.querySelector('.na-notice'), null);
+});
+test('node revisions come from detail and refresh before the next action', async () => {
+  await mount(); fixture.detail.node = {...fixture.detail.node, revision: 'aaaaaaaaaaaaaaaa'};
+  // Detail replies use the current overview node, as the real server does after a fresh read.
+  fixture.list.nodes.find(n => n.key === 'control').revision = 'aaaaaaaaaaaaaaaa';
+  await expand(); await click(button('認領節點')); assert.equal(mutations()[0].body.expected_revision, 'aaaaaaaaaaaaaaaa');
+  fixture.list.nodes.find(n => n.key === 'control').revision = 'bbbbbbbbbbbbbbbb';
+  await click(button('重新讀取')); await click(button('完成節點')); assert.equal(mutations()[1].body.expected_revision, 'bbbbbbbbbbbbbbbb');
 });
