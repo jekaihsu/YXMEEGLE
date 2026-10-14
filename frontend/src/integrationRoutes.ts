@@ -65,6 +65,18 @@ export interface P2HashRoute {view: P2Route; ctx?: string}
 export const p2ContextOfRoute = (route: {view: string; ctx?: string}): Result<P2Context> =>
  !isP2View(route.view) ? {ok: false, reason: 'bad_route', value: defaultContext('overview')}
   : route.ctx === undefined ? {ok: true, value: defaultContext(route.view)} : decodeContext(route.ctx, route.view);
+/** Fetch gate (F2): a hash whose context fails validation is refused. The default context in the result is only for the refusal
+ *  page's own reset action; nothing may be read or rendered from it. Only that reset (a navigation to the bare hash) may start a read. */
+export type P2Gate = {ok: true; context: P2Context} | {ok: false; context: P2Context; reason: string};
+export function p2Gate(route: {view: string; ctx?: string}): P2Gate {
+ const parsed = p2ContextOfRoute(route);
+ return parsed.ok ? {ok: true, context: parsed.value} : {ok: false, context: parsed.value, reason: parsed.reason};
+}
+/** Same query? Blank values count as absent, key order is irrelevant (F1: draft edits vs the committed query). */
+export const sameFilters = (a: Readonly<Record<string, string>>, b: Readonly<Record<string, string>>): boolean => {
+ const norm = (x: Readonly<Record<string, string>>) => JSON.stringify(Object.entries(x).filter(([, v]) => typeof v === 'string' && v.trim() !== '').sort(([p], [q]) => p < q ? -1 : p > q ? 1 : 0));
+ return norm(a) === norm(b);
+};
 export function p2RouteOfContext(context: P2Context): P2HashRoute | null {
  const encoded = encodeContext(context);
  if (!encoded.ok) return null;

@@ -2,7 +2,7 @@
 // Read-only. Transport only: every state text comes from the view models or dataState labels. All navigation and
 // return context is built by drilldownContext.ts (drill / back / backTo / linkOut) through integrationRoutes.ts.
 // Not changed: the legacy #project, #projects, #work and #sources views stay reachable from the left navigation.
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {fetchP2, ApiError, getSessionEpoch, parseRoute} from './api';
 import {ManagerOverview} from './ManagerOverview';
 import {ConfirmationList} from './ConfirmationList';
@@ -18,8 +18,8 @@ import type {WorkItemTab} from './workItemDetailView.ts';
 import {DATA_STATE_LABELS} from './dataState.ts';
 import {backTo, breadcrumbs, drill, linkOut} from './drilldownContext.ts';
 import type {P2Context, P2Route, SortSpec} from './drilldownContext.ts';
-import {boundHistory, caseNavigate, caseSelection, confirmationKeyOfRow, detailNavigate, kpiDrill, p2Back, p2ContextOfRoute, p2Failure,
- p2Request, p2RouteOfContext, recordPage} from './integrationRoutes.ts';
+import {boundHistory, caseNavigate, caseSelection, confirmationKeyOfRow, detailNavigate, kpiDrill, p2Back, p2Failure,
+ p2Gate, p2Request, p2RouteOfContext, recordPage, sameFilters} from './integrationRoutes.ts';
 import type {HistoryStore, P2Failure} from './integrationRoutes.ts';
 import type {Ctx} from './appCommon';
 import type {Route} from './types';
@@ -75,8 +75,8 @@ function FailureNotice({failure, onRetry}: {failure: P2Failure; onRetry: () => v
 
 export function P2Page({c}: {c: Ctx}) {
  const route = c.route;
- const parsed = useMemo(() => p2ContextOfRoute(route), [route.view, route.ctx]); // eslint-disable-line react-hooks/exhaustive-deps
- const context = parsed.value;
+ const parsed = useMemo(() => p2Gate(route), [route.view, route.ctx]); // eslint-disable-line react-hooks/exhaustive-deps
+ const context = parsed.context;
  const userId = c.s?.user?.id;
  ownMemory(`${getSessionEpoch()}|${String(userId)}`);
  const [notice, setNotice] = useState('');
@@ -95,25 +95,25 @@ export function P2Page({c}: {c: Ctx}) {
  const goBack = context.stack.length ? () => {const r = p2Back(context); if (r.ok) open(r.value); else setNotice('無法返回上一層：返回脈絡已損毀。');} : undefined;
  const version = c.reloadVersion ?? c.w.version;
  const crumbs = breadcrumbs(context);
- const pageRequest = useMemo(() => p2Request(context), [route.view, route.ctx]); // eslint-disable-line react-hooks/exhaustive-deps
- const fetched = useP2Read(pageRequest.ok ? pageRequest.url : null, retry, version, userId);
+ const pageRequest = useMemo(() => parsed.ok ? p2Request(context) : null, [route.view, route.ctx]); // eslint-disable-line react-hooks/exhaustive-deps
+ const fetched = useP2Read(pageRequest?.ok ? pageRequest.url : null, retry, version, userId);
  const failure = fetched.status === 'error' ? p2Failure(context.route, fetched) : null;
  const onRetry = () => setRetry(n => n + 1);
  const openSources = () => openExisting(linkOut('sources').ok ? 'view=sources' : null);
  const openEntryPoint = (entry: string) => {const l = linkOut('entry_point', entry); openExisting(l.ok ? l.hash : null);};
  const body = fetched.status === 'ok' ? fetched.body : undefined;
  let page: React.ReactNode;
- if (!pageRequest.ok) page = <UnsupportedFilters unsupported={pageRequest.unsupported} invalid={pageRequest.invalid} unlocated={pageRequest.reason === 'unlocated'}
+ if (!parsed.ok) page = <InvalidContext label={ROUTE_LABEL[context.route]} onReset={() => open(context, true)}/>;
+ else if (!pageRequest?.ok) page = <UnsupportedFilters unsupported={pageRequest?.ok === false ? pageRequest.unsupported : []} invalid={pageRequest?.ok === false ? pageRequest.invalid : []} unlocated={pageRequest?.ok === false && pageRequest.reason === 'unlocated'}
   onReset={() => open({...context, filters: {}, cursor: null}, true)}/>;
- else if (fetched.status === 'loading') page = <Notice state="loading" message="正在讀取。"/>;
+ else if (fetched.status === 'loading' && context.route !== 'confirmations') page = <Notice state="loading" message="正在讀取。"/>;
  else if (failure && !(failure.state === 'forbidden' && context.route === 'confirmations')) page = <FailureNotice failure={failure} onRetry={onRetry}/>;
  else if (context.route === 'overview') page = <OverviewBody context={context} body={body} open={open} openEntryPoint={openEntryPoint} openSources={openSources} setNotice={setNotice} goBack={goBack}/>;
- else if (context.route === 'confirmations') page = <ConfirmationsBody context={context} body={failure ? {status: 403} : body} open={open} setNotice={setNotice}/>;
+ else if (context.route === 'confirmations') page = <ConfirmationsBody context={context} body={failure ? {status: 403} : body} loading={fetched.status === 'loading'} open={open} setNotice={setNotice}/>;
  else if (context.route === 'confirmation') page = <CaseBody context={context} body={body} open={open} openExisting={openExisting} goBack={goBack} setNotice={setNotice}/>;
  else if (context.route === 'contract') page = <ContractBody context={context} body={body} open={open} setNotice={setNotice} goBack={goBack}/>;
  else page = <WorkItemBody context={context} body={body} open={open} openExisting={openExisting} setNotice={setNotice} goBack={goBack}/>;
  return <main className="page p2-page" aria-label={ROUTE_LABEL[context.route]}>
-  {!parsed.ok && route.ctx !== undefined && <Notice state="unknown" message="網址中的返回脈絡無法驗證，已改用預設條件開啟；沒有套用任何部分內容。"/>}
   {crumbs.length > 1 && <nav className="p2-breadcrumb" aria-label="返回路徑">
    {goBack && (context.route === 'overview' || context.route === 'confirmations') && <button type="button" className="p2-btn p2-btn-plain" onClick={goBack}>返回上一層</button>}
    <ol className="p2-breadcrumb-list">
@@ -127,6 +127,12 @@ export function P2Page({c}: {c: Ctx}) {
   {notice && <div className="error-banner" role="alert"><span>{notice}</span></div>}
   {page}
  </main>;
+}
+
+function InvalidContext({label, onReset}: {label: string; onReset: () => void}) {
+ return <Notice state="unknown" message={`網址中的篩選或返回脈絡無法驗證，因此沒有讀取「${label}」的資料（不會改用較寬的條件代替）。`}>
+  <button type="button" className="button compact" onClick={onReset}>清除並重新開啟（不含篩選）</button>
+ </Notice>;
 }
 
 function UnsupportedFilters({unsupported, invalid, unlocated, onReset}: {unsupported: string[]; invalid: string[]; unlocated: boolean; onReset: () => void}) {
@@ -184,18 +190,43 @@ const overviewFilters = (context: P2Context) => ({
  ...(context.filters.pm ? {pm_id: context.filters.pm} : {}), ...(context.filters.execution_state ? {execution_status: context.filters.execution_state} : {}),
 });
 
-function ConfirmationsBody({context, body, open, setNotice}: {context: P2Context; body: unknown; open: Open; setNotice: (m: string) => void}) {
- const view = useMemo(() => buildConfirmationListView(body, {filters: context.filters, sort: context.sort, cursor: context.cursor, columns: context.columns, selected: context.selected,
-  cursorHistory: boundHistory(cursorStore, context.filters, context.sort, context.cursor)}), [body, context]);
- // Any change to the query (filters, search, sort) restarts at page one and drops the selection.
+const COMMIT_DELAY_MS = 400;
+function ConfirmationsBody({context, body, loading, open, setNotice}: {context: P2Context; body: unknown; loading: boolean; open: Open; setNotice: (m: string) => void}) {
+ // F1: the controls stay mounted through reads. Edits live in `draft`; the hash/query is committed after a pause (or on blur/Enter-free change of a select)
+ // and the table shows loading, never the previous rows, while draft and committed query differ.
+ const [draft, setDraft] = useState<Record<string, string>>(context.filters);
+ const lastCommitted = useRef<Record<string, string>>(context.filters);
+ const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+ const latest = useRef({context, open});
+ latest.current = {context, open};
+ useEffect(() => {
+  if (!sameFilters(context.filters, lastCommitted.current)) {setDraft(context.filters); lastCommitted.current = context.filters;} // external change: Back, reset, link
+ }, [context.filters]);
+ useEffect(() => () => {if (timer.current) clearTimeout(timer.current)}, []);
+ const commit = (filters: Record<string, string>) => {
+  if (timer.current) clearTimeout(timer.current);
+  timer.current = setTimeout(() => {
+   timer.current = null;
+   const {context: current, open: go} = latest.current;
+   if (sameFilters(filters, current.filters)) return;
+   lastCommitted.current = filters;
+   go({...current, cursor: null, selected: null, filters}, true);
+  }, COMMIT_DELAY_MS);
+ };
+ const edit = (filters: Record<string, string>) => {const next = withoutEmpty(filters); setDraft(next); commit(next);};
+ const pending = !sameFilters(draft, context.filters);
+ const showBody = pending || loading ? undefined : body;
+ const view = useMemo(() => buildConfirmationListView(showBody, {filters: draft, sort: context.sort, cursor: context.cursor, columns: context.columns, selected: context.selected,
+  cursorHistory: boundHistory(cursorStore, context.filters, context.sort, context.cursor)}), [showBody, draft, context]);
+ // Any change to the query (sort) restarts at page one and drops the selection.
  const requery = (next: Partial<P2Context>) => open({...context, cursor: null, selected: null, ...next}, true);
  const rows = body && typeof body === 'object' && Array.isArray((body as {rows?: unknown}).rows) ? (body as {rows: {row_key?: unknown; case_link?: {project_id?: unknown}}[]}).rows : [];
  return <ConfirmationList view={view}
   onSelect={key => open({...context, selected: key}, true)}
   onSort={(sort: SortSpec) => requery({sort})}
-  onSearch={search => requery({filters: withoutEmpty({...context.filters, search})})}
-  onFilterChange={filters => requery({filters: withoutEmpty(filters)})}
-  onResetFilters={() => requery({filters: {}})}
+  onSearch={search => edit({...draft, search})}
+  onFilterChange={filters => edit(filters)}
+  onResetFilters={() => {if (timer.current) clearTimeout(timer.current); setDraft({}); lastCommitted.current = {}; requery({filters: {}})}}
   onColumnToggle={column => {
    const shown = view.columns.filter(col => col.visible).map(col => col.key);
    const columns = shown.includes(column) ? shown.filter(key => key !== column) : view.columns.filter(col => col.visible || col.key === column).map(col => col.key);

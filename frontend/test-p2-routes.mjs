@@ -285,6 +285,37 @@ test('wiring: five hash views, left navigation entries only for the two list pag
  for (const t of ['drilldown-context', 'confirmation-list-view', 'case-detail-view', 'contract-detail-view', 'work-item-detail-view', 'manager-overview-view', 'p2-routes']) assert.ok(ci.includes(`test-${t}.mjs`), `local_ci runs test-${t}`);
 });
 
+test('fetch gate (F2): an invalid or unsupported context is refused with no usable request; only the bare reset route is valid', M => {
+ const bad = [{view: 'overview', ctx: hashOf({}) + 'zz'}, {view: 'confirmations', ctx: 'not-a-context'}, {view: 'nope'}];
+ const real = M.p2RouteOfContext(ctx('overview', {filters: {pm: 'u-a'}}));
+ assert.equal(M.p2Gate(real).ok, true);
+ // a list-valued overview filter echo with an unknown key (the reviewer's source_version case) is rejected by NAV
+ const unsupported = Buffer.from(Buffer.from(D.encodeContext(ctx('overview', {filters: {pm: 'u-a'}})).value, 'base64url').toString().replace('"pm":"u-a"', '"source_version":"2"')).toString('base64url');
+ for (const route of [...bad, {view: 'overview', ctx: unsupported}]) {
+  const gate = M.p2Gate(route);
+  assert.equal(gate.ok, false, JSON.stringify(route));
+  assert.deepEqual(gate.context.filters, {}, 'the fallback context is empty and only feeds the reset action');
+ }
+ const reset = M.p2RouteOfContext(M.p2Gate({view: 'overview', ctx: 'zz'}).context);
+ assert.deepEqual(reset, {view: 'overview'}, 'the reset action navigates to the bare hash');
+ assert.equal(M.p2Gate(reset).ok, true, 'and the bare hash is valid, so only then a read is allowed');
+ const pages = read('src/P2Pages.tsx');
+ assert.match(pages, /parsed\.ok \? p2Request\(context\) : null/, 'the request is built only from a validated context');
+ assert.match(pages, /if \(!parsed\.ok\) page = <InvalidContext/, 'invalid context renders the refusal instead of data');
+});
+
+test('list edit state (F1): draft vs committed query comparison ignores blanks and order; page keeps the list mounted while reading', M => {
+ assert.equal(M.sameFilters({search: 'V'}, {search: 'V'}), true);
+ assert.equal(M.sameFilters({search: 'VI'}, {search: 'V'}), false);
+ assert.equal(M.sameFilters({search: ' ', pm: 'a'}, {pm: 'a'}), true);
+ assert.equal(M.sameFilters({pm: 'a', search: 'x'}, {search: 'x', pm: 'a'}), true);
+ assert.equal(M.sameFilters({}, {search: 'x'}), false);
+ const pages = read('src/P2Pages.tsx');
+ assert.match(pages, /fetched\.status === 'loading' && context\.route !== 'confirmations'/, 'confirmations is not replaced by a loading notice');
+ assert.match(pages, /const showBody = pending \|\| loading \? undefined : body/, 'old rows are never shown for a different or pending query');
+ assert.match(pages, /onSearch=\{search => edit\(/); assert.doesNotMatch(pages, /onSearch=\{search => requery/, 'typing does not commit immediately');
+});
+
 // ---- runner ------------------------------------------------------------------------------------------------------------
 async function run(M) {
  M0 = M;
@@ -315,6 +346,9 @@ const MUTANTS = [
  ['Back does not restore the parent', "export const p2Back = navBack;", "export const p2Back = (c: P2Context) => ({ok: true, value: c} as Result<P2Context>);"],
  ['contract -> confirmation guesses a case', "return projectId ? drill(context, 'confirmation', {selected: caseSelection(projectId, key)}) : null;", "return drill(context, 'confirmation', {selected: caseSelection(projectId ?? 'guess', key)});"],
  ['task keys are navigable', "return SOURCE_KEY.test(bare) && !OTHER_KIND.test(bare) ? bare : null;", "return SOURCE_KEY.test(bare) ? bare : null;"],
+ ['gate accepts an invalid context', "return parsed.ok ? {ok: true, context: parsed.value} : {ok: false, context: parsed.value, reason: parsed.reason};", "return {ok: true, context: parsed.value};"],
+ ['draft compare is order sensitive', "sort(([p], [q]) => p < q ? -1 : p > q ? 1 : 0)", "sort(() => 0)"],
+ ['draft compare counts blanks', ".filter(([, v]) => typeof v === 'string' && v.trim() !== '').sort(", ".sort("],
  ['overview sends list vocabulary as case filter', "const OVERVIEW_NAV_TO_BACKEND: Readonly<Record<string, string>> = {pm: 'pm_id', execution_state: 'execution_status'};", "const OVERVIEW_NAV_TO_BACKEND: Readonly<Record<string, string>> = {pm: 'pm', execution_state: 'execution_status'};"],
 ];
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'p2-routes-mutants-'));
