@@ -21,7 +21,7 @@ class AttendanceScheduleService(PeopleDirectoryService):
                 u.get('directory_missing'),deepcopy(u.get('directory_source'))) for u in people}
         with self.sessions() as db:
             row=db.get(self.W,wid);require(row is not None,'工作區不存在',404)
-            state=self._state(db,row);self._actor(state,actor_id)
+            state=self._state(db,row,('users',));self._actor(state,actor_id)
             require(state.get('environment')=='production','班表識別限公司正式工作區',403)
             people=eligible(state);expected=signature(people)
             verified=[u for u in people if roster_identity_verified(u,policy[0])
@@ -33,7 +33,7 @@ class AttendanceScheduleService(PeopleDirectoryService):
             require(self._policy(wid)==policy,'班表識別設定已變更',409)
             with self.sessions() as db:
                 row=db.get(self.W,wid);require(row is not None,'工作區不存在',404)
-                fresh=self._state(db,row);self._actor(fresh,actor_id)
+                fresh=self._state(db,row,('users',));self._actor(fresh,actor_id)
                 require(fresh.get('environment')=='production' and signature(eligible(fresh))==expected,
                         '班表識別核對期間名冊已變更',409)
         result={'mappings':{},'issues':pending}
@@ -46,7 +46,7 @@ class AttendanceScheduleService(PeopleDirectoryService):
         with self.sessions.begin() as db:
             row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update())
             require(row is not None,'工作區不存在',404)
-            current=self._state(db,row);actor=self._actor(current,actor_id)
+            current=self._state(db,row,('users',));actor=self._actor(current,actor_id)
             require(self._policy(wid)==policy and current.get('environment')=='production'
                     and signature(eligible(current))==expected,'班表識別套用前名冊已變更',409)
             for person in current['users']:
@@ -63,11 +63,11 @@ class AttendanceScheduleService(PeopleDirectoryService):
             current['attendance_identity_status']={'resolved':len(result['mappings']),
                 'issues':result['issues'],'checked_at':now(),'status':'pending' if result['issues'] else 'ready'}
             event(current,actor,'attendance_identity_sync',message='唯讀核實原生帳號與員工識別，未按姓名配對')
-            self._save(db,row,current)
+            self._save(db,row,current,('users','events'))
         return deepcopy(current['attendance_identity_status'])
 
-    def _state(self,db,row):
-        state=super()._state(db,row)
+    def _state(self,db,row,collections=None):
+        state=super()._state(db,row,collections)
         # Legacy formal workspaces predate the environment field. Infer only
         # from the server namespace and fully validated configured company;
         # explicit isolation labels are never upgraded. Normal _save owns the
@@ -98,7 +98,7 @@ class AttendanceScheduleService(PeopleDirectoryService):
             self.resolve_identities(wid,actor_id)
         with self.sessions() as db:
             row=db.get(self.W,wid);require(row is not None,'工作區不存在',404)
-            state=self._state(db,row);self._actor(state,actor_id)
+            state=self._state(db,row,('users',));self._actor(state,actor_id)
             require(state.get('environment')=='production','班表同步限公司正式工作區',403)
             people=[deepcopy(u) for u in state['users'] if admitted(u,policy[0])]
             generation=state.get('attendance_schedule_status',{}).get('sync_revision',0)
@@ -114,7 +114,7 @@ class AttendanceScheduleService(PeopleDirectoryService):
                 require(self._policy(wid)==policy,'班表同步設定已變更',409)
                 with self.sessions() as db:
                     row=db.get(self.W,wid);require(row is not None,'工作區不存在',404)
-                    current=self._state(db,row);self._actor(current,actor_id)
+                    current=self._state(db,row,('users',));self._actor(current,actor_id)
                     require(current.get('environment')=='production' and identity(current['users'])==expected_identity,
                         '人員身分或工作區已變更，請重新同步班表',409)
             adapter=self.adapter_factory(deepcopy(self.cfg))
@@ -122,7 +122,7 @@ class AttendanceScheduleService(PeopleDirectoryService):
             check()
             with self.sessions.begin() as db:
                 row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update())
-                current=self._state(db,row);actor=self._actor(current,actor_id)
+                current=self._state(db,row,('users','work_schedules'));actor=self._actor(current,actor_id)
                 require(self._policy(wid)==policy and current.get('environment')=='production' and identity(current['users'])==expected_identity,
                     '班表套用前人員或設定已變更',409)
                 require(current.get('attendance_schedule_status',{}).get('sync_revision',0)==generation,
@@ -137,16 +137,16 @@ class AttendanceScheduleService(PeopleDirectoryService):
                 prior=current.get('attendance_schedule_connection',{})
                 current['attendance_schedule_connection']=readonly_sync_connection(self.cfg,actor_id or prior.get('authorized_by') or prior.get('actor_id'),dataset='attendance')
                 event(current,actor,'attendance_schedule_sync',message='唯讀更新正常班表，保留人工設定與歷史')
-                self._save(db,row,current)
+                self._save(db,row,current,('users','work_schedules','events'))
                 return deepcopy(current['attendance_schedule_status'])
         except Exception as exc:
             with self.sessions.begin() as db:
                 row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update())
                 if row:
-                    current=self._state(db,row);status=current.setdefault('attendance_schedule_status',{})
+                    current=self._state(db,row,('users',));status=current.setdefault('attendance_schedule_status',{})
                     if status.get('sync_revision',0)==generation:
                         status.update(status='error',last_attempt_at=now(),message='正常班表讀取失敗，保留上次成功資料')
-                        self._save(db,row,current)
+                        self._save(db,row,current,('users',))
             if isinstance(exc,HTTPException):raise
             raise HTTPException(502,'正常班表讀取失敗，保留上次成功資料') from exc
         finally:

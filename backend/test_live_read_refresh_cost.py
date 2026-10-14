@@ -36,22 +36,29 @@ class Bucket:
 
 @pytest.fixture
 def full_workspace_cost(monkeypatch):
-    calls = {'load': 0, 'save': 0}
+    """Counts and slows whole-workspace operations once armed; setup runs at full speed."""
+    cost = {'armed': False, 'load': 0, 'save': 0}
     load, save = storage.load, storage.save
 
     def slow_load(*args, **kwargs):
-        calls['load'] += 1
-        sleep(FULL_LOAD_SECONDS)
+        if cost['armed']:
+            cost['load'] += 1
+            sleep(FULL_LOAD_SECONDS)
         return load(*args, **kwargs)
 
     def slow_save(*args, **kwargs):
-        calls['save'] += 1
-        sleep(FULL_SAVE_SECONDS)
+        if cost['armed']:
+            cost['save'] += 1
+            sleep(FULL_SAVE_SECONDS)
         return save(*args, **kwargs)
 
     monkeypatch.setattr(storage, 'load', slow_load)
     monkeypatch.setattr(storage, 'save', slow_save)
-    return calls
+    return cost
+
+
+def spent(cost):
+    return cost['load'], cost['save']
 
 
 def lark(h, respond):
@@ -121,7 +128,7 @@ def test_refresh_finishes_inside_its_budget_when_full_workspace_operations_are_s
         harness, full_workspace_cost, dataset, build):
     h = harness
     refresher = build(h)
-    full_workspace_cost.update(load=0, save=0)
+    full_workspace_cost['armed'] = True
     result, elapsed = refresh(h, dataset, refresher)
     assert result['status'] == 'fresh'
     assert elapsed < BUDGET, f'{dataset} refresh took {elapsed:.2f}s against a {BUDGET}s budget'
@@ -131,24 +138,35 @@ def test_refresh_finishes_inside_its_budget_when_full_workspace_operations_are_s
 def test_refresh_never_loads_or_diffs_the_whole_workspace(harness, full_workspace_cost, dataset, build):
     h = harness
     refresher = build(h)
-    full_workspace_cost.update(load=0, save=0)
+    full_workspace_cost['armed'] = True
     result, _ = refresh(h, dataset, refresher)
     assert result['status'] == 'fresh'
-    assert full_workspace_cost == {'load': 0, 'save': 0}
+    assert spent(full_workspace_cost) == (0, 0)
+
+
+@pytest.mark.parametrize('dataset,build,action', [('roster', roster, 'people_directory_sync'),
+                                                  ('attendance', attendance, 'attendance_schedule_sync')])
+def test_refresh_adds_exactly_its_own_audit_event(harness, dataset, build, action):
+    h = harness
+    refresher = build(h)
+    before = h.read()[0]['events']
+    refresh(h, dataset, refresher)
+    added = h.read()[0]['events'][:-len(before)] if before else h.read()[0]['events']
+    assert [event['action'] for event in added] == [action]
 
 
 def test_failed_roster_refresh_records_its_error_without_the_whole_workspace(harness, full_workspace_cost):
     h = harness
     refresher = roster(h)
     refresher.service.fetcher = lambda adapter, app_id: (_ for _ in ()).throw(RuntimeError('lark down'))
-    full_workspace_cost.update(load=0, save=0)
+    full_workspace_cost['armed'] = True
     coordinator = RefreshCoordinator(h.sessions, h.C, {'roster': refresher}, h.cfg)
     try:
         with pytest.raises(Exception):
             coordinator.ensure(h.wid, 'roster', wait=True, force=True, timeout=30)
     finally:
         coordinator.close()
-    assert full_workspace_cost == {'load': 0, 'save': 0}
+    assert spent(full_workspace_cost) == (0, 0)
     with h.sessions() as db:
         status = db.get(h.W, h.wid).data['people_directory_status']
     assert status['status'] == 'error'
@@ -163,10 +181,10 @@ def test_attendance_failure_records_its_error_without_the_whole_workspace(harnes
 
     refresher.service.adapter_factory = lambda cfg: type('A', (), {
         'request': staticmethod(broken), 'client': type('C', (), {'close': staticmethod(lambda: None)})()})()
-    full_workspace_cost.update(load=0, save=0)
+    full_workspace_cost['armed'] = True
     with pytest.raises(HTTPException):
         refresher.service.sync(h.wid, None, '2026-09-28', '2026-09-28')
-    assert full_workspace_cost == {'load': 0, 'save': 0}
+    assert spent(full_workspace_cost) == (0, 0)
     with h.sessions() as db:
         assert db.get(h.W, h.wid).data['attendance_schedule_status']['status'] == 'error'
 
@@ -258,6 +276,6 @@ def test_save_collections_keeps_the_project_index_ready_only_if_it_was_current(t
     with sessions.begin() as db:
         for counter in db.scalars(select(WorkspaceCounter)):
             counter.source_version = 0
-    write(sessions, roster_change, ('users',))
+    write(sessions, lambda state: state['users'][0].update(name='again'), ('users',))
     assert versions() == {0}
     engine.dispose()

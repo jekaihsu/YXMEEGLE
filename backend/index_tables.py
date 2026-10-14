@@ -93,6 +93,12 @@ def replace_counters(db,model,wid,state):
     if fresh: db.execute(insert(ci),fresh)
 
 
+def advance_counters(db,model,wid,previous,version):
+    """Carry a current index across a write that cannot change any counter; a stale one stays stale."""
+    *_,ci=tables(model)
+    db.execute(ci.update().where(ci.c.workspace_id==wid,ci.c.source_version==previous).values(source_version=version))
+
+
 def _mismatch(rows,expected,key,ignore=('source_version',)):
     """Compare actual vs expected row dicts keyed by `key`: (missing, extra, stale) key lists."""
     strip=lambda row:{k:v for k,v in row.items() if k not in ignore}

@@ -5,7 +5,7 @@ business collections are rows with indexed workspace, kind, parent and ordering.
 All materialization happens within the caller's version-checked transaction.
 """
 from copy import deepcopy
-from sqlalchemy import Column, String, Integer, JSON, ForeignKey, UniqueConstraint, select, delete
+from sqlalchemy import Column, String, Integer, JSON, ForeignKey, UniqueConstraint, select, delete, func
 
 COLLECTIONS=('users','projects','approvals','events','sop_templates','delegations','jobs','recurring','input_mappings','input_revisions','cost_allocations','daily_unmatched','daily_reviews','handover_requests','sop_requests','training_plans','capability_catalog','capability_awards','learning_standards','work_schedules','approved_leave_delegations','capability_bindings','learning_mappings','financial_requests','source_quotes','source_confirmations','contract_items','source_work_items')
 PROJECT_CHILDREN=('files','comments','daily_reports','evidence','finance_versions','payment_batches','confirmation_issues','delivery_batches','quote_reviews')
@@ -123,6 +123,51 @@ def save(db,model,wid,state):
         from . import index_tables  # lazy: storage must stay importable inside the isolated backup helper bundle
         index_tables.replace_projects(db,model,wid,state,dirty)
         index_tables.replace_counters(db,model,wid,state)
+    root['storage_schema']=2
+    return root
+
+def save_collections(db,model,wid,state,collections):
+    """Write only the named non-project collections of a load_partial state.
+
+    Rows of every other kind are not read, copied or compared, so a write that
+    changes a few people or events no longer pays for the whole workspace. Events
+    stay insert-only and may be named without having been loaded.
+    """
+    collections=tuple(collections)
+    partial=state.get('_partial')
+    if (partial is None or 'projects' in collections or set(collections)-set(COLLECTIONS)
+            or set(collections)-set(partial['collections'])-{'events'}):
+        raise ValueError('save_collections needs a partial state that loaded every named non-project collection')
+    root={k:deepcopy(v) for k,v in state.items() if k not in COLLECTIONS and k!='_partial'}
+    desired={}
+    for collection in collections:
+        for i,record in enumerate(state.get(collection,[])):
+            ident=str(record.get('id') or f':{i}')
+            if (collection,ident) in desired: raise ValueError(f'duplicate record id in storage.save_collections: kind={collection} id={ident}')
+            desired[(collection,ident)]={'parent_id':'','ordinal':i,'data':deepcopy(record)}
+    stored=[c for c in collections if c!='events']
+    existing={(r.kind,r.entity_id):r for r in db.scalars(select(model).where(model.workspace_id==wid,model.kind.in_(stored)))} if stored else {}
+    if 'events' in collections:
+        ids=[ident for kind,ident in desired if kind=='events']
+        known=set()
+        for i in range(0,len(ids),400):
+            known.update(db.scalars(select(model.entity_id).where(model.workspace_id==wid,model.kind=='events',model.entity_id.in_(ids[i:i+400]))))
+        fresh=[key for key in desired if key[0]=='events' and key[1] not in known]
+        floor=db.scalar(select(func.min(model.ordinal)).where(model.workspace_id==wid,model.kind=='events')) or 0
+        for index,key in enumerate(fresh):
+            desired[key]['ordinal']=floor-len(fresh)+index
+        for key in desired.keys()-set(fresh):
+            if key[0]=='events': del desired[key]
+    for key,value in desired.items():
+        old=existing.pop(key,None)
+        if old:
+            if old.data!=value['data'] or old.parent_id!=value['parent_id'] or old.ordinal!=value['ordinal']:
+                old.data=value['data']; old.parent_id=value['parent_id']; old.ordinal=value['ordinal']
+        else: db.add(model(workspace_id=wid,kind=key[0],entity_id=key[1],**value))
+    for row in existing.values(): db.delete(row)
+    if db.info.get('index_tables'):
+        from . import index_tables
+        index_tables.advance_counters(db,model,wid,state['version']-1,state['version'])
     root['storage_schema']=2
     return root
 
