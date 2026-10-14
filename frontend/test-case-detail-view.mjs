@@ -49,10 +49,11 @@ test('forbidden rows, nested tasks, IDs, labels, times and count hints disappear
  assert.equal(sec(v,'contract_lines').label,'沒有權限'); assert.deepEqual(sec(v,'contract_lines').rows,[]);
  assert.equal(v.drawer,null); assert.equal(sec(v,'contract_lines').sourceTime.text,'—'); assert.equal(/SECRET_CHILD|SECRET_ID/.test(JSON.stringify(v)),false);
  const persons=fixture(); persons.header.pm={name:'SECRET_PM',states:['forbidden']}; persons.header.blockers={items:['SECRET_BLOCKER'],states:['forbidden']}; persons.header.source_link={url:'https://secret.invalid',states:['forbidden']}; assert.equal(/SECRET_PM|SECRET_BLOCKER|secret.invalid/.test(JSON.stringify(build(persons))),false);
+ const unknownPerson=fixture(); unknownPerson.header.pm={name:'UNPROVEN_PM',states:['unknown'],reason:'person_not_in_authorized_view'}; assert.equal(header(build(unknownPerson),'PM').text,'—');
  const versions=fixture(); versions.sections.versions.states=['forbidden']; assert.equal(header(build(versions),'確認單版本').text,'—');
 });
 test('malformed body fails closed without retaining otherwise valid header facts',()=>{
- for(const mutate of [b=>b.sections.work_items.rows.push(null),b=>b.sections.history.rows[0].revision={},b=>b.header.pm.name=42,b=>b.sections.versions.source_time=[],b=>b.sections.contract_lines.states=['partial','unknown'],b=>b.header.details.edges[0].contested='yes',b=>b.sections.versions.rows[0].kind='contract',b=>delete b.sections.overview,b=>b.sections.work_items.rows[0].parents=[null]]){
+ for(const mutate of [b=>b.sections.work_items.rows.push(null),b=>b.sections.history.rows[0].revision={},b=>Object.assign(b.sections.history.rows[0],{revision:{},event_id:'e',action:'read',created_at:'2026-01-01'}),b=>b.sections.workflow_nodes.rows[0].tasks[0].kind='contract',b=>b.sections.versions.states=['complete_empty'],b=>b.header.pm.name=42,b=>b.sections.versions.source_time=[],b=>b.sections.contract_lines.states=['partial','unknown'],b=>b.header.details.edges[0].contested='yes',b=>b.sections.versions.rows[0].kind='contract',b=>delete b.sections.overview,b=>b.sections.work_items.rows[0].parents=[null]]){
   const b=fixture(); mutate(b); const v=build(b); assert.deepEqual(v.page,{states:['unknown'],label:'狀態未知',reason:'malformed_case_detail_body'}); assert.deepEqual(v.header,[]); assert.equal(v.drawer,null);
  }
  assert.equal(build(fixture()).header[0].text,'測試案件');
