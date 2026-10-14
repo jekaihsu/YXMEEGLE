@@ -259,10 +259,10 @@ def test_oauth_failed_roster_preserves_access_policy(tmp_path,monkeypatch,kind,e
     state=parse_qs(urlparse(login.headers['location']).query)['state'][0]
     with app.state.sessions() as db: before=set(db.scalars(select(AuthRow.id)))
     response=client.get('/api/auth/lark/callback',params={'state':state,'code':'synthetic'},follow_redirects=False)
-    assert response.status_code==(403 if expected=='denied' else 307),response.text
+    assert response.status_code==(503 if expected=='denied' else 307),response.text
     assert calls==['lark-company']
     if expected=='denied':
-        assert '名冊' in response.json()['detail'] and 'private-token' not in response.text
+        assert 'private-token' not in response.text  # refresh unavailable is 503, not an unverified-directory 403
         with app.state.sessions() as db: assert set(db.scalars(select(AuthRow.id)))<=before
     else:
         assert client.get('/api/session').json()['access_mode']==expected

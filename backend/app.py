@@ -1183,7 +1183,15 @@ def create_app(overrides=None):
             existing=db.get(PersonRow,(org,oid))
             admission_person=deepcopy(existing.data) if existing else user
         # The reloaded access policy preserves grants and bootstrap recovery on failure.
-        ensure_roster_for_admission(app.state.live_read,org,admission_person,callback=True)
+        roster_refreshed=ensure_roster_for_admission(app.state.live_read,org,admission_person,callback=True)
+        def require_callback_access(person):
+            # A failed roster refresh must not look like a fresh roster that lacks this exact ID.
+            # Recovery and grants still pass through require_access; this never grants admission.
+            try: return require_access(person,cfg['LARK_APP_ID'],allow_recovery=True,cfg=cfg,tenant=tenant)
+            except HTTPException as denied:
+                if not roster_refreshed and getattr(denied,'code',None) in ('access_not_admitted','access_roster_expired'):
+                    raise HTTPException(503,'公司名冊暫時無法更新，請稍後再試')
+                raise
         with sessions.begin() as db:
             profile=db.execute(select(PersonRow).where(PersonRow.organization_id==org,PersonRow.person_id==oid).with_for_update()).scalar_one_or_none()
             if profile:
@@ -1194,7 +1202,7 @@ def create_app(overrides=None):
                 if role=='manager' and user.get('role')=='manager': user['bootstrap_admin']=True
                 elif role=='manager' and not user.get('authz_version'):
                     user.update(role='manager',bootstrap_admin=True,capabilities=initial_capabilities(oid,'manager'))
-                require_access(user,cfg['LARK_APP_ID'],allow_recovery=True,cfg=cfg,tenant=tenant)
+                require_callback_access(user)
                 reconcile_company_admin(db,org,user)
                 if isinstance(info.get('user_id'),str) and info['user_id']:
                     user['attendance_identity']={'employee_type':'employee_id','employee_id':info['user_id'],'open_id':oid,'app_id':cfg['LARK_APP_ID'],'tenant':tenant,'verified_at':now(),'source':'oauth_user_info'}
@@ -1202,7 +1210,7 @@ def create_app(overrides=None):
             else:
                 user['oauth_identity']={'source':'oauth_user_info','app_id':cfg['LARK_APP_ID'],'tenant':tenant,'open_id':oid,'verified_at':now()}
                 if role=='manager': user['bootstrap_admin']=True
-                require_access(user,cfg['LARK_APP_ID'],allow_recovery=True,cfg=cfg,tenant=tenant)
+                require_callback_access(user)
                 reconcile_company_admin(db,org,user)
                 if isinstance(info.get('user_id'),str) and info['user_id']:
                     user['attendance_identity']={'employee_type':'employee_id','employee_id':info['user_id'],'open_id':oid,'app_id':cfg['LARK_APP_ID'],'tenant':tenant,'verified_at':now(),'source':'oauth_user_info'}
