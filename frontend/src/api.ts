@@ -130,3 +130,6 @@ export function perfMark(name:string){
 export const fetchPilotShadow=(signal?:AbortSignal)=>api<unknown>('/api/lark-pilot/shadow',{method:'GET',cache:'no-store',signal,timeoutMs:120000});
 
 export const fetchCaseNavigation=(projectId:string,signal?:AbortSignal)=>api<import('./CaseNavigation').Navigation>(`/api/projects/${encodeURIComponent(projectId)}/navigation`,{signal});
+
+// P2 read-only pages (VCC-128..132): one GET per page view; the caller owns retry (the identical GET only).
+export const fetchP2=(url:string,signal?:AbortSignal)=>api<unknown>(url,{method:'GET',cache:'no-store',signal,timeoutMs:60000});

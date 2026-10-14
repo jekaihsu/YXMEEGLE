@@ -50,6 +50,13 @@ node test-company-route.mjs
 npm run test:integration-routes
 npm run test:my-work-view
 npm run test:source-health-view
+node test-drilldown-context.mjs
+node test-confirmation-list-view.mjs
+node test-case-detail-view.mjs
+node test-contract-detail-view.mjs
+node test-work-item-detail-view.mjs
+node test-manager-overview-view.mjs
+node test-p2-routes.mjs
 npm run build
 npm run test:dev-tooling
 
