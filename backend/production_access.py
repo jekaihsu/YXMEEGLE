@@ -177,7 +177,8 @@ TENANT_READ_ROUTES=frozenset({
 
 
 def tenant_read_allowed(person,cfg,org,method,path):
-    if method!='GET' or path not in TENANT_READ_ROUTES or not person or not person.get('active',True):
+    if (method!='GET' or path not in TENANT_READ_ROUTES or not person or not person.get('active',True)
+            or person.get('directory_status')=='left' or person.get('directory_missing',False)):
         return False
     app_id=cfg.get('LARK_APP_ID'); tenant=org.removeprefix('lark-')
     proof=person.get('oauth_identity') or {}

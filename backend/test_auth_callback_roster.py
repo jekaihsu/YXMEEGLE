@@ -41,7 +41,7 @@ def finish(client,saved_state,**params):
     return client.get('/api/auth/lark/callback',params={'state':saved_state,'code':'synthetic',**params},follow_redirects=False)
 
 
-@pytest.mark.parametrize('fields',[{}, {'directory_status':'left','directory_missing':True}])
+@pytest.mark.parametrize('fields',[{}, {'directory_status':'employed'}])
 def test_stale_roster_and_failed_reads_never_block_login(tmp_path,monkeypatch,fields):
     app,_=production_client(tmp_path);stale(app,role='member',authz_version=1,**fields)
     oauth(monkeypatch,open_id='u-manager')
@@ -184,3 +184,25 @@ def test_startup_warms_all_datasets_without_waiting_for_lark(tmp_path):
                 assert app.state.live_read.status('lark-company')['datasets']['roster']['status']=='refreshing'
             finally: release.set()
     finally: release.set()
+
+
+@pytest.mark.parametrize('fields', [
+    {'directory_status': 'left', 'active': False},
+    {'directory_missing': True},
+    {'active': False},
+    {'directory_status': 'left', 'active': None},
+])
+def test_departed_missing_or_inactive_person_loses_tenant_reads(tmp_path, monkeypatch, fields):
+    app, _ = production_client(tmp_path)
+    oauth(monkeypatch)
+    client = TestClient(app)
+    assert finish(client, begin(client)).status_code == 307
+    with app.state.sessions.begin() as db:
+        person = db.get(PersonRow, ('lark-company', 'u-tenant'))
+        data = {**person.data, **fields}
+        if fields.get('active', True) is None:
+            data.pop('active', None)
+        person.data = data
+    response = client.get('/api/workspace')
+    assert response.status_code == 403
+    assert client.get('/api/session').json()['user'] is None
