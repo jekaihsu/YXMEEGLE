@@ -31,5 +31,3 @@ Wed Oct 14 22:36:05 2026    /Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-202610
     14043    0.033    0.000    0.033    0.000 encoder.py:205(iterencode)
     56396    0.011    0.000    0.032    0.000 source_lifecycle.py:36(needs_review)
     28076    0.016    0.000    0.032    0.000 workflow.py:9(now)
-
-

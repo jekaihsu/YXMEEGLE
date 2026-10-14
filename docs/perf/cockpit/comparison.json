@@ -1,0 +1,2878 @@
+{
+  "latency_seconds": 0.25,
+  "projects": 319,
+  "table_counts": {
+    "tblmSQrcCs9vPQZx": 106,
+    "tblobs4qPy2w9MZ6": 573,
+    "tblwQPYk3c9RvCU7": 701,
+    "tbl8wRYCUCvbSoJG": 213,
+    "tblKwSDRg6WaGHYr": 201,
+    "tbl5zPLS0ExWNEty": 187,
+    "tblrCo8KeZiuJUNh": 348,
+    "tblENZvYAya93Twa": 423,
+    "tblvV4X1kNVQisVj": 106
+  },
+  "assumptions": "Fictional existing 319-project fixture. Counts from read-only Lark table lists on 2026-10-14. Mock per-call latency. SQLite. No real network.",
+  "runs": [
+    {
+      "loads": [
+        {
+          "temperature": "cold",
+          "wall_ms": 808.669,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 17.868,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 24.694,
+              "bytes": 150244
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 765.984,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 3
+        },
+        {
+          "temperature": "warm",
+          "wall_ms": 686.021,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 5.138,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 15.963,
+              "bytes": 150416
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 664.773,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 45
+        }
+      ],
+      "lark_calls": [
+        {
+          "path": "/open-apis/auth/v3/tenant_access_token/internal",
+          "duration_ms": 267.535
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/fields",
+          "duration_ms": 264.134
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 279.034
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/records",
+          "duration_ms": 260.217
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 260.446
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/fields",
+          "duration_ms": 251.066
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift0",
+          "duration_ms": 260.02
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 260.178
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift1",
+          "duration_ms": 250.195
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 259.203
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift2",
+          "duration_ms": 254.529
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 275.181
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift3",
+          "duration_ms": 252.808
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/fields",
+          "duration_ms": 258.567
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift4",
+          "duration_ms": 260.024
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 253.85
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift5",
+          "duration_ms": 260.019
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 251.889
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift6",
+          "duration_ms": 260.015
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.189
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift7",
+          "duration_ms": 252.007
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.108
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift8",
+          "duration_ms": 260.021
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/fields",
+          "duration_ms": 250.032
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift9",
+          "duration_ms": 253.958
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 260.158
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift10",
+          "duration_ms": 260.019
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 260.126
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift11",
+          "duration_ms": 252.738
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/fields",
+          "duration_ms": 260.023
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift12",
+          "duration_ms": 260.017
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 255.345
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift13",
+          "duration_ms": 258.373
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 253.403
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/fields",
+          "duration_ms": 250.154
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/records",
+          "duration_ms": 251.396
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/fields",
+          "duration_ms": 257.392
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 260.299
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 260.259
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/fields",
+          "duration_ms": 259.159
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.195
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 252.469
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.162
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/fields",
+          "duration_ms": 253.597
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/records",
+          "duration_ms": 254.257
+        }
+      ],
+      "refresh_status": {
+        "server_time": "2026-10-14T22:42:42.453027+08:00",
+        "enabled": true,
+        "datasets": {
+          "sources": {
+            "as_of": "2026-10-14T22:42:32.006035+08:00",
+            "fetched_at": "2026-10-14T22:42:41.765484+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 60.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:42:41.765484+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 29,
+              "retries": 0,
+              "duration_ms": 9756
+            }
+          },
+          "roster": {
+            "as_of": null,
+            "fetched_at": null,
+            "age_seconds": null,
+            "ttl_seconds": 60.0,
+            "status": "never",
+            "changed_at": null,
+            "last_error": null,
+            "lark": {
+              "calls": 0,
+              "retries": 0,
+              "duration_ms": 0
+            },
+            "hard_max_age_seconds": 900
+          },
+          "attendance": {
+            "as_of": "2026-10-14T22:42:32.008707+08:00",
+            "fetched_at": "2026-10-14T22:42:38.745540+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 300.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:42:38.745540+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 16,
+              "retries": 0,
+              "duration_ms": 6734
+            }
+          }
+        }
+      },
+      "side": "baseline"
+    },
+    {
+      "loads": [
+        {
+          "temperature": "cold",
+          "wall_ms": 302.192,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 5.691,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 18.314,
+              "bytes": 150244
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 278.068,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 1
+        },
+        {
+          "temperature": "warm",
+          "wall_ms": 250.135,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 5.261,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 12.865,
+              "bytes": 150416
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 231.873,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 45
+        }
+      ],
+      "lark_calls": [
+        {
+          "path": "/open-apis/auth/v3/tenant_access_token/internal",
+          "duration_ms": 267.091
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/fields",
+          "duration_ms": 260.037
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 254.569
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/records",
+          "duration_ms": 257.455
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 260.401
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/fields",
+          "duration_ms": 258.124
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift0",
+          "duration_ms": 260.02
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 257.131
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift1",
+          "duration_ms": 260.019
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 260.122
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift2",
+          "duration_ms": 260.023
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 260.162
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift3",
+          "duration_ms": 251.415
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/fields",
+          "duration_ms": 255.596
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift4",
+          "duration_ms": 260.024
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.194
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift5",
+          "duration_ms": 254.356
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.159
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift6",
+          "duration_ms": 257.615
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.178
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift7",
+          "duration_ms": 260.018
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.097
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift8",
+          "duration_ms": 260.03
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/fields",
+          "duration_ms": 260.048
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift9",
+          "duration_ms": 260.025
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 260.154
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift10",
+          "duration_ms": 260.015
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 260.184
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift11",
+          "duration_ms": 260.021
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/fields",
+          "duration_ms": 253.449
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift12",
+          "duration_ms": 260.02
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 260.15
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift13",
+          "duration_ms": 259.278
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 260.126
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/fields",
+          "duration_ms": 260.029
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/records",
+          "duration_ms": 260.25
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/fields",
+          "duration_ms": 260.034
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 253.6
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 259.379
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/fields",
+          "duration_ms": 257.68
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 252.477
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 251.144
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.147
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/fields",
+          "duration_ms": 253.168
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/records",
+          "duration_ms": 260.134
+        }
+      ],
+      "refresh_status": {
+        "server_time": "2026-10-14T22:42:53.515448+08:00",
+        "enabled": true,
+        "datasets": {
+          "sources": {
+            "as_of": "2026-10-14T22:42:43.494334+08:00",
+            "fetched_at": "2026-10-14T22:42:53.263725+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 60.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:42:53.263725+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 29,
+              "retries": 0,
+              "duration_ms": 9767
+            }
+          },
+          "roster": {
+            "as_of": null,
+            "fetched_at": null,
+            "age_seconds": null,
+            "ttl_seconds": 60.0,
+            "status": "never",
+            "changed_at": null,
+            "last_error": null,
+            "lark": {
+              "calls": 0,
+              "retries": 0,
+              "duration_ms": 0
+            },
+            "hard_max_age_seconds": 900
+          },
+          "attendance": {
+            "as_of": "2026-10-14T22:42:43.496182+08:00",
+            "fetched_at": "2026-10-14T22:42:50.233272+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 300.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:42:50.233272+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 16,
+              "retries": 0,
+              "duration_ms": 6735
+            }
+          }
+        }
+      },
+      "side": "optimized"
+    },
+    {
+      "loads": [
+        {
+          "temperature": "cold",
+          "wall_ms": 696.084,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 6.447,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 18.538,
+              "bytes": 150244
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 670.946,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 2
+        },
+        {
+          "temperature": "warm",
+          "wall_ms": 698.167,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 5.77,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 13.994,
+              "bytes": 150416
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 678.259,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 45
+        }
+      ],
+      "lark_calls": [
+        {
+          "path": "/open-apis/auth/v3/tenant_access_token/internal",
+          "duration_ms": 267.541
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/fields",
+          "duration_ms": 260.171
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 254.245
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/records",
+          "duration_ms": 256.997
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 252.358
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/fields",
+          "duration_ms": 256.055
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift0",
+          "duration_ms": 259.236
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 258.652
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift1",
+          "duration_ms": 250.97
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 260.217
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift2",
+          "duration_ms": 260.02
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 255.62
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift3",
+          "duration_ms": 251.171
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/fields",
+          "duration_ms": 260.027
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift4",
+          "duration_ms": 260.018
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 251.819
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift5",
+          "duration_ms": 260.024
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.195
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift6",
+          "duration_ms": 254.824
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.182
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift7",
+          "duration_ms": 260.019
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 259.436
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift8",
+          "duration_ms": 260.018
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/fields",
+          "duration_ms": 253.698
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift9",
+          "duration_ms": 250.922
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 260.166
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift10",
+          "duration_ms": 251.955
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 260.121
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift11",
+          "duration_ms": 256.373
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/fields",
+          "duration_ms": 260.025
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift12",
+          "duration_ms": 260.016
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 260.163
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift13",
+          "duration_ms": 260.02
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 259.727
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/fields",
+          "duration_ms": 254.94
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/records",
+          "duration_ms": 260.243
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/fields",
+          "duration_ms": 251.568
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 260.459
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 260.217
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/fields",
+          "duration_ms": 259.991
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.252
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 254.734
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.133
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/fields",
+          "duration_ms": 260.031
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/records",
+          "duration_ms": 260.121
+        }
+      ],
+      "refresh_status": {
+        "server_time": "2026-10-14T22:43:05.097143+08:00",
+        "enabled": true,
+        "datasets": {
+          "sources": {
+            "as_of": "2026-10-14T22:42:54.616989+08:00",
+            "fetched_at": "2026-10-14T22:43:04.397417+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 60.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:43:04.397417+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 29,
+              "retries": 0,
+              "duration_ms": 9778
+            }
+          },
+          "roster": {
+            "as_of": null,
+            "fetched_at": null,
+            "age_seconds": null,
+            "ttl_seconds": 60.0,
+            "status": "never",
+            "changed_at": null,
+            "last_error": null,
+            "lark": {
+              "calls": 0,
+              "retries": 0,
+              "duration_ms": 0
+            },
+            "hard_max_age_seconds": 900
+          },
+          "attendance": {
+            "as_of": "2026-10-14T22:42:54.618967+08:00",
+            "fetched_at": "2026-10-14T22:43:01.347693+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 300.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:43:01.347693+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 16,
+              "retries": 0,
+              "duration_ms": 6726
+            }
+          }
+        }
+      },
+      "side": "baseline"
+    },
+    {
+      "loads": [
+        {
+          "temperature": "cold",
+          "wall_ms": 295.554,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 6.97,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 18.565,
+              "bytes": 150244
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 269.888,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 1
+        },
+        {
+          "temperature": "warm",
+          "wall_ms": 258.495,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 5.051,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 14.517,
+              "bytes": 150416
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 238.789,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 45
+        }
+      ],
+      "lark_calls": [
+        {
+          "path": "/open-apis/auth/v3/tenant_access_token/internal",
+          "duration_ms": 259.619
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/fields",
+          "duration_ms": 254.781
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 261.339
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/records",
+          "duration_ms": 260.146
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 259.766
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/fields",
+          "duration_ms": 260.026
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift0",
+          "duration_ms": 260.019
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 260.143
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift1",
+          "duration_ms": 260.019
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 260.155
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift2",
+          "duration_ms": 256.714
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 260.194
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift3",
+          "duration_ms": 260.021
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/fields",
+          "duration_ms": 260.028
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift4",
+          "duration_ms": 255.674
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 250.669
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift5",
+          "duration_ms": 260.016
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.175
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift6",
+          "duration_ms": 260.017
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.202
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift7",
+          "duration_ms": 252.705
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.15
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift8",
+          "duration_ms": 250.766
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/fields",
+          "duration_ms": 251.703
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift9",
+          "duration_ms": 260.019
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 257.671
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift10",
+          "duration_ms": 252.897
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 260.135
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift11",
+          "duration_ms": 250.378
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/fields",
+          "duration_ms": 257.617
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift12",
+          "duration_ms": 256.996
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 257.508
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift13",
+          "duration_ms": 260.021
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 255.776
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/fields",
+          "duration_ms": 257.144
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/records",
+          "duration_ms": 253.676
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/fields",
+          "duration_ms": 259.13
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 260.322
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 260.23
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/fields",
+          "duration_ms": 250.159
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 254.438
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 257.437
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 250.903
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/fields",
+          "duration_ms": 260.037
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/records",
+          "duration_ms": 260.128
+        }
+      ],
+      "refresh_status": {
+        "server_time": "2026-10-14T22:43:16.232339+08:00",
+        "enabled": true,
+        "datasets": {
+          "sources": {
+            "as_of": "2026-10-14T22:43:06.215052+08:00",
+            "fetched_at": "2026-10-14T22:43:15.972300+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 60.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:43:15.972300+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 29,
+              "retries": 0,
+              "duration_ms": 9754
+            }
+          },
+          "roster": {
+            "as_of": null,
+            "fetched_at": null,
+            "age_seconds": null,
+            "ttl_seconds": 60.0,
+            "status": "never",
+            "changed_at": null,
+            "last_error": null,
+            "lark": {
+              "calls": 0,
+              "retries": 0,
+              "duration_ms": 0
+            },
+            "hard_max_age_seconds": 900
+          },
+          "attendance": {
+            "as_of": "2026-10-14T22:43:06.217417+08:00",
+            "fetched_at": "2026-10-14T22:43:12.943331+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 300.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:43:12.943331+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 16,
+              "retries": 0,
+              "duration_ms": 6724
+            }
+          }
+        }
+      },
+      "side": "optimized"
+    },
+    {
+      "loads": [
+        {
+          "temperature": "cold",
+          "wall_ms": 868.347,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 6.731,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 19.422,
+              "bytes": 150244
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 842.07,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 3
+        },
+        {
+          "temperature": "warm",
+          "wall_ms": 625.815,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 5.457,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 12.781,
+              "bytes": 150416
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 607.433,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 45
+        }
+      ],
+      "lark_calls": [
+        {
+          "path": "/open-apis/auth/v3/tenant_access_token/internal",
+          "duration_ms": 259.467
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/fields",
+          "duration_ms": 262.556
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 329.364
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/records",
+          "duration_ms": 259.528
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 260.433
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/fields",
+          "duration_ms": 250.074
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift0",
+          "duration_ms": 258.032
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 250.433
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift1",
+          "duration_ms": 250.804
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 250.773
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift2",
+          "duration_ms": 251.796
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 252.435
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift3",
+          "duration_ms": 254.115
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/fields",
+          "duration_ms": 258.467
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift4",
+          "duration_ms": 251.722
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 250.638
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift5",
+          "duration_ms": 260.021
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 253.171
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift6",
+          "duration_ms": 259.15
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 255.749
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift7",
+          "duration_ms": 250.499
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.13
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift8",
+          "duration_ms": 260.029
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/fields",
+          "duration_ms": 260.031
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift9",
+          "duration_ms": 260.026
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 260.173
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift10",
+          "duration_ms": 251.862
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 260.193
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift11",
+          "duration_ms": 260.023
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/fields",
+          "duration_ms": 260.035
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift12",
+          "duration_ms": 251.589
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 258.255
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift13",
+          "duration_ms": 257.201
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 260.297
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/fields",
+          "duration_ms": 259.585
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/records",
+          "duration_ms": 252.106
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/fields",
+          "duration_ms": 260.05
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 254.784
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 251.528
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/fields",
+          "duration_ms": 260.036
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.305
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.232
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.168
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/fields",
+          "duration_ms": 260.033
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/records",
+          "duration_ms": 260.135
+        }
+      ],
+      "refresh_status": {
+        "server_time": "2026-10-14T22:43:27.738491+08:00",
+        "enabled": true,
+        "datasets": {
+          "sources": {
+            "as_of": "2026-10-14T22:43:17.340042+08:00",
+            "fetched_at": "2026-10-14T22:43:27.111113+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 60.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:43:27.111113+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 29,
+              "retries": 0,
+              "duration_ms": 9768
+            }
+          },
+          "roster": {
+            "as_of": null,
+            "fetched_at": null,
+            "age_seconds": null,
+            "ttl_seconds": 60.0,
+            "status": "never",
+            "changed_at": null,
+            "last_error": null,
+            "lark": {
+              "calls": 0,
+              "retries": 0,
+              "duration_ms": 0
+            },
+            "hard_max_age_seconds": 900
+          },
+          "attendance": {
+            "as_of": "2026-10-14T22:43:17.342217+08:00",
+            "fetched_at": "2026-10-14T22:43:24.068039+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 300.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:43:24.068039+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 16,
+              "retries": 0,
+              "duration_ms": 6723
+            }
+          }
+        }
+      },
+      "side": "baseline"
+    },
+    {
+      "loads": [
+        {
+          "temperature": "cold",
+          "wall_ms": 259.228,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 5.9,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 19.509,
+              "bytes": 150244
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 233.701,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 1
+        },
+        {
+          "temperature": "warm",
+          "wall_ms": 288.029,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 5.44,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 36.747,
+              "bytes": 150416
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 245.713,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 45
+        }
+      ],
+      "lark_calls": [
+        {
+          "path": "/open-apis/auth/v3/tenant_access_token/internal",
+          "duration_ms": 250.148
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/fields",
+          "duration_ms": 258.694
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 257.544
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/records",
+          "duration_ms": 250.432
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 260.426
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/fields",
+          "duration_ms": 254.909
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift0",
+          "duration_ms": 251.57
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 254.999
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift1",
+          "duration_ms": 260.028
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 260.15
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift2",
+          "duration_ms": 250.94
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 250.744
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift3",
+          "duration_ms": 257.194
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/fields",
+          "duration_ms": 253.417
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift4",
+          "duration_ms": 255.049
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 252.867
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift5",
+          "duration_ms": 260.02
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 252.561
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift6",
+          "duration_ms": 250.303
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 252.286
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift7",
+          "duration_ms": 260.02
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 259.118
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift8",
+          "duration_ms": 250.82
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/fields",
+          "duration_ms": 260.037
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift9",
+          "duration_ms": 260.019
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 251.24
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift10",
+          "duration_ms": 254.766
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 259.841
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift11",
+          "duration_ms": 253.435
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/fields",
+          "duration_ms": 258.612
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift12",
+          "duration_ms": 260.026
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 260.175
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift13",
+          "duration_ms": 252.437
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 255.254
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/fields",
+          "duration_ms": 256.547
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/records",
+          "duration_ms": 254.651
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/fields",
+          "duration_ms": 250.148
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 260.366
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 255.13
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/fields",
+          "duration_ms": 260.028
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 250.248
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 259.827
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 255.652
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/fields",
+          "duration_ms": 260.027
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/records",
+          "duration_ms": 260.14
+        }
+      ],
+      "refresh_status": {
+        "server_time": "2026-10-14T22:43:38.978647+08:00",
+        "enabled": true,
+        "datasets": {
+          "sources": {
+            "as_of": "2026-10-14T22:43:28.943126+08:00",
+            "fetched_at": "2026-10-14T22:43:38.689000+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 60.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:43:38.689000+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 29,
+              "retries": 0,
+              "duration_ms": 9743
+            }
+          },
+          "roster": {
+            "as_of": null,
+            "fetched_at": null,
+            "age_seconds": null,
+            "ttl_seconds": 60.0,
+            "status": "never",
+            "changed_at": null,
+            "last_error": null,
+            "lark": {
+              "calls": 0,
+              "retries": 0,
+              "duration_ms": 0
+            },
+            "hard_max_age_seconds": 900
+          },
+          "attendance": {
+            "as_of": "2026-10-14T22:43:28.944969+08:00",
+            "fetched_at": "2026-10-14T22:43:35.658254+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 300.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:43:35.658254+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 16,
+              "retries": 0,
+              "duration_ms": 6711
+            }
+          }
+        }
+      },
+      "side": "optimized"
+    },
+    {
+      "loads": [
+        {
+          "temperature": "cold",
+          "wall_ms": 695.421,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 6.122,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 19.948,
+              "bytes": 150244
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 669.227,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 2
+        },
+        {
+          "temperature": "warm",
+          "wall_ms": 727.13,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 5.448,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 14.079,
+              "bytes": 150416
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 707.457,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 45
+        }
+      ],
+      "lark_calls": [
+        {
+          "path": "/open-apis/auth/v3/tenant_access_token/internal",
+          "duration_ms": 269.721
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/fields",
+          "duration_ms": 260.194
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 260.387
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/records",
+          "duration_ms": 255.837
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 260.409
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/fields",
+          "duration_ms": 260.025
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift0",
+          "duration_ms": 260.022
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 256.406
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift1",
+          "duration_ms": 260.032
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 260.147
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift2",
+          "duration_ms": 256.005
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 255.189
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift3",
+          "duration_ms": 250.062
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/fields",
+          "duration_ms": 257.42
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift4",
+          "duration_ms": 260.019
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 256.113
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift5",
+          "duration_ms": 260.02
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 258.117
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift6",
+          "duration_ms": 259.291
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.196
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift7",
+          "duration_ms": 260.02
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.127
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift8",
+          "duration_ms": 257.33
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/fields",
+          "duration_ms": 259.306
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift9",
+          "duration_ms": 252.976
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 258.643
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift10",
+          "duration_ms": 250.8
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 259.119
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift11",
+          "duration_ms": 252.279
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/fields",
+          "duration_ms": 260.037
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift12",
+          "duration_ms": 256.28
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 260.148
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift13",
+          "duration_ms": 260.014
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 259.134
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/fields",
+          "duration_ms": 260.032
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/records",
+          "duration_ms": 260.272
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/fields",
+          "duration_ms": 260.036
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 257.842
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 259.677
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/fields",
+          "duration_ms": 250.857
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.188
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.228
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.059
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/fields",
+          "duration_ms": 253.664
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/records",
+          "duration_ms": 252.022
+        }
+      ],
+      "refresh_status": {
+        "server_time": "2026-10-14T22:43:50.636886+08:00",
+        "enabled": true,
+        "datasets": {
+          "sources": {
+            "as_of": "2026-10-14T22:43:40.126100+08:00",
+            "fetched_at": "2026-10-14T22:43:49.908026+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 60.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:43:49.908026+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 29,
+              "retries": 0,
+              "duration_ms": 9779
+            }
+          },
+          "roster": {
+            "as_of": null,
+            "fetched_at": null,
+            "age_seconds": null,
+            "ttl_seconds": 60.0,
+            "status": "never",
+            "changed_at": null,
+            "last_error": null,
+            "lark": {
+              "calls": 0,
+              "retries": 0,
+              "duration_ms": 0
+            },
+            "hard_max_age_seconds": 900
+          },
+          "attendance": {
+            "as_of": "2026-10-14T22:43:40.128397+08:00",
+            "fetched_at": "2026-10-14T22:43:46.863265+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 300.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:43:46.863265+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 16,
+              "retries": 0,
+              "duration_ms": 6732
+            }
+          }
+        }
+      },
+      "side": "baseline"
+    },
+    {
+      "loads": [
+        {
+          "temperature": "cold",
+          "wall_ms": 284.064,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 6.438,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 21.959,
+              "bytes": 150244
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 255.546,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 1
+        },
+        {
+          "temperature": "warm",
+          "wall_ms": 275.289,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 5.424,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 12.972,
+              "bytes": 150416
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 256.754,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 45
+        }
+      ],
+      "lark_calls": [
+        {
+          "path": "/open-apis/auth/v3/tenant_access_token/internal",
+          "duration_ms": 255.861
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/fields",
+          "duration_ms": 258.823
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 256.516
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/records",
+          "duration_ms": 251.006
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 260.402
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/fields",
+          "duration_ms": 252.509
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift0",
+          "duration_ms": 260.034
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 253.771
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift1",
+          "duration_ms": 255.011
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 260.161
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift2",
+          "duration_ms": 260.016
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 284.319
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift3",
+          "duration_ms": 260.019
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/fields",
+          "duration_ms": 257.207
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift4",
+          "duration_ms": 260.019
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 254.067
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift5",
+          "duration_ms": 260.019
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.171
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift6",
+          "duration_ms": 260.018
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.199
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift7",
+          "duration_ms": 257.094
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.102
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift8",
+          "duration_ms": 260.023
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/fields",
+          "duration_ms": 260.094
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift9",
+          "duration_ms": 260.023
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 260.164
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift10",
+          "duration_ms": 254.413
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 260.122
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift11",
+          "duration_ms": 253.964
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/fields",
+          "duration_ms": 260.029
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift12",
+          "duration_ms": 255.175
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 260.154
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift13",
+          "duration_ms": 260.022
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 250.25
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/fields",
+          "duration_ms": 260.035
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/records",
+          "duration_ms": 260.225
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/fields",
+          "duration_ms": 260.054
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 250.265
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 250.416
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/fields",
+          "duration_ms": 260.029
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.198
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.232
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 250.785
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/fields",
+          "duration_ms": 260.031
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/records",
+          "duration_ms": 251.33
+        }
+      ],
+      "refresh_status": {
+        "server_time": "2026-10-14T22:44:01.823829+08:00",
+        "enabled": true,
+        "datasets": {
+          "sources": {
+            "as_of": "2026-10-14T22:43:51.807438+08:00",
+            "fetched_at": "2026-10-14T22:44:01.547009+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 60.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:44:01.547009+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 29,
+              "retries": 0,
+              "duration_ms": 9737
+            }
+          },
+          "roster": {
+            "as_of": null,
+            "fetched_at": null,
+            "age_seconds": null,
+            "ttl_seconds": 60.0,
+            "status": "never",
+            "changed_at": null,
+            "last_error": null,
+            "lark": {
+              "calls": 0,
+              "retries": 0,
+              "duration_ms": 0
+            },
+            "hard_max_age_seconds": 900
+          },
+          "attendance": {
+            "as_of": "2026-10-14T22:43:51.809650+08:00",
+            "fetched_at": "2026-10-14T22:43:58.528388+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 300.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:43:58.528388+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 16,
+              "retries": 0,
+              "duration_ms": 6716
+            }
+          }
+        }
+      },
+      "side": "optimized"
+    },
+    {
+      "loads": [
+        {
+          "temperature": "cold",
+          "wall_ms": 705.842,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 6.358,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 18.849,
+              "bytes": 150244
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 680.507,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 2
+        },
+        {
+          "temperature": "warm",
+          "wall_ms": 824.531,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 5.988,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 14.24,
+              "bytes": 150416
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 804.16,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 45
+        }
+      ],
+      "lark_calls": [
+        {
+          "path": "/open-apis/auth/v3/tenant_access_token/internal",
+          "duration_ms": 268.062
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/fields",
+          "duration_ms": 266.095
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 260.721
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/records",
+          "duration_ms": 260.159
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 260.423
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/fields",
+          "duration_ms": 257.012
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift0",
+          "duration_ms": 256.807
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 260.166
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift1",
+          "duration_ms": 256.865
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 260.036
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift2",
+          "duration_ms": 260.017
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 251.821
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift3",
+          "duration_ms": 259.353
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/fields",
+          "duration_ms": 260.049
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift4",
+          "duration_ms": 260.023
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 257.136
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift5",
+          "duration_ms": 250.223
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 254.304
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift6",
+          "duration_ms": 260.019
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.202
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift7",
+          "duration_ms": 251.555
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 250.612
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift8",
+          "duration_ms": 254.959
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/fields",
+          "duration_ms": 253.129
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift9",
+          "duration_ms": 254.877
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 254.89
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift10",
+          "duration_ms": 260.023
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 260.138
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift11",
+          "duration_ms": 251.035
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/fields",
+          "duration_ms": 256.25
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift12",
+          "duration_ms": 251.704
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 260.171
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift13",
+          "duration_ms": 260.02
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 260.127
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/fields",
+          "duration_ms": 255.315
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/records",
+          "duration_ms": 260.23
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/fields",
+          "duration_ms": 260.035
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 260.33
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 260.224
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/fields",
+          "duration_ms": 260.031
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 254.437
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 250.36
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.078
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/fields",
+          "duration_ms": 250.113
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/records",
+          "duration_ms": 252.422
+        }
+      ],
+      "refresh_status": {
+        "server_time": "2026-10-14T22:44:13.651724+08:00",
+        "enabled": true,
+        "datasets": {
+          "sources": {
+            "as_of": "2026-10-14T22:44:03.055549+08:00",
+            "fetched_at": "2026-10-14T22:44:12.825590+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 60.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:44:12.825590+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 29,
+              "retries": 0,
+              "duration_ms": 9767
+            }
+          },
+          "roster": {
+            "as_of": null,
+            "fetched_at": null,
+            "age_seconds": null,
+            "ttl_seconds": 60.0,
+            "status": "never",
+            "changed_at": null,
+            "last_error": null,
+            "lark": {
+              "calls": 0,
+              "retries": 0,
+              "duration_ms": 0
+            },
+            "hard_max_age_seconds": 900
+          },
+          "attendance": {
+            "as_of": "2026-10-14T22:44:03.057608+08:00",
+            "fetched_at": "2026-10-14T22:44:09.796542+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 300.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:44:09.796542+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 16,
+              "retries": 0,
+              "duration_ms": 6737
+            }
+          }
+        }
+      },
+      "side": "baseline"
+    },
+    {
+      "loads": [
+        {
+          "temperature": "cold",
+          "wall_ms": 341.55,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 6.862,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 23.663,
+              "bytes": 150244
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 310.883,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 1
+        },
+        {
+          "temperature": "warm",
+          "wall_ms": 308.449,
+          "endpoints": [
+            {
+              "path": "/api/session",
+              "wall_ms": 5.867,
+              "bytes": 9298
+            },
+            {
+              "path": "/api/workspace?scope=shell",
+              "wall_ms": 15.155,
+              "bytes": 150416
+            },
+            {
+              "path": "/api/company-dashboard?limit=40",
+              "wall_ms": 287.276,
+              "bytes": 31807
+            }
+          ],
+          "cases": 319,
+          "tasks": 7018,
+          "digest": "75a2b0a9b06827d6cbdf830719f6c9d679eb951dd75e29ba3f5adb8bb619666e",
+          "completed_lark_calls": 45
+        }
+      ],
+      "lark_calls": [
+        {
+          "path": "/open-apis/auth/v3/tenant_access_token/internal",
+          "duration_ms": 264.668
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/fields",
+          "duration_ms": 252.887
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 261.079
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblmSQrcCs9vPQZx/records",
+          "duration_ms": 253.783
+        },
+        {
+          "path": "/open-apis/attendance/v1/user_daily_shifts/query",
+          "duration_ms": 260.43
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/fields",
+          "duration_ms": 256.857
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift0",
+          "duration_ms": 260.018
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 260.148
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift1",
+          "duration_ms": 256.558
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 258.756
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift2",
+          "duration_ms": 255.093
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblobs4qPy2w9MZ6/records",
+          "duration_ms": 250.996
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift3",
+          "duration_ms": 260.018
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/fields",
+          "duration_ms": 260.037
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift4",
+          "duration_ms": 260.02
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.177
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift5",
+          "duration_ms": 254.825
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 250.215
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift6",
+          "duration_ms": 260.021
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.305
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift7",
+          "duration_ms": 260.019
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblwQPYk3c9RvCU7/records",
+          "duration_ms": 260.11
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift8",
+          "duration_ms": 260.018
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/fields",
+          "duration_ms": 251.119
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift9",
+          "duration_ms": 260.023
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 259.99
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift10",
+          "duration_ms": 260.018
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl8wRYCUCvbSoJG/records",
+          "duration_ms": 252.083
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift11",
+          "duration_ms": 256.196
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/fields",
+          "duration_ms": 260.044
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift12",
+          "duration_ms": 253.138
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 260.149
+        },
+        {
+          "path": "/open-apis/attendance/v1/shifts/shift13",
+          "duration_ms": 259.34
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblKwSDRg6WaGHYr/records",
+          "duration_ms": 260.133
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/fields",
+          "duration_ms": 258.481
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tbl5zPLS0ExWNEty/records",
+          "duration_ms": 258.43
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/fields",
+          "duration_ms": 260.034
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 257.657
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/H7W6b0PFWaVF1BsgqXJj3pQ9pXb/tables/tblrCo8KeZiuJUNh/records",
+          "duration_ms": 260.274
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/fields",
+          "duration_ms": 260.029
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 258.306
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 259.419
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblENZvYAya93Twa/records",
+          "duration_ms": 260.154
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/fields",
+          "duration_ms": 257.496
+        },
+        {
+          "path": "/open-apis/bitable/v1/apps/JoOqbggsVar0ATsVgbcjh6IIp1g/tables/tblvV4X1kNVQisVj/records",
+          "duration_ms": 256.86
+        }
+      ],
+      "refresh_status": {
+        "server_time": "2026-10-14T22:44:25.078556+08:00",
+        "enabled": true,
+        "datasets": {
+          "sources": {
+            "as_of": "2026-10-14T22:44:14.987533+08:00",
+            "fetched_at": "2026-10-14T22:44:24.768584+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 60.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:44:24.768584+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 29,
+              "retries": 0,
+              "duration_ms": 9778
+            }
+          },
+          "roster": {
+            "as_of": null,
+            "fetched_at": null,
+            "age_seconds": null,
+            "ttl_seconds": 60.0,
+            "status": "never",
+            "changed_at": null,
+            "last_error": null,
+            "lark": {
+              "calls": 0,
+              "retries": 0,
+              "duration_ms": 0
+            },
+            "hard_max_age_seconds": 900
+          },
+          "attendance": {
+            "as_of": "2026-10-14T22:44:14.989646+08:00",
+            "fetched_at": "2026-10-14T22:44:21.724568+08:00",
+            "age_seconds": 10,
+            "ttl_seconds": 300.0,
+            "status": "fresh",
+            "changed_at": "2026-10-14T22:44:21.724568+08:00",
+            "last_error": null,
+            "lark": {
+              "calls": 16,
+              "retries": 0,
+              "duration_ms": 6732
+            }
+          }
+        }
+      },
+      "side": "optimized"
+    }
+  ]
+}

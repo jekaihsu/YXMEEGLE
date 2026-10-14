@@ -74,7 +74,7 @@ def canonical(result):
     return hashlib.sha256(json.dumps(result,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 
 
-def measure(latency, projects, profile=None):
+def measure(latency, projects, profile=None, legacy=False):
     with TemporaryDirectory() as directory:
         root = Path(directory)
         cfg = {'DATABASE_URL':f'sqlite:///{root}/bench.db', 'UPLOAD_DIR':str(root/'u'),
@@ -86,6 +86,14 @@ def measure(latency, projects, profile=None):
         tables = [dict(base_token=base,table_id=table,kind=kind) for base,known in KNOWN_TABLES.items() for table,kind in known.items()]
         cfg['LARK_SOURCE_TABLES_JSON'] = json.dumps(tables)
         app = create_app(cfg)
+        if legacy:
+            endpoint = next(route.endpoint for route in app.routes if route.path=='/api/company-dashboard')
+            cell = dict(zip(endpoint.__code__.co_freevars,endpoint.__closure__))['public_ws']
+            original_workspace = cell.cell_contents
+            def legacy_workspace(*args,**kwargs):
+                kwargs['task_details'] = True
+                return original_workspace(*args,**kwargs)
+            cell.cell_contents = legacy_workspace
         state = build_scaled_workspace(projects)
         state['environment'] = 'production'
         state['source_status'] = {'status':'ready','last_sync':'2026-10-14T12:00:00+08:00'}
@@ -120,19 +128,20 @@ def measure(latency, projects, profile=None):
                 assert len(result['rows'])==938
                 return {'fingerprint':'attendance','lark':client.metrics}
         app.state.live_read.refreshers = {'sources':sources,'attendance':attendance,'roster':lambda wid:{'fingerprint':'roster'}}
-        if profile:
-            import cProfile
-            from . import app as app_module
-            original = app_module.filter_private_workspace
-            profiler = cProfile.Profile()
-            def profiled(*args,**kwargs):
-                return profiler.runcall(original,*args,**kwargs)
-            app_module.filter_private_workspace = profiled
         client = TestClient(app)
         client.cookies.set('meegle_session',app.state.signer.dumps({'mode':'lark','uid':person['id'],'wid':'lark-bench','sid':'bench-session'}))
         samples = []
         try:
             for temperature in ('cold','warm'):
+                if profile and temperature=='warm':
+                    import cProfile
+                    endpoint = next(route.endpoint for route in app.routes if route.path=='/api/company-dashboard')
+                    cell = dict(zip(endpoint.__code__.co_freevars,endpoint.__closure__))['public_ws']
+                    public_workspace = cell.cell_contents
+                    profiler = cProfile.Profile()
+                    def profiled_workspace(*args,**kwargs):
+                        return profiler.runcall(public_workspace,*args,**kwargs)
+                    cell.cell_contents = profiled_workspace
                 start = perf_counter()
                 endpoints = []
                 for path in ('/api/session','/api/workspace?scope=shell','/api/company-dashboard?limit=40'):
@@ -154,7 +163,6 @@ def measure(latency, projects, profile=None):
             app.state.live_read.close()
             app.state.engine.dispose()
             if profile:
-                app_module.filter_private_workspace = original
                 profiler.dump_stats(profile)
 
 
@@ -165,14 +173,20 @@ def main():
     parser.add_argument('--latency',type=float,default=.25)
     parser.add_argument('--projects',type=int,default=319)
     parser.add_argument('--profile')
+    parser.add_argument('--compare',action='store_true')
+    parser.add_argument('--legacy',action='store_true')
     args = parser.parse_args()
-    runs = [measure(args.latency,args.projects,args.profile) for _ in range(args.runs)]
+    runs = []
+    for _ in range(args.runs):
+        for side in ('baseline','optimized') if args.compare else ('baseline' if args.legacy else 'optimized',):
+            result = measure(args.latency,args.projects,args.profile,legacy=side=='baseline')
+            runs.append(dict(result,side=side))
     artifact = {'latency_seconds':args.latency,'projects':args.projects,'table_counts':TABLE_COUNTS,
                 'assumptions':'Fictional existing 319-project fixture. Counts from read-only Lark table lists on 2026-10-14. Mock per-call latency. SQLite. No real network.',
                 'runs':runs}
     args.output.write_text(json.dumps(artifact,ensure_ascii=False,indent=2)+'\n')
     for run in runs:
-        print(json.dumps({'loads':run['loads'],'total_lark_calls':len(run['lark_calls'])}))
+        print(json.dumps({'side':run['side'],'loads':run['loads'],'total_lark_calls':len(run['lark_calls'])}))
 
 
 if __name__=='__main__':
