@@ -49,7 +49,7 @@ def reflect_job_status(state,job,status,message):
         issue.update(status=status,error=message)
 
 
-def schedule(ws,clock=None):
+def schedule(ws,clock=None,*,cfg=None):
     clock=clock or now(); today=clock[:10]; upgrade(ws)
     from .case_cutover import execution_allowed
     from .workflow_rules import activate_scheduled
@@ -79,7 +79,7 @@ def schedule(ws,clock=None):
         if not p or not execution_allowed(ws,p) or p.get('case_type')=='intake' or needs_review(p):continue
         instant=datetime.fromisoformat(clock)
         if instant.tzinfo is None:instant=instant.replace(tzinfo=ZoneInfo('Asia/Taipei'))
-        r['deadline']=cutoff(ws,r['owner_id'],r['due_date'],clock=instant)
+        r['deadline']=cutoff(ws,r['owner_id'],r['due_date'],clock=instant,cfg=cfg)
         r['cutoff_time']=r['deadline']['time']
         r['deadline_status']=r['deadline']['status']
         r['overdue']=False
@@ -258,7 +258,7 @@ class Worker:
     def run_one(self,wid):
         self.refresh_delegations(wid)
         with self.sessions.begin() as db:
-            row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update()); state=self.state(db,row); before=deepcopy(state); schedule(state)
+            row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update()); state=self.state(db,row); before=deepcopy(state); schedule(state,cfg=self.cfg)
             for j in state['jobs']:
                 from .features import enabled
                 if j['kind']=='digest' and not enabled(state,'routines') and j['status'] not in ('succeeded','canceled','cancelled'):
