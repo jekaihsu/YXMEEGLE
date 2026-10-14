@@ -38,7 +38,8 @@ export function CompanyCockpit({refreshVersion,role}:{refreshVersion:number;role
  const dataQuery=useRef('offset=0&limit=50');
  useEffect(()=>{let active=true;const controller=new AbortController();const epoch=getSessionEpoch();setError('');const params=new URLSearchParams({offset:String(offset),limit:'50'});if(search)params.set('q',search);if(group)params.set('group',group);if(lifecycle)params.set('lifecycle',lifecycle);if(attention)params.set('attention',attention);
   const query=params.toString();const cached=reload===0?cachedDashboard(refreshVersion,query):undefined;
-  setData(previous=>cached??(dataQuery.current===query?previous:undefined));setRetained(!!cached);dataQuery.current=query;
+  const same=dataQuery.current===query;
+  setData(previous=>cached??(same?previous:undefined));setRetained(!!cached);dataQuery.current=query;
   if(cached&&dashboardIsFresh(refreshVersion,query)){setLoading(false);return}
   setLoading(true);
   readDashboard(`/api/company-dashboard?${params}`,controller.signal,role||'').then(result=>{if(active&&epoch===getSessionEpoch()){rememberDashboard(epoch,refreshVersion,query,result);setData(result);setRetained(false)}}).catch(e=>{if(active&&epoch===getSessionEpoch())setError(e instanceof Error?e.message:'暫時無法讀取公司資料')}).finally(()=>{if(active&&epoch===getSessionEpoch())setLoading(false)});return()=>{active=false;controller.abort()};
