@@ -46,6 +46,7 @@ globalThis.fetch=async(url,init)=>{
  if(url==='/api/source-health')return json({page_state:null,sources:[]});
  if(url==='/api/workspace'){await fullGate();return json({...workspace,version:current.version});}
  if(url.startsWith('/api/projects?view=overview'))return overview(url);
+ if(url.endsWith('/node-assignments'))return new Response(JSON.stringify({code:'disabled',detail:'disabled'}),{status:404});
  if(url.startsWith('/api/projects/'))return detail(url);
  if(url.startsWith('/api/daily-reports?'))return json({items:[],total:0,offset:0,limit:30,summary:{}});
  if(url==='/api/workspace?scope=shell')return init.headers.get('If-None-Match')===etag?new Response(null,{status:304,headers:{ETag:etag}}):json(current,{ETag:etag});
@@ -156,10 +157,11 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  current=shell;etag='W/"shell-A:1"';failMutation=false;mutationResponse=undefined;location.hash='view=project&project=pA';
  await mount({workspace_shell:true});
  const goto=async hash=>flush(()=>{location.hash=hash;window.dispatchEvent(new window.Event('hashchange'))});
- const detailUrls=()=>requests.map(r=>r.url).filter(u=>u.startsWith('/api/projects/'));
+ const detailUrls=()=>requests.map(r=>r.url).filter(u=>u.startsWith('/api/projects/')&&!u.endsWith('/node-assignments'));
  assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects/pA']);
  assert.ok(document.querySelector('.workspace').textContent.includes('PRIVATE_CASE_A')&&document.querySelector('.workspace').textContent.includes('TASK_A'),'detail renders the project tree');
  await goto('view=project&project=pA&tab=flow');await goto('view=project&project=pA&tab=data&section=basic');assert.deepEqual(detailUrls(),['/api/projects/pA'],'tabs do not refetch the project');
+ assert.deepEqual(requests.filter(r=>r.url.endsWith('/node-assignments')).map(r=>r.url),['/api/projects/pA/node-assignments']);
  await goto('view=project&project=pB');assert.deepEqual(detailUrls(),['/api/projects/pA','/api/projects/pB']);assert.ok(document.querySelector('.workspace').textContent.includes('CASE_B'));
  // The 日報 tab lists through /api/daily-reports; the other cards in the shell are summaries without daily_reports and must not be scanned.
  await goto('view=project&project=pB&tab=daily');assert.ok(!document.querySelector('.workspace').textContent.includes('畫面暫時無法顯示'),'daily tab survives summary projects without daily_reports');assert.ok(document.querySelector('.daily-records'),'daily tab renders');

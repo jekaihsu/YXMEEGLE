@@ -36,7 +36,7 @@ function actionHint(n: AssignmentNode, can: NodePermissions): string {
   if (!n.owners.length && can.claim) return '待你認領';
   return can.complete ? '待你處理' : '';
 }
-export function NodeAssignments({projectId, legacy}: {projectId: string; legacy: ReactNode}) {
+export function NodeAssignments({projectId, legacy, before}: {projectId: string; legacy: ReactNode; before?: ReactNode}) {
   const assignments = useNodeAssignments(projectId);
   const [expanded, setExpanded] = useState('');
   const listRef = useRef<HTMLOListElement>(null);
@@ -52,11 +52,11 @@ export function NodeAssignments({projectId, legacy}: {projectId: string; legacy:
   const finished = data.summary.total > 0 && data.summary.done >= data.summary.total;
   const summaryLabel = finished ? '已完成' : '進行中';
   const jumpToList = () => {listRef.current?.scrollIntoView({behavior: 'smooth', block: 'start'}); listRef.current?.focus({preventScroll: true})};
-  return <section className="node-assignments" aria-label="案件節點指派">
+  return <>{before}<section className="node-assignments" aria-label="案件節點指派">
     <header className="na-heading"><div><p className="na-eyebrow">流程與交付</p><h2>案件流程</h2><p>從接案到結算，掌握每一次交接。</p></div>
       <button className="na-summary" aria-controls={listId} onClick={jumpToList}><span className="na-summary-count">{data.summary.done}/{data.summary.total}</span><span><strong>{summaryLabel}</strong><small>節點完成 · 查看清單</small></span><ArrowRight size={18}/></button>
     </header>
-    <ol className="na-overview" aria-label="九個節點流程總覽">{data.nodes.map((n, i) => <li key={n.key} aria-current={data.summary.current_node === n.key ? 'step' : undefined}>
+    <ol className="na-overview" tabIndex={0} aria-label="九個節點流程總覽，可左右捲動">{data.nodes.map((n, i) => <li key={n.key} aria-current={data.summary.current_node === n.key ? 'step' : undefined}>
       <span className={`na-overview-node${nodeStatusLabel(n.derived_status) === '已完成' ? ' is-done' : ''}${data.summary.current_node === n.key ? ' is-current' : ''}`}><span className="na-overview-marker" aria-hidden="true">{nodeStatusLabel(n.derived_status) === '已完成' ? <Check size={12}/> : i + 1}</span>{n.label}<span className="na-sr-only">{nodeStatusLabel(n.derived_status)}</span></span>
       {i < data.nodes.length - 1 && <ArrowRight size={13} className="na-arrow" aria-hidden="true"/>}
     </li>)}</ol>
@@ -79,7 +79,7 @@ export function NodeAssignments({projectId, legacy}: {projectId: string; legacy:
       </li>;
     })}</ol>
     {!data.nodes.length && <p className="na-empty">尚未建立節點指派。重新讀取後再確認。</p>}
-  </section>;
+  </section></>;
 }
 
 type DetailState = {kind: 'loading'} | {kind: 'ready'; data: NodeAssignmentDetail; refreshing: boolean} | {kind: 'error'; message: string; data?: NodeAssignmentDetail};
@@ -90,6 +90,8 @@ function NodeDetail({projectId, node, can, revision, listBlocked, pending, error
   const [state, setState] = useState<DetailState>({kind: 'loading'});
   const [retry, setRetry] = useState(0);
   const [form, setForm] = useState<'assign' | 'task' | 'reject' | ''>('');
+  const [changedTask, setChangedTask] = useState('');
+  const detailId = useId();
   useEffect(() => {
     const controller = new AbortController(), epoch = getSessionEpoch();
     const current = () => !controller.signal.aborted && epoch === getSessionEpoch();
@@ -123,8 +125,8 @@ function NodeDetail({projectId, node, can, revision, listBlocked, pending, error
     <div className="na-tasks-heading"><h4>節點任務 <span>{data.tasks.length} 項</span></h4><ActionButton allowed={can.create_task === true} busy={busy} reason={busy ? busyReason : undefined} onClick={() => setForm(form === 'task' ? '' : 'task')}><Plus size={15}/>新增任務</ActionButton></div>
     {form === 'task' && <TaskCreator detail={data} busy={busy} error={error} onCancel={() => setForm('')} onSubmit={task => save({action: 'create_task', nodeKey: node.key, task})}/>}
     <ul className="na-tasks">{data.tasks.map(task => <li key={task.id}><div className="na-task-body"><strong>{task.title}</strong>{task.detail && <p>{task.detail}</p>}<div className="na-task-meta"><span>{task.assignee?.name || '尚未指派'}</span><span>{task.department || '未設定部門'}</span><span><Clock3 size={13}/>{deadlineLabel(task.deadline)}</span></div></div>
-      <label className="na-task-status" title={!can.complete ? '目前沒有更新任務狀態的權限。' : busy ? busyReason : undefined}><span>任務狀態</span><select aria-label={`${task.title}狀態`} value={taskStatusValue(task.status)} disabled={!can.complete || busy} onChange={e => void mutate({action: 'update_task', nodeKey: node.key, taskId: task.id, patch: {status: e.target.value}})}>
-        {!taskStatusValue(task.status) && <option value="">{taskStatusLabel(task.status)}</option>}{TASK_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{!can.complete && <small>需有任務處理權限</small>}</label>
+      <label className="na-task-status" title={!can.complete ? '目前沒有更新任務狀態的權限。' : busy ? busyReason : undefined}><span>任務狀態</span><select aria-label={`${task.title}狀態`} value={taskStatusValue(task.status)} disabled={!can.complete || busy} aria-invalid={changedTask === task.id && !!error?.fields.status} aria-describedby={changedTask === task.id && error?.fields.status ? `${detailId}-${task.id}` : undefined} onChange={e => {setChangedTask(task.id); void mutate({action: 'update_task', nodeKey: node.key, taskId: task.id, patch: {status: e.target.value}})}}>
+        {!taskStatusValue(task.status) && <option value="">{taskStatusLabel(task.status)}</option>}{TASK_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{!can.complete && <small>需有任務處理權限</small>}{changedTask === task.id && error?.fields.status && <small className="na-field-error" id={`${detailId}-${task.id}`} role="alert">{error.fields.status}</small>}</label>
     </li>)}</ul>
     {!data.tasks.length && <p className="na-empty">此節點尚無任務。新增任務後即可追蹤交付進度。</p>}
     <div className="na-review"><div><ShieldCheck size={19}/><span><strong>節點交接</strong><small>確認任務與成果後，再完成或審核此節點。</small></span></div><div className="na-actions">

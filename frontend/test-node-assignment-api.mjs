@@ -56,3 +56,13 @@ test('malformed node payload becomes a local readable error', async () => {
   response = {status: 200, body: {...assignmentFixture().list, nodes: [{key: 'control'}]}};
   await assert.rejects(api.fetchNodeAssignments('p1', signal, () => true), {message: '節點資料格式不正確，請稍後重試。'});
 });
+test('detail refuses a response for a different node', async () => {
+  response = {status: 200, body: assignmentFixture().detail};
+  await assert.rejects(api.fetchNodeAssignmentDetail('p1', 'sales', signal, () => true), {message: '節點資料格式不正確，請稍後重試。'});
+});
+test('detail resolves person IDs to names and hides unresolved technical IDs', async () => {
+  const detail = assignmentFixture().detail; detail.tasks[0].assignee = 'ou_wei'; detail.node.assigned_by = 'ou_anna'; detail.node.approver = 'ou_unknown';
+  response = {status: 200, body: detail};
+  const parsed = await api.fetchNodeAssignmentDetail('p1', 'control', signal, () => true);
+  assert.equal(parsed.tasks[0].assignee.name, '陳威廷'); assert.equal(parsed.node.assigned_by.name, '林安娜'); assert.equal(parsed.node.approver.name, '姓名待確認');
+});

@@ -193,3 +193,25 @@ test('ProjectDetail integration leaves original stages and selected-node section
   assert.equal(document.querySelector('.node-assignments'), null); assert.equal(document.querySelector('.na-loading'), null);
   assert.equal(document.querySelector('.project-discussion h2').textContent, '案件討論');
 });
+test('ProjectDetail supports assignments when the legacy project has no nodes', async () => {
+  await mount(); const {workspace, user} = projectFixture(); workspace.projects[0].nodes = [];
+  const c = {w: workspace, s: {user, users: [user], mode: 'demo', auth_configured: false}, route: {view: 'project', project: 'p1', tab: 'flow'}, busy: false, go() {}, notify() {}, registerDrafts() {}, run: async () => undefined, refresh: async () => {}};
+  await act(async () => root.render(React.createElement(ui.ProjectDetail, {c})));
+  assert.equal(document.querySelectorAll('.na-row').length, 9); assert.equal(text().includes('尚未建立案件流程'), false); assert.equal(document.querySelector('.major-approval-summary h2').textContent, '重大事項審批');
+});
+test('task status validation attaches the server message to its select', async () => {
+  await mount({mutationReply: {status: 422, body: {code: 'validation', detail: {status: '請先補齊成果'}}}}); await expand(); await input(document.querySelector('.na-task-status select'), 'completed');
+  const select = document.querySelector('.na-task-status select'); assert.equal(select.getAttribute('aria-invalid'), 'true'); assert.equal(document.getElementById(select.getAttribute('aria-describedby')).textContent, '請先補齊成果'); assert.equal(select.value, 'in_progress');
+});
+test('failed list refresh keeps rows but blocks stale mutation permissions until retry', async () => {
+  await mount(); await expand(); listReply = {status: 500, body: {detail: '清單更新失敗'}}; await click(button('重新讀取'));
+  assert.equal(document.querySelector('.na-error span').textContent, '清單更新失敗'); assert.equal(document.querySelectorAll('.na-row').length, 9); assert.equal(button('認領節點').disabled, true);
+  listReply = null; await click(button('重試')); assert.equal(button('認領節點').disabled, false); assert.equal(document.querySelector('.na-error'), null);
+});
+test('initial loading leaves the legacy flow available', async () => {
+  await mount(); let release; const waiting = new Promise(resolve => {release = resolve});
+  globalThis.fetch = async () => {await waiting; return reply(assignmentFixture().list)};
+  await act(async () => root.render(React.createElement(ui.NodeAssignments, {key: 'loading', projectId: 'p1', legacy: React.createElement('div', {id: 'legacy-flow'}, '原有案件流程與任務')})));
+  assert.equal(document.querySelector('.na-loading').textContent, '正在讀取節點指派…'); assert.equal(document.getElementById('legacy-flow').textContent, '原有案件流程與任務');
+  await act(async () => release()); assert.equal(document.querySelector('.na-summary-count').textContent, '4/9');
+});

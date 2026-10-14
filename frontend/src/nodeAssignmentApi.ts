@@ -50,7 +50,7 @@ function optionalText(value: unknown): string | null {return value == null ? nul
 function count(value: unknown): number {if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw malformed(); return value}
 function array<T>(value: unknown, parse: (item: unknown) => T): T[] {if (!Array.isArray(value)) throw malformed(); return value.map(parse)}
 function person(value: unknown): AssignmentPerson {
-  if (typeof value === 'string') return {open_id: value, name: value};
+  if (typeof value === 'string') return {open_id: value, name: '姓名待確認'};
   const p = record(value); return {open_id: text(p.open_id), name: text(p.name)};
 }
 function optionalPerson(value: unknown): AssignmentPerson | null {return value == null || value === '' ? null : person(value)}
@@ -104,9 +104,14 @@ export async function fetchNodeAssignments(projectId: string, signal: AbortSigna
 }
 export async function fetchNodeAssignmentDetail(projectId: string, key: string, signal: AbortSignal, isCurrent: () => boolean): Promise<NodeAssignmentDetail> {
   const result = record(await request(`${basePath(projectId)}/nodes/${encodeURIComponent(key)}`, {signal, cache: 'no-store'}, isCurrent));
-  return {node: node(result.node), tasks: array(result.tasks, task), assignable_people: array(result.assignable_people, value => {
+  const parsedNode = node(result.node);
+  if (parsedNode.key !== key) throw malformed();
+  const people = array(result.assignable_people, value => {
     const p = record(value); return {...person(p), departments: array(p.departments, text)};
-  })};
+  });
+  const named = (p: AssignmentPerson | null) => p && p.name === '姓名待確認' ? people.find(candidate => candidate.open_id === p.open_id) || p : p;
+  return {node: {...parsedNode, assigned_by: named(parsedNode.assigned_by), approver: named(parsedNode.approver)},
+    tasks: array(result.tasks, task).map(t => ({...t, assignee: named(t.assignee), assigned_by: named(t.assigned_by)})), assignable_people: people};
 }
 function requestId(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
