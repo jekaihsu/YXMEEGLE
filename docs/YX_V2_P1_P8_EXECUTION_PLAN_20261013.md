@@ -354,6 +354,23 @@ P2-F1 view models dispatched from `7ae4a9d` (new files only): 128F1 Sonnet `task
   - P1-SH-DIAG (Codex `task_5eb97aef681a`, read-only) enumerated the 409 guards. A strong candidate is a persistent partial snapshot at the fetch page cap (`source_sync.py:106`). Staging counts are needed; nothing has been fixed.
 - P2-INT-B: Sonnet `task_1a6e1469a11f` from `4752820`.
 
+**State at c59bb87** (origin; the root integrated A1–A6, 131F1, 132F1, P1-SH-STATE 61da797 = 02295a6, and P1-LEASE d2e0a24). The root owns integration; the commander supplies ordered SHAs only (coordinator decision, option A).
+- **P1-LEASE** (Codex `task_ac6fe69d8dfd` → FIX1 `task_c037db015485`):
+  - Root cause from the staging log: the refresh took 131–144 s, longer than the 120 s lease. The Lark read is already capped at ~100 s (client budget), so the overrun is the apply phase.
+  - Fix: revision-CAS renewal bounded by claim + budget + lease (existing values; 220 s by default).
+  - Opus CHANGES-REQUESTED on fca809e (renewal treated transient DB errors as ownership loss) → delta PASS on d2e0a24.
+- **128B:**
+  - The Opus retry review `task_50cfda02b2f7` found B1: the case list depended on the confirmation population.
+  - FIX1 `4030811` (Codex `task_e46a093af2b2`): Opus delta PASS-WITH-FINDINGS.
+  - Matching 128F1 updates FIX3/FIX4, final `57cbf64`, commander evidence-verified. Decision: `row_keys []` renders as a dash with 「不代表沒有確認單」, never 「無」.
+- **P2-INT-B final `f78291f`:**
+  - Codex REV `task_465098761c28` CHANGES-REQUESTED (F1–F5) → FIX1 `9f7e78d`. FIX1 includes bounded edits to confirmation_list/case_detail.
+  - Codex delta `task_94d61af43ca8` CHANGES-REQUESTED (B1 fence exhaustion, B2 freshness outside the fence) → FIX2 `929f53d`, evidence-verified with the reviewer's probes (13/13).
+  - FIX3 `f78291f`: case/population filter split. I1 gap recorded: C-STATE has no complete-nonempty value, so healthy cards show partial.
+- **P2-UI-b final `b796f8d`** (AGY): Codex `task_fde58094dcb9` CHANGES-REQUESTED (6 accessibility/failure-state blockers) → delta `task_9580e6d5811a` PASS-WITH-FINDINGS.
+- **Missing deltas for the root:** 128B `4030811` + 128F1 `273d219..57cbf64`; 129F1 `0c0a3de`; 130F1 `2d4da56`; INT-B `2694d9e..f78291f`; UI-b `df95a23..b796f8d`.
+- **Next after those land:** AGY UI-a (ConfirmationList/ManagerOverview), AGY UI-c (CaseDetail), then P2-INT-F (Sonnet, frontend hub), then P2-E2E (Codex).
+
 **Proposed serial order for the root:** A1 129B → A2 130B → A3 131B → A4 132B → A5 128B → A6 NAV (focused test per merge; one full backend pytest and one frontend build/tsc at A6) → B P2-INT-B (Sonnet; `backend/app.py` + `backend/test_p2_int_routes.py`; exactly `GET /api/manager-overview`, `/api/confirmations`, `/api/case-detail/{project_id}`, `/api/contract-detail?key`, `/api/work-item-detail?key`) → C F1 ×5 → D AGY UI-a/UI-b → E P2-INT-F (Sonnet; frontend hub files plus new `P2Pages.tsx`; NAV F2 vocabulary adapter) → F P2-E2E (Codex). Specs: `spec-p2-int-b.txt`, `spec-p2-int-f.txt`.
 
 Held P2 rows (file sets fixed now, dispatched when their input is reviewed):
