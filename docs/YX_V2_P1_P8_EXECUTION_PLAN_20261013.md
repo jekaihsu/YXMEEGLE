@@ -343,6 +343,17 @@ All rows branch from `7ae4a9d`, live in Orca `new-child` worktrees under `/Users
 
 P2-F1 view models dispatched from `7ae4a9d` (new files only): 128F1 Sonnet `task_72dbe16e6f60`, 129F1 Codex `task_372a1b5fce1b`, 130F1 Codex `task_95c9f3e727b2`, 131F1 Sonnet `task_b4132a99398a`, 132F1 Sonnet `task_c8ad12122165`.
 
+**State at 4752820 (root cherry-picked A1–A6 and pushed `origin/ava-apple/yx-v2` = `4752820932a83e0c5cdbc47ef0f0c4d8038d4a6e`; the commander verified that all 12 files are blob-identical to the reviewed SHAs):**
+- 130B final: Codex delta `task_66fdc4d7e733` PASS at `9747c16`.
+- F1 results:
+  - 129F1 `0c0a3de` and 130F1 `2d4da56`: Opus PASS-WITH-FINDINGS, with real-backend parity probes.
+  - 131F1 `65f5b60` and 132F1 `8ed3c4d`: Codex delta `task_4f2af82b0a02` PASS, after Codex `task_167c7fe4de37` CHANGES-REQUESTED.
+  - 128F1 `9c89b54`: accepted by commander evidence verification after a residual found by the Codex delta.
+- P1 Source Health state order (found during P2):
+  - P1-SH-STATE `02295a6` (Sonnet `task_fa9e9d351dce` → FIX1 `task_14802a770aea`): Codex `task_92bf6f28caef` CHANGES-REQUESTED → delta `task_bdd04057a2f5` PASS. Only an active refresh outranks a failed or blocked refresh; a cached `loading` status without a lease is `read_failed`.
+  - P1-SH-DIAG (Codex `task_5eb97aef681a`, read-only) enumerated the 409 guards. A strong candidate is a persistent partial snapshot at the fetch page cap (`source_sync.py:106`). Staging counts are needed; nothing has been fixed.
+- P2-INT-B: Sonnet `task_1a6e1469a11f` from `4752820`.
+
 **Proposed serial order for the root:** A1 129B → A2 130B → A3 131B → A4 132B → A5 128B → A6 NAV (focused test per merge; one full backend pytest and one frontend build/tsc at A6) → B P2-INT-B (Sonnet; `backend/app.py` + `backend/test_p2_int_routes.py`; exactly `GET /api/manager-overview`, `/api/confirmations`, `/api/case-detail/{project_id}`, `/api/contract-detail?key`, `/api/work-item-detail?key`) → C F1 ×5 → D AGY UI-a/UI-b → E P2-INT-F (Sonnet; frontend hub files plus new `P2Pages.tsx`; NAV F2 vocabulary adapter) → F P2-E2E (Codex). Specs: `spec-p2-int-b.txt`, `spec-p2-int-f.txt`.
 
 Held P2 rows (file sets fixed now, dispatched when their input is reviewed):
