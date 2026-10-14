@@ -107,7 +107,8 @@ def test_existing_staff_session_preserves_read_login_but_rechecks_privileged_acc
     assert login().status_code == 307
     assert client.get('/api/workspace').status_code == 200
     change(patch)
-    blocked=patch.get('active') is False or patch.get('identity_app_id')=='another-app'
+    blocked=(patch.get('active') is False or patch.get('identity_app_id')=='another-app'
+             or patch.get('directory_status')=='left' or patch.get('directory_missing') is True)
     assert client.get('/api/workspace').status_code == (403 if blocked else 200)
     assert (client.get('/api/session').json()['user'] is None)==blocked
     assert client.post('/api/people/sync').status_code==403
@@ -121,10 +122,11 @@ def test_oauth_does_not_reactivate_or_remap_unverified_staff(staff, patch):
     _, client, login, change = staff
     change(patch)
     assert login().status_code in (303, 307, 403)
-    blocked=patch.get('active') is False or patch.get('identity_app_id')=='another-app'
-    assert (client.get('/api/session').json()['user'] is None)==blocked
-    assert client.get('/api/workspace').status_code == (401 if blocked else 200)
-    assert client.post('/api/people/sync').status_code==(401 if blocked else 403)
+    login_blocked=patch.get('active') is False or patch.get('identity_app_id')=='another-app'
+    read_blocked=login_blocked or patch.get('directory_status')=='left' or patch.get('directory_missing') is True
+    assert (client.get('/api/session').json()['user'] is None)==read_blocked
+    assert client.get('/api/workspace').status_code == (401 if login_blocked else 403 if read_blocked else 200)
+    assert client.post('/api/people/sync').status_code==(401 if login_blocked else 403)
 
 
 @pytest.mark.parametrize('stamp',[
