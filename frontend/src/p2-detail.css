@@ -10,12 +10,6 @@
   color: var(--label, #1d1d1f);
 }
 
-.p2-container {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-4, 16px);
-  width: 100%;
-}
 
 /* Page State Banner */
 .p2-banner {
@@ -624,7 +618,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-5, 20px);
-  outline: none;
+}
+
+.p2-tabpanel:focus,
+.p2-tabpanel:focus-visible {
+  outline: 2px solid var(--accent, #0c5494);
+  outline-offset: 2px;
 }
 
 .p2-tabpanel[hidden] {

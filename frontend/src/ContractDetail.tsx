@@ -40,8 +40,28 @@ export function ContractDetail({
   onNavigate,
   onBack,
 }: ContractDetailProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const rowSelectButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const prevDrawerKeyRef = useRef<string | null>(view.drawer?.identity.sourceKey ?? null);
+
+  const restoreFocus = (targetKey: string | null) => {
+    if (targetKey) {
+      const btn = rowSelectButtonRefs.current.get(targetKey);
+      if (btn && !btn.closest('[hidden]')) {
+        btn.focus();
+        return;
+      }
+    }
+    const fallback = rootRef.current?.querySelector<HTMLElement>(
+      'caption, h2, h1'
+    );
+    if (fallback) {
+      if (!fallback.hasAttribute('tabindex')) {
+        fallback.setAttribute('tabindex', '-1');
+      }
+      fallback.focus();
+    }
+  };
 
   useEffect(() => {
     const currentKey = view.drawer?.identity.sourceKey ?? null;
@@ -49,8 +69,7 @@ export function ContractDetail({
     prevDrawerKeyRef.current = currentKey;
 
     if (prevKey !== null && currentKey === null) {
-      const btn = rowSelectButtonRefs.current.get(prevKey);
-      btn?.focus();
+      restoreFocus(prevKey);
     }
   }, [view.drawer]);
 
@@ -88,7 +107,7 @@ export function ContractDetail({
   const mainKey = currentEntry?.navKey ?? null;
 
   return (
-    <div className="p2-detail-root">
+    <div className="p2-detail-root" ref={rootRef}>
       {/* 頁面資料狀態橫幅 (Page State Banner) */}
       <section
         className={`p2-banner ${view.page.states.map(s => `state-${s}`).join(' ')}`}
@@ -358,7 +377,7 @@ export function ContractDetail({
                                     e.stopPropagation();
                                     onNavigate?.(row.nav);
                                   }}
-                                  aria-label={`前往工項 ${row.name.kind === 'text' ? row.name.text : row.navKey}`}
+                                  aria-label={`前往工項 ${row.name.text}`}
                                 >
                                   {renderCell(row.name)}
                                 </button>
@@ -513,11 +532,9 @@ export function ContractDetail({
                   type="button"
                   className="p2-btn p2-btn-sm p2-btn-close"
                   onClick={() => {
-                    const keyToRestore = view.drawer?.identity.sourceKey;
+                    const keyToRestore = view.drawer?.identity.sourceKey ?? null;
                     onSelect?.(null);
-                    if (keyToRestore) {
-                      rowSelectButtonRefs.current.get(keyToRestore)?.focus();
-                    }
+                    restoreFocus(keyToRestore);
                   }}
                   aria-label="關閉原生詳情抽屜"
                 >

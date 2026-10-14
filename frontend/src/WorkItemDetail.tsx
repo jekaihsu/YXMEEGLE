@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useId } from 'react';
 import type {
   WorkItemView,
   WorkItemTab,
@@ -45,9 +45,33 @@ export function WorkItemDetail({
   onNavigate,
   onBack,
 }: WorkItemDetailProps) {
+  const instanceId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
   const rowSelectButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const tabButtonRefs = useRef<Map<WorkItemTab, HTMLButtonElement>>(new Map());
   const prevDrawerKeyRef = useRef<string | null>(view.drawer.model?.key ?? null);
+
+  const tabId = (key: string) => `${instanceId}-tab-${key}`;
+  const panelId = (key: string) => `${instanceId}-panel-${key}`;
+
+  const restoreFocus = (targetKey: string | null) => {
+    if (targetKey) {
+      const btn = rowSelectButtonRefs.current.get(targetKey);
+      if (btn && !btn.closest('[hidden]')) {
+        btn.focus();
+        return;
+      }
+    }
+    const fallback = rootRef.current?.querySelector<HTMLElement>(
+      '.p2-tabpanel:not([hidden]) caption, .p2-tabpanel:not([hidden]) h2, caption, h2, h1'
+    );
+    if (fallback) {
+      if (!fallback.hasAttribute('tabindex')) {
+        fallback.setAttribute('tabindex', '-1');
+      }
+      fallback.focus();
+    }
+  };
 
   useEffect(() => {
     const currentKey = view.drawer.model?.key ?? null;
@@ -55,12 +79,12 @@ export function WorkItemDetail({
     prevDrawerKeyRef.current = currentKey;
 
     if (prevKey !== null && currentKey === null) {
-      const btn = rowSelectButtonRefs.current.get(prevKey);
-      btn?.focus();
+      restoreFocus(prevKey);
     }
   }, [view.drawer.open, view.drawer.model]);
 
   const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, currentTab: WorkItemTab) => {
+    if (e.repeat) return;
     const tabs = WORK_ITEM_TABS;
     const currentIndex = tabs.indexOf(currentTab);
     if (currentIndex === -1) return;
@@ -117,7 +141,7 @@ export function WorkItemDetail({
   }
 
   return (
-    <div className="p2-detail-root">
+    <div className="p2-detail-root" ref={rootRef}>
       {/* 頁面資料狀態橫幅 (Page State Banner) */}
       <section
         className={`p2-banner ${view.pageState.states.map(s => `state-${s}`).join(' ')}`}
@@ -217,8 +241,8 @@ export function WorkItemDetail({
                 key={tab.key}
                 type="button"
                 role="tab"
-                id={`p2-tab-${tab.key}`}
-                aria-controls={`p2-tabpanel-${tab.key}`}
+                id={tabId(tab.key)}
+                aria-controls={panelId(tab.key)}
                 aria-selected={tab.active}
                 tabIndex={tab.active ? 0 : -1}
                 ref={el => {
@@ -237,8 +261,8 @@ export function WorkItemDetail({
           {/* Tab 1: 工作內容 (Work Content) */}
           <div
             role="tabpanel"
-            id="p2-tabpanel-work_content"
-            aria-labelledby="p2-tab-work_content"
+            id={panelId('work_content')}
+            aria-labelledby={tabId('work_content')}
             tabIndex={0}
             className="p2-tabpanel"
             hidden={view.activeTab !== 'work_content'}
@@ -361,8 +385,8 @@ export function WorkItemDetail({
           {/* Tab 2: 工單 (Work Orders unlocated with Source Health link) */}
           <div
             role="tabpanel"
-            id="p2-tabpanel-work_orders"
-            aria-labelledby="p2-tab-work_orders"
+            id={panelId('work_orders')}
+            aria-labelledby={tabId('work_orders')}
             tabIndex={0}
             className="p2-tabpanel"
             hidden={view.activeTab !== 'work_orders'}
@@ -394,8 +418,8 @@ export function WorkItemDetail({
           {/* Tab 3: 工作流程節點／SOP (Workflow Nodes / SOP) */}
           <div
             role="tabpanel"
-            id="p2-tabpanel-nodes"
-            aria-labelledby="p2-tab-nodes"
+            id={panelId('nodes')}
+            aria-labelledby={tabId('nodes')}
             tabIndex={0}
             className="p2-tabpanel"
             hidden={view.activeTab !== 'nodes'}
@@ -498,8 +522,8 @@ export function WorkItemDetail({
           {/* Tab 4: 交付物 (Deliverables - evidence rows marked evidence-only) */}
           <div
             role="tabpanel"
-            id="p2-tabpanel-deliverables"
-            aria-labelledby="p2-tab-deliverables"
+            id={panelId('deliverables')}
+            aria-labelledby={tabId('deliverables')}
             tabIndex={0}
             className="p2-tabpanel"
             hidden={view.activeTab !== 'deliverables'}
@@ -597,8 +621,8 @@ export function WorkItemDetail({
           {/* Tab 5: 歷程 (History) */}
           <div
             role="tabpanel"
-            id="p2-tabpanel-history"
-            aria-labelledby="p2-tab-history"
+            id={panelId('history')}
+            aria-labelledby={tabId('history')}
             tabIndex={0}
             className="p2-tabpanel"
             hidden={view.activeTab !== 'history'}
@@ -609,7 +633,7 @@ export function WorkItemDetail({
                 <span className="p2-badge">{view.history.state.label}</span>
               </div>
               {view.history.rounds.length === 0 ? (
-                <p className="p2-table-empty">尚無重工輪次紀錄</p>
+                <p className="p2-table-empty">{view.history.state.label}</p>
               ) : (
                 <div className="p2-table-wrapper" tabIndex={0} role="region" aria-label="重工輪次歷程表格">
                   <table className="p2-table">
@@ -655,7 +679,7 @@ export function WorkItemDetail({
               {view.history.completedExpanded && (
                 <div>
                   {!view.history.completed || view.history.completed.length === 0 ? (
-                    <p className="p2-table-empty">尚無已完成任務歷程</p>
+                    <p className="p2-table-empty">{view.history.state.label}</p>
                   ) : (
                     <div className="p2-table-wrapper" tabIndex={0} role="region" aria-label="已完成任務表格">
                       <table className="p2-table">
@@ -781,11 +805,9 @@ export function WorkItemDetail({
                 type="button"
                 className="p2-btn p2-btn-sm p2-btn-close"
                 onClick={() => {
-                  const keyToRestore = view.drawer.model?.key;
+                  const keyToRestore = view.drawer.model?.key ?? null;
                   onSelect?.(null);
-                  if (keyToRestore) {
-                    rowSelectButtonRefs.current.get(keyToRestore)?.focus();
-                  }
+                  restoreFocus(keyToRestore);
                 }}
                 aria-label="關閉原生詳情抽屜"
               >
