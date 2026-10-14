@@ -105,7 +105,7 @@ def test_unresolved_is_reported_separately_and_never_counted_as_a_case():
     state = workspace()
     state['confirmation_fixture'] = [state['confirmation_fixture'][3]]
     assert cards(overview(state))['stable_cases']['value'] is None  # no proven complete zero
-    assert overview(state)['snapshot']['cases'] == []
+    assert [r['project_id'] for r in overview(state)['snapshot']['cases']] == ['case-A', 'case-B']
 
 
 def test_overlapping_populations_are_not_summed_into_a_total():
@@ -261,7 +261,13 @@ def test_unavailable_population_is_never_an_empty_denominator(states):
                    population_state=data_state(*states) if states else None, as_of=AS_OF)
     expected = list(states) if states and states[0] not in ('complete_empty', 'filtered_empty') else ['unknown']
     assert result['snapshot']['state']['states'] == expected
-    assert result['snapshot']['cases'] == []
+    # Local unfinished cases remain listed when population is None.
+    assert [r['project_id'] for r in result['snapshot']['cases']] == ['case-A', 'case-B']
+    for row in result['snapshot']['cases']:
+        assert row['details']['row_keys'] is None
+        assert row['details']['row_keys_state'] == data_state('unknown')
+        assert row['details']['row_keys_reason']
+    assert result['snapshot']['cases'][0]['responsible']['value'] == 'Synthetic PM'
     assert result['snapshot']['unresolved']['value'] is None
     for card in result['snapshot']['cards']:
         assert card['value'] is None
@@ -278,3 +284,67 @@ def test_malformed_or_duplicate_population_identity_is_rejected(key):
     with pytest.raises(ValueError, match='unique nonempty opaque string'):
         overview(state)
     assert cards(overview())['confirmation_versions']['value'] == 5
+
+
+def test_unfinished_case_without_confirmation_row_remains_visible():
+    state = workspace()
+    state['confirmation_fixture'] = state['confirmation_fixture'][:2]
+    result = overview(state)
+    assert [r['project_id'] for r in result['snapshot']['cases']] == ['case-A', 'case-B']
+    assert result['snapshot']['cases'][1]['details']['row_keys'] == []
+    assert cards(result)['confirmation_versions']['value'] == 2
+    assert cards(result)['stable_cases']['value'] == 1
+
+
+@pytest.mark.parametrize('filters, expected', [
+    ({'pm_id': 'pm-A'}, ['case-A']),
+    ({'execution_status': 'paused'}, ['case-B']),
+    ({'pm_id': 'pm-A', 'execution_status': 'paused'}, []),
+    ({'pm_id': 'absent'}, []),
+    ({'execution_status': 'completed'}, []),
+    ({'version': 'absent', 'cutoff': AS_OF, 'scope': 'opaque'}, ['case-A', 'case-B']),
+])
+def test_only_project_pm_and_execution_filters_apply_to_local_cases(filters, expected):
+    result = build(workspace(), population=lambda s, f: None, filters=filters)
+    assert [r['project_id'] for r in result['snapshot']['cases']] == expected
+    assert result['snapshot']['filters'] == filters
+    assert cards(result)['confirmation_versions']['value'] is None
+
+
+def test_confirmation_version_filter_does_not_hide_other_local_cases():
+    result = overview(filters={'version': 'v3'})
+    assert [r['project_id'] for r in result['snapshot']['cases']] == ['case-A', 'case-B']
+    assert [r['details']['row_keys'] for r in result['snapshot']['cases']] == [['rk-01'], []]
+    assert cards(result)['confirmation_versions']['value'] == 1
+    assert cards(result)['stable_cases']['value'] == 1
+
+
+@pytest.mark.parametrize('bad_project', [None, 'not a project', {},
+    {'name': 'SECRET malformed project'},
+    {'id': None, 'name': 'SECRET malformed project'},
+    {'id': '', 'name': 'SECRET malformed project'}])
+def test_project_without_stable_id_is_skipped_without_leak(bad_project):
+    state = workspace()
+    state['projects'].append(bad_project)
+    result = build(state, population=lambda s, f: [])
+    assert [r['project_id'] for r in result['snapshot']['cases']] == ['case-A', 'case-B']
+    assert 'SECRET' not in json.dumps(result)
+    assert cards(result)['stable_cases']['value'] is None
+
+
+@pytest.mark.parametrize('health', ['malformed', [], 42, {'page_state': 'malformed'},
+                                  {'page_state': {'reason': 'SECRET health metadata'}},
+                                  {'page_state': {'states': 'unknown'}},
+                                  {'page_state': {'states': []}}])
+def test_malformed_source_health_is_unknown_and_retains_local_cases(health):
+    result = overview(source_health=health)
+    assert result['source_health']['state'] == data_state('unknown')
+    assert result['source_health']['failure']['state'] == data_state('unknown')
+    assert [r['project_id'] for r in result['snapshot']['cases']] == ['case-A', 'case-B']
+    assert 'SECRET' not in json.dumps(result)
+
+
+def test_review_healthy_nonempty_population_without_envelope_stays_partial_for_p2_int():
+    result = overview(population_state=None)
+    assert cards(result)['confirmation_versions']['value'] == 5
+    assert cards(result)['confirmation_versions']['state'] == data_state('partial', count=5)
