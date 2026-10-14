@@ -1340,6 +1340,18 @@ def create_app(overrides=None):
     register(app,identity,load,persist_mutation,sessions,WorkspaceRow,BusinessRow,PersonRow,cfg,upload_dir)
     from .native_routes import register as register_native
     register_native(app,identity,load,persist_mutation,sessions,WorkspaceRow,cfg)
+
+    def node_assignment_case(data,user,project_id):
+        from .source_case_policy import visible_project
+        require(len(project_id)<=200,'查詢參數過長',422)
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
+        project=next((p for p in state['projects'] if p['id']==project_id and visible_project(state,p)),None)
+        require(project is not None,'找不到這個案件',404)
+        return state,project
+    from .node_assignment.routes import register as register_node_assignment
+    from .node_skip import valid_waiver
+    app.state.node_assignment=register_node_assignment(app,identity=identity,load_case=node_assignment_case,sessions=sessions,
+        receipt_model=Receipt,audit_model=AuditRow,cfg=cfg,skipped_nodes=valid_waiver)
     from .native_poller import NativeApprovalPoller
     app.state.native_poller=NativeApprovalPoller(sessions,WorkspaceRow,BusinessRow,PersonRow,cfg)
     from .source_sync import SourceSyncService

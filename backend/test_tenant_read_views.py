@@ -20,9 +20,9 @@ READS = [
 
 @pytest.fixture
 def tenant_views(tmp_path, monkeypatch):
-    # Exercise authorization even for the owner-disabled learning feature.
+    # Exercise authorization even for features that are off by default.
     monkeypatch.setattr('backend.features.FEATURE_LEARNING', True)
-    app, _ = company(tmp_path, {'WORKSPACE_SHELL_ENABLED': 'true'})
+    app, _ = company(tmp_path, {'WORKSPACE_SHELL_ENABLED': 'true', 'NODE_ASSIGNMENT_ENABLED': 'true'})
     state, vis, _ = build_state()
     with app.state.sessions.begin() as db:
         row = db.get(WorkspaceRow, 'lark-company')
