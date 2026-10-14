@@ -43,6 +43,11 @@ def new_project(code, first, sop, case_type='formal'):
     return dict(id=pid,code=code,name=text(first['fields'].get('工程名稱')) or code,client='',pm_id='',status='pending',priority='medium',due_date=None,original_due_date=None,created_at=now(),started_at=None,description='',contract_amount=None,estimated_points=None,source_kind='lark',source_model='v4',case_type=case_type,revision=1,nodes=nodes(pid,sop),files=[],comments=[],daily_reports=[],source_url=url(first),sop_version=sop['id'])
 
 
+def quote_companies(quotes):
+    """Distinct 行號單位 values; the project client is only known when they agree."""
+    return sorted({name for q in quotes if (name:=text(q['fields'].get('行號單位')).strip())})
+
+
 def quote_snapshot(record):
     f=record['fields']
     return dict(id=source_id(record),quote_code=normalized_case(f.get('報價編號')),engineering_code=normalized_case(f.get('工程編號')),source_url=url(record),amount=number(f.get('契約價格(未稅)')),fields=deepcopy(f))
@@ -317,6 +322,9 @@ def import_v4(ws, records, complete_tables=None):
         for field in ('工程名稱','合約總額','預估總成本','實際總成本','狀態'):
             vals={text(r['fields'].get(field)) for r in group if text(r['fields'].get(field))}
             if len(vals)>1: conflicts[field]=sorted(vals)
+        companies=quote_companies(linked_quotes[code])
+        if len(companies)>1: conflicts['行號單位']=companies
+        p['client']=companies[0] if len(companies)==1 else ''
         p['source_conflicts']=conflicts
         if '工程名稱' not in conflicts: p['name']=unique_value(text(r['fields'].get('工程名稱')) for r in group) or p['name']
         remote=unique_value(text(r['fields'].get('狀態')) for r in group)
@@ -360,6 +368,7 @@ def import_v4(ws, records, complete_tables=None):
             p=new_project(snapshot['quote_code'] or ident,q,sop,'intake'); ws['projects'].append(p)
         p.update(case_type='intake',source_model='v4',intake_status=reason,quotes=[snapshot],source_url=url(q),source_record_ids=[ident],source_records=[{'id':ident,'kind':'quote','fields':deepcopy(q['fields']),'url':url(q)}],source_identity={k:q[k] for k in ('base_token','table_id','record_id')},parent_code=None)
         p['source_conflicts']={'confirmation':possible} if possible else {}
+        p['client']=next(iter(quote_companies([q])),'')
         p['name']=text(q['fields'].get('工程名稱')) or p['name']
         p['source_status']='待確認單'; p['status']='pending'
         p['source_lifecycle']=summarize([],[q])
