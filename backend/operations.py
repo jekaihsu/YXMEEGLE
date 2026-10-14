@@ -308,6 +308,8 @@ def require_financial_pair(ws,p,item):
     require(set(votes)=={'pm','admin'} and len(set(votes.values()))==2,'需 PM 與行政兩位不同操作者核對本項',409)
 
 def submit_review(ws,user,p,n):
+    from .features import require_task_features
+    require_task_features(ws,n['tasks'])
     require(not (ws.get('environment')=='production' and n['key'] in FINANCIAL),'正式財務須走 Lark 原生共同核准，再核實條件完成節點',403)
     require(operator(user,p,n),'沒有本節點送審權')
     errors=missing(p,n,ws); require(not errors,'尚未完成：'+'、'.join(errors),409)
@@ -323,6 +325,8 @@ def submit_review(ws,user,p,n):
     n['review_cycles'].append(cycle); return cycle
 
 def vote(ws,user,p,n,data):
+    from .features import require_task_features
+    require_task_features(ws,n['tasks'])
     require(not (ws.get('environment')=='production' and n['key'] in FINANCIAL),'正式財務不使用本地票，請查回 Lark 原生共同核准',403)
     cycle=find(n['review_cycles'],data.get('cycle_id'),'審核輪次')
     require(cycle['status']=='pending','此審核輪次已結束',409)

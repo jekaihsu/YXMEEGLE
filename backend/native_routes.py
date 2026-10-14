@@ -184,6 +184,8 @@ def register(app,identity,load,persist,sessions,W,cfg):
             from .case_cutover import require_execution
             require_execution(state,p)
             n=find(p['nodes'],body.get('node_id'),'節點')
+            from .features import guard_task_scope
+            guard_task_scope(state,p['id'],n['id'])
             from .policy import FINANCIAL
             require(n['key'] in FINANCIAL,'重大財務確認請選擇計價或結案節點',422)
             actor=find(state['users'],user['id'],'操作者')
@@ -313,7 +315,10 @@ def register(app,identity,load,persist,sessions,W,cfg):
         permitted(user,p,item)
         scope_version=item.get('approval_scope_version',1 if item.get('native_binding') else 3)
         from .case_cutover import require_execution
-        if operation in ('prepare','submit'):require_execution(state,p)
+        if operation in ('prepare','submit'):
+            require_execution(state,p)
+            from .features import guard_task_scope
+            guard_task_scope(state,p['id'],n['id'] if n else None,item.get('task_ids'))
         tenant=cfg.get('LARK_WORKER_ORGANIZATION'); app_id=cfg.get('LARK_APP_ID')
         ctx=context(state,p,n,item,app_id,tenant)
         try: mapping=service.mapping(kind)
@@ -327,7 +332,9 @@ def register(app,identity,load,persist,sessions,W,cfg):
             require(fresh_data['wid']==data['wid'] and fresh_user['id']==user['id'],'登入身分已變更',403)
             fresh=get_state(data['wid']);fp,fn,fi=locate(fresh,kind,request_id)
             permitted(fresh_user,fp,fi)
-            if operation in ('prepare','submit'):require_execution(fresh,fp)
+            if operation in ('prepare','submit'):
+                require_execution(fresh,fp)
+                guard_task_scope(fresh,fp['id'],fn['id'] if fn else None,fi.get('task_ids'))
             check_financial_evidence(fp,fi)
             require(actors(fresh,fp,fn,fi,mapping,app_id)==approvers,'核准人已變更，請重新建立申請',409)
             return context(fresh,fp,fn,fi,app_id,tenant)

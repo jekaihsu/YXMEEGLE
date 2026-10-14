@@ -221,3 +221,21 @@ def test_operate_uses_project_version_not_workspace_version(api):
     assert operate(api,'submit',project_version=project_version(api)).status_code==200
     assert operate(api,'poll',project_version='x').status_code==422
     assert api.client.post('/api/native-approvals/extension/request/poll',json={'version':api.h.read()[0]['version']}).status_code==422
+
+
+@pytest.mark.parametrize('operation', ['prepare', 'submit'])
+def test_native_submission_rejects_disabled_task_before_remote_effect(api, operation):
+    with api.h.sessions.begin() as db:
+        row = db.get(api.h.W, api.h.wid)
+        state = storage.load(db, api.h.B, row)
+        state['features']['routines'] = False
+        p = find(state['projects'], api.pid)
+        n = find(p['nodes'], api.nid)
+        n['tasks'][0]['sop_rule_id'] = 'quote_followup'
+        row.data = storage.save(db, api.h.B, api.h.wid, state)
+    before = deepcopy(api.h.read())
+    response = operate(api, operation)
+    assert response.status_code == 403
+    assert response.json()['detail']['code'] == 'feature_disabled'
+    assert api.h.read() == before
+    assert api.calls == []

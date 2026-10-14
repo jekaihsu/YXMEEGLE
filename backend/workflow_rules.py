@@ -96,9 +96,11 @@ def activation_reasons(ws,p,n,t,clock=None):
 def activate_scheduled(ws,clock=None):
     clock=clock or now(); activated=[]
     from .case_cutover import execution_allowed
+    from .features import task_enabled
     for p in ws['projects']:
         if not execution_allowed(ws,p) or needs_review(p) or declared(p) in ('已完工','已結案','中止'):continue
         for n,t in all_tasks(p):
+            if not task_enabled(ws,t): continue
             if t['status']!='pending' or activation_reasons(ws,p,n,t,clock): continue
             before={'status':t['status'],'started_at':t.get('started_at')}
             t.update(status='in_progress',activated_at=clock,activation_source='schedule')
@@ -119,6 +121,8 @@ def confirmation_hash(p,n,t):
 
 
 def batch_complete(ws,user,body):
+    from .features import guard_action
+    guard_action(ws,body)
     items=(body.get('payload') or {}).get('items')
     require(isinstance(items,list) and 0<len(items)<=50,'請選擇 1 至 50 項本人工作',422)
     resolved=[]; seen=set()

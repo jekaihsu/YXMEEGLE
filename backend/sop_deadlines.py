@@ -81,8 +81,9 @@ def _materialize(ws,p,record,user):
         node_key=record.get('node_key') if node_key=='$group' else node_key
         node=next((n for n in p['nodes'] if n['key']==node_key),None)
         require(node is not None,'SOP 規則所需節點不存在',409)
-        from .features import enabled
-        if not enabled(ws,'routines') and (rule_id=='quote_followup' or node.get('status')=='completed'): continue
+        from .features import task_enabled
+        scope = 'post_completion_followup' if node.get('status')=='completed' else None
+        if not task_enabled(ws, {'sop_rule_id': rule_id, 'completion_scope': scope}): continue
         binding=record['task_bindings'].get(rule_id)
         followups=p.get('sop_followups',[])
         task=find(node['tasks'],binding,'期限對應任務') if binding else next((t for t in node['tasks']+followups if t.get('sop_rule_id')==rule_id and t.get('sop_event_stream')==record['stream_id']),None)

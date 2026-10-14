@@ -54,7 +54,7 @@ def schedule(ws,clock=None):
     from .case_cutover import execution_allowed
     from .workflow_rules import activate_scheduled
     activate_scheduled(ws,clock)
-    from .features import enabled
+    from .features import enabled, task_enabled
     if not enabled(ws,'routines'): return
     for p in ws['projects']:
         if not execution_allowed(ws,p):continue
@@ -69,6 +69,7 @@ def schedule(ws,clock=None):
             ws['recurring'].append(dict(id=ident,project_id=p['id'],kind=kind,title=LABELS[kind],owner_id=owner,supervisor_id=p['supervisor_id'],status='active',start_date=today,due_date=today if kind=='daily_progress' else next_due(kind,today,ws),history=[]))
     due={}; source_projects={}
     for r in ws['recurring']:
+        if not task_enabled(ws,r,'recurring'): continue
         if r['kind']=='monthly':
             if r['status']=='active':
                 r.update(status='disabled',disabled_reason='業主裁示停用考評；財務結算另依案件流程',disabled_at=clock)
