@@ -3,6 +3,21 @@ from .lark_adapter import RemoteFailure
 
 FORMAL_BASES=frozenset({'JoOqbggsVar0ATsVgbcjh6IIp1g','H7W6b0PFWaVF1BsgqXJj3pQ9pXb','VwAsbezz9app3YsramgjduLYp2U','Sdw1bG1djaHsVGsRPvmjyVWipgg'})
 
+# Business decision 2026-10-14: the only formal-Base tables the application
+# identity may write are V4 節點指派 and 任務. Deliberately literal so that no
+# environment value can widen it; every other formal table stays read-only.
+FORMAL_WRITE_ALLOWLIST=frozenset({('H7W6b0PFWaVF1BsgqXJj3pQ9pXb','tblcPZPmezkyeVb7'),
+                                  ('H7W6b0PFWaVF1BsgqXJj3pQ9pXb','tblsoyGcC6K5AipF')})
+
+
+def formal_write_allowed(base,table):
+    return (base,table) in FORMAL_WRITE_ALLOWLIST
+
+
+def require_formal_write(base,table):
+    if not formal_write_allowed(base,table):
+        raise RemoteFailure('此 Base 資料表不在正式回寫白名單，禁止寫入','blocked')
+
 
 def connection_policy(wid,state,cfg,kind,for_verification=False):
     from .capability_write_policy import PAUSED_MESSAGE
