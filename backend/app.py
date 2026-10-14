@@ -1041,7 +1041,7 @@ def create_app(overrides=None):
         from .my_work import build_my_work_input
         data,user=identity(request)
         app.state.live_read.ensure(data['wid'],'sources')
-        read={'admitted':data.get('access_mode','normal')=='normal'}
+        read={'admitted':data.get('access_mode','normal') in ('normal','tenant-read')}
         try:
             with phase(request,'load'),sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
             read['loaded']=True

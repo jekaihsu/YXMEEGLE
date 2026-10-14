@@ -4,6 +4,7 @@ from copy import deepcopy
 from datetime import datetime,timezone
 import json
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -173,11 +174,19 @@ def test_profile(formal, overlay):
 TENANT_READ_ROUTES=frozenset({
     '/api/session','/api/workspace','/api/live/status','/api/sources',
     '/api/source-health','/api/company-dashboard','/api/manager-overview',
+    '/api/projects','/api/my-work','/api/confirmations','/api/contract-detail',
+    '/api/work-item-detail','/api/daily-reports',
 })
+
+TENANT_READ_PATTERNS=(
+    re.compile(r'/api/projects/[^/]+'),
+    re.compile(r'/api/projects/[^/]+/navigation'),
+    re.compile(r'/api/case-detail/[^/]+'),
+)
 
 
 def tenant_read_allowed(person,cfg,org,method,path):
-    if (method!='GET' or path not in TENANT_READ_ROUTES or not person or not person.get('active',True)
+    if (method!='GET' or not (path in TENANT_READ_ROUTES or any(p.fullmatch(path) for p in TENANT_READ_PATTERNS)) or not person or not person.get('active',True)
             or person.get('directory_status')=='left' or person.get('directory_missing',False)):
         return False
     app_id=cfg.get('LARK_APP_ID'); tenant=org.removeprefix('lark-')
