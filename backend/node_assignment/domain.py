@@ -260,7 +260,7 @@ class TaskPermissions:
 
 
 def task_permissions(actor: Actor, key: NodeKey, node_status: NodeStatus, task: TaskFacts) -> TaskPermissions:
-    if node_status in FINISHED:
+    if node_status in FINISHED or (not actor.override and (actor.person is None or not actor.person.employed)):
         return TaskPermissions(False, False, False, False, False)
     manager = actor.manages(key)
     mine = task.assignee == actor.open_id

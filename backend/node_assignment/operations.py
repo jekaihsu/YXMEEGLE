@@ -297,7 +297,7 @@ def find_task(s: Situation, task_id) -> TaskRow:
 
 def plan_patch_task(s: Situation, task: TaskRow, command: PatchTask) -> Plan:
     status = derive_chain(facts_of(s.snapshot, s.skipped))[s.key]
-    if s.actor.person is None and not s.actor.override:
+    if (s.actor.person is None or not s.actor.person.employed) and not s.actor.override:
         raise Denied('你不在人員名單或尚未在職，無法更新任務')
     _check_revision(task.revision, command.expected_revision)
     if status not in OPEN:

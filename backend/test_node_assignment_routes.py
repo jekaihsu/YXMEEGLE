@@ -616,3 +616,17 @@ def test_delayed_node_create_replay_uses_same_token(h):
     replay = act(h, 'ou_sales', '/nodes/sales/claim', body)
     assert replay.status_code == 200, replay.text
     assert len(h.fake.tables[NODES]) == 1
+
+
+@pytest.mark.parametrize('changes', [{'detail': 'changed'}, {'status': '已完成'}, {'status': '取消'}])
+def test_departed_assignee_cannot_patch_own_task(h, changes):
+    created = act(h, 'ou_sales', '/nodes/sales/tasks', {'request_id': 'own', 'title': 'own task'})
+    assert created.status_code == 200, created.text
+    task = created.json()['tasks'][0]
+    person, = h.fake.rows(PEOPLE, Lark帳號=[{'id': 'ou_sales'}]).values()
+    person['在職'] = False
+    h.clock[0] += 121
+    response = act(h, 'ou_sales', f'/nodes/sales/tasks/{task["id"]}',
+                   {'request_id': 'departed', 'expected_revision': task['revision'], **changes}, method='patch')
+    assert (response.status_code, response.json().get('code')) == (403, 'forbidden')
+    assert not any(view(h, 'ou_sales', 'sales')['tasks'][0]['can'].values())
