@@ -593,3 +593,68 @@ def test_audit_records_actor_change_and_request_without_secrets(h):
     assert change['kind'] == 'node_task' and change['after']['assignee'] == ['ou_member']
     text = json.dumps(data, ensure_ascii=False)
     assert 't-synthetic' not in text and 'client_token' not in text and 'synthetic' not in text
+
+
+def test_delayed_node_create_replay_uses_same_token(h):
+    pending = []
+
+    def timeout(request):
+        pending.append((request.url.params['client_token'], json.loads(request.content)['fields']))
+        raise httpx.ReadTimeout('uncertain create', request=request)
+
+    def land_first(request):
+        token, fields = pending[0]
+        rid = h.fake.add(NODES, fields)
+        h.fake.tokens[token] = rid
+        return None
+
+    h.fake.fault('POST', f'{NODES}/records', timeout)
+    body = {'request_id': 'delayed-node'}
+    first = act(h, 'ou_sales', '/nodes/sales/claim', body)
+    assert first.json()['code'] == 'outcome_unknown'
+    h.fake.fault('POST', f'{NODES}/records', land_first)
+    replay = act(h, 'ou_sales', '/nodes/sales/claim', body)
+    assert replay.status_code == 200, replay.text
+    assert len(h.fake.tables[NODES]) == 1
+
+
+@pytest.mark.parametrize('changes', [{'detail': 'changed'}, {'status': '已完成'}, {'status': '取消'}])
+def test_departed_assignee_cannot_patch_own_task(h, changes):
+    created = act(h, 'ou_sales', '/nodes/sales/tasks', {'request_id': 'own', 'title': 'own task'})
+    assert created.status_code == 200, created.text
+    task = created.json()['tasks'][0]
+    person, = h.fake.rows(PEOPLE, Lark帳號=[{'id': 'ou_sales'}]).values()
+    person['在職'] = False
+    h.clock[0] += 121
+    response = act(h, 'ou_sales', f'/nodes/sales/tasks/{task["id"]}',
+                   {'request_id': 'departed', 'expected_revision': task['revision'], **changes}, method='patch')
+    assert (response.status_code, response.json().get('code')) == (403, 'forbidden')
+    assert not any(view(h, 'ou_sales', 'sales')['tasks'][0]['can'].values())
+
+
+@pytest.mark.parametrize('landed', [False, True])
+def test_uncertain_task_create_does_not_reconcile_to_identical_older_task(h, landed):
+    body = {'request_id': 'first-task', 'title': 'identical task'}
+    first = act(h, 'ou_sales', '/nodes/sales/tasks', body)
+    assert first.status_code == 200, first.text
+    old_id = first.json()['record_id']
+
+    def timeout(request):
+        if landed:
+            token = request.url.params['client_token']
+            h.fake.tokens[token] = h.fake.add(TASKS, json.loads(request.content)['fields'])
+        raise httpx.ReadTimeout('uncertain task create', request=request)
+
+    h.fake.fault('POST', f'{TASKS}/records', timeout)
+    body['request_id'] = 'second-task'
+    failed = act(h, 'ou_sales', '/nodes/sales/tasks', body)
+    assert failed.json()['code'] == 'outcome_unknown'
+    h.client = h.build()  # Reconciliation must use the persisted receipt after a restart.
+    replay = act(h, 'ou_sales', '/nodes/sales/tasks', body)
+    assert replay.status_code == 200, replay.text
+    assert replay.json()['record_id'] != old_id
+    assert len(h.fake.tables[TASKS]) == 2
+    writes = len(h.fake.writes())
+    again = act(h, 'ou_sales', '/nodes/sales/tasks', body)
+    assert again.json() == replay.json()
+    assert len(h.fake.writes()) == writes

@@ -165,16 +165,18 @@ class Plan:
     client_token: str | None = None
     warnings: tuple[str, ...] = ()
     before: dict = field(default_factory=dict)
+    pre_create_task_ids: tuple[str, ...] | None = None
 
     def to_json(self):
         return {'kind': self.kind, 'record_id': self.record_id, 'base_revision': self.base_revision,
                 'changes': self.changes, 'client_token': self.client_token, 'warnings': list(self.warnings),
-                'before': self.before}
+                'before': self.before, 'pre_create_task_ids': self.pre_create_task_ids}
 
     @classmethod
     def from_json(cls, data):
         return cls(data['kind'], data['record_id'], data['base_revision'], data['changes'], data.get('client_token'),
-                   tuple(data.get('warnings', ())), data.get('before', {}))
+                   tuple(data.get('warnings', ())), data.get('before', {}),
+                   tuple(data['pre_create_task_ids']) if data.get('pre_create_task_ids') is not None else None)
 
 
 def facts_of(snapshot: CaseSnapshot, skipped, overrides=None) -> dict[NodeKey, NodeFacts]:
@@ -297,7 +299,7 @@ def find_task(s: Situation, task_id) -> TaskRow:
 
 def plan_patch_task(s: Situation, task: TaskRow, command: PatchTask) -> Plan:
     status = derive_chain(facts_of(s.snapshot, s.skipped))[s.key]
-    if s.actor.person is None and not s.actor.override:
+    if (s.actor.person is None or not s.actor.person.employed) and not s.actor.override:
         raise Denied('你不在人員名單或尚未在職，無法更新任務')
     _check_revision(task.revision, command.expected_revision)
     if status not in OPEN:

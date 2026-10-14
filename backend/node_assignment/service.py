@@ -18,7 +18,7 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlsplit
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid5
 
 from sqlalchemy.exc import IntegrityError
 
@@ -286,6 +286,10 @@ class NodeAssignmentService:
                                       self.now_ms(), confirmation_record(ctx.project, self.config))
                 try:
                     plan = plan_fn(situation, resumed)
+                    if plan.kind == 'task_create':
+                        plan = replace(plan, client_token=resumed.client_token if resumed else str(uuid5(
+                            NAMESPACE_URL, f'{receipt}\0{akey}\0task-create')),
+                            pre_create_task_ids=resumed.pre_create_task_ids if resumed else None)
                 except Denied as exc:
                     record('denied', reason=str(exc))
                     raise Failure('forbidden', str(exc)) from None
@@ -319,7 +323,7 @@ class NodeAssignmentService:
                           record_ids=[r.record_id for r in rows])
         return rows
 
-    def _node_row(self, client, s: Situation):
+    def _node_row(self, client, s: Situation, receipt):
         """Search first, create once, then search again so a racing duplicate is reported, not picked."""
         row = s.snapshot.row(s.key)
         if row is not None:
@@ -333,7 +337,7 @@ class NodeAssignmentService:
         if s.confirmation_record:
             initial['confirmation'] = [s.confirmation_record]
         try:
-            client.create(Table.NODES, wire(NODE_FIELDS, initial), str(uuid4()))
+            client.create(Table.NODES, wire(NODE_FIELDS, initial), str(uuid5(NAMESPACE_URL, f'{receipt}\0{akey}\0node-create')))
         except Failure as exc:
             if exc.code != 'outcome_unknown':
                 raise
@@ -354,11 +358,14 @@ class NodeAssignmentService:
             return updated
 
         if plan.kind == 'node' and plan.record_id is None:
-            row = self._node_row(client, s)
+            row = self._node_row(client, s, receipt)
             plan = pin(replace(plan, record_id=row.record_id, base_revision=row.revision))
         if plan.kind == 'task_create':
             if 'node' not in plan.changes:
-                plan = pin(replace(plan, changes={**plan.changes, 'node': [self._node_row(client, s).record_id]}))
+                plan = pin(replace(plan, changes={**plan.changes, 'node': [self._node_row(client, s, receipt).record_id]}))
+            if plan.pre_create_task_ids is None:
+                row = client.get(Table.NODES, plan.changes['node'][0])
+                plan = pin(replace(plan, pre_create_task_ids=parse_node(row).task_ids))
             fields = wire(TASK_FIELDS, plan.changes)
             plan = pin(replace(plan, record_id=client.create(Table.TASKS, fields, plan.client_token)))
             self._verify(client, Table.TASKS, TASK_FIELDS, plan.record_id, fields)
@@ -380,8 +387,12 @@ class NodeAssignmentService:
             row = snapshot.row(key)
             if row is None or 'node' not in plan.changes:
                 return 'not_applied', plan
-            matches = [r for r in client.batch_get(Table.TASKS, list(row.task_ids))
-                       if not mismatches(TASK_FIELDS, fields, r)] if row.task_ids else []
+            if plan.pre_create_task_ids is None:
+                raise Failure('outcome_unknown', '先前任務建立結果無法安全核對；請重新整理確認')
+            # Identical older tasks cannot be evidence that this request landed.
+            new_ids = [rid for rid in row.task_ids if rid not in plan.pre_create_task_ids]
+            matches = [r for r in client.batch_get(Table.TASKS, new_ids)
+                       if not mismatches(TASK_FIELDS, fields, r)] if new_ids else []
             if len(matches) > 1:
                 return 'conflict', plan
             if matches:
