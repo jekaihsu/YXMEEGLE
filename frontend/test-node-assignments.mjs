@@ -296,9 +296,38 @@ for (const kind of ['timeout', 'network', 'abort']) test(`${kind} retries retain
     assert.notEqual(mutations()[2].body.request_id, mutations()[0].body.request_id); fail = false;
   } finally {globalThis.setTimeout = timer}
 });
-for (const status of [403, 409, 422]) test(`definitive ${status} clears the retained attempt`, async () => {
+for (const status of [403, 404, 409, 413, 422, 429]) test(`definitive ${status} clears the retained attempt`, async () => {
   await mount({mutationReply: {status: 502, body: {code: 'outcome_unknown', detail: '未知'}}}); await expand(); await click(button('認領節點'));
   mutationReply = {status, body: {code: 'invalid', detail: '拒絕'}}; await click(button('認領節點'));
   assert.equal(mutations()[1].body.request_id, mutations()[0].body.request_id);
   await click(button('認領節點')); assert.notEqual(mutations()[2].body.request_id, mutations()[0].body.request_id);
+});
+
+for (const response of [
+  {status: 409, code: 'busy'}, {status: 502}, {status: 503}, {status: 504},
+  {status: 503, code: 'lark_unavailable'}, {status: 503, code: 'roster_unavailable'},
+]) test(`uncertain create then ${response.status}/${response.code} keeps the retry ID`, async () => {
+  await mount({mutationReply: {status: 408, body: {code: 'client_timeout', detail: 'timeout'}}});
+  await expand(); await click(button('新增任務')); await input(formControl('任務名稱'), '任務'); await click(button('建立任務'));
+  mutationReply = {status: response.status, body: {code: response.code, detail: 'retry later'}};
+  await click(button('建立任務')); await click(button('建立任務'));
+  assert.deepEqual(mutations()[2].body, mutations()[0].body);
+});
+for (const form of [
+  {open: '新增任務', submit: '建立任務', field: '任務名稱'},
+  {open: '指派負責人', submit: '儲存指派'},
+  {open: '退回', submit: '確認退回', field: '退回原因'},
+]) for (const close of ['取消', form.open]) test(`${form.open} ${close} abandons the uncertain retry`, async () => {
+  await mount({mutationReply: {status: 502, body: {code: 'outcome_unknown', detail: 'unknown'}}}); await expand();
+  await click(button(form.open)); if (form.field) await input(formControl(form.field), '任務'); await click(button(form.submit));
+  await click(button(close)); await click(button(form.open));
+  if (form.field) await input(formControl(form.field), '任務'); await click(button(form.submit));
+  assert.notEqual(mutations()[1].body.request_id, mutations()[0].body.request_id);
+});
+
+for (const code of ['lark_unconfigured', 'writes_disabled']) test(`pre-write ${code} clears the retained attempt`, async () => {
+  await mount({mutationReply: {status: 408, body: {code: 'client_timeout', detail: 'timeout'}}}); await expand(); await click(button('認領節點'));
+  mutationReply = {status: 503, body: {code, detail: 'disabled'}};
+  await click(button('認領節點')); await click(button('認領節點'));
+  assert.notEqual(mutations()[2].body.request_id, mutations()[0].body.request_id);
 });

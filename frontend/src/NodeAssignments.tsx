@@ -75,7 +75,7 @@ export function NodeAssignments({projectId, legacy, before}: {projectId: string;
           <People people={n.owners}/><span className="na-deadline"><span className="na-mobile-label">下個期限 </span>{deadlineLabel(n.deadline)}</span>
           <span className={`na-hint${hint ? ' needs-action' : ''}`}>{hint || '檢視進度'}</span><ChevronDown size={17} className="na-chevron"/>
         </button>
-        {open && <div id={panelId}><NodeDetail key={n.key} projectId={projectId} node={n} revision={assignments.revision} listBlocked={!data.writes_enabled || refreshing || state.kind === 'error'} pending={pending} error={error} mutate={assignments.mutate} onDisabled={() => void assignments.reload()}/></div>}
+        {open && <div id={panelId}><NodeDetail key={n.key} projectId={projectId} node={n} revision={assignments.revision} listBlocked={!data.writes_enabled || refreshing || state.kind === 'error'} pending={pending} error={error} mutate={assignments.mutate} onAbandon={assignments.clearFeedback} onDisabled={() => void assignments.reload()}/></div>}
       </li>;
     })}</ol>
     {!data.nodes.length && <p className="na-empty">尚未建立節點指派。重新讀取後再確認。</p>}
@@ -84,8 +84,8 @@ export function NodeAssignments({projectId, legacy, before}: {projectId: string;
 
 type DetailState = {kind: 'loading'} | {kind: 'ready'; data: NodeAssignmentDetail; refreshing: boolean} | {kind: 'error'; message: string; data?: NodeAssignmentDetail};
 type Mutate = (mutation: AssignmentMutation) => Promise<boolean>;
-function NodeDetail({projectId, node, revision, listBlocked, pending, error, mutate, onDisabled}: {
-  projectId: string; node: AssignmentNode; revision: number; listBlocked: boolean; pending: string; error: NodeAssignmentError | null; mutate: Mutate; onDisabled: () => void;
+function NodeDetail({projectId, node, revision, listBlocked, pending, error, mutate, onAbandon, onDisabled}: {
+  projectId: string; node: AssignmentNode; revision: number; listBlocked: boolean; pending: string; error: NodeAssignmentError | null; mutate: Mutate; onAbandon: () => void; onDisabled: () => void;
 }) {
   const [state, setState] = useState<DetailState>({kind: 'loading'});
   const [retry, setRetry] = useState(0);
@@ -111,6 +111,7 @@ function NodeDetail({projectId, node, revision, listBlocked, pending, error, mut
   const can = data.can;
   const busy = !data.writes_enabled || listBlocked || !!pending || state.kind !== 'ready' || state.refreshing;
   const busyReason = !data.writes_enabled ? data.writes_disabled_reason || '節點修改已停用。' : state.kind === 'error' ? '明細更新失敗，請重試後操作。' : '正在更新節點資料，請稍候。';
+  const changeForm = (next: typeof form) => {onAbandon(); setForm(next)};
   const save = async (mutation: AssignmentMutation) => {if (await mutate(mutation)) setForm('')};
   return <section className="na-detail" aria-label={`${node.label}節點明細`} aria-busy={busy}>
     {state.kind === 'error' && <ErrorBanner message={state.message} retry={() => setRetry(r => r + 1)}/>}
@@ -118,14 +119,14 @@ function NodeDetail({projectId, node, revision, listBlocked, pending, error, mut
     <div className="na-detail-heading"><div><h3>{node.label}交接與任務</h3><p>負責人共同維護進度，完成後送交審核。</p></div>{(!!pending || (state.kind === 'ready' && state.refreshing)) && <span className="na-loading" role="status"><Loader2 size={14} className="spin"/>{pending ? '儲存中…' : '更新中…'}</span>}</div>
     <div className="na-owner-section"><div><span className="na-field-label">節點負責人</span><People people={data.node.owners}/></div><div className="na-actions">
       <ActionButton allowed={can.claim === true} busy={busy} reason={busy ? busyReason : undefined} onClick={() => void save({action: 'claim', nodeKey: node.key, expected_revision: data.node.revision})}><UserPlus size={15}/>認領節點</ActionButton>
-      <ActionButton allowed={can.assign === true} busy={busy} reason={busy ? busyReason : undefined} onClick={() => setForm(form === 'assign' ? '' : 'assign')}><Users size={15}/>指派負責人</ActionButton>
+      <ActionButton allowed={can.assign === true} busy={busy} reason={busy ? busyReason : undefined} onClick={() => changeForm(form === 'assign' ? '' : 'assign')}><Users size={15}/>指派負責人</ActionButton>
     </div></div>
     <dl className="na-facts">{data.node.assigned_by && <div><dt>指派人</dt><dd>{data.node.assigned_by.name}</dd></div>}{data.node.approver && <div><dt>審核人</dt><dd>{data.node.approver.name}</dd></div>}{data.node.approved_at && <div><dt>核准日期</dt><dd>{deadlineLabel(data.node.approved_at)}</dd></div>}<div><dt>節點期限</dt><dd>{deadlineLabel(data.node.deadline)}</dd></div></dl>
     {data.node.reject_reason && <div className="na-banner na-stale"><span>退回原因 · {data.node.reject_reason}</span></div>}
     {!!data.node.warnings.length && <ul className="na-warnings">{data.node.warnings.map((warning, i) => <li key={i}><TriangleAlert size={14}/>{warning}</li>)}</ul>}
-    {form === 'assign' && <AssignForm detail={data} busy={busy} error={error} onCancel={() => setForm('')} onSubmit={assignees => save({action: 'assign', nodeKey: node.key, owner_open_ids: assignees, expected_revision: data.node.revision})}/>}
-    <div className="na-tasks-heading"><h4>節點任務 <span>{data.tasks.length} 項</span></h4><ActionButton allowed={can.create_task === true} busy={busy} reason={busy ? busyReason : undefined} onClick={() => setForm(form === 'task' ? '' : 'task')}><Plus size={15}/>新增任務</ActionButton></div>
-    {form === 'task' && <TaskCreator detail={data} busy={busy} error={error} onCancel={() => setForm('')} onSubmit={task => save({action: 'create_task', nodeKey: node.key, task})}/>}
+    {form === 'assign' && <AssignForm detail={data} busy={busy} error={error} onCancel={() => changeForm('')} onSubmit={assignees => save({action: 'assign', nodeKey: node.key, owner_open_ids: assignees, expected_revision: data.node.revision})}/>}
+    <div className="na-tasks-heading"><h4>節點任務 <span>{data.tasks.length} 項</span></h4><ActionButton allowed={can.create_task === true} busy={busy} reason={busy ? busyReason : undefined} onClick={() => changeForm(form === 'task' ? '' : 'task')}><Plus size={15}/>新增任務</ActionButton></div>
+    {form === 'task' && <TaskCreator detail={data} busy={busy} error={error} onCancel={() => changeForm('')} onSubmit={task => save({action: 'create_task', nodeKey: node.key, task})}/>}
     <ul className="na-tasks">{data.tasks.map(task => <li key={task.id}><div className="na-task-body"><strong>{task.title}</strong>{task.detail && <p>{task.detail}</p>}<div className="na-task-meta"><span>{task.assignee?.name || '尚未指派'}</span><span>{task.department || '未設定部門'}</span><span><Clock3 size={13}/>{deadlineLabel(task.deadline)}</span></div></div>
       <label className="na-task-status" title={!(task.can.edit_status || task.can.cancel) ? '目前沒有更新任務狀態的權限。' : busy ? busyReason : undefined}><span>任務狀態</span><select aria-label={`${task.title}狀態`} value={taskStatusValue(task.status)} disabled={!(task.can.edit_status || task.can.cancel) || busy} aria-invalid={changedTask === task.id && !!error?.fields.status} aria-describedby={changedTask === task.id && error?.fields.status ? `${detailId}-${task.id}` : undefined} onChange={e => {setChangedTask(task.id); void mutate({action: 'update_task', nodeKey: node.key, taskId: task.id, expected_revision: task.revision, patch: {status: e.target.value}})}}>
         {!taskStatusValue(task.status) && <option value="">{taskStatusLabel(task.status)}</option>}{TASK_STATUS_OPTIONS.filter(([value]) => value === task.status || (value === '取消' ? task.can.cancel : task.can.edit_status)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{!(task.can.edit_status || task.can.cancel) && <small>需有任務處理權限</small>}{changedTask === task.id && error?.fields.status && <small className="na-field-error" id={`${detailId}-${task.id}`} role="alert">{error.fields.status}</small>}</label>
@@ -134,9 +135,9 @@ function NodeDetail({projectId, node, revision, listBlocked, pending, error, mut
     <div className="na-review"><div><ShieldCheck size={19}/><span><strong>節點交接</strong><small>確認任務與成果後，再完成或審核此節點。</small></span></div><div className="na-actions">
       <ActionButton allowed={can.complete === true} busy={busy} primary reason={busy ? busyReason : undefined} onClick={() => void save({action: 'complete', nodeKey: node.key, expected_revision: data.node.revision})}>完成節點</ActionButton>
       <ActionButton allowed={can.approve === true} busy={busy} reason={busy ? busyReason : undefined} onClick={() => void save({action: 'approve', nodeKey: node.key, expected_revision: data.node.revision})}>核准</ActionButton>
-      <ActionButton allowed={can.reject === true} busy={busy} reason={busy ? busyReason : undefined} onClick={() => setForm(form === 'reject' ? '' : 'reject')}>退回</ActionButton>
+      <ActionButton allowed={can.reject === true} busy={busy} reason={busy ? busyReason : undefined} onClick={() => changeForm(form === 'reject' ? '' : 'reject')}>退回</ActionButton>
     </div></div>
-    {form === 'reject' && <RejectForm busy={busy} error={error} onCancel={() => setForm('')} onSubmit={reason => save({action: 'reject', nodeKey: node.key, reason, expected_revision: data.node.revision})}/>}
+    {form === 'reject' && <RejectForm busy={busy} error={error} onCancel={() => changeForm('')} onSubmit={reason => save({action: 'reject', nodeKey: node.key, reason, expected_revision: data.node.revision})}/>}
   </section>;
 }
 

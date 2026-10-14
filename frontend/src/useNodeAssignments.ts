@@ -46,7 +46,7 @@ export function useNodeAssignments(projectId: string) {
       if (!mutationCurrent()) return false;
       setNotice('已儲存變更。'); await reload(); return true;
     } catch (failure) {
-      const uncertain = !(failure instanceof NodeAssignmentError) || failure.status === 408 || failure.code === 'client_timeout' || failure.code === 'outcome_unknown' || failure.code === 'readback_mismatch';
+      const uncertain = !(failure instanceof NodeAssignmentError) || failure.status === 408 || failure.code === 'client_timeout' || failure.code === 'outcome_unknown' || failure.code === 'readback_mismatch' || failure.code === 'busy' || (failure.status >= 500 && !['lark_unconfigured', 'writes_disabled', 'disabled'].includes(failure.code || ''));
       if (!uncertain) retryAttempt.current = null;
       if (!mutationCurrent()) return false;
       if (assignmentsDisabled(failure)) {setState({kind: 'disabled'}); return false}
@@ -59,5 +59,5 @@ export function useNodeAssignments(projectId: string) {
       return false;
     } finally {mutating.current = false; if (mutationCurrent()) setPending('')}
   };
-  return {state, refreshing, revision, pending, notice, error, reload, mutate, retryMutation: () => retryAttempt.current ? mutate(retryAttempt.current.mutation) : Promise.resolve(false), clearFeedback: () => {setError(null); setNotice('')}};
+  return {state, refreshing, revision, pending, notice, error, reload, mutate, retryMutation: () => retryAttempt.current ? mutate(retryAttempt.current.mutation) : Promise.resolve(false), clearFeedback: () => {retryAttempt.current = null; setError(null); setNotice('')}};
 }
