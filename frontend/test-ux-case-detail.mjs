@@ -122,5 +122,7 @@ test('literal date number and status sorts keep unknown values last', () => {
   assert.equal(ui.sourceFieldValue(null), '來源未提供');
   assert.equal(ui.sourceFieldValue([]), '來源未提供');
   assert.equal(ui.sourceFieldValue(0), '0');
+  assert.equal(ui.sourceFieldValue('   '), '來源未提供');
+  assert.equal(ui.sourceFieldValue(0.0000001), '0.0000001');
   assert.equal(ui.sourceFieldValue([{name: '甲'}, {name: '乙'}]), '甲、乙');
 });

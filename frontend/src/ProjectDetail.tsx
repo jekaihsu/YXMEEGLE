@@ -66,12 +66,12 @@ export function ProjectDetailGate({c}:{c:Ctx}){
 export function ProjectDetail({c}:{c:Ctx}){
  const tabPrefetch=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);useEffect(()=>()=>clearTimeout(tabPrefetch.current),[]);
  const prefetchFlow=(id:string)=>{clearTimeout(tabPrefetch.current);if(!c.s.features?.node_assignment)return;const connection=navigator as Navigator&{connection?:{saveData?:boolean;effectiveType?:string}};if(connection.connection?.saveData||['slow-2g','2g'].includes(connection.connection?.effectiveType||''))return;tabPrefetch.current=setTimeout(()=>{void prefetchNodeAssignments(id).catch(()=>{})},150)};
- const p=c.w.projects.find(p=>p.id===c.route.project);const[modal,setModal]=useState(c.route.focus?'complete-node':'');useEffect(()=>{if(c.route.focus)setModal('complete-node')},[c.route.focus,c.route.node]);const[approvalType,setApprovalType]=useState<'change'|'extension'>('change');const[expanded,setExpanded]=useState<Record<string,boolean>>({});
+ const p=c.w.projects.find(p=>p.id===c.route.project);const[modal,setModal]=useState(c.route.focus&&!assignmentTarget(c.route,p?.nodes)?'complete-node':'');useEffect(()=>{if(c.route.focus&&!assignmentTarget(c.route,p?.nodes))setModal('complete-node')},[c.route.focus,c.route.node]);const[approvalType,setApprovalType]=useState<'change'|'extension'>('change');const[expanded,setExpanded]=useState<Record<string,boolean>>({});
 
  if(!p)return <Empty title="找不到這個案件" detail="案件連結可能已失效，請回到案件總覽重新開啟。"/>;
  const selected=p.nodes.find(n=>n.id===c.route.node||n.key===c.route.node)||p.nodes.find(n=>n.status==='in_progress')||p.nodes[0];
  const target=assignmentTarget(c.route,p.nodes);const changeEnabled=c.s.features?.change_extension===true;const routinesEnabled=c.s.features?.routines===true;
- const tab=c.route.tab||'flow';const dataSection=tab==='data'?(c.route.section||'basic'):'';const selectedTask=p.nodes.flatMap(n=>n.tasks.map(t=>({p,n,t}))).find(r=>r.t.id===c.route.task);const approvals=c.w.approvals.filter(a=>a.project_id===p.id);const total=p.nodes.flatMap(n=>n.tasks).filter(t=>t.status!=='superseded');
+ const tab=c.route.tab||'flow';const dataSection=tab==='data'?(c.route.section||'basic'):'';const selectedTask=target?undefined:p.nodes.flatMap(n=>n.tasks.map(t=>({p,n,t}))).find(r=>r.t.id===c.route.task);const approvals=c.w.approvals.filter(a=>a.project_id===p.id);const total=p.nodes.flatMap(n=>n.tasks).filter(t=>t.status!=='superseded');
  const nodeRoute=(n:Node)=>c.go({view:'project',project:p.id,node:n.id,tab:'flow'});
  const share=async()=>{try{await navigator.clipboard.writeText(location.href);c.notify('已複製此頁直達連結')}catch{c.notify('請複製瀏覽器網址列中的直達連結')}};
  const flowApprovals=<details><summary>審批與歷史</summary><section className="major-approval-summary"><div><h2>重大事項審批</h2><p>財務與節點跳過保留原核准流程。變更與展延尚未開放。</p></div><button className="button compact" onClick={()=>c.go({view:'project',project:p.id,node:selected?.id,tab:'flow',section:'approvals'})}>查看審批（{approvals.filter(a=>(changeEnabled||!['change','extension'].includes(a.type))&&['draft','pending','approved'].includes(a.status)).length+(c.w.financial_requests||[]).filter((r:any)=>r.project_id===p.id&&['draft','pending','approved'].includes(r.status)).length}）</button>{approvals.filter(a=>(changeEnabled||!['change','extension'].includes(a.type))&&['pending','approved'].includes(a.status)).map(a=><p key={a.id}>{a.title} · {a.status==='approved'?'已核准，待套用':'審批中'}</p>)}</section></details>;
@@ -205,8 +205,8 @@ function sourceEntities(value:unknown):CaseSourceEntity[]{
  return value.filter((row):row is CaseSourceEntity=>!!row&&typeof row==='object'&&typeof row.id==='string');
 }
 export function sourceFieldValue(value:unknown):string{
- if(value==null||value==='')return '來源未提供';
- if(typeof value==='number')return Number.isFinite(value)?value.toLocaleString('zh-TW',{maximumFractionDigits:6}):'來源未提供';
+ if(value==null||typeof value==='string'&&value.trim()==='')return '來源未提供';
+ if(typeof value==='number')return Number.isFinite(value)?value.toLocaleString('zh-TW',{maximumFractionDigits:20}):'來源未提供';
  if(typeof value==='boolean')return value?'是':'否';
  if(Array.isArray(value))return value.length?value.map(sourceFieldValue).join('、'):'來源未提供';
  if(typeof value==='object'){
@@ -223,7 +223,7 @@ function CaseAssignmentPeople({projectId}:{projectId:string}){
  return <section><h3>Lark 指派與任務人員</h3><p className="ds-footer">資料讀取時間 {data.fetched_at||'來源未提供'}{data.stale&&' · 上次資料'}。</p><div className="table-scroll"><table className="data-table"><thead><tr><th>節點</th><th>負責人</th><th>指派方式</th><th>指派人</th><th>任務人員</th></tr></thead><tbody>{data.nodes.map(n=><tr key={n.key}><td>{n.label}</td><td>{!n.owners.length&&'尚未指派'}{n.owners.map(owner=><span className="person-cell" key={owner.open_id}><Avatar small user={owner}/>{owner.name}</span>)}</td><td>{n.assignment_method||'來源未提供'}</td><td>{n.assigned_by?.name||'來源未提供'}</td><td>{data.node_details?.[n.key]?.tasks.map(t=>t.assignee?.name||'尚未指派').join('、')||'來源未提供'}</td></tr>)}</tbody></table></div></section>;
 }
 export function contractItemOrder(a:CaseSourceEntity,b:CaseSourceEntity){
- const item=(row:CaseSourceEntity)=>{const value=row.item_number||row.fields?.['合約項次'];return value==null||value===''?null:Number(value)};
+ const item=(row:CaseSourceEntity)=>{const value=row.item_number||row.fields?.['合約項次'];return value==null||typeof value==='string'&&value.trim()===''?null:Number(value)};
  const x=item(a),y=item(b),knownX=x!==null&&Number.isFinite(x),knownY=y!==null&&Number.isFinite(y);
  return Number(!knownX)-Number(!knownY)||(knownX&&knownY?x!-y!:0)||a.id.localeCompare(b.id);
 }
