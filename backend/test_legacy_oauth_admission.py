@@ -38,8 +38,8 @@ def test_existing_normalized_workspace_first_manager_login_admits_sync(tmp_path,
     nonce=parse_qs(urlparse(login.headers['location']).query)['state'][0]
     result=client.get('/api/auth/lark/callback',params={'state':nonce,'code':'test-valid'},follow_redirects=False)
     assert result.status_code==307
-    assert client.get('/api/session').json()['environment']=='production'
-    assert client.get('/api/workspace').status_code==403
+    assert client.get('/api/session').json()['access_mode']=='tenant-read'
+    assert client.get('/api/workspace').status_code==200
     assert client.post('/api/workspace/switch',json={'environment':'production'}).status_code==403
     with app.state.sessions.begin() as db:
         profile=db.get(PersonRow,('lark-company','ou_manager'))

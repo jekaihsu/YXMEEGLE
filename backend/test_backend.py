@@ -190,8 +190,9 @@ def test_oauth_verified_identity_tenant_and_role_isolation(tmp_path,monkeypatch)
     response=client.get('/api/auth/lark/login',follow_redirects=False); state=parse_qs(urlparse(response.headers['location']).query)['state'][0]
     response=client.get('/api/auth/lark/callback',params={'state':state,'code':'valid'},follow_redirects=False); assert response.status_code==307
     assert client.get('/api/session').json()['user']['role']=='manager'
-    assert client.get('/api/workspace').status_code==403
-    # OAuth bootstrap alone grants repair access, not business access. Simulate
+    assert client.get('/api/workspace').status_code==200
+    assert client.get('/api/session').json()['access_mode']=='tenant-read'
+    # OAuth bootstrap permits read views; writes still need the existing authority. Simulate
     # a fresh authoritative roster result before exercising ordinary isolation.
     from .app import PersonRow
     from .workflow import now
@@ -220,9 +221,10 @@ def test_oauth_verified_identity_tenant_and_role_isolation(tmp_path,monkeypatch)
     first_client=TestClient(first)
     login=first_client.get('/api/auth/lark/login',follow_redirects=False)
     first_state=parse_qs(urlparse(login.headers['location']).query)['state'][0]
-    # Company tenant membership alone must not admit an unverified employee.
-    assert first_client.get('/api/auth/lark/callback',params={'state':first_state,'code':'valid'},follow_redirects=False).status_code==403
-    assert first_client.get('/api/session').json()['user'] is None
+    # Tenant membership permits read views, without write or administrative authority.
+    assert first_client.get('/api/auth/lark/callback',params={'state':first_state,'code':'valid'},follow_redirects=False).status_code==307
+    assert first_client.get('/api/session').json()['access_mode']=='tenant-read'
+    assert first_client.post('/api/people/sync').status_code==403
 
 def test_changed_revision_updates_dependency_references(client):
     aid=proposal(client); act(client,'approval_submit',{'approval_id':aid}); assign_demo_manager_as_pm(client); role(client,'u-manager')
@@ -325,14 +327,14 @@ def test_v4_missing_and_ambiguous_project_mapping_is_reported():
     result=import_sources(ws,records); assert result['daily_unmatched']==1
     assert all(not project['daily_reports'] for project in ws['projects'])
 
-def test_oauth_scope_parameter_is_explicit_minimal_and_configurable(tmp_path):
+def test_oauth_login_does_not_request_feature_scopes(tmp_path):
     from urllib.parse import urlparse, parse_qs
     cfg={'DATABASE_URL':f'sqlite:///{tmp_path}/scope.db','UPLOAD_DIR':str(tmp_path/'uploads'),'APP_ENV':'development','DEMO_MODE':'false','LARK_APP_ID':'test','LARK_APP_SECRET':'test','LARK_REDIRECT_URI':'https://example.org/callback','LARK_ALLOWED_TENANTS':'company'}
     for value,expected in [(None,'bitable:app:readonly'),('bitable:app:readonly, approval:approval:readonly bitable:app:readonly','bitable:app:readonly approval:approval:readonly')]:
         a=create_app({**cfg,**({'LARK_OAUTH_SCOPES':value} if value else {})})
         result=TestClient(a).get('/api/auth/lark/login',follow_redirects=False)
         query=parse_qs(urlparse(result.headers['location']).query)
-        assert query['scope']==[expected] and query['response_type']==['code'] and query['app_id']==['test']
+        assert 'scope' not in query and query['response_type']==['code'] and query['app_id']==['test']
     with pytest.raises(RuntimeError): create_app({**cfg,'LARK_ROLE_MAP_JSON':'{"ou_user":"administrator"}'})
 
 def test_native_approval_refresh_uses_official_user_endpoint(app,monkeypatch):

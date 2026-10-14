@@ -228,7 +228,7 @@ def test_test_session_never_calls_roster_even_when_person_is_stale(tmp_path):
     assert app.state.live_read.queue_depth==0
 
 
-@pytest.mark.parametrize('kind,expected', [('bootstrap', 'recovery'), ('grant', 'normal'), ('member', 'denied'), ('fresh_member', 'normal')])
+@pytest.mark.parametrize('kind,expected', [('bootstrap', 'tenant-read'), ('grant', 'normal'), ('member', 'tenant-read'), ('fresh_member', 'normal')])
 def test_oauth_failed_roster_preserves_access_policy(tmp_path,monkeypatch,kind,expected):
     from urllib.parse import parse_qs,urlparse
     from sqlalchemy import select
@@ -259,13 +259,9 @@ def test_oauth_failed_roster_preserves_access_policy(tmp_path,monkeypatch,kind,e
     state=parse_qs(urlparse(login.headers['location']).query)['state'][0]
     with app.state.sessions() as db: before=set(db.scalars(select(AuthRow.id)))
     response=client.get('/api/auth/lark/callback',params={'state':state,'code':'synthetic'},follow_redirects=False)
-    assert response.status_code==(503 if expected=='denied' else 307),response.text
-    assert calls==['lark-company']
-    if expected=='denied':
-        assert 'private-token' not in response.text  # refresh unavailable is 503, not an unverified-directory 403
-        with app.state.sessions() as db: assert set(db.scalars(select(AuthRow.id)))<=before
-    else:
-        assert client.get('/api/session').json()['access_mode']==expected
+    assert response.status_code==307,response.text
+    assert calls==[]
+    assert client.get('/api/session').json()['access_mode']==expected
 
 
 @pytest.mark.parametrize('bootstrap',[True,False])

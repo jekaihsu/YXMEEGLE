@@ -349,3 +349,31 @@ def test_ordinary_request_never_waits_on_slow_roster(harness):
             assert monotonic() - started < 1
         finally:
             release.set()
+
+
+@pytest.mark.parametrize('result,expected', [({'status':'fresh'},'fresh'),({'status':'stale'},'stale'),(RuntimeError('secret'),'RuntimeError')])
+def test_temporary_wait_diagnostic_has_no_identity_or_exception_text(caplog,result,expected):
+    import logging
+    def ensure(*args,**kwargs):
+        if isinstance(result,Exception): raise result
+        return result
+    coordinator=SimpleNamespace(cfg={'LARK_LIVE_READ_ENABLED':'true','LARK_WORKER_IDENTITY':'application'},ensure=ensure)
+    with caplog.at_level(logging.INFO):
+        refreshed=ensure_roster_for_admission(coordinator,'lark-private-tenant',{'id':'private-person'},callback=True)
+    record=next(r for r in caplog.records if getattr(r,'event',None)=='oauth_roster_wait')
+    assert refreshed==(expected=='fresh')
+    assert record.result_class==expected and record.duration_ms>=0
+    assert all(v not in str(record.__dict__) for v in ('private-person','private-tenant','secret'))
+
+
+@pytest.mark.parametrize('person,code', [({'active':True},'access_not_admitted'),
+    ({'active':True,'identity_app_id':'app','directory_status':'employed',
+      'directory_source':{'app_id':'app','record_id':'private-record'}},'access_roster_expired')])
+def test_denial_diagnostic_contains_only_code(caplog,person,code):
+    import logging
+    with caplog.at_level(logging.INFO),pytest.raises(HTTPException) as denied:
+        require_access(person,'app')
+    assert denied.value.status_code==403 and denied.value.code==code
+    record=next(r for r in caplog.records if getattr(r,'event',None)=='access_denied')
+    assert record.denial_code==code and record.getMessage()=='access_denied denial_code='+code
+    assert 'private-record' not in str(record.__dict__)

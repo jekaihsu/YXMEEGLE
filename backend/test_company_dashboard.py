@@ -100,12 +100,13 @@ def test_real_route_includes_closed_lark_reference_without_template_progress(sta
     assert reply['cases'][0]['workbench_execution_enabled'] is False
 
 
-def test_recovery_manager_cannot_read_company_dashboard(staff):
+def test_tenant_manager_can_read_company_dashboard_without_fresh_roster(staff):
     app,client,login,change=staff
     change({'role':'manager','bootstrap_admin':True,'directory_last_seen_at':'2000-01-01T00:00:00Z'})
     assert login().status_code==307
-    assert client.get('/api/session').json()['access_mode']=='recovery'
-    assert client.get('/api/company-dashboard').status_code==403
+    assert client.get('/api/session').json()['access_mode']=='tenant-read'
+    assert client.get('/api/company-dashboard').status_code==200
+    assert client.post('/api/workspace/switch',json={'environment':'test'}).status_code==403
 
 
 def test_output_whitelist_excludes_person_salary_leave_and_financial_payloads():

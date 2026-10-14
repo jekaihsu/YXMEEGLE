@@ -1,12 +1,13 @@
-"""OAuth callback: a failed roster refresh is not reported as a missing person."""
+"""Tenant OAuth admits reads without fetching a roster or granting business authority."""
 import json
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
-from .app import PersonRow
+from .app import PersonRow, AuthRow
 from .test_live_read_routes import production_client
 
 HTML = {'accept': 'text/html'}
@@ -19,107 +20,167 @@ def stale(app, oid='u-manager', **fields):
         p.data = {**p.data, 'directory_last_seen_at': (datetime.now(timezone.utc) - timedelta(seconds=901)).isoformat(), **fields}
 
 
-def login(app, monkeypatch, open_id='u-manager', headers=HTML, refresh=None):
+def oauth(monkeypatch, *, open_id='u-tenant', tenant='company', scope=''):
     class OAuth:
         def __init__(self, **kwargs): pass
         def __enter__(self): return self
         def __exit__(self, *args): pass
         def post(self, url, **kwargs):
-            return httpx.Response(200, json={'access_token': 'synthetic', 'expires_in': 3600}, request=httpx.Request('POST', url))
+            return httpx.Response(200, json={'access_token': 'synthetic', 'expires_in': 3600, 'scope': scope}, request=httpx.Request('POST', url))
         def get(self, url, **kwargs):
-            return httpx.Response(200, json={'data': {'open_id': open_id, 'name': 'Synthetic', 'tenant_key': 'company'}}, request=httpx.Request('GET', url))
+            return httpx.Response(200, json={'data': {'open_id': open_id, 'name': 'Synthetic', 'tenant_key': tenant}}, request=httpx.Request('GET', url))
     monkeypatch.setattr('backend.app.httpx.Client', OAuth)
-    if refresh is not None: app.state.live_read.refreshers['roster'] = refresh
-    client = TestClient(app)  # fresh jar: any cookie present afterwards came from this callback
-    state = parse_qs(urlparse(client.get('/api/auth/lark/login', follow_redirects=False).headers['location']).query)['state'][0]
-    client.cookies.pop('meegle_session', None)
-    response = client.get('/api/auth/lark/callback', params={'state': state, 'code': 'synthetic'}, headers=headers, follow_redirects=False)
-    return client, response
 
 
-def unavailable(wid): raise RuntimeError('synthetic-failure')
-def fresh_ok(wid): return {'fingerprint': 'synthetic'}
+def begin(client, next='/', headers=None):
+    r=client.get('/api/auth/lark/login',params={'next':next},headers=headers or {},follow_redirects=False)
+    return parse_qs(urlparse(r.headers['location']).query)['state'][0]
 
 
-def code_of(response): return parse_qs(urlparse(response.headers['location']).query).get('auth_error', [None])[0]
-def has_session(response): return 'meegle_session' in response.headers.get('set-cookie', '')
+def finish(client,saved_state,**params):
+    return client.get('/api/auth/lark/callback',params={'state':saved_state,'code':'synthetic',**params},follow_redirects=False)
 
 
-def test_refresh_unavailable_stale_person_reports_provider_unavailable(tmp_path, monkeypatch):
-    app, _ = production_client(tmp_path); stale(app, role='member', authz_version=1)
-    _, r = login(app, monkeypatch, refresh=unavailable)
-    assert r.status_code == 303 and code_of(r) == 'provider_unavailable' and not has_session(r)
-    assert 'synthetic-failure' not in r.text
+@pytest.mark.parametrize('fields',[{}, {'directory_status':'left','directory_missing':True}])
+def test_stale_roster_and_failed_reads_never_block_login(tmp_path,monkeypatch,fields):
+    app,_=production_client(tmp_path);stale(app,role='member',authz_version=1,**fields)
+    oauth(monkeypatch,open_id='u-manager')
+    calls=[]
+    def unavailable(*args,**kwargs):
+        calls.append(args)
+        raise RuntimeError('private upstream failure')
+    monkeypatch.setattr(app.state.live_read,'ensure',unavailable)
+    client=TestClient(app)
+    r=finish(client,begin(client))
+    assert r.status_code==307 and r.headers['location']=='http://testserver/'
+    assert calls==[]
+    cookie=next(c for c in r.headers.get_list('set-cookie') if c.startswith('meegle_session='))
+    assert 'Secure' not in cookie and 'HttpOnly' in cookie and 'SameSite=lax' in cookie
+    # Status is a read-only cache view; neither stale nor absent roster is a login gate.
+    assert client.get('/api/live/status').status_code==200
+    assert client.get('/api/session').json()['access_mode']=='tenant-read'
+    assert 'lark_oauth_state' not in client.cookies
 
 
-def test_refresh_fresh_but_person_not_admitted_reports_unverified_directory(tmp_path, monkeypatch):
-    app, _ = production_client(tmp_path)
-    stale(app, role='member', authz_version=1, directory_status='left', directory_missing=True)
-    _, r = login(app, monkeypatch, refresh=fresh_ok)
-    assert r.status_code == 303 and code_of(r) == 'unverified_directory' and not has_session(r)
+def test_unknown_tenant_member_reads_but_cannot_use_privileged_routes(tmp_path,monkeypatch):
+    app,_=production_client(tmp_path);oauth(monkeypatch)
+    client=TestClient(app);assert finish(client,begin(client)).status_code==307
+    session=client.get('/api/session').json()
+    assert session['access_mode']=='tenant-read' and session['user']['role']=='member'
+    assert session['user']['capabilities']==[]
+    for path in ('/api/workspace','/api/sources','/api/live/status','/api/company-dashboard','/api/manager-overview'):
+        response=client.get(path)
+        assert response.status_code==200,(path,response.text)
+    for method,path,body in [
+        ('POST','/api/people/sync',{}),('POST','/api/attendance/sync',{}),
+        ('POST','/api/actions',{'action':'admin_person','version':1,'request_id':'tenant-denied'}),
+        ('POST','/api/workspace/switch',{'environment':'test'}),
+        ('POST','/api/live/refresh',{'datasets':['roster'],'force':True}),
+        ('GET','/api/admin/runtime-health',None),('GET','/api/admin/index-health',None),
+        ('POST','/api/native-approvals/definitions/verify',{'version':1}),
+        ('POST','/api/native-approvals/financial/request',{}),
+        ('POST','/api/admin/worker/run',{}),
+    ]:
+        response=client.request(method,path,json=body)
+        assert response.status_code==403,(path,response.text)
+    with app.state.sessions() as db:
+        p=db.get(PersonRow,('lark-company','u-tenant')).data
+        assert p['role']=='member' and p['capabilities']==[] and not p.get('bootstrap_admin')
 
 
-def test_refresh_fresh_present_and_active_logs_in(tmp_path, monkeypatch):
-    app, _ = production_client(tmp_path); stale(app, role='member', authz_version=1)
-    def refresh(wid):
-        with app.state.sessions.begin() as db:
-            p = db.get(PersonRow, ('lark-company', 'u-manager'))
-            p.data = {**p.data, 'directory_last_seen_at': datetime.now(timezone.utc).isoformat()}
-        return {'fingerprint': 'synthetic'}
-    client, r = login(app, monkeypatch, refresh=refresh)
-    assert r.status_code == 307 and has_session(r)
-    assert client.get('/api/session').json()['access_mode'] == 'normal'
+@pytest.mark.parametrize('tenant,expected',[('company',307),('other',403)])
+def test_tenant_allowlist(tmp_path,monkeypatch,tenant,expected):
+    app,_=production_client(tmp_path);oauth(monkeypatch,tenant=tenant)
+    client=TestClient(app);response=finish(client,begin(client))
+    assert response.status_code==expected
+    assert ('meegle_session' in client.cookies)==(expected==307)
+    assert 'lark_oauth_state' not in client.cookies
 
 
-def test_refresh_unavailable_bootstrap_recovery_still_admitted(tmp_path, monkeypatch):
-    app, _ = production_client(tmp_path); stale(app, role='manager', bootstrap_admin=True, authz_version=1)
-    client, r = login(app, monkeypatch, refresh=unavailable)
-    assert r.status_code == 307 and has_session(r)
-    assert client.get('/api/session').json()['access_mode'] == 'recovery'
+@pytest.mark.parametrize('params',[{'state':'bad'},{'error':'access_denied'},{'code':''}])
+def test_bad_state_cancelled_or_missing_code_never_creates_session(tmp_path,monkeypatch,params):
+    app,_=production_client(tmp_path);oauth(monkeypatch)
+    client=TestClient(app);state=begin(client)
+    response=finish(client,state,**params)
+    assert response.status_code in (303,400)
+    assert 'meegle_session' not in client.cookies and 'lark_oauth_state' not in client.cookies
+    if params.get('error'): assert response.headers['location']=='/?auth_error=authorization_denied'
 
 
-def test_refresh_unavailable_company_admin_grant_still_admitted(tmp_path, monkeypatch):
-    app, _ = production_client(tmp_path); stale(app, role='manager', authz_version=1)
-    app.state.cfg['LARK_COMPANY_ADMIN_GRANTS_JSON'] = json.dumps([{'open_id': 'u-manager', 'app_id': app.state.cfg['LARK_APP_ID'],
-        'tenant': 'company', 'authorized_at': datetime.now(timezone.utc).isoformat(), 'enabled': True, 'role': 'manager',
-        'grant_id': 'g', 'reason': 'synthetic', 'authorized_by': 'owner', 'decision_ref': 'd'}])
-    client, r = login(app, monkeypatch, refresh=unavailable)
-    assert r.status_code == 307 and client.get('/api/session').json()['access_mode'] == 'normal'
+@pytest.mark.parametrize('next',['https://evil.example','//evil.example','/\\evil.example','/\nLocation:evil'])
+def test_login_redirect_rejects_unsafe_targets(tmp_path,next):
+    app,_=production_client(tmp_path);client=TestClient(app)
+    assert client.get('/api/auth/lark/login',params={'next':next},follow_redirects=False).status_code==422
 
 
-def test_refresh_unavailable_inactive_person_stays_inactive(tmp_path, monkeypatch):
-    app, _ = production_client(tmp_path); stale(app, active=False)
-    _, r = login(app, monkeypatch, refresh=unavailable)
-    assert r.status_code == 303 and code_of(r) == 'inactive' and not has_session(r)
+def test_cookie_attributes_signature_public_origin_and_replay(tmp_path,monkeypatch):
+    app,_=production_client(tmp_path);oauth(monkeypatch)
+    client=TestClient(app,base_url='https://internal')
+    headers={'x-forwarded-host':'public.example','x-forwarded-proto':'https'}
+    state=begin(client,'/people?tab=all',headers)
+    response=client.get('/api/auth/lark/callback',params={'state':state,'code':'synthetic'},headers=headers,follow_redirects=False)
+    assert response.headers['location']=='https://public.example/people?tab=all'
+    cookie=next(c for c in response.headers.get_list('set-cookie') if c.startswith('meegle_session='))
+    for part in ('HttpOnly','Secure','SameSite=lax','Path=/','Max-Age=604800'): assert part in cookie
+    # A SHA256 HMAC signature is 32 bytes encoded without padding.
+    raw=client.cookies['meegle_session'];assert len(raw.split('.')[-1])==43
+    with app.state.sessions() as db:
+        data=app.state.signer.loads(raw);auth=db.get(AuthRow,data['sid']).data
+        assert auth['expires']-auth['token_expires']>600000
+    assert finish(client,state).status_code==400
+    client.cookies.clear();client.cookies.set('meegle_session',raw[:raw.rfind('.')+1]+('A' if raw[raw.rfind('.')+1]!='A' else 'B')+raw[raw.rfind('.')+2:])
+    assert client.get('/api/workspace').status_code==401
 
 
-def test_refresh_unavailable_new_unknown_open_id_reports_provider_unavailable(tmp_path, monkeypatch):
-    app, _ = production_client(tmp_path)
-    _, r = login(app, monkeypatch, open_id='u-not-in-roster', refresh=unavailable)
-    assert r.status_code == 303 and code_of(r) == 'provider_unavailable' and not has_session(r)
+def test_inactive_person_stays_denied(tmp_path,monkeypatch):
+    app,_=production_client(tmp_path);stale(app,active=False);oauth(monkeypatch,open_id='u-manager')
+    client=TestClient(app);response=finish(client,begin(client))
+    assert response.status_code==403 and 'meegle_session' not in client.cookies
 
 
-def test_json_callers_get_503_when_unavailable_and_403_when_fresh_absent(tmp_path, monkeypatch):
-    app, _ = production_client(tmp_path); stale(app, role='member', authz_version=1)
-    _, r = login(app, monkeypatch, headers=JSON, refresh=unavailable)
-    assert r.status_code == 503 and 'synthetic-failure' not in r.text and not has_session(r)
-    app2, _ = production_client(tmp_path / 'b'); stale(app2, role='member', authz_version=1, directory_status='left', directory_missing=True)
-    _, r = login(app2, monkeypatch, headers=JSON, refresh=fresh_ok)
-    assert r.status_code == 403 and '名冊' in r.json()['detail'] and not has_session(r)
-    app3, _ = production_client(tmp_path / 'c'); stale(app3, active=False)
-    _, r = login(app3, monkeypatch, headers=JSON, refresh=unavailable)
-    assert r.status_code == 403 and '停權' in r.json()['detail']
+def test_hr_viewers_list_hides_people_and_attendance(tmp_path,monkeypatch):
+    app,_=production_client(tmp_path);oauth(monkeypatch)
+    client=TestClient(app);assert finish(client,begin(client)).status_code==307
+    assert len(client.get('/api/session').json()['users'])>1
+    app.state.cfg['HR_VIEWERS']='someone-else'
+    assert [u['id'] for u in client.get('/api/session').json()['users']]==['u-tenant']
+    ws=client.get('/api/workspace').json()
+    assert ws['hr_view_allowed'] is False and ws['work_schedules']==[]
+    assert [u['id'] for u in ws['users']]==['u-tenant']
+    app.state.cfg['HR_VIEWERS']='u-tenant'
+    assert client.get('/api/workspace').json()['hr_view_allowed'] is True
 
 
-def test_diagnostic_logs_are_identity_free(tmp_path, monkeypatch, caplog):
-    import logging
-    app, _ = production_client(tmp_path); stale(app, role='member', authz_version=1)
-    with caplog.at_level(logging.INFO):
-        _, response = login(app, monkeypatch, refresh=unavailable)
-    assert response.status_code == 303
-    records = [r for r in caplog.records if getattr(r, 'event', None)]
-    wait = next(r for r in records if r.event == 'oauth_roster_wait')
-    assert wait.result_class == 'RuntimeError' and wait.duration_ms >= 0
-    assert next(r for r in records if r.event == 'access_denied').denial_code == 'access_roster_expired'
-    assert 'u-manager' not in str([r.__dict__ for r in records])
-    assert 'Synthetic' not in str([r.__dict__ for r in records])
+def test_app_url_origin_wins_and_callback_revalidates_saved_next(tmp_path,monkeypatch):
+    app,_=production_client(tmp_path);oauth(monkeypatch)
+    app.state.cfg['APP_URL']='https://public.example/'
+    client=TestClient(app,base_url='https://internal');state=begin(client)
+    with app.state.sessions.begin() as db:
+        row=db.get(AuthRow,'oauth-'+state)
+        row.data={**row.data,'next':'//evil.example'}
+    response=finish(client,state)
+    assert response.status_code==307 and response.headers['location']=='https://public.example/'
+
+
+def test_startup_warms_all_datasets_without_waiting_for_lark(tmp_path):
+    from threading import Event
+    from .app import create_app
+    release=Event();roster_started=Event();attendance_started=Event()
+    app=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/warm.db','UPLOAD_DIR':str(tmp_path/'uploads'),
+        'DEMO_MODE':'false','LARK_WORKER_ORGANIZATION':'company','LARK_ALLOWED_TENANTS':'company',
+        'LARK_WORKER_IDENTITY':'application','LARK_LIVE_READ_ENABLED':'true'})
+    def roster(wid):
+        roster_started.set();assert release.wait(5)
+        return {'fingerprint':'roster'}
+    def attendance(wid):
+        attendance_started.set();assert release.wait(5)
+        return {'fingerprint':'attendance'}
+    app.state.live_read.refreshers={'roster':roster,'attendance':attendance,'sources':lambda wid:{'fingerprint':'sources'}}
+    try:
+        with TestClient(app) as client:
+            try:
+                assert roster_started.wait(2) and attendance_started.wait(2)
+                assert client.get('/api/health').status_code==200
+                assert app.state.live_read.status('lark-company')['datasets']['roster']['status']=='refreshing'
+            finally: release.set()
+    finally: release.set()

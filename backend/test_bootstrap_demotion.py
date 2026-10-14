@@ -67,13 +67,15 @@ def test_demoted_bootstrap_can_comment_and_relogin_without_admin_or_recovery(dem
     {'directory_source': {}},
     {'directory_status': 'left'},
 ], ids=['stale', 'missing-row', 'missing-proof', 'departed'])
-def test_demoted_bootstrap_cannot_recover_or_relogin_without_fresh_roster(demoted, patch):
+def test_demoted_bootstrap_keeps_tenant_reads_without_recovery_or_write_authority(demoted, patch):
     (_, client, login, change), _ = demoted
     change(patch)
-    assert client.get('/api/workspace').status_code == 403
-    assert client.get('/api/session').json()['user'] is None
+    assert client.get('/api/workspace').status_code == 200
+    assert client.get('/api/session').json()['access_mode'] == 'tenant-read'
     assert client.post('/api/people/sync').status_code == 403
     assert client.get('/api/admin/runtime-health').status_code == 403
     assert client.post('/api/logout').status_code == 200
-    assert login().status_code == 403
-    assert client.get('/api/workspace').status_code == 401
+    assert login().status_code == 307
+    assert client.get('/api/workspace').status_code == 200
+    assert client.post('/api/people/sync').status_code == 403
+    assert client.get('/api/admin/runtime-health').status_code == 403

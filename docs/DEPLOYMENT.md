@@ -74,7 +74,8 @@ python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
 | LARK_REDIRECT_URI | 實際 origin＋/api/auth/lark/callback，與後台白名單完全一致 |
 | LARK_ALLOWED_TENANTS | 允許的 tenant_key，以逗號分隔、避免多餘空白 |
 | LARK_ROLE_MAP_JSON | open_id 對 pm／manager／member 的 JSON；未列入者預設 member |
-| LARK_OAUTH_SCOPES | 使用者登入要求的 scopes，以空白分隔；範例為 bitable:app:readonly approval:approval:readonly。與 application scopes、Base 資源角色分開查核；發布新 app 版本不代表舊 user token 自動取得新權限 |
+| HR_VIEWERS | 人員及班表查看名單，預設 `*` 允許全部已登入成員；可改為逗號或空白分隔的 open_id 清單，空值不允許查看。登入不要求額外 OAuth scopes；缺少既有 application 權限時顯示 needs-permission，不阻擋登入 |
+| APP_URL | 公開 origin（例如 https://example.com）；未設定時使用 x-forwarded-host/proto 或請求 origin |
 | LARK_SOURCE_TABLES_JSON | 必須填完整 9 張來源表 JSON，參照 deployment/source-tables.json；單純將檔案放進 image 不會自動載入，範例值 [] 不可作正式設定 |
 | LARK_SOURCE_MAX_PAGES | 預設 50，每頁 200；來源上限限制為 1 至 100 頁 |
 | LARK_WORKER_IDENTITY | 需要公司背景真實連線時設 application；不能以本機 CLI 憑證替代 |

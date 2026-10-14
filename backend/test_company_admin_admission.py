@@ -124,8 +124,9 @@ def test_normal_oauth_applies_audited_grant_without_salary_roster_and_revokes_li
     assert staff_audit.status_code==200
     assert all(not row['action'].startswith('company_admin_') for row in staff_audit.json()['items'])
     app.state.cfg['LARK_COMPANY_ADMIN_GRANTS_JSON']='[]'
-    assert client.get('/api/workspace').status_code==403
-    assert client.get('/api/session').json()['access_mode']=='recovery'
+    assert client.get('/api/workspace').status_code==200
+    assert client.get('/api/session').json()['access_mode']=='tenant-read'
+    assert client.post('/api/workspace/switch',json={'environment':'test'}).status_code==403
     with app.state.sessions() as db:
         assert any(row.action=='company_admin_authorization_revoked' for row in db.scalars(select(AuditRow)))
 

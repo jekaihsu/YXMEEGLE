@@ -39,7 +39,7 @@ def ensure_roster_for_admission(coordinator, wid, person, *, now=None, callback=
         return not wait
     finally:
         if callback:
-            logger.info('oauth_roster_wait', extra={'event': 'oauth_roster_wait',
-                        'duration_ms': round((perf_counter()-started)*1000, 2),
-                        'result_class': result_class})
+            duration_ms=round((perf_counter()-started)*1000,2)
+            logger.info('oauth_roster_wait duration_ms=%.2f result_class=%s', duration_ms, result_class,
+                        extra={'event':'oauth_roster_wait','duration_ms':duration_ms,'result_class':result_class})
     return not wait or result.get('status') == 'fresh'

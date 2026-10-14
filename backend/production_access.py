@@ -104,7 +104,8 @@ def require_access(person,app_id,*,allow_recovery=False,now=None,cfg=None,tenant
         exc = HTTPException(403, '公司名冊已逾15分鐘未核實，請由維運管理員恢復同步' if verified
                             else '尚未核實在職名冊或帳號已停用')
         exc.code = 'access_roster_expired' if verified else 'access_not_admitted'
-        logger.info('access_denied', extra={'event': 'access_denied', 'denial_code': exc.code})
+        logger.info('access_denied denial_code=%s',exc.code,
+                    extra={'event':'access_denied','denial_code':exc.code})
         raise exc
     return mode
 
@@ -165,3 +166,29 @@ def test_profile(formal, overlay):
     if formal.get('manager_revoked'):
         result['manager_revoked']=True
     return result
+
+
+# Deliberately exact: tenant login does not authorize arbitrary GETs, writes,
+# admin diagnostics, approvals, recovery, workspace switching or grants.
+TENANT_READ_ROUTES=frozenset({
+    '/api/session','/api/workspace','/api/live/status','/api/sources',
+    '/api/source-health','/api/company-dashboard','/api/manager-overview',
+})
+
+
+def tenant_read_allowed(person,cfg,org,method,path):
+    if method!='GET' or path not in TENANT_READ_ROUTES or not person or not person.get('active',True):
+        return False
+    app_id=cfg.get('LARK_APP_ID'); tenant=org.removeprefix('lark-')
+    proof=person.get('oauth_identity') or {}
+    return bool(app_id and org=='lark-'+tenant and tenant in {
+        x.strip() for x in cfg.get('LARK_ALLOWED_TENANTS','').split(',') if x.strip()}
+        and person.get('identity_app_id')==app_id and proof.get('source')=='oauth_user_info'
+        and proof.get('app_id')==app_id and proof.get('tenant')==tenant
+        and proof.get('open_id')==person.get('id') and proof.get('verified_at'))
+
+
+def hr_view_allowed(person,cfg):
+    # Owner decision: all logged-in users now; one list can narrow this later.
+    viewers=set(cfg.get('HR_VIEWERS','*').replace(',',' ').split())
+    return bool(person and person.get('active',True) and ('*' in viewers or person.get('id') in viewers))

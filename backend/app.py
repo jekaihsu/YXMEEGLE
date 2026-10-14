@@ -125,11 +125,17 @@ def create_app(overrides=None):
     # Migration is reversible: preserve the original JSON before normalizing.
     from .workspace_migration import migrate_workspaces
     migrate_workspaces(sessions,WorkspaceRow,BusinessRow,upgrade,storage)
-    signer=URLSafeTimedSerializer(secret,salt='meegle-session-v1')
+    signer=URLSafeTimedSerializer(secret,salt='meegle-session-v1',signer_kwargs={'digest_method':hashlib.sha256})
     upload_dir=Path(cfg.get('UPLOAD_DIR','./backend/uploads')).resolve(); upload_dir.mkdir(parents=True,exist_ok=True)
     @asynccontextmanager
     async def lifespan(app):
         try:
+            tenant=cfg.get('LARK_WORKER_ORGANIZATION')
+            if tenant and tenant in allowed_tenants:
+                wid='lark-'+tenant
+                ensure_workspace(wid,True)
+                for dataset in ('roster','attendance','sources'):
+                    app.state.live_read.ensure(wid,dataset,wait=False)
             yield
         finally:
             app.state.live_read.close()
@@ -154,13 +160,14 @@ def create_app(overrides=None):
         body = {'detail': exc.detail}
         if request.url.path == '/api/lark-pilot/shadow':
             body['code'] = getattr(exc, 'code', 'pilot_method_not_allowed' if exc.status_code == 405 else 'pilot_read_failed')
-        return JSONResponse(body,status_code=exc.status_code,headers=exc.headers)
+        response=JSONResponse(body,status_code=exc.status_code,headers=exc.headers)
+        if request.url.path=='/api/auth/lark/callback': response.delete_cookie('lark_oauth_state')
+        return response
     app.add_middleware(GZipMiddleware,minimum_size=1000,compresslevel=5)
     from .request_limits import JsonRequestLimit
     app.add_middleware(JsonRequestLimit)
     oauth_configured=all(cfg.get(k) for k in ('LARK_APP_ID','LARK_APP_SECRET','LARK_REDIRECT_URI','LARK_ALLOWED_TENANTS'))
-    oauth_scopes=' '.join(dict.fromkeys(x for x in re.split(r'[\s,]+',cfg.get('LARK_OAUTH_SCOPES','bitable:app:readonly').strip()) if x))
-    if not oauth_scopes: oauth_scopes='bitable:app:readonly'
+    oauth_scopes=''  # Login uses identity only; feature reads use application permissions.
     try: role_map=json.loads(cfg.get('LARK_ROLE_MAP_JSON','{}'))
     except (ValueError,TypeError): raise RuntimeError('LARK_ROLE_MAP_JSON must be a JSON object of open_id to role')
     if not isinstance(role_map,dict) or any(not isinstance(k,str) or v not in ('member','pm','manager') for k,v in role_map.items()):
@@ -202,15 +209,30 @@ def create_app(overrides=None):
             response.headers['Server-Timing']=', '.join([f'{k};dur={v*1000:.1f}' for k,v in phases.items()]+[f'total;dur={total*1000:.1f}'])
         return response
 
+    SESSION_MAX_AGE=7*24*3600
+
+    def public_origin(request):
+        if cfg.get('APP_URL'): return cfg['APP_URL'].rstrip('/')
+        host=request.headers.get('x-forwarded-host') or request.headers.get('host')
+        proto=request.headers.get('x-forwarded-proto',request.url.scheme).split(',')[0].strip()
+        return f'{proto}://{host}' if host else str(request.base_url).rstrip('/')
+
+    def safe_next(value):
+        return (isinstance(value,str) and value.startswith('/') and not value.startswith('//')
+                and '\\' not in value and not any(ord(c)<32 for c in value))
+
+    def secure_cookie(request):
+        return production or public_origin(request).startswith('https://')
+
     def read_cookie(request):
         cookie=request.cookies.get('meegle_session')
         if not cookie: return None
-        try: data=signer.loads(cookie,max_age=8*3600)
+        try: data=signer.loads(cookie,max_age=SESSION_MAX_AGE)
         except BadSignature: return None
         if data.get('mode')=='demo' and not demo: return None
         return data
-    def set_cookie(response,data):
-        response.set_cookie('meegle_session',signer.dumps(data),httponly=True,secure=production,samesite='lax',max_age=8*3600,path='/')
+    def set_cookie(response,data,request):
+        response.set_cookie('meegle_session',signer.dumps(data),httponly=True,secure=secure_cookie(request),samesite='lax',max_age=SESSION_MAX_AGE,path='/')
     def ensure_workspace(wid,empty=False):
         with sessions.begin() as db:
             if not db.get(WorkspaceRow,wid):
@@ -256,7 +278,7 @@ def create_app(overrides=None):
                      'source':'server_allowlist_and_verified_oauth','salary_base_modified':False}))
         return True
 
-    def person_identity(db,data,user):
+    def person_identity(db,data,user,*,tenant_read=False):
         if data.get('mode')!='lark': return user
         org=organization(data); row=db.get(PersonRow,(org,user['id']))
         if row:
@@ -271,7 +293,7 @@ def create_app(overrides=None):
                 result['capabilities']=list(dict.fromkeys(result.get('capabilities',[])+['approve_capability']))
                 result.update(capability_config_applied=True,capability_config_applied_at=now(),authz_version=result.get('authz_version',0)+1)
                 row.data=result; db.commit()
-            if admission_required: require_admission(result,cfg.get('LARK_APP_ID'))
+            if admission_required and not tenant_read: require_admission(result,cfg.get('LARK_APP_ID'))
             if data['wid'].startswith('test-'):
                 overlay=db.get(PersonRow,(data['wid'],user['id']))
                 result=test_profile(result,overlay.data if overlay else None)
@@ -282,7 +304,7 @@ def create_app(overrides=None):
         result=deepcopy(user); result['role']=role_map.get(user['id'],user.get('role','member'))
         if admission_required:
             if role_map.get(user['id'])=='manager': result['bootstrap_admin']=True
-            require_admission(result,cfg.get('LARK_APP_ID'))
+            if not tenant_read: require_admission(result,cfg.get('LARK_APP_ID'))
         result['capabilities']=initial_capabilities(user['id'],result['role'])
         result.setdefault('default_workspace','test' if result['role']=='manager' else 'production')
         result.setdefault('active',True)
@@ -304,21 +326,42 @@ def create_app(overrides=None):
             if (data.get('mode')=='lark' and not data['wid'].startswith('test-')
                     and request.url.path not in NO_ROSTER_REFRESH_PATHS):
                 from .live_read.admission import ensure_roster_for_admission
-                # End the DB read transaction before a blocking roster refresh.
+                # Release the transaction before scheduling the background roster refresh.
                 db.rollback()
                 ensure_roster_for_admission(app.state.live_read,organization(data),user)
                 db.expire_all()
                 profile=db.get(PersonRow,(organization(data),data['uid']))
                 if profile: user=deepcopy(profile.data)
-            user=person_identity(db,data,user)
+            from .production_access import tenant_read_allowed
+            tenant_read=(data.get('mode')=='lark' and data['wid']==organization(data)
+                         and tenant_read_allowed(user,cfg,organization(data),request.method,request.url.path))
+            user=person_identity(db,data,user,tenant_read=tenant_read)
             require(user.get('active',True),'帳號已停權',403)
             if data.get('mode')=='lark' and admission_required:
                 from .production_access import require_access
                 recovery_routes={('GET','/api/session'),('POST','/api/logout'),
                     ('POST','/api/people/sync'),('GET','/api/admin/runtime-health')}
-                access=require_access(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'),allow_recovery=(request.method,request.url.path) in recovery_routes)
+                if tenant_read:
+                    from .production_access import access_mode
+                    access=access_mode(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'))
+                    if access in ('denied','recovery'): access='tenant-read'
+                else:
+                    access=require_access(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'),allow_recovery=(request.method,request.url.path) in recovery_routes)
                 data={**data,'access_mode':access}
         return data,user
+
+    def hr_visible(user):
+        from .production_access import hr_view_allowed
+        return hr_view_allowed(user,cfg)
+
+    def restrict_hr(out,user):
+        out['hr_view_allowed']=hr_visible(user)
+        if not hr_visible(user):
+            out['users']=[p for p in out.get('users',[]) if p['id']==user['id']]
+            out['work_schedules']=[]
+            out['people_directory_status']={'status':'restricted','message':'不在人事資料查看名單（HR_VIEWERS）'}
+            out['attendance_schedule_status']={'status':'restricted','message':'不在人事資料查看名單（HR_VIEWERS）'}
+
     def public_ws(data,wid,user,mode=None,owned=False):
         """owned=True: caller passes a fresh load nobody else uses; it is projected in place (no deepcopy)."""
         file_categories=categories(data); verification=data.get('native_definition_verification')
@@ -346,6 +389,7 @@ def create_app(overrides=None):
         result.pop('source_work_items_status',None)
         result.pop('source_work_items_enabled',None)
         out=filter_private_workspace(result,user)
+        restrict_hr(out,user)
         if out.get('environment') not in ('test','demo'):
             app.state.case_redaction_stats=case_redaction.apply(out,case_redaction.make_plan(pre,out))
         return out
@@ -403,7 +447,7 @@ def create_app(overrides=None):
         data=read_cookie(request)
         if not data and demo:
             data={'mode':'demo','uid':'u-pm','wid':'demo-'+uid()}; ensure_workspace(data['wid'])
-            response=JSONResponse({'user':USERS[0],'users':USERS,'mode':'demo','auth_configured':oauth_configured,**features()}); set_cookie(response,data); return response
+            response=JSONResponse({'user':USERS[0],'users':USERS,'mode':'demo','auth_configured':oauth_configured,**features()}); set_cookie(response,data,request); return response
         if not data: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured}
         try: data,user=identity(request)
         except HTTPException: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured}
@@ -411,7 +455,7 @@ def create_app(overrides=None):
             return {'user':public_person(user,include_authority=True),'users':[],'mode':data['mode'],'workspace_id':data['wid'],
                     'environment':'test' if data['wid'].startswith('test-') else 'production','auth_configured':oauth_configured,'access_mode':'recovery'}
         with phase(request,'load'),sessions() as db: users=load(db,db.get(WorkspaceRow,data['wid']),collections=('users',))['users']
-        return {'user':public_person(user,include_authority=True),'users':[public_person(person) for person in users],'mode':data['mode'],'workspace_id':data['wid'],'environment':'test' if data['wid'].startswith('test-') else data['mode'],'auth_configured':oauth_configured,'access_mode':data.get('access_mode','normal'),**features()}
+        return {'user':public_person(user,include_authority=True),'users':[public_person(person) for person in users if hr_visible(user) or person['id']==user['id']],'mode':data['mode'],'workspace_id':data['wid'],'environment':'test' if data['wid'].startswith('test-') else data['mode'],'auth_configured':oauth_configured,'access_mode':data.get('access_mode','normal'),**features()}
 
     @app.post('/api/demo/session')
     async def demo_session(request:Request):
@@ -420,7 +464,7 @@ def create_app(overrides=None):
         body=await json_object(request)
         with sessions() as db: users=load(db,db.get(WorkspaceRow,data['wid']))['users']
         user=find(users,body.get('user_id'),'角色'); require(user.get('active',True),'帳號已停權'); data['uid']=user['id']
-        response=JSONResponse({'user':user,'users':users,'mode':'demo','auth_configured':oauth_configured}); set_cookie(response,data); return response
+        response=JSONResponse({'user':user,'users':users,'mode':'demo','auth_configured':oauth_configured}); set_cookie(response,data,request); return response
 
     @app.post('/api/logout')
     def logout(request:Request):
@@ -437,6 +481,7 @@ def create_app(overrides=None):
         from fastapi.responses import JSONResponse, Response
         from . import shell, index_reads
         wid=data['wid']
+        if not hr_visible(user): return None
         with sessions() as db:
             row=db.get(WorkspaceRow,wid)
             with phase(request,'load'):
@@ -447,6 +492,7 @@ def create_app(overrides=None):
             if tag in [v.strip() for v in request.headers.get('if-none-match','').split(',')]: return Response(status_code=304,headers={'ETag':tag})
             with phase(request,'project'):
                 result=shell.build(db,BusinessRow,row,state,user,facts,today,approval_connection(cfg,simulation_available=(data['mode']=='demo') or wid.startswith('test-'),definition_verification=state.get('native_definition_verification')))
+        restrict_hr(result,user)
         result['freshness']=coordinator.status(wid)
         as_of=result['freshness']['datasets']['sources']['as_of']
         return JSONResponse(result,headers={'ETag':tag,**({'X-Data-As-Of':as_of} if as_of else {})})
@@ -1123,13 +1169,13 @@ def create_app(overrides=None):
         return persist_mutation(data['wid'],body['version'],mutate,actor_id=user['id'])
 
     @app.get('/api/auth/lark/login')
-    def lark_login(next:str='/'):
+    def lark_login(request:Request,next:str='/'):
         require(oauth_configured,'尚未設定 Lark 登入應用、回呼網址或租戶白名單',503)
-        require(next.startswith('/') and not next.startswith('//') and '\\' not in next and not any(ord(c)<32 for c in next),'返回路徑不合法',422)
+        require(safe_next(next),'返回路徑不合法',422)
         state=secrets.token_urlsafe(32)
         with sessions.begin() as db: db.add(AuthRow(id='oauth-'+state,data={'expires':datetime.now(timezone.utc).timestamp()+600,'next':next}))
-        response=RedirectResponse('https://accounts.larksuite.com/open-apis/authen/v1/authorize?'+urlencode({'app_id':cfg['LARK_APP_ID'],'redirect_uri':cfg['LARK_REDIRECT_URI'],'state':state,'response_type':'code','scope':oauth_scopes}))
-        response.set_cookie('lark_oauth_state',signer.dumps(state),httponly=True,secure=production,samesite='lax',max_age=600); return response
+        response=RedirectResponse('https://accounts.larksuite.com/open-apis/authen/v1/authorize?'+urlencode({'app_id':cfg['LARK_APP_ID'],'redirect_uri':cfg['LARK_REDIRECT_URI'],'state':state,'response_type':'code'}))
+        response.set_cookie('lark_oauth_state',signer.dumps(state),httponly=True,secure=secure_cookie(request),samesite='lax',max_age=600,path='/'); return response
 
     @app.get('/api/auth/lark/callback')
     def lark_callback(request:Request,code:str='',state:str='',error:str='',error_description:str=''):
@@ -1141,6 +1187,7 @@ def create_app(overrides=None):
             nonce=db.execute(select(AuthRow).where(AuthRow.id=='oauth-'+state).with_for_update()).scalar_one_or_none()
             require(nonce is not None and nonce.data['expires']>datetime.now(timezone.utc).timestamp(),'OAuth state 已失效或已使用',400)
             return_to=nonce.data.get('next','/'); db.delete(nonce)
+        return_to=return_to if safe_next(return_to) else '/'
         # Authorization servers return OAuth errors on the callback instead of
         # an authorization code when consent is denied or a scope is invalid.
         # Never forward provider-supplied descriptions into our URL or UI.
@@ -1156,6 +1203,7 @@ def create_app(overrides=None):
             safe_code=provider_errors.get(error,'authorization_failed')
             response=RedirectResponse('/?auth_error='+safe_code,status_code=303)
             response.delete_cookie('lark_oauth_state'); return response
+        require(bool(code),'Lark 沒有回傳授權碼',400)
         try:
             with httpx.Client(timeout=25) as client:
                 response=client.post(API+'/authen/v2/oauth/token',json={'grant_type':'authorization_code','client_id':cfg['LARK_APP_ID'],'client_secret':cfg['LARK_APP_SECRET'],'code':code,'redirect_uri':cfg['LARK_REDIRECT_URI']})
@@ -1167,10 +1215,6 @@ def create_app(overrides=None):
                             'Lark 登入服務暫時無法連線')
                     raise HTTPException(400 if provider_error in ('access_denied','invalid_scope','unauthorized_client','invalid_client') else 502,detail)
                 token=response.json()
-                granted_scope=token.get('scope')
-                if isinstance(granted_scope,str) and granted_scope.strip():
-                    missing_scopes=set(oauth_scopes.split())-set(granted_scope.split())
-                    if missing_scopes: raise HTTPException(403,'OAuth 應用權限未授予：請管理員檢查 Lark 應用權限與發布版本')
                 require(bool(token.get('access_token')),'Lark 授權碼交換失敗',401)
                 response=client.get(API+'/authen/v1/user_info',headers={'Authorization':'Bearer '+token['access_token']}); response.raise_for_status(); info=response.json().get('data',{})
         except httpx.HTTPError: raise HTTPException(502,'Lark 登入服務暫時無法連線')
@@ -1178,20 +1222,6 @@ def create_app(overrides=None):
         oid=info.get('open_id'); require(bool(oid),'Lark 未返回有效使用者身分',401)
         role=role_map.get(oid,'member')
         org='lark-'+tenant; user={'id':oid,'identity_app_id':cfg['LARK_APP_ID'],'name':info.get('name') or oid,'role':role,'department':'公司成員','avatar':(info.get('name') or '?')[:1],'active':True,'capabilities':initial_capabilities(oid,role),'default_workspace':'production'}
-        from .live_read.admission import ensure_roster_for_admission
-        with sessions() as db:
-            existing=db.get(PersonRow,(org,oid))
-            admission_person=deepcopy(existing.data) if existing else user
-        # The reloaded access policy preserves grants and bootstrap recovery on failure.
-        roster_refreshed=ensure_roster_for_admission(app.state.live_read,org,admission_person,callback=True)
-        def require_callback_access(person):
-            # A failed roster refresh must not look like a fresh roster that lacks this exact ID.
-            # Recovery and grants still pass through require_access; this never grants admission.
-            try: return require_access(person,cfg['LARK_APP_ID'],allow_recovery=True,cfg=cfg,tenant=tenant)
-            except HTTPException as denied:
-                if not roster_refreshed and getattr(denied,'code',None) in ('access_not_admitted','access_roster_expired'):
-                    raise HTTPException(503,'公司名冊暫時無法更新，請稍後再試')
-                raise
         with sessions.begin() as db:
             profile=db.execute(select(PersonRow).where(PersonRow.organization_id==org,PersonRow.person_id==oid).with_for_update()).scalar_one_or_none()
             if profile:
@@ -1202,7 +1232,6 @@ def create_app(overrides=None):
                 if role=='manager' and user.get('role')=='manager': user['bootstrap_admin']=True
                 elif role=='manager' and not user.get('authz_version'):
                     user.update(role='manager',bootstrap_admin=True,capabilities=initial_capabilities(oid,'manager'))
-                require_callback_access(user)
                 reconcile_company_admin(db,org,user)
                 if isinstance(info.get('user_id'),str) and info['user_id']:
                     user['attendance_identity']={'employee_type':'employee_id','employee_id':info['user_id'],'open_id':oid,'app_id':cfg['LARK_APP_ID'],'tenant':tenant,'verified_at':now(),'source':'oauth_user_info'}
@@ -1210,7 +1239,6 @@ def create_app(overrides=None):
             else:
                 user['oauth_identity']={'source':'oauth_user_info','app_id':cfg['LARK_APP_ID'],'tenant':tenant,'open_id':oid,'verified_at':now()}
                 if role=='manager': user['bootstrap_admin']=True
-                require_callback_access(user)
                 reconcile_company_admin(db,org,user)
                 if isinstance(info.get('user_id'),str) and info['user_id']:
                     user['attendance_identity']={'employee_type':'employee_id','employee_id':info['user_id'],'open_id':oid,'app_id':cfg['LARK_APP_ID'],'tenant':tenant,'verified_at':now(),'source':'oauth_user_info'}
@@ -1221,9 +1249,9 @@ def create_app(overrides=None):
         wid=org
         ensure_workspace(wid,True); ensure_workspace(org,True); sid=uid()
         with sessions.begin() as db:
-            db.add(AuthRow(id=sid,data={'wid':wid,'organization':org,'uid':oid,'access_token':token['access_token'],'granted_scope':token.get('scope',''),'requested_scope':oauth_scopes,'expires':datetime.now(timezone.utc).timestamp()+min(int(token.get('expires_in',7200)),8*3600)}))
+            db.add(AuthRow(id=sid,data={'wid':wid,'organization':org,'uid':oid,'access_token':token['access_token'],'granted_scope':token.get('scope',''),'requested_scope':oauth_scopes,'expires':datetime.now(timezone.utc).timestamp()+SESSION_MAX_AGE,'token_expires':datetime.now(timezone.utc).timestamp()+int(token.get('expires_in',7200))}))
             db.add(audit.record(AuditRow,wid,oid,'login',details={'environment':'test' if wid.startswith('test-') else 'production'}))
-        response=RedirectResponse(return_to); set_cookie(response,{'mode':'lark','uid':oid,'wid':wid,'organization':org,'sid':sid}); response.delete_cookie('lark_oauth_state'); return response
+        response=RedirectResponse(public_origin(request)+return_to); set_cookie(response,{'mode':'lark','uid':oid,'wid':wid,'organization':org,'sid':sid},request); response.delete_cookie('lark_oauth_state'); return response
 
     @app.post('/api/workspace/switch')
     async def switch_workspace(request:Request):
@@ -1236,7 +1264,7 @@ def create_app(overrides=None):
             require(auth.data.get('wid')==data['wid'],'工作區已在另一視窗切換，請重新載入',409)
             auth.data={**auth.data,'wid':wid}
             db.add(audit.record(AuditRow,wid,user['id'],'workspace_switch',details={'from':data['wid'],'to':wid}))
-        data['wid']=wid; response=JSONResponse({'ok':True,'environment':target}); set_cookie(response,data); return response
+        data['wid']=wid; response=JSONResponse({'ok':True,'environment':target}); set_cookie(response,data,request); return response
 
     @app.post('/api/pilot/copy')
     async def copy_pilot(request:Request):
