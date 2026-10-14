@@ -1,3 +1,4 @@
+import {compareTableValues} from './companyDashboardCache';
 import { useRef, useEffect } from 'react';
 import type {
   ContractDetailView,
@@ -183,16 +184,16 @@ export function ContractDetail({
       <div className="p2-main-layout">
         {/* 同確認單合約明細目錄 (Sibling Directory) */}
         {view.directory && (
-          <aside className="p2-sibling-directory" aria-label="同確認單合約明細清單">
+          <details className="p2-sibling-directory" aria-label="同確認單合約明細清單"><summary>同確認單合約明細</summary>
             <div className="p2-card-header">
               <h2 className="p2-section-title">同確認單明細</h2>
               <span className="p2-badge">{view.directory.state.label}</span>
             </div>
             {view.directory.note && (
-              <p className="p2-directory-note">{view.directory.note}</p>
+              <p className="p2-directory-note">合約項次由小到大，缺項次列在末尾。</p>
             )}
             <ul className="p2-sibling-list">
-              {view.directory.entries.map((entry, idx) => {
+              {[...view.directory.entries].sort((a,b)=>compareTableValues(a.lineNumber.kind==='text'?a.lineNumber.text:null,b.lineNumber.kind==='text'?b.lineNumber.text:null,'number')||(a.navKey||'').localeCompare(b.navKey||'')).map((entry, idx) => {
                 const entryKey = entry.navKey ?? `unlocated-sibling-${idx}`;
                 return (
                   <li
@@ -229,7 +230,7 @@ export function ContractDetail({
                 );
               })}
             </ul>
-          </aside>
+          </details>
         )}
 
         {/* 主內容區與抽屜 (Content Area with Drawer) */}

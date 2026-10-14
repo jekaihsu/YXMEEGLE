@@ -566,7 +566,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
             >
               <div className="p2-footer-totals">
                 <div className="p2-footer-item">
-                  <span className="p2-footer-label">符合條件筆數：</span>
+                  <span className="p2-footer-label">符合條件版本筆數：</span>
                   <strong className="p2-footer-val">
                     {view.footer.matching.label}
                   </strong>
@@ -594,7 +594,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                   )}
                 </div>
                 <div className="p2-footer-item">
-                  <span className="p2-footer-label">已授權來源筆數：</span>
+                  <span className="p2-footer-label">已授權來源版本筆數：</span>
                   <strong className="p2-footer-val">
                     {view.footer.authorizedSource.label}
                   </strong>

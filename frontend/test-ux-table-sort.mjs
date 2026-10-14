@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import fs from 'node:fs/promises';
+const bundle=await build({stdin:{contents:"export {compareTableValues,tableCalendarDay,populationLabel} from './src/companyDashboardCache';export {readPanel,cachedPanel} from './src/companyDashboardCache';export {invalidateSessionEpoch} from './src/api';export {sortCaseSection} from './src/CaseDetail';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const path=new URL('./.ux-table-sort-bundle.mjs',import.meta.url);
+await fs.writeFile(path,bundle.outputFiles[0].text);
+try {
+ const {compareTableValues,tableCalendarDay,populationLabel,sortCaseSection,readPanel,cachedPanel,invalidateSessionEpoch}=await import(path.href);
+ const rows=[{id:'null',value:null},{id:'10',value:'10'},{id:'2',value:2},{id:'blank',value:''},{id:'decimal',value:'2.5'}];
+ assert.deepEqual([...rows].sort((a,b)=>compareTableValues(a.value,b.value,'number')).map(r=>r.id),['2','decimal','10','null','blank']);
+ assert.deepEqual([...rows].sort((a,b)=>compareTableValues(a.value,b.value,'number','desc')).map(r=>r.id),['10','decimal','2','null','blank']);
+ const dates=[null,'2026-10-15T00:00:00+08:00','2026-10-14T18:00:00Z','invalid'];
+ assert.deepEqual([...dates].sort((a,b)=>compareTableValues(a,b,'date','desc')),['2026-10-14T18:00:00Z','2026-10-15T00:00:00+08:00',null,'invalid']);
+ assert.equal(tableCalendarDay('2026-10-14T18:00:00Z'),'2026-10-15');
+ assert.equal(tableCalendarDay('2026-02-30'),null);
+ assert.equal(populationLabel(null,50,false),'符合條件 未知 筆 · 本頁已載入 50 筆 · 部分資料，總數未知');
+ assert.equal(populationLabel(0,0,true),'符合條件 0 筆 · 本頁已載入 0 筆 · 已授權範圍');
+ const section={key:'contract_lines',rows:[{key:'c',fields:[]},{key:'b',fields:[{label:'項次',text:'10'}]},{key:'a',fields:[{label:'項次',text:'2'}]}]};
+ assert.deepEqual(sortCaseSection(section,null).rows.map(r=>r.key),['a','b','c']);
+ let calls=0,finish;
+ globalThis.fetch=()=>{calls++;return new Promise(resolve=>{finish=resolve})};
+ const a=new AbortController(),b=new AbortController();
+ const first=readPanel('/api/synthetic-panel',a.signal,'user-a');
+ const second=readPanel('/api/synthetic-panel',b.signal,'user-a');
+ assert.equal(calls,1);
+ a.abort();
+ finish(new Response(JSON.stringify({rows:[{id:'literal'}]})));
+ assert.deepEqual(await first,{rows:[{id:'literal'}]});
+ assert.deepEqual(await second,{rows:[{id:'literal'}]});
+ assert.deepEqual(cachedPanel('/api/synthetic-panel','user-a'),{rows:[{id:'literal'}]});
+ assert.equal(cachedPanel('/api/synthetic-panel','user-b'),undefined);
+ invalidateSessionEpoch();
+ assert.equal(cachedPanel('/api/synthetic-panel','user-a'),undefined);
+ console.log('PASS scoped panel reads. Coalescing, one-reader cancellation, scope isolation and session invalidation.');
+ console.log('PASS UX table sort. Numeric and date orders, Taipei calendar days, nulls, stable item order and population labels.');
+} finally {await fs.unlink(path)}
