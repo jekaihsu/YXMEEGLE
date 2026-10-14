@@ -175,7 +175,7 @@ TENANT_READ_ROUTES=frozenset({
     '/api/session','/api/workspace','/api/live/status','/api/sources',
     '/api/source-health','/api/company-dashboard','/api/manager-overview',
     '/api/projects','/api/my-work','/api/confirmations','/api/contract-detail',
-    '/api/work-item-detail','/api/daily-reports',
+    '/api/work-item-detail','/api/daily-reports','/api/people/attendance',
 })
 
 # Legacy project detail carries raw amounts; use the P2 case projection instead.

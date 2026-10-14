@@ -136,8 +136,10 @@ def create_app(overrides=None):
                 ensure_workspace(wid,True)
                 for dataset in ('roster','attendance','sources'):
                     app.state.live_read.ensure(wid,dataset,wait=False)
+                app.state.people_attendance.view(wid)
             yield
         finally:
+            app.state.people_attendance.close()
             app.state.live_read.close()
 
     app=FastAPI(title='詠翔專案工作台',docs_url=None if production else '/api/docs',lifespan=lifespan); app.state.engine=engine; app.state.sessions=sessions; app.state.signer=signer
@@ -1360,6 +1362,17 @@ def create_app(overrides=None):
     from .live_read.routes import register as register_live, refresh as live_refresh
     app.state.live_read=RefreshCoordinator(sessions,CacheRow,build_refreshers(
         app.state.source_sync,app.state.people_directory,app.state.attendance_schedule),cfg)
+
+    from .live_read.people_attendance import PeopleAttendance
+    app.state.people_attendance=PeopleAttendance(sessions,CacheRow,app.state.live_read,cfg)
+
+    @app.get('/api/people/attendance')
+    def people_attendance(request:Request,week:str|None=None):
+        data,user=identity(request)
+        require(hr_visible(user),'不在人事資料查看名單（HR_VIEWERS）',403)
+        from fastapi.responses import JSONResponse
+        return JSONResponse(app.state.people_attendance.view(data['wid'],week),
+                            headers={'Cache-Control':'no-store'})
 
     def live_enabled(wid):
         return app.state.live_read.status(wid)['enabled']

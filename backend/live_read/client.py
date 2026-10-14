@@ -13,9 +13,11 @@ from .rate_limit import BudgetExceeded, RETRY_CODES, RetryPolicy, process_bucket
 from .token_cache import TokenError, process_token_cache
 
 ALLOWED_POSTS = (r'/bitable/v1/apps/[^/]+/tables/[^/]+/records/search',
-                 r'/attendance/v1/user_daily_shifts/query')
+                 r'/attendance/v1/user_daily_shifts/query',
+                 r'/attendance/v1/user_tasks/query', r'/attendance/v1/user_approvals/query')
 ALLOWED_GETS = (r'/bitable/v1/apps/[^/]+(?:/.*)?',
-                r'/contact/v3/users/batch', r'/attendance/v1/shifts/[^/]+')
+                r'/contact/v3/users/batch', r'/attendance/v1/shifts/[^/]+',
+                r'/attendance/v1/groups')
 
 
 class ReadFailure(RuntimeError):
@@ -147,7 +149,7 @@ class LiveLarkClient:
                 if not scopes:
                     scopes=(['bitable:app:readonly'] if '/bitable/' in path else
                             ['contact:contact.base:readonly','contact:user.employee_id:readonly'] if '/contact/' in path else
-                            ['attendance:rule:readonly' if '/shifts/' in path else 'attendance:task:readonly'] if '/attendance/' in path else [])
+                            ['attendance:rule:readonly' if '/shifts/' in path or path == '/attendance/v1/groups' else 'attendance:task:readonly'] if '/attendance/' in path else [])
                 raise ReadNeedsPermission(scopes, upstream_status=response.status_code,
                                           lark_code=code, kind='needs-permission')
             if code == 1254302 or (response.status_code in (401, 403) and not invalid_token):

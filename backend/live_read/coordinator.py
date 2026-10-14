@@ -203,6 +203,8 @@ class RefreshCoordinator:
                         fingerprint=fingerprint, changed_at=finished if changed else claimed.get('changed_at'),
                         lark=result.get('lark') or dict(calls=0, retries=0, duration_ms=int((monotonic()-began)*1000)),
                         last_error=None, error_at=None, error_code=None, missing_scopes=[], lease_until=None, revision=str(uuid4()))
+            if 'snapshot' in result:
+                data['snapshot'] = result['snapshot']
             if not self._replace(key, claimed['revision'], data):
                 raise LeaseLost('Live-read lease ownership lost')
         except Exception as exc:
