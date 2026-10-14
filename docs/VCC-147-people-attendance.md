@@ -1,6 +1,6 @@
 # People/resource and weekly attendance
 
-`#view=people` uses `GET /api/people/attendance?week=YYYY-MM-DD`. Omitted week means the current Taipei week; any supplied day normalizes to its Monday. The window ends Sunday.
+`#view=people` uses `GET /api/people/attendance?week=YYYY-MM-DD`. Omitted week means the current Taipei week; any supplied day normalizes to its Monday. The window ends Sunday. Queries are limited to 26 weeks before or after the current Taipei week; unsupported dates return 422 before a cache claim or Lark read.
 
 VCC-148 should import `fetchPeopleAttendance`, `PeopleAttendance`, and `attendanceValue` from `frontend/src/peopleAttendance.ts`. This is the same reader and cache as the People tab. The response includes:
 

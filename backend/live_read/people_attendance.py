@@ -1,5 +1,6 @@
 """Shared weekly view; the existing coordinator owns leases and last-good data."""
 from copy import deepcopy
+from datetime import date
 from fastapi import HTTPException
 from .coordinator import RefreshCoordinator
 from .datasets.weekly_attendance import week_window, empty_view
@@ -23,9 +24,12 @@ class PeopleAttendance(RefreshCoordinator):
 
     def view(self, wid, week=None):
         try:
-            days = week_window(week)
-        except (ValueError, TypeError):
-            raise HTTPException(422, '請提供有效週日期') from None
+            days = week_window(week, now=self.clock())
+            current = week_window(now=self.clock())[0]
+            if abs((date.fromisoformat(days[0]) - date.fromisoformat(current)).days) > 26 * 7:
+                raise ValueError('Week outside supported range')
+        except (ValueError, TypeError, OverflowError):
+            raise HTTPException(422, '請提供有效週日期，查詢限目前週前後26週') from None
         key = wid + '|' + days[0]
         result = empty_view(days)
         if not self._enabled(wid):

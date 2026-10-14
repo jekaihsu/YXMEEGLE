@@ -168,3 +168,21 @@ def test_unread_week_preserves_retry_or_failure(harness,monkeypatch,attempt,expe
     view=reader.view('lark-company')
     assert view['status']==expected and view['refreshing'] is refreshing
     assert not view['incomplete'] and view['summary']['on_trip'] is None
+
+
+@pytest.mark.parametrize('week',['0001-01-01','9999-12-31','bad','2026-04-06','2027-04-19'])
+def test_week_range_rejected_before_refresh(harness,monkeypatch,week):
+    from fastapi import HTTPException
+    _,live,_,_,_=harness
+    reader=PeopleAttendance(live.Session,live.CacheRow,live,live.cfg,executor=SynchronousExecutor(),clock=lambda:datetime(2026,10,14,tzinfo=timezone.utc))
+    monkeypatch.setattr(reader,'ensure',lambda *args,**kwargs:pytest.fail('out-of-range date started refresh'))
+    with pytest.raises(HTTPException) as exc:reader.view('lark-company',week)
+    assert exc.value.status_code==422
+
+
+@pytest.mark.parametrize('week',['2026-04-13','2027-04-12'])
+def test_week_range_edges_are_supported(harness,monkeypatch,week):
+    _,live,_,_,_=harness
+    reader=PeopleAttendance(live.Session,live.CacheRow,live,live.cfg,executor=SynchronousExecutor(),clock=lambda:datetime(2026,10,14,tzinfo=timezone.utc))
+    monkeypatch.setattr(reader,'ensure',lambda *args,**kwargs:{'status':'busy'})
+    assert reader.view('lark-company',week)['week_start']==week
