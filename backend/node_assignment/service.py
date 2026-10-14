@@ -49,7 +49,7 @@ class Context:
     user: dict
     state: dict
     project: dict
-    authorize: Callable[[], None]
+    authorize: Callable[[], dict]
 
 
 def digest(value):
@@ -301,12 +301,40 @@ class NodeAssignmentService:
                                                                     'assignment_key': akey, **details}))
 
         with self.locks.hold((ctx.wid, akey), self.config.lock_timeout_seconds):
-            ctx.authorize()
+            ctx = replace(ctx, user=ctx.authorize())
             stored = self.receipts.load(receipt, fingerprint)
             if stored and stored['state'] == 'done':
                 return stored['status'], stored['body'], True
             roster = self._roster(fresh=True)
-            with self.client(before_write=ctx.authorize) as client:
+            situation = None
+            planned = None
+            write_attempts = 0
+
+            def authorize_write():
+                nonlocal ctx, write_attempts
+                try:
+                    fresh_user = ctx.authorize()
+                    if (actor_for(ctx.user, roster.value).override and not actor_for(fresh_user, roster.value).override
+                            or fresh_user.get('department') != ctx.user.get('department')):
+                        raise Failure('forbidden', '操作權限已變更，請重新整理後再操作')
+                    ctx = replace(ctx, user=fresh_user)
+                except Failure as exc:
+                    if exc.code == 'forbidden' and write_attempts:
+                        raise Failure('forbidden', '操作權限已變更，部分寫入可能已完成；請以同一 request_id 重送以核對結果',
+                                      writes_started=True) from None
+                    raise
+                if situation is not None:
+                    fresh = replace(situation, actor=actor_for(ctx.user, roster.value))
+                    try:
+                        checked = plan_fn(fresh, resumed)
+                    except Denied as exc:
+                        raise Failure('forbidden', str(exc), writes_started=bool(write_attempts)) from None
+                    if planned is not None and checked.changes != planned.changes:
+                        raise Failure('forbidden', '操作權限已變更，請重新整理後再操作',
+                                      writes_started=bool(write_attempts))
+                write_attempts += 1
+
+            with self.client(before_write=authorize_write) as client:
                 self._ensure_schemas(client)
                 snapshot = read_case(client, code)
                 resumed = None
@@ -321,10 +349,12 @@ class NodeAssignmentService:
                         record('failed', code=failure.code)
                         raise failure
                     resumed = previous
+                ctx = replace(ctx, user=ctx.authorize())
                 situation = Situation(key, code, actor_for(ctx.user, roster.value), roster.value, snapshot, self.skipped(ctx),
                                       self.now_ms(), confirmation_record(ctx.project, self.config))
                 try:
                     plan = plan_fn(situation, resumed)
+                    planned = plan
                     if plan.kind == 'task_create':
                         plan = replace(plan, client_token=resumed.client_token if resumed else create_token(receipt, akey, 'task-create'),
                             pre_create_task_ids=resumed.pre_create_task_ids if resumed else None)
@@ -342,7 +372,8 @@ class NodeAssignmentService:
                     # Without a baseline, execution has not reached the task-create call.
                     before_task_create = plan.kind == 'task_create' and all(
                         saved.pre_create_task_ids is None for saved in pinned)
-                    if exc.code not in UNCERTAIN and (not pinned or before_task_create):
+                    if exc.code not in UNCERTAIN and (not pinned or before_task_create) and not (
+                            exc.code == 'forbidden' and write_attempts):
                         self.receipts.drop(receipt)
                     record('failed', code=exc.code, changes=self._changes(ctx, akey, plan))
                     raise
@@ -475,6 +506,8 @@ class NodeAssignmentService:
             self._verify(client, Table.NODES, NODE_FIELDS, row.record_id, fields)
             return 'written'
         except Failure as exc:
+            if exc.code == 'forbidden':
+                raise
             logger.warning('node_assignment status sync failed code=%s', exc.code)
             return 'failed'
 
