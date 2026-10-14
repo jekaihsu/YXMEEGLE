@@ -161,7 +161,7 @@ assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,befor
  assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects/pA']);
  assert.ok(document.querySelector('.workspace').textContent.includes('PRIVATE_CASE_A')&&document.querySelector('.workspace').textContent.includes('TASK_A'),'detail renders the project tree');
  await goto('view=project&project=pA&tab=flow');await goto('view=project&project=pA&tab=data&section=basic');assert.deepEqual(detailUrls(),['/api/projects/pA'],'tabs do not refetch the project');
- assert.deepEqual(requests.filter(r=>r.url.endsWith('/node-assignments')).map(r=>r.url),['/api/projects/pA/node-assignments']);
+ assert.deepEqual(requests.filter(r=>r.url.endsWith('/node-assignments')).map(r=>r.url),[],'session flag off: no node-assignment request');
  await goto('view=project&project=pB');assert.deepEqual(detailUrls(),['/api/projects/pA','/api/projects/pB']);assert.ok(document.querySelector('.workspace').textContent.includes('CASE_B'));
  // The 日報 tab lists through /api/daily-reports; the other cards in the shell are summaries without daily_reports and must not be scanned.
  await goto('view=project&project=pB&tab=daily');assert.ok(!document.querySelector('.workspace').textContent.includes('畫面暫時無法顯示'),'daily tab survives summary projects without daily_reports');assert.ok(document.querySelector('.daily-records'),'daily tab renders');
