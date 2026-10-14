@@ -107,6 +107,8 @@ def _reidentify_pilot_project(project,occupied_ids=()):
 
 def create_app(overrides=None):
     cfg=dict(os.environ); cfg.update(overrides or {})
+    from .features import resolve_features, guard_action
+    feature_flags=resolve_features(cfg)
     production=cfg.get('APP_ENV','development')=='production'
     demo=str(cfg.get('DEMO_MODE','false' if production else 'true')).lower()=='true'
     db_url=cfg.get('DATABASE_URL','sqlite:///./backend/workspace.db')
@@ -161,6 +163,7 @@ def create_app(overrides=None):
             response=RedirectResponse('/?auth_error='+code,status_code=303)
             response.delete_cookie('lark_oauth_state'); return response
         body = {'detail': exc.detail}
+        if isinstance(exc.detail,dict) and exc.detail.get('code')=='feature_disabled': body=exc.detail
         if getattr(exc,'code',None)=='user_token_expired': body['code']=exc.code
         if request.url.path == '/api/lark-pilot/shadow':
             body['code'] = getattr(exc, 'code', 'pilot_method_not_allowed' if exc.status_code == 405 else 'pilot_read_failed')
@@ -271,6 +274,10 @@ def create_app(overrides=None):
         from .workspace_environment import normalize_environment
         from .case_cutover import initialize_execution_system
         normalize_environment(state,row.id,cfg)
+        state['features']=dict(feature_flags)
+        if state.get('environment')=='production':
+            require(not any(p.get('source_kind') in ('demo','mock','simulation') for p in state.get('projects',[])),
+                    '正式工作區包含隔離示範資料，請由管理員核對',409)
         initialize_execution_system(state)
         if row.id.startswith(('lark-','test-lark-')):
             org=row.id.removeprefix('test-')
@@ -405,6 +412,9 @@ def create_app(overrides=None):
         if not result['projects'] or any(p.get('source_kind')=='lark' for p in result['projects']): result['as_of']=now()[:10]
         upgrade(result)
         result['environment']=result.get('environment','demo' if any(p.get('source_kind')=='demo' for p in result['projects']) else 'production')
+        if result['environment']=='production':
+            for collection in ('approvals','node_skip_requests','financial_requests'):
+                result[collection]=[item for item in result.get(collection,[]) if not item.get('simulated')]
         if task_details:
             result['policy_summary']=[project_summary(result,p) for p in result['projects']]
         else:
@@ -472,10 +482,12 @@ def create_app(overrides=None):
         with engine.connect() as connection: connection.execute(select(1))
         return {'status':'ok','mode':'demo' if demo else 'lark','database':'postgresql' if engine.dialect.name=='postgresql' else 'sqlite'}
 
-    def features():
+    def features(environment=None):
         from .node_assignment.config import NodeAssignmentConfig
         node_config = NodeAssignmentConfig.from_env(cfg)
-        flags = {'workspace_shell': True} if shell_enabled else {}
+        flags = dict(feature_flags)
+        flags['mock_ui']=environment in ('demo','test') and str(cfg.get('FEATURE_LARK_AUTHORITATIVE_OPS','false')).lower()=='true'
+        if shell_enabled: flags['workspace_shell']=True
         if (node_config.enabled and node_config.writable and cfg.get('LARK_WORKER_ORGANIZATION')
                 and cfg.get('LARK_WORKER_IDENTITY') == 'application'
                 and cfg.get('LARK_APP_ID') and cfg.get('LARK_APP_SECRET')):
@@ -488,15 +500,15 @@ def create_app(overrides=None):
         data=read_cookie(request)
         if not data and demo:
             data={'mode':'demo','uid':'u-pm','wid':'demo-'+uid()}; ensure_workspace(data['wid'])
-            response=JSONResponse({'user':USERS[0],'users':USERS,'mode':'demo','auth_configured':oauth_configured,**features()}); set_cookie(response,data,request); return response
-        if not data: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured}
+            response=JSONResponse({'user':USERS[0],'users':USERS,'mode':'demo','auth_configured':oauth_configured,'environment':'demo',**features('demo')}); set_cookie(response,data,request); return response
+        if not data: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured,**features()}
         try: data,user=identity(request)
-        except HTTPException: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured}
+        except HTTPException: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured,**features()}
         if data.get('access_mode')=='recovery':
             return {'user':public_person(user,include_authority=True),'users':[],'mode':data['mode'],'workspace_id':data['wid'],
-                    'environment':'test' if data['wid'].startswith('test-') else 'production','auth_configured':oauth_configured,'access_mode':'recovery'}
+                    'environment':'test' if data['wid'].startswith('test-') else 'production','auth_configured':oauth_configured,'access_mode':'recovery',**features()}
         with phase(request,'load'),sessions() as db: users=load(db,db.get(WorkspaceRow,data['wid']),collections=('users',))['users']
-        return {'user':public_person(user,include_authority=True),'users':[public_person(person) for person in users if hr_visible(user) or person['id']==user['id']],'mode':data['mode'],'workspace_id':data['wid'],'environment':'test' if data['wid'].startswith('test-') else data['mode'],'auth_configured':oauth_configured,'access_mode':data.get('access_mode','normal'),**features()}
+        return {'user':public_person(user,include_authority=True),'users':[public_person(person) for person in users if hr_visible(user) or person['id']==user['id']],'mode':data['mode'],'workspace_id':data['wid'],'environment':'test' if data['wid'].startswith('test-') else ('demo' if data['mode']=='demo' else 'production'),'auth_configured':oauth_configured,'access_mode':data.get('access_mode','normal'),**features('test' if data['wid'].startswith('test-') else 'demo' if data['mode']=='demo' else 'production')}
 
     @app.post('/api/demo/session')
     async def demo_session(request:Request):
@@ -742,7 +754,9 @@ def create_app(overrides=None):
     def actions(body:Action,request:Request):
         data,user=identity(request); raw=body.model_dump()
         from .input_validation import validate_action
-        try:validate_action(raw)
+        try:
+            guard_action({'features':feature_flags},raw)
+            validate_action(raw)
         except HTTPException as exc:
             with sessions.begin() as db:
                 db.add(audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,
@@ -1118,7 +1132,10 @@ def create_app(overrides=None):
 
     @app.post('/api/approvals/{approval_id}/refresh')
     async def refresh_approval(approval_id:str,request:Request):
-        data,user=identity(request); require(data['mode']=='lark','原生審批查詢需公司 Lark 登入',403)
+        data,user=identity(request)
+        from .features import require_feature
+        require_feature(feature_flags,'change_extension')
+        require(data['mode']=='lark','原生審批查詢需公司 Lark 登入',403)
         body=await json_object(request)
         require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
         instance_code=str(body.get('instance_code','')); require(bool(re.fullmatch(r'[A-Za-z0-9_-]{6,128}',instance_code)),'請提供有效 Lark 審批實例 ID',400)

@@ -135,6 +135,9 @@ def register(app,identity,load,persist,sessions,W,cfg):
         from .native_requests import change_evidence,scope_hash,receipt_valid
         from .native_approval import digest
         from .production_access import business_admitted
+        data,user=identity(request)
+        from .features import require_feature,resolve_features
+        require_feature(resolve_features(cfg),'change_extension')
         data,user=formal(request);body=await json_object(request)
         def confirm(state):
             p,n,item=locate(state,'change',request_id)
@@ -207,6 +210,10 @@ def register(app,identity,load,persist,sessions,W,cfg):
 
     @app.post('/api/native-approvals/{kind}/{request_id}/{operation}')
     async def operate(kind:str,request_id:str,operation:str,request:Request):
+        data,user=identity(request)
+        if kind in ('change','extension'):
+            from .features import require_feature,resolve_features
+            require_feature(resolve_features(cfg),'change_extension')
         require(operation in ('prepare','submit','poll','cancel','abandon'),'未知審批操作',422)
         data,user=formal(request);body=await json_object(request);state=get_state(data['wid'])
         pv=body.get('project_version')

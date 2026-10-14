@@ -355,7 +355,10 @@ def vote(ws,user,p,n,data):
         if n['key']=='settlement': p['execution_status']='completed'
 
 def apply_operation(ws,user,body,demo=False,cfg=None):
+    from .features import guard_action
+    guard_action(ws,body)
     from .input_validation import validate_action
+    from .features import enabled
     validate_action(body)
     """Returns False for legacy task actions, True for handled actions."""
     upgrade(ws); action=body['action']; data=body.get('payload') or {}
@@ -415,6 +418,10 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         event(ws,user,action,message=person_event_message(ident,previous,target)); return True
     if action=='admin_settings':
         require(user['role']=='manager')
+        if not enabled(ws,'routines'):
+            from .features import require_feature
+            if any(key in data and data[key]!=ws['settings'].get(key) for key in ('followup_workdays','review_weekday','monthly_workday','field_weekday','indoor_weekday','digest_time')):
+                require_feature(ws.get('features',{}),'routines')
         allowed=set(ws['settings'])
         require(set(data)<=allowed,'未知設定',422)
         from .policy import defaults
@@ -776,7 +783,7 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         require_financial_pair(ws,p,b)
         require(b['kind']!='subcontract' or b['phase']=='advance' or b['technical_approved_by'],'成果款需組主管驗收',409); b.update(status='approved',approved_by=user['id'],approved_at=now())
         kind='receivable' if b['kind']=='receivable' else 'subcontract_receivable'
-        if not any(r.get('batch_id')==b['id'] and r['kind']==kind for r in ws['recurring']): ws['recurring'].append(dict(id=uid(),project_id=p['id'],kind=kind,title='收付款追蹤',owner_id=p['admin_id'] or p['pm_id'],supervisor_id=p['supervisor_id'],start_date=now()[:10],due_date=next_due(kind,now()[:10],ws),status='active',history=[],batch_id=b['id']))
+        if enabled(ws,'routines') and not any(r.get('batch_id')==b['id'] and r['kind']==kind for r in ws['recurring']): ws['recurring'].append(dict(id=uid(),project_id=p['id'],kind=kind,title='收付款追蹤',owner_id=p['admin_id'] or p['pm_id'],supervisor_id=p['supervisor_id'],start_date=now()[:10],due_date=next_due(kind,now()[:10],ws),status='active',history=[],batch_id=b['id']))
     elif action=='payment_record':
         require(p and operator(user,p)); b=find(p['payment_batches'],data.get('id')); require(b['status'] in ('approved','partially_paid'),'請先核准款項',409)
         amount=decimal(data.get('amount')); require(amount>0 and amount+sum((decimal(x['amount']) for x in b.get('receipts',[])),Decimal(0))<=decimal(b['amount']),'本次實收付金額超過未清款項',422)

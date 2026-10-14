@@ -82,6 +82,8 @@ def register(app, identity, load, sessions, WorkspaceRow, clock=None):
             row = db.get(WorkspaceRow, data['wid'])
             require(row is not None, '工作區不存在', 404)
             state = load(db, row)
+        from ..features import mock_allowed
+        require(mock_allowed(state),'正式工作區不提供模擬資料',403)
         if entity_id is None:
             return data, user, state
         project = find(state['projects'], project_of(entity_id), '案件')
