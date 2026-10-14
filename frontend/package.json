@@ -43,7 +43,8 @@
     "test:home-review-regressions": "node test-home-review-regressions.mjs",
     "test:source-coverage-views": "node test-source-coverage-views.mjs",
     "test:project-disabled-reasons": "node test-project-disabled-reasons.mjs",
-    "test:search-input": "node test-search-input.mjs"
+    "test:search-input": "node test-search-input.mjs",
+    "test:p2-routes": "node test-p2-routes.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",
