@@ -57,6 +57,7 @@ node test-contract-detail-view.mjs
 node test-work-item-detail-view.mjs
 node test-manager-overview-view.mjs
 node test-p2-routes.mjs
+node test-pm-glance.mjs
 npm run build
 npm run test:dev-tooling
 

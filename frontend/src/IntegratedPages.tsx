@@ -1,27 +1,28 @@
 // P1-INT pages: #work -> MyWorkTable(buildMyWorkView(...)), #sources -> SourceHealth(buildSourceHealthView(...)).
 // The legacy MyWork / Sources screens stay reachable through tab=legacy. Transport only; all state text comes
 // from the view models. New GETs: /api/my-work and /api/source-health.
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {lazy, Suspense, useCallback, useEffect, useMemo, useState} from 'react';
 import {api, ApiError, getSessionEpoch, parseRoute} from './api';
 import {MyWorkTable} from './MyWorkTable';
-import {SourceHealth} from './SourceHealth';
 import {buildMyWorkView} from './myWorkView.ts';
 import {buildSourceHealthView} from './sourceHealthView.ts';
 import {filtersFromRoute, hashOfRoute, isLegacyTab, myWorkInput, sourceHealthInput, withFilters} from './integrationRoutes.ts';
 import {Segmented} from './design';
 import type {Ctx} from './appCommon';
 
-type Fetched = {status: 'loading'} | {status: 'ok'; body: unknown} | {status: 'error'; httpStatus?: number};
+const SourceHealth = lazy(() => import('./SourceHealth').then(module => ({default: module.SourceHealth})));
+
+export type Fetched = {status: 'loading'} | {status: 'ok'; body: unknown} | {status: 'error'; httpStatus?: number};
 
 // The body is keyed by url, version, session epoch and user: any change reads as loading, so a previous user's
 // rows are never shown while the refetch is in flight.
-function useFetched(url: string, version: unknown, userId: unknown): Fetched {
+export function useFetched(url: string, version: unknown, userId: unknown): Fetched {
  const key = `${url}|${String(version)}|${getSessionEpoch()}|${String(userId)}`;
  const [state, setState] = useState<{key: string; fetched: Fetched}>({key, fetched: {status: 'loading'}});
  useEffect(() => {
   const epoch = getSessionEpoch();
   const controller = new AbortController();
-  api<unknown>(url, {signal: controller.signal, cache: 'no-store'})
+  api<unknown>(url, {method: 'GET', signal: controller.signal, cache: 'no-store'})
    .then(body => {if (epoch === getSessionEpoch()) setState({key, fetched: {status: 'ok', body}})})
    .catch(error => {
     if (controller.signal.aborted || epoch !== getSessionEpoch()) return;
@@ -71,6 +72,6 @@ export function SourceHealthPage({c}: {c: Ctx}) {
  const view = useMemo(() => buildSourceHealthView(sourceHealthInput(fetched), {diagnosticCapability: false}), [fetched]);
  return <main className="page sources-page" aria-label="資料來源">
   <LegacyTabs c={c} view="sources"/>
-  <SourceHealth view={view}/>
+  <Suspense fallback={<p role="status">正在載入來源健康…</p>}><SourceHealth view={view}/></Suspense>
  </main>;
 }
