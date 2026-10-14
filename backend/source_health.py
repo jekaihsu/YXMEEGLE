@@ -42,11 +42,13 @@ def _state(snapshot, freshness, table=None, *, viewer_filtered=None):
         return data_state('forbidden')
     if snapshot.get('status') == 'error' or status in ('error', 'read_failed'):
         return data_state('read_failed')
-    # An active refresh (lease) supersedes a retained historical last_error.
-    if status == 'loading' or freshness.get('status') == 'refreshing':
+    # Only an active refresh (lease) supersedes a retained historical last_error.
+    if freshness.get('status') == 'refreshing':
         return data_state('loading')
     if freshness.get('last_error') or freshness.get('status') in ('error', 'blocked'):
         return data_state('read_failed')
+    if status == 'loading':
+        return data_state('loading')
     if status == 'unlocated':
         return data_state('unlocated')
     read = table is not None and table.get('status') in ('ready', 'partial') and (_count(table.get('pages_read')) or 0) > 0

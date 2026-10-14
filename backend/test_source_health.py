@@ -364,6 +364,66 @@ def test_failure_without_active_lease_is_read_failed(freshness):
     assert 'health' not in result['sources'][0]
 
 
+@pytest.mark.parametrize('root_status', ['ready', 'loading'])
+@pytest.mark.parametrize('freshness', [
+    {'status': 'error', 'last_error': 'CURRENT_FAILURE', 'age_seconds': 561600, 'ttl_seconds': 60},
+    {'status': 'blocked', 'last_error': 'CURRENT_FAILURE', 'age_seconds': 561600, 'ttl_seconds': 60},
+    {'status': 'error'}, {'status': 'blocked'}, dict(HISTORICAL)])
+def test_cached_loading_without_active_lease_is_read_failed(root_status, freshness):
+    value = snapshot(status=root_status)
+    value['tables'][0]['status'] = 'loading'
+    result = build(value, freshness, diagnostic=True)
+    assert result['page_state'] == {'states': ['read_failed'], 'count': None}
+    row = result['sources'][0]
+    assert row['data_state'] == {'states': ['read_failed'], 'count': None}
+    assert 'health' not in row
+
+
+def test_cached_loading_without_lease_matches_real_expired_lease_projection():
+    from datetime import datetime, timedelta, timezone
+    from backend.live_read.config import LiveReadConfig
+    from backend.live_read.status import freshness as real_freshness
+    now = datetime(2026, 10, 14, tzinfo=timezone.utc)
+    actual = real_freshness({'sources': {
+        'as_of': (now - timedelta(days=6.5)).isoformat(),
+        'lease_until': (now - timedelta(seconds=1)).isoformat(),
+        'last_error': 'CURRENT_FAILURE'}}, LiveReadConfig(), now, True)['datasets']['sources']
+    assert actual['status'] == 'error'
+    value = snapshot(status='loading')
+    value['tables'][0]['status'] = 'loading'
+    assert build(value, actual, diagnostic=True)['page_state'] == {'states': ['read_failed'], 'count': None}
+
+
+def test_cached_loading_still_loading_when_failure_is_absent():
+    value = snapshot(status='loading')
+    value['tables'][0]['status'] = 'loading'
+    assert build(value, {'status': 'fresh'}, diagnostic=True)['page_state'] == {'states': ['loading'], 'count': None}
+
+
+def test_active_refresh_with_cached_loading_stays_loading():
+    value = snapshot(status='loading')
+    value['tables'][0]['status'] = 'loading'
+    result = build(value, {'status': 'refreshing', **HISTORICAL}, diagnostic=True)
+    assert result['page_state'] == {'states': ['loading'], 'count': None}
+    assert result['sources'][0]['data_state'] == {'states': ['loading'], 'count': None}
+
+
+def test_mutation_cached_loading_outranking_failure_is_caught():
+    # Mutant (in memory only): the pre-fix guard where cached loading beats failed freshness.
+    import inspect
+    from backend import source_health as subject
+    code = inspect.getsource(subject._state)
+    old = "if freshness.get('status') == 'refreshing':"
+    assert code.count(old) == 1
+    scope = dict(subject.__dict__)
+    exec(compile(code.replace(old, "if status == 'loading' or freshness.get('status') == 'refreshing':"), '<mutant>', 'exec'), scope)
+    value = snapshot()
+    value['tables'][0]['status'] = 'loading'
+    failed = {'status': 'error', 'last_error': 'CURRENT_FAILURE'}
+    assert subject._state(value, failed, value['tables'][0])['states'] == ['read_failed']
+    assert scope['_state'](value, failed, value['tables'][0])['states'] == ['loading']
+
+
 @pytest.mark.parametrize('change', [{'status': 'error'}, {'tables': [dict(snapshot()['tables'][0], status='read_failed')]}])
 def test_explicit_error_beats_refreshing(change):
     result = build(snapshot(**change), {'status': 'refreshing'}, diagnostic=True)
