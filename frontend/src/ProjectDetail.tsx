@@ -17,7 +17,7 @@ import {TaskBatchCompletion} from './TaskBatchCompletion';
 import {draftKey, useDraft} from './drafts';
 import {lifecycleGate} from './sourceLifecycle';
 import {type Approval, type Node, type Project, type Task, type Workspace} from './types';
-import {Ctx,active,progress,date,nameOf,money,points,sourceTaskNote,openTask,TaskIcon,isLate,shortDate,Empty,EventList,ProjectSlice,Badge,NODE_NAMES,elapsed,isProjectLead,Primary,TaskTable,safeUrl,num,taskReadiness,isTaskActor,allTasks,Modal,STATUS,Field,TaskRow,OwnerSelect,eventMessage,stamp,unmatchedDaily} from './appCommon';
+import {Ctx,active,progress,date,nameOf,money,amountWithheld,amountLabel,points,sourceTaskNote,openTask,TaskIcon,isLate,shortDate,Empty,EventList,ProjectSlice,Badge,NODE_NAMES,elapsed,isProjectLead,Primary,TaskTable,safeUrl,num,taskReadiness,isTaskActor,allTasks,Modal,STATUS,Field,TaskRow,OwnerSelect,eventMessage,stamp,unmatchedDaily} from './appCommon';
 import {NextAction} from './DailyHome';
 import {Badge as Tag,DisabledActionReasons,Button,Progress,Row,Section,Skeleton,Stat} from './design';
 import './ProjectDetail.css';
@@ -31,7 +31,7 @@ export function CaseOverview({c,p}:{c:Ctx;p:Project}){
  const navigate=(tab:string)=>c.go({view:'project',project:p.id,tab});
 
  const overdueCount=tasks.filter(r=>isLate(r.t,c.w.as_of)).length;
- const facts:[string,string][]=[['案件性質',p.case_type==='intake'?'待確認接案':'正式案件'],['有效期限',date(p.due_date)],['專案經理',nameOf(c.w,p.pm_id)],['合約金額',money(p.contract_amount)],...(p.parent_code?[['母案',p.parent_code] as [string,string]]:[])];
+ const facts:[string,string][]=[['案件性質',p.case_type==='intake'?'待確認接案':'正式案件'],['有效期限',date(p.due_date)],['專案經理',nameOf(c.w,p.pm_id)],['合約金額',amountLabel(p)],...(p.parent_code?[['母案',p.parent_code] as [string,string]]:[])];
  return <div className="case-overview"><NextAction c={c} rows={p.nodes.flatMap(n=>n.tasks.map(t=>({p,n,t})))}/>
  <Section title={overdueCount?`待處理任務 · ${overdueCount} 項逾期`:"待處理任務"}>{tasks.slice(0,4).map(r=><Row key={r.t.id} icon={<TaskIcon status={r.t.status}/>} label={r.t.title} detail={[r.n.name,nameOf(c.w,r.t.owner_id),sourceTaskNote(r.t)].filter(Boolean).join(' · ')} value={isLate(r.t,c.w.as_of)?<Tag tone="critical">{shortDate(r.t.due_date)}</Tag>:shortDate(r.t.due_date)} onClick={()=>openTask(c,r)}/>)}{!tasks.length&&<Empty title="目前沒有待處理任務"/>}<Row label="全部任務" icon={<ArrowUpRight size={17}/>} onClick={()=>navigate('flow')}/></Section>
  <Section title="案件摘要"><div className="co-progress"><Stat label="任務完成度" value={<>{progress(p)}<small>%</small></>}/><Progress value={progress(p)} label="任務完成度"/><p>{completed} / {total.length} 項任務完成</p></div>{facts.map(([k,v])=><Row key={k} label={k} value={v}/>)}<div className="co-actions"><Button variant="primary" onClick={()=>navigate('flow')}>流程與交付<ArrowRight size={16}/></Button><Button onClick={()=>navigate('quotes')}>報價（{projectQuotes(c.w,p).length}）</Button></div></Section>
@@ -73,7 +73,7 @@ export function ProjectDetail({c}:{c:Ctx}){
  {dataSection==='basic'&&<div className="detail-page-content"><div className="section-heading"><div><h2>基本資料</h2><p>保留來源關係，不重複填寫已知資訊</p></div>{safeUrl(p.source_url)&&<a className="button" href={p.source_url} target="_blank" rel="noreferrer">開啟來源<ExternalLink size={15}/></a>}</div><div className="definition-grid">{[
  ['案件編號',basicValue(p.code)],['業主',basicValue(p.client)],
  ['專案經理',basicValue(p.pm_id,()=>nameOf(c.w,p.pm_id))],['案件版本',basicValue(p.revision,()=>`v${p.revision}`)],
- ['合約金額',basicValue(p.contract_amount,()=>money(p.contract_amount))],['預估營業額',basicValue(p.estimated_points,()=>`${points(p.estimated_points)} 點`)],
+ ['合約金額',amountWithheld(p)?'未核准顯示':basicValue(p.contract_amount,()=>money(p.contract_amount))],['預估營業額',basicValue(p.estimated_points,()=>`${points(p.estimated_points)} 點`)],
  ['目前有效期限',basicValue(p.due_date,()=>date(p.due_date))],['原始期限',basicValue(p.original_due_date,()=>date(p.original_due_date))],
  ['開始日期',basicValue(p.started_at,()=>date(p.started_at))],['資料來源',basicValue(p.source_kind,()=>p.source_kind==='demo'?'獨立示範資料':'報價總表／V4')]
  ].map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</div><div className="description-block"><h3>案件說明</h3><p>{basicValue(p.description)}</p></div><div className="info-callout"><Network size={19}/><div><strong>金額、成本與點數分開追蹤</strong><p>合約金額為案件層資料。子任務點數依來源或指派設定，不重複累加為合約營收。</p></div></div></div>}
@@ -182,5 +182,5 @@ export function FamilyPanel({c,p}:{c:Ctx;p:Project}){
  const children=c.w.projects.filter(x=>x.parent_code===code&&x.case_type!=='intake');
  const amounts=children.map(x=>x.contract_amount);
  const complete=amounts.length>0&&amounts.every(x=>typeof x==='number');
- return <div className="detail-page-content operations"><h2>母案 {code}</h2><p>子案各自管理 PM、財務、進度及結案；彙總只計子案，避免加上母案後重複計算。</p>{parent&&<button className="button" onClick={()=>c.go({view:'project',project:parent.id,tab:'family'})}>開啟母案 {parent.code}</button>}<p>子案合約彙總：{complete?money(amounts.reduce((a,b)=>a!+b!,0)):'金額資料未齊備'} · 子案結案須另核對業務及財務條件，不以來源狀態代替</p>{children.length?<div className="table-scroll case-comparison-scroll" tabIndex={0} aria-label="子案比較表，可左右捲動"><table className="data-table"><thead><tr><th>子案</th><th>PM</th><th>進度</th><th>合約金額</th><th>狀態</th></tr></thead><tbody>{children.map(x=><tr key={x.id}><td><button className="text-button" onClick={()=>c.go({view:'project',project:x.id})}>{x.code} {x.name}</button></td><td>{nameOf(c.w,x.pm_id)}</td><td>{progress(x)}%</td><td>{money(x.contract_amount)}</td><td><Badge status={x.status} label={`來源：${x.source_status||'待核對'}`}/></td></tr>)}</tbody></table></div>:<p>尚無已確認的子案關聯。</p>}</div>
+ return <div className="detail-page-content operations"><h2>母案 {code}</h2><p>子案各自管理 PM、財務、進度及結案；彙總只計子案，避免加上母案後重複計算。</p>{parent&&<button className="button" onClick={()=>c.go({view:'project',project:parent.id,tab:'family'})}>開啟母案 {parent.code}</button>}<p>子案合約彙總：{complete?money(amounts.reduce((a,b)=>a!+b!,0)):'金額資料未齊備'} · 子案結案須另核對業務及財務條件，不以來源狀態代替</p>{children.length?<div className="table-scroll case-comparison-scroll" tabIndex={0} aria-label="子案比較表，可左右捲動"><table className="data-table"><thead><tr><th>子案</th><th>PM</th><th>進度</th><th>合約金額</th><th>狀態</th></tr></thead><tbody>{children.map(x=><tr key={x.id}><td><button className="text-button" onClick={()=>c.go({view:'project',project:x.id})}>{x.code} {x.name}</button></td><td>{nameOf(c.w,x.pm_id)}</td><td>{progress(x)}%</td><td>{amountLabel(x)}</td><td><Badge status={x.status} label={`來源：${x.source_status||'待核對'}`}/></td></tr>)}</tbody></table></div>:<p>尚無已確認的子案關聯。</p>}</div>
 }

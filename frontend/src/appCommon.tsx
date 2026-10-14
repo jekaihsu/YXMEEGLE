@@ -28,6 +28,9 @@ export const num=(value?:number|null)=>value==null?'—':value.toLocaleString('z
 export const points=(value?:number|null)=>value==null?'—':value.toLocaleString('zh-TW',{maximumFractionDigits:4});
 export const sourceTaskNote=(t:Record<string,unknown>)=>t.source_missing===true?'來源已移除，保留紀錄':t.source_change_pending===true?'來源已異動，待核對':null;
 export const money=(value?:number|null)=>value==null?'待帶入':`NT$ ${num(value)}`;
+// The workbench keeps contract amounts out of the page until finance approves them (gate G-AMT); the source may still hold one.
+export const amountWithheld=(p:{contract_amount?:number|null;source_projection?:{finance?:{contract_amount?:number|null}}|null})=>p.contract_amount==null&&p.source_projection?.finance?.contract_amount!=null;
+export const amountLabel=(p:Parameters<typeof amountWithheld>[0])=>amountWithheld(p)?'未核准顯示':money(p.contract_amount);
 export const unmatchedDaily=(w:Workspace)=>w.scope==='shell'&&w.counts?w.counts.daily_unmatched:w.source_status.mapping?.daily_unmatched??(Array.isArray(w.daily_unmatched)?w.daily_unmatched.length:0);
 export const active=(t:Task)=>!['completed','superseded'].includes(t.status);
 export const allTasks=(w:Workspace):TaskRow[]=>w.projects.flatMap(p=>(p.nodes||[]).flatMap(n=>n.tasks.map(t=>({p,n,t}))));
