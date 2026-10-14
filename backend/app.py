@@ -1014,9 +1014,12 @@ def create_app(overrides=None):
         require(len(values)<=1 and all(len(v)<=limit for v in values),'查詢參數過長',422)
         return values[0] if values else None
 
-    def p2_list_page(state,args,as_of):
+    def p2_cursor_context(data,user):
+        return [data.get('wid'),user.get('identity_app_id'),user.get('id'),user.get('role'),user.get('authz_version',0)]
+
+    def p2_list_page(state,args,as_of,cursor_context=None):
         from .confirmation_list import build_confirmation_list
-        result=build_confirmation_list(state,as_of=as_of,**args)
+        result=build_confirmation_list(state,as_of=as_of,cursor_context=cursor_context,**args)
         if result.get('status')==403: raise HTTPException(403,'沒有權限')
         if result.get('status')!=200: raise HTTPException(result.get('status',422),result.get('detail') or '查詢參數錯誤')
         return result
@@ -1026,7 +1029,7 @@ def create_app(overrides=None):
         data,user=identity(request)
         args=p2_list_args(request)
         _,_,_,state=p2_read(data,user)
-        return p2_list_page(state,args,state['as_of'])
+        return p2_list_page(state,args,state['as_of'],p2_cursor_context(data,user))
 
     @app.get('/api/manager-overview')
     def manager_overview(request:Request):
@@ -1038,7 +1041,7 @@ def create_app(overrides=None):
         case_filters={k:p2_one(request,k,120) for k in sorted(P2_CASE_PARAMS) if k in request.query_params}
         _,_,health,state=p2_read(data,user)
         # The same read that feeds the population supplies its C-STATE; this also validates the filters (422).
-        page=p2_list_page(state,{'q':'','filters':args['filters'],'cursor':None,'sort':None,'limit':1},state['as_of'])
+        page=p2_list_page(state,{'q':'','filters':args['filters'],'cursor':None,'sort':None,'limit':1},state['as_of'],p2_cursor_context(data,user))
         envelope=page['page_state']
         # C-STATE has no complete-nonempty value (data_state.py STATES), so a healthy read (page_state None) stays None
         # (manager_overview then reports partial: completeness not asserted); any other state is passed through exactly.
