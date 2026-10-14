@@ -182,6 +182,28 @@ test('17. retained rows under read_failed keep the error label and cards with co
  const ok2=v(withSnap({state:st(['read_failed']),cards:[card('stable_cases','stable_case',null,st(['read_failed']),'x')],unresolved:{value:null,state:st(['read_failed']),reason:'x',rows:[]}}));
  eq([ok2.snapshot.stateLabel,ok2.snapshot.cases.length,cardOf(ok2,'stable_cases').valueText],['讀取失敗',2,'—']);
 });
+test('18. 128-R1: admission accepts only the backend field set; an extra (amount) property voids the snapshot',()=>{
+ const real={execution_system:'pending',execution_system_label:'待確認歸屬',execution_readonly_reason:'r',case_visibility:null};
+ const okb=body();okb.snapshot.cases[0].details.admission=real;eq(v(okb,{selectedId:'p1'}).drawer.case.admission,real,'real admission shape accepted');
+ for(const extra of [{original_amount:987654321},{nested:{amount:5}}]){
+  const b=body();b.snapshot.cases[0].details.admission={...real,...extra};
+  const view=v(b,{selectedId:'p1'});
+  eq([view.snapshot.state.states,view.snapshot.cases,view.drawer.open],[['unknown'],[],false],'unexpected admission property fails closed');
+  ok(!JSON.stringify(view).includes('987654321'),'amount never output');
+ }
+ const t=body();t.snapshot.cases[0].details.admission={execution_system:42};eq(v(t).snapshot.state.states,['unknown'],'wrong admission value type rejected');
+});
+test('19. 128-R2: contradictory or malformed state invalidates the snapshot',()=>{
+ const empty=body();empty.snapshot.state=st(['complete_empty'],0);empty.snapshot.cards=[];
+ empty.snapshot.unresolved={value:0,state:st(['complete_empty'],0),reason:'x',rows:[]};
+ let view=v(empty);eq([view.snapshot.state.states,view.snapshot.cases,view.snapshot.reason],[['unknown'],[],L.invalidBody],'complete_empty beside case rows is contradictory');
+ const emptyRows=body();emptyRows.snapshot.state=st(['filtered_empty'],0);emptyRows.snapshot.cases=[];emptyRows.snapshot.cards=[];
+ view=v(emptyRows);eq(view.snapshot.state.states,['unknown'],'empty state beside unresolved rows is contradictory');
+ const mal=body();mal.snapshot.cases[0].actionable.state={states:['unknown'],count:'bad'};
+ view=v(mal);eq([view.snapshot.state.states,view.snapshot.cases,view.snapshot.reason],[['unknown'],[],L.invalidBody],'unknown with a malformed count is invalid');
+ const mal2=body();mal2.snapshot.cards[2].state={states:['unknown'],count:3};eq(v(mal2).snapshot.state.states,['unknown']);eq(v(mal2).snapshot.cards,[],'unknown with a count is invalid');
+ eq(cardOf(v(),'pending_decisions').valueText,'—','plain unknown state still accepted');
+});
 
 // ---- mutation checks: break each guard in a temp copy and require the behavior it protects to break ----
 const src=readFileSync(new URL('./src/managerOverviewView.ts',import.meta.url),'utf8');
@@ -225,6 +247,19 @@ test('M7. mutation: Source Health counts leak -> no-counts guard (test 11) would
  const b=await mutated("const labelOf=(s:DataState):string=>s.states.map(n=>DATA_STATE_LABELS[n]).join('・');","const labelOf=(s:DataState):string=>s.states.map(n=>DATA_STATE_LABELS[n]).join('・')+('count' in s&&s.count!==null?`（${s.count} 筆）`:'');");
  const bb=body();bb.source_health.partial.state=st(['partial'],55);
  ok(JSON.stringify(b({body:bb}).sourceHealth).includes('55'),'mutant leaks count');
+});
+test('M8. mutation: admission field-set guard removed -> amount leaks into the drawer (test 18 would fail)',async()=>{
+ const b=await mutated("if(!ADMISSION_KEYS.has(k))bad();\n   if(x!==null&&typeof x!=='string')bad();","");
+ const bb=body();bb.snapshot.cases[0].details.admission={execution_system:'pending',original_amount:987654321};
+ ok(JSON.stringify(b({body:bb,selectedId:'p1'})).includes('987654321'),'mutant leaks admission amount');
+});
+test('M9. mutation: malformed-state and empty-consistency guards removed -> contradictions survive (test 19 would fail)',async()=>{
+ const b=await mutated("if(!isUnknownOnly)return bad();","");
+ const bb=body();bb.snapshot.cases[0].actionable.state={states:['unknown'],count:'bad'};
+ eq(b({body:bb}).snapshot.cases.length,2,'mutant keeps cases with malformed state');
+ const c=await mutated("if(EMPTY.has(state.states[0])&&(cases.length||rows.length))bad();","");
+ const e=body();e.snapshot.state=st(['complete_empty'],0);e.snapshot.cards=[];e.snapshot.unresolved={value:0,state:st(['complete_empty'],0),reason:'x',rows:[]};
+ eq(c({body:e}).snapshot.cases.length,2,'mutant keeps cases beside complete_empty');
 });
 
 let failed=0;

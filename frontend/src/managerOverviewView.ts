@@ -96,8 +96,15 @@ const stateOf=(v:unknown):DataState=>{
  // Strictness beyond parseDataState: a malformed envelope is invalid, not silently "unknown".
  const r=rec(v);if(!r||!Array.isArray(r.states))return bad();
  const p=parseDataState(v);
- return p.states.length===1&&p.states[0]==='unknown'&&!(r.states.length===1&&r.states[0]==='unknown')?bad():p;
+ if(p.states.length===1&&p.states[0]==='unknown'){
+  // parseDataState collapses anything malformed to unknown; only a literal unknown (no count) is genuine.
+  const isUnknownOnly=r.states.length===1&&r.states[0]==='unknown'&&(r.count===null||r.count===undefined);
+  if(!isUnknownOnly)return bad();
+ }
+ return p;
 };
+// Backend case_cutover.admission_fields contract; any other property (e.g. an amount) is rejected.
+const ADMISSION_KEYS:ReadonlySet<string>=new Set(['execution_system','execution_system_label','execution_readonly_reason','case_visibility']);
 const cloneJson=(v:unknown):unknown=>{
  if(v===null||typeof v==='string'||typeof v==='boolean')return v;
  if(typeof v==='number'&&Number.isFinite(v))return v;
@@ -162,7 +169,15 @@ function parseCase(raw:unknown):{row:CaseRow;detail:CaseDetail}{
   pendingDecision:fact(c.pending_decision,renderBool),
   entry:{label:OVERVIEW_LABELS.openCase,route:safeRoute(ep.route)},
  };
- const admission=d.admission===null||d.admission===undefined?null:cloneJson(need(d.admission)) as Record<string,unknown>;
+ let admission:Record<string,unknown>|null=null;
+ if(d.admission!==null&&d.admission!==undefined){
+  const a=need(d.admission);admission={};
+  for(const [k,x] of Object.entries(a)){
+   if(!ADMISSION_KEYS.has(k))bad();
+   if(x!==null&&typeof x!=='string')bad();
+   admission[k]=x;
+  }
+ }
  const detail:CaseDetail={
   id,rowKeys:rowKeys as string[],pmId:optStr(d.pm_id),executionStatus:optStr(d.execution_status),admission,
   mappingLabel:OVERVIEW_LABELS.unverifiedMapping,
@@ -224,6 +239,9 @@ function parseSnapshot(raw:unknown){
  // The unresolved count is its own measure; it must agree with the supplied rows when known.
  if(um.known&&Number(um.text)!==rows.length)bad();
  if(UNCOUNTED.has(state.states[0])&&um.known)bad();
+ // An explicit empty population cannot coexist with case or unresolved rows.
+ if(EMPTY.has(state.states[0])&&(cases.length||rows.length))bad();
+ if(EMPTY.has(ustate.states[0])&&rows.length)bad();
  return {state,filters,cases,details,cards,
   bucketNote:optStr(s.bucket_policy),
   unresolved:{countText:um.text,known:um.known,stateLabel:labelOf(ustate),reason:reqStr(u.reason),rows}};
