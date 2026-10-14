@@ -42,7 +42,7 @@ summary{min-height:44px;padding-block:var(--space-3);cursor:pointer;box-sizing:b
 .ds-progress::-moz-progress-bar{background:var(--accent);border-radius:var(--radius-pill)}
 @keyframes ds-fade{from{opacity:0}}
 @keyframes ds-rise{from{transform:translateY(24px)}}
-@media(prefers-reduced-motion:reduce){.ds-backdrop,.ds-sheet{width:min(560px,100%);max-height:90vh;overflow:auto;color:var(--label);padding:var(--sp-4) var(--sp-5) var(--sp-6);animation:ds-rise 300ms ease-out}.ds-sheet.glass{border-radius:var(--radius-card) var(--radius-card) 0 0}}
+@media(prefers-reduced-motion:reduce){.ds-backdrop,.ds-sheet{animation:none}.ds-progress::-webkit-progress-value{transition:none}.ds-picker>button>svg{transition:none}}
 
 /* Picker: pill trigger + floating list, sized like the other 44px controls. */
 .ds-picker{position:relative;display:inline-flex;flex:0 0 auto}

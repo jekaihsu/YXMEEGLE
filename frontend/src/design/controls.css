@@ -27,12 +27,12 @@
 }
 :is(.button,.ds-button,[class*="p2-btn"],.p2-page-btn,.p2-drawer-close-btn,[class*="source-health-btn"],.source-health-drawer-retry-btn,.source-health-drawer-close-btn,.my-work-action-button):hover{background:var(--btn-fill-hover);border-color:var(--accent);transform:none}
 :is(.button,.ds-button,[class*="p2-btn"],.p2-page-btn,.p2-drawer-close-btn,[class*="source-health-btn"],.source-health-drawer-retry-btn,.source-health-drawer-close-btn,.my-work-action-button):active{background:color-mix(in srgb,var(--accent) 10%,var(--surface));box-shadow:var(--btn-shadow-active);transform:none}
-:is(.button.primary,.ds-button[data-variant=primary],.p2-btn-primary){
+:is(.button.primary,.ds-button[data-variant=primary],.p2-btn-primary,.source-health-drawer-retry-btn){
  background:var(--btn-fill-primary);color:var(--on-accent);border-color:var(--accent-hover);
  box-shadow:inset 0 1px 0 rgb(255 255 255/.28),0 1px 2px rgb(12 84 148/.3),0 4px 10px rgb(12 84 148/.18);
 }
-:is(.button.primary,.ds-button[data-variant=primary],.p2-btn-primary):hover{background:var(--btn-fill-primary-hover);border-color:var(--accent-hover);color:var(--on-accent)}
-:is(.button.primary,.ds-button[data-variant=primary],.p2-btn-primary):active{background:var(--accent-hover);box-shadow:inset 0 1px 2px rgb(0 0 0/.28)}
+:is(.button.primary,.ds-button[data-variant=primary],.p2-btn-primary,.source-health-drawer-retry-btn):hover{background:var(--btn-fill-primary-hover);border-color:var(--accent-hover);color:var(--on-accent)}
+:is(.button.primary,.ds-button[data-variant=primary],.p2-btn-primary,.source-health-drawer-retry-btn):active{background:var(--accent-hover);box-shadow:inset 0 1px 2px rgb(0 0 0/.28)}
 :is(.ds-button[data-variant=plain],.p2-btn-plain,.p2-btn-close,.p2-drawer-close-btn,.source-health-drawer-close-btn,.text-button,.p2-sort-btn,.source-health-sort-btn,.p2-row-title-btn,.my-work-row-title-btn,.cockpit-group-button,.people-text-button){
  background:transparent;border-color:transparent;box-shadow:none;color:var(--btn-fg,var(--accent));
 }

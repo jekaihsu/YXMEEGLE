@@ -200,4 +200,9 @@ button.resource-cell:focus-visible{outline:2px solid var(--accent);outline-offse
  .workspace .section-heading{flex-wrap:wrap;gap:var(--space-2) var(--space-4)}
  .workspace .flow-legend{flex-wrap:wrap}
 }
+
+/* Empty and disabled landings are one centered glass card. */
+.workspace section.empty{display:flex;flex-direction:column;align-items:center;gap:var(--space-3);padding:var(--space-8) var(--space-6);text-align:center;max-width:36rem;margin:var(--space-8) auto}
+.workspace section.empty h1,.workspace section.empty h2{margin:0}
+.workspace section.empty p{margin:0;color:var(--label-2);font-size:var(--fs-subhead)}
 }
