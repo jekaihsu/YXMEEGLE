@@ -468,7 +468,14 @@ def create_app(overrides=None):
         return {'status':'ok','mode':'demo' if demo else 'lark','database':'postgresql' if engine.dialect.name=='postgresql' else 'sqlite'}
 
     def features():
-        return {'features':{'workspace_shell':True}} if shell_enabled else {}
+        from .node_assignment.config import NodeAssignmentConfig
+        node_config = NodeAssignmentConfig.from_env(cfg)
+        flags = {'workspace_shell': True} if shell_enabled else {}
+        if (node_config.enabled and node_config.writable and cfg.get('LARK_WORKER_ORGANIZATION')
+                and cfg.get('LARK_WORKER_IDENTITY') == 'application'
+                and cfg.get('LARK_APP_ID') and cfg.get('LARK_APP_SECRET')):
+            flags['node_assignment'] = True
+        return {'features': flags} if flags else {}
 
     @app.get('/api/session')
     def get_session(request:Request):

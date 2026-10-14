@@ -32,3 +32,15 @@ def test_demo_workspace_never_reaches_lark(tmp_path):
     for response in (client.get(URL), client.post(URL + '/nodes/sales/claim', json={'request_id': 'x'})):
         assert (response.status_code, response.json()['code'], response.json()['detail']) == (
             404, 'disabled', '節點指派僅限公司正式工作區')
+
+
+def test_session_feature_flag_requires_enabled_configured_deployment_without_shell(tmp_path):
+    cfg = {'DATABASE_URL': f'sqlite:///{tmp_path}/flags.db', 'UPLOAD_DIR': str(tmp_path / 'uploads'),
+           'SESSION_SECRET': 'test-secret' * 5, 'APP_ENV': 'development', 'DEMO_MODE': 'true',
+           'WORKSPACE_SHELL_ENABLED': 'false', 'NODE_ASSIGNMENT_ENABLED': 'true',
+           'LARK_WORKER_IDENTITY': 'application', 'LARK_WORKER_ORGANIZATION': 'company',
+           'LARK_APP_ID': 'app-test', 'LARK_APP_SECRET': 'synthetic'}
+    assert TestClient(create_app(cfg)).get('/api/session').json()['features'] == {'node_assignment': True}
+    for changes in ({'NODE_ASSIGNMENT_ENABLED': ''}, {'LARK_APP_SECRET': ''},
+                    {'NODE_ASSIGNMENT_TASK_TABLE_ID': 'tblUnapproved'}):
+        assert 'node_assignment' not in TestClient(create_app({**cfg, **changes})).get('/api/session').json().get('features', {})
