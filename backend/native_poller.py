@@ -84,6 +84,9 @@ class NativeApprovalPoller:
             row=db.get(self.W,wid);require(row is not None,'工作區不存在',404)
             state=self._load(db,row);require(state.get('environment')=='production','正式工作區已變更',403)
             item=find(state.get(collection,[]),ident,'原審批')
+            if item.get('type') in ('change','extension'):
+                from .features import require_feature
+                require_feature(state.get('features',{}),'change_extension')
             require(item.get('native_binding',{}).get('binding_hash')==binding['binding_hash'],'原審批版本已被替換',409)
 
     def _commit(self,wid,collection,ident,binding,receipt,observation,error=None,definite=False):
@@ -92,6 +95,8 @@ class NativeApprovalPoller:
             if not row:return
             state=self._load(db,row);item=next((i for i in state.get(collection,[]) if i['id']==ident),None)
             if not item or item.get('native_binding',{}).get('binding_hash')!=binding['binding_hash']:return
+            from .features import enabled
+            if item.get('type') in ('change','extension') and not enabled(state,'change_extension'):return
             status=item.setdefault('native_poll_status',{});current_binding=item['native_binding']
             if observation:item['native_observation']=observation
             if error:

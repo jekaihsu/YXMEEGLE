@@ -108,7 +108,6 @@ def _reidentify_pilot_project(project,occupied_ids=()):
 def create_app(overrides=None):
     cfg=dict(os.environ); cfg.update(overrides or {})
     from .features import resolve_features, guard_action
-    feature_flags=resolve_features(cfg)
     production=cfg.get('APP_ENV','development')=='production'
     demo=str(cfg.get('DEMO_MODE','false' if production else 'true')).lower()=='true'
     db_url=cfg.get('DATABASE_URL','sqlite:///./backend/workspace.db')
@@ -274,7 +273,7 @@ def create_app(overrides=None):
         from .workspace_environment import normalize_environment
         from .case_cutover import initialize_execution_system
         normalize_environment(state,row.id,cfg)
-        state['features']=dict(feature_flags)
+        state['features']=resolve_features(cfg)
         if state.get('environment')=='production':
             require(not any(p.get('source_kind') in ('demo','mock','simulation') for p in state.get('projects',[])),
                     '正式工作區包含隔離示範資料，請由管理員核對',409)
@@ -485,7 +484,7 @@ def create_app(overrides=None):
     def features(environment=None):
         from .node_assignment.config import NodeAssignmentConfig
         node_config = NodeAssignmentConfig.from_env(cfg)
-        flags = dict(feature_flags)
+        flags = resolve_features(cfg)
         flags['mock_ui']=environment in ('demo','test') and str(cfg.get('FEATURE_LARK_AUTHORITATIVE_OPS','false')).lower()=='true'
         if shell_enabled: flags['workspace_shell']=True
         if (node_config.enabled and node_config.writable and cfg.get('LARK_WORKER_ORGANIZATION')
@@ -755,7 +754,7 @@ def create_app(overrides=None):
         data,user=identity(request); raw=body.model_dump()
         from .input_validation import validate_action
         try:
-            guard_action({'features':feature_flags},raw)
+            guard_action({'features':resolve_features(cfg)},raw)
             validate_action(raw)
         except HTTPException as exc:
             with sessions.begin() as db:
@@ -1134,7 +1133,7 @@ def create_app(overrides=None):
     async def refresh_approval(approval_id:str,request:Request):
         data,user=identity(request)
         from .features import require_feature
-        require_feature(feature_flags,'change_extension')
+        require_feature(resolve_features(cfg),'change_extension')
         require(data['mode']=='lark','原生審批查詢需公司 Lark 登入',403)
         body=await json_object(request)
         require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)

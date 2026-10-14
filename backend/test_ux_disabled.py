@@ -106,3 +106,57 @@ def test_old_digest_is_blocked_before_dispatch(client):
                     adapter_factory=lambda *args: pytest.fail('disabled job must not create an adapter'))
     worker.run_one(wid)
     assert snapshot(client)[0]['jobs'][0]['status'] == 'blocked_feature'
+
+
+def enabled_seed(empty=False):
+    state = seed(empty)
+    state["features"] = {"change_extension": True, "routines": True}
+    return state
+
+
+@pytest.mark.parametrize('environment', ['production', 'demo', 'test'])
+def test_mock_server_gate_with_explicit_opt_in(tmp_path, environment):
+    app = create_app({'DATABASE_URL': 'sqlite:///' + str(tmp_path / 'mock.db'),
+                      'UPLOAD_DIR': str(tmp_path / 'uploads'), 'DEMO_MODE': 'true',
+                      'FEATURE_LARK_AUTHORITATIVE_OPS': 'true'})
+    state = seed(True)
+    state.update(environment=environment, users=[{'id': 'fixture-user', 'name': '隔離測試', 'role': 'manager'}])
+    with app.state.sessions.begin() as db:
+        row = WorkspaceRow(id='isolated-fixture', version=1, data=state)
+        db.add(row)
+    client = TestClient(app)
+    client.cookies.set('meegle_session', app.state.signer.dumps({
+        'mode': 'demo', 'wid': 'isolated-fixture', 'uid': 'fixture-user'}))
+    before = snapshot(client)
+    response = client.get('/api/ops-sync/flow')
+    assert response.status_code == (403 if environment == 'production' else 200)
+    if environment == 'production':
+        assert response.json() == {'detail': '正式工作區不提供模擬資料'}
+        assert snapshot(client) == before
+    else:
+        assert response.json()['live'] is False
+
+
+def test_production_quarantines_stored_seed_data(client):
+    app = client.app
+    with app.state.sessions.begin() as db:
+        row = WorkspaceRow(id='isolated-production', version=1, data=seed())
+        row.data['environment'] = 'production'
+        db.add(row)
+    client.cookies.set('meegle_session', app.state.signer.dumps({
+        'mode': 'demo', 'wid': 'isolated-production', 'uid': 'u-pm'}))
+    response = client.get('/api/workspace')
+    assert response.status_code == 409
+    assert '桃園捷運' not in response.text
+    assert response.json()['detail'] == '正式工作區包含隔離示範資料，請由管理員核對'
+
+
+def test_retry_disabled_digest_preserves_history():
+    state = seed()
+    state['jobs'] = [{'id': 'old', 'kind': 'digest', 'status': 'blocked_feature', 'actor_id': 'u-manager'}]
+    before = deepcopy(state)
+    actor = next(user for user in state['users'] if user['id'] == 'u-manager')
+    with pytest.raises(HTTPException) as error:
+        apply_operation(state, actor, {'action': 'job_retry', 'payload': {'id': 'old'}}, True)
+    assert error.value.detail['code'] == 'feature_disabled'
+    assert state == before

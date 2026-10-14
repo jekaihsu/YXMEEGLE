@@ -39,6 +39,8 @@ def action_feature(body):
 
 def guard_action(state, body):
     feature = action_feature(body)
+    if body['action']=='job_retry' and any(job['id']==(body.get('payload') or {}).get('id') and job['kind']=='digest' for job in state.get('jobs', [])):
+        feature='routines'
     if feature:
         require_feature(state.get('features', {}), feature)
 
