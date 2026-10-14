@@ -10,11 +10,11 @@ import {pmGlanceVisible} from './src/pmGlanceConfig.ts';
 const bundle = await build({stdin: {contents: "export {PmGlancePage} from './src/PmGlance.tsx'; export {AppShell} from './src/AppShell.tsx'; export * from './src/pmGlanceView'; export {buildMyWorkView} from './src/myWorkView'; export {buildManagerOverviewView} from './src/managerOverviewView'; export {buildSourceHealthView} from './src/sourceHealthView'; export {buildConfirmationListView} from './src/confirmationListView'; export {parsePeopleAttendance,taipeiWeek} from './src/peopleAttendance';", resolveDir: process.cwd(), loader: 'tsx'}, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
 const file = new URL('./.pm-glance-test.mjs', import.meta.url);
 await fs.writeFile(file, bundle.outputFiles[0].text);
-let PmGlancePage, AppShell, buildPmGlanceView, attendanceTiles, tileState, staleReaders, buildMyWorkView, buildManagerOverviewView, buildSourceHealthView, buildConfirmationListView, parsePeopleAttendance, taipeiWeek;
-try {({PmGlancePage, AppShell, buildPmGlanceView, attendanceTiles, tileState, staleReaders, buildMyWorkView, buildManagerOverviewView, buildSourceHealthView, buildConfirmationListView, parsePeopleAttendance, taipeiWeek} = await import(file.href))} finally {await fs.unlink(file)}
+let PmGlancePage, AppShell, buildPmGlanceView, attendanceTiles, tileState, staleReaders, buildMyWorkView, buildManagerOverviewView, buildSourceHealthView, buildConfirmationListView, parsePeopleAttendance, taipeiWeek, parseCaseCount;
+try {({PmGlancePage, AppShell, buildPmGlanceView, attendanceTiles, tileState, staleReaders, buildMyWorkView, buildManagerOverviewView, buildSourceHealthView, buildConfirmationListView, parsePeopleAttendance, taipeiWeek, parseCaseCount} = await import(file.href))} finally {await fs.unlink(file)}
 
 const work = (readState, canSeeAwaitingConfirmation = true) => buildMyWorkView({readState, rows: [], assignment: 'assigned', canSeeAwaitingConfirmation, asOf: '2026-10-14T01:00:00Z'});
-const input = w => ({work: w, awaiting: buildMyWorkView({readState: w.pageState, rows: [], assignment: 'assigned', canSeeAwaitingConfirmation: true, filters: {mode: 'awaiting_my_confirmation'}}), overview: buildManagerOverviewView({}), sources: buildSourceHealthView({}, {diagnosticCapability: false}), confirmations: buildConfirmationListView(undefined), attendance: {kind: 'loading'}});
+const input = w => ({work: w, awaiting: buildMyWorkView({readState: w.pageState, rows: [], assignment: 'assigned', canSeeAwaitingConfirmation: true, filters: {mode: 'awaiting_my_confirmation'}}), overview: buildManagerOverviewView({}), sources: buildSourceHealthView({}, {diagnosticCapability: false}), confirmations: buildConfirmationListView(undefined), attendance: {kind: 'loading'}, cases: {kind: 'loading'}});
 for (const [states, expected] of [[['read_failed'], 'failed'], [['forbidden'], 'needs-permission'], [['unknown'], 'unknown'], [['stale'], 'stale'], [['partial'], 'unknown'], [['partial', 'stale'], 'stale'], [['complete_empty'], 'ok'], [['loading'], 'unknown']]) assert.equal(tileState(states), expected);
 for (const name of ['unknown', 'read_failed', 'forbidden', 'loading', 'unlocated', 'partial']) {
  const tiles = buildPmGlanceView(input(work({states: [name], count: null})));
@@ -40,6 +40,20 @@ for (const [status, expected] of [['loading', 'unknown'], ['incomplete', 'unknow
  const tiles = attendance({status, missing_scopes: ['attendance:readonly']});
  assert.ok(tiles.every(t => t.state === expected && t.value === '—'), status);
 }
+assert.equal(parseCaseCount({total: 420}), 420);
+assert.equal(parseCaseCount({total: 0}), 0);
+for (const total of [undefined, null, -1, '420', true, Infinity, 2 ** 53]) assert.equal(parseCaseCount({total}), null);
+const loaded = input(work('ready'));
+loaded.attendance = {kind: 'ready', view: parsePeopleAttendance({...attendanceBody, status: 'incomplete', summary: {},
+ people: [{id: 'one', name: 'PRIVATE_PERSON'}], trips: [{person_id: 'one', kind: 'trip', start: '2026-10-12', end: '2026-10-13'}]})};
+loaded.cases = {kind: 'ready', count: 420, asOf: '2026-10-14T01:00:00Z'};
+const loadedTiles = buildPmGlanceView(loaded);
+assert.equal(loadedTiles.find(t => t.id === 'source-cases')?.value, '420');
+assert.equal(loadedTiles.find(t => t.id === 'source-people')?.value, '1', 'loaded records remain visible when aggregate attendance is incomplete');
+assert.equal(loadedTiles.find(t => t.id === 'source-trips')?.value, '1');
+assert.equal(loadedTiles.find(t => t.id === 'leave').value, '—', 'loaded trip records never invent an aggregate leave count');
+loaded.attendance = {kind: 'failed'};
+assert.equal(buildPmGlanceView(loaded).find(t => t.id === 'source-people')?.value, '—');
 const staleAttendance = attendance({status: 'stale', incomplete: true, refreshing: true});
 assert.deepEqual(staleAttendance.map(t => t.value), ['2', '0']);
 assert.ok(staleAttendance.every(t => t.state === 'stale' && /資料不完整/.test(t.reason) && /正在更新/.test(t.reason)));
@@ -51,7 +65,7 @@ assert.deepEqual(staleReaders(unknown), []);
 assert.deepEqual(staleReaders([{state: 'stale', reader: 'work'}, {state: 'stale', reader: 'work'}, {state: 'failed', reader: 'overview'}, {state: 'ok', reader: 'sources'}]), ['work']);
 assert.equal(pmGlanceVisible('member'), true); assert.equal(pmGlanceVisible(undefined), false);
 assert.equal(pmGlanceVisible('member', ['pm']), false); assert.equal(pmGlanceVisible('pm', ['pm']), true);
-assert.ok(unknown.every(tile => /^#view=(work|overview|sources|people|confirmations)(&|$)/.test(tile.href)));
+assert.ok(unknown.every(tile => /^#view=(work|overview|sources|people|confirmations|projects)(&|$)/.test(tile.href)));
 
 const dom = new JSDOM('<div id="root"></div>', {url: 'http://localhost/#view=pm-glance', pretendToBeVisual: true});
 for (const key of ['window', 'document', 'location', 'history', 'Event', 'HTMLElement']) Object.defineProperty(globalThis, key, {value: dom.window[key], configurable: true});
@@ -59,15 +73,18 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 dom.window.scrollTo = () => {};
 const requests = [];
 let sourceStale = true;
+let holdReads = false;
+const heldReads = [];
 let attendanceResponse = {...attendanceBody, status: 'stale'};
 let attendanceHttpStatus = 200;
 globalThis.fetch = async (url, options) => {
  requests.push({url, method: options.method ?? 'GET'});
+ if (holdReads) await new Promise(resolve => heldReads.push(resolve));
  if (url.startsWith('/api/people/attendance?week=')) return new Response(JSON.stringify({...attendanceResponse, people: [{id: 'private', name: 'PRIVATE_PERSON', phone: 'PRIVATE_PHONE'}], trips: [{person_id: 'private', kind: 'trip', start: '2026-10-12', end: '2026-10-18', reason: 'PRIVATE_REASON'}]}), {status: attendanceHttpStatus, headers: {'Content-Type': 'application/json'}});
  let body = {};
  if (url === '/api/my-work') body = {readState: 'ready', rows: [], assignment: 'assigned', canSeeAwaitingConfirmation: true, as_of: '2026-10-14'};
  if (url === '/api/source-health') body = {page_state: {states: [sourceStale ? 'stale' : 'unknown'], count: null}, sources: [{authorized: true, amount: 987654321, last_success: 'PRIVATE_TIME', name: 'PRIVATE_SOURCE'}]};
- if (url === '/api/manager-overview') return new Response('{}', {status: 503, headers: {'Content-Type': 'application/json'}});
+ if (url === '/api/projects?limit=1') return new Response('{}', {status: 503, headers: {'Content-Type': 'application/json'}});
  if (url === '/api/confirmations') return new Response('{}', {status: 403, headers: {'Content-Type': 'application/json'}});
  return new Response(JSON.stringify(body), {headers: {'Content-Type': 'application/json'}});
 };
@@ -79,22 +96,28 @@ await act(async () => root.render(React.createElement(AppShell, {s: session, w: 
 await settle();
 assert.equal(document.querySelectorAll('.topbar button[aria-label="重新整理資料"], .topbar .data-freshness button').length, 0, 'PM shell exposes only the stale-tile refresh, not the global POST refresh');
 assert.equal(requests.length, 5); assert.ok(requests.every(r => r.method === 'GET'));
-assert.deepEqual(requests.map(r => r.url).sort(), ['/api/confirmations', '/api/manager-overview', '/api/my-work', `/api/people/attendance?week=${taipeiWeek()}`, '/api/source-health']);
-assert.equal(document.querySelector('[data-tile="overdue"]').dataset.state, 'failed');
+assert.deepEqual(requests.map(r => r.url).sort(), ['/api/confirmations', '/api/projects?limit=1', '/api/my-work', `/api/people/attendance?week=${taipeiWeek()}`, '/api/source-health'].sort());
+assert.equal(document.querySelector('[data-tile="source-cases"]').dataset.state, 'failed');
 assert.equal(document.querySelector('[data-tile="confirmations"]').dataset.state, 'needs-permission');
 assert.doesNotMatch(document.body.textContent, /987654321|PRIVATE_TIME|PRIVATE_SOURCE|PRIVATE_PERSON|PRIVATE_PHONE|PRIVATE_REASON/);
-assert.equal(document.querySelectorAll('[data-tile]').length, 8);
+assert.equal(document.querySelectorAll('[data-tile]').length, 11);
 sourceStale = false;
 attendanceResponse = {...attendanceBody, status: 'ok'};
+holdReads = true;
 await act(async () => document.querySelector('.pm-glance-head button').click());
 await settle();
-assert.equal(requests.length, 7);
-assert.deepEqual(requests.slice(5).map(r => r.url).sort(), [`/api/people/attendance?week=${taipeiWeek()}`, '/api/source-health'], 'refresh re-reads each stale reader once');
+assert.equal(document.querySelector('[data-tile=work] .pm-glance-value').textContent, '0', 'manual refresh retains the previous snapshot');
 assert.equal(document.querySelector('.pm-glance-head button').disabled, true);
+holdReads = false;
+await act(async () => heldReads.splice(0).forEach(resolve => resolve()));
+await settle();
+assert.equal(requests.length, 10);
+assert.deepEqual(requests.slice(5).map(r => r.url).sort(), requests.slice(0, 5).map(r => r.url).sort(), 'one explicit refresh reads each dashboard source once');
+assert.equal(document.querySelector('.pm-glance-head button').disabled, false);
 const clock = fakeClock(dom.window);
 const settlePolling = () => act(async () => {await new Promise(r => clock.realTimeout(r, 20))});
 const reread = async reloadVersion => {
- await act(async () => root.render(React.createElement(AppShell, {s: session, w: workspace, route: {view: 'pm-glance'}, ready: true, asOfLabel: '2026-10-14', guardedRefresh: () => {}, go: () => {}}, React.createElement(PmGlancePage, {c: {w: workspace, s: session, reloadVersion}}))));
+ await act(async () => root.render(React.createElement(AppShell, {s: session, w: workspace, route: {view: 'pm-glance'}, ready: true, asOfLabel: '2026-10-14', guardedRefresh: () => {}, go: () => {}}, React.createElement(PmGlancePage, {key: reloadVersion, c: {w: workspace, s: session, reloadVersion}}))));
  await settlePolling();
 };
 attendanceResponse = {...attendanceBody, status: 'loading', refreshing: true};
@@ -102,12 +125,14 @@ await reread(2);
 assert.equal(document.querySelector('[data-tile="leave"] .pm-glance-value').textContent, '—');
 const beforePoll = requests.length;
 attendanceResponse = {...attendanceBody, status: 'ok'};
-await act(async () => {await clock.advance(2000)});
+await act(async () => {await clock.advance(60000)});
 await settlePolling();
-assert.equal(requests.length, beforePoll + 1, 'loading/refreshing polls only the shared attendance read');
-assert.match(requests.at(-1).url, /^\/api\/people\/attendance\?week=/);
+assert.equal(requests.length, beforePoll, 'idle dashboard never polls while the server is refreshing');
+assert.equal(clock.timers.size, 0);
+await act(async () => document.querySelector('.pm-glance-head button').click());
+await settlePolling();
+assert.equal(requests.length, beforePoll + 5, 'manual refresh reloads all dashboard readers once');
 assert.equal(document.querySelector('[data-tile="leave"] .pm-glance-value').textContent, '2');
-assert.equal(clock.timers.size, 0, 'polling stops when the weekly snapshot is ready');
 attendanceHttpStatus = 500;
 await reread(3);
 assert.equal(document.querySelector('[data-tile="leave"]').dataset.state, 'failed');
@@ -118,4 +143,4 @@ assert.equal(document.querySelector('[data-tile="trips"]').dataset.state, 'needs
 assert.equal(document.querySelector('[data-tile="trips"] .pm-glance-value').textContent, '—');
 await act(async () => root.unmount());
 clock.restore();
-console.log('PM glance: state, unknown/zero, gating, privacy, existing GETs, and selective refresh passed');
+console.log('PM glance: state, unknown/zero, gating, privacy, existing GETs, explicit refresh, retained data, idle and source counts passed');

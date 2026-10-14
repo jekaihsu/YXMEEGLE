@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {build} from 'esbuild';
-import React from 'react';
+import React, {act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {Simulate} from 'react-dom/test-utils';
+import {JSDOM} from 'jsdom';
+import {fakeClock} from './fake-clock-fixture.mjs';
 import {renderToStaticMarkup} from 'react-dom/server';
-const bundle=await build({stdin:{contents:"export * from './src/peopleAttendance'; export {WeeklyAttendanceTable} from './src/AttendanceWorkSchedules';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export * from './src/peopleAttendance'; export {WeeklyAttendanceTable} from './src/AttendanceWorkSchedules'; export {PeopleAttendancePanel} from './src/PeopleAttendancePanel';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',packages:'external',loader:{'.css':'empty'}});
 const path=new URL('./.people-attendance-test.mjs',import.meta.url);
 await fs.writeFile(path,bundle.outputFiles[0].text);
 let model;
@@ -27,3 +31,55 @@ for(const status of ['needs-permission','not-connected','read-failed','garbage']
 assert.equal(model.parsePeopleAttendance({...raw,status:'ok',summary:{trips:0}}).summary.trips,0);
 assert.equal(model.parsePeopleAttendance({...raw,summary:{trips:-1}}).summary.trips,null);
 console.log('people attendance view contracts passed');
+
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=people',pretendToBeVisual:true});
+for(const key of ['window','document','location','history','Event','HTMLElement'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const body={status:'incomplete',as_of:'2026-10-14T01:00:00Z',week_start:'2026-10-12',week_end:'2026-10-18',days:['2026-10-12'],refreshing:true,people:[
+ {id:'one',name:'合成甲',group:'控制組',in_service:true,attendance:['遲到'],phone:'PRIVATE_PHONE'},
+ {id:'two',name:'合成乙',group:'圖資組',in_service:false,attendance:['出差']},
+ {id:'three',name:'合成丙',group:null,in_service:null,attendance:[null]}],
+ trips:[{person_id:'two',name:'合成乙',group:'圖資組',kind:'trip',start:'2026-10-12',end:'2026-10-13'}],summary:{on_leave:null,on_trip:null}};
+const requests=[];let httpStatus=200;
+globalThis.fetch=async(url,options)=>{requests.push(url);return new Response(JSON.stringify(body),{status:httpStatus,headers:{'Content-Type':'application/json'}})};
+const settle=()=>act(async()=>{await new Promise(resolve=>setTimeout(resolve,20))});
+const root=createRoot(document.getElementById('root'));
+const render=async(key,reloadVersion=1)=>{await act(async()=>root.render(React.createElement(model.PeopleAttendancePanel,{key,c:{reloadVersion,w:{version:1},s:{user:{id:'same-user'}}}})));await settle()};
+await render('first');
+assert.equal(requests.length,1);
+assert.equal(document.querySelectorAll('.attendance-grid tbody tr').length,3);
+assert.ok(document.querySelector('.attendance-attention'));
+assert.ok(document.querySelector('[role=region][tabindex="0"]'));
+assert.ok(document.querySelector('th[scope=row]'));
+assert.doesNotMatch(document.body.textContent,/PRIVATE_PHONE/);
+const change=async(node,value)=>{await act(async()=>Simulate.change(node,{target:{value}}));await settle()};
+await change(document.querySelector('input[type=search]'),'合成甲');
+assert.equal(document.querySelectorAll('.attendance-grid tbody tr').length,1);
+assert.match(document.querySelector('.attendance-grid').textContent,/合成甲/);
+assert.equal(requests.length,1,'search filters locally');
+await change(document.querySelector('input[type=search]'),'');
+await change(document.querySelectorAll('select')[0],'group:圖資組');
+assert.equal(document.querySelectorAll('.attendance-grid tbody tr').length,1);
+assert.match(document.querySelector('.attendance-grid').textContent,/合成乙/);
+await change(document.querySelectorAll('select')[1],'active');
+assert.match(document.querySelector('.people-empty').textContent,/沒有符合篩選/);
+await act(async()=>document.querySelector('.people-empty button').click());await settle();
+assert.equal(document.querySelectorAll('.attendance-grid tbody tr').length,3);
+const clock=fakeClock(dom.window);const before=requests.length;
+await act(async()=>{await clock.advance(60000)});
+assert.equal(requests.length,before,'People page never polls while its source is refreshing');
+assert.equal(clock.timers.size,0);clock.restore();
+await act(async()=>document.querySelector('.people-heading button').click());await settle();
+assert.equal(requests.length,before+1,'explicit reload makes one request');
+await render('return');
+assert.equal(requests.length,before+2,'leaving and returning reads once');
+await render('return',2);
+assert.equal(requests.length,before+3,'the global manual reload signal reads once');
+await render('return',2);
+assert.equal(requests.length,before+3,'ordinary rerenders do not reread');
+httpStatus=403;
+await act(async()=>document.querySelector('.people-heading button').click());await settle();
+assert.doesNotMatch(document.body.textContent,/合成甲|合成乙|合成丙/,'permission revocation clears retained personal records');
+assert.match(document.body.textContent,/缺少唯讀權限|needs-permission/);
+await act(async()=>root.unmount());
+console.log('People page: search, filters, empty/reset, keyboard table, explicit refresh, re-entry, idle and permission safety passed');

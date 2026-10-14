@@ -60,7 +60,7 @@ class SourceSyncService:
         require(wid.startswith('lark-'),'隔離工作區不可直接同步正式來源',403)
         with self.sessions() as db:
             row=db.get(self.W,wid); require(row is not None,'工作區不存在',404)
-            state=self._state(db,row)
+            state=upgrade(storage.load_partial(db,self.B,row,collections=('users',)))
             require(state.get('environment') not in ('test','demo'),'隔離工作區不可直接同步正式來源',403)
             return self._actor(db,wid,state,actor_id)
 

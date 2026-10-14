@@ -186,3 +186,70 @@ def test_week_range_edges_are_supported(harness,monkeypatch,week):
     reader=PeopleAttendance(live.Session,live.CacheRow,live,live.cfg,executor=SynchronousExecutor(),clock=lambda:datetime(2026,10,14,tzinfo=timezone.utc))
     monkeypatch.setattr(reader,'ensure',lambda *args,**kwargs:{'status':'busy'})
     assert reader.view('lark-company',week)['week_start']==week
+
+
+def test_weekly_background_refresh_waits_beyond_interactive_roster_timeout(harness):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from dataclasses import replace
+    from types import SimpleNamespace
+
+    _, live, _, _, _ = harness
+    live.config = replace(live.config, blocking_timeout_seconds=.01, budget_seconds=.5)
+    started, release = Event(), Event()
+    def roster(wid):
+        started.set()
+        assert release.wait(2)
+        return {'fingerprint': 'roster'}
+    live.refreshers['roster'] = roster
+    live.roster_executor = ThreadPoolExecutor(max_workers=1)
+    expected = {'fingerprint': 'weekly', 'snapshot': {'status': 'incomplete'}}
+    live.refreshers['attendance'] = SimpleNamespace(weekly=lambda *args: expected)
+    reader = PeopleAttendance(live.Session, live.CacheRow, live, live.cfg)
+    reader.config = live.config
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        live.ensure('lark-company', 'roster')
+        assert started.wait(1)
+        pending = pool.submit(reader._weekly, 'lark-company|2026-10-12')
+        with pytest.raises(TimeoutError):
+            pending.result(timeout=.05)
+        assert not pending.done()
+        release.set()
+        assert pending.result(timeout=1) == expected
+    finally:
+        release.set()
+        pool.shutdown(wait=True)
+        reader.close()
+        live.roster_executor.shutdown(wait=True)
+
+
+def test_weekly_uses_successful_roster_that_finishes_after_soft_ttl(harness):
+    from types import SimpleNamespace
+
+    _, live, _, _, _ = harness
+    clock = [datetime(2026, 10, 14, tzinfo=timezone.utc)]
+    live.clock = lambda: clock[0]
+    def roster(wid):
+        clock[0] += timedelta(seconds=61)
+        return {'fingerprint': 'roster'}
+    live.refreshers['roster'] = roster
+    expected = {'fingerprint': 'weekly', 'snapshot': {'status': 'incomplete'}}
+    live.refreshers['attendance'] = SimpleNamespace(weekly=lambda *args: expected)
+    reader = PeopleAttendance(live.Session, live.CacheRow, live, live.cfg)
+    try:
+        assert reader._weekly('lark-company|2026-10-12') == expected
+    finally:
+        reader.close()
+
+
+def test_weekly_rejects_roster_beyond_existing_hard_validity(harness, monkeypatch):
+    _, live, _, _, _ = harness
+    monkeypatch.setattr(live, 'ensure', lambda *args, **kwargs: {
+        'status': 'stale', 'age_seconds': 900, 'hard_max_age_seconds': 900})
+    reader = PeopleAttendance(live.Session, live.CacheRow, live, live.cfg)
+    try:
+        with pytest.raises(ReadFailure, match='Roster has not been read'):
+            reader._weekly('lark-company|2026-10-12')
+    finally:
+        reader.close()
