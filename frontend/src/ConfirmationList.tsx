@@ -78,11 +78,25 @@ export function ConfirmationList(props: ConfirmationListProps) {
     }
   };
 
+  const handleFilterChange = (filterKey: string, value: string) => {
+    if (!onFilterChange) return;
+    const nextFilters: Record<string, string> = {};
+    for (const [k, v] of Object.entries(view.controls.filters)) {
+      if (k !== filterKey && typeof v === 'string' && v.trim()) {
+        nextFilters[k] = v;
+      }
+    }
+    if (value && value.trim()) {
+      nextFilters[filterKey] = value;
+    }
+    onFilterChange(nextFilters);
+  };
+
   const handleSearchChange = (value: string) => {
     if (onSearch) {
       onSearch(value);
     } else if (onFilterChange) {
-      onFilterChange({ ...view.controls.filters, search: value });
+      handleFilterChange('search', value);
     }
   };
 
@@ -119,7 +133,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
         <div className="p2-banner-header">
           <span className="p2-banner-title">頁面資料狀態</span>
           <span className="p2-badge">
-            {view.pageStateLabel ?? '正常'}
+            {view.pageStateLabel ?? ''}
           </span>
         </div>
         {view.reason && <p className="p2-banner-reason">{view.reason}</p>}
@@ -149,6 +163,65 @@ export function ConfirmationList(props: ConfirmationListProps) {
                 ×
               </button>
             ) : null}
+          </div>
+
+          {/* Source Version filter */}
+          <div className="p2-filter-field">
+            <label
+              htmlFor={`${baseId}-filter-source-version`}
+              className="p2-filter-label"
+            >
+              版本
+            </label>
+            <input
+              id={`${baseId}-filter-source-version`}
+              name="source_version"
+              type="text"
+              className="p2-filter-input"
+              value={view.controls.filters.source_version ?? ''}
+              onChange={(e) =>
+                handleFilterChange('source_version', e.target.value)
+              }
+              placeholder="確認單版本"
+              aria-label="篩選確認單版本"
+            />
+          </div>
+
+          {/* PM filter */}
+          <div className="p2-filter-field">
+            <label htmlFor={`${baseId}-filter-pm`} className="p2-filter-label">
+              負責人
+            </label>
+            <input
+              id={`${baseId}-filter-pm`}
+              name="pm"
+              type="text"
+              className="p2-filter-input"
+              value={view.controls.filters.pm ?? ''}
+              onChange={(e) => handleFilterChange('pm', e.target.value)}
+              placeholder="案件負責人"
+              aria-label="篩選案件負責人"
+            />
+          </div>
+
+          {/* Admission filter */}
+          <div className="p2-filter-field">
+            <label
+              htmlFor={`${baseId}-filter-admission`}
+              className="p2-filter-label"
+            >
+              准入狀態
+            </label>
+            <input
+              id={`${baseId}-filter-admission`}
+              name="admission"
+              type="text"
+              className="p2-filter-input"
+              value={view.controls.filters.admission ?? ''}
+              onChange={(e) => handleFilterChange('admission', e.target.value)}
+              placeholder="准入狀態"
+              aria-label="篩選准入狀態"
+            />
           </div>
 
           {/* Deadline filter control (disabled with reason) */}
@@ -211,7 +284,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
               aria-controls={`${baseId}-chooser-panel`}
               onClick={() => setChooserOpen(!chooserOpen)}
             >
-              欄位設定（{visibleColumns.length}/{view.columns.length}）
+              欄位設定
             </button>
             {chooserOpen && (
               <div
@@ -320,7 +393,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                         colSpan={visibleColumns.length + 1}
                         className="p2-empty-cell"
                       >
-                        {view.pageStateLabel ?? '尚無資料'}
+                        {view.pageStateLabel ?? view.reason ?? '—'}
                       </td>
                     </tr>
                   ) : (
@@ -335,6 +408,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                           onClick={() => onSelect?.(isSelected ? null : row.key)}
                           tabIndex={0}
                           onKeyDown={(e) => {
+                            if (e.repeat) return;
                             if (
                               e.target === e.currentTarget &&
                               (e.key === 'Enter' || e.key === ' ')
@@ -366,7 +440,11 @@ export function ConfirmationList(props: ConfirmationListProps) {
                                       e.stopPropagation();
                                       onNavigate?.(row.key);
                                     }}
-                                    aria-label={`查看案件詳情：${cell?.label ?? row.key}`}
+                                    aria-label={
+                                      cell?.label && cell.label !== '—'
+                                        ? `查看案件詳情：${cell.label}`
+                                        : '查看案件詳情'
+                                    }
                                   >
                                     <strong>{cell?.label ?? '—'}</strong>
                                   </button>
@@ -462,7 +540,12 @@ export function ConfirmationList(props: ConfirmationListProps) {
                                 e.stopPropagation();
                                 onSelect?.(isSelected ? null : row.key);
                               }}
-                              aria-label={`選取來源資訊：${row.cells.case_number?.label ?? row.key}`}
+                              aria-label={
+                                row.cells.case_number?.label &&
+                                row.cells.case_number.label !== '—'
+                                  ? `選取來源資訊：${row.cells.case_number.label}`
+                                  : '選取來源資訊'
+                              }
                             >
                               {isSelected ? '收合' : '選取'}
                             </button>
