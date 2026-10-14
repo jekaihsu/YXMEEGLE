@@ -385,3 +385,35 @@ def test_direct_apply_denies_environment_flip_with_legacy_403(harness, environme
         h.service.apply_snapshot(h.wid, raw, 'u-manager',
                                  expected_policy=policy, expected_generation=generation)
     assert exc.value.status_code == 403
+
+
+def test_page_authorization_does_not_exhaust_lark_budget_loading_unrelated_cases(harness, monkeypatch):
+    import httpx
+    from .live_read.client import LiveLarkClient
+    from .live_read.rate_limit import TokenBucket
+    from .live_read.token_cache import TenantTokenCache
+    from .test_live_read_client import Clock
+
+    h = harness
+    clock = Clock()
+    original = storage.load
+    def slow_full_load(*args, **kwargs):
+        clock.sleep(8)
+        return original(*args, **kwargs)
+    monkeypatch.setattr(storage, 'load', slow_full_load)
+    def response(request):
+        if '/auth/' in request.url.path:
+            return httpx.Response(200, json={'tenant_access_token': 'synthetic', 'expire': 7200})
+        return httpx.Response(200, json={'code': 0, 'data': {}})
+    cfg = dict(h.cfg, LARK_APP_SECRET='synthetic', LARK_LIVE_READ_BUDGET_SECONDS='100')
+    client = LiveLarkClient(cfg, transport=httpx.MockTransport(response), clock=clock,
+                            sleep=clock.sleep, token_cache=TenantTokenCache(clock=clock),
+                            bucket=TokenBucket(5, clock=clock, sleep=clock.sleep))
+    adapter = SimpleNamespace(token='', client=client)
+    h.service.adapter_factory = lambda _: adapter
+    def fetch(_):
+        for _ in range(28):
+            adapter.client.request('GET', '/bitable/v1/apps/fake/tables/fake/records')
+        return snapshot(h.clock[0])
+    h.service.fetcher = fetch
+    assert h.service.fetch(h.wid)['status'] == 'ready'
