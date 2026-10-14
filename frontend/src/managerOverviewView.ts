@@ -15,7 +15,7 @@ export const OVERVIEW_LABELS={
  invalidBody:'回應格式無效，已停止顯示此區塊',
  unfinished:'本機執行中（未完成）',
  rowKeysUnknown:'確認單列：未知',
- rowKeysNone:'確認單列：無',
+ rowKeysEmptyReason:'目前載入的確認單母體中未找到此案件的版本；不代表沒有確認單',
  rowKeysListed:'確認單列',
  unfinishedUnknown:'是否未完成：未知',
  yes:'是',no:'否',
@@ -154,7 +154,7 @@ function parseCase(raw:unknown):{row:CaseRow;detail:CaseDetail}{
  const ep=need(c.entry_point);
  if(ep.kind!=='case'||ep.read_only!==true)bad();
  const d=need(c.details);
- // row_keys is a list (possibly empty: no confirmation rows) or null, and null only together with a no-count
+ // row_keys is a list (possibly empty: no row in the current, usually partial, loaded population; never an absence claim) or null, and null only together with a no-count
  // row_keys_state and a reason (population unavailable). Anything else, including state beside a list, is invalid.
  const rowKeys=d.row_keys;
  let rowKeysState:string|null=null,rowKeysReason:string|null=null;
@@ -193,8 +193,8 @@ function parseCase(raw:unknown):{row:CaseRow;detail:CaseDetail}{
  }
  const detail:CaseDetail={
   id,rowKeys:rowKeys as string[]|null,
-  rowKeysText:rowKeys===null?OVERVIEW_LABELS.rowKeysUnknown:rowKeys.length?`${OVERVIEW_LABELS.rowKeysListed}`:OVERVIEW_LABELS.rowKeysNone,
-  rowKeysStateLabel:rowKeysState,rowKeysReason,pmId:optStr(d.pm_id),executionStatus:optStr(d.execution_status),admission,
+  rowKeysText:rowKeys===null?OVERVIEW_LABELS.rowKeysUnknown:rowKeys.length?`${OVERVIEW_LABELS.rowKeysListed}`:OVERVIEW_LABELS.dash,
+  rowKeysStateLabel:rowKeysState,rowKeysReason:rowKeys!==null&&!rowKeys.length?OVERVIEW_LABELS.rowKeysEmptyReason:rowKeysReason,pmId:optStr(d.pm_id),executionStatus:optStr(d.execution_status),admission,
   mappingLabel:OVERVIEW_LABELS.unverifiedMapping,
   amounts:{text:OVERVIEW_LABELS.withheld,reason:reqStr(am.reason)},
   formula:optStr(d.formula),

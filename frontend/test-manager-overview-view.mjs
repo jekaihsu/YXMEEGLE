@@ -234,7 +234,9 @@ test('21. 128b-4030811 X1: population unavailable keeps cases listed with row ke
  // a case with no confirmation row (backend: unfinished project, available population, row_keys [])
  const norow=body();norow.snapshot.cases[1].details.row_keys=[];
  const b=v(norow,{selectedId:'p2'});
- eq(b.snapshot.cases.length,2,'no-row case stays listed');eq([b.drawer.case.rowKeys,b.drawer.case.rowKeysText,b.drawer.case.rowKeysReason],[[],L.rowKeysNone,null]);
+ eq(b.snapshot.cases.length,2,'no-row case stays listed');eq([b.drawer.case.rowKeys,b.drawer.case.rowKeysText,b.drawer.case.rowKeysReason],[[],'—',L.rowKeysEmptyReason]);
+ ok(!JSON.stringify(b.drawer.case).includes('確認單列：無'),'[] never renders as an absence claim');
+ for(const stt of [['partial'],['stale']]){const y=body();y.snapshot.state=st([stt[0]],stt[1]);y.snapshot.cases[1].details.row_keys=[];eq(v(y,{selectedId:'p2'}).drawer.case.rowKeysReason,L.rowKeysEmptyReason,'same text for state '+stt[0])}
  eq(v(norow,{selectedId:'p1'}).drawer.case.rowKeys,['rk-p1-1'],'listed keys still shown');
  // strictness: null without a valid state/reason, or state beside a list, fails the whole snapshot closed
  const mk=fn=>{const x=body();fn(x.snapshot.cases[0].details);return v(x)};
@@ -314,6 +316,12 @@ test('M11. mutation: null row_keys without state/reason accepted -> strict row-k
  const b=await mutated("const rs=stateOf(d.row_keys_state);\n  if(!UNCOUNTED.has(rs.states[0]))bad();\n  rowKeysState=labelOf(rs);rowKeysReason=reqStr(d.row_keys_reason);","");
  const x=body();x.snapshot.cases[0].details.row_keys=null;
  eq(b({body:x}).snapshot.cases.length,2,'mutant accepts null row_keys with no state or reason');
+});
+
+test('M12. mutation: [] rendered as 「無」 -> empty-population copy test would fail',async()=>{
+ const b=await mutated("rowKeys.length?`${OVERVIEW_LABELS.rowKeysListed}`:OVERVIEW_LABELS.dash","rowKeys.length?`${OVERVIEW_LABELS.rowKeysListed}`:'確認單列：無'");
+ const x=body();x.snapshot.cases[1].details.row_keys=[];
+ eq(b({body:x,selectedId:'p2'}).drawer.case.rowKeysText,'確認單列：無','mutant claims absence');
 });
 
 let failed=0;
