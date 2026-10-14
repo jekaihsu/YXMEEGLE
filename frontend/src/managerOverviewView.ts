@@ -326,7 +326,7 @@ export function buildManagerOverviewView(input:ManagerOverviewInput):ManagerOver
   cases=cases.map((r,i)=>({r,i})).sort((a,b)=>{
    const ka=sortKeyOf(a.r,sort.key),kb=sortKeyOf(b.r,sort.key);
    if(!ka!==!kb)return ka?-1:1;
-   return (ka<kb?-sgn:ka>kb?sgn:0)||a.i-b.i;
+   return ka.localeCompare(kb,'zh-Hant',{numeric:true})*sgn||a.r.id.localeCompare(b.r.id);
   }).map(x=>x.r);
  }
  const first=state.states[0];

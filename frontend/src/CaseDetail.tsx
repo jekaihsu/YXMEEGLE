@@ -1,3 +1,5 @@
+import {compareTableValues} from './companyDashboardCache';
+import {taipeiTime} from './taipeiTime';
 import { useRef, useEffect, useId } from 'react';
 import type {
   CaseDetailView,
@@ -32,18 +34,18 @@ function renderDisplayField(f: DisplayField) {
   if (f.text === '未核准顯示') {
     return (
       <span className="p2-cell-withheld" title={f.reason ?? undefined}>
-        {f.text}
+        {['事件時間','取代時間'].includes(f.label)?taipeiTime(f.text,'未提供'):f.text}
       </span>
     );
   }
   if (f.text === '—') {
     return (
       <span className="p2-cell-unknown" title={f.reason ?? undefined}>
-        {f.text}
+        {['事件時間','取代時間'].includes(f.label)?taipeiTime(f.text,'未提供'):f.text}
       </span>
     );
   }
-  return <span className="p2-cell-text">{f.text}</span>;
+  return <span className="p2-cell-text">{['事件時間','取代時間'].includes(f.label)?taipeiTime(f.text,'未提供'):f.text}</span>;
 }
 
 function getKindLabel(kind: string): string {
@@ -616,7 +618,7 @@ export function CaseDetail({
 
         {/* Distinct labelled header fields: dates are never merged */}
         <dl className="p2-header-grid">
-          {view.header.map((fieldItem, idx) => (
+          {view.header.filter(f=>['專案','案件編號','確認單版本','PM','目前階段'].includes(f.label)).map((fieldItem, idx) => (
             <div
               key={`${instanceId}-hdr-${idx}-${fieldItem.label}`}
               className="p2-header-field-item"
@@ -628,6 +630,12 @@ export function CaseDetail({
             </div>
           ))}
         </dl>
+        <details className="p2-card">
+          <summary>阻礙、日期與來源說明</summary>
+          <dl className="p2-header-grid">
+            {view.header.filter(f=>!['專案','案件編號','確認單版本','PM','目前階段'].includes(f.label)).map((fieldItem,idx)=><div key={idx} className="p2-header-field-item"><dt className="p2-header-label">{fieldItem.label}</dt><dd className="p2-header-val">{renderDisplayField(fieldItem)}</dd></div>)}
+          </dl>
+        </details>
       </header>
 
       {/* 頁內導覽 (In-page Navigation) */}
@@ -811,7 +819,9 @@ export function CaseDetail({
             )}
 
             {/* 各章節資料 (Overview, Versions, Contract Lines, Work Items, Workflow Nodes, Reports, History) */}
-            {view.sections.map(section => renderSection(section))}
+            {view.sections.map(section => ['history','reports_documents'].includes(section.key)
+              ? <details key={section.key} className="p2-card"><summary>{section.title}</summary>{renderSection(sortCaseSection(section,currentSort??null))}</details>
+              : renderSection(sortCaseSection(section,currentSort??null)))}
           </div>
 
           {/* 原生識別抽屜 (Selection-only Drawer for Full IDs) */}
@@ -1086,4 +1096,17 @@ export function CaseDetail({
       </div>
     </div>
   );
+}
+
+export function sortCaseSection(section: CaseDetailView['sections'][number], sort: SortSpec) {
+ const field = (row: CaseDetailView['sections'][number]['rows'][number], label: string) => row.fields.find(f=>f.label===label)?.text;
+ const rows=[...section.rows].sort((a,b)=>{
+  if(sort?.key==='title') return compareTableValues(a.title.reason?null:a.title.text,b.title.reason?null:b.title.text,'text',sort.dir)||a.key.localeCompare(b.key);
+  const label=section.key==='contract_lines'?'項次':section.key==='versions'?'修訂':section.key==='history'?'事件時間':null;
+  if(!label)return 0;
+  const left=field(a,label),right=field(b,label);
+  const result=compareTableValues(left,right,section.key==='history'?'date':'number',section.key==='contract_lines'?'asc':'desc');
+  return result||a.key.localeCompare(b.key);
+ });
+ return {...section,rows};
 }
