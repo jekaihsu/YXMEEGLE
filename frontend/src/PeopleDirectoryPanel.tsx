@@ -53,3 +53,5 @@ export function PeopleDirectoryPanel({c}:{c:Context}){
   {error&&<p className="owned-alert" role="alert">{error}</p>}
  </Section></section>;
 }
+
+export {PeopleAttendancePanel} from './PeopleAttendancePanel';
