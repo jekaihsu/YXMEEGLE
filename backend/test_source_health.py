@@ -337,3 +337,56 @@ def test_age_at_or_above_ttl_is_stale_even_with_fresh_status(age, expected):
     else:
         assert result['page_state'] == {'states': expected, 'count': None}
         assert result['sources'][0]['data_state'] == result['page_state']
+
+
+HISTORICAL = {'last_error': 'SYNTHETIC_PRIOR_FAILURE'}
+
+
+@pytest.mark.parametrize('base', [{}, {'status': 'refreshing', 'age_seconds': 561600, 'ttl_seconds': 60}])
+def test_active_refresh_wins_over_historical_last_error(base):
+    freshness = dict(base, status='refreshing', **HISTORICAL)
+    result = build(snapshot(), freshness, diagnostic=True)
+    assert result['page_state'] == {'states': ['loading'], 'count': None}
+    assert 'error' not in result
+    # Retained rows are neither healthy nor current while loading.
+    assert result['sources'][0]['data_state'] == {'states': ['loading'], 'count': None}
+    assert 'health' not in result['sources'][0]
+    assert result['sources'][0]['last_success'] == '2026-10-10T08:00:00.000+08:00'
+    assert 'SYNTHETIC_PRIOR' not in json.dumps(result)
+    assert build(snapshot(), freshness)['page_state'] == {'states': ['loading'], 'count': None}
+
+
+@pytest.mark.parametrize('freshness', [
+    {'status': 'blocked', **HISTORICAL}, {'status': 'error'}, {'status': 'stale', **HISTORICAL}, dict(HISTORICAL)])
+def test_failure_without_active_lease_is_read_failed(freshness):
+    result = build(snapshot(), freshness, diagnostic=True)
+    assert result['page_state'] == {'states': ['read_failed'], 'count': None}
+    assert 'health' not in result['sources'][0]
+
+
+@pytest.mark.parametrize('change', [{'status': 'error'}, {'tables': [dict(snapshot()['tables'][0], status='read_failed')]}])
+def test_explicit_error_beats_refreshing(change):
+    result = build(snapshot(**change), {'status': 'refreshing'}, diagnostic=True)
+    assert result['page_state'] == {'states': ['read_failed'], 'count': None}
+
+
+@pytest.mark.parametrize('change', [{'status': 'forbidden'}, {'authorized': False}])
+def test_forbidden_snapshot_stays_forbidden_while_refreshing(change):
+    result = build(snapshot(**change), {'status': 'refreshing', **HISTORICAL}, diagnostic=True)
+    assert result == {'page_state': {'states': ['forbidden']}, 'sources': []}
+
+
+def test_forbidden_table_is_absent_while_refreshing():
+    value = snapshot()
+    value['tables'].append(dict(value['tables'][0], table_id='table-F', name='HIDDEN_NAME', status='forbidden'))
+    text = json.dumps(build(value, {'status': 'refreshing', **HISTORICAL}, diagnostic=True))
+    assert 'table-F' not in text and 'HIDDEN_NAME' not in text
+
+
+@pytest.mark.parametrize('freshness', [
+    {'status': 'fresh', 'age_seconds': 561600, 'ttl_seconds': 60}, {'status': 'stale', 'age_seconds': 561600}])
+def test_six_and_half_day_old_cache_without_lease_is_never_healthy(freshness):
+    result = build(snapshot(), freshness, diagnostic=True)
+    assert result['page_state'] == {'states': ['stale'], 'count': None}
+    assert result['page_state'] is not None
+    assert 'health' not in result['sources'][0]
