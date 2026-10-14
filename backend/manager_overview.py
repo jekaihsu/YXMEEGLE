@@ -16,6 +16,12 @@ no ready/complete-nonempty value; arbitrary "ready" strings are rejected.
 Failure/loading/unknown do not acquire counts from retained rows. ``as_of`` is
 the caller's snapshot instant, never a fetch time relabelled source-updated.
 
+Case candidates come from the caller's authorized projects, across all history,
+not from confirmation versions. Only pm_id and execution_status filters have
+proven project fields and apply to cases. Version/cutoff/scope and other opaque
+population filters have no project mapping here; they apply to cards/drilldown
+only. Missing population leaves local cases intact with unknown row_keys.
+
 Local unfinished execution: operations.py:190-195 and shell.py:178. This is
 workbench execution, not engineering lifecycle or source closure. No manager
 case-action/pending-decision predicate is defined: home_details.py:188-191 and
@@ -118,11 +124,11 @@ def _case(project, versions, people):
 
 
 def _health(result):
-    if result is None:
+    page = result.get('page_state') if isinstance(result, dict) else None
+    # Malformed/absent state is unknown, never an assertion of overall health.
+    if not isinstance(page, dict) or not isinstance(page.get('states'), list) or not page['states']:
         page = data_state('unknown')
     else:
-        # Null is unknown, not an assertion that all sources are healthy.
-        page = result.get('page_state') or data_state('unknown')
         page = data_state(*page['states'])
     return {'route': 'sources', 'state': page,
             'reason': 'Source Health page state only; no diagnostic source inventory is exposed.',
@@ -155,7 +161,8 @@ def build_manager_overview(state, *, population, filters=None, period=None,
         raise ValueError('population must return a list or None')
     if not available:
         rows = []
-    projects = {p['id']: p for p in state.get('projects', [])}
+    projects = {p['id']: p for p in state.get('projects', [])
+                if isinstance(p, dict) and p.get('id')}
     versions = {}
     unresolved = []
     row_keys = set()
@@ -180,8 +187,20 @@ def build_manager_overview(state, *, population, filters=None, period=None,
     if not available and read['states'][0] in EMPTY:
         read = data_state('unknown')  # None contradicts a claim of proven emptiness.
     people = {p['id']: p for p in state.get('users', [])}
-    cases = [_case(projects[pid], keys, people) for pid, keys in versions.items()
-             if projects[pid].get('execution_status') != 'completed']
+    cases = []
+    for pid, project in projects.items():
+        if project.get('execution_status') == 'completed':
+            continue
+        # These two filters alone are defined on the authorized project shape.
+        if filters.get('pm_id') and project.get('pm_id') != filters['pm_id']:
+            continue
+        if filters.get('execution_status') and project.get('execution_status') != filters['execution_status']:
+            continue
+        case = _case(project, versions.get(pid, []) if available else None, people)
+        if not available:
+            case['details']['row_keys_state'] = data_state('unknown')
+            case['details']['row_keys_reason'] = 'The confirmation population is unavailable; row keys are unknown.'
+        cases.append(case)
     cards = [_card('confirmation_versions', 'Confirmation versions', 'confirmation_version',
                    len(rows) if available else None, read, filters, as_of),
              _card('stable_cases', 'Stable cases', 'stable_case', len(versions) if available else None, read, filters, as_of),
