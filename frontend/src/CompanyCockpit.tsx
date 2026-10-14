@@ -41,7 +41,7 @@ export function CompanyCockpit({refreshVersion,role}:{refreshVersion:number;role
   setData(previous=>cached??(dataQuery.current===query?previous:undefined));setRetained(!!cached);dataQuery.current=query;
   if(cached&&dashboardIsFresh(refreshVersion,query)){setLoading(false);return}
   setLoading(true);
-  readDashboard(`/api/company-dashboard?${params}`,controller.signal,role||'').then(result=>{if(active&&epoch===getSessionEpoch()){rememberDashboard(epoch,refreshVersion,query,result);setData(result)}}).catch(e=>{if(active&&epoch===getSessionEpoch())setError(e instanceof Error?e.message:'暫時無法讀取公司資料')}).finally(()=>{if(active&&epoch===getSessionEpoch())setLoading(false)});return()=>{active=false;controller.abort()};
+  readDashboard(`/api/company-dashboard?${params}`,controller.signal,role||'').then(result=>{if(active&&epoch===getSessionEpoch()){rememberDashboard(epoch,refreshVersion,query,result);setData(result);setRetained(false)}}).catch(e=>{if(active&&epoch===getSessionEpoch())setError(e instanceof Error?e.message:'暫時無法讀取公司資料')}).finally(()=>{if(active&&epoch===getSessionEpoch())setLoading(false)});return()=>{active=false;controller.abort()};
  },[search,group,lifecycle,attention,offset,reload,refreshVersion]);
  const total=data?.totals;
  const drillDown=()=>document.getElementById('cockpit-cases-title')?.scrollIntoView({block:'start'});
