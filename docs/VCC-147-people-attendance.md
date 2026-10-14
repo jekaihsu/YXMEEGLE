@@ -17,3 +17,15 @@ The existing AttendanceRefresher owns the weekly reads. The existing coordinator
 Only GET attendance/v1/groups and POST attendance/v1/user_tasks/query and user_approvals/query were added to the Lark boundary. Group details and department expansion remain disallowed. The view therefore shows returned punch evidence and approval records; it does not infer obligations, an attendance percentage, or absence from missing punches. A day can contain both normal and exception labels from different punches.
 
 Before live acceptance, confirm the app's granted scopes and the correct YX roster Base/table/group mapping. The implementation preserves the existing approved roster configuration until confirmed. Verify with a logged-in colleague on staging after deployment.
+
+## Single cross-model review
+
+Claude Opus 5.5 reviewed the implementation once. No P1 findings. Both P2 findings were fixed with focused tests: unread weeks retain a retry/loading state when refresh capacity is busy, and date queries are bounded to ±26 weeks with overflow returning 422 before refresh.
+
+P3 follow-ups, recorded without further review or implementation:
+
+- Use groups for membership only after group-detail/department expansion is approved; the current groups call validates the specified read and scope only.
+- Reuse verified attendance identity mappings/settings where appropriate and retain each source person's identity_app_id when invoking the resolver.
+- Consider using a recently stale roster during a failed refresh rather than requiring a fresh roster read first.
+- Expire old weekly cache rows and completed future entries as the supported date window moves.
+- Hide the People tab for excluded HR_VIEWERS users when narrowing the default list; the API already denies these reads.
