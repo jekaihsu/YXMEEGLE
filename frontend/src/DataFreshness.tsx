@@ -44,7 +44,7 @@ export function DataFreshness({freshness,syncedAt,demo=false,mutationActive=fals
   const reread=async()=>{
     if(!active||busy||mutationActive||dirtyDraft||epoch.current!==getSessionEpoch())return;
     setNow(Date.now());
-    const failed=entries.filter(([,d])=>d.status==='error'||d.status==='blocked').map(([key])=>key);
+    const failed=entries.filter(([,d])=>d.status==='error'||d.status==='blocked'||d.status==='needs-permission').map(([key])=>key);
     const datasets:LiveDataset[]=failed.length?failed:['sources','attendance'];
     setBusy(true);setRequestError('');manualController.current?.abort();manualController.current=new AbortController();
     try{
@@ -68,7 +68,7 @@ export function DataFreshness({freshness,syncedAt,demo=false,mutationActive=fals
   if(state==='refreshing')label='更新中…';
   if(state==='never')label=`正在讀取 Lark ${names[deciding[0]?.[0]||'sources']}…`;
   if(state==='error')label=`${deciding.map(([key])=>names[key]).join('、')}：Lark 暫時無法讀取，${ageText}`;
-  if(state==='needs-permission')label=`需要權限：${[...new Set(deciding.flatMap(([,d])=>d.missing_scopes||[]))].join('、')||'尚待核對'} · ${ageText}`;
+  if(state==='needs-permission')label=`需要權限：${[...new Set(deciding.flatMap(([,d])=>d.missing_scopes||[]))].join('、')||'尚待核對'} · ${source?.as_of?ageText:'尚無已讀取資料'}`;
   if(state==='blocked')label=`${deciding.map(([key])=>names[key]).join('、')}：Lark 權限不足（1254302），請聯絡管理員`;
   const color=state==='error'||state==='blocked'||state==='needs-permission'?'var(--critical)':state==='stale'?'var(--critical)':'var(--label-2)';
   const details=legacy?(dataAt?`資料時間 ${time(dataAt.as_of)}（已儲存的工作區資料，並非即時讀取） · 資料時間距今 ${dataAt.age_seconds==null?'—':Math.floor(dataAt.age_seconds)} 秒`:''):entries.map(([key,d])=>`${names[key]}：讀取驗證 ${time(d.as_of)} · 距今 ${d.age_seconds??'—'} 秒 · 有效 ${d.ttl_seconds} 秒`).join('\n');

@@ -5,7 +5,7 @@ import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
-const bundle=await build({stdin:{contents:"export {DataFreshness} from './src/DataFreshness';export {liveRefresh} from './src/api';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external'});
+const bundle=await build({stdin:{contents:"export {DataFreshness} from './src/DataFreshness';export {liveRefresh} from './src/api';export {datasetNotice} from './src/freshness';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external'});
 const path=new URL('./.live-regression-bundle.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);
 let mod;try{mod=await import(path.href)}finally{await fs.unlink(path)}
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost'});
@@ -37,6 +37,19 @@ try{
  let retryBody;globalThis.fetch=async(url,init)=>{retryBody=JSON.parse(init.body);return new Response(JSON.stringify({freshness:error}))};
  await flush(()=>document.querySelector('.data-freshness button').click());
  assert.deepEqual(retryBody.datasets,['roster'],'minor 12: retry targets the erroring dataset');
+ const permission={...freshness(),server_time:'2026-10-07T02:04:23Z'};
+ permission.datasets.roster={...dataset('needs-permission',null),missing_scopes:['bitable:app:readonly']};
+ await render(permission);
+ assert.match(document.querySelector('[role="status"]').textContent,/尚無已讀取資料/);
+ assert.doesNotMatch(document.querySelector('[role="status"]').textContent,/顯示先前資料/);
+ assert.match(mod.datasetNotice('roster',permission.datasets.roster),/尚無已讀取資料/);
+ globalThis.fetch=async(url,init)=>{retryBody=JSON.parse(init.body);return new Response(JSON.stringify({freshness:permission}))};
+ await flush(()=>document.querySelector('.data-freshness button').click());
+ assert.deepEqual(retryBody.datasets,['roster'],'needs-permission retries the affected dataset');
+ const retained={...permission,server_time:'2026-10-07T02:04:24Z',datasets:{...permission.datasets,roster:{...dataset('needs-permission',20),as_of:'2026-10-07T02:04:04Z'}}};
+ await render(retained);
+ assert.match(document.querySelector('[role="status"]').textContent,/顯示.*秒前資料/);
+ assert.match(mod.datasetNotice('roster',retained.datasets.roster),/顯示.*秒前資料/);
  const snapshot={...error,server_time:'2026-10-07T02:05:23Z'};await render(snapshot);
  await render({...freshness(),server_time:'2026-10-07T02:01:23Z'});
  assert.equal(document.querySelector('.data-freshness').dataset.state,'error','older snapshot cannot overwrite newer freshness');

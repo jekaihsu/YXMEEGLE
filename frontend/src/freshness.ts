@@ -21,7 +21,7 @@ export function datasetNotice(key:LiveDataset,d:Freshness['datasets'][LiveDatase
  const name=datasetNames[key];
  switch(d.status){
   case 'error':return `${name}：Lark 暫時無法讀取，${retainedAge(d.age_seconds)}`;
-  case 'needs-permission':return `${name}：需要權限（${d.missing_scopes?.join('、')||'尚待核對'}），顯示先前資料`;
+  case 'needs-permission':return `${name}：需要權限（${d.missing_scopes?.join('、')||'尚待核對'}），${d.as_of?retainedAge(d.age_seconds):'尚無已讀取資料'}`;
   case 'blocked':return `${name}：Lark 權限不足（1254302），請聯絡管理員`;
   case 'refreshing':return `${name}仍在更新中…`;
   case 'never':return `正在讀取 Lark ${name}…`;
