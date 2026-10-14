@@ -356,10 +356,16 @@ def confirmation_population(state, filters=None, *, q='', sort=None):
             for r in _ordered(matching, _normalize_sort(sort))]
 
 
-def _page_state(source_state, authorized, matching):
+def _independent_stale(state, source_state):
+    """C-STATE keeps partial and stale independent: ``source_status.stale`` marks stale on top of a partial read."""
+    source = state.get('source_status')
+    return source_state == 'stale' or (source_state == 'partial' and isinstance(source, dict) and source.get('stale') is True)
+
+
+def _page_state(source_state, authorized, matching, stale=False):
     if source_state in ('read_failed', 'loading', 'unlocated', 'unknown'):
         return data_state(source_state)
-    flags = [s for s in ('partial', 'stale') if source_state == s]
+    flags = [s for s, on in (('partial', source_state == 'partial'), ('stale', stale)) if on]
     if flags:                      # C-STATE: only partial/stale combine; a filtered zero keeps them
         return data_state(*flags)
     if authorized == 0:
@@ -409,10 +415,11 @@ def build_confirmation_list(state, *, q='', filters=None, sort=None, cursor=None
                 'requested': {k: v for k, v in norm_filters.items() if k.startswith('deadline_')}}
     return {
         'status': 200, 'as_of': as_of,
-        'page_state': _page_state(source_state, len(rows), len(matching)),
+        'page_state': _page_state(source_state, len(rows), len(matching), _independent_stale(state, source_state)),
         'rows': [_public(r) for r in page],
         'next_cursor': _encode_cursor(binding, page[-1]['row_key']) if more and page else None,
-        'totals': {'matching': len(matching) if known else None, 'loaded': len(page),
+        # A noncurrent read never proves a filtered zero: the matching denominator stays undetermined.
+        'totals': {'matching': len(matching) if known and (matching or source_state == 'ok') else None, 'loaded': len(page),
                    'authorized_source': len(rows) if known else None},
         'totals_basis': _basis(source_state, known), 'snapshot': snapshot,
         'filter_status': {'deadline': deadline},
