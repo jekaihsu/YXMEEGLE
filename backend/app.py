@@ -792,19 +792,15 @@ def create_app(overrides=None):
             result=public_source_response(state,cache.data,user) if cache else {'configured':bool(configuration(cfg)),'last_sync':None,'status':'never','message':'尚未同步來源','tables':[],'records':[]}
         return {**result,'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
 
-    def source_health_page(data,user):
-        """The GET /api/source-health computation, shared so the manager overview binds the identical page state."""
+    def source_health_from(data,user,freshness,cache_data,state):
+        """The GET /api/source-health computation over an already captured read (cache snapshot data and loaded workspace state)."""
         from .source_health import build_source_health
-        app.state.live_read.ensure(data['wid'],'sources')
-        freshness=app.state.live_read.status(data['wid'])
         if data['mode']!='lark' or data['wid'].startswith('test-'):
             snapshot={'status':'requires_login','tables':[],'records':[]}
         else:
-            with sessions() as db:
-                cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']))
-            if cache:
+            if cache_data is not None:
                 from .source_case_policy import visible_source_snapshot
-                snapshot=visible_source_snapshot(state,cache.data)
+                snapshot=visible_source_snapshot(state,cache_data)
                 if state.get('environment') not in ('test','demo'):
                     from . import case_redaction
                     from .source_case_policy import filter_visible_cases
@@ -815,6 +811,17 @@ def create_app(overrides=None):
         # records to the admitted ids, so a zero count cannot be proven unfiltered.
         read_authorized=data['mode']=='lark' and not data['wid'].startswith('test-') and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
         return build_source_health(snapshot,freshness['datasets']['sources'],diagnostic=False,read_authorized=read_authorized,viewer_filtered=None)
+
+    def source_health_page(data,user):
+        """The GET /api/source-health computation, shared so the manager overview binds the identical page state."""
+        app.state.live_read.ensure(data['wid'],'sources')
+        freshness=app.state.live_read.status(data['wid'])
+        cache_data=state=None
+        if data['mode']=='lark' and not data['wid'].startswith('test-'):
+            with sessions() as db:
+                cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']))
+                cache_data=cache.data if cache else None
+        return source_health_from(data,user,freshness,cache_data,state)
 
     @app.get('/api/source-health')
     def source_health(request:Request):
@@ -828,15 +835,16 @@ def create_app(overrides=None):
     P2_FILTER_PARAMS=('source_version','pm','admission_state','deadline_from','deadline_to')
     P2_SOURCE_STATUS={'forbidden':'forbidden','read_failed':'error','loading':'loading','unlocated':'unlocated','partial':'partial','stale':'stale'}
 
-    def p2_narrowed_state(data,user,page):
-        """identity -> load -> filter_visible_cases -> filter_private_workspace -> case_redaction (non test/demo).
+    def p2_narrowed_state(state,user,page,freshness):
+        """filter_visible_cases -> filter_private_workspace -> case_redaction (non test/demo) over a captured workspace state.
 
         Unlike public_ws this keeps source_work_items/status, but only as narrowed by filter_visible_cases.
-        ``source_status`` is derived from the Source Health page state of this request, never from fetch time.
+        ``source_status`` translates the Source Health page state of the same capture and keeps its trusted
+        last_sync/sync_revision; ``as_of`` is that capture's source snapshot time, never fetch or request time.
         """
         from .source_case_policy import filter_visible_cases
         from . import case_redaction
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
+        stored=state.get('source_status') if isinstance(state.get('source_status'),dict) else {}
         pre=case_redaction.snapshot(state)
         filter_visible_cases(state)
         filter_private_workspace(state,user)
@@ -846,14 +854,36 @@ def create_app(overrides=None):
         if page is None: status='fresh'
         elif states and 'partial' in states: status='partial'
         else: status=P2_SOURCE_STATUS.get(states[0]) if states else None
-        state.pop('source_status',None)
-        if status: state['source_status']={'status':status}
-        state['as_of']=now()[:10]
+        translated={'status':status or 'unknown'}
+        if states and 'partial' in states and 'stale' in states: translated['stale']=True
+        for key in ('last_sync','sync_revision'):
+            if key in stored: translated[key]=stored[key]
+        try:
+            stamp=stored.get('last_sync')
+            if isinstance(stamp,str) and datetime.fromisoformat(stamp).tzinfo is not None: translated['last_success_at']=stamp
+        except ValueError: pass
+        state['source_status']=translated
+        state['as_of']=(freshness.get('datasets',{}).get('sources',{}).get('as_of') or stored.get('as_of')) or None
         return state
 
+    def p2_generation(db,wid):
+        row,cache=db.get(WorkspaceRow,wid),db.get(CacheRow,wid)
+        return (row.version if row else None,(cache.data or {}).get('status') if cache else None,(cache.data or {}).get('last_attempt_at') if cache else None)
+
     def p2_read(data,user):
-        health=source_health_page(data,user)
-        return data,user,health,p2_narrowed_state(data,user,health.get('page_state'))
+        """Health and module input come from ONE capture; a source-generation change during compute re-captures (bounded)."""
+        wid=data['wid']
+        app.state.live_read.ensure(wid,'sources')
+        for _ in range(3):
+            freshness=app.state.live_read.status(wid)
+            with sessions() as db:
+                generation=p2_generation(db,wid)
+                cache=db.get(CacheRow,wid);cache_data=deepcopy(cache.data) if cache else None
+                state=load(db,db.get(WorkspaceRow,wid))
+            health=source_health_from(data,user,freshness,cache_data,deepcopy(state))
+            with sessions() as db: unchanged=p2_generation(db,wid)==generation
+            if unchanged: break
+        return data,user,health,p2_narrowed_state(state,user,health.get('page_state'),freshness)
 
     def p2_list_args(request,allowed=P2_LIST_PARAMS):
         query=request.query_params
@@ -865,9 +895,16 @@ def create_app(overrides=None):
         limit=query.get('limit')
         if limit is not None:
             require(limit.isascii() and limit.isdigit() and len(limit)<=4,'limit 錯誤',422)
+        require(query.get('direction') in (None,'asc','desc'),'排序方向錯誤',422)
         return {'q':query.get('q',''),'filters':filters,'cursor':query.get('cursor') or None,
                 'sort':{'column':query.get('sort'),'direction':query.get('direction') or 'asc'} if query.get('sort') else None,
                 'limit':int(limit) if limit is not None else 50}
+
+    def p2_one(request,name,limit):
+        """The single bounded value of a scalar query parameter; repeated or oversize values are 422."""
+        values=request.query_params.getlist(name)
+        require(len(values)<=1 and all(len(v)<=limit for v in values),'查詢參數過長',422)
+        return values[0] if values else None
 
     def p2_list_page(state,args,as_of):
         from .confirmation_list import build_confirmation_list
@@ -898,11 +935,12 @@ def create_app(overrides=None):
             source_health=health,as_of=state['as_of'])
 
     @app.get('/api/case-detail/{project_id}')
-    def case_detail(request:Request,project_id:str,confirmation_key:str|None=None):
+    def case_detail(request:Request,project_id:str):
         from .case_detail import build_case_detail
         data,user=identity(request)
-        require(len(project_id)<=200 and (confirmation_key is None or len(confirmation_key)<=300),'查詢參數過長',422)
+        require(len(project_id)<=200,'查詢參數過長',422)
         require(set(request.query_params.keys())<={'confirmation_key'},'查詢參數錯誤',422)
+        confirmation_key=p2_one(request,'confirmation_key',300)
         _,_,_,state=p2_read(data,user)
         from .source_case_policy import visible_project
         require(any(p['id']==project_id and visible_project(state,p) for p in state.get('projects',[])),P2_NOT_FOUND,404)
@@ -911,20 +949,24 @@ def create_app(overrides=None):
         return result
 
     @app.get('/api/contract-detail')
-    def contract_detail(request:Request,key:str=''):
+    def contract_detail(request:Request):
         from .contract_detail import build_contract_detail
         data,user=identity(request)
-        require(0<len(key)<=300 and set(request.query_params.keys())<={'key'},'查詢參數錯誤',422)
+        require(set(request.query_params.keys())<={'key'},'查詢參數錯誤',422)
+        key=p2_one(request,'key',300) or ''
+        require(0<len(key),'查詢參數錯誤',422)
         _,_,_,state=p2_read(data,user)
         result=build_contract_detail(state,key,as_of=state['as_of'])
         require(result.get('page_state',{}).get('states')!=['unlocated'],P2_NOT_FOUND,404)
         return result
 
     @app.get('/api/work-item-detail')
-    def work_item_detail(request:Request,key:str=''):
+    def work_item_detail(request:Request):
         from .work_item_detail import build_work_item_detail
         data,user=identity(request)
-        require(0<len(key)<=300 and set(request.query_params.keys())<={'key'},'查詢參數錯誤',422)
+        require(set(request.query_params.keys())<={'key'},'查詢參數錯誤',422)
+        key=p2_one(request,'key',300) or ''
+        require(0<len(key),'查詢參數錯誤',422)
         _,_,_,state=p2_read(data,user)
         result=build_work_item_detail(state,key,as_of=state['as_of'])
         require('header' in result,P2_NOT_FOUND,404)

@@ -328,3 +328,130 @@ def test_p2_routes_are_get_only(world):
     app, client, _, _, _, ids = world
     for template in ROUTES:
         assert client.post(template.format(**ids).split('?')[0], json={}).status_code in (404, 405)
+
+
+# ---- P2-INT-B-FIX1: one captured read, noncurrent zero, C-STATE combination, provenance, parameter validation ----
+STAMP = '2026-10-13T00:00:00+00:00'
+
+
+def cache_state(app, status, *, partial=False):
+    """Alter only the observed read: the cached table status and the freshness the live-read service reports."""
+    with app.state.sessions.begin() as db:
+        row = db.get(CacheRow, WID)
+        data = dict(row.data)
+        data['tables'] = [dict(t, status='partial' if partial else 'ready') for t in data['tables']]
+        row.data = data
+    previous = app.state.live_read.status
+    def altered(wid):
+        out = previous(wid)
+        out['datasets']['sources'].update(status=status, age_seconds=1000 if status == 'stale' else 1)
+        return out
+    app.state.live_read.status = altered
+
+
+def test_failure_between_health_and_module_read_never_becomes_current(world, monkeypatch):
+    app, client, _, _, _, _ = world
+    from backend import source_health
+    original, calls = source_health.build_source_health, []
+    def fail_after_first_read(*a, **kw):
+        result = original(*a, **kw)
+        calls.append(result['page_state'])
+        if len(calls) == 1:
+            assert result['page_state'] is None          # the interleaved read really was healthy
+            app.state.source_sync.failure(WID, 'synthetic refresh failure')
+        return result
+    monkeypatch.setattr(source_health, 'build_source_health', fail_after_first_read)
+    body = client.get('/api/confirmations').json()
+    assert len(calls) >= 2 and body['page_state']['states'] == ['read_failed']
+    assert body['totals_basis'] != 'current' and {r['source_status'] for r in body['rows']} != {'located'}
+
+
+def test_already_failed_read_is_never_overwritten_with_fresh(world):
+    app, client, _, _, _, _ = world
+    app.state.source_sync.failure(WID, 'synthetic refresh failure')
+    body = client.get('/api/confirmations').json()
+    assert body['page_state']['states'] == ['read_failed'] and body['totals_basis'] != 'current'
+
+
+def test_health_and_module_input_share_one_workspace_load(world, monkeypatch):
+    app, client, _, _, _, _ = world
+    loads = []
+    real = storage.load
+    monkeypatch.setattr(storage, 'load', lambda *a, **kw: (loads.append(1), real(*a, **kw))[1])
+    assert client.get('/api/confirmations').status_code == 200
+    assert len(loads) == 1                                   # health and narrowed state come from the same capture
+
+
+@pytest.mark.parametrize('status,partial', [('stale', False), ('fresh', True)])
+def test_noncurrent_filtered_zero_is_undetermined_in_list_and_overview(world, status, partial):
+    app, client, _, _, _, _ = world
+    cache_state(app, status, partial=partial)
+    params = {'admission_state': 'nonexistent'}
+    listing, overview = client.get('/api/confirmations', params=params).json(), client.get('/api/manager-overview', params=params).json()
+    card = overview['snapshot']['cards'][0]
+    assert listing['totals']['matching'] is None and card['value'] is None
+    assert listing['page_state']['states'] != ['filtered_empty'] and 'complete_empty' not in json.dumps(card['state'])
+    nonzero_list, nonzero_card = client.get('/api/confirmations').json(), client.get('/api/manager-overview').json()['snapshot']['cards'][0]
+    assert nonzero_list['totals']['matching'] == nonzero_card['value'] == 2
+
+
+def test_partial_and_stale_stay_independent_through_every_envelope(world):
+    app, client, _, _, _, ids = world
+    cache_state(app, 'stale', partial=True)
+    assert client.get('/api/source-health').json()['page_state']['states'] == ['partial', 'stale']
+    assert client.get('/api/confirmations').json()['page_state']['states'] == ['partial', 'stale']
+    assert client.get('/api/manager-overview').json()['snapshot']['cards'][0]['state']['states'] == ['partial', 'stale']
+    sections = client.get('/api/case-detail/' + ids['vis']).json()['sections']
+    assert any(s['states'] == ['partial', 'stale'] for s in sections.values()) and all(s['freshness'] == 'stale' for s in sections.values())
+    cache_state(app, 'stale', partial=False)
+    assert client.get('/api/confirmations').json()['page_state']['states'] == ['stale']
+
+
+def test_stored_sync_metadata_survives_with_verified_timestamp_and_snapshot_as_of(world):
+    app, client, seat, _, state, ids = world
+    state['source_status'] = {'status': 'ready', 'last_sync': STAMP, 'sync_revision': 4, 'message': 'secret-message-sentinel'}
+    seat(state)
+    cache_state(app, 'stale')
+    listing = client.get('/api/confirmations').json()
+    assert listing['snapshot'] == {'state': 'proven', 'last_success_at': STAMP}
+    detail = client.get('/api/case-detail/' + ids['vis']).json()
+    assert {s['source_time']['value'] for s in detail['sections'].values()} == {STAMP}
+    assert 'secret-message-sentinel' not in json.dumps([listing, detail])
+    freshness = app.state.live_read.status(WID)['datasets']['sources']['as_of']
+    assert listing['as_of'] == freshness
+
+
+def test_as_of_is_the_source_snapshot_time_never_request_time(world):
+    app, client, seat, _, state, _ = world
+    previous = app.state.live_read.status
+    def with_as_of(wid):
+        out = previous(wid); out['datasets']['sources']['as_of'] = '2026-01-02T03:04:05+00:00'; return out
+    app.state.live_read.status = with_as_of
+    assert client.get('/api/confirmations').json()['as_of'] == '2026-01-02T03:04:05+00:00'
+    def without(wid):
+        out = previous(wid); out['datasets']['sources'].pop('as_of', None); return out
+    app.state.live_read.status = without
+    assert client.get('/api/confirmations').json()['as_of'] is None
+
+
+def test_unproven_timestamp_stays_unproven_and_is_not_invented(world):
+    app, client, seat, _, state, _ = world
+    state['source_status'] = {'status': 'ready', 'last_sync': 'not-a-timestamp'}
+    seat(state); cache_state(app, 'stale')
+    assert client.get('/api/confirmations').json()['snapshot'] == {'state': 'unproven', 'last_success_at': None}
+
+
+def test_direction_is_validated_even_without_sort(world):
+    _, client, _, _, _, _ = world
+    assert client.get('/api/confirmations?direction=sideways').status_code == 422
+    assert client.get('/api/confirmations?direction=desc').status_code == 200
+    assert client.get('/api/confirmations?direction=asc&direction=desc').status_code == 422
+
+
+@pytest.mark.parametrize('path', ['/api/contract-detail?key=a&key=b', '/api/work-item-detail?key=a&key=b',
+                                  '/api/case-detail/p?confirmation_key=a&confirmation_key=b',
+                                  '/api/contract-detail?key=' + 'x' * 301, '/api/case-detail/p?confirmation_key=' + 'x' * 301,
+                                  '/api/contract-detail?key=a&key=' + 'x' * 301])
+def test_detail_scalar_parameters_take_exactly_one_bounded_value(world, path):
+    _, client, _, _, _, _ = world
+    assert client.get(path).status_code == 422

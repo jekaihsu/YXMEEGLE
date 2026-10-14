@@ -373,7 +373,7 @@ def test_filtered_zero_on_partial_or_stale_keeps_source_uncertainty():
     for status in ('partial', 'stale'):
         page = build_confirmation_list(state(source_status={'status': status}), q='no-match')
         assert page['page_state'] == {'states': [status], 'count': None}, status
-        assert page['totals']['matching'] == 0 and page['totals']['loaded'] == 0
+        assert page['totals']['matching'] is None and page['totals']['loaded'] == 0   # F2: unproven zero
         assert page['totals_basis'] != 'current'
     both = build_confirmation_list(state(source_status={'status': 'error', 'last_success_at': '2026-10-01T00:00:00+00:00'}), q='no-match')
     assert both['page_state']['states'] == ['read_failed']
@@ -401,3 +401,18 @@ def test_mutation_unknown_retention_guard():
     exec(compile(src.replace(good, bad), 'mutant', 'exec'), mutant)
     rows = mutant['build_confirmation_list'](state(source_status={}), limit=100)['rows']
     assert {r['retention'] for r in rows} == {'current'}     # the guarded behaviour test would fail on this
+
+
+def test_partial_with_independent_stale_flag_keeps_both_states_and_noncurrent_zero_is_undetermined():
+    both = build_confirmation_list(state(source_status={'status': 'partial', 'stale': True}), limit=100)
+    assert both['page_state']['states'] == ['partial', 'stale'] and both['totals_basis'] == 'partial_snapshot'
+    plain = build_confirmation_list(state(source_status={'status': 'partial'}), limit=100)
+    assert plain['page_state']['states'] == ['partial']      # the flag is what adds stale
+    assert build_confirmation_list(state(source_status={'status': 'ready', 'stale': True}))['page_state'] is None
+    for status in ({'status': 'stale'}, {'status': 'partial'}, {'status': 'partial', 'stale': True}):
+        zero = build_confirmation_list(state(source_status=status), filters={'admission_state': ['nonexistent']})
+        assert zero['totals']['matching'] is None and zero['rows'] == [], status
+        nonzero = build_confirmation_list(state(source_status=status), limit=100)
+        assert nonzero['totals']['matching'] == len(nonzero['rows']) > 0, status
+    current = build_confirmation_list(state(), filters={'admission_state': ['nonexistent']})
+    assert current['totals']['matching'] == 0 and current['page_state']['states'] == ['filtered_empty']

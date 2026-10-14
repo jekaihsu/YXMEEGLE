@@ -235,7 +235,7 @@ def build_case_detail(state, project_id, *, confirmation_key=None, as_of=None, s
     project = tree['project']
     overrides = section_status or {}
     last_sync = (state.get('source_status') or {}).get('last_sync')
-    source_stale = (state.get('source_status') or {}).get('status') == 'stale'
+    source_stale = (state.get('source_status') or {}).get('status') == 'stale' or (state.get('source_status') or {}).get('stale') is True
 
     versions = [c for c in tree['confirmations']]
     selected = next((c for c in versions if c['id'] == confirmation_key), None)

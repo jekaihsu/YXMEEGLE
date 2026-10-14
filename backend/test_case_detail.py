@@ -352,3 +352,12 @@ def test_fix2_legacy_fallback_only_when_project_not_in_imported_mode():
     s['source_work_items_status'] = {}  # genuinely not imported -> exact legacy rule applies
     d = build_case_detail(s, 'p', confirmation_key='b/conf/c1')
     assert 'work_item:b/rep/r2' in [e['child_key'] for e in walk(d)]
+
+
+def test_partial_status_with_independent_stale_flag_marks_sections_partial_and_stale():
+    state = fixture(); state['source_status'] = dict(status='partial', stale=True, last_sync='2026-10-14T01:00:00')
+    sections = build_case_detail(state, 'p', confirmation_key='b/conf/c1')['sections']
+    assert all(s['freshness'] == 'stale' for s in sections.values())
+    assert any(s['states'] == ['partial', 'stale'] for s in sections.values())
+    state['source_status'] = dict(status='partial', last_sync='2026-10-14T01:00:00')
+    assert all(s['freshness'] is None for s in build_case_detail(state, 'p', confirmation_key='b/conf/c1')['sections'].values())
