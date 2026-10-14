@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useId } from 'react';
 import type {
   ManagerOverviewView,
   Drilldown,
@@ -58,6 +58,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
     onSourceHealthLink,
   } = props;
 
+  const baseId = useId();
   const rowSelectButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const prevSelectedIdRef = useRef<string | null>(view?.selectedId ?? null);
 
@@ -129,10 +130,10 @@ export function ManagerOverview(props: ManagerOverviewProps) {
           {/* Actionable Unfinished Cases FIRST */}
           <section
             className="p2-section p2-cases-section"
-            aria-labelledby="cases-heading"
+            aria-labelledby={`${baseId}-cases-heading`}
           >
             <div className="p2-section-header">
-              <h3 id="cases-heading" className="p2-section-title">
+              <h3 id={`${baseId}-cases-heading`} className="p2-section-title">
                 未完成案件
               </h3>
             </div>
@@ -141,8 +142,9 @@ export function ManagerOverview(props: ManagerOverviewProps) {
               <div className="p2-empty-state" role="status">
                 <p>
                   {view.snapshot.casesEmptyLabel ??
-                    view.snapshot.reason ??
-                    '尚無未完成案件'}
+                    (view.snapshot.reason
+                      ? `${view.snapshot.stateLabel}：${view.snapshot.reason}`
+                      : view.snapshot.stateLabel)}
                 </p>
               </div>
             ) : (
@@ -181,6 +183,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                             }
                             tabIndex={0}
                             onKeyDown={(e) => {
+                              if (e.repeat) return;
                               if (
                                 e.target === e.currentTarget &&
                                 (e.key === 'Enter' || e.key === ' ')
@@ -233,7 +236,12 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                                     e.stopPropagation();
                                     onSelect?.(isSelected ? null : caseRow.id);
                                   }}
-                                  aria-label={`選取案件詳情：${caseRow.label.text}`}
+                                  aria-label={
+                                    caseRow.label.text &&
+                                    caseRow.label.text !== '—'
+                                      ? `選取案件詳情：${caseRow.label.text}`
+                                      : '選取案件詳情'
+                                  }
                                 >
                                   {isSelected ? '收合' : '詳情'}
                                 </button>
@@ -253,9 +261,9 @@ export function ManagerOverview(props: ManagerOverviewProps) {
           {view.snapshot.cards.length > 0 && (
             <section
               className="p2-section p2-cards-section"
-              aria-labelledby="cards-heading"
+              aria-labelledby={`${baseId}-cards-heading`}
             >
-              <h3 id="cards-heading" className="p2-section-title">
+              <h3 id={`${baseId}-cards-heading`} className="p2-section-title">
                 快照摘要
               </h3>
               <div className="p2-cards-grid">
@@ -270,6 +278,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                     }，單位：${card.unitLabel}`}
                     onClick={() => onDrilldown?.(card.drilldown)}
                     onKeyDown={(e) => {
+                      if (e.repeat) return;
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         onDrilldown?.(card.drilldown);
@@ -309,10 +318,13 @@ export function ManagerOverview(props: ManagerOverviewProps) {
           {/* Unresolved summary (separate section; no bucket total) */}
           <section
             className="p2-section p2-unresolved-section"
-            aria-labelledby="unresolved-heading"
+            aria-labelledby={`${baseId}-unresolved-heading`}
           >
             <div className="p2-section-header">
-              <h3 id="unresolved-heading" className="p2-section-title">
+              <h3
+                id={`${baseId}-unresolved-heading`}
+                className="p2-section-title"
+              >
                 未歸屬資料
               </h3>
               <div className="p2-unresolved-meta">
@@ -366,6 +378,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                               }
                               tabIndex={0}
                               onKeyDown={(e) => {
+                                if (e.repeat) return;
                                 if (
                                   e.target === e.currentTarget &&
                                   (e.key === 'Enter' || e.key === ' ')
@@ -404,7 +417,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                                     e.stopPropagation();
                                     onSelect?.(isSelected ? null : urow.id);
                                   }}
-                                  aria-label={`選取未歸屬資料詳情：${urow.rowKey}`}
+                                  aria-label={`選取${urow.label}詳情`}
                                 >
                                   {isSelected ? '收合' : '詳情'}
                                 </button>
@@ -429,10 +442,10 @@ export function ManagerOverview(props: ManagerOverviewProps) {
           {/* Weekly activity (separate section; unavailable) */}
           <section
             className="p2-section p2-weekly-section is-unavailable"
-            aria-labelledby="weekly-heading"
+            aria-labelledby={`${baseId}-weekly-heading`}
           >
             <div className="p2-section-header">
-              <h3 id="weekly-heading" className="p2-section-title">
+              <h3 id={`${baseId}-weekly-heading`} className="p2-section-title">
                 本期活動
               </h3>
               <span className="p2-badge p2-badge-unavailable">暫不可用</span>
@@ -453,10 +466,10 @@ export function ManagerOverview(props: ManagerOverviewProps) {
         <div className="manager-overview-side">
           <aside
             className="p2-side-panel p2-source-health-panel"
-            aria-labelledby="health-heading"
+            aria-labelledby={`${baseId}-health-heading`}
           >
             <div className="p2-side-header">
-              <h3 id="health-heading">來源健康</h3>
+              <h3 id={`${baseId}-health-heading`}>來源健康</h3>
               <span className="p2-badge">{view.sourceHealth.stateLabel}</span>
             </div>
             <div className="p2-health-rows">

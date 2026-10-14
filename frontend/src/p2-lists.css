@@ -217,6 +217,36 @@
   outline: 2px solid var(--accent, #0070f3);
 }
 
+/* Active Filter Input Controls */
+.p2-filter-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.p2-filter-label {
+  font-size: 0.75rem;
+  color: var(--label-2, #64748b);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.p2-filter-input {
+  width: 100px;
+  padding: 5px 8px;
+  border: 1px solid var(--sep, #cbd5e1);
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  background: var(--surface, #ffffff);
+  color: var(--label, #1e293b);
+  transition: border-color 0.15s;
+}
+
+.p2-filter-input:focus-visible {
+  outline: 2px solid var(--accent, #0070f3);
+  outline-offset: 1px;
+}
+
 /* Disabled Deadline Filter Control */
 .p2-deadline-filter-group {
   display: inline-flex;
