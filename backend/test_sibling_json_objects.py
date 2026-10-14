@@ -26,6 +26,7 @@ INVALID_BODIES = [b'[]', b'null', b'{bad', b'1', b'"x"', b'true', b'', b'\xff']
 @pytest.fixture
 def formal_api(tmp_path, monkeypatch):
     app, client = company(tmp_path)
+    app.state.cfg['FEATURE_CHANGE_EXTENSION']='true'
     cookie = client.cookies.get('meegle_session')
     client.cookies.clear()
     client.cookies.set('meegle_session', cookie, domain='testserver.local', path='/')

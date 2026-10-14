@@ -9,7 +9,8 @@ import httpx
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import select, create_engine
-from .seed import seed, USERS
+from .test_ux_disabled import enabled_seed as seed
+from .seed import USERS
 from .policy import upgrade
 from .sources import import_sources, configuration, normalized_case
 from .operations import apply_operation, missing, add_workdays, next_due, queue
@@ -197,7 +198,7 @@ def test_mapping_cannot_write_status_or_formula_and_unique_target(ws):
 
 @pytest.fixture
 def api_app(tmp_path):
-    app=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/app.db','UPLOAD_DIR':str(tmp_path/'uploads'),'SESSION_SECRET':'x'*40,'APP_ENV':'development','DEMO_MODE':'true'})
+    app=create_app({'FEATURE_CHANGE_EXTENSION':'true','FEATURE_ROUTINES':'true','DATABASE_URL':f'sqlite:///{tmp_path}/app.db','UPLOAD_DIR':str(tmp_path/'uploads'),'SESSION_SECRET':'x'*40,'APP_ENV':'development','DEMO_MODE':'true'})
     client=TestClient(app); client.get('/api/session'); client.post('/api/demo/session',json={'user_id':'u-manager'})
     return app,client
 

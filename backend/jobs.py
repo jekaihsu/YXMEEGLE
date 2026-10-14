@@ -54,6 +54,8 @@ def schedule(ws,clock=None):
     from .case_cutover import execution_allowed
     from .workflow_rules import activate_scheduled
     activate_scheduled(ws,clock)
+    from .features import enabled
+    if not enabled(ws,'routines'): return
     for p in ws['projects']:
         if not execution_allowed(ws,p):continue
         if p.get('case_type')=='intake': continue
@@ -124,6 +126,8 @@ class Worker:
         from .workspace_environment import normalize_environment
         from .case_cutover import initialize_execution_system
         normalize_environment(state,row.id,self.cfg)
+        from .features import resolve_features
+        state['features']=resolve_features(self.cfg)
         initialize_execution_system(state)
         if row.id.startswith(('lark-','test-lark-')):
             org=row.id.removeprefix('test-')
@@ -195,6 +199,9 @@ class Worker:
         with self.sessions() as db:
             row=db.get(self.W,wid); state=self.state(db,row); job=find(state['jobs'],jid)
         require(job.get('lease_token')==token and job['status']=='running','工作已失去執行權',409)
+        from .features import enabled
+        if job['kind']=='digest' and not enabled(state,'routines'):
+            raise RemoteFailure('追蹤與檢討尚未開放','blocked_feature')
         actor=active_user(state,job['actor_id']); payload=job['payload']
         from .case_cutover import require_execution
         if payload.get('project_id'):require_execution(state,find(state['projects'],payload['project_id']))
@@ -252,6 +259,11 @@ class Worker:
         with self.sessions.begin() as db:
             row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update()); state=self.state(db,row); before=deepcopy(state); schedule(state)
             for j in state['jobs']:
+                from .features import enabled
+                if j['kind']=='digest' and not enabled(state,'routines') and j['status'] not in ('succeeded','canceled','cancelled'):
+                    j.update(status='blocked_feature',error='追蹤與檢討尚未開放')
+                    j.pop('lease_token',None); j.pop('lease_until',None)
+                    continue
                 if j['kind']=='digest' and LABELS['monthly'] in j.get('payload',{}).get('text','') and j['status'] not in ('succeeded','canceled','cancelled'):
                     j.update(status='blocked',error='此舊提醒含已停用的月考評，禁止發送；其他工作請看工作台')
                     j.pop('lease_token',None); j.pop('lease_until',None)

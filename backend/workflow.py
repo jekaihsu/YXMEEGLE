@@ -73,6 +73,8 @@ def refresh_node(n):
         if dues: n['due_date']=max(dues)
 
 def apply_action(ws,user,body,demo=True):
+    from .features import guard_action
+    guard_action(ws,body)
     from .input_validation import validate_action
     validate_action(body)
     action=body['action']; payload=body.get('payload') or {}; pid=body.get('project_id'); nid=body.get('node_id'); tid=body.get('task_id')

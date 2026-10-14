@@ -39,7 +39,8 @@ assert.match(document.querySelector('.cockpit-freshness').textContent,/2026\/10\
 await flush(()=>resolveWorkspace(new Response(JSON.stringify(workspace))));
 assert.equal(requests.filter(url=>url.startsWith('/api/company-dashboard')).length,1,'first workspace response does not duplicate the cockpit request');
 currentUser={...a,id:'different-session-user'};
-await flush(()=>document.querySelector('[aria-label="重新整理資料"]').click());
+await flush(()=>window.dispatchEvent(new Event('yx:session-expired')));
+await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent.includes('重新檢查')).click());
 await flush();
 assert.ok(document.querySelector('.cockpit-loading'),'identity change remounts the cockpit with its own skeleton');
 assert.equal(document.querySelector('.cockpit-freshness'),null,'previous identity snapshot is hidden immediately');

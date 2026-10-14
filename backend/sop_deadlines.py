@@ -81,6 +81,8 @@ def _materialize(ws,p,record,user):
         node_key=record.get('node_key') if node_key=='$group' else node_key
         node=next((n for n in p['nodes'] if n['key']==node_key),None)
         require(node is not None,'SOP 規則所需節點不存在',409)
+        from .features import enabled
+        if not enabled(ws,'routines') and (rule_id=='quote_followup' or node.get('status')=='completed'): continue
         binding=record['task_bindings'].get(rule_id)
         followups=p.get('sop_followups',[])
         task=find(node['tasks'],binding,'期限對應任務') if binding else next((t for t in node['tasks']+followups if t.get('sop_rule_id')==rule_id and t.get('sop_event_stream')==record['stream_id']),None)
@@ -130,6 +132,8 @@ def apply_sop_deadline(ws,user,body):
     if action not in ('sop_event_record','sop_deadline_resolve','sop_followup_complete'): return False
     active_user(ws,user['id']); p=find(ws['projects'],body.get('project_id'),'案件')
     if action=='sop_followup_complete':
+        from .features import require_feature
+        require_feature(ws.get('features',{}),'routines')
         from .case_cutover import require_execution
         require_execution(ws,p)
         task=find(p.get('sop_followups',[]),data.get('id'),'完成後追蹤工作')

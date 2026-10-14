@@ -40,7 +40,7 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
   let data:any;let parsed=true;
   try{const text=await bounded(response.text());data=JSON.parse(text);perfParsed(trace,text)}catch(error){if(controller?.signal.aborted)throw error;data={detail:malformed};parsed=false}
   if(response.status===401&&epoch===getSessionEpoch()&&isCurrent())window.dispatchEvent(new Event('yx:session-expired'));
-  if(!response.ok)throw new ApiError(response.status,typeof data?.detail==='string'?data.detail:JSON.stringify(data?.detail||'操作未完成'),typeof data?.code==='string'?data.code:undefined,Number.isFinite(data?.ceiling_seconds)?data.ceiling_seconds:undefined);
+  if(!response.ok)throw new ApiError(response.status,typeof data?.message==='string'?data.message:typeof data?.detail==='string'?data.detail:JSON.stringify(data?.detail||'操作未完成'),typeof data?.code==='string'?data.code:undefined,Number.isFinite(data?.ceiling_seconds)?data.ceiling_seconds:undefined);
   if(!parsed||data===null||typeof data!=='object')throw new ApiError(response.status,malformed);
   if(cacheable&&epoch===getSessionEpoch()&&isCurrent()&&!init?.signal?.aborted){
    const value=response.headers.get('ETag');
@@ -133,3 +133,10 @@ export const fetchCaseNavigation=(projectId:string,signal?:AbortSignal)=>api<imp
 
 // P2 read-only pages (VCC-128..132): one GET per page view; the caller owns retry (the identical GET only).
 export const fetchP2=(url:string,signal?:AbortSignal)=>api<unknown>(url,{method:'GET',cache:'no-store',signal,timeoutMs:60000});
+
+export function disabledRouteFeature(route:import('./types').Route,features:import('./types').FeatureContract|undefined):'change_extension'|'routines'|undefined {
+ const normalized=normalizeRoute(route);
+ if((normalized.view==='approvals'||normalized.approval)&&features?.change_extension!==true)return 'change_extension';
+ if((normalized.view==='routines'||(normalized.view==='project'&&normalized.tab==='flow'&&normalized.section==='routines'))&&features?.routines!==true)return 'routines';
+ return undefined;
+}

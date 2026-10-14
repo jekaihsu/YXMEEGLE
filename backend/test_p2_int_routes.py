@@ -50,6 +50,7 @@ def fresh_cache():
 
 def build_state(visible=('recC1', 'recC2', 'recK1', 'recW1')):
     state = upgrade(seed()); state['environment'] = 'production'
+    for project in state.get('projects', []): project['source_kind']='lark'
     for p in state['projects']: p.update(case_visibility='excluded_history', execution_system='meegle')
     old, new = state['projects'][:2]
     new.update(case_visibility='new_case', execution_system='workbench', name='Visible case')

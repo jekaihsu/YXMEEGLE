@@ -21,7 +21,7 @@ def test_disabling_demo_revokes_old_cookie_without_creating_workspace(tmp_path):
         before=db.scalar(select(func.count()).select_from(WorkspaceRow))
     session=live.get('/api/session')
     assert session.status_code==200
-    assert session.json()=={'user':None,'users':[],'mode':'lark','auth_configured':True}
+    assert session.json()=={'user':None,'users':[],'mode':'lark','auth_configured':True,'features':{'change_extension':False,'routines':False,'mock_ui':False}}
     assert live.get('/api/workspace').status_code==401
     assert live.get('/api/projects').status_code==401
     assert live.post('/api/demo/session',json={'user_id':'u-manager'}).status_code==403

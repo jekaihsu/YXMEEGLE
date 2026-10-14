@@ -2,7 +2,7 @@
 from copy import deepcopy
 import pytest
 from fastapi import HTTPException
-from .seed import seed
+from .test_ux_disabled import enabled_seed as seed
 from .policy import upgrade
 from .workflow import apply_action
 from .workflow_rules import activate_scheduled, activation_reasons, confirmation_hash, inherit_new_task

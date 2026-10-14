@@ -18,6 +18,7 @@ def isolated_http(tmp_path):
         'LARK_WORKER_ORGANIZATION':'boundary','LARK_ALLOWED_TENANTS':'boundary',
         'WORKSPACE_SHELL_ENABLED':'true','INDEX_TABLES_ENABLED':'true'})
     state=upgrade(seed());state['environment']='production'
+    for project in state.get('projects', []): project['source_kind']='lark'
     for p in state['projects']:p.update(case_visibility='excluded_history',execution_system='meegle')
     old,new=state['projects'][:2];old['name']='OLD_CASE_SENTINEL';new.update(case_visibility='new_case',execution_system='workbench',name='Current case')
     old['files'].append({'id':'old-file','name':'OLD_CASE_SENTINEL','storage':'local','size':1})

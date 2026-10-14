@@ -290,6 +290,8 @@ def open_round(ws, project, approval, actor, *, receipt_ok=None, mapping=None):
     from .workflow import require, now, uid, impacted
     from .native_requests import kind_of, receipt_valid
     from .operations import invalidate
+    from .features import require_feature
+    require_feature(ws.get('features',{}),'change_extension')
     rounds = project.setdefault('sop_rounds', [])
     existing = next((r for r in rounds if r['approval_id'] == approval['id']), None)
     if existing:
