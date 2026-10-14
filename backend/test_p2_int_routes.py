@@ -1,5 +1,6 @@
 """P2-INT-B: the five P2 GET routes over a synthetic isolated SQLite workspace. No Lark or cloud data."""
 import json
+from copy import deepcopy
 import time
 from urllib.parse import urlencode
 import pytest
@@ -455,3 +456,58 @@ def test_direction_is_validated_even_without_sort(world):
 def test_detail_scalar_parameters_take_exactly_one_bounded_value(world, path):
     _, client, _, _, _, _ = world
     assert client.get(path).status_code == 422
+
+
+def test_fence_exhaustion_does_not_affirm_current_after_real_failure(world, monkeypatch):
+    app, client, *_ = world
+    from backend import source_health
+    original = source_health.build_source_health; calls = []
+    def during_compute(*a, **kw):
+        result = original(*a, **kw); calls.append(result['page_state'])
+        if len(calls) < 3:
+            with app.state.sessions.begin() as db: db.get(WorkspaceRow, WID).version += 1
+        else: app.state.source_sync.failure(WID, 'genuine third-capture refresh failure')
+        return result
+    monkeypatch.setattr(source_health, 'build_source_health', during_compute)
+    body = client.get('/api/confirmations').json()
+    with app.state.sessions() as db: assert db.get(CacheRow, WID).data['status'] == 'error'
+    assert len(calls) == 3 and body['totals_basis'] != 'current' and body['page_state']['states'] == ['read_failed']
+
+
+def test_fence_exhaustion_never_returns_revoked_rows(world, monkeypatch):
+    app, client, *_ = world
+    from backend import source_health
+    original = source_health.build_source_health; calls = []
+    def during_compute(*a, **kw):
+        result = original(*a, **kw); calls.append(1)
+        with app.state.sessions.begin() as db:
+            row = db.get(WorkspaceRow, WID)
+            if len(calls) == 3:
+                state = storage.load(db, BusinessRow, row); state['source_visible_record_ids'] = []
+                row.data = storage.save(db, BusinessRow, WID, state)
+            row.version += 1
+        return result
+    monkeypatch.setattr(source_health, 'build_source_health', during_compute)
+    raw = client.get('/api/confirmations'); body = raw.json()
+    assert len(calls) == 3 and body['rows'] == [] and body['totals']['matching'] is None
+    assert 'recC1' not in raw.text and 'Visible case' not in raw.text
+
+
+def test_freshness_capture_is_inside_generation_fence(world):
+    app, client, seat, _, state, _ = world
+    old, new = '2026-10-01T00:00:00+00:00', '2026-10-13T00:00:00+00:00'
+    state['source_status'] = {'status': 'ready', 'last_sync': old, 'sync_revision': 1}; seat(state)
+    real = app.state.live_read.status; calls = []
+    def status_then_new_source(wid):
+        result = real(wid); calls.append(1)
+        result['datasets']['sources'].update(as_of=old if len(calls) == 1 else new, status='stale', age_seconds=1000)
+        if len(calls) == 1:
+            with app.state.sessions.begin() as db:
+                row = db.get(WorkspaceRow, WID); s = storage.load(db, BusinessRow, row)
+                s['source_status'] = {'status': 'ready', 'last_sync': new, 'sync_revision': 2}
+                row.data = storage.save(db, BusinessRow, WID, s); row.version += 1
+                cache = db.get(CacheRow, WID); d = deepcopy(cache.data); d.update(last_sync=new, as_of=new); cache.data = d
+        return result
+    app.state.live_read.status = status_then_new_source
+    body = client.get('/api/confirmations').json()
+    assert len(calls) == 2 and body['as_of'] == body['snapshot']['last_success_at'] == new

@@ -868,22 +868,28 @@ def create_app(overrides=None):
 
     def p2_generation(db,wid):
         row,cache=db.get(WorkspaceRow,wid),db.get(CacheRow,wid)
-        return (row.version if row else None,(cache.data or {}).get('status') if cache else None,(cache.data or {}).get('last_attempt_at') if cache else None)
+        data=(cache.data or {}) if cache else {}
+        return (row.version if row else None,data.get('status'),data.get('last_attempt_at'),data.get('last_sync'),data.get('as_of'))
 
     def p2_read(data,user):
-        """Health and module input come from ONE capture; a source-generation change during compute re-captures (bounded)."""
+        """Health and module input come from ONE capture fenced by a generation read BEFORE the first input read
+        (freshness, cache, workspace) and re-checked after the last. A capture is returned only after its fence
+        passed; when the bounded retries are exhausted nothing from any rejected capture is returned: the input is an
+        empty state under a read_failed page state (rows/counts/ids/labels absent, never current)."""
         wid=data['wid']
         app.state.live_read.ensure(wid,'sources')
         for _ in range(3):
+            with sessions() as db: generation=p2_generation(db,wid)
             freshness=app.state.live_read.status(wid)
             with sessions() as db:
-                generation=p2_generation(db,wid)
                 cache=db.get(CacheRow,wid);cache_data=deepcopy(cache.data) if cache else None
                 state=load(db,db.get(WorkspaceRow,wid))
             health=source_health_from(data,user,freshness,cache_data,deepcopy(state))
             with sessions() as db: unchanged=p2_generation(db,wid)==generation
-            if unchanged: break
-        return data,user,health,p2_narrowed_state(state,user,health.get('page_state'),freshness)
+            if unchanged: return data,user,health,p2_narrowed_state(state,user,health.get('page_state'),freshness)
+        failed={'page_state':{'states':['read_failed'],'count':None}}
+        empty={'environment':state.get('environment'),'projects':[],'source_confirmations':[],'contract_items':[],'source_work_items':[],'source_visible_record_ids':[]}
+        return data,user,failed,p2_narrowed_state(empty,user,failed['page_state'],{})
 
     def p2_list_args(request,allowed=P2_LIST_PARAMS):
         query=request.query_params
