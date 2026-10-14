@@ -39,7 +39,7 @@ assert.equal(calls.some(url=>url.includes('panel=completed')),false);
 assert.equal(calls.some(url=>url==='/api/workspace'),false);
 const open=[...host.querySelectorAll('button')].find(b=>b.textContent==='開啟案件');
 await act(async()=>open.click());
-assert.deepEqual(navigated,{view:'project',project:'stable1',tab:'flow',assignment_node:'field'});
+assert.deepEqual(navigated,{view:'project',project:'stable1',tab:'flow',node:'field',task:undefined});
 await act(async()=>root.unmount());
 behavior='pending';root=createRoot(host);
 await act(async()=>{root.render(React.createElement(mod.ShellDashboard,{c}))});
