@@ -154,7 +154,8 @@ def day(value, *, formula_serial=False):
         try:
             serial=float(text(value))
             if 1<=serial<2958466:
-                return (datetime(1899,12,30)+timedelta(days=serial)).date().isoformat()
+                # Lark serials count UTC days: Taipei midnight arrives as .66667. Whole seconds keep float noise from crossing the day.
+                return (datetime(1899,12,30)+timedelta(seconds=round(serial*86400)+8*3600)).date().isoformat()
         except (ValueError,TypeError,OverflowError): pass
     if isinstance(value,(int,float)):
         try: return datetime.fromtimestamp(value/1000 if value>100000000000 else value,timezone(timedelta(hours=8))).date().isoformat()
