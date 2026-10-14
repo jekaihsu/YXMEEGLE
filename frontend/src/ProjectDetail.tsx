@@ -26,7 +26,7 @@ import {NodeAssignments} from './NodeAssignments';
 import {assignmentTarget} from './nodeAssignmentApi';
 import {ApprovalList} from './App';
 
-export function localTaskOrder(a:TaskRow,b:TaskRow){const priority:Record<string,number>={paused:0,rework:1,in_progress:2,pending:3,completed:4,superseded:5};return Number(!a.t.due_date)-Number(!b.t.due_date)||(a.t.due_date||'').localeCompare(b.t.due_date||'')||(priority[a.t.status]??6)-(priority[b.t.status]??6)||a.t.id.localeCompare(b.t.id)}
+export function localTaskOrder(a:TaskRow,b:TaskRow){const priority:Record<string,number>={paused:0,rework:1,in_progress:2,pending:3,completed:4,superseded:5};const today=new Date(Date.now()+8*3600000).toISOString().slice(0,10);const overdue=(t:Task)=>!!t.due_date&&t.due_date.slice(0,10)<today&&!['completed','superseded'].includes(t.status);return Number(overdue(b.t))-Number(overdue(a.t))||Number(!a.t.due_date)-Number(!b.t.due_date)||(a.t.due_date||'').localeCompare(b.t.due_date||'')||(priority[a.t.status]??6)-(priority[b.t.status]??6)||a.t.id.localeCompare(b.t.id)}
 const basicValue=(value:unknown,format?:()=>string)=>value==null||String(value).trim()===''?'來源未提供':format?format():String(value).trim();
 let projectEpoch=getSessionEpoch();
 const projectSnapshots=new Map<string,ProjectSlice>();

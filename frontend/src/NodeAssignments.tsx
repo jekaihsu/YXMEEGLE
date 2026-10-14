@@ -85,7 +85,7 @@ export function NodeAssignments({projectId, enabled = false, legacy, before, tar
     prefetchTimer.current = setTimeout(() => {void prefetchNodeAssignmentDetail(projectId, key).catch(() => {})}, 150);
   };
   useEffect(() => {if (expanded) document.getElementById(`${listId}-${expanded}`)?.scrollIntoView({behavior: reducedMotion(), block: 'nearest'})}, [expanded, listId]);
-  if (state.kind === 'disabled') return <>{legacy}</>;
+  if (state.kind === 'disabled') return <>{target && <p className="ops-notice" role="status">節點指派尚未開放，無法定位此 Lark 節點或任務。</p>}{legacy}</>;
   if (!data) return <>
     {state.kind === 'error' && <ErrorBanner message={state.message} retry={() => void assignments.reload()} busy={refreshing}/>}
     <section className="node-assignments" aria-label="案件節點指派"><header className="na-heading"><div><p className="na-eyebrow">流程與交付</p><h2>案件流程</h2></div></header><Overview/></section>{before}

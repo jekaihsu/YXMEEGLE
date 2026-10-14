@@ -68,6 +68,24 @@ test('unknown remote tasks have a readable scoped error', async () => {
   assert.ok(document.body.textContent.includes('找不到此 Lark 任務'));
   assert.equal(document.querySelector('.task-inspector'), null);
 });
+test('zero Lark tasks remain separate from expandable local templates', async () => {
+  ui.invalidateSessionEpoch(); const fixture = sourceFixture();
+  fixture.list.node_details = {};
+  fixture.list.nodes = fixture.list.nodes.map(n => ({...n, tasks: {done: 0, total: 0}, progress: 0, derived_status: '未開始'}));
+  fixture.list.summary = {done: 0, total: 9, current_node: 'sales'};
+  globalThis.fetch = async () => reply(fixture.list);
+  await mount(React.createElement(ui.NodeAssignments, {projectId: 'p1', enabled: true, legacy: React.createElement('div', {id: 'template'}, '21 項本地範本')}));
+  assert.equal(document.querySelector('.na-summary-count').textContent, '0/9');
+  assert.equal(document.querySelector('.na-summary strong').textContent, '尚未開始');
+  assert.equal(document.getElementById('template'), null);
+  assert.deepEqual([...document.querySelectorAll('.na-progress-cell strong')].map(e => e.textContent), ['0/0', '0/0', '0/0', '0/0', '0/0', '0/0', '0/0', '0/0', '0/0']);
+});
+test('an unavailable remote link does not pretend to focus local workflow', async () => {
+  ui.invalidateSessionEpoch();
+  await mount(React.createElement(ui.NodeAssignments, {projectId: 'p1', enabled: false, target: {nodeKey: 'control', taskId: 'recTask1'}, legacy: React.createElement('div', null, '本地流程')}));
+  assert.ok(document.body.textContent.includes('節點指派尚未開放，無法定位此 Lark 節點或任務。'));
+  assert.equal(document.querySelector('[data-assignment-task]'), null);
+});
 test('opening logs does not read assignments before the flow tab is selected', async () => {
   ui.invalidateSessionEpoch(); const fixture = sourceFixture(), requests = [];
   globalThis.fetch = async url => {requests.push(url); return reply(url.endsWith('/node-assignments') ? fixture.list : {items: [], total: 0})};
