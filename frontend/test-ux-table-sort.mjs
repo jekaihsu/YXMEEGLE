@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
+import {JSDOM} from 'jsdom';
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+import {workspace,a} from './session-epoch-fixture.mjs';
 import fs from 'node:fs/promises';
-const bundle=await build({stdin:{contents:"export {compareTableValues,tableCalendarDay,populationLabel} from './src/companyDashboardCache';export {readPanel,cachedPanel} from './src/companyDashboardCache';export {invalidateSessionEpoch} from './src/api';export {sortCaseSection} from './src/CaseDetail';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {compareTableValues,tableCalendarDay,populationLabel} from './src/companyDashboardCache';export {readPanel,cachedPanel} from './src/companyDashboardCache';export {invalidateSessionEpoch} from './src/api';export {Projects} from './src/ProjectsList';export {sortCaseSection} from './src/CaseDetail';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const path=new URL('./.ux-table-sort-bundle.mjs',import.meta.url);
 await fs.writeFile(path,bundle.outputFiles[0].text);
 try {
- const {compareTableValues,tableCalendarDay,populationLabel,sortCaseSection,readPanel,cachedPanel,invalidateSessionEpoch}=await import(path.href);
+ const {compareTableValues,tableCalendarDay,populationLabel,sortCaseSection,readPanel,cachedPanel,invalidateSessionEpoch,Projects}=await import(path.href);
  const rows=[{id:'null',value:null},{id:'10',value:'10'},{id:'2',value:2},{id:'blank',value:''},{id:'decimal',value:'2.5'}];
  assert.deepEqual([...rows].sort((a,b)=>compareTableValues(a.value,b.value,'number')).map(r=>r.id),['2','decimal','10','null','blank']);
  assert.deepEqual([...rows].sort((a,b)=>compareTableValues(a.value,b.value,'number','desc')).map(r=>r.id),['10','decimal','2','null','blank']);
@@ -32,5 +36,23 @@ try {
  invalidateSessionEpoch();
  assert.equal(cachedPanel('/api/synthetic-panel','user-a'),undefined);
  console.log('PASS scoped panel reads. Coalescing, one-reader cancellation, scope isolation and session invalidation.');
+ const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=projects'});
+ for(const key of ['window','document','location','localStorage','HTMLElement','Event'])globalThis[key]=dom.window[key];
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const w=structuredClone(workspace),base=w.projects[0];w.as_of='2026-10-16';
+ const project=(id,name,due)=>({...base,id,code:id,name,case_type:'formal',source_status:'執行中',due_date:due,nodes:[]});
+ w.projects=[project('A','Overdue','2026-10-14T18:00:00Z'),project('B','Next','2026-10-17'),project('Z','Undated',null),
+  ...Array.from({length:48},(_,i)=>project(`F${String(i).padStart(2,'0')}`,`Future ${i}`,'2027-01-01'))];
+ const root=createRoot(document.getElementById('root'));
+ await act(async()=>{root.render(React.createElement(Projects,{c:{w,s:{user:a,workspace_id:'synthetic'},route:{view:'projects'},go:()=>{},run:async()=>{},reloadVersion:0,busy:false}}));await new Promise(r=>setTimeout(r,10))});
+ assert.equal(document.querySelectorAll('tbody tr').length,50);
+ assert.equal(document.querySelector('select[aria-label="每頁筆數"]').value,'50');
+ assert.deepEqual([...document.querySelectorAll('tbody .case-link')].slice(0,2).map(a=>a.textContent),['Overdue','Next']);
+ assert.ok(![...document.querySelectorAll('tbody .case-link')].some(a=>a.textContent==='Undated'));
+ assert.match(document.querySelector('tbody').textContent,/來源 執行中/);
+ assert.match(document.querySelector('.table-footer').textContent,/符合條件 51 筆 · 本頁已載入 50 筆 · 部分資料，總數未知/);
+ assert.ok(!document.querySelector('thead').textContent.includes('合約金額'));
+ await act(async()=>root.unmount());dom.window.close();
+ console.log('PASS project table. Fifty-row default, overdue and deadline order, source status and loaded population.');
  console.log('PASS UX table sort. Numeric and date orders, Taipei calendar days, nulls, stable item order and population labels.');
 } finally {await fs.unlink(path)}

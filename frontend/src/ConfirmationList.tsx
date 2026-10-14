@@ -302,7 +302,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                         checked={col.visible}
                         onChange={() => onColumnToggle?.(col.key)}
                       />
-                      <span>{col.label}</span>
+                      <span>{col.key==='source_status'?'來源讀取狀態':col.label}</span>
                       {col.technical ? (
                         <span className="p2-badge-tech">技術欄位（非預設）</span>
                       ) : !col.default ? (
@@ -361,9 +361,9 @@ export function ConfirmationList(props: ConfirmationListProps) {
                               type="button"
                               className="p2-sort-btn"
                               onClick={() => handleSortClick(col.key, currentDir)}
-                              aria-label={`依${col.label}排序`}
+                              aria-label={`依${col.key==='source_status'?'來源讀取狀態':col.label}排序`}
                             >
-                              <span>{col.label}</span>
+                              <span>{col.key==='source_status'?'來源讀取狀態':col.label}</span>
                               <span className="p2-sort-icon" aria-hidden="true">
                                 {currentDir === 'asc'
                                   ? ' ↑'
@@ -377,7 +377,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                               className="p2-col-unsortable"
                               title={col.sortDisabledReason ?? undefined}
                             >
-                              {col.label}
+                              {col.key==='source_status'?'來源讀取狀態':col.label}
                             </span>
                           )}
                         </th>
