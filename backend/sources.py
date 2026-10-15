@@ -108,9 +108,10 @@ def _fetch_sources(token,cfg=None,client=None, *, scope=None):
                             return response
                         delay = RetryPolicy.after(response, attempt, jitter=True)
                         if response.status_code == 429 or code in RETRY_CODES: shared.penalize(time.monotonic() + delay)
-                        if attempt == RetryPolicy.max_attempts or time.monotonic() + delay >= deadline:
-                            raise ReadFailure('Lark read attempts exhausted', upstream_status=response.status_code, lark_code=code,
-                                              kind='transient' if attempt == RetryPolicy.max_attempts else 'deadline')
+                        if attempt == RetryPolicy.max_attempts:
+                            raise ReadFailure('Lark read attempts exhausted', upstream_status=response.status_code, lark_code=code, kind='transient')
+                        if time.monotonic() + delay >= deadline:
+                            raise ReadFailure('Lark read deadline reached before the next retry', upstream_status=response.status_code, lark_code=code, kind='deadline')
                         time.sleep(delay)
                 # Legacy get-only test clients remain supported.
                 response = client.get(url, **kwargs) if method == 'GET' and not hasattr(client, 'request') else client.request(method, url, **kwargs)

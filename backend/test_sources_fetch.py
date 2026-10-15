@@ -231,3 +231,18 @@ def test_exhausted_retries_log_the_last_upstream_status_and_code(caplog, monkeyp
     assert attempts == ['/open-apis/bitable/v1/apps/synthetic-base/tables/tblSynthetic/fields'] * 3
     assert ('Lark source read failed: table=/bitable/v1/apps/synthetic-base/tables/tblSynthetic/fields '
             'cause=ReadFailure kind=transient upstream_status=503 lark_code=1061045') in caplog.text
+
+
+def test_a_retry_after_beyond_the_budget_logs_the_deadline_kind(caplog):
+    attempts = []
+
+    def respond(request):
+        attempts.append(request.url.path)
+        return httpx.Response(429, json={'code': 99991400}, headers={'Retry-After': '600'})
+
+    with httpx.Client(transport=httpx.MockTransport(respond)) as client, caplog.at_level('WARNING', logger='backend.sources'), \
+            pytest.raises(HTTPException) as failure:
+        fetch_sources('synthetic-token', {**config('list'), 'LARK_APP_ID': 'cli_synthetic'}, client)
+    assert failure.value.status_code == 502
+    assert len(attempts) == 1
+    assert 'cause=ReadFailure kind=deadline upstream_status=429 lark_code=99991400' in caplog.text
