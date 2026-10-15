@@ -147,6 +147,8 @@ def create_app(overrides=None):
             app.state.live_read.close()
 
     app=FastAPI(title='詠翔專案工作台',docs_url=None if production else '/api/docs',lifespan=lifespan); app.state.engine=engine; app.state.sessions=sessions; app.state.signer=signer
+    try: app.state.slow_request_seconds=float(cfg.get('SLOW_REQUEST_SECONDS','5'))
+    except ValueError: app.state.slow_request_seconds=5.0
     app.state.cfg=cfg; app.state.upload_dir=upload_dir
     from starlette.exceptions import HTTPException as StarletteHTTPException
     @app.exception_handler(StarletteHTTPException)
@@ -203,7 +205,6 @@ def create_app(overrides=None):
         try:
             response=await call_next(request)
         except Exception as exc:
-            import logging
             from fastapi.responses import JSONResponse
             logging.getLogger(__name__).warning('oauth_callback_failed error_class=%s',type(exc).__name__)
             response=(RedirectResponse('/?auth_error=provider_unavailable',status_code=303)
@@ -231,7 +232,7 @@ def create_app(overrides=None):
             phases=dict(request.scope.get('phases',{})); total=perf_counter()-started
             phases['serialize']=max(total-sum(phases.values()),0)
             response.headers['Server-Timing']=', '.join([f'{k};dur={v*1000:.1f}' for k,v in phases.items()]+[f'total;dur={total*1000:.1f}'])
-            if total>float(cfg.get('SLOW_REQUEST_SECONDS','5')):
+            if total>app.state.slow_request_seconds:
                 logging.getLogger(__name__).warning('slow_request method=%s path=%s status=%s total_ms=%d phases=%s',request.method,request.url.path,
                                                     response.status_code,int(total*1000),{k:int(v*1000) for k,v in phases.items()})
         return response
@@ -486,7 +487,6 @@ def create_app(overrides=None):
         return persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,None)
 
     def declined(action_name,reason):
-        import logging
         app.state.partial_writes['declined']+=1
         logging.getLogger(__name__).warning('partial_write_declined action=%s reason=%s',action_name,str(getattr(reason,'detail',reason))[:200])
 
