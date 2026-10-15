@@ -1,5 +1,52 @@
 @layer tokens,legacy,components,pages,surfaces,controls,polish;
 @layer polish{
+.workspace .manager-overview-root{gap:24px}
+.workspace .manager-overview-root>.p2-header{background:transparent;border:0;box-shadow:none;padding:0 0 8px;border-radius:0}
+.manager-overview-root .p2-header-title-row{align-items:flex-start;flex-direction:column;gap:10px}
+.manager-overview-root .p2-title{font-size:var(--fs-title1)}
+.workspace .manager-overview-root>.p2-toolbar{margin:0;padding:20px 24px;gap:24px;align-items:flex-end;border-radius:20px}
+.manager-overview-root>.p2-toolbar .p2-toolbar-left{flex:0 1 640px;gap:20px}
+.manager-overview-root>.p2-toolbar .p2-filter-field{flex:1;min-width:160px}
+.manager-overview-root>.p2-toolbar .p2-toolbar-right{margin-left:0}
+.workspace .manager-overview-root>.p2-banner{background:transparent;border:0;box-shadow:none;padding:0 4px;border-radius:0}
+.manager-overview-root .manager-overview-layout{flex-direction:column;gap:32px}
+.manager-overview-root .manager-overview-main{gap:32px}
+.manager-overview-root .manager-overview-side{width:100%}
+.manager-overview-root .overview-table-note{margin:0;color:var(--label-2);font-size:var(--fs-footnote)}
+.manager-overview-root .p2-cases-table{min-width:1000px}
+.manager-overview-root .p2-cases-table th{padding:16px 20px;background:var(--surface-2);font-size:var(--fs-footnote)}
+.manager-overview-root .p2-cases-table td{padding:20px;line-height:1.6}
+.manager-overview-root .p2-cases-table td:first-child{min-width:220px;font-weight:600}
+.manager-overview-root .p2-cases-table .p2-toolbar-left{flex-wrap:nowrap;gap:12px}
+.manager-overview-root .p2-cases-table .p2-btn-select{background:transparent;box-shadow:none;border-color:transparent}
+.manager-overview-root .p2-source-health-panel{padding:24px;border-radius:20px}
+.manager-overview-root .p2-health-rows{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin:16px 0}
+.manager-overview-root .p2-health-row{padding:0;border:0}
+.manager-overview-root .overview-health-detail{margin-top:12px;color:var(--label-2);font-size:var(--fs-footnote)}
+.manager-overview-root .overview-health-detail summary{cursor:pointer;width:fit-content;color:var(--accent)}
+.manager-overview-root .p2-btn-health-link{width:auto}
+@media(max-width:760px){
+ .manager-overview-root .p2-health-rows{grid-template-columns:1fr;gap:20px}
+ .workspace .manager-overview-root>.p2-toolbar{padding:16px}
+ .manager-overview-root>.p2-toolbar .p2-toolbar-left{flex-wrap:wrap;flex-basis:100%}
+}
+.modal:has(.appearance-control){background:var(--surface);border-radius:28px;border:1px solid var(--sep);backdrop-filter:none;-webkit-backdrop-filter:none}
+.modal:has(.appearance-control)>header{border-bottom:1px solid var(--sep);padding:24px}
+.modal:has(.appearance-control) .modal-body{padding:24px}
+.modal .appearance-control{display:grid;gap:16px;margin:0}
+.modal .appearance-field{justify-content:space-between;gap:16px;flex-wrap:wrap}
+.modal .appearance-control .ds-segmented{background:var(--surface-2);border:1px solid var(--sep);border-radius:18px;padding:4px;gap:4px;box-shadow:none}
+.modal .appearance-control .ds-segmented>button{min-width:44px;border-radius:14px;border:1px solid transparent;background:transparent;color:var(--label-2);box-shadow:none;transform:none}
+.modal .appearance-control .ds-segmented>button:hover{background:var(--accent-fill);color:var(--accent)}
+.modal .appearance-control .ds-segmented>button[aria-checked=true]{background:var(--accent);color:var(--on-accent);border-color:var(--accent);box-shadow:none}
+.modal .role-list{display:grid;gap:6px;padding:16px;border-top:1px solid var(--sep)}
+.modal .role-option{min-height:68px;padding:12px 16px;border:1px solid transparent;border-radius:18px;background:transparent;color:var(--label);box-shadow:none;transition:background var(--dur-fast) var(--ease),border-color var(--dur-fast) var(--ease)}
+.modal .role-option:hover{background:var(--surface-2)}
+.modal .role-option.selected{background:var(--accent-fill);border-color:color-mix(in srgb,var(--accent) 24%,var(--surface))}
+.modal .role-option.selected>svg,.modal .role-option.selected strong{color:var(--accent)}
+.modal .role-option .avatar{background:var(--surface-2);color:var(--label-2);border:1px solid var(--sep)}
+.modal .role-option.selected .avatar{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.modal:has(.appearance-control)>header .icon-button{border-radius:14px;background:var(--surface-2);border:0;box-shadow:none}
 /* Cross-screen polish: consistent page heads, spacing and tables. Scoped under .workspace so it wins over legacy rules. */
 .workspace .operations>h1{font-size:var(--fs-large-title);font-weight:600;letter-spacing:-.02em;line-height:1.2}
 .workspace .operations>h1+p{color:var(--label-2);font-size:var(--fs-subhead);margin:var(--sp-1) 0 var(--sp-6)}

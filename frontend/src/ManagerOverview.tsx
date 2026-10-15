@@ -1,4 +1,4 @@
-import { useRef, useEffect, useId } from 'react';
+import { useRef, useEffect, useId, type ReactNode } from 'react';
 import type {
   ManagerOverviewView,
   Drilldown,
@@ -10,6 +10,7 @@ import type {
 import './p2-lists.css';
 
 export interface ManagerOverviewCallbacks {
+  filters?: ReactNode;
   onSelect?: (id: string | null) => void;
   onDrilldown?: (drilldown: Drilldown) => void;
   onNavigate?: (route: string) => void;
@@ -26,10 +27,10 @@ export type ManagerOverviewProps = (
 function renderFact(cell: FactCell) {
   if (!cell.known) {
     return (
-      <span className="p2-cell-unknown" title={cell.reason ?? undefined}>
+      <span className="p2-cell-unknown" title={[cell.stateLabel, cell.reason].filter(Boolean).join('：') || undefined}>
         <span className="p2-dash">{cell.text}</span>
         {cell.stateLabel && (
-          <small className="p2-cell-statelabel">（{cell.stateLabel}）</small>
+          <small className="p2-sr-only">（{cell.stateLabel}）</small>
         )}
         {cell.reason && <span className="p2-sr-only">：{cell.reason}</span>}
       </span>
@@ -52,6 +53,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
       : (props as { view: ManagerOverviewView }).view;
 
   const {
+    filters,
     onSelect,
     onDrilldown,
     onNavigate,
@@ -100,6 +102,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
           </div>
         )}
       </header>
+      {filters}
 
       {/* Filter mismatch warning */}
       {view.header.filterMismatch && (
@@ -136,6 +139,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
               <h3 id={`${baseId}-cases-heading`} className="p2-section-title">
                 未完成案件
               </h3>
+              <p className="overview-table-note">— 表示資料尚未確認；指向欄位可查看原因。</p>
             </div>
 
             {view.snapshot.cases.length === 0 ? (
@@ -479,9 +483,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                     <span className="p2-health-label">{hr.label}</span>
                     <span className="p2-health-state">{hr.stateLabel}</span>
                   </div>
-                  <span className="p2-health-reason" title={hr.reason}>
-                    {hr.reason}
-                  </span>
+                  <details className="overview-health-detail"><summary>查看說明</summary><p className="p2-health-reason">{hr.reason}</p></details>
                 </div>
               ))}
             </div>

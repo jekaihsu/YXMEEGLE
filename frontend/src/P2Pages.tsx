@@ -165,8 +165,7 @@ function OverviewBody({context, body, open, openEntryPoint, openSources, setNoti
   if (status.trim()) filters.execution_state = status.trim();
   open({...context, filters, selected: null}, true);
  };
- return <>
-  <form className="p2-toolbar" onSubmit={apply} aria-label="案件篩選">
+ const filters = <form className="p2-toolbar" onSubmit={apply} aria-label="案件篩選">
    <div className="p2-toolbar-left">
     <div className="p2-filter-field"><label className="p2-filter-label" htmlFor="p2-ov-pm">案件負責人</label><input id="p2-ov-pm" className="p2-filter-input" value={pm} maxLength={120} onChange={e => setPm(e.target.value)}/></div>
     <div className="p2-filter-field"><label className="p2-filter-label" htmlFor="p2-ov-status">執行狀態</label><input id="p2-ov-status" className="p2-filter-input" value={status} maxLength={120} onChange={e => setStatus(e.target.value)}/></div>
@@ -175,8 +174,9 @@ function OverviewBody({context, body, open, openEntryPoint, openSources, setNoti
     <button type="submit" className="p2-btn-reset-filters">套用</button>
     <button type="button" className="p2-btn-reset-filters" onClick={() => open({...context, filters: {}, selected: null}, true)}>清除篩選</button>
    </div>
-  </form>
-  <ManagerOverview view={view}
+  </form>;
+ return <>
+  <ManagerOverview view={view} filters={filters}
    onSelect={id => open({...context, selected: id}, true)}
    onSort={sort => open({...context, sort}, true)}
    onBack={goBack}
