@@ -93,16 +93,27 @@ def test_a_user_write_between_the_early_read_and_the_lock_forces_a_fresh_load(tw
     advance(full, partial, '2026-09-27T10:05:00+08:00')
     for side in (full, partial): side.service.fetcher = lambda token: snapshot('2026-09-27T10:05:00+08:00', records())
     prepared = partial.service._prepare
+    edited = []
     def prepare_then_write(*args, **kwargs):
         result = prepared(*args, **kwargs)
         with partial.sessions.begin() as db:
-            row = db.get(partial.W, partial.wid); row.version += 1
+            row = db.get(partial.W, partial.wid)
+            state = storage.load(db, partial.B, row)
+            task = state['projects'][0]['nodes'][0]['tasks'][0]
+            task.setdefault('comments', []).append({'id': 'local-comment', 'body': 'keep this local edit',
+                                                   'author_id': 'u-manager', 'created_at': partial.clock[0]})
+            edited.append(task['id'])
+            state['version'] = row.version + 1
+            row.data = storage.save(db, partial.B, partial.wid, state)
+            row.version = state['version']
         return result
     monkeypatch.setattr(partial.service, '_prepare', prepare_then_write)
     Pinned.active = partial.pin
     partial.service.sync(partial.wid, 'u-manager', 'fake')
     state, cache = partial.read()
     assert state['version'] == 3 and cache['status'] == 'ready' and state['source_status']['sync_revision'] == 1
+    task = next(t for p in state['projects'] for n in p['nodes'] for t in n['tasks'] if t['id'] == edited[0])
+    assert [c['body'] for c in task['comments']] == ['keep this local edit']
 
 
 def test_the_import_runs_before_the_lock_unless_the_version_moved(twins, monkeypatch):
