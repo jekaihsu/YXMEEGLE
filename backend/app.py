@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import secrets
@@ -189,7 +190,6 @@ def create_app(overrides=None):
     shell_enabled=str(cfg.get('WORKSPACE_SHELL_ENABLED','false')).lower()=='true'
     TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('POST','/api/actions'),
                   ('GET','/api/confirmations'),('GET','/api/manager-overview'),('GET','/api/source-health'),('GET','/api/my-work')}
-    SLOW_REQUEST_SECONDS=5
     @contextmanager
     def phase(request,name):
         started=perf_counter()
@@ -231,7 +231,7 @@ def create_app(overrides=None):
             phases=dict(request.scope.get('phases',{})); total=perf_counter()-started
             phases['serialize']=max(total-sum(phases.values()),0)
             response.headers['Server-Timing']=', '.join([f'{k};dur={v*1000:.1f}' for k,v in phases.items()]+[f'total;dur={total*1000:.1f}'])
-            if total>SLOW_REQUEST_SECONDS:
+            if total>float(cfg.get('SLOW_REQUEST_SECONDS','5')):
                 logging.getLogger(__name__).warning('slow_request method=%s path=%s status=%s total_ms=%d phases=%s',request.method,request.url.path,
                                                     response.status_code,int(total*1000),{k:int(v*1000) for k,v in phases.items()})
         return response
@@ -272,9 +272,9 @@ def create_app(overrides=None):
                 row=WorkspaceRow(id=wid,version=1,data=data); db.add(row); db.flush()
                 row.data=storage.save(db,BusinessRow,wid,data)
 
-    def load(db,row,*,collections=None,project_ids=None):
+    def load(db,row,*,collections=None,project_ids=None,node_headers=False):
         if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=[c for c in storage.COLLECTIONS if c!='projects'],project_ids=project_ids,project_children=storage.PROJECT_CHILDREN)
-        else: state=storage.load(db,BusinessRow,row) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections)
+        else: state=storage.load(db,BusinessRow,row) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections,node_headers=node_headers)
         state=upgrade(state)
         return seal(db,row,state)
 
@@ -991,6 +991,9 @@ def create_app(overrides=None):
         read_authorized=data['mode']=='lark' and not data['wid'].startswith('test-') and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
         return build_source_health(snapshot,freshness['datasets']['sources'],diagnostic=False,read_authorized=read_authorized,viewer_filtered=None)
 
+    def p2_list_load(db,row):
+        return load(db,row,collections=('users','projects','source_quotes','source_confirmations'),node_headers=True)
+
     def source_health_page(data,user):
         """The GET /api/source-health computation, shared so the manager overview binds the identical page state."""
         app.state.live_read.ensure(data['wid'],'sources')
@@ -998,7 +1001,7 @@ def create_app(overrides=None):
         cache_data=state=None
         if data['mode']=='lark' and not data['wid'].startswith('test-'):
             with sessions() as db:
-                cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']),collections=P2_LIST_COLLECTIONS)
+                cache=db.get(CacheRow,data['wid']);state=p2_list_load(db,db.get(WorkspaceRow,data['wid']))
                 cache_data=cache.data if cache else None
         return source_health_from(data,user,freshness,cache_data,state)
 
@@ -1014,8 +1017,6 @@ def create_app(overrides=None):
     P2_CASE_PARAMS=frozenset({'pm_id','execution_status'})
     P2_FILTER_PARAMS=('source_version','pm','admission_state','deadline_from','deadline_to')
     P2_SOURCE_STATUS={'forbidden':'forbidden','read_failed':'error','loading':'loading','unlocated':'unlocated','partial':'partial','stale':'stale'}
-    # What the list pages and Source Health render; task trees, events and daily reports stay in the database.
-    P2_LIST_COLLECTIONS=('users','projects','sop_templates','source_quotes','source_confirmations','contract_items','source_work_items')
 
     def p2_narrowed_state(state,user,page,freshness):
         """filter_visible_cases -> filter_private_workspace -> case_redaction (non test/demo) over a captured workspace state.
@@ -1054,12 +1055,11 @@ def create_app(overrides=None):
         data=(cache.data or {}) if cache else {}
         return (row.version if row else None,data.get('status'),data.get('last_attempt_at'),data.get('last_sync'),data.get('as_of'))
 
-    def p2_read(data,user,collections=None):
+    def p2_read(data,user,loader=load):
         """Health and module input come from ONE capture fenced by a generation read BEFORE the first input read
         (freshness, cache, workspace) and re-checked after the last. A capture is returned only after its fence
         passed; when the bounded retries are exhausted nothing from any rejected capture is returned: the input is an
-        empty state under a read_failed page state (rows/counts/ids/labels absent, never current).
-        ``collections`` scopes the load to the workspace collections the caller renders; None loads the whole workspace."""
+        empty state under a read_failed page state (rows/counts/ids/labels absent, never current)."""
         wid=data['wid']
         app.state.live_read.ensure(wid,'sources')
         for _ in range(3):
@@ -1067,7 +1067,7 @@ def create_app(overrides=None):
             freshness=app.state.live_read.status(wid)
             with sessions() as db:
                 cache=db.get(CacheRow,wid);cache_data=deepcopy(cache.data) if cache else None
-                state=load(db,db.get(WorkspaceRow,wid),collections=collections)
+                state=loader(db,db.get(WorkspaceRow,wid))
             health=source_health_from(data,user,freshness,cache_data,deepcopy(state))
             with sessions() as db: unchanged=p2_generation(db,wid)==generation
             if unchanged: return data,user,health,p2_narrowed_state(state,user,health.get('page_state'),freshness)
@@ -1110,7 +1110,7 @@ def create_app(overrides=None):
     def confirmations(request:Request):
         data,user=identity(request)
         args=p2_list_args(request)
-        with phase(request,'read'): _,_,_,state=p2_read(data,user,P2_LIST_COLLECTIONS)
+        with phase(request,'read'): _,_,_,state=p2_read(data,user,p2_list_load)
         with phase(request,'build'): return p2_list_page(state,args,state['as_of'],p2_cursor_context(data,user))
 
     @app.get('/api/manager-overview')
@@ -1121,7 +1121,7 @@ def create_app(overrides=None):
         args=p2_list_args(request,frozenset(P2_FILTER_PARAMS)|P2_CASE_PARAMS)
         # Case-level filters (project fields) go only to build_manager_overview; the list/population vocabulary stays separate.
         case_filters={k:p2_one(request,k,120) for k in sorted(P2_CASE_PARAMS) if k in request.query_params}
-        with phase(request,'read'): _,_,health,state=p2_read(data,user,P2_LIST_COLLECTIONS)
+        with phase(request,'read'): _,_,health,state=p2_read(data,user,p2_list_load)
         # The same read that feeds the population supplies its C-STATE; this also validates the filters (422).
         page=p2_list_page(state,{'q':'','filters':args['filters'],'cursor':None,'sort':None,'limit':1},state['as_of'],p2_cursor_context(data,user))
         envelope=page['page_state']
