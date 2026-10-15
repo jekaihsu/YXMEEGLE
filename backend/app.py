@@ -26,6 +26,7 @@ from .sources import API, configuration, import_sources
 from .policy import upgrade, CAPABILITIES, MANAGER_CAPABILITIES
 from .operations import apply_operation, project_summary, capable, review_hash, invalidate
 from . import storage
+from .write_footprint import WorkspaceView, resolve as resolve_footprint
 from .learning import apply_learning
 from .approval_capabilities import approval_connection
 from .avatar import avatar_url
@@ -270,13 +271,23 @@ def create_app(overrides=None):
         if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=[c for c in storage.COLLECTIONS if c!='projects'],project_ids=project_ids,project_children=storage.PROJECT_CHILDREN)
         else: state=storage.load(db,BusinessRow,row) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections)
         state=upgrade(state)
+        return seal(db,row,state)
+
+    def seal(db,row,state,*,scoped=False):
+        """What every load adds to a stored state. A scoped load holds only part of the projects, so it checks the rest in SQL."""
         from .workspace_environment import normalize_environment
-        from .case_cutover import initialize_execution_system
+        from .case_cutover import initialize_execution_system,SYSTEMS,isolated
         normalize_environment(state,row.id,cfg)
         state['features']=resolve_features(cfg)
         if state.get('environment')=='production':
-            require(not any(p.get('source_kind') in ('demo','mock','simulation') for p in state.get('projects',[])),
-                    '正式工作區包含隔離示範資料，請由管理員核對',409)
+            if scoped: demo_rows=db.scalar(select(func.count()).select_from(BusinessRow).where(BusinessRow.workspace_id==row.id,BusinessRow.kind=='projects',BusinessRow.data['source_kind'].as_string().in_(('demo','mock','simulation'))))
+            else: demo_rows=sum(p.get('source_kind') in ('demo','mock','simulation') for p in state.get('projects',[]))
+            require(not demo_rows,'正式工作區包含隔離示範資料，請由管理員核對',409)
+        if scoped and not isolated(state):
+            # The full load would classify these cases (and record an event); only the full path may.
+            unclassified=BusinessRow.data['execution_system'].as_string()
+            if db.scalar(select(func.count()).select_from(BusinessRow).where(BusinessRow.workspace_id==row.id,BusinessRow.kind=='projects',or_(unclassified.is_(None),unclassified.notin_(SYSTEMS)))):
+                raise storage.PartialUnavailable('cases without an execution system')
         initialize_execution_system(state)
         if row.id.startswith(('lark-','test-lark-')):
             org=row.id.removeprefix('test-')
@@ -290,6 +301,14 @@ def create_app(overrides=None):
         state['native_approval_authority']={'app_id':cfg.get('LARK_APP_ID'),'tenant':cfg.get('LARK_WORKER_ORGANIZATION')}
         set_company_admin_authority(state,cfg)
         return state
+
+    def load_for_write(db,row,footprint):
+        """load() over just a footprint, with the project order; PartialUnavailable when the stored state needs the full path."""
+        state,order=storage.load_scoped(db,BusinessRow,row,collections=sorted(footprint.collections),project_ids=footprint.project_ids)
+        templates=deepcopy(state['sop_templates']) if 'sop_templates' in footprint.collections else None
+        upgrade(state,generate_sop_candidate='sop_templates' in footprint.collections)
+        if state['events'] or (templates is not None and state['sop_templates']!=templates): raise storage.PartialUnavailable('an upgrade would change shared records')
+        return seal(db,row,state,scoped=True),order
 
     def organization(data):
         return data.get('organization') or data['wid'].removeprefix('test-')
@@ -436,44 +455,90 @@ def create_app(overrides=None):
         if out.get('environment') not in ('test','demo'):
             app.state.case_redaction_stats=case_redaction.apply(out,case_redaction.make_plan(pre,out))
         return out
-    def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None):
+    partial_writes=str(cfg.get('PARTIAL_WRITES_ENABLED','true')).lower()=='true'
+    partial_strict=str(cfg.get('PARTIAL_WRITES_STRICT','false')).lower()=='true'
+    app.state.partial_writes={'committed':0,'declined':0}
+    app.state.last_write={}  # diagnostics: which path the last write took and how long it held the workspace row lock
+
+    def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None,footprint=None):
+        """Run callback on the workspace and commit it as the next version.
+
+        With a footprint only that part is loaded, checked and saved, so the lock covers a
+        few rows instead of the workspace. Anything the footprint cannot serve (a mutation
+        that reaches outside it, an unknown record, legacy rows) runs again on the full path
+        from a rolled back transaction, and strict mode raises instead.
+        """
         require(bool(actor_id),'缺少操作人員身分',403)
+        if footprint is not None and partial_writes and set(project_versions or ())<=set(footprint.project_ids):
+            try: return persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,footprint)
+            except (storage.FootprintViolation,storage.PartialUnavailable) as stop:
+                if partial_strict and isinstance(stop,storage.FootprintViolation): raise
+                declined(action_name,stop)
+            except HTTPException as exc:
+                if exc.status_code!=404: raise
+                declined(action_name,exc)  # a case outside the footprint looks missing; the full path decides
+        return persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,None)
+
+    def declined(action_name,reason):
+        import logging
+        app.state.partial_writes['declined']+=1
+        logging.getLogger(__name__).warning('partial_write_declined action=%s reason=%s',action_name,str(getattr(reason,'detail',reason))[:200])
+
+    def persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,footprint):
+        replay=False
         with sessions.begin() as db:
             row=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one()
+            locked_at=perf_counter()
             if receipt_key:
                 receipt=db.get(Receipt,receipt_key)
                 if receipt:
                     require(receipt.fingerprint==fingerprint,'request_id 已用於不同操作',409)
-                    state=load(db,row)
-                    return public_ws(state,wid,find(state['users'],actor_id,'登入人員'))
-            state=load(db,row)
-            if project_versions:
-                require(all(find(state['projects'],pid).get('concurrency_version',0)==version for pid,version in project_versions.items()),'此案件已被更新，請核對最新內容後重試',409)
-            else: require(row.version==expected,'資料已被其他操作更新，請重新整理後重試',409)
-            expected=row.version
-            if actor_id: require(find(state['users'],actor_id).get('active',True),'帳號已停權',403)
-            if admission_required and wid.startswith(('lark-','test-lark-')):
-                person=db.get(PersonRow,(wid.removeprefix('test-'),actor_id))
-                from .production_access import require_access
-                require_access(person.data if person else None,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=wid.removeprefix('test-').removeprefix('lark-'))
-            if wid.startswith('lark-'): state['as_of']=now()[:10]
-            before=audit.entities(state)
-            callback(state); state['version']=row.version+1
-            if wid.startswith(('lark-','test-lark-')):
-                org=wid
-                for person in state['users']:
-                    profile=db.get(PersonRow,(org,person['id']))
-                    if profile:
-                        if profile.data!=person: profile.data=deepcopy(person)
-                    else: db.add(PersonRow(organization_id=org,person_id=person['id'],data=deepcopy(person)))
-            root=storage.save(db,BusinessRow,wid,state)
-            updated=db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==expected).values(version=expected+1,data=root))
-            require(updated.rowcount==1,'資料版本衝突，請重新整理',409)
-            if receipt_key: db.add(Receipt(id=receipt_key,fingerprint=fingerprint,result={'version':state['version']}))
-            db.add(audit.record(AuditRow,wid,actor_id,action_name,request_id=receipt_key,
-                               details={'version':state['version'],'changes':audit.changes(before,state),
-                                        'business_authority':{k:v for k,v in find(state['users'],actor_id).get('_business_authority',{}).items()
-                                                              if k in ('grant_id','decision_ref','scopes')}}))
+                    if footprint is None:
+                        state=load(db,row)
+                        return public_ws(state,wid,find(state['users'],actor_id,'登入人員'))
+                    replay=True
+            if not replay:
+                if footprint is None: state=view=load(db,row)
+                else:
+                    state,order=load_for_write(db,row,footprint)
+                    view=WorkspaceView(state,footprint.collections,order)
+                if project_versions:
+                    require(all(find(view['projects'],pid).get('concurrency_version',0)==version for pid,version in project_versions.items()),'此案件已被更新，請核對最新內容後重試',409)
+                else: require(row.version==expected,'資料已被其他操作更新，請重新整理後重試',409)
+                expected=row.version
+                if actor_id: require(find(state['users'],actor_id).get('active',True),'帳號已停權',403)
+                if admission_required and wid.startswith(('lark-','test-lark-')):
+                    person=db.get(PersonRow,(wid.removeprefix('test-'),actor_id))
+                    from .production_access import require_access
+                    require_access(person.data if person else None,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=wid.removeprefix('test-').removeprefix('lark-'))
+                if wid.startswith('lark-'): state['as_of']=now()[:10]
+                before=audit.entities(state)
+                callback(view); state['version']=row.version+1
+                if wid.startswith(('lark-','test-lark-')):
+                    org=wid
+                    for person in state['users']:
+                        profile=db.get(PersonRow,(org,person['id']))
+                        if profile:
+                            if profile.data!=person: profile.data=deepcopy(person)
+                        else: db.add(PersonRow(organization_id=org,person_id=person['id'],data=deepcopy(person)))
+                if footprint is None: root=storage.save(db,BusinessRow,wid,state)
+                else: root=storage.save_partial(db,BusinessRow,wid,state,sorted(footprint.collections|{'events'}),footprint.project_ids,order,view=view)
+                updated=db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==expected).values(version=expected+1,data=root))
+                require(updated.rowcount==1,'資料版本衝突，請重新整理',409)
+                if receipt_key: db.add(Receipt(id=receipt_key,fingerprint=fingerprint,result={'version':state['version']}))
+                db.add(audit.record(AuditRow,wid,actor_id,action_name,request_id=receipt_key,
+                                   details={'version':state['version'],'changes':audit.changes(before,state),
+                                            'business_authority':{k:v for k,v in find(state['users'],actor_id).get('_business_authority',{}).items()
+                                                                  if k in ('grant_id','decision_ref','scopes')}}))
+                if footprint is None:
+                    response=public_ws(state,wid,find(state['users'],actor_id,'登入人員'))
+                    app.state.last_write={'path':'full','held_seconds':perf_counter()-locked_at}
+                    return response
+            if not replay: app.state.last_write={'path':'partial','held_seconds':perf_counter()-locked_at}
+        # Committed. The lock is gone, so the full response is read like GET /api/workspace.
+        if not replay: app.state.partial_writes['committed']+=1
+        with sessions() as db:
+            state=load(db,db.get(WorkspaceRow,wid))
             return public_ws(state,wid,find(state['users'],actor_id,'登入人員'))
 
     @app.get('/api/health')
@@ -799,12 +864,12 @@ def create_app(overrides=None):
                 if body.action=='task_start':
                     p=find(ws['projects'],body.project_id); p['execution_status']='in_progress'
             if body.action=='task_update':
-                for p in ws['projects']:
+                for p in affected:
                     for n in p['nodes']:
                         for t in n['tasks']:
                             if t['id']==body.task_id: t['manual_updated']=True
         try:
-            with phase(request,'mutate'): return persist_mutation(data['wid'],body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions)
+            with phase(request,'mutate'): return persist_mutation(data['wid'],body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=resolve_footprint(raw))
         except HTTPException as exc:
             with sessions.begin() as db:
                 db.add(audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,
@@ -818,7 +883,7 @@ def create_app(overrides=None):
         def authorize_upload(ws,actor):
             p=find(ws['projects'],project_id,'案件'); n=find(p['nodes'],node_id,'節點') if node_id else None
             require_execution(ws,p)
-            require(is_pm(actor,p) or (n and (n['owner_id']==actor['id'] or any(is_owner(actor,t,ws) for t in n['tasks']))))
+            require(is_pm(actor,p) or (n and (n['owner_id']==actor['id'] or any(is_owner(actor,t,ws,p) for t in n['tasks']))))
             validate_category(ws,category_id)
             return p,n
         # Check before writing any uploaded bytes, then repeat under the mutation lock.

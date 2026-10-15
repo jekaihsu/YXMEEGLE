@@ -86,12 +86,15 @@ def run(target, projects, repeats, label):
                 assert response.status_code == 200, f'{name} failed: {response.status_code} {response.text[:200]}'
                 with app.state.sessions() as db: assert db.get(WorkspaceRow, WID).version == version + 1, 'version did not advance by one'
                 timing = server_timing(response)
-                samples.append({'total_ms': total * 1000, 'mutate_ms': timing.get('mutate', 0), 'bytes': len(response.content),
+                held = app.state.last_write
+                samples.append({'total_ms': total * 1000, 'mutate_ms': timing.get('mutate', 0), 'lock_held_ms': held['held_seconds'] * 1000,
+                                'partial': held['path'] == 'partial', 'bytes': len(response.content),
                                 **{k + '_ms': v * 1000 for k, v in spent.items()}})
+            paths = sorted({'partial' if s.pop('partial') else 'full' for s in samples})
             keys = sorted({k for s in samples for k in s})
-            report['scenarios'][name] = {k: {'median': round(statistics.median(s.get(k, 0) for s in samples), 1),
+            report['scenarios'][name] = {'paths': paths, **{k: {'median': round(statistics.median(s.get(k, 0) for s in samples), 1),
                                              'min': round(min(s.get(k, 0) for s in samples), 1),
-                                             'max': round(max(s.get(k, 0) for s in samples), 1)} for k in keys}
+                                             'max': round(max(s.get(k, 0) for s in samples), 1)} for k in keys}}
         return report
     finally:
         drop()
@@ -108,10 +111,10 @@ def main():
     report = run(args.db, args.projects, args.repeats, args.label)
     if args.out: Path(args.out).write_text(json.dumps(report, indent=1, ensure_ascii=False))
     print(f"{report['label']} {report['database']} projects={report['projects']} rows={report['business_rows']} runs={report['runs']} (median ms)")
-    columns = ('total_ms', 'mutate_ms', 'load_ms', 'save_ms', 'load_partial_ms', 'save_partial_ms', 'save_collections_ms')
-    print(f"{'scenario':16}" + ''.join(f'{c[:-3]:>16}' for c in columns))
+    columns = ('total_ms', 'mutate_ms', 'lock_held_ms', 'load_ms', 'save_ms', 'load_partial_ms', 'save_partial_ms')
+    print(f"{'scenario':16}" + ''.join(f'{c[:-3]:>14}' for c in columns))
     for name, stats in report['scenarios'].items():
-        print(f'{name:16}' + ''.join(f"{stats.get(c, {}).get('median', 0):16.1f}" for c in columns))
+        print(f'{name:16}' + ''.join(f"{stats.get(c, {}).get('median', 0):14.1f}" for c in columns) + '  ' + '+'.join(stats['paths']))
 
 
 if __name__ == '__main__':
