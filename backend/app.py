@@ -993,7 +993,7 @@ def create_app(overrides=None):
         cache_data=state=None
         if data['mode']=='lark' and not data['wid'].startswith('test-'):
             with sessions() as db:
-                cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']))
+                cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']),collections=P2_LIST_COLLECTIONS)
                 cache_data=cache.data if cache else None
         return source_health_from(data,user,freshness,cache_data,state)
 
@@ -1009,6 +1009,8 @@ def create_app(overrides=None):
     P2_CASE_PARAMS=frozenset({'pm_id','execution_status'})
     P2_FILTER_PARAMS=('source_version','pm','admission_state','deadline_from','deadline_to')
     P2_SOURCE_STATUS={'forbidden':'forbidden','read_failed':'error','loading':'loading','unlocated':'unlocated','partial':'partial','stale':'stale'}
+    # What the list pages and Source Health render; task trees, events and daily reports stay in the database.
+    P2_LIST_COLLECTIONS=('users','projects','sop_templates','source_quotes','source_confirmations','contract_items','source_work_items')
 
     def p2_narrowed_state(state,user,page,freshness):
         """filter_visible_cases -> filter_private_workspace -> case_redaction (non test/demo) over a captured workspace state.
@@ -1047,11 +1049,12 @@ def create_app(overrides=None):
         data=(cache.data or {}) if cache else {}
         return (row.version if row else None,data.get('status'),data.get('last_attempt_at'),data.get('last_sync'),data.get('as_of'))
 
-    def p2_read(data,user):
+    def p2_read(data,user,collections=None):
         """Health and module input come from ONE capture fenced by a generation read BEFORE the first input read
         (freshness, cache, workspace) and re-checked after the last. A capture is returned only after its fence
         passed; when the bounded retries are exhausted nothing from any rejected capture is returned: the input is an
-        empty state under a read_failed page state (rows/counts/ids/labels absent, never current)."""
+        empty state under a read_failed page state (rows/counts/ids/labels absent, never current).
+        ``collections`` scopes the load to the workspace collections the caller renders; None loads the whole workspace."""
         wid=data['wid']
         app.state.live_read.ensure(wid,'sources')
         for _ in range(3):
@@ -1059,7 +1062,7 @@ def create_app(overrides=None):
             freshness=app.state.live_read.status(wid)
             with sessions() as db:
                 cache=db.get(CacheRow,wid);cache_data=deepcopy(cache.data) if cache else None
-                state=load(db,db.get(WorkspaceRow,wid))
+                state=load(db,db.get(WorkspaceRow,wid),collections=collections)
             health=source_health_from(data,user,freshness,cache_data,deepcopy(state))
             with sessions() as db: unchanged=p2_generation(db,wid)==generation
             if unchanged: return data,user,health,p2_narrowed_state(state,user,health.get('page_state'),freshness)
@@ -1102,7 +1105,7 @@ def create_app(overrides=None):
     def confirmations(request:Request):
         data,user=identity(request)
         args=p2_list_args(request)
-        _,_,_,state=p2_read(data,user)
+        _,_,_,state=p2_read(data,user,P2_LIST_COLLECTIONS)
         return p2_list_page(state,args,state['as_of'],p2_cursor_context(data,user))
 
     @app.get('/api/manager-overview')
@@ -1113,7 +1116,7 @@ def create_app(overrides=None):
         args=p2_list_args(request,frozenset(P2_FILTER_PARAMS)|P2_CASE_PARAMS)
         # Case-level filters (project fields) go only to build_manager_overview; the list/population vocabulary stays separate.
         case_filters={k:p2_one(request,k,120) for k in sorted(P2_CASE_PARAMS) if k in request.query_params}
-        _,_,health,state=p2_read(data,user)
+        _,_,health,state=p2_read(data,user,P2_LIST_COLLECTIONS)
         # The same read that feeds the population supplies its C-STATE; this also validates the filters (422).
         page=p2_list_page(state,{'q':'','filters':args['filters'],'cursor':None,'sort':None,'limit':1},state['as_of'],p2_cursor_context(data,user))
         envelope=page['page_state']
