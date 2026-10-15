@@ -257,3 +257,37 @@ def test_a_daily_mapping_is_proposed_and_approved_identically(pair, daily):
     assert a.status_code == 200, a.text
     same(full, partial, 'daily_approve')
     assert partial.app.state.partial_writes == {'committed': 2, 'declined': 0}
+
+
+@pytest.fixture
+def company(tmp_path, monkeypatch):
+    """The company workspace: roster admission, person profiles, production-only checks."""
+    Pinned(monkeypatch)
+    full = Rig(tmp_path, 'cfull', partial=False, projects=PROJECTS, production=True)
+    partial = Rig(tmp_path, 'cpartial', partial=True, projects=PROJECTS, world=full.world, production=True)
+    yield full, partial
+    full.close(); partial.close()
+
+
+@pytest.mark.parametrize('action', ['task_start', 'task_complete', 'task_update', 'comment_add', 'evidence_submit', 'participants_update', 'file_link'])
+def test_a_company_workspace_stores_what_the_full_path_stores(company, action):
+    full, partial = company
+    user, fields = scenarios(full.world, 2)[action][1]
+    a, b = both(full, partial, user, action, **fields)
+    assert a.status_code == 200, a.text
+    same(full, partial, action)
+    assert partial.app.state.partial_writes == {'committed': 1, 'declined': 0}
+
+
+def test_a_company_workspace_with_unclassified_cases_takes_the_full_path(company):
+    """The full load would classify them and record an event; only the full path may."""
+    full, partial = company
+    for rig in (full, partial):
+        with rig.app.state.sessions.begin() as db:
+            row = db.get(BusinessRow, (rig.wid, 'projects', 'p003'))
+            data = dict(row.data); data.pop('execution_system'); row.data = data
+    user, fields = scenarios(full.world, 2)[ 'task_start'][0]
+    a, b = both(full, partial, user, 'task_start', **fields)
+    assert a.status_code == 200
+    same(full, partial, 'unclassified')
+    assert partial.app.state.partial_writes == {'committed': 0, 'declined': 1}

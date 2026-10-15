@@ -15,8 +15,9 @@ from sqlalchemy import create_engine, select, text
 
 from . import audit, mention_notifications, storage, workflow
 from .app import create_app
-from .models import (AuditRow, BusinessRow, Receipt, WorkspaceRow, ProjectIndex, TaskIndex, WorkspaceCounter)
-from .write_world import WID, build_world
+from copy import deepcopy
+from .models import (AuditRow, AuthRow, BusinessRow, PersonRow, Receipt, WorkspaceRow, ProjectIndex, TaskIndex, WorkspaceCounter)
+from .write_world import COMPANY_WID, WID, build_world
 
 POSTGRES = os.environ.get('PARTIAL_WRITES_TEST_POSTGRES_URL') or os.environ.get('ACTION_AUDIT_TEST_POSTGRES_URL')
 CLOCK = datetime(2026, 10, 15, 8, 0, 0, tzinfo=timezone(timedelta(hours=8)))
@@ -54,27 +55,34 @@ def database_url(tmp_path, name):
 class Rig:
     """One app on one database holding the world, driven through HTTP."""
 
-    def __init__(self, tmp_path, name, *, partial, projects=40, extra=None, world=None):
+    def __init__(self, tmp_path, name, *, partial, projects=40, extra=None, world=None, production=False):
+        self.production = production; self.wid = COMPANY_WID if production else WID
         self.url, self.drop = database_url(tmp_path, name)
         cfg = {'DATABASE_URL': self.url, 'UPLOAD_DIR': tempfile.mkdtemp(), 'SESSION_SECRET': 'x' * 40, 'APP_ENV': 'development',
                'DEMO_MODE': 'true', 'INDEX_TABLES_ENABLED': 'true', 'WORKSPACE_SHELL_ENABLED': 'true', 'FEATURE_CHANGE_EXTENSION': 'true',
                'PARTIAL_WRITES_ENABLED': 'true' if partial else 'false', 'PARTIAL_WRITES_STRICT': 'true', **(extra or {})}
+        if production:
+            cfg.update(LARK_APP_ID='app1', LARK_WORKER_IDENTITY='application', LARK_WORKER_ORGANIZATION='tenant', LARK_ALLOWED_TENANTS='tenant')
         self.app = create_app(cfg)
-        self.world = world or build_world(projects)
+        self.world = world or build_world(projects, production)
         with self.app.state.sessions.begin() as db:
-            row = WorkspaceRow(id=WID, version=1, data=self.world); db.add(row); db.flush()
-            row.data = storage.save(db, BusinessRow, WID, self.world)
+            row = WorkspaceRow(id=self.wid, version=1, data=self.world); db.add(row); db.flush()
+            row.data = storage.save(db, BusinessRow, self.wid, self.world)
+            if production:
+                db.add(AuthRow(id='s1', data={'expires': 4102444800, 'wid': self.wid}))
+                for u in self.world['users']: db.add(PersonRow(organization_id=self.wid, person_id=u['id'], data=deepcopy(u)))
         self.client = TestClient(self.app, raise_server_exceptions=True)
         self.counter = itertools.count(1)
         self.uuids = itertools.count(1); self.audits = itertools.count(1)
         Pinned.active = self
 
     def version(self):
-        with self.app.state.sessions() as db: return db.get(WorkspaceRow, WID).version
+        with self.app.state.sessions() as db: return db.get(WorkspaceRow, self.wid).version
 
     def as_user(self, uid):
         Pinned.active = self
-        self.client.cookies.set('meegle_session', self.app.state.signer.dumps({'mode': 'demo', 'uid': uid, 'wid': WID}))
+        session = {'mode': 'lark', 'uid': uid, 'wid': self.wid, 'sid': 's1'} if self.production else {'mode': 'demo', 'uid': uid, 'wid': WID}
+        self.client.cookies.set('meegle_session', self.app.state.signer.dumps(session))
 
     def act(self, user, action, *, version=None, request_id=None, project_versions=None, **fields):
         self.as_user(user)
@@ -90,7 +98,7 @@ class Rig:
 
     def project_version(self, pid):
         with self.app.state.sessions() as db:
-            return db.get(BusinessRow, (WID, 'projects', pid)).data.get('concurrency_version', 0)
+            return db.get(BusinessRow, (self.wid, 'projects', pid)).data.get('concurrency_version', 0)
 
     def dump(self):
         """Every table a write may touch, as sorted plain data."""
@@ -98,7 +106,7 @@ class Rig:
             def rows(model, *keys):
                 return sorted(([getattr(r, c.name) for c in model.__table__.columns] for r in db.scalars(select(model))), key=lambda v: [str(v[i]) for i in range(len(keys))])
             return {'workspaces': rows(WorkspaceRow, 'id'), 'business_records': rows(BusinessRow, 'workspace_id', 'kind', 'entity_id'),
-                    'receipts': rows(Receipt, 'id'), 'action_audit': rows(AuditRow, 'id'),
+                    'receipts': rows(Receipt, 'id'), 'action_audit': rows(AuditRow, 'id'), 'company_people': rows(PersonRow, 'organization_id', 'person_id'),
                     'project_index': rows(ProjectIndex, 'workspace_id', 'project_id'), 'task_index': rows(TaskIndex, 'workspace_id', 'task_id'),
                     'workspace_counters': rows(WorkspaceCounter, 'workspace_id', 'key', 'subject_id')}
 
@@ -113,7 +121,7 @@ def first_difference(full, partial):
         if len(left) != len(right): return f'{table}: {len(left)} rows on the full path, {len(partial[table])} on the partial path'
         for a, b in zip(left, right):
             if a != b:
-                names = [c.name for c in {'workspaces': WorkspaceRow, 'business_records': BusinessRow, 'receipts': Receipt, 'action_audit': AuditRow,
+                names = [c.name for c in {'workspaces': WorkspaceRow, 'business_records': BusinessRow, 'receipts': Receipt, 'action_audit': AuditRow, 'company_people': PersonRow,
                                          'project_index': ProjectIndex, 'task_index': TaskIndex, 'workspace_counters': WorkspaceCounter}[table].__table__.columns]
                 columns = [n for n, x, y in zip(names, a, b) if x != y]
                 return f'{table} {a[:3]}: columns {columns} differ\n  full:    {[x for n, x in zip(names, a) if n in columns]}\n  partial: {[y for n, y in zip(names, b) if n in columns]}'

@@ -62,22 +62,41 @@ class SourceSyncService:
         """The root document of state, written the way storage.save would write it for a root-only change."""
         return storage.save_collections(db,self.B,row.id,state,()) if light else storage.save(db,self.B,row.id,state)
 
-    def _prepare(self,wid,digest,skip_unchanged):
-        """Load (and fingerprint) the workspace before taking its lock.
+    def _prepare(self,wid,snapshot,digest,skip_unchanged,actor_id):
+        """Load, fingerprint and fold the records into the workspace before taking its lock.
 
         Every content write bumps the workspace version, so a state read at one version that
-        is still that version under the lock is exactly what the lock would have loaded.
+        is still that version under the lock is exactly what the lock would have loaded, and
+        the import done on it is the import the lock would have done. Anything that fails
+        here is left for the locked path to fail properly.
         """
         with self.sessions() as db:
             row=db.get(self.W,wid)
             if row is None: return None
-            version=row.version; state=self._state(db,row); matches=None
+            version=row.version; state=self._state(db,row); matches=None; plan=None
             if skip_unchanged:
                 status=state.get('source_status',{})
                 matches=(status.get('projection_fingerprint')==digest and status.get('projection_version')==SOURCE_PROJECTION_VERSION
                          and status.get('projection_state_fingerprint')==projection_fingerprint(state))
+            if not matches:
+                try:
+                    candidate=deepcopy(snapshot); candidate.update(fingerprint=digest,as_of=candidate['last_sync'],source_message=candidate['message'])
+                    self._import(state,candidate,self._actor(db,wid,state,actor_id))
+                    plan=candidate
+                except Exception: return None
             if db.scalar(select(self.W.version).where(self.W.id==wid))!=version: return None
-            return {'version':version,'state':state,'matches':matches}
+            return {'version':version,'state':state,'matches':matches,'plan':plan}
+
+    def _import(self,state,snapshot,actor):
+        """The heavy half of an apply: fold the records into the state and count what is visible."""
+        from .source_case_policy import apply_source_reference_policy,visible_project
+        admissible=snapshot['records']
+        snapshot['mapping']=import_sources(state,admissible,complete_tables=snapshot['tables'])
+        apply_source_reference_policy(state,snapshot,actor)
+        visible=[p for p in state['projects'] if visible_project(state,p)]
+        snapshot['mapping']['projects']=sum(p.get('case_type','formal')=='formal' for p in visible)
+        snapshot['mapping']['intakes']=sum(p.get('case_type')=='intake' for p in visible)
+        snapshot['case_filter']={'admitted_records':len(admissible),'source_records':len(snapshot['records'])}
 
     def _actor(self,db,wid,state,actor_id):
         if actor_id is None:
@@ -151,7 +170,7 @@ class SourceSyncService:
                 '來源紀錄識別或核定表格不符；保留上次成功資料',409)
         from .live_read.fingerprint import fingerprint
         digest=fingerprint(snapshot)
-        prepared=self._prepare(wid,digest,skip_unchanged) if self.partial else None
+        prepared=self._prepare(wid,snapshot,digest,skip_unchanged,actor_id) if self.partial else None
         with self.sessions.begin() as db:
             row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update()); require(row is not None,'工作區不存在',404)
             fresh=prepared is not None and prepared['version']==row.version
@@ -167,8 +186,9 @@ class SourceSyncService:
                 previous=cached_time
             require(not previous or datetime.fromisoformat(snapshot['last_sync'])>=datetime.fromisoformat(previous),'來源快照早於上次成功資料，保留最新資料',409)
             status=state.get('source_status',{})
+            planned=prepared['plan'] if fresh else None
             projection_matches=(prepared['matches'] if fresh and skip_unchanged
-                                else status.get('projection_fingerprint')==digest
+                                else skip_unchanged and status.get('projection_fingerprint')==digest
                                 and status.get('projection_version')==SOURCE_PROJECTION_VERSION
                                 and status.get('projection_state_fingerprint')==projection_fingerprint(state))
             if (skip_unchanged and projection_matches and cache
@@ -189,15 +209,11 @@ class SourceSyncService:
                                    .values(version=row.version+1,data=root))
                 require(changed.rowcount==1,'來源同步版本衝突，請重試',409)
                 return value
-            snapshot.update(fingerprint=digest,as_of=snapshot['last_sync'],source_message=snapshot['message'])
-            from .source_case_policy import apply_source_reference_policy,visible_project
-            admissible=snapshot['records']
-            snapshot['mapping']=import_sources(state,admissible,complete_tables=snapshot['tables'])
-            apply_source_reference_policy(state,snapshot,actor)
-            visible=[p for p in state['projects'] if visible_project(state,p)]
-            snapshot['mapping']['projects']=sum(p.get('case_type','formal')=='formal' for p in visible)
-            snapshot['mapping']['intakes']=sum(p.get('case_type')=='intake' for p in visible)
-            snapshot['case_filter']={'admitted_records':len(admissible),'source_records':len(snapshot['records'])}
+            if planned is not None:
+                snapshot.clear(); snapshot.update(planned)
+            else:
+                snapshot.update(fingerprint=digest,as_of=snapshot['last_sync'],source_message=snapshot['message'])
+                self._import(state,snapshot,actor)
             mapping=snapshot['mapping']
             mapping['daily_total']=mapping['daily_imported']+mapping['daily_unmatched']
             warnings=[]

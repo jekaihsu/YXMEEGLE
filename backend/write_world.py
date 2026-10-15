@@ -10,10 +10,11 @@ from .perf_fixture import build_scaled_workspace
 from .policy import upgrade
 
 WID = 'demo-bench'
+COMPANY_WID = 'lark-tenant'
 MAPPED = {'state': 'mapped', 'canonical': '執行中', 'reasons': []}
 
 
-def build_world(n_projects=420):
+def build_world(n_projects=420, production=False):
     ws = build_scaled_workspace(n_projects)
     for p in ws['projects']:
         p['source_lifecycle'] = deepcopy(MAPPED)
@@ -43,6 +44,12 @@ def build_world(n_projects=420):
     upgrade(ws)
     ws['version'] = 1
     ws['environment'] = 'demo'
+    if production:
+        # A company workspace: people must be admitted by the roster before they can be assigned or act.
+        ws['environment'] = 'production'
+        ws['people_directory_status'] = {'app_id': 'app1', 'status': 'ready'}
+        for u in ws['users']:
+            u.update(identity_app_id='app1', directory_status='employed', directory_source={'app_id': 'app1', 'record_id': f'rec-{u["id"]}'})
     return ws
 
 

@@ -103,3 +103,25 @@ def test_a_user_write_between_the_early_read_and_the_lock_forces_a_fresh_load(tw
     partial.service.sync(partial.wid, 'u-manager', 'fake')
     state, cache = partial.read()
     assert state['version'] == 3 and cache['status'] == 'ready' and state['source_status']['sync_revision'] == 1
+
+
+def test_the_import_runs_before_the_lock_unless_the_version_moved(twins, monkeypatch):
+    full, partial = twins
+    advance(full, partial, '2026-09-27T10:05:00+08:00')
+    inside, seen = [False], []
+    for side in (full, partial):
+        begin = side.sessions.begin
+        class Locked:
+            def __init__(self, context): self.context = context
+            def __enter__(self): inside[0] = True; return self.context.__enter__()
+            def __exit__(self, *a):
+                inside[0] = False; return self.context.__exit__(*a)
+        side.sessions.begin = lambda *a, _b=begin, **k: Locked(_b(*a, **k))
+    original = source_sync.import_sources
+    monkeypatch.setattr(source_sync, 'import_sources', lambda *a, **k: (seen.append(inside[0]), original(*a, **k))[1])
+    for side in (full, partial): side.service.fetcher = lambda token: snapshot('2026-09-27T10:05:00+08:00', records())
+    Pinned.active = full.pin; full.service.sync(full.wid, 'u-manager', 'fake')
+    Pinned.active = partial.pin; partial.service.sync(partial.wid, 'u-manager', 'fake')
+    assert seen == [True, False], 'the full path imports under the lock, the partial path before it'
+    a, b = dump(full), dump(partial)
+    assert a['records'] == b['records'] and a['workspace'] == b['workspace']

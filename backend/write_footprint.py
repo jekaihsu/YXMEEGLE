@@ -16,9 +16,6 @@ from .storage import COLLECTIONS, FootprintViolation
 CASE_RECORDS = frozenset({'users', 'approvals', 'delegations', 'approved_leave_delegations', 'input_revisions',
                           'financial_requests', 'sop_templates'})
 
-# Set to a list in tests to learn which collections a request touched.
-OBSERVER = None
-
 
 @dataclass(frozen=True)
 class Footprint:
@@ -162,37 +159,36 @@ class WorkspaceView(MutableMapping):
         self._events = EventLog(raw['events'])
         raw['events'] = self._events
 
-    def _check(self, key, access):
-        if OBSERVER is not None and key in COLLECTIONS: OBSERVER.append((key, access))
+    def _check(self, key):
         if key in COLLECTIONS and key not in self.allowed and key not in ('projects', 'events'):
             raise FootprintViolation(f'{key} is outside the footprint')
 
     def __getitem__(self, key):
-        self._check(key, 'read')
+        self._check(key)
         if key == 'projects': return self._projects
         return self.raw[key]
 
     def get(self, key, default=None):
-        self._check(key, 'read')
+        self._check(key)
         if key == 'projects': return self._projects
         return self.raw.get(key, default)
 
     def __contains__(self, key):
-        self._check(key, 'read')
+        self._check(key)
         return key in self.raw
 
     def __setitem__(self, key, value):
-        self._check(key, 'write')
+        self._check(key)
         if key in ('projects', 'events'): raise FootprintViolation(f'{key} cannot be replaced by a partial write')
         self.raw[key] = value
 
     def __delitem__(self, key):
-        self._check(key, 'write')
+        self._check(key)
         if key in COLLECTIONS: raise FootprintViolation(f'{key} cannot be removed by a partial write')
         del self.raw[key]
 
     def setdefault(self, key, default=None):
-        self._check(key, 'read')
+        self._check(key)
         if key == 'projects': return self._projects
         return self.raw.setdefault(key, default)
 

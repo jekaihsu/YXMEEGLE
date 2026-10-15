@@ -2,167 +2,247 @@
  "label": "before",
  "database": "sqlite",
  "projects": 420,
- "business_rows": 44324,
+ "business_rows": 44511,
  "runs": 7,
  "scenarios": {
   "task_start": {
+   "paths": [
+    "full"
+   ],
    "bytes": {
-    "median": 18452399,
-    "min": 18439848,
-    "max": 18453513
+    "median": 18500403,
+    "min": 18487852,
+    "max": 18501517
    },
    "load_ms": {
-    "median": 143.4,
-    "min": 130.2,
-    "max": 165.9
+    "median": 150.1,
+    "min": 131.1,
+    "max": 165.5
+   },
+   "load_partial_ms": {
+    "median": 1.8,
+    "min": 1.8,
+    "max": 1.9
+   },
+   "lock_held_ms": {
+    "median": 1874.6,
+    "min": 1832.5,
+    "max": 1889.3
+   },
+   "mutate_ms": {
+    "median": 1883.6,
+    "min": 1841.4,
+    "max": 1898.3
+   },
+   "save_ms": {
+    "median": 924.8,
+    "min": 896.7,
+    "max": 938.4
+   },
+   "total_ms": {
+    "median": 2353.9,
+    "min": 2317.8,
+    "max": 2374.7
+   }
+  },
+  "comment_add": {
+   "paths": [
+    "full"
+   ],
+   "bytes": {
+    "median": 18503195,
+    "min": 18490497,
+    "max": 18504452
+   },
+   "load_ms": {
+    "median": 148.7,
+    "min": 146.6,
+    "max": 161.5
    },
    "load_partial_ms": {
     "median": 1.9,
     "min": 1.8,
-    "max": 4.2
+    "max": 14.9
+   },
+   "lock_held_ms": {
+    "median": 1884.8,
+    "min": 1864.2,
+    "max": 1897.1
    },
    "mutate_ms": {
-    "median": 1853.2,
-    "min": 1808.9,
-    "max": 1888.2
+    "median": 1894.1,
+    "min": 1873.1,
+    "max": 1906.1
    },
    "save_ms": {
-    "median": 886.3,
-    "min": 878.8,
-    "max": 916.6
+    "median": 923.5,
+    "min": 897.6,
+    "max": 939.4
    },
    "total_ms": {
-    "median": 2315.3,
-    "min": 2282.1,
-    "max": 2354.1
-   }
-  },
-  "task_complete": {
-   "bytes": {
-    "median": 18454910,
-    "min": 18442451,
-    "max": 18455931
-   },
-   "load_ms": {
-    "median": 145.4,
-    "min": 142.7,
-    "max": 149.4
-   },
-   "load_partial_ms": {
-    "median": 1.8,
-    "min": 1.8,
-    "max": 1.9
-   },
-   "mutate_ms": {
-    "median": 1864.2,
-    "min": 1853.3,
-    "max": 1872.7
-   },
-   "save_ms": {
-    "median": 887.9,
-    "min": 879.9,
-    "max": 917.0
-   },
-   "total_ms": {
-    "median": 2328.0,
-    "min": 2312.4,
-    "max": 2336.0
-   }
-  },
-  "comment_add": {
-   "bytes": {
-    "median": 18457608,
-    "min": 18444911,
-    "max": 18458865
-   },
-   "load_ms": {
-    "median": 145.2,
-    "min": 138.4,
-    "max": 154.2
-   },
-   "load_partial_ms": {
-    "median": 1.8,
-    "min": 1.8,
-    "max": 2.0
-   },
-   "mutate_ms": {
-    "median": 1883.3,
-    "min": 1844.5,
-    "max": 1959.7
-   },
-   "save_ms": {
-    "median": 912.1,
-    "min": 886.3,
-    "max": 920.8
-   },
-   "total_ms": {
-    "median": 2350.9,
-    "min": 2298.9,
-    "max": 2459.0
+    "median": 2362.4,
+    "min": 2329.8,
+    "max": 2383.6
    }
   },
   "evidence_submit": {
+   "paths": [
+    "full"
+   ],
    "bytes": {
-    "median": 18460882,
-    "min": 18447918,
-    "max": 18462388
+    "median": 18506525,
+    "min": 18493505,
+    "max": 18508031
    },
    "load_ms": {
-    "median": 143.1,
-    "min": 125.8,
-    "max": 151.9
+    "median": 155.5,
+    "min": 148.5,
+    "max": 169.4
    },
    "load_partial_ms": {
-    "median": 1.8,
+    "median": 1.9,
     "min": 1.8,
-    "max": 2.0
+    "max": 15.0
+   },
+   "lock_held_ms": {
+    "median": 1896.2,
+    "min": 1859.2,
+    "max": 1899.3
    },
    "mutate_ms": {
-    "median": 1885.1,
-    "min": 1846.0,
-    "max": 1956.7
+    "median": 1905.1,
+    "min": 1868.1,
+    "max": 1908.3
    },
    "save_ms": {
-    "median": 896.9,
-    "min": 871.2,
-    "max": 935.8
+    "median": 930.9,
+    "min": 918.6,
+    "max": 938.6
    },
    "total_ms": {
-    "median": 2352.9,
-    "min": 2341.8,
-    "max": 2447.3
+    "median": 2346.6,
+    "min": 2343.7,
+    "max": 2384.2
    }
   },
   "node_complete": {
+   "paths": [
+    "full"
+   ],
    "bytes": {
-    "median": 18465318,
-    "min": 18453688,
-    "max": 18468848
+    "median": 18511317,
+    "min": 18499365,
+    "max": 18512921
    },
    "load_ms": {
-    "median": 129.5,
-    "min": 125.4,
-    "max": 154.7
+    "median": 150.5,
+    "min": 127.9,
+    "max": 165.9
    },
    "load_partial_ms": {
-    "median": 1.8,
-    "min": 1.8,
-    "max": 1.9
+    "median": 1.9,
+    "min": 1.9,
+    "max": 14.9
+   },
+   "lock_held_ms": {
+    "median": 1878.9,
+    "min": 1855.6,
+    "max": 1902.2
    },
    "mutate_ms": {
-    "median": 1864.3,
-    "min": 1838.5,
-    "max": 1892.5
+    "median": 1887.9,
+    "min": 1864.6,
+    "max": 1911.1
    },
    "save_ms": {
-    "median": 924.0,
-    "min": 870.0,
-    "max": 927.1
+    "median": 933.8,
+    "min": 887.0,
+    "max": 945.4
    },
    "total_ms": {
-    "median": 2357.4,
-    "min": 2309.7,
-    "max": 2380.3
+    "median": 2380.9,
+    "min": 2347.6,
+    "max": 2389.1
+   }
+  },
+  "node_skip_create": {
+   "paths": [
+    "full"
+   ],
+   "bytes": {
+    "median": 18410061,
+    "min": 18402354,
+    "max": 18417768
+   },
+   "load_ms": {
+    "median": 147.2,
+    "min": 129.1,
+    "max": 164.5
+   },
+   "load_partial_ms": {
+    "median": 1.9,
+    "min": 1.9,
+    "max": 2.0
+   },
+   "lock_held_ms": {
+    "median": 1890.5,
+    "min": 1848.4,
+    "max": 1902.1
+   },
+   "mutate_ms": {
+    "median": 1900.2,
+    "min": 1857.3,
+    "max": 1911.2
+   },
+   "save_ms": {
+    "median": 927.6,
+    "min": 888.5,
+    "max": 937.9
+   },
+   "total_ms": {
+    "median": 2375.8,
+    "min": 2346.8,
+    "max": 2386.0
+   }
+  },
+  "daily_propose": {
+   "paths": [
+    "full"
+   ],
+   "bytes": {
+    "median": 18420810,
+    "min": 18418527,
+    "max": 18423096
+   },
+   "load_ms": {
+    "median": 149.6,
+    "min": 130.8,
+    "max": 157.1
+   },
+   "load_partial_ms": {
+    "median": 2.0,
+    "min": 1.9,
+    "max": 2.1
+   },
+   "lock_held_ms": {
+    "median": 1887.2,
+    "min": 1864.7,
+    "max": 1907.5
+   },
+   "mutate_ms": {
+    "median": 1896.8,
+    "min": 1873.9,
+    "max": 1916.4
+   },
+   "save_ms": {
+    "median": 928.9,
+    "min": 887.8,
+    "max": 942.2
+   },
+   "total_ms": {
+    "median": 2377.6,
+    "min": 2342.3,
+    "max": 2388.0
    }
   }
  }
