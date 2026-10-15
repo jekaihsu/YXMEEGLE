@@ -240,5 +240,20 @@ def test_mentions_load_the_job_queue_and_still_match(pair):
 
 
 def test_every_registered_action_has_an_equivalence_test():
-    covered = set(CONVERTED) | {'node_skip_submit', 'node_skip_vote', 'node_skip_apply', 'node_skip_withdraw', 'delivery_review', 'review_vote'}
+    covered = set(CONVERTED) | {'daily_approve', 'node_skip_submit', 'node_skip_vote', 'node_skip_apply', 'node_skip_withdraw', 'delivery_review', 'review_vote'}
     assert set(write_footprint.RULES) == covered
+
+
+@pytest.mark.parametrize('daily', ['unmatched', 'held by another case'])
+def test_a_daily_mapping_is_proposed_and_approved_identically(pair, daily):
+    full, partial = pair
+    user, fields = scenarios(full.world, 2)['daily_propose'][0]
+    if daily != 'unmatched': fields = dict(fields, payload={'daily_id': 'dr1', 'reason': '改掛正確案件'})
+    a, b = both(full, partial, user, 'daily_propose', **fields)
+    assert a.status_code == 200, a.text
+    same(full, partial, 'daily_propose')
+    review = b.json()['daily_reviews'][-1]['id']
+    a, b = both(full, partial, 'u-manager', 'daily_approve', project_id=fields['project_id'], payload={'id': review})
+    assert a.status_code == 200, a.text
+    same(full, partial, 'daily_approve')
+    assert partial.app.state.partial_writes == {'committed': 2, 'declined': 0}

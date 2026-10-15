@@ -26,7 +26,7 @@ from .sources import API, configuration, import_sources
 from .policy import upgrade, CAPABILITIES, MANAGER_CAPABILITIES
 from .operations import apply_operation, project_summary, capable, review_hash, invalidate
 from . import storage
-from .write_footprint import WorkspaceView, resolve as resolve_footprint
+from .write_footprint import WorkspaceView, Lookup, resolve as resolve_footprint, RULES as FOOTPRINT_RULES
 from .learning import apply_learning
 from .approval_capabilities import approval_connection
 from .avatar import avatar_url
@@ -463,13 +463,14 @@ def create_app(overrides=None):
     def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None,footprint=None):
         """Run callback on the workspace and commit it as the next version.
 
-        With a footprint only that part is loaded, checked and saved, so the lock covers a
+        footprint, when given, is a function from a Lookup to the Footprint of this request
+        (or None). Only that part is then loaded, checked and saved, so the lock covers a
         few rows instead of the workspace. Anything the footprint cannot serve (a mutation
         that reaches outside it, an unknown record, legacy rows) runs again on the full path
         from a rolled back transaction, and strict mode raises instead.
         """
         require(bool(actor_id),'缺少操作人員身分',403)
-        if footprint is not None and partial_writes and set(project_versions or ())<=set(footprint.project_ids):
+        if footprint is not None and partial_writes:
             try: return persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,footprint)
             except (storage.FootprintViolation,storage.PartialUnavailable) as stop:
                 if partial_strict and isinstance(stop,storage.FootprintViolation): raise
@@ -484,7 +485,7 @@ def create_app(overrides=None):
         app.state.partial_writes['declined']+=1
         logging.getLogger(__name__).warning('partial_write_declined action=%s reason=%s',action_name,str(getattr(reason,'detail',reason))[:200])
 
-    def persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,footprint):
+    def persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,resolver):
         replay=False
         with sessions.begin() as db:
             row=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one()
@@ -493,11 +494,14 @@ def create_app(overrides=None):
                 receipt=db.get(Receipt,receipt_key)
                 if receipt:
                     require(receipt.fingerprint==fingerprint,'request_id 已用於不同操作',409)
-                    if footprint is None:
+                    if resolver is None:
                         state=load(db,row)
                         return public_ws(state,wid,find(state['users'],actor_id,'登入人員'))
                     replay=True
             if not replay:
+                footprint=resolver(Lookup(db,BusinessRow,wid)) if resolver is not None else None
+                if resolver is not None and (footprint is None or not set(project_versions or ())<=set(footprint.project_ids)):
+                    raise storage.PartialUnavailable('this request has no footprint')
                 if footprint is None: state=view=load(db,row)
                 else:
                     state,order=load_for_write(db,row,footprint)
@@ -869,7 +873,7 @@ def create_app(overrides=None):
                         for t in n['tasks']:
                             if t['id']==body.task_id: t['manual_updated']=True
         try:
-            with phase(request,'mutate'): return persist_mutation(data['wid'],body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=resolve_footprint(raw))
+            with phase(request,'mutate'): return persist_mutation(data['wid'],body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=(lambda lookup:resolve_footprint(raw,lookup)) if raw['action'] in FOOTPRINT_RULES else None)
         except HTTPException as exc:
             with sessions.begin() as db:
                 db.add(audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,

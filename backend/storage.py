@@ -38,21 +38,23 @@ class FootprintViolation(BaseException):
     """
 
 def _adder(desired,origin):
-    def add(kind,record,parent='',ordinal=0):
-        item=deepcopy(record); ident=str(item.get('id') or f'{parent}:{ordinal}')
+    def add(kind,record,parent='',ordinal=0,nested=()):
+        # Nested lists become rows of their own, so they are copied there and not here.
+        item={k:deepcopy(v) for k,v in record.items() if k not in nested}; ident=str(item.get('id') or f'{parent}:{ordinal}')
         if (kind,ident) in desired: raise ValueError(f'duplicate record id in {origin}: kind={kind} id={ident}')
         desired[(kind,ident)]={'parent_id':parent,'ordinal':ordinal,'data':item}
         return item
     return add
 
 def _flatten_project(add,record,ordinal):
-    row=add('projects',record,ordinal=ordinal); pid=record['id']
-    for j,node in enumerate(row.pop('nodes',[])):
-        nr=add('nodes',node,pid,j)
-        for k,task in enumerate(nr.pop('tasks',[])): add('tasks',task,node['id'],k)
-        for k,review in enumerate(nr.pop('review_cycles',[])): add('review_cycles',review,node['id'],k)
+    pid=record['id']
+    add('projects',record,ordinal=ordinal,nested=('nodes',)+PROJECT_CHILDREN)
+    for j,node in enumerate(record.get('nodes',[])):
+        add('nodes',node,pid,j,nested=('tasks','review_cycles'))
+        for k,task in enumerate(node.get('tasks',[])): add('tasks',task,node['id'],k)
+        for k,review in enumerate(node.get('review_cycles',[])): add('review_cycles',review,node['id'],k)
     for child in PROJECT_CHILDREN:
-        for j,value in enumerate(row.pop(child,[])): add('project_'+child,value,pid,j)
+        for j,value in enumerate(record.get(child,[])): add('project_'+child,value,pid,j)
 
 PROJECT_LINKED=frozenset({'approvals','sop_requests','financial_requests','delegations','recurring',
                           'input_mappings','input_revisions','cost_allocations','daily_reviews','handover_requests',
@@ -110,12 +112,12 @@ def _templates_changed(desired,existing):
 def save(db,model,wid,state):
     """Replace only changed entity rows; preserve one atomic workspace revision."""
     if '_partial' in state: raise ValueError('partial workspaces are read-only')
-    root=deepcopy(state); desired={}
-    archive=root.pop('migration_archive',None)
+    root={k:deepcopy(v) for k,v in state.items() if k not in COLLECTIONS and k!='migration_archive'}; desired={}
+    archive=state.get('migration_archive')
     if archive is not None: root['migration_archive_ref']='original'
     add=_adder(desired,'storage.save')
     for collection in COLLECTIONS:
-        for i,record in enumerate(root.pop(collection,[])):
+        for i,record in enumerate(state.get(collection,[])):
             if collection=='projects': _flatten_project(add,record,i)
             else: add(collection,record,ordinal=i)
     if archive is not None and db.get(model,(wid,'migration_archive','original')) is None:

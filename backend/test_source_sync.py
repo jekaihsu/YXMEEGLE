@@ -1,4 +1,5 @@
 """Atomic source refresh and scheduler tests against isolated SQLite memory stores."""
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -23,8 +24,8 @@ def snapshot(clock, rows=None):
     return {'configured':True,'status':'ready','last_sync':clock,'message':'success','tables':[{'table_id':'confirmation','status':'ready'}],'records':records() if rows is None else rows}
 
 
-@pytest.fixture
-def harness(monkeypatch):
+@contextmanager
+def built_harness(monkeypatch,partial=True):
     base=declarative_base()
     class W(base):
         __tablename__='workspaces'
@@ -49,7 +50,7 @@ def harness(monkeypatch):
         db.add(C(id=wid,data=snapshot(clock[0])))
         db.add(P(organization_id=wid,person_id='u-manager',data=deepcopy(next(u for u in ws['users'] if u['id']=='u-manager'))))
         db.add(A(id='auth1',data={'organization':wid,'uid':'u-manager','access_token':'fake','expires':datetime.fromisoformat(clock[0]).timestamp()+3600}))
-    cfg={'LARK_APP_ID':'app1','LARK_WORKER_IDENTITY':'application','LARK_WORKER_ORGANIZATION':'tenant','LARK_ALLOWED_TENANTS':'tenant'}; fetched=[]
+    cfg={'LARK_APP_ID':'app1','LARK_WORKER_IDENTITY':'application','LARK_WORKER_ORGANIZATION':'tenant','LARK_ALLOWED_TENANTS':'tenant','PARTIAL_WRITES_ENABLED':str(partial).lower()}; fetched=[]
     monkeypatch.setattr(source_sync,'application_adapter',lambda config:SimpleNamespace(token='application-token',client=SimpleNamespace(close=lambda:None)))
     def fetch(token): fetched.append(token); return snapshot(clock[0])
     service=SourceSyncService(sessions,W,B,P,A,C,cfg,fetcher=fetch)
@@ -57,6 +58,11 @@ def harness(monkeypatch):
         with sessions() as db: return storage.load(db,B,db.get(W,wid)),deepcopy(db.get(C,wid).data)
     yield SimpleNamespace(service=service,sessions=sessions,W=W,B=B,P=P,A=A,C=C,wid=wid,cfg=cfg,clock=clock,fetched=fetched,read=read)
     engine.dispose()
+
+
+@pytest.fixture
+def harness(monkeypatch):
+    with built_harness(monkeypatch) as h: yield h
 
 
 @pytest.mark.parametrize('kind',['partial','partial_table','invalid'])

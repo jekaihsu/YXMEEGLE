@@ -34,11 +34,37 @@ class Rule:
     extra: object = None
 
 
-def _case_project(body):
+class Lookup:
+    """Primary key reads inside the write transaction, for rules whose case is found through a record."""
+
+    def __init__(self, db, model, wid):
+        self.db, self.model, self.wid = db, model, wid
+
+    def row(self, kind, entity_id):
+        from sqlalchemy import select
+        m = self.model
+        return self.db.execute(select(m.parent_id, m.data).where(m.workspace_id == self.wid, m.kind == kind, m.entity_id == str(entity_id))).first()
+
+
+def _case_project(body, lookup):
     return (body.get('project_id'),) if body.get('project_id') else None
 
 
-PROJECT_RESOLVERS = {'body': _case_project}
+def _daily_projects(body, lookup):
+    """The case a daily report is mapped to and the case that holds it now (a daily id exists once)."""
+    payload = body.get('payload') or {}
+    if body.get('action') == 'daily_propose':
+        target, daily = body.get('project_id'), payload.get('daily_id')
+    else:
+        review = lookup.row('daily_reviews', payload.get('id'))
+        if review is None: return None
+        target, daily = review.data.get('project_id'), review.data.get('daily_id')
+    held = lookup.row('project_daily_reports', daily) if daily else None
+    projects = [target] + ([held.parent_id] if held else [])
+    return tuple(dict.fromkeys(projects)) if all(projects) else None
+
+
+PROJECT_RESOLVERS = {'body': _case_project, 'daily': _daily_projects}
 
 RULES = {
     'task_start': Rule(CASE_RECORDS),
@@ -54,6 +80,8 @@ RULES = {
     'evidence_approve': Rule(CASE_RECORDS),
     'file_link': Rule(CASE_RECORDS),
     'participants_update': Rule(CASE_RECORDS),
+    'daily_propose': Rule(CASE_RECORDS | {'daily_unmatched', 'daily_reviews'}, project='daily'),
+    'daily_approve': Rule(CASE_RECORDS | {'daily_unmatched', 'daily_reviews'}, project='daily'),
     'document_withdraw': Rule(CASE_RECORDS),
     'project_roles': Rule(CASE_RECORDS),
     'delegation_set': Rule(CASE_RECORDS),
@@ -63,11 +91,11 @@ RULES = {
 }
 
 
-def resolve(body):
+def resolve(body, lookup=None):
     """The footprint for one /api/actions body, or None when the full path must run."""
     rule = RULES.get(body.get('action'))
     if rule is None: return None
-    projects = PROJECT_RESOLVERS[rule.project](body)
+    projects = PROJECT_RESOLVERS[rule.project](body, lookup)
     if not projects: return None
     extra = frozenset(rule.extra(body)) if rule.extra else frozenset()
     return Footprint(rule.collections | extra, tuple(projects))

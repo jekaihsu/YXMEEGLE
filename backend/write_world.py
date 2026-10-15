@@ -50,7 +50,8 @@ def scenarios(ws, count):
     """Per scenario, `count` distinct (user, action fields) targets that succeed once each."""
     result = {name: [] for name in ('task_start', 'task_complete', 'task_return', 'task_add', 'task_update', 'comment_add',
                                     'evidence_submit', 'evidence_approve', 'file_link', 'participants_update', 'node_complete',
-                                    'review_submit', 'document_withdraw', 'project_roles', 'delegation_set', 'node_skip_create', 'delivery_submit')}
+                                    'review_submit', 'document_withdraw', 'project_roles', 'delegation_set', 'node_skip_create', 'delivery_submit',
+                                    'daily_propose')}
     for p in ws['projects']:
         pid = p['id']; index = int(pid[1:]) - 1
         pm = next(n for n in p['nodes'] if n['key'] == 'pm')
@@ -63,6 +64,8 @@ def scenarios(ws, count):
         if index % 2 == 0:
             name = 'node_complete' if len(result['node_complete']) <= len(result['review_submit']) else 'review_submit'
             if len(result[name]) < count: result[name].append((pm['owner_id'], dict(project_id=pid, node_id=pm['id'])))
+        if len(result['daily_propose']) < count:
+            result['daily_propose'].append((p['pm_id'], dict(project_id=pid, payload={'daily_id': f'du{index}', 'reason': '依案號核對'})))
         if len(result['document_withdraw']) < count:
             result['document_withdraw'].append((p['pm_id'], dict(project_id=pid, payload={'id': f'f{index}', 'reason': '版本錯誤'})))
         if len(result['project_roles']) < count:

@@ -27,6 +27,14 @@ def operator(user,p,n=None):
 def digest(value):
     return hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
 
+def loaded_projects(ws):
+    """Every project of a full state; only the footprint's own cases in a partial one."""
+    return [p for p in ws['projects'] if not getattr(p,'unloaded',False)]
+
+def daily_entries(ws):
+    """Unmatched dailies, then the reports of each (loaded) case. A daily id exists once, and a partial write loads the case holding it."""
+    return ws['daily_unmatched']+[d for pr in loaded_projects(ws) for d in pr['daily_reports']]
+
 def decimal(value):
     try: result=Decimal(str(value))
     except (InvalidOperation,TypeError,ValueError): require(False,'請輸入有效金額',422)
@@ -837,7 +845,7 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
     elif action=='daily_propose':
         from .v4_sources import daily_source_version,daily_mapping_version
         require(p is not None,'請指定案件',422); ident=data.get('daily_id')
-        entry=next((d for d in ws['daily_unmatched']+[d for pr in ws['projects'] for d in pr['daily_reports']] if d['id']==ident),None); require(entry,'日報不存在',404)
+        entry=next((d for d in daily_entries(ws) if d['id']==ident),None); require(entry,'日報不存在',404)
         require(lead(user,p) or user['id'] in entry.get('source_actor_ids',[]),'需由已核實日報填報人或案件主管補充關聯')
         require(data.get('reason'),'需填核對依據',422)
         require(not entry.get('source_missing'),'來源日報目前不存在，不能新增配對核准',409)
@@ -845,9 +853,9 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
     elif action=='daily_approve':
         from .v4_sources import daily_mapping_version,review_mapping_version
         require(capable(user,'review_mapping')); r=find(ws['daily_reviews'],data.get('id')); require(r['status']=='pending','已核對',409); p=find(ws['projects'],r['project_id'])
-        current=[d for d in ws['daily_unmatched']+[d for pr in ws['projects'] for d in pr['daily_reports']] if d['id']==r['daily_id']]
+        current=[d for d in daily_entries(ws) if d['id']==r['daily_id']]
         require(len(current)==1 and not current[0].get('source_missing') and daily_mapping_version(current[0])==review_mapping_version(r),'日報來源關聯已變更或不存在，請重新提出配對核對',409)
-        for project in ws['projects']: project['daily_reports']=[d for d in project['daily_reports'] if d['id']!=r['daily_id']]
+        for project in loaded_projects(ws): project['daily_reports']=[d for d in project['daily_reports'] if d['id']!=r['daily_id']]
         ws['daily_unmatched']=[d for d in ws['daily_unmatched'] if d['id']!=r['daily_id']]
         entry=deepcopy(current[0]); entry.update(case_code=p['code'],match_basis='manual_review',case_mapping_status='matched'); p['daily_reports'].append(entry); r.update(status='approved',approved_by=user['id'],approved_at=now())
     elif action=='handover_request':
