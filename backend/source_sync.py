@@ -207,11 +207,15 @@ class SourceSyncService:
                 # or incrementing the source generation/event history.
                 status.update(last_sync=value['last_sync'],as_of=value['as_of'],
                               last_attempt_at=value['last_attempt_at'])
+                previous=row.version
                 root=deepcopy(row.data)
                 root.update(source_status=status,version=row.version+1)
                 changed=db.execute(update(self.W).where(self.W.id==wid,self.W.version==row.version)
                                    .values(version=row.version+1,data=root))
                 require(changed.rowcount==1,'來源同步版本衝突，請重試',409)
+                if db.info.get('index_tables'):
+                    from . import index_tables
+                    index_tables.advance_counters(db,self.B,wid,previous,previous+1)
                 return value
             if planned is not None:
                 snapshot.clear(); snapshot.update(planned)

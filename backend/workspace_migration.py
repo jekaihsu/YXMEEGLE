@@ -45,6 +45,7 @@ def _migrate_one(sessions, model, business_model, upgrade, storage, wid, max_att
                     state.setdefault('migration_archive', deepcopy(data))
                 else:
                     state = upgrade(storage.load(db, business_model, row))
+                state['version'] = version + 1
                 root = storage.save(db, business_model, wid, state)
                 if 'version' in root:
                     root['version'] = version + 1          # the app serves data['version'] and checks it against row.version
