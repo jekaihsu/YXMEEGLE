@@ -24,7 +24,7 @@ def demoted(staff):
         row = db.get(WorkspaceRow, 'lark-company')
         state = storage.load(db, BusinessRow, row)
         project = upgrade(seed())['projects'][0]
-        project.update(execution_system='workbench', pm_id='ou_staff')
+        project.update(source_kind='lark', execution_system='workbench', pm_id='ou_staff')
         state['projects'] = [project]
         row.data = storage.save(db, BusinessRow, row.id, state)
     workspace = client.get('/api/workspace').json()

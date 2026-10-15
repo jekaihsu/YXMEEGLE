@@ -2,6 +2,7 @@
 from datetime import date, datetime, timedelta
 from ..status import TAIPEI
 from ..client import ReadFailure
+from ...avatar import avatar_url
 from ...attendance_identity import AttendanceIdentityResolver
 
 PERSON_FIELDS = ('id', 'name', 'group', 'in_service')
@@ -23,9 +24,11 @@ def project_people(users, app_id):
         group = user.get('department') or None
         if user.get('department_source') in ('unknown', 'work_category_unmapped'):
             group = None
+        photo = avatar_url(user.get('avatar_url'))
         result.append(dict(id=user['id'], name=user.get('name') or None,
                            group=group,
-                           in_service=True if status == 'employed' else False if status == 'left' else None))
+                           in_service=True if status == 'employed' else False if status == 'left' else None,
+                           **({'avatar_url': photo} if photo else {})))
     return sorted(result, key=lambda p: (p['group'] or '', p['name'] or '', p['id']))
 
 

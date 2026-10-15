@@ -1,5 +1,7 @@
-/* VCC-130 Case and Confirmation Detail Styles */
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
 @import './p2-detail.css';
+@layer pages{
+/* VCC-130 Case and Confirmation Detail Styles */
 
 /* Root and in-page navigation */
 .p2-case-root {
@@ -49,8 +51,8 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--sp-2, 8px);
-  padding: var(--sp-3, 12px) var(--sp-4, 16px);
+  gap: var(--sp-2, var(--space-2));
+  padding: var(--sp-3, var(--space-3)) var(--sp-4, var(--space-4));
   background: var(--surface, #ffffff);
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   border-radius: var(--radius-m, 12px);
@@ -61,14 +63,14 @@
   font-size: var(--fs-subhead, 0.9375rem);
   font-weight: 600;
   color: var(--label-2, #6e6e73);
-  margin-right: var(--sp-1, 4px);
+  margin-right: var(--sp-1, var(--space-1));
 }
 
 .p2-inpage-nav-list {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
   list-style: none;
   margin: 0;
   padding: 0;
@@ -81,7 +83,7 @@
 .p2-inpage-nav-link {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
+  padding: var(--space-1) var(--space-3);
   background: var(--surface-2, #f5f5f7);
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   border-radius: var(--radius-pill, 999px);
@@ -106,8 +108,8 @@
 .p2-header-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--sp-3, 12px);
-  margin: var(--sp-3, 12px) 0 0 0;
+  gap: var(--sp-3, var(--space-3));
+  margin: var(--sp-3, var(--space-3)) 0 0 0;
   padding: 0;
 }
 
@@ -135,7 +137,7 @@
 .p2-tree-section {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
 }
 
 .p2-tree-note {
@@ -147,7 +149,7 @@
 .p2-tree-root-container {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
 }
 
 .p2-tree-node-wrapper {
@@ -158,8 +160,8 @@
 .p2-tree-node-btn {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-2, 8px);
-  padding: 6px 12px;
+  gap: var(--sp-2, var(--space-2));
+  padding: var(--space-2) var(--space-3);
   background: var(--surface, #ffffff);
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   border-radius: var(--radius-s, 8px);
@@ -208,20 +210,20 @@
 .p2-tree-level-1 {
   list-style: none;
   margin: 0;
-  padding-left: var(--sp-4, 16px);
+  padding-left: var(--sp-4, var(--space-4));
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
   border-left: 2px solid var(--sep, rgba(60, 60, 67, 0.12));
 }
 
 .p2-tree-level-2 {
   list-style: none;
-  margin: var(--sp-2, 8px) 0 0 0;
-  padding-left: var(--sp-4, 16px);
+  margin: var(--sp-2, var(--space-2)) 0 0 0;
+  padding-left: var(--sp-4, var(--space-4));
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1, 4px);
+  gap: var(--sp-1, var(--space-1));
   border-left: 2px dashed var(--sep, rgba(60, 60, 67, 0.18));
 }
 
@@ -231,7 +233,7 @@
 }
 
 .p2-tree-empty-nested {
-  margin: var(--sp-1, 4px) 0 0 var(--sp-4, 16px);
+  margin: var(--sp-1, var(--space-1)) 0 0 var(--sp-4, var(--space-4));
   font-size: var(--fs-caption, 0.75rem);
   color: var(--label-2, #6e6e73);
   font-style: italic;
@@ -239,13 +241,13 @@
 
 /* Sections and Tables */
 .p2-section-card {
-  scroll-margin-top: var(--sp-5, 20px);
+  scroll-margin-top: var(--sp-5, var(--space-6));
 }
 
 .p2-section-meta {
   display: flex;
   align-items: center;
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
   font-size: var(--fs-footnote, 0.8125rem);
   color: var(--label-2, #6e6e73);
 }
@@ -253,8 +255,8 @@
 .p2-section-reason-block {
   display: flex;
   align-items: center;
-  gap: var(--sp-2, 8px);
-  padding: var(--sp-2, 8px) var(--sp-3, 12px);
+  gap: var(--sp-2, var(--space-2));
+  padding: var(--sp-2, var(--space-2)) var(--sp-3, var(--space-3));
   background: color-mix(in srgb, var(--warning, #b25000) 8%, var(--surface, #ffffff));
   border: 1px solid color-mix(in srgb, var(--warning, #b25000) 25%, transparent);
   border-radius: var(--radius-s, 8px);
@@ -263,7 +265,7 @@
 }
 
 .p2-section-empty {
-  padding: var(--sp-6, 24px);
+  padding: var(--sp-6, var(--space-6));
   text-align: center;
   background: var(--surface-2, #f5f5f7);
   border-radius: var(--radius-s, 8px);
@@ -309,7 +311,7 @@
 .p2-side-card {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
 }
 
 .p2-completeness-value {
@@ -346,14 +348,14 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
 }
 
 .p2-source-time-item {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 6px 8px;
+  padding: var(--space-2) var(--space-2);
   background: var(--surface-2, #f5f5f7);
   border-radius: var(--radius-s, 8px);
 }
@@ -362,7 +364,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .p2-st-name {
@@ -377,7 +379,7 @@
 }
 
 .p2-side-actions {
-  margin-top: var(--sp-2, 8px);
+  margin-top: var(--sp-2, var(--space-2));
 }
 
 /* Drawer details */
@@ -387,15 +389,15 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
 }
 
 .p2-drawer-parent-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--sp-2, 8px);
-  padding: 6px 8px;
+  gap: var(--sp-2, var(--space-2));
+  padding: var(--space-2) var(--space-2);
   background: var(--surface-2, #f5f5f7);
   border-radius: var(--radius-s, 8px);
   font-size: var(--fs-footnote, 0.8125rem);
@@ -415,8 +417,8 @@
 .p2-drawer-actions {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2, 8px);
-  margin-top: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
+  margin-top: var(--sp-2, var(--space-2));
 }
 
 /* Responsive adjustments */
@@ -461,4 +463,5 @@
   .p2-case-root .p2-drawer {
     width: 100%;
   }
+}
 }

@@ -37,6 +37,7 @@ def home_queues(ws, user):
     if not uid or not any(u.get('id') == uid and u.get('active', True) for u in ws.get('users', [])):
         return result
     people = {u.get('id'): u for u in ws.get('users', [])}
+    from .home_details import local_work_instance
     projects = {p['id']: p for p in ws.get('projects', []) if p.get('id') and p.get('case_visibility') != 'excluded_history'}
     today = now()[:10]
     missing_assignment_history = False
@@ -46,6 +47,7 @@ def home_queues(ws, user):
             if executable and n.get('status') not in CLOSED_NODES and n.get('review_cycles'):
                 cycle = n['review_cycles'][-1]
                 if (cycle.get('status') == 'pending' and not cycle.get('historical_scope')
+                        and not (ws.get('environment') == 'production' and cycle.get('simulated'))
                         and cycle.get('mode') != 'native'
                         and not (ws.get('environment') == 'production' and n.get('key') in FINANCIAL)):
                     try:
@@ -69,6 +71,7 @@ def home_queues(ws, user):
                                     f'待你以 {seat} 職責確認本輪節點', p['id'], 'node_review', node_id=n['id']))
             for t in n.get('tasks', []):
                 if t.get('status') in CLOSED_TASKS: continue
+                if ws.get('environment') == 'production' and not local_work_instance(p,t): continue
                 history = t.get('assignment_history')
                 if not isinstance(history, list) or not history:
                     if t.get('owner_id') and t['owner_id'] != uid: missing_assignment_history = True

@@ -201,6 +201,7 @@ def build_manager_overview(state, *, population, filters=None, period=None,
             case['details']['row_keys_state'] = data_state('unknown')
             case['details']['row_keys_reason'] = 'The confirmation population is unavailable; row keys are unknown.'
         cases.append(case)
+    cases.sort(key=lambda c:(c['label'] is None,c['label'] or '',c['project_id']))
     cards = [_card('confirmation_versions', 'Confirmation versions', 'confirmation_version',
                    len(rows) if available else None, read, filters, as_of),
              _card('stable_cases', 'Stable cases', 'stable_case', len(versions) if available else None, read, filters, as_of),

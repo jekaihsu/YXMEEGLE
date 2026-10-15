@@ -13,7 +13,7 @@ from .workflow import find
 
 @pytest.fixture
 def api(harness,monkeypatch):
-    h=harness;state,_=h.read();p=state['projects'][0];n=next(n for n in p['nodes'] if n['key']=='control')
+    h=harness;h.cfg['FEATURE_CHANGE_EXTENSION']='true';state,_=h.read();p=state['projects'][0];n=next(n for n in p['nodes'] if n['key']=='control')
     p.update(pm_id='ou_pm',admin_id='ou_admin',supervisor_id='ou_sup',execution_system='workbench');n['owner_id']='ou_pm'
     state['users']=[{'id':i,'name':i,'role':'member','active':True,'identity_app_id':'app1',
         'directory_status':'employed','directory_source':{'app_id':'app1','record_id':'rec-'+i}}
@@ -21,6 +21,7 @@ def api(harness,monkeypatch):
     item={'id':'request','type':'extension','project_id':p['id'],'node_id':n['id'],
           'project_revision':p['revision'],'reason':'延後','status':'draft','created_by':'ou_pm',
           'task_ids':[n['tasks'][0]['id']],'dates':[{'task_id':n['tasks'][0]['id'],'due_date':'2026-10-01'}]}
+    state['features']={'change_extension':True,'routines':True}
     state['approvals']=[item]
     fn=next(node for node in p['nodes'] if node['key']=='pricing')
     p['evidence']=[{'id':'e1','node_id':fn['id'],'value':'交付證明','status':'accepted'}]
@@ -220,3 +221,21 @@ def test_operate_uses_project_version_not_workspace_version(api):
     assert operate(api,'submit',project_version=project_version(api)).status_code==200
     assert operate(api,'poll',project_version='x').status_code==422
     assert api.client.post('/api/native-approvals/extension/request/poll',json={'version':api.h.read()[0]['version']}).status_code==422
+
+
+@pytest.mark.parametrize('operation', ['prepare', 'submit'])
+def test_native_submission_rejects_disabled_task_before_remote_effect(api, operation):
+    with api.h.sessions.begin() as db:
+        row = db.get(api.h.W, api.h.wid)
+        state = storage.load(db, api.h.B, row)
+        state['features']['routines'] = False
+        p = find(state['projects'], api.pid)
+        n = find(p['nodes'], api.nid)
+        n['tasks'][0]['sop_rule_id'] = 'quote_followup'
+        row.data = storage.save(db, api.h.B, api.h.wid, state)
+    before = deepcopy(api.h.read())
+    response = operate(api, operation)
+    assert response.status_code == 403
+    assert response.json()['detail']['code'] == 'feature_disabled'
+    assert api.h.read() == before
+    assert api.calls == []

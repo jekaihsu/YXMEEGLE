@@ -60,7 +60,7 @@ def age_person(app, seconds, **changes):
             datetime.now(timezone.utc) - timedelta(seconds=seconds)).isoformat(), **changes}
 
 
-@pytest.mark.parametrize('age,expected', [(90, 200), (901, 403)])
+@pytest.mark.parametrize('age,expected', [(90, 200), (901, 200), (25 * 3600, 403)])
 def test_E19_pilot_does_not_refresh_and_stale_access_fails_closed(pilot_identity, age, expected):
     app, client, refreshes, mutations = pilot_identity
     age_person(app, age, role='member', bootstrap_admin=False)

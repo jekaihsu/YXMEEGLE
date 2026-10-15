@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from . import sop_execution as ex
 from .operations import apply_operation
 from .policy import upgrade, template
-from .seed import seed
+from .test_ux_disabled import enabled_seed as seed
 from .sop_runtime import _source_graph, topology_projection
 from .sources import project_nodes
 
@@ -274,7 +274,7 @@ def round_project():
 def test_approved_round_invalidates_only_affected_scope_and_preserves_history():  # revision_rollback
     p, approval = round_project(), {'id': 'ap', 'type': 'change', 'project_id': 'p', 'status': 'approved',
                                     'node_id': 'a', 'task_ids': ['a-t']}
-    record = ex.open_round({}, p, approval, {'id': 'pm'}, receipt_ok=lambda: True)
+    record = ex.open_round({'features':{'change_extension':True}}, p, approval, {'id': 'pm'}, receipt_ok=lambda: True)
     a, b = p['nodes']
     assert record['round'] == 1 and record['task_ids'] == ['a-t'] and record['source_nodes'] == ['state_75']
     assert a['tasks'][0]['status'] == 'rework' and a['status'] == 'rework' and a['tasks'][0]['sop_round'] == 1
@@ -282,7 +282,7 @@ def test_approved_round_invalidates_only_affected_scope_and_preserves_history():
     assert a['tasks'][0]['owner_id'] == 'owner-control' and a['tasks'][0]['output'] == 'out-control'
     assert a['review_cycles'][0]['votes'] == ['kept'] and a['review_cycles'][0]['status'] == 'invalidated'
     assert record['previous']['a-t']['status'] == 'completed' and a['tasks'][0]['round_history'][0]['round'] == 1
-    assert ex.open_round({}, p, approval, {'id': 'pm'}, receipt_ok=lambda: True) is record      # idempotent
+    assert ex.open_round({'features':{'change_extension':True}}, p, approval, {'id': 'pm'}, receipt_ok=lambda: True) is record      # idempotent
     assert len(p['sop_rounds']) == 1
 
 
@@ -292,10 +292,10 @@ def test_round_requires_approved_native_change(mutation):
     approval = {'id': 'ap', 'type': 'change', 'project_id': 'p', 'status': 'approved', 'node_id': 'a',
                 'task_ids': ['a-t'], **mutation}
     with pytest.raises(HTTPException):
-        ex.open_round({}, p, approval, {'id': 'pm'}, receipt_ok=lambda: True)
+        ex.open_round({'features':{'change_extension':True}}, p, approval, {'id': 'pm'}, receipt_ok=lambda: True)
     approval = {**approval, 'type': 'change', 'status': 'approved', 'project_id': 'p'}
     with pytest.raises(HTTPException):
-        ex.open_round({}, p, approval, {'id': 'pm'}, receipt_ok=lambda: False)
+        ex.open_round({'features':{'change_extension':True}}, p, approval, {'id': 'pm'}, receipt_ok=lambda: False)
     assert 'sop_rounds' not in p or p['sop_rounds'] == []
 
 

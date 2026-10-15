@@ -26,8 +26,10 @@ from .sources import API, configuration, import_sources
 from .policy import upgrade, CAPABILITIES, MANAGER_CAPABILITIES
 from .operations import apply_operation, project_summary, capable, review_hash, invalidate
 from . import storage
+from .write_footprint import WorkspaceView, Lookup, resolve as resolve_footprint, RULES as FOOTPRINT_RULES
 from .learning import apply_learning
 from .approval_capabilities import approval_connection
+from .avatar import avatar_url
 from .workspace_projection import public_copy, strip_migration_archive, filter_private_workspace, public_person
 from .production_access import require_admission, require_access, test_profile,company_admin_grant,set_company_admin_authority
 from . import audit
@@ -106,6 +108,7 @@ def _reidentify_pilot_project(project,occupied_ids=()):
 
 def create_app(overrides=None):
     cfg=dict(os.environ); cfg.update(overrides or {})
+    from .features import resolve_features, guard_action
     production=cfg.get('APP_ENV','development')=='production'
     demo=str(cfg.get('DEMO_MODE','false' if production else 'true')).lower()=='true'
     db_url=cfg.get('DATABASE_URL','sqlite:///./backend/workspace.db')
@@ -160,6 +163,7 @@ def create_app(overrides=None):
             response=RedirectResponse('/?auth_error='+code,status_code=303)
             response.delete_cookie('lark_oauth_state'); return response
         body = {'detail': exc.detail}
+        if isinstance(exc.detail,dict) and exc.detail.get('code')=='feature_disabled': body=exc.detail
         if getattr(exc,'code',None)=='user_token_expired': body['code']=exc.code
         if request.url.path == '/api/lark-pilot/shadow':
             body['code'] = getattr(exc, 'code', 'pilot_method_not_allowed' if exc.status_code == 405 else 'pilot_read_failed')
@@ -220,7 +224,7 @@ def create_app(overrides=None):
         response.headers['X-Content-Type-Options']='nosniff'
         response.headers['Referrer-Policy']='same-origin'
         if request.url.path.startswith('/api'): response.headers['Cache-Control']='no-store'
-        if (request.method,request.url.path) in TIMED_ROUTES:
+        if (request.method,request.url.path) in TIMED_ROUTES or (request.method=='GET' and re.fullmatch(r'/api/projects/[^/]+',request.url.path)):
             # Durations only. 'serialize' is the unmeasured remainder (response encoding and framework time).
             phases=dict(request.scope.get('phases',{})); total=perf_counter()-started
             phases['serialize']=max(total-sum(phases.values()),0)
@@ -267,9 +271,23 @@ def create_app(overrides=None):
         if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=[c for c in storage.COLLECTIONS if c!='projects'],project_ids=project_ids,project_children=storage.PROJECT_CHILDREN)
         else: state=storage.load(db,BusinessRow,row) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections)
         state=upgrade(state)
+        return seal(db,row,state)
+
+    def seal(db,row,state,*,scoped=False):
+        """What every load adds to a stored state. A scoped load holds only part of the projects, so it checks the rest in SQL."""
         from .workspace_environment import normalize_environment
-        from .case_cutover import initialize_execution_system
+        from .case_cutover import initialize_execution_system,SYSTEMS,isolated
         normalize_environment(state,row.id,cfg)
+        state['features']=resolve_features(cfg)
+        if state.get('environment')=='production':
+            if scoped: demo_rows=db.scalar(select(func.count()).select_from(BusinessRow).where(BusinessRow.workspace_id==row.id,BusinessRow.kind=='projects',BusinessRow.data['source_kind'].as_string().in_(('demo','mock','simulation'))))
+            else: demo_rows=sum(p.get('source_kind') in ('demo','mock','simulation') for p in state.get('projects',[]))
+            require(not demo_rows,'正式工作區包含隔離示範資料，請由管理員核對',409)
+        if scoped and not isolated(state):
+            # The full load would classify these cases (and record an event); only the full path may.
+            unclassified=BusinessRow.data['execution_system'].as_string()
+            if db.scalar(select(func.count()).select_from(BusinessRow).where(BusinessRow.workspace_id==row.id,BusinessRow.kind=='projects',or_(unclassified.is_(None),unclassified.notin_(SYSTEMS)))):
+                raise storage.PartialUnavailable('cases without an execution system')
         initialize_execution_system(state)
         if row.id.startswith(('lark-','test-lark-')):
             org=row.id.removeprefix('test-')
@@ -283,6 +301,14 @@ def create_app(overrides=None):
         state['native_approval_authority']={'app_id':cfg.get('LARK_APP_ID'),'tenant':cfg.get('LARK_WORKER_ORGANIZATION')}
         set_company_admin_authority(state,cfg)
         return state
+
+    def load_for_write(db,row,footprint):
+        """load() over just a footprint, with the project order; PartialUnavailable when the stored state needs the full path."""
+        state,order=storage.load_scoped(db,BusinessRow,row,collections=sorted(footprint.collections),project_ids=footprint.project_ids)
+        templates=deepcopy(state['sop_templates']) if 'sop_templates' in footprint.collections else None
+        upgrade(state,generate_sop_candidate='sop_templates' in footprint.collections)
+        if state['events'] or (templates is not None and state['sop_templates']!=templates): raise storage.PartialUnavailable('an upgrade would change shared records')
+        return seal(db,row,state,scoped=True),order
 
     def organization(data):
         return data.get('organization') or data['wid'].removeprefix('test-')
@@ -391,7 +417,7 @@ def create_app(overrides=None):
             out['people_directory_status']={'status':'restricted','message':'不在人事資料查看名單（HR_VIEWERS）'}
             out['attendance_schedule_status']={'status':'restricted','message':'不在人事資料查看名單（HR_VIEWERS）'}
 
-    def public_ws(data,wid,user,mode=None,owned=False):
+    def public_ws(data,wid,user,mode=None,owned=False,task_details=True):
         """owned=True: caller passes a fresh load nobody else uses; it is projected in place (no deepcopy)."""
         file_categories=categories(data); verification=data.get('native_definition_verification')
         result=strip_migration_archive(data) if owned else public_copy(data)
@@ -404,7 +430,14 @@ def create_app(overrides=None):
         if not result['projects'] or any(p.get('source_kind')=='lark' for p in result['projects']): result['as_of']=now()[:10]
         upgrade(result)
         result['environment']=result.get('environment','demo' if any(p.get('source_kind')=='demo' for p in result['projects']) else 'production')
-        result['policy_summary']=[project_summary(result,p) for p in result['projects']]
+        if result['environment']=='production':
+            for collection in ('approvals','node_skip_requests','financial_requests'):
+                result[collection]=[item for item in result.get(collection,[]) if not item.get('simulated')]
+        if task_details:
+            result['policy_summary']=[project_summary(result,p) for p in result['projects']]
+        else:
+            from .operations import refresh_project_state
+            for project in result['projects']: refresh_project_state(project,result)
         # Workspace namespaces are assigned by the server. Match /api/actions:
         # signed demo sessions and test namespaces may simulate, never submit.
         result['approval_connection']=approval_connection(cfg,simulation_available=(mode=='demo' if mode is not None else wid.startswith('demo-')) or wid.startswith('test-'),definition_verification=verification)
@@ -413,53 +446,108 @@ def create_app(overrides=None):
         from .attachment_coverage import source_attachment_coverage
         for project in result['projects']:
             project.update(project_execution_view(result,project))
-            project['source_attachment_coverage']=source_attachment_coverage(project)
+            if task_details: project['source_attachment_coverage']=source_attachment_coverage(project)
         result.pop('source_work_items',None)
         result.pop('source_work_items_status',None)
         result.pop('source_work_items_enabled',None)
-        out=filter_private_workspace(result,user)
+        out=filter_private_workspace(result,user,task_details=task_details)
         restrict_hr(out,user)
         if out.get('environment') not in ('test','demo'):
             app.state.case_redaction_stats=case_redaction.apply(out,case_redaction.make_plan(pre,out))
         return out
-    def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None):
+    partial_writes=str(cfg.get('PARTIAL_WRITES_ENABLED','true')).lower()=='true'
+    partial_strict=str(cfg.get('PARTIAL_WRITES_STRICT','false')).lower()=='true'
+    app.state.partial_writes={'committed':0,'declined':0}
+    app.state.last_write={}  # diagnostics: which path the last write took and how long it held the workspace row lock
+
+    def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None,footprint=None):
+        """Run callback on the workspace and commit it as the next version.
+
+        footprint, when given, is a function from a Lookup to the Footprint of this request
+        (or None). Only that part is then loaded, checked and saved, so the lock covers a
+        few rows instead of the workspace. Anything the footprint cannot serve (a mutation
+        that reaches outside it, an unknown record, legacy rows) runs again on the full path
+        from a rolled back transaction, and strict mode raises instead.
+        """
         require(bool(actor_id),'缺少操作人員身分',403)
+        if footprint is not None and partial_writes:
+            try: return persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,footprint)
+            except (storage.FootprintViolation,storage.PartialUnavailable) as stop:
+                if partial_strict and isinstance(stop,storage.FootprintViolation): raise
+                declined(action_name,stop)
+            except HTTPException as exc:
+                if exc.status_code!=404: raise
+                declined(action_name,exc)  # a case outside the footprint looks missing; the full path decides
+        return persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,None)
+
+    def declined(action_name,reason):
+        import logging
+        app.state.partial_writes['declined']+=1
+        logging.getLogger(__name__).warning('partial_write_declined action=%s reason=%s',action_name,str(getattr(reason,'detail',reason))[:200])
+
+    def persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,resolver):
+        replay=False
         with sessions.begin() as db:
             row=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one()
+            locked_at=perf_counter()
             if receipt_key:
                 receipt=db.get(Receipt,receipt_key)
                 if receipt:
                     require(receipt.fingerprint==fingerprint,'request_id 已用於不同操作',409)
-                    state=load(db,row)
-                    return public_ws(state,wid,find(state['users'],actor_id,'登入人員'))
-            state=load(db,row)
-            if project_versions:
-                require(all(find(state['projects'],pid).get('concurrency_version',0)==version for pid,version in project_versions.items()),'此案件已被更新，請核對最新內容後重試',409)
-            else: require(row.version==expected,'資料已被其他操作更新，請重新整理後重試',409)
-            expected=row.version
-            if actor_id: require(find(state['users'],actor_id).get('active',True),'帳號已停權',403)
-            if admission_required and wid.startswith(('lark-','test-lark-')):
-                person=db.get(PersonRow,(wid.removeprefix('test-'),actor_id))
-                from .production_access import require_access
-                require_access(person.data if person else None,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=wid.removeprefix('test-').removeprefix('lark-'))
-            if wid.startswith('lark-'): state['as_of']=now()[:10]
-            before=audit.entities(state)
-            callback(state); state['version']=row.version+1
-            if wid.startswith(('lark-','test-lark-')):
-                org=wid
-                for person in state['users']:
-                    profile=db.get(PersonRow,(org,person['id']))
-                    if profile:
-                        if profile.data!=person: profile.data=deepcopy(person)
-                    else: db.add(PersonRow(organization_id=org,person_id=person['id'],data=deepcopy(person)))
-            root=storage.save(db,BusinessRow,wid,state)
-            updated=db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==expected).values(version=expected+1,data=root))
-            require(updated.rowcount==1,'資料版本衝突，請重新整理',409)
-            if receipt_key: db.add(Receipt(id=receipt_key,fingerprint=fingerprint,result={'version':state['version']}))
-            db.add(audit.record(AuditRow,wid,actor_id,action_name,request_id=receipt_key,
-                               details={'version':state['version'],'changes':audit.changes(before,state),
-                                        'business_authority':{k:v for k,v in find(state['users'],actor_id).get('_business_authority',{}).items()
-                                                              if k in ('grant_id','decision_ref','scopes')}}))
+                    if resolver is None:
+                        state=load(db,row)
+                        return public_ws(state,wid,find(state['users'],actor_id,'登入人員'))
+                    replay=True
+            if not replay:
+                footprint=resolver(Lookup(db,BusinessRow,wid)) if resolver is not None else None
+                if resolver is not None and (footprint is None or not set(project_versions or ())<=set(footprint.project_ids)):
+                    raise storage.PartialUnavailable('this request has no footprint')
+                if footprint is None: state=view=load(db,row)
+                else:
+                    state,order=load_for_write(db,row,footprint)
+                    view=WorkspaceView(state,footprint.collections,order)
+                if project_versions:
+                    require(all(find(view['projects'],pid).get('concurrency_version',0)==version for pid,version in project_versions.items()),'此案件已被更新，請核對最新內容後重試',409)
+                else: require(row.version==expected,'資料已被其他操作更新，請重新整理後重試',409)
+                expected=row.version
+                if actor_id: require(find(state['users'],actor_id).get('active',True),'帳號已停權',403)
+                if admission_required and wid.startswith(('lark-','test-lark-')):
+                    person=db.get(PersonRow,(wid.removeprefix('test-'),actor_id))
+                    from .production_access import require_access
+                    require_access(person.data if person else None,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=wid.removeprefix('test-').removeprefix('lark-'))
+                if wid.startswith('lark-'): state['as_of']=now()[:10]
+                before=audit.entities(state)
+                callback(view); state['version']=row.version+1
+                if wid.startswith(('lark-','test-lark-')):
+                    org=wid
+                    for person in state['users']:
+                        profile=db.get(PersonRow,(org,person['id']))
+                        if profile:
+                            if profile.data!=person: profile.data=deepcopy(person)
+                        else: db.add(PersonRow(organization_id=org,person_id=person['id'],data=deepcopy(person)))
+                if footprint is None: root=storage.save(db,BusinessRow,wid,state)
+                else: root=storage.save_partial(db,BusinessRow,wid,state,sorted(footprint.collections|{'events'}),footprint.project_ids,order,view=view)
+                updated=db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==expected).values(version=expected+1,data=root))
+                require(updated.rowcount==1,'資料版本衝突，請重新整理',409)
+                if receipt_key: db.add(Receipt(id=receipt_key,fingerprint=fingerprint,result={'version':state['version']}))
+                db.add(audit.record(AuditRow,wid,actor_id,action_name,request_id=receipt_key,
+                                   details={'version':state['version'],'changes':audit.changes(before,state),
+                                            'business_authority':{k:v for k,v in find(state['users'],actor_id).get('_business_authority',{}).items()
+                                                                  if k in ('grant_id','decision_ref','scopes')}}))
+                if footprint is None:
+                    response=public_ws(state,wid,find(state['users'],actor_id,'登入人員'))
+                    app.state.last_write={'path':'full','held_seconds':perf_counter()-locked_at}
+                    return response
+            if not replay: app.state.last_write={'path':'partial','held_seconds':perf_counter()-locked_at}
+        # Committed. The lock is gone, so the full response is read like GET /api/workspace.
+        if not replay: app.state.partial_writes['committed']+=1
+        with sessions() as db:
+            if engine.dialect.name=='postgresql':
+                db.connection(execution_options={'isolation_level':'REPEATABLE READ'})
+            else:
+                # SQLite's legacy driver does not begin a snapshot for SELECT alone.
+                db.connection().exec_driver_sql('BEGIN')
+            state=load(db,db.get(WorkspaceRow,wid))
             return public_ws(state,wid,find(state['users'],actor_id,'登入人員'))
 
     @app.get('/api/health')
@@ -467,8 +555,17 @@ def create_app(overrides=None):
         with engine.connect() as connection: connection.execute(select(1))
         return {'status':'ok','mode':'demo' if demo else 'lark','database':'postgresql' if engine.dialect.name=='postgresql' else 'sqlite'}
 
-    def features():
-        return {'features':{'workspace_shell':True}} if shell_enabled else {}
+    def features(environment=None):
+        from .node_assignment.config import NodeAssignmentConfig
+        node_config = NodeAssignmentConfig.from_env(cfg)
+        flags = resolve_features(cfg)
+        flags['mock_ui']=environment in ('demo','test') and str(cfg.get('FEATURE_LARK_AUTHORITATIVE_OPS','false')).lower()=='true'
+        if shell_enabled: flags['workspace_shell']=True
+        if (node_config.enabled and node_config.writable and cfg.get('LARK_WORKER_ORGANIZATION')
+                and cfg.get('LARK_WORKER_IDENTITY') == 'application'
+                and cfg.get('LARK_APP_ID') and cfg.get('LARK_APP_SECRET')):
+            flags['node_assignment'] = True
+        return {'features': flags} if flags else {}
 
     @app.get('/api/session')
     def get_session(request:Request):
@@ -476,15 +573,15 @@ def create_app(overrides=None):
         data=read_cookie(request)
         if not data and demo:
             data={'mode':'demo','uid':'u-pm','wid':'demo-'+uid()}; ensure_workspace(data['wid'])
-            response=JSONResponse({'user':USERS[0],'users':USERS,'mode':'demo','auth_configured':oauth_configured,**features()}); set_cookie(response,data,request); return response
-        if not data: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured}
+            response=JSONResponse({'user':USERS[0],'users':USERS,'mode':'demo','auth_configured':oauth_configured,'environment':'demo',**features('demo')}); set_cookie(response,data,request); return response
+        if not data: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured,**features()}
         try: data,user=identity(request)
-        except HTTPException: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured}
+        except HTTPException: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured,**features()}
         if data.get('access_mode')=='recovery':
             return {'user':public_person(user,include_authority=True),'users':[],'mode':data['mode'],'workspace_id':data['wid'],
-                    'environment':'test' if data['wid'].startswith('test-') else 'production','auth_configured':oauth_configured,'access_mode':'recovery'}
+                    'environment':'test' if data['wid'].startswith('test-') else 'production','auth_configured':oauth_configured,'access_mode':'recovery',**features()}
         with phase(request,'load'),sessions() as db: users=load(db,db.get(WorkspaceRow,data['wid']),collections=('users',))['users']
-        return {'user':public_person(user,include_authority=True),'users':[public_person(person) for person in users if hr_visible(user) or person['id']==user['id']],'mode':data['mode'],'workspace_id':data['wid'],'environment':'test' if data['wid'].startswith('test-') else data['mode'],'auth_configured':oauth_configured,'access_mode':data.get('access_mode','normal'),**features()}
+        return {'user':public_person(user,include_authority=True),'users':[public_person(person) for person in users if hr_visible(user) or person['id']==user['id']],'mode':data['mode'],'workspace_id':data['wid'],'environment':'test' if data['wid'].startswith('test-') else ('demo' if data['mode']=='demo' else 'production'),'auth_configured':oauth_configured,'access_mode':data.get('access_mode','normal'),**features('test' if data['wid'].startswith('test-') else 'demo' if data['mode']=='demo' else 'production')}
 
     @app.post('/api/demo/session')
     async def demo_session(request:Request):
@@ -548,7 +645,7 @@ def create_app(overrides=None):
         data,user=identity(request)
         require(offset>=0 and 1<=limit<=250 and attention in ('','overdue','review'),'駕駛艙查詢參數錯誤',422)
         require(len(q)<=240 and len(group)<=120 and len(source_status)<=120 and len(lifecycle)<=120,'查詢文字過長',422)
-        with sessions() as db: safe=public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'],owned=True)
+        with sessions() as db: safe=public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'],owned=True,task_details=False)
         from .company_dashboard import overview
         return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle)
 
@@ -730,7 +827,9 @@ def create_app(overrides=None):
     def actions(body:Action,request:Request):
         data,user=identity(request); raw=body.model_dump()
         from .input_validation import validate_action
-        try:validate_action(raw)
+        try:
+            guard_action({'features':resolve_features(cfg)},raw)
+            validate_action(raw)
         except HTTPException as exc:
             with sessions.begin() as db:
                 db.add(audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,
@@ -774,12 +873,12 @@ def create_app(overrides=None):
                 if body.action=='task_start':
                     p=find(ws['projects'],body.project_id); p['execution_status']='in_progress'
             if body.action=='task_update':
-                for p in ws['projects']:
+                for p in affected:
                     for n in p['nodes']:
                         for t in n['tasks']:
                             if t['id']==body.task_id: t['manual_updated']=True
         try:
-            with phase(request,'mutate'): return persist_mutation(data['wid'],body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions)
+            with phase(request,'mutate'): return persist_mutation(data['wid'],body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=(lambda lookup:resolve_footprint(raw,lookup)) if raw['action'] in FOOTPRINT_RULES else None)
         except HTTPException as exc:
             with sessions.begin() as db:
                 db.add(audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,
@@ -793,7 +892,7 @@ def create_app(overrides=None):
         def authorize_upload(ws,actor):
             p=find(ws['projects'],project_id,'案件'); n=find(p['nodes'],node_id,'節點') if node_id else None
             require_execution(ws,p)
-            require(is_pm(actor,p) or (n and (n['owner_id']==actor['id'] or any(is_owner(actor,t,ws) for t in n['tasks']))))
+            require(is_pm(actor,p) or (n and (n['owner_id']==actor['id'] or any(is_owner(actor,t,ws,p) for t in n['tasks']))))
             validate_category(ws,category_id)
             return p,n
         # Check before writing any uploaded bytes, then repeat under the mutation lock.
@@ -989,9 +1088,12 @@ def create_app(overrides=None):
         require(len(values)<=1 and all(len(v)<=limit for v in values),'查詢參數過長',422)
         return values[0] if values else None
 
-    def p2_list_page(state,args,as_of):
+    def p2_cursor_context(data,user):
+        return [data.get('wid'),user.get('identity_app_id'),user.get('id'),user.get('role'),user.get('authz_version',0)]
+
+    def p2_list_page(state,args,as_of,cursor_context=None):
         from .confirmation_list import build_confirmation_list
-        result=build_confirmation_list(state,as_of=as_of,**args)
+        result=build_confirmation_list(state,as_of=as_of,cursor_context=cursor_context,**args)
         if result.get('status')==403: raise HTTPException(403,'沒有權限')
         if result.get('status')!=200: raise HTTPException(result.get('status',422),result.get('detail') or '查詢參數錯誤')
         return result
@@ -1001,7 +1103,7 @@ def create_app(overrides=None):
         data,user=identity(request)
         args=p2_list_args(request)
         _,_,_,state=p2_read(data,user)
-        return p2_list_page(state,args,state['as_of'])
+        return p2_list_page(state,args,state['as_of'],p2_cursor_context(data,user))
 
     @app.get('/api/manager-overview')
     def manager_overview(request:Request):
@@ -1013,7 +1115,7 @@ def create_app(overrides=None):
         case_filters={k:p2_one(request,k,120) for k in sorted(P2_CASE_PARAMS) if k in request.query_params}
         _,_,health,state=p2_read(data,user)
         # The same read that feeds the population supplies its C-STATE; this also validates the filters (422).
-        page=p2_list_page(state,{'q':'','filters':args['filters'],'cursor':None,'sort':None,'limit':1},state['as_of'])
+        page=p2_list_page(state,{'q':'','filters':args['filters'],'cursor':None,'sort':None,'limit':1},state['as_of'],p2_cursor_context(data,user))
         envelope=page['page_state']
         # C-STATE has no complete-nonempty value (data_state.py STATES), so a healthy read (page_state None) stays None
         # (manager_overview then reports partial: completeness not asserted); any other state is passed through exactly.
@@ -1070,6 +1172,7 @@ def create_app(overrides=None):
         """Read model for the viewer; same full-workspace load as GET /api/workspace. my_work applies case_redaction itself."""
         from .my_work import build_my_work_input
         data,user=identity(request)
+        if request.query_params: return app.state.home_panels.read_workspace(request,data,user)
         app.state.live_read.ensure(data['wid'],'sources')
         read={'admitted':data.get('access_mode','normal') in ('normal','tenant-read')}
         try:
@@ -1106,7 +1209,10 @@ def create_app(overrides=None):
 
     @app.post('/api/approvals/{approval_id}/refresh')
     async def refresh_approval(approval_id:str,request:Request):
-        data,user=identity(request); require(data['mode']=='lark','原生審批查詢需公司 Lark 登入',403)
+        data,user=identity(request)
+        from .features import require_feature
+        require_feature(resolve_features(cfg),'change_extension')
+        require(data['mode']=='lark','原生審批查詢需公司 Lark 登入',403)
         body=await json_object(request)
         require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
         instance_code=str(body.get('instance_code','')); require(bool(re.fullmatch(r'[A-Za-z0-9_-]{6,128}',instance_code)),'請提供有效 Lark 審批實例 ID',400)
@@ -1266,6 +1372,10 @@ def create_app(overrides=None):
                 reconcile_company_admin(db,org,user)
                 if isinstance(info.get('user_id'),str) and info['user_id']:
                     user['attendance_identity']={'employee_type':'employee_id','employee_id':info['user_id'],'open_id':oid,'app_id':cfg['LARK_APP_ID'],'tenant':tenant,'verified_at':now(),'source':'oauth_user_info'}
+                photo = avatar_url(info.get('avatar_url')) or avatar_url(info.get('avatar_thumb')) or avatar_url(user.get('avatar_url'))
+                user.pop('avatar_url', None)
+                if photo:
+                    user['avatar_url'] = photo
                 profile.data=deepcopy(user)
             else:
                 user['oauth_identity']={'source':'oauth_user_info','app_id':cfg['LARK_APP_ID'],'tenant':tenant,'open_id':oid,'verified_at':now()}
@@ -1273,6 +1383,9 @@ def create_app(overrides=None):
                 reconcile_company_admin(db,org,user)
                 if isinstance(info.get('user_id'),str) and info['user_id']:
                     user['attendance_identity']={'employee_type':'employee_id','employee_id':info['user_id'],'open_id':oid,'app_id':cfg['LARK_APP_ID'],'tenant':tenant,'verified_at':now(),'source':'oauth_user_info'}
+                photo = avatar_url(info.get('avatar_url')) or avatar_url(info.get('avatar_thumb'))
+                if photo:
+                    user['avatar_url'] = photo
                 db.add(PersonRow(organization_id=org,person_id=oid,data=user))
         # Company OAuth always enters the real company workspace. Historical
         # manager preferences must not silently turn a fresh login into a test.
@@ -1340,6 +1453,20 @@ def create_app(overrides=None):
     register(app,identity,load,persist_mutation,sessions,WorkspaceRow,BusinessRow,PersonRow,cfg,upload_dir)
     from .native_routes import register as register_native
     register_native(app,identity,load,persist_mutation,sessions,WorkspaceRow,cfg)
+
+    def node_assignment_case(data,user,project_id):
+        from .source_case_policy import visible_project
+        require(len(project_id)<=200,'查詢參數過長',422)
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
+        project=next((p for p in state['projects'] if p['id']==project_id and visible_project(state,p)),None)
+        require(project is not None,'找不到這個案件',404)
+        return state,project
+    from .node_assignment.routes import register as register_node_assignment
+    from .node_skip import valid_waiver
+    app.state.node_assignment=register_node_assignment(app,identity=identity,load_case=node_assignment_case,sessions=sessions,
+        receipt_model=Receipt,audit_model=AuditRow,cfg=cfg,skipped_nodes=valid_waiver)
+    from .home_panels import register as register_home_panels
+    app.state.home_panels=register_home_panels(app,identity=identity,load=load,sessions=sessions,workspace_model=WorkspaceRow,nodes=app.state.node_assignment)
     from .native_poller import NativeApprovalPoller
     app.state.native_poller=NativeApprovalPoller(sessions,WorkspaceRow,BusinessRow,PersonRow,cfg)
     from .source_sync import SourceSyncService
@@ -1405,6 +1532,8 @@ def create_app(overrides=None):
     register_pilot(app, identity=identity, authorize=authorize_live, cfg=cfg)
     from .runtime_health import register as register_runtime_health
     register_runtime_health(app,identity,sessions,CacheRow,cfg,workspace_model=WorkspaceRow,coordinator=app.state.live_read)
+    from .settings_overview import register as register_settings_overview
+    register_settings_overview(app,identity,load,sessions,WorkspaceRow,CacheRow,cfg)
 
     @app.post('/api/attendance/sync')
     async def sync_attendance(request:Request):

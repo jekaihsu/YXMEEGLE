@@ -1,4 +1,5 @@
 """Response-only privacy projection; authoritative storage remains intact."""
+from .avatar import avatar_url
 from copy import deepcopy
 import json
 
@@ -9,6 +10,8 @@ def public_person(person, *, include_authority=False):
     if include_authority:
         fields |= {'capabilities','authz_version'}
     result = {key: deepcopy(value) for key, value in person.items() if key in fields}
+    if photo := avatar_url(person.get('avatar_url')):
+        result['avatar_url'] = photo
     if include_authority:
         from .business_policy import can_business_override
         result['can_business_override'] = can_business_override(person)
@@ -141,7 +144,7 @@ def strip_migration_archive(value):
     return value
 
 
-def filter_private_workspace(state, user):
+def filter_private_workspace(state, user, *, task_details=True):
     """Apply the existing leave-view policy after authoritative policy calculations.
 
     Use the current workspace profile, never stale role/capability claims supplied
@@ -163,21 +166,23 @@ def filter_private_workspace(state, user):
     from .workflow_rules import confirmation_hash, activation_reasons
     from .home_details import build_home_task
     from .home_queues import home_queues
-    state['task_capabilities_checked_at'] = now()
-    state['home_queues'] = home_queues(state, actor)
+    if task_details:
+        state['task_capabilities_checked_at'] = now()
+        state['home_queues'] = home_queues(state, actor)
     for project in state.get('projects', []):
-        for node in project.get('nodes', []):
-            for task in node.get('tasks', []):
-                home = build_home_task(state, project, node, task, actor, state.get('as_of') or now()[:10])
-                task['can_execute'] = home['can_execute']
-                task['assigned_to_viewer'] = home['assigned']
-                task['confirmation_hash'] = confirmation_hash(project, node, task)
-                task['activation_blockers'] = activation_reasons(state, project, node, task, clock=state.get('as_of'))
-                task['execution_blockers'] = home['execution_blockers']
-                if home['assigned']:
-                    task['home_detail'] = home['detail']
-                else:
-                    task.pop('home_detail', None)
+        if task_details:
+            for node in project.get('nodes', []):
+                for task in node.get('tasks', []):
+                    home = build_home_task(state, project, node, task, actor, state.get('as_of') or now()[:10])
+                    task['can_execute'] = home['can_execute']
+                    task['assigned_to_viewer'] = home['assigned']
+                    task['confirmation_hash'] = confirmation_hash(project, node, task)
+                    task['activation_blockers'] = activation_reasons(state, project, node, task, clock=state.get('as_of'))
+                    task['execution_blockers'] = home['execution_blockers']
+                    if home['assigned']:
+                        task['home_detail'] = home['detail']
+                    else:
+                        task.pop('home_detail', None)
         # Operational source provenance remains server-side for reconciliation.
         # Browser pages use normalized business fields and explicit source URLs.
         _strip_source_payloads(project)

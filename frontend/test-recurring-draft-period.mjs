@@ -20,7 +20,7 @@ try{
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 
 const rec=(id,due,extra={})=>({id,project_id:'P1',kind:'weekly_review',owner_id:'u1',status:'active',due_date:due,history:[],title:'週檢討',...extra});
-const ctx=recurring=>({busy:false,run:async()=>undefined,refresh:async()=>{},s:{user:{id:'u1',role:'manager'}},
+const ctx=recurring=>({busy:false,run:async()=>undefined,refresh:async()=>{},s:{features:{routines:true},user:{id:'u1',role:'manager'}},
  w:{users:[{id:'u1',name:'U'}],projects:[{id:'P1',code:'C1',pm_id:'u1',supervisor_id:'u1'}],recurring,jobs:[]}});
 const root=createRoot(document.getElementById('root'));
 const show=async recurring=>act(async()=>root.render(React.createElement(DraftNamespace.Provider,{value:'u1:w1'},React.createElement(Routines,{c:ctx(recurring)}))));

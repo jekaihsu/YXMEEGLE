@@ -17,9 +17,9 @@ def trainer(user, plan=None):
     return capable(user, 'manage_training') or bool(plan and user['id'] == plan.get('trainer_id'))
 
 
-def cutoff(ws, user_id, day, *, clock=None):
+def cutoff(ws, user_id, day, *, clock=None, cfg=None):
     from .attendance_identity import schedule_subject_verified
-    if not schedule_subject_verified(ws,user_id,clock=clock):
+    if not schedule_subject_verified(ws,user_id,clock=clock,cfg=cfg):
         return {'status':'pending_schedule','time':None,'basis':'scheduled_shift','reason':'employee_identity_unverified'}
     matches=[s for s in ws.get('work_schedules',[]) if s['user_id']==user_id and s['day']==day and s.get('active',True)]
     if len(matches)!=1:

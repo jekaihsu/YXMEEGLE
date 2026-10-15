@@ -1,3 +1,5 @@
+import {compareTableValues} from './companyDashboardCache';
+import {taipeiDate} from './taipeiTime';
 import { useRef, useEffect, useId } from 'react';
 import type {
   WorkItemView,
@@ -324,7 +326,7 @@ export function WorkItemDetail({
                       </tr>
                     </thead>
                     <tbody>
-                      {view.parents.rows.map(p => {
+                      {[...view.parents.rows].sort((a,b)=>compareTableValues(a.itemNumber.state==='known'?a.itemNumber.text:null,b.itemNumber.state==='known'?b.itemNumber.text:null,'number')||a.key.localeCompare(b.key)).map(p => {
                         const isSelected = view.drawer.open && view.drawer.model?.key === p.key;
                         return (
                           <tr
@@ -582,7 +584,7 @@ export function WorkItemDetail({
                             onClick={() => onSelect?.(isSelected ? null : row.key)}
                           >
                             <td>{renderCell(row.name)}</td>
-                            <td>{renderCell(row.date)}</td>
+                            <td>{row.date.state==='known'?taipeiDate(row.date.text,'未提供'):renderCell(row.date)}</td>
                             <td>{renderCell(row.direction)}</td>
                             <td>{renderCell(row.version)}</td>
                             <td>{row.scope}</td>

@@ -44,35 +44,37 @@ assert.ok(document.querySelector('.dh-hero').textContent.includes('2 項待處�
 
 w.projects=Array.from({length:300},(_,i)=>({...structuredClone(p),id:`p${i}`,code:`CASE-${String(i+1).padStart(3,'0')}`,name:`Road survey ${i+1}`,created_at:new Date(Date.UTC(2026,0,1)+ (300-i)*86400000).toISOString()}));
 await flush(()=>root.render(React.createElement(Projects,{c:{...c,route:{view:'projects'}}})));
-assert.equal(document.querySelectorAll('tbody tr').length,10);assert.ok(document.querySelector('.table-footer').textContent.includes('共 300 筆'));
-const row=document.querySelector('tbody tr');assert.equal(row.querySelector('.verification-cell').getAttribute('aria-label'),'已驗證');assert.ok(row.textContent.includes('受阻'));assert.ok(row.textContent.includes('即將到期'));assert.ok(row.querySelector('.deadline').classList.contains('is-upcoming'));assert.equal(row.querySelector('.numeric').textContent,'NT$ 120,000');
-await flush(()=>[...document.querySelectorAll('.pager button')].find(b=>b.textContent==='下一頁').click());assert.ok(document.querySelector('tbody').textContent.includes('CASE-011'));assert.ok(!document.querySelector('tbody').textContent.includes('CASE-001'));
+assert.equal(document.querySelectorAll('tbody tr').length,50);assert.ok(document.querySelector('.table-footer').textContent.includes('符合條件 300 筆 · 本頁已載入 50 筆'));
+const row=document.querySelector('tbody tr');assert.equal(row.querySelector('.verification-cell').getAttribute('aria-label'),'已驗證');assert.ok(row.textContent.includes('受阻'));assert.ok(row.textContent.includes('即將到期'));assert.ok(row.querySelector('.deadline').classList.contains('is-upcoming'));assert.equal(row.querySelector('.numeric'),null,'contract amount is absent from overview rows');
+await flush(()=>[...document.querySelectorAll('.pager button')].find(b=>b.textContent==='下一頁').click());assert.ok(document.querySelector('tbody').textContent.includes('CASE-051'));assert.ok(!document.querySelector('tbody').textContent.includes('CASE-001'));
 // App add-time ordering is shared by shell requests and legacy rows.
 w.projects=[['old','2026-10-01'],['new','2026-10-13'],['tied','2026-10-13'],['empty','']].map(([id,created_at])=>({...structuredClone(p),id,code:id,created_at}));
 await flush(()=>root.render(React.createElement(Projects,{key:'created',c:{...c,route:{view:'projects'}}})));
-assert.equal(document.querySelector('[aria-label="案件排序"]').value,'created');
+assert.equal(document.querySelector('[aria-label="案件排序"]').value,'due');
+const selectSort=async value=>flush(()=>{const select=document.querySelector('[aria-label="案件排序"]');select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}))});
+await selectSort('created');
 const codes=()=>[...document.querySelectorAll('tbody .case-code')].map(e=>e.childNodes[0].textContent);
-assert.deepEqual(codes(),['tied','new','old','empty']);
+assert.deepEqual(codes(),['new','tied','old','empty']);
 await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
 assert.deepEqual(codes(),['old','new','tied','empty']);
 // Mixed offsets represent instants, with invalid/empty app add times last.
 w.projects=[['utc','2026-10-13T01:00:00+00:00'],['early','2026-10-13T08:00:00+08:00'],['equal','2026-10-13T09:00:00+08:00'],['later','2026-10-13T02:00:00Z'],['invalid','invalid'],['empty','']].map(([id,created_at])=>({...structuredClone(p),id,code:id,created_at}));
 await flush(()=>root.render(React.createElement(Projects,{key:'instants',c:{...c,route:{view:'projects'}}})));
+await selectSort('created');
 assert.deepEqual(codes(),['later','equal','utc','early','empty','invalid']);
 await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
-assert.deepEqual(codes(),['early','utc','equal','later','invalid','empty']);
+assert.deepEqual(codes(),['early','equal','utc','later','empty','invalid']);
 assert.equal(document.querySelector('[aria-label="案件排序"] option[value="created"]').textContent,'最近加入');
 // Switching a sort discards the previous direction and uses its natural default.
-w.projects=[['z','2026-10-01','2026-10-01',0],['a','2026-10-13','2026-10-13',1]].map(([id,created_at,due_date,completed])=>({...structuredClone(p),id,code:id,name:id,created_at,due_date,nodes:[{...p.nodes[0],tasks:[{...base,status:completed?'completed':'in_progress'}]}]}));
+w.projects=[['z','2026-10-01','2026-10-01',0],['a','2026-10-13','2026-10-13',1],['b','2026-10-12','2026-10-12',1]].map(([id,created_at,due_date,completed])=>({...structuredClone(p),id,code:id,name:id,created_at,due_date,nodes:[{...p.nodes[0],tasks:[{...base,status:completed?'completed':'in_progress'}]}]}));
 await flush(()=>root.render(React.createElement(Projects,{key:'switch-defaults',c:{...c,route:{view:'projects'}}})));
-assert.deepEqual(codes(),['a','z']);
-const selectSort=async value=>flush(()=>{const select=document.querySelector('[aria-label="案件排序"]');select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}))});
-for(const [sort,expected] of [['due',['z','a']],['name',['a','z']],['progress',['z','a']],['created',['a','z']]]){
+assert.deepEqual(codes(),['z','b','a']);
+for(const [sort,expected,reversed] of [['due',['z','b','a'],['z','a','b']],['name',['a','b','z'],['z','b','a']],['created',['a','b','z'],['z','b','a']]]){
  await selectSort(sort);assert.deepEqual(codes(),expected,`${sort} natural direction`);
  await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
- assert.deepEqual(codes(),[...expected].reverse(),`${sort} explicit reverse`);
+ assert.deepEqual(codes(),reversed,`${sort} explicit reverse`);
 }
 const requests=[];globalThis.fetch=async url=>{requests.push(String(url));return new Response(JSON.stringify({items:[],total:0,facets:{all:0,formal:0,intake:0}}),{status:200})};
-await flush(()=>root.render(React.createElement(Projects,{key:'shell-created',c:{...c,w:{...w,scope:'shell'},route:{view:'projects'}}})));
-assert.ok(requests.some(url=>url.includes('sort=created&dir=desc')),requests.join(' | '));
+await flush(()=>root.render(React.createElement(Projects,{key:'shell-default',c:{...c,w:{...w,scope:'shell'},route:{view:'projects'}}})));
+assert.ok(requests.some(url=>url==='/api/projects?view=overview&tab=formal&sort=due&dir=asc&limit=50&offset=0'),requests.join(' | '));
 await flush(()=>root.unmount());dom.window.close();console.log('Overview design: ready action, separate assigned waiting parity, preserved original deadline, verification/deadline states and 300-case paging passed');

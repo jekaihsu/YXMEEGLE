@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
+@layer pages{
 /* Execution admission: the cell is plain text with a reason; the queue is a grouped list of one-case forms. */
 .admission-cell{display:flex;flex-direction:column;gap:2px}.admission-cell strong{font-weight:600}
 .admission-cell small{font-size:var(--fs-footnote);color:var(--label-2)}.admission-cell.not-admitted .admission-reason{color:var(--warning)}.admission-cell a{color:var(--accent)}
@@ -9,4 +11,5 @@
 .admission-queue li>small{font-size:var(--fs-footnote);color:var(--label-2)}
 .admission-queue form{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:end}
 .admission-queue label{display:grid;gap:var(--sp-1);flex:1 1 12rem;font-size:var(--fs-footnote);color:var(--label-2)}
-.admission-queue :is(select,input){min-height:44px;padding:0 var(--sp-3);border:.5px solid var(--glass-border);border-radius:var(--radius-m);background:var(--surface);color:var(--label);font-size:var(--fs-body)}
+.admission-queue :is(select,input){min-height:44px;padding:0 var(--sp-3);border:1px solid var(--glass-border);border-radius:var(--radius-m);background:var(--surface);color:var(--label);font-size:var(--fs-body)}
+}

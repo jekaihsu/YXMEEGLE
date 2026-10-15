@@ -73,6 +73,8 @@ def refresh_node(n):
         if dues: n['due_date']=max(dues)
 
 def apply_action(ws,user,body,demo=True):
+    from .features import guard_action
+    guard_action(ws,body)
     from .input_validation import validate_action
     validate_action(body)
     action=body['action']; payload=body.get('payload') or {}; pid=body.get('project_id'); nid=body.get('node_id'); tid=body.get('task_id')
@@ -100,7 +102,7 @@ def apply_action(ws,user,body,demo=True):
         if not pair: fail('任務不存在',404)
         n,t=pair; nid=n['id']
     if action in ('task_start','task_complete','task_return'):
-        require(t is not None,'請指定任務',400); require(is_owner(user,t,ws),'只有任務負責人或有效代理人可操作')
+        require(t is not None,'請指定任務',400); require(is_owner(user,t,ws,p),'只有任務負責人或有效代理人可操作')
         require(not blocked(ws,p,t),'設計變更範圍已暫停，請先完成變更或明確恢復',409)
         require(t['status'] not in ('superseded','paused'),'任務不可操作',409)
         if action in ('task_start','task_complete'):
@@ -185,7 +187,7 @@ def apply_action(ws,user,body,demo=True):
         from .mention_notifications import enqueue_mentions
         enqueue_mentions(ws,user,p,n,t,comment,demo)
     elif action=='file_link':
-        require(is_pm(user,p) or (n and (n['owner_id']==user['id'] or any(is_owner(user,x,ws) for x in n['tasks']))))
+        require(is_pm(user,p) or (n and (n['owner_id']==user['id'] or any(is_owner(user,x,ws,p) for x in n['tasks']))))
         require(payload.get('direction') in ('input','output'),'文件用途需為 input/output',400)
         from .file_categories import validate_category
         category=payload.get('category_id') or 'other'; validate_category(ws,category); ident=uid()

@@ -46,7 +46,7 @@ def save(h,state):
 
 def test_production_worker_never_sends_for_stale_directory_actor(harness,tmp_path):
     from .operations import queue
-    h=harness;state,_=h.read();state['environment']='production'
+    h=harness;h.cfg['FEATURE_ROUTINES']='true';state,_=h.read();state['environment']='production'
     state['settings']['external_enabled']=True
     for project in state['projects']:project['execution_system']='workbench'
     actor=state['users'][0]
@@ -185,6 +185,7 @@ def notification_job(h,kind):
 
 
 def notification_worker(h,tmp_path,message):
+    h.cfg['FEATURE_ROUTINES']='true'
     adapter=SimpleNamespace(message=message,client=SimpleNamespace(close=lambda:None))
     return Worker(h.sessions,h.W,h.B,h.P,h.cfg,tmp_path,adapter_factory=lambda _:adapter)
 

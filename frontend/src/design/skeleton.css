@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
+@layer components{
 .skeleton {
   min-height: 1em;
   border-radius: var(--radius-s);
@@ -9,3 +11,5 @@
 .skeleton-header { height: 2rem; width: 60%; }
 .skeleton-chip { display: inline-block; height: 1.5rem; width: 5rem; margin: .25rem; }
 @keyframes skeleton-shimmer { to { background-position: -200% 0; } }
+@media(prefers-reduced-motion:reduce){.skeleton{animation:none;background:var(--surface-2)}}
+}

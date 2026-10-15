@@ -42,3 +42,35 @@ def test_simulated_manual_deadline_needs_no_lark_roster(environment):
     ws={'environment':environment,'work_schedules':[{'id':'manual','user_id':'local',
         'day':'2026-09-29','end_time':'18:00','active':True,'version':1}]}
     assert cutoff(ws,'local','2026-09-29')['status']=='ready'
+
+
+@pytest.mark.parametrize('age,live,expected', [
+    (7200, True, 'ready'), (90000, True, 'pending_schedule'),
+    (900, False, 'ready'), (901, False, 'pending_schedule'),
+    (7200, False, 'pending_schedule'),
+])
+def test_schedule_uses_configured_roster_freshness(setup, age, live, expected):
+    from datetime import timedelta
+    from .production_access import access_mode
+
+    ws, p, n, user = setup
+    clock = datetime.fromisoformat('2026-09-29T18:01:00+08:00')
+    cfg = {'LARK_APP_ID': 'app1', 'LARK_WORKER_IDENTITY': 'application',
+           'LARK_LIVE_READ_ENABLED': 'true' if live else 'false'}
+    ws.update(environment='production', people_directory_status={'app_id': 'app1'})
+    p['execution_system'] = 'workbench'
+    user.update(active=True, identity_app_id='app1', directory_status='employed',
+                directory_source={'app_id': 'app1', 'record_id': 'verified'},
+                directory_last_seen_at=(clock - timedelta(seconds=age)).isoformat())
+    ws['work_schedules'] = [{'id': 'stored-shift', 'user_id': user['id'], 'day': '2026-09-29',
+                             'end_time': '18:00', 'version': 1}]
+    routine = {'id': 'stored-task', 'project_id': p['id'], 'kind': 'correction',
+               'title': '成果補正', 'owner_id': user['id'], 'supervisor_id': 'u-manager',
+               'status': 'active', 'due_date': '2026-09-29', 'history': []}
+    ws['recurring'] = [routine]
+    assert access_mode(user, 'app1', now=clock, cfg=cfg) == ('normal' if expected == 'ready' else 'denied')
+    assert cutoff(ws, user['id'], '2026-09-29', clock=clock, cfg=cfg)['status'] == expected
+    schedule(ws, clock.isoformat(), cfg=cfg)
+    assert routine['deadline_status'] == expected
+    assert routine['overdue'] is (expected == 'ready')
+    assert cutoff(ws, user['id'], '2026-09-29', clock=clock)['status'] == ('ready' if age <= 900 else 'pending_schedule')

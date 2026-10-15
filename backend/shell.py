@@ -39,7 +39,7 @@ def etag(wid,user,version,today,users):
 def home_population(db,model,row,state,user,facts,cards,as_of):
     """Compute personal counts and preview details from canonical source facts."""
     from . import storage
-    from .home_details import build_home_task
+    from .home_details import build_home_task, local_work_instance
     visible={p['id']:p for p in cards}
     empty=dict(active=0,overdue=0,due_today=0,attention=[],waiting=[],waiting_counts={})
     if not visible:return empty
@@ -70,6 +70,7 @@ def home_population(db,model,row,state,user,facts,cards,as_of):
         for n in p.get('nodes',[]):
             for t in n.get('tasks',[]):
                 if t['status'] in CLOSED:continue
+                if state.get('environment') == 'production' and not local_work_instance(p,t):continue
                 home=build_home_task(full,p,n,t,actor,as_of)
                 if not home['assigned']:continue
                 detail=home['detail']
@@ -131,7 +132,8 @@ def build(db,model,row,state,user,facts,today,approval_connection):
     counters={r.key:r.value for r in db.execute(select(ci.c.key,ci.c.value).where(ci.c.workspace_id==wid,ci.c.subject_id==''))}
     rows=db.execute(select(pi).where(pi.c.workspace_id==wid,*vis).order_by(pi.c.ordinal,pi.c.project_id)).mappings().all()
     hidden=counters.get('projects_total',0)-len(rows) if vis else 0  # ready() has verified projects_total against the index
-    pending=counters.get('approvals_pending',0); pending_items=[]
+    from .features import enabled
+    pending=counters.get('approvals_pending',0) if env in ('demo','test') or enabled(state,'change_extension') else 0; pending_items=[]
     if pending:  # one partial load serves the exact recount over visible cases (hidden ones must not count) and the rows the dashboard lists
         from . import storage
         visible={r for r in db.scalars(select(pi.c.project_id).where(pi.c.workspace_id==wid,*vis))} if hidden else None
@@ -182,6 +184,9 @@ def overview_page(db,model,row,state,today,*,q='',status='',owner='',tab='formal
     if key is None: key=_binary(case((pi.c.due_date=='','9999'),else_=pi.c.due_date),db)
     elif sort=='name': key=_binary(key,db)
     order=[(o.desc() if desc else o.asc()) for o in (key,_binary(pi.c.project_id,db))]
+    if sort=='due' and not desc:
+        # Default urgency order: cases with overdue open tasks first, then nearest deadline, unknown deadlines last.
+        order=[case((pi.c.project_id.in_(select(over.c.pid)),0),else_=1).asc()]+order
     if sort=='created':
         # App import/add time, not source recency. Parse offsets; invalid values stay last.
         if db.get_bind().dialect.name=='postgresql':

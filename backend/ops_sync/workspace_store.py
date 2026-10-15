@@ -97,6 +97,10 @@ class WorkspaceStore:
             hit = db.execute(update(m).where(m.id == self.wid, m.version == version).values(version=version + 1, data=new)).rowcount
             if hit != 1:
                 return False, None                 # CAS miss: nothing was written; the caller re-reads
+            if db.info.get('index_tables'):
+                from .. import index_tables
+                from ..models import BusinessRow
+                index_tables.advance_counters(db,BusinessRow,self.wid,version,version+1)
             self._barrier('updated')               # UPDATE executed, COMMIT not yet issued
         self._barrier('committed')
         return True, result

@@ -14,6 +14,13 @@ class LiveReadConfig:
     blocking_timeout_seconds: float = 10
     lease_seconds: float = 120
     budget_seconds: float = 100
+    request_timeout_seconds: float = 10
+    attendance_budget_seconds: float = 40
+    roster_budget_seconds: float = 30
+    source_budget_seconds: float = 60
+    table_rps: float = 2
+    roster_grace_seconds: float = 86400
+    read_workers: int = 3
     records_api: str = 'list'
 
     @classmethod
@@ -40,6 +47,18 @@ class LiveReadConfig:
             blocking_timeout_seconds=number('BLOCKING_TIMEOUT_SECONDS', 10, .01),
             lease_seconds=number('LEASE_SECONDS', 120, 60),
             budget_seconds=number('BUDGET_SECONDS', 100, 10),
+            request_timeout_seconds=number('REQUEST_TIMEOUT_SECONDS', 10, .1, 15),
+            attendance_budget_seconds=number('ATTENDANCE_BUDGET_SECONDS', 40, 1, 60),
+            roster_budget_seconds=number('ROSTER_BUDGET_SECONDS', 30, 1, 60),
+            source_budget_seconds=number('SOURCE_BUDGET_SECONDS', 60, 1, 75),
+            table_rps=number('TABLE_RPS', 2, .01, 2),
+            roster_grace_seconds=number('ROSTER_GRACE_SECONDS', 86400, 900, 7 * 86400),
+            read_workers=int(number('READ_WORKERS', 3, 1, 3)),
             records_api=env.get('LARK_BITABLE_RECORDS_API', 'list')
             if env.get('LARK_BITABLE_RECORDS_API', 'list') in ('list', 'search') else 'list',
         )
+
+    def dataset_budget(self, dataset):
+        return min(self.budget_seconds, getattr(self, {
+            'sources': 'source', 'roster': 'roster', 'attendance': 'attendance'
+        }[dataset] + '_budget_seconds'))

@@ -1,5 +1,8 @@
 """Shared retry classification and a process-wide paced token bucket."""
 import math
+import random
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import threading
 import time
 
@@ -14,15 +17,22 @@ class RetryPolicy:
     max_attempts = 3
 
     @staticmethod
-    def after(response, attempt=1):
-        for name in ('x-ogw-ratelimit-reset', 'Retry-After'):
+    def after(response, attempt=1, *, jitter=False):
+        names = ('Retry-After', 'x-ogw-ratelimit-reset') if jitter else ('x-ogw-ratelimit-reset', 'Retry-After')
+        for name in names:
             try:
                 value = float(response.headers[name])
                 if math.isfinite(value) and value >= 0:
                     return max(1, value) if response.status_code == 429 else value
             except (KeyError, TypeError, ValueError):
                 pass
-        return min(30, 2 ** (attempt - 1))
+        try:
+            until = parsedate_to_datetime(response.headers['Retry-After'])
+            return max(0, (until - datetime.now(timezone.utc)).total_seconds())
+        except (KeyError, TypeError, ValueError, OverflowError):
+            pass
+        delay = min(30, 2 ** (attempt - 1))
+        return delay + random.uniform(0, delay * .25) if jitter else delay
 
 
 class TokenBucket:
@@ -81,3 +91,18 @@ def process_bucket(max_rps):
         else:
             _bucket.set_rate(max_rps)
         return _bucket
+
+_table_buckets = {}
+
+
+def table_bucket(cfg, path, max_rps=2):
+    parts = path.split('/')
+    if len(parts) < 8 or parts[1:4] != ['bitable', 'v1', 'apps'] or parts[5] != 'tables':
+        return None
+    key = (cfg.get('LARK_APP_ID'), cfg.get('LARK_WORKER_ORGANIZATION'), parts[4], parts[6])
+    with _lock:
+        if key not in _table_buckets:
+            _table_buckets[key] = TokenBucket(max_rps)
+        return _table_buckets[key]
+
+read_slots = threading.BoundedSemaphore(3)

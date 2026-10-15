@@ -237,7 +237,7 @@ def test_oauth_failed_roster_preserves_access_policy(tmp_path,monkeypatch,kind,e
     with app.state.sessions.begin() as db:
         p=db.get(PersonRow,('lark-company','u-manager'))
         p.data={**p.data,'role':'member' if kind in ('member', 'fresh_member') else 'manager', 'bootstrap_admin':kind=='bootstrap',
-                'authz_version':1, 'directory_last_seen_at':(datetime.now(timezone.utc)-timedelta(seconds=90 if kind=='fresh_member' else 901)).isoformat()}
+                'authz_version':1, 'directory_last_seen_at':(datetime.now(timezone.utc)-timedelta(seconds=90 if kind=='fresh_member' else 25*3600)).isoformat()}
     if kind=='grant':
         import json
         app.state.cfg['LARK_COMPANY_ADMIN_GRANTS_JSON']=json.dumps([{'open_id':'u-manager', 'app_id':app.state.cfg['LARK_APP_ID'], 'tenant':'company', 'authorized_at':datetime.now(timezone.utc).isoformat(), 'enabled':True, 'role':'manager', 'grant_id':'test-grant', 'reason':'test', 'authorized_by':'owner', 'decision_ref':'test'}])
@@ -270,7 +270,7 @@ def test_failed_hard_roster_read_keeps_denial_or_bootstrap_recovery(tmp_path,boo
     with app.state.sessions.begin() as db:
         p=db.get(PersonRow,('lark-company','u-manager'))
         p.data={**p.data,'bootstrap_admin':bootstrap,
-                'directory_last_seen_at':(datetime.now(timezone.utc)-timedelta(seconds=901)).isoformat()}
+                'directory_last_seen_at':(datetime.now(timezone.utc)-timedelta(seconds=25*3600)).isoformat()}
     def failed(wid): raise RuntimeError('private-token')
     app.state.live_read.refreshers['roster']=failed
     response=client.get('/api/workspace')

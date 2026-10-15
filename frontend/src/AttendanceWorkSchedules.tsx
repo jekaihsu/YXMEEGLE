@@ -1,3 +1,4 @@
+import {Avatar} from './Avatar';
 import {taipeiTime} from './taipeiTime';
 import {Section,Button,Badge} from './design';
 import './owned-screens.css';
@@ -28,5 +29,5 @@ function attendanceTone(value:string|null){
 }
 
 export function WeeklyAttendanceTable({days,people}:{days:string[];people:import('./peopleAttendance').AttendancePerson[]}){
- return <div className="people-table-scroll" role="region" aria-label="每週出勤表，可左右捲動" tabIndex={0}><table className="data-table attendance-grid"><caption className="sr-only">每週出勤紀錄；空白表示待核對，不代表未出勤</caption><thead><tr><th scope="col">人員</th><th scope="col">在職</th>{days.map((day,i)=><th scope="col" key={day}>{day.slice(5)}<small>週{['一','二','三','四','五','六','日'][i]}</small></th>)}</tr></thead><tbody>{people.map(person=><tr key={person.id}><th scope="row">{person.name??'—'}</th><td>{person.in_service===null?'—':person.in_service?'在職':'離職'}</td>{days.map((day,i)=><td key={day}><span className={`attendance-status attendance-${attendanceTone(person.attendance[i]??null)}`}>{person.attendance[i]??'—'}</span></td>)}</tr>)}</tbody></table></div>;
+ return <div className="people-table-scroll" role="region" aria-label="每週出勤表，可左右捲動" tabIndex={0}><table className="data-table attendance-grid"><caption className="sr-only">每週出勤紀錄；空白表示待核對，不代表未出勤</caption><thead><tr><th scope="col">人員</th><th scope="col">在職</th>{days.map((day,i)=><th scope="col" key={day}>{day.slice(5)}<small>週{['一','二','三','四','五','六','日'][i]}</small></th>)}</tr></thead><tbody>{people.map(person=><tr key={person.id}><th scope="row"><span className="person-cell"><Avatar small user={{name:person.name??'未',avatar_url:person.avatar_url}}/>{person.name??'—'}</span></th><td>{person.in_service===null?'—':person.in_service?'在職':'離職'}</td>{days.map((day,i)=><td key={day}><span className={`attendance-status attendance-${attendanceTone(person.attendance[i]??null)}`}>{person.attendance[i]??'—'}</span></td>)}</tr>)}</tbody></table></div>;
 }

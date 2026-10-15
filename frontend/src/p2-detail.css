@@ -1,9 +1,11 @@
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
+@layer pages{
 /* P2 Detail Shared Styles (VCC-131 Contract Detail & VCC-132 Work Item Detail) */
 
 .p2-detail-root {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5, 20px);
+  gap: var(--sp-5, var(--space-6));
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -17,8 +19,8 @@
 .p2-banner {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2, 8px);
-  padding: var(--sp-4, 16px) var(--sp-5, 20px);
+  gap: var(--sp-2, var(--space-2));
+  padding: var(--sp-4, var(--space-4)) var(--sp-5, var(--space-6));
   border-radius: var(--radius-s, 8px);
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   background: var(--surface, #ffffff);
@@ -50,7 +52,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
   flex-wrap: wrap;
 }
 
@@ -78,8 +80,8 @@
 .p2-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-pill, 999px);
   font-size: var(--fs-caption, 0.75rem);
   font-weight: 600;
@@ -132,7 +134,7 @@
 .p2-breadcrumb {
   display: flex;
   align-items: center;
-  padding: var(--sp-2, 8px) 0;
+  padding: var(--sp-2, var(--space-2)) 0;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -143,7 +145,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
   list-style: none;
   margin: 0;
   padding: 0;
@@ -156,7 +158,7 @@
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
   max-width: 100%;
   min-width: 0;
 }
@@ -169,7 +171,7 @@
 .p2-breadcrumb-link {
   background: none;
   border: none;
-  padding: 2px 4px;
+  padding: 2px var(--space-1);
   font-size: inherit;
   font-weight: 500;
   color: var(--accent, #0c5494);
@@ -214,8 +216,8 @@
 .p2-header {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2, 8px);
-  padding: var(--sp-4, 16px) var(--sp-5, 20px);
+  gap: var(--sp-2, var(--space-2));
+  padding: var(--sp-4, var(--space-4)) var(--sp-5, var(--space-6));
   background: var(--surface, #ffffff);
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   border-radius: var(--radius-m, 12px);
@@ -228,7 +230,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
   min-width: 0;
   max-width: 100%;
 }
@@ -245,7 +247,7 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--fs-subhead, 0.9375rem);
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 2px var(--space-2);
   background: var(--surface-2, #f5f5f7);
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   border-radius: var(--radius-s, 8px);
@@ -255,7 +257,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--sp-4, 16px);
+  gap: var(--sp-4, var(--space-4));
   font-size: var(--fs-footnote, 0.8125rem);
   color: var(--label-2, #6e6e73);
 }
@@ -263,14 +265,14 @@
 .p2-meta-item {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 /* Layouts */
 .p2-main-layout {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
-  gap: var(--sp-5, 20px);
+  gap: var(--sp-5, var(--space-6));
   align-items: start;
   width: 100%;
   max-width: 100%;
@@ -280,7 +282,7 @@
 
 .p2-layout-with-drawer {
   display: flex;
-  gap: var(--sp-5, 20px);
+  gap: var(--sp-5, var(--space-6));
   align-items: flex-start;
   width: 100%;
   max-width: 100%;
@@ -291,7 +293,7 @@
 .p2-primary-column {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5, 20px);
+  gap: var(--sp-5, var(--space-6));
   flex: 1 1 0;
   min-width: 0;
   max-width: 100%;
@@ -302,7 +304,7 @@
 .p2-side-column {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5, 20px);
+  gap: var(--sp-5, var(--space-6));
   width: 300px;
   max-width: 100%;
   min-width: 0;
@@ -314,8 +316,8 @@
 .p2-sibling-directory {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3, 12px);
-  padding: var(--sp-4, 16px);
+  gap: var(--sp-3, var(--space-3));
+  padding: var(--sp-4, var(--space-4));
   background: var(--surface, #ffffff);
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   border-radius: var(--radius-m, 12px);
@@ -337,7 +339,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1, 4px);
+  gap: var(--sp-1, var(--space-1));
 }
 
 .p2-sibling-item {
@@ -355,9 +357,9 @@
 .p2-sibling-unresolved {
   display: flex;
   align-items: center;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
   width: 100%;
-  padding: var(--sp-2, 8px) var(--sp-3, 12px);
+  padding: var(--sp-2, var(--space-2)) var(--sp-3, var(--space-3));
   box-sizing: border-box;
   text-align: left;
   font-size: var(--fs-subhead, 0.9375rem);
@@ -406,10 +408,10 @@
   background: var(--surface, #ffffff);
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   border-radius: var(--radius-m, 12px);
-  padding: var(--sp-5, 20px);
+  padding: var(--sp-5, var(--space-6));
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4, 16px);
+  gap: var(--sp-4, var(--space-4));
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
@@ -420,7 +422,7 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
   min-width: 0;
   max-width: 100%;
 }
@@ -428,7 +430,7 @@
 .p2-card-header-left {
   display: flex;
   align-items: center;
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
   flex-wrap: wrap;
 }
 
@@ -456,19 +458,19 @@
 .p2-def-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--sp-4, 16px);
+  gap: var(--sp-4, var(--space-4));
   margin: 0;
 }
 
 .p2-def-grid-sm {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
 }
 
 .p2-def-item {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-1, 4px);
+  gap: var(--sp-1, var(--space-1));
 }
 
 .p2-def-item dt {
@@ -529,7 +531,7 @@
 
 .p2-table th,
 .p2-table td {
-  padding: var(--sp-3, 12px) var(--sp-4, 16px);
+  padding: var(--sp-3, var(--space-3)) var(--sp-4, var(--space-4));
   border-bottom: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   vertical-align: middle;
 }
@@ -557,7 +559,7 @@
 .p2-table-empty {
   text-align: center;
   color: var(--label-2, #6e6e73);
-  padding: var(--sp-7, 32px) !important;
+  padding: var(--sp-7, var(--space-8)) !important;
 }
 
 .p2-th-sortable {
@@ -567,10 +569,10 @@
 .p2-sort-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   width: 100%;
   height: 100%;
-  padding: var(--sp-3, 12px) var(--sp-4, 16px);
+  padding: var(--sp-3, var(--space-3)) var(--sp-4, var(--space-4));
   background: none;
   border: none;
   font: inherit;
@@ -614,17 +616,17 @@
 .p2-row-actions {
   display: flex;
   align-items: center;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
 }
 
 /* WAI-ARIA Tabs */
 .p2-tablist {
   display: flex;
   align-items: center;
-  gap: var(--sp-1, 4px);
+  gap: var(--sp-1, var(--space-1));
   border-bottom: 2px solid var(--sep, rgba(60, 60, 67, 0.18));
   padding-bottom: 0;
-  margin-bottom: var(--sp-4, 16px);
+  margin-bottom: var(--sp-4, var(--space-4));
   overflow-x: auto;
   max-width: 100%;
   width: 100%;
@@ -636,8 +638,8 @@
 .p2-tab {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-2, 8px);
-  padding: var(--sp-3, 12px) var(--sp-4, 16px);
+  gap: var(--sp-2, var(--space-2));
+  padding: var(--sp-3, var(--space-3)) var(--sp-4, var(--space-4));
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -669,7 +671,7 @@
 .p2-tabpanel {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5, 20px);
+  gap: var(--sp-5, var(--space-6));
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
@@ -690,8 +692,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: var(--control-pad-block, 8px) var(--control-pad-inline, 16px);
+  gap: var(--space-2);
+  padding: var(--control-pad-block, var(--space-2)) var(--control-pad-inline, var(--space-4));
   border-radius: var(--radius-s, 8px);
   font-size: var(--fs-subhead, 0.9375rem);
   font-weight: 500;
@@ -706,7 +708,7 @@
 }
 
 .p2-btn-sm {
-  padding: 4px 10px;
+  padding: var(--space-1) var(--space-3);
   font-size: var(--fs-footnote, 0.8125rem);
 }
 
@@ -756,8 +758,8 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--sp-4, 16px);
-  padding: var(--sp-3, 12px) var(--sp-4, 16px);
+  gap: var(--sp-4, var(--space-4));
+  padding: var(--sp-3, var(--space-3)) var(--sp-4, var(--space-4));
   background: var(--surface-2, #f5f5f7);
   border-radius: var(--radius-s, 8px);
 }
@@ -765,7 +767,7 @@
 .p2-version-meta-item {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
   font-size: var(--fs-subhead, 0.9375rem);
 }
 
@@ -776,24 +778,24 @@
 .p2-observations-list {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
 }
 
 .p2-observation-card {
-  padding: var(--sp-4, 16px);
+  padding: var(--sp-4, var(--space-4));
   background: var(--surface-2, #f5f5f7);
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   border-radius: var(--radius-s, 8px);
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
 }
 
 .p2-observation-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
 }
 
 .p2-observation-version {
@@ -804,9 +806,9 @@
 .p2-source-fields {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
   border-top: 1px dashed var(--sep, rgba(60, 60, 67, 0.18));
-  padding-top: var(--sp-3, 12px);
+  padding-top: var(--sp-3, var(--space-3));
 }
 
 .p2-field-heading {
@@ -822,13 +824,13 @@
   padding: 0;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
 }
 
 .p2-field-item {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: var(--space-2);
   font-size: var(--fs-footnote, 0.8125rem);
 }
 
@@ -849,14 +851,14 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
 }
 
 .p2-warning-item {
   display: flex;
   align-items: flex-start;
-  gap: var(--sp-2, 8px);
-  padding: var(--sp-3, 12px);
+  gap: var(--sp-2, var(--space-2));
+  padding: var(--sp-3, var(--space-3));
   background: color-mix(in srgb, var(--warning, #b25000) 8%, var(--surface, #ffffff));
   border: 1px solid color-mix(in srgb, var(--warning, #b25000) 25%, transparent);
   border-radius: var(--radius-s, 8px);
@@ -881,18 +883,18 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
 }
 
 .p2-rework-item {
-  padding: var(--sp-2, 8px) var(--sp-3, 12px);
+  padding: var(--sp-2, var(--space-2)) var(--sp-3, var(--space-3));
   background: var(--surface-2, #f5f5f7);
   border-radius: var(--radius-s, 8px);
   font-size: var(--fs-footnote, 0.8125rem);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
 }
 
 .p2-rework-badge {
@@ -908,8 +910,8 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4, 16px);
-  padding: var(--sp-5, 20px);
+  gap: var(--sp-4, var(--space-4));
+  padding: var(--sp-5, var(--space-6));
   background: var(--surface, #ffffff);
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   border-radius: var(--radius-m, 12px);
@@ -921,9 +923,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
   border-bottom: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
-  padding-bottom: var(--sp-3, 12px);
+  padding-bottom: var(--sp-3, var(--space-3));
   min-width: 0;
   max-width: 100%;
 }
@@ -939,7 +941,7 @@
 .p2-drawer-body {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4, 16px);
+  gap: var(--sp-4, var(--space-4));
   min-width: 0;
   max-width: 100%;
 }
@@ -947,7 +949,7 @@
 .p2-drawer-section {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
   min-width: 0;
   max-width: 100%;
 }
@@ -966,7 +968,7 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
   min-width: 0;
   max-width: 100%;
 }
@@ -975,7 +977,7 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
   font-size: var(--fs-subhead, 0.9375rem);
   flex-wrap: wrap;
   min-width: 0;
@@ -998,7 +1000,7 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.8125rem;
   background: var(--surface-2, #f5f5f7);
-  padding: 2px 6px;
+  padding: 2px var(--space-2);
   border-radius: 4px;
 }
 
@@ -1011,7 +1013,7 @@
 .p2-drawer-alert {
   color: var(--warning, #b25000);
   background: color-mix(in srgb, var(--warning, #b25000) 8%, var(--surface, #ffffff));
-  padding: var(--sp-2, 8px) var(--sp-3, 12px);
+  padding: var(--sp-2, var(--space-2)) var(--sp-3, var(--space-3));
   border-radius: var(--radius-s, 8px);
   font-size: var(--fs-footnote, 0.8125rem);
 }
@@ -1022,16 +1024,16 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
 }
 
 .p2-drawer-field-item {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--sp-2, 8px);
+  gap: var(--sp-2, var(--space-2));
   font-size: var(--fs-footnote, 0.8125rem);
-  padding: 4px 0;
+  padding: var(--space-1) 0;
   border-bottom: 1px dotted var(--sep, rgba(60, 60, 67, 0.18));
 }
 
@@ -1049,8 +1051,8 @@
 .p2-side-area {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4, 16px);
-  padding: var(--sp-4, 16px);
+  gap: var(--sp-4, var(--space-4));
+  padding: var(--sp-4, var(--space-4));
   background: var(--surface, #ffffff);
   border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
   border-radius: var(--radius-m, 12px);
@@ -1062,7 +1064,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3, 12px);
+  gap: var(--sp-3, var(--space-3));
 }
 
 .p2-side-date-item {
@@ -1119,14 +1121,15 @@
 
 @media (max-width: 600px) {
   .p2-card {
-    padding: var(--sp-4, 16px);
+    padding: var(--sp-4, var(--space-4));
   }
 
   .p2-drawer {
-    padding: var(--sp-4, 16px);
+    padding: var(--sp-4, var(--space-4));
   }
 
   .p2-header {
-    padding: var(--sp-3, 12px) var(--sp-4, 16px);
+    padding: var(--sp-3, var(--space-3)) var(--sp-4, var(--space-4));
   }
+}
 }

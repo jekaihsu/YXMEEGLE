@@ -16,7 +16,7 @@ def switch(client, uid):
 
 def test_shell_flag_off_changes_nothing(tmp_path):
     with scaled_client(tmp_path, 6, upgraded=True, INDEX_TABLES_ENABLED='true') as (app, client):
-        assert 'features' not in client.get('/api/session').json()
+        assert client.get('/api/session').json()['features'] == {'change_extension':False,'routines':False,'mock_ui':False}
         full = client.get('/api/workspace').json()
         shellish = client.get('/api/workspace?scope=shell').json()
         assert shellish.get('scope') is None and len(shellish['projects'][0]['nodes']) > 0
@@ -25,7 +25,7 @@ def test_shell_flag_off_changes_nothing(tmp_path):
 
 def test_shell_advertised_and_scope_absent_is_full(tmp_path):
     with scaled_client(tmp_path, 6, **ON) as (app, client):
-        assert client.get('/api/session').json()['features'] == {'workspace_shell': True}
+        assert client.get('/api/session').json()['features'] == {'workspace_shell':True,'change_extension':False,'routines':False,'mock_ui':False}
         assert client.get('/api/workspace').json().get('scope') is None
 
 

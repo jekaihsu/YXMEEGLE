@@ -93,6 +93,53 @@ def replace_counters(db,model,wid,state):
     if fresh: db.execute(insert(ci),fresh)
 
 
+def advance_counters(db,model,wid,previous,version):
+    """Carry a current index across a write that cannot change any counter; a stale one stays stale."""
+    *_,ci=tables(model)
+    db.execute(ci.update().where(ci.c.workspace_id==wid,ci.c.source_version==previous).values(source_version=version))
+
+
+def scoped_counters(rows):
+    """Counter contributions of just the given (kind, entity_id, parent_id, data) rows.
+
+    Open tasks count per owner exactly like counter_values; approvals and unmatched
+    dailies count only when those collections are part of the rows.
+    """
+    rows=list(rows)
+    node_owner={ident:data.get('owner_id') or '' for kind,ident,_,data in rows if kind=='nodes'}
+    values={}
+    def bump(key,amount=1): values[key]=values.get(key,0)+amount
+    for kind,ident,parent,data in rows:
+        if kind=='tasks' and data.get('status') not in CLOSED_TASK_STATUSES:
+            bump(('tasks_open',data.get('owner_id') or node_owner.get(parent,'')))
+        elif kind=='approvals': values.setdefault(('approvals_pending',''),0); values[('approvals_pending','')]+=data.get('status')=='pending'
+        elif kind=='daily_unmatched': bump(('daily_unmatched',''))
+    return values
+
+
+def apply_counter_deltas(db,model,wid,previous,version,before,after):
+    """advance_counters plus the change in the counters a partial write touched.
+
+    A stale index stays stale (nothing is created or moved on it); a current one ends up
+    exactly as replace_counters would leave it, because untouched contributions cancel.
+    """
+    advance_counters(db,model,wid,previous,version)
+    *_,ci=tables(model)
+    if db.scalar(select(ci.c.source_version).where(ci.c.workspace_id==wid,ci.c.key=='projects_total',ci.c.subject_id==''))!=version: return
+    stored={(r.key,r.subject_id):r for r in db.execute(select(ci).where(ci.c.workspace_id==wid))}
+    for key in before.keys()|after.keys():
+        delta=after.get(key,0)-before.get(key,0)
+        name,subject=key; row=stored.get(key)
+        if row is not None and row.source_version!=version: continue
+        if not delta and (row is not None or name=='tasks_open'): continue
+        value=(row.value if row is not None else 0)+delta
+        if row is not None:
+            if value<=0 and name=='tasks_open': db.execute(delete(ci).where(ci.c.workspace_id==wid,ci.c.key==name,ci.c.subject_id==subject))
+            else: db.execute(ci.update().where(ci.c.workspace_id==wid,ci.c.key==name,ci.c.subject_id==subject).values(value=value))
+        elif value>0 or name!='tasks_open':
+            db.execute(insert(ci),[dict(workspace_id=wid,key=name,subject_id=subject,value=value,source_version=version)])
+
+
 def _mismatch(rows,expected,key,ignore=('source_version',)):
     """Compare actual vs expected row dicts keyed by `key`: (missing, extra, stale) key lists."""
     strip=lambda row:{k:v for k,v in row.items() if k not in ignore}

@@ -5,13 +5,13 @@ import pytest
 from fastapi.testclient import TestClient
 from .app import create_app, WorkspaceRow, AuthRow, BusinessRow
 from . import storage
-from .seed import seed
+from .test_ux_disabled import enabled_seed as seed
 from .sources import import_sources, number, day
 from .workflow import now
 
 @pytest.fixture
 def app(tmp_path):
-    return create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/test.db','UPLOAD_DIR':str(tmp_path/'uploads'),'SESSION_SECRET':'test-secret'*5,'APP_ENV':'development','DEMO_MODE':'true'})
+    return create_app({'FEATURE_CHANGE_EXTENSION':'true','FEATURE_ROUTINES':'true','DATABASE_URL':f'sqlite:///{tmp_path}/test.db','UPLOAD_DIR':str(tmp_path/'uploads'),'SESSION_SECRET':'test-secret'*5,'APP_ENV':'development','DEMO_MODE':'true'})
 @pytest.fixture
 def client(app):
     c=TestClient(app); assert c.get('/api/session').status_code==200; return c
@@ -96,7 +96,7 @@ def test_initial_schedule_assignment_history_and_replay(client):
 
 def test_restart_and_demo_isolation(app,client,tmp_path):
     assert act(client,'comment_add',{'body':'重新啟動仍保留'}).status_code==200
-    restarted=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/test.db','UPLOAD_DIR':str(tmp_path/'uploads'),'SESSION_SECRET':'test-secret'*5,'APP_ENV':'development','DEMO_MODE':'true'})
+    restarted=create_app({'FEATURE_CHANGE_EXTENSION':'true','FEATURE_ROUTINES':'true','DATABASE_URL':f'sqlite:///{tmp_path}/test.db','UPLOAD_DIR':str(tmp_path/'uploads'),'SESSION_SECRET':'test-secret'*5,'APP_ENV':'development','DEMO_MODE':'true'})
     c2=TestClient(restarted); c2.cookies.update(client.cookies); assert workspace(c2)['projects'][0]['comments'][0]['body']=='重新啟動仍保留'
     isolated=TestClient(app); isolated.get('/api/session'); assert workspace(isolated)['projects'][0]['comments']==[]
     assert isolated.get('/api/sources').json()['records']==[]; assert isolated.post('/api/sources/sync').status_code==403
@@ -209,7 +209,7 @@ def test_oauth_verified_identity_tenant_and_role_isolation(tmp_path,monkeypatch)
     existing=TestClient(downgraded); existing.cookies.update(client.cookies)
     assert existing.get('/api/session').json()['user']['role']=='manager'
     session=existing.get('/api/session').json()
-    assert session['environment']=='lark'  # Session namespace label; workspace uses production.
+    assert session['environment']=='production'
     assert session['workspace_id']=='lark-company'
     assert workspace(existing)['environment']=='production'
     with downgraded.state.sessions() as db:
@@ -248,10 +248,11 @@ def test_inherited_assignment_updates_but_explicit_owner_and_completed_work_rema
 
 def test_live_submit_fails_without_mutating_draft_or_freezing_work(tmp_path):
     import time
-    app=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/live.db','UPLOAD_DIR':str(tmp_path/'uploads'),
+    app=create_app({'FEATURE_CHANGE_EXTENSION':'true','FEATURE_ROUTINES':'true','DATABASE_URL':f'sqlite:///{tmp_path}/live.db','UPLOAD_DIR':str(tmp_path/'uploads'),
                     'SESSION_SECRET':'live-test-secret'*4,'APP_ENV':'development','DEMO_MODE':'false',
                     'LARK_WORKER_ORGANIZATION':'test','LARK_ALLOWED_TENANTS':'test'})
     live=seed(); live['environment']='production'
+    for project in live.get('projects', []): project['source_kind']='lark'
     for project in live['projects']:
         project.update(source_kind='lark',execution_system='workbench',case_visibility='new_case')
     with app.state.sessions.begin() as db:
@@ -343,6 +344,7 @@ def test_native_approval_refresh_uses_official_user_endpoint(app,monkeypatch):
     live=seed(); live['projects'][0]['source_kind']='lark'
     app.state.cfg.update(LARK_WORKER_ORGANIZATION='approval-test',LARK_ALLOWED_TENANTS='approval-test')
     live['environment']='production'
+    for project in live.get('projects', []): project['source_kind']='lark'
     for project in live['projects']:
         project.update(case_visibility='new_case',execution_system='workbench')
     with app.state.sessions.begin() as db:
@@ -455,6 +457,7 @@ def test_gzip_large_workspace_and_authenticated_sources_preserves_json_and_acces
     app.state.cfg.update(LARK_WORKER_ORGANIZATION='compression',LARK_ALLOWED_TENANTS='compression')
     with app.state.sessions.begin() as db:
         state=seed();state['environment']='production'
+        for project in state.get('projects', []): project['source_kind']='lark'
         state['source_visible_record_ids']=[f'base|quote|rec{i}' for i in range(100)]
         db.add(WorkspaceRow(id='lark-compression',version=1,data=state))
         db.add(AuthRow(id='compression-session',data={'wid':'lark-compression','expires':time.time()+3600,'access_token':'unused'}))

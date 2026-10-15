@@ -6,6 +6,7 @@ import json
 import re
 from sqlalchemy import select, update
 
+from .avatar import avatar_url
 from . import storage
 from .workflow import require, now, event
 from .policy import upgrade
@@ -81,7 +82,8 @@ def fetch_directory(adapter, app_id):
         people.append({'id':ident,'name':name,'department':text(values.get(selected.get('department'))),
             'source_work_category':text(values.get(selected.get('work_category'))),
             'employment_status':employment,
-            'record_id':rid})
+            'record_id':rid,
+            **({'avatar_url': photo} if (photo := avatar_url(account.get('avatar_url'))) else {})})
     duplicates={ident for ident,count in account_counts.items() if count>1}
     for person in people:
         if person['id'] in duplicates: issues.append({'record_id':person['record_id'],'reason':'duplicate_account'})
@@ -109,6 +111,10 @@ def merge_directory(existing, snapshot):
                     '人員登入身分屬於另一應用，停止合併',409)
             stats['updated']+=1
         current['name']=person['name']; current['avatar']=person['name'][:1]
+        photo = avatar_url(person.get('avatar_url')) or avatar_url(current.get('avatar_url'))
+        current.pop('avatar_url', None)
+        if photo:
+            current['avatar_url'] = photo
         previous_category=current.get('source_work_category','')
         old_placeholder=f'來源內外勤：{previous_category}（待確認組別）' if previous_category else '待確認部門'
         category=person.get('source_work_category','')
@@ -145,8 +151,11 @@ class PeopleDirectoryService:
         require(self.cfg['LARK_WORKER_ORGANIZATION'] in tenants,'名冊公司不在登入允許名單',403)
         return (self.cfg['LARK_APP_ID'],self.cfg['LARK_WORKER_ORGANIZATION'])
 
-    def _state(self,db,row):
-        state=upgrade(storage.load(db,self.B,row))
+    def _state(self,db,row,collections=None):
+        # Partial saves cannot persist a generated SOP candidate with its audit event.
+        state=upgrade(storage.load(db,self.B,row) if collections is None
+                      else storage.load_partial(db,self.B,row,collections=(*collections,'sop_templates')),
+                      generate_sop_candidate=collections is None)
         profiles={p.person_id:deepcopy(p.data) for p in db.scalars(select(self.P).where(self.P.organization_id==row.id))}
         old={u['id'] for u in state['users']}
         state['users']=[profiles.get(u['id'],u) for u in state['users']]+[u for ident,u in profiles.items() if ident not in old]
@@ -165,27 +174,29 @@ class PeopleDirectoryService:
         require(admitted(actor,self.cfg.get('LARK_APP_ID')),'名冊同步操作者尚未核實在職身分',403)
         return actor
 
-    def _save(self,db,row,state):
+    def _save(self,db,row,state,collections=None):
         state['version']=row.version+1
+        data=(storage.save(db,self.B,row.id,state) if collections is None
+              else storage.save_collections(db,self.B,row.id,state,collections))
         result=db.execute(update(self.W).where(self.W.id==row.id,self.W.version==row.version)
-            .values(version=state['version'],data=storage.save(db,self.B,row.id,state)))
+            .values(version=state['version'],data=data))
         require(result.rowcount==1,'名冊同步版本衝突，請重試',409)
 
     def failure(self,wid,message,expected_generation=None):
         with self.sessions.begin() as db:
             row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update())
             if not row: return
-            state=self._state(db,row)
+            state=self._state(db,row,('users',))
             if expected_generation is not None and state.get('people_directory_status',{}).get('sync_revision',0)!=expected_generation:
                 return
             state.setdefault('people_directory_status',{}).update(status='error',last_attempt_at=now(),message=message)
-            self._save(db,row,state)
+            self._save(db,row,state,('users',))
 
     def sync(self,wid,actor_id):
         policy=self._policy(wid)
         with self.sessions() as db:
             row=db.get(self.W,wid); require(row is not None,'工作區不存在',404)
-            state=self._state(db,row); self._actor(state,actor_id)
+            state=self._state(db,row,('users',)); self._actor(state,actor_id)
             require(state.get('environment') not in ('test','demo'),'隔離工作區不可同步正式名冊',403)
             prior=state.get('people_directory_status',{}).get('app_id')
             require(not prior or prior==policy[0],'Lark應用已變更，請先核對名冊身分',409)
@@ -198,7 +209,7 @@ class PeopleDirectoryService:
                 require(self._policy(wid)==policy,'名冊同步設定已變更',409)
                 with self.sessions() as db:
                     row=db.get(self.W,wid); require(row is not None,'工作區不存在',404)
-                    fresh=self._state(db,row); self._actor(fresh,actor_id)
+                    fresh=self._state(db,row,('users',)); self._actor(fresh,actor_id)
                     require(fresh.get('environment') not in ('test','demo'),'工作區環境已變更',403)
             check()
             from .jobs import PermissionCheckedClient
@@ -212,7 +223,7 @@ class PeopleDirectoryService:
                 require(self._policy(wid)==policy,'名冊同步設定已變更',409)
                 row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update())
                 require(row is not None,'工作區不存在',404)
-                state=self._state(db,row); actor=self._actor(state,actor_id)
+                state=self._state(db,row,('users',)); actor=self._actor(state,actor_id)
                 require(state.get('environment') not in ('test','demo'),'工作區環境已变更',403)
                 require(state.get('people_directory_status',{}).get('sync_revision',0)==generation,
                         '已有較新名冊同步完成，請重新讀取；保留最新人員資料',409)
@@ -235,7 +246,7 @@ class PeopleDirectoryService:
                 prior=state.get('people_directory_connection',{})
                 state['people_directory_connection']=readonly_sync_connection(self.cfg,actor_id or prior.get('authorized_by') or prior.get('actor_id'),dataset='roster')
                 event(state,actor,'people_directory_sync',message='唯讀同步人員名冊，保留原有授權及歷史')
-                self._save(db,row,state)
+                self._save(db,row,state,('users','events'))
                 return deepcopy(state['people_directory_status'])
         except Exception as exc:
             from fastapi import HTTPException

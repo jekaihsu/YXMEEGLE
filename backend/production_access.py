@@ -39,6 +39,16 @@ def require_admission(person, app_id):
 DIRECTORY_MAX_AGE_SECONDS=900
 
 
+def directory_max_age(cfg):
+    """Live reads refresh the roster on demand, so a failing refresh must not lock out people
+    the last good roster admitted. Admission itself still needs a verified, employed, unexpired
+    record; only how long an unrefreshed proof is trusted changes, and only for live reads."""
+    if not cfg or cfg.get('LARK_WORKER_IDENTITY')!='application':return DIRECTORY_MAX_AGE_SECONDS
+    from .live_read.config import LiveReadConfig
+    live=LiveReadConfig.from_env(cfg)
+    return live.roster_grace_seconds if live.enabled else DIRECTORY_MAX_AGE_SECONDS
+
+
 def roster_age_seconds(person, now):
     """Return roster verification age, or None for missing/invalid timestamps."""
     try:
@@ -91,7 +101,7 @@ def access_mode(person,app_id,*,now=None,cfg=None,tenant=None):
     try:
         stamp=datetime.fromisoformat(person.get('directory_last_seen_at','').replace('Z','+00:00'))
         age=(clock-stamp).total_seconds() if stamp.tzinfo else -999
-        fresh=0<=age<=DIRECTORY_MAX_AGE_SECONDS
+        fresh=0<=age<=directory_max_age(cfg)
     except (ValueError,TypeError,AttributeError):pass
     if verified and fresh:return 'normal'
     if person.get('bootstrap_admin') and person.get('role')=='manager':return 'recovery'

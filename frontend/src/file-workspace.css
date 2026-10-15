@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
+@layer pages{
 .file-screen.file-workspace,.file-sheet.file-sheet{color:var(--label);font:var(--fs-body)/1.6 var(--font);min-width:0}
 .file-screen.file-workspace .section-heading{align-items:flex-start;gap:var(--sp-4);flex-wrap:wrap}
 .file-screen.file-workspace h2{color:var(--label);font-size:var(--fs-title1);font-weight:600}
@@ -25,3 +27,4 @@
 .file-sheet.file-sheet .form-error{color:var(--critical)}
 .file-screen .ds-row-main,.file-sheet{overflow-wrap:anywhere}
 @media(prefers-reduced-motion:reduce){.file-sheet.file-sheet{animation:none}.file-sheet-backdrop{animation:none}}
+}

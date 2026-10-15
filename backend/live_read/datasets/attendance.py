@@ -11,7 +11,7 @@ class AttendanceRefresher(DatasetRefresher):
         service, clients = self.reader()
         status = service.sync(wid, None)
         with service.sessions() as db:
-            state = service._state(db, db.get(service.W, wid))
+            state = service._state(db, db.get(service.W, wid), ('users', 'work_schedules'))
         rows = [{key: value for key, value in row.items()
                  if key not in ('id', 'history', 'version', 'updated_at', 'source_verified_at')}
                 for row in state['work_schedules']
@@ -25,7 +25,7 @@ class AttendanceRefresher(DatasetRefresher):
         service, clients = self.reader()
         app_id, tenant = service._policy(wid)
         with service.sessions() as db:
-            state = service._state(db, db.get(service.W, wid))
+            state = service._state(db, db.get(service.W, wid), ('users',))
         adapter = service.adapter_factory(service.cfg)
         try:
             snapshot = fetch_week(adapter, state['users'], app_id, tenant, days,

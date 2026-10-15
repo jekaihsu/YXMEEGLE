@@ -2,7 +2,7 @@ import {api} from './api';
 
 export const attendanceStatuses=['loading','ok','incomplete','stale','needs-permission','not-connected','read-failed'] as const;
 export type AttendanceStatus=typeof attendanceStatuses[number];
-export type AttendancePerson={id:string;name:string|null;group:string|null;in_service:boolean|null;attendance:(string|null)[]};
+export type AttendancePerson={id:string;name:string|null;avatar_url?:string;group:string|null;in_service:boolean|null;attendance:(string|null)[]};
 export type AttendanceTrip={person_id:string;name:string|null;group:string|null;kind:'trip'|'out';start:string;end:string};
 export type PeopleAttendance={status:AttendanceStatus;week_start:string;week_end:string;days:string[];people:AttendancePerson[];trips:AttendanceTrip[];as_of:string|null;missing_scopes:string[];refreshing:boolean;incomplete:boolean;summary:{people:number|null;in_service:number|null;on_leave:number|null;on_trip:number|null;trips:number|null}};
 const field=(value:unknown,key:string):unknown=>value!==null&&typeof value==='object'?Reflect.get(value,key):undefined;
@@ -24,8 +24,8 @@ export function parsePeopleAttendance(raw:unknown):PeopleAttendance{
  const rawPeople=field(raw,'people');
  if(Array.isArray(rawPeople))for(const row of rawPeople){
   const id=string(field(row,'id'));if(!id)continue;
-  const service=field(row,'in_service'),days=field(row,'attendance');
-  people.push({id,name:string(field(row,'name')),group:string(field(row,'group')),in_service:typeof service==='boolean'?service:null,attendance:Array.isArray(days)?days.map((d:unknown)=>string(d)):[]});
+  const service=field(row,'in_service'),days=field(row,'attendance'),photo=string(field(row,'avatar_url'));
+  people.push({id,name:string(field(row,'name')), ...(photo ? {avatar_url:photo} : {}),group:string(field(row,'group')),in_service:typeof service==='boolean'?service:null,attendance:Array.isArray(days)?days.map((d:unknown)=>string(d)):[]});
  }
  const rawTrips=field(raw,'trips');
  if(Array.isArray(rawTrips))for(const row of rawTrips){

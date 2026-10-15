@@ -16,7 +16,7 @@ const project={id:'p1',concurrency_version:7,execution_allowed:true};
 const other={id:'p2',concurrency_version:3,execution_allowed:true};
 let refreshed=0;const requests=[];let reply={status:200,body:{}};
 globalThis.fetch=async(url,init)=>{requests.push({url,body:JSON.parse(init.body)});return new Response(JSON.stringify(reply.body),{status:reply.status,headers:{'content-type':'application/json'}})};
-const c={w:{version:99,projects:[other,project],environment:'production',approval_connection:{native_submit:{by_type:{extension:{available:true}}}}},s:{mode:'lark',user:{id:'u1'}},busy:false,refresh:async()=>{refreshed++}};
+const c={w:{version:99,projects:[other,project],environment:'production',approval_connection:{native_submit:{by_type:{extension:{available:true}}}}},s:{mode:'lark',features:{change_extension:true},user:{id:'u1'}},busy:false,refresh:async()=>{refreshed++}};
 const root=createRoot(document.getElementById('root'));
 await act(async()=>root.render(React.createElement(mod.NativeApprovalControls,{c,kind:'extension',item:{id:'r1',project_id:'p1',status:'draft'},canSubmit:true})));
 const click=async()=>{await act(async()=>{[...document.querySelectorAll('button')].find(b=>b.textContent.includes('核對送審設定')).click()})};

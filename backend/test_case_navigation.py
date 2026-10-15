@@ -57,6 +57,7 @@ def test_project_scope_native_e2_and_visibility():
     assert result['contracts'][0]['work_items']==[]
     assert case_navigation(state,'other')=={'confirmations':[]}
     state['environment']='production'
+    for project in state.get('projects', []): project['source_kind']='lark'
     assert case_navigation(state,'p')=={'confirmations':[]}
 
 
@@ -83,6 +84,7 @@ def test_route_returns_navigation_and_rejects_unknown_project(tmp_path):
 
 def test_production_requires_admitted_source_identity():
     state=fixture();state['environment']='production';state['projects'][0]['case_visibility']='source_reference'
+    for project in state.get('projects', []): project['source_kind']='lark'
     state['source_visible_record_ids']=['b|confirmations|c','b|contracts|contract0']
     for collection,table in (('source_confirmations','confirmations'),('contract_items','contracts')):
         for row in state[collection]:

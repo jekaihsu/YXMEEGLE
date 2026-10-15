@@ -9,7 +9,7 @@ export interface DatasetFreshness {
 }
 export interface Freshness {server_time:string;enabled:boolean;datasets:Record<LiveDataset,DatasetFreshness>}
 export type Status = 'pending'|'in_progress'|'completed'|'paused'|'superseded'|'rework'|string;
-export interface User {can_business_override?:boolean;can_mention?:boolean;id:string;name:string;role:string;department:string;avatar:string;active?:boolean;capabilities?:string[];default_workspace?:string}
+export interface User {can_business_override?:boolean;can_mention?:boolean;id:string;name:string;role:string;department:string;avatar:string;avatar_url?:string;active?:boolean;capabilities?:string[];default_workspace?:string}
 export interface Comment {id:string;author_id:string;body:string;created_at:string;mentions?:string[];notifications?:{recipient_id:string;status:string;error?:string;simulated?:boolean}[]}
 export type HomeWaitingKind = 'paused'|'correction'|'prerequisite'|'upcoming'|'proxy';
 export interface HomeTaskDetail {
@@ -38,7 +38,8 @@ export interface Event {id:string;project_id:string;node_id?:string;task_id?:str
 export interface SourceMapping {daily_total?:number;daily_imported:number;daily_unmatched:number;daily_unmatched_missing_reference?:number;daily_unmatched_unresolved_reference?:number;daily_unmatched_ambiguous_reference?:number;confirmations_missing_code?:number;daily_missing_date?:number;daily_conflicting_dates?:number;daily_missing_department?:number;daily_provisional?:number;projects?:number;intakes?:number}
 export interface ShellAttention {detail?:HomeTaskFacts|null;task_id:string;project_id:string;project_code:string;project_name:string;node_id?:string;node_key:string;node_name?:string|null;assignee_id?:string;status:string;due_date:string;title:string}
 export interface Workspace {scope?:'full'|'shell';attention?:ShellAttention[];home_waiting?:HomeWaitingItem[];home_waiting_counts?:Partial<Record<HomeWaitingKind,number>>;home_queues?:HomeQueues;pending_approvals?:{id:string;title:string;type:string;project_id:string}[];counts?:WorkspaceCounts;freshness?:Freshness;environment?:string;workspace_id?:string;version:number;as_of:string;users:User[];projects:Project[];approvals:Approval[];events:Event[];calendar:{holidays:string[];workdays:string[]};source_status:{status:string;last_sync:string;message:string;mapping?:SourceMapping};[key:string]:any}
-export interface Session {features?:{workspace_shell?:boolean};access_mode?:string;user:User|null;users:User[];mode:string;auth_configured:boolean;environment?:string;workspace_id?:string}
+export interface FeatureContract {change_extension?:boolean;routines?:boolean;mock_ui?:boolean;workspace_shell?:boolean;node_assignment?:boolean}
+export interface Session {features?:FeatureContract;access_mode?:string;user:User|null;users:User[];mode:string;auth_configured:boolean;environment?:string;workspace_id?:string}
 export interface SourceData {freshness?:Freshness;as_of?:string|null;configured:boolean;last_sync:string;status:string;message:string;tables:unknown[];records:unknown[];mapping?:SourceMapping}
 export type View = 'pm-glance'|'company'|'dashboard'|'projects'|'work'|'schedule'|'people'|'approvals'|'sources'|'project'|'admin'|'routines'|'overview'|'confirmations'|'confirmation'|'contract'|'workitem';
 export interface Route {view:View;project?:string;node?:string;task?:string;tab?:string;section?:string;completion?:string;focus?:string;comment?:string;approval?:string;ctx?:string}

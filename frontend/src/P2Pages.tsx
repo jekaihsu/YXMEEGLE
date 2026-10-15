@@ -1,9 +1,10 @@
+import {cachedPanel, readPanel} from './companyDashboardCache';
 // P2-INT-F pages: #view=overview | confirmations | confirmation | contract | workitem (VCC-128..132).
 // Read-only. Transport only: every state text comes from the view models or dataState labels. All navigation and
 // return context is built by drilldownContext.ts (drill / back / backTo / linkOut) through p2Routes.ts.
 // Not changed: the legacy #project, #projects, #work and #sources views stay reachable from the left navigation.
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {fetchP2, ApiError, getSessionEpoch, parseRoute} from './api';
+import {ApiError, getSessionEpoch, parseRoute} from './api';
 import {ManagerOverview} from './ManagerOverview';
 import {ConfirmationList} from './ConfirmationList';
 import {CaseDetail} from './CaseDetail';
@@ -15,6 +16,7 @@ import {buildCaseDetailView} from './caseDetailView.ts';
 import {buildContractDetailView} from './contractDetailView.ts';
 import {buildWorkItemDetailView} from './workItemDetailView.ts';
 import type {WorkItemTab} from './workItemDetailView.ts';
+import {Skeleton} from './design';
 import {DATA_STATE_LABELS} from './dataState.ts';
 import {backTo, breadcrumbs, drill, linkOut} from './drilldownContext.ts';
 import type {P2Context, P2Route, SortSpec} from './drilldownContext.ts';
@@ -24,26 +26,29 @@ import type {HistoryStore, P2Failure} from './p2Routes.ts';
 import type {Ctx} from './appCommon';
 import type {Route} from './types';
 
-type Fetched = {status: 'loading'} | {status: 'ok'; body: unknown} | {status: 'error'; httpStatus?: number};
+type Fetched = {status: 'loading'} | {status: 'ok'; body: unknown; updateFailed?: boolean} | {status: 'error'; httpStatus?: number};
 const ROUTE_LABEL: Record<P2Route, string> = {overview: '管理總覽', confirmations: '工程確認單', confirmation: '案件與確認單詳情', contract: '合約明細', workitem: '工作項'};
 
 // One GET per (url, retry, session, user). A previous user's body is never shown while the refetch is in flight.
 function useP2Read(url: string | null, retry: number, version: unknown, userId: unknown): Fetched {
  const key = `${url}|${retry}|${String(version)}|${getSessionEpoch()}|${String(userId)}`;
- const [state, setState] = useState<{key: string; fetched: Fetched}>({key, fetched: {status: 'loading'}});
+ const [state, setState] = useState<{key: string; fetched: Fetched}>(() => {const body=url?cachedPanel(url,String(userId)):undefined;return {key,fetched:body===undefined?{status:'loading'}:{status:'ok',body}}});
  useEffect(() => {
   if (!url) return;
   const epoch = getSessionEpoch();
   const controller = new AbortController();
-  fetchP2(url, controller.signal)
-   .then(body => {if (epoch === getSessionEpoch()) setState({key, fetched: {status: 'ok', body}})})
+  readPanel(url, controller.signal,String(userId),{timeoutMs:60000,reloadVersion:JSON.stringify([version,retry])})
+   .then(body => {if (!controller.signal.aborted && epoch === getSessionEpoch()) setState({key, fetched: {status: 'ok', body}})})
    .catch(error => {
     if (controller.signal.aborted || epoch !== getSessionEpoch()) return;
-    setState({key, fetched: {status: 'error', httpStatus: error instanceof ApiError ? error.status : undefined}});
+    const retained=cachedPanel(url,String(userId));
+    if(retained!==undefined&&!(error instanceof ApiError&&(error.status===401||error.status===403)))setState({key,fetched:{status:'ok',body:retained,updateFailed:true}});
+    else setState({key, fetched: {status: 'error', httpStatus: error instanceof ApiError ? error.status : undefined}});
    });
   return () => controller.abort();
  }, [key, url]);
- return state.key === key ? state.fetched : {status: 'loading'};
+ const cached=url?cachedPanel(url,String(userId)):undefined;
+ return state.key === key ? state.fetched : cached===undefined?{status:'loading'}:{status:'ok',body:cached};
 }
 
 // Per-owner memory so Back restores what was open on a page (cursor history, drawer selection, tab); module-level on purpose.
@@ -77,7 +82,7 @@ export function P2Page({c}: {c: Ctx}) {
  const route = c.route;
  const parsed = useMemo(() => p2Gate(route), [route.view, route.ctx]); // eslint-disable-line react-hooks/exhaustive-deps
  const context = parsed.context;
- const userId = c.s?.user?.id;
+ const userId = JSON.stringify([c.s?.user?.id,c.s?.user?.role,c.s.workspace_id,c.w.workspace_id]);
  ownMemory(`${getSessionEpoch()}|${String(userId)}`);
  const [notice, setNotice] = useState('');
  const [retry, setRetry] = useState(0);
@@ -106,7 +111,7 @@ export function P2Page({c}: {c: Ctx}) {
  if (!parsed.ok) page = <InvalidContext label={ROUTE_LABEL[context.route]} onReset={() => open(context, true)}/>;
  else if (!pageRequest?.ok) page = <UnsupportedFilters unsupported={pageRequest?.ok === false ? pageRequest.unsupported : []} invalid={pageRequest?.ok === false ? pageRequest.invalid : []} unlocated={pageRequest?.ok === false && pageRequest.reason === 'unlocated'}
   onReset={() => open({...context, filters: {}, cursor: null}, true)}/>;
- else if (fetched.status === 'loading' && context.route !== 'confirmations') page = <Notice state="loading" message="正在讀取。"/>;
+ else if (fetched.status === 'loading' && context.route !== 'confirmations') page = <div className="p2-card" aria-hidden="true"><Skeleton lines={6}/></div>;
  else if (failure && !(failure.state === 'forbidden' && context.route === 'confirmations')) page = <FailureNotice failure={failure} onRetry={onRetry}/>;
  else if (context.route === 'overview') page = <OverviewBody context={context} body={body} open={open} openEntryPoint={openEntryPoint} openSources={openSources} setNotice={setNotice} goBack={goBack}/>;
  else if (context.route === 'confirmations') page = <ConfirmationsBody context={context} body={failure ? {status: 403} : body} loading={fetched.status === 'loading'} open={open} setNotice={setNotice}/>;
@@ -125,6 +130,7 @@ export function P2Page({c}: {c: Ctx}) {
    </ol>
   </nav>}
   {notice && <div className="error-banner" role="alert"><span>{notice}</span></div>}
+  {fetched.status==='ok'&&fetched.updateFailed&&<Notice state="read_failed" message="上次資料，更新失敗。資料日期保留原快照時間。" onRetry={onRetry}/>}
   {page}
  </main>;
 }
@@ -215,13 +221,26 @@ function ConfirmationsBody({context, body, loading, open, setNotice}: {context: 
  };
  const edit = (filters: Record<string, string>) => {const next = withoutEmpty(filters); setDraft(next); commit(next);};
  const pending = !sameFilters(draft, context.filters);
- const showBody = pending || loading ? undefined : body;
- const view = useMemo(() => buildConfirmationListView(showBody, {filters: draft, sort: context.sort, cursor: context.cursor, columns: context.columns, selected: context.selected,
+ const showBody = pending || loading ? {status: 200, page_state: {states: ['loading'], count: null},
+  rows: [], next_cursor: null, totals: {matching: null, loaded: 0, authorized_source: null}} : body;
+ const view = useMemo(() => buildConfirmationListView(showBody, {filters: draft, sort: context.sort, cursor: context.cursor, columns: context.columns??['case_number','project_name','confirmation_version','pm','admission_state','source_status'], selected: context.selected,
   cursorHistory: boundHistory(cursorStore, context.filters, context.sort, context.cursor)}), [showBody, draft, context]);
  // Any change to the query (sort) restarts at page one and drops the selection.
  const requery = (next: Partial<P2Context>) => open({...context, cursor: null, selected: null, ...next}, true);
  const rows = body && typeof body === 'object' && Array.isArray((body as {rows?: unknown}).rows) ? (body as {rows: {row_key?: unknown; case_link?: {project_id?: unknown}}[]}).rows : [];
- return <ConfirmationList view={view}
+ const proximity=useRef<HTMLDivElement>(null);
+ useEffect(()=>{
+  const cursor=view.pagination.next.cursor;
+  const connection='connection' in navigator?navigator.connection:null;
+  if(!cursor||pending||loading||typeof IntersectionObserver==='undefined'||connection&&typeof connection==='object'&&('saveData' in connection&&connection.saveData||'effectiveType' in connection&&['slow-2g','2g'].includes(String(connection.effectiveType))))return;
+  const request=p2Request({...context,cursor});
+  if(!request.ok||!proximity.current)return;
+  const controller=new AbortController();
+  const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){observer.disconnect();void readPanel(request.url,controller.signal,memoryOwner.split('|').slice(1).join('|'),{timeoutMs:60000}).catch(()=>{})}},{rootMargin:'600px'});
+  observer.observe(proximity.current);
+  return()=>{observer.disconnect();controller.abort()};
+ },[view.pagination.next.cursor,pending,loading,context]);
+ return <><ConfirmationList view={view}
   onSelect={key => open({...context, selected: key}, true)}
   onSort={(sort: SortSpec) => requery({sort})}
   onSearch={search => edit({...draft, search})}
@@ -240,7 +259,7 @@ function ConfirmationsBody({context, body, loading, open, setNotice}: {context: 
    if (typeof projectId !== 'string' || !projectId) {setNotice('這筆確認單尚未對應到案件（對應未驗證），無法開啟案件詳情。'); return;}
    const result = drill({...context, selected: rowKey}, 'confirmation', {selected: caseSelection(projectId, confirmation)});
    if (result.ok) open(result.value); else setNotice('無法開啟案件詳情。');
-  }}/>;
+  }}/><div ref={proximity} aria-hidden="true"/></>;
 }
 const withoutEmpty = (filters: Readonly<Record<string, string>>): Record<string, string> =>
  Object.fromEntries(Object.entries(filters).filter(([, value]) => typeof value === 'string' && value.trim() !== ''));

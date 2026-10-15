@@ -138,6 +138,7 @@ def staging():
     # ops_sync is imported by app.py when FEATURE_LARK_AUTHORITATIVE_OPS is on; its test-only helpers (testing*.py) stay out.
     files += [p for p in (ROOT/'backend'/'ops_sync').rglob('*.py') if not p.name.startswith('test')]
     files += [p for p in (ROOT/'backend'/'lark_pilot').rglob('*.py') if not p.name.startswith('test')]
+    files += [p for p in (ROOT/'backend'/'node_assignment').rglob('*.py') if not p.name.startswith('test')]
     for part in ('frontend/src', 'frontend/public'):
         source = ROOT / part
         if source.exists(): files += [p for p in source.rglob('*') if p.is_file()]

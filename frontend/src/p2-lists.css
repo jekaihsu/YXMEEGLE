@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
+@layer pages{
 /* P2 Lists Presentational Styles (VCC-129 Confirmation List & VCC-128 Manager Overview) */
 
 :root {
@@ -8,7 +10,7 @@
 .manager-overview-root {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-6);
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -35,8 +37,8 @@
 .p2-header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-bottom: 12px;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--sep, #e2e8f0);
   width: 100%;
   max-width: 100%;
@@ -48,7 +50,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
   flex-wrap: wrap;
   min-width: 0;
   max-width: 100%;
@@ -67,7 +69,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--space-3);
   font-size: 0.8125rem;
   color: var(--label-2, #64748b);
   min-width: 0;
@@ -77,7 +79,7 @@
 .p2-meta-item {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   flex-wrap: wrap;
   min-width: 0;
   max-width: 100%;
@@ -88,8 +90,8 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
   min-width: 0;
   max-width: 100%;
 }
@@ -97,7 +99,7 @@
 .p2-scope-tag {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 2px var(--space-2);
   border-radius: 4px;
   font-size: 0.75rem;
   background: var(--surface-2, #f1f5f9);
@@ -111,8 +113,8 @@
 .p2-banner {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px 16px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   border-radius: 6px;
   border: 1px solid var(--sep, #e2e8f0);
   background: var(--surface, #ffffff);
@@ -150,7 +152,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
   min-width: 0;
   max-width: 100%;
@@ -174,7 +176,7 @@
 }
 
 .p2-banner-mismatch {
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   border-radius: 6px;
   background: color-mix(in srgb, var(--warning, #f59e0b) 12%, transparent);
   border: 1px solid var(--warning, #f59e0b);
@@ -192,14 +194,15 @@
 /* Toolbar & Filter Controls */
 .p2-toolbar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 10px 14px;
-  background: var(--surface, #ffffff);
-  border: 1px solid var(--sep, #e2e8f0);
-  border-radius: 6px;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--glass-fill-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--glass-highlight), var(--glass-shadow-flat);
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -209,140 +212,108 @@
 .p2-toolbar-left,
 .p2-toolbar-right {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--space-4);
   min-width: 0;
   max-width: 100%;
+}
+
+.p2-toolbar-left {
+  flex: 1 1 28rem;
 }
 
 .p2-search-box {
   position: relative;
   display: inline-flex;
   align-items: center;
+  flex: 1 1 14rem;
   min-width: 0;
   max-width: 100%;
 }
 
 .p2-search-input {
-  width: 220px;
+  width: 100%;
   max-width: 100%;
   min-width: 0;
-  padding: 6px 28px 6px 10px;
-  border: 1px solid var(--sep, #cbd5e1);
-  border-radius: 4px;
-  font-size: 0.8125rem;
-  background: var(--surface, #ffffff);
-  color: var(--label, #1e293b);
-  transition: border-color 0.15s;
+  padding-right: var(--space-8);
+  font-size: var(--fs-subhead);
   box-sizing: border-box;
-}
-
-.p2-search-input:focus-visible {
-  outline: 2px solid var(--accent, #0070f3);
-  outline-offset: 1px;
 }
 
 .p2-search-clear {
   position: absolute;
-  right: 6px;
+  right: var(--space-1);
   top: 50%;
   transform: translateY(-50%);
+  min-width: 44px;
+  min-height: 44px;
   border: none;
   background: transparent;
-  color: var(--label-2, #64748b);
+  color: var(--label-2);
   font-size: 1rem;
   line-height: 1;
-  padding: 2px 4px;
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
 }
 
-.p2-search-clear:focus-visible {
-  outline: 2px solid var(--accent, #0070f3);
-}
-
-/* Active Filter Input Controls */
+/* Filter fields stack the label over the field, like every other filter row. */
 .p2-filter-field {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  flex: 1 1 10rem;
   min-width: 0;
   max-width: 100%;
-  flex-wrap: wrap;
 }
 
-.p2-filter-label {
-  font-size: 0.75rem;
-  color: var(--label-2, #64748b);
-  font-weight: 500;
-  white-space: nowrap;
+.p2-filter-label,
+.p2-deadline-filter-label {
+  font-size: var(--fs-footnote);
+  color: var(--label-2);
+  font-weight: 600;
 }
 
 .p2-filter-input {
-  width: 100px;
+  width: 100%;
   max-width: 100%;
   min-width: 0;
-  padding: 5px 8px;
-  border: 1px solid var(--sep, #cbd5e1);
-  border-radius: 4px;
-  font-size: 0.8125rem;
-  background: var(--surface, #ffffff);
-  color: var(--label, #1e293b);
-  transition: border-color 0.15s;
+  font-size: var(--fs-subhead);
   box-sizing: border-box;
 }
 
-.p2-filter-input:focus-visible {
-  outline: 2px solid var(--accent, #0070f3);
-  outline-offset: 1px;
-}
-
-/* Disabled Deadline Filter Control */
+/* Disabled deadline filter: kept visible with its reason, but clearly inactive. */
 .p2-deadline-filter-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border: 1px dashed var(--sep, #cbd5e1);
-  border-radius: 4px;
-  background: var(--surface-2, #f8fafc);
-  opacity: 0.8;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px dashed var(--field-border);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
   flex-wrap: wrap;
+  flex: 1 1 100%;
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
-}
-
-.p2-deadline-filter-label {
-  font-size: 0.75rem;
-  color: var(--label-2, #64748b);
-  font-weight: 500;
-  white-space: nowrap;
 }
 
 .p2-deadline-input {
-  width: 90px;
+  width: 9rem;
   max-width: 100%;
   min-width: 0;
-  padding: 4px 6px;
-  font-size: 0.75rem;
-  border: 1px solid var(--sep, #cbd5e1);
-  border-radius: 3px;
-  background: #f1f5f9;
-  color: var(--muted, #94a3b8);
-  cursor: not-allowed;
   box-sizing: border-box;
 }
 
 .p2-deadline-reason {
-  font-size: 0.6875rem;
-  color: var(--label-2, #64748b);
+  flex: 1 1 14rem;
+  font-size: var(--fs-footnote);
+  color: var(--label-2);
   max-width: 100%;
   min-width: 0;
   white-space: normal;
   overflow-wrap: anywhere;
-  word-break: break-word;
 }
 
 /* Column Chooser */
@@ -354,8 +325,8 @@
 .p2-btn-chooser {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
   font-size: 0.75rem;
   font-weight: 600;
   border: 1px solid var(--sep, #cbd5e1);
@@ -381,7 +352,7 @@
   top: 100%;
   right: 0;
   z-index: 20;
-  margin-top: 4px;
+  margin-top: var(--space-1);
   width: 260px;
   max-height: 320px;
   overflow-y: auto;
@@ -389,11 +360,11 @@
   border: 1px solid var(--sep, #cbd5e1);
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 8px;
+  padding: var(--space-2);
 }
 
 .p2-chooser-title {
-  margin: 0 0 6px 4px;
+  margin: 0 0 var(--space-2) var(--space-1);
   font-size: 0.6875rem;
   font-weight: 700;
   color: var(--label-2, #64748b);
@@ -404,14 +375,14 @@
 .p2-chooser-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .p2-chooser-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 6px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
   font-size: 0.75rem;
   color: var(--label, #1e293b);
   border-radius: 3px;
@@ -430,13 +401,13 @@
   font-size: 0.6875rem;
   color: var(--accent, #0070f3);
   background: color-mix(in srgb, var(--accent, #0070f3) 10%, transparent);
-  padding: 1px 4px;
+  padding: 1px var(--space-1);
   border-radius: 3px;
   margin-left: auto;
 }
 
 .p2-btn-reset-filters {
-  padding: 5px 10px;
+  padding: var(--space-1) var(--space-3);
   font-size: 0.75rem;
   font-weight: 500;
   border: 1px solid var(--sep, #cbd5e1);
@@ -462,7 +433,7 @@
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  gap: 20px;
+  gap: var(--space-6);
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -476,7 +447,7 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
   box-sizing: border-box;
 }
 
@@ -518,7 +489,7 @@
 
 .p2-table.is-dense th,
 .p2-table.is-dense td {
-  padding: 6px 10px;
+  padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--sep, #f1f5f9);
   white-space: nowrap;
 }
@@ -560,10 +531,10 @@ thead th.p2-col-sticky-2 {
 .p2-sort-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   border: none;
   background: transparent;
-  padding: 2px 4px;
+  padding: 2px var(--space-1);
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--label-2, #64748b);
@@ -591,7 +562,7 @@ thead th.p2-col-sticky-2 {
   font-size: 0.75rem;
   color: var(--label-2, #64748b);
   display: inline-block;
-  padding: 2px 4px;
+  padding: 2px var(--space-1);
 }
 
 /* Rows & Cells */
@@ -665,7 +636,7 @@ thead th.p2-col-sticky-2 {
 .p2-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 6px;
+  padding: 2px var(--space-2);
   border-radius: 4px;
   font-size: 0.6875rem;
   font-weight: 600;
@@ -708,7 +679,7 @@ thead th.p2-col-sticky-2 {
 .p2-case-link {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .p2-link-reason {
@@ -718,7 +689,7 @@ thead th.p2-col-sticky-2 {
 
 .p2-empty-cell {
   text-align: center;
-  padding: 24px !important;
+  padding: var(--space-6) !important;
   color: var(--label-2, #64748b);
   font-size: 0.875rem;
 }
@@ -727,7 +698,7 @@ thead th.p2-col-sticky-2 {
 .p2-btn-select,
 .p2-btn-link,
 .p2-btn-entry {
-  padding: 3px 8px;
+  padding: var(--space-1) var(--space-2);
   font-size: 0.6875rem;
   font-weight: 600;
   border-radius: 4px;
@@ -761,8 +732,8 @@ thead th.p2-col-sticky-2 {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 16px;
-  padding: 10px 14px;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   background: var(--surface-2, #f8fafc);
   border-top: 1px solid var(--sep, #e2e8f0);
   font-size: 0.75rem;
@@ -777,7 +748,7 @@ thead th.p2-col-sticky-2 {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: var(--space-4);
   min-width: 0;
   max-width: 100%;
 }
@@ -785,7 +756,7 @@ thead th.p2-col-sticky-2 {
 .p2-footer-item {
   display: inline-flex;
   align-items: baseline;
-  gap: 4px;
+  gap: var(--space-1);
   flex-wrap: wrap;
   min-width: 0;
 }
@@ -816,14 +787,14 @@ thead th.p2-col-sticky-2 {
 .p2-pagination {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
   min-width: 0;
   max-width: 100%;
 }
 
 .p2-page-btn {
-  padding: 4px 10px;
+  padding: var(--space-1) var(--space-3);
   font-size: 0.75rem;
   font-weight: 600;
   border: 1px solid var(--sep, #cbd5e1);
@@ -860,7 +831,7 @@ thead th.p2-col-sticky-2 {
   background: var(--surface, #ffffff);
   border: 1px solid var(--sep, #e2e8f0);
   border-radius: 8px;
-  padding: 16px;
+  padding: var(--space-4);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   box-sizing: border-box;
 }
@@ -869,8 +840,8 @@ thead th.p2-col-sticky-2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 12px;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--sep, #e2e8f0);
   flex-wrap: wrap;
   min-width: 0;
@@ -887,7 +858,7 @@ thead th.p2-col-sticky-2 {
 }
 
 .p2-drawer-close-btn {
-  padding: 4px 10px;
+  padding: var(--space-1) var(--space-3);
   border: 1px solid var(--sep, #cbd5e1);
   background: var(--surface-2, #f8fafc);
   border-radius: 4px;
@@ -909,8 +880,8 @@ thead th.p2-col-sticky-2 {
 .p2-drawer-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-top: 14px;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
   min-width: 0;
   max-width: 100%;
 }
@@ -918,7 +889,7 @@ thead th.p2-col-sticky-2 {
 .p2-drawer-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 0;
   max-width: 100%;
 }
@@ -938,7 +909,7 @@ thead th.p2-col-sticky-2 {
   margin: 0;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 8px;
+  gap: var(--space-2);
   font-size: 0.75rem;
   min-width: 0;
   max-width: 100%;
@@ -948,8 +919,8 @@ thead th.p2-col-sticky-2 {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
-  padding-bottom: 4px;
+  gap: var(--space-3);
+  padding-bottom: var(--space-1);
   border-bottom: 1px solid var(--sep, #f1f5f9);
   flex-wrap: wrap;
   min-width: 0;
@@ -976,7 +947,7 @@ thead th.p2-col-sticky-2 {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.75rem;
   background: var(--surface-2, #f1f5f9);
-  padding: 1px 4px;
+  padding: 1px var(--space-1);
   border-radius: 3px;
   overflow-wrap: anywhere;
   word-break: break-all;
@@ -998,11 +969,11 @@ thead th.p2-col-sticky-2 {
 }
 
 .p2-rowkeys-list {
-  margin: 4px 0 0;
-  padding-left: 16px;
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
@@ -1012,7 +983,7 @@ thead th.p2-col-sticky-2 {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.75rem;
   background: var(--surface-2, #f1f5f9);
-  padding: 1px 4px;
+  padding: 1px var(--space-1);
   border-radius: 3px;
   overflow-wrap: anywhere;
   word-break: break-all;
@@ -1025,7 +996,7 @@ thead th.p2-col-sticky-2 {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  gap: 20px;
+  gap: var(--space-6);
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -1039,7 +1010,7 @@ thead th.p2-col-sticky-2 {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--space-6);
   box-sizing: border-box;
 }
 
@@ -1050,7 +1021,7 @@ thead th.p2-col-sticky-2 {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-6);
   box-sizing: border-box;
 }
 
@@ -1058,7 +1029,7 @@ thead th.p2-col-sticky-2 {
 .p2-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -1069,7 +1040,7 @@ thead th.p2-col-sticky-2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
   width: 100%;
   max-width: 100%;
@@ -1095,7 +1066,7 @@ thead th.p2-col-sticky-2 {
 }
 
 .p2-empty-state {
-  padding: 24px;
+  padding: var(--space-6);
   text-align: center;
   background: var(--surface-2, #f8fafc);
   border: 1px dashed var(--sep, #cbd5e1);
@@ -1113,7 +1084,7 @@ thead th.p2-col-sticky-2 {
 .p2-cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
-  gap: 16px;
+  gap: var(--space-4);
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -1123,8 +1094,8 @@ thead th.p2-col-sticky-2 {
 .p2-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4);
   border: 1px solid var(--sep, #e2e8f0);
   border-radius: 8px;
   background: var(--surface, #ffffff);
@@ -1158,7 +1129,7 @@ thead th.p2-col-sticky-2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
   min-width: 0;
   max-width: 100%;
@@ -1176,7 +1147,7 @@ thead th.p2-col-sticky-2 {
   font-size: 0.6875rem;
   color: var(--label-2, #64748b);
   background: var(--surface-2, #f1f5f9);
-  padding: 1px 6px;
+  padding: 1px var(--space-2);
   border-radius: 3px;
   white-space: nowrap;
 }
@@ -1184,7 +1155,7 @@ thead th.p2-col-sticky-2 {
 .p2-card-body {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   min-width: 0;
   max-width: 100%;
 }
@@ -1193,7 +1164,7 @@ thead th.p2-col-sticky-2 {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
   min-width: 0;
   max-width: 100%;
@@ -1229,9 +1200,9 @@ thead th.p2-col-sticky-2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
   margin-top: auto;
-  padding-top: 8px;
+  padding-top: var(--space-2);
   border-top: 1px solid var(--sep, #f1f5f9);
   font-size: 0.6875rem;
   color: var(--label-2, #64748b);
@@ -1249,7 +1220,7 @@ thead th.p2-col-sticky-2 {
 .p2-unresolved-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-size: 0.8125rem;
   flex-wrap: wrap;
   min-width: 0;
@@ -1262,7 +1233,7 @@ thead th.p2-col-sticky-2 {
 }
 
 .p2-bucket-policy-note {
-  margin: 6px 0 0;
+  margin: var(--space-2) 0 0;
   font-size: 0.75rem;
   color: var(--label-2, #64748b);
   font-style: italic;
@@ -1272,7 +1243,7 @@ thead th.p2-col-sticky-2 {
 
 /* Weekly Section */
 .p2-weekly-section.is-unavailable {
-  padding: 14px 16px;
+  padding: var(--space-4) var(--space-4);
   background: var(--surface-2, #f8fafc);
   border: 1px dashed var(--sep, #cbd5e1);
   border-radius: 8px;
@@ -1285,7 +1256,7 @@ thead th.p2-col-sticky-2 {
 .p2-weekly-body {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   min-width: 0;
   max-width: 100%;
 }
@@ -1305,7 +1276,7 @@ thead th.p2-col-sticky-2 {
 }
 
 .p2-weekly-period {
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
   font-size: 0.6875rem;
   color: var(--label-2, #64748b);
   overflow-wrap: anywhere;
@@ -1316,8 +1287,8 @@ thead th.p2-col-sticky-2 {
 .p2-side-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  gap: var(--space-3);
+  padding: var(--space-4);
   background: var(--surface, #ffffff);
   border: 1px solid var(--sep, #e2e8f0);
   border-radius: 8px;
@@ -1332,8 +1303,8 @@ thead th.p2-col-sticky-2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding-bottom: 8px;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--sep, #e2e8f0);
   flex-wrap: wrap;
   min-width: 0;
@@ -1350,7 +1321,7 @@ thead th.p2-col-sticky-2 {
 .p2-health-rows {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
   min-width: 0;
   max-width: 100%;
 }
@@ -1359,7 +1330,7 @@ thead th.p2-col-sticky-2 {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding-bottom: 8px;
+  padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--sep, #f1f5f9);
   min-width: 0;
   max-width: 100%;
@@ -1369,7 +1340,7 @@ thead th.p2-col-sticky-2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
   min-width: 0;
   max-width: 100%;
@@ -1397,7 +1368,7 @@ thead th.p2-col-sticky-2 {
 .p2-btn-health-link {
   width: 100%;
   max-width: 100%;
-  padding: 7px 12px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--accent, #0070f3);
   background: var(--surface, #ffffff);
   color: var(--accent, #0070f3);
@@ -1457,13 +1428,13 @@ thead th.p2-col-sticky-2 {
     max-width: 100%;
     min-width: 0;
     order: 2; /* Below the table */
-    margin-top: 16px;
+    margin-top: var(--space-4);
     box-sizing: border-box;
   }
 
   .p2-table.is-dense th,
   .p2-table.is-dense td {
-    padding: 4px 6px;
+    padding: var(--space-1) var(--space-2);
   }
 }
 
@@ -1471,4 +1442,5 @@ thead th.p2-col-sticky-2 {
   .p2-cards-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
 }

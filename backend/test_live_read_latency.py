@@ -20,6 +20,7 @@ def test_pages_return_immediately_while_refresh_is_slow_or_failing(tmp_path, fai
                       'LARK_APP_ID': 'a', 'LARK_APP_SECRET': 's'})
     live = seed()
     live['environment'] = 'production'
+    for project in live.get('projects', []): project['source_kind']='lark'
     with app.state.sessions.begin() as db:
         db.add(WorkspaceRow(id='lark-test', version=1, data=live))
         db.add(AuthRow(id='s1', data={'wid': 'lark-test', 'expires': time() + 3600, 'access_token': 'x'}))
@@ -37,7 +38,7 @@ def test_pages_return_immediately_while_refresh_is_slow_or_failing(tmp_path, fai
     client.cookies.set('meegle_session', app.state.signer.dumps(
         {'mode': 'lark', 'uid': 'u-pm', 'wid': 'lark-test', 'sid': 's1'}))
     try:
-        for path in ('/api/session', '/api/workspace', '/api/workspace', '/api/session'):
+        for path in ('/api/session', '/api/workspace', '/api/company-dashboard', '/api/workspace', '/api/company-dashboard', '/api/session'):
             begun = monotonic()
             response = client.get(path)
             assert monotonic() - begun < 3, path

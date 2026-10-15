@@ -29,6 +29,7 @@ export function NativeApprovalControls({c,kind,item,canSubmit}:{c:Context;kind:s
    const enabled=[...(section.current?.querySelectorAll<HTMLButtonElement>('button[data-action]')||[])].filter(b=>!b.disabled);
    (enabled.find(b=>b.dataset.action===action)||enabled[0]||heading.current)?.focus();
  });
+ if(['change','extension'].includes(kind)&&c.s.features?.change_extension!==true)return <p className="na-note">變更與展延尚未開放</p>;
  if(c.s.mode==='demo'||c.w.environment==='test')return <p className="na-note">此為隔離環境，不向正式 Lark 送審。</p>;
  const project=c.w.projects.find(p=>p.id===item.project_id);
  const writable=!!project&&executionAllowed(project,c.w);

@@ -1,3 +1,5 @@
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
+@layer pages{
 .operations.operations{max-width:1080px;margin:auto;color:var(--label);font:var(--fs-body)/1.6 var(--font);overflow-wrap:anywhere}
 .operations.flow-operations{max-width:none;margin:var(--sp-6) 0;padding:0;border:0;background:none}
 .operations h2{font-size:var(--fs-title2);margin:var(--sp-6) 0 var(--sp-3);color:var(--label)}
@@ -21,8 +23,6 @@
 .operations.operations .ops-review{padding:0;background:none;border:0}
 .operations :is(.ops-review,.finance-readonly)>.ds-section>.ds-group{padding:var(--sp-4)}
 .operations .ops-input{padding:var(--sp-4) 0;border:0;border-bottom:1px solid var(--separator);background:none}
-.operations :is(.button,.ds-button){min-height:var(--sp-8);padding:var(--sp-2) var(--sp-5);border:0;border-radius:var(--radius-pill);font:inherit;white-space:normal;background:var(--surface-2);color:var(--accent);box-shadow:none}
-.operations .button.primary{background:var(--accent);color:var(--on-accent)}
 .operations :is(.error-banner,.late-text){color:var(--critical);background:var(--surface-2);border-color:var(--separator)}
 .operations .flow-operation-picker{border:0}
 .operations .flow-operation-picker label{max-width:none}
@@ -36,7 +36,6 @@
 
 .operations h1{font-size:var(--fs-large-title)}
 .operations h3{font-size:var(--fs-headline);color:var(--label)}
-.operations .text-button{background:none;color:var(--accent)}
 .operations .ds-badge{white-space:normal}
 
 /* Keep routine identities and dates readable while the history scrolls on phones. */
@@ -55,3 +54,4 @@
 .workspace .administration-page>.ops-form>summary:hover{background:var(--surface-2)}
 .workspace .administration-page>.ops-form>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .workspace .administration-page>.ops-form>div{padding:var(--sp-4);border-top:1px solid var(--separator)}
+}

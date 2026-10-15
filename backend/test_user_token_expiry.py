@@ -16,6 +16,7 @@ ROUTES = ['/api/sources/sync', '/api/approvals/a1/refresh', '/api/learning/sync'
 def token_client(tmp_path, monkeypatch):
     monkeypatch.setattr('backend.features.FEATURE_LEARNING', True)
     app, client = production_client(tmp_path, enabled=False)
+    app.state.cfg['FEATURE_CHANGE_EXTENSION']='true'
     with app.state.sessions.begin() as db:
         auth = db.get(AuthRow, 'sid')
         auth.data = {**auth.data, 'access_token': 'synthetic-user-token', 'token_expires': time.time() + 3600}
