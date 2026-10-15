@@ -187,7 +187,9 @@ def create_app(overrides=None):
         return (MANAGER_CAPABILITIES[:] if role=='manager' else [])+(['approve_capability'] if ident in capability_approvers else [])
 
     shell_enabled=str(cfg.get('WORKSPACE_SHELL_ENABLED','false')).lower()=='true'
-    TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('POST','/api/actions')}
+    TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('POST','/api/actions'),
+                  ('GET','/api/confirmations'),('GET','/api/manager-overview'),('GET','/api/source-health'),('GET','/api/my-work')}
+    SLOW_REQUEST_SECONDS=5
     @contextmanager
     def phase(request,name):
         started=perf_counter()
@@ -229,6 +231,9 @@ def create_app(overrides=None):
             phases=dict(request.scope.get('phases',{})); total=perf_counter()-started
             phases['serialize']=max(total-sum(phases.values()),0)
             response.headers['Server-Timing']=', '.join([f'{k};dur={v*1000:.1f}' for k,v in phases.items()]+[f'total;dur={total*1000:.1f}'])
+            if total>SLOW_REQUEST_SECONDS:
+                logging.getLogger(__name__).warning('slow_request method=%s path=%s status=%s total_ms=%d phases=%s',request.method,request.url.path,
+                                                    response.status_code,int(total*1000),{k:int(v*1000) for k,v in phases.items()})
         return response
 
     SESSION_MAX_AGE=7*24*3600
@@ -1001,7 +1006,7 @@ def create_app(overrides=None):
     def source_health(request:Request):
         """Page state only (G-DIAG open: diagnostic=False). Same branches and visibility as GET /api/sources; no record values."""
         data,user=identity(request)
-        return source_health_page(data,user)
+        with phase(request,'read'): return source_health_page(data,user)
 
     # ---- P2 read routes (VCC-128..132). Read-only; every handler works on one visibility-narrowed state. ----
     P2_NOT_FOUND='找不到這個項目'
@@ -1105,8 +1110,8 @@ def create_app(overrides=None):
     def confirmations(request:Request):
         data,user=identity(request)
         args=p2_list_args(request)
-        _,_,_,state=p2_read(data,user,P2_LIST_COLLECTIONS)
-        return p2_list_page(state,args,state['as_of'],p2_cursor_context(data,user))
+        with phase(request,'read'): _,_,_,state=p2_read(data,user,P2_LIST_COLLECTIONS)
+        with phase(request,'build'): return p2_list_page(state,args,state['as_of'],p2_cursor_context(data,user))
 
     @app.get('/api/manager-overview')
     def manager_overview(request:Request):
@@ -1116,7 +1121,7 @@ def create_app(overrides=None):
         args=p2_list_args(request,frozenset(P2_FILTER_PARAMS)|P2_CASE_PARAMS)
         # Case-level filters (project fields) go only to build_manager_overview; the list/population vocabulary stays separate.
         case_filters={k:p2_one(request,k,120) for k in sorted(P2_CASE_PARAMS) if k in request.query_params}
-        _,_,health,state=p2_read(data,user,P2_LIST_COLLECTIONS)
+        with phase(request,'read'): _,_,health,state=p2_read(data,user,P2_LIST_COLLECTIONS)
         # The same read that feeds the population supplies its C-STATE; this also validates the filters (422).
         page=p2_list_page(state,{'q':'','filters':args['filters'],'cursor':None,'sort':None,'limit':1},state['as_of'],p2_cursor_context(data,user))
         envelope=page['page_state']

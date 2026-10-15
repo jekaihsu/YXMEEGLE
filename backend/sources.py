@@ -1,6 +1,7 @@
 """Lark read-only adapter. No request in this module writes a Base record."""
 import hashlib
 import json
+import logging
 import os
 import time
 import unicodedata
@@ -14,6 +15,7 @@ import httpx
 from fastapi import HTTPException
 from .seed import STAGES, TITLES
 
+logger=logging.getLogger(__name__)
 API='https://open.larksuite.com/open-apis'
 PROVISIONAL_CASE_FIELD='可能的確認單工編(若暫無確認單才需填寫)'
 FIELDS={
@@ -116,7 +118,9 @@ def _fetch_sources(token,cfg=None,client=None, *, scope=None):
                 return response
             except ReadBlocked:
                 raise HTTPException(403,'目前 Lark 身分沒有這張 Base 的資源存取權限（1254302）；請確認表格分享權限') from None
-            except (ReadFailure, BudgetExceeded, httpx.HTTPError, ValueError):
+            except (ReadFailure, BudgetExceeded, httpx.HTTPError, ValueError) as exc:
+                logger.warning('Lark source read failed: cause=%s upstream_status=%s',type(exc).__name__,
+                               getattr(getattr(exc,'response',None),'status_code',None))
                 raise HTTPException(502,'Lark 讀取失敗；保留上次成功資料') from None
         def read_table(table):
             collected=[]; summary=[]; partial=False
