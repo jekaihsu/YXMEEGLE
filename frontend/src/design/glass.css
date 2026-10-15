@@ -1,7 +1,7 @@
 @layer tokens,legacy,components,pages,surfaces,controls,polish;
 /* Glass surfaces: the only owner of card, bar and flat panel looks.
-   Blur is kept to the outer cards of a page. Tables, long lists and rows are flat translucent panels (no backdrop-filter),
-   so phones scroll without a blur layer per row. Fill and blur fall back to solid colours through tokens.css. */
+   Blur is kept to outer page cards, including one layer around a whole table.
+   Nested lists and individual rows remain flat so scrolling never adds a blur layer per row. Fill and blur fall back to solid colours through tokens.css. */
 @layer components{
 .glass,.glass--card,.glass--bar,.glass--flat{background:var(--glass-fill);border:1px solid var(--glass-border);box-shadow:var(--glass-highlight),var(--glass-shadow);border-radius:var(--radius-card);color:var(--label)}
 .glass,.glass--card{-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur)}
@@ -14,11 +14,16 @@
 /* Page level cards. These selectors own surface paint (fill, border, radius, shadow);
    page files keep ownership of layout, padding and density. */
 @layer surfaces{
-.workspace :is(.dh-hero,.p2-header,.cockpit-overview-grid>section,.cockpit-delivery,.cockpit-source,.major-approval-summary,.case-brief,.next-action,.metric-strip){
+.workspace :is(.dh-hero,.cockpit-overview-grid>section,.cockpit-delivery,.cockpit-source,.major-approval-summary,.case-brief,.next-action,.metric-strip){
  background:var(--glass-fill);border:1px solid var(--glass-border);border-radius:var(--radius-card);box-shadow:var(--glass-highlight),var(--glass-shadow);
  -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
 }
-.workspace :is(.glass--flat,.pm-glance-tile,.ds-group,.table-scroll,.portfolio-index,.my-work-table-scroll,.tl-sheet,.approval-list,.na-summary,.na-list,.node-section,.project-discussion,.p2-banner,.p2-side-panel,.p2-card,.people-surface,.source-connection,.ds-section.dh-personal-queue,.my-work-toolbar,.owned-view:not(.owned-state),section.empty,.p2-drawer,.source-health-drawer,.my-work-drawer,.cockpit-table-scroll,.inbox-row,.inbox-clear,.empty>span){
+/* Page headings sit directly on the canvas, without a separate material layer. */
+.workspace :is(.p2-header,.p2-header-title-row){
+ background:transparent;border:0;border-radius:0;box-shadow:none;
+ -webkit-backdrop-filter:none;backdrop-filter:none;
+}
+.workspace :is(.glass--flat,.pm-glance-tile,.ds-group,.table-scroll,.portfolio-index,.my-work-table-scroll,.tl-sheet,.approval-list,.na-summary,.na-list,.node-section,.project-discussion,.p2-banner,.p2-side-panel,.p2-card,.people-surface,.people-summary>div,.project-readiness,.source-contract-index,.daily-cards>article,.source-connection,.ds-section.dh-personal-queue,.my-work-toolbar,.owned-view:not(.owned-state),section.empty,.p2-drawer,.source-health-drawer,.my-work-drawer,.cockpit-table-scroll,.inbox-row,.inbox-clear,.empty>span){
  background:var(--glass-fill-strong);border:1px solid var(--glass-border);border-radius:var(--radius-card);box-shadow:var(--glass-highlight),var(--glass-shadow-flat);
  -webkit-backdrop-filter:none;backdrop-filter:none;
 }
@@ -30,6 +35,20 @@
 .workspace :is(.ds-group,.glass--flat,.my-work-table-scroll,.portfolio-index,.ds-section.dh-personal-queue,.file-screen,.audit-screen) :is(.ds-row,.file-version,.audit-entry,.source-attachment-index,.source-attachment-index article){background:transparent}
 .workspace :is(.ds-group,.glass--flat) :is(button.ds-row,a.ds-row):hover{background:color-mix(in srgb,var(--accent) 7%,transparent)}
 .workspace :is(.ds-group,.glass--flat,.cockpit-overview-grid>section,.cockpit-delivery,.cockpit-source) .ds-group{border:0;border-radius:0}
+/* Read-status cards retain their semantic left border while sharing the flat glass material. */
+.workspace .people-status{background:var(--glass-fill-strong);border-radius:var(--radius-card);box-shadow:var(--glass-highlight),var(--glass-shadow-flat);-webkit-backdrop-filter:none;backdrop-filter:none}
+/* One frosted boundary for each primary panel. The pastel canvas remains visible through the material. */
+.workspace :is(.ds-group,.table-scroll,.portfolio-index,.my-work-table-scroll,.tl-sheet,.approval-list,.na-summary,.na-list,.node-section,.project-discussion,.p2-side-panel,.p2-card,.people-surface,.people-summary>div,.people-status,.project-readiness,.source-contract-index,.source-connection,.ds-section.dh-personal-queue,.my-work-toolbar,.owned-view:not(.owned-state),section.empty,.cockpit-table-scroll){
+ background:var(--glass-fill);box-shadow:var(--glass-highlight),var(--glass-shadow);
+ -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
+}
+/* Nested surfaces inherit their parent's material instead of stacking blur layers. */
+.workspace :is(.glass,.glass--card,.dh-hero,.p2-header,.cockpit-overview-grid>section,.cockpit-delivery,.cockpit-source,.major-approval-summary,.ds-group,.table-scroll,.portfolio-index,.my-work-table-scroll,.tl-sheet,.approval-list,.na-summary,.na-list,.node-section,.project-discussion,.p2-side-panel,.p2-card,.people-surface,.people-summary>div,.people-status,.project-readiness,.source-contract-index,.source-connection,.ds-section.dh-personal-queue,.my-work-toolbar,.owned-view:not(.owned-state),section.empty,.cockpit-table-scroll) :is(.ds-group,.table-scroll,.portfolio-index,.my-work-table-scroll,.tl-sheet,.approval-list,.na-summary,.na-list,.node-section,.project-discussion,.p2-side-panel,.p2-card,.people-surface,.people-summary>div,.people-status,.project-readiness,.source-contract-index,.source-connection,.ds-section.dh-personal-queue,.my-work-toolbar,.owned-view:not(.owned-state),section.empty,.cockpit-table-scroll){
+ background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
+}
+@media(max-width:600px){
+ .workspace .portfolio-page .table-scroll{background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+}
 /* Status badges use the opaque foreground and background pairs from tokens.css, in both themes. */
 .ds-badge{background:var(--status-unknown-bg);color:var(--status-unknown-fg)}
 .ds-badge[data-tone=positive]{background:var(--status-ok-bg);color:var(--status-ok-fg)}

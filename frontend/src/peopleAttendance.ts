@@ -4,7 +4,8 @@ export const attendanceStatuses=['loading','ok','incomplete','stale','needs-perm
 export type AttendanceStatus=typeof attendanceStatuses[number];
 export type AttendancePerson={id:string;name:string|null;avatar_url?:string;group:string|null;in_service:boolean|null;attendance:(string|null)[]};
 export type AttendanceTrip={person_id:string;name:string|null;group:string|null;kind:'trip'|'out';start:string;end:string};
-export type PeopleAttendance={status:AttendanceStatus;week_start:string;week_end:string;days:string[];people:AttendancePerson[];trips:AttendanceTrip[];as_of:string|null;missing_scopes:string[];refreshing:boolean;incomplete:boolean;summary:{people:number|null;in_service:number|null;on_leave:number|null;on_trip:number|null;trips:number|null}};
+export type AttendanceLeave={person_id:string;name:string|null;group:string|null;start:string;end:string};
+export type PeopleAttendance={status:AttendanceStatus;week_start:string;week_end:string;days:string[];people:AttendancePerson[];trips:AttendanceTrip[];leaves:AttendanceLeave[];leaves_available:boolean|null;as_of:string|null;missing_scopes:string[];refreshing:boolean;incomplete:boolean;summary:{people:number|null;in_service:number|null;on_leave:number|null;on_trip:number|null;trips:number|null}};
 const field=(value:unknown,key:string):unknown=>value!==null&&typeof value==='object'?Reflect.get(value,key):undefined;
 const string=(value:unknown):string|null=>typeof value==='string'&&value?value:null;
 const strings=(value:unknown):string[]=>Array.isArray(value)?value.filter((item:unknown):item is string=>typeof item==='string'):[];
@@ -20,7 +21,7 @@ export function parsePeopleAttendance(raw:unknown):PeopleAttendance{
  const state=status(field(raw,'status'));
  const known=state==='ok'||state==='incomplete'||state==='stale';
  const summary=field(raw,'summary');
- const people:AttendancePerson[]=[];const trips:AttendanceTrip[]=[];
+ const people:AttendancePerson[]=[];const trips:AttendanceTrip[]=[];const leaves:AttendanceLeave[]=[];
  const rawPeople=field(raw,'people');
  if(Array.isArray(rawPeople))for(const row of rawPeople){
   const id=string(field(row,'id'));if(!id)continue;
@@ -32,7 +33,13 @@ export function parsePeopleAttendance(raw:unknown):PeopleAttendance{
   const id=string(field(row,'person_id')),kind=field(row,'kind'),start=string(field(row,'start')),end=string(field(row,'end'));
   if(id&&(kind==='trip'||kind==='out')&&start&&end)trips.push({person_id:id,name:string(field(row,'name')),group:string(field(row,'group')),kind,start,end});
  }
- return {status:state,week_start:string(field(raw,'week_start'))??'',week_end:string(field(raw,'week_end'))??'',days:strings(field(raw,'days')),people,trips,as_of:string(field(raw,'as_of')),missing_scopes:strings(field(raw,'missing_scopes')),refreshing:field(raw,'refreshing')===true,incomplete:field(raw,'incomplete')===true||state==='incomplete',summary:{people:known?count(field(summary,'people')):null,in_service:known?count(field(summary,'in_service')):null,on_leave:known?count(field(summary,'on_leave')):null,on_trip:known?count(field(summary,'on_trip')):null,trips:known?count(field(summary,'trips')):null}};
+ const rawLeaves=field(raw,'leaves');
+ if(known&&Array.isArray(rawLeaves))for(const row of rawLeaves){
+  const id=string(field(row,'person_id')),start=string(field(row,'start')),end=string(field(row,'end'));
+  if(id&&start&&end&&/^\d{4}-\d{2}-\d{2}$/.test(start)&&/^\d{4}-\d{2}-\d{2}$/.test(end)&&end>=start)leaves.push({person_id:id,name:string(field(row,'name')),group:string(field(row,'group')),start,end});
+ }
+ const available=field(raw,'leaves_available');
+ return {status:state,week_start:string(field(raw,'week_start'))??'',week_end:string(field(raw,'week_end'))??'',days:strings(field(raw,'days')),people,trips,leaves,leaves_available:known?(typeof available==='boolean'?available:null):false,as_of:string(field(raw,'as_of')),missing_scopes:strings(field(raw,'missing_scopes')),refreshing:field(raw,'refreshing')===true,incomplete:field(raw,'incomplete')===true||state==='incomplete',summary:{people:known?count(field(summary,'people')):null,in_service:known?count(field(summary,'in_service')):null,on_leave:known?count(field(summary,'on_leave')):null,on_trip:known?count(field(summary,'on_trip')):null,trips:known?count(field(summary,'trips')):null}};
 }
 export async function fetchPeopleAttendance({week,signal,current}:{week?:string;signal?:AbortSignal;current?:()=>boolean}={}):Promise<PeopleAttendance>{
  const query=week?'?'+new URLSearchParams({week}):'';

@@ -50,6 +50,7 @@ class PeopleAttendance(RefreshCoordinator):
         elif state['status'] in ('needs-permission', 'blocked', 'error'):
             result['status'] = 'needs-permission' if state['status'] == 'needs-permission' else 'read-failed'
             result['summary'] = empty_view(days)['summary']
+            result['leaves_available'] = False
         elif snapshot and state['status'] in ('stale', 'refreshing'):
             result['status'] = 'stale'
         return result
