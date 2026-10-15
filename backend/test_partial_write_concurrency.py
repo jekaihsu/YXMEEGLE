@@ -6,9 +6,11 @@ PARTIAL_WRITES_TEST_POSTGRES_URL is set, otherwise SQLite, whose file lock is co
 """
 import threading
 import uuid
+from time import monotonic
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import event, text
 
 from . import index_tables, storage
 from .app import BusinessRow
@@ -84,6 +86,49 @@ def test_a_partial_writer_queues_behind_a_full_path_writer_and_sees_its_version(
     (user, fields), = scenarios(rig.world, 1)['comment_add']
     version = rig.project_version(fields['project_id'])
     calendar = {'action': 'calendar_update', 'version': 1, 'request_id': uuid.uuid4().hex, 'payload': {'holidays': ['2026-12-25'], 'workdays': []}}
-    answers = post_together(rig, [('u-manager', calendar), (user, comment(fields, 1, {fields['project_id']: version}))])
-    assert sorted(a.status_code for a in answers) == [200, 409], [a.text[:120] for a in answers]
+    locked, release, attempted = threading.Event(), threading.Event(), threading.Event()
+    answers, errors, partial_pid = {}, [], []
+    def before_query(connection, cursor, statement, parameters, context, executemany):
+        if 'FROM workspaces' in statement and 'FOR UPDATE' in statement and locked.is_set() and not release.is_set():
+            partial_pid.append(cursor.connection.info.backend_pid)
+            attempted.set()
+    def after_query(connection, cursor, statement, parameters, context, executemany):
+        if 'FROM workspaces' in statement and 'FOR UPDATE' in statement and not locked.is_set():
+            locked.set()
+            assert release.wait(15), 'the test did not release the full writer'
+    def send(name, actor, body):
+        try:
+            with TestClient(rig.app) as client:
+                client.cookies.set('meegle_session', rig.app.state.signer.dumps({'mode': 'demo', 'uid': actor, 'wid': WID}))
+                answers[name] = client.post('/api/actions', json=body)
+        except BaseException as exc:
+            errors.append(exc)
+    event.listen(rig.app.state.engine, 'before_cursor_execute', before_query)
+    event.listen(rig.app.state.engine, 'after_cursor_execute', after_query)
+    full = threading.Thread(name='full-writer', target=send, args=('full', 'u-manager', calendar))
+    partial = threading.Thread(name='partial-writer', target=send,
+                               args=('partial', user, comment(fields, 1, {fields['project_id']: version})))
+    try:
+        full.start()
+        assert locked.wait(10), errors
+        partial.start()
+        assert attempted.wait(10), errors
+        deadline = monotonic() + 5
+        blockers = []
+        with rig.app.state.engine.connect() as connection:
+            while monotonic() < deadline:
+                blockers = connection.scalar(text('SELECT pg_blocking_pids(:pid)'), {'pid': partial_pid[0]})
+                if blockers: break
+                release.wait(0.01)
+        assert blockers, 'the partial writer never waited on the full writer row lock'
+        assert 'partial' not in answers
+    finally:
+        release.set()
+        full.join(20)
+        if partial.ident is not None: partial.join(20)
+        event.remove(rig.app.state.engine, 'before_cursor_execute', before_query)
+        event.remove(rig.app.state.engine, 'after_cursor_execute', after_query)
+    assert not full.is_alive() and not partial.is_alive() and not errors
+    assert answers['full'].status_code == 200, answers['full'].text
+    assert answers['partial'].status_code == 409, answers['partial'].text
     assert rig.version() == 2
