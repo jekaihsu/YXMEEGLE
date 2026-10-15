@@ -66,10 +66,10 @@ def build_state(visible=('recC1', 'recC2', 'recK1', 'recW1')):
 
 
 @pytest.fixture
-def http(tmp_path, monkeypatch):
+def http(tmp_path, monkeypatch, request):
     app = create_app({'DATABASE_URL': f'sqlite:///{tmp_path}/p2int.db', 'UPLOAD_DIR': str(tmp_path / 'f'), 'DEMO_MODE': 'false',
                       'APP_ENV': 'development', 'SESSION_SECRET': 'p2-int-only' * 4,
-                      'LARK_WORKER_ORGANIZATION': 'boundary', 'LARK_ALLOWED_TENANTS': 'boundary'})
+                      'LARK_WORKER_ORGANIZATION': 'boundary', 'LARK_ALLOWED_TENANTS': 'boundary', **getattr(request, 'param', {})})
     real = app.state.live_read.status
     def status(wid):
         out = real(wid); out['datasets']['sources'].update(status='fresh', age_seconds=1, ttl_seconds=900, last_error=None)
