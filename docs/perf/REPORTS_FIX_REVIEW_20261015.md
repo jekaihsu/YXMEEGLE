@@ -76,3 +76,22 @@ Final commands run in the specified worktree and frontend directory.
 - `.venv/bin/python -m backend.benchmark_reports --data /tmp/lark-docs/data --requests 30 --rounds 1 2>/dev/null` completes with zero errors. This is one acceptance run, not a speedup comparison. Each endpoint has 30 cache-hit requests and 300 forced-cache-miss requests. The harness times synchronous TestClient responses, validates status and snapshot presence, and independently checks field review totals against the dump. Miss p95 in ms is review 0.743, review/rows 0.500, sales 2.903, assets 2.074, progress 0.504. Each aggregate is below 100 ms and rows below 80 ms. Host load before the run was 1.56/1.59/2.00 on 10 CPUs. The measurement includes in-process request handling and excludes live Lark latency. No comparative performance claim is made.
 
 Model the Domain shaped the explicit search/query state and per-tab sort maps. Implementation and verification ran in-thread as the assigned implementation sub-agent. No independent review or browser verification was performed; the coordinator owns both. The data limitations above remain intentional. No requested implementation finding is left open.
+
+## Round 3
+
+The asset category bar now displays 「未填」 and sends `category=__blank__`. Empty category, status, and owner table cells display 「未填」. Changing asset kind clears category, status, and owner together. Progress week and department changes clear group together with pagination. Week changes deliberately clear even a group that exists in both weeks, so the first request cannot contain an obsolete selection. Shared Select clears a value absent from loaded options and retains its visible value until that correction applies, rather than showing 全部 while the query still filters.
+
+Progress uses one missing-group label for both the dropdown and bars. The dropdown reads 「未分組」 on 2026-09-07. KPI details, group summaries, and case columns branch on `basis`. Points reports show planned and matched points, with days retained as secondary data. The API adds `matched_points` to KPI, group, and case records because `actual_points` includes unplanned work and cannot explain the percentage. Achievement calculations are unchanged. The mock supplies the new numerator.
+
+Seven rendered React interaction scenarios run through stubbed fetch in `test-reports-interactions.mjs`, included by `npm run test:reports`. They cover the blank-category click and four blank instrument rows, owner reset on kind change, group reset across weeks with different options, the 2026-09-07 missing-group label, points KPI and group text and table columns, the missing-group bar sentinel, and invalid freshly loaded options with one corrective request. Four defect scenarios failed before their fixes. The progress bar sentinel already passed before changes and remains a regression test. The backend numerator test first failed with `KeyError: matched_points`, then passed after the additive API fields.
+
+Verification completed in the assigned worktree.
+
+- `.venv/bin/python -m pytest backend/test_reports_*.py -q` passed 48 tests. One existing Starlette TestClient deprecation warning remains.
+- `npx tsc -b`, `npm run test:reports`, `npm run build`, and `npm run test:overview` passed.
+- FastAPI TestClient with `FixtureReader('/tmp/lark-docs/data')` returned HTTP 200 and total 4 for instrument `category=__blank__`. Every returned category was empty.
+- The same real-dump endpoint returned HTTP 200 and total 2 for vehicle `owner=__blank__`. Every returned owner was empty.
+
+No real records were copied into the repo. No commit, push, stash, source refresh, or other checkout edit ran. Browser verification and independent review belong to the coordinator and have not run in this implementation round.
+
+Model the Domain shaped the explicit matched-points numerator and the distinction between display labels and transport sentinels. Test Behavior, Not Implementation shaped the rendered controls, outgoing query assertions, and returned table rows. Implementation and verification ran in-thread as the assigned implementation sub-agent. No child delegation ran.

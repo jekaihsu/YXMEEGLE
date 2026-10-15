@@ -40,3 +40,6 @@ assert.equal(pending.length,before+1);assert.equal(new URL(pending.at(-1).url,'h
 await act(async()=>new Promise(r=>setTimeout(r,300)));assert.equal(pending.length,before+1);
 await act(async()=>atomicRoot.unmount());
 console.log('Clear and ranking apply the query and filters together without stale requests.');
+
+const {spawnSync}=await import('node:child_process');
+for(const scenario of ['assets-blank','asset-owner','progress-week','progress-label','points','progress-sentinel','progress-options']){const result=spawnSync(process.execPath,['test-reports-interactions.mjs'],{env:{...process.env,REPORT_CASE:scenario},encoding:'utf8'});assert.equal(result.status,0,result.stdout+result.stderr);process.stdout.write(result.stdout);}

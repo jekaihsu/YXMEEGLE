@@ -294,7 +294,7 @@ def progress(data, **p):
     for code in sorted(codes):
         r=cases.get(code,{'id':'','f':{}});f=r['f']; expected=number(f.get('預期營業額點數'));done=number(f.get('累計外業營業額點數' if dept=='field' else '累計內業營業額點數'))
         pd=len(planned[code]); ad=len(dates[code]); matched=len(dates[code]&planned[code]); pl=plans[code]; ac=actual[code]
-        rows.append(dict(case_code=code,case_name=str(cell(f.get('案件名稱'))),planned=pl,actual=ac,planned_days=pd,actual_days=ad,matched_days=matched,unplanned_days=ad-matched,achievement=ratio(matched,pd) if basis=='days' else ratio(matched_points[code],pl),diff=ad-pd if basis=='days' else ac-pl,expected_total=expected,done_total=done,remaining=expected-done if expected is not None and done is not None else None,status=str(cell(f.get('狀態'))) or '未填',link=record_link(data['base'],'case',r['id'])))
+        rows.append(dict(case_code=code,case_name=str(cell(f.get('案件名稱'))),planned=pl,actual=ac,matched_points=matched_points[code],planned_days=pd,actual_days=ad,matched_days=matched,unplanned_days=ad-matched,achievement=ratio(matched,pd) if basis=='days' else ratio(matched_points[code],pl),diff=ad-pd if basis=='days' else ac-pl,expected_total=expected,done_total=done,remaining=expected-done if expected is not None and done is not None else None,status=str(cell(f.get('狀態'))) or '未填',link=record_link(data['base'],'case',r['id'])))
     pd=sum(r['planned_days'] for r in rows); ad=sum(r['actual_days'] for r in rows); matched=sum(r['matched_days'] for r in rows); pl=sum(plans.values()); ac=sum(actual.values())
     negative=sum(r['remaining'] is not None and r['remaining']<0 for r in rows)
     gaps=[gap('negative-remaining',f'{negative} 件剩餘點數為負，保留明細但不納入 KPI')] if negative else []
@@ -303,9 +303,9 @@ def progress(data, **p):
         plg=len(group_plan[g]) if basis=='days' else group_points[g][0]
         acg=len(group_actual[g]) if basis=='days' else sum(r['points'] or 0 for r in review_rows(data,dept,week,g))
         numerator=len(group_plan[g]&group_actual[g]) if basis=='days' else group_points[g][1]
-        by_group.append(dict(group=g,group_label=g,planned_days=len(group_plan[g]),matched_days=len(group_plan[g]&group_actual[g]),planned=plg,actual=acg,unplanned_days=len(group_actual[g]-group_plan[g]),achievement=ratio(numerator,plg)))
+        by_group.append(dict(group=g,group_label=g,matched_points=group_points[g][1],planned_days=len(group_plan[g]),matched_days=len(group_plan[g]&group_actual[g]),planned=plg,actual=acg,unplanned_days=len(group_actual[g]-group_plan[g]),achievement=ratio(numerator,plg)))
     options=sorted({r['group'] for r in data['plan_indices'].get((dept,week),[])}|{r['group'] for r in review_rows(data,dept,week)})
-    return dict(gaps=gaps,options=dict(group=['__blank__' if g=='未分組' else g for g in options]),dept=dept,week=week,basis=basis,kpi=dict(planned_points=pl if basis=='points' else None,actual_points=ac,planned_days=pd,actual_days=ad,matched_days=matched,unplanned_days=ad-matched,achievement=ratio(matched,pd) if basis=='days' else ratio(sum(matched_points.values()),pl),open_cases=sum('執行中' in r['status'] for r in rows),remaining_points=nullable_sum(r['remaining'] for r in rows if '執行中' in r['status'] and r['remaining'] is not None and r['remaining']>=0)),by_group=by_group,**page(rows,p,'case_code'))
+    return dict(gaps=gaps,options=dict(group=['__blank__' if g=='未分組' else g for g in options]),dept=dept,week=week,basis=basis,kpi=dict(matched_points=sum(matched_points.values()),planned_points=pl if basis=='points' else None,actual_points=ac,planned_days=pd,actual_days=ad,matched_days=matched,unplanned_days=ad-matched,achievement=ratio(matched,pd) if basis=='days' else ratio(sum(matched_points.values()),pl),open_cases=sum('執行中' in r['status'] for r in rows),remaining_points=nullable_sum(r['remaining'] for r in rows if '執行中' in r['status'] and r['remaining'] is not None and r['remaining']>=0)),by_group=by_group,**page(rows,p,'case_code'))
 
 
 def sources(data, fetched_at):

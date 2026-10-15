@@ -286,3 +286,13 @@ def test_round2_missing_group_and_blank_options():
         if kind=='instrument':
             assert '__blank__' in result['options']['status']
             assert '__blank__' in result['options']['category']
+
+
+def test_points_report_exposes_achievement_numerator():
+    result=c.progress(c.normalize(FixtureReader(FIXTURES).read()),week='2026-10-12')
+    assert result['basis']=='points'
+    assert result['kpi']['matched_points']==sum(r['matched_points'] for r in result['items'])
+    assert result['kpi']['achievement']==result['kpi']['matched_points']/result['kpi']['planned_points']
+    for group in result['by_group']:
+        if group['planned']:
+            assert group['achievement']==group['matched_points']/group['planned']

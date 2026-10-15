@@ -103,3 +103,9 @@ Query：`dept=field|office`、`week`、`group`、`scope=week|open`（預設 week
 - 缺組別統一正規化為 `未分組`，可重複正規化。`group=未分組` 與 `group=__blank__` 查詢相同資料。組別圖表顯示「未分組」。工作單缺口計數包含無日期列，但無日期列仍不納入每週達成率。
 - Assets 的 owner、category、status 空白選項及 Progress 缺組別選項使用 `__blank__`，下拉標示「未填」。空字串僅代表全部。資產明細保留原始空字串，空白篩選由後端轉換。車輛仍沿用啟用狀態及「車輛」類別回退。
 - 每個 tab 定義欄位預設排序，日期與最後使用日期預設降冪。同欄再次點擊反轉方向。清除篩選及工項排行點擊同步更新搜尋條件，不先以舊 q 查詢。
+
+## Round 3 補充契約
+
+- Progress 的 KPI、`by_group`、`items` 新增數值 `matched_points`，為已預排案件日期上的實際點數。points 達成率使用 `matched_points / planned_points`，組別及案件分母使用 `planned`。`actual_points` 與 `actual` 保留全部實際點數。UI 的 points 說明與主要明細欄使用預排點數、對應點數，另保留預排、對應、未預排天數。
+- Progress 缺組別的下拉及圖表標示統一為「未分組」，傳輸值仍為 `__blank__`。此規則取代 Round 2 對 Progress 下拉「未填」的敘述。Assets 空白類別圖表標示「未填」，傳輸值為 `__blank__`，空白 category、status、owner 明細顯示「未填」。
+- 切換資產種類同步清除 category、status、owner。Progress 切換週次或部門同步清除 group。Select 收到的 options 不含目前值時清除該條件，修正前仍顯示目前值，不顯示「全部」。
