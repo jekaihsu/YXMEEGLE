@@ -41,7 +41,7 @@ export interface Workspace {scope?:'full'|'shell';attention?:ShellAttention[];ho
 export interface FeatureContract {change_extension?:boolean;routines?:boolean;mock_ui?:boolean;workspace_shell?:boolean;node_assignment?:boolean}
 export interface Session {features?:FeatureContract;access_mode?:string;user:User|null;users:User[];mode:string;auth_configured:boolean;environment?:string;workspace_id?:string}
 export interface SourceData {freshness?:Freshness;as_of?:string|null;configured:boolean;last_sync:string;status:string;message:string;tables:unknown[];records:unknown[];mapping?:SourceMapping}
-export type View = 'pm-glance'|'company'|'dashboard'|'projects'|'work'|'schedule'|'people'|'approvals'|'sources'|'project'|'admin'|'routines'|'overview'|'confirmations'|'confirmation'|'contract'|'workitem';
+export type View = 'pm-glance'|'company'|'reports'|'dashboard'|'projects'|'work'|'schedule'|'people'|'approvals'|'sources'|'project'|'admin'|'routines'|'overview'|'confirmations'|'confirmation'|'contract'|'workitem';
 export interface Route {view:View;project?:string;node?:string;task?:string;tab?:string;section?:string;completion?:string;focus?:string;comment?:string;approval?:string;ctx?:string}
 
 export interface WorkSchedule {id:string;user_id:string;day:string;end_time:string;version:number;active?:boolean;source_url?:string;basis?:string}
