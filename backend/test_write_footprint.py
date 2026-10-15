@@ -160,7 +160,7 @@ def test_a_write_that_changes_another_case_is_refused_before_any_row_moves(pair)
         state['version'] = row.version + 1
         foreign = next(a for a in state['approvals'] if a['project_id'] != 'p001')
         foreign['status'] = 'withdrawn'
-        before = db.scalar(__import__('sqlalchemy').select(__import__('sqlalchemy').func.count()).select_from(BusinessRow))
         with pytest.raises(Violation, match='outside the footprint'):
-            storage.save_partial(db, BusinessRow, WID, state, ['approvals'], ['p001'], order)
+            storage.save_partial(db, BusinessRow, WID, state, ['approvals'], ['p001'], order, view=WorkspaceView(state, {'approvals'}, order))
+        assert not db.new and not db.dirty and not db.deleted, 'nothing may be staged before the refusal'
         db.rollback()

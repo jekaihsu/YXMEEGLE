@@ -7,78 +7,78 @@
  "scenarios": {
   "failure": {
    "load_partial_ms": {
-    "median": 1.0,
+    "median": 1.1,
     "min": 1.0,
     "max": 1.1
    },
    "lock_held_ms": {
-    "median": 18.9,
+    "median": 18.8,
     "min": 18.2,
-    "max": 37.1
+    "max": 39.9
    },
    "save_collections_ms": {
     "median": 0.6,
     "min": 0.6,
-    "max": 0.7
+    "max": 0.8
    },
    "total_ms": {
-    "median": 19.2,
+    "median": 19.1,
     "min": 18.5,
-    "max": 37.5
+    "max": 40.4
    }
   },
   "apply_unchanged": {
    "load_ms": {
-    "median": 171.6,
-    "min": 146.1,
-    "max": 192.3
+    "median": 154.0,
+    "min": 130.6,
+    "max": 162.9
    },
    "load_partial_ms": {
-    "median": 3.5,
+    "median": 3.6,
     "min": 3.3,
-    "max": 3.8
+    "max": 3.9
    },
    "lock_held_ms": {
-    "median": 38.9,
-    "min": 37.2,
-    "max": 1996.1
+    "median": 37.8,
+    "min": 35.9,
+    "max": 704.0
    },
    "save_ms": {
     "median": 0,
     "min": 0,
-    "max": 691.8
+    "max": 614.5
    },
    "total_ms": {
-    "median": 362.7,
-    "min": 322.0,
-    "max": 2279.2
+    "median": 387.9,
+    "min": 351.9,
+    "max": 2244.8
    }
   },
   "apply_changed": {
    "load_ms": {
-    "median": 147.6,
-    "min": 136.5,
-    "max": 163.1
+    "median": 154.4,
+    "min": 132.2,
+    "max": 213.4
    },
    "load_partial_ms": {
     "median": 3.5,
     "min": 3.4,
-    "max": 3.8
+    "max": 3.9
    },
    "lock_held_ms": {
-    "median": 787.8,
-    "min": 711.2,
-    "max": 804.9
+    "median": 713.7,
+    "min": 699.1,
+    "max": 785.9
    },
    "save_ms": {
-    "median": 697.5,
-    "min": 619.0,
-    "max": 715.2
+    "median": 622.9,
+    "min": 608.6,
+    "max": 695.4
    },
    "total_ms": {
-    "median": 2210.8,
-    "min": 2130.0,
-    "max": 2250.0
+    "median": 2185.2,
+    "min": 2124.3,
+    "max": 2223.2
    }
   }
  }

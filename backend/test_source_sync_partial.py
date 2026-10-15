@@ -125,3 +125,28 @@ def test_the_import_runs_before_the_lock_unless_the_version_moved(twins, monkeyp
     assert seen == [True, False], 'the full path imports under the lock, the partial path before it'
     a, b = dump(full), dump(partial)
     assert a['records'] == b['records'] and a['workspace'] == b['workspace']
+
+
+def test_the_first_sync_after_a_failed_attempt_also_imports_before_the_lock(twins, monkeypatch):
+    """A failed attempt marks the cache as error, so an unchanged snapshot must be imported again; that work stays out of the lock."""
+    full, partial = twins
+    advance(full, partial, '2026-09-27T10:05:00+08:00')
+    inside, seen = [False], []
+    class Locked:
+        def __init__(self, context): self.context = context
+        def __enter__(self): inside[0] = True; return self.context.__enter__()
+        def __exit__(self, *a):
+            inside[0] = False; return self.context.__exit__(*a)
+    for side in (full, partial):
+        side.sessions.begin = lambda *a, _b=side.sessions.begin, **k: Locked(_b(*a, **k))
+    original = source_sync.import_sources
+    monkeypatch.setattr(source_sync, 'import_sources', lambda *a, **k: (seen.append(inside[0]), original(*a, **k))[1])
+    for side in (full, partial): side.service.fetcher = lambda token: snapshot('2026-09-27T10:05:00+08:00', records())
+    run(full, partial, lambda h: h.service.sync(h.wid, 'u-manager', 'fake', skip_unchanged=True) and None)
+    advance(full, partial, '2026-09-27T10:10:00+08:00')
+    run(full, partial, lambda h: h.service.failure(h.wid, 'Lark 暫時無法連線'))
+    advance(full, partial, '2026-09-27T10:15:00+08:00')
+    seen.clear()
+    for side in (full, partial): side.service.fetcher = lambda token: snapshot('2026-09-27T10:15:00+08:00', records())
+    run(full, partial, lambda h: h.service.sync(h.wid, 'u-manager', 'fake', skip_unchanged=True) and None)
+    assert seen == [True, False]

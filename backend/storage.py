@@ -242,6 +242,7 @@ def save_partial(db,model,wid,state,collections,project_ids,project_order,*,view
     if (partial is None or 'projects' in collections or set(collections)-set(COLLECTIONS)
             or set(collections)-set(partial['collections'])-{'events'}):
         raise ValueError('save_partial needs a scoped state that loaded every named collection')
+    if db.info.get('index_tables') and view is None: raise ValueError('save_partial needs the view with every project in order to rebuild index rows')
     loaded=[p['id'] for p in state['projects']]
     if sorted(loaded)!=sorted(project_ids): raise FootprintViolation('projects were added or removed by a partial write')
     root={k:deepcopy(v) for k,v in state.items() if k not in COLLECTIONS and k!='_partial'}
@@ -303,7 +304,7 @@ def save_partial(db,model,wid,state,collections,project_ids,project_order,*,view
         else: db.add(model(workspace_id=wid,kind=key[0],entity_id=key[1],**value))
     for row in existing.values(): db.delete(row)
     if indexed:
-        index_tables.replace_projects(db,model,wid,view if view is not None else state,dirty)
+        index_tables.replace_projects(db,model,wid,view,dirty)
         index_tables.apply_counter_deltas(db,model,wid,state['version']-1,state['version'],before,after)
     root['storage_schema']=2
     return root

@@ -78,7 +78,11 @@ class SourceSyncService:
                 status=state.get('source_status',{})
                 matches=(status.get('projection_fingerprint')==digest and status.get('projection_version')==SOURCE_PROJECTION_VERSION
                          and status.get('projection_state_fingerprint')==projection_fingerprint(state))
-            if not matches:
+            cache=db.get(self.C,wid)
+            from .live_read.fingerprint import fingerprint
+            skippable=bool(matches and cache and (cache.data or {}).get('status')=='ready'
+                           and cache.data.get('source_message')==snapshot['message'] and fingerprint(cache.data)==digest)
+            if not skippable:
                 try:
                     candidate=deepcopy(snapshot); candidate.update(fingerprint=digest,as_of=candidate['last_sync'],source_message=candidate['message'])
                     self._import(state,candidate,self._actor(db,wid,state,actor_id))
