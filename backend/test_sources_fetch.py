@@ -199,3 +199,17 @@ def test_attachment_fingerprint_ignores_rotating_urls_but_preserves_file_identit
     assert fingerprint(changed) == fingerprint(original)
     attachment['file_token'] = 'file-two'
     assert fingerprint(changed) != fingerprint(original)
+
+
+def test_a_failed_read_logs_its_upstream_diagnostics_before_the_502(caplog):
+    from .live_read.client import ReadFailure
+
+    class FailingClient:
+        def request(self, method, url, **kwargs):
+            raise ReadFailure('Lark read attempts exhausted', upstream_status=503, lark_code=99991400, kind='transient')
+
+    with caplog.at_level('WARNING', logger='backend.sources'), pytest.raises(HTTPException) as failure:
+        fetch_sources('synthetic-token', config('list'), FailingClient())
+    assert failure.value.status_code == 502
+    assert ('Lark source read failed: table=/bitable/v1/apps/synthetic-base/tables/tblSynthetic/fields '
+            'cause=ReadFailure kind=transient upstream_status=503 lark_code=99991400') in caplog.text

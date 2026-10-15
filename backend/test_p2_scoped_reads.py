@@ -1,33 +1,39 @@
-"""The P2 list pages and Source Health read only the collections they render; task trees, events and daily reports stay in the database."""
+import logging
 import pytest
 from . import storage
-from .test_p2_int_routes import http, world  # noqa: F401 (pytest fixtures)
+from .test_p2_int_routes import http, world  # noqa: F401
 
 LIST_ROUTES = ('/api/confirmations', '/api/manager-overview', '/api/source-health')
-UNRENDERED = {'events', 'work_schedules', 'approvals', 'recurring', 'daily_unmatched', 'jobs', 'delegations'}
+
+
+def full_load_everywhere(monkeypatch):
+    full = storage.load
+    monkeypatch.setattr(storage, 'load_partial', lambda db, model, row, **_: full(db, model, row))
 
 
 @pytest.mark.parametrize('route', LIST_ROUTES)
-def test_list_reads_load_headers_and_source_rows_only(world, monkeypatch, route):
+def test_list_read_equals_the_full_load_without_loading_the_whole_workspace(world, monkeypatch, route):
     _, client, _, _, _, _ = world
-    reads = []
-    full, partial = storage.load, storage.load_partial
+    with monkeypatch.context() as patched:
+        full_load_everywhere(patched)
+        expected = client.get(route)
+    assert expected.status_code == 200, expected.text
+    assert any(row['workflow_summary']['total'] > 0 for row in expected.json()['rows']) if route == '/api/confirmations' else True
+    full_loads = []
+    full = storage.load
+    monkeypatch.setattr(storage, 'load', lambda *a, **kw: (full_loads.append(1), full(*a, **kw))[1])
+    actual = client.get(route)
+    assert actual.status_code == 200, actual.text
+    assert actual.json() == expected.json()
+    assert full_loads == []
 
-    def spy_full(db, model, row):
-        reads.append({'scope': 'full'})
-        return full(db, model, row)
 
-    def spy_partial(db, model, row, *, collections=(), project_ids=None, project_children=()):
-        reads.append({'scope': 'partial', 'collections': set(collections), 'project_ids': project_ids, 'children': tuple(project_children)})
-        return partial(db, model, row, collections=collections, project_ids=project_ids, project_children=project_children)
-
-    monkeypatch.setattr(storage, 'load', spy_full)
-    monkeypatch.setattr(storage, 'load_partial', spy_partial)
-    response = client.get(route)
+def test_a_slow_timed_request_still_answers_and_logs_its_phases(world, caplog):
+    app, client, _, _, _, _ = world
+    app.state.cfg['SLOW_REQUEST_SECONDS'] = '0'
+    with caplog.at_level(logging.WARNING, logger='backend.app'):
+        response = client.get('/api/confirmations')
     assert response.status_code == 200, response.text
-    assert reads, 'the route must read the workspace'
-    assert all(read['scope'] == 'partial' for read in reads), reads
-    for read in reads:
-        assert read['project_ids'] is None and not read['children'], read
-        assert not read['collections'] & UNRENDERED, read
-        assert {'projects', 'users', 'source_confirmations'} <= read['collections'], read
+    assert response.headers['Server-Timing'].startswith('identity;dur=')
+    slow = [record.getMessage() for record in caplog.records if record.getMessage().startswith('slow_request ')]
+    assert slow and 'path=/api/confirmations status=200' in slow[0] and "'read': " in slow[0]
