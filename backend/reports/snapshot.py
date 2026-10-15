@@ -1,5 +1,6 @@
 """Single-flight snapshots with bounded cold waits and stale reads."""
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, Future
+from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime, timezone
 import hashlib
@@ -23,7 +24,7 @@ class SnapshotStore:
         self.budget=setting(cfg,'REPORTS_COLD_WAIT_SECONDS',10,.01,60)
         self.base=cfg.get('LARK_REPORT_BASE_TOKEN',compute.BASE_TOKEN)
         self._lock=Lock();self._executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix='reports')
-        self._future=None;self._snapshot=None;self._last_request=None;self._retry_at=0
+        self._future=None;self._snapshot=None;self._last_request=None;self._retry_at=0;self._refresh_error=False
 
     def _build(self):
         try:
@@ -32,12 +33,12 @@ class SnapshotStore:
             fingerprint=hashlib.sha256(canonical.encode()).hexdigest()
             with self._lock: previous=self._snapshot
             data=previous['data'] if previous and previous['fingerprint']==fingerprint else compute.normalize(raw,self.base)
-            gaps=previous['gaps'] if previous and previous['fingerprint']==fingerprint else {endpoint:compute.report_gaps(data,endpoint) for endpoint in ('sources','review','review/rows','sales','assets','progress')}
-            current=dict(gaps=gaps,data=data,fingerprint=fingerprint,fetched_at=datetime.now(timezone.utc).isoformat(),at=self.clock(),cache=previous['cache'] if previous and previous['fingerprint']==fingerprint else {})
-            with self._lock: self._snapshot=current;self._retry_at=0
+            gaps=previous['gaps'] if previous and previous['fingerprint']==fingerprint else {(endpoint,dept):compute.report_gaps(data,endpoint,dept) for endpoint in ('sources','review','review/rows','sales','assets','progress') for dept in ('field','office','control')}
+            current=dict(gaps=gaps,data=data,fingerprint=fingerprint,fetched_at=datetime.now(timezone.utc).isoformat(),at=self.clock(),cache=previous['cache'] if previous and previous['fingerprint']==fingerprint else OrderedDict(),pending=previous['pending'] if previous and previous['fingerprint']==fingerprint else {})
+            with self._lock: self._snapshot=current;self._retry_at=0;self._refresh_error=False
             return current
         except Exception:
-            with self._lock: self._retry_at=self.clock()+min(30,self.ttl)
+            with self._lock: self._retry_at=self.clock()+min(30,self.ttl);self._refresh_error=True
             raise
 
     def start(self, *, manual=False):
@@ -64,24 +65,40 @@ class SnapshotStore:
         if snapshot is None:
             with self._lock: snapshot=self._snapshot
         if snapshot is None:
-            return dict(fetched_at='',stale=True,snapshot='',gaps=[compute.gap('cold','報表來源正在讀取')])
-        return dict(fetched_at=snapshot['fetched_at'],stale=self.clock()-snapshot['at']>=self.ttl,snapshot=snapshot['fingerprint'][:12],gaps=deepcopy(snapshot['gaps'][endpoint]))
+            return dict(fetched_at='',stale=True,refresh_error=self._refresh_error,snapshot='',gaps=[compute.gap('cold','報表來源正在讀取')])
+        return dict(fetched_at=snapshot['fetched_at'],refresh_error=self._refresh_error,stale=self._refresh_error or self.clock()-snapshot['at']>=self.ttl,snapshot=snapshot['fingerprint'][:12],gaps=deepcopy(snapshot['gaps'][(endpoint,'field')]))
 
     def result(self, endpoint, params):
+        from .routes import parameters
+        params=parameters(endpoint,params)
         snapshot=self.get();key=(endpoint,tuple(sorted(params.items())))
-        with self._lock: result=snapshot['cache'].get(key)
+        with self._lock:
+            result=snapshot['cache'].get(key)
+            if result is not None: snapshot['cache'].move_to_end(key)
+            pending=snapshot['pending'].get(key)
+            owner=result is None and pending is None
+            if owner: pending=Future();snapshot['pending'][key]=pending
         if result is None:
-            if endpoint=='sources': result=compute.sources(snapshot['data'],snapshot['fetched_at'])
-            else: result={'review':compute.review,'review/rows':compute.rows_report,'sales':compute.sales,'assets':compute.assets,'progress':compute.progress}[endpoint](snapshot['data'],**params)
-            with self._lock:
-                if len(snapshot['cache'])>=512: snapshot['cache'].clear()
-                snapshot['cache'][key]=result
+            if not owner: result=pending.result()
+            else:
+                try:
+                    if endpoint=='sources': result=compute.sources(snapshot['data'],snapshot['fetched_at'])
+                    else: result={'review':compute.review,'review/rows':compute.rows_report,'sales':compute.sales,'assets':compute.assets,'progress':compute.progress}[endpoint](snapshot['data'],**params)
+                    with self._lock:
+                        snapshot['cache'][key]=result
+                        if len(snapshot['cache'])>512: snapshot['cache'].popitem(last=False)
+                    pending.set_result(result)
+                except BaseException as exc:
+                    pending.set_exception(exc)
+                    raise
+                finally:
+                    with self._lock: snapshot['pending'].pop(key,None)
         result=deepcopy(result)
         if endpoint=='sources':
             for table in result['tables']:
                 if table['status']=='ok': table['fetched_at']=snapshot['fetched_at']
         meta=self.meta(snapshot,endpoint)
-        meta['gaps']=compute.report_gaps(snapshot['data'],endpoint,params.get('dept','field'))
+        meta['gaps']=deepcopy(snapshot['gaps'][(endpoint,params.get('dept','field'))])+result.pop('gaps',[])
         return dict(result,meta=meta)
 
     def close(self): self._executor.shutdown(wait=True)

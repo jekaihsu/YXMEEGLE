@@ -20,3 +20,7 @@
 .reports-notices summary{cursor:pointer;min-height:28px;padding-top:4px}.reports-trend>svg{height:220px;max-height:260px}.reports-trend{min-height:0}.reports-bar-row:focus-visible{outline:2px solid var(--focus-ring);outline-offset:3px}.reports-trend g:focus-visible{outline:2px solid var(--focus-ring)}.reports-rate-line{stroke-dasharray:6 3}
 @media(max-width:700px){.reports-trend>svg{height:180px;max-height:200px}.reports-bar-label{flex-wrap:wrap;gap:4px}.reports-bar-label strong{text-align:left}}
 }
+
+.reports-week-actions{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
+.reports-week-actions button{min-height:44px;min-width:44px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;cursor:pointer}
+.reports-week-actions button:focus-visible{outline:2px solid currentColor;outline-offset:2px}

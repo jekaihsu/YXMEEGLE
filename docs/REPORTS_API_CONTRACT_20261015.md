@@ -5,7 +5,8 @@
 ```ts
 type Meta = {
   fetched_at: string;            // ISO，快照讀取時間
-  stale: boolean;                // 已過 TTL，背景刷新中
+  stale: boolean;                // 已過 TTL 或最近刷新失敗
+  refresh_error: boolean;        // 最近一次刷新失敗，顯示「更新失敗，顯示舊資料」
   snapshot: string;              // 快照版本（內容指紋前 12 碼）
   gaps: Gap[];                   // 此報表相關的資料缺口
 };
@@ -24,7 +25,7 @@ Query：`dept=field|office|control`（預設 field）、`week`、`weeks=12`、`g
  kpi: Kpi; kpi_prev: Kpi;                                   // 本週與前一週
  trend: {week: string; total: number; passed: number; returned: number; error_rate: number|null}[];   // 近 weeks 週，舊到新
  by_group: ({group: string} & Kpi)[];                       // 依 error_rate 降冪，null 在後
- by_person: ({person: string; group: string} & Kpi)[];
+ by_person: ({person: string; person_key: string; group: string} & Kpi)[];
  by_item: {item: string; total: number; passed: number; returned: number; error_rate: number|null}[];  // 取前 15
  flags: {flag: string; count: number; share: number}[];     // office：⚠案件不符等；field：違反檢核程序
  control: {checked: number; unchecked: number; violated: number}  // 控制組檢核勾選／未勾／是否有檢核程序=否
@@ -57,9 +58,9 @@ Query：`dept=field|office`、`week`、`group`、`scope=week|open`（預設 week
 ```ts
 {meta: Meta; dept: string; week: string;
  basis: 'days'|'points';   // 工作預排.預估營業額點數 全空時為 'days'：預排出工天數 vs 實際出工天數
- kpi: {planned_points: number|null; actual_points: number; planned_days: number; actual_days: number; achievement: number|null; open_cases: number; remaining_points: number|null};
- by_group: {group: string; planned: number; actual: number; achievement: number|null}[];
- items: {case_code: string; case_name: string; planned: number; actual: number; planned_days: number; actual_days: number; achievement: number|null; diff: number;
+ kpi: {planned_points: number|null; actual_points: number; planned_days: number; actual_days: number; matched_days: number; unplanned_days: number; achievement: number|null; open_cases: number; remaining_points: number|null};
+ by_group: {group: string; group_label: string; unplanned_days: number; planned: number; actual: number; achievement: number|null}[];
+ items: {case_code: string; case_name: string; planned: number; actual: number; planned_days: number; actual_days: number; matched_days: number; unplanned_days: number; achievement: number|null; diff: number;
          expected_total: number|null; done_total: number|null; remaining: number|null; status: string; link: string}[];
  total: number; offset: number; limit: number}
 ```
@@ -77,3 +78,19 @@ Query：`dept=field|office`、`week`、`group`、`scope=week|open`（預設 week
 - 檢核失誤率分母為 `passed + returned`。KPI、排行、趨勢提示顯示已檢核筆數，1 至 19 筆標示「樣本少」。零分母仍為「無法計算」。
 - 前端依端點、完整查詢條件與登入工作階段快取成功結果 60 秒。離開或切換條件取消舊請求。
 - 天數模式的明細與 KPI 使用 `planned_days`、`actual_days`，差異為實際天數減預排天數。點數欄仍保留原值。
+
+## 2026-10-15 獨立審查修正的加法欄位與計算規則
+
+所有 GET 端點僅接受各自 Query 清單中的欄位。`sources` 不接受查詢欄位。未知欄位回 422 `{detail: string}`。文字 trim，最長 240 字元，數值與日期由邊界正規化後組成快取 key。結果快取最多 512 筆，使用 LRU，併發同鍵 miss 只計算一次。靜態資料缺口在快照建立時按端點、部門計算一次。日期區間覆蓋率與負剩餘筆數由當次篩選結果計算。
+
+- 組別共用 `normalize_group`。先 trim，再去除尾端「組」，已知別名「控制組」對應「控制」。`group` filter 接受原始名稱與正規化名稱。工作單保留 `group_label`，進度組別回 `group_label` 作顯示標籤。無對應組別列入資料缺口。
+- 預排的開始與結束日期皆含當日，依台北日曆展開後裁切報告週。結束早於開始時只算開始當日並提示筆數。排除休假與 C000000。一列多案件各自取得日期。總計以 `(case, date)` 去重，組別表在各組內去重。
+- days 達成率為 `matched_days / planned_days`。`matched_days` 是實際出工與預排 `(case, date)` 的交集。`actual_days` 保留全部出工天數，`unplanned_days` 為實際減交集，在 KPI 與明細回傳；組別表另回各組的 `unplanned_days`。points 達成率也排除未預排日期上的實際點數。
+- `diff` 的 days 基準為 `actual_days - planned_days`，points 基準為 `actual - planned`。伺服器排序與畫面均使用 `diff`。
+- 個案 `remaining` 保留負值。進行中案件的 KPI 僅加總非負且有值者，沒有可加總值回 null，並提示排除筆數。
+- sales 的所有 `contract_total`，包括 `by_status` 與 `by_pm`，全缺值回 null。實際合約為 0 且預期合約為正時使用預期合約，並提示筆數。單案超過正合約總額 50% 或正合約中位數 100 倍時提示筆數與案件編號。`by_pm.progress` 以有進度且正合約的案件加權，沒有可用權重回 null。金額缺值顯示「來源無資料」。
+- assets KPI 加 `coverage: number|null` 與 `mileage_excluded: number`。`coverage` 為期間有該類資產反向連結的成本單比例。缺口列車輛與儀器的 `N / M 張成本單有車輛紀錄` 或儀器紀錄。缺值與倒退里程逐組排除並計數，有排除時標「部分里程」。`idle_days` filter 保留從未使用者，null 顯示「期間無使用紀錄」。覆蓋不足 80% 時，無使用 KPI 使用「期間無使用紀錄」；目前所有覆蓋率均採此保守名稱。
+- review 人員排行保留 `(person_key, group)` 為識別，顯示 `person · group`。空白 person 顯示「未填」，`person_key=__blank__`，可用 `person=__blank__` 篩選。排行點擊同時套用 person 與 group。
+- review、progress、sales、assets 加 `options`。分別為 `{group:string[],person:string[],flag:string[]}`、`{group:string[]}`、`{status:string[],pm:string[]}`、`{status:string[],category:string[],owner:string[]}`。選項獨立於當次 group、人員、PM、類別與文字篩選。review 為整個部門，progress 為當週，assets 為資產類型。
+- review status 升冪依「已通過、已退回、待檢核、未填」。所有表格首次點文字欄為升冪，數字欄為降冪，同欄再點切換。搜尋 offset 與 debounced query 同時套用。
+- TrendChart 的圖像內沒有可聚焦元素。外層 group 提供名稱，SVG 提供完整文字摘要，原生週次按鈕提供鍵盤選取。錯誤狀態使用 `role=alert`。

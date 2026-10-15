@@ -3,7 +3,7 @@ import {api,getSessionEpoch} from '../api';
 import {query} from './reportsView';
 import type {Query} from './types';
 const cache=new Map<string,{at:number;data:unknown}>();
-export function useDebounce(value:string){const [result,set]=useState(value);useEffect(()=>{const timer=setTimeout(()=>set(value),250);return()=>clearTimeout(timer)},[value]);return result}
+export function useDebounce(value:string,onApply?:()=>void){const apply=useRef(onApply);apply.current=onApply;const [result,set]=useState(value);useEffect(()=>{if(value===result)return;const timer=setTimeout(()=>{set(value);apply.current?.()},250);return()=>clearTimeout(timer)},[value,result]);return result}
 export function useReport<T>(endpoint:string,params:Query){
  const key=query(Object.fromEntries(Object.entries(params).sort(([a],[b])=>a.localeCompare(b))));const sequence=useRef(0);const [reload,setReload]=useState(0);
  const [state,setState]=useState<{key:string; data?:T; error?:string; loading:boolean}>({key:'',loading:true});

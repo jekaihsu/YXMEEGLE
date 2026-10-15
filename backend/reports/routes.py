@@ -15,8 +15,26 @@ SORTS={
 }
 
 
+PAGE_KEYS={'sort','order','offset','limit'}
+ALLOWED={
+    'review':{'dept','week','weeks','group','person'},
+    'review/rows':PAGE_KEYS|{'dept','week','weeks','group','person','status','flag','q'},
+    'progress':PAGE_KEYS|{'dept','week','group','scope'},
+    'sales':PAGE_KEYS|{'status','pm'},
+    'assets':PAGE_KEYS|{'kind','from','to','status','category','owner','idle_days','q'},
+    'sources':set(),
+}
+
+
 def parameters(endpoint, query):
     p=dict(query)
+    unknown=set(p)-ALLOWED[endpoint]
+    if unknown: raise HTTPException(422,'不支援的查詢欄位：'+', '.join(sorted(unknown)))
+    p={k:v.strip() if isinstance(v,str) else v for k,v in p.items()}
+    p={k:v for k,v in p.items() if v!=''}
+    if p.get('group'):
+        from .compute import normalize_group
+        p['group']=normalize_group(p['group'])
     def integer(key, default, minimum, maximum):
         try: n=int(p.get(key,default))
         except (ValueError,TypeError): raise HTTPException(422,f'{key} 必須為整數') from None

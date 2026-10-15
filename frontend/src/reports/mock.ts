@@ -23,6 +23,8 @@ export function mockReport(endpoint:string,p:URLSearchParams):unknown{
  const state=new URLSearchParams(location.search).get('mockState');
  if(state==='error')throw new Error('示範讀取失敗，請重試。');
  const result=buildMockReport(endpoint,p) as Record<string,unknown>;
+ const options=endpoint==='review'?{group:groups,person:people,flag:p.get('dept')==='office'?['⚠案件不符','⚠組別權重=0','⚠工項不符']:['違反檢核程序']}:endpoint==='progress'?{group:groups}:endpoint==='sales'?{status:['未填','執行中','已結案','洽談中'],pm:people}:endpoint==='assets'?{status:p.get('kind')==='instrument'?['正常','送修-損壞']:['正常'],category:p.get('kind')==='instrument'?['全站儀','GNSS','水準儀']:['工程車','公務車'],owner:groups}:undefined;
+ if(options)result.options=options;
  if(state==='stale')return {...result,meta:{...(result.meta as Meta),stale:true}};
  if(state==='empty'){
   const empty=(v:unknown):unknown=>Array.isArray(v)?[]:v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,k==='meta'?x:['error_rate','pending_rate','coverage','achievement'].includes(k)?null:empty(x)])):typeof v==='number'?0:v;

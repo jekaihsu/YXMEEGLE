@@ -46,14 +46,15 @@ def run(directory, requests=300, rounds=5):
         paths=['review','review/rows','sales','assets','progress']
         def stats(samples):
             return dict(p50_ms=statistics.median(samples),p95_ms=sorted(samples)[int(len(samples)*.95)-1],max_ms=max(samples))
+        def weekly(path): return {'week':'2026-10-05'} if path in ('review','review/rows','progress') else {}
         for path in paths:
-            warm=client.get('/api/reports/'+path,params={'week':'2026-10-05'})
+            warm=client.get('/api/reports/'+path,params=weekly(path))
             assert warm.status_code==200
             samples=[];sizes=[];batches=[]
             for _ in range(rounds):
                 batch=[]
                 for _ in range(requests):
-                    started=time.perf_counter();response=client.get('/api/reports/'+path,params={'week':'2026-10-05'})
+                    started=time.perf_counter();response=client.get('/api/reports/'+path,params=weekly(path))
                     elapsed=(time.perf_counter()-started)*1000
                     assert response.status_code==200,response.text
                     body=response.json();assert body['meta']['snapshot']
@@ -63,7 +64,7 @@ def run(directory, requests=300, rounds=5):
             misses=[]
             for i in range(max(300,requests)):
                 weeks=sorted(w for w in snapshot['data']['indices']['field'] if w)
-                params={'week':weeks[i%len(weeks)] if weeks else '2026-10-05'}
+                params={'week':weeks[i%len(weeks)] if weeks else '2026-10-05'} if path in ('review','review/rows','progress') else {}
                 if path!='review':
                     from .reports.routes import SORTS
                     params.update(sort=SORTS[path][i%len(SORTS[path])],order='asc' if i%2 else 'desc',offset=i%100,limit=1+i%200)

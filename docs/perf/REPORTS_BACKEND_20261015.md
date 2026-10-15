@@ -70,3 +70,43 @@ Field progress for 2026-10-05 uses days, with 8 planned case-days and 30 distinc
 `python -m pytest backend/test_reports_compute.py backend/test_reports_routes.py -q` passed 23 tests. Tests cover Taipei UTC-to-Monday boundary, trimmed status, all vehicle slots, negative mileage, null financial totals, days basis, linked multiple cases, placeholder exclusion, distinct dates, open scope, CLI retry and 422 responses for malformed/non-Monday week, limits 0/999, unknown sort/dept/scope. Sanitized fixtures occupy 48 KB on disk.
 
 Optional planned asset use counts were not added because the contract has no response field; the existing computed coverage gap remains. No contract deviation for required fields. The additive scope parameter follows the fix brief although the copied contract query list does not yet mention it. TAF, calibration and monthly inspection sources remain absent. Empty financial formulas remain a source data gap. No commit or push.
+
+## Independent review fix acceptance, 2026-10-15
+
+This section supersedes the earlier progress semantics and totals. No speedup is claimed. The acceptance claim is that all result-cache miss p95 values remain below 100 ms for aggregates and 80 ms for rows on the existing local dump.
+
+Five complete runs of `backend.benchmark_reports.run('/tmp/lark-docs/data', 300, 5)` produced 45,000 timed HTTP requests. Each run includes five rounds of 300 hits and 300 varied forced misses per endpoint. Every response status, snapshot and page size was asserted. Errors were zero. The independent field-status reconciliation still matches 361 passed, 47 returned and 405 pending, including four undated pending records outside weekly reports. The dump contains no contract-detail file, so those rows are zero here. This run does not repeat live network acquisition.
+
+The benchmark sends `week` to sales and assets, which the new per-endpoint allowlist correctly rejects. That file is outside the permitted edit paths. The run used this temporary in-memory adapter, leaving the benchmark file unchanged. All benchmark requests otherwise use the original implementation.
+
+```python
+from fastapi.testclient import TestClient
+from backend.benchmark_reports import run
+original = TestClient.get
+
+def get(self, url, **kwargs):
+    if url.endswith(('/sales', '/assets')) and 'params' in kwargs:
+        kwargs['params'] = {k: v for k, v in kwargs['params'].items() if k != 'week'}
+    return original(self, url, **kwargs)
+
+TestClient.get = get
+for _ in range(5):
+    result = run('/tmp/lark-docs/data', 300, 5)
+    print({k: v['miss'] for k, v in result['endpoints'].items()})
+```
+
+The table gives the median and range across five per-run miss p95 values, in milliseconds.
+
+| Endpoint | Median miss p95 ms | Minimum p95 ms | Maximum p95 ms |
+|---|---:|---:|---:|
+| review | 0.733 | 0.725 | 0.749 |
+| review/rows | 0.511 | 0.499 | 0.532 |
+| sales | 2.867 | 2.826 | 2.954 |
+| assets | 2.079 | 2.073 | 2.088 |
+| progress | 0.490 | 0.484 | 0.556 |
+
+All five runs pass both limits. Raw benchmark JSON remains local at `/tmp/reports-fix-benchmark-runs.json`. The first cold file snapshot took 135.65 ms, including file reads, fingerprints, date expansion, normalization and static gap precomputation. Warm misses include endpoint computation, deepcopy, JSON serialization and TestClient transport. Cache clearing is outside the timed region. The host has 10 logical CPUs; load averages before measurement were 2.24, 2.81 and 3.45. These are sequential local acceptance numbers, not production concurrency capacity. One separate profile overlapped the start of a repeat run; no before/after speed comparison is inferred.
+
+A separate untimed cProfile run executed 100 sales, vehicle and progress calculations. Sales consumed 1.142 cumulative seconds of 1.566 profiled seconds. Cell and numeric decoding dominate sales; date parsing contributes 0.257 cumulative seconds across the run. Profiling time is excluded from the latency table. Work is CPU-bound over these small source tables. Static source gaps now come from the snapshot cache. Date-window asset coverage and selected negative-remaining counts are computed from each request's relevant data.
+
+Real-data corrected KPIs, group names, query rejection and per-finding test evidence are in `REPORTS_FIX_REVIEW_20261015.md`.
