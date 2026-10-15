@@ -542,6 +542,11 @@ def create_app(overrides=None):
         # Committed. The lock is gone, so the full response is read like GET /api/workspace.
         if not replay: app.state.partial_writes['committed']+=1
         with sessions() as db:
+            if engine.dialect.name=='postgresql':
+                db.connection(execution_options={'isolation_level':'REPEATABLE READ'})
+            else:
+                # SQLite's legacy driver does not begin a snapshot for SELECT alone.
+                db.connection().exec_driver_sql('BEGIN')
             state=load(db,db.get(WorkspaceRow,wid))
             return public_ws(state,wid,find(state['users'],actor_id,'登入人員'))
 
