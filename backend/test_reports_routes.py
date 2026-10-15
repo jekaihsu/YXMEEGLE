@@ -208,3 +208,32 @@ def test_snapshot_gaps_do_not_rescan_requests(monkeypatch):
         for weeks in (1,2,3): store.result('review',{'dept':dept,'weeks':weeks,'week':'2026-10-12'})
     assert len(calls)==count
     store.close()
+
+
+def test_round2_blank_select_roundtrips_and_day_sort_keys():
+    raw=FixtureReader(FIXTURES).read()
+    raw['plan']['records'][0]['fields']['組別']=''
+    for r in raw['field_cost']['records']: r['fields']['組別']=''
+    for r in raw['instrument']['records']:
+        r['fields']['類別']='';r['fields']['狀態']=''
+    class Reader:
+        def read(self): return raw
+    app=FastAPI();store=register(app,lambda _:({'wid':'company','mode':'lark'},{}),{},reader=Reader())
+    with TestClient(app) as client:
+        for key in ('owner','category','status'):
+            params={'kind':'instrument','from':'2026-10-12','to':'2026-10-18'}
+            options=client.get('/api/reports/assets',params=params).json()['options'][key]
+            assert '__blank__' in options and '' not in options
+            result=client.get('/api/reports/assets',params={**params,key:'__blank__'})
+            assert result.status_code==200
+            assert result.json()['total']>0
+            assert all(r[key]=='' for r in result.json()['items'])
+        for group in ('未分組','__blank__'):
+            for key in ('matched_days','unplanned_days'):
+                result=client.get('/api/reports/progress',params={'week':'2026-10-12','group':group,'sort':key})
+                assert result.status_code==200
+                body=result.json()
+                assert '__blank__' in body['options']['group']
+                assert body['kpi']['planned_days']>0 and body['kpi']['actual_days']>0
+                assert [r[key] for r in body['items']]==sorted(r[key] for r in body['items'])
+    store.close()

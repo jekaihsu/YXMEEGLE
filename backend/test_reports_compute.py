@@ -242,3 +242,47 @@ def test_filter_options_survive_empty_filtered_results():
     params={'kind':'vehicle','from':'2026-10-12','to':'2026-10-18'}
     assert c.assets(d,category='missing',**params)['options']==c.assets(d,**params)['options']
     assert c.progress(d,week='2026-10-12',group='missing')['options']==c.progress(d,week='2026-10-12')['options']
+
+
+def test_round2_blank_sales_identity_and_sort():
+    raw=FixtureReader(FIXTURES).read()
+    raw['case']['records'].append({'record_id':'blank-record','fields':{'實際合約金額':0}})
+    d=c.normalize(raw); rows=c.sales(d,sort='code',order='asc')['items']
+    assert rows[-1]['id']=='blank-record'
+    assert c.sales(d,sort='code',order='desc')['items'][-1]['id']=='blank-record'
+    assert rows[-1]['code']=='' and 'blank-record' in rows[-1]['link']
+    assert any(g['message']=='1 件案件未填編號' for g in c.report_gaps(d,'sales'))
+
+
+def test_round2_missing_group_and_blank_options():
+    from backend.reports.routes import parameters
+    raw=FixtureReader(FIXTURES).read()
+    raw['plan']['records'][0]['fields']['組別']=''
+    for r in raw['field_cost']['records']: r['fields']['組別']=''
+    d=c.normalize(raw)
+    assert c.normalize_group('未分組')=='未分組'
+    for value in ('','未分組','控制組','水深A組','__blank__','未分組組','A組 組'):
+        assert c.normalize_group(c.normalize_group(value))==c.normalize_group(value)
+    result=c.progress(d,**parameters('progress',{'week':'2026-10-12','group':'未分組'}))
+    assert result['kpi']['planned_days']>0
+    assert result['kpi']['actual_days']>0
+    assert '__blank__' in result['options']['group']
+    assert '' not in result['options']['group']
+    assert result['by_group'][0]['matched_days']>=0
+    assert c.progress(d,week='2026-10-12',group='__blank__')['total']==result['total']
+    assert any(g['id']=='field-group' for g in c.report_gaps(d,'progress'))
+    for kind in ('instrument','vehicle'):
+        for r in raw[kind]['records']:
+            for key in ('狀態','類別','備註'): r['fields'][key]=''
+        d=c.normalize(raw)
+        args={'kind':kind,'from':'2026-10-12','to':'2026-10-18'}
+        result=c.assets(d,**args)
+        for key in ('owner','status','category'):
+            if '__blank__' in result['options'][key]:
+                selected=c.assets(d,**args,**{key:'__blank__'})
+                assert selected['total']>0
+                assert all(not r[key] for r in selected['items'])
+        assert '__blank__' in result['options']['owner']
+        if kind=='instrument':
+            assert '__blank__' in result['options']['status']
+            assert '__blank__' in result['options']['category']

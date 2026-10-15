@@ -59,7 +59,7 @@ Query：`dept=field|office`、`week`、`group`、`scope=week|open`（預設 week
 {meta: Meta; dept: string; week: string;
  basis: 'days'|'points';   // 工作預排.預估營業額點數 全空時為 'days'：預排出工天數 vs 實際出工天數
  kpi: {planned_points: number|null; actual_points: number; planned_days: number; actual_days: number; matched_days: number; unplanned_days: number; achievement: number|null; open_cases: number; remaining_points: number|null};
- by_group: {group: string; group_label: string; unplanned_days: number; planned: number; actual: number; achievement: number|null}[];
+ by_group: {group: string; group_label: string; planned_days: number; matched_days: number; unplanned_days: number; planned: number; actual: number; achievement: number|null}[];
  items: {case_code: string; case_name: string; planned: number; actual: number; planned_days: number; actual_days: number; matched_days: number; unplanned_days: number; achievement: number|null; diff: number;
          expected_total: number|null; done_total: number|null; remaining: number|null; status: string; link: string}[];
  total: number; offset: number; limit: number}
@@ -77,7 +77,7 @@ Query：`dept=field|office`、`week`、`group`、`scope=week|open`（預設 week
 - `meta.gaps` 依端點與部門限制範圍。控制組使用外業提醒。來源頁保留跨表提醒。畫面以預設收合的「資料品質提醒 N 項」呈現，更新時間與過期標記持續可見。
 - 檢核失誤率分母為 `passed + returned`。KPI、排行、趨勢提示顯示已檢核筆數，1 至 19 筆標示「樣本少」。零分母仍為「無法計算」。
 - 前端依端點、完整查詢條件與登入工作階段快取成功結果 60 秒。離開或切換條件取消舊請求。
-- 天數模式的明細與 KPI 使用 `planned_days`、`actual_days`，差異為實際天數減預排天數。點數欄仍保留原值。
+- 天數模式的明細與 KPI 顯示預排 `planned_days`、對應 `matched_days`、未預排 `unplanned_days`；`actual_days` 保留全部出工天數，差異為實際天數減預排天數。點數欄仍保留原值。
 
 ## 2026-10-15 獨立審查修正的加法欄位與計算規則
 
@@ -94,3 +94,12 @@ Query：`dept=field|office`、`week`、`group`、`scope=week|open`（預設 week
 - review、progress、sales、assets 加 `options`。分別為 `{group:string[],person:string[],flag:string[]}`、`{group:string[]}`、`{status:string[],pm:string[]}`、`{status:string[],category:string[],owner:string[]}`。選項獨立於當次 group、人員、PM、類別與文字篩選。review 為整個部門，progress 為當週，assets 為資產類型。
 - review status 升冪依「已通過、已退回、待檢核、未填」。所有表格首次點文字欄為升冪，數字欄為降冪，同欄再點切換。搜尋 offset 與 debounced query 同時套用。
 - TrendChart 的圖像內沒有可聚焦元素。外層 group 提供名稱，SVG 提供完整文字摘要，原生週次按鈕提供鍵盤選取。錯誤狀態使用 `role=alert`。
+
+
+## Round 2 補充契約
+
+- Sales items 新增 `id`，保留空白 `code`、`name`、`client`。UI 編號顯示「（未填編號）」及 record id 末六碼，名稱與業主顯示淡色「未填」。空字串與 null 的排序固定在有值列之後，升降冪皆相同，並以 record id 作穩定次序。`sales-code` 缺口回傳「N 件案件未填編號」。
+- Progress 組別新增 `planned_days`、`matched_days`，既有欄位不移除。組別達成率旁顯示「對應 matched / 預排 planned 天」，另以淡色顯示「另有 N 天未預排」。KPI 新增對應天數與未預排天數標示。明細顯示預排、對應、未預排天數，後兩欄接受 `sort=matched_days` 與 `sort=unplanned_days`。達成率計算不變。
+- 缺組別統一正規化為 `未分組`，可重複正規化。`group=未分組` 與 `group=__blank__` 查詢相同資料。組別圖表顯示「未分組」。工作單缺口計數包含無日期列，但無日期列仍不納入每週達成率。
+- Assets 的 owner、category、status 空白選項及 Progress 缺組別選項使用 `__blank__`，下拉標示「未填」。空字串僅代表全部。資產明細保留原始空字串，空白篩選由後端轉換。車輛仍沿用啟用狀態及「車輛」類別回退。
+- 每個 tab 定義欄位預設排序，日期與最後使用日期預設降冪。同欄再次點擊反轉方向。清除篩選及工項排行點擊同步更新搜尋條件，不先以舊 q 查詢。

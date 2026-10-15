@@ -11,7 +11,7 @@ SORTS={
     'review/rows':('date','group','person','case','points','status'),
     'sales':('code','name','client','pm','status','contract','progress_revenue','progress_cost','progress_billing','billable_unbilled','receivable'),
     'assets':('name','category','status','owner','uses','km','last_used','idle_days','daily_rent'),
-    'progress':('case_code','case_name','planned','actual','planned_days','actual_days','achievement','diff','expected_total','done_total','remaining','status'),
+    'progress':('case_code','case_name','planned','actual','planned_days','actual_days','matched_days','unplanned_days','achievement','diff','expected_total','done_total','remaining','status'),
 }
 
 

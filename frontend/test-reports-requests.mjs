@@ -4,8 +4,8 @@ import {writeFile,unlink} from 'node:fs/promises';
 import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
-const bundle=await build({stdin:{contents:"export {useReport,useDebounce} from './src/reports/useReport';export {invalidateSessionEpoch} from './src/api';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',packages:'external',jsx:'automatic'});
-const path=new URL('./.reports-requests-bundle.mjs',import.meta.url);await writeFile(path,bundle.outputFiles[0].text);let useReport,useDebounce,invalidateSessionEpoch;try{({useReport,useDebounce,invalidateSessionEpoch}=await import(path.href))}finally{await unlink(path)}
+const bundle=await build({stdin:{contents:"export {useReport,useDebounce,useReportSearch} from './src/reports/useReport';export {invalidateSessionEpoch} from './src/api';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',packages:'external',jsx:'automatic'});
+const path=new URL('./.reports-requests-bundle.mjs',import.meta.url);await writeFile(path,bundle.outputFiles[0].text);let useReport,useDebounce,useReportSearch,invalidateSessionEpoch;try{({useReport,useDebounce,useReportSearch,invalidateSessionEpoch}=await import(path.href))}finally{await unlink(path)}
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/'});Object.assign(globalThis,{window:dom.window,document:dom.window.document,location:dom.window.location,IS_REACT_ACT_ENVIRONMENT:true});
 const pending=[];globalThis.fetch=(url,options)=>new Promise(resolve=>pending.push({url,options,resolve}));
 function View({group}){const state=useReport('review',{group});return React.createElement('div',null,state.loading?'loading':state.error||state.data?.value)}
@@ -24,3 +24,19 @@ await act(async()=>new Promise(r=>setTimeout(r,300)));
 assert.equal(document.body.textContent,'new:0');
 await act(async()=>searchRoot.unmount());
 console.log('Search offset resets with the debounced query.');
+
+const atomicRoot=createRoot(document.getElementById('root'));let searchActions;
+function AtomicSearch(){const [group,setGroup]=React.useState('A');const state=useReportSearch(()=>{});searchActions={...state,clear:()=>{state.applySearch('');setGroup('')},rank:()=>{state.applySearch('ranked');setGroup('B')}};useReport('review/rows',{group,q:state.q});return null}
+await act(async()=>atomicRoot.render(React.createElement(AtomicSearch)));
+await act(async()=>searchActions.setSearch('old'));
+await act(async()=>new Promise(r=>setTimeout(r,300)));
+let before=pending.length;
+await act(async()=>searchActions.clear());
+assert.equal(pending.length,before+1);assert.equal(new URL(pending.at(-1).url,'http://localhost').searchParams.has('q'),false);
+await act(async()=>searchActions.setSearch('pending'));
+before=pending.length;
+await act(async()=>searchActions.rank());
+assert.equal(pending.length,before+1);assert.equal(new URL(pending.at(-1).url,'http://localhost').searchParams.get('q'),'ranked');
+await act(async()=>new Promise(r=>setTimeout(r,300)));assert.equal(pending.length,before+1);
+await act(async()=>atomicRoot.unmount());
+console.log('Clear and ranking apply the query and filters together without stale requests.');

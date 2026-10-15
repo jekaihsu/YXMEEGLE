@@ -65,7 +65,9 @@ def gap(ident, message, severity='warn'): return dict(id=ident, severity=severit
 
 def normalize_group(value):
     name=str(cell(value)).strip()
-    return {'控制組':'控制'}.get(name,name.removesuffix('組').strip()) or '未分組'
+    if name in ('', '未分組', '未分', '__blank__'): return '未分組'
+    while name.endswith('組'): name=name[:-1].strip()
+    return '未分組' if name in ('', '未分') else name
 
 
 def contract(f):
@@ -167,7 +169,7 @@ def review(data, dept='field', week=None, weeks=12, group='', person='', **_):
 def page(rows, params, default, aliases=None):
     key = (aliases or {}).get(params.get('sort',default), params.get('sort',default))
     rows = sorted(rows, key=lambda r: str(r.get('id', r.get('code', r.get('case_code','')))))
-    known = [r for r in rows if r.get(key) is not None]; missing = [r for r in rows if r.get(key) is None]
+    known = [r for r in rows if r.get(key) not in (None, '')]; missing = [r for r in rows if r.get(key) in (None, '')]
     known.sort(key=lambda r:({'passed':0,'returned':1,'pending':2,'unset':3}.get(r[key],r[key]) if key=='status' else r.get(key,'')), reverse=params.get('order','asc')=='desc')
     rows = known + missing
     offset, limit = params.get('offset',0), params.get('limit',50)
@@ -185,7 +187,7 @@ def sales(data, **p):
     for r in data['tables'].get('case',[]):
         f=r['f']; s=str(cell(f.get('狀態'))) or '未填'; manager=str(cell(f.get('PM'))) or '未填'
         if p.get('status') and s!=p['status'] or p.get('pm') and manager!=p['pm']: continue
-        row=dict(code=str(cell(f.get('案件編號'))),name=str(cell(f.get('案件名稱'))),client=str(cell(f.get('業主'))),pm=manager,status=s,
+        row=dict(id=r['id'],code=str(cell(f.get('案件編號'))),name=str(cell(f.get('案件名稱'))),client=str(cell(f.get('業主'))),pm=manager,status=s,
             contract=contract(f),progress_revenue=number(f.get('營業額進度')),progress_cost=number(f.get('成本進度')),progress_billing=number(f.get('計價進度')),
             billable_unbilled=number(f.get('可請款未請')),receivable=number(f.get('應收未收')),link=record_link(data['base'],'case',r['id']))
         rows.append(row);status[s].append(row);pm[manager].append(row)
@@ -220,14 +222,14 @@ def assets(data, **p):
         f=r['f']; ident=r['id']; days=use[ident]; selected=[dt for dt in days if start<=dt<=end]
         active=f.get('啟用') is True
         if active: active_ids.add(ident)
-        status=str(cell(f.get('狀態'))) or ('啟用' if active else '停用') if kind=='vehicle' else str(cell(f.get('狀態'))) or '未填'
+        status=str(cell(f.get('狀態'))) or ('啟用' if active else '停用') if kind=='vehicle' else str(cell(f.get('狀態')))
         owner=vehicle_owner(str(cell(f.get('備註')))) if kind=='vehicle' else ''
         last=max(days) if days else None
-        row=dict(id=ident,name=str(cell(f.get('車牌') if kind=='vehicle' else f.get('儀器名稱'))),category=str(cell(f.get('類別'))) or ('車輛' if kind=='vehicle' else '未填'),status=status,owner=owner,
+        row=dict(id=ident,name=str(cell(f.get('車牌') if kind=='vehicle' else f.get('儀器名稱'))),category=str(cell(f.get('類別'))) or ('車輛' if kind=='vehicle' else ''),status=status,owner=owner,
             uses=len(selected),km=sum(v for v in kms[ident] if v is not None) if kind=='vehicle' and any(v is not None for v in kms[ident]) else None,
             last_used=last,idle_days=(end_day-date.fromisoformat(last)).days if last else None,daily_rent=number(f.get('日租金')) if kind=='instrument' else None,note=str(cell(f.get('備註'))),link=record_link(data['base'],kind,ident))
-        for key in ('status','category','owner'): options[key].add(row[key])
-        if any(p.get(k) and p[k]!=row[k] for k in ('status','category','owner')): continue
+        for key in ('status','category','owner'): options[key].add(row[key] or '__blank__')
+        if any(p.get(k) and ('' if p[k]=='__blank__' else p[k])!=row[k] for k in ('status','category','owner')): continue
         if p.get('idle_days') is not None and (row['idle_days'] is not None and row['idle_days']<p['idle_days']): continue
         if p.get('q') and p['q'].casefold() not in (row['name']+' '+row['note']).casefold(): continue
         rows.append(row)
@@ -301,9 +303,9 @@ def progress(data, **p):
         plg=len(group_plan[g]) if basis=='days' else group_points[g][0]
         acg=len(group_actual[g]) if basis=='days' else sum(r['points'] or 0 for r in review_rows(data,dept,week,g))
         numerator=len(group_plan[g]&group_actual[g]) if basis=='days' else group_points[g][1]
-        by_group.append(dict(group=g,group_label=g,planned=plg,actual=acg,unplanned_days=len(group_actual[g]-group_plan[g]),achievement=ratio(numerator,plg)))
+        by_group.append(dict(group=g,group_label=g,planned_days=len(group_plan[g]),matched_days=len(group_plan[g]&group_actual[g]),planned=plg,actual=acg,unplanned_days=len(group_actual[g]-group_plan[g]),achievement=ratio(numerator,plg)))
     options=sorted({r['group'] for r in data['plan_indices'].get((dept,week),[])}|{r['group'] for r in review_rows(data,dept,week)})
-    return dict(gaps=gaps,options=dict(group=options),dept=dept,week=week,basis=basis,kpi=dict(planned_points=pl if basis=='points' else None,actual_points=ac,planned_days=pd,actual_days=ad,matched_days=matched,unplanned_days=ad-matched,achievement=ratio(matched,pd) if basis=='days' else ratio(sum(matched_points.values()),pl),open_cases=sum('執行中' in r['status'] for r in rows),remaining_points=nullable_sum(r['remaining'] for r in rows if '執行中' in r['status'] and r['remaining'] is not None and r['remaining']>=0)),by_group=by_group,**page(rows,p,'case_code'))
+    return dict(gaps=gaps,options=dict(group=['__blank__' if g=='未分組' else g for g in options]),dept=dept,week=week,basis=basis,kpi=dict(planned_points=pl if basis=='points' else None,actual_points=ac,planned_days=pd,actual_days=ad,matched_days=matched,unplanned_days=ad-matched,achievement=ratio(matched,pd) if basis=='days' else ratio(sum(matched_points.values()),pl),open_cases=sum('執行中' in r['status'] for r in rows),remaining_points=nullable_sum(r['remaining'] for r in rows if '執行中' in r['status'] and r['remaining'] is not None and r['remaining']>=0)),by_group=by_group,**page(rows,p,'case_code'))
 
 
 def sources(data, fetched_at):
@@ -334,6 +336,8 @@ def report_gaps(data, endpoint, dept='field'):
             rows=data['tables'].get('case',[])
             n=sum(number(r['f'].get(key)) is not None for r in rows)
             if n<len(rows): gaps.append(gap('sales-'+key,f'案件 {key} 僅 {n}/{len(rows)} 有值；全空時顯示來源無資料；部分有值時僅加總有值資料，非完整總額'))
+        missing_code=sum(not cell(r['f'].get('案件編號')) for r in data['tables'].get('case',[]))
+        if missing_code: gaps.append(gap('sales-code',f'{missing_code} 件案件未填編號'))
         blank=sum(not cell(r['f'].get('狀態')) for r in data['tables'].get('case',[]))
         gaps += [gap('sales-status',f'案件狀態 {blank} 筆未填'),gap('sales-intake','業務接案量／成交量與請款詳情來源尚未建立')]
     if endpoint=='assets':

@@ -12,4 +12,4 @@ export function safeLink(link:string){try{const u=new URL(link);return u.protoco
 export function sample(reviewed:number){return `${number(reviewed)} 筆已檢核${reviewed>0&&reviewed<20?' · 樣本少':''}`}
 export function compactMoney(v:number|null|undefined){if(v==null||!Number.isFinite(v))return '來源無資料';return `NT$ ${number(v>=100000000?v/100000000:v>=10000?v/10000:v)}${v>=100000000?' 億':v>=10000?' 萬':''}`}
 
-export function nextSortOrder(current:string,order:string,next:string){if(current===next)return order==='asc'?'desc':'asc';return ['points','contract','progress_revenue','progress_cost','progress_billing','billable_unbilled','receivable','uses','km','idle_days','daily_rent','planned','actual','planned_days','actual_days','achievement','diff','expected_total','done_total','remaining'].includes(next)?'desc':'asc'}
+export function nextSortOrder(current:string,order:string,next:string,defaults:Record<string,string>){if(current===next)return order==='asc'?'desc':'asc';return defaults[next]??'asc'}

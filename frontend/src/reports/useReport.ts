@@ -13,3 +13,9 @@ export function useReport<T>(endpoint:string,params:Query){
  },[endpoint,key,reload]);
  return {...(state.key===key?state:{key,loading:true}),retry:()=>setReload(v=>v+1)};
 }
+
+export function useReportSearch(onApply:()=>void){
+ const [state,setState]=useState({search:'',q:''});const apply=useRef(onApply);apply.current=onApply;
+ useEffect(()=>{if(state.search===state.q)return;const timer=setTimeout(()=>{setState(s=>({...s,q:s.search}));apply.current()},250);return()=>clearTimeout(timer)},[state.search,state.q]);
+ return {...state,setSearch:(search:string)=>setState(s=>({...s,search})),applySearch:(search:string)=>setState({search,q:search})};
+}
