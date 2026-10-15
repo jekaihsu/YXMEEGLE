@@ -1,6 +1,24 @@
 # Reports API contract（後端與前端共同遵守）
 
-所有端點 `GET`、唯讀、需登入、`Cache-Control: no-store`。回應皆含 `meta`。週以 Asia/Taipei 週一為起點，`week` 為該週週一 `YYYY-MM-DD`，預設為最近一個已結束的完整週。錯誤沿用 repo 慣例 `{detail: string}`。
+所有端點 `GET`、唯讀、需登入、`Cache-Control: no-store`。成功回應皆含 `meta`。週以 Asia/Taipei 週一為起點，`week` 為該週週一 `YYYY-MM-DD`，預設為最近一個已結束的完整週。錯誤沿用 repo 慣例 `{detail: string}`。
+
+## 首次讀取與失敗回應
+
+啟動時，僅在 `REPORTS_ENABLED=true`、reader 為 `LarkReader` 且有 `LARK_APP_ID` 與 `LARK_APP_SECRET` 時背景建立首份快照。啟動不等待來源讀取，失敗不阻止 app 啟動。FixtureReader 不預熱。
+
+無快照時，每個請求最多等待 `REPORTS_COLD_WAIT_SECONDS`，預設 20 秒，上限 60 秒。逾時且背景仍在讀取時回 HTTP 503，標頭含 `Retry-After: 5` 與 `Cache-Control: no-store`。
+
+```json
+{"detail":"報表資料正在首次讀取，請稍候","warming":true,"retry_after":5}
+```
+
+來源讀取失敗且無快照時回 HTTP 503，仍含 `Cache-Control: no-store`。
+
+```json
+{"detail":"報表來源暫時無法讀取","warming":false}
+```
+
+前端只對 `503 warming=true` 自動重試。等待時顯示骨架及「正在首次讀取 Lark 資料，約需 15 到 30 秒」。每次回應後依 `retry_after` 秒數排下一次請求，同一 hook 最多 12 次請求，含首次請求。卸載、參數變更或 session epoch 變更後不再送舊請求。達上限或非預熱失敗時顯示錯誤及「重試」。手動刷新每 60 秒一次的限制不變。
 
 ```ts
 type Meta = {

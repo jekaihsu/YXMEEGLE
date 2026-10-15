@@ -1,11 +1,12 @@
 """Authenticated adapters for the shared PM reports contract."""
 from datetime import datetime, timedelta
+from contextlib import asynccontextmanager
 import os
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from .compute import TZ, monday
 from .reader import LarkReader
-from .snapshot import SnapshotStore
+from .snapshot import SnapshotStore, ensure_visible_logs
 
 SORTS={
     'review/rows':('date','group','person','case','points','status'),
@@ -75,7 +76,17 @@ def parameters(endpoint, query):
 def register(app, identity, cfg=None, *, reader=None, authorize=None, live_enabled=None, allow=None):
     cfg=os.environ if cfg is None else cfg
     store=SnapshotStore(reader or LarkReader(cfg),cfg)
+    ensure_visible_logs()
     app.state.reports=store
+    if (str(cfg.get('REPORTS_ENABLED','true')).lower()=='true'
+            and isinstance(store.reader,LarkReader) and cfg.get('LARK_APP_ID') and cfg.get('LARK_APP_SECRET')):
+        lifespan=app.router.lifespan_context
+        @asynccontextmanager
+        async def reports_lifespan(app):
+            store.start()
+            async with lifespan(app) as state:
+                yield state
+        app.router.lifespan_context=reports_lifespan
     def gate(request):
         data,user=identity(request)
         if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true': raise HTTPException(404,'報表未啟用')
@@ -89,7 +100,7 @@ def register(app, identity, cfg=None, *, reader=None, authorize=None, live_enabl
                 gate(request)
                 return JSONResponse(store.result(endpoint,parameters(endpoint,request.query_params)),headers={'Cache-Control':'no-store'})
             except HTTPException as exc:
-                return JSONResponse({'detail':str(exc.detail)},status_code=exc.status_code,headers={'Cache-Control':'no-store'})
+                return JSONResponse(exc.detail if isinstance(exc.detail,dict) else {'detail':str(exc.detail)},status_code=exc.status_code,headers={'Cache-Control':'no-store',**(exc.headers or {})})
         read.__name__='reports_'+endpoint.replace('/','_')
         return read
     for endpoint in ('review','review/rows','sales','assets','progress','sources'):
@@ -106,5 +117,5 @@ def register(app, identity, cfg=None, *, reader=None, authorize=None, live_enabl
                 except Exception: raise HTTPException(503,'報表來源暫時無法讀取') from None
             return JSONResponse({'meta':store.meta()},status_code=202 if not future.done() else 200,headers={'Cache-Control':'no-store'})
         except HTTPException as exc:
-            return JSONResponse({'detail':str(exc.detail)},status_code=exc.status_code,headers={'Cache-Control':'no-store'})
+            return JSONResponse(exc.detail if isinstance(exc.detail,dict) else {'detail':str(exc.detail)},status_code=exc.status_code,headers={'Cache-Control':'no-store',**(exc.headers or {})})
     return store

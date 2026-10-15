@@ -237,3 +237,67 @@ def test_round2_blank_select_roundtrips_and_day_sort_keys():
                 assert body['kpi']['planned_days']>0 and body['kpi']['actual_days']>0
                 assert [r[key] for r in body['items']]==sorted(r[key] for r in body['items'])
     store.close()
+
+
+def test_cold_warming_then_ready():
+    release=Event()
+    class Slow:
+        def read(self):
+            release.wait(2)
+            return FixtureReader(FIXTURES).read()
+    app=FastAPI();store=register(app,lambda _:({'wid':'company','mode':'lark'},{}),{'REPORTS_COLD_WAIT_SECONDS':'.01'},reader=Slow())
+    try:
+        with TestClient(app) as client:
+            response=client.get('/api/reports/sales')
+            assert response.json()=={'detail':'報表資料正在首次讀取，請稍候','warming':True,'retry_after':5}
+            assert response.status_code==503
+            assert response.headers['retry-after']=='5'
+            assert response.headers['cache-control']=='no-store'
+            release.set();store.start().result()
+            assert client.get('/api/reports/sales').status_code==200
+    finally: release.set();store.close()
+
+
+def test_cold_failure_logs_safely(caplog):
+    class Failing:
+        def read(self): raise ValueError('secret=never-print-this')
+    app=FastAPI();store=register(app,lambda _:({'wid':'company','mode':'lark'},{}),{},reader=Failing())
+    with caplog.at_level('INFO',logger='backend.reports'),TestClient(app) as client:
+        response=client.get('/api/reports/sales')
+        assert response.json()=={'detail':'報表來源暫時無法讀取','warming':False}
+        assert any(r.levelname=='WARNING' and 'error_class=ValueError' in r.message for r in caplog.records)
+        assert 'never-print-this' not in caplog.text
+    store.close()
+
+
+@pytest.mark.parametrize('kind',['live','failure','fixture','disabled','missing'])
+def test_startup_warming(kind):
+    started=Event()
+    class Live(LarkReader):
+        def read(self):
+            started.set()
+            if kind=='failure': raise RuntimeError('unavailable')
+            return FixtureReader(FIXTURES).read()
+    class Fixture(FixtureReader):
+        def read(self): started.set();return super().read()
+    cfg={'LARK_APP_ID':'test','LARK_APP_SECRET':'test'}
+    if kind=='disabled': cfg['REPORTS_ENABLED']='false'
+    if kind=='missing': cfg.pop('LARK_APP_SECRET')
+    from contextlib import asynccontextmanager
+    @asynccontextmanager
+    async def lifespan(app): yield
+    app=FastAPI(lifespan=lifespan)
+    store=register(app,lambda _:({},{}),cfg,reader=Fixture(FIXTURES) if kind=='fixture' else Live(cfg))
+    with TestClient(app):
+        assert started.wait(.2)==(kind in ('live','failure'))
+    store.close()
+
+
+def test_reports_logger_emits_info_when_app_has_no_logging():
+    import logging
+    logger=logging.getLogger('backend.reports')
+    for handler in list(logger.handlers): logger.removeHandler(handler)
+    logger.setLevel(logging.NOTSET)
+    app_for()
+    assert logger.isEnabledFor(logging.INFO)
+    assert logging.getLogger().handlers or logger.handlers

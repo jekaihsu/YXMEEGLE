@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import math
+import logging
 from threading import Lock
 import time
 from fastapi import HTTPException
@@ -17,16 +18,27 @@ def setting(cfg, key, default, minimum, maximum):
     except (ValueError, TypeError): value=default
     return min(maximum,max(minimum,value)) if math.isfinite(value) else default
 
+logger=logging.getLogger('backend.reports')
+
+
+def ensure_visible_logs():
+    # The app configures no logging, so INFO from this module would be dropped; only add a handler when nothing else did.
+    if logger.level==logging.NOTSET: logger.setLevel(logging.INFO)
+    if not logging.getLogger().handlers and not logger.handlers:
+        handler=logging.StreamHandler();handler.setFormatter(logging.Formatter('%(levelname)s:     %(name)s %(message)s'));logger.addHandler(handler)
+
 class SnapshotStore:
     def __init__(self, reader, cfg=None, *, clock=time.monotonic):
         cfg=cfg or {}; self.reader=reader;self.clock=clock
         self.ttl=setting(cfg,'REPORTS_TTL_SECONDS',300,1,86400)
-        self.budget=setting(cfg,'REPORTS_COLD_WAIT_SECONDS',10,.01,60)
+        self.budget=setting(cfg,'REPORTS_COLD_WAIT_SECONDS',20,.01,60)
         self.base=cfg.get('LARK_REPORT_BASE_TOKEN',compute.BASE_TOKEN)
         self._lock=Lock();self._executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix='reports')
         self._future=None;self._snapshot=None;self._last_request=None;self._retry_at=0;self._refresh_error=False
 
     def _build(self):
+        started=time.monotonic()
+        logger.info('reports snapshot build started')
         try:
             raw=self.reader.read()
             canonical=json.dumps({k:dict(v,records=sorted(v['records'],key=lambda r:r['record_id'])) for k,v in raw.items()},sort_keys=True,ensure_ascii=False,separators=(',',':'))
@@ -36,8 +48,10 @@ class SnapshotStore:
             gaps=previous['gaps'] if previous and previous['fingerprint']==fingerprint else {(endpoint,dept):compute.report_gaps(data,endpoint,dept) for endpoint in ('sources','review','review/rows','sales','assets','progress') for dept in ('field','office','control')}
             current=dict(gaps=gaps,data=data,fingerprint=fingerprint,fetched_at=datetime.now(timezone.utc).isoformat(),at=self.clock(),cache=previous['cache'] if previous and previous['fingerprint']==fingerprint else OrderedDict(),pending=previous['pending'] if previous and previous['fingerprint']==fingerprint else {})
             with self._lock: self._snapshot=current;self._retry_at=0;self._refresh_error=False
+            logger.info('reports snapshot ready tables=%s records=%s duration_ms=%.0f',len(raw),sum(len(t['records']) for t in raw.values()),(time.monotonic()-started)*1000)
             return current
-        except Exception:
+        except Exception as exc:
+            logger.warning('reports snapshot failed error_class=%s duration_ms=%.0f',type(exc).__name__,(time.monotonic()-started)*1000)
             with self._lock: self._retry_at=self.clock()+min(30,self.ttl);self._refresh_error=True
             raise
 
@@ -58,7 +72,11 @@ class SnapshotStore:
             future=self.start()
             if current is None:
                 try: current=future.result(timeout=self.budget)
-                except Exception: raise HTTPException(503,'報表來源尚未就緒，請稍後再試') from None
+                except TimeoutError:
+                    if not future.done():
+                        raise HTTPException(503,dict(detail='報表資料正在首次讀取，請稍候',warming=True,retry_after=5),headers={'Retry-After':'5'}) from None
+                    raise HTTPException(503,dict(detail='報表來源暫時無法讀取',warming=False)) from None
+                except Exception: raise HTTPException(503,dict(detail='報表來源暫時無法讀取',warming=False)) from None
         return current
 
     def meta(self, snapshot=None, endpoint='sources'):

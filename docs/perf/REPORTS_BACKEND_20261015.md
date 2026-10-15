@@ -110,3 +110,17 @@ All five runs pass both limits. Raw benchmark JSON remains local at `/tmp/report
 A separate untimed cProfile run executed 100 sales, vehicle and progress calculations. Sales consumed 1.142 cumulative seconds of 1.566 profiled seconds. Cell and numeric decoding dominate sales; date parsing contributes 0.257 cumulative seconds across the run. Profiling time is excluded from the latency table. Work is CPU-bound over these small source tables. Static source gaps now come from the snapshot cache. Date-window asset coverage and selected negative-remaining counts are computed from each request's relevant data.
 
 Real-data corrected KPIs, group names, query rejection and per-finding test evidence are in `REPORTS_FIX_REVIEW_20261015.md`.
+
+## 2026-10-15 staging cold-start fix
+
+The coordinator measured the production LarkReader in the staging container. All 12 tables succeeded. Sequential reads took 36.9 s. Field had 820 rows and took 5.1 s. Field cost took 4.1 s, office 6.0 s, office cost 3.9 s, case 3.0 s, contract 5.7 s, and plan 4.0 s. Other tables took about 1 s each. The estimated duration with three workers was about 15 s. The old 10 s cold wait caused review, rows, and sales to return 503 together on first load. The runtime log had no reports lines.
+
+The fix starts a single background snapshot during the existing app lifespan when reports and Lark credentials are configured. Startup does not wait for the read. The default cold wait is now 20 s, capped at 60 s. A pending first read returns 503 with warming=true, retry_after=5, Retry-After=5, and no-store. A failed read returns warming=false. The frontend waits with a skeleton and retries serially, with at most 12 requests including the initial request. The manual refresh throttle remains 60 s.
+
+The backend.reports logger emits INFO on build start and completion, including table count, record count, and duration. Failure logs contain only the exception class and duration at WARNING. Exception messages are omitted because reader errors may contain source records or credentials.
+
+Local verification passed 62 backend tests, npx tsc -b, npm run test:reports, npm run build, and npm run test:overview. New tests failed before the corresponding backend and frontend changes. The UI tests mount ReportState and use controlled fetch responses and timers.
+
+The requested acceptance run used .venv/bin/python -m backend.benchmark_reports --data /tmp/lark-docs/data --requests 30 --rounds 1. It reported zero errors, 30 hits and 300 forced cache misses per endpoint. Miss p95 was review 0.813 ms, review/rows 0.571 ms, sales 2.995 ms, assets 2.563 ms, and progress 0.664 ms. All aggregate endpoints passed 100 ms and rows passed 80 ms. The cold fixture snapshot took 167.341 ms. The script checks HTTP 200 and snapshot metadata and independently cross-checks review counts. Cache clearing occurs outside the timed region. The host has 10 logical CPUs, with load averages 1.86, 1.76, and 1.76 before the run. Frontend validation overlapped this single acceptance run. These numbers establish local acceptance only, with no speedup claim or live Lark timing inference.
+
+The staging measurements above came from the coordinator's brief. This implementation run did not verify a browser or staging deployment. The coordinator owns redeployment and live runtime-log checks.
