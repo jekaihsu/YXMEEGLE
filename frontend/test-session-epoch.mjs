@@ -61,7 +61,7 @@ async function scenario(kind,change,status=200,body){
   assert.equal(window.epochContext.w.version,1,'new epoch accepts lower version');
   assert.equal(window.epochContext.w.projects.length,0);
   assert.ok(!document.body.textContent.includes('PRIVATE_CASE_A'),'refresh clears previous workspace from screen');
-  if(change==='environment')assert.ok(document.body.textContent.includes('獨立測試區'));
+  if(change==='environment')assert.equal(document.querySelector('.topbar .demo-tag')?.textContent,'測試');
   let newer;await flush(()=>{newer=window.epochContext.upload(new FormData())});
   const newRelease=release;
   let result;await flush(async()=>{oldRelease(json(status===200?{...workspace,version:99,projects:workspace.projects.map(p=>({...p,nodes:p.nodes.map(n=>({...n,status:'completed',tasks:n.tasks.map(t=>({...t,status:'completed'}))}))}))}:{detail:'OLD_ERROR'},status));result=await pending});
