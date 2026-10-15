@@ -331,7 +331,9 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
         if project_ids is not None:
             result['projects']=[p for p in result['projects'] if p['id'] in project_ids]
         for p in result['projects']:
-            if project_ids is None: p['nodes']=[]
+            if project_ids is None and node_headers:
+                for n in p['nodes']: n['tasks']=[]; n['review_cycles']=[]
+            elif project_ids is None: p['nodes']=[]
             for child in PROJECT_CHILDREN:
                 if project_ids is None or child not in project_children: p[child]=[]
     else:
