@@ -101,7 +101,7 @@ function AssignmentWorkPage({c}:{c:Ctx}) {
     <option value="assigned">指派給我</option><option value="confirmation">待我確認</option><option value="delegated">我交辦的</option><option value="proxy">代理給我</option><option value="local">本地 SOP</option><option value="completed">已完成</option>
    </select></label>
    <label>期限<select value={params.get('deadline')||'all'} onChange={e=>update({deadline:e.target.value})}><option value="all">全部期限</option><option value="unscheduled">未排期限</option></select></label>
-   <label>搜尋<input type="search" value={params.get('q')||''} onChange={e=>update({q:e.target.value})}/></label>
+   <label>搜尋<input placeholder="搜尋任務、案件或關鍵字" type="search" value={params.get('q')||''} onChange={e=>update({q:e.target.value})}/></label>
    {(read.body?.manager_view_available || scope==='team') && <label>範圍<select value={scope} onChange={e=>update({scope:e.target.value})}><option value="mine">我的工作</option><option value="team">同組</option></select></label>}
   </div>
   <PanelStatus read={read}/>

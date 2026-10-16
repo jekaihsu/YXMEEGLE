@@ -221,6 +221,6 @@ function RejectForm({busy, error, onCancel, onSubmit}: {busy: boolean; error: No
   const [reason, setReason] = useState(''), [validation, setValidation] = useState('');
   const id = useId(), message = validation || error?.fields.reason;
   const submit = (event: FormEvent) => {event.preventDefault(); if (!reason.trim()) {setValidation('請填寫退回原因。'); return} setValidation(''); void onSubmit(reason.trim())};
-  return <form className="na-form" noValidate onSubmit={submit}><fieldset disabled={busy}><legend>退回節點</legend><label><span>退回原因 <small>必填</small></span><textarea rows={3} value={reason} required aria-invalid={!!message} aria-describedby={message ? id : undefined} onChange={e => {setReason(e.target.value); setValidation('')}}/></label>{message && <p id={id} className="na-field-error" role="alert">{message}</p>}
+  return <form className="na-form" noValidate onSubmit={submit}><fieldset disabled={busy}><legend>退回節點</legend><label><span>退回原因 <small>必填</small></span><textarea placeholder="說明本次調整的原因" rows={3} value={reason} required aria-invalid={!!message} aria-describedby={message ? id : undefined} onChange={e => {setReason(e.target.value); setValidation('')}}/></label>{message && <p id={id} className="na-field-error" role="alert">{message}</p>}
     <div className="na-form-actions"><button type="button" className="button compact" onClick={onCancel}>取消</button><button type="submit" className="button primary compact">確認退回</button></div></fieldset></form>;
 }

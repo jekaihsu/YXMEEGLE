@@ -16,7 +16,7 @@ import {buildCaseDetailView} from './caseDetailView.ts';
 import {buildContractDetailView} from './contractDetailView.ts';
 import {buildWorkItemDetailView} from './workItemDetailView.ts';
 import type {WorkItemTab} from './workItemDetailView.ts';
-import {Skeleton} from './design';
+import {Picker,Skeleton} from './design';
 import {DATA_STATE_LABELS} from './dataState.ts';
 import {backTo, breadcrumbs, drill, linkOut} from './drilldownContext.ts';
 import type {P2Context, P2Route, SortSpec} from './drilldownContext.ts';
@@ -24,7 +24,7 @@ import {boundHistory, caseNavigate, caseSelection, confirmationKeyOfRow, detailN
  p2Gate, p2Request, p2RouteOfContext, recordPage, sameFilters} from './p2Routes.ts';
 import type {HistoryStore, P2Failure} from './p2Routes.ts';
 import type {Ctx} from './appCommon';
-import type {Route} from './types';
+import type {Route,User} from './types';
 
 type Fetched = {status: 'loading'} | {status: 'ok'; body: unknown; updateFailed?: boolean} | {status: 'error'; httpStatus?: number};
 const ROUTE_LABEL: Record<P2Route, string> = {overview: '管理總覽', confirmations: '工程確認單', confirmation: '案件與確認單詳情', contract: '合約明細', workitem: '工作項'};
@@ -113,7 +113,7 @@ export function P2Page({c}: {c: Ctx}) {
   onReset={() => open({...context, filters: {}, cursor: null}, true)}/>;
  else if (fetched.status === 'loading' && context.route !== 'confirmations') page = <div className="p2-card" aria-hidden="true"><Skeleton lines={6}/></div>;
  else if (failure && !(failure.state === 'forbidden' && context.route === 'confirmations')) page = <FailureNotice failure={failure} onRetry={onRetry}/>;
- else if (context.route === 'overview') page = <OverviewBody context={context} body={body} open={open} openEntryPoint={openEntryPoint} openSources={openSources} setNotice={setNotice} goBack={goBack}/>;
+ else if (context.route === 'overview') page = <OverviewBody users={c.w.users} context={context} body={body} open={open} openEntryPoint={openEntryPoint} openSources={openSources} setNotice={setNotice} goBack={goBack}/>;
  else if (context.route === 'confirmations') page = <ConfirmationsBody context={context} body={failure ? {status: 403} : body} loading={fetched.status === 'loading'} open={open} setNotice={setNotice}/>;
  else if (context.route === 'confirmation') page = <CaseBody context={context} body={body} open={open} openExisting={openExisting} goBack={goBack} setNotice={setNotice}/>;
  else if (context.route === 'contract') page = <ContractBody context={context} body={body} open={open} setNotice={setNotice} goBack={goBack}/>;
@@ -152,7 +152,7 @@ function UnsupportedFilters({unsupported, invalid, unlocated, onReset}: {unsuppo
 
 type Open = (next: P2Context, replace?: boolean) => void;
 
-function OverviewBody({context, body, open, openEntryPoint, openSources, setNotice, goBack}: {context: P2Context; body: unknown; open: Open; openEntryPoint: (r: string) => void; openSources: () => void; setNotice: (m: string) => void; goBack?: () => void}) {
+function OverviewBody({users, context, body, open, openEntryPoint, openSources, setNotice, goBack}: {context: P2Context; body: unknown; open: Open; openEntryPoint: (r: string) => void; openSources: () => void; setNotice: (m: string) => void; goBack?: () => void; users: User[]}) {
  const view = useMemo(() => buildManagerOverviewView({body, filters: overviewFilters(context), sort: context.sort, period: context.period, selectedId: context.selected}), [body, context]);
  const caseOpen = view.snapshot.cases.some(row => row.id === view.selectedId);
  const [pm, setPm] = useState(context.filters.pm ?? '');
@@ -167,8 +167,8 @@ function OverviewBody({context, body, open, openEntryPoint, openSources, setNoti
  };
  const filters = <form className="p2-toolbar" onSubmit={apply} aria-label="案件篩選">
    <div className="p2-toolbar-left">
-    <div className="p2-filter-field"><label className="p2-filter-label" htmlFor="p2-ov-pm">案件負責人</label><input id="p2-ov-pm" className="p2-filter-input" value={pm} maxLength={120} onChange={e => setPm(e.target.value)}/></div>
-    <div className="p2-filter-field"><label className="p2-filter-label" htmlFor="p2-ov-status">執行狀態</label><input id="p2-ov-status" className="p2-filter-input" value={status} maxLength={120} onChange={e => setStatus(e.target.value)}/></div>
+    <div className="p2-filter-field"><span className="p2-filter-label">案件負責人</span><Picker label="案件負責人" value={pm} onChange={setPm} options={[['','所有負責人'],...users.map(u=>[u.id,u.name] as [string,string]),...(pm&&!users.some(u=>u.id===pm)?[[pm,'目前負責人（名冊待核對）'] as [string,string]]:[])]}/></div>
+    <div className="p2-filter-field"><span className="p2-filter-label">執行狀態</span><Picker label="執行狀態" value={status} onChange={setStatus} options={[['','所有狀態'],['pending','待開始'],['in_progress','進行中'],['engineering_complete','工程完成、財務待結'],['paused','已暫停'],['completed','已完成'],...(!['','pending','in_progress','engineering_complete','paused','completed'].includes(status)?[[status,'目前狀態（待核對）'] as [string,string]]:[])]}/></div>
    </div>
    <div className="p2-toolbar-right">
     <button type="submit" className="p2-btn-reset-filters">套用</button>

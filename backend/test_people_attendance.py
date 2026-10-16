@@ -66,6 +66,30 @@ def test_weekly_evidence_is_projected_and_unknown_is_null():
     assert all(v is None for v in partial['summary'].values())
 
 
+def test_named_leave_preview_projects_only_authorized_dates_and_no_private_reason():
+    class LeaveAdapter(Adapter):
+        def request(self, method, path, **kwargs):
+            data = super().request(method, path, **kwargs)
+            if path == '/attendance/v1/user_approvals/query':
+                leave = dict(approval_id='leave-one', start_time='2026-10-12 09:00:00',
+                             end_time='2026-10-14 00:00:00', reason='PRIVATE_MEDICAL_REASON',
+                             leave_type='PRIVATE_LEAVE_TYPE')
+                data['user_approvals'][0]['leaves'] = [leave, dict(leave)]
+            return data
+
+    days = week_window('2026-10-12')
+    view = fetch_week(LeaveAdapter(), [person()], 'app', 'company', days, True)
+    assert view['leaves_available'] is True
+    assert view['leaves'] == [dict(person_id='ou_one', name='合成人員', group='控制組',
+                                   start='2026-10-12', end='2026-10-13')]
+    assert view['summary']['on_leave'] == 1
+    assert 'PRIVATE_' not in str(view)
+    invalid = fetch_week(LeaveAdapter(invalid=True), [person()], 'app', 'company', days, True)
+    assert invalid['leaves'] == [] and invalid['leaves_available'] is False
+    partial = fetch_week(LeaveAdapter(), [person()], 'app', 'company', days, False)
+    assert partial['leaves'] and partial['leaves_available'] is False
+
+
 def test_shared_cache_last_good_permission_and_week_isolation(harness):
     _,live,_,_,_=harness
     clock=[datetime(2026,10,14,tzinfo=timezone.utc)]

@@ -6,7 +6,7 @@
 .app-shell .workspace :is(.tabbar,.ops-tabs)>button.active{font-weight:600}
 .app-shell .workspace :is(.tabbar,.ops-tabs)>button::after{display:none}
 .app-shell .workspace :is(.tabbar,.ops-tabs)>button>span{background:var(--surface-2);color:var(--label-2);border-radius:var(--radius-s);padding:1px var(--sp-1);font-size:var(--fs-caption)}
-.app-shell .workspace :is(.tabbar,.ops-tabs)[data-scroll-before=true]{border-left:4px solid var(--accent)}
-.app-shell .workspace :is(.tabbar,.ops-tabs)[data-scroll-after=true]{border-right:4px solid var(--accent)}
+.app-shell .workspace :is(.tabbar,.ops-tabs)[data-scroll-before=true]{border-left-color:transparent}
+.app-shell .workspace :is(.tabbar,.ops-tabs)[data-scroll-after=true]{border-right-color:transparent}
 @media(max-width:760px){.app-shell .workspace :is(.tabbar,.ops-tabs){width:100%}}
 }

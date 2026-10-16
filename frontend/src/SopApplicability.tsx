@@ -27,7 +27,7 @@ export function SopApplicability({c,p}:{c:Context;p:Project}){
   },{project_id:p.id})}>
    <Field title="是否下包" name="applies"><select name="applies" required defaultValue=""><option value="" disabled>請選擇</option><option value="false">無下包需求</option><option value="true">有下包需求</option></select></Field>
    <fieldset><legend>下包作業組別（有下包時選填）</legend>{Object.entries(groups).map(([key,name])=><label key={key}><input type="checkbox" name="groups" value={key}/>{name}</label>)}</fieldset>
-   <Field title="工作範圍及判斷理由" name="reason"><textarea name="reason" required maxLength={2000}/></Field>
+   <Field title="工作範圍及判斷理由" name="reason"><textarea placeholder="說明適用性調整的原因" name="reason" required maxLength={2000}/></Field>
   </ActionForm>}
   {canConfirm&&<ActionForm key={`${p.id}:${proposal.id}`} title="確認本次下包範圍" draftId={`sop-confirm:${p.id}:${proposal.id}`} busy={c.busy} onSubmit={d=>c.run('sop_applicability_confirm',{...d,proposal_id:proposal.id},{project_id:p.id})}>
    <Field title="確認結果" name="result"><select name="result"><option value="approved">確認範圍</option><option value="returned">退回 PM 補充</option></select></Field>
@@ -43,7 +43,7 @@ export function SopFollowups({c,p}:{c:Context;p:Project}){
   {tasks.map(task=><article key={task.id} className="ds-group glass--flat"><Row label={task.title} detail={<>{who(c,task.owner_id)} · {task.due_date} · <Status value={task.status}/></>}/>
    {task.output&&<p className="sop-note">{task.output}</p>}
    {executionAllowed(p,c.w)&&task.status==='pending'&&task.owner_id===c.s.user?.id&&<ActionForm key={`${p.id}:${task.id}`} title={`交付追蹤成果：${task.title}`} draftId={`sop-followup:${p.id}:${task.id}`} busy={c.busy} onSubmit={d=>c.run('sop_followup_complete',{...d,id:task.id},{project_id:p.id})}>
-    <Field title="追蹤成果" name="output"><textarea name="output" required maxLength={10000}/></Field>
+    <Field title="追蹤成果" name="output"><textarea placeholder="填寫完成結果與交付說明" name="output" required maxLength={10000}/></Field>
    </ActionForm>}
   </article>)}
  </section>;

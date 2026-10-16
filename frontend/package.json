@@ -49,7 +49,9 @@
     "test:pm-glance": "node test-pm-glance.mjs",
     "test:node-assignments": "node test-node-assignment-api.mjs && node test-node-assignments.mjs",
     "test:task-table": "node test-task-table.mjs",
-    "test:case-amount-label": "node test-case-amount-label.mjs"
+    "test:case-amount-label": "node test-case-amount-label.mjs",
+    "test:reports": "node test-reports-view.mjs && node test-reports-requests.mjs && node test-reports-mock.mjs",
+    "test:unified-home": "node test-unified-home.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",

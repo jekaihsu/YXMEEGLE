@@ -8,6 +8,8 @@ import {workspace,a} from './session-epoch-fixture.mjs';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/'});
 for(const key of ['window','document','location','localStorage','sessionStorage','HTMLElement','Event','MouseEvent'])globalThis[key]=dom.window[key];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+globalThis.requestAnimationFrame=callback=>setTimeout(callback,0);
+dom.window.HTMLElement.prototype.scrollIntoView=function(){};
 const bundle=await build({stdin:{contents:"export {Dashboard,ShellDashboard} from './src/DailyHome';export {Projects} from './src/ProjectsList';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,format:'esm',platform:'node',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const path=new URL('./.overview-test-bundle.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);
 let Dashboard,ShellDashboard,Projects;try{({Dashboard,ShellDashboard,Projects}=await import(path.href))}finally{await fs.unlink(path)}
@@ -50,8 +52,16 @@ await flush(()=>[...document.querySelectorAll('.pager button')].find(b=>b.textCo
 // App add-time ordering is shared by shell requests and legacy rows.
 w.projects=[['old','2026-10-01'],['new','2026-10-13'],['tied','2026-10-13'],['empty','']].map(([id,created_at])=>({...structuredClone(p),id,code:id,created_at}));
 await flush(()=>root.render(React.createElement(Projects,{key:'created',c:{...c,route:{view:'projects'}}})));
-assert.equal(document.querySelector('[aria-label="案件排序"]').value,'due');
-const selectSort=async value=>flush(()=>{const select=document.querySelector('[aria-label="案件排序"]');select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}))});
+const sortPicker=()=>document.querySelector('button[aria-label^="案件排序："]');
+assert.equal(sortPicker().getAttribute('aria-label'),'案件排序：依工作台期限');
+const sortLabels={created:'最近加入',due:'依工作台期限',name:'依案件名稱'};
+const selectSort=async value=>{
+ await flush(()=>sortPicker().click());
+ const option=[...document.querySelectorAll('[role="listbox"][aria-label="案件排序"] [role="option"]')].find(item=>item.textContent===sortLabels[value]);
+ assert.ok(option,`sort picker offers ${value}`);
+ await flush(()=>option.click());
+ assert.equal(sortPicker().getAttribute('aria-expanded'),'false');
+};
 await selectSort('created');
 const codes=()=>[...document.querySelectorAll('tbody .case-code')].map(e=>e.childNodes[0].textContent);
 assert.deepEqual(codes(),['new','tied','old','empty']);
@@ -64,7 +74,7 @@ await selectSort('created');
 assert.deepEqual(codes(),['later','equal','utc','early','empty','invalid']);
 await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
 assert.deepEqual(codes(),['early','equal','utc','later','empty','invalid']);
-assert.equal(document.querySelector('[aria-label="案件排序"] option[value="created"]').textContent,'最近加入');
+assert.equal(sortPicker().getAttribute('aria-label'),'案件排序：最近加入');
 // Switching a sort discards the previous direction and uses its natural default.
 w.projects=[['z','2026-10-01','2026-10-01',0],['a','2026-10-13','2026-10-13',1],['b','2026-10-12','2026-10-12',1]].map(([id,created_at,due_date,completed])=>({...structuredClone(p),id,code:id,name:id,created_at,due_date,nodes:[{...p.nodes[0],tasks:[{...base,status:completed?'completed':'in_progress'}]}]}));
 await flush(()=>root.render(React.createElement(Projects,{key:'switch-defaults',c:{...c,route:{view:'projects'}}})));
