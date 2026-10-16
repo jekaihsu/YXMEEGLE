@@ -199,3 +199,50 @@ def test_attachment_fingerprint_ignores_rotating_urls_but_preserves_file_identit
     assert fingerprint(changed) == fingerprint(original)
     attachment['file_token'] = 'file-two'
     assert fingerprint(changed) != fingerprint(original)
+
+
+def test_a_failed_read_logs_its_upstream_diagnostics_before_the_502(caplog):
+    from .live_read.client import ReadFailure
+
+    class FailingClient:
+        def request(self, method, url, **kwargs):
+            raise ReadFailure('Lark read attempts exhausted', upstream_status=503, lark_code=99991400, kind='transient')
+
+    with caplog.at_level('WARNING', logger='backend.sources'), pytest.raises(HTTPException) as failure:
+        fetch_sources('synthetic-token', config('list'), FailingClient())
+    assert failure.value.status_code == 502
+    assert ('Lark source read failed: table=/bitable/v1/apps/synthetic-base/tables/tblSynthetic/fields '
+            'cause=ReadFailure kind=transient upstream_status=503 lark_code=99991400') in caplog.text
+
+
+def test_exhausted_retries_log_the_last_upstream_status_and_code(caplog, monkeypatch):
+    from . import sources as sources_module
+    monkeypatch.setattr(sources_module.time, 'sleep', lambda seconds: None)
+    attempts = []
+
+    def respond(request):
+        attempts.append(request.url.path)
+        return httpx.Response(503, json={'code': 1061045, 'msg': 'retry later'})
+
+    with httpx.Client(transport=httpx.MockTransport(respond)) as client, caplog.at_level('WARNING', logger='backend.sources'), \
+            pytest.raises(HTTPException) as failure:
+        fetch_sources('synthetic-token', {**config('list'), 'LARK_APP_ID': 'cli_synthetic'}, client)
+    assert failure.value.status_code == 502
+    assert attempts == ['/open-apis/bitable/v1/apps/synthetic-base/tables/tblSynthetic/fields'] * 3
+    assert ('Lark source read failed: table=/bitable/v1/apps/synthetic-base/tables/tblSynthetic/fields '
+            'cause=ReadFailure kind=transient upstream_status=503 lark_code=1061045') in caplog.text
+
+
+def test_a_retry_after_beyond_the_budget_logs_the_deadline_kind(caplog):
+    attempts = []
+
+    def respond(request):
+        attempts.append(request.url.path)
+        return httpx.Response(429, json={'code': 99991400}, headers={'Retry-After': '600'})
+
+    with httpx.Client(transport=httpx.MockTransport(respond)) as client, caplog.at_level('WARNING', logger='backend.sources'), \
+            pytest.raises(HTTPException) as failure:
+        fetch_sources('synthetic-token', {**config('list'), 'LARK_APP_ID': 'cli_synthetic'}, client)
+    assert failure.value.status_code == 502
+    assert len(attempts) == 1
+    assert 'cause=ReadFailure kind=deadline upstream_status=429 lark_code=99991400' in caplog.text

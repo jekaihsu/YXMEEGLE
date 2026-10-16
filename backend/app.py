@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import secrets
@@ -146,6 +147,8 @@ def create_app(overrides=None):
             app.state.live_read.close()
 
     app=FastAPI(title='詠翔專案工作台',docs_url=None if production else '/api/docs',lifespan=lifespan); app.state.engine=engine; app.state.sessions=sessions; app.state.signer=signer
+    try: app.state.slow_request_seconds=float(cfg.get('SLOW_REQUEST_SECONDS','5'))
+    except ValueError: app.state.slow_request_seconds=5.0
     app.state.cfg=cfg; app.state.upload_dir=upload_dir
     from starlette.exceptions import HTTPException as StarletteHTTPException
     @app.exception_handler(StarletteHTTPException)
@@ -187,7 +190,8 @@ def create_app(overrides=None):
         return (MANAGER_CAPABILITIES[:] if role=='manager' else [])+(['approve_capability'] if ident in capability_approvers else [])
 
     shell_enabled=str(cfg.get('WORKSPACE_SHELL_ENABLED','false')).lower()=='true'
-    TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('POST','/api/actions')}
+    TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('POST','/api/actions'),
+                  ('GET','/api/confirmations'),('GET','/api/manager-overview'),('GET','/api/source-health'),('GET','/api/my-work')}
     @contextmanager
     def phase(request,name):
         started=perf_counter()
@@ -201,7 +205,6 @@ def create_app(overrides=None):
         try:
             response=await call_next(request)
         except Exception as exc:
-            import logging
             from fastapi.responses import JSONResponse
             logging.getLogger(__name__).warning('oauth_callback_failed error_class=%s',type(exc).__name__)
             response=(RedirectResponse('/?auth_error=provider_unavailable',status_code=303)
@@ -229,6 +232,9 @@ def create_app(overrides=None):
             phases=dict(request.scope.get('phases',{})); total=perf_counter()-started
             phases['serialize']=max(total-sum(phases.values()),0)
             response.headers['Server-Timing']=', '.join([f'{k};dur={v*1000:.1f}' for k,v in phases.items()]+[f'total;dur={total*1000:.1f}'])
+            if total>app.state.slow_request_seconds:
+                logging.getLogger(__name__).warning('slow_request method=%s path=%s status=%s total_ms=%d phases=%s',request.method,request.url.path,
+                                                    response.status_code,int(total*1000),{k:int(v*1000) for k,v in phases.items()})
         return response
 
     SESSION_MAX_AGE=7*24*3600
@@ -267,9 +273,9 @@ def create_app(overrides=None):
                 row=WorkspaceRow(id=wid,version=1,data=data); db.add(row); db.flush()
                 row.data=storage.save(db,BusinessRow,wid,data)
 
-    def load(db,row,*,collections=None,project_ids=None):
+    def load(db,row,*,collections=None,project_ids=None,node_headers=False):
         if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=[c for c in storage.COLLECTIONS if c!='projects'],project_ids=project_ids,project_children=storage.PROJECT_CHILDREN)
-        else: state=storage.load(db,BusinessRow,row) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections)
+        else: state=storage.load(db,BusinessRow,row) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections,node_headers=node_headers)
         state=upgrade(state)
         return seal(db,row,state)
 
@@ -481,7 +487,6 @@ def create_app(overrides=None):
         return persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,None)
 
     def declined(action_name,reason):
-        import logging
         app.state.partial_writes['declined']+=1
         logging.getLogger(__name__).warning('partial_write_declined action=%s reason=%s',action_name,str(getattr(reason,'detail',reason))[:200])
 
@@ -986,6 +991,9 @@ def create_app(overrides=None):
         read_authorized=data['mode']=='lark' and not data['wid'].startswith('test-') and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
         return build_source_health(snapshot,freshness['datasets']['sources'],diagnostic=False,read_authorized=read_authorized,viewer_filtered=None)
 
+    def p2_list_load(db,row):
+        return load(db,row,collections=('users','projects','source_quotes','source_confirmations'),node_headers=True)
+
     def source_health_page(data,user):
         """The GET /api/source-health computation, shared so the manager overview binds the identical page state."""
         app.state.live_read.ensure(data['wid'],'sources')
@@ -993,7 +1001,7 @@ def create_app(overrides=None):
         cache_data=state=None
         if data['mode']=='lark' and not data['wid'].startswith('test-'):
             with sessions() as db:
-                cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']))
+                cache=db.get(CacheRow,data['wid']);state=p2_list_load(db,db.get(WorkspaceRow,data['wid']))
                 cache_data=cache.data if cache else None
         return source_health_from(data,user,freshness,cache_data,state)
 
@@ -1001,7 +1009,7 @@ def create_app(overrides=None):
     def source_health(request:Request):
         """Page state only (G-DIAG open: diagnostic=False). Same branches and visibility as GET /api/sources; no record values."""
         data,user=identity(request)
-        return source_health_page(data,user)
+        with phase(request,'read'): return source_health_page(data,user)
 
     # ---- P2 read routes (VCC-128..132). Read-only; every handler works on one visibility-narrowed state. ----
     P2_NOT_FOUND='找不到這個項目'
@@ -1047,7 +1055,7 @@ def create_app(overrides=None):
         data=(cache.data or {}) if cache else {}
         return (row.version if row else None,data.get('status'),data.get('last_attempt_at'),data.get('last_sync'),data.get('as_of'))
 
-    def p2_read(data,user):
+    def p2_read(data,user,loader=load):
         """Health and module input come from ONE capture fenced by a generation read BEFORE the first input read
         (freshness, cache, workspace) and re-checked after the last. A capture is returned only after its fence
         passed; when the bounded retries are exhausted nothing from any rejected capture is returned: the input is an
@@ -1059,7 +1067,7 @@ def create_app(overrides=None):
             freshness=app.state.live_read.status(wid)
             with sessions() as db:
                 cache=db.get(CacheRow,wid);cache_data=deepcopy(cache.data) if cache else None
-                state=load(db,db.get(WorkspaceRow,wid))
+                state=loader(db,db.get(WorkspaceRow,wid))
             health=source_health_from(data,user,freshness,cache_data,deepcopy(state))
             with sessions() as db: unchanged=p2_generation(db,wid)==generation
             if unchanged: return data,user,health,p2_narrowed_state(state,user,health.get('page_state'),freshness)
@@ -1102,8 +1110,8 @@ def create_app(overrides=None):
     def confirmations(request:Request):
         data,user=identity(request)
         args=p2_list_args(request)
-        _,_,_,state=p2_read(data,user)
-        return p2_list_page(state,args,state['as_of'],p2_cursor_context(data,user))
+        with phase(request,'read'): _,_,_,state=p2_read(data,user,p2_list_load)
+        with phase(request,'build'): return p2_list_page(state,args,state['as_of'],p2_cursor_context(data,user))
 
     @app.get('/api/manager-overview')
     def manager_overview(request:Request):
@@ -1113,7 +1121,7 @@ def create_app(overrides=None):
         args=p2_list_args(request,frozenset(P2_FILTER_PARAMS)|P2_CASE_PARAMS)
         # Case-level filters (project fields) go only to build_manager_overview; the list/population vocabulary stays separate.
         case_filters={k:p2_one(request,k,120) for k in sorted(P2_CASE_PARAMS) if k in request.query_params}
-        _,_,health,state=p2_read(data,user)
+        with phase(request,'read'): _,_,health,state=p2_read(data,user,p2_list_load)
         # The same read that feeds the population supplies its C-STATE; this also validates the filters (422).
         page=p2_list_page(state,{'q':'','filters':args['filters'],'cursor':None,'sort':None,'limit':1},state['as_of'],p2_cursor_context(data,user))
         envelope=page['page_state']

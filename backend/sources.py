@@ -1,6 +1,7 @@
 """Lark read-only adapter. No request in this module writes a Base record."""
 import hashlib
 import json
+import logging
 import os
 import time
 import unicodedata
@@ -14,6 +15,7 @@ import httpx
 from fastapi import HTTPException
 from .seed import STAGES, TITLES
 
+logger=logging.getLogger(__name__)
 API='https://open.larksuite.com/open-apis'
 PROVISIONAL_CASE_FIELD='可能的確認單工編(若暫無確認單才需填寫)'
 FIELDS={
@@ -106,8 +108,10 @@ def _fetch_sources(token,cfg=None,client=None, *, scope=None):
                             return response
                         delay = RetryPolicy.after(response, attempt, jitter=True)
                         if response.status_code == 429 or code in RETRY_CODES: shared.penalize(time.monotonic() + delay)
-                        if attempt == RetryPolicy.max_attempts or time.monotonic() + delay >= deadline:
-                            raise BudgetExceeded('Lark read budget exhausted')
+                        if attempt == RetryPolicy.max_attempts:
+                            raise ReadFailure('Lark read attempts exhausted', upstream_status=response.status_code, lark_code=code, kind='transient')
+                        if time.monotonic() + delay >= deadline:
+                            raise ReadFailure('Lark read deadline reached before the next retry', upstream_status=response.status_code, lark_code=code, kind='deadline')
                         time.sleep(delay)
                 # Legacy get-only test clients remain supported.
                 response = client.get(url, **kwargs) if method == 'GET' and not hasattr(client, 'request') else client.request(method, url, **kwargs)
@@ -116,7 +120,10 @@ def _fetch_sources(token,cfg=None,client=None, *, scope=None):
                 return response
             except ReadBlocked:
                 raise HTTPException(403,'目前 Lark 身分沒有這張 Base 的資源存取權限（1254302）；請確認表格分享權限') from None
-            except (ReadFailure, BudgetExceeded, httpx.HTTPError, ValueError):
+            except (ReadFailure, BudgetExceeded, httpx.HTTPError, ValueError) as exc:
+                upstream=getattr(exc,'upstream_status',None) or getattr(getattr(exc,'response',None),'status_code',None)
+                logger.warning('Lark source read failed: table=%s cause=%s kind=%s upstream_status=%s lark_code=%s',url[len(API):],
+                               type(exc).__name__,getattr(exc,'kind',None),upstream,getattr(exc,'lark_code',None))
                 raise HTTPException(502,'Lark 讀取失敗；保留上次成功資料') from None
         def read_table(table):
             collected=[]; summary=[]; partial=False

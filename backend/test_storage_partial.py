@@ -168,6 +168,26 @@ def test_partial_project_headers_and_multiple_ids(complete_projects, legacy):
                                     project_ids=ids)['projects'] == []
 
 
+@pytest.mark.parametrize('legacy', [False, True])
+def test_partial_node_headers_keep_every_node_without_its_tasks(complete_projects, legacy):
+    db, row, full = complete_projects
+    if legacy:
+        row.data = deepcopy(full)
+        row.data.pop('storage_schema')
+        db.flush()
+    headers = storage.load_partial(db, BusinessRow, row, collections=('projects',), node_headers=True)
+    expected = deepcopy(full['projects'])
+    for project in expected:
+        for node in project['nodes']:
+            node['tasks'] = []
+            node['review_cycles'] = []
+        for child in storage.PROJECT_CHILDREN:
+            project[child] = []
+    assert headers['projects'] == expected
+    assert [len(p['nodes']) for p in headers['projects']] == [9, 9]
+    assert headers['_partial']['node_headers'] is True
+
+
 def test_partial_project_does_not_read_other_workspace(complete_projects):
     db, row, full = complete_projects
     other = WorkspaceRow(id='fictional-other-workspace', version=1, data={})

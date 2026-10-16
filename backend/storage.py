@@ -309,12 +309,13 @@ def save_partial(db,model,wid,state,collections,project_ids,project_order,*,view
     root['storage_schema']=2
     return root
 
-def load_partial(db,model,row,*,collections=(),project_ids=None,project_children=()):
+def load_partial(db,model,row,*,collections=(),project_ids=None,project_children=(),node_headers=False):
     """Read selected collections and project trees; never pass this to save.
 
     Project IDs also select their headers, nodes, tasks and review cycles.
-    Without IDs, project headers have empty nested lists. Other project lists
-    are loaded only when explicitly named in project_children.
+    Without IDs, project headers have empty nested lists, or with node_headers
+    their nodes without tasks or review cycles. Other project lists are loaded
+    only when explicitly named in project_children.
     """
     collections=tuple(collections)
     project_children=tuple(project_children)
@@ -330,7 +331,9 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
         if project_ids is not None:
             result['projects']=[p for p in result['projects'] if p['id'] in project_ids]
         for p in result['projects']:
-            if project_ids is None: p['nodes']=[]
+            if project_ids is None and node_headers:
+                for n in p['nodes']: n['tasks']=[]; n['review_cycles']=[]
+            elif project_ids is None: p['nodes']=[]
             for child in PROJECT_CHILDREN:
                 if project_ids is None or child not in project_children: p[child]=[]
     else:
@@ -355,6 +358,8 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
             if project_ids is not None: filters['entity_id']=project_ids
             result['projects']=[data for kind,parent,data in fetch(('projects',),**filters)]
         records={}
+        if node_headers and project_ids is None and 'projects' in kinds:
+            for kind,parent,data in fetch(('nodes',)): records.setdefault((kind,parent),[]).append(data)
         selected_ids=[p['id'] for p in result['projects']] if project_ids is not None else []
         if selected_ids:
             nested=('nodes',)+tuple('project_'+child for child in project_children)
@@ -370,7 +375,7 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
                 n['tasks']=records.get(('tasks',n['id']),[])
                 n['review_cycles']=records.get(('review_cycles',n['id']),[])
             for child in PROJECT_CHILDREN: p[child]=records.get(('project_'+child,p['id']),[])
-    result['_partial']={'collections':list(collections),'project_ids':None if project_ids is None else list(project_ids),'project_children':list(project_children)}
+    result['_partial']={'collections':list(collections),'project_ids':None if project_ids is None else list(project_ids),'project_children':list(project_children),'node_headers':node_headers}
     return result
 
 def load(db,model,row):

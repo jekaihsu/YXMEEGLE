@@ -66,10 +66,10 @@ def build_state(visible=('recC1', 'recC2', 'recK1', 'recW1')):
 
 
 @pytest.fixture
-def http(tmp_path, monkeypatch):
+def http(tmp_path, monkeypatch, request):
     app = create_app({'DATABASE_URL': f'sqlite:///{tmp_path}/p2int.db', 'UPLOAD_DIR': str(tmp_path / 'f'), 'DEMO_MODE': 'false',
                       'APP_ENV': 'development', 'SESSION_SECRET': 'p2-int-only' * 4,
-                      'LARK_WORKER_ORGANIZATION': 'boundary', 'LARK_ALLOWED_TENANTS': 'boundary'})
+                      'LARK_WORKER_ORGANIZATION': 'boundary', 'LARK_ALLOWED_TENANTS': 'boundary', **getattr(request, 'param', {})})
     real = app.state.live_read.status
     def status(wid):
         out = real(wid); out['datasets']['sources'].update(status='fresh', age_seconds=1, ttl_seconds=900, last_error=None)
@@ -378,8 +378,9 @@ def test_already_failed_read_is_never_overwritten_with_fresh(world):
 def test_health_and_module_input_share_one_workspace_load(world, monkeypatch):
     app, client, _, _, _, _ = world
     loads = []
-    real = storage.load
-    monkeypatch.setattr(storage, 'load', lambda *a, **kw: (loads.append(1), real(*a, **kw))[1])
+    full, partial = storage.load, storage.load_partial
+    monkeypatch.setattr(storage, 'load', lambda *a, **kw: (loads.append('full'), full(*a, **kw))[1])
+    monkeypatch.setattr(storage, 'load_partial', lambda *a, **kw: (loads.append('partial'), partial(*a, **kw))[1])
     assert client.get('/api/confirmations').status_code == 200
     assert len(loads) == 1                                   # health and narrowed state come from the same capture
 
