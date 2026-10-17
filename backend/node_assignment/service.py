@@ -299,16 +299,19 @@ class NodeAssignmentService:
     # Writes
 
     def mutate(self, ctx: Context, key: NodeKey, action: str, request_id, payload, plan_fn, *, finish=None,
-               landed=None, receipt_id=None):
+               landed=None, receipt_id=None, charge_per_write=False):
         """plan_fn(situation, resumed_plan) -> Plan, or None when there is nothing to write (body is then None).
 
         `finish` replaces the default node-detail response. `landed`, when given, collects every plan pinned before
         a failure so the caller can tell what already reached Lark. `receipt_id` replaces the request-derived receipt
         key, and with it the client tokens, for operations whose identity is the work rather than the request.
+        A call costs one rate charge, or one per outbound write with `charge_per_write`.
         Returns (http_status, body, replayed).
         """
         finish = finish or self._finish
         code = self.open(ctx, write=True)
+        if not charge_per_write:
+            self.rate.take(ctx.wid, ctx.user['id'])
         receipt = receipt_id or self.receipts.key(ctx.wid, ctx.user['id'], request_id)
         fingerprint = digest({'action': action, 'project_id': ctx.project['id'], 'node': key.value, **payload})
         akey = assignment_key(code, key)
@@ -351,7 +354,8 @@ class NodeAssignmentService:
                     if planned is not None and (checked is None or checked.changes != planned.changes):
                         raise Failure('forbidden', '操作權限已變更，請重新整理後再操作',
                                       writes_started=bool(write_attempts))
-                self.rate.take(ctx.wid, ctx.user['id'])
+                if charge_per_write:
+                    self.rate.take(ctx.wid, ctx.user['id'])
                 write_attempts += 1
 
             with self.client(before_write=authorize_write) as client:

@@ -280,7 +280,8 @@ class StartSopRunner:
         try:
             _, body, _ = svc.mutate(ctx, key, ACTION, f'start-sop:{request_id}:{key.value}',
                                     {'sop_rule_version': SOP_RULE_VERSION, 'sequence': number, 'kind': kind},
-                                    plan_fn, finish=finish, landed=landed, receipt_id=receipt_id)
+                                    plan_fn, finish=finish, landed=landed, receipt_id=receipt_id,
+                                    charge_per_write=True)
         except Failure as exc:
             return failed(key, exc, node_outcome(landed))
         if body is None:

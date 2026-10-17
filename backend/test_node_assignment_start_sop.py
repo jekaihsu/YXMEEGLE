@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 from .node_assignment.lark_table import date_millis
-from .test_node_assignment_routes import NODES, PEOPLE, TASKS, URL, h, project  # noqa: F401  (h is the shared fixture)
+from .test_node_assignment_routes import NODES, PEOPLE, TASKS, URL, act, h, project  # noqa: F401  (h is the shared fixture)
 
 SOP = URL + '/start-sop'
 
@@ -722,3 +722,18 @@ def test_every_run_leaves_an_audit_row_per_node(s):
     start(s, 'r1')
     rows = [(a[0], a[2]['result'], a[2]['node']) for a in s.audits()]
     assert rows == [('node_assignment.start_sop', 'success', k) for k in ('field', 'control', 'mapping', 'report')]
+
+
+def test_ordinary_task_creation_still_costs_one_charge_per_call(s):
+    codes = [act(s, 'ou_fm', '/nodes/field/tasks', {'request_id': f'c{n}', 'title': f'任務 {n}', 'department': '外業'}).status_code
+             for n in range(31)]
+    assert codes == [200] * 30 + [429]
+    assert len(s.fake.rows(TASKS)) == 30
+
+
+def test_replaying_a_finished_press_costs_nothing(s):
+    first = start(s, 'same')
+    for _ in range(40):
+        replay = s.client.post(SOP, json={'request_id': 'same', 'preview_hash': preview(s)['preview_hash']})
+        assert (replay.status_code, replay.json()) == (200, first.json())
+    assert len(s.fake.writes()) == 12

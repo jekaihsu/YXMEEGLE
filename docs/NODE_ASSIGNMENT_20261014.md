@@ -114,7 +114,7 @@ Errors are `{detail, code, ...}` with `detail` in Traditional Chinese.
 | `writes_disabled` | 403 | `external_enabled` is off, or a table outside the write allowlist |
 | `invalid` | 422 | Body failed validation |
 | `payload_too_large` | 413 | Body over 16 KB |
-| `rate_limited` | 429 | More than 30 Lark writes per person or 300 per company in a minute. Every outbound create or update counts once; replays, no-op presses and denied attempts cost nothing |
+| `rate_limited` | 429 | More than 30 calls per person or 300 per company in a minute. Every node-assignment write call counts once, whatever it sends to Lark; 啟動 SOP counts every outbound create or update once instead (a full press can cost up to 12). Replays, no-op presses and denied attempts cost nothing |
 | `illegal_transition` | 409 | Not allowed from the current status |
 | `revision_conflict` | 409 | Someone changed the row since `expected_revision`; `current_revision` included |
 | `duplicate_assignment_key` | 409 | More than one row for one 指派鍵; `record_ids` included, nothing is picked |
