@@ -13,6 +13,7 @@ from .lark_table import CaseSnapshot, NodeRow, TaskRow, date_millis
 from .roster import Roster
 
 OPEN_ID = re.compile(r'ou_[A-Za-z0-9]{1,64}')
+PREVIEW_HASH = re.compile(r'[0-9a-f]{64}')
 REVISION = re.compile(r'[0-9a-f]{16}')
 UNSET = object()
 LIMITS = {'request_id': 120, 'title': 200, 'detail': 2000, 'reason': 500}
@@ -109,6 +110,19 @@ def parse_create_task(body) -> CreateTask:
     return CreateTask(_text(body, 'title'), _text(body, 'detail', required=False, blank=True) or '',
                       None if assignee is None else _open_id(assignee, 'assignee_open_id'),
                       _deadline(body.get('deadline')), department)
+
+
+@dataclass(frozen=True)
+class StartSopCommand:
+    preview_hash: str
+
+
+def parse_start_sop(body) -> StartSopCommand:
+    _keys(body, ('preview_hash',))
+    value = body.get('preview_hash')
+    if not isinstance(value, str) or not PREVIEW_HASH.fullmatch(value):
+        raise Failure('invalid', 'preview_hash 格式錯誤，請重新取得預覽')
+    return StartSopCommand(value)
 
 
 @dataclass(frozen=True)

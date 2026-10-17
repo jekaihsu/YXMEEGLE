@@ -14,6 +14,8 @@ STATUS = {
     'idempotency_conflict': 409,
     'readback_mismatch': 409,
     'busy': 409,
+    'preview_stale': 409,
+    'nothing_to_start': 409,
     'outcome_unknown': 502,
     'lark_permission': 502,
     'lark_error': 502,
