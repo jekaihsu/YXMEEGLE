@@ -8,8 +8,6 @@ from .node_assignment.lark_table import date_millis
 from .test_node_assignment_routes import NODES, TASKS, URL, h, project  # noqa: F401  (h is the shared fixture)
 
 SOP = URL + '/start-sop'
-FIELD_DETAIL = ('依計畫數量完成外業。\n計畫數量：123.45\n合約明細：2 筆；工項：5 項\n'
-                '工項連結：原生 5、推導 0、待確認 0、未連結 0\n[SOP-START:v1:field]')
 
 
 def counts(qty='0', lines=0, items=0, **extra):
@@ -81,7 +79,9 @@ def test_preview_describes_the_plan_without_writing(s):
         'key': 'field', 'label': '外業', 'category': '外業', 'planned_qty': '123.45', 'lines': 2, 'items': 5,
         'items_basis': {'native': 5, 'derived': 0, 'ambiguous': 0, 'unlinked': 0}, 'deadline': '2026-10-30',
         'node_exists': False, 'seed_task_exists': False, 'will_create_node': True, 'will_create_task': True,
-        'task_title': '外業：依計畫數量完成', 'task_detail': FIELD_DETAIL}
+        'task_title': '外業：依計畫數量完成',
+        'task_detail': '依計畫數量完成外業。\n計畫數量：123.45\n合約明細：2 筆；工項：5 項\n'
+                       '工項連結：原生 5、推導 0、待確認 0、未連結 0\n[SOP-START:v1:field]'}
     assert [n['deadline'] for n in body['nodes']] == ['2026-10-30', '2026-11-05', '2026-11-10', '2026-11-20']
     assert (body['project_id'], body['code'], body['eligible'], body['already_started'], body['blockers'],
             body['plan_rule_version']) == ('p1', 'A115001-01', True, False, [], 'contract-links-20261017.1')
@@ -103,10 +103,20 @@ def test_start_creates_four_nodes_and_one_marked_task_each(s):
     assert sorted(tasks) == ['圖資：依計畫數量完成', '報告：依計畫數量完成', '外業：依計畫數量完成', '控制：依計畫數量完成']
     field = tasks['外業：依計畫數量完成']
     assert (field['內容'], field['部門'], field['狀態'], field['截止日'], field['指派人']) == (
-        FIELD_DETAIL, '外業', '待處理', date_millis('2026-10-30'), [{'id': 'ou_pm'}])
+        '依計畫數量完成外業。\n計畫數量：123.45\n合約明細：2 筆；工項：5 項\n'
+        '工項連結：原生 5、推導 0、待確認 0、未連結 0\n[SOP-START:v1:field]',
+        '外業', '待處理', date_millis('2026-10-30'), [{'id': 'ou_pm'}])
+    assert tasks['控制：依計畫數量完成']['內容'] == (
+        '依計畫數量完成控制。\n計畫數量：10\n合約明細：1 筆；工項：1 項\n'
+        '工項連結：原生 1、推導 0、待確認 0、未連結 0\n[SOP-START:v1:control]')
+    assert tasks['圖資：依計畫數量完成']['內容'] == (
+        '依計畫數量完成圖資。\n計畫數量：8.5\n合約明細：1 筆；工項：2 項\n'
+        '工項連結：原生 2、推導 0、待確認 0、未連結 0\n[SOP-START:v1:mapping]')
     assert '負責人' not in field
     assert tasks['圖資：依計畫數量完成']['部門'] == '圖報A'
-    assert tasks['報告：依計畫數量完成']['內容'].endswith('[SOP-START:v1:report]')
+    assert tasks['報告：依計畫數量完成']['內容'] == (
+        '依計畫數量完成報告。\n計畫數量：3\n合約明細：1 筆；工項：0 項\n'
+        '工項連結：原生 0、推導 0、待確認 0、未連結 0\n[SOP-START:v1:report]')
     assert tasks['控制：依計畫數量完成']['截止日'] == date_millis('2026-11-05')
     node = next(f for f in s.fake.rows(NODES).values() if f['節點'] == '外業')
     assert (node['指派鍵'], node['狀態'], node['工程確認單']) == ('A115001-01|外業', '未開始', ['recCONF1'])
