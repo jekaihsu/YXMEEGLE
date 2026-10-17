@@ -1,0 +1,93 @@
+import {taipeiTime} from './taipeiTime';
+import {assignmentRequest, type NodeAssignmentList, nodeStatusLabel} from './nodeAssignmentApi';
+export const PRODUCTION = {field: '外業', control: '控制', mapping: '圖資', report: '報告'} as const;
+export type ProductionKey = keyof typeof PRODUCTION;
+export interface PlanNode {key: ProductionKey; label: string; category: string; planned_qty: string; lines: number; items: number; items_basis: Record<'native'|'derived'|'ambiguous'|'unlinked', number>; deadline: string|null; node_exists: boolean; seed_task_exists: boolean; will_create_node: boolean; will_create_task: boolean; task_title: string; task_detail: string}
+interface Issue {code: string; message: string; node?: ProductionKey|null; duplicates?: string[]}
+export interface SopPreview {project_id: string; code: string|null; eligible: boolean; can_start: boolean; already_started: boolean; seeds_pending: number; seeds_optional: boolean; seed_tasks?: boolean; blockers: Issue[]; warnings: Issue[]; nodes: PlanNode[]; chain_note: string; preview_hash: string; plan_rule_version: string}
+export interface SopResult {started: boolean; complete: boolean; results: {key: ProductionKey; node: 'created'|'existing'|'failed'; task: 'created'|'existing'|'failed'|'skipped'; error: string|null; sync?: 'ok'|'failed'; warning?: 'content_differs'|'duplicate_seed'; duplicates?: string[]; first_sent_at?: number}[]; overview: unknown}
+const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+const str = (v: unknown) => typeof v === 'string';
+const nullable = (v: unknown) => v === null || str(v);
+const count = (v: unknown) => Number.isSafeInteger(v) && Number(v) >= 0;
+const key = (v: unknown): v is ProductionKey => str(v) && Object.hasOwn(PRODUCTION, v as string);
+function issue(v: unknown): boolean {return object(v) && str(v.code) && str(v.message) && (v.node === undefined || v.node === null || key(v.node))}
+export function parseSopPreview(v: unknown): SopPreview {
+ const fail = () => {throw new Error('啟動預覽格式不正確。')};
+ if (!object(v) || !str(v.project_id) || !nullable(v.code) || typeof v.eligible !== 'boolean' || typeof v.can_start !== 'boolean' || typeof v.already_started !== 'boolean' || !str(v.chain_note) || !str(v.preview_hash) || !str(v.plan_rule_version) || !Array.isArray(v.blockers) || !v.blockers.every(issue) || !Array.isArray(v.warnings) || !v.warnings.every(issue) || !Array.isArray(v.nodes)) return fail();
+ if ((v.seeds_pending !== undefined && !count(v.seeds_pending)) || (v.seeds_optional !== undefined && typeof v.seeds_optional !== 'boolean') || (v.seed_tasks !== undefined && typeof v.seed_tasks !== 'boolean')) return fail();
+ for (const n of v.nodes) {
+  if (!object(n) || !key(n.key) || !['label','category','task_title','task_detail'].every(k => str(n[k])) || !str(n.planned_qty) || !/^\d+(?:\.\d+)?(?:[eE][+-]?\d{1,4})?$/.test(n.planned_qty as string) || (n.planned_qty as string).length > 100 || !count(n.lines) || !count(n.items) || !nullable(n.deadline) || !object(n.items_basis) || !['native','derived','ambiguous','unlinked'].every(k => count((n.items_basis as Record<string, unknown>)[k])) || !['node_exists','seed_task_exists','will_create_node','will_create_task'].every(k => typeof n[k] === 'boolean')) return fail();
+ }
+ if (new Set(v.nodes.map(n => n.key)).size !== v.nodes.length) return fail();
+ const preview = v as unknown as SopPreview;
+ return {...preview, seeds_pending: preview.seeds_pending ?? 0, seeds_optional: preview.seeds_optional ?? false, warnings: preview.warnings.map(({duplicates, ...warning}) => ({...warning, ...(Array.isArray(duplicates) && duplicates.every(str) ? {duplicates} : {})}))};
+}
+export function parseSopResult(v: unknown): SopResult {
+ if (!object(v) || typeof v.started !== 'boolean' || typeof v.complete !== 'boolean' || !object(v.overview) || !Array.isArray(v.results) || !v.results.every(r => object(r) && key(r.key) && ['created','existing','failed'].includes(String(r.node)) && ['created','existing','failed','skipped'].includes(String(r.task)) && nullable(r.error))) throw new Error('啟動結果格式不正確，請重新讀取。');
+ const result = v as unknown as SopResult;
+ return {...result, results: result.results.map(({key, node, task, error, sync, warning, duplicates, first_sent_at}) => ({key, node, task, error,
+  ...(sync === 'ok' || sync === 'failed' ? {sync} : {}),
+  ...(warning === 'content_differs' || warning === 'duplicate_seed' ? {warning} : {}),
+  ...(Array.isArray(duplicates) && duplicates.every(str) ? {duplicates} : {}),
+  ...(typeof first_sent_at === 'number' && Number.isFinite(first_sent_at) && Math.abs(first_sent_at) <= 8640000000000 ? {first_sent_at} : {}),
+ }))};
+}
+export const sopPath = (id: string) => `/api/projects/${encodeURIComponent(id)}/node-assignments/start-sop`;
+export async function fetchSop(id: string, current: () => boolean) {return parseSopPreview(await assignmentRequest(sopPath(id), {cache: 'no-store'}, current))}
+export const SOP_STEPS = [
+ ['確認單建立','PM／行政','在來源 Lark 建立確認單'],
+ ['啟動 SOP','PM 或主管','可在 Lark 或此處啟動；只建立節點，節點已存在即已啟動'],
+ ['指派負責人','節點主管','在節點上指派或認領'],
+ ['執行與回報','負責人','進度自動來自案件資料；需指派具體工作時再建立任務'],
+ ['送審','主管','全部任務完成後完成節點'],
+ ['核准','節點主管或副總以上','核准；退回會回到進行中'],
+] as const;
+// `already_started` means node rows exist, made by Lark's own button or by this app, so seeds may still be pending.
+export function currentSopStep(data: NodeAssignmentList, preview?: SopPreview): number {
+ const nodes = data.nodes;
+ const status = (n: typeof nodes[number]) => nodeStatusLabel(n.derived_status);
+ if (nodes.length && nodes.every(n => ['已完成','略過'].includes(status(n)))) return 6;
+ if (nodes.some(n => status(n) === '待審核')) return 5;
+ if (nodes.some(n => Object.hasOwn(PRODUCTION, n.key) && ['進行中','已完成','略過'].includes(status(n)))) return 4;
+ if (preview?.already_started && nodes.some(n => !n.owners.length)) return 3;
+ if (preview?.eligible && !preview.already_started) return 2;
+ if (!(preview ? preview.code : data.code) || nodes.slice(0, 3).some(n => !['已完成','略過'].includes(status(n)))) return 1;
+ return 4;
+}
+export const SOP_ERRORS: Record<string, string> = {
+ forbidden: '僅案件 PM、主管或節點主管可以啟動',
+ preview_stale: '計畫已變更，請重新讀取預覽後確認。',
+ rate_limited: '操作過於頻繁，請稍後再按一次，可安全續做。',
+ lark_permission: 'Lark 權限不足，請聯絡管理員。',
+ lark_error: 'Lark 寫入失敗，請稍後再試。',
+ lark_unavailable: 'Lark 暫時無法使用，請稍後再試。',
+ lark_unconfigured: 'Lark 連線尚未設定，請聯絡管理員。',
+ roster_unavailable: '人員資料暫時無法使用，請稍後再試。',
+ writes_disabled: '節點修改已停用，請聯絡管理員。',
+ outcome_unknown: '上次建立結果不確定，請稍後再試',
+ busy: '其他啟動操作進行中，請稍後再試。',
+};
+export function sopWarningMessage(warning: Issue): string {
+ if (warning.code !== 'duplicate_seed') return warning.message;
+ const ids = warning.duplicates || warning.message.match(/（多出：([^）]+)）/)?.[1].split('、');
+ return '偵測到重複的種子任務，未自動刪除，請由主管取消多餘的任務' + (ids ? `（多出 ${ids.length} 筆）` : '');
+}
+export function sopResultMessage(result: SopResult, preview: SopPreview, seed = false): string {
+ const outcomes = {created: '已建立', existing: '已存在', failed: '失敗', skipped: '略過'};
+ const notes = result.results.flatMap(r => {
+  const label = preview.nodes.find(n => n.key === r.key)?.label || r.key;
+  return [r.sync === 'failed' ? `${label}：節點進度同步失敗，再按一次可補同步` : '', r.warning === 'content_differs' ? `${label}：已存在的種子任務內容與目前計畫不同，未覆寫；如需更新請手動編輯任務` : '', r.warning === 'duplicate_seed' ? `${label}：${sopWarningMessage({code: r.warning, message: '', duplicates: r.duplicates})}` : ''].filter(Boolean);
+ }).join('\n');
+ if (result.complete) return (!result.started && result.results.length > 0 && result.results.every(r => r.node === 'existing' && (!seed || r.task === 'existing')) ? '已啟動，無需再建立。' : '已啟動 SOP。') + result.results.map(r => `${preview.nodes.find(n => n.key === r.key)?.label || r.key}：節點${outcomes[r.node]}${seed ? `／任務${outcomes[r.task]}` : ''}`).join('、') + (notes ? `。\n${notes}` : '');
+ const finished = result.results.filter(r => r.node !== 'failed' && ['created','existing','skipped'].includes(r.task) && !r.error && r.sync !== 'failed').length;
+ const errors = result.results.filter(r => r.error).map(r => `${preview.nodes.find(n => n.key === r.key)?.label || r.key}（${SOP_ERRORS[r.error || ''] || r.error}${r.error === 'outcome_unknown' && r.first_sent_at !== undefined ? `；首次送出 ${taipeiTime(new Date(r.first_sent_at * 1000).toISOString())}` : ''}）`).join('、');
+ return `已完成 ${finished} 個節點。未完成：${errors || '部分節點尚未建立'}。稍後再按一次可安全續做。${notes ? `\n${notes}` : ''}`;
+}
+
+export const SEED_ACTION_LABEL = '另外建立計畫任務（選用）';
+export const SEED_EXPLANATION = '進度會自動來自案件資料，只有需要指派具體工作時才建立任務。';
+// Starting only creates the missing node rows, as Lark's own button does; a case Lark already started has nothing left to start.
+export function sopActionLabel(preview: Pick<SopPreview, 'already_started'>) {return preview.already_started ? null : '啟動 SOP'}
+export const canSeedTasks = (preview: SopPreview) => !preview.already_started && preview.seeds_pending > 0;
+export function canConfirmSop(preview: SopPreview, seed = false) {return preview.can_start && !preview.blockers.length && !preview.already_started && (seed ? preview.seeds_pending > 0 : preview.eligible)}

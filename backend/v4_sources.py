@@ -9,7 +9,8 @@ import json
 from collections import defaultdict
 from copy import deepcopy
 from urllib.parse import urlparse, parse_qs
-from .sources import text, number, day, source_id, normalized_case, link_ids, new_task, canonical_department, unique_value, PROVISIONAL_CASE_FIELD
+from .sources import text, number, day, source_id, normalized_case, link_ids, new_task, canonical_department, unique_value, PROVISIONAL_CASE_FIELD, REMAINING_POINTS_FIELD
+from .source_lifecycle import summarize
 from .seed import STAGES
 from .policy import upgrade, template, TECHNICAL, VERSION
 from .workflow import now, uid
@@ -40,6 +41,11 @@ def nodes(pid, sop):
 def new_project(code, first, sop, case_type='formal'):
     pid=uid()
     return dict(id=pid,code=code,name=text(first['fields'].get('工程名稱')) or code,client='',pm_id='',status='pending',priority='medium',due_date=None,original_due_date=None,created_at=now(),started_at=None,description='',contract_amount=None,estimated_points=None,source_kind='lark',source_model='v4',case_type=case_type,revision=1,nodes=nodes(pid,sop),files=[],comments=[],daily_reports=[],source_url=url(first),sop_version=sop['id'])
+
+
+def quote_companies(quotes):
+    """Distinct 行號單位 values; the project client is only known when they agree."""
+    return sorted({name for q in quotes if (name:=text(q['fields'].get('行號單位')).strip())})
 
 
 def quote_snapshot(record):
@@ -173,7 +179,12 @@ def daily_source_version(entry):
     return provenance_hash(provenance)
 
 
-def daily_mapping_version(entry):
+# The v3 projection added only 出工人. Older approvals bind every other daily
+# field, including fields outside the configured projection, so keep that hash.
+DAILY_MAPPING_LEGACY_ADDITIONS = {'sources-v3-daily-client-20261014': frozenset({'出工人'})}
+
+
+def daily_mapping_version(entry, *, excluded_daily_fields=frozenset()):
     """Case pairing binds identities/links, independently of delivered content."""
     provenance=deepcopy(entry.get('source_provenance'))
     identity_fields={'工程確認單編號','所屬案件','SourceID','報價編號','工程編號',
@@ -181,9 +192,12 @@ def daily_mapping_version(entry):
     if not provenance:
         # Legacy rows cannot prove which fields are identity-bearing; retain
         # their full supplied source content instead of guessing a safe subset.
-        return provenance_hash({'id':entry.get('id'),'fields':entry.get('source_fields',{})})
+        return provenance_hash({'id':entry.get('id'),'fields':{k:v for k,v in entry.get('source_fields',{}).items() if k not in excluded_daily_fields}})
     for record in provenance.get('records',[]):
-        if record.get('kind') in ('daily','cost'):continue
+        if record.get('kind')=='daily':
+            record['fields']={k:v for k,v in record.get('fields',{}).items() if k not in excluded_daily_fields}
+            continue
+        if record.get('kind')=='cost':continue
         allowed=identity_fields|set(RELATIONS.get(record.get('kind'),{}))
         record['fields']={k:v for k,v in record.get('fields',{}).items() if k in allowed}
     return provenance_hash(provenance)
@@ -316,10 +330,14 @@ def import_v4(ws, records, complete_tables=None):
         for field in ('工程名稱','合約總額','預估總成本','實際總成本','狀態'):
             vals={text(r['fields'].get(field)) for r in group if text(r['fields'].get(field))}
             if len(vals)>1: conflicts[field]=sorted(vals)
+        companies=quote_companies(linked_quotes[code])
+        if len(companies)>1: conflicts['行號單位']=companies
+        p['client']=companies[0] if len(companies)==1 else ''
         p['source_conflicts']=conflicts
         if '工程名稱' not in conflicts: p['name']=unique_value(text(r['fields'].get('工程名稱')) for r in group) or p['name']
         remote=unique_value(text(r['fields'].get('狀態')) for r in group)
         p['source_status']=remote or '來源狀態待核對'
+        p['source_lifecycle']=lifecycle=summarize(group,linked_quotes[code])
         # Lark's archived/finished label is source information, never a local
         # delivery, payment or closure approval.
         p['status']=p.get('execution_status','pending')
@@ -328,7 +346,8 @@ def import_v4(ws, records, complete_tables=None):
         if sorted(previous_records.get(p['id'],[]),key=lambda r:r['id'])!=sorted(snapshots,key=lambda r:r['id']):
             p['source_changed_at']=now()
         for node in p['nodes']:
-            complete=remote=='已結案' or remote=='已完工' and node['key'] in TECHNICAL|{'sales','confirmation','pm'} or remote=='執行中' and node['key'] in {'sales','confirmation'}
+            declared=lifecycle['canonical']
+            complete=declared=='已結案' or declared=='已完工' and node['key'] in TECHNICAL|{'sales','confirmation','pm'} or declared=='執行中' and node['key'] in {'sales','confirmation'}
             node['source_declared_completed']=complete
             node['source_completed']=False
             node['source_completion_basis']='依 V4 匯入' if complete else None
@@ -357,8 +376,10 @@ def import_v4(ws, records, complete_tables=None):
             p=new_project(snapshot['quote_code'] or ident,q,sop,'intake'); ws['projects'].append(p)
         p.update(case_type='intake',source_model='v4',intake_status=reason,quotes=[snapshot],source_url=url(q),source_record_ids=[ident],source_records=[{'id':ident,'kind':'quote','fields':deepcopy(q['fields']),'url':url(q)}],source_identity={k:q[k] for k in ('base_token','table_id','record_id')},parent_code=None)
         p['source_conflicts']={'confirmation':possible} if possible else {}
+        p['client']=next(iter(quote_companies([q])),'')
         p['name']=text(q['fields'].get('工程名稱')) or p['name']
         p['source_status']='待確認單'; p['status']='pending'
+        p['source_lifecycle']=summarize([],[q])
     for r in records:
         if r.get('kind')!='contract': continue
         f=r['fields']; targets,unresolved=native_records(r,'所屬成案確認單（日報關聯）',record_index,{'confirmation','quote_confirmation'})
@@ -380,7 +401,7 @@ def import_v4(ws, records, complete_tables=None):
         if not key: continue  # 外業 remains its SOP, not a duplicated confirmation work item.
         node=next(n for n in p['nodes'] if n['key']==key); ident=source_id(r)
         source={'title':text(f.get('工項名稱') or f.get('填報工項')) or 'V4 工項','points':number(f.get('對應營業額')),'work_item_id':'|'.join(sorted(refs)) or ident,
-                'source_fields':deepcopy(f),'source_url':url(r)}
+                'source_fields':{k:deepcopy(v) for k,v in f.items() if k!=REMAINING_POINTS_FIELD},'source_url':url(r)}  # the remaining changes with every linked daily row; it would flag started tasks as changed
         elsewhere=[(oldp,oldn,t) for oldp in ws['projects'] for oldn in oldp['nodes'] for t in oldn['tasks'] if t['id']==ident and oldn is not node]
         protected=[(oldp,oldn,t) for oldp,oldn,t in elsewhere if t.get('started_at') or t.get('manual_updated') or t.get('status')!='pending' or t.get('output') or t.get('comments')]
         if protected:
@@ -426,16 +447,21 @@ def import_v4(ws, records, complete_tables=None):
                 else: unresolved_case=True
                 if (r['base_token'],rid) in report_fields: linked.append(report_fields[(r['base_token'],rid)])
         if not candidates and not code and not any(link_ids(f.get(k)) for k in ('所屬案件','內業工項','合約工項')):
-            code=normalized_case(f.get(PROVISIONAL_CASE_FIELD) or f.get('可能確認單工作編號')); candidates=dict(aliases.get(code,{})); basis='provisional_case_code'
+            code=normalized_case(f.get(PROVISIONAL_CASE_FIELD) or f.get('可能確認單工作編號')); candidates=dict(aliases.get(code,{}))
+            if code: basis='provisional_case_code'
         costrecords,_=native_records(r,'所屬成本單',record_index,{'cost'})
         costfields=[c['fields'] for c in costrecords]
         dates={day(f.get(k),formula_serial=k in ('工作日期-薪資','工作日期-營業額明細')) for k in ('工作日期-薪資','工作日期-營業額明細','日期')}|{day(c.get(k)) for c in costfields for k in ('工作日期','出工日期','日期')}; dates.discard('')
         rawgroup=unique_value([text(f.get('組別'))]+[text(c.get('內業組別') or c.get('組別') or c.get('所屬組別')) for c in costfields])
         department=canonical_department(text(f.get('營業額組別-明細') or r.get('department')) or unique_value(text(x.get('工項類別')) for x in linked) or rawgroup)
-        people=[text(f.get('姓名') or f.get('填寫人') or f.get('人員'))]
-        for c in [f]+costfields:
-            for k in ('填報帳號','組長帳號-津貼自動化','組員帳號-津貼自動化'):
-                v=c.get(k); people.extend(text(x) for x in v) if isinstance(v,list) else people.append(text(v))
+        # 出工人 (組長＋組員) and 姓名 name who worked. The account fields are only the fallback: 填報帳號 is
+        # whoever created the cost row, and the 組員 user field omits crew without a Lark account.
+        crew=[n for n in (s.strip() for s in re.split('[,，、]',text(f.get('出工人')))) if n and not n.startswith('⚠')]
+        people=crew or [text(f.get('姓名') or f.get('填寫人') or f.get('人員'))]
+        if not any(people):
+            for c in [f]+costfields:
+                for k in ('填報帳號','組長帳號-津貼自動化','組員帳號-津貼自動化'):
+                    v=c.get(k); people.extend(text(x) for x in v) if isinstance(v,list) else people.append(text(v))
         entry=dict(id=ident,date=unique_value(dates),department=department,source_department=rawgroup,case_code=code,source_case_code=code,person='、'.join(dict.fromkeys(x for x in people if x)),description=text(f.get('工作內容') or f.get('工項說明') or f.get('本明細適用工項') or f.get('備註')) or '、'.join(text(x.get('工項名稱')) for x in linked),points=number(f.get('最終營業額點數') if f.get('最終營業額點數') is not None else f.get('營業額點數')),source_url=url(r),match_basis=basis,mapping_status='conflicting_dates' if len(dates)>1 else 'missing_date' if not dates else 'missing_department' if not department else 'provisional_case_code' if basis=='provisional_case_code' else 'ready',source_fields=deepcopy(f))
         entry['review']=daily_review(r,costfields)
         entry['source_identity']={k:r[k] for k in ('base_token','table_id','record_id')}
@@ -444,6 +470,11 @@ def import_v4(ws, records, complete_tables=None):
         entry['source_version']=daily_source_version(entry)
         entry['mapping_version']=daily_mapping_version(entry)
         for review in ws['daily_reviews']:
+            if (review['daily_id']==ident and review['status']=='approved'
+                    and review_mapping_version(review)!=entry['mapping_version']
+                    and any(review_mapping_version(review)==daily_mapping_version(entry,excluded_daily_fields=fields)
+                            for fields in DAILY_MAPPING_LEGACY_ADDITIONS.values())):
+                review['mapping_version']=entry['mapping_version']
             if (review['daily_id']==ident and review['status'] in ('pending','approved')
                     and not review_mapping_version(review) and review.get('source_version')==entry['source_version']):
                 review['mapping_version']=entry['mapping_version']
@@ -452,6 +483,8 @@ def import_v4(ws, records, complete_tables=None):
         approved=next((m for m in reversed(ws['daily_reviews']) if m['daily_id']==ident and m['status']=='approved' and review_mapping_version(m)==entry['mapping_version']),None)
         if approved:
             candidates={p['id']:p for p in ws['projects'] if p['id']==approved['project_id']}; entry['match_basis']='manual_review'; unresolved_case=False
+            # The provisional label is evaluated after date and group checks, so it only ever stood in for 'ready'.
+            if entry['mapping_status']=='provisional_case_code': entry['mapping_status']='ready'
         # Date/department quality applies to all source rows, including unmatched
         # rows. Counting it only after a match makes a broken source look healthy.
         for k,condition in [('daily_provisional',basis=='provisional_case_code' and bool(code)),('daily_missing_date',not dates),('daily_missing_department',not department),('daily_conflicting_dates',len(dates)>1)]: stats[k]+=int(condition)
@@ -483,6 +516,29 @@ def import_v4(ws, records, complete_tables=None):
     for p in ws['projects']:
         for ident in p.get('source_record_ids',[]): assignments[ident]=p['id']
         for entry in p.get('daily_reports',[]): assignments[entry['id']]=p['id']
+    from .contract_links import build_projection,record_key
+    plan_kinds={'confirmation','contract','reporting'}
+    from .sources import KNOWN_TABLES
+    required={(r['base_token'],r['table_id']) for r in records if r.get('kind') in plan_kinds}
+    required.update((t['base_token'],t['table_id']) for t in complete_tables or [] if t.get('kind') in plan_kinds)
+    bases={base for base,table in required}
+    required.update((base,table) for base in bases for table,kind in KNOWN_TABLES.get(base,{}).items() if kind in plan_kinds)
+    required.update(tuple(ident.split('/')[:2]) for summary in ws.get('derived_plan',{}).values()
+                    for ident in summary.get('_source_ids',[]))
+    ready={(t.get('base_token'),t.get('table_id')) for t in complete_tables or [] if t.get('status')=='ready'}
+    ready_kinds={t.get('kind') for t in complete_tables or [] if t.get('status')=='ready'}
+    if required <= ready and plan_kinds <= ready_kinds:
+        projection=build_projection(records,
+            {record_key(r):p['id'] for r in records if r.get('kind')=='confirmation'
+             and (p:=by_ref.get((r['base_token'],r['record_id'])))},
+            {record_key(r):p['id'] for r in records if r.get('kind')=='contract'
+             and (p:=contract_projects.get((r['base_token'],r['record_id'])))},
+            native_item_projects={record_key(r):p['id'] for r in records if r.get('kind')=='reporting'
+             and (p:=report_projects.get((r['base_token'],r['record_id'])))})
+        ws['derived_plan']=projection.plans
+        ws['derived_plan_status']={**projection.status,'partial':False}
+    else:
+        ws.setdefault('derived_plan_status',{})['partial']=True
     update_attachments(ws,records,complete_tables,assignments)
     from .source_entities import update_entities
     update_entities(ws,records,complete_tables,assignments)

@@ -1,7 +1,12 @@
 """Company admission is independent of simulated workspace permissions."""
+from fastapi import HTTPException
 from copy import deepcopy
 from datetime import datetime,timezone
 import json
+import logging
+import re
+
+logger = logging.getLogger(__name__)
 
 from .workflow import require
 from .business_policy import refresh_business_authority
@@ -15,8 +20,8 @@ def admitted(person, app_id):
         return False
     if person.get('identity_app_id') not in (None, '', app_id):
         return False
-    if person.get('bootstrap_admin'):
-        return person.get('role') == 'manager' and not person.get('manager_revoked')
+    if person.get('bootstrap_admin') and person.get('role')=='manager':
+        return not person.get('manager_revoked')
     source = person.get('directory_source') or {}
     return (person.get('directory_status') == 'employed'
             and not person.get('directory_missing', False)
@@ -25,10 +30,34 @@ def admitted(person, app_id):
 
 
 def require_admission(person, app_id):
-    require(admitted(person, app_id), '尚未核實在職名冊或帳號已停用，請聯絡公司管理員核對', 403)
+    if not admitted(person, app_id):
+        exc = HTTPException(403, '尚未核實在職名冊或帳號已停用，請聯絡公司管理員核對')
+        exc.code = 'access_not_admitted'
+        raise exc
 
 
 DIRECTORY_MAX_AGE_SECONDS=900
+
+
+def directory_max_age(cfg):
+    """Live reads refresh the roster on demand, so a failing refresh must not lock out people
+    the last good roster admitted. Admission itself still needs a verified, employed, unexpired
+    record; only how long an unrefreshed proof is trusted changes, and only for live reads."""
+    if not cfg or cfg.get('LARK_WORKER_IDENTITY')!='application':return DIRECTORY_MAX_AGE_SECONDS
+    from .live_read.config import LiveReadConfig
+    live=LiveReadConfig.from_env(cfg)
+    return live.roster_grace_seconds if live.enabled else DIRECTORY_MAX_AGE_SECONDS
+
+
+def roster_age_seconds(person, now):
+    """Return roster verification age, or None for missing/invalid timestamps."""
+    try:
+        stamp=datetime.fromisoformat(person.get('directory_last_seen_at','').replace('Z','+00:00'))
+        if stamp.tzinfo is None:return None
+        age=(now-stamp).total_seconds()
+        return age if age>=0 else None
+    except (ValueError,TypeError,AttributeError):
+        return None
 
 
 def company_admin_grant(person,cfg,*,tenant=None,now=None):
@@ -72,7 +101,7 @@ def access_mode(person,app_id,*,now=None,cfg=None,tenant=None):
     try:
         stamp=datetime.fromisoformat(person.get('directory_last_seen_at','').replace('Z','+00:00'))
         age=(clock-stamp).total_seconds() if stamp.tzinfo else -999
-        fresh=0<=age<=DIRECTORY_MAX_AGE_SECONDS
+        fresh=0<=age<=directory_max_age(cfg)
     except (ValueError,TypeError,AttributeError):pass
     if verified and fresh:return 'normal'
     if person.get('bootstrap_admin') and person.get('role')=='manager':return 'recovery'
@@ -81,9 +110,14 @@ def access_mode(person,app_id,*,now=None,cfg=None,tenant=None):
 
 def require_access(person,app_id,*,allow_recovery=False,now=None,cfg=None,tenant=None):
     mode=access_mode(person,app_id,now=now,cfg=cfg,tenant=tenant)
-    require(mode=='normal' or allow_recovery and mode=='recovery',
-            '公司名冊已逾15分鐘未核實，請由維運管理員恢復同步' if admitted(person,app_id)
-            else '尚未核實在職名冊或帳號已停用',403)
+    if not (mode=='normal' or allow_recovery and mode=='recovery'):
+        verified = admitted(person, app_id)
+        exc = HTTPException(403, '公司名冊已逾15分鐘未核實，請由維運管理員恢復同步' if verified
+                            else '尚未核實在職名冊或帳號已停用')
+        exc.code = 'access_roster_expired' if verified else 'access_not_admitted'
+        logger.info('access_denied denial_code=%s',exc.code,
+                    extra={'event':'access_denied','denial_code':exc.code})
+        raise exc
     return mode
 
 
@@ -122,10 +156,13 @@ def readonly_sync_actor(state,cfg,connection_name):
     return {'id':'system:company-readonly','name':'公司唯讀同步','role':'system','active':True,'capabilities':[]}
 
 
-def readonly_sync_connection(cfg,actor_id):
+def readonly_sync_connection(cfg,actor_id,dataset='sources'):
+    from .live_read.config import LiveReadConfig
+    from .live_read.status import ttl_seconds
+    interval=ttl_seconds(LiveReadConfig.from_env(cfg),dataset)
     return {'enabled':True,'authorization':'company_application_readonly','app_id':cfg.get('LARK_APP_ID'),
             'tenant':cfg.get('LARK_WORKER_ORGANIZATION'),'authorized_by':actor_id,
-            'interval_seconds':300}
+            'interval_seconds':interval}
 
 
 def test_profile(formal, overlay):
@@ -140,3 +177,39 @@ def test_profile(formal, overlay):
     if formal.get('manager_revoked'):
         result['manager_revoked']=True
     return result
+
+
+# Deliberately exact: tenant login does not authorize arbitrary GETs, writes,
+# admin diagnostics, approvals, recovery, workspace switching or grants.
+TENANT_READ_ROUTES=frozenset({
+    '/api/session','/api/workspace','/api/live/status','/api/sources',
+    '/api/source-health','/api/company-dashboard','/api/manager-overview',
+    '/api/projects','/api/my-work','/api/confirmations','/api/contract-detail',
+    '/api/work-item-detail','/api/daily-reports','/api/people/attendance',
+})
+
+# Legacy project detail carries raw amounts; use the P2 case projection instead.
+TENANT_READ_PATTERNS=(
+    re.compile(r'/api/projects/[^/]+/navigation'),
+    re.compile(r'/api/case-detail/[^/]+'),
+    re.compile(r'/api/projects/[^/]+/progress'),
+)
+
+
+def tenant_read_allowed(person,cfg,org,method,path):
+    if (method!='GET' or not (path in TENANT_READ_ROUTES or any(p.fullmatch(path) for p in TENANT_READ_PATTERNS)) or not person or not person.get('active',True)
+            or person.get('directory_status')=='left' or person.get('directory_missing',False)):
+        return False
+    app_id=cfg.get('LARK_APP_ID'); tenant=org.removeprefix('lark-')
+    proof=person.get('oauth_identity') or {}
+    return bool(app_id and org=='lark-'+tenant and tenant in {
+        x.strip() for x in cfg.get('LARK_ALLOWED_TENANTS','').split(',') if x.strip()}
+        and person.get('identity_app_id')==app_id and proof.get('source')=='oauth_user_info'
+        and proof.get('app_id')==app_id and proof.get('tenant')==tenant
+        and proof.get('open_id')==person.get('id') and proof.get('verified_at'))
+
+
+def hr_view_allowed(person,cfg):
+    # Owner decision: all logged-in users now; one list can narrow this later.
+    viewers=set(cfg.get('HR_VIEWERS','*').replace(',',' ').split())
+    return bool(person and person.get('active',True) and ('*' in viewers or person.get('id') in viewers))

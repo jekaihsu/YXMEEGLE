@@ -1,0 +1,88 @@
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
+@layer pages{
+/* Project detail chrome and overview. Selectors are scoped to .project-detail to win over legacy rules. */
+.project-detail .project-topline{display:flex;justify-content:space-between;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-4)}
+.project-detail .project-tools{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap}
+.project-detail .project-tools .icon-button{display:inline-flex;align-items:center;justify-content:center;color:var(--accent)}
+.project-detail .demo-inline{color:var(--label-2);font-size:var(--fs-footnote)}
+.project-detail .project-title{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--sp-4);margin-bottom:var(--space-6)}
+.project-detail .project-title .case-code{font-size:var(--fs-caption);font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+.project-detail .project-title .revision{margin-left:var(--sp-2);color:var(--label-2)}
+.project-detail .project-title h1{font-size:var(--fs-large-title);font-weight:600;line-height:1.2;letter-spacing:-.02em;color:var(--label);overflow-wrap:anywhere}
+.project-detail .project-meta{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2) var(--sp-3);margin-top:var(--sp-2);font-size:var(--fs-subhead);color:var(--label-2)}
+.project-detail .project-meta>span{display:inline-flex;align-items:center;gap:var(--sp-1)}.project-detail .project-meta .separator{width:3px;height:3px;border-radius:50%;background:var(--label-2)}
+.project-detail .project-source-status{display:flex;flex-direction:column;align-items:flex-end;gap:var(--sp-1)}.project-detail .project-source-status small{font-size:var(--fs-caption);color:var(--label-2)}
+.project-detail .project-tabs{display:flex;gap:2px;padding:2px;margin:0 0 var(--space-6);width:fit-content;max-width:100%;overflow-x:auto}
+.project-detail .project-tabs button{color:var(--label);font-size:var(--fs-subhead);white-space:nowrap}
+.project-detail .case-data-navigation label{display:flex;flex-direction:column;gap:var(--sp-1);margin-bottom:var(--sp-4);font-size:var(--fs-footnote);color:var(--label-2)}
+.project-detail .case-data-navigation select{min-height:44px;max-width:20rem;padding:0 var(--sp-3);border:1px solid var(--glass-border);border-radius:var(--radius-m);background:var(--surface);color:var(--label);font-size:var(--fs-body)}
+.co-progress{display:flex;flex-direction:column;gap:var(--sp-2);padding:var(--sp-4)}.co-progress p{font-size:var(--fs-footnote);color:var(--label-2)}.co-progress small{font-size:var(--fs-title2);color:var(--label-2)}
+.co-actions{display:flex;flex-wrap:wrap;gap:var(--sp-2);padding:var(--sp-4);border-top:1px solid var(--sep)}
+.case-overview .dh-hero{margin-bottom:var(--sp-6)}
+@media(max-width:760px){.project-detail .project-title{flex-direction:column;align-items:flex-start}.project-detail .project-title h1{font-size:var(--fs-title1)}.project-detail .project-source-status{align-items:flex-start}}
+.co-loading{color:var(--label-2);font-size:var(--fs-subhead);margin-bottom:var(--sp-3)}
+
+.workspace .case-overview .event-list .event{padding:var(--sp-3) var(--sp-4);gap:var(--sp-3)}
+.workspace .case-overview .event-list :is(p,small){font-size:var(--fs-footnote);line-height:1.6}
+/* Case-data categories and fields follow the same left reading edge. */
+.workspace .project-detail .case-data-navigation{padding:0 0 var(--sp-4)}
+.workspace .project-detail .case-data-navigation label{align-items:flex-start;text-align:left;gap:var(--sp-2);margin:0}
+.workspace .project-detail .case-data-navigation select{width:min(20rem,100%);min-width:0;max-width:100%}
+.workspace .project-detail .definition-grid{width:100%;max-width:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 var(--sp-6)}
+.workspace .project-detail .definition-grid>div{display:flex;flex-direction:column;align-items:flex-start;gap:var(--sp-1);padding:var(--sp-4) 0;overflow-wrap:anywhere}
+.workspace .project-detail .definition-grid dt{font-size:var(--fs-footnote);color:var(--label-2)}
+.workspace .project-detail .definition-grid dd{font-size:var(--fs-subhead);color:var(--label)}
+@media(max-width:600px){.workspace .project-detail .definition-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Back navigation follows the content edge rather than the shared button inset. */
+.workspace .project-detail .project-topline>.ds-button[data-variant=plain]{padding-left:0;justify-content:flex-start;border-radius:var(--radius-s)}
+
+/* Populated comparison tables keep readable columns and scroll within the case. */
+.project-detail .case-comparison-scroll .data-table{min-width:40rem}
+
+.workspace .project-detail .ds-section>h2{padding-left:0;text-transform:none;letter-spacing:normal}
+.workspace .project-detail .description-block p{line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* Narrow rails settle on whole active pills; existing tabs watcher centers selection. */
+.workspace .project-detail :is(.project-tabs,.ops-tabs){scroll-snap-type:x mandatory;scroll-padding-inline:var(--sp-2);border-inline:0}
+.workspace .project-detail :is(.project-tabs,.ops-tabs)>button{flex:0 0 auto;scroll-snap-align:center;scroll-snap-stop:always}
+.workspace .project-detail :is(.project-tabs,.ops-tabs)[data-scroll-after=true]{mask-image:linear-gradient(to right,var(--label) calc(100% - var(--sp-4)),transparent)}
+.workspace .project-detail :is(.project-tabs,.ops-tabs)[data-scroll-before=true]{mask-image:linear-gradient(to right,transparent,var(--label) var(--sp-4))}
+.workspace .project-detail :is(.project-tabs,.ops-tabs)[data-scroll-before=true][data-scroll-after=true]{mask-image:linear-gradient(to right,transparent,var(--label) var(--sp-4),var(--label) calc(100% - var(--sp-4)),transparent)}
+.workspace .project-detail .project-title{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);gap:var(--sp-2) var(--sp-4);align-items:center}
+.workspace .project-detail .project-title>div{display:contents}
+.workspace .project-detail .project-title :is(.case-code,h1){grid-column:1/-1}
+.workspace .project-detail .project-meta{margin-top:0}
+.workspace .project-detail .project-source-status{flex-direction:row;align-items:center;justify-self:start}
+@media(max-width:760px){
+ .workspace .project-detail .project-title{grid-template-columns:minmax(0,1fr)}
+ .workspace .project-detail .project-source-status{grid-column:1}
+}
+@media(max-width:600px){
+ .workspace .project-detail :is(.node-actions,.co-actions,.heading-actions){width:100%;display:flex;flex-direction:column;align-items:stretch}
+ .workspace .project-detail :is(.node-actions,.co-actions,.heading-actions)>button{width:100%}
+}
+@media(max-width:600px){
+ .workspace .project-detail :is(.project-tabs,.ops-tabs){width:100%;--control-pad-inline:var(--sp-1);gap:calc(var(--sp-1)/2);padding:calc(var(--sp-1)/2);scroll-padding-inline:calc(var(--sp-1)/2)}
+ .workspace .project-detail .project-tabs>button{flex-basis:calc((100% - var(--sp-1))/3);scroll-snap-align:start}
+ .workspace .project-detail .ops-tabs>button{flex-basis:calc((100% - var(--sp-1)/2)/2);scroll-snap-align:start}
+}
+/* The shared rail cue adds a border; scoped fades reserve no width. */
+.workspace .project-detail :is(.project-tabs,.ops-tabs)[data-scroll-before]{border-inline:0}
+
+/* Keep the explanation adjacent to its disabled primary action. */
+.disabled-action { flex-shrink: 0; display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--sp-1); max-width: 100%; }
+.disabled-action-reason { color: var(--text-secondary); font-size: var(--fs-footnote); line-height: 1.5; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.project-detail .inspector-footer { flex-wrap: wrap; }
+
+@media(max-width:760px){
+ .workspace .project-detail :is(.node-actions,.co-actions,.heading-actions)>.disabled-action { width:100%; align-items:stretch; }
+}
+
+/* Page rhythm: header to tabs 24, tabs to content 24, notes sit flush with the content edge, sections 32 apart. */
+.workspace .project-detail>.ds-footer,.workspace .project-detail>.tab-scroll-hint{padding:0;margin:0 0 var(--space-4);font-size:var(--fs-footnote);color:var(--label-2)}
+.workspace .project-detail>:is(section,div):not(.project-topline,.project-title,.case-data-navigation)+:is(section,div){margin-top:var(--section-gap)}
+.workspace .project-detail .ds-section{margin-bottom:var(--section-gap)}
+.workspace .project-detail .ds-section>h2{margin-bottom:var(--space-3)}
+}

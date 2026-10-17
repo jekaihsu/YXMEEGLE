@@ -3,6 +3,21 @@ from .lark_adapter import RemoteFailure
 
 FORMAL_BASES=frozenset({'JoOqbggsVar0ATsVgbcjh6IIp1g','H7W6b0PFWaVF1BsgqXJj3pQ9pXb','VwAsbezz9app3YsramgjduLYp2U','Sdw1bG1djaHsVGsRPvmjyVWipgg'})
 
+# Business decision 2026-10-14: the only formal-Base tables the application
+# identity may write are V4 節點指派 and 任務. Deliberately literal so that no
+# environment value can widen it; every other formal table stays read-only.
+FORMAL_WRITE_ALLOWLIST=frozenset({('H7W6b0PFWaVF1BsgqXJj3pQ9pXb','tblcPZPmezkyeVb7'),
+                                  ('H7W6b0PFWaVF1BsgqXJj3pQ9pXb','tblsoyGcC6K5AipF')})
+
+
+def formal_write_allowed(base,table):
+    return (base,table) in FORMAL_WRITE_ALLOWLIST
+
+
+def require_formal_write(base,table):
+    if not formal_write_allowed(base,table):
+        raise RemoteFailure('此 Base 資料表不在正式回寫白名單，禁止寫入','blocked')
+
 
 def connection_policy(wid,state,cfg,kind,for_verification=False):
     from .capability_write_policy import PAUSED_MESSAGE
@@ -39,7 +54,12 @@ def connection_policy(wid,state,cfg,kind,for_verification=False):
         return result
     org=cfg.get('LARK_WORKER_ORGANIZATION')
     if not org or wid!='lark-'+org or not for_verification and settings.get('external_enabled') is not True: raise RemoteFailure('正式外部連線未啟用或組織不符','blocked')
-    result={'mode':'production','simulated':False,'base_token':None,'drive_root':settings.get('drive_root') if kind=='file' else None}
+    result={'mode':'production','simulated':False,'base_token':None,'drive_root':None}
+    if kind=='file':
+        root=settings.get('drive_root'); approved=cfg.get('LARK_DRIVE_ROOT')
+        if not root or not approved or root!=approved: raise RemoteFailure('正式 Drive 目錄未同時核定於伺服器與工作區','blocked')
+        if root in {settings.get('test_drive_root'),cfg.get('LARK_TEST_DRIVE_ROOT')}: raise RemoteFailure('正式檔案不得使用隔離測試 Drive 目錄','blocked')
+        result['drive_root']=root
     if kind=='input':
         target=settings.get('input_base');table=settings.get('input_table')
         protected=FORMAL_BASES | {settings.get(k) for k in ('v4_base','quote_base','capability_base')} | {cfg.get(k) for k in ('LARK_V4_BASE_TOKEN','LARK_QUOTE_BASE_TOKEN','LARK_CAPABILITY_BASE_TOKEN')}

@@ -84,6 +84,46 @@ def test_progress_payment_requires_approved_delivery_not_free_text(state):
         payment(state,item)
 
 
+def test_delivery_reassignment_requires_current_supervisor_review(state):
+    p,n=prepared(state,'control')
+    n['supervisor_id']='u-control'
+    evidence=next(e for e in reversed(p['evidence']) if e['node_id']==n['id'] and e['key']=='deliverable')
+    action(state,'delivery_submit',dict(work_item_ids=[n['tasks'][0]['id']],quantity='10',unit='點',evidence_ids=[evidence['id']]))
+    item=p['delivery_batches'][-1]
+    assert item['required_reviewer_ids']==['u-control']
+
+    action(state,'project_roles',{'node_supervisor_id':'u-field'},user='u-manager',key='control')
+    with pytest.raises(HTTPException,match='現任交付組主管'):
+        action(state,'delivery_review',dict(id=item['id'],result='approved'),user='u-control')
+    action(state,'delivery_review',dict(id=item['id'],result='approved'),user='u-field')
+    from .operations import delivery_current
+    assert item['required_reviewer_ids']==['u-field']
+    assert [vote['actor_id'] for vote in item['approvals']]==['u-field']
+    assert delivery_current(p,item,state)
+
+
+def test_supervisor_handover_updates_only_matching_node_review_seats(state):
+    p,n=prepared(state,'control')
+    unrelated=next(node for node in p['nodes'] if node['key']=='field')
+    unrelated['supervisor_id']='u-control'
+    action(state,'review_submit',{},user='u-pm',key='control')
+    prior_cycle=n['review_cycles'][-1]
+    assert prior_cycle['seats']['supervisor']=='u-manager'
+
+    action(state,'handover_request',{'from_id':'u-manager','to_id':'u-field','reason':'主管交接'},user='u-manager')
+    handover=state['handover_requests'][-1]
+    action(state,'handover_approve',{'id':handover['id']},user='u-manager')
+    action(state,'handover_accept',{'id':handover['id']},user='u-field')
+
+    assert p['supervisor_id']=='u-field' and n['supervisor_id']=='u-field'
+    assert unrelated['supervisor_id']=='u-control'
+    assert prior_cycle['seats']['supervisor']=='u-field'
+    action(state,'review_submit',{},user='u-pm',key='control')
+    assert prior_cycle['status']=='pending'
+    assert n['review_cycles'][-1] is prior_cycle
+    action(state,'review_vote',{'cycle_id':prior_cycle['id'],'seat':'supervisor','result':'approved'},user='u-field',key='control')
+
+
 def test_one_delivery_can_be_billed_while_other_is_returned(state):
     first=delivery(state); second=delivery(state)
     second['status']='returned'
@@ -99,14 +139,14 @@ def test_new_batch_evidence_preserves_approved_delivery_but_revision_invalidates
     prior_proof=next(e for e in p['evidence'] if e['id']==first['evidence_ids'][0])
     n['status']='completed';n['review_cycles']=[{'id':'previous','status':'approved'}]
     action(state,'evidence_submit',{'key':'deliverable','note':'第二批成果','url':'https://example.com/batch2','new_batch':True},user='u-pm',key='control')
-    assert delivery_current(p,first) and first['status']=='approved'
+    assert delivery_current(p,first,state) and first['status']=='approved'
     assert prior_proof['superseded_for_current'] and not prior_proof.get('withdrawn')
     assert n['review_cycles'][0]['status']=='approved' and n['review_cycles'][0]['historical_scope']
     assert n['status']=='in_progress'
     action(state,'evidence_submit',{'key':'deliverable','note':'修訂第二批，不影響第一批','url':'https://example.com/correction2'},user='u-pm',key='control')
-    assert delivery_current(p,first)
+    assert delivery_current(p,first,state)
     action(state,'evidence_submit',{'key':'deliverable','note':'第一批原成果有誤，明確修訂','url':'https://example.com/correction1','replaces_evidence_id':prior_proof['id']},user='u-pm',key='control')
-    assert not delivery_current(p,first) and first['status']=='invalidated'
+    assert not delivery_current(p,first,state) and first['status']=='invalidated'
 
 
 def test_delivery_revision_requires_fresh_pair_and_preserves_history(state):

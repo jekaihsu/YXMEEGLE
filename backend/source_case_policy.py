@@ -242,6 +242,19 @@ def filter_visible_cases(state):
             if not related&visible:continue
             rows.append(row)
         state[key]=rows
+    confirmations={r['id'] for r in state.get('source_confirmations',[])}
+    contracts={r['id'] for r in state.get('contract_items',[]) if r.get('confirmation_ids')
+               and set(r['confirmation_ids'])<=confirmations and not r.get('unresolved_confirmation_ids')}
+    if 'source_work_items' in state:
+        state['source_work_items']=[r for r in state['source_work_items'] if r.get('project_id') in visible
+            and r.get('contract_ids') and set(r['contract_ids'])<=contracts
+            and r['id'].replace('/','|') in allowed_sources]
+        state['source_work_items_status']={pid:s for pid,s in state.get('source_work_items_status',{}).items() if pid in visible}
+    if 'derived_plan' in state:
+        state['derived_plan']={pid:summary for pid,summary in (state.get('derived_plan') or {}).items()
+            if pid in visible and summary.get('_source_ids')
+            and all(ident.replace('/','|') in allowed_sources for ident in summary['_source_ids'])}
+    state.pop('derived_plan_status',None)
     if 'jobs' in state:
         state['jobs']=[job for job in state['jobs']
             if ((job.get('payload') or {}).get('project_id') in visible

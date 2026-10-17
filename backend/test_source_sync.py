@@ -1,4 +1,5 @@
 """Atomic source refresh and scheduler tests against isolated SQLite memory stores."""
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -23,8 +24,8 @@ def snapshot(clock, rows=None):
     return {'configured':True,'status':'ready','last_sync':clock,'message':'success','tables':[{'table_id':'confirmation','status':'ready'}],'records':records() if rows is None else rows}
 
 
-@pytest.fixture
-def harness(monkeypatch):
+@contextmanager
+def built_harness(monkeypatch,partial=True):
     base=declarative_base()
     class W(base):
         __tablename__='workspaces'
@@ -49,7 +50,7 @@ def harness(monkeypatch):
         db.add(C(id=wid,data=snapshot(clock[0])))
         db.add(P(organization_id=wid,person_id='u-manager',data=deepcopy(next(u for u in ws['users'] if u['id']=='u-manager'))))
         db.add(A(id='auth1',data={'organization':wid,'uid':'u-manager','access_token':'fake','expires':datetime.fromisoformat(clock[0]).timestamp()+3600}))
-    cfg={'LARK_APP_ID':'app1','LARK_WORKER_IDENTITY':'application','LARK_WORKER_ORGANIZATION':'tenant','LARK_ALLOWED_TENANTS':'tenant'}; fetched=[]
+    cfg={'LARK_APP_ID':'app1','LARK_WORKER_IDENTITY':'application','LARK_WORKER_ORGANIZATION':'tenant','LARK_ALLOWED_TENANTS':'tenant','PARTIAL_WRITES_ENABLED':str(partial).lower()}; fetched=[]
     monkeypatch.setattr(source_sync,'application_adapter',lambda config:SimpleNamespace(token='application-token',client=SimpleNamespace(close=lambda:None)))
     def fetch(token): fetched.append(token); return snapshot(clock[0])
     service=SourceSyncService(sessions,W,B,P,A,C,cfg,fetcher=fetch)
@@ -57,6 +58,11 @@ def harness(monkeypatch):
         with sessions() as db: return storage.load(db,B,db.get(W,wid)),deepcopy(db.get(C,wid).data)
     yield SimpleNamespace(service=service,sessions=sessions,W=W,B=B,P=P,A=A,C=C,wid=wid,cfg=cfg,clock=clock,fetched=fetched,read=read)
     engine.dispose()
+
+
+@pytest.fixture
+def harness(monkeypatch):
+    with built_harness(monkeypatch) as h: yield h
 
 
 @pytest.mark.parametrize('kind',['partial','partial_table','invalid'])
@@ -122,12 +128,12 @@ def test_first_connection_error_is_visible_without_existing_cache(harness):
     assert cache['status']=='error' and cache['records']==[] and cache['last_attempt_at']==h.clock[0]
 
 
-def test_scheduler_reserves_five_minute_slot_and_skips_test_workspaces(harness):
-    h=harness; h.clock[0]='2026-09-27T10:04:59+08:00'
+def test_scheduler_reserves_configured_slot_and_skips_test_workspaces(harness):
+    h=harness; h.cfg['LARK_LIVE_READ_SOURCE_TTL_SECONDS']='120'; h.clock[0]='2026-09-27T10:01:59+08:00'
     assert h.service.run_due(h.wid) is None and not h.fetched
-    h.clock[0]='2026-09-27T10:05:00+08:00'
+    h.clock[0]='2026-09-27T10:02:00+08:00'
     h.service.run_due(h.wid); assert h.fetched==['application-token']
-    h.clock[0]='2026-09-27T10:05:30+08:00'
+    h.clock[0]='2026-09-27T10:02:30+08:00'
     assert h.service.run_due(h.wid) is None
     h.clock[0]='2026-09-27T10:10:00+08:00'
     h.service.run_due(h.wid); assert h.fetched==['application-token','application-token']
@@ -250,3 +256,190 @@ def test_older_snapshot_and_configuration_swap_fail_closed(harness):
     h.service.fetcher=swap
     with pytest.raises(HTTPException):h.service.sync(h.wid,'u-manager')
     assert h.read()[1]['records']==cache['records']
+
+
+def test_split_fetch_then_apply_preserves_projection_and_replay_ids(harness):
+    h=harness
+    before=h.read()[0]
+    policy=h.service._policy(h.wid)
+    raw=h.service.fetch(h.wid,'u-manager',expected_policy=policy)
+    result=h.service.apply_snapshot(h.wid,raw,'u-manager',expected_policy=policy,
+        expected_generation=before.get('source_status',{}).get('sync_revision',0))
+    state=h.read()[0]
+    assert result['mapping']==state['source_status']['mapping']
+    assert [p['id'] for p in state['projects']]==[p['id'] for p in before['projects']]
+    ids=[(p['id'],[t['id'] for n in p['nodes'] for t in n['tasks']]) for p in state['projects']]
+    policy=h.service._policy(h.wid)
+    generation=state['source_status']['sync_revision']
+    h.service.apply_snapshot(h.wid,h.service.fetch(h.wid,'u-manager'),'u-manager',
+        expected_policy=policy,expected_generation=generation)
+    assert [(p['id'],[t['id'] for n in p['nodes'] for t in n['tasks']]) for p in h.read()[0]['projects']]==ids
+
+
+@pytest.mark.parametrize('actor_id',['u-manager',None])
+def test_environment_changed_during_source_read_is_denied(harness,actor_id):
+    h=harness
+    def fetch(token):
+        with h.sessions.begin() as db:
+            row=db.get(h.W,h.wid);state=storage.load(db,h.B,row)
+            state['environment']='test';row.data=storage.save(db,h.B,h.wid,state)
+        return snapshot(h.clock[0])
+    h.service.fetcher=fetch
+    with pytest.raises(HTTPException) as exc:h.service.sync(h.wid,actor_id,skip_unchanged=True)
+    assert exc.value.status_code==403
+
+
+def test_source_timer_disabled_by_live_read(harness):
+    h=harness;h.cfg['LARK_LIVE_READ_ENABLED']='true';h.clock[0]='2026-09-27T12:00:00+08:00'
+    before=h.read()
+    assert h.service.run_due(h.wid) is None and not h.fetched
+    assert h.read()==before
+
+
+def test_older_read_cannot_overwrite_as_of_after_unchanged_refresh(harness):
+    h=harness;h.clock[0]='2026-09-27T10:02:00+08:00'
+    h.service.sync(h.wid,'u-manager',skip_unchanged=True)
+    assert h.read()[1]['last_sync']==h.clock[0]
+    h.service.fetcher=lambda token:snapshot('2026-09-27T10:01:00+08:00',records('C111111'))
+    with pytest.raises(HTTPException) as exc:h.service.sync(h.wid,'u-manager',skip_unchanged=True)
+    assert exc.value.status_code==409
+    assert h.read()[1]['last_sync']==h.clock[0]
+    assert not any(p['code']=='C111111' for p in h.read()[0]['projects'])
+
+
+@pytest.mark.parametrize('flag', [None, 'false'])
+def test_legacy_source_timer_defaults_to_300_seconds(harness, flag):
+    h = harness
+    if flag is not None:
+        h.cfg['LARK_LIVE_READ_ENABLED'] = flag
+    h.clock[0] = '2026-09-27T10:04:59+08:00'
+    assert h.service.run_due(h.wid) is None and not h.fetched
+    h.clock[0] = '2026-09-27T10:05:00+08:00'
+    assert h.service.run_due(h.wid)['status'] == 'ready'
+    assert len(h.fetched) == 1
+
+
+@pytest.mark.parametrize('fails', [False, True])
+def test_null_cache_data_can_refresh_and_record_failure(harness, fails):
+    h = harness
+    # Populate the stamps first so the null cache exercises the skip condition.
+    h.service.sync(h.wid, 'u-manager')
+    with h.sessions.begin() as db:
+        db.get(h.C, h.wid).data = None
+    if fails:
+        def fetch(token):
+            raise OSError('synthetic failure')
+        h.service.fetcher = fetch
+        with pytest.raises(HTTPException) as exc:
+            h.service.sync(h.wid, 'u-manager', skip_unchanged=True)
+        assert exc.value.status_code == 502
+        assert h.read()[1]['status'] == 'error'
+    else:
+        assert h.service.sync(h.wid, 'u-manager', skip_unchanged=True)['status'] == 'ready'
+
+
+def test_direct_apply_requires_fetch_time_fences(harness):
+    h = harness
+    raw = h.service.fetch(h.wid, 'u-manager')
+    with pytest.raises(TypeError):
+        h.service.apply_snapshot(h.wid, raw, 'u-manager')
+    with pytest.raises(HTTPException) as exc:
+        h.service.apply_snapshot(h.wid, raw, 'u-manager',
+                                 expected_policy=None, expected_generation=None)
+    assert exc.value.status_code == 409
+
+
+def test_direct_apply_rejects_a_newer_sync_after_fetch(harness):
+    h = harness
+    policy = h.service._policy(h.wid)
+    generation = h.read()[0]['source_status'].get('sync_revision', 0)
+    raw = h.service.fetch(h.wid, 'u-manager', expected_policy=policy)
+    h.clock[0] = '2026-09-27T10:01:00+08:00'
+    h.service.sync(h.wid, 'u-manager')
+    with pytest.raises(HTTPException) as exc:
+        h.service.apply_snapshot(h.wid, raw, 'u-manager',
+                                 expected_policy=policy, expected_generation=generation)
+    assert exc.value.status_code == 409
+
+
+def test_changed_read_message_is_not_discarded_by_equal_fingerprint(harness):
+    h = harness
+    h.service.sync(h.wid, 'u-manager', skip_unchanged=True)
+    previous, cache = h.read()
+    h.clock[0] = '2026-09-27T10:01:00+08:00'
+    raw = snapshot(h.clock[0])
+    raw['message'] = 'updated read diagnostics'
+    h.service.fetcher = lambda token: raw
+    result = h.service.sync(h.wid, 'u-manager', skip_unchanged=True)
+    assert result['fingerprint'] == cache['fingerprint']
+    assert result['source_message'] == 'updated read diagnostics'
+    assert h.read()[0]['source_status']['sync_revision'] == previous['source_status']['sync_revision'] + 1
+
+
+@pytest.mark.parametrize('environment', ['test', 'demo'])
+def test_direct_apply_denies_environment_flip_with_legacy_403(harness, environment):
+    h = harness
+    policy = h.service._policy(h.wid)
+    generation = h.read()[0]['source_status'].get('sync_revision', 0)
+    raw = h.service.fetch(h.wid, 'u-manager', expected_policy=policy)
+    with h.sessions.begin() as db:
+        row = db.get(h.W, h.wid)
+        state = storage.load(db, h.B, row)
+        state['environment'] = environment
+        row.data = storage.save(db, h.B, h.wid, state)
+    with pytest.raises(HTTPException) as exc:
+        h.service.apply_snapshot(h.wid, raw, 'u-manager',
+                                 expected_policy=policy, expected_generation=generation)
+    assert exc.value.status_code == 403
+
+
+def test_page_authorization_does_not_exhaust_lark_budget_loading_unrelated_cases(harness, monkeypatch):
+    import httpx
+    from .live_read.client import LiveLarkClient
+    from .live_read.rate_limit import TokenBucket
+    from .live_read.token_cache import TenantTokenCache
+    from .test_live_read_client import Clock
+
+    h = harness
+    clock = Clock()
+    original = storage.load
+    def slow_full_load(*args, **kwargs):
+        clock.sleep(8)
+        return original(*args, **kwargs)
+    monkeypatch.setattr(storage, 'load', slow_full_load)
+    def response(request):
+        if '/auth/' in request.url.path:
+            return httpx.Response(200, json={'tenant_access_token': 'synthetic', 'expire': 7200})
+        return httpx.Response(200, json={'code': 0, 'data': {}})
+    cfg = dict(h.cfg, LARK_APP_SECRET='synthetic', LARK_LIVE_READ_BUDGET_SECONDS='100')
+    client = LiveLarkClient(cfg, transport=httpx.MockTransport(response), clock=clock,
+                            sleep=clock.sleep, token_cache=TenantTokenCache(clock=clock),
+                            bucket=TokenBucket(5, clock=clock, sleep=clock.sleep))
+    adapter = SimpleNamespace(token='', client=client)
+    h.service.adapter_factory = lambda _: adapter
+    def fetch(_):
+        for _ in range(28):
+            adapter.client.request('GET', '/bitable/v1/apps/fake/tables/fake/records')
+        return snapshot(h.clock[0])
+    h.service.fetcher = fetch
+    assert h.service.fetch(h.wid)['status'] == 'ready'
+
+
+def test_derived_plan_root_persists_and_participates_in_projection_fingerprint(harness):
+    from .contract_links import build_projection,plan_summary
+    from .test_contract_links import line,item,row as source_row
+    h=harness
+    state,_=h.read()
+    assert plan_summary({},'p') is None
+    before=source_sync.projection_fingerprint(state)
+    projection=build_projection([line(),item(),source_row('confirmation','c',工程確認單編號='X')],{'b/confirmation/c':'p'}, {})
+    state.update(derived_plan=projection.plans,derived_plan_status=projection.status)
+    assert source_sync.projection_fingerprint(state)!=before
+    with h.sessions.begin() as db:
+        workspace=db.get(h.W,h.wid)
+        workspace.data=storage.save(db,h.B,h.wid,state)
+    loaded,_=h.read()
+    assert loaded['derived_plan']==projection.plans and loaded['derived_plan_status']==projection.status
+    with h.sessions() as db:
+        partial=storage.load_partial(db,h.B,db.get(h.W,h.wid),collections=(),project_ids=())
+    assert partial['derived_plan']==projection.plans

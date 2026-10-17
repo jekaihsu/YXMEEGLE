@@ -1,0 +1,20 @@
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
+@layer pages{
+.ops-sync .ops-sync-notice{border-inline-start:3px solid var(--warning);padding-inline-start:var(--sp-3);color:var(--label)}
+.ops-sync .ops-sync-item{display:grid;gap:var(--sp-2);padding:var(--sp-4);border-bottom:1px solid var(--separator)}
+.ops-sync .ops-sync-item header{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3)}
+.ops-sync .ops-sync-entity{color:var(--label-2);font-size:var(--fs-caption)}
+.ops-sync .ops-sync-item p{margin-block:0}
+.ops-sync .ops-sync-values{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr));gap:var(--sp-3);margin:0}
+.ops-sync .ops-sync-values dt{color:var(--label-2);font-size:var(--fs-caption)}.ops-sync .ops-sync-values dd{margin:0;color:var(--label)}
+.ops-sync .ops-sync-item[data-state=conflict]{border-inline-start:3px solid var(--critical)}
+.ops-sync .inline-actions{display:flex;flex-wrap:wrap;gap:var(--sp-3)}
+.ops-sync .ops-sync-item>.ds-button{justify-self:start}
+.ops-flow .ops-flow-pick{padding:var(--sp-4)}
+.ops-flow .ops-flow-people{display:grid;gap:var(--sp-2);border:1px solid var(--separator);padding:var(--sp-3)}
+.ops-flow .ops-flow-people label{display:flex;gap:var(--sp-2);align-items:center}
+.ops-flow .ops-flow-proposals{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp-2)}
+.ops-flow .ops-flow-proposals li{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center}
+.ops-flow .ops-flow-denial{display:grid;gap:var(--sp-2)}
+.ops-flow .ops-flow-notice{border-inline-start:3px solid var(--accent);padding-inline-start:var(--sp-3)}
+}

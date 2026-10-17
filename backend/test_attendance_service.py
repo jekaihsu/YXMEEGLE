@@ -214,3 +214,19 @@ def test_contact_sync_mixed_roster_keeps_unverified_admin_pending_and_queries_58
     again=service.sync(h.wid,'u-manager','2026-09-28','2026-10-04')
     assert again['status']=='pending_schedule'
     assert all(c[0]=='POST' for c in calls)
+
+
+def test_attendance_timer_live_gate_and_configured_interval(harness,monkeypatch):
+    from . import attendance_service
+    h=harness;service,fake=make(h);clock=['2026-09-27T10:00:00+08:00']
+    monkeypatch.setattr(attendance_service,'now',lambda:clock[0])
+    service.sync(h.wid,'u-manager','2026-09-28','2026-09-28')
+    h.cfg['LARK_LIVE_READ_ATTENDANCE_TTL_SECONDS']='600'
+    clock[0]='2026-09-27T10:09:59+08:00'
+    assert service.run_due(h.wid) is None
+    calls=[];service.sync=lambda *args:calls.append(args) or {'ready':True}
+    clock[0]='2026-09-27T10:10:00+08:00'
+    assert service.run_due(h.wid)=={'ready':True} and len(calls)==1
+    h.cfg['LARK_LIVE_READ_ENABLED']='true';clock[0]='2026-09-27T12:00:00+08:00'
+    before=h.read()
+    assert service.run_due(h.wid) is None and len(calls)==1 and h.read()==before

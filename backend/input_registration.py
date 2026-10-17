@@ -159,6 +159,16 @@ class RegistrationAdapter:
         if not ident:raise RemoteFailure('尚未查到登錄，不代表先前未寫入；保留待核實','outcome_unknown')
         return self._receipt(plan,ident)
 
+    def confirm_absent(self,plan,policy):
+        """Read-only freshness check for an explicit not-created disposal.
+
+        Returns normally only when a complete filtered search finds no row. A
+        found, duplicate or changed row means the caller must reconcile instead.
+        """
+        path,expected=self._prepare(plan,policy)
+        if self._find(path,plan,expected):
+            raise RemoteFailure('遠端已有此登錄，請改用查回核實，不可處置為未建立','conflict')
+
     def submit(self,plan,policy):
         path,expected=self._prepare(plan,policy)
         ident=self._find(path,plan,expected)
@@ -169,9 +179,13 @@ class RegistrationAdapter:
                 try:return self.reconcile(plan,policy)
                 except RemoteFailure as read_exc:
                     raise RemoteFailure('登錄送出結果尚未核實，請使用唯讀查回','outcome_unknown') from read_exc
+            except Exception as exc:
+                # A non-remote error once the POST was issued (e.g. a permission
+                # re-check) cannot prove the row was not created.
+                raise RemoteFailure('登錄送出期間發生未核實錯誤，請使用唯讀查回','outcome_unknown') from exc
             # POST success is insufficient: independently read the complete row.
             try:return self.reconcile(plan,policy)
-            except RemoteFailure as read_exc:
+            except Exception as read_exc:
                 raise RemoteFailure('登錄已送出但讀回尚未核實，請使用唯讀查回','outcome_unknown') from read_exc
         return self._receipt(plan,ident)
 

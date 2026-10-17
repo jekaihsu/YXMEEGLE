@@ -87,6 +87,15 @@ def project_execution_view(ws,project):
                 ('舊案留在 Meegle 完成' if system=='meegle' else '等待管理員核定案件歸屬')}
 
 
+def admission_fields(project,allowed):
+    """Read-only admission facts for list surfaces; never grants or changes authority."""
+    system=execution_system(project)
+    reason=None if allowed else project.get('execution_readonly_reason') or (
+        '舊案留在 Meegle 完成' if system=='meegle' else '等待管理員核定案件歸屬')
+    return {'execution_system':system,'execution_system_label':LABELS[system],
+            'execution_readonly_reason':reason,'case_visibility':project.get('case_visibility')}
+
+
 def resolve_action_projects(ws,body):
     """Resolve stored ownership, never trust supplied project for indirect actions."""
     action=body.get('action',''); data=body.get('payload') or {}
