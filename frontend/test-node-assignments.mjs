@@ -401,7 +401,7 @@ test('graph groups parallel production cards and exposes colors, owners, progres
   assert.ok(card.classList.contains('is-current'));
   assert.ok(card.querySelector('.na-status-active'));
   assert.ok(card.querySelector('.na-avatar').className.includes('na-person-color-'));
-  assert.ok(card.textContent.includes('3/5 項任務60%'));
+  assert.ok(card.textContent.includes('3/5 項任務 · 60%'));
   assert.ok(card.querySelector('.is-overdue').textContent.includes('逾期'));
   assert.ok(card.querySelector('.na-warning-dot'));
   assert.equal(document.querySelectorAll('.na-flow-arrow.is-done').length, 3);

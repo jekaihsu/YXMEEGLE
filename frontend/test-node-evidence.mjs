@@ -47,6 +47,8 @@ async function mount(patches = {}) {
   await act(async () => root.render(React.createElement(ui.NodeAssignments, {projectId: 'p1', enabled: true, legacy: null})));
 }
 afterEach(async () => {if (root) {await act(async () => root.unmount()); root = null}});
+const click = async element => act(async () => element.dispatchEvent(new window.MouseEvent('click', {bubbles: true})));
+const openNode = key => click(document.querySelector(`.na-row[aria-label^="${key}節點"]`));
 const card = key => [...document.querySelectorAll('.na-flow-card')].find(c => c.querySelector('.na-card-top strong')?.textContent === key);
 
 test('the list parser carries evidence and the submit hint, and nulls stay null', async () => {
@@ -81,46 +83,51 @@ test('evidence line wording', () => {
   assert.equal(ui.evidenceLine(evidence({actual_source: 'v3_reports', actual_known: true, actual_value: null})).text, '計畫 123.45 · 週報登記冊已有外業進度');
 });
 
-test('a production card with mapped rows shows the evidence line, the data tag and a link to the progress tab', async () => {
+test('a production card stays compact and the evidence line, the data tag and the progress link move into the node', async () => {
   await mount({field: {derived_status: '進行中', status: '未開始', evidence: evidence(KNOWN)}});
   const field = card('外業');
-  const wrap = field.closest('.na-card-wrap');
-  assert.match(field.textContent, /計畫 123\.45 · 日報 2 筆 · 最近 10\/12/);
-  assert.match(field.textContent, /依案件資料判定/);
-  assert.match(field.textContent, /任務（選用） 0\/0/);
-  assert.doesNotMatch(field.textContent, /來源未提供|0%/);
+  assert.match(field.textContent, /已有進度紀錄/);
+  assert.match(field.textContent, /自動判定/);
+  assert.doesNotMatch(field.textContent, /計畫 123|來源未提供|0%/);
   assert.equal(field.querySelector('.na-evidence-hint'), null);
-  const link = wrap.querySelector('a.na-evidence-link');
-  assert.equal(link.getAttribute('href'), '#view=project&project=p1&tab=progress');
-  assert.equal(field.contains(link), false);
+  assert.equal(document.querySelector('.na-wi'), null);
+  await openNode('外業');
+  assert.match(document.querySelector('.na-wi-summary').textContent, /計畫 123\.45 · 日報 2 筆 · 最近 10\/12/);
+  assert.match(document.querySelector('.na-row[aria-label^="外業節點"]').textContent, /依案件資料判定/);
 });
 
-test('unknown evidence says so in muted text and never shows 0%', async () => {
+test('unknown evidence says so and never shows 0%', async () => {
   await mount({field: {derived_status: '待處理', status: '待處理'}});
   const field = card('外業');
-  assert.match(field.textContent, /計畫 123\.45/);
-  assert.match(field.querySelector('.na-muted').textContent, /^尚無進度資料（日報未連結或尚未開工）$/);
-  assert.equal(field.querySelector('.na-progress-bar'), null);
-  assert.doesNotMatch(field.textContent, /日報 \d|0%|完成|來源未提供|依案件資料判定/);
-  assert.match(field.textContent, /無任務/);
+  assert.match(field.textContent, /無進度資料/);
+  assert.equal(field.querySelector('.na-progress-track').hidden, true);
+  assert.doesNotMatch(field.textContent, /日報 \d|0%|完成|來源未提供|自動判定/);
+  await openNode('外業');
+  assert.match(document.querySelector('.na-wi-summary').textContent, /計畫 123\.45 · 尚無進度資料（日報未連結或尚未開工）/);
+  assert.equal(document.querySelector('.na-wi .na-empty').textContent, '此節點尚無對應的合約工項。');
+  assert.doesNotMatch(document.querySelector('.na-wi').textContent, /\d+%/);
 });
 
 test('the submit hint shows only when the server says so', async () => {
   await mount({field: {derived_status: '進行中', evidence: evidence(KNOWN), can_submit_hint: true}, control: {derived_status: '進行中', evidence: evidence({...KNOWN, drives_status: false})}});
-  assert.equal(card('外業').querySelector('.na-evidence-hint').textContent, '可送審');
-  assert.equal(card('控制').querySelector('.na-evidence-hint'), null);
-  assert.doesNotMatch(card('控制').textContent, /依案件資料判定/);
+  assert.match(card('外業').querySelector('.na-card-footer').textContent, /可送審/);
+  assert.doesNotMatch(card('控制').textContent, /可送審|自動判定/);
+  await openNode('外業');
+  assert.equal(document.querySelector('.na-wi .na-evidence-hint').textContent, '可送審');
+  await openNode('外業'); await openNode('控制');
+  assert.equal(document.querySelector('.na-wi .na-evidence-hint'), null);
 });
 
-test('optional tasks keep their real counts and percentage when they exist', async () => {
+test('optional tasks keep their real counts when they exist', async () => {
   await mount({field: {derived_status: '進行中', evidence: evidence(KNOWN), tasks: {done: 1, total: 4}, progress: 0.25}});
-  assert.match(card('外業').textContent, /任務（選用） 1\/4.*25%/);
+  assert.match(document.querySelector('.na-row[aria-label^="外業節點"]').textContent, /任務 1\/4/);
 });
 
-test('cards without evidence keep the old task wording and have no link', async () => {
+test('cards without evidence keep the task wording and have no item table', async () => {
   await mount();
-  assert.match(card('業務').textContent, /0\/0 項任務/);
-  assert.equal(card('業務').closest('.na-card-wrap'), null);
+  assert.match(card('業務').textContent, /無任務/);
+  await openNode('業務');
+  assert.equal(document.querySelector('.na-wi'), null);
 });
 
 const HOSTILE = ['1e9999999999', '1e99999', '-5', 'NaN', 'Infinity', '1'.repeat(101), '1,5', ''];
@@ -137,7 +144,7 @@ test('an unbounded or non-decimal quantity is neutralized to null and the list s
 test('a hostile planned quantity leaves the page mounted with the no-data wording', async () => {
   await mount({field: {evidence: evidence({planned_qty: '1e9999999999', actual_value: '1e9999999999'})}});
   assert.ok(document.getElementById('root').innerHTML.length > 0);
-  assert.match(card('外業').textContent, /尚無進度資料/);
+  assert.match(card('外業').textContent, /無進度資料/);
 });
 
 test('the quantity formatter never throws', () => {
@@ -192,47 +199,72 @@ test('progress wording', () => {
   assert.deepEqual([ui.ITEM_STATUS_LABEL.done, ui.ITEM_STATUS_LABEL.partial, ui.ITEM_STATUS_LABEL.no_signal], ['已完成', '進行中', '尚無進度資料']);
 });
 
-test('a card with item progress shows the bar, the percent and a collapsed item list', async () => {
+test('a card with item progress shows the bar and percent, and the node lists every work item', async () => {
   await mount({field: {derived_status: '進行中', evidence: evidence(WITH_ITEMS)}});
-  const field = card('外業'), wrap = field.closest('.na-card-wrap');
-  assert.match(field.textContent, /完成 30%（已完成 0\/2 工項）/);
-  assert.equal(field.querySelector('.na-progress-bar > span').style.width, '30%');
-  assert.equal(field.querySelector('.na-progress-bar').getAttribute('role'), 'progressbar');
-  assert.equal(field.querySelector('.na-progress-bar').getAttribute('aria-valuenow'), '30');
-  assert.equal(field.querySelector('.na-evidence .na-muted'), null);
-  const details = wrap.querySelector('details.na-items');
-  assert.equal(details.open, false);
-  assert.equal(details.querySelector('summary').textContent, '工項明細（2）');
-  assert.equal(field.contains(details), false);
-  const rows = [...details.querySelectorAll('li')];
+  const field = card('外業');
+  assert.match(field.textContent, /完成 30%/);
+  assert.equal(field.querySelector('.na-progress-track > span').style.width, '30%');
+  assert.equal(field.querySelector('details'), null);
+  assert.match(document.querySelector('.na-row[aria-label^="外業節點"]').textContent, /0\/2.*工項完成 · 明細 2 項/);
+  await openNode('外業');
+  const wi = document.querySelector('.na-wi');
+  assert.match(wi.querySelector('h4').textContent, /工項明細\s*2 項/);
+  assert.match(wi.querySelector('.na-wi-summary').textContent, /完成 30%.*已完成 0\/2 工項/);
+  const rows = [...wi.querySelectorAll('.na-wi-row')];
   assert.equal(rows.length, 2);
-  assert.match(rows[0].textContent, /C1-1.*導線測量.*數量 50.*進行中.*剩餘 40 \/ 100 點/);
-  assert.match(rows[1].textContent, /C1-2.*水準測量.*數量 5.*尚無進度資料/);
+  assert.match(rows[0].textContent, /C1-1導線測量50100.*60%.*進行中/);
+  assert.equal(rows[0].querySelector('.na-progress-bar').getAttribute('aria-valuenow'), '60');
+  assert.match(rows[1].textContent, /C1-2水準測量5100—尚無進度資料/);
   assert.equal(rows[1].querySelector('.na-item-status').className.includes('na-item-no_signal'), true);
-  assert.doesNotMatch(rows[1].textContent, /0%/);
-  assert.equal(wrap.querySelector('a.na-evidence-link').textContent.trim(), '到工程進度看完整證據');
-  assert.equal(wrap.lastElementChild, wrap.querySelector('a.na-evidence-link'));
+  assert.equal(rows[1].querySelector('.na-progress-bar'), null);
+  assert.doesNotMatch(rows[1].textContent, /%/);
+});
+
+test('clicking a work item opens its detail and Escape closes it', async () => {
+  await mount({field: {derived_status: '進行中', evidence: evidence(WITH_ITEMS)}});
+  await openNode('外業');
+  const row = document.querySelectorAll('.na-wi-row')[0];
+  assert.equal(row.getAttribute('aria-label'), '查看工項 C1-1 導線測量 明細');
+  await click(row);
+  const sheet = document.querySelector('[role=dialog]');
+  assert.equal(sheet.getAttribute('aria-label'), '工項明細 · C1-1 導線測量');
+  const text = sheet.textContent;
+  for (const expected of [/工項編號C1-1/, /工項名稱導線測量/, /所屬節點外業/, /計畫數量50/, /狀態進行中/, /完成度60%/, /營業額點數（計畫）100/, /已完成點數60/, /剩餘點數40/, /Lark 原生關聯/]) assert.match(text, expected);
+  assert.equal(sheet.querySelector('a.na-evidence-link').getAttribute('href'), '#view=project&project=p1&tab=progress');
+  await act(async () => document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})));
+  assert.equal(document.querySelector('[role=dialog]'), null);
+  await click(document.querySelectorAll('.na-wi-row')[1]);
+  assert.match(document.querySelector('[role=dialog]').textContent, /已完成點數尚無進度資料/);
+});
+
+test('item progress needs a certain link and a valid pair of points', () => {
+  assert.deepEqual(ui.itemProgress(workItem()), {earned: 60, planned: 100, remaining: 40, percent: 60});
+  for (const patch of [{status: 'no_signal'}, {link_basis: 'ambiguous'}, {link_basis: 'unlinked'}, {remaining_points: null}, {planned_points: null}, {remaining_points: '101'}, {planned_points: '0', remaining_points: '0'}, {remaining_points: '-1'}]) assert.equal(ui.itemProgress(workItem(patch)), null, JSON.stringify(patch));
+  assert.equal(ui.itemProgress(workItem({link_basis: 'derived'})).percent, 60);
 });
 
 test('items without any signal never render a percentage or a bar', async () => {
   const idle = workItem({status: 'no_signal', remaining_points: '100'});
   await mount({field: {derived_status: '待處理', evidence: evidence({items_total: 1, work_items: [idle]})}});
-  const field = card('外業');
-  assert.equal(field.querySelector('.na-progress-bar'), null);
-  assert.match(field.querySelector('.na-muted').textContent, /^尚無進度資料（日報未連結或尚未開工）$/);
-  assert.doesNotMatch(field.closest('.na-card-wrap').textContent.replace(/任務（選用） 0\/0/, ''), /\d+%/);
-  assert.equal(field.closest('.na-card-wrap').querySelector('details summary').textContent, '工項明細（1）');
+  assert.equal(card('外業').querySelector('.na-progress-track').hidden, true);
+  assert.match(card('外業').textContent, /無進度資料/);
+  await openNode('外業');
+  assert.equal(document.querySelector('.na-wi .na-progress-bar'), null);
+  assert.doesNotMatch(document.querySelector('.na-wi').textContent, /\d+%/);
+  assert.equal(document.querySelectorAll('.na-wi-row').length, 1);
 });
 
 test('a viewer without the points gate sees the counts and statuses only', async () => {
   const gated = {progress: {percent: null, earned_points: null, planned_points: null, items_done: 1, items_total: 2}, items_total: 2, drives_status: true,
     work_items: [workItem({planned_points: null, remaining_points: null, status: 'done'}), workItem({planned_points: null, remaining_points: null, status: 'no_signal'})]};
   await mount({field: {derived_status: '進行中', evidence: evidence(gated)}});
-  const wrap = card('外業').closest('.na-card-wrap');
   assert.match(card('外業').textContent, /已完成 1\/2 工項/);
-  assert.equal(card('外業').querySelector('.na-progress-bar'), null);
-  assert.doesNotMatch(wrap.textContent, /點|%/);
-  assert.match(wrap.querySelectorAll('li')[0].textContent, /已完成/);
+  assert.equal(card('外業').querySelector('.na-progress-track').hidden, true);
+  await openNode('外業');
+  const wi = document.querySelector('.na-wi');
+  assert.doesNotMatch(wi.textContent, /%/);
+  assert.equal(wi.querySelector('.na-progress-bar'), null);
+  assert.match(wi.querySelectorAll('.na-wi-row')[0].textContent, /已完成/);
 });
 
 test('all items done shows the submit chip while the status stays in progress', async () => {
@@ -240,22 +272,27 @@ test('all items done shows the submit chip while the status stays in progress', 
     work_items: [workItem({remaining_points: '0', status: 'done'}), workItem({remaining_points: '0', status: 'done'})]};
   await mount({field: {derived_status: '進行中', evidence: evidence(done), can_submit_hint: true}});
   const field = card('外業');
-  assert.equal(field.querySelector('.na-evidence-hint').textContent, '可送審');
+  assert.match(field.querySelector('.na-card-footer').textContent, /可送審/);
   assert.match(field.textContent, /進行中/);
-  assert.match(field.textContent, /完成 100%（已完成 2\/2 工項）/);
+  assert.match(field.textContent, /完成 100%/);
   assert.doesNotMatch(field.textContent, /待審核|已完成節點/);
+  await openNode('外業');
+  assert.match(document.querySelector('.na-wi-summary').textContent, /完成 100%/);
 });
 
 test('a truncated list says how many are shown', async () => {
   await mount({field: {derived_status: '進行中', evidence: evidence({...WITH_ITEMS, items_total: 80, items_truncated: true})}});
-  assert.match(card('外業').closest('.na-card-wrap').querySelector('details').textContent, /僅顯示前 2 筆，共 80 筆/);
+  await openNode('外業');
+  assert.match(document.querySelector('.na-wi').textContent, /僅顯示前 2 筆，共 80 筆/);
+  assert.match(document.querySelector('.na-wi h4').textContent, /80 項/);
 });
 
-test('the item list is touch sized and cannot overflow at 390px', async () => {
+test('the item table is touch sized and cannot overflow at 390px', async () => {
   const css = await fs.readFile(new URL('./src/NodeAssignments.css', import.meta.url), 'utf8');
-  assert.match(css, /\.na-items>summary\{[^}]*min-height:44px/);
-  assert.match(css, /\.na-items li\{[^}]*overflow-wrap:anywhere/);
-  assert.match(css, /\.na-card-wrap:has\(\.na-items\[open\]\)\{[^}]*grid-column:1\/-1/);
+  assert.match(css, /\.na-wi-row\{[^}]*min-height:52px/);
+  assert.match(css, /\.na-wi-name\{[^}]*overflow-wrap:anywhere/);
+  assert.match(css, /@container\(max-width:700px\)\{\.na-wi-head\{display:none\}/);
+  assert.match(css, /@container\(max-width:1000px\)\{\.na-overview\{flex-direction:column/);
 });
 
 const UNKNOWN_HEAVY = {progress: {percent: '99.9', earned_points: '1', planned_points: '1', items_done: 1, items_total: 100, known_items: 1, unknown_items: 99}, items_total: 100,
@@ -272,23 +309,25 @@ test('a percent over few known items says it covers only them', () => {
   assert.equal(gated.text, '已完成 1/4 工項（僅計有進度資料的 3 項；其餘 1 項尚無資料）');
 });
 
-test('an unknown-heavy card leads with the caveat, mutes the percent and keeps the bar nearly empty', async () => {
+test('an unknown-heavy card says only some items have data and keeps the bar nearly empty', async () => {
   await mount({field: {derived_status: '進行中', evidence: evidence(UNKNOWN_HEAVY)}});
-  const field = card('外業'), percent = field.querySelector('.na-evidence-percent');
-  assert.equal(percent.classList.contains('is-muted'), true);
-  assert.equal(percent.firstElementChild.textContent, '僅計有進度資料的 1 項；其餘 99 項尚無資料');
-  assert.match(percent.textContent, /完成 99\.9%$/);
-  assert.equal(field.querySelector('.na-progress-bar').classList.contains('is-partial'), true);
-  assert.equal(field.querySelector('.na-progress-bar > span').style.width, '1%');
-  assert.doesNotMatch(field.textContent, /已完成 1\/100/);
+  const field = card('外業');
+  assert.match(field.textContent, /僅部分工項有資料/);
+  assert.doesNotMatch(field.textContent, /99\.9|已完成 1\/100/);
+  assert.equal(field.querySelector('.na-progress-track > span').style.width, '1%');
+  await openNode('外業');
+  assert.match(document.querySelector('.na-wi-summary').textContent, /完成 99\.9%.*僅計有進度資料的 1 項；其餘 99 項尚無資料/);
 });
 
 test('an item that is not certainly linked reads 關聯待確認 instead of a status', async () => {
   const items = [workItem({link_basis: 'ambiguous', status: 'no_signal', planned_points: null, remaining_points: null}), workItem({code: 'C1-2', link_basis: 'unlinked', status: 'no_signal'}), workItem({code: 'C1-3', link_basis: 'derived', status: 'done', remaining_points: '0'})];
   await mount({field: {derived_status: '待處理', evidence: evidence({items_total: 3, work_items: items})}});
-  const rows = [...card('外業').closest('.na-card-wrap').querySelectorAll('li .na-item-status')].map(n => n.textContent);
+  await openNode('外業');
+  const rows = [...document.querySelectorAll('.na-wi-row .na-item-status')].map(n => n.textContent);
   assert.deepEqual(rows, ['關聯待確認', '關聯待確認', '已完成']);
   assert.equal(ui.itemStatusLabel({status: 'partial', link_basis: ''}), '進行中');
+  await click(document.querySelectorAll('.na-wi-row')[0]);
+  assert.match(document.querySelector('[role=dialog]').textContent, /關聯尚未確認，暫不計入進度/);
 });
 
 test('an item without code or name is kept and labelled', async () => {
@@ -297,6 +336,9 @@ test('an item without code or name is kept and labelled', async () => {
   const e = parsed.nodes.find(n => n.key === 'field').evidence;
   assert.deepEqual(e.work_items.map(ui.itemLabel), ['未命名工項', '只有名稱', 'C9']);
   await mount({field: {derived_status: '進行中', evidence: e}});
-  const names = [...card('外業').closest('.na-card-wrap').querySelectorAll('.na-item-name')].map(n => n.textContent.trim());
+  await openNode('外業');
+  const names = [...document.querySelectorAll('.na-wi-name')].map(n => n.textContent.trim());
   assert.deepEqual(names, ['未命名工項', '只有名稱', 'C9']);
+  await click(document.querySelectorAll('.na-wi-row')[0]);
+  assert.match(document.querySelector('[role=dialog]').getAttribute('aria-label'), /未命名工項/);
 });

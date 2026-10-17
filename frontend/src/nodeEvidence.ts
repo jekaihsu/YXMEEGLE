@@ -61,3 +61,22 @@ export const itemsSummary = (e: NodeEvidence) => `工項明細（${e.items_total
 export const itemsTruncatedNote = (e: NodeEvidence) => `僅顯示前 ${e.work_items.length} 筆，共 ${e.items_total} 筆`;
 export const itemPoints = (remaining: string | null, planned: string | null) =>
   remaining !== null && planned !== null ? `剩餘 ${formatPlanQuantity(remaining)} / ${formatPlanQuantity(planned)} 點` : '';
+
+export const LINK_BASIS_TEXT: Record<string, string> = {
+  native: 'Lark 原生關聯（合約工項已連結此工項）',
+  derived: '依工編推導的關聯，非 Lark 原生連結',
+};
+export const UNCERTAIN_LINK_TEXT = '關聯尚未確認，暫不計入進度，請到工程確認單核對。';
+export const linkBasisText = (item: Pick<WorkItem, 'link_basis'>) => LINK_BASIS_TEXT[item.link_basis] ?? UNCERTAIN_LINK_TEXT;
+
+export interface ItemProgress {earned: number; planned: number; remaining: number; percent: number}
+// Only a pair of valid numbers with remaining not above plan counts; anything else is unknown, never 0.
+export function itemProgress(item: Pick<WorkItem, 'planned_points' | 'remaining_points' | 'link_basis' | 'status'>): ItemProgress | null {
+  if (item.status === 'no_signal' || (item.link_basis && !CERTAIN_LINKS.has(item.link_basis))) return null;
+  if (item.planned_points === null || item.remaining_points === null) return null;
+  const planned = Number(item.planned_points), remaining = Number(item.remaining_points);
+  if (!Number.isFinite(planned) || !Number.isFinite(remaining) || planned <= 0 || remaining < 0 || remaining > planned) return null;
+  const earned = planned - remaining;
+  return {earned, planned, remaining, percent: Math.round(earned / planned * 1000) / 10};
+}
+export const itemsDoneCount = (e: Pick<NodeEvidence, 'progress'>) => e.progress ? `${e.progress.items_done}/${e.progress.items_total}` : null;
