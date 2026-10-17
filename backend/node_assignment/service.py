@@ -315,13 +315,12 @@ class NodeAssignmentService:
         key, and with it the client tokens, for operations whose identity is the work rather than the request.
         `recognize(client, snapshot, plan)` may name the record of a pending create that landed but no longer matches
         its fields (someone edited it), which then counts as applied instead of a conflict.
-        A call costs one rate charge, or one per outbound write with `charge_per_write`.
+        A call costs one rate charge taken at its first authorized outbound write (replays, denials and no-ops
+        cost nothing), or one per outbound write with `charge_per_write`.
         Returns (http_status, body, replayed).
         """
         finish = finish or self._finish
         code = self.open(ctx, write=True)
-        if not charge_per_write:
-            self.rate.take(ctx.wid, ctx.user['id'])
         receipt = receipt_id or self.receipts.key(ctx.wid, ctx.user['id'], request_id)
         fingerprint = fingerprint_of(action, ctx.project['id'], key, payload)
         akey = assignment_key(code, key)
@@ -364,7 +363,7 @@ class NodeAssignmentService:
                     if planned is not None and (checked is None or checked.changes != planned.changes):
                         raise Failure('forbidden', '操作權限已變更，請重新整理後再操作',
                                       writes_started=bool(write_attempts))
-                if charge_per_write:
+                if charge_per_write or not write_attempts:
                     self.rate.take(ctx.wid, ctx.user['id'])
                 write_attempts += 1
 

@@ -855,3 +855,17 @@ def test_admin_demoted_between_node_and_task_create_stops_second_write(h):
     assert retried.status_code == 200
     assert len(h.fake.tables[NODES]) == 1
     assert len(h.fake.tables[TASKS]) == 1
+
+
+def test_replays_and_denied_attempts_cost_no_rate_budget(h):
+    payload = {'request_id': 'claim-1', 'expected_revision': None}
+    assert act(h, 'ou_sales', '/nodes/sales/claim', payload).status_code == 200
+    replays = [act(h, 'ou_sales', '/nodes/sales/claim', payload) for _ in range(40)]
+    assert {r.status_code for r in replays} == {200} and {r.headers['idempotent-replayed'] for r in replays} == {'true'}
+    denied = [act(h, 'ou_member', '/nodes/sales/assign', {'request_id': f'deny-{n}', 'owner_open_ids': ['ou_sales']})
+              for n in range(40)]
+    assert {r.status_code for r in denied} == {403}
+    writes = len(h.fake.writes())
+    created = act(h, 'ou_sales', '/nodes/sales/tasks', {'request_id': 'task-1', 'title': 'x'})
+    assert created.status_code == 200, created.text
+    assert len(h.fake.writes()) == writes + 1
