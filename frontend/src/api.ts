@@ -53,6 +53,7 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
   }finally{if(timer!==undefined)clearTimeout(timer);request.signal?.removeEventListener('abort',cancel);if(mutating){const remaining=(pendingMutations.get(epoch)||1)-1;if(remaining)pendingMutations.set(epoch,remaining);else pendingMutations.delete(epoch);mutationChanged()}}
 }
 export function normalizeRoute<T extends {view:string;tab?:string;section?:string}>(route:T):T {
+ if(route.view==='pm-glance')return {...route,view:'dashboard'};
  if(route.view==='learning')return {...route,view:'admin',tab:'people'};
  if(route.view!=='project')return route;
  if(['quotes','family','basic','participants','files'].includes(route.tab||''))return {...route,tab:'data',section:route.tab};

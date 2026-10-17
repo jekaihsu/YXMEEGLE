@@ -1530,6 +1530,9 @@ def create_app(overrides=None):
                                 details={'live_read':True,'force':True,'datasets':datasets}))
 
     register_live(app,identity,app.state.live_read,authorize=authorize_live,audit=audit_live_refresh)
+    from .reports.routes import register as register_reports
+    register_reports(app,identity,cfg,authorize=authorize_live,live_enabled=live_enabled,
+                     allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'))
     from .lark_pilot.routes import register as register_pilot
     register_pilot(app, identity=identity, authorize=authorize_live, cfg=cfg)
     from .runtime_health import register as register_runtime_health

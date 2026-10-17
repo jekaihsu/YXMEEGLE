@@ -15,6 +15,12 @@ try{model=await import(path.href)}finally{await fs.unlink(path)}
 assert.equal(model.taipeiWeek('2026-10-11'),'2026-10-05');
 assert.equal(model.taipeiWeek('2026-10-12'),'2026-10-12');
 assert.equal(model.taipeiWeek('2026-10-18'),'2026-10-12');
+const leavePreview=model.parsePeopleAttendance({status:'ok',leaves_available:true,leaves:[{person_id:'one',name:'合成人員',group:'控制組',start:'2026-10-12',end:'2026-10-13',reason:'PRIVATE_REASON'},{person_id:'bad',start:'2026-10-14',end:'2026-10-12'}]});
+assert.equal(leavePreview.leaves.length,1);
+assert.equal(leavePreview.leaves_available,true);
+assert.doesNotMatch(JSON.stringify(leavePreview),/PRIVATE_REASON/);
+assert.equal(model.parsePeopleAttendance({status:'ok'}).leaves_available,null,'old snapshots cannot imply verified empty leave');
+assert.deepEqual(model.parsePeopleAttendance({status:'needs-permission',leaves:leavePreview.leaves,leaves_available:true}).leaves,[],'denied records are not exposed');
 assert.equal(model.attendanceValue(null),'—');
 assert.equal(model.attendanceValue(undefined),'—');
 assert.equal(model.attendanceValue(0),'0');

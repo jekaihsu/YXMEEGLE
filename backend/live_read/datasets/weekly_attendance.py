@@ -33,7 +33,7 @@ def project_people(users, app_id):
 
 
 def empty_view(days):
-    return dict(week_start=days[0], week_end=days[-1], days=days, people=[], trips=[],
+    return dict(week_start=days[0], week_end=days[-1], days=days, people=[], trips=[], leaves=[], leaves_available=False,
                 summary=dict(people=None, in_service=None, on_leave=None, on_trip=None, trips=None),
                 status='incomplete', as_of=None, missing_scopes=[], issues=[])
 
@@ -129,7 +129,7 @@ def fetch_week(adapter, users, app_id, tenant, days, roster_complete):
             label = day_labels(task['records'])
             if label:
                 person['attendance'][i] = '、'.join(sorted(set((person['attendance'][i] or '').split('、') + label.split('、')) - {''}))
-    unique = {}
+    unique, leave_records = {}, {}
     leave_people, trip_people = set(), set()
     for row in approvals:
         employee = row.get('user_id')
@@ -158,8 +158,10 @@ def fetch_week(adapter, users, app_id, tenant, days, roster_complete):
                 if kind == 'trip':
                     trip_people.add(person['id'])
                 # Leave durations and punch obligations are deliberately not inferred.
-                if kind != 'leave':
-                    ident = str(item.get('approval_id') or item.get('uniq_id') or f'{start}|{end}')
+                ident = str(item.get('approval_id') or item.get('uniq_id') or f'{start}|{end}')
+                if kind == 'leave':
+                    leave_records[(employee, ident)] = dict(person_id=person['id'], name=person['name'], group=person['group'], start=start, end=end)
+                else:
                     unique[(employee, kind, ident)] = dict(person_id=person['id'], name=person['name'], group=person['group'], kind=kind, start=start, end=end)
     issues.extend({'reason': 'invalid_attendance_identity', 'user_id': mapping[e]} for e in invalid if e in mapping)
     if not roster_complete:
@@ -172,6 +174,8 @@ def fetch_week(adapter, users, app_id, tenant, days, roster_complete):
     view.update(status='incomplete' if issues else 'ok', issues=issues, trips=sorted(unique.values(), key=lambda t: (t['start'], t['name'] or '')))
     roster_known = roster_complete and all(p['in_service'] is not None for p in people)
     approvals_known = roster_known and not identities['issues'] and not invalid and not any(i['reason'] == 'unread_approval' for i in issues)
+    view.update(leaves=sorted(leave_records.values(), key=lambda item: (item['start'], item['name'] or '')),
+                leaves_available=approvals_known)
     view['summary'] = dict(people=len(people) if roster_complete else None,
                            in_service=len(employed) if roster_known else None,
                            on_leave=len(leave_people) if approvals_known else None,
