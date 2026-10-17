@@ -55,7 +55,7 @@ class Kind(StrEnum):
     CREATED = 'created_time'
 
 
-LARK_TYPES = {Kind.TEXT: {1}, Kind.NUMBER: {2}, Kind.SELECT: {3}, Kind.MULTI: {4}, Kind.DATE: {5},
+LARK_TYPES = {Kind.TEXT: {1}, Kind.NUMBER: {2}, Kind.SELECT: {3}, Kind.MULTI: {3, 4}, Kind.DATE: {5},
               Kind.CHECKBOX: {7}, Kind.USERS: {11}, Kind.LINK: {18, 21}, Kind.CREATED: {1001}}
 
 NODE_FIELDS = {
@@ -95,7 +95,8 @@ def canon(kind, raw):
     if kind is Kind.LINK:
         return tuple(sorted(link_ids(raw)))
     if kind is Kind.MULTI:
-        return tuple(sorted({text(v).strip() for v in raw or [] if text(v).strip()}))
+        values = raw if isinstance(raw, list) else [raw] if raw else []
+        return tuple(sorted({text(v).strip() for v in values if text(v).strip()}))
     if kind is Kind.CHECKBOX:
         return raw is True
     raise ValueError(kind)

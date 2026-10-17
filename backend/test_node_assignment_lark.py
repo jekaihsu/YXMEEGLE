@@ -52,6 +52,17 @@ def test_roster_excludes_ambiguous_accounts_and_keeps_departed_people_unassignab
     assert roster.person('ou_c').employed is False
 
 
+def test_roster_reads_a_single_select_department_field():
+    roster = parse_roster([row('ou_a', '甲', '外業', '經理'), row('ou_b', '乙', ['PM'], '組員')])
+    assert roster.people['ou_a'].departments == frozenset({'外業'})
+    assert roster.people['ou_b'].departments == frozenset({'PM'})
+
+
+def test_people_schema_accepts_single_and_multi_select_departments():
+    from backend.node_assignment.lark_table import LARK_TYPES, Kind
+    assert LARK_TYPES[Kind.MULTI] == {3, 4}
+
+
 def test_roster_rejects_columns_it_did_not_ask_for():
     with pytest.raises(Failure, match='未要求的欄位'):
         parse_roster([{'record_id': 'r', 'fields': {'姓名': '甲', '薪資': 1}}])
