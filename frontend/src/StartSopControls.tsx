@@ -5,9 +5,9 @@ import {formatPlanQuantity} from './caseDetailView';
 import {currentSopStep, SOP_STEPS, type PlanNode} from './startSop';
 import type {NodeAssignmentList} from './nodeAssignmentApi';
 import type {useStartSop} from './useStartSop';
-export function PlanLine({node}: {node?: PlanNode}) {
+export function PlanLine({node, derived = false}: {node?: PlanNode; derived?: boolean}) {
  if (!node) return null;
- return <span className="sop-plan"><span>計畫 {formatPlanQuantity(node.planned_qty)}・合約項 {node.lines}・工項 {node.items}</span><span className="sop-chips">{([['native','原生'],['derived','推導'],['ambiguous','待確認'],['unlinked','未關聯']] as const).map(([key,label]) => node.items_basis[key] > 0 && <Badge key={key}>{label} {node.items_basis[key]}</Badge>)}</span>{(node.items_basis.derived > 0 || node.items_basis.ambiguous > 0) && <small>依工編推導，非 Lark 關聯。</small>}</span>;
+ return <span className="sop-plan"><span>計畫 {formatPlanQuantity(node.planned_qty)}・合約項 {node.lines}・工項 {node.items}</span><span className="sop-chips">{([['native','原生'],['derived','推導'],['ambiguous','待確認'],['unlinked','未關聯']] as const).map(([key,label]) => node.items_basis[key] > 0 && <Badge key={key}>{label} {node.items_basis[key]}</Badge>)}</span>{(derived || node.items_basis.derived > 0 || node.items_basis.ambiguous > 0) && <small>依工編推導，非 Lark 關聯。</small>}</span>;
 }
 export function SopControls({sop}: {sop: ReturnType<typeof useStartSop>}) {
  const [open, setOpen] = useState(false);
