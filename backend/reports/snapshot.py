@@ -66,6 +66,9 @@ class SnapshotStore:
             self._future=self._executor.submit(self._build)
             return self._future
 
+    def peek(self):
+        with self._lock: return self._snapshot
+
     def get(self):
         with self._lock: current=self._snapshot
         if current is None or self.clock()-current['at']>=self.ttl:

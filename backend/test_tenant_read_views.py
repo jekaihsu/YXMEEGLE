@@ -13,7 +13,7 @@ from .test_p2_int_routes import build_state, fresh_cache, B, KT, WT, assert_no_a
 
 READS = [
     '/api/projects', '/api/projects/{vis}/navigation',
-    '/api/my-work', '/api/confirmations', '/api/case-detail/{vis}',
+    '/api/my-work', '/api/confirmations', '/api/case-detail/{vis}', '/api/projects/{vis}/progress',
     '/api/contract-detail?key={contract}', '/api/work-item-detail?key={work}', '/api/daily-reports',
 ]
 
@@ -62,8 +62,10 @@ def test_tenant_only_view_and_all_privileged_routes(tenant_views, template):
     response = client.get(template.format(**ids))
     assert response.status_code == 200, response.text
     assert HIDDEN_NAME not in response.text
-    if template.startswith(('/api/confirmations', '/api/case-detail', '/api/contract-detail', '/api/work-item-detail')):
+    if template.startswith(('/api/confirmations', '/api/case-detail', '/api/contract-detail', '/api/work-item-detail')) or template.endswith('/progress'):
         assert_no_amount(response)
+    if template.endswith('/progress'):
+        assert response.json()['finance']['restricted'] is True and response.json()['sources']['reports_status'] == 'restricted'
     if template == '/api/my-work':
         assert response.json()['readState'] == 'ready'
         assert response.json()['assignment'] == 'unassigned'
