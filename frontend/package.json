@@ -54,7 +54,8 @@
     "test:case-amount-label": "node test-case-amount-label.mjs",
     "test:reports-progress": "node test-reports-progress.mjs && node test-reports-progress-fixes.mjs",
     "test:reports": "node test-reports-view.mjs && node test-reports-requests.mjs && node test-reports-mock.mjs",
-    "test:unified-home": "node test-unified-home.mjs"
+    "test:unified-home": "node test-unified-home.mjs",
+    "test:project-progress": "node test-project-progress.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",

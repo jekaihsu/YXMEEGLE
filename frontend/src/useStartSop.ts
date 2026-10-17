@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {getSessionEpoch} from './api';
 import {assignmentErrorMessage, assignmentRequest, NodeAssignmentError, requestId} from './nodeAssignmentApi';
-import {fetchSop, parseSopResult, sopResultMessage, SOP_ERRORS, sopPath, type SopPreview} from './startSop';
+import {canConfirmSop, fetchSop, parseSopResult, sopResultMessage, SOP_ERRORS, sopPath, type SopPreview} from './startSop';
 type State = {kind: 'hidden'} | {kind: 'forbidden'; reason: string} | {kind: 'ready'; data: SopPreview};
 let epoch = getSessionEpoch();
 const cache = new Map<string, SopPreview>();
@@ -32,7 +32,7 @@ export function useStartSop(id: string, enabled: boolean, refreshOverview: () =>
  }, [id]);
  useEffect(() => {life.current = {active: true, epoch: getSessionEpoch()}; setNotice(''); pendingSync.current = false; attempt.current = null; setState(enabled && epoch === getSessionEpoch() && cache.has(id) ? {kind: 'ready', data: cache.get(id)!} : {kind: 'hidden'}); if (enabled) void reload(); return () => {life.current.active = false}}, [id, enabled, reload]);
  const confirm = async () => {
-  if (posting.current || state.kind !== 'ready' || !state.data.can_start || !state.data.eligible || state.data.blockers.length || state.data.already_started) return false;
+  if (posting.current || state.kind !== 'ready' || !canConfirmSop(state.data)) return false;
   posting.current = true; setBusy(true); setNotice('');
   const scope = life.current, valid = () => scope.active && scope === life.current && scope.epoch === getSessionEpoch();
   const hash = state.data.preview_hash;

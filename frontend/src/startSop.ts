@@ -37,7 +37,7 @@ export const sopPath = (id: string) => `/api/projects/${encodeURIComponent(id)}/
 export async function fetchSop(id: string, current: () => boolean) {return parseSopPreview(await assignmentRequest(sopPath(id), {cache: 'no-store'}, current))}
 export const SOP_STEPS = [
  ['確認單建立','PM／行政','在來源 Lark 建立確認單'],
- ['啟動 SOP','PM 或主管','按下「啟動 SOP」預覽並確認'],
+ ['啟動 SOP','PM 或主管','可在 Lark 或此處啟動；節點已存在即已啟動，計畫任務可選擇補建'],
  ['指派負責人','節點主管','在節點上指派或認領'],
  ['執行與回報','負責人','完成任務並上傳成果'],
  ['送審','主管','全部任務完成後完成節點'],
@@ -84,3 +84,6 @@ export function sopResultMessage(result: SopResult, preview: SopPreview): string
  const errors = result.results.filter(r => r.error).map(r => `${preview.nodes.find(n => n.key === r.key)?.label || r.key}（${SOP_ERRORS[r.error || ''] || r.error}${r.error === 'outcome_unknown' && r.first_sent_at !== undefined ? `；首次送出 ${taipeiTime(new Date(r.first_sent_at * 1000).toISOString())}` : ''}）`).join('、');
  return `已完成 ${finished} 個節點。未完成：${errors || '部分節點尚未建立'}。稍後再按一次可安全續做。${notes ? `\n${notes}` : ''}`;
 }
+
+export function sopActionLabel(preview: Pick<SopPreview, 'already_started'|'seeds_optional'>) {return !preview.already_started ? '啟動 SOP' : preview.seeds_optional ? '補建計畫任務（選用）' : null}
+export function canConfirmSop(preview: SopPreview) {return preview.can_start && !preview.blockers.length && (preview.already_started ? preview.seeds_optional : preview.eligible)}

@@ -33,10 +33,10 @@ function Overview({data, selected = '', onSelect, onPrefetch, preview}: {preview
     const percent = n ? Math.round(Math.min(1, n.progress) * 100) : 0;
     const hint = n ? actionHint(n, data?.writes_enabled ? data.can[key] || {} : {}) : '';
     return <button key={key} onMouseEnter={() => onPrefetch?.(key)} onFocus={() => onPrefetch?.(key)} className={`na-flow-card na-card-${statusTone(n?.derived_status || '')}${data?.summary.current_node === key ? ' is-current' : ''}${selected === key ? ' is-selected' : ''}${!data ? ' is-skeleton' : ''}`} disabled={!n} aria-current={data?.summary.current_node === key ? 'step' : undefined} aria-expanded={n ? selected === key : undefined} aria-label={`${label}節點，${status || '讀取中'}，${n?.owners.map(p => p.name).join('、') || '尚未指派'}`} onClick={() => onSelect?.(key)}>
-      <span className="na-card-top"><strong>{label}</strong>{n ? <StatusChip status={n.derived_status}/> : <span className="na-placeholder na-placeholder-status"/>}</span>
+      <span className="na-card-top"><strong>{label}</strong>{n ? <><StatusChip status={n.derived_status}/>{n.auto_done && <small className="na-auto-done" title={n.auto_done.reason}>自動判定 · {n.auto_done.reason}</small>}</> : <span className="na-placeholder na-placeholder-status"/>}</span>
       {n ? <People people={n.owners} compact/> : <span className="na-placeholder na-placeholder-people"/>}
-      <PlanLine node={preview?.nodes.find(n => n.key === key)}/><span className="na-card-progress">{n ? <><span>{n.tasks.done}/{n.tasks.total} 項任務</span><strong>{percent}%</strong></> : <span className="na-placeholder"/>}</span>
-      <span className="na-progress-track" aria-hidden="true"><span style={{width: `${percent}%`}}/></span>
+      <PlanLine node={preview?.nodes.find(n => n.key === key)}/><span className="na-card-progress">{n ? <><span>{n.tasks.done}/{n.tasks.total} 項任務</span><strong>{n.tasks.total ? `${percent}%` : '無任務'}</strong></> : <span className="na-placeholder"/>}</span>
+      <span className="na-progress-track" aria-hidden="true" hidden={!n?.tasks.total}><span style={{width: `${percent}%`}}/></span>
       <span className={`na-card-deadline${overdue ? ' is-overdue' : ''}`}>{n ? <><Clock3 size={12}/>{deadlineLabel(nextDue)}{overdue && <strong>{status === '未開始' ? '期限已過，等待條件' : '逾期'}</strong>}</> : <span className="na-placeholder"/>}</span>
       {n && <span className="na-card-footer"><span className={hint ? 'needs-action' : 'na-muted'}>{hint || '檢視交接'}</span>{!!n.warnings.length && <span className="na-warning-dot" title={n.warnings.join('、')} aria-label="有節點警告"/>}</span>}
     </button>;
@@ -118,7 +118,7 @@ export function NodeAssignments({projectId, enabled = false, legacy, before, tar
       const can = data.writes_enabled ? data.can[n.key] || {} : {}, hint = actionHint(n, can), open = expanded === n.key, panelId = `${listId}-${n.key}`;
       return <li key={n.key} className={`na-list-item${open ? ' is-expanded' : ''}`}>
         <button className="na-row" data-assignment-node={n.key} onMouseEnter={() => prefetch(n.key)} onFocus={() => prefetch(n.key)} aria-label={`${n.label}節點，${nodeStatusLabel(n.derived_status)}，${n.tasks.done}/${n.tasks.total} 項任務`} aria-expanded={open} aria-controls={panelId} onClick={() => {setExpanded(open ? '' : n.key); assignments.clearFeedback()}}>
-          <span className="na-node-cell"><span className="na-index">{String(i + 1).padStart(2, '0')}</span><span><strong>{n.label}</strong><StatusChip status={n.derived_status}/></span></span>
+          <span className="na-node-cell"><span className="na-index">{String(i + 1).padStart(2, '0')}</span><span><strong>{n.label}</strong><StatusChip status={n.derived_status}/>{n.auto_done && <small className="na-auto-done" title={n.auto_done.reason}>自動判定 · {n.auto_done.reason}</small>}</span></span>
           <span className="na-progress-cell"><strong>{n.tasks.done}/{n.tasks.total}</strong><span className="na-progress-track" aria-hidden="true"><span style={{width: `${n.tasks.total ? Math.min(100, n.tasks.done / n.tasks.total * 100) : 0}%`}}/></span><small className="na-mobile-label">項任務完成</small></span>
           <People people={n.owners}/><span className="na-deadline"><span className="na-mobile-label">下個期限 </span>{deadlineLabel(n.next_due === undefined ? n.deadline : n.next_due)}</span>
           <span className={`na-hint${hint ? ' needs-action' : ''}`}>{hint || '檢視進度'}</span><ChevronDown size={17} className="na-chevron"/>
