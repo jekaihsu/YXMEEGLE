@@ -180,17 +180,20 @@ class Plan:
     warnings: tuple[str, ...] = ()
     before: dict = field(default_factory=dict)
     pre_create_task_ids: tuple[str, ...] | None = None
+    created_node: bool = False
 
     def to_json(self):
         return {'kind': self.kind, 'record_id': self.record_id, 'base_revision': self.base_revision,
                 'changes': self.changes, 'client_token': self.client_token, 'warnings': list(self.warnings),
-                'before': self.before, 'pre_create_task_ids': self.pre_create_task_ids}
+                'before': self.before, 'pre_create_task_ids': self.pre_create_task_ids,
+                'created_node': self.created_node}
 
     @classmethod
     def from_json(cls, data):
         return cls(data['kind'], data['record_id'], data['base_revision'], data['changes'], data.get('client_token'),
                    tuple(data.get('warnings', ())), data.get('before', {}),
-                   tuple(data['pre_create_task_ids']) if data.get('pre_create_task_ids') is not None else None)
+                   tuple(data['pre_create_task_ids']) if data.get('pre_create_task_ids') is not None else None,
+                   data.get('created_node', False))
 
 
 def facts_of(snapshot: CaseSnapshot, skipped, overrides=None) -> dict[NodeKey, NodeFacts]:

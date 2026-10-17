@@ -402,6 +402,46 @@ def test_a_task_create_lost_after_landing_is_reconciled_not_repeated(s):
     assert (resumed['results'][0]['task'], resumed['results'][0]['error']) == ('created', None)
 
 
+def test_a_rejected_task_after_the_node_landed_is_a_partial_success(s):
+    fail_nth_create(s, TASKS, 1, httpx.Response(400, json={'code': 1254001, 'msg': 'bad'}))
+    response = start(s, 'r1')
+    body = response.json()
+    assert (body['started'], body['complete']) == (True, False)
+    assert [(r['key'], r['node'], r['task'], r['error']) for r in body['results']] == [
+        ('field', 'created', 'failed', 'lark_error'), ('control', 'created', 'created', None),
+        ('mapping', 'created', 'created', None), ('report', 'created', 'created', None)]
+    assert len(s.fake.rows(NODES)) == 4 and len(s.fake.rows(TASKS)) == 3
+    resumed = start(s, 'r1').json()
+    assert resumed['complete'] is True
+    assert len(s.fake.rows(TASKS)) == 4
+
+
+def test_every_task_rejected_still_answers_200_because_the_nodes_landed(s):
+    s.fake.fault('POST', f'{TASKS}/records', lambda request: httpx.Response(400, json={'code': 1254001, 'msg': 'bad'}),
+                 times=4)
+    body = start(s, 'r1').json()
+    assert (body['started'], body['complete']) == (True, False)
+    assert [(r['node'], r['task'], r['error']) for r in body['results']] == [('created', 'failed', 'lark_error')] * 4
+    assert len(s.fake.rows(NODES)) == 4 and len(s.fake.rows(TASKS)) == 0
+
+
+def test_resume_after_a_crash_that_landed_reports_created_then_a_plain_press_reports_existing(s):
+    def lost_response(request):
+        s.fake.tokens[request.url.params['client_token']] = s.fake.add(TASKS, json.loads(request.content)['fields'])
+        return httpx.Response(504, text='gateway timeout')
+    s.fake.fault('POST', f'{TASKS}/records', lost_response)
+    first = start(s, 'r1').json()
+    assert [(r['node'], r['task'], r['error']) for r in first['results']][:2] == [
+        ('created', 'failed', 'outcome_unknown'), ('created', 'created', None)]
+    resumed = start(s, 'r1').json()
+    assert (resumed['started'], resumed['complete']) == (True, True)
+    assert [(r['node'], r['task']) for r in resumed['results']] == [('created', 'created')] * 4
+    plain = start(s, 'r2').json()
+    assert (plain['started'], plain['complete']) == (False, True)
+    assert [(r['node'], r['task']) for r in plain['results']] == [('existing', 'existing')] * 4
+    assert len(s.fake.rows(TASKS)) == 4
+
+
 def test_a_failure_on_every_node_is_returned_as_the_lark_error(s):
     s.fake.fault('POST', f'{NODES}/records', lambda request: httpx.Response(
         403, json={'code': 1254302, 'msg': 'NoPermission'}))

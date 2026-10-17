@@ -37,8 +37,15 @@ class NodeResult:
                 'error': self.failure.code if self.failure else None}
 
 
-def failed(key: NodeKey, failure: Failure) -> NodeResult:
-    return NodeResult(key, Outcome.FAILED, Outcome.FAILED, failure)
+def failed(key: NodeKey, failure: Failure, node: Outcome = Outcome.FAILED) -> NodeResult:
+    return NodeResult(key, node, Outcome.FAILED, failure)
+
+
+def node_outcome(landed: list[Plan]) -> Outcome:
+    """What a failed write already did to the node row, read from the plans it pinned before failing."""
+    if not any(p.record_id or 'node' in p.changes for p in landed):
+        return Outcome.FAILED
+    return Outcome.CREATED if any(p.created_node for p in landed) else Outcome.EXISTING
 
 
 class StartSopRunner:
@@ -128,9 +135,10 @@ class StartSopRunner:
                 if results[-1].failure and results[-1].failure.code in SYSTEMIC:
                     halt = results[-1].failure
         failures = [r.failure for r in results if r.failure]
-        if len(failures) == len(results):
+        started = any(Outcome.CREATED in (r.node, r.task) for r in results)
+        if len(failures) == len(results) and not started:
             raise failures[0]
-        body = {'started': any(Outcome.CREATED in (r.node, r.task) for r in results), 'complete': not failures,
+        body = {'started': started, 'complete': not failures,
                 'results': [r.public() for r in results], 'overview': self._overview(ctx, code)}
         if not failures:
             svc.receipts.save(receipt, fingerprint, {'state': 'done', 'status': 200, 'body': body})
@@ -154,15 +162,12 @@ class StartSopRunner:
 
     def _seed(self, ctx, request_id, node: PlannedNode, preview_hash) -> NodeResult:
         svc, key = self.svc, node.key
-        seen = {'node_created': False, 'task': Outcome.EXISTING}
+        observed, landed = {}, []
 
         def plan_fn(s, _resumed):
             if (reason := start_denial(s.actor, ctx.project, key)):
                 raise Denied(reason)
-            state = observe(s.snapshot, s.skipped, key)
-            seen['node_created'] = state.will_create_node
-            if not state.open and not state.seed_task_exists:
-                seen['task'] = Outcome.SKIPPED
+            state = observed['state'] = observe(s.snapshot, s.skipped, key)
             if state.will_create_task:
                 return Plan('task_create', None, None, {
                     'title': node.title, 'detail': node.detail, 'assignee': None, 'assigned_by': [s.actor.open_id],
@@ -170,9 +175,10 @@ class StartSopRunner:
                     'status': TaskStatus.TODO.value})
             return Plan('node', None, None, {}) if state.will_create_node else None
 
-        def finish(fin_ctx, _client, fin_code, fin_key, plan, _roster, fin_receipt, fingerprint, record):
-            body = {'node_created': seen['node_created'], 'task_created': plan.kind == 'task_create'}
-            svc._converge(fin_ctx, _client, fin_code, fin_key, plan)
+        def finish(fin_ctx, client, fin_code, fin_key, plan, _roster, fin_receipt, fingerprint, record):
+            body = {'node': (Outcome.CREATED if plan.created_node else Outcome.EXISTING).value,
+                    'task': (Outcome.CREATED if plan.kind == 'task_create' else Outcome.SKIPPED).value}
+            svc._converge(fin_ctx, client, fin_code, fin_key, plan)
             svc.receipts.save(fin_receipt, fingerprint, {'state': 'done', 'status': 200, 'body': body})
             record('success', record_id=plan.record_id,
                    changes=svc._changes(fin_ctx, assignment_key(fin_code, fin_key), plan))
@@ -180,10 +186,9 @@ class StartSopRunner:
 
         try:
             _, body, _ = svc.mutate(ctx, key, ACTION, f'start-sop:{request_id}:{key.value}',
-                                    {'body': {'preview_hash': preview_hash}}, plan_fn, finish=finish)
+                                    {'body': {'preview_hash': preview_hash}}, plan_fn, finish=finish, landed=landed)
         except Failure as exc:
-            return failed(key, exc)
+            return failed(key, exc, node_outcome(landed))
         if body is None:
-            return NodeResult(key, Outcome.EXISTING, seen['task'])
-        return NodeResult(key, Outcome.CREATED if body['node_created'] else Outcome.EXISTING,
-                          Outcome.CREATED if body['task_created'] else Outcome.SKIPPED)
+            return NodeResult(key, Outcome.EXISTING, Outcome.EXISTING if observed['state'].seed_task_exists else Outcome.SKIPPED)
+        return NodeResult(key, Outcome(body['node']), Outcome(body['task']))

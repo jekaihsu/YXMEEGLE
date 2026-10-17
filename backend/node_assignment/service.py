@@ -286,10 +286,12 @@ class NodeAssignmentService:
 
     # Writes
 
-    def mutate(self, ctx: Context, key: NodeKey, action: str, request_id, payload, plan_fn, *, finish=None):
+    def mutate(self, ctx: Context, key: NodeKey, action: str, request_id, payload, plan_fn, *, finish=None,
+               landed=None):
         """plan_fn(situation, resumed_plan) -> Plan, or None when there is nothing to write (body is then None).
 
-        `finish` replaces the default node-detail response. Returns (http_status, body, replayed).
+        `finish` replaces the default node-detail response. `landed`, when given, collects every plan pinned before
+        a failure so the caller can tell what already reached Lark. Returns (http_status, body, replayed).
         """
         finish = finish or self._finish
         code = self.open(ctx, write=True)
@@ -372,7 +374,7 @@ class NodeAssignmentService:
                 except IllegalTransition as exc:
                     raise Failure('illegal_transition', str(exc)) from None
                 self.receipts.save(receipt, fingerprint, {'state': 'pending', 'plan': plan.to_json()})
-                pinned = []
+                pinned = landed if landed is not None else []
                 try:
                     plan = self._execute(client, situation, plan, receipt, fingerprint, pinned)
                 except Failure as exc:
@@ -404,14 +406,17 @@ class NodeAssignmentService:
         return rows
 
     def _node_row(self, client, s: Situation, receipt):
-        """Search first, create once, then search again so a racing duplicate is reported, not picked."""
+        """Search first, create once, then search again so a racing duplicate is reported, not picked.
+
+        Returns the row and whether this request issued the create.
+        """
         row = s.snapshot.row(s.key)
         if row is not None:
-            return row
+            return row, False
         akey = assignment_key(s.code, s.key)
         found = self._rows_for(client, akey)
         if found:
-            return found[0]
+            return found[0], False
         status = derive_chain(facts_of(s.snapshot, s.skipped))[s.key]
         initial = {'assignment_key': akey, 'code': s.code, 'node': NODE_LABELS[s.key], 'status': status.value}
         if s.confirmation_record:
@@ -424,7 +429,7 @@ class NodeAssignmentService:
         found = self._rows_for(client, akey)
         if not found:
             raise Failure('outcome_unknown', '節點指派列建立結果未知；請以同一 request_id 重送以核對結果')
-        return found[0]
+        return found[0], True
 
     def _verify(self, client, table, spec, record_id, fields):
         wrong = mismatches(spec, fields, client.get(table, record_id))
@@ -438,11 +443,12 @@ class NodeAssignmentService:
             return updated
 
         if plan.kind == 'node' and plan.record_id is None:
-            row = self._node_row(client, s, receipt)
-            plan = pin(replace(plan, record_id=row.record_id, base_revision=row.revision))
+            row, created = self._node_row(client, s, receipt)
+            plan = pin(replace(plan, record_id=row.record_id, base_revision=row.revision, created_node=created))
         if plan.kind == 'task_create':
             if 'node' not in plan.changes:
-                plan = pin(replace(plan, changes={**plan.changes, 'node': [self._node_row(client, s, receipt).record_id]}))
+                row, created = self._node_row(client, s, receipt)
+                plan = pin(replace(plan, changes={**plan.changes, 'node': [row.record_id]}, created_node=created))
             if plan.pre_create_task_ids is None:
                 row = client.get(Table.NODES, plan.changes['node'][0])
                 plan = pin(replace(plan, pre_create_task_ids=parse_node(row).task_ids))
