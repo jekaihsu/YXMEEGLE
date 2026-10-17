@@ -1217,3 +1217,27 @@ def test_start_sop_agrees_with_the_evidence_overlay_and_leaves_auto_done_rows_al
     assert overview['pm']['derived_status'] == '待處理'
     states = {f['節點']: f['狀態'] for f in s.fake.rows(NODES).values()}
     assert (states['業務'], states['PM'], states['確認單']) == ('未開始', '未開始', '未開始')
+
+
+def approve_nodes(s, *labels):
+    for rid, fields in s.fake.rows(NODES).items():
+        if fields['節點'] in labels:
+            s.fake.tables[NODES][rid].update({'狀態': '已完成', '核准人': [{'id': 'ou_vp'}], '核准時間': date_millis('2026-10-01')})
+
+
+def test_seeds_pending_counts_exactly_the_seed_tasks_the_post_will_create(s):
+    lark_button_rows(s)
+    approve_nodes(s, '業務', 'PM', '確認單', '外業')
+    body = preview(s)
+    assert (body['seeds_pending'], body['seeds_optional']) == (3, True)
+    assert [n['will_create_task'] for n in body['nodes']] == [False, True, True, True]
+    created = [r['key'] for r in start(s).json()['results'] if r['task'] == 'created']
+    assert created == ['control', 'mapping', 'report'] and len(s.fake.rows(TASKS)) == 3
+
+
+def test_seeds_are_not_optional_when_every_node_is_finished(s):
+    lark_button_rows(s)
+    approve_nodes(s, '業務', 'PM', '確認單', '外業', '控制', '圖資', '報告')
+    body = preview(s)
+    assert (body['already_started'], body['seeds_pending'], body['seeds_optional']) == (True, 0, False)
+    assert not any(n['will_create_task'] for n in body['nodes'])

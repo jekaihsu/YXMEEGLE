@@ -163,7 +163,7 @@ class HomePanels:
                 case = {'id': project['id'] if project else None, 'code': code, 'name': project.get('name') if project else None,
                         'relation_state': 'verified' if project else 'unverified'}
                 status = STATUS.get(derived if kind == 'node_assignment' and derived else source_status, 'unknown')
-                if kind == 'node_assignment' and row.rejected:
+                if kind == 'node_assignment' and row.rejected and status != 'done':
                     status = 'rework'
                 valid_tasks = [t for t in linked.get(rid, ()) if t.status is not TaskStatus.CANCELLED]
                 deadlines = [t.deadline for t in valid_tasks if t.deadline]

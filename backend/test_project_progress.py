@@ -1,6 +1,7 @@
 """GET /api/projects/{id}/progress over the isolated P2 SQLite workspace plus a synthetic reports snapshot."""
 import json
 import pytest
+from .project_progress import ReportsView, build_project_progress
 from .contract_links import build_projection, record_key
 from .reports.snapshot import SnapshotStore
 from .test_p2_int_routes import http, B, CT, KT, WT, WID, conf, contract, work, ident, fresh_cache, build_state  # noqa: F401
@@ -167,7 +168,7 @@ def test_v3_match_by_quote_number_and_report_rows(progress):
     rows = body['production']['report_rows']
     assert len(rows) == 1 and rows[0]['case_key'] == 'recvsaz8kB86Jh' and rows[0]['dept'] == 'field' and rows[0]['week'] == '2026-08-10'
     assert (rows[0]['actual'], rows[0]['actual_days'], rows[0]['planned_days'], rows[0]['done_total'], rows[0]['status']) == (0.25, 1, 0, 0.25, '未填')
-    assert body['production']['field']['actual'] == {'known': True, 'value': '0.25', 'unit_note': '營業額點數（v3 案件累計外業，未經驗收）',
+    assert body['production']['field']['actual'] == {'known': True, 'value': '0.25', 'unit_note': '營業額點數（v3 週報登記冊案件累計外業，未經驗收）',
                                                       'reason': None, 'source': 'v3_reports'}
     assert body['sources']['reports_status'] == 'ok' and body['sources']['reports_fetched_at']
 
@@ -311,3 +312,90 @@ def test_nothing_is_mutated_by_a_read(progress):
     assert client.get(f'/api/projects/{vis}/progress').json() == first
     with app.state.sessions() as db:
         assert db.get(WorkspaceRow, WID).version == version
+
+
+def bare(code='115588', **extra):
+    return {'id': 'p1', 'code': code, 'source_records': [], 'quotes': [], 'daily_reports': [], **extra}
+
+
+def direct(project, **kwargs):
+    return build_project_progress({'projects': [project], 'contract_items': kwargs.pop('lines', [])}, 'p1', **kwargs)
+
+
+def sales(body):
+    return stage(body, 'sales')['state']
+
+
+def test_tombstoned_confirmation_and_lines_prove_nothing_in_progress():
+    state = {'projects': [bare(source_records=[{'kind': 'confirmation', 'source_missing': True, 'fields': {}}])],
+             'source_confirmations': [{'id': 'sc', 'project_id': 'p1', 'source_kind': 'confirmation', 'source_missing': True, 'fields': {}}],
+             'contract_items': [{'id': 'a', 'project_id': 'p1', 'source_missing': True, 'fields': {}}]}
+    body = build_project_progress(state, 'p1')
+    assert [stage(body, k)['state'] for k in ('sales', 'pm', 'confirmation')] == ['unknown', 'waiting', 'waiting']
+    assert body['identity']['confirmation']['present'] is False
+
+
+def test_tombstoned_source_record_confirmation_is_skipped_in_the_fallback():
+    live = {'projects': [bare(source_records=[{'kind': 'confirmation', 'fields': {}}])], 'contract_items': [{'id': 'a', 'project_id': 'p1', 'fields': {}}]}
+    assert [stage(build_project_progress(live, 'p1'), k)['state'] for k in ('pm', 'confirmation')] == ['done', 'done']
+    live['projects'][0]['source_records'][0]['source_missing'] = True
+    assert [stage(build_project_progress(live, 'p1'), k)['state'] for k in ('pm', 'confirmation')] == ['waiting', 'waiting']
+
+
+@pytest.mark.parametrize('code, case_type, expected', [
+    ('\u200bC115264', 'formal', 'done'), ('C115238-01', 'formal', 'done'), ('C000000', 'formal', 'unknown'),
+    ('C115264', 'intake', 'unknown')])
+def test_sales_by_c_code_uses_the_shared_predicate(code, case_type, expected):
+    assert sales(direct(bare(code, case_type=case_type))) == expected
+
+
+def test_restricted_viewer_learns_nothing_about_invoicing():
+    project = bare(source_records=[{'kind': 'confirmation', 'fields': {}}],
+                   quotes=[{'quote_code': 'Q1', 'fields': {'累計已請款': '1,500,000', '案件已入帳': True}}])
+    body = direct(project, amounts=False)
+    for key in ('billing', 'settlement'):
+        assert (stage(body, key)['state'], stage(body, key)['basis'], stage(body, key)['evidence'][0]['value']) == \
+            ('unknown', 'none', '金額欄位僅限 PM／主管查看')
+    assert '1500000' not in json.dumps(body, ensure_ascii=False) and '已有累計已請款' not in json.dumps(body, ensure_ascii=False)
+    visible = direct(project, amounts=True)
+    assert (stage(visible, 'billing')['state'], stage(visible, 'settlement')['state']) == ('done', 'done')
+
+
+def test_cumulative_v3_points_are_actual_without_any_weekly_rows():
+    state, pid, _ = chain_state()
+    store = SnapshotStore(RawReader([('recV3', 'C115264', '執行中', 0.25)]))
+    store.get()
+    try:
+        body = build_project_progress(state, pid, reports=ReportsView(store), amounts=True)
+    finally:
+        store.close()
+    assert body['production']['report_rows'] == []
+    assert body['production']['field']['actual'] == {'known': True, 'value': '0.25', 'source': 'v3_reports', 'reason': None,
+                                                     'unit_note': '營業額點數（v3 週報登記冊案件累計外業，未經驗收）'}
+    assert stage(body, 'field')['state'] == 'active'
+    assert body['production']['control']['actual']['known'] is False
+
+
+def test_ambiguous_v3_never_borrows_a_cumulative_actual():
+    state, pid, _ = chain_state(quotes=(('115588', 'C115264', '報價中'),))
+    store = SnapshotStore(RawReader([('recA', 'C115264', '執行中', 0.25), ('recB', '115588', '執行中', 0.5)]))
+    store.get()
+    try:
+        body = build_project_progress(state, pid, reports=ReportsView(store), amounts=True)
+    finally:
+        store.close()
+    assert body['identity']['v3_ambiguous'] is True and body['production']['field']['actual']['known'] is False
+
+
+@pytest.mark.parametrize('points', [True, False, float('nan'), float('inf'), float('-inf'), '1', None])
+def test_non_numeric_or_non_finite_points_are_not_known(points):
+    body = direct(bare(daily_reports=[{'department': '外業組', 'points': points, 'date': '2026-10-01'}]))
+    assert body['production']['field']['actual'] == {'known': False, 'value': None, 'unit_note': None, 'source': None,
+                                                     'reason': '已有日報連結，但完成數量尚未投影'}
+
+
+def test_zero_points_daily_is_a_known_zero_report():
+    body = direct(bare(daily_reports=[{'department': '外業組', 'points': 0, 'date': '2026-10-01'}]))
+    assert body['production']['field']['actual']['known'] is True and body['production']['field']['actual']['value'] == '0'
+    assert stage(body, 'field')['state'] == 'active'
+    assert stage(body, 'field')['evidence'][-1]['value'].startswith('0（')

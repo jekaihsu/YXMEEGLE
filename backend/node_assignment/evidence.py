@@ -3,14 +3,11 @@
 Pure and read-only: the result is overlaid on the derived chain and never written to Lark. Later nodes
 (外業 to 結算) are never inferred. Edit RULES to change what counts as evidence.
 """
-import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
-from ..sources import normalized_case
+from ..case_evidence import live_confirmation_fields, live_contract_lines, proves_sales_by_code
 from .domain import NodeKey
-
-C_CODE = re.compile(r'[Cc]\d+')
 
 
 @dataclass(frozen=True)
@@ -24,7 +21,7 @@ class AutoDone:
 
 @dataclass(frozen=True)
 class Basis:
-    code: str
+    c_code: bool
     has_confirmation: bool
     contract_lines: int
 
@@ -39,19 +36,15 @@ class Rule:
 # The first rule that claims a node wins. A rule's reason is None when it does not apply.
 RULES = (
     Rule('c_code', (NodeKey.SALES,),
-         lambda b: '工編以 C 開頭，業務階段已完成' if C_CODE.match(b.code) else None),
+         lambda b: '工編以 C 開頭，業務階段已完成' if b.c_code else None),
     Rule('confirmation_lines', (NodeKey.SALES, NodeKey.PM, NodeKey.CONFIRMATION),
          lambda b: f'已建立工程確認單（{b.contract_lines} 筆合約工項）' if b.has_confirmation and b.contract_lines else None),
 )
 
 
 def basis_of(project, state) -> Basis:
-    pid = project.get('id')
-    confirmed = any(isinstance(r, dict) and r.get('kind') == 'confirmation' for r in project.get('source_records') or []) \
-        or any(c.get('project_id') == pid and c.get('source_kind') == 'confirmation'
-               for c in state.get('source_confirmations') or [])
-    lines = sum(1 for c in state.get('contract_items') or [] if c.get('project_id') == pid)
-    return Basis(normalized_case(project.get('code')), confirmed, lines)
+    return Basis(proves_sales_by_code(project), bool(live_confirmation_fields(state, project)),
+                 len(live_contract_lines(state, project)))
 
 
 def evidence_for(project, state) -> dict[NodeKey, AutoDone]:

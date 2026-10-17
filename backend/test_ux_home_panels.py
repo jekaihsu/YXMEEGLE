@@ -249,3 +249,18 @@ def test_roster_failure_does_not_claim_zero_confirmations(home):
     assert result['counts']['node_assignments'] is None
     assert result['total_count'] is None
     assert result['complete'] is False
+
+
+def test_evidence_done_node_with_a_rejection_reason_is_completed_not_rework(home):
+    home.state['projects'][0]['code'] = 'C115264'
+    rid = home.fake.add(NODES, {'指派鍵': 'C115264|業務', '確認單編號': 'C115264', '節點': '業務', '工程確認單': ['recCONF1'],
+                               '負責人': [{'id': 'ou_sales'}], '狀態': '待處理', '退回原因': '資料有誤'})
+    completed = home.read('ou_sales', panel='completed')['items']
+    assert [(i['source']['record_id'], i['derived_status'], i['status']) for i in completed] == [(rid, 'done', 'done')]
+    assert rid not in [i['source']['record_id'] for i in home.read('ou_sales', panel='assigned')['items']]
+
+
+def test_a_rejected_open_node_is_still_rework(home):
+    rid = node(home, '外業', owner='ou_sales', 退回原因='資料有誤')
+    row = next(r for r in home.read('ou_sales')['items'] if r['source']['record_id'] == rid)
+    assert row['status'] == 'rework'

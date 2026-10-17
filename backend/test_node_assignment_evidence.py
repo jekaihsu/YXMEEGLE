@@ -154,3 +154,45 @@ def test_pure_rules(h):
     assert evidence_for({'id': 'p1', 'code': '115588'}, {'contract_items': by_state['contract_items']}) == {}
     assert evidence_for({'id': 'p1', 'code': ''}, {}) == {}
     assert evidence_for({'id': 'p1'}, {}) == {}
+
+
+def tombstone_state(confirmation_missing=False, lines_missing=False):
+    return {'contract_items': [{'id': 'a', 'project_id': 'p1', 'source_missing': lines_missing}],
+            'source_confirmations': [{'id': 'sc', 'project_id': 'p1', 'source_kind': 'confirmation',
+                                      'source_missing': confirmation_missing, 'fields': {}}]}
+
+
+@pytest.mark.parametrize('confirmation_missing, lines_missing, expected', [
+    (False, False, {'sales', 'pm', 'confirmation'}), (True, False, set()), (False, True, set()), (True, True, set())])
+def test_tombstoned_confirmations_and_contract_lines_are_not_evidence(confirmation_missing, lines_missing, expected):
+    proj = {'id': 'p1', 'code': '115588', 'source_records': []}
+    found = evidence_for(proj, tombstone_state(confirmation_missing, lines_missing))
+    assert {k.value for k in found} == expected
+
+
+def test_a_tombstoned_source_record_confirmation_is_not_evidence():
+    proj = {'id': 'p1', 'code': '115588', 'source_records': [{'kind': 'confirmation', 'source_missing': True, 'fields': {}}]}
+    assert evidence_for(proj, {'contract_items': [{'id': 'a', 'project_id': 'p1'}]}) == {}
+
+
+def test_deleted_contract_lines_do_not_unlock_production_nodes(h):
+    h.case['project'] = project(code='115588')
+    h.state['contract_items'] = [{'id': 'deleted-line', 'project_id': 'p1', 'source_missing': True}]
+    body = view(h, 'ou_vp')
+    assert statuses(body)[:3] != ['已完成'] * 3
+    assert all(n['auto_done'] is None for n in body['nodes'])
+    response = act(h, 'ou_vp', '/nodes/field/complete', {'request_id': 'finish-deleted-evidence', 'expected_revision': None})
+    assert response.status_code != 200
+
+
+@pytest.mark.parametrize('code, expected', [
+    ('​C115264', True), ('C115238-01', True), ('c115238', True), ('C000000', False), ('c000', False),
+    ('1C115264', False), ('C', False), ('', False)])
+def test_c_code_predicate_ignores_format_characters_and_placeholders(code, expected):
+    proj = {'id': 'p1', 'code': code, 'source_records': []}
+    assert ('sales' in {k.value for k in evidence_for(proj, {})}) is expected
+
+
+def test_an_intake_case_is_never_sales_done_by_its_c_code():
+    proj = {'id': 'p1', 'code': 'C115264', 'case_type': 'intake', 'source_records': []}
+    assert evidence_for(proj, {}) == {}

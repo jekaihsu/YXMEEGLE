@@ -316,7 +316,7 @@ def preview_body(plan: StartPlan, states: dict[NodeKey, NodeState] | None, block
     pending = any(r['will_create_node'] or r['will_create_task'] for r in rows)
     # Started means the node rows exist, whoever made them (Lark's own button or this app); seeds are optional extras.
     started = states is not None and bool(rows) and all(r['node_exists'] for r in rows)
-    seeds_pending = 0 if states is None else sum(not r['seed_task_exists'] for r in rows)
+    seeds_pending = sum(r['will_create_task'] for r in rows)
     return {
         'project_id': plan.project_id, 'code': plan.code, 'eligible': not blockers and pending, 'can_start': can_start,
         'already_started': started, 'seeds_pending': seeds_pending, 'seeds_optional': started and seeds_pending > 0,
