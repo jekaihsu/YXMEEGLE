@@ -15,11 +15,12 @@ def _user(ref):
     return ref.public() if ref else None
 
 
-def node_warnings(key, row: NodeRow | None, duplicates, status, tasks, now_ms):
+def node_warnings(key, row: NodeRow | None, duplicates, status, tasks, now_ms, auto=None):
     warnings = []
     if duplicates:
         warnings.append('duplicate_assignment_key')
-    if row is None:
+    if row is None or auto:
+        # An auto-done row is deliberately left untouched in Lark, so it cannot drift or be unapproved.
         return warnings
     if row.status == NodeStatus.DONE.value and not row.approved:
         warnings.append('unapproved_completion')
@@ -31,7 +32,7 @@ def node_warnings(key, row: NodeRow | None, duplicates, status, tasks, now_ms):
     return warnings
 
 
-def node_view(key: NodeKey, snapshot: CaseSnapshot, status: NodeStatus, now_ms):
+def node_view(key: NodeKey, snapshot: CaseSnapshot, status: NodeStatus, now_ms, auto=None):
     rows = snapshot.rows.get(key, ())
     row = rows[0] if len(rows) == 1 else None
     tasks = snapshot.node_tasks(key)
@@ -53,8 +54,8 @@ def node_view(key: NodeKey, snapshot: CaseSnapshot, status: NodeStatus, now_ms):
         'next_due': min(open_deadlines) if open_deadlines else None,
         'deadline_basis': 'related_tasks_max',
         'assignment_key': row.assignment_key if row else None,
-        'origin': 'lark',
-        'warnings': node_warnings(key, row, len(rows) > 1, status, tasks, now_ms),
+        'origin': 'lark', 'auto_done': auto.public() if auto else None,
+        'warnings': node_warnings(key, row, len(rows) > 1, status, tasks, now_ms, auto),
     }
     if len(rows) > 1:
         view['duplicate_record_ids'] = [r.record_id for r in rows]
@@ -76,29 +77,30 @@ def task_sort_key(task: TaskRow, now_ms):
     return (not overdue, task.deadline is None, task.deadline or '', priority[task.status], task.record_id)
 
 
-def _can(actor, key, status, snapshot, writes_enabled):
+def _can(actor, key, status, snapshot, writes_enabled, auto=None):
     rows = snapshot.rows.get(key, ())
-    if not writes_enabled or len(rows) > 1:
+    if not writes_enabled or len(rows) > 1 or auto:
         return dict(NO_ACTIONS)
     owners = frozenset(u.open_id for u in rows[0].owners) if rows else frozenset()
     return {action.value: ok for action, ok in node_permissions(actor, key, status, owners).items()}
 
 
-def case_view(snapshot: CaseSnapshot, skipped, actor, writes_enabled, now_ms):
-    statuses = derive_chain(facts_of(snapshot, skipped))
+def case_view(snapshot: CaseSnapshot, skipped, actor, writes_enabled, now_ms, evidence=None):
+    evidence = evidence or {}
+    statuses = derive_chain(facts_of(snapshot, skipped, evidence))
     summary = summarize(statuses)
     return statuses, {
         'code': snapshot.code,
         'summary': {'done': summary.done, 'total': summary.total,
                     'current_node': summary.current_node.value if summary.current_node else None},
-        'nodes': [node_view(key, snapshot, statuses[key], now_ms) for key in CHAIN],
-        'can': {key.value: _can(actor, key, statuses[key], snapshot, writes_enabled) for key in CHAIN},
+        'nodes': [node_view(key, snapshot, statuses[key], now_ms, evidence.get(key)) for key in CHAIN],
+        'can': {key.value: _can(actor, key, statuses[key], snapshot, writes_enabled, evidence.get(key)) for key in CHAIN},
         'warnings': list(snapshot.warnings),
     }
 
 
-def node_detail(snapshot: CaseSnapshot, skipped, actor, roster, key: NodeKey, writes_enabled, now_ms):
-    statuses, case = case_view(snapshot, skipped, actor, writes_enabled, now_ms)
+def node_detail(snapshot: CaseSnapshot, skipped, actor, roster, key: NodeKey, writes_enabled, now_ms, evidence=None):
+    statuses, case = case_view(snapshot, skipped, actor, writes_enabled, now_ms, evidence)
     status = statuses[key]
     tasks = []
     for task in sorted(snapshot.node_tasks(key), key=lambda t: task_sort_key(t, now_ms)):

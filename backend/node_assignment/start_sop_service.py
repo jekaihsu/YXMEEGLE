@@ -126,8 +126,9 @@ class StartSopRunner:
                     roster_future = pool.submit(svc._roster, fresh=False)
                     case_future = pool.submit(svc._case, ctx, code)
                     roster, cached = roster_future.result(), case_future.result()
-                skipped = svc.skipped(ctx)
-                states = {n.key: observe(cached.value, skipped, n.key, self.ledger.ids(ctx.wid, ctx.project['id'], n.key))
+                skipped, evidence = svc.skipped(ctx), svc.evidence(ctx)
+                states = {n.key: observe(cached.value, skipped, n.key, self.ledger.ids(ctx.wid, ctx.project['id'], n.key),
+                                         evidence=evidence)
                           for n in plan.nodes}
                 denials = self._denials(ctx, [n.key for n in plan.nodes] or SEED_NODES, roster)
                 can_start = any(reason is None for reason in denials.values())
@@ -290,7 +291,7 @@ class StartSopRunner:
                     snapshot = read_case(client, code)
                     recorded = self.ledger.ids(wid, pid, key)
                     state = observe(snapshot, svc.skipped(ctx), key, recorded,
-                                    self._unlisted(client, snapshot, key, recorded))
+                                    self._unlisted(client, snapshot, key, recorded), svc.evidence(ctx))
                     self.ledger.add(wid, pid, key, *state.seeds)
                     if state.live:
                         _, warnings = svc._converge(ctx, client, code, key, Plan('task_create', state.live[0], None, {}),
@@ -304,7 +305,7 @@ class StartSopRunner:
                                                    str(len(state.seeds)))
                     row, made = svc._node_row(client, Situation(
                         key, code, actor_for(user, roster.value), roster.value, snapshot, svc.skipped(ctx), svc.now_ms(),
-                        confirmation_record(ctx.project, svc.config)), identity)
+                        confirmation_record(ctx.project, svc.config), svc.evidence(ctx)), identity)
                     node_row = Outcome.CREATED if made or node_row is Outcome.CREATED else Outcome.EXISTING
                     fields = {**node.seed_fields, 'assignee': None, 'assigned_by': [user['id']],
                               'status': TaskStatus.TODO.value, 'node': [row.record_id]}

@@ -181,7 +181,8 @@ class NodeState:
         return self.open and not self.live
 
 
-def observe(snapshot: CaseSnapshot, skipped, key: NodeKey, recorded: tuple[str, ...] = (), unlisted=()) -> NodeState:
+def observe(snapshot: CaseSnapshot, skipped, key: NodeKey, recorded: tuple[str, ...] = (), unlisted=(),
+            evidence=None) -> NodeState:
     """Seeds are the recorded ledger ids, then any task of the node that still carries the marker.
 
     Only a seed that is not cancelled is live, so a manager can cancel one and start again. `unlisted` are recorded
@@ -190,7 +191,7 @@ def observe(snapshot: CaseSnapshot, skipped, key: NodeKey, recorded: tuple[str, 
     tasks = {t.record_id: t for t in (*snapshot.node_tasks(key), *unlisted)}
     seeds = (*recorded, *sorted(i for i, t in tasks.items() if marker(key) in t.detail and i not in recorded))
     live = tuple(i for i in seeds if i in tasks and tasks[i].status is not TaskStatus.CANCELLED)
-    status = derive_chain(facts_of(snapshot, skipped))[key]
+    status = derive_chain(facts_of(snapshot, skipped, evidence))[key]
     return NodeState(bool(snapshot.rows.get(key)), seeds, live, status not in FINISHED)
 
 
@@ -313,9 +314,12 @@ def preview_body(plan: StartPlan, states: dict[NodeKey, NodeState] | None, block
             'will_create_task': bool(state and state.will_create_task),
             'task_title': node.title, 'task_detail': node.detail})
     pending = any(r['will_create_node'] or r['will_create_task'] for r in rows)
+    # Started means the node rows exist, whoever made them (Lark's own button or this app); seeds are optional extras.
+    started = states is not None and bool(rows) and all(r['node_exists'] for r in rows)
+    seeds_pending = 0 if states is None else sum(not r['seed_task_exists'] for r in rows)
     return {
         'project_id': plan.project_id, 'code': plan.code, 'eligible': not blockers and pending, 'can_start': can_start,
-        'already_started': states is not None and bool(rows) and not pending,
+        'already_started': started, 'seeds_pending': seeds_pending, 'seeds_optional': started and seeds_pending > 0,
         'blockers': [{'code': b.value, 'message': m} for b, m in blockers],
         'warnings': warnings, 'nodes': rows, 'chain_note': CHAIN_NOTE,
         'preview_hash': plan.preview_hash, 'plan_rule_version': plan.plan_rule_version}

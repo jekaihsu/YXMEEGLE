@@ -1,6 +1,7 @@
 """Typed commands parsed from request bodies, and pure planning into Lark field changes."""
 import re
 import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from datetime import date
 from enum import StrEnum
@@ -10,6 +11,7 @@ from .domain import (
     NodeFacts, NodeKey, NodeStatus, TaskFacts, TaskStatus, check_node_action, check_task_status, derive_chain,
     eligible_assignee, later_nodes_started, progress, task_counts, task_permissions)
 from .errors import Failure
+from .evidence import AutoDone
 from .lark_table import CaseSnapshot, NodeRow, TaskRow, date_millis
 from .roster import Roster
 
@@ -168,6 +170,7 @@ class Situation:
     skipped: frozenset
     now_ms: int
     confirmation_record: str | None = None
+    evidence: Mapping[NodeKey, AutoDone] = field(default_factory=dict)
 
 
 class CreatePhase(StrEnum):
@@ -219,7 +222,8 @@ class Plan:
                    data.get('created_node', False), CreatePhase(data['phase']) if data.get('phase') else _inferred_phase(data))
 
 
-def facts_of(snapshot: CaseSnapshot, skipped, overrides=None) -> dict[NodeKey, NodeFacts]:
+def facts_of(snapshot: CaseSnapshot, skipped, evidence=None) -> dict[NodeKey, NodeFacts]:
+    """Lark facts per node. `evidence` nodes count as approved, whatever Lark says; a skipped node never is."""
     facts = {}
     for key in NodeKey:
         rows = snapshot.rows.get(key, ())
@@ -227,7 +231,9 @@ def facts_of(snapshot: CaseSnapshot, skipped, overrides=None) -> dict[NodeKey, N
         facts[key] = NodeFacts(approved=bool(row and row.approved), skipped=key in skipped,
                                rejected=bool(row and row.rejected),
                                tasks=tuple(t.status for t in snapshot.node_tasks(key)))
-    facts.update(overrides or {})
+    for key in evidence or ():
+        if key not in skipped:
+            facts[key] = replace(facts[key], approved=True, rejected=False)
     return facts
 
 
@@ -258,7 +264,7 @@ def _check_revision(current, expected):
 
 def plan_node(s: Situation, command: NodeCommand, expected_revision) -> Plan:
     row = s.snapshot.row(s.key)
-    facts = facts_of(s.snapshot, s.skipped)
+    facts = facts_of(s.snapshot, s.skipped, s.evidence)
     statuses = derive_chain(facts)
     status = statuses[s.key]
     owners = frozenset(u.open_id for u in row.owners) if row else frozenset()
@@ -267,6 +273,8 @@ def plan_node(s: Situation, command: NodeCommand, expected_revision) -> Plan:
         check_node_action(s.actor, s.key, command.action, status, owners)
     except IllegalTransition as exc:
         illegal = exc
+    if illegal is None and command.action is NodeAction.REJECT and s.key in s.evidence:
+        illegal = IllegalTransition(f'此節點由系統依資料判定完成（{s.evidence[s.key].reason_zh}），不能退回')
     _check_revision(row.revision if row else None, expected_revision)
     if illegal:
         raise illegal
@@ -311,7 +319,7 @@ def _department(s: Situation, requested, assignee):
 
 def plan_create_task(s: Situation, command: CreateTask, client_token) -> Plan:
     row = s.snapshot.row(s.key)
-    status = derive_chain(facts_of(s.snapshot, s.skipped))[s.key]
+    status = derive_chain(facts_of(s.snapshot, s.skipped, s.evidence))[s.key]
     check_node_action(s.actor, s.key, NodeAction.CREATE_TASK, status,
                       frozenset(u.open_id for u in row.owners) if row else frozenset())
     assignee = command.assignee
@@ -338,7 +346,7 @@ def find_task(s: Situation, task_id) -> TaskRow:
 
 
 def plan_patch_task(s: Situation, task: TaskRow, command: PatchTask) -> Plan:
-    status = derive_chain(facts_of(s.snapshot, s.skipped))[s.key]
+    status = derive_chain(facts_of(s.snapshot, s.skipped, s.evidence))[s.key]
     if (s.actor.person is None or not s.actor.person.employed) and not s.actor.override:
         raise Denied('你不在人員名單或尚未在職，無法更新任務')
     _check_revision(task.revision, command.expected_revision)

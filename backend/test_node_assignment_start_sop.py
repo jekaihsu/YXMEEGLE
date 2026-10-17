@@ -1152,3 +1152,68 @@ def test_extra_live_seeds_are_reported_but_never_removed_and_a_cancelled_one_is_
     assert start(s, 'r3').json()['results'][0] == {
         'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
     assert [w for w in preview(s)['warnings'] if w['code'] == 'duplicate_seed'] == []
+
+
+def lark_button_rows(h, nodes=None):
+    """What Lark's native 開啟SOP button leaves behind: node rows, the first 待處理, and no task."""
+    labels = {'sales': '業務', 'pm': 'PM', 'confirmation': '確認單', 'field': '外業', 'control': '控制',
+              'mapping': '圖資', 'report': '報告', 'pricing': '計價', 'settlement': '結算'}
+    for key, label in labels.items():
+        if nodes is None or key in nodes:
+            h.fake.add(NODES, {'指派鍵': f'A115001-01|{label}', '確認單編號': 'A115001-01', '節點': label,
+                               '狀態': '待處理' if key == 'sales' else '未開始'})
+
+
+def test_node_rows_made_by_the_lark_button_count_as_started_with_seeds_still_pending(s):
+    lark_button_rows(s)
+    body = preview(s)
+    assert (body['already_started'], body['seeds_pending'], body['seeds_optional']) == (True, 4, True)
+    assert all(n['node_exists'] and not n['seed_task_exists'] and not n['will_create_node'] and n['will_create_task']
+               for n in body['nodes'])
+    assert body['eligible'] is True
+    assert s.fake.writes() == []
+
+
+def test_posting_over_lark_made_node_rows_creates_only_the_seed_tasks(s):
+    lark_button_rows(s)
+    body = start(s).json()
+    assert body['results'] == [{'key': k, 'node': 'existing', 'task': 'created', 'error': None, 'sync': 'ok'}
+                               for k in ('field', 'control', 'mapping', 'report')]
+    assert len(s.fake.rows(NODES)) == 9 and len(s.fake.rows(TASKS)) == 4
+    after = preview(s)
+    assert (after['already_started'], after['seeds_pending'], after['seeds_optional']) == (True, 0, False)
+
+
+def test_partial_node_rows_are_not_started_and_unknown_lark_state_promises_nothing(s):
+    lark_button_rows(s, nodes={'field', 'control'})
+    body = preview(s)
+    assert (body['already_started'], body['seeds_pending'], body['seeds_optional']) == (False, 4, False)
+    assert [n['node_exists'] for n in body['nodes']] == [True, True, False, False]
+
+
+def test_a_fresh_case_has_all_seeds_pending_but_is_not_started(s):
+    body = preview(s)
+    assert (body['already_started'], body['seeds_pending'], body['seeds_optional']) == (False, 4, False)
+
+
+def test_unreadable_lark_reports_not_started_and_no_pending_count(s):
+    s.fake.fault('GET', 'records', lambda _r: httpx.Response(500, json={}), times=50)
+    s.fake.fault('POST', 'records/search', lambda _r: httpx.Response(500, json={}), times=50)
+    body = preview(s)
+    assert (body['already_started'], body['seeds_pending'], body['seeds_optional']) == (False, 0, False)
+    assert 'lark_unavailable' in [b['code'] for b in body['blockers']]
+
+
+def test_start_sop_agrees_with_the_evidence_overlay_and_leaves_auto_done_rows_alone(s):
+    s.case['project'] = {**project(code='C115001'), 'pm_id': 'ou_pm'}
+    for label in ('業務', 'PM', '確認單', '外業', '控制', '圖資', '報告', '計價', '結算'):
+        s.fake.add(NODES, {'指派鍵': f'C115001|{label}', '確認單編號': 'C115001', '節點': label, '狀態': '未開始'})
+    body = preview(s)
+    assert (body['already_started'], body['seeds_pending']) == (True, 4)
+    result = start(s).json()
+    assert [r['task'] for r in result['results']] == ['created'] * 4
+    overview = {n['key']: n for n in result['overview']['nodes']}
+    assert (overview['sales']['derived_status'], overview['sales']['auto_done']['rule']) == ('已完成', 'c_code')
+    assert overview['pm']['derived_status'] == '待處理'
+    states = {f['節點']: f['狀態'] for f in s.fake.rows(NODES).values()}
+    assert (states['業務'], states['PM'], states['確認單']) == ('未開始', '未開始', '未開始')

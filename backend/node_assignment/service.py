@@ -29,6 +29,7 @@ from ..sources import normalized_case
 from .cache import Cached, StaleCache
 from .config import NodeAssignmentConfig
 from .domain import NODE_LABELS, Actor, Denied, IllegalTransition, NodeKey, derive_chain, task_counts
+from .evidence import applicable, evidence_for
 from .errors import Failure
 from .lark_table import (
     NODE_FIELDS, TASK_FIELDS, BitableClient, CaseSnapshot, Table, assignment_key, check_schema, mismatches,
@@ -219,6 +220,9 @@ class NodeAssignmentService:
         return frozenset(NodeKey(n['key']) for n in ctx.project.get('nodes', [])
                          if n.get('key') in values and self.skipped_nodes(ctx.state, ctx.project, n))
 
+    def evidence(self, ctx: Context):
+        return applicable(evidence_for(ctx.project, ctx.state), self.skipped(ctx))
+
     def now_ms(self):
         return int(self.clock() * 1000)
 
@@ -281,13 +285,14 @@ class NodeAssignmentService:
             people = roster.value if roster else None
             actor = actor_for(ctx.user, people)
             skipped, enabled, now = self.skipped(ctx), self.write_block(ctx) is None, self.now_ms()
+            evidence = self.evidence(ctx)
             if key is not None:
-                body = node_detail(cached.value, skipped, actor, people, key, enabled, now)
+                body = node_detail(cached.value, skipped, actor, people, key, enabled, now, evidence)
             else:
-                _, body = case_view(cached.value, skipped, actor, enabled, now)
+                _, body = case_view(cached.value, skipped, actor, enabled, now, evidence)
                 body['node_details'] = {}
                 for node_key in NodeKey:
-                    detail = node_detail(cached.value, skipped, actor, people, node_key, enabled, now)
+                    detail = node_detail(cached.value, skipped, actor, people, node_key, enabled, now, evidence)
                     body['node_details'][node_key.value] = {k: detail[k] for k in ('tasks', 'assignable_people')}
             return self._envelope(ctx, cached, roster, body)
         finally:
@@ -373,7 +378,8 @@ class NodeAssignmentService:
                     resumed = previous
                 ctx = replace(ctx, user=ctx.authorize())
                 situation = Situation(key, code, actor_for(ctx.user, roster.value), roster.value, snapshot, self.skipped(ctx),
-                                      self.now_ms(), confirmation_record(ctx.project, self.config))
+                                      self.now_ms(), confirmation_record(ctx.project, self.config),
+                                      self.evidence(ctx))
                 try:
                     plan = plan_fn(situation, resumed)
                     if plan is None:
@@ -438,7 +444,7 @@ class NodeAssignmentService:
         found = self._rows_for(client, akey)
         if found:
             return found[0], False
-        status = derive_chain(facts_of(s.snapshot, s.skipped))[s.key]
+        status = derive_chain(facts_of(s.snapshot, s.skipped, s.evidence))[s.key]
         initial = {'assignment_key': akey, 'code': s.code, 'node': NODE_LABELS[s.key], 'status': status.value}
         if s.confirmation_record:
             initial['confirmation'] = [s.confirmation_record]
@@ -526,7 +532,7 @@ class NodeAssignmentService:
         row = snapshot.row(key)
         if row is None:
             return 'unchanged'
-        facts = facts_of(snapshot, self.skipped(ctx))
+        facts = facts_of(snapshot, self.skipped(ctx), self.evidence(ctx))
         clear = plan.kind == 'task_update' and plan.changes.get('status') == '已完成' and row.rejected
         if clear:
             facts[key] = replace(facts[key], rejected=False)
@@ -570,7 +576,7 @@ class NodeAssignmentService:
         snapshot, warnings = self._converge(ctx, client, code, key, plan)
         warnings = list(plan.warnings) + warnings
         body = node_detail(snapshot, self.skipped(ctx), actor_for(ctx.user, roster.value), roster.value, key,
-                           self.write_block(ctx) is None, self.now_ms())
+                           self.write_block(ctx) is None, self.now_ms(), self.evidence(ctx))
         body['warnings'] += warnings
         body = {**self._envelope(ctx, Cached(snapshot, False, self.clock()), roster, body), 'record_id': plan.record_id}
         self.receipts.save(receipt, fingerprint, {'state': 'done', 'status': 200, 'body': body})

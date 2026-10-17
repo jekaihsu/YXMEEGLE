@@ -116,3 +116,17 @@ test('overview parses embedded tasks and people, and supports older envelopes', 
   f.list.node_details = {control: {tasks: 'invalid', assignable_people: []}};
   await assert.rejects(api.fetchNodeAssignments('p1', signal, () => true), {message: '節點資料格式不正確，請稍後重試。'});
 });
+test('auto_done is carried as rule and reason, null stays null and a malformed one is rejected', async () => {
+  const body = assignmentFixture().list;
+  const at = key => body.nodes.find(n => n.key === key);
+  at('sales').auto_done = {rule: 'c_code', reason: '工編以 C 開頭，業務階段已完成'};
+  at('pm').auto_done = null;
+  response = {status: 200, body};
+  const list = await api.fetchNodeAssignments('p1', signal, () => true);
+  const parsed = key => list.nodes.find(n => n.key === key);
+  assert.deepEqual(parsed('sales').auto_done, {rule: 'c_code', reason: '工編以 C 開頭，業務階段已完成'});
+  assert.equal(parsed('pm').auto_done, null);
+  assert.equal(parsed('field').auto_done, undefined);
+  at('sales').auto_done = {rule: 1};
+  await assert.rejects(api.fetchNodeAssignments('p1', signal, () => true));
+});

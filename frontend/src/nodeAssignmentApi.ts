@@ -5,12 +5,14 @@ export type NodeAction = 'claim' | 'assign' | 'complete' | 'approve' | 'reject' 
 export type NodePermissions = Partial<Record<NodeAction, boolean>>;
 export interface AssignmentPerson {open_id: string; name: string; avatar_url?: string}
 export interface AssignablePerson extends AssignmentPerson {departments: string[]}
+export interface AutoDone {rule: string; reason: string}
 export interface AssignmentNode {
   key: string; label: string; status: string | null; derived_status: string; record_id: string | null; revision: string | null;
   departments: string[]; assignment_method: string | null; started_at: string | null; finished_at: string | null;
   tasks: {done: number; total: number}; progress: number;
   owners: AssignmentPerson[]; assigned_by: AssignmentPerson | null; approver: AssignmentPerson | null;
   approved_at: string | null; reject_reason: string | null; deadline: string | null; warnings: string[];
+  auto_done?: AutoDone | null;
   next_due?: string | null; deadline_basis?: string; assignment_key?: string | null; origin?: 'lark';
 }
 export interface AssignmentTask {
@@ -59,6 +61,11 @@ function person(value: unknown): AssignmentPerson {
   const p = record(value); return {open_id: text(p.open_id), name: text(p.name), ...(typeof p.avatar_url === 'string' ? {avatar_url: p.avatar_url} : {})};
 }
 function optionalPerson(value: unknown): AssignmentPerson | null {return value == null || value === '' ? null : person(value)}
+function autoDone(value: unknown): AutoDone | null {
+  if (value == null) return null;
+  const a = record(value);
+  return {rule: text(a.rule), reason: text(a.reason)};
+}
 function node(value: unknown): AssignmentNode {
   const n = record(value), tasks = record(n.tasks);
   return {
@@ -68,6 +75,7 @@ function node(value: unknown): AssignmentNode {
     tasks: {done: count(tasks.done), total: count(tasks.total)}, progress: count(n.progress), owners: array(n.owners, person),
     assigned_by: optionalPerson(n.assigned_by), approver: optionalPerson(n.approver), approved_at: optionalText(n.approved_at),
     reject_reason: optionalText(n.reject_reason), deadline: optionalText(n.deadline), warnings: array(n.warnings, text),
+    ...('auto_done' in n ? {auto_done: autoDone(n.auto_done)} : {}),
     ...('next_due' in n ? {next_due: optionalText(n.next_due)} : {}),
     ...('assignment_key' in n ? {assignment_key: optionalText(n.assignment_key)} : {}),
     ...('deadline_basis' in n ? {deadline_basis: text(n.deadline_basis)} : {}),

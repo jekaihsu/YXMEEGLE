@@ -72,7 +72,7 @@ All routes sit under `/api/projects/{project_id}/node-assignments`. Mutations ne
     "assigned_by": {"open_id": "ou_...", "name": "林經理"},
     "approver": null, "approved_at": null, "reject_reason": null,
     "started_at": "2026-10-14T09:00:00+08:00", "finished_at": null,
-    "deadline": "2026-10-20", "warnings": []
+    "deadline": "2026-10-20", "auto_done": null, "warnings": []
   }],
   "can": {"field": {"claim": false, "assign": true, "complete": true, "approve": false, "reject": false, "create_task": true}},
   "warnings": [], "stale": false, "stale_reason": null, "fetched_at": "2026-10-14T09:00:05+08:00",
@@ -81,7 +81,7 @@ All routes sit under `/api/projects/{project_id}/node-assignments`. Mutations ne
 }
 ```
 
-`derived_status` is authoritative. `status` is the value stored in the Lark 狀態 column; the app keeps it in step on every write, and a difference is flagged with the node warning `lark_status_drift`.
+`auto_done` is `null`, or `{"rule", "reason"}` when the case's own data proves the node done (see Auto-done evidence); such a node reports 已完成 and progress 1 while its Lark row stays as it is. `derived_status` is authoritative. `status` is the value stored in the Lark 狀態 column; the app keeps it in step on every write, and a difference is flagged with the node warning `lark_status_drift`.
 
 ### Node detail and mutation responses
 
@@ -135,7 +135,7 @@ Errors are `{detail, code, ...}` with `detail` in Traditional Chinese.
 The nine nodes form one chain, 業務 to 結算. Status is derived per node in this order.
 
 1. 略過 when the app's existing approved skip (`approved_skipped` with a valid waiver) applies. Never written here.
-2. 已完成 when Lark holds 狀態 已完成 with 核准人 and 核准時間.
+2. 已完成 when Lark holds 狀態 已完成 with 核准人 and 核准時間, or when auto-done evidence applies (below).
 3. 未開始 when the previous node is neither 已完成 nor 略過.
 4. 進行中 while a rejection (退回原因) is active.
 5. 待審核 when at least one task is not cancelled and every such task is 已完成.
@@ -151,6 +151,17 @@ Read caches use stale-while-revalidate: first reads load synchronously, with ros
 The overview adds `node_details`, keyed by all nine node keys, each containing `tasks` and `assignable_people` exactly as the node detail endpoint does (empty lists where applicable). People are visible only to actors who manage that node. Existing overview fields and the node detail endpoint remain unchanged.
 
 Read duration logs use `node_assignment read overview ms=<total> cache=<hit|stale|miss> lark_calls=<n>` (or `read detail`), without identities or tokens; calls count Bitable attempts, excluding token minting. Session responses expose `features.node_assignment: true` only when the deployment flag is enabled and application identity, organization, credentials and approved table targets are configured, independently of `workspace_shell`.
+
+## Auto-done evidence
+
+`backend/node_assignment/evidence.py` proves the early nodes from the case's own data, so nobody has to tick them in Lark. `evidence_for(project, state)` returns `{node: AutoDone(rule, reason_zh)}`; the rules live in one table, `RULES`, at the top of the module. The first rule that claims a node wins. 外業, 控制, 圖資, 報告, 計價 and 結算 are never inferred.
+
+| rule | nodes | applies when | reason |
+| --- | --- | --- | --- |
+| `c_code` | 業務 | the case code matches `^[Cc]\d+` (C115264, C115238-01) | 工編以 C 開頭，業務階段已完成 |
+| `confirmation_lines` | 業務, PM, 確認單 | the project has a confirmation source record (or a `source_confirmations` entry) and at least one `contract_items` line with its `project_id` | 已建立工程確認單（N 筆合約工項） |
+
+The overlay goes through `facts_of(snapshot, skipped, evidence)`, so the overview and detail reads, every mutation (including the status a lazily created row starts with and the 狀態 sync), 啟動 SOP and the home panels derive the same chain. An auto-done node counts as approved: its status, progress and the summary x/9 follow. Nothing is written for it: no 已完成, no 核准人, and the sync mirrors only the node a request touches, never an untouched one. An explicit 略過 wins and carries no `auto_done`. A Lark 退回原因 on an auto-done node is ignored. Every action on an auto-done node is refused: `claim`, `assign`, `complete`, `approve` and `create_task` because the node is not open, `reject` with 409 `illegal_transition` because there is nothing the app could write that would undo the evidence. `can` is all false for it, and it raises neither `lark_status_drift` nor `unapproved_completion`.
 
 ## Who may act
 
@@ -209,6 +220,7 @@ A project lead previews, then confirms, and the app seeds one 節點指派 row a
 
 ```json
 {"project_id": "p1", "code": "A115001-01", "eligible": true, "can_start": true, "already_started": false,
+ "seeds_pending": 4, "seeds_optional": false,
  "blockers": [{"code": "forbidden", "message": "..."}],
  "warnings": [{"code": "deadline_conflict", "message": "...", "node": "field"}],
  "nodes": [{"key": "field", "label": "外業", "category": "外業", "planned_qty": "123.45", "lines": 2, "items": 5,
@@ -217,6 +229,8 @@ A project lead previews, then confirms, and the app seeds one 節點指派 row a
    "task_title": "外業：依計畫數量完成", "task_detail": "..."}],
  "chain_note": "...", "preview_hash": "<sha256>", "plan_rule_version": "contract-links-20261017.1"}
 ```
+
+**Started.** `already_started` is true when Lark is readable and every production node in the plan already has a 節點指派 row, whoever created it: this app, or Lark's own 開啟SOP button, which creates all nine rows and no 任務 row. Seed tasks are not part of it. `seeds_pending` counts the plan nodes without a live seed task (0 while Lark cannot be read) and `seeds_optional` is `already_started && seeds_pending > 0`, a started case that may still get its seed tasks. `eligible` is unchanged (no blocker and something left to write), so a Lark-started case stays eligible while seeds are pending, and the POST creates only what is missing: with the node rows present it creates just the seed task.
 
 `preview_hash` is the sha256 of the canonical JSON of the project id, the confirmation code and each node's quantity, counts, deadline, task title and detail plus both rule versions. It does not include Lark state, so it stays the same while a run progresses and a changed plan or quote makes it stale.
 
