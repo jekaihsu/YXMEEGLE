@@ -322,3 +322,19 @@ def test_fill_item_remaining_points_never_reach_the_public_workspace(isolated_ht
     install(app,state);signin('u-manager')
     response=client.get('/api/workspace');assert response.status_code==200
     assert marker not in response.text
+
+
+def test_source_listing_hides_remaining_points_from_a_restricted_viewer(isolated_http):
+    from .sources import REMAINING_POINTS_FIELD
+    app,client,_,signin=isolated_http
+    state,records,_=build_universe()
+    for r in records:
+        if r['kind']=='reporting': r['fields'].update({'對應營業額':'100',REMAINING_POINTS_FIELD:'40.4242'})
+    install(app,state)
+    with app.state.sessions.begin() as db:
+        db.get(CacheRow,'lark-boundary').data={'configured':True,'status':'ready','tables':[],'records':records}
+    for who in ('u-field','u-manager'):
+        signin(who)
+        response=client.get('/api/sources');assert response.status_code==200
+        assert any(r['kind']=='reporting' for r in response.json()['records'])
+        assert '40.4242' not in response.text and REMAINING_POINTS_FIELD not in response.text

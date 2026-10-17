@@ -45,7 +45,7 @@ def test_one_partial_item_starts_the_node_by_evidence_and_shows_the_percent(full
     evidence = field['evidence']
     assert evidence['work_orders'] == 0 and evidence['drives_status'] is True and evidence['actual_known'] is False
     assert evidence['reason'] == '合約填報工項已有進度（來源剩餘營業額小於對應營業額）'
-    assert evidence['progress'] == {'percent': '30', 'earned_points': '60', 'planned_points': '200', 'items_done': 0, 'items_total': 2}
+    assert evidence['progress'] == {'percent': '30', 'earned_points': '60', 'planned_points': '200', 'items_done': 0, 'items_total': 2, 'known_items': 1, 'unknown_items': 1}
     assert evidence['items_total'] == 2 and evidence['items_truncated'] is False
     assert evidence['work_items'] == [
         {'code': 'C1-1', 'name': '導線測量', 'planned_qty': '50', 'planned_points': '100', 'remaining_points': '40', 'status': 'partial', 'link_basis': 'native'},
@@ -60,7 +60,7 @@ def test_every_item_done_offers_the_submit_hint_but_never_review_or_done(full):
     field = field_of(client, h)
     assert field['can_submit_hint'] is True
     assert (field['derived_status'], field['approver'], field['approved_at'], field['finished_at']) == ('進行中', None, None, None)
-    assert field['evidence']['progress'] == {'percent': '100', 'earned_points': '104.5', 'planned_points': '104.5', 'items_done': 2, 'items_total': 2}
+    assert field['evidence']['progress'] == {'percent': '100', 'earned_points': '104.5', 'planned_points': '104.5', 'items_done': 2, 'items_total': 2, 'known_items': 2, 'unknown_items': 0}
     assert [i['status'] for i in field['evidence']['work_items']] == ['done', 'done']
     assert statuses(client.get(URL).json())[3] == '進行中'
 
@@ -137,7 +137,7 @@ def test_each_category_reads_only_its_own_items(full):
     body = client.get(URL).json()
     progress = {k: node(body, k)['evidence']['progress'] for k in ('field', 'control', 'mapping', 'report')}
     assert progress['field'] is None and progress['mapping'] is None
-    assert progress['control'] == {'percent': '100', 'earned_points': '10', 'planned_points': '10', 'items_done': 1, 'items_total': 1}
+    assert progress['control'] == {'percent': '100', 'earned_points': '10', 'planned_points': '10', 'items_done': 1, 'items_total': 1, 'known_items': 1, 'unknown_items': 0}
     assert progress['report']['percent'] == '66.7'
     assert node(body, 'control')['can_submit_hint'] is False   # not started: 外業 is still the open node
     assert node(body, 'field')['derived_status'] == '待處理'
@@ -148,7 +148,7 @@ def test_work_items_are_capped_at_fifty_but_counted_fully(full):
     points_plan(h, [('外業', f'C1-{i}', f'n{i}', '1', '10', '5') for i in range(60)])
     evidence = field_of(client, h)['evidence']
     assert (len(evidence['work_items']), evidence['items_total'], evidence['items_truncated']) == (50, 60, True)
-    assert evidence['progress'] == {'percent': '50', 'earned_points': '300', 'planned_points': '600', 'items_done': 0, 'items_total': 60}
+    assert evidence['progress'] == {'percent': '50', 'earned_points': '300', 'planned_points': '600', 'items_done': 0, 'items_total': 60, 'known_items': 60, 'unknown_items': 0}
 
 
 def test_a_viewer_without_the_reports_gate_gets_statuses_and_counts_but_no_points(h):
@@ -158,7 +158,7 @@ def test_a_viewer_without_the_reports_gate_gets_statuses_and_counts_but_no_point
     for body in (gated.get(URL).json()['nodes'], [gated.get(URL + '/nodes/field').json()['node']]):
         field = next(n for n in body if n['key'] == 'field')
         assert field['derived_status'] == '進行中' and field['evidence']['drives_status'] is True
-        assert field['evidence']['progress'] == {'percent': None, 'earned_points': None, 'planned_points': None, 'items_done': 0, 'items_total': 2}
+        assert field['evidence']['progress'] == {'percent': None, 'earned_points': None, 'planned_points': None, 'items_done': 0, 'items_total': 2, 'known_items': 1, 'unknown_items': 1}
         assert [(i['planned_qty'], i['planned_points'], i['remaining_points'], i['status']) for i in field['evidence']['work_items']] == [
             ('50', None, None, 'partial'), ('5', None, None, 'no_signal')]
 
@@ -184,3 +184,56 @@ def test_production_signal_without_a_plan_is_unchanged():
     found = production_signal({'id': 'p1', 'code': '115588', 'daily_reports': []}, {})
     assert all((s.progress, s.item_rows, s.items_total, s.items_all_done) == (None, (), 0, False) for s in found.values())
     assert list(found) == [NodeKey.FIELD, NodeKey.CONTROL, NodeKey.MAPPING, NodeKey.REPORT]
+
+
+def with_basis(h, *bases):
+    for item, basis in zip(h.state['derived_plan']['p1']['items'], bases):
+        item['basis'] = basis
+
+
+@pytest.mark.parametrize('basis', ['ambiguous', 'unlinked'])
+def test_an_uncertain_item_is_listed_but_never_starts_the_node(full, basis):
+    h, client = full
+    points_plan(h, [('外業', 'C1-1', 'a', '5', '100', '40')])
+    with_basis(h, basis)
+    field = field_of(client, h)
+    assert field['derived_status'] == '待處理'
+    assert field['evidence']['progress'] is None and field['evidence']['drives_status'] is False
+    row, = field['evidence']['work_items']
+    assert (row['status'], row['link_basis'], row['planned_points'], row['remaining_points']) == ('no_signal', basis, None, None)
+
+
+@pytest.mark.parametrize('basis', ['ambiguous', 'unlinked'])
+def test_an_uncertain_done_item_alone_gives_no_submit_hint(full, basis):
+    h, client = full
+    points_plan(h, [('外業', 'C1-1', 'a', '5', '100', '0')])
+    with_basis(h, basis)
+    assert field_of(client, h)['can_submit_hint'] is False
+
+
+def test_an_uncertain_item_beside_certain_done_items_keeps_the_hint_off_and_out_of_the_percent(full):
+    h, client = full
+    points_plan(h, [*DONE_ALL, ('外業', 'C1-3', 'c', '1', '100', '0')])
+    with_basis(h, 'native', 'derived', 'unlinked')
+    field = field_of(client, h)
+    assert field['can_submit_hint'] is False
+    assert field['evidence']['progress'] == {'percent': '99.9', 'earned_points': '104.5', 'planned_points': '104.5', 'items_done': 2,
+                                             'items_total': 3, 'known_items': 2, 'unknown_items': 1}
+    assert [i['status'] for i in field['evidence']['work_items']] == ['done', 'done', 'no_signal']
+
+
+def test_derived_items_keep_their_labels_when_the_contract_line_has_no_project(full):
+    h, client = full
+    points_plan(h, [('外業', 'C1-1', '導線測量', '50', '100', '40')])
+    with_basis(h, 'derived')
+    h.state['contract_items'][0]['project_id'] = None
+    row, = field_of(client, h)['evidence']['work_items']
+    assert (row['code'], row['name'], row['planned_qty']) == ('C1-1', '導線測量', '50')
+
+
+def test_a_line_of_another_case_never_labels_the_item(full):
+    h, client = full
+    points_plan(h, [('外業', 'C1-1', '導線測量', '50', '100', '40')])
+    h.state['contract_items'][0]['project_id'] = 'other-case'
+    row, = field_of(client, h)['evidence']['work_items']
+    assert (row['code'], row['name']) == (None, None)

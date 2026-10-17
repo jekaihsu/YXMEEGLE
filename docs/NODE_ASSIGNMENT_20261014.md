@@ -305,3 +305,9 @@ Before a node's first write the run re-reads the session, the project record and
 **Duplicates are loud.** When a read finds two or more live seeds for one node, the node stays seeded and `complete` can be true, the result carries `warning: "duplicate_seed"` and `duplicates` (the extra record ids), and the preview adds a non-blocking warning of the same code naming them. Nothing is cancelled or deleted automatically; a manager cancels the extra task, after which the warning disappears.
 
 **Residual risk.** Lark only deduplicates a `client_token` inside its own idempotency window. A create whose answer was lost and which lands after that window, followed by a resend after the window, can still produce one extra seed task; it is detected and reported as `duplicate_seed` once both are visible. A seed that was never recorded (the answer was lost) and whose marker is removed by a person before the app has read it cannot be recognised, so an uncertain create that is also edited and not deduplicated by Lark can create one unreported extra task. In both cases the cure is to cancel the extra task by hand.
+
+### Fill-item progress: certainty and privacy (follow-up)
+
+- Only items whose link is native or derived feed a node's status evidence, percent, `items_done` and the submit hint. Ambiguous and unlinked items are listed as 關聯待確認 with no signal, and any such item keeps the hint off.
+- `progress` carries `known_items` and `unknown_items`; the UI says the percent covers only the known items and mutes it when they are fewer than half.
+- `本工項剩餘營ˊ業額` is read from Lark for these computations only (`SERVER_ONLY_FIELDS`); no public source response carries it. A comma in a points value is accepted only as a thousands separator ("1,500", never "0,0").

@@ -417,7 +417,7 @@ def test_fill_item_points_give_item_status_and_a_node_percent(progress):
     set_points(state, vis, '外業', [('10', '0'), ('20', '5'), ('4', '4')])
     body = run(state, vis).json()
     field = body['production']['field']
-    assert field['progress'] == {'percent': '73.5', 'earned_points': '25', 'planned_points': '34', 'items_done': 1, 'items_total': 3}
+    assert field['progress'] == {'percent': '73.5', 'earned_points': '25', 'planned_points': '34', 'items_done': 1, 'items_total': 3, 'known_items': 2, 'unknown_items': 1}
     assert sorted(i['status'] for i in field['items']) == ['done', 'no_signal', 'partial']
     assert sorted((i['planned_points'], i['remaining_points']) for i in field['items']) == [('10', '0'), ('20', '5'), ('4', '4')]
     assert field['actual']['known'] is False   # no daily row: the items alone are the evidence
@@ -443,7 +443,7 @@ def test_a_viewer_without_the_amounts_gate_sees_statuses_and_counts_only(progres
     set_points(state, vis, '外業', [('10', '0'), ('20', '5'), ('4', '4')])
     body = run(state, vis, uid='u-field').json()
     field = body['production']['field']
-    assert field['progress'] == {'percent': None, 'earned_points': None, 'planned_points': None, 'items_done': 1, 'items_total': 3}
+    assert field['progress'] == {'percent': None, 'earned_points': None, 'planned_points': None, 'items_done': 1, 'items_total': 3, 'known_items': 2, 'unknown_items': 1}
     assert all(i['planned_points'] is None and i['remaining_points'] is None for i in field['items'])
     assert sorted(i['status'] for i in field['items']) == ['done', 'no_signal', 'partial']
     assert {'label': '工項進度', 'value': '已完成 1/3 工項', 'tone': 'ok'} in stage(body, 'field')['evidence']

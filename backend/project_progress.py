@@ -125,6 +125,8 @@ class ItemsProgress(TypedDict):
     planned_points: str | None
     items_done: int
     items_total: int
+    known_items: int
+    unknown_items: int
 
 
 class StageProduction(TypedDict):
@@ -373,18 +375,26 @@ def work_orders_of(project, key):
     return {'count': len(orders) or None, 'latest_date': dates[-1] if dates else None}
 
 
+CERTAIN_BASIS = frozenset({'native', 'derived'})
+
+
 def planned_items(state, project, summary, key):
     """(planned totals, up to MAX_ITEMS items, items total, truncated, NodeProgress or None) of one production category.
 
     Progress is None while the plan is unavailable or truncated: a partial list would overstate the percentage.
     Items carry Lark's own revenue points and the status computed from them; callers apply the amounts gate.
+    Only items with a certain link (native or derived) feed the progress. An ambiguous or unlinked item may belong to
+    another case, so it is listed without a signal and, being unproven, keeps the all-done hint off.
     """
     if summary is None:
         return None, [], 0, False, None
     category = PRODUCTION[key][0]
-    lines = {c['id']: c for c in state.get('contract_items', []) if c.get('project_id') == project['id']}
+    # A derived line can lack project_id; the plan item already ties it to this case, so only another case's line is refused.
+    lines = {c['id']: c for c in state.get('contract_items', []) if c.get('project_id') in (None, project['id'])}
     mine = [i for i in summary.get('items', []) if i.get('category') == category]
-    points = [(parse_points(i.get('planned_points')), parse_points(i.get('remaining_points'))) for i in mine]
+    certain = [i.get('basis') in CERTAIN_BASIS for i in mine]
+    points = [(parse_points(i.get('planned_points')), parse_points(i.get('remaining_points'))) if sure else (None, None)
+              for i, sure in zip(mine, certain)]
     items = []
     for item, (planned, remaining) in list(zip(mine, points))[:MAX_ITEMS]:
         fields = (lines.get(item.get('line_id')) or {}).get('fields') or {}

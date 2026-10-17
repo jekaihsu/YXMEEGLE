@@ -90,7 +90,7 @@ def public_source_cache(cache, user=None):
     Source readers keep original fields for matching/hashing. This response copy
     is not suitable as an authoritative sync input.
     """
-    from .sources import FIELDS, REVIEW_FIELDS
+    from .sources import FIELDS, REVIEW_FIELDS, SERVER_ONLY_FIELDS
     result = {key: deepcopy(value) for key, value in cache.items()
               if key in {'configured','last_sync','status','message','tables','records'}}
     result['tables'] = [{k: deepcopy(v) for k,v in row.items()
@@ -99,7 +99,7 @@ def public_source_cache(cache, user=None):
     records = []
     for row in cache.get('records', []):
         kind = row.get('kind')
-        allowed = set(FIELDS.get(kind, []))
+        allowed = set(FIELDS.get(kind, [])) - SERVER_ONLY_FIELDS
         if kind in ('daily','cost'):
             # Dates and names are represented by the normalized daily report;
             # payroll/allowance identity formulas never enter public raw fields.

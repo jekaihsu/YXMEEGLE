@@ -23,7 +23,7 @@ try {ui = await import(path.href)} finally {await fs.unlink(path)}
 const evidence = (patch = {}) => ({planned_qty: '123.4500', lines: 2, items: 5, work_orders: 0, latest_date: null, actual_known: false, actual_value: null,
   actual_source: null, reason: '尚無日報連結到此案件', drives_status: false, progress: null, items_total: 0, items_truncated: false, work_items: [], ...patch});
 const workItem = (patch = {}) => ({code: 'C1-1', name: '導線測量', planned_qty: '50', planned_points: '100', remaining_points: '40', status: 'partial', link_basis: 'native', ...patch});
-const PROGRESS = {percent: '30', earned_points: '60', planned_points: '200', items_done: 0, items_total: 2};
+const PROGRESS = {percent: '30', earned_points: '60', planned_points: '200', items_done: 0, items_total: 2, known_items: 2, unknown_items: 0};
 const WITH_ITEMS = {progress: PROGRESS, items_total: 2, work_items: [workItem(), workItem({code: 'C1-2', name: '水準測量', planned_qty: '5', remaining_points: '100', status: 'no_signal'})],
   work_orders: 0, actual_known: false, drives_status: true, reason: '合約填報工項已有進度（來源剩餘營業額小於對應營業額）'};
 const KNOWN = {work_orders: 2, latest_date: '2026-10-12', actual_known: true, actual_value: '5', actual_source: 'v4_daily', reason: '已有 2 筆日報連結到此案件', drives_status: true};
@@ -164,10 +164,10 @@ test('hostile item numbers and statuses are neutralized without rejecting the pa
   const parsed = await ui.fetchNodeAssignments('p1', new AbortController().signal, () => true);
   const e = parsed.nodes.find(n => n.key === 'field').evidence;
   assert.equal(e.progress, null);
-  assert.deepEqual([e.items_total, e.items_truncated], [2, false]);
-  assert.equal(e.work_items.length, 2);
+  assert.deepEqual([e.items_total, e.items_truncated], [3, false]);
+  assert.equal(e.work_items.length, 3);   // a nameless item is kept; only non-objects are dropped
   assert.deepEqual([e.work_items[0].planned_qty, e.work_items[0].planned_points, e.work_items[0].remaining_points, e.work_items[0].status], [null, null, null, 'no_signal']);
-  assert.equal(e.work_items[1].status, 'done');
+  assert.equal(e.work_items[2].status, 'done');
 });
 
 test('a percent outside 0..100 drops the percent but keeps the counts', async () => {
@@ -185,10 +185,10 @@ test('work items are capped at fifty when parsed', async () => {
 });
 
 test('progress wording', () => {
-  assert.deepEqual(ui.progressLine(evidence(WITH_ITEMS)), {known: true, percent: 30, text: '完成 30%（已完成 0/2 工項）'});
-  assert.deepEqual(ui.progressLine(evidence({progress: {...PROGRESS, percent: '42.5', items_done: 1}})), {known: true, percent: 42.5, text: '完成 42.5%（已完成 1/2 工項）'});
-  assert.deepEqual(ui.progressLine(evidence({progress: {...PROGRESS, percent: null, earned_points: null, planned_points: null, items_done: 1}})), {known: true, percent: null, text: '已完成 1/2 工項'});
-  assert.deepEqual(ui.progressLine(evidence()), {known: false, percent: null, text: '尚無進度資料（日報未連結或尚未開工）'});
+  assert.deepEqual(ui.progressLine(evidence(WITH_ITEMS)), {known: true, percent: 30, text: '完成 30%（已完成 0/2 工項）', counts: '已完成 0/2 工項', partial: false, muted: false, caveat: null, figure: '完成 30%', fill: 30});
+  assert.deepEqual(ui.progressLine(evidence({progress: {...PROGRESS, percent: '42.5', items_done: 1}})), {known: true, percent: 42.5, text: '完成 42.5%（已完成 1/2 工項）', counts: '已完成 1/2 工項', partial: false, muted: false, caveat: null, figure: '完成 42.5%', fill: 42.5});
+  assert.deepEqual(ui.progressLine(evidence({progress: {...PROGRESS, percent: null, earned_points: null, planned_points: null, items_done: 1}})), {known: true, percent: null, text: '已完成 1/2 工項', counts: '已完成 1/2 工項', partial: false, muted: false, caveat: null, figure: null, fill: null});
+  assert.deepEqual(ui.progressLine(evidence()), {known: false, percent: null, text: '尚無進度資料（日報未連結或尚未開工）', counts: '', partial: false, muted: false, caveat: null, figure: null, fill: null});
   assert.deepEqual([ui.ITEM_STATUS_LABEL.done, ui.ITEM_STATUS_LABEL.partial, ui.ITEM_STATUS_LABEL.no_signal], ['已完成', '進行中', '尚無進度資料']);
 });
 
@@ -256,4 +256,47 @@ test('the item list is touch sized and cannot overflow at 390px', async () => {
   assert.match(css, /\.na-items>summary\{[^}]*min-height:44px/);
   assert.match(css, /\.na-items li\{[^}]*overflow-wrap:anywhere/);
   assert.match(css, /\.na-card-wrap:has\(\.na-items\[open\]\)\{[^}]*grid-column:1\/-1/);
+});
+
+const UNKNOWN_HEAVY = {progress: {percent: '99.9', earned_points: '1', planned_points: '1', items_done: 1, items_total: 100, known_items: 1, unknown_items: 99}, items_total: 100,
+  drives_status: true, work_items: [workItem({remaining_points: '0', planned_points: '1', status: 'done'})]};
+
+test('a percent over few known items says it covers only them', () => {
+  const heavy = ui.progressLine(evidence(UNKNOWN_HEAVY));
+  assert.equal(heavy.text, '完成 99.9%（僅計有進度資料的 1 項；其餘 99 項尚無資料）');
+  assert.deepEqual([heavy.partial, heavy.muted, heavy.fill], [true, true, 1]);
+  const mostly = ui.progressLine(evidence({progress: {percent: '80', earned_points: '8', planned_points: '10', items_done: 1, items_total: 4, known_items: 3, unknown_items: 1}}));
+  assert.equal(mostly.text, '完成 80%（僅計有進度資料的 3 項；其餘 1 項尚無資料）');
+  assert.deepEqual([mostly.partial, mostly.muted, mostly.fill], [true, false, 60]);
+  const gated = ui.progressLine(evidence({progress: {percent: null, earned_points: null, planned_points: null, items_done: 1, items_total: 4, known_items: 3, unknown_items: 1}}));
+  assert.equal(gated.text, '已完成 1/4 工項（僅計有進度資料的 3 項；其餘 1 項尚無資料）');
+});
+
+test('an unknown-heavy card leads with the caveat, mutes the percent and keeps the bar nearly empty', async () => {
+  await mount({field: {derived_status: '進行中', evidence: evidence(UNKNOWN_HEAVY)}});
+  const field = card('外業'), percent = field.querySelector('.na-evidence-percent');
+  assert.equal(percent.classList.contains('is-muted'), true);
+  assert.equal(percent.firstElementChild.textContent, '僅計有進度資料的 1 項；其餘 99 項尚無資料');
+  assert.match(percent.textContent, /完成 99\.9%$/);
+  assert.equal(field.querySelector('.na-progress-bar').classList.contains('is-partial'), true);
+  assert.equal(field.querySelector('.na-progress-bar > span').style.width, '1%');
+  assert.doesNotMatch(field.textContent, /已完成 1\/100/);
+});
+
+test('an item that is not certainly linked reads 關聯待確認 instead of a status', async () => {
+  const items = [workItem({link_basis: 'ambiguous', status: 'no_signal', planned_points: null, remaining_points: null}), workItem({code: 'C1-2', link_basis: 'unlinked', status: 'no_signal'}), workItem({code: 'C1-3', link_basis: 'derived', status: 'done', remaining_points: '0'})];
+  await mount({field: {derived_status: '待處理', evidence: evidence({items_total: 3, work_items: items})}});
+  const rows = [...card('外業').closest('.na-card-wrap').querySelectorAll('li .na-item-status')].map(n => n.textContent);
+  assert.deepEqual(rows, ['關聯待確認', '關聯待確認', '已完成']);
+  assert.equal(ui.itemStatusLabel({status: 'partial', link_basis: ''}), '進行中');
+});
+
+test('an item without code or name is kept and labelled', async () => {
+  globalThis.fetch = async () => reply(listWith({field: {evidence: evidence({items_total: 3, work_items: [workItem({code: null, name: null}), workItem({code: null, name: '只有名稱'}), workItem({code: 'C9', name: null})]})}}));
+  const parsed = await ui.fetchNodeAssignments('p1', new AbortController().signal, () => true);
+  const e = parsed.nodes.find(n => n.key === 'field').evidence;
+  assert.deepEqual(e.work_items.map(ui.itemLabel), ['未命名工項', '只有名稱', 'C9']);
+  await mount({field: {derived_status: '進行中', evidence: e}});
+  const names = [...card('外業').closest('.na-card-wrap').querySelectorAll('.na-item-name')].map(n => n.textContent.trim());
+  assert.deepEqual(names, ['未命名工項', '只有名稱', 'C9']);
 });

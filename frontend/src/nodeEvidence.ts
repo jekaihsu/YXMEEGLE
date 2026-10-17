@@ -1,5 +1,5 @@
 import {formatPlanQuantity} from './caseDetailView';
-import type {AssignmentNode, NodeEvidence, WorkItemStatus} from './nodeAssignmentApi';
+import type {AssignmentNode, NodeEvidence, WorkItem, WorkItemStatus} from './nodeAssignmentApi';
 
 export const NO_PROGRESS_TEXT = '尚無進度資料（日報未連結或尚未開工）';
 export const SUBMIT_HINT_TEXT = '可送審';
@@ -27,16 +27,34 @@ export const showsEvidence = (n: AssignmentNode) => isProductionNode(n.key) && !
 export const progressHref = (projectId: string) => `#view=project&project=${encodeURIComponent(projectId)}&tab=progress`;
 
 export const ITEM_STATUS_LABEL: Record<WorkItemStatus, string> = {done: '已完成', partial: '進行中', no_signal: '尚無進度資料'};
-export interface ProgressLine {known: boolean; percent: number | null; text: string}
+export const UNCERTAIN_LINK_LABEL = '關聯待確認';
+export const UNNAMED_ITEM_LABEL = '未命名工項';
+const CERTAIN_LINKS = new Set(['native', 'derived']);
+// An item whose contract link is not certain is listed but carries no signal, whatever its points say.
+export const itemStatusLabel = (item: Pick<WorkItem, 'status' | 'link_basis'>) =>
+  item.link_basis && !CERTAIN_LINKS.has(item.link_basis) ? UNCERTAIN_LINK_LABEL : ITEM_STATUS_LABEL[item.status];
+export const itemLabel = (item: Pick<WorkItem, 'code' | 'name'>) => item.code ?? item.name ?? UNNAMED_ITEM_LABEL;
+export interface ProgressLine {
+  known: boolean; percent: number | null; text: string; counts: string;
+  // Some items have no signal: the percent covers only the known ones. `muted` when they are fewer than half, then the caveat leads.
+  partial: boolean; muted: boolean; caveat: string | null; figure: string | null; fill: number | null;
+}
 
-// Progress is only known when some item has real progress; no signal is never shown as 0%.
+// Progress is only known when some item has real progress; no signal is never shown as 0% and a partial view is never shown as the whole.
 export function progressLine(e: Pick<NodeEvidence, 'progress'>): ProgressLine {
   const p = e.progress;
-  if (!p) return {known: false, percent: null, text: NO_PROGRESS_TEXT};
+  if (!p) return {known: false, percent: null, text: NO_PROGRESS_TEXT, counts: '', partial: false, muted: false, caveat: null, figure: null, fill: null};
   const percent = p.percent === null ? null : Number(p.percent);
   const shown = percent === null ? null : String(Math.round(percent * 10) / 10);
+  const unknown = p.unknown_items ?? 0, known = p.known_items ?? p.items_total - unknown;   // the project progress payload is not normalized on the way in
+  const partial = unknown > 0;
+  const caveat = partial ? `僅計有進度資料的 ${known} 項；其餘 ${unknown} 項尚無資料` : null;
   const counts = `已完成 ${p.items_done}/${p.items_total} 工項`;
-  return {known: true, percent, text: shown === null ? counts : `完成 ${shown}%（${counts}）`};
+  const figure = shown === null ? null : `完成 ${shown}%`;
+  const text = shown === null ? (partial ? `${counts}（${caveat}）` : counts) : `${figure}（${caveat ?? counts}）`;
+  // The bar shows how much of the whole is proven, so 99.9% of one known item out of 100 never looks nearly full.
+  const fill = percent === null ? null : partial ? Math.round(percent * known / p.items_total * 10) / 10 : percent;
+  return {known: true, percent, text, counts, partial, muted: partial && known * 2 < p.items_total, caveat, figure, fill};
 }
 
 export const itemsSummary = (e: NodeEvidence) => `工項明細（${e.items_total}）`;

@@ -62,7 +62,7 @@ def test_node_percent_is_decimal_safe_and_rounds_half_up_to_one_decimal():
     assert (node.earned, node.planned, node.items_total, node.items_done, node.known, node.all_done) == (
         D('0.4'), D('1.0'), 3, 1, True, False)
     assert node.percent == D('40.0')
-    assert node.public() == {'percent': '40', 'earned_points': '0.4', 'planned_points': '1', 'items_done': 1, 'items_total': 3}
+    assert node.public() == {'percent': '40', 'earned_points': '0.4', 'planned_points': '1', 'items_done': 1, 'items_total': 3, 'known_items': 2, 'unknown_items': 1}
     assert node_progress(pairs(('3', '1'), ('3', '3'))).percent == D('33.3')
     assert node_progress(pairs(('3', '2'), ('3', '3'))).percent == D('16.7')   # 1/6 = 16.666..
 
@@ -96,4 +96,23 @@ def test_a_partial_node_never_displays_100_until_every_item_is_done():
 
 def test_the_points_gate_keeps_only_counts():
     node = node_progress(pairs(('4', '0'), ('6', '3')))
-    assert node.public(points=False) == {'percent': None, 'earned_points': None, 'planned_points': None, 'items_done': 1, 'items_total': 2}
+    assert node.public(points=False) == {'percent': None, 'earned_points': None, 'planned_points': None, 'items_done': 1, 'items_total': 2, 'known_items': 2, 'unknown_items': 0}
+
+
+@pytest.mark.parametrize('value, expected', [
+    ('1,500', D(1500)), ('1,500.5', D('1500.5')), ('12,345,678', D(12345678)), ('999,999', D(999999)),
+    ('0,0', None), ('1,2', None), ('1,50', None), ('1,5000', None), ('1500,000', None), (',500', None),
+    ('1,500,', None), ('1,,500', None), ('1,500e2', None), ('1,5.5', None), ('1.500,5', None),
+])
+def test_a_comma_is_only_a_thousands_separator(value, expected):
+    assert parse_points(value) == expected
+    assert item_status(parse_points('10'), parse_points(value if expected is None else '3')) in (NO_SIGNAL, PARTIAL)
+
+
+def test_a_malformed_comma_remaining_is_not_done():
+    assert item_status(parse_points('100'), parse_points('0,0')) == NO_SIGNAL
+
+
+def test_progress_counts_known_and_unknown_items():
+    result = node_progress([(D(10), D(0)), (D(10), D(10)), (None, None)]).public()
+    assert (result['known_items'], result['unknown_items'], result['items_total']) == (1, 2, 3)

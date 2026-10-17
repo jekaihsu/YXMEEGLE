@@ -176,3 +176,10 @@ def test_actions_endpoint_rejects_hostile_action_with_safe_denied_audit(tmp_path
     assert row.data['status'] == 422 and row.data['action_length'] == len(action)
     assert not any(c in json.dumps(row.data, ensure_ascii=False) for c in ('\x00', '\x1f'))
     assert action not in json.dumps(row.data)
+
+
+def test_source_response_never_carries_the_fill_item_remaining_points():
+    from .sources import REMAINING_POINTS_FIELD
+    original={'records':[{'kind':'reporting','record_id':'r1','fields':{'對應營業額':'100',REMAINING_POINTS_FIELD:'40'}}]}
+    assert public_source_cache(original)['records'][0]['fields']=={'對應營業額':'100'}
+    assert REMAINING_POINTS_FIELD in original['records'][0]['fields']

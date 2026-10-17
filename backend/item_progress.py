@@ -14,6 +14,8 @@ PLANNED_POINTS_FIELD = '對應營業額'
 MAX_POINTS = Decimal(10) ** 9
 DONE, PARTIAL, NO_SIGNAL = 'done', 'partial', 'no_signal'
 NUMBER = re.compile(r'(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?')
+# A comma is only a thousands separator: groups of exactly three digits, so "0,0" and "1,2" are malformed, not 0 and 12.
+GROUPED = re.compile(r'\d{1,3}(?:,\d{3})+(?:\.\d*)?')
 HUNDRED, ONE_DECIMAL = Decimal(100), Decimal('0.1')
 CAPPED_UNTIL_DONE = Decimal('99.9')
 
@@ -22,8 +24,12 @@ def parse_points(value) -> Decimal | None:
     """A non-negative, bounded decimal, or None for anything else (blank, negative, NaN, huge, text)."""
     if value is None or isinstance(value, bool):
         return None
-    raw = (text(value) if isinstance(value, (list, dict)) else str(value)).replace(',', '').strip()
-    if len(raw) > 100 or not NUMBER.fullmatch(raw):
+    raw = (text(value) if isinstance(value, (list, dict)) else str(value)).strip()
+    if len(raw) > 100:
+        return None
+    if GROUPED.fullmatch(raw):
+        raw = raw.replace(',', '')
+    elif not NUMBER.fullmatch(raw):
         return None
     try:
         number = Decimal(raw)
@@ -53,6 +59,7 @@ class NodeProgress:
     planned: Decimal
     known: bool
     all_done: bool
+    known_items: int = 0
 
     @property
     def percent(self) -> Decimal | None:
@@ -67,7 +74,8 @@ class NodeProgress:
             return None
         return {'percent': fmt(self.percent) if points else None, 'earned_points': fmt(self.earned) if points else None,
                 'planned_points': fmt(self.planned) if points else None, 'items_done': self.items_done,
-                'items_total': self.items_total}
+                'items_total': self.items_total, 'known_items': self.known_items,
+                'unknown_items': self.items_total - self.known_items}
 
 
 def node_progress(pairs, complete: bool = True) -> NodeProgress:
@@ -81,4 +89,5 @@ def node_progress(pairs, complete: bool = True) -> NodeProgress:
     valid = [(p, r) for p, r in pairs if p is not None and r is not None and p > 0 and r <= p]
     return NodeProgress(len(pairs), statuses.count(DONE), sum((p - r for p, r in valid), Decimal(0)),
                         sum((p for p, _ in valid), Decimal(0)), any(s != NO_SIGNAL for s in statuses),
-                        complete and bool(pairs) and all(s == DONE for s in statuses))
+                        complete and bool(pairs) and all(s == DONE for s in statuses),
+                        sum(s != NO_SIGNAL for s in statuses))

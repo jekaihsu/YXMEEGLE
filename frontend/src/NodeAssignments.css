@@ -59,3 +59,5 @@
 .na-items>p{margin:var(--space-2) var(--space-1) 0}.na-evidence-hint{display:inline-flex;align-self:flex-start;padding:var(--space-1) var(--space-2);border-radius:var(--radius-pill);background:var(--accent-soft)}
 .na-evidence-link{min-height:44px}
 .na-card-progress{flex-wrap:wrap}.na-card-progress>strong{white-space:nowrap}.na-production-cards{align-items:start}
+.na-evidence-percent.is-muted,.na-evidence-percent.is-muted>small:not(.na-caveat){font-weight:400;color:var(--label-2)}.na-caveat{display:block;font-weight:600;color:var(--label)}
+.na-progress-bar.is-partial{background:repeating-linear-gradient(135deg,var(--sep) 0 4px,transparent 4px 8px)}.na-progress-bar.is-partial>span{opacity:.6}

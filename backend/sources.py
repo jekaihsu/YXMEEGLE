@@ -18,6 +18,8 @@ API='https://open.larksuite.com/open-apis'
 PROVISIONAL_CASE_FIELD='可能的確認單工編(若暫無確認單才需填寫)'
 # Lark's own spelling carries a stray U+02CA between 營 and 業; copy it exactly, never "fix" it.
 REMAINING_POINTS_FIELD='本工項剩餘營\u02ca業額'
+# Read from Lark for server-side progress only; FIELDS drives the fetch, so the public source views subtract this set.
+SERVER_ONLY_FIELDS=frozenset({REMAINING_POINTS_FIELD})
 FIELDS={
  'quote':['工程編號','報價編號','此案確認單','工程名稱','行號單位','契約價格(未稅)','備註','案件負責人','報價期限','外業期限','內業期限(控)','內業期限(圖)','內業期限(報)','合約開始日期','合約結束日期'],
  'confirmation':['工程確認單編號','所屬案件','SourceID','工程名稱','狀態','合約總額','預估總成本','實際總成本','案件負責人','合約結束日期','備註','報價編號'],

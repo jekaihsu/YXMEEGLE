@@ -1,6 +1,7 @@
 """Serve the built UI against synthetic node-evidence data computed by the real backend code. Run from the worktree root.
 
-Open http://127.0.0.1:8767/?scenario=partial#view=project&project=<id>&tab=flow with scenario nosignal, partial, alldone or restricted."""
+Open http://127.0.0.1:8767/?scenario=partial#view=project&project=<id>&tab=flow with scenario nosignal, partial, alldone, restricted,
+unknownheavy, uncertain or nulllabel (the last three reshape the partial payload the way a real case would arrive)."""
 import copy
 import json
 import os
@@ -40,7 +41,25 @@ SCENARIOS = {
     'partial': {'外業': [('10', '0'), ('20', '5'), ('4', '4')], '圖資': [('3', '0'), ('2', '2')]},
     'alldone': {'外業': [('10', '0'), ('20', '0'), ('4', '0')]},
     'restricted': {'外業': [('10', '0'), ('20', '5'), ('4', '4')], '圖資': [('3', '0'), ('2', '2')]},
+    'unknownheavy': {'外業': [('10', '0'), ('20', '5'), ('4', '4')]},
+    'uncertain': {'外業': [('10', '0'), ('20', '5'), ('4', '4')]},
+    'nulllabel': {'外業': [('10', '0'), ('20', '5'), ('4', '4')]},
 }
+
+
+def reshape(scenario, evidence):
+    items = evidence['work_items']
+    if scenario == 'unknownheavy':
+        evidence['progress'] = dict(percent='99.9', earned_points='10', planned_points='10', items_done=1, items_total=100, known_items=1, unknown_items=99)
+        evidence['items_total'] = 100
+        evidence['work_items'] = items[:1] + [dict(items[1], status='no_signal', planned_points=None, remaining_points=None)] * 2
+    elif scenario == 'uncertain':
+        items[1].update(link_basis='ambiguous', status='no_signal', planned_points=None, remaining_points=None)
+        items[2].update(link_basis='unlinked', status='no_signal', planned_points=None, remaining_points=None)
+    elif scenario == 'nulllabel':
+        items[0].update(code=None, name=None)
+        items[1].update(code=None)
+        items[2].update(name=None)
 OPEN = ('待處理', '進行中')
 
 
@@ -59,6 +78,8 @@ def payload(scenario):
         status = ('進行中' if signal.started else '待處理') if first else '未開始'
         node.update(derived_status=status, evidence={**signal.public(), 'drives_status': first and signal.started},
                     can_submit_hint=signal.can_submit and status in OPEN)
+        if first:
+            reshape(scenario, node['evidence'])
     if scenario == 'restricted':
         hide_report_figures(body)
     return body

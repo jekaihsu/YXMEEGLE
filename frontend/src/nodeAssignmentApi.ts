@@ -13,7 +13,7 @@ export interface WorkItem {
   status: WorkItemStatus; link_basis: string;
 }
 // percent and the points are null for a viewer without the reports gate; the counts stay.
-export interface ItemsProgress {percent: string | null; earned_points: string | null; planned_points: string | null; items_done: number; items_total: number}
+export interface ItemsProgress {percent: string | null; earned_points: string | null; planned_points: string | null; items_done: number; items_total: number; known_items: number; unknown_items: number}
 export interface NodeEvidence {
   planned_qty: string | null; lines: number | null; items: number | null; work_orders: number; latest_date: string | null;
   actual_known: boolean; actual_value: string | null; actual_source: string | null; reason: string; drives_status: boolean;
@@ -91,14 +91,15 @@ function itemsProgress(value: unknown): ItemsProgress | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const p = Object.fromEntries(Object.entries(value));
   if (!isCount(p.items_total) || !isCount(p.items_done) || p.items_done > p.items_total) return null;
+  // known_items is additive: a server without it sent only items with a signal counted, so every item is taken as known.
+  const known = isCount(p.known_items) && p.known_items <= p.items_total ? p.known_items : p.items_total;
   return {percent: percentText(p.percent), earned_points: decimalText(p.earned_points), planned_points: decimalText(p.planned_points),
-    items_done: p.items_done, items_total: p.items_total};
+    items_done: p.items_done, items_total: p.items_total, known_items: known, unknown_items: p.items_total - known};
 }
 function workItem(value: unknown): WorkItem | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const i = Object.fromEntries(Object.entries(value));
   const code = typeof i.code === 'string' ? i.code : null, name = typeof i.name === 'string' ? i.name : null;
-  if (code === null && name === null) return null;
   return {code, name, planned_qty: decimalText(i.planned_qty), planned_points: decimalText(i.planned_points), remaining_points: decimalText(i.remaining_points),
     status: i.status === 'done' || i.status === 'partial' ? i.status : 'no_signal', link_basis: typeof i.link_basis === 'string' ? i.link_basis : ''};
 }
