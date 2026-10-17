@@ -342,6 +342,8 @@ def test_multicase_group_points_count_row_once_and_filter_equal_share():
     raw['case']['records'].append({'record_id':'recSecond','fields':{'案件編號':'C02','狀態':'已結案'}})
     d=c.normalize(raw)
     assert c.progress(d,week='2026-10-12')['by_group'][0]['actual']==120
+    assert c.progress(d,week='2026-10-12')['by_group'][0]['matched_points']==120
+    assert c.progress(d,week='2026-10-12',q='C01')['by_group'][0]['matched_points']==60
     assert c.progress(d,week='2026-10-12',q='C01')['by_group'][0]['actual']==60
     assert c.progress(d,week='2026-10-12',status='已結案')['by_group'][0]['actual']==60
 

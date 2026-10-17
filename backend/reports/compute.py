@@ -325,7 +325,7 @@ def progress_groups(data,dept,week,selected,included,group_plan,group_actual,bas
         codes=case_codes(r['case_code'])
         share=(r['points'] or 0)/len(codes) if codes else 0
         actual_points[r['group']]+=(share*len(codes & included) if filtered else r['points'] or 0)
-        group_points[r['group']][1]+=sum(share for code in codes & included if (code,r['date']) in group_plan.get(r['group'],set()))
+        group_points[r['group']][1]+=sum(share if filtered else r['points'] or 0 for code in codes & included if (code,r['date']) in group_plan.get(r['group'],set()))
     by_group=[]
     for g in sorted(set(group_plan)|set(group_actual)):
         plg=len(group_plan[g]) if basis=='days' else group_points[g][0]
@@ -361,7 +361,7 @@ def progress(data, **p) -> ProgressResponse:
     counts=Counter(r['status'] for r in filter_progress(rows,q=p.get('q','')))
     observed={str(cell(r['f'].get('狀態'))) or '未填' for r in cases.values()} | {'未填'}
     if p.get('status') and p['status'] not in observed:
-            raise UnknownStatus('status 不支援的值')
+        raise UnknownStatus('status 不支援的值')
     rows=filter_progress(rows,p.get('status',''),p.get('q',''))
     included={r['case_code'] for r in rows}
     group_plan=defaultdict(set,{g:{x for x in v if x[0] in included} for g,v in group_plan.items()})
