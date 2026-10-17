@@ -195,13 +195,14 @@ def h():
     def load_case(_data, _user, project_id):
         return state, case['others'].get(project_id) or case['project']
 
-    def build(overrides=None):
+    def build(overrides=None, **options):
         app = FastAPI()
         register(app, identity=identity, load_case=load_case, sessions=sessions, receipt_model=Receipt,
                  audit_model=AuditRow, cfg={**cfg, **(overrides or {})},
                  skipped_nodes=lambda _s, _p, node: node.get('status') == 'approved_skipped',
                  transport=httpx.MockTransport(fake), clock=lambda: clock[0],
-                 client_options={'token_cache': TenantTokenCache(), 'bucket': NoBucket(), 'sleep': lambda _s: None})
+                 client_options={'token_cache': TenantTokenCache(), 'bucket': NoBucket(), 'sleep': lambda _s: None},
+                 **options)
         return TestClient(app)
 
     def audits():

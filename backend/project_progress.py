@@ -198,7 +198,7 @@ class ReportsView:
     """Non-blocking look at the reports snapshot. A cached (even stale) snapshot is used as is; a cold store is only
     warmed in the background (single-flight, read-only) and reported as ``cold``. Never waits on Lark."""
 
-    def __init__(self, store=None, status='ok'):
+    def __init__(self, store=None, status='ok', *, warm=True):
         self.store, self.status, self.data, self.fetched_at, self.stale = store, status, None, None, None
         if status != 'ok':
             return
@@ -208,6 +208,8 @@ class ReportsView:
         snapshot = store.peek()
         if snapshot is None:
             self.status = 'unavailable' if store.meta().get('refresh_error') else 'cold'
+            if not warm:
+                return
             try:
                 store.start()
             except Exception:
@@ -267,6 +269,10 @@ def _dec(value):
     return number if number is not None and number.is_finite() else None
 
 
+def parse_decimal(value):
+    return _dec(value)
+
+
 def _fmt(number):
     return None if number is None else format(number.normalize(), 'f')
 
@@ -283,6 +289,22 @@ def _stage(key, label, state, basis, *evidence):
     return {'key': key, 'label': label, 'state': state, 'basis': basis, 'evidence': list(evidence)}
 
 
+def _v3_matches(code, quotes, reports):
+    found = {}
+    for candidate, how in [(code, 'code')] + [(q['number'], 'quote_number') for q in quotes]:
+        case = reports.case(candidate)
+        if case and case['case_key'] not in found:
+            found[case['case_key']] = {**case, 'match': how}
+    return found
+
+
+def v3_field_total(project, reports):
+    """The register's cumulative 外業 points, only when exactly one v3 case matches the code or a quote number."""
+    quotes = [{'number': text(q.get('quote_code')) or None} for q in project.get('quotes', [])]
+    found = _v3_matches(text(project.get('code')) or None, quotes, reports)
+    return reports.field_total(next(iter(found.values()))['case_code']) if len(found) == 1 else None
+
+
 def _identity(state, project, reports):
     pid, code = project['id'], text(project.get('code')) or None
     rows = live_confirmation_fields(state, project)
@@ -293,11 +315,7 @@ def _identity(state, project, reports):
     quotes = [{'number': text(q.get('quote_code')) or None, 'engineering_code': text(q.get('engineering_code')) or None,
                'status': text((q.get('fields') or {}).get('狀態')) or text((q.get('fields') or {}).get('案件狀態')) or None}
               for q in project.get('quotes', [])]
-    found = {}
-    for candidate, how in [(code, 'code')] + [(q['number'], 'quote_number') for q in quotes]:
-        case = reports.case(candidate)
-        if case and case['case_key'] not in found:
-            found[case['case_key']] = {**case, 'match': how}
+    found = _v3_matches(code, quotes, reports)
     return {'code': code, 'is_c_prefix': is_c_code(code),
             'confirmation': {'present': bool(rows), 'line_count': len(lines),
                              'fill_item_count': len(fills) if imported else None,
@@ -310,7 +328,7 @@ def _daily(project, key):
     return [d for d in project.get('daily_reports', []) if d.get('department') == group and not d.get('source_missing')]
 
 
-def _actual(project, key, v3_field_total):
+def actual_of(project, key, v3_field_total):
     rows = _daily(project, key)
     if rows:
         points = [Decimal(str(d['points'])) for d in rows
@@ -326,6 +344,22 @@ def _actual(project, key, v3_field_total):
     return {'known': False, 'value': None, 'unit_note': None, 'source': None, 'reason': reason}
 
 
+def planned_of(summary, key):
+    """The category's planned totals from the derived contract plan, or None while the plan is unavailable."""
+    if summary is None:
+        return None
+    c = summary['categories'][PRODUCTION[key][0]]
+    return {'lines': c['lines'], 'items': c['items'], 'qty': c['planned_qty'], 'needs_review': c['needs_review'],
+            'basis': {'native': c['items_native'], 'derived': c['items_derived'], 'ambiguous': c['items_ambiguous'],
+                      'unlinked': c['items_unlinked'] + c['items_native_unresolved']}}
+
+
+def work_orders_of(project, key):
+    orders = _daily(project, key)
+    dates = sorted(d['date'] for d in orders if d.get('date'))
+    return {'count': len(orders) or None, 'latest_date': dates[-1] if dates else None}
+
+
 def _planned_items(state, project, summary, key):
     if summary is None:
         return None, [], 0, False
@@ -339,11 +373,7 @@ def _planned_items(state, project, summary, key):
                       'name': text(fields.get(CATEGORY_FIELDS[category][1])) or None,
                       'planned_qty': _fmt(_dec(fields.get(CATEGORY_FIELDS[category][0]))),
                       'link_basis': BASIS_LABEL[item['basis']]})
-    c = summary['categories'][category]
-    planned = {'lines': c['lines'], 'items': c['items'], 'qty': c['planned_qty'], 'needs_review': c['needs_review'],
-               'basis': {'native': c['items_native'], 'derived': c['items_derived'], 'ambiguous': c['items_ambiguous'],
-                         'unlinked': c['items_unlinked'] + c['items_native_unresolved']}}
-    return planned, items, len(mine), len(mine) > MAX_ITEMS
+    return planned_of(summary, key), items, len(mine), len(mine) > MAX_ITEMS
 
 
 def _finance(project, amounts, rows):
@@ -474,16 +504,12 @@ def build_project_progress(state, project_id, *, reports=None, amounts=False, as
         found, cut = reports.rows(case['case_code'])
         v3_rows += found
         rows_truncated = rows_truncated or cut
-    only = identity['v3_cases'][0]['case_code'] if len(identity['v3_cases']) == 1 else None
-    v3_field_total = reports.field_total(only)
+    field_total = v3_field_total(project, reports)
     production = {}
     for key in PRODUCTION:
         planned, items, total, truncated = _planned_items(state, project, summary, key)
-        orders = _daily(project, key)
-        dates = sorted(d['date'] for d in orders if d.get('date'))
         production[key] = {'planned': planned, 'items': items, 'items_total': total, 'items_truncated': truncated,
-                           'actual': _actual(project, key, v3_field_total),
-                           'work_orders': {'count': len(orders) or None, 'latest_date': dates[-1] if dates else None}}
+                           'actual': actual_of(project, key, field_total), 'work_orders': work_orders_of(project, key)}
     production.update(report_rows=v3_rows, report_rows_truncated=rows_truncated)
     finance = _finance(project, amounts, conf_rows)
     status = state.get('source_status') or {}

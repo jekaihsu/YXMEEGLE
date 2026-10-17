@@ -11,7 +11,7 @@ from .domain import (
     NodeFacts, NodeKey, NodeStatus, TaskFacts, TaskStatus, check_node_action, check_task_status, derive_chain,
     eligible_assignee, later_nodes_started, progress, task_counts, task_permissions)
 from .errors import Failure
-from .evidence import AutoDone
+from .evidence import AutoDone, Signal, auto_done, signals
 from .lark_table import CaseSnapshot, NodeRow, TaskRow, date_millis
 from .roster import Roster
 
@@ -118,14 +118,19 @@ def parse_create_task(body) -> CreateTask:
 @dataclass(frozen=True)
 class StartSopCommand:
     preview_hash: str
+    # Off by default: 啟動 SOP only creates the missing 節點指派 rows. On, it also seeds one planned task per node.
+    seed_tasks: bool = False
 
 
 def parse_start_sop(body) -> StartSopCommand:
-    _keys(body, ('preview_hash',))
+    _keys(body, ('preview_hash', 'seed_tasks'))
     value = body.get('preview_hash')
     if not isinstance(value, str) or not PREVIEW_HASH.fullmatch(value):
         raise Failure('invalid', 'preview_hash 格式錯誤，請重新取得預覽')
-    return StartSopCommand(value)
+    seed = body.get('seed_tasks', False)
+    if not isinstance(seed, bool):
+        raise Failure('invalid', 'seed_tasks 必須是 true 或 false')
+    return StartSopCommand(value, seed)
 
 
 @dataclass(frozen=True)
@@ -170,7 +175,7 @@ class Situation:
     skipped: frozenset
     now_ms: int
     confirmation_record: str | None = None
-    evidence: Mapping[NodeKey, AutoDone] = field(default_factory=dict)
+    evidence: Mapping[NodeKey, AutoDone | Signal] = field(default_factory=dict)
 
 
 class CreatePhase(StrEnum):
@@ -223,7 +228,8 @@ class Plan:
 
 
 def facts_of(snapshot: CaseSnapshot, skipped, evidence=None) -> dict[NodeKey, NodeFacts]:
-    """Lark facts per node. `evidence` nodes count as approved, whatever Lark says; a skipped node never is."""
+    """Lark facts per node. Auto-done nodes count as approved, whatever Lark says; a skipped node never is.
+    A production signal that shows work has begun only marks the node `evidence_started`."""
     facts = {}
     for key in NodeKey:
         rows = snapshot.rows.get(key, ())
@@ -231,9 +237,12 @@ def facts_of(snapshot: CaseSnapshot, skipped, evidence=None) -> dict[NodeKey, No
         facts[key] = NodeFacts(approved=bool(row and row.approved), skipped=key in skipped,
                                rejected=bool(row and row.rejected),
                                tasks=tuple(t.status for t in snapshot.node_tasks(key)))
-    for key in evidence or ():
+    for key in auto_done(evidence or {}):
         if key not in skipped:
             facts[key] = replace(facts[key], approved=True, rejected=False)
+    for key, signal in signals(evidence or {}).items():
+        if signal.started and key not in skipped:
+            facts[key] = replace(facts[key], evidence_started=True)
     return facts
 
 
@@ -273,8 +282,9 @@ def plan_node(s: Situation, command: NodeCommand, expected_revision) -> Plan:
         check_node_action(s.actor, s.key, command.action, status, owners)
     except IllegalTransition as exc:
         illegal = exc
-    if illegal is None and command.action is NodeAction.REJECT and s.key in s.evidence:
-        illegal = IllegalTransition(f'此節點由系統依資料判定完成（{s.evidence[s.key].reason_zh}），不能退回')
+    done_by_data = auto_done(s.evidence).get(s.key)
+    if illegal is None and command.action is NodeAction.REJECT and done_by_data:
+        illegal = IllegalTransition(f'此節點由系統依資料判定完成（{done_by_data.reason_zh}），不能退回')
     _check_revision(row.revision if row else None, expected_revision)
     if illegal:
         raise illegal

@@ -6,6 +6,10 @@ export type NodePermissions = Partial<Record<NodeAction, boolean>>;
 export interface AssignmentPerson {open_id: string; name: string; avatar_url?: string}
 export interface AssignablePerson extends AssignmentPerson {departments: string[]}
 export interface AutoDone {rule: string; reason: string}
+export interface NodeEvidence {
+  planned_qty: string | null; lines: number | null; items: number | null; work_orders: number; latest_date: string | null;
+  actual_known: boolean; actual_value: string | null; actual_source: string | null; reason: string; drives_status: boolean;
+}
 export interface AssignmentNode {
   key: string; label: string; status: string | null; derived_status: string; record_id: string | null; revision: string | null;
   departments: string[]; assignment_method: string | null; started_at: string | null; finished_at: string | null;
@@ -13,6 +17,7 @@ export interface AssignmentNode {
   owners: AssignmentPerson[]; assigned_by: AssignmentPerson | null; approver: AssignmentPerson | null;
   approved_at: string | null; reject_reason: string | null; deadline: string | null; warnings: string[];
   auto_done?: AutoDone | null;
+  evidence?: NodeEvidence | null; can_submit_hint?: boolean;
   next_due?: string | null; deadline_basis?: string; assignment_key?: string | null; origin?: 'lark';
 }
 export interface AssignmentTask {
@@ -66,6 +71,15 @@ function autoDone(value: unknown): AutoDone | null {
   const a = record(value);
   return {rule: text(a.rule), reason: text(a.reason)};
 }
+function optionalCount(value: unknown): number | null {return value == null ? null : count(value)}
+function flag(value: unknown): boolean {if (typeof value !== 'boolean') throw malformed(); return value}
+function evidence(value: unknown): NodeEvidence | null {
+  if (value == null) return null;
+  const e = record(value);
+  return {planned_qty: optionalText(e.planned_qty), lines: optionalCount(e.lines), items: optionalCount(e.items), work_orders: count(e.work_orders),
+    latest_date: optionalText(e.latest_date), actual_known: flag(e.actual_known), actual_value: optionalText(e.actual_value),
+    actual_source: optionalText(e.actual_source), reason: text(e.reason), drives_status: flag(e.drives_status)};
+}
 function node(value: unknown): AssignmentNode {
   const n = record(value), tasks = record(n.tasks);
   return {
@@ -76,6 +90,7 @@ function node(value: unknown): AssignmentNode {
     assigned_by: optionalPerson(n.assigned_by), approver: optionalPerson(n.approver), approved_at: optionalText(n.approved_at),
     reject_reason: optionalText(n.reject_reason), deadline: optionalText(n.deadline), warnings: array(n.warnings, text),
     ...('auto_done' in n ? {auto_done: autoDone(n.auto_done)} : {}),
+    ...('evidence' in n ? {evidence: evidence(n.evidence), can_submit_hint: n.can_submit_hint === true} : {}),
     ...('next_due' in n ? {next_due: optionalText(n.next_due)} : {}),
     ...('assignment_key' in n ? {assignment_key: optionalText(n.assignment_key)} : {}),
     ...('deadline_basis' in n ? {deadline_basis: text(n.deadline_basis)} : {}),

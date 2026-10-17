@@ -23,9 +23,10 @@ TASK_ID = re.compile(r'rec[A-Za-z0-9]{1,40}')
 
 
 def register(app, *, identity, load_case, sessions, receipt_model, audit_model, cfg, skipped_nodes,
-             transport=None, client_options=None, clock=None):
+             transport=None, client_options=None, clock=None, reports=None, reports_visible=None):
     """load_case(session_data, user, project_id) -> (state, project) for a case visible to that user."""
-    options = {'transport': transport, 'client_options': client_options}
+    options = {'transport': transport, 'client_options': client_options, 'reports': reports,
+               'reports_visible': reports_visible}
     if clock is not None:
         options['clock'] = clock
     service = NodeAssignmentService(cfg, sessions=sessions, receipt_model=receipt_model, audit_model=audit_model,
@@ -103,7 +104,10 @@ def register(app, *, identity, load_case, sessions, receipt_model, audit_model, 
     def start_sop_preview(request: Request, project_id: str):
         if not enabled:
             return disabled()
-        return guarded(lambda: (200, start_sop.preview(context(request, project_id)), False))
+        seed = request.query_params.get('seed_tasks')
+        if seed not in (None, 'true', 'false'):
+            return respond(failure=Failure('invalid', 'seed_tasks 必須是 true 或 false'))
+        return guarded(lambda: (200, start_sop.preview(context(request, project_id), seed == 'true'), False))
 
     @app.post(PREFIX + '/start-sop')
     async def start_sop_run(request: Request, project_id: str):

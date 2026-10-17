@@ -18,7 +18,7 @@ from .lark_table import CaseSnapshot, date_millis
 from .operations import OPEN_ID, facts_of
 
 SOP_RULE_VERSION = 'start-sop-20261017.1'
-CHAIN_NOTE = '節點狀態仍依九節點流程推導；啟動 SOP 只建立節點列與一筆種子任務，不會變更任何節點狀態。'
+CHAIN_NOTE = '節點狀態仍依九節點流程推導；啟動 SOP 只建立缺少的節點列，不會變更任何節點狀態。進度會自動來自案件資料，計畫任務為選用。'
 SHOWN_DATES = 5
 PLAN_TRUNCATED_MESSAGE = '計畫明細過多已截斷，工項數量可能不完整'
 
@@ -297,8 +297,12 @@ def plan_start(state, project, code: str | None) -> StartPlan:
     return StartPlan(project['id'], code, tuple(nodes), tuple(notices), str(summary.get('rule_version') or ''))
 
 
-def preview_body(plan: StartPlan, states: dict[NodeKey, NodeState] | None, blockers, can_start: bool) -> dict:
-    """The GET contract. `states` is None while Lark cannot be read, so nothing is promised."""
+def preview_body(plan: StartPlan, states: dict[NodeKey, NodeState] | None, blockers, can_start: bool,
+                 seed_tasks: bool = False) -> dict:
+    """The GET contract. `states` is None while Lark cannot be read, so nothing is promised.
+
+    `eligible` follows the chosen path: missing node rows by default, node rows or seed tasks with `seed_tasks`.
+    """
     rows, warnings = [], [n.public() for n in plan.notices]
     for node in plan.nodes:
         state = (states or {}).get(node.key)
@@ -313,13 +317,13 @@ def preview_body(plan: StartPlan, states: dict[NodeKey, NodeState] | None, block
             'will_create_node': bool(state and state.will_create_node),
             'will_create_task': bool(state and state.will_create_task),
             'task_title': node.title, 'task_detail': node.detail})
-    pending = any(r['will_create_node'] or r['will_create_task'] for r in rows)
+    pending = any(r['will_create_node'] or (seed_tasks and r['will_create_task']) for r in rows)
     # Started means the node rows exist, whoever made them (Lark's own button or this app); seeds are optional extras.
     started = states is not None and bool(rows) and all(r['node_exists'] for r in rows)
     seeds_pending = sum(r['will_create_task'] for r in rows)
     return {
         'project_id': plan.project_id, 'code': plan.code, 'eligible': not blockers and pending, 'can_start': can_start,
-        'already_started': started, 'seeds_pending': seeds_pending, 'seeds_optional': started and seeds_pending > 0,
+        'seed_tasks': seed_tasks, 'already_started': started, 'seeds_pending': seeds_pending, 'seeds_optional': started and seeds_pending > 0,
         'blockers': [{'code': b.value, 'message': m} for b, m in blockers],
         'warnings': warnings, 'nodes': rows, 'chain_note': CHAIN_NOTE,
         'preview_hash': plan.preview_hash, 'plan_rule_version': plan.plan_rule_version}

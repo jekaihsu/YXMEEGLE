@@ -56,6 +56,7 @@ Conventions:
 - Quantities and money are decimal strings (never floats). Reports points (`planned`, `actual`, `done_total`) are floats as in `/api/reports/progress`.
 - `null`/`unknown` means no data, never 0. `work_orders.count: null` means no mapped row (not a verified zero). `case_received` is `true` or `null`: an unchecked box cannot be told from an unset one.
 - The SOP-node status is not here. The frontend joins it beside `stages`.
+- The 外業/控制/圖資/報告 SOP nodes read the same joins (`planned_of`, `work_orders_of`, `actual_of`, `v3_field_total`) for their evidence and may start from them; see `NODE_ASSIGNMENT_20261014.md`, Production evidence.
 - `report_rows` carry `case_key`, which opens the existing drawer (`GET /api/reports/progress/case?key=…&dept=…&week=…`).
 
 ## Stage rules (top of the module)

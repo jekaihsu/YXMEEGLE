@@ -5,6 +5,7 @@ import {NODE_ASSIGNMENT_ORDER, overviewDetail, assignmentErrorMessage, assignmen
   type AssignmentNode, type AssignmentPerson, type AssignmentMutation, type NewAssignmentTask, type NodeAssignmentDetail, type NodeAssignmentError, type NodePermissions, type NodeAssignmentList} from './nodeAssignmentApi';
 import {prefetchNodeAssignmentDetail, useNodeAssignments} from './useNodeAssignments';
 import {Avatar} from './Avatar';
+import {DRIVES_STATUS_TEXT, OPTIONAL_TASKS_LABEL, SUBMIT_HINT_TEXT, evidenceLine, progressHref, showsEvidence} from './nodeEvidence';
 import './NodeAssignments.css';
 import {useStartSop} from './useStartSop';
 import {PlanLine, SopControls, UsageMap} from './StartSopControls';
@@ -24,7 +25,7 @@ function People({people, compact = false}: {people: AssignmentPerson[]; compact?
 const personColor = (id: string) => Array.from(id).reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0) % 6;
 const FLOW_LABELS: Record<string, string> = {sales: '業務', pm: 'PM', confirmation: '確認單', field: '外業', control: '控制', mapping: '圖資', report: '報告', pricing: '計價', settlement: '結算'};
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
-function Overview({data, selected = '', onSelect, onPrefetch, preview}: {preview?: SopPreview; data?: NodeAssignmentList; selected?: string; onSelect?: (key: string) => void; onPrefetch?: (key: string) => void}) {
+function Overview({data, selected = '', onSelect, onPrefetch, preview, projectId = ''}: {projectId?: string; preview?: SopPreview; data?: NodeAssignmentList; selected?: string; onSelect?: (key: string) => void; onPrefetch?: (key: string) => void}) {
   const card = (key: string) => {
     const n = data?.nodes.find(n => n.key === key), label = n?.label || FLOW_LABELS[key];
     const status = n ? nodeStatusLabel(n.derived_status) : '', done = status === '已完成' || status === '略過';
@@ -32,14 +33,16 @@ function Overview({data, selected = '', onSelect, onPrefetch, preview}: {preview
     const overdue = !!nextDue && !done && new Date(nextDue.length === 10 ? `${nextDue}T23:59:59+08:00` : nextDue).getTime() < Date.now();
     const percent = n ? Math.round(Math.min(1, n.progress) * 100) : 0;
     const hint = n ? actionHint(n, data?.writes_enabled ? data.can[key] || {} : {}) : '';
-    return <button key={key} onMouseEnter={() => onPrefetch?.(key)} onFocus={() => onPrefetch?.(key)} className={`na-flow-card na-card-${statusTone(n?.derived_status || '')}${data?.summary.current_node === key ? ' is-current' : ''}${selected === key ? ' is-selected' : ''}${!data ? ' is-skeleton' : ''}`} disabled={!n} aria-current={data?.summary.current_node === key ? 'step' : undefined} aria-expanded={n ? selected === key : undefined} aria-label={`${label}節點，${status || '讀取中'}，${n?.owners.map(p => p.name).join('、') || '尚未指派'}`} onClick={() => onSelect?.(key)}>
-      <span className="na-card-top"><strong>{label}</strong>{n ? <><StatusChip status={n.derived_status}/>{n.auto_done && <small className="na-auto-done" title={n.auto_done.reason}>自動判定 · {n.auto_done.reason}</small>}</> : <span className="na-placeholder na-placeholder-status"/>}</span>
+    const evidence = n && showsEvidence(n) ? n.evidence : null, line = evidence ? evidenceLine(evidence) : null;
+    const flowCard = <button key={key} onMouseEnter={() => onPrefetch?.(key)} onFocus={() => onPrefetch?.(key)} className={`na-flow-card na-card-${statusTone(n?.derived_status || '')}${data?.summary.current_node === key ? ' is-current' : ''}${selected === key ? ' is-selected' : ''}${!data ? ' is-skeleton' : ''}`} disabled={!n} aria-current={data?.summary.current_node === key ? 'step' : undefined} aria-expanded={n ? selected === key : undefined} aria-label={`${label}節點，${status || '讀取中'}，${n?.owners.map(p => p.name).join('、') || '尚未指派'}`} onClick={() => onSelect?.(key)}>
+      <span className="na-card-top"><strong>{label}</strong>{n ? <><StatusChip status={n.derived_status}/>{n.auto_done && <small className="na-auto-done" title={n.auto_done.reason}>自動判定 · {n.auto_done.reason}</small>}{evidence?.drives_status && <small className="na-auto-done" title={evidence.reason}>{DRIVES_STATUS_TEXT}</small>}</> : <span className="na-placeholder na-placeholder-status"/>}</span>
       {n ? <People people={n.owners} compact/> : <span className="na-placeholder na-placeholder-people"/>}
-      <PlanLine node={preview?.nodes.find(n => n.key === key)}/><span className="na-card-progress">{n ? <><span>{n.tasks.done}/{n.tasks.total} 項任務</span><strong>{n.tasks.total ? `${percent}%` : '無任務'}</strong></> : <span className="na-placeholder"/>}</span>
+      <PlanLine node={preview?.nodes.find(n => n.key === key)} chipsOnly={!!evidence}/>{line && <span className="na-evidence">{line.known ? <span>{line.text}</span> : <>{line.plan && <span>{line.plan}</span>}<span className="na-muted">{line.text}</span></>}{n?.can_submit_hint && <strong className="na-evidence-hint">{SUBMIT_HINT_TEXT}</strong>}</span>}<span className="na-card-progress">{n ? <><span>{evidence ? `${OPTIONAL_TASKS_LABEL} ${n.tasks.done}/${n.tasks.total}` : `${n.tasks.done}/${n.tasks.total} 項任務`}</span><strong>{n.tasks.total ? `${percent}%` : '無任務'}</strong></> : <span className="na-placeholder"/>}</span>
       <span className="na-progress-track" aria-hidden="true" hidden={!n?.tasks.total}><span style={{width: `${percent}%`}}/></span>
-      <span className={`na-card-deadline${overdue ? ' is-overdue' : ''}`}>{n ? <><Clock3 size={12}/>{deadlineLabel(nextDue)}{overdue && <strong>{status === '未開始' ? '期限已過，等待條件' : '逾期'}</strong>}</> : <span className="na-placeholder"/>}</span>
+      {!(evidence && !nextDue) && <span className={`na-card-deadline${overdue ? ' is-overdue' : ''}`}>{n ? <><Clock3 size={12}/>{deadlineLabel(nextDue)}{overdue && <strong>{status === '未開始' ? '期限已過，等待條件' : '逾期'}</strong>}</> : <span className="na-placeholder"/>}</span>}
       {n && <span className="na-card-footer"><span className={hint ? 'needs-action' : 'na-muted'}>{hint || '檢視交接'}</span>{!!n.warnings.length && <span className="na-warning-dot" title={n.warnings.join('、')} aria-label="有節點警告"/>}</span>}
     </button>;
+    return evidence ? <div className="na-card-wrap" key={key}>{flowCard}<a className="na-evidence-link" href={progressHref(projectId)}>到工程進度看完整證據 <ArrowRight size={12} aria-hidden="true"/></a></div> : flowCard;
   };
   const arrow = (keys: readonly string[]) => <ArrowRight className={`na-flow-arrow${data && keys.every(key => nodeStatusLabel(data.nodes.find(n => n.key === key)?.derived_status || '') === '已完成') ? ' is-done' : ''}`} size={18} aria-hidden="true"/>;
   return <><div className="na-overview" aria-label="案件流程總覽" aria-busy={!data} aria-hidden={!data || undefined}>
@@ -105,7 +108,7 @@ export function NodeAssignments({projectId, enabled = false, legacy, before, tar
     </header>
     <p className="na-muted">Lark 節點指派 N · Lark 任務 T。範本與本地流程不計入此進度。資料讀取時間 {data.fetched_at || '來源未提供'}{refreshing && ' · 更新中'}{state.kind === 'error' && ' · 上次資料，更新失敗'}</p>
     {tasksOnly && <section className="na-detail"><h3>Lark 任務</h3><ul className="na-tasks">{sortAssignmentTasks(Object.values(details).flatMap(d => d?.tasks || [])).map(task => <li key={task.id}><button className="text-button" onClick={() => setExpanded(data.nodes.find(n => details[n.key]?.tasks.some(t => t.id === task.id))?.key || '')}>{task.title}</button><span>{task.assignee?.name || '來源未提供'} · {deadlineLabel(task.deadline)} · {taskStatusLabel(task.status)}</span></li>)}</ul>{!Object.values(details).some(d => d?.tasks.length) && <p className="na-empty">目前沒有可見的 Lark 任務，範本另列於本地流程。</p>}</section>}
-    {!tasksOnly && <Overview data={data} preview={sop.state.kind === 'ready' ? sop.state.data : undefined} selected={expanded} onPrefetch={prefetch} onSelect={key => {setExpanded(key === expanded ? '' : key); assignments.clearFeedback()}}/>}
+    {!tasksOnly && <Overview projectId={projectId} data={data} preview={sop.state.kind === 'ready' ? sop.state.data : undefined} selected={expanded} onPrefetch={prefetch} onSelect={key => {setExpanded(key === expanded ? '' : key); assignments.clearFeedback()}}/>}
     {target?.taskId && data.node_details && !Object.values(details).some(d => d?.tasks.some(t => t.id === target.taskId)) && <p className="na-banner na-error" role="alert">找不到此 Lark 任務，可能已移除或不在可見範圍。</p>}
     {!data.writes_enabled && <div className="na-banner na-stale" role="status">{data.writes_disabled_reason || '節點修改已停用。'}</div>}
     {data.stale && <div className="na-banner na-stale" role="status"><Clock3 size={17}/><span>目前顯示上次同步的資料，Lark 資料可能尚未更新。</span><button className="text-button" disabled={refreshing} onClick={() => void assignments.reload()}>重新讀取</button></div>}
@@ -118,7 +121,7 @@ export function NodeAssignments({projectId, enabled = false, legacy, before, tar
       const can = data.writes_enabled ? data.can[n.key] || {} : {}, hint = actionHint(n, can), open = expanded === n.key, panelId = `${listId}-${n.key}`;
       return <li key={n.key} className={`na-list-item${open ? ' is-expanded' : ''}`}>
         <button className="na-row" data-assignment-node={n.key} onMouseEnter={() => prefetch(n.key)} onFocus={() => prefetch(n.key)} aria-label={`${n.label}節點，${nodeStatusLabel(n.derived_status)}，${n.tasks.done}/${n.tasks.total} 項任務`} aria-expanded={open} aria-controls={panelId} onClick={() => {setExpanded(open ? '' : n.key); assignments.clearFeedback()}}>
-          <span className="na-node-cell"><span className="na-index">{String(i + 1).padStart(2, '0')}</span><span><strong>{n.label}</strong><StatusChip status={n.derived_status}/>{n.auto_done && <small className="na-auto-done" title={n.auto_done.reason}>自動判定 · {n.auto_done.reason}</small>}</span></span>
+          <span className="na-node-cell"><span className="na-index">{String(i + 1).padStart(2, '0')}</span><span><strong>{n.label}</strong><StatusChip status={n.derived_status}/>{n.auto_done && <small className="na-auto-done" title={n.auto_done.reason}>自動判定 · {n.auto_done.reason}</small>}{n.evidence?.drives_status && <small className="na-auto-done" title={n.evidence.reason}>{DRIVES_STATUS_TEXT}</small>}</span></span>
           <span className="na-progress-cell"><strong>{n.tasks.done}/{n.tasks.total}</strong><span className="na-progress-track" aria-hidden="true"><span style={{width: `${n.tasks.total ? Math.min(100, n.tasks.done / n.tasks.total * 100) : 0}%`}}/></span><small className="na-mobile-label">項任務完成</small></span>
           <People people={n.owners}/><span className="na-deadline"><span className="na-mobile-label">下個期限 </span>{deadlineLabel(n.next_due === undefined ? n.deadline : n.next_due)}</span>
           <span className={`na-hint${hint ? ' needs-action' : ''}`}>{hint || '檢視進度'}</span><ChevronDown size={17} className="na-chevron"/>

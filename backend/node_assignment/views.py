@@ -4,9 +4,13 @@ from datetime import datetime
 from .domain import (
     CHAIN, NODE_DEPARTMENTS, NODE_LABELS, NodeKey, NodeStatus, TaskFacts, TaskStatus, derive_chain,
     node_permissions, progress, summarize, task_counts, task_permissions)
+from .evidence import auto_done, signals
 from .lark_table import CaseSnapshot, NodeRow, TaskRow, TAIPEI, iso_time
 from .operations import facts_of, mirror
 
+PRODUCTION_KEYS = frozenset({NodeKey.FIELD, NodeKey.CONTROL, NodeKey.MAPPING, NodeKey.REPORT})
+# A 可送審 hint only makes sense while the work is still open; a submitted or finished node needs none.
+SUBMITTABLE = frozenset({NodeStatus.TODO, NodeStatus.IN_PROGRESS})
 NO_ACTIONS = {'claim': False, 'assign': False, 'complete': False, 'approve': False, 'reject': False,
               'create_task': False}
 
@@ -15,12 +19,12 @@ def _user(ref):
     return ref.public() if ref else None
 
 
-def node_warnings(key, row: NodeRow | None, duplicates, status, tasks, now_ms, auto=None):
+def node_warnings(key, row: NodeRow | None, duplicates, status, tasks, now_ms, auto=None, by_data=False):
     warnings = []
     if duplicates:
         warnings.append('duplicate_assignment_key')
-    if row is None or auto:
-        # An auto-done row is deliberately left untouched in Lark, so it cannot drift or be unapproved.
+    if row is None or auto or by_data:
+        # A row whose status the case data decides is deliberately left untouched in Lark, so it cannot drift.
         return warnings
     if row.status == NodeStatus.DONE.value and not row.approved:
         warnings.append('unapproved_completion')
@@ -32,7 +36,7 @@ def node_warnings(key, row: NodeRow | None, duplicates, status, tasks, now_ms, a
     return warnings
 
 
-def node_view(key: NodeKey, snapshot: CaseSnapshot, status: NodeStatus, now_ms, auto=None):
+def node_view(key: NodeKey, snapshot: CaseSnapshot, status: NodeStatus, now_ms, auto=None, signal=None, by_data=False):
     rows = snapshot.rows.get(key, ())
     row = rows[0] if len(rows) == 1 else None
     tasks = snapshot.node_tasks(key)
@@ -55,8 +59,13 @@ def node_view(key: NodeKey, snapshot: CaseSnapshot, status: NodeStatus, now_ms, 
         'deadline_basis': 'related_tasks_max',
         'assignment_key': row.assignment_key if row else None,
         'origin': 'lark', 'auto_done': auto.public() if auto else None,
-        'warnings': node_warnings(key, row, len(rows) > 1, status, tasks, now_ms, auto),
+        'warnings': node_warnings(key, row, len(rows) > 1, status, tasks, now_ms, auto, by_data),
     }
+    if key in PRODUCTION_KEYS:
+        view['evidence'] = {**signal.public(), 'drives_status': by_data} if signal else None
+        view['can_submit_hint'] = bool(signal and signal.can_submit and status in SUBMITTABLE)
+    else:
+        view['evidence'], view['can_submit_hint'] = None, False
     if len(rows) > 1:
         view['duplicate_record_ids'] = [r.record_id for r in rows]
     return view
@@ -87,14 +96,18 @@ def _can(actor, key, status, snapshot, writes_enabled, auto=None):
 
 def case_view(snapshot: CaseSnapshot, skipped, actor, writes_enabled, now_ms, evidence=None):
     evidence = evidence or {}
+    done, found = auto_done(evidence), signals(evidence)
     statuses = derive_chain(facts_of(snapshot, skipped, evidence))
+    without = derive_chain(facts_of(snapshot, skipped, done))
+    by_data = {key: statuses[key] is NodeStatus.IN_PROGRESS and without[key] is not NodeStatus.IN_PROGRESS for key in CHAIN}
     summary = summarize(statuses)
     return statuses, {
         'code': snapshot.code,
         'summary': {'done': summary.done, 'total': summary.total,
                     'current_node': summary.current_node.value if summary.current_node else None},
-        'nodes': [node_view(key, snapshot, statuses[key], now_ms, evidence.get(key)) for key in CHAIN],
-        'can': {key.value: _can(actor, key, statuses[key], snapshot, writes_enabled, evidence.get(key)) for key in CHAIN},
+        'nodes': [node_view(key, snapshot, statuses[key], now_ms, done.get(key), found.get(key), by_data[key])
+                  for key in CHAIN],
+        'can': {key.value: _can(actor, key, statuses[key], snapshot, writes_enabled, done.get(key)) for key in CHAIN},
         'warnings': list(snapshot.warnings),
     }
 

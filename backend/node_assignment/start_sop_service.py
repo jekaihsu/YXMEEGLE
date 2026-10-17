@@ -1,4 +1,7 @@
-"""啟動 SOP over the node-assignment service: a read-only preview and a resumable seeding run.
+"""啟動 SOP over the node-assignment service: a read-only preview and a resumable run.
+
+By default the run only creates the missing 節點指派 rows, as Lark's own button does; progress comes from the case's
+data. With `seed_tasks` it also seeds one planned task per node, under the protections below.
 
 A seed is identified by one Lark client token derived from (workspace, project, node, rule version, seed
 sequence), never from content, actor, request or attempt. Every try at the same intended seed carries that token,
@@ -108,7 +111,7 @@ class StartSopRunner:
 
     # Preview
 
-    def preview(self, ctx) -> dict:
+    def preview(self, ctx, seed_tasks=False) -> dict:
         svc = self.svc
         code = self._code(ctx)
         plan = plan_start(ctx.state, ctx.project, code)
@@ -136,7 +139,7 @@ class StartSopRunner:
                     blockers.append((BlockerCode.FORBIDDEN, BLOCKER_MESSAGES[BlockerCode.FORBIDDEN]))
             except Failure as exc:
                 blockers.append((BlockerCode.LARK_UNAVAILABLE, exc.message))
-        return preview_body(plan, states, blockers, can_start)
+        return preview_body(plan, states, blockers, can_start, seed_tasks)
 
     # Run
 
@@ -150,7 +153,8 @@ class StartSopRunner:
         plan = plan_start(ctx.state, ctx.project, code)
         receipt = svc.receipts.key(ctx.wid, ctx.user['id'], 'start-sop:' + request_id)
         fingerprint = digest({'action': ACTION, 'project_id': ctx.project['id'],
-                              'body': {'preview_hash': command.preview_hash}})
+                              'body': {'preview_hash': command.preview_hash,
+                                       **({'seed_tasks': True} if command.seed_tasks else {})}})
         stored = svc.receipts.load(receipt, fingerprint)
         if stored and stored['state'] == 'done':
             return stored['status'], stored['body'], True
@@ -178,7 +182,7 @@ class StartSopRunner:
             elif halt is not None:
                 results.append(failed(node.key, halt))
             else:
-                results.append(self._seed(ctx, request_id, node, code))
+                results.append(self._seed(ctx, request_id, node, code, command.seed_tasks))
                 if results[-1].failure and results[-1].failure.code in SYSTEMIC:
                     halt = results[-1].failure
                 elif results[-1].finished:
@@ -246,6 +250,22 @@ class StartSopRunner:
             receipts.save(identity, RECEIPT_FINGERPRINT, {'state': state, 'at': at})
         return at
 
+    def _node_only(self, ctx, client, request_id, code, key, snapshot, state, roster, user) -> NodeResult:
+        """Create the node's row if Lark has none. An existing row is left exactly as it is: no write at all."""
+        svc, akey = self.svc, assignment_key(code, key)
+        if not state.will_create_node:
+            return NodeResult(key, Outcome.EXISTING, Outcome.SKIPPED)
+        identity = svc.receipts.scoped('start-sop-seed', ctx.wid, ctx.project['id'], key.value, SOP_RULE_VERSION,
+                                       str(len(state.seeds)))
+        row, made = svc._node_row(client, Situation(
+            key, code, actor_for(user, roster.value), roster.value, snapshot, svc.skipped(ctx), svc.now_ms(),
+            confirmation_record(ctx.project, svc.config), svc.evidence(ctx)), identity)
+        plan = Plan('node', row.record_id, None, {})
+        _, warnings = svc._converge(ctx, client, code, key, plan)
+        self._audit(ctx, request_id, 'success', node=key.value, assignment_key=akey, record_id=row.record_id,
+                    changes=svc._changes(ctx, akey, plan), warnings=warnings)
+        return NodeResult(key, Outcome.CREATED if made else Outcome.EXISTING, Outcome.SKIPPED, sync=sync_of(warnings))
+
     def _create(self, client, wid, pid, key: NodeKey, identity, fields):
         """Send the seed under the token of its identity and record the id Lark answers with. Returns the record."""
         at = self._mark(identity, 'sent')
@@ -260,17 +280,18 @@ class StartSopRunner:
         self._mark(identity, 'done')
         return landed
 
-    def _seed(self, ctx, request_id, node: PlannedNode, code) -> NodeResult:
+    def _seed(self, ctx, request_id, node: PlannedNode, code, seed_tasks) -> NodeResult:
         svc, key = self.svc, node.key
         try:
             ctx = self._revalidated(ctx, node, code)
             with svc.locks.hold((ctx.wid, assignment_key(code, key)), svc.config.lock_timeout_seconds):
-                return self._seed_locked(ctx, request_id, node, code)
+                return self._seed_locked(ctx, request_id, node, code, seed_tasks)
         except Failure as exc:
             return failed(key, exc)
 
-    def _seed_locked(self, ctx, request_id, node: PlannedNode, code) -> NodeResult:
-        """One node under its lock: keep the seed it has, else create the one its identity stands for."""
+    def _seed_locked(self, ctx, request_id, node: PlannedNode, code, seed_tasks) -> NodeResult:
+        """One node under its lock. Nodes only: create the missing row. With seeds: keep the seed it has, else create the
+        one its identity stands for."""
         svc, key, wid, pid = self.svc, node.key, ctx.wid, ctx.project['id']
         akey, node_row = assignment_key(code, key), Outcome.FAILED
         try:
@@ -293,6 +314,8 @@ class StartSopRunner:
                     state = observe(snapshot, svc.skipped(ctx), key, recorded,
                                     self._unlisted(client, snapshot, key, recorded), svc.evidence(ctx))
                     self.ledger.add(wid, pid, key, *state.seeds)
+                    if not seed_tasks:
+                        return self._node_only(ctx, client, request_id, code, key, snapshot, state, roster, user)
                     if state.live:
                         _, warnings = svc._converge(ctx, client, code, key, Plan('task_create', state.live[0], None, {}),
                                                     snapshot)

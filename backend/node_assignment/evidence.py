@@ -1,12 +1,16 @@
-"""Early nodes the case's own data already proves done, so nobody has to tick them in Lark.
+"""What the case's own data says about its nodes, so nobody keeps a second copy in Lark.
 
-Pure and read-only: the result is overlaid on the derived chain and never written to Lark. Later nodes
-(外業 to 結算) are never inferred. Edit RULES to change what counts as evidence.
+Pure and read-only: the result is overlaid on the derived chain and never written to Lark. Two kinds:
+`AutoDone` proves an early node done (edit RULES to change that); `Signal` reports a production node's source
+evidence (外業/控制/圖資/報告), which may start the node but never finishes or submits it.
 """
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 
 from ..case_evidence import live_confirmation_fields, live_contract_lines, proves_sales_by_code
+from ..contract_links import plan_summary
+from ..project_progress import PRODUCTION, NO_DAILY, actual_of, parse_decimal, planned_of, v3_field_total, work_orders_of
 from .domain import NodeKey
 
 
@@ -62,3 +66,74 @@ def evidence_for(project, state) -> dict[NodeKey, AutoDone]:
 def applicable(evidence: Mapping[NodeKey, AutoDone], skipped) -> dict[NodeKey, AutoDone]:
     """An explicit 略過 always wins, so a skipped node carries no auto-done mark."""
     return {key: auto for key, auto in evidence.items() if key not in skipped}
+
+
+# The progress read model names stages 'field'..'report'; they are the same keys as the production nodes.
+PRODUCTION_NODES = tuple(NodeKey(key) for key in PRODUCTION)
+
+
+@dataclass(frozen=True)
+class Signal:
+    """One production node's source evidence. Counts are None while the plan or the daily links are unavailable."""
+    planned_qty: str | None
+    lines: int | None
+    items: int | None
+    work_orders: int
+    latest_date: str | None
+    actual_known: bool
+    actual_value: str | None
+    actual_source: str | None
+    started: bool
+    reason_zh: str
+
+    @property
+    def can_submit(self) -> bool:
+        planned, actual = parse_decimal(self.planned_qty), parse_decimal(self.actual_value)
+        return bool(self.actual_known and planned is not None and actual is not None and planned > Decimal(0)
+                    and actual >= planned)
+
+    def public(self) -> dict:
+        return {'planned_qty': self.planned_qty, 'lines': self.lines, 'items': self.items,
+                'work_orders': self.work_orders, 'latest_date': self.latest_date,
+                'actual_known': self.actual_known, 'actual_value': self.actual_value, 'reason': self.reason_zh,
+                'actual_source': self.actual_source}
+
+
+def production_signal(project, state, reports=None) -> dict[NodeKey, Signal]:
+    """Per production node, from the case's contract plan, linked daily rows and (外業 only) the v3 register.
+
+    `reports` is an already-built ReportsView, or None; this never reads Lark and never waits for the register.
+    """
+    summary = plan_summary(state or {}, project['id'])
+    total = v3_field_total(project, reports) if reports is not None else None
+    found = {}
+    for node in PRODUCTION_NODES:
+        key = node.value
+        planned, orders = planned_of(summary, key), work_orders_of(project, key)
+        actual = actual_of(project, key, total)
+        count = orders['count'] or 0
+        started = bool(count) or actual['source'] == 'v3_reports'
+        if count:
+            reason = f'已有 {count} 筆日報連結到此案件'
+        elif started:
+            reason = '週報登記冊顯示此案件外業累計大於 0'
+        else:
+            reason = actual['reason'] or NO_DAILY
+        found[node] = Signal(
+            planned['qty'] if planned else None, planned['lines'] if planned else None,
+            planned['items'] if planned else None, count, orders['latest_date'], actual['known'], actual['value'],
+            actual['source'], started, reason)
+    return found
+
+
+def evidence_of(project, state, reports=None) -> dict[NodeKey, 'AutoDone | Signal']:
+    """Everything the overlay uses: the early nodes proven done and every production node's signal."""
+    return {**production_signal(project, state, reports), **evidence_for(project, state)}
+
+
+def auto_done(evidence: Mapping) -> dict[NodeKey, AutoDone]:
+    return {key: found for key, found in evidence.items() if isinstance(found, AutoDone)}
+
+
+def signals(evidence: Mapping) -> dict[NodeKey, Signal]:
+    return {key: found for key, found in evidence.items() if isinstance(found, Signal)}

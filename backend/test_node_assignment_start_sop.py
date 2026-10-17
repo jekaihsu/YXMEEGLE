@@ -46,16 +46,17 @@ def s(h):
     return h
 
 
-def preview(h, who='ou_pm'):
+def preview(h, who='ou_pm', seed=True):
     h.who[0] = who
-    response = h.client.get(SOP)
+    response = h.client.get(SOP + ('?seed_tasks=true' if seed else ''))
     assert response.status_code == 200, response.text
     return response.json()
 
 
-def start(h, rid='r1', who='ou_pm', digest=None, expect=200):
+def start(h, rid='r1', who='ou_pm', digest=None, expect=200, seed=True):
     h.who[0] = who
-    response = h.client.post(SOP, json={'request_id': rid, 'preview_hash': digest or preview(h, who)['preview_hash']})
+    response = h.client.post(SOP, json={'request_id': rid, 'seed_tasks': seed,
+                                        'preview_hash': digest or preview(h, who, seed)['preview_hash']})
     assert response.status_code == expect, response.text
     return response
 
@@ -93,7 +94,7 @@ def test_preview_describes_the_plan_without_writing(s):
     assert (body['project_id'], body['code'], body['eligible'], body['already_started'], body['blockers'],
             body['plan_rule_version']) == ('p1', 'A115001-01', True, False, [], 'contract-links-20261017.1')
     assert body['warnings'] == []
-    assert body['chain_note'] == '節點狀態仍依九節點流程推導；啟動 SOP 只建立節點列與一筆種子任務，不會變更任何節點狀態。'
+    assert body['chain_note'] == '節點狀態仍依九節點流程推導；啟動 SOP 只建立缺少的節點列，不會變更任何節點狀態。進度會自動來自案件資料，計畫任務為選用。'
     assert len(body['preview_hash']) == 64
     assert s.fake.writes() == []
 
@@ -151,7 +152,7 @@ def test_pressing_again_creates_nothing_and_reports_existing(s):
 def test_replaying_a_request_id_returns_the_stored_body_and_a_different_body_conflicts(s):
     first = start(s, 'same')
     writes = len(s.fake.writes())
-    replay = s.client.post(SOP, json={'request_id': 'same', 'preview_hash': preview(s)['preview_hash']})
+    replay = s.client.post(SOP, json={'request_id': 'same', 'preview_hash': preview(s)['preview_hash'], 'seed_tasks': True})
     assert replay.status_code == 200 and replay.json() == first.json()
     assert replay.headers['idempotent-replayed'] == 'true'
     assert len(s.fake.writes()) == writes
@@ -577,7 +578,7 @@ def test_concurrent_double_press_creates_one_set(s):
     s.who[0] = 'ou_pm'
 
     def press(rid):
-        return s.client.post(SOP, json={'request_id': rid, 'preview_hash': digest})
+        return s.client.post(SOP, json={'request_id': rid, 'preview_hash': digest, 'seed_tasks': True})
     with ThreadPoolExecutor(2) as pool:
         results = list(pool.map(press, ['a', 'b']))
     assert [r.status_code for r in results] == [200, 200]
@@ -697,7 +698,7 @@ def press(s, pid, rid):
     url = f'/api/projects/{pid}/node-assignments/start-sop'
     s.who[0] = 'ou_pm'
     digest = s.client.get(url).json()['preview_hash']
-    return s.client.post(url, json={'request_id': rid, 'preview_hash': digest})
+    return s.client.post(url, json={'request_id': rid, 'preview_hash': digest, 'seed_tasks': True})
 
 
 def test_the_person_limit_counts_every_lark_write_across_projects(s):
@@ -738,7 +739,7 @@ def test_ordinary_task_creation_still_costs_one_charge_per_call(s):
 def test_replaying_a_finished_press_costs_nothing(s):
     first = start(s, 'same')
     for _ in range(40):
-        replay = s.client.post(SOP, json={'request_id': 'same', 'preview_hash': preview(s)['preview_hash']})
+        replay = s.client.post(SOP, json={'request_id': 'same', 'preview_hash': preview(s)['preview_hash'], 'seed_tasks': True})
         assert (replay.status_code, replay.json()) == (200, first.json())
     assert len(s.fake.writes()) == 12
 
@@ -1241,3 +1242,74 @@ def test_seeds_are_not_optional_when_every_node_is_finished(s):
     body = preview(s)
     assert (body['already_started'], body['seeds_pending'], body['seeds_optional']) == (True, 0, False)
     assert not any(n['will_create_task'] for n in body['nodes'])
+
+
+def test_default_start_creates_only_the_node_rows_and_no_task(s):
+    body = start(s, seed=False).json()
+    assert (body['started'], body['complete']) == (True, True)
+    assert body['results'] == [{'key': k, 'node': 'created', 'task': 'skipped', 'error': None, 'sync': 'ok'}
+                               for k in ('field', 'control', 'mapping', 'report')]
+    assert seeded_nodes(s) == ['圖資', '報告', '外業', '控制']
+    assert len(s.fake.rows(TASKS)) == 0
+    assert post_methods(s) == ['POST', 'PUT'] * 4
+    assert {f['狀態'] for f in s.fake.rows(NODES).values()} == {'未開始'}
+    assert s.client.get(SOP).json()['seeds_pending'] == 4
+
+
+def test_default_start_over_lark_made_rows_writes_nothing(s):
+    lark_button_rows(s)
+    body = start(s, seed=False).json()
+    assert body['started'] is False
+    assert [(r['node'], r['task']) for r in body['results']] == [('existing', 'skipped')] * 4
+    assert s.fake.writes() == [] and len(s.fake.rows(TASKS)) == 0
+
+
+def test_default_start_creates_only_the_missing_rows(s):
+    lark_button_rows(s, nodes={'field', 'control'})
+    body = start(s, seed=False).json()
+    assert [(r['key'], r['node']) for r in body['results']] == [
+        ('field', 'existing'), ('control', 'existing'), ('mapping', 'created'), ('report', 'created')]
+    assert len(s.fake.rows(TASKS)) == 0
+
+
+def test_default_preview_is_eligible_by_missing_rows_and_seed_preview_by_seeds(s):
+    lark_button_rows(s)
+    plain, seeded = preview(s, seed=False), preview(s, seed=True)
+    assert (plain['eligible'], plain['seed_tasks'], plain['already_started']) == (False, False, True)
+    assert (seeded['eligible'], seeded['seed_tasks'], seeded['seeds_pending']) == (True, True, 4)
+    assert plain['preview_hash'] == seeded['preview_hash']
+
+
+def test_seed_opt_in_after_a_default_start_creates_the_tasks_with_the_old_protections(s):
+    start(s, 'nodes-only', seed=False)
+    body = start(s, 'seeds', seed=True).json()
+    assert [(r['node'], r['task']) for r in body['results']] == [('existing', 'created')] * 4
+    assert len(s.fake.rows(NODES)) == 4 and len(s.fake.rows(TASKS)) == 4
+    again = start(s, 'seeds-again', seed=True).json()
+    assert [(r['node'], r['task']) for r in again['results']] == [('existing', 'existing')] * 4
+    assert len(s.fake.rows(TASKS)) == 4
+
+
+def test_the_same_request_id_with_and_without_seeds_conflicts(s):
+    start(s, 'same', seed=False)
+    other = s.client.post(SOP, json={'request_id': 'same', 'seed_tasks': True, 'preview_hash': preview(s)['preview_hash']})
+    assert (other.status_code, other.json()['code']) == (409, 'idempotency_conflict')
+
+
+@pytest.mark.parametrize('value', ['true', 1, None, []])
+def test_seed_tasks_must_be_a_boolean(s, value):
+    response = s.client.post(SOP, json={'request_id': 'r1', 'seed_tasks': value, 'preview_hash': '0' * 64})
+    assert (response.status_code, response.json()['code']) == (422, 'invalid')
+    assert s.fake.writes() == []
+    assert s.client.get(SOP + '?seed_tasks=yes').json()['code'] == 'invalid'
+
+
+def test_start_agrees_with_the_evidence_overlay_and_mirrors_it_only_onto_rows_it_creates(s):
+    s.state['contract_items'] = [{'id': 'ct1', 'project_id': 'p1'}]
+    s.case['project']['daily_reports'] = [{'id': 'd1', 'date': '2026-10-08', 'department': '外業組', 'points': 1}]
+    body = start(s, seed=False).json()
+    states = {f['節點']: f['狀態'] for f in s.fake.rows(NODES).values()}
+    assert states == {'外業': '進行中', '控制': '未開始', '圖資': '未開始', '報告': '未開始'}
+    overview = {n['key']: n for n in body['overview']['nodes']}
+    assert (overview['field']['derived_status'], overview['field']['evidence']['drives_status']) == ('進行中', True)
+    assert overview['field']['warnings'] == [] and len(s.fake.rows(TASKS)) == 0

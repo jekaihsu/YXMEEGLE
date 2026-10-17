@@ -1491,8 +1491,14 @@ def create_app(overrides=None):
         return state,project
     from .node_assignment.routes import register as register_node_assignment
     from .node_skip import valid_waiver
+    def node_reports():
+        # Cached snapshot only: never starts a read, so a cold or disabled register simply means no v3 evidence.
+        from .project_progress import ReportsView
+        if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true' or getattr(app.state,'reports',None) is None: return None
+        return ReportsView(app.state.reports,warm=False)
     app.state.node_assignment=register_node_assignment(app,identity=identity,load_case=node_assignment_case,sessions=sessions,
-        receipt_model=Receipt,audit_model=AuditRow,cfg=cfg,skipped_nodes=valid_waiver)
+        receipt_model=Receipt,audit_model=AuditRow,cfg=cfg,skipped_nodes=valid_waiver,reports=node_reports,
+        reports_visible=lambda user: user['role'] in ('pm','manager') or capable(user,'manage_sources'))
     from .home_panels import register as register_home_panels
     app.state.home_panels=register_home_panels(app,identity=identity,load=load,sessions=sessions,workspace_model=WorkspaceRow,nodes=app.state.node_assignment)
     from .native_poller import NativeApprovalPoller

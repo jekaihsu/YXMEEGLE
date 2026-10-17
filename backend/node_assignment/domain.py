@@ -116,6 +116,8 @@ class NodeFacts:
     skipped: bool = False
     rejected: bool = False
     tasks: tuple[TaskStatus, ...] = ()
+    # The case's own source data shows this node's work has begun. It can only lift 待處理 to 進行中.
+    evidence_started: bool = False
 
 
 @dataclass(frozen=True)
@@ -143,7 +145,7 @@ def derive_status(facts: NodeFacts, previous_done: bool) -> NodeStatus:
         return NodeStatus.IN_REVIEW
     if any(t in (TaskStatus.IN_PROGRESS, TaskStatus.DONE) for t in facts.tasks):
         return NodeStatus.IN_PROGRESS
-    return NodeStatus.TODO
+    return NodeStatus.IN_PROGRESS if facts.evidence_started else NodeStatus.TODO
 
 
 def derive_chain(facts: Mapping[NodeKey, NodeFacts]) -> dict[NodeKey, NodeStatus]:

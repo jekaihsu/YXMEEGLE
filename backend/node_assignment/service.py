@@ -29,7 +29,7 @@ from ..sources import normalized_case
 from .cache import Cached, StaleCache
 from .config import NodeAssignmentConfig
 from .domain import NODE_LABELS, Actor, Denied, IllegalTransition, NodeKey, derive_chain, task_counts
-from .evidence import applicable, evidence_for
+from .evidence import applicable, evidence_of
 from .errors import Failure
 from .lark_table import (
     NODE_FIELDS, TASK_FIELDS, BitableClient, CaseSnapshot, Table, assignment_key, check_schema, mismatches,
@@ -54,6 +54,15 @@ class Context:
     authorize: Callable[[], dict]
     # Re-reads the session user, the state and the project, for a run that spans several writes.
     refresh: Callable[[], 'Context'] | None = None
+
+
+def hide_report_figures(body):
+    """The v3 register's cumulative points follow the reports gate; the status they imply stays the same for everyone."""
+    nodes = body['nodes'] if 'nodes' in body else [body['node']]
+    for node in nodes:
+        found = node.get('evidence')
+        if found and found.get('actual_source') == 'v3_reports':
+            found['actual_value'] = None
 
 
 def digest(value):
@@ -181,8 +190,10 @@ class Receipts:
 
 class NodeAssignmentService:
     def __init__(self, cfg, *, sessions, receipt_model, audit_model, skipped_nodes, transport=None,
-                 clock=time.time, client_options=None):
+                 clock=time.time, client_options=None, reports=None, reports_visible=None):
         self.cfg = cfg
+        # reports() -> a non-blocking ReportsView or None; reports_visible(user) -> may this person see v3 report figures.
+        self.reports, self.reports_visible = reports, reports_visible or (lambda _user: False)
         self.config = NodeAssignmentConfig.from_env(cfg)
         self.sessions, self.Audit = sessions, audit_model
         self.skipped_nodes = skipped_nodes
@@ -221,7 +232,7 @@ class NodeAssignmentService:
                          if n.get('key') in values and self.skipped_nodes(ctx.state, ctx.project, n))
 
     def evidence(self, ctx: Context):
-        return applicable(evidence_for(ctx.project, ctx.state), self.skipped(ctx))
+        return applicable(evidence_of(ctx.project, ctx.state, self.reports() if self.reports else None), self.skipped(ctx))
 
     def now_ms(self):
         return int(self.clock() * 1000)
@@ -261,6 +272,8 @@ class NodeAssignmentService:
 
     def _envelope(self, ctx, cached, roster, body):
         block = self.write_block(ctx)
+        if not self.reports_visible(ctx.user):
+            hide_report_figures(body)
         return {'project_id': ctx.project['id'], **body, 'stale': cached.stale, 'stale_reason': cached.stale_reason,
                 'fetched_at': datetime.fromtimestamp(cached.fetched_at, TAIPEI).isoformat(timespec='seconds'),
                 'roster': {'available': roster is not None, 'stale': bool(roster is None or roster.stale)},

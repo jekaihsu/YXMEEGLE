@@ -16,7 +16,7 @@ from .node_assignment.cache import ReadScope, StaleCache
 from .node_assignment.domain import CHAIN, NODE_DEPARTMENTS, NODE_LABELS, NodeAction, NodeKey, NodeStatus, TaskFacts, TaskStatus, derive_chain, node_permissions, task_permissions
 from .node_assignment.errors import Failure
 from .node_assignment.lark_table import NODE_FIELDS, TASK_FIELDS, CaseSnapshot, Table, assignment_key, iso_time, parse_node, parse_task
-from .node_assignment.evidence import applicable, evidence_for
+from .node_assignment.evidence import applicable, evidence_of
 from .node_assignment.operations import facts_of
 from .node_assignment.roster import fetch_roster
 from .node_assignment.service import actor_for, confirmation_record
@@ -126,6 +126,7 @@ class HomePanels:
                 groups[group][key].append(row)
         linked = {rid: tuple(t for t in tasks.values() if t.node_ids == (rid,)) for rid in nodes}
         chains = {}
+        reports = self.nodes.reports() if self.nodes.reports else None
         for group, rows in groups.items():
             code, relations = group
             candidates = projects.get(relations[0], []) if len(relations) == 1 else []
@@ -133,7 +134,7 @@ class HomePanels:
             skipped = frozenset(NodeKey(n['key']) for n in project.get('nodes', [])
                                 if n.get('key') in NODE_LABELS and self.nodes.skipped_nodes(state, project, n)) if project else frozenset()
             snap = CaseSnapshot(code, {k: tuple(v) for k, v in rows.items()}, linked)
-            evidence = applicable(evidence_for(project, state), skipped) if project else {}
+            evidence = applicable(evidence_of(project, state, reports), skipped) if project else {}
             chains[group] = derive_chain(facts_of(snap, skipped, evidence))
         items = []
         for kind, entries in (('node_assignment', nodes), ('task', tasks)):

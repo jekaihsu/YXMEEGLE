@@ -31,23 +31,23 @@ export function useStartSop(id: string, enabled: boolean, refreshOverview: () =>
   catch (e) {if (current()) setState(e instanceof NodeAssignmentError && e.status === 403 ? {kind: 'forbidden', reason: assignmentErrorMessage(e)} : {kind: 'hidden'})}
  }, [id]);
  useEffect(() => {life.current = {active: true, epoch: getSessionEpoch()}; setNotice(''); pendingSync.current = false; attempt.current = null; setState(enabled && epoch === getSessionEpoch() && cache.has(id) ? {kind: 'ready', data: cache.get(id)!} : {kind: 'hidden'}); if (enabled) void reload(); return () => {life.current.active = false}}, [id, enabled, reload]);
- const confirm = async () => {
-  if (posting.current || state.kind !== 'ready' || !canConfirmSop(state.data)) return false;
+ const confirm = async (seed = false) => {
+  if (posting.current || state.kind !== 'ready' || !canConfirmSop(state.data, seed)) return false;
   posting.current = true; setBusy(true); setNotice('');
   const scope = life.current, valid = () => scope.active && scope === life.current && scope.epoch === getSessionEpoch();
-  const hash = state.data.preview_hash;
-  if (attempt.current?.hash !== hash) attempt.current = {hash, id: requestId()};
+  const hash = state.data.preview_hash, attemptKey = seed ? hash + ':seed' : hash;
+  if (attempt.current?.hash !== attemptKey) attempt.current = {hash: attemptKey, id: requestId()};
   try {
-   const result = parseSopResult(await assignmentRequest(sopPath(id), {method: 'POST', body: JSON.stringify({request_id: attempt.current.id, preview_hash: hash})}, valid));
+   const result = parseSopResult(await assignmentRequest(sopPath(id), {method: 'POST', body: JSON.stringify({request_id: attempt.current.id, preview_hash: hash, ...(seed ? {seed_tasks: true} : {})})}, valid));
    if (!valid()) return false;
    attempt.current = null;
    pendingSync.current = result.results.some(node => node.sync === 'failed');
-   setNotice(sopResultMessage(result, state.data));
+   setNotice(sopResultMessage(result, state.data, seed));
    await refreshOverview(); await reload(true); return result.complete;
   } catch (e) {
    if (!valid()) return false;
    if (e instanceof NodeAssignmentError && e.code === 'preview_stale') {attempt.current = null; await reload(true); setNotice('計畫已變更，已重新讀取預覽，請確認後再啟動。')}
-   else if (e instanceof NodeAssignmentError && e.code === 'rate_limited') {setNotice(`已完成 ${state.data.nodes.filter(n => n.seed_task_exists).length} 個節點。${SOP_ERRORS.rate_limited}`)}
+   else if (e instanceof NodeAssignmentError && e.code === 'rate_limited') {setNotice(`已完成 ${state.data.nodes.filter(n => seed ? n.seed_task_exists : n.node_exists).length} 個節點。${SOP_ERRORS.rate_limited}`)}
    else {setNotice(e instanceof NodeAssignmentError ? SOP_ERRORS[e.code || ""] || assignmentErrorMessage(e) : assignmentErrorMessage(e)); if (e instanceof NodeAssignmentError && [403,404].includes(e.status)) await reload(true)}
    return false;
   } finally {posting.current = false; if (valid()) setBusy(false)}
