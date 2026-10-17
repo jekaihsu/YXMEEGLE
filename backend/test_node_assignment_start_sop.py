@@ -484,6 +484,70 @@ def test_a_quote_deadline_that_changes_mid_run_is_also_stale(s):
         ('field', None), ('control', None), ('mapping', None), ('report', 'preview_stale')]
 
 
+def lose_and_hide_the_first_task(s):
+    """The first task create lands in Lark under its client token but the answer is lost and the node does not list it yet."""
+    def lost_response(request):
+        rid = s.fake.add(TASKS, json.loads(request.content)['fields'])
+        s.fake.tokens[request.url.params['client_token']] = rid
+        s.fake.hidden.add(rid)
+        return httpx.Response(504, text='gateway timeout')
+    s.fake.fault('POST', f'{TASKS}/records', lost_response)
+
+
+def field_tasks(s):
+    return [f for f in s.fake.tables[TASKS].values() if f['標題'].startswith('外業')]
+
+
+def test_a_new_request_by_another_person_reconciles_an_uncertain_create_instead_of_duplicating(s):
+    s.case['project'] = {**s.case['project'], 'supervisor_id': 'ou_sup'}
+    lose_and_hide_the_first_task(s)
+    first = start(s, 'r1').json()
+    assert [(r['node'], r['task'], r['error']) for r in first['results']][:2] == [
+        ('created', 'failed', 'outcome_unknown'), ('created', 'created', None)]
+    second = start(s, 'r2', who='ou_sup').json()
+    assert [(r['key'], r['node'], r['task'], r['error']) for r in second['results']] == [
+        ('field', 'created', 'created', None), ('control', 'existing', 'existing', None),
+        ('mapping', 'existing', 'existing', None), ('report', 'existing', 'existing', None)]
+    s.fake.hidden.clear()
+    assert len(field_tasks(s)) == 1 and len(s.fake.rows(TASKS)) == 4
+    assert field_tasks(s)[0]['指派人'] == [{'id': 'ou_pm'}]
+    third = start(s, 'r3', who='ou_sup').json()
+    assert (third['started'], third['complete']) == (False, True)
+    assert len(s.fake.rows(TASKS)) == 4
+
+
+def test_an_uncertain_create_is_reconciled_even_when_the_task_became_visible_before_the_retry(s):
+    lose_and_hide_the_first_task(s)
+    start(s, 'r1')
+    s.fake.hidden.clear()
+    body = start(s, 'r2').json()
+    assert body['results'][0] == {'key': 'field', 'node': 'created', 'task': 'created', 'error': None}
+    assert len(field_tasks(s)) == 1
+    assert start(s, 'r3').json()['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None}
+
+
+def test_cancelling_the_seed_and_pressing_again_creates_exactly_one_new_task(s):
+    start(s, 'r1')
+    old = edit_seed_detail(s, '外業', '外業：舊的\n[SOP-START:v1:field]')
+    s.fake.tables[TASKS][old]['狀態'] = '取消'
+    s.clock[0] += 3600
+    assert start(s, 'r2').json()['results'][0]['task'] == 'created'
+    assert [f['狀態'] for f in field_tasks(s)].count('取消') == 1 and len(field_tasks(s)) == 2
+    assert start(s, 'r3').json()['started'] is False
+    assert len(field_tasks(s)) == 2
+
+
+def test_a_marker_task_from_before_the_ledger_stays_the_seed_after_its_marker_is_edited_away(s):
+    node = s.fake.add(NODES, {'指派鍵': 'A115001-01|外業', '確認單編號': 'A115001-01', '節點': '外業', '狀態': '未開始'})
+    legacy = s.fake.add(TASKS, {'標題': '外業：依計畫數量完成', '內容': '舊版\n[SOP-START:v1:field]', '節點指派': [node],
+                                '狀態': '待處理', '部門': '外業'})
+    start(s, 'r1')
+    s.fake.tables[TASKS][legacy]['內容'] = '舊版，標記已刪除'
+    s.clock[0] += 3600
+    assert start(s, 'r2').json()['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None}
+    assert len(field_tasks(s)) == 1
+
+
 def test_a_failure_on_every_node_is_returned_as_the_lark_error(s):
     s.fake.fault('POST', f'{NODES}/records', lambda request: httpx.Response(
         403, json={'code': 1254302, 'msg': 'NoPermission'}))

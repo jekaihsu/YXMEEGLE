@@ -16,8 +16,8 @@ from .lark_table import assignment_key, date_millis, read_case
 from .operations import Plan, StartSopCommand
 from .service import NodeAssignmentService, actor_for, digest
 from .start_sop import (
-    BLOCKER_MESSAGES, SEED_NODES, BlockerCode, Outcome, PlannedNode, observe, plan_start, preview_body,
-    start_denial)
+    BLOCKER_MESSAGES, SEED_NODES, SOP_RULE_VERSION, BlockerCode, Outcome, PlannedNode, marker, observe, plan_start,
+    preview_body, start_denial)
 
 ACTION = 'start_sop'
 LEDGER_FINGERPRINT = 'start-sop-seed-ledger'
@@ -25,6 +25,7 @@ LEDGER_FINGERPRINT = 'start-sop-seed-ledger'
 SYSTEMIC = frozenset({'lark_permission', 'lark_unconfigured', 'lark_unavailable', 'rate_limited', 'roster_unavailable',
                       'writes_disabled', 'preview_stale'})
 STALE_MESSAGE = '計畫數量或期限已變更，請重新檢視預覽後再啟動'
+KINDS = ('task_create', 'node')
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,10 @@ class NodeResult:
     def public(self):
         return {'key': self.key.value, 'node': self.node.value, 'task': self.task.value,
                 'error': self.failure.code if self.failure else None}
+
+    @classmethod
+    def restore(cls, key: str, stored: dict):
+        return cls(NodeKey(key), Outcome(stored['node']), Outcome(stored['task']))
 
 
 def failed(key: NodeKey, failure: Failure, node: Outcome = Outcome.FAILED) -> NodeResult:
@@ -152,18 +157,25 @@ class StartSopRunner:
             raise Failure('forbidden', denials[refused[0]])
         if plan.preview_hash != command.preview_hash:
             raise Failure('preview_stale', STALE_MESSAGE)
-        svc.receipts.save(receipt, fingerprint, {'state': 'pending'})
+        finished = {k: NodeResult.restore(k, r) for k, r in ((stored or {}).get('results') or {}).items()}
+        svc.receipts.save(receipt, fingerprint, {'state': 'pending', 'results': {k: r.public() for k, r in finished.items()}})
 
         results, halt = [], None
         for node in plan.nodes:
-            if denials[node.key]:
+            if node.key.value in finished:
+                results.append(finished[node.key.value])
+            elif denials[node.key]:
                 results.append(failed(node.key, Failure('forbidden', denials[node.key])))
             elif halt is not None:
                 results.append(failed(node.key, halt))
             else:
-                results.append(self._seed(ctx, request_id, node, command.preview_hash, code))
+                results.append(self._seed(ctx, request_id, node, code))
                 if results[-1].failure and results[-1].failure.code in SYSTEMIC:
                     halt = results[-1].failure
+                elif not results[-1].failure:
+                    finished[node.key.value] = results[-1]
+                    svc.receipts.save(receipt, fingerprint, {'state': 'pending',
+                                                             'results': {k: r.public() for k, r in finished.items()}})
         failures = [r.failure for r in results if r.failure]
         started = any(Outcome.CREATED in (r.node, r.task) for r in results)
         if len(failures) == len(results) and not started:
@@ -199,32 +211,67 @@ class StartSopRunner:
             raise Failure('preview_stale', STALE_MESSAGE)
         return fresh
 
-    def _seed(self, ctx, request_id, node: PlannedNode, preview_hash, code) -> NodeResult:
+    def _receipt_id(self, ctx, key: NodeKey, seq: int, kind: str):
+        """Identity of one seed attempt: the work (which seed of which node), never the request or the person."""
+        return self.svc.receipts.scoped('start-sop-node', ctx.wid, ctx.project['id'], key.value, SOP_RULE_VERSION,
+                                        str(seq), kind)
+
+    def _pending(self, ctx, key: NodeKey, seq: int):
+        """An earlier attempt at this node's seed that is still unconfirmed, newest sequence first."""
+        for number in range(seq, -1, -1):
+            for kind in KINDS:
+                rid = self._receipt_id(ctx, key, number, kind)
+                stored = self.svc.receipts.peek(rid)
+                if stored and stored['state'] == 'pending':
+                    return rid, number, kind
+        return None
+
+    def _seed(self, ctx, request_id, node: PlannedNode, code) -> NodeResult:
         svc, key = self.svc, node.key
-        observed, landed = {}, []
         try:
             ctx = self._revalidated(ctx, node, code)
+            with svc.locks.hold(('start-sop', ctx.wid, assignment_key(code, key)), svc.config.lock_timeout_seconds):
+                return self._seed_locked(ctx, request_id, node, code)
         except Failure as exc:
             return failed(key, exc)
-        seed_ids = frozenset(self.ledger.ids(ctx.wid, ctx.project['id'], key))
 
-        def plan_fn(s, _resumed):
+    def _seed_locked(self, ctx, request_id, node: PlannedNode, code) -> NodeResult:
+        """One node's seed under the run lock, so a second press observes what the first one left behind."""
+        svc, key, wid, pid = self.svc, node.key, ctx.wid, ctx.project['id']
+        with svc.client() as client:
+            snapshot = read_case(client, code)
+        carried = {t.record_id for t in snapshot.node_tasks(key) if marker(key) in t.detail}
+        self.ledger.add(wid, pid, key, *sorted(carried))
+        known = frozenset(self.ledger.ids(wid, pid, key)) | carried
+        state = observe(snapshot, svc.skipped(ctx), key, known)
+        seq = len(known)
+        pending = self._pending(ctx, key, seq)
+        if pending is None and not (state.will_create_node or state.will_create_task):
+            return NodeResult(key, Outcome.EXISTING, Outcome.EXISTING if state.seed_task_exists else Outcome.SKIPPED)
+        receipt_id, number, kind = pending or (
+            self._receipt_id(ctx, key, seq, 'task_create' if state.will_create_task else 'node'), seq,
+            'task_create' if state.will_create_task else 'node')
+        observed, landed = {'state': state}, []
+
+        def plan_fn(s, resumed):
             if (reason := start_denial(s.actor, ctx.project, key)):
                 raise Denied(reason)
-            state = observed['state'] = observe(s.snapshot, s.skipped, key, seed_ids)
-            if state.will_create_task:
+            current = observed['state'] = observe(s.snapshot, s.skipped, key, known)
+            if current.will_create_task:
+                if resumed is not None and resumed.kind == 'task_create':
+                    return Plan('task_create', None, None, resumed.changes)
                 return Plan('task_create', None, None, {
                     'title': node.title, 'detail': node.detail, 'assignee': None, 'assigned_by': [s.actor.open_id],
                     'department': node.department, 'deadline': date_millis(node.deadline) if node.deadline else None,
                     'status': TaskStatus.TODO.value})
-            return Plan('node', None, None, {}) if state.will_create_node else None
+            return Plan('node', None, None, {}) if current.will_create_node else None
 
-        def finish(fin_ctx, client, fin_code, fin_key, plan, _roster, fin_receipt, fingerprint, record):
+        def finish(fin_ctx, fin_client, fin_code, fin_key, plan, _roster, fin_receipt, fingerprint, record):
             body = {'node': (Outcome.CREATED if plan.created_node else Outcome.EXISTING).value,
                     'task': (Outcome.CREATED if plan.kind == 'task_create' else Outcome.SKIPPED).value}
             if plan.kind == 'task_create':
-                self.ledger.add(fin_ctx.wid, fin_ctx.project['id'], fin_key, plan.record_id)
-            svc._converge(fin_ctx, client, fin_code, fin_key, plan)
+                self.ledger.add(wid, pid, fin_key, plan.record_id)
+            svc._converge(fin_ctx, fin_client, fin_code, fin_key, plan)
             svc.receipts.save(fin_receipt, fingerprint, {'state': 'done', 'status': 200, 'body': body})
             record('success', record_id=plan.record_id,
                    changes=svc._changes(fin_ctx, assignment_key(fin_code, fin_key), plan))
@@ -232,9 +279,11 @@ class StartSopRunner:
 
         try:
             _, body, _ = svc.mutate(ctx, key, ACTION, f'start-sop:{request_id}:{key.value}',
-                                    {'body': {'preview_hash': preview_hash}}, plan_fn, finish=finish, landed=landed)
+                                    {'sop_rule_version': SOP_RULE_VERSION, 'sequence': number, 'kind': kind},
+                                    plan_fn, finish=finish, landed=landed, receipt_id=receipt_id)
         except Failure as exc:
             return failed(key, exc, node_outcome(landed))
         if body is None:
-            return NodeResult(key, Outcome.EXISTING, Outcome.EXISTING if observed['state'].seed_task_exists else Outcome.SKIPPED)
+            final = observed['state']
+            return NodeResult(key, Outcome.EXISTING, Outcome.EXISTING if final.seed_task_exists else Outcome.SKIPPED)
         return NodeResult(key, Outcome(body['node']), Outcome(body['task']))

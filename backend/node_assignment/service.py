@@ -147,6 +147,11 @@ class Receipts:
                 raise Failure('idempotency_conflict', 'request_id 已用於不同操作，請產生新的 request_id')
             return deepcopy(row.result)
 
+    def peek(self, key):
+        with self.sessions() as db:
+            row = db.get(self.model, key)
+            return None if row is None else deepcopy(row.result)
+
     def save(self, key, fingerprint, result):
         try:
             with self.sessions.begin() as db:
@@ -294,15 +299,17 @@ class NodeAssignmentService:
     # Writes
 
     def mutate(self, ctx: Context, key: NodeKey, action: str, request_id, payload, plan_fn, *, finish=None,
-               landed=None):
+               landed=None, receipt_id=None):
         """plan_fn(situation, resumed_plan) -> Plan, or None when there is nothing to write (body is then None).
 
         `finish` replaces the default node-detail response. `landed`, when given, collects every plan pinned before
-        a failure so the caller can tell what already reached Lark. Returns (http_status, body, replayed).
+        a failure so the caller can tell what already reached Lark. `receipt_id` replaces the request-derived receipt
+        key, and with it the client tokens, for operations whose identity is the work rather than the request.
+        Returns (http_status, body, replayed).
         """
         finish = finish or self._finish
         code = self.open(ctx, write=True)
-        receipt = self.receipts.key(ctx.wid, ctx.user['id'], request_id)
+        receipt = receipt_id or self.receipts.key(ctx.wid, ctx.user['id'], request_id)
         fingerprint = digest({'action': action, 'project_id': ctx.project['id'], 'node': key.value, **payload})
         akey = assignment_key(code, key)
 
@@ -375,6 +382,8 @@ class NodeAssignmentService:
                     if plan.kind == 'task_create':
                         plan = replace(plan, client_token=resumed.client_token if resumed else create_token(receipt, akey, 'task-create'),
                             pre_create_task_ids=resumed.pre_create_task_ids if resumed else None)
+                    if resumed:
+                        plan = replace(plan, created_node=plan.created_node or resumed.created_node)
                 except Denied as exc:
                     record('denied', reason=str(exc))
                     raise Failure('forbidden', str(exc)) from None
@@ -451,11 +460,13 @@ class NodeAssignmentService:
 
         if plan.kind == 'node' and plan.record_id is None:
             row, created = self._node_row(client, s, receipt)
-            plan = pin(replace(plan, record_id=row.record_id, base_revision=row.revision, created_node=created))
+            plan = pin(replace(plan, record_id=row.record_id, base_revision=row.revision,
+                                     created_node=created or plan.created_node))
         if plan.kind == 'task_create':
             if 'node' not in plan.changes:
                 row, created = self._node_row(client, s, receipt)
-                plan = pin(replace(plan, changes={**plan.changes, 'node': [row.record_id]}, created_node=created))
+                plan = pin(replace(plan, changes={**plan.changes, 'node': [row.record_id]},
+                                     created_node=created or plan.created_node))
             if plan.pre_create_task_ids is None:
                 row = client.get(Table.NODES, plan.changes['node'][0])
                 plan = pin(replace(plan, pre_create_task_ids=parse_node(row).task_ids))

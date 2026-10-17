@@ -42,6 +42,7 @@ class FakeBitable:
     def __init__(self):
         self.tables = {NODES: {}, TASKS: {}, PEOPLE: {}}
         self.requests, self.faults, self.tokens, self.seq = [], [], {}, 0
+        self.hidden = set()  # task ids that exist but are not linked from their node yet (read-after-write lag)
         for ident, name, groups, rank, employed in STAFF:
             self.add(PEOPLE, {'姓名': name, '所屬組別': groups, '職級': rank, '在職': employed,
                               'Lark帳號': [{'id': ident}], '同步_OpenID': ident})
@@ -76,7 +77,7 @@ class FakeBitable:
                 value = [{'text': value, 'type': 'text'}]
             fields[name] = value
         if table == NODES:
-            linked = [t for t, f in self.tables[TASKS].items() if rid in f.get('節點指派', [])]
+            linked = [t for t, f in self.tables[TASKS].items() if rid in f.get('節點指派', []) and t not in self.hidden]
             if linked:
                 fields['任務'] = {'link_record_ids': linked} if style == 'search' else [{'record_ids': linked, 'type': 'text'}]
         return {'record_id': rid, 'fields': fields}
