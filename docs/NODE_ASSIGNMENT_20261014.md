@@ -201,14 +201,14 @@ A project lead previews, then confirms, and the app seeds one 節點指派 row a
 
 **Seed task.** Unassigned, status 待處理, 指派人 is the person who pressed start. Title `<外業|控制|圖資|報告>：依計畫數量完成`. Detail lists the planned quantity, contract lines and items, link-basis counts and the node's warnings, and ends with the marker `[SOP-START:v1:<node key>]`. Department is the first of the node's departments (外業, 控制, 圖報A, 圖報A) because existing task creation requires one of them. A node counts as seeded when any non-cancelled task of that node carries its marker. A manually created task without the marker does not count, and a 已完成 or 略過 node gets its row but no task (`task: "skipped"`).
 
-**Who.** The system administrator (`can_manage_roles`), the project's PM or supervisor, the node's supervisor, or a manager of the node's departments (the same rule as `Actor.manages`). Authority is checked per node. Everyone else gets 403 `forbidden`, audited as `node_assignment.start_sop` with result `denied`.
+**Who.** The system administrator (`can_manage_roles`), the project's PM or supervisor, the node's supervisor, or a manager of the node's departments (the same rule as `Actor.manages`). A project lead who is not an employed person in the roster is refused unless they hold the system-admin or business override (the rule of `plan_patch_task`), and the pressing account must be a Lark open id because it is written as 指派人. Authority is checked per node. Everyone else gets 403 `forbidden` with a Chinese reason, audited as `node_assignment.start_sop` with result `denied`.
 
-**Blockers** (`eligible` is true only with none and at least one row to write): `disabled`, `writes_disabled` (workspace `external_enabled` off), `no_confirmation_code`, `no_planned_quantity`, `forbidden`, `lark_unavailable`. The flag-off case answers 404 `disabled` like every route, so `disabled` is not sent as a blocker. **Warnings** never block: `no_pm`, `deadline_conflict`, `ambiguous_links`, `needs_review`, `derived_links`, `plan_truncated`. `items_basis.unlinked` also counts native links that could not be resolved.
+**Blockers** (`eligible` is true only with none and at least one row to write): `disabled`, `writes_disabled` (workspace `external_enabled` off), `no_confirmation_code`, `no_planned_quantity`, `forbidden`, `lark_unavailable`. The flag-off case answers 404 `disabled` like every route, so `disabled` is not sent as a blocker. `can_start` is true only when the caller may start at least one node, so the frontend gates the button on it instead of re-implementing authority (it is also false while the case cannot be read). **Warnings** never block: `no_pm`, `deadline_conflict`, `ambiguous_links`, `needs_review`, `derived_links`, `plan_truncated`. `items_basis.unlinked` also counts native links that could not be resolved.
 
 **Preview** (`GET`, same authorization and caches as the other reads, never writes):
 
 ```json
-{"project_id": "p1", "code": "A115001-01", "eligible": true, "already_started": false,
+{"project_id": "p1", "code": "A115001-01", "eligible": true, "can_start": true, "already_started": false,
  "blockers": [{"code": "forbidden", "message": "..."}],
  "warnings": [{"code": "deadline_conflict", "message": "...", "node": "field"}],
  "nodes": [{"key": "field", "label": "外業", "category": "外業", "planned_qty": "123.45", "lines": 2, "items": 5,

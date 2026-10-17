@@ -11,12 +11,11 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 
-from ..business_policy import can_manage_roles
 from ..contract_links import plan_summary
 from ..sources import day
-from .domain import FINISHED, NODE_DEPARTMENTS, NodeKey, TaskStatus, derive_chain
+from .domain import FINISHED, NODE_DEPARTMENTS, Actor, NodeKey, TaskStatus, derive_chain
 from .lark_table import CaseSnapshot
-from .operations import facts_of
+from .operations import OPEN_ID, facts_of
 
 SOP_RULE_VERSION = 'start-sop-20261017.1'
 CHAIN_NOTE = '節點狀態仍依九節點流程推導；啟動 SOP 只建立節點列與一筆種子任務，不會變更任何節點狀態。'
@@ -48,6 +47,9 @@ class Outcome(StrEnum):
     FAILED = 'failed'
     SKIPPED = 'skipped'
 
+
+NOT_EMPLOYED_MESSAGE = '你不在人員名單或尚未在職，無法啟動 SOP'
+NOT_OPEN_ID_MESSAGE = '你的帳號不是有效的 Lark 帳號，無法啟動 SOP'
 
 BLOCKER_MESSAGES = {
     BlockerCode.DISABLED: '節點指派功能尚未啟用',
@@ -168,11 +170,19 @@ def observe(snapshot: CaseSnapshot, skipped, key: NodeKey) -> NodeState:
     return NodeState(bool(snapshot.rows.get(key)), seeded, status not in FINISHED)
 
 
-def may_start(user, project, key: NodeKey, manages_node: bool) -> bool:
-    """Project lead (admin, PM, project or node supervisor) or a manager of the node's departments."""
+def start_denial(actor: Actor, project, key: NodeKey) -> str | None:
+    """Why this actor may not seed the node, or None. Leads still have to be employed people, as for task edits."""
+    if not OPEN_ID.fullmatch(actor.open_id):
+        return NOT_OPEN_ID_MESSAGE
+    if actor.override:
+        return None
+    if actor.person is None or not actor.person.employed:
+        return NOT_EMPLOYED_MESSAGE
     node = next((n for n in project.get('nodes') or [] if n.get('key') == key.value), {})
     leads = {project.get('pm_id'), project.get('supervisor_id'), node.get('supervisor_id')} - {None, ''}
-    return can_manage_roles(user) or user['id'] in leads or manages_node
+    if actor.open_id in leads or actor.manages(key):
+        return None
+    return BLOCKER_MESSAGES[BlockerCode.FORBIDDEN]
 
 
 def project_quotes(state, project):
@@ -262,7 +272,7 @@ def plan_start(state, project, code: str | None) -> StartPlan:
     return StartPlan(project['id'], code, tuple(nodes), tuple(notices), str(summary.get('rule_version') or ''))
 
 
-def preview_body(plan: StartPlan, states: dict[NodeKey, NodeState] | None, blockers) -> dict:
+def preview_body(plan: StartPlan, states: dict[NodeKey, NodeState] | None, blockers, can_start: bool) -> dict:
     """The GET contract. `states` is None while Lark cannot be read, so nothing is promised."""
     rows = []
     for node in plan.nodes:
@@ -277,7 +287,7 @@ def preview_body(plan: StartPlan, states: dict[NodeKey, NodeState] | None, block
             'task_title': node.title, 'task_detail': node.detail})
     pending = any(r['will_create_node'] or r['will_create_task'] for r in rows)
     return {
-        'project_id': plan.project_id, 'code': plan.code, 'eligible': not blockers and pending,
+        'project_id': plan.project_id, 'code': plan.code, 'eligible': not blockers and pending, 'can_start': can_start,
         'already_started': states is not None and bool(rows) and not pending,
         'blockers': [{'code': b.value, 'message': m} for b, m in blockers],
         'warnings': [n.public() for n in plan.notices], 'nodes': rows, 'chain_note': CHAIN_NOTE,

@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 from .node_assignment.lark_table import date_millis
-from .test_node_assignment_routes import NODES, TASKS, URL, h, project  # noqa: F401  (h is the shared fixture)
+from .test_node_assignment_routes import NODES, PEOPLE, TASKS, URL, h, project  # noqa: F401  (h is the shared fixture)
 
 SOP = URL + '/start-sop'
 
@@ -36,6 +36,9 @@ def s(h):
     h.case['project'] = {**project(), 'pm_id': 'ou_pm'}
     set_plan(h)
     h.state['source_quotes'] = [quote('q1', **DEADLINES)]
+    for ident, name in (('ou_pm', '張專案'), ('ou_sup', '李主管'), ('ou_nsup', '趙節點')):
+        h.fake.add(PEOPLE, {'姓名': name, '所屬組別': ['PM'], '職級': '組員', '在職': True,
+                            'Lark帳號': [{'id': ident}], '同步_OpenID': ident})
     return h
 
 
@@ -197,6 +200,56 @@ def test_a_plain_member_is_forbidden_and_the_denial_is_audited(s):
     assert s.fake.writes() == []
     denied = [(a[0], a[1], a[2]['request_id'], a[2]['nodes']) for a in s.audits() if a[2]['result'] == 'denied']
     assert denied == [('node_assignment.start_sop', 'ou_member', 'r1', ['field', 'control', 'mapping', 'report'])]
+
+
+def test_can_start_tells_the_frontend_whether_the_button_works(s):
+    assert (preview(s, 'ou_pm')['can_start'], preview(s, 'ou_member')['can_start']) == (True, False)
+    start(s, 'r1')
+    again = preview(s, 'ou_pm')
+    assert (again['can_start'], again['eligible']) == (True, False)
+    assert preview(s, 'ou_fm')['can_start'] is True
+    s.state['settings']['external_enabled'] = False
+    assert preview(s, 'ou_pm')['can_start'] is True
+
+
+def test_a_lead_who_is_not_in_the_roster_cannot_start(s):
+    s.case['project'] = {**s.case['project'], 'pm_id': 'ou_ghost'}
+    body = preview(s, 'ou_ghost')
+    assert (body['can_start'], [b['code'] for b in body['blockers']]) == (False, ['forbidden'])
+    response = start(s, 'r1', who='ou_ghost', digest=body['preview_hash'], expect=403)
+    assert response.json()['code'] == 'forbidden'
+    assert s.fake.writes() == []
+    assert [a[2]['nodes'] for a in s.audits() if a[2]['result'] == 'denied'] == [
+        ['field', 'control', 'mapping', 'report']]
+
+
+def test_an_unemployed_lead_cannot_start(s):
+    s.fake.add(PEOPLE, {'姓名': '離職PM', '所屬組別': ['PM'], '職級': '組員', '在職': False,
+                        'Lark帳號': [{'id': 'ou_left'}], '同步_OpenID': 'ou_left'})
+    s.case['project'] = {**s.case['project'], 'pm_id': 'ou_left', 'supervisor_id': 'ou_left'}
+    body = preview(s, 'ou_left')
+    assert (body['can_start'], body['eligible']) == (False, False)
+    response = start(s, 'r1', who='ou_left', digest=body['preview_hash'], expect=403)
+    assert response.json()['detail'] == '你不在人員名單或尚未在職，無法啟動 SOP'
+    assert s.fake.writes() == []
+
+
+def test_a_system_admin_outside_the_roster_may_still_start(s):
+    s.user_fields['role'] = 'manager'
+    assert preview(s, 'ou_boss')['can_start'] is True
+    assert start(s, 'r1', who='ou_boss').json()['complete'] is True
+    assert [f['指派人'] for f in s.fake.rows(TASKS).values()] == [[{'id': 'ou_boss'}]] * 4
+
+
+def test_an_account_that_is_not_a_lark_open_id_is_not_written_as_assigned_by(s):
+    s.fake.add(PEOPLE, {'姓名': '舊帳號', '所屬組別': ['PM'], '職級': '組員', '在職': True,
+                        'Lark帳號': [{'id': 'legacy-7'}], '同步_OpenID': 'legacy-7'})
+    s.case['project'] = {**s.case['project'], 'pm_id': 'legacy-7'}
+    body = preview(s, 'legacy-7')
+    assert body['can_start'] is False
+    response = start(s, 'r1', who='legacy-7', digest=body['preview_hash'], expect=403)
+    assert response.json()['detail'] == '你的帳號不是有效的 Lark 帳號，無法啟動 SOP'
+    assert s.fake.writes() == []
 
 
 def test_project_pm_supervisor_node_supervisor_and_system_admin_may_start(s):

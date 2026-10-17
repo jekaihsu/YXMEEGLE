@@ -15,8 +15,8 @@ from .lark_table import assignment_key, date_millis, read_case
 from .operations import Plan, StartSopCommand
 from .service import NodeAssignmentService, actor_for, digest
 from .start_sop import (
-    BLOCKER_MESSAGES, SEED_NODES, BlockerCode, Outcome, PlannedNode, may_start, observe, plan_start,
-    preview_body)
+    BLOCKER_MESSAGES, SEED_NODES, BlockerCode, Outcome, PlannedNode, observe, plan_start, preview_body,
+    start_denial)
 
 ACTION = 'start_sop'
 # Retrying the next node would fail the same way, so a run stops at the first of these.
@@ -53,9 +53,9 @@ class StartSopRunner:
                 raise
             return None
 
-    def _authority(self, ctx, keys, roster):
+    def _denials(self, ctx, keys, roster):
         actor = actor_for(ctx.user, roster.value if roster else None)
-        return {k: may_start(ctx.user, ctx.project, k, actor.manages(k)) for k in keys}
+        return {k: start_denial(actor, ctx.project, k) for k in keys}
 
     # Preview
 
@@ -70,7 +70,7 @@ class StartSopRunner:
             blockers.append((BlockerCode.NO_CONFIRMATION_CODE, BLOCKER_MESSAGES[BlockerCode.NO_CONFIRMATION_CODE]))
         if not plan.nodes:
             blockers.append((BlockerCode.NO_PLANNED_QUANTITY, BLOCKER_MESSAGES[BlockerCode.NO_PLANNED_QUANTITY]))
-        states = None
+        states, can_start = None, False
         if code is not None:
             try:
                 with ThreadPoolExecutor(max_workers=2) as pool:
@@ -79,11 +79,13 @@ class StartSopRunner:
                     roster, cached = roster_future.result(), case_future.result()
                 skipped = svc.skipped(ctx)
                 states = {n.key: observe(cached.value, skipped, n.key) for n in plan.nodes}
-                if not any(self._authority(ctx, [n.key for n in plan.nodes] or SEED_NODES, roster).values()):
+                denials = self._denials(ctx, [n.key for n in plan.nodes] or SEED_NODES, roster)
+                can_start = any(reason is None for reason in denials.values())
+                if not can_start:
                     blockers.append((BlockerCode.FORBIDDEN, BLOCKER_MESSAGES[BlockerCode.FORBIDDEN]))
             except Failure as exc:
                 blockers.append((BlockerCode.LARK_UNAVAILABLE, exc.message))
-        return preview_body(plan, states, blockers)
+        return preview_body(plan, states, blockers, can_start)
 
     # Run
 
@@ -105,20 +107,20 @@ class StartSopRunner:
             missing = BlockerCode.NO_CONFIRMATION_CODE if code is None else BlockerCode.NO_PLANNED_QUANTITY
             raise Failure('nothing_to_start', BLOCKER_MESSAGES[missing],
                           blockers=[{'code': missing.value, 'message': BLOCKER_MESSAGES[missing]}])
-        allowed = self._authority(ctx, [n.key for n in plan.nodes], svc._roster(fresh=False))
-        refused = [k for k, ok in allowed.items() if not ok]
+        denials = self._denials(ctx, [n.key for n in plan.nodes], svc._roster(fresh=False))
+        refused = [k for k, reason in denials.items() if reason]
         if refused:
             self._deny(ctx, request_id, refused)
-        if not any(allowed.values()):
-            raise Failure('forbidden', BLOCKER_MESSAGES[BlockerCode.FORBIDDEN])
+        if len(refused) == len(denials):
+            raise Failure('forbidden', denials[refused[0]])
         if plan.preview_hash != command.preview_hash:
             raise Failure('preview_stale', STALE_MESSAGE)
         svc.receipts.save(receipt, fingerprint, {'state': 'pending'})
 
         results, halt = [], None
         for node in plan.nodes:
-            if not allowed[node.key]:
-                results.append(failed(node.key, Failure('forbidden', BLOCKER_MESSAGES[BlockerCode.FORBIDDEN])))
+            if denials[node.key]:
+                results.append(failed(node.key, Failure('forbidden', denials[node.key])))
             elif halt is not None:
                 results.append(failed(node.key, halt))
             else:
@@ -155,8 +157,8 @@ class StartSopRunner:
         seen = {'node_created': False, 'task': Outcome.EXISTING}
 
         def plan_fn(s, _resumed):
-            if not may_start(ctx.user, ctx.project, key, s.actor.manages(key)):
-                raise Denied(BLOCKER_MESSAGES[BlockerCode.FORBIDDEN])
+            if (reason := start_denial(s.actor, ctx.project, key)):
+                raise Denied(reason)
             state = observe(s.snapshot, s.skipped, key)
             seen['node_created'] = state.will_create_node
             if not state.open and not state.seed_task_exists:
