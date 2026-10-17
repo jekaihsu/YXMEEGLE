@@ -16,7 +16,7 @@ globalThis.fetch=async(url,options={})=>{
  const u=new URL(url,'http://localhost');
  if(holdSearch&&u.searchParams.get('q'))return new Promise(()=>{});
  const d=mockReport(u.pathname.endsWith('/case')?'progress/case':'progress',u.searchParams);
- if(u.pathname.endsWith('/case')){d.week.plan_rows=[{date:'2026-10-12',group:'A',people:'王小明',items:'測量 · 水深',points:10}];}
+ if(u.pathname.endsWith('/case')){d.case.name=snapshot==='new'?'更新後詳情':d.case.name;d.week.plan_rows=[{date:'2026-10-12',group:'A',people:'王小明',items:'測量 · 水深',points:10}];}
  else {if(d.items[1])d.items[1].case_key=null;if(posts&&refreshStatus===202&&++polls>=changeAfter)snapshot='new';d.meta.can_refresh=true;if(u.searchParams.get('q')==='absent')d.options.status=[];d.items[0]&&(d.items[0].case_name=snapshot==='new'?'更新後案件':d.items[0].case_name);}
  d.meta.snapshot=snapshot;return new Response(JSON.stringify(d));
 };
@@ -51,6 +51,10 @@ await click(button('重新整理資料'));assert.equal(posts,1);assert.equal(pol
 await act(async()=>mock.timers.tick(2999));assert.equal(polls,0);
 await act(async()=>mock.timers.tick(1));assert.equal(polls,1);assert.equal(document.querySelector('[role=status]'),null);
 await act(async()=>mock.timers.tick(3000));assert.match(document.querySelector('[role=status]').textContent,/資料已更新/);assert.match(document.querySelector('tbody').textContent,/更新後案件/);
+await click(document.querySelector('.reports-progress-table .reports-pagination button:last-child'));
+assert.match(document.querySelector('tbody').textContent,/更新後案件/);
+await click(document.querySelector('tbody tr button'));assert.match(document.querySelector('[role=dialog]').textContent,/更新後詳情/);
+window.history.replaceState(null,'',location.hash);await click(document.querySelector('[role=dialog] [aria-label=關閉]'));
 refreshStatus=429;await click(button('重新整理資料'));assert.equal(posts,2);assert.match(document.querySelector('[role=status]').textContent,/每 60 秒只能重新整理一次/);
 refreshStatus=202;changeAfter=Infinity;await click(button('重新整理資料'));for(let i=0;i<6;i++)await act(async()=>mock.timers.tick(3000));assert.equal(posts,3);assert.match(document.querySelector('[role=status]').textContent,/資料仍在更新，稍後會自動出現/);
 const count=requests.length;await act(async()=>mock.timers.tick(30000));assert.equal(requests.length,count);
