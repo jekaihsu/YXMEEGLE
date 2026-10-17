@@ -133,6 +133,11 @@ class Receipts:
     def key(wid, actor_id, request_id):
         return 'node-assignment:' + hashlib.sha256(f'{wid}\0{actor_id}\0{request_id}'.encode()).hexdigest()
 
+    @staticmethod
+    def scoped(scope, *parts):
+        """A key in its own namespace, for durable facts that are not tied to one request."""
+        return f'{scope}:' + hashlib.sha256('\0'.join(parts).encode()).hexdigest()
+
     def load(self, key, fingerprint):
         with self.sessions() as db:
             row = db.get(self.model, key)

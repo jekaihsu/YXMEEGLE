@@ -547,6 +547,37 @@ def test_a_cancelled_seed_task_is_ignored_and_a_live_one_is_honored(s):
     assert len(s.fake.rows(TASKS)) == 5
 
 
+def edit_seed_detail(s, label, detail):
+    rid = next(rid for rid, f in s.fake.tables[TASKS].items() if f['標題'].startswith(label))
+    s.fake.tables[TASKS][rid]['內容'] = detail
+    s.clock[0] += 3600  # the preview reads the cached snapshot until its TTL passes
+    return rid
+
+
+def test_a_seed_task_stays_the_seed_after_someone_edits_the_marker_away(s):
+    start(s, 'r1')
+    edit_seed_detail(s, '外業', '現場調整後的說明')
+    again = preview(s)
+    assert (again['already_started'], again['nodes'][0]['seed_task_exists'], again['nodes'][0]['will_create_task']) == (
+        True, True, False)
+    writes = len(s.fake.writes())
+    body = start(s, 'r2').json()
+    assert (body['started'], body['complete']) == (False, True)
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None}
+    assert len(s.fake.writes()) == writes and len(s.fake.rows(TASKS)) == 4
+
+
+def test_a_cancelled_seed_counts_as_absent_even_without_its_marker(s):
+    start(s, 'r1')
+    rid = edit_seed_detail(s, '外業', '已取消的舊任務')
+    s.fake.tables[TASKS][rid]['狀態'] = '取消'
+    s.clock[0] += 3600
+    assert preview(s)['nodes'][0]['will_create_task'] is True
+    assert start(s, 'r2').json()['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None}
+    live = [f for f in s.fake.tables[TASKS].values() if f['標題'].startswith('外業') and f['狀態'] != '取消']
+    assert len(live) == 1 and live[0]['內容'].endswith('[SOP-START:v1:field]')
+
+
 def test_a_finished_node_is_not_given_a_task(s):
     done = s.fake.add(NODES, {'指派鍵': 'A115001-01|外業', '確認單編號': 'A115001-01', '節點': '外業', '狀態': '已完成',
                               '核准人': [{'id': 'ou_vp'}], '核准時間': date_millis('2026-10-01')})

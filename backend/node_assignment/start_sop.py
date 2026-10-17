@@ -164,8 +164,13 @@ class NodeState:
         return self.open and not self.seed_task_exists
 
 
-def observe(snapshot: CaseSnapshot, skipped, key: NodeKey) -> NodeState:
-    seeded = any(t.status is not TaskStatus.CANCELLED and marker(key) in t.detail for t in snapshot.node_tasks(key))
+def observe(snapshot: CaseSnapshot, skipped, key: NodeKey, seed_ids: frozenset[str] = frozenset()) -> NodeState:
+    """A node is seeded by a live task this app recorded as its seed, or one that still carries the marker.
+
+    A cancelled seed counts as absent on purpose, so a manager can cancel it and start again.
+    """
+    seeded = any(t.status is not TaskStatus.CANCELLED and (t.record_id in seed_ids or marker(key) in t.detail)
+                 for t in snapshot.node_tasks(key))
     status = derive_chain(facts_of(snapshot, skipped))[key]
     return NodeState(bool(snapshot.rows.get(key)), seeded, status not in FINISHED)
 

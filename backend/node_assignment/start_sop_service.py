@@ -5,6 +5,7 @@ the fresh-read planning, duplicate protection, read-back and pending-receipt
 reconciliation of every other write. The run itself holds a receipt that binds
 the request_id to the reviewed preview hash.
 """
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 
@@ -19,6 +20,7 @@ from .start_sop import (
     start_denial)
 
 ACTION = 'start_sop'
+LEDGER_FINGERPRINT = 'start-sop-seed-ledger'
 # Retrying the next node would fail the same way, so a run stops at the first of these.
 SYSTEMIC = frozenset({'lark_permission', 'lark_unconfigured', 'lark_unavailable', 'rate_limited', 'roster_unavailable',
                       'writes_disabled', 'preview_stale'})
@@ -48,9 +50,35 @@ def node_outcome(landed: list[Plan]) -> Outcome:
     return Outcome.CREATED if any(p.created_node for p in landed) else Outcome.EXISTING
 
 
+class SeedLedger:
+    """The Lark record ids of the seed tasks this app created, in creation order, per workspace, project and node.
+
+    The marker in 內容 is editable by anyone, the record id is not, so the id keeps a seed a seed.
+    """
+
+    def __init__(self, receipts):
+        self.receipts, self._lock = receipts, threading.Lock()
+
+    def _key(self, wid, project_id, key: NodeKey):
+        return self.receipts.scoped('start-sop-seeds', wid, project_id, key.value)
+
+    def ids(self, wid, project_id, key: NodeKey) -> tuple[str, ...]:
+        stored = self.receipts.load(self._key(wid, project_id, key), LEDGER_FINGERPRINT)
+        return tuple(stored['record_ids']) if stored else ()
+
+    def add(self, wid, project_id, key: NodeKey, *record_ids):
+        with self._lock:
+            known = self.ids(wid, project_id, key)
+            new = [r for r in dict.fromkeys(record_ids) if r not in known]
+            if new:
+                self.receipts.save(self._key(wid, project_id, key), LEDGER_FINGERPRINT,
+                                   {'record_ids': [*known, *new]})
+
+
 class StartSopRunner:
     def __init__(self, service: NodeAssignmentService):
         self.svc = service
+        self.ledger = SeedLedger(service.receipts)
 
     def _code(self, ctx):
         try:
@@ -85,7 +113,9 @@ class StartSopRunner:
                     case_future = pool.submit(svc._case, ctx, code)
                     roster, cached = roster_future.result(), case_future.result()
                 skipped = svc.skipped(ctx)
-                states = {n.key: observe(cached.value, skipped, n.key) for n in plan.nodes}
+                states = {n.key: observe(cached.value, skipped, n.key,
+                                         frozenset(self.ledger.ids(ctx.wid, ctx.project['id'], n.key)))
+                          for n in plan.nodes}
                 denials = self._denials(ctx, [n.key for n in plan.nodes] or SEED_NODES, roster)
                 can_start = any(reason is None for reason in denials.values())
                 if not can_start:
@@ -176,11 +206,12 @@ class StartSopRunner:
             ctx = self._revalidated(ctx, node, code)
         except Failure as exc:
             return failed(key, exc)
+        seed_ids = frozenset(self.ledger.ids(ctx.wid, ctx.project['id'], key))
 
         def plan_fn(s, _resumed):
             if (reason := start_denial(s.actor, ctx.project, key)):
                 raise Denied(reason)
-            state = observed['state'] = observe(s.snapshot, s.skipped, key)
+            state = observed['state'] = observe(s.snapshot, s.skipped, key, seed_ids)
             if state.will_create_task:
                 return Plan('task_create', None, None, {
                     'title': node.title, 'detail': node.detail, 'assignee': None, 'assigned_by': [s.actor.open_id],
@@ -191,6 +222,8 @@ class StartSopRunner:
         def finish(fin_ctx, client, fin_code, fin_key, plan, _roster, fin_receipt, fingerprint, record):
             body = {'node': (Outcome.CREATED if plan.created_node else Outcome.EXISTING).value,
                     'task': (Outcome.CREATED if plan.kind == 'task_create' else Outcome.SKIPPED).value}
+            if plan.kind == 'task_create':
+                self.ledger.add(fin_ctx.wid, fin_ctx.project['id'], fin_key, plan.record_id)
             svc._converge(fin_ctx, client, fin_code, fin_key, plan)
             svc.receipts.save(fin_receipt, fingerprint, {'state': 'done', 'status': 200, 'body': body})
             record('success', record_id=plan.record_id,
