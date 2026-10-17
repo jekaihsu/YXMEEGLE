@@ -54,7 +54,11 @@ def register(app, *, identity, load_case, sessions, receipt_model, audit_model, 
             if fresh_data['wid'] != data['wid'] or fresh_user['id'] != user['id'] or not fresh_user.get('active', True):
                 raise Failure('forbidden', '登入身分已變更，請重新整理後再操作')
             return fresh_user
-        return Context(data['wid'], user, state, project, authorize)
+        def refresh():
+            fresh_user = authorize()
+            fresh_state, fresh_project = load_case(data, fresh_user, project_id)
+            return Context(data['wid'], fresh_user, fresh_state, fresh_project, authorize, refresh)
+        return Context(data['wid'], user, state, project, authorize, refresh)
 
     def node_key(value):
         try:

@@ -21,7 +21,7 @@ from .start_sop import (
 ACTION = 'start_sop'
 # Retrying the next node would fail the same way, so a run stops at the first of these.
 SYSTEMIC = frozenset({'lark_permission', 'lark_unconfigured', 'lark_unavailable', 'rate_limited', 'roster_unavailable',
-                      'writes_disabled'})
+                      'writes_disabled', 'preview_stale'})
 STALE_MESSAGE = '計畫數量或期限已變更，請重新檢視預覽後再啟動'
 
 
@@ -131,7 +131,7 @@ class StartSopRunner:
             elif halt is not None:
                 results.append(failed(node.key, halt))
             else:
-                results.append(self._seed(ctx, request_id, node, command.preview_hash))
+                results.append(self._seed(ctx, request_id, node, command.preview_hash, code))
                 if results[-1].failure and results[-1].failure.code in SYSTEMIC:
                     halt = results[-1].failure
         failures = [r.failure for r in results if r.failure]
@@ -160,9 +160,22 @@ class StartSopRunner:
             pass
         return svc.overview(ctx)
 
-    def _seed(self, ctx, request_id, node: PlannedNode, preview_hash) -> NodeResult:
+    def _revalidated(self, ctx, node: PlannedNode, code):
+        """The context and plan as they stand now. The confirmed preview only covers this node's reviewed content."""
+        fresh = ctx.refresh()
+        fresh_code = self._code(fresh)
+        current = next((n for n in plan_start(fresh.state, fresh.project, fresh_code).nodes if n.key == node.key), None)
+        if fresh_code != code or current is None or current.reviewed() != node.reviewed():
+            raise Failure('preview_stale', STALE_MESSAGE)
+        return fresh
+
+    def _seed(self, ctx, request_id, node: PlannedNode, preview_hash, code) -> NodeResult:
         svc, key = self.svc, node.key
         observed, landed = {}, []
+        try:
+            ctx = self._revalidated(ctx, node, code)
+        except Failure as exc:
+            return failed(key, exc)
 
         def plan_fn(s, _resumed):
             if (reason := start_denial(s.actor, ctx.project, key)):

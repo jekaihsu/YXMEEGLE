@@ -50,6 +50,8 @@ class Context:
     state: dict
     project: dict
     authorize: Callable[[], dict]
+    # Re-reads the session user, the state and the project, for a run that spans several writes.
+    refresh: Callable[[], 'Context'] | None = None
 
 
 def digest(value):

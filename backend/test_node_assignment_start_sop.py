@@ -442,6 +442,48 @@ def test_resume_after_a_crash_that_landed_reports_created_then_a_plain_press_rep
     assert len(s.fake.rows(TASKS)) == 4
 
 
+def after_first_task_create(s, change):
+    """Run `change` once the first seed task has been sent to Lark, then let the request through."""
+    def hook(_request):
+        change()
+    s.fake.fault('POST', f'{TASKS}/records', hook)
+
+
+def test_a_pm_removed_mid_run_stops_the_later_nodes(s):
+    after_first_task_create(s, lambda: s.case.update(project={**s.case['project'], 'pm_id': 'ou_other'}))
+    body = start(s, 'r1').json()
+    assert (body['started'], body['complete']) == (True, False)
+    assert [(r['key'], r['node'], r['task'], r['error']) for r in body['results']] == [
+        ('field', 'created', 'created', None), ('control', 'failed', 'failed', 'forbidden'),
+        ('mapping', 'failed', 'failed', 'forbidden'), ('report', 'failed', 'failed', 'forbidden')]
+    assert seeded_nodes(s) == ['外業'] and len(s.fake.rows(TASKS)) == 1
+    assert [a[2]['node'] for a in s.audits() if a[2]['result'] == 'denied'] == ['control', 'mapping', 'report']
+
+
+def test_a_plan_that_changes_mid_run_stops_the_remaining_nodes_and_a_new_preview_resumes(s):
+    after_first_task_create(s, lambda: set_plan(s, 控制=counts('11', 1, 1, items_native=1)))
+    first = start(s, 'r1').json()
+    assert (first['started'], first['complete']) == (True, False)
+    assert [(r['key'], r['node'], r['task'], r['error']) for r in first['results']] == [
+        ('field', 'created', 'created', None), ('control', 'failed', 'failed', 'preview_stale'),
+        ('mapping', 'failed', 'failed', 'preview_stale'), ('report', 'failed', 'failed', 'preview_stale')]
+    assert seeded_nodes(s) == ['外業']
+    fresh = preview(s)['preview_hash']
+    resumed = start(s, 'r2', digest=fresh).json()
+    assert [(r['key'], r['node'], r['task']) for r in resumed['results']] == [
+        ('field', 'existing', 'existing'), ('control', 'created', 'created'),
+        ('mapping', 'created', 'created'), ('report', 'created', 'created')]
+    assert next(f for f in s.fake.rows(TASKS).values() if f['標題'].startswith('控制'))['內容'].startswith(
+        '依計畫數量完成控制。\n計畫數量：11\n')
+
+
+def test_a_quote_deadline_that_changes_mid_run_is_also_stale(s):
+    after_first_task_create(s, lambda: s.state.update(source_quotes=[quote('q1', **{**DEADLINES, '內業期限(報)': '2026-12-01'})]))
+    body = start(s, 'r1').json()
+    assert [(r['key'], r['error']) for r in body['results']] == [
+        ('field', None), ('control', None), ('mapping', None), ('report', 'preview_stale')]
+
+
 def test_a_failure_on_every_node_is_returned_as_the_lark_error(s):
     s.fake.fault('POST', f'{NODES}/records', lambda request: httpx.Response(
         403, json={'code': 1254302, 'msg': 'NoPermission'}))
