@@ -14,7 +14,7 @@ from .domain import Denied, NodeKey, TaskStatus
 from .errors import Failure
 from .lark_table import assignment_key, date_millis, read_case
 from .operations import Plan, StartSopCommand
-from .service import NodeAssignmentService, actor_for, digest
+from .service import SYNC_FAILED, NodeAssignmentService, actor_for, digest
 from .start_sop import (
     BLOCKER_MESSAGES, SEED_NODES, SOP_RULE_VERSION, BlockerCode, Outcome, PlannedNode, marker, observe, plan_start,
     preview_body, start_denial)
@@ -34,14 +34,20 @@ class NodeResult:
     node: Outcome
     task: Outcome
     failure: Failure | None = None
+    # 'failed' only when the seed landed but the 進度/開始時間 mirror write did not.
+    sync: str = 'ok'
 
     def public(self):
         return {'key': self.key.value, 'node': self.node.value, 'task': self.task.value,
-                'error': self.failure.code if self.failure else None}
+                'error': self.failure.code if self.failure else None, 'sync': self.sync}
+
+    @property
+    def finished(self):
+        return not self.failure and self.sync == 'ok'
 
     @classmethod
     def restore(cls, key: str, stored: dict):
-        return cls(NodeKey(key), Outcome(stored['node']), Outcome(stored['task']))
+        return cls(NodeKey(key), Outcome(stored['node']), Outcome(stored['task']), sync=stored.get('sync', 'ok'))
 
 
 def failed(key: NodeKey, failure: Failure, node: Outcome = Outcome.FAILED) -> NodeResult:
@@ -172,7 +178,7 @@ class StartSopRunner:
                 results.append(self._seed(ctx, request_id, node, code))
                 if results[-1].failure and results[-1].failure.code in SYSTEMIC:
                     halt = results[-1].failure
-                elif not results[-1].failure:
+                elif results[-1].finished:
                     finished[node.key.value] = results[-1]
                     svc.receipts.save(receipt, fingerprint, {'state': 'pending',
                                                              'results': {k: r.public() for k, r in finished.items()}})
@@ -180,9 +186,9 @@ class StartSopRunner:
         started = any(Outcome.CREATED in (r.node, r.task) for r in results)
         if len(failures) == len(results) and not started:
             raise failures[0]
-        body = {'started': started, 'complete': not failures,
+        body = {'started': started, 'complete': all(r.finished for r in results),
                 'results': [r.public() for r in results], 'overview': self._overview(ctx, code)}
-        if not failures:
+        if body['complete']:
             svc.receipts.save(receipt, fingerprint, {'state': 'done', 'status': 200, 'body': body})
         return 200, body, False
 
@@ -271,10 +277,13 @@ class StartSopRunner:
                     'task': (Outcome.CREATED if plan.kind == 'task_create' else Outcome.SKIPPED).value}
             if plan.kind == 'task_create':
                 self.ledger.add(wid, pid, fin_key, plan.record_id)
-            svc._converge(fin_ctx, fin_client, fin_code, fin_key, plan)
-            svc.receipts.save(fin_receipt, fingerprint, {'state': 'done', 'status': 200, 'body': body})
+            _, warnings = svc._converge(fin_ctx, fin_client, fin_code, fin_key, plan)
+            body['sync'] = 'failed' if SYNC_FAILED in warnings else 'ok'
+            # A pending receipt is reconciled as applied on the next press, which re-runs only this sync.
+            if body['sync'] == 'ok':
+                svc.receipts.save(fin_receipt, fingerprint, {'state': 'done', 'status': 200, 'body': body})
             record('success', record_id=plan.record_id,
-                   changes=svc._changes(fin_ctx, assignment_key(fin_code, fin_key), plan))
+                   changes=svc._changes(fin_ctx, assignment_key(fin_code, fin_key), plan), warnings=warnings)
             return 200, body, False
 
         try:
@@ -287,4 +296,4 @@ class StartSopRunner:
         if body is None:
             final = observed['state']
             return NodeResult(key, Outcome.EXISTING, Outcome.EXISTING if final.seed_task_exists else Outcome.SKIPPED)
-        return NodeResult(key, Outcome(body['node']), Outcome(body['task']))
+        return NodeResult(key, Outcome(body['node']), Outcome(body['task']), sync=body.get('sync', 'ok'))

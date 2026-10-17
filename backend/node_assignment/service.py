@@ -40,6 +40,7 @@ from .views import case_view, node_detail
 logger = logging.getLogger(__name__)
 TAIPEI = timezone(timedelta(hours=8))
 UNCERTAIN = frozenset({'outcome_unknown', 'readback_mismatch'})
+SYNC_FAILED = 'node_status_sync_failed'
 SCHEMA_RECHECK_SECONDS = 600
 
 
@@ -558,7 +559,7 @@ class NodeAssignmentService:
         snapshot = read_case(client, code)
         synced = self._sync_node(client, ctx, snapshot, key, plan)
         if synced == 'failed':
-            warnings.append('node_status_sync_failed')
+            warnings.append(SYNC_FAILED)
         elif synced == 'written':
             snapshot = read_case(client, code)
         self.case_cache.put((ctx.wid, code), snapshot)
