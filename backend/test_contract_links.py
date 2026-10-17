@@ -76,11 +76,11 @@ def test_duplicate_plan_groups_exclude_quantities_and_preserve_native_projects()
     before=deepcopy(records)
     projection=build_projection(records,{'b/confirmation/c':'p'},{'b/contract/c':'q'})
     summary=projection.plans['p'];category=summary['categories']['外業']
-    assert category==dict(lines=2,planned_qty='0',items=1,items_native=0,items_derived=0,items_ambiguous=1,items_unlinked=0,needs_review=2)
+    assert category==dict(lines=2,planned_qty='0',items=1,items_native=0,items_native_unresolved=0,items_derived=0,items_ambiguous=1,items_unlinked=0,needs_review=2)
     assert summary['review_groups']==[dict(key='X-1',category='外業',line_ids=['b/contract/a','b/contract/b'])]
     assert projection.plans['q']['categories']['外業']['planned_qty']=='5'
-    assert projection.plans['q']['basis']==dict(native=1,derived=0,ambiguous=0,unlinked=0)
-    assert projection.status==dict(lines_total=3,lines_derived=2,lines_unmatched=0,items_native=1,items_derived=0,items_ambiguous=1,items_unlinked=0)
+    assert projection.plans['q']['basis']==dict(native=1,native_unresolved=0,derived=0,ambiguous=0,unlinked=0)
+    assert projection.status==dict(lines_total=3,lines_derived=2,lines_unmatched=0,items_native=1,items_native_unresolved=0,items_derived=0,items_ambiguous=1,items_unlinked=0)
     assert records==before
     json.dumps(projection.plans,allow_nan=False)
 
@@ -90,7 +90,7 @@ def test_unique_item_inherits_derived_line_and_no_executable_or_done_data():
     summary=projection.plans['p']
     assert summary['categories']['外業']['planned_qty']=='12'
     assert summary['items']==[dict(id='b/reporting/i',category='外業',line_id='b/contract/l',basis='derived',reason='exact_match')]
-    assert summary['basis']==dict(native=0,derived=1,ambiguous=0,unlinked=0)
+    assert summary['basis']==dict(native=0,native_unresolved=0,derived=1,ambiguous=0,unlinked=0)
     assert summary['rule_version']=='contract-links-20261017.1'
     assert not {'tasks','completion','progress','done'} & summary.keys()
 
@@ -123,7 +123,7 @@ def test_importer_is_additive_and_replaces_stale_projection(monkeypatch):
     state=seed(True);import_sources(state,records,complete_tables=tables)
     pid=next(p['id'] for p in state['projects'] if p['code']=='X')
     assert state['derived_plan'][pid]['categories']['控制']['planned_qty']=='12'
-    assert state['derived_plan_status']==dict(lines_total=1,lines_derived=1,lines_unmatched=0,items_native=0,items_derived=1,items_ambiguous=0,items_unlinked=0,partial=False)
+    assert state['derived_plan_status']==dict(lines_total=1,lines_derived=1,lines_unmatched=0,items_native=0,items_native_unresolved=0,items_derived=1,items_ambiguous=0,items_unlinked=0,partial=False)
     assert next(c for c in state['contract_items'] if c['source_identity']['record_id']=='recLine')['project_id'] is None
     before=deepcopy(state)
     monkeypatch.setattr(contract_links,'build_projection',lambda *args,**kwargs:contract_links.Projection({},{}))
@@ -198,3 +198,22 @@ def test_partial_import_preserves_previous_plan(missing):
     import_v4(state,records,complete_tables=tables if missing else None)
     assert state['derived_plan']=={'previous':{'marker':42}}
     assert state['derived_plan_status']=={'lines_derived':7,'partial':True}
+
+
+def test_line_and_unresolved_native_provenance_is_additive_and_private():
+    records=[line('a'),line('b',code='X-2'),
+        item(**{'來源合約明細（日報關聯）':[{'id':'missing'}]}),
+        row('confirmation','c',工程確認單編號='X')]
+    records[0]['fields'].update(控制數量=3,控制工項='Control')
+    projection=build_projection(records,{'b/confirmation/c':'p'},{'b/contract/a':'p'},
+        native_item_projects={'b/reporting/i':'p'})
+    summary=plan_summary({'derived_plan':projection.plans},'p')
+    assert summary['lines_basis']=={'native':1,'derived':1}
+    assert summary['basis']=={'native':0,'native_unresolved':1,'derived':0,'ambiguous':0,'unlinked':0}
+    assert summary['categories']['外業']['items_native_unresolved']==1
+    assert summary['items']==[dict(id='b/reporting/i',category='外業',line_id=None,
+        basis='native_unresolved',reason='native_link_present')]
+    assert projection.status['items_native_unresolved']==1
+    assert projection.status['lines_derived']==1
+    assert '_source_ids' not in summary
+    assert projection.plans['p']['_source_ids']==['b/confirmation/c','b/contract/a','b/contract/b','b/reporting/i']

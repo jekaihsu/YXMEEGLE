@@ -10,6 +10,6 @@ def test_backtest_merges_reporting_projections_and_reuses_resolver(tmp_path):
               'confirm2':[dict(record_id='c',工程確認單編號='X')]}
     for name,rows in fixtures.items():
         (tmp_path/(name+'.ndjson')).write_text('\n'.join(json.dumps(r) for r in rows))
-    assert backtest(tmp_path)==dict(known=dict(total=1,unique_correct=1,unique_wrong=0,ambiguous=0,none=0),
+    assert backtest(tmp_path)==dict(provenance=dict(lines_total=1,lines_derived=0,lines_unmatched=1,items_native=1,items_native_unresolved=0,items_derived=1,items_ambiguous=0,items_unlinked=0),known=dict(total=1,unique_correct=1,unique_wrong=0,ambiguous=0,none=0),
         unlinked=dict(total=1,unique=1,ambiguous_same_qty=0,ambiguous_different_qty=0,none=0),
         lines=dict(total=1,unique=1,ambiguous=0,none=0))

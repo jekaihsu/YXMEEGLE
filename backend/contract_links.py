@@ -186,10 +186,13 @@ def build_projection(records,confirmation_projects,native_line_projects,*,native
         if pid:=confirmation_projects.get(confirmation.record_id): dependencies[pid].add(confirmation.record_id)
     def plan(pid):
         if pid not in plans:
-            plans[pid]=dict(rule_version=RULE_VERSION,basis=dict.fromkeys(('native','derived','ambiguous','unlinked'),0),
-                categories={c:dict(lines=0,planned_qty=Decimal(0),items=0,items_native=0,items_derived=0,items_ambiguous=0,items_unlinked=0,needs_review=0) for c in CATEGORY_FIELDS},
-                review_groups=[],items=[],truncated=False)
+            plans[pid]=dict(rule_version=RULE_VERSION,basis=dict.fromkeys(('native','native_unresolved','derived','ambiguous','unlinked'),0),
+                categories={c:dict(lines=0,planned_qty=Decimal(0),items=0,items_native=0,items_native_unresolved=0,items_derived=0,items_ambiguous=0,items_unlinked=0,needs_review=0) for c in CATEGORY_FIELDS},
+                lines_basis={'native':0,'derived':0},review_groups=[],items=[],truncated=False)
         return plans[pid]
+    for line in parsed.lines:
+        if pid:=line_projects.get(line.record_id):
+            plan(pid)['lines_basis']['native' if line.record_id in native_line_projects else 'derived']+=1
     groups=defaultdict(list)
     for line in parsed.lines:
         for category in CATEGORY_FIELDS:
@@ -207,7 +210,8 @@ def build_projection(records,confirmation_projects,native_line_projects,*,native
     for item in sorted(parsed.items,key=lambda i:i.record_id):
         result=resolve_item(item,parsed.lines);line_id=result.line_id
         if item.native_link_present:
-            item_basis='native';line_id=item.native_line_ids[0] if len(item.native_line_ids)==1 else None
+            item_basis='native' if item.native_line_ids else 'native_unresolved'
+            line_id=item.native_line_ids[0] if len(item.native_line_ids)==1 else None
             pids={line_projects.get(l) for l in item.native_line_ids} if line_id else set()
         else:
             item_basis={Status.UNIQUE:'derived',Status.AMBIGUOUS:'ambiguous',Status.NONE:'unlinked'}[result.status]
@@ -234,7 +238,7 @@ def build_projection(records,confirmation_projects,native_line_projects,*,native
     for pid,summary in plans.items(): summary['_source_ids']=sorted(dependencies[pid])
     return Projection(plans,dict(lines_total=len(parsed.lines),lines_derived=derived,
         lines_unmatched=sum(l.record_id not in line_projects for l in parsed.lines),
-        **{'items_'+k:basis[k] for k in ('native','derived','ambiguous','unlinked')}))
+        **{'items_'+k:basis[k] for k in ('native','native_unresolved','derived','ambiguous','unlinked')}))
 
 
 def plan_summary(state,pid):

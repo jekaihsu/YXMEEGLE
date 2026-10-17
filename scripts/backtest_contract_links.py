@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from backend.contract_links import parse_records, resolve_item, resolve_line, Status
+from backend.contract_links import parse_records, resolve_item, resolve_line, build_projection, Status
 
 
 def read(path):
@@ -36,7 +36,7 @@ def backtest(data_dir):
             unlinked['ambiguous_same_qty' if result.same_quantity else 'ambiguous_different_qty']+=1
         else: unlinked[result.status.value]+=1
     for line in parsed.lines: lines[resolve_line(line,parsed.confirmations).status.value]+=1
-    return dict(known=dict(total=sum(known.values()),**{k:known[k] for k in ('unique_correct','unique_wrong','ambiguous','none')}),
+    return dict(provenance=build_projection(records,{},{}).status,known=dict(total=sum(known.values()),**{k:known[k] for k in ('unique_correct','unique_wrong','ambiguous','none')}),
         unlinked=dict(total=sum(unlinked.values()),**{k:unlinked[k] for k in ('unique','ambiguous_same_qty','ambiguous_different_qty','none')}),
         lines=dict(total=sum(lines.values()),**{k:lines[k] for k in ('unique','ambiguous','none')}))
 
