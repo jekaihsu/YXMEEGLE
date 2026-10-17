@@ -140,7 +140,7 @@
   gap: var(--sp-3, var(--space-3));
 }
 
-.p2-tree-note {
+.p2-tree-note, .p2-plan-note {
   margin: 0;
   font-size: var(--fs-footnote, 0.8125rem);
   color: var(--label-2, #6e6e73);

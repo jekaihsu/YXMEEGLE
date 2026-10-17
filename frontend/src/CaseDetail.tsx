@@ -9,7 +9,7 @@ import type {
   SectionView,
   SortSpec,
 } from './caseDetailView.ts';
-import {PLAN_CATEGORIES} from './caseDetailView.ts';
+import {PLAN_CATEGORIES, formatPlanQuantity, hasPlanDerivation} from './caseDetailView.ts';
 import './p2-case.css';
 
 export interface CaseDetailNavTarget {
@@ -32,19 +32,21 @@ export interface CaseDetailProps {
   currentSort?: SortSpec;
 }
 
-function PlanQuantityPanel({summary}: {summary: PlanSummary | null}) {
-  return <section className="p2-plan-panel" aria-label="計畫數量">
-    <h3 className="p2-section-title">計畫數量</h3>
-    {summary ? <>
-      {(summary.basis.derived > 0 || summary.basis.ambiguous > 0) &&
-        <p className="p2-tree-note">依工編推導，來源 Lark 尚未建立關聯</p>}
+export function PlanQuantityPanel({summary}: {summary: PlanSummary | null | 'unavailable'}) {
+  const headingId = useId();
+  const hasRows = summary && summary !== 'unavailable' && PLAN_CATEGORIES.some(k => summary.categories[k].lines > 0 || summary.categories[k].items > 0);
+  return <section className="p2-plan-panel" aria-labelledby={headingId}>
+    <h3 id={headingId} className="p2-section-title">計畫數量</h3>
+    {summary === 'unavailable' ? <p className="p2-plan-note">計畫數量無法顯示</p> : summary && hasRows ? <>
+      {hasPlanDerivation(summary) &&
+        <p className="p2-plan-note">含依工編推導或待確認的關聯，非 Lark 原生關聯</p>}
       <table className="p2-plan-table">
         <caption className="p2-sr-only">各類別計畫數量與工項關聯狀態</caption>
         <thead><tr><th scope="col">類別</th><th scope="col">合約項數</th><th scope="col">計畫數量</th><th scope="col">工項數</th><th scope="col">關聯狀態</th></tr></thead>
         <tbody>{PLAN_CATEGORIES.map(category => {
           const c = summary.categories[category];
           if (c.lines === 0 && c.items === 0) return null;
-          const quantity = c.planned_qty.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+          const quantity = formatPlanQuantity(c.planned_qty);
           return <tr key={category}>
             <th scope="row">{category}</th><td>{c.lines}</td><td>{quantity}</td><td>{c.items}</td>
             <td><div className="p2-plan-chips">
@@ -57,10 +59,10 @@ function PlanQuantityPanel({summary}: {summary: PlanSummary | null}) {
           </tr>;
         })}</tbody>
       </table>
-      {PLAN_CATEGORIES.some(category => summary.categories[category].needs_review > 0) &&
-        <p className="p2-tree-note">需人工確認：重複的合約項未計入總量</p>}
-      {summary.truncated && <p className="p2-tree-note">清單僅顯示部分資料</p>}
-    </> : <p className="p2-tree-note">尚無計畫數量資料</p>}
+      {summary.needsReview &&
+        <p className="p2-plan-note">需人工確認：重複的合約項未計入總量</p>}
+      {summary.truncated && <p className="p2-plan-note">清單僅顯示部分資料</p>}
+    </> : <p className="p2-plan-note">尚無計畫數量資料</p>}
   </section>;
 }
 

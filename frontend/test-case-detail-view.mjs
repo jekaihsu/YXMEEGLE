@@ -117,13 +117,15 @@ test('plan summary is typed, allowlisted, optional and suppressed with blocked w
  const summary={rule_version:'test-v1',basis:{native:1,derived:1,ambiguous:1,unlinked:1,native_unresolved:0},lines_basis:{native:1,derived:1},categories:Object.fromEntries(['外業','控制','圖資','報告'].map(k=>[k,clone(counts)])),review_groups:[{key:'duplicate-a',category:'外業',line_ids:['line-a','line-b']}],items:[{id:'item-a',category:'外業',line_id:null,basis:'ambiguous',reason:'duplicate'}],truncated:true};
  b.sections.work_items.details.plan_summary=clone(summary);
  b.sections.work_items.details.plan_summary.injected='SECRET';
- assert.deepEqual(sec(build(b),'work_items').planSummary,summary);
+ assert.equal(sec(build(b),'work_items').planSummary.needsReview,true);
  assert.deepEqual(sec(build(b),'work_items').planSummary.categories.外業,{lines:2,planned_qty:'12.500',items:4,items_native:1,items_derived:1,items_ambiguous:1,items_unlinked:1,items_native_unresolved:0,needs_review:1});
  for(const state of ['forbidden','loading','read_failed','unlocated']) {b.sections.work_items.states=[state]; assert.equal(sec(build(b),'work_items').planSummary,null);}
  b.sections.work_items.states=[];
- for(const invalid of [{...summary,truncated:'yes'},{...summary,categories:{...summary.categories,外業:{...counts,planned_qty:12.5}}},{...summary,basis:{...summary.basis,derived:-1}}]) {
-  b.sections.work_items.details.plan_summary=invalid; assert.equal(build(b).page.reason,'malformed_case_detail_body');
+ for(const invalid of [{...summary,truncated:'yes'},{...summary,categories:{...summary.categories,外業:{...counts,planned_qty:12.5}}},{...summary,basis:{...summary.basis,derived:-1}},{...summary,categories:{...summary.categories,外業:{...counts,planned_qty:'-1'}}}]) {
+  b.sections.work_items.details.plan_summary=invalid; assert.equal(build(b).page.reason,null); assert.equal(header(build(b),'專案').text,'測試案件'); assert.equal(build(b).tree.children.length,2); assert.equal(sec(build(b),'work_items').planSummary,'unavailable');
  }
+ for(const mutate of [s=>s.items='invalid',s=>delete s.categories.控制,s=>s.categories.外業.items=-1,s=>s.categories.外業.planned_qty='invalid']) {const value=clone(summary); mutate(value); b.sections.work_items.details.plan_summary=value; const v=build(b); assert.equal(header(v,'專案').text,'測試案件'); assert.equal(v.tree.children.length,2); if(value.items==='invalid') {assert.equal(sec(v,'work_items').planSummary.categories.外業.items,4); assert.equal(Object.hasOwn(sec(v,'work_items').planSummary,'items'),false);} else assert.equal(sec(v,'work_items').planSummary,'unavailable');}
+ const ignored=clone(summary); Object.defineProperty(ignored,'items',{get(){throw Error('items traversed');}}); Object.defineProperty(ignored,'review_groups',{get(){throw Error('review groups traversed');}}); b.sections.work_items.details.plan_summary=ignored; assert.equal(sec(build(b),'work_items').planSummary.categories.外業.items,4);
  b.sections.work_items.details.plan_summary=null; assert.equal(sec(build(b),'work_items').planSummary,null);
  delete b.sections.work_items.details.plan_summary; assert.equal(sec(build(b),'work_items').planSummary,null);
 });
