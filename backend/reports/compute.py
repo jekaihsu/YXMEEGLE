@@ -4,9 +4,18 @@ from datetime import date, datetime, timedelta, timezone
 import math
 import statistics
 from zoneinfo import ZoneInfo
+from .models import CaseDetail, ProgressResponse, ProgressRow
 from .registry import BASE_TOKEN, BY_KIND, FLAGS, TABLES
 
 TZ = ZoneInfo('Asia/Taipei')
+class UnknownStatus(ValueError):
+    pass
+
+
+class CaseNotFound(ValueError):
+    pass
+
+
 STATUS = {'已通過': 'passed', '已退回': 'returned', '待檢核': 'pending'}
 
 def cell(value):
@@ -127,6 +136,7 @@ def normalize(raw, base=BASE_TOKEN):
 
 
 def record_link(base, kind, ident):
+    if not ident: return None
     return f'https://www.larksuite.com/base/{base}?table={BY_KIND[kind].table_id}&record={ident}'
 
 
@@ -270,42 +280,98 @@ def weighted_progress(rows):
     return ratio(sum(r['contract']*r['progress_revenue'] for r in weighted),sum(r['contract'] for r in weighted))
 
 
-def progress(data, **p):
+def filter_progress(rows: list[ProgressRow], status: str='', q: str='') -> list[ProgressRow]:
+    search=q.casefold()
+    return [r for r in rows if (not status or r['status']==status) and
+            (not search or search in (r['case_code']+' '+r['case_name']).casefold())]
+
+
+def progress_case(data, key: str, dept: str='field', week: str | None=None) -> CaseDetail:
+    record=next((r for r in data['tables'].get('case',[]) if r['id']==key),None)
+    if record is None: raise CaseNotFound('case_not_found')
+    f=record['f']; code=str(cell(f.get('案件編號')))
+    people={r['id']:str(cell(r['f'].get('姓名'))) or '未填' for r in data['tables'].get('people',[])}
+    def plan_people(value):
+        ids=links(value)
+        return ','.join(people.get(key,'未填') for key in ids) if ids else str(cell(value)) or '未填'
+    plans=[dict(date=r['date'],group=r['group'],people=plan_people(r['f'].get('人員')),
+                items=' · '.join(str(cell(r['f'].get(key))) for key in ('預排工作項目','工作內容') if cell(r['f'].get(key))),points=number(r['f'].get('預估營業額點數')))
+           for r in data['plan_indices'].get((dept,week),[]) if code in case_codes(r['f'].get('案件'))]
+    work=[dict(date=r['date'],group=r['group'],person=r['person'],item=r['item'],points=r['points'],
+               checks=dict(status=r['status'],control_checked=r['control_checked']),flags=r['flags'],note=r['note'])
+          for r in review_rows(data,dept,week) if code in case_codes(r['case_code'])]
+    plans.sort(key=lambda r:(r['date'],r['group']))
+    work.sort(key=lambda r:(r['date'],r['group'],r['person']))
+    planned={r['date'] for r in plans}; actual={r['date'] for r in work}
+    return dict(case=dict(code=code,name=str(cell(f.get('案件名稱'))),client=str(cell(f.get('業主'))),
+        pm=str(cell(f.get('PM'))),status=str(cell(f.get('狀態'))) or '未填',
+        contract=dict(expected=number(f.get('預期合約金額')),actual=number(f.get('實際合約金額'))),
+        billing=dict(billed=number(f.get('累計已請款')),receivable=number(f.get('應收未收')),progress=number(f.get('計價進度'))),
+        revenue_progress=number(f.get('營業額進度')),cost_progress=number(f.get('成本進度')),
+        expected_points=number(f.get('預期營業額點數')),
+        cumulative_points_by_dept=dict(field=number(f.get('累計外業營業額點數')),office=number(f.get('累計內業營業額點數')))),
+        week=dict(dept=dept,week=week,basis=data['plan_basis'],plan_rows=plans[:200],work_rows=work[:200],
+                  matched=len(planned & actual),unplanned=len(actual-planned),truncated=len(plans)>200 or len(work)>200),
+        link=record_link(data['base'],'case',key))
+
+
+def progress_groups(data,dept,week,selected,included,group_plan,group_actual,basis,filtered):
+    group_points=defaultdict(lambda:[0,0])
+    actual_points=defaultdict(float)
+    for r in data['plan_indices'].get((dept,week),[]):
+        if selected and selected!=r['group']: continue
+        group_points[r['group']][0]+=sum(number(r['f'].get('預估營業額點數')) or 0 for code in case_codes(r['f'].get('案件')) if code in included)
+    for r in review_rows(data,dept,week,selected or ''):
+        codes=case_codes(r['case_code'])
+        share=(r['points'] or 0)/len(codes) if codes else 0
+        actual_points[r['group']]+=(share*len(codes & included) if filtered else r['points'] or 0)
+        group_points[r['group']][1]+=sum(share if filtered else r['points'] or 0 for code in codes & included if (code,r['date']) in group_plan.get(r['group'],set()))
+    by_group=[]
+    for g in sorted(set(group_plan)|set(group_actual)):
+        plg=len(group_plan[g]) if basis=='days' else group_points[g][0]
+        acg=len(group_actual[g]) if basis=='days' else actual_points[g]
+        numerator=len(group_plan[g]&group_actual[g]) if basis=='days' else group_points[g][1]
+        by_group.append(dict(group=g,group_label=g,matched_points=group_points[g][1],planned_days=len(group_plan[g]),matched_days=len(group_plan[g]&group_actual[g]),planned=plg,actual=acg,unplanned_days=len(group_actual[g]-group_plan[g]),achievement=ratio(numerator,plg)))
+    return by_group
+
+
+def progress(data, **p) -> ProgressResponse:
     dept=p.get('dept','field'); week=p['week']; selected=normalize_group(p['group']) if p.get('group') else None
     plans=defaultdict(float); actual=defaultdict(float); matched_points=defaultdict(float)
     planned=defaultdict(set); dates=defaultdict(set); group_plan=defaultdict(set); group_actual=defaultdict(set)
-    group_points=defaultdict(lambda:[0,0]); basis=data['plan_basis']
+    basis=data['plan_basis']
     for r in data['plan_indices'].get((dept,week),[]):
         f=r['f']; group=r['group']
         if selected and selected!=group: continue
         for code in case_codes(f.get('案件')):
             planned[code].add(r['date']); group_plan[group].add((code,r['date']))
             plans[code]+=number(f.get('預估營業額點數')) or 0
-            group_points[group][0]+=number(f.get('預估營業額點數')) or 0
     for r in review_rows(data,dept,week,p.get('group','')):
         for code in case_codes(r['case_code']):
             actual[code]+=r['points'] or 0; dates[code].add(r['date'])
             group_actual[r['group']].add((code,r['date']))
             if r['date'] in planned[code]: matched_points[code]+=r['points'] or 0
-            if (code,r['date']) in group_plan[r['group']]: group_points[r['group']][1]+=r['points'] or 0
     cases=data['cases']; codes=set(planned)|set(dates)
-    if p.get('scope')=='open': codes.update(c for c,r in cases.items() if '執行中' in str(cell(r['f'].get('狀態'))))
+    if p.get('scope')=='open' and not selected: codes.update(c for c,r in cases.items() if '執行中' in str(cell(r['f'].get('狀態'))))
     rows=[]
     for code in sorted(codes):
         r=cases.get(code,{'id':'','f':{}});f=r['f']; expected=number(f.get('預期營業額點數'));done=number(f.get('累計外業營業額點數' if dept=='field' else '累計內業營業額點數'))
         pd=len(planned[code]); ad=len(dates[code]); matched=len(dates[code]&planned[code]); pl=plans[code]; ac=actual[code]
-        rows.append(dict(case_code=code,case_name=str(cell(f.get('案件名稱'))),planned=pl,actual=ac,matched_points=matched_points[code],planned_days=pd,actual_days=ad,matched_days=matched,unplanned_days=ad-matched,achievement=ratio(matched,pd) if basis=='days' else ratio(matched_points[code],pl),diff=ad-pd if basis=='days' else ac-pl,expected_total=expected,done_total=done,remaining=expected-done if expected is not None and done is not None else None,status=str(cell(f.get('狀態'))) or '未填',link=record_link(data['base'],'case',r['id'])))
-    pd=sum(r['planned_days'] for r in rows); ad=sum(r['actual_days'] for r in rows); matched=sum(r['matched_days'] for r in rows); pl=sum(plans.values()); ac=sum(actual.values())
+        rows.append(dict(case_key=r['id'] or None,case_code=code,case_name=str(cell(f.get('案件名稱'))) or '案件資料未建立',planned=pl,actual=ac,matched_points=matched_points[code],planned_days=pd,actual_days=ad,matched_days=matched,unplanned_days=ad-matched,achievement=ratio(matched,pd) if basis=='days' else ratio(matched_points[code],pl),diff=ad-pd if basis=='days' else ac-pl,expected_total=expected,done_total=done,remaining=expected-done if expected is not None and done is not None else None,status=str(cell(f.get('狀態'))) or '未填',link=record_link(data['base'],'case',r['id'])))
+    counts=Counter(r['status'] for r in filter_progress(rows,q=p.get('q','')))
+    observed={str(cell(r['f'].get('狀態'))) or '未填' for r in cases.values()} | {'未填'}
+    if p.get('status') and p['status'] not in observed:
+        raise UnknownStatus('status 不支援的值')
+    rows=filter_progress(rows,p.get('status',''),p.get('q',''))
+    included={r['case_code'] for r in rows}
+    group_plan=defaultdict(set,{g:{x for x in v if x[0] in included} for g,v in group_plan.items()})
+    group_actual=defaultdict(set,{g:{x for x in v if x[0] in included} for g,v in group_actual.items()})
+    pd=sum(r['planned_days'] for r in rows); ad=sum(r['actual_days'] for r in rows); matched=sum(r['matched_days'] for r in rows); pl=sum(r['planned'] for r in rows); ac=sum(r['actual'] for r in rows)
     negative=sum(r['remaining'] is not None and r['remaining']<0 for r in rows)
     gaps=[gap('negative-remaining',f'{negative} 件剩餘點數為負，保留明細但不納入 KPI')] if negative else []
-    by_group=[]
-    for g in sorted(set(group_plan)|set(group_actual)):
-        plg=len(group_plan[g]) if basis=='days' else group_points[g][0]
-        acg=len(group_actual[g]) if basis=='days' else sum(r['points'] or 0 for r in review_rows(data,dept,week,g))
-        numerator=len(group_plan[g]&group_actual[g]) if basis=='days' else group_points[g][1]
-        by_group.append(dict(group=g,group_label=g,matched_points=group_points[g][1],planned_days=len(group_plan[g]),matched_days=len(group_plan[g]&group_actual[g]),planned=plg,actual=acg,unplanned_days=len(group_actual[g]-group_plan[g]),achievement=ratio(numerator,plg)))
+    by_group=progress_groups(data,dept,week,selected,included,group_plan,group_actual,basis,bool(p.get('status') or p.get('q')))
     options=sorted({r['group'] for r in data['plan_indices'].get((dept,week),[])}|{r['group'] for r in review_rows(data,dept,week)})
-    return dict(gaps=gaps,options=dict(group=['__blank__' if g=='未分組' else g for g in options]),dept=dept,week=week,basis=basis,kpi=dict(matched_points=sum(matched_points.values()),planned_points=pl if basis=='points' else None,actual_points=ac,planned_days=pd,actual_days=ad,matched_days=matched,unplanned_days=ad-matched,achievement=ratio(matched,pd) if basis=='days' else ratio(sum(matched_points.values()),pl),open_cases=sum('執行中' in r['status'] for r in rows),remaining_points=nullable_sum(r['remaining'] for r in rows if '執行中' in r['status'] and r['remaining'] is not None and r['remaining']>=0)),by_group=by_group,**page(rows,p,'case_code'))
+    return dict(gaps=gaps,options=dict(group=['__blank__' if g=='未分組' else g for g in options],status=[dict(status=s,count=n) for s,n in sorted(counts.items())]),dept=dept,week=week,basis=basis,kpi=dict(matched_points=sum(r['matched_points'] for r in rows),planned_points=pl if basis=='points' else None,actual_points=ac,planned_days=pd,actual_days=ad,matched_days=matched,unplanned_days=ad-matched,achievement=ratio(matched,pd) if basis=='days' else ratio(sum(r['matched_points'] for r in rows),pl),open_cases=sum('執行中' in r['status'] for r in rows),remaining_points=nullable_sum(r['remaining'] for r in rows if '執行中' in r['status'] and r['remaining'] is not None and r['remaining']>=0)),by_group=by_group,**page(rows,p,'case_code',{'name':'case_name'}))
 
 
 def sources(data, fetched_at):
@@ -313,13 +379,14 @@ def sources(data, fetched_at):
 
 
 def report_gaps(data, endpoint, dept='field'):
+    if endpoint=='progress/case': endpoint='progress'
     department='field' if dept=='control' else dept
     relevant={
         'review': {department+'-date',department+'-group'} | ({'office-review-coverage','PM檢核','內業組長檢核'} if department=='office' else set()),
         'review/rows': {department+'-date',department+'-group'} | ({'office-review-coverage','PM檢核','內業組長檢核'} if department=='office' else set()),
         'progress': {department+'-date',department+'-group','plan-negative-span'},
     }
-    source_kinds={'review': {department,department+'_cost'}, 'review/rows': {department,department+'_cost'}, 'sales': {'case'}, 'assets': {'vehicle','instrument','field_cost','plan'}, 'progress': {'case','plan','contract',department}}
+    source_kinds={'review': {department,department+'_cost'}, 'review/rows': {department,department+'_cost'}, 'sales': {'case'}, 'assets': {'vehicle','instrument','field_cost','plan'}, 'progress': {'case','plan','contract','people',department}}
     allowed=relevant.get(endpoint,set()) | {'source-'+k for k in source_kinds.get(endpoint,set())}
     gaps=[g for g in data['gaps'] if endpoint=='sources' or g['id'] in allowed]
     if endpoint=='sales':

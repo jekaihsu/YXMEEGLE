@@ -241,7 +241,8 @@ def test_filter_options_survive_empty_filtered_results():
     assert c.sales(d,pm='missing')['options']==c.sales(d)['options']
     params={'kind':'vehicle','from':'2026-10-12','to':'2026-10-18'}
     assert c.assets(d,category='missing',**params)['options']==c.assets(d,**params)['options']
-    assert c.progress(d,week='2026-10-12',group='missing')['options']==c.progress(d,week='2026-10-12')['options']
+    assert c.progress(d,week='2026-10-12',group='missing')['options']['group']==c.progress(d,week='2026-10-12')['options']['group']
+    assert c.progress(d,week='2026-10-12',group='missing')['options']['status']==[]
 
 
 def test_round2_blank_sales_identity_and_sort():
@@ -296,3 +297,71 @@ def test_points_report_exposes_achievement_numerator():
     for group in result['by_group']:
         if group['planned']:
             assert group['achievement']==group['matched_points']/group['planned']
+
+
+def test_progress_status_search_counts_and_filtered_totals():
+    raw=FixtureReader(FIXTURES).read()
+    raw['case']['records'][0]['fields']['狀態']='執行中'
+    raw['case']['records'].append({'record_id':'c3','fields':{'案件編號':'ABC','案件名稱':'Alpha','狀態':'已結案'}})
+    raw['plan']['records'].append({'record_id':'plan3','fields':{'開始日期':'2026-10-12','業別':'外業','案件':'ABC','預估營業額點數':10}})
+    d=c.normalize(raw)
+    all_rows=c.progress(d,week='2026-10-12',limit=1)
+    assert all_rows['options']['status']==[{'status':'執行中','count':1},{'status':'已結案','count':1}]
+    assert sum(x['count'] for x in all_rows['options']['status'])==all_rows['total']==2
+    filtered=c.progress(d,week='2026-10-12',status='已結案')
+    assert filtered['kpi']['planned_points']==10
+    assert filtered['kpi']['actual_points']==0
+    assert filtered['total']==1
+    assert filtered['options']['status']==all_rows['options']['status']
+    assert c.progress(d,week='2026-10-12',q='aLpH')['items'][0]['case_code']=='ABC'
+    assert [x['case_code'] for x in c.progress(d,week='2026-10-12',sort='name')['items']]==['ABC','C01']
+    assert c.progress(d,week='2026-10-12',scope='open',group='missing')['total']==0
+
+
+def test_progress_unknown_record_and_payload_budget():
+    import json
+    from copy import deepcopy
+    raw=FixtureReader(FIXTURES).read()
+    raw['case']['records']=[]
+    unknown=c.progress(c.normalize(raw),week='2026-10-12')['items'][0]
+    assert unknown['case_key'] is None and unknown['link'] is None
+    raw=FixtureReader(FIXTURES).read()
+    original=deepcopy(raw['case']['records'][0])
+    raw['case']['records']=[dict(record_id=f'rec{i:014}',fields={**original['fields'],'案件編號':f'C{i:03}','狀態':'執行中'}) for i in range(50)]
+    result=c.progress(c.normalize(raw),week='2026-10-12',scope='open')
+    baseline=deepcopy(result)
+    baseline['options'].pop('status')
+    for row in baseline['items']: row.pop('case_key')
+    assert len(json.dumps(result).encode())/len(json.dumps(baseline).encode())<1.15
+
+
+def test_multicase_group_points_count_row_once_and_filter_equal_share():
+    raw=FixtureReader(FIXTURES).read()
+    raw['field']['records']=raw['field']['records'][:1]
+    raw['field']['records'][0]['fields'].update({'案件編號':'C01,C02','最終營業額點數':120})
+    raw['case']['records'].append({'record_id':'recSecond','fields':{'案件編號':'C02','狀態':'已結案'}})
+    d=c.normalize(raw)
+    assert c.progress(d,week='2026-10-12')['by_group'][0]['actual']==120
+    assert c.progress(d,week='2026-10-12')['by_group'][0]['matched_points']==120
+    assert c.progress(d,week='2026-10-12',q='C01')['by_group'][0]['matched_points']==60
+    assert c.progress(d,week='2026-10-12',q='C01')['by_group'][0]['actual']==60
+    assert c.progress(d,week='2026-10-12',status='已結案')['by_group'][0]['actual']==60
+
+
+def test_plan_people_items_and_detail_exact_contract():
+    raw=FixtureReader(FIXTURES).read()
+    raw['people']['records']=[{'record_id':'recPerson','fields':{'姓名':'王小明'}}]
+    raw['plan']['records'][0]['fields'].update({'人員':[{'record_ids':['recPerson','recMissing']}],'預排工作項目':'測量','工作內容':'水深'})
+    d=c.normalize(raw)
+    detail=c.progress_case(d,d['tables']['case'][0]['id'],week='2026-10-12')
+    assert set(detail)=={'case','week','link'}
+    assert set(detail['case'])=={'code','name','client','pm','status','contract','billing','revenue_progress','cost_progress','expected_points','cumulative_points_by_dept'}
+    assert set(detail['case']['contract'])=={'expected','actual'}
+    assert set(detail['case']['billing'])=={'billed','receivable','progress'}
+    assert set(detail['case']['cumulative_points_by_dept'])=={'field','office'}
+    assert set(detail['week'])=={'dept','week','basis','plan_rows','work_rows','matched','unplanned','truncated'}
+    assert set(detail['week']['plan_rows'][0])=={'date','group','people','items','points'}
+    assert set(detail['week']['work_rows'][0])=={'date','group','person','item','points','checks','flags','note'}
+    assert set(detail['week']['work_rows'][0]['checks'])=={'status','control_checked'}
+    assert detail['week']['plan_rows'][0]['people']=='王小明,未填'
+    assert detail['week']['plan_rows'][0]['items']=='測量 · 水深'

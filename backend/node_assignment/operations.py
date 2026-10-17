@@ -13,6 +13,7 @@ from .lark_table import CaseSnapshot, NodeRow, TaskRow, date_millis
 from .roster import Roster
 
 OPEN_ID = re.compile(r'ou_[A-Za-z0-9]{1,64}')
+PREVIEW_HASH = re.compile(r'[0-9a-f]{64}')
 REVISION = re.compile(r'[0-9a-f]{16}')
 UNSET = object()
 LIMITS = {'request_id': 120, 'title': 200, 'detail': 2000, 'reason': 500}
@@ -112,6 +113,19 @@ def parse_create_task(body) -> CreateTask:
 
 
 @dataclass(frozen=True)
+class StartSopCommand:
+    preview_hash: str
+
+
+def parse_start_sop(body) -> StartSopCommand:
+    _keys(body, ('preview_hash',))
+    value = body.get('preview_hash')
+    if not isinstance(value, str) or not PREVIEW_HASH.fullmatch(value):
+        raise Failure('invalid', 'preview_hash 格式錯誤，請重新取得預覽')
+    return StartSopCommand(value)
+
+
+@dataclass(frozen=True)
 class PatchTask:
     expected_revision: str
     status: object = UNSET
@@ -166,17 +180,20 @@ class Plan:
     warnings: tuple[str, ...] = ()
     before: dict = field(default_factory=dict)
     pre_create_task_ids: tuple[str, ...] | None = None
+    created_node: bool = False
 
     def to_json(self):
         return {'kind': self.kind, 'record_id': self.record_id, 'base_revision': self.base_revision,
                 'changes': self.changes, 'client_token': self.client_token, 'warnings': list(self.warnings),
-                'before': self.before, 'pre_create_task_ids': self.pre_create_task_ids}
+                'before': self.before, 'pre_create_task_ids': self.pre_create_task_ids,
+                'created_node': self.created_node}
 
     @classmethod
     def from_json(cls, data):
         return cls(data['kind'], data['record_id'], data['base_revision'], data['changes'], data.get('client_token'),
                    tuple(data.get('warnings', ())), data.get('before', {}),
-                   tuple(data['pre_create_task_ids']) if data.get('pre_create_task_ids') is not None else None)
+                   tuple(data['pre_create_task_ids']) if data.get('pre_create_task_ids') is not None else None,
+                   data.get('created_node', False))
 
 
 def facts_of(snapshot: CaseSnapshot, skipped, overrides=None) -> dict[NodeKey, NodeFacts]:
