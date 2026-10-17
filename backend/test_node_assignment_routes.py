@@ -148,9 +148,9 @@ class NoBucket:
         pass
 
 
-def project(code=CODE, skipped=()):
-    return {'id': 'p1', 'code': code, 'case_type': 'formal',
-            'nodes': [{'id': f'p1-{k}', 'key': k, 'status': 'approved_skipped' if k in skipped else 'pending'}
+def project(code=CODE, skipped=(), pid='p1'):
+    return {'id': pid, 'code': code, 'case_type': 'formal',
+            'nodes': [{'id': f'{pid}-{k}', 'key': k, 'status': 'approved_skipped' if k in skipped else 'pending'}
                       for k in ('sales', 'pm', 'confirmation', 'field', 'control', 'mapping', 'report', 'pricing', 'settlement')],
             'source_records': [{'id': 'src-1', 'kind': 'confirmation',
                                 'url': f'https://x.larksuite.com/base/{BASE}?table=tblmSQrcCs9vPQZx&record=recCONF1'}]}
@@ -183,7 +183,7 @@ def h():
            'LARK_APP_SECRET': 'synthetic', 'LARK_WORKER_ORGANIZATION': 'company'}
     clock = [T0]
     state = {'environment': 'production', 'settings': {'external_enabled': True}}
-    case = {'project': project()}
+    case = {'project': project(), 'others': {}}
     who = ['ou_member']
     user_fields = {}
 
@@ -191,8 +191,7 @@ def h():
         return {'mode': 'lark', 'wid': 'lark-company'}, {'id': who[0], 'active': True, **user_fields}
 
     def load_case(_data, _user, project_id):
-        assert project_id == 'p1'
-        return state, case['project']
+        return state, case['others'].get(project_id) or case['project']
 
     def build(overrides=None):
         app = FastAPI()

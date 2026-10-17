@@ -153,6 +153,20 @@ def test_a_changed_plan_makes_the_preview_stale(s):
     assert start(s, 'r2', digest=stale, expect=409).json()['code'] == 'preview_stale'
 
 
+def test_a_plan_identical_across_two_projects_hashes_differently(s):
+    s.case['others']['p2'] = {**project(code='A115002-01', pid='p2'), 'pm_id': 'ou_pm'}
+    s.state['derived_plan']['p2'] = s.state['derived_plan']['p1']
+    s.state['source_quotes'] = [quote('q1', **DEADLINES), quote('q2', project_id='p2', **DEADLINES)]
+    s.who[0] = 'ou_pm'
+    other = s.client.get('/api/projects/p2/node-assignments/start-sop').json()
+    first = preview(s)
+    assert (other['project_id'], other['code']) == ('p2', 'A115002-01')
+    assert [n['planned_qty'] for n in first['nodes']] == [n['planned_qty'] for n in other['nodes']] == [
+        '123.45', '10', '8.5', '3']
+    assert [n['deadline'] for n in first['nodes']] == [n['deadline'] for n in other['nodes']]
+    assert first['preview_hash'] != other['preview_hash']
+
+
 def test_hash_does_not_change_when_lark_state_changes(s):
     before = preview(s)['preview_hash']
     start(s)

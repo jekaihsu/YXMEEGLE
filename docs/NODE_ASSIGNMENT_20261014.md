@@ -218,7 +218,7 @@ A project lead previews, then confirms, and the app seeds one 節點指派 row a
  "chain_note": "...", "preview_hash": "<sha256>", "plan_rule_version": "contract-links-20261017.1"}
 ```
 
-`preview_hash` is the sha256 of the canonical JSON of each node's quantity, counts, deadline, task title and detail plus both rule versions. It does not include Lark state, so it stays the same while a run progresses and a changed plan or quote makes it stale.
+`preview_hash` is the sha256 of the canonical JSON of the project id, the confirmation code and each node's quantity, counts, deadline, task title and detail plus both rule versions. It does not include Lark state, so it stays the same while a run progresses and a changed plan or quote makes it stale.
 
 **Run** (`POST`, body `{request_id, preview_hash}`) answers `{"started", "complete", "results": [{"key", "node": "created|existing|failed", "task": "created|existing|failed|skipped", "error"}], "overview": <case overview>}`. `started` is true when this call created a row. Before writing it checks, in order, `writes_disabled` (403), a stored result for the `request_id` (replayed with `Idempotent-Replayed`, or `idempotency_conflict` for a different body), `nothing_to_start` (409), `forbidden` (403) and `preview_stale` (409).
 

@@ -140,7 +140,8 @@ class StartPlan:
 
     @property
     def preview_hash(self) -> str:
-        reviewed = {'nodes': [n.reviewed() for n in self.nodes], 'plan_rule_version': self.plan_rule_version,
+        reviewed = {'project_id': self.project_id, 'code': self.code, 'nodes': [n.reviewed() for n in self.nodes],
+                    'plan_rule_version': self.plan_rule_version,
                     'sop_rule_version': SOP_RULE_VERSION}
         return hashlib.sha256(json.dumps(reviewed, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
