@@ -132,6 +132,9 @@ class PlannedNode:
         return {'title': self.title, 'detail': self.detail, 'department': self.department,
                 'deadline': date_millis(self.deadline) if self.deadline else None}
 
+    def matches(self, changes: dict) -> bool:
+        return all(changes.get(k) == v for k, v in self.seed_fields.items())
+
     def reviewed(self):
         return {'key': self.key.value, 'planned_qty': self.planned_qty, 'lines': self.lines, 'items': self.items,
                 'items_basis': self.basis.public(), 'deadline': self.deadline, 'task_title': self.title,

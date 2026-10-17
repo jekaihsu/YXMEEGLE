@@ -25,6 +25,7 @@ LEDGER_FINGERPRINT = 'start-sop-seed-ledger'
 # Retrying the next node would fail the same way, so a run stops at the first of these.
 SYSTEMIC = frozenset({'lark_permission', 'lark_unconfigured', 'lark_unavailable', 'rate_limited', 'roster_unavailable',
                       'writes_disabled', 'preview_stale'})
+CONTENT_DIFFERS = 'content_differs'
 STALE_MESSAGE = '計畫數量或期限已變更，請重新檢視預覽後再啟動'
 KINDS = ('task_create', 'node')
 
@@ -37,10 +38,13 @@ class NodeResult:
     failure: Failure | None = None
     # 'failed' only when the seed landed but the 進度/開始時間 mirror write did not.
     sync: str = 'ok'
+    # Set only when the seed is an earlier attempt whose content differs from the confirmed plan.
+    warning: str | None = None
 
     def public(self):
         return {'key': self.key.value, 'node': self.node.value, 'task': self.task.value,
-                'error': self.failure.code if self.failure else None, 'sync': self.sync}
+                'error': self.failure.code if self.failure else None, 'sync': self.sync,
+                **({'warning': self.warning} if self.warning else {})}
 
     @property
     def finished(self):
@@ -48,7 +52,8 @@ class NodeResult:
 
     @classmethod
     def restore(cls, key: str, stored: dict):
-        return cls(NodeKey(key), Outcome(stored['node']), Outcome(stored['task']), sync=stored.get('sync', 'ok'))
+        return cls(NodeKey(key), Outcome(stored['node']), Outcome(stored['task']), sync=stored.get('sync', 'ok'),
+                   warning=stored.get('warning'))
 
 
 def failed(key: NodeKey, failure: Failure, node: Outcome = Outcome.FAILED) -> NodeResult:
@@ -270,14 +275,18 @@ class StartSopRunner:
         """The pending attempt to resume, or None once it is abandoned. Reads Lark before deciding."""
         svc, plan = self.svc, attempt.plan
         expired = svc.clock() - attempt.at >= svc.config.stale_max_seconds
-        if plan.kind == 'task_create' and plan.phase.may_have_landed:
+        sent = plan.kind == 'task_create' and plan.phase.may_have_landed
+        if sent:
             try:
                 if svc._reconcile(client, snapshot, node.key, plan)[0] == 'applied':
                     return attempt
             except Failure as exc:
                 if exc.code != 'outcome_unknown' or not expired:
                     raise
-        if expired:
+        obsolete = plan.kind == 'task_create' and not node.matches(plan.changes)
+        if sent and obsolete and not expired:
+            raise Failure('outcome_unknown', '先前送出的任務內容與目前計畫不同，且尚無法確認是否已建立；請稍後再試')
+        if obsolete or expired:
             self._abandon(ctx, node.key, attempt)
             return None
         return attempt
@@ -325,6 +334,9 @@ class StartSopRunner:
         def finish(fin_ctx, fin_client, fin_code, fin_key, plan, _roster, fin_receipt, fingerprint, record):
             body = {'node': (Outcome.CREATED if plan.created_node else Outcome.EXISTING).value,
                     'task': (Outcome.CREATED if plan.kind == 'task_create' else Outcome.SKIPPED).value}
+            if plan.kind == 'task_create' and not node.matches(plan.changes):
+                # An earlier attempt landed with content the plan has since moved on from. It is the seed; never overwrite it.
+                body = {'node': Outcome.EXISTING.value, 'task': Outcome.EXISTING.value, 'warning': CONTENT_DIFFERS}
             if plan.kind == 'task_create':
                 self.ledger.add(wid, pid, fin_key, plan.record_id)
             _, warnings = svc._converge(fin_ctx, fin_client, fin_code, fin_key, plan)
@@ -344,4 +356,5 @@ class StartSopRunner:
         if body is None:
             final = observed['state']
             return NodeResult(key, Outcome.EXISTING, Outcome.EXISTING if final.seed_task_exists else Outcome.SKIPPED)
-        return NodeResult(key, Outcome(body['node']), Outcome(body['task']), sync=body.get('sync', 'ok'))
+        return NodeResult(key, Outcome(body['node']), Outcome(body['task']), sync=body.get('sync', 'ok'),
+                          warning=body.get('warning'))

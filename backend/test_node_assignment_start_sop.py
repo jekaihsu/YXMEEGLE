@@ -872,3 +872,49 @@ def test_a_pending_attempt_older_than_the_stale_window_is_abandoned_and_recreate
     again = start(s, 'r3').json()
     assert (again['started'], again['complete']) == (False, True)
     assert len(field_tasks(s)) == 1
+
+
+def test_a_plan_changed_after_a_failed_create_is_created_once_with_the_new_content_after_the_window(s):
+    tokens = task_tokens(s, httpx.Response(504, text='gateway timeout'))
+    assert start(s, 'r1').json()['results'][0]['error'] == 'outcome_unknown'
+    set_plan(s, 外業=counts('130', 2, 5, items_native=5))
+    s.clock[0] += 901
+    body = start(s, 'r2').json()
+    assert (body['complete'], body['started']) == (True, True)
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None, 'sync': 'ok'}
+    assert [r['task'] for r in body['results'][1:]] == ['existing'] * 3
+    assert [f['內容'].split('\n')[1] for f in field_tasks(s)] == ['計畫數量：130']
+    assert len(tokens[FIELD_TITLE]) == 2 and tokens[FIELD_TITLE][0] != tokens[FIELD_TITLE][1]
+    assert len(s.fake.rows(TASKS)) == 4
+    again = start(s, 'r3').json()
+    assert (again['started'], again['complete']) == (False, True)
+    assert len(field_tasks(s)) == 1
+
+
+def test_a_changed_plan_waits_for_a_create_that_may_still_land_instead_of_sending_a_second_one(s):
+    task_tokens(s, httpx.Response(504, text='gateway timeout'))
+    start(s, 'r1')
+    set_plan(s, 外業=counts('130', 2, 5, items_native=5))
+    s.clock[0] += 60
+    waiting = start(s, 'r2').json()
+    assert (waiting['complete'], waiting['results'][0]['error']) == (False, 'outcome_unknown')
+    assert not field_tasks(s)
+    s.clock[0] += 900
+    assert start(s, 'r3').json()['complete'] is True
+    assert [f['內容'].split('\n')[1] for f in field_tasks(s)] == ['計畫數量：130']
+
+
+def test_a_changed_plan_adopts_an_old_create_that_had_landed_and_warns_that_its_content_differs(s):
+    lose_and_hide_the_first_task(s)
+    assert start(s, 'r1').json()['results'][0]['error'] == 'outcome_unknown'
+    s.fake.hidden.clear()
+    set_plan(s, 外業=counts('130', 2, 5, items_native=5))
+    s.clock[0] += 60
+    body = start(s, 'r2').json()
+    assert (body['started'], body['complete']) == (False, True)
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok',
+                                  'warning': 'content_differs'}
+    assert [f['內容'].split('\n')[1] for f in field_tasks(s)] == ['計畫數量：123.45']
+    again = start(s, 'r3').json()
+    assert again['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
+    assert len(field_tasks(s)) == 1 and len(s.fake.rows(TASKS)) == 4
