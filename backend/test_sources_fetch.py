@@ -199,3 +199,11 @@ def test_attachment_fingerprint_ignores_rotating_urls_but_preserves_file_identit
     assert fingerprint(changed) == fingerprint(original)
     attachment['file_token'] = 'file-two'
     assert fingerprint(changed) != fingerprint(original)
+
+
+def test_contract_link_projection_uses_defaults_in_deployment():
+    from .sources import FIELDS
+    assert {'工編號碼','外業工項','外業數量','控制工項','控制數量','圖資工項','圖資數量','報告工項','報告數量'} <= set(FIELDS['contract'])
+    assert {'工編號碼','基準數量'} <= set(FIELDS['reporting'])
+    tables = json.loads((Path(__file__).parent.parent / 'deployment/source-tables.json').read_text())
+    assert all('field_names' not in t for t in tables if t['kind'] in ('contract','reporting'))
