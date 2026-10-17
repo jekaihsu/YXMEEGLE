@@ -3,11 +3,13 @@ import {taipeiTime} from './taipeiTime';
 import { useRef, useEffect, useId } from 'react';
 import type {
   CaseDetailView,
+  PlanSummary,
   DetailRow,
   DisplayField,
   SectionView,
   SortSpec,
 } from './caseDetailView.ts';
+import {PLAN_CATEGORIES} from './caseDetailView.ts';
 import './p2-case.css';
 
 export interface CaseDetailNavTarget {
@@ -28,6 +30,38 @@ export interface CaseDetailProps {
   onBack?: () => void;
   onPage?: (page: number) => void;
   currentSort?: SortSpec;
+}
+
+function PlanQuantityPanel({summary}: {summary: PlanSummary | null}) {
+  return <section className="p2-plan-panel" aria-label="計畫數量">
+    <h3 className="p2-section-title">計畫數量</h3>
+    {summary ? <>
+      {(summary.basis.derived > 0 || summary.basis.ambiguous > 0) &&
+        <p className="p2-tree-note">依工編推導，來源 Lark 尚未建立關聯</p>}
+      <table className="p2-plan-table">
+        <caption className="p2-sr-only">各類別計畫數量與工項關聯狀態</caption>
+        <thead><tr><th scope="col">類別</th><th scope="col">合約項數</th><th scope="col">計畫數量</th><th scope="col">工項數</th><th scope="col">關聯狀態</th></tr></thead>
+        <tbody>{PLAN_CATEGORIES.map(category => {
+          const c = summary.categories[category];
+          if (c.lines === 0 && c.items === 0) return null;
+          const quantity = c.planned_qty.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+          return <tr key={category}>
+            <th scope="row">{category}</th><td>{c.lines}</td><td>{quantity}</td><td>{c.items}</td>
+            <td><div className="p2-plan-chips">
+              <span className="p2-badge">原生 {c.items_native}</span>
+              <span className="p2-badge">推導 {c.items_derived}</span>
+              <span className="p2-badge">待確認 {c.items_ambiguous}</span>
+              <span className="p2-badge">未關聯 {c.items_unlinked}</span>
+              {c.items_native_unresolved > 0 && <span className="p2-badge">原生未解析 {c.items_native_unresolved}</span>}
+            </div></td>
+          </tr>;
+        })}</tbody>
+      </table>
+      {PLAN_CATEGORIES.some(category => summary.categories[category].needs_review > 0) &&
+        <p className="p2-tree-note">需人工確認：重複的合約項未計入總量</p>}
+      {summary.truncated && <p className="p2-tree-note">清單僅顯示部分資料</p>}
+    </> : <p className="p2-tree-note">尚無計畫數量資料</p>}
+  </section>;
 }
 
 function renderDisplayField(f: DisplayField) {
@@ -357,6 +391,9 @@ export function CaseDetail({
             </span>
           </div>
         )}
+
+        {section.key === 'work_items' && !section.states.some(state => ['forbidden', 'loading', 'read_failed', 'unlocated'].includes(state)) &&
+          <PlanQuantityPanel summary={section.planSummary} />}
 
         {/* Section rows or state placeholder */}
         {section.rows.length === 0 ? (

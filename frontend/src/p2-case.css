@@ -465,3 +465,31 @@
   }
 }
 }
+
+@layer pages {
+.p2-plan-panel {
+  min-width: 0;
+  margin-block: var(--space-4, 16px);
+  padding: var(--space-3, 12px);
+  border: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
+  border-radius: var(--radius-m, 12px);
+  background: var(--surface, #fff);
+}
+.p2-plan-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--fs-caption, 0.8125rem);
+}
+.p2-plan-table th, .p2-plan-table td {
+  padding: var(--space-2, 8px) var(--space-1, 4px);
+  border-bottom: 1px solid var(--sep, rgba(60, 60, 67, 0.18));
+  text-align: start;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.p2-plan-table th:first-child { width: 12%; }
+.p2-plan-table th:last-child { width: 34%; }
+.p2-plan-chips { display: flex; flex-wrap: wrap; gap: var(--space-1, 4px); }
+.p2-plan-chips .p2-badge { white-space: normal; overflow-wrap: anywhere; }
+}
