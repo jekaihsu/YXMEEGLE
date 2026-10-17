@@ -43,6 +43,7 @@ class FakeBitable:
         self.tables = {NODES: {}, TASKS: {}, PEOPLE: {}}
         self.requests, self.faults, self.tokens, self.seq = [], [], {}, 0
         self.hidden = set()  # task ids that exist but are not linked from their node yet (read-after-write lag)
+        self.dedupe = True  # False: a repeated client_token creates again, as after Lark's idempotency window
         for ident, name, groups, rank, employed in STAFF:
             self.add(PEOPLE, {'姓名': name, '所屬組別': groups, '職級': rank, '在職': employed,
                               'Lark帳號': [{'id': ident}], '同步_OpenID': ident})
@@ -119,7 +120,7 @@ class FakeBitable:
                        'absent_record_ids': [rid for rid in ids if rid not in self.tables[table]]})
         if rest == ['records'] and method == 'POST':
             token = request.url.params['client_token']
-            if token not in self.tokens:
+            if not self.dedupe or token not in self.tokens:
                 self.tokens[token] = self.add(table, body['fields'])
             return ok({'record': self.render(table, self.tokens[token], 'get')})
         if len(rest) == 2 and method == 'GET':
@@ -208,7 +209,7 @@ def h():
             return [(r.action, r.actor_id, r.data) for r in db.scalars(select(AuditRow).order_by(AuditRow.created_at))]
 
     yield SimpleNamespace(client=build(), build=build, fake=fake, clock=clock, state=state, case=case, who=who,
-                          audits=audits, user_fields=user_fields)
+                          audits=audits, user_fields=user_fields, sessions=sessions)
     engine.dispose()
 
 
@@ -855,3 +856,17 @@ def test_admin_demoted_between_node_and_task_create_stops_second_write(h):
     assert retried.status_code == 200
     assert len(h.fake.tables[NODES]) == 1
     assert len(h.fake.tables[TASKS]) == 1
+
+
+def test_replays_and_denied_attempts_cost_no_rate_budget(h):
+    payload = {'request_id': 'claim-1', 'expected_revision': None}
+    assert act(h, 'ou_sales', '/nodes/sales/claim', payload).status_code == 200
+    replays = [act(h, 'ou_sales', '/nodes/sales/claim', payload) for _ in range(40)]
+    assert {r.status_code for r in replays} == {200} and {r.headers['idempotent-replayed'] for r in replays} == {'true'}
+    denied = [act(h, 'ou_member', '/nodes/sales/assign', {'request_id': f'deny-{n}', 'owner_open_ids': ['ou_sales']})
+              for n in range(40)]
+    assert {r.status_code for r in denied} == {403}
+    writes = len(h.fake.writes())
+    created = act(h, 'ou_sales', '/nodes/sales/tasks', {'request_id': 'task-1', 'title': 'x'})
+    assert created.status_code == 200, created.text
+    assert len(h.fake.writes()) == writes + 1
