@@ -1007,25 +1007,31 @@ def create_app(overrides=None):
 
     # ---- P2 read routes (VCC-128..132). Read-only; every handler works on one visibility-narrowed state. ----
     P2_NOT_FOUND='找不到這個項目'
+    from .project_progress import PLANNING_FIELDS
     P2_LIST_PARAMS=frozenset({'q','source_version','pm','admission_state','deadline_from','deadline_to','sort','direction','cursor','limit'})
     P2_CASE_PARAMS=frozenset({'pm_id','execution_status'})
     P2_FILTER_PARAMS=('source_version','pm','admission_state','deadline_from','deadline_to')
     P2_SOURCE_STATUS={'forbidden':'forbidden','read_failed':'error','loading':'loading','unlocated':'unlocated','partial':'partial','stale':'stale'}
 
-    def p2_narrowed_state(state,user,page,freshness):
+    def p2_narrowed_state(state,user,page,freshness,keep_lines=False):
         """filter_visible_cases -> filter_private_workspace -> case_redaction (non test/demo) over a captured workspace state.
 
         Unlike public_ws this keeps source_work_items/status, but only as narrowed by filter_visible_cases.
         ``source_status`` translates the Source Health page state of the same capture and keeps its trusted
         last_sync/sync_revision; ``as_of`` is that capture's source snapshot time, never fetch or request time.
+        ``keep_lines`` re-attaches only the planning fields of the already visibility-narrowed contract lines after the
+        payload strip (which empties them) and before case_redaction, so the same redaction still sweeps them.
         """
         from .source_case_policy import filter_visible_cases
         from . import case_redaction
         stored=state.get('source_status') if isinstance(state.get('source_status'),dict) else {}
         pre=case_redaction.snapshot(state)
         filter_visible_cases(state)
+        kept={c['id']:{k:deepcopy(v) for k,v in (c.get('fields') or {}).items() if k in PLANNING_FIELDS} for c in state.get('contract_items',[])} if keep_lines else {}
         filter_private_workspace(state,user)
         restrict_hr(state,user)
+        for c in state.get('contract_items',[]):
+            if c['id'] in kept: c['fields']=kept[c['id']]
         if state.get('environment') not in ('test','demo'):
             case_redaction.apply(state,case_redaction.make_plan(pre,state))
         states=(page or {}).get('states') if isinstance(page,dict) else None
@@ -1049,7 +1055,7 @@ def create_app(overrides=None):
         data=(cache.data or {}) if cache else {}
         return (row.version if row else None,data.get('status'),data.get('last_attempt_at'),data.get('last_sync'),data.get('as_of'))
 
-    def p2_read(data,user):
+    def p2_read(data,user,keep_lines=False):
         """Health and module input come from ONE capture fenced by a generation read BEFORE the first input read
         (freshness, cache, workspace) and re-checked after the last. A capture is returned only after its fence
         passed; when the bounded retries are exhausted nothing from any rejected capture is returned: the input is an
@@ -1064,7 +1070,7 @@ def create_app(overrides=None):
                 state=load(db,db.get(WorkspaceRow,wid))
             health=source_health_from(data,user,freshness,cache_data,deepcopy(state))
             with sessions() as db: unchanged=p2_generation(db,wid)==generation
-            if unchanged: return data,user,health,p2_narrowed_state(state,user,health.get('page_state'),freshness)
+            if unchanged: return data,user,health,p2_narrowed_state(state,user,health.get('page_state'),freshness,keep_lines)
         failed={'page_state':{'states':['read_failed'],'count':None}}
         empty={'environment':state.get('environment'),'projects':[],'source_confirmations':[],'contract_items':[],'source_work_items':[],'source_visible_record_ids':[]}
         return data,user,failed,p2_narrowed_state(empty,user,failed['page_state'],{})
@@ -1131,6 +1137,28 @@ def create_app(overrides=None):
             card['drilldown']['filters']={k:v for k,v in card['drilldown']['filters'].items() if k not in P2_CASE_PARAMS}
         return result
 
+    def p2_visible_case_state(data,user,project_id,keep_lines=False):
+        """The narrowed P2 state, or 404 (identical for absent and not visible) unless the case is visible to the viewer."""
+        _,_,_,state=p2_read(data,user,keep_lines)
+        from .source_case_policy import visible_project
+        require(any(p['id']==project_id and visible_project(state,p) for p in state.get('projects',[])),P2_NOT_FOUND,404)
+        return state
+
+    @app.get('/api/projects/{project_id}/progress')
+    def project_progress(request:Request,project_id:str):
+        """One case's engineering progress. Same gates as case-detail; amounts and v3 reports only for PM/manager in normal access."""
+        from fastapi.responses import JSONResponse
+        from .project_progress import build_project_progress,ReportsView
+        data,user=identity(request)
+        require(len(project_id)<=200,'查詢參數過長',422)
+        require(not request.query_params,'查詢參數錯誤',422)
+        state=p2_visible_case_state(data,user,project_id,keep_lines=True)
+        privileged=data.get('access_mode','normal')=='normal' and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+        if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true': reports=ReportsView(status='disabled')
+        elif not privileged or data.get('mode')!='lark' or data['wid'].startswith(('test-','demo-')): reports=ReportsView(status='restricted')
+        else: reports=ReportsView(getattr(app.state,'reports',None))
+        return JSONResponse(build_project_progress(state,project_id,reports=reports,amounts=privileged,as_of=state['as_of']),headers={'Cache-Control':'no-store'})
+
     @app.get('/api/case-detail/{project_id}')
     def case_detail(request:Request,project_id:str):
         from .case_detail import build_case_detail
@@ -1138,9 +1166,7 @@ def create_app(overrides=None):
         require(len(project_id)<=200,'查詢參數過長',422)
         require(set(request.query_params.keys())<={'confirmation_key'},'查詢參數錯誤',422)
         confirmation_key=p2_one(request,'confirmation_key',300)
-        _,_,_,state=p2_read(data,user)
-        from .source_case_policy import visible_project
-        require(any(p['id']==project_id and visible_project(state,p) for p in state.get('projects',[])),P2_NOT_FOUND,404)
+        state=p2_visible_case_state(data,user,project_id)
         result=build_case_detail(state,project_id,confirmation_key=confirmation_key,as_of=state['as_of'])
         require(result.get('header') is not None,P2_NOT_FOUND,404)
         return result

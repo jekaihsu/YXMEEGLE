@@ -192,6 +192,7 @@ TENANT_READ_ROUTES=frozenset({
 TENANT_READ_PATTERNS=(
     re.compile(r'/api/projects/[^/]+/navigation'),
     re.compile(r'/api/case-detail/[^/]+'),
+    re.compile(r'/api/projects/[^/]+/progress'),
 )
 
 
