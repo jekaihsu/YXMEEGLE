@@ -333,3 +333,33 @@ def test_progress_unknown_record_and_payload_budget():
     baseline['options'].pop('status')
     for row in baseline['items']: row.pop('case_key')
     assert len(json.dumps(result).encode())/len(json.dumps(baseline).encode())<1.15
+
+
+def test_multicase_group_points_count_row_once_and_filter_equal_share():
+    raw=FixtureReader(FIXTURES).read()
+    raw['field']['records']=raw['field']['records'][:1]
+    raw['field']['records'][0]['fields'].update({'案件編號':'C01,C02','最終營業額點數':120})
+    raw['case']['records'].append({'record_id':'recSecond','fields':{'案件編號':'C02','狀態':'已結案'}})
+    d=c.normalize(raw)
+    assert c.progress(d,week='2026-10-12')['by_group'][0]['actual']==120
+    assert c.progress(d,week='2026-10-12',q='C01')['by_group'][0]['actual']==60
+    assert c.progress(d,week='2026-10-12',status='已結案')['by_group'][0]['actual']==60
+
+
+def test_plan_people_items_and_detail_exact_contract():
+    raw=FixtureReader(FIXTURES).read()
+    raw['people']['records']=[{'record_id':'recPerson','fields':{'姓名':'王小明'}}]
+    raw['plan']['records'][0]['fields'].update({'人員':[{'record_ids':['recPerson','recMissing']}],'預排工作項目':'測量','工作內容':'水深'})
+    d=c.normalize(raw)
+    detail=c.progress_case(d,d['tables']['case'][0]['id'],week='2026-10-12')
+    assert set(detail)=={'case','week','link'}
+    assert set(detail['case'])=={'code','name','client','pm','status','contract','billing','revenue_progress','cost_progress','expected_points','cumulative_points_by_dept'}
+    assert set(detail['case']['contract'])=={'expected','actual'}
+    assert set(detail['case']['billing'])=={'billed','receivable','progress'}
+    assert set(detail['case']['cumulative_points_by_dept'])=={'field','office'}
+    assert set(detail['week'])=={'dept','week','basis','plan_rows','work_rows','matched','unplanned','truncated'}
+    assert set(detail['week']['plan_rows'][0])=={'date','group','people','items','points'}
+    assert set(detail['week']['work_rows'][0])=={'date','group','person','item','points','checks','flags','note'}
+    assert set(detail['week']['work_rows'][0]['checks'])=={'status','control_checked'}
+    assert detail['week']['plan_rows'][0]['people']=='王小明,未填'
+    assert detail['week']['plan_rows'][0]['items']=='測量 · 水深'

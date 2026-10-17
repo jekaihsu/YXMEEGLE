@@ -1,4 +1,6 @@
-"""The v3 report boundary. Monetary cost and salary fields are excluded."""
+"""The v3 report boundary. Monetary cost and salary fields are excluded.
+Case detail contract/billing amounts and progress ratios are allowed because 案件 is already registered for sales and progress behind the same gate; monetary cost and salary fields stay excluded.
+"""
 from dataclasses import dataclass
 
 BASE_TOKEN = 'Sdw1bG1djaHsVGsRPvmjyVWipgg'
@@ -19,7 +21,7 @@ TABLES = (
     Table('內業成本單', 'tbl8JdWLLwlPFuoF', 'office_cost', ('工作日期','內業組別','內業組長檢核','PM檢核'), ('review',)),
     Table('案件', 'tblWsSaOcy4nKuGI', 'case', ('案件編號','案件名稱','業主','PM','狀態','預期營業額點數','預期合約金額','實際合約金額','案件可請款總額','累計外業營業額點數','累計內業營業額點數','營業額進度','成本進度','計價進度','可請款未請','應收未收','累計已請款','累計已入帳'), ('sales','progress')),
     Table('合約明細', 'tblCPwtDjBstnEOQ', 'contract', ('所屬案件','預期營業額點數','已完成營業額點數','還差營業額點數'), ('progress',)),
-    Table('工作預排', 'tblN8c3WN44233aG', 'plan', ('條類型','開始日期','結束日期','業別','組別','案件','預估營業額點數','車輛','儀器'), ('progress','assets')),
+    Table('工作預排', 'tblN8c3WN44233aG', 'plan', ('條類型','開始日期','結束日期','業別','組別','案件','預估營業額點數','車輛','儀器','人員','預排工作項目','工作內容'), ('progress','assets')),
     Table('車輛', 'tblryKpRlYXJ9Y2E', 'vehicle', ('車牌','啟用','備註','第一台車紀錄','第二台車紀錄','第三台車紀錄'), ('assets',)),
     Table('儀器費率', 'tblfgeEtMuBTg72O', 'instrument', ('儀器名稱','日租金','啟用','狀態','類別','備註','使用此儀器的成本單'), ('assets',)),
     Table('人員名單', 'tblmlpA6nG5Ou7NQ', 'people', ('姓名','所屬組別'), ('review',)),

@@ -307,8 +307,9 @@ def test_progress_detail_snapshot_privacy_bounds_and_validation():
     app,store=app_for()
     with TestClient(app) as client:
         page=client.get('/api/reports/progress?week=2026-10-12').json()
-        key=page['items'][0]['case_key']
+        key='recCase1'
         snapshot=store.get()
+        snapshot['data']['tables']['case'][0]['id']=key
         snapshot['data']['cases']['C01']['f']['薪資']=999999
         snapshot['data']['plan_indices'][('field','2026-10-12')]*=201
         store.reader.read=lambda:pytest.fail('warm detail must not read Lark')
@@ -326,7 +327,7 @@ def test_progress_detail_snapshot_privacy_bounds_and_validation():
         for query in ('q='+('x'*51),'status=unknown','sort=unknown'):
             assert client.get('/api/reports/progress?'+query).status_code==422
         assert client.get('/api/reports/progress?sort=name').status_code==200
-        assert client.get('/api/reports/progress/case').status_code==422
+        assert client.get('/api/reports/progress/case').status_code==404
     store.close()
 
 
@@ -334,4 +335,29 @@ def test_progress_detail_role_gate():
     app,store=app_for(allow=lambda *_:False)
     with TestClient(app) as client:
         assert client.get('/api/reports/progress/case?key=c1').status_code==403
+    store.close()
+
+
+def test_progress_normalized_search_and_detail_key_rejected_before_scan():
+    from backend.reports.routes import parameters
+    from backend.reports import compute
+    raw=FixtureReader(FIXTURES).read()
+    raw['case']['records'][0]['fields']['案件編號']='YX-26000'
+    d=compute.normalize(raw)
+    for text in (' YX-26000 ','ＹＸ-26000'):
+        p=parameters('progress',{'week':'2026-10-12','scope':'open','q':text})
+        assert p['q']=='YX-26000'
+    assert 'q' not in parameters('progress',{'q':' '})
+    raw['plan']['records'][0]['fields']['案件']='YX-26000'
+    d=compute.normalize(raw)
+    for text in (' YX-26000 ','ＹＸ-26000'):
+        assert compute.progress(d,**parameters('progress',{'week':'2026-10-12','q':text}))['items'][0]['case_code']=='YX-26000'
+    assert compute.progress(d,**parameters('progress',{'week':'2026-10-12','q':' '}))['total']==compute.progress(d,week='2026-10-12')['total']
+    app,store=app_for()
+    store.result=lambda *args:pytest.fail('invalid keys must not access the snapshot')
+    with TestClient(app) as client:
+        for key in ('','bad','rec','rec!','rec'+'a'*65,'rec中文'):
+            response=client.get('/api/reports/progress/case',params={'key':key})
+            assert response.status_code==404
+            assert response.json()=={'detail':'case_not_found'}
     store.close()

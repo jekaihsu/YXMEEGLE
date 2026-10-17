@@ -2,9 +2,11 @@
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 import os
+import re
+import unicodedata
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
-from .compute import TZ, monday
+from .compute import TZ, monday, UnknownStatus, CaseNotFound
 from .reader import LarkReader
 from .snapshot import SnapshotStore, ensure_visible_logs
 
@@ -30,6 +32,7 @@ ALLOWED={
 
 def parameters(endpoint, query):
     p=dict(query)
+    if 'q' in p: p['q']=unicodedata.normalize('NFKC',p['q']).strip()
     unknown=set(p)-ALLOWED[endpoint]
     if unknown: raise HTTPException(422,'不支援的查詢欄位：'+', '.join(sorted(unknown)))
     p={k:v.strip() if isinstance(v,str) else v for k,v in p.items()}
@@ -58,7 +61,7 @@ def parameters(endpoint, query):
         calendar('week',(today-timedelta(days=today.weekday()+7)).isoformat())
         if monday(p['week'])!=p['week']: raise HTTPException(422,'week 必須為週一')
         if today.year-30>int(p['week'][:4]) or int(p['week'][:4])>today.year+10: raise HTTPException(422,'week 超出範圍')
-    if endpoint=='progress/case' and not p.get('key'): raise HTTPException(422,'key 為必填')
+    if endpoint=='progress/case' and not re.fullmatch(r'rec[A-Za-z0-9]{1,64}',p.get('key','')): raise HTTPException(404,'case_not_found')
     if endpoint=='progress' and len(p.get('q',''))>50: raise HTTPException(422,'q 最多 50 字')
     if endpoint=='progress': choice('scope','week',('week','open'))
     if endpoint.startswith('review'): integer('weeks',12,1,104)
@@ -101,7 +104,10 @@ def register(app, identity, cfg=None, *, reader=None, authorize=None, live_enabl
         def read(request: Request):
             try:
                 data,user=gate(request)
-                result=store.result(endpoint,parameters(endpoint,request.query_params))
+                try:
+                    result=store.result(endpoint,parameters(endpoint,request.query_params))
+                except UnknownStatus as exc: raise HTTPException(422,str(exc)) from None
+                except CaseNotFound: raise HTTPException(404,'case_not_found') from None
                 if endpoint=='progress':
                     result['meta']['can_refresh']=False
                     if authorize is not None and live_enabled is not None and live_enabled(data['wid']):
