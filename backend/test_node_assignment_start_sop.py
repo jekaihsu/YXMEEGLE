@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 from .node_assignment.lark_table import date_millis
-from .test_node_assignment_routes import NODES, TASKS, URL, T0, FakeBitable, h, ok, project  # noqa: F401
+from .test_node_assignment_routes import NODES, TASKS, URL, h, project  # noqa: F401  (h is the shared fixture)
 
 SOP = URL + '/start-sop'
 FIELD_DETAIL = ('依計畫數量完成外業。\n計畫數量：123.45\n合約明細：2 筆；工項：5 項\n'
