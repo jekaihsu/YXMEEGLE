@@ -217,3 +217,9 @@ def test_line_and_unresolved_native_provenance_is_additive_and_private():
     assert projection.status['lines_derived']==1
     assert '_source_ids' not in summary
     assert projection.plans['p']['_source_ids']==['b/confirmation/c','b/contract/a','b/contract/b','b/reporting/i']
+
+
+@pytest.mark.parametrize('quantity,expected', [('0.00000001','0.00000001'),('1E+3','1000'),('0E+1','0')])
+def test_plan_quantity_uses_plain_decimal_strings(quantity, expected):
+    projection=build_projection([row('confirmation','c',工程確認單編號='X'),line(qty=quantity)], {'b/confirmation/c':'p'}, {})
+    assert projection.plans['p']['categories']['外業']['planned_qty']==expected

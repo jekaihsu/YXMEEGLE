@@ -227,7 +227,7 @@ def build_projection(records,confirmation_projects,native_line_projects,*,native
             counts=summary['categories'][item.category];counts['items']+=1;counts['items_'+item_basis]+=1
         summary['items'].append(dict(id=item.record_id,category=item.category,line_id=line_id,basis=item_basis,reason=result.reason.value))
     for summary in plans.values():
-        for counts in summary['categories'].values(): counts['planned_qty']=str(counts['planned_qty'])
+        for counts in summary['categories'].values(): counts['planned_qty']=format(counts['planned_qty'], 'f')
         rows=summary['items'];summary['items']=rows[:MAX_ROWS];summary['truncated']=len(rows)>MAX_ROWS
         # Bound both review groups and item rows because source text can be arbitrarily long.
         while len(json.dumps(summary,ensure_ascii=False,separators=(',',':')).encode())>MAX_BYTES:
