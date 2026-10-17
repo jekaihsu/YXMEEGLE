@@ -5,6 +5,7 @@ import httpx
 import pytest
 
 from .node_assignment.lark_table import date_millis
+from .node_assignment.service import Receipts
 from .test_node_assignment_routes import NODES, PEOPLE, TASKS, URL, act, h, project  # noqa: F401  (h is the shared fixture)
 
 SOP = URL + '/start-sop'
@@ -773,3 +774,101 @@ def test_repeating_the_same_request_after_a_failed_sync_retries_it_too(s):
     again = start(s, 'r1').json()
     assert again['complete'] is True and len(s.fake.writes()) == writes + 1
     assert start(s, 'r1').json() == again
+
+
+def die_right_after(monkeypatch, saved):
+    """The process dies once, immediately after the first receipt write for which `saved(plan)` holds."""
+    original, fired = Receipts.save, []
+
+    def save(self, key, fingerprint, result):
+        original(self, key, fingerprint, result)
+        if not fired and (plan := result.get('plan')) and saved(plan):
+            fired.append(True)
+            raise RuntimeError('process died')
+    monkeypatch.setattr(Receipts, 'save', save)
+
+
+def test_a_press_after_the_process_died_with_only_the_node_pinned_completes_without_a_second_seed(s, monkeypatch):
+    die_right_after(monkeypatch, lambda p: p['kind'] == 'task_create' and p['changes'].get('node')
+                    and p['pre_create_task_ids'] is None)
+    with pytest.raises(RuntimeError):
+        start(s, 'r1')
+    monkeypatch.undo()
+    assert len(s.fake.rows(NODES)) == 1 and not s.fake.rows(TASKS)
+    tokens = []
+    s.fake.fault('POST', f'{TASKS}/records', lambda request: tokens.append(request.url.params.get('client_token')), times=4)
+    second = start(s, 'r2').json()
+    assert (second['started'], second['complete']) == (True, True)
+    assert second['results'][0] == {'key': 'field', 'node': 'created', 'task': 'created', 'error': None, 'sync': 'ok'}
+    assert all(tokens) and len(set(tokens)) == 4
+    for rid in ('r3', 'r4'):
+        again = start(s, rid).json()
+        assert (again['started'], again['complete']) == (False, True)
+    assert len(field_tasks(s)) == 1 and len(s.fake.rows(TASKS)) == 4 and len(s.fake.rows(NODES)) == 4
+
+
+def test_a_pending_attempt_left_by_one_person_is_finished_by_another(s, monkeypatch):
+    s.case['project'] = {**s.case['project'], 'supervisor_id': 'ou_sup'}
+    die_right_after(monkeypatch, lambda p: p['kind'] == 'task_create' and p['changes'].get('node')
+                    and p['pre_create_task_ids'] is None)
+    with pytest.raises(RuntimeError):
+        start(s, 'r1', who='ou_pm')
+    monkeypatch.undo()
+    body = start(s, 'r2', who='ou_sup').json()
+    assert (body['started'], body['complete']) == (True, True)
+    assert len(field_tasks(s)) == 1 and field_tasks(s)[0]['指派人'] == [{'id': 'ou_sup'}]
+
+
+def test_a_node_attempt_resumed_as_a_task_create_is_sent_under_a_client_token(s, monkeypatch):
+    s.case['project'] = {**project(skipped=('field',)), 'pm_id': 'ou_pm'}
+    die_right_after(monkeypatch, lambda p: p['kind'] == 'node' and not p['record_id'])
+    with pytest.raises(RuntimeError):
+        start(s, 'r1')
+    monkeypatch.undo()
+    assert not s.fake.rows(NODES) and not s.fake.rows(TASKS)
+    s.case['project'] = {**project(), 'pm_id': 'ou_pm'}
+    tokens = []
+    s.fake.fault('POST', f'{TASKS}/records', lambda request: tokens.append(request.url.params.get('client_token')), times=4)
+    body = start(s, 'r2').json()
+    assert (body['started'], body['complete']) == (True, True)
+    assert len(tokens) == 4 and all(tokens)
+    assert len(field_tasks(s)) == 1
+
+
+FIELD_TITLE = '外業：依計畫數量完成'
+
+
+def task_tokens(s, first_response=None):
+    """Every task create's client token by task title. The first create answers `first_response` without landing."""
+    seen, tokens = [], {}
+
+    def record(request):
+        title = json.loads(request.content)['fields']['標題']
+        tokens.setdefault(title, []).append(request.url.params['client_token'])
+        seen.append(1)
+        return first_response if len(seen) == 1 else None
+    s.fake.fault('POST', f'{TASKS}/records', record, times=50)
+    return tokens
+
+
+def test_an_unlanded_create_is_retried_under_the_same_token_until_the_stale_window_passes(s):
+    tokens = task_tokens(s, httpx.Response(504, text='gateway timeout'))
+    assert start(s, 'r1').json()['results'][0]['error'] == 'outcome_unknown'
+    assert len(s.fake.rows(TASKS)) == 3
+    body = start(s, 'r2').json()
+    assert (body['complete'], body['results'][0]['task']) == (True, 'created')
+    assert len(tokens[FIELD_TITLE]) == 2 and tokens[FIELD_TITLE][0] == tokens[FIELD_TITLE][1]
+    assert len(field_tasks(s)) == 1
+
+
+def test_a_pending_attempt_older_than_the_stale_window_is_abandoned_and_recreated_under_a_new_token(s):
+    tokens = task_tokens(s, httpx.Response(504, text='gateway timeout'))
+    start(s, 'r1')
+    s.clock[0] += 901
+    body = start(s, 'r2').json()
+    assert (body['complete'], body['results'][0]['task']) == (True, 'created')
+    assert len(tokens[FIELD_TITLE]) == 2 and tokens[FIELD_TITLE][0] != tokens[FIELD_TITLE][1]
+    assert len(field_tasks(s)) == 1
+    again = start(s, 'r3').json()
+    assert (again['started'], again['complete']) == (False, True)
+    assert len(field_tasks(s)) == 1

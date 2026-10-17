@@ -14,7 +14,7 @@ from enum import StrEnum
 from ..contract_links import plan_summary
 from ..sources import day
 from .domain import FINISHED, NODE_DEPARTMENTS, Actor, NodeKey, TaskStatus, derive_chain
-from .lark_table import CaseSnapshot
+from .lark_table import CaseSnapshot, date_millis
 from .operations import OPEN_ID, facts_of
 
 SOP_RULE_VERSION = 'start-sop-20261017.1'
@@ -125,6 +125,12 @@ class PlannedNode:
     def department(self) -> str:
         # Existing task creation requires one of the node's departments; the first is the generic one.
         return NODE_DEPARTMENTS[self.key][0]
+
+    @property
+    def seed_fields(self) -> dict:
+        """The content of the seed task, which is what a pending create is compared against."""
+        return {'title': self.title, 'detail': self.detail, 'department': self.department,
+                'deadline': date_millis(self.deadline) if self.deadline else None}
 
     def reviewed(self):
         return {'key': self.key.value, 'planned_qty': self.planned_qty, 'lines': self.lines, 'items': self.items,

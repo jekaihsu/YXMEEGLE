@@ -6,6 +6,7 @@ reconciliation of every other write. The run itself holds a receipt that binds
 the request_id to the reviewed preview hash.
 """
 import threading
+from itertools import count
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 
@@ -14,7 +15,7 @@ from .domain import Denied, NodeKey, TaskStatus
 from .errors import Failure
 from .lark_table import assignment_key, date_millis, read_case
 from .operations import Plan, StartSopCommand
-from .service import SYNC_FAILED, NodeAssignmentService, actor_for, digest
+from .service import SYNC_FAILED, NodeAssignmentService, actor_for, digest, fingerprint_of
 from .start_sop import (
     BLOCKER_MESSAGES, SEED_NODES, SOP_RULE_VERSION, BlockerCode, Outcome, PlannedNode, marker, observe, plan_start,
     preview_body, start_denial)
@@ -59,6 +60,15 @@ def node_outcome(landed: list[Plan]) -> Outcome:
     if not any(p.record_id or 'node' in p.changes for p in landed):
         return Outcome.FAILED
     return Outcome.CREATED if any(p.created_node for p in landed) else Outcome.EXISTING
+
+
+@dataclass(frozen=True)
+class Attempt:
+    """One try at a node's seed: its receipt, the identity payload of that receipt, and the stored plan if pending."""
+    receipt_id: str
+    payload: dict
+    plan: Plan | None
+    at: float
 
 
 class SeedLedger:
@@ -217,20 +227,60 @@ class StartSopRunner:
             raise Failure('preview_stale', STALE_MESSAGE)
         return fresh
 
-    def _receipt_id(self, ctx, key: NodeKey, seq: int, kind: str):
-        """Identity of one seed attempt: the work (which seed of which node), never the request or the person."""
-        return self.svc.receipts.scoped('start-sop-node', ctx.wid, ctx.project['id'], key.value, SOP_RULE_VERSION,
-                                        str(seq), kind)
+    def _identity(self, ctx, key: NodeKey, seq: int, kind: str, ordinal: int):
+        """Identity of one seed attempt: the work (which seed of which node), never the request or the person.
 
-    def _pending(self, ctx, key: NodeKey, seq: int):
+        Attempt 0 keeps the key and payload it always had. An abandoned attempt is never reused, because its
+        Lark client token may still be in flight, so the next try of the same seed gets the next ordinal.
+        """
+        parts = [ctx.wid, ctx.project['id'], key.value, SOP_RULE_VERSION, str(seq), kind, *([str(ordinal)] if ordinal else [])]
+        payload = {'sop_rule_version': SOP_RULE_VERSION, 'sequence': seq, 'kind': kind, **({'attempt': ordinal} if ordinal else {})}
+        return self.svc.receipts.scoped('start-sop-node', *parts), payload
+
+    def _attempt(self, ctx, key: NodeKey, seq: int, kind: str, ordinal: int, stored=None) -> Attempt:
+        receipt_id, payload = self._identity(ctx, key, seq, kind, ordinal)
+        plan = Plan.from_json(stored['plan']) if stored and stored['state'] == 'pending' else None
+        return Attempt(receipt_id, payload, plan, (stored or {}).get('at') or self.svc.clock())
+
+    def _tries(self, ctx, key: NodeKey, seq: int, kind: str):
+        """The stored attempts at one seed and write kind, oldest first, up to the first unused ordinal."""
+        for ordinal in count():
+            stored = self.svc.receipts.peek(self._identity(ctx, key, seq, kind, ordinal)[0])
+            if stored is None:
+                return
+            yield ordinal, stored
+
+    def _pending(self, ctx, key: NodeKey, seq: int) -> Attempt | None:
         """An earlier attempt at this node's seed that is still unconfirmed, newest sequence first."""
         for number in range(seq, -1, -1):
             for kind in KINDS:
-                rid = self._receipt_id(ctx, key, number, kind)
-                stored = self.svc.receipts.peek(rid)
-                if stored and stored['state'] == 'pending':
-                    return rid, number, kind
+                for ordinal, stored in self._tries(ctx, key, number, kind):
+                    if stored['state'] == 'pending':
+                        return self._attempt(ctx, key, number, kind, ordinal, stored)
         return None
+
+    def _fresh(self, ctx, key: NodeKey, seq: int, kind: str) -> Attempt:
+        return self._attempt(ctx, key, seq, kind, sum(1 for _ in self._tries(ctx, key, seq, kind)))
+
+    def _abandon(self, ctx, key: NodeKey, attempt: Attempt):
+        self.svc.receipts.save(attempt.receipt_id, fingerprint_of(ACTION, ctx.project['id'], key, attempt.payload),
+                               {'state': 'abandoned', 'plan': attempt.plan.to_json()})
+
+    def _settle(self, ctx, client, snapshot, node: PlannedNode, attempt: Attempt) -> Attempt | None:
+        """The pending attempt to resume, or None once it is abandoned. Reads Lark before deciding."""
+        svc, plan = self.svc, attempt.plan
+        expired = svc.clock() - attempt.at >= svc.config.stale_max_seconds
+        if plan.kind == 'task_create' and plan.phase.may_have_landed:
+            try:
+                if svc._reconcile(client, snapshot, node.key, plan)[0] == 'applied':
+                    return attempt
+            except Failure as exc:
+                if exc.code != 'outcome_unknown' or not expired:
+                    raise
+        if expired:
+            self._abandon(ctx, node.key, attempt)
+            return None
+        return attempt
 
     def _seed(self, ctx, request_id, node: PlannedNode, code) -> NodeResult:
         svc, key = self.svc, node.key
@@ -246,17 +296,18 @@ class StartSopRunner:
         svc, key, wid, pid = self.svc, node.key, ctx.wid, ctx.project['id']
         with svc.client() as client:
             snapshot = read_case(client, code)
-        carried = {t.record_id for t in snapshot.node_tasks(key) if marker(key) in t.detail}
-        self.ledger.add(wid, pid, key, *sorted(carried))
-        known = frozenset(self.ledger.ids(wid, pid, key)) | carried
-        state = observe(snapshot, svc.skipped(ctx), key, known)
-        seq = len(known)
-        pending = self._pending(ctx, key, seq)
-        if pending is None and not (state.will_create_node or state.will_create_task):
-            return NodeResult(key, Outcome.EXISTING, Outcome.EXISTING if state.seed_task_exists else Outcome.SKIPPED)
-        receipt_id, number, kind = pending or (
-            self._receipt_id(ctx, key, seq, 'task_create' if state.will_create_task else 'node'), seq,
-            'task_create' if state.will_create_task else 'node')
+            carried = {t.record_id for t in snapshot.node_tasks(key) if marker(key) in t.detail}
+            self.ledger.add(wid, pid, key, *sorted(carried))
+            known = frozenset(self.ledger.ids(wid, pid, key)) | carried
+            state = observe(snapshot, svc.skipped(ctx), key, known)
+            seq = len(known)
+            attempt = self._pending(ctx, key, seq)
+            if attempt is not None:
+                attempt = self._settle(ctx, client, snapshot, node, attempt)
+        if attempt is None:
+            if not (state.will_create_node or state.will_create_task):
+                return NodeResult(key, Outcome.EXISTING, Outcome.EXISTING if state.seed_task_exists else Outcome.SKIPPED)
+            attempt = self._fresh(ctx, key, seq, 'task_create' if state.will_create_task else 'node')
         observed, landed = {'state': state}, []
 
         def plan_fn(s, resumed):
@@ -264,11 +315,10 @@ class StartSopRunner:
                 raise Denied(reason)
             current = observed['state'] = observe(s.snapshot, s.skipped, key, known)
             if current.will_create_task:
-                if resumed is not None and resumed.kind == 'task_create':
+                if resumed is not None and resumed.kind == 'task_create' and resumed.phase.may_have_landed:
                     return Plan('task_create', None, None, resumed.changes)
                 return Plan('task_create', None, None, {
-                    'title': node.title, 'detail': node.detail, 'assignee': None, 'assigned_by': [s.actor.open_id],
-                    'department': node.department, 'deadline': date_millis(node.deadline) if node.deadline else None,
+                    **node.seed_fields, 'assignee': None, 'assigned_by': [s.actor.open_id],
                     'status': TaskStatus.TODO.value})
             return Plan('node', None, None, {}) if current.will_create_node else None
 
@@ -287,10 +337,8 @@ class StartSopRunner:
             return 200, body, False
 
         try:
-            _, body, _ = svc.mutate(ctx, key, ACTION, f'start-sop:{request_id}:{key.value}',
-                                    {'sop_rule_version': SOP_RULE_VERSION, 'sequence': number, 'kind': kind},
-                                    plan_fn, finish=finish, landed=landed, receipt_id=receipt_id,
-                                    charge_per_write=True)
+            _, body, _ = svc.mutate(ctx, key, ACTION, f'start-sop:{request_id}:{key.value}', attempt.payload, plan_fn,
+                                    finish=finish, landed=landed, receipt_id=attempt.receipt_id, charge_per_write=True)
         except Failure as exc:
             return failed(key, exc, node_outcome(landed))
         if body is None:
