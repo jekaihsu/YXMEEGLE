@@ -1,4 +1,5 @@
 import {api, ApiError} from './api';
+import {isPlainDecimal} from './caseDetailView';
 
 export const NODE_ASSIGNMENT_ORDER = ['sales', 'pm', 'confirmation', 'field', 'control', 'mapping', 'report', 'pricing', 'settlement'] as const;
 export type NodeAction = 'claim' | 'assign' | 'complete' | 'approve' | 'reject' | 'create_task';
@@ -72,12 +73,13 @@ function autoDone(value: unknown): AutoDone | null {
   return {rule: text(a.rule), reason: text(a.reason)};
 }
 function optionalCount(value: unknown): number | null {return value == null ? null : count(value)}
+function decimalText(value: unknown): string | null {return isPlainDecimal(value) ? value : null}
 function flag(value: unknown): boolean {if (typeof value !== 'boolean') throw malformed(); return value}
 function evidence(value: unknown): NodeEvidence | null {
   if (value == null) return null;
   const e = record(value);
-  return {planned_qty: optionalText(e.planned_qty), lines: optionalCount(e.lines), items: optionalCount(e.items), work_orders: count(e.work_orders),
-    latest_date: optionalText(e.latest_date), actual_known: flag(e.actual_known), actual_value: optionalText(e.actual_value),
+  return {planned_qty: decimalText(e.planned_qty), lines: optionalCount(e.lines), items: optionalCount(e.items), work_orders: count(e.work_orders),
+    latest_date: optionalText(e.latest_date), actual_known: flag(e.actual_known), actual_value: decimalText(e.actual_value),
     actual_source: optionalText(e.actual_source), reason: text(e.reason), drives_status: flag(e.drives_status)};
 }
 function node(value: unknown): AssignmentNode {

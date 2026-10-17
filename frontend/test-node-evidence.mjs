@@ -117,3 +117,25 @@ test('cards without evidence keep the old task wording and have no link', async 
   assert.match(card('業務').textContent, /0\/0 項任務/);
   assert.equal(card('業務').closest('.na-card-wrap'), null);
 });
+
+const HOSTILE = ['1e9999999999', '1e99999', '-5', 'NaN', 'Infinity', '1'.repeat(101), '1,5', ''];
+
+test('an unbounded or non-decimal quantity is neutralized to null and the list still parses', async () => {
+  for (const bad of HOSTILE) {
+    globalThis.fetch = async () => reply(listWith({field: {evidence: evidence({planned_qty: bad, actual_value: bad})}}));
+    const parsed = await ui.fetchNodeAssignments('p1', new AbortController().signal, () => true);
+    const e = parsed.nodes.find(n => n.key === 'field').evidence;
+    assert.deepEqual([e.planned_qty, e.actual_value], [null, null], bad);
+  }
+});
+
+test('a hostile planned quantity leaves the page mounted with the no-data wording', async () => {
+  await mount({field: {evidence: evidence({planned_qty: '1e9999999999', actual_value: '1e9999999999'})}});
+  assert.ok(document.getElementById('root').innerHTML.length > 0);
+  assert.match(card('外業').textContent, /尚無日報連結/);
+});
+
+test('the quantity formatter never throws', () => {
+  for (const bad of HOSTILE) assert.doesNotThrow(() => ui.evidenceLine(evidence({planned_qty: bad})), bad);
+  assert.equal(ui.evidenceLine(evidence({planned_qty: '1e9999999999'})).known, false);
+});

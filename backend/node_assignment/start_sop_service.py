@@ -15,6 +15,7 @@ from dataclasses import dataclass, replace
 from .. import audit
 from .domain import NodeKey, TaskStatus
 from .errors import Failure
+from .evidence import signals
 from .lark_table import TASK_FIELDS, Table, assignment_key, mismatches, parse_task, read_case, wire
 from .operations import Plan, Situation, StartSopCommand
 from .service import SYNC_FAILED, NodeAssignmentService, actor_for, confirmation_record, create_token, digest
@@ -251,10 +252,22 @@ class StartSopRunner:
         return at
 
     def _node_only(self, ctx, client, request_id, code, key, snapshot, state, roster, user) -> NodeResult:
-        """Create the node's row if Lark has none. An existing row is left exactly as it is: no write at all."""
+        """Create the node's row if Lark has none. A row Lark made is left exactly as it is. A row whose status the case
+        evidence drives is written only where 狀態/進度/開始時間 differ, so a retry repairs a mirror that failed."""
         svc, akey = self.svc, assignment_key(code, key)
         if not state.will_create_node:
-            return NodeResult(key, Outcome.EXISTING, Outcome.SKIPPED)
+            if not (signal := signals(svc.evidence(ctx)).get(key)) or not signal.started:
+                return NodeResult(key, Outcome.EXISTING, Outcome.SKIPPED)
+            plan = Plan('node', snapshot.row(key).record_id, None, {})
+            synced = svc._sync_node(client, ctx, snapshot, key, plan)
+            if synced == 'unchanged':
+                return NodeResult(key, Outcome.EXISTING, Outcome.SKIPPED)
+            warnings = [SYNC_FAILED] if synced == 'failed' else []
+            if synced == 'written':
+                svc.case_cache.put((ctx.wid, code), read_case(client, code))
+            self._audit(ctx, request_id, 'success', node=key.value, assignment_key=akey, record_id=plan.record_id,
+                        changes=svc._changes(ctx, akey, plan), warnings=warnings)
+            return NodeResult(key, Outcome.EXISTING, Outcome.SKIPPED, sync=sync_of(warnings))
         identity = svc.receipts.scoped('start-sop-seed', ctx.wid, ctx.project['id'], key.value, SOP_RULE_VERSION,
                                        str(len(state.seeds)))
         row, made = svc._node_row(client, Situation(

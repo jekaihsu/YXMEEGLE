@@ -94,7 +94,10 @@ function projectPlanSummary(value: unknown): PlanSummary | null | 'unavailable' 
   truncated: value.truncated,
  };
 }
+const PLAIN_DECIMAL = /^\d+(?:\.\d+)?(?:[eE][+-]?\d{1,4})?$/;
+export const isPlainDecimal = (value: unknown): value is string => typeof value === 'string' && value.length <= 100 && PLAIN_DECIMAL.test(value);
 export function formatPlanQuantity(value: string): string {
+ if (!isPlainDecimal(value)) return '—';
  if (/^-?0+(?:\.0+)?(?:[eE][+-]?\d+)?$/.test(value)) return '0';
  const [coefficient, exponent = '0'] = value.toLowerCase().split('e');
  const [whole, fraction = ''] = coefficient.split('.');

@@ -23,13 +23,13 @@ def node_warnings(key, row: NodeRow | None, duplicates, status, tasks, now_ms, a
     warnings = []
     if duplicates:
         warnings.append('duplicate_assignment_key')
-    if row is None or auto or by_data:
-        # A row whose status the case data decides is deliberately left untouched in Lark, so it cannot drift.
+    if row is None or auto:
         return warnings
     if row.status == NodeStatus.DONE.value and not row.approved:
         warnings.append('unapproved_completion')
     expected = mirror(row, status, task_counts(t.status for t in tasks), now_ms).get('status')
-    if expected and row.status != expected:
+    # A row whose status the case data decides differs from Lark's by design, so only that drift is explained away.
+    if expected and row.status != expected and not by_data:
         warnings.append('lark_status_drift')
     if status is NodeStatus.NOT_STARTED and any(t.status is TaskStatus.IN_PROGRESS for t in tasks):
         warnings.append('previous_node_not_done')

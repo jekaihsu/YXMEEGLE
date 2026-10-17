@@ -7,7 +7,7 @@ from .node_assignment.domain import NodeFacts, NodeKey, NodeStatus, TaskStatus, 
 from .node_assignment.evidence import Signal, production_signal
 from .test_node_assignment_evidence import case, lark_rows, lark_statuses, statuses, with_lines
 from .test_node_assignment_routes import NODES, PEOPLE, URL, act, h, node, project, view  # noqa: F401
-from .test_node_assignment_start_sop import SOP, counts, preview, s, set_plan, start  # noqa: F401
+from .test_node_assignment_start_sop import SOP, TASKS, counts, preview, s, set_plan, start  # noqa: F401
 
 DEPT = {'field': '外業組', 'control': '控制組', 'mapping': '圖資組', 'report': '報告組'}
 NO_DAILY = '尚無日報連結到此案件'
@@ -306,3 +306,53 @@ def test_pure_status_rules():
     assert derive_status(NodeFacts(evidence_started=True, tasks=(TaskStatus.CANCELLED,)), True) is NodeStatus.IN_PROGRESS
     assert derive_status(base, True) is NodeStatus.TODO
     assert derive_chain({NodeKey.SALES: NodeFacts(approved=True), NodeKey.PM: NodeFacts(evidence_started=True)})[NodeKey.PM] is NodeStatus.IN_PROGRESS
+
+
+def rate_service(env):
+    endpoint = next(r.endpoint for r in env.client.app.routes
+                    if getattr(r, 'path', None) == '/api/projects/{project_id}/node-assignments')
+    return dict(zip(endpoint.__code__.co_freevars, [c.cell_contents for c in endpoint.__closure__]))['service']
+
+
+def test_a_node_only_retry_repairs_the_mirror_the_rate_limit_skipped(s):
+    set_plan(s, 控制=counts(), 圖資=counts(), 報告=counts())
+    s.state['contract_items'] = [{'id': 'ct1', 'project_id': 'p1'}]
+    daily(s, 'field', '2026-10-08')
+    svc = rate_service(s)
+    svc.rate.per_actor = 1
+    first = start(s, 'same', seed=False).json()
+    assert [(r['node'], r['sync']) for r in first['results']] == [('created', 'failed')]
+    assert first['complete'] is False
+    assert '開始時間' not in next(iter(s.fake.rows(NODES).values()))
+    svc.rate._events.clear()
+    before = len(s.fake.writes())
+    again = start(s, 'same', seed=False).json()
+    assert [(r['node'], r['sync']) for r in again['results']] == [('existing', 'ok')]
+    assert (again['complete'], len(s.fake.writes()) - before) == (True, 1)
+    row = next(iter(s.fake.rows(NODES).values()))
+    assert row['狀態'] == '進行中' and row['開始時間'] and row['進度'] is not None
+    assert len(s.fake.rows(NODES)) == 1 and len(s.fake.rows(TASKS)) == 0
+    svc.rate._events.clear()
+    before = len(s.fake.writes())
+    start(s, 'new-id', seed=False)
+    assert len(s.fake.writes()) == before
+
+
+def test_evidence_explains_status_drift_but_never_hides_an_unapproved_completion(h):
+    open_case(h)
+    lark_rows(h, '115588')
+    for row in h.fake.rows(NODES).values():
+        if row['節點'] == '外業':
+            row['狀態'] = '已完成'
+    assert node(view(h), 'field')['warnings'] == ['unapproved_completion', 'lark_status_drift']
+    daily(h, 'field', '2026-10-08')
+    field = node(view(h), 'field')
+    assert (field['derived_status'], field['evidence']['drives_status']) == ('進行中', True)
+    assert field['warnings'] == ['unapproved_completion']
+
+
+def test_evidence_still_explains_a_plain_status_drift(h):
+    open_case(h)
+    lark_rows(h, '115588')
+    daily(h, 'field', '2026-10-08')
+    assert node(view(h), 'field')['warnings'] == []
