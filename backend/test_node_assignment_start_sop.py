@@ -546,6 +546,41 @@ def test_a_second_press_after_the_mirror_writes_nothing(s):
     assert len(s.fake.writes()) == writes
 
 
+def add_project(s, pid, number):
+    s.case['others'][pid] = {**project(code=f'A11500{number}-01', pid=pid), 'pm_id': 'ou_pm'}
+    s.state['derived_plan'][pid] = s.state['derived_plan']['p1']
+    s.state['source_quotes'].append(quote('q-' + pid, project_id=pid, **DEADLINES))
+
+
+def press(s, pid, rid):
+    url = f'/api/projects/{pid}/node-assignments/start-sop'
+    s.who[0] = 'ou_pm'
+    digest = s.client.get(url).json()['preview_hash']
+    return s.client.post(url, json={'request_id': rid, 'preview_hash': digest})
+
+
+def test_the_person_limit_counts_every_lark_write_across_projects(s):
+    for number, pid in enumerate(('p2', 'p3', 'p4'), start=2):
+        add_project(s, pid, number)
+    responses = [press(s, pid, 'r-' + pid) for pid in ('p1', 'p2', 'p3', 'p4')]
+    assert [r.status_code for r in responses] == [200, 200, 200, 429]
+    assert [[(x['node'], x['task'], x['error']) for x in r.json()['results']] for r in responses[:3]] == [
+        [('created', 'created', None)] * 4, [('created', 'created', None)] * 4,
+        [('created', 'created', None)] * 2 + [('failed', 'failed', 'rate_limited')] * 2]
+    assert responses[3].json()['code'] == 'rate_limited'
+    assert len(s.fake.writes()) == 30
+
+
+def test_presses_that_write_nothing_cost_nothing(s):
+    add_project(s, 'p2', 2)
+    assert press(s, 'p1', 'first').json()['complete'] is True
+    for n in range(12):
+        assert press(s, 'p1', f'again-{n}').json()['started'] is False
+    second = press(s, 'p2', 'second').json()
+    assert [(x['node'], x['task'], x['error']) for x in second['results']] == [('created', 'created', None)] * 4
+    assert len(s.fake.writes()) == 24
+
+
 def test_every_run_leaves_an_audit_row_per_node(s):
     start(s, 'r1')
     rows = [(a[0], a[2]['result'], a[2]['node']) for a in s.audits()]

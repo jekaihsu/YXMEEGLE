@@ -295,7 +295,6 @@ class NodeAssignmentService:
         """
         finish = finish or self._finish
         code = self.open(ctx, write=True)
-        self.rate.take(ctx.wid, ctx.user['id'])
         receipt = self.receipts.key(ctx.wid, ctx.user['id'], request_id)
         fingerprint = digest({'action': action, 'project_id': ctx.project['id'], 'node': key.value, **payload})
         akey = assignment_key(code, key)
@@ -338,6 +337,7 @@ class NodeAssignmentService:
                     if planned is not None and (checked is None or checked.changes != planned.changes):
                         raise Failure('forbidden', '操作權限已變更，請重新整理後再操作',
                                       writes_started=bool(write_attempts))
+                self.rate.take(ctx.wid, ctx.user['id'])
                 write_attempts += 1
 
             with self.client(before_write=authorize_write) as client:
