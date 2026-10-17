@@ -28,6 +28,8 @@ const button=text=>[...document.querySelectorAll('button')].find(e=>e.textConten
 const click=async el=>{assert.ok(el);await act(async()=>el.click())};
 await click(document.querySelector('.reports-progress-table .reports-pagination button:last-child'));
 assert.equal(new URL(requests.at(-1).url,'http://localhost').searchParams.get('offset'),'50');
+await click(document.querySelector('.reports-status-filters button'));
+assert.match(document.querySelector('.reports-progress-table .reports-pagination').textContent,/51/);
 const trigger=document.querySelector('tbody tr button');trigger.focus();await click(trigger);
 assert.ok(trigger.isConnected);
 assert.match(document.querySelector('[role=dialog]').getAttribute('aria-label'),/案件詳情 · .* /);
