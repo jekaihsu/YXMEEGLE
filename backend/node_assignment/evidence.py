@@ -72,6 +72,11 @@ def applicable(evidence: Mapping[NodeKey, AutoDone], skipped) -> dict[NodeKey, A
 PRODUCTION_NODES = tuple(NodeKey(key) for key in PRODUCTION)
 
 
+# Daily and v3 actuals are revenue points; a plan quantity is in contract units, so they must not be compared.
+# Only an actual measured in contract units may drive the 可送審 hint, and no source provides one yet.
+QUANTITY_SOURCE = 'quantity'
+
+
 @dataclass(frozen=True)
 class Signal:
     """One production node's source evidence. Counts are None while the plan or the daily links are unavailable."""
@@ -89,8 +94,8 @@ class Signal:
     @property
     def can_submit(self) -> bool:
         planned, actual = parse_decimal(self.planned_qty), parse_decimal(self.actual_value)
-        return bool(self.actual_known and planned is not None and actual is not None and planned > Decimal(0)
-                    and actual >= planned)
+        return bool(self.actual_source == QUANTITY_SOURCE and self.actual_known and planned is not None
+                    and actual is not None and planned > Decimal(0) and actual >= planned)
 
     def public(self) -> dict:
         return {'planned_qty': self.planned_qty, 'lines': self.lines, 'items': self.items,

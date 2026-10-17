@@ -72,16 +72,16 @@ def test_evidence_never_yields_review_or_done_however_much_work_is_reported(h):
     field = node(view(h), 'field')
     assert field['derived_status'] == '進行中' and field['approver'] is None and field['approved_at'] is None
     assert field['evidence']['actual_value'] == '500'
-    assert field['can_submit_hint'] is True
+    assert field['can_submit_hint'] is False
 
 
-def test_can_submit_hint_needs_a_known_actual_at_least_the_plan(h):
+def test_points_never_drive_the_submit_hint_because_the_plan_is_in_contract_units(h):
     open_case(h)
     set_plan(h, 外業=counts('10', 1, 1))
     daily(h, 'field', '2026-10-01', points=9.99)
     assert node(view(h), 'field')['can_submit_hint'] is False
     h.case['project']['daily_reports'][0]['points'] = 10
-    assert node(view(h), 'field')['can_submit_hint'] is True
+    assert node(view(h), 'field')['can_submit_hint'] is False
     h.case['project']['daily_reports'][0]['points'] = None
     unknown = node(view(h), 'field')
     assert (unknown['derived_status'], unknown['can_submit_hint'], unknown['evidence']['actual_known']) == ('進行中', False, False)
@@ -228,7 +228,8 @@ def test_signal_is_pure_decimal_safe_and_does_not_read_a_missing_plan_as_zero():
     assert (control.started, control.actual_known, control.actual_value) == (True, False, None)
     assert found[NodeKey.MAPPING] == Signal(None, None, None, 0, None, False, None, None, False, '此案件的日報沒有歸屬到圖資')
     assert production_signal({'id': 'p1'}, {})[NodeKey.MAPPING].reason_zh == NO_DAILY
-    assert Signal('0.3', 1, 1, 1, None, True, '0.3', 'v4_daily', True, '').can_submit is True
+    assert Signal('0.3', 1, 1, 1, None, True, '0.3', 'quantity', True, '').can_submit is True
+    assert Signal('0.3', 1, 1, 1, None, True, '0.3', 'v4_daily', True, '').can_submit is False
 
 
 class StubReports:
