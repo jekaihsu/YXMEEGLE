@@ -5,7 +5,9 @@ import httpx
 import pytest
 
 from .node_assignment.lark_table import date_millis
-from .test_node_assignment_routes import NODES, PEOPLE, TASKS, URL, h, project  # noqa: F401  (h is the shared fixture)
+from .node_assignment.service import Receipts
+from .node_assignment.start_sop_service import stored_failure
+from .test_node_assignment_routes import NODES, PEOPLE, TASKS, URL, act, h, project  # noqa: F401  (h is the shared fixture)
 
 SOP = URL + '/start-sop'
 
@@ -98,7 +100,7 @@ def test_start_creates_four_nodes_and_one_marked_task_each(s):
     response = start(s)
     body = response.json()
     assert (body['started'], body['complete']) == (True, True)
-    assert body['results'] == [{'key': k, 'node': 'created', 'task': 'created', 'error': None}
+    assert body['results'] == [{'key': k, 'node': 'created', 'task': 'created', 'error': None, 'sync': 'ok'}
                                for k in ('field', 'control', 'mapping', 'report')]
     assert post_methods(s) == ['POST', 'POST', 'PUT'] * 4
     assert seeded_nodes(s) == ['圖資', '報告', '外業', '控制']
@@ -139,7 +141,7 @@ def test_pressing_again_creates_nothing_and_reports_existing(s):
     writes = len(s.fake.writes())
     body = start(s, 'r2').json()
     assert (body['started'], body['complete']) == (False, True)
-    assert body['results'] == [{'key': k, 'node': 'existing', 'task': 'existing', 'error': None}
+    assert body['results'] == [{'key': k, 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
                                for k in ('field', 'control', 'mapping', 'report')]
     assert len(s.fake.writes()) == writes and len(s.fake.rows(TASKS)) == 4
 
@@ -269,7 +271,7 @@ def test_project_pm_supervisor_node_supervisor_and_system_admin_may_start(s):
 def test_a_department_manager_seeds_only_their_node(s):
     body = start(s, 'r1', who='ou_fm').json()
     assert body['complete'] is False
-    assert body['results'][0] == {'key': 'field', 'node': 'created', 'task': 'created', 'error': None}
+    assert body['results'][0] == {'key': 'field', 'node': 'created', 'task': 'created', 'error': None, 'sync': 'ok'}
     assert [(r['key'], r['node'], r['task'], r['error']) for r in body['results'][1:]] == [
         (k, 'failed', 'failed', 'forbidden') for k in ('control', 'mapping', 'report')]
     assert seeded_nodes(s) == ['外業']
@@ -521,9 +523,9 @@ def test_an_uncertain_create_is_reconciled_even_when_the_task_became_visible_bef
     start(s, 'r1')
     s.fake.hidden.clear()
     body = start(s, 'r2').json()
-    assert body['results'][0] == {'key': 'field', 'node': 'created', 'task': 'created', 'error': None}
+    assert body['results'][0] == {'key': 'field', 'node': 'created', 'task': 'created', 'error': None, 'sync': 'ok'}
     assert len(field_tasks(s)) == 1
-    assert start(s, 'r3').json()['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None}
+    assert start(s, 'r3').json()['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
 
 
 def test_cancelling_the_seed_and_pressing_again_creates_exactly_one_new_task(s):
@@ -544,7 +546,7 @@ def test_a_marker_task_from_before_the_ledger_stays_the_seed_after_its_marker_is
     start(s, 'r1')
     s.fake.tables[TASKS][legacy]['內容'] = '舊版，標記已刪除'
     s.clock[0] += 3600
-    assert start(s, 'r2').json()['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None}
+    assert start(s, 'r2').json()['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
     assert len(field_tasks(s)) == 1
 
 
@@ -590,7 +592,7 @@ def test_existing_node_with_a_manual_task_still_gets_the_seed_task(s):
     assert (before['node_exists'], before['seed_task_exists'], before['will_create_node'], before['will_create_task']) == (
         True, False, False, True)
     body = start(s).json()
-    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None}
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None, 'sync': 'ok'}
     assert sorted(f['標題'] for f in s.fake.tables[TASKS].values() if node in f['節點指派']) == [
         '外業：依計畫數量完成', '手動任務']
     assert len(s.fake.rows(NODES)) == 4
@@ -627,7 +629,7 @@ def test_a_seed_task_stays_the_seed_after_someone_edits_the_marker_away(s):
     writes = len(s.fake.writes())
     body = start(s, 'r2').json()
     assert (body['started'], body['complete']) == (False, True)
-    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None}
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
     assert len(s.fake.writes()) == writes and len(s.fake.rows(TASKS)) == 4
 
 
@@ -637,7 +639,7 @@ def test_a_cancelled_seed_counts_as_absent_even_without_its_marker(s):
     s.fake.tables[TASKS][rid]['狀態'] = '取消'
     s.clock[0] += 3600
     assert preview(s)['nodes'][0]['will_create_task'] is True
-    assert start(s, 'r2').json()['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None}
+    assert start(s, 'r2').json()['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None, 'sync': 'ok'}
     live = [f for f in s.fake.tables[TASKS].values() if f['標題'].startswith('外業') and f['狀態'] != '取消']
     assert len(live) == 1 and live[0]['內容'].endswith('[SOP-START:v1:field]')
 
@@ -648,7 +650,7 @@ def test_a_finished_node_is_not_given_a_task(s):
     node = preview(s)['nodes'][0]
     assert (node['node_exists'], node['will_create_node'], node['will_create_task']) == (True, False, False)
     body = start(s).json()
-    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'skipped', 'error': None}
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'skipped', 'error': None, 'sync': 'ok'}
     assert [f for f in s.fake.tables[TASKS].values() if done in f.get('節點指派', [])] == []
     assert len(s.fake.rows(NODES)) == 4 and len(s.fake.rows(TASKS)) == 3
 
@@ -722,3 +724,249 @@ def test_every_run_leaves_an_audit_row_per_node(s):
     start(s, 'r1')
     rows = [(a[0], a[2]['result'], a[2]['node']) for a in s.audits()]
     assert rows == [('node_assignment.start_sop', 'success', k) for k in ('field', 'control', 'mapping', 'report')]
+
+
+def test_ordinary_task_creation_still_costs_one_charge_per_call(s):
+    codes = [act(s, 'ou_fm', '/nodes/field/tasks', {'request_id': f'c{n}', 'title': f'任務 {n}', 'department': '外業'}).status_code
+             for n in range(31)]
+    assert codes == [200] * 30 + [429]
+    assert len(s.fake.rows(TASKS)) == 30
+
+
+def test_replaying_a_finished_press_costs_nothing(s):
+    first = start(s, 'same')
+    for _ in range(40):
+        replay = s.client.post(SOP, json={'request_id': 'same', 'preview_hash': preview(s)['preview_hash']})
+        assert (replay.status_code, replay.json()) == (200, first.json())
+    assert len(s.fake.writes()) == 12
+
+
+def reject_the_first_node_update_after_the_field_task_create(s):
+    def reject_node_update(request):
+        node_id = json.loads(request.content)['fields']['節點指派'][0]
+        s.fake.fault('PUT', f'{NODES}/records/{node_id}', lambda _: httpx.Response(400, json={'code': 1254001, 'msg': 'bad'}))
+    s.fake.fault('POST', f'{TASKS}/records', reject_node_update)
+
+
+def test_a_failed_node_sync_is_reported_and_a_later_press_retries_only_the_sync(s):
+    reject_the_first_node_update_after_the_field_task_create(s)
+    first = start(s, 'r1').json()
+    assert (first['started'], first['complete']) == (True, False)
+    assert [(r['key'], r['node'], r['task'], r['error'], r['sync']) for r in first['results']] == [
+        ('field', 'created', 'created', None, 'failed'), ('control', 'created', 'created', None, 'ok'),
+        ('mapping', 'created', 'created', None, 'ok'), ('report', 'created', 'created', None, 'ok')]
+    assert '進度' not in next(f for f in s.fake.rows(NODES).values() if f['節點'] == '外業')
+    writes = len(s.fake.writes())
+    second = start(s, 'r2').json()
+    assert second['complete'] is True
+    assert [r['sync'] for r in second['results']] == ['ok'] * 4
+    assert len(s.fake.writes()) == writes + 1
+    assert len(field_tasks(s)) == 1 and len(s.fake.rows(TASKS)) == 4
+    assert next(f for f in s.fake.rows(NODES).values() if f['節點'] == '外業')['進度'] == 0.0
+    third = start(s, 'r3').json()
+    assert (third['started'], third['complete']) == (False, True)
+    assert len(s.fake.writes()) == writes + 1
+
+
+def test_repeating_the_same_request_after_a_failed_sync_retries_it_too(s):
+    reject_the_first_node_update_after_the_field_task_create(s)
+    assert start(s, 'r1').json()['complete'] is False
+    writes = len(s.fake.writes())
+    again = start(s, 'r1').json()
+    assert again['complete'] is True and len(s.fake.writes()) == writes + 1
+    assert start(s, 'r1').json() == again
+
+
+def die_right_after(monkeypatch, saved):
+    """The process dies once, immediately after the first receipt write for which `saved(plan)` holds."""
+    original, fired = Receipts.save, []
+
+    def save(self, key, fingerprint, result):
+        original(self, key, fingerprint, result)
+        if not fired and (plan := result.get('plan')) and saved(plan):
+            fired.append(True)
+            raise RuntimeError('process died')
+    monkeypatch.setattr(Receipts, 'save', save)
+
+
+def test_a_press_after_the_process_died_with_only_the_node_pinned_completes_without_a_second_seed(s, monkeypatch):
+    die_right_after(monkeypatch, lambda p: p['kind'] == 'task_create' and p['changes'].get('node')
+                    and p['pre_create_task_ids'] is None)
+    with pytest.raises(RuntimeError):
+        start(s, 'r1')
+    monkeypatch.undo()
+    assert len(s.fake.rows(NODES)) == 1 and not s.fake.rows(TASKS)
+    tokens = []
+    s.fake.fault('POST', f'{TASKS}/records', lambda request: tokens.append(request.url.params.get('client_token')), times=4)
+    second = start(s, 'r2').json()
+    assert (second['started'], second['complete']) == (True, True)
+    assert second['results'][0] == {'key': 'field', 'node': 'created', 'task': 'created', 'error': None, 'sync': 'ok'}
+    assert all(tokens) and len(set(tokens)) == 4
+    for rid in ('r3', 'r4'):
+        again = start(s, rid).json()
+        assert (again['started'], again['complete']) == (False, True)
+    assert len(field_tasks(s)) == 1 and len(s.fake.rows(TASKS)) == 4 and len(s.fake.rows(NODES)) == 4
+
+
+def test_a_pending_attempt_left_by_one_person_is_finished_by_another(s, monkeypatch):
+    s.case['project'] = {**s.case['project'], 'supervisor_id': 'ou_sup'}
+    die_right_after(monkeypatch, lambda p: p['kind'] == 'task_create' and p['changes'].get('node')
+                    and p['pre_create_task_ids'] is None)
+    with pytest.raises(RuntimeError):
+        start(s, 'r1', who='ou_pm')
+    monkeypatch.undo()
+    body = start(s, 'r2', who='ou_sup').json()
+    assert (body['started'], body['complete']) == (True, True)
+    assert len(field_tasks(s)) == 1 and field_tasks(s)[0]['指派人'] == [{'id': 'ou_sup'}]
+
+
+def test_a_node_attempt_resumed_as_a_task_create_is_sent_under_a_client_token(s, monkeypatch):
+    s.case['project'] = {**project(skipped=('field',)), 'pm_id': 'ou_pm'}
+    die_right_after(monkeypatch, lambda p: p['kind'] == 'node' and not p['record_id'])
+    with pytest.raises(RuntimeError):
+        start(s, 'r1')
+    monkeypatch.undo()
+    assert not s.fake.rows(NODES) and not s.fake.rows(TASKS)
+    s.case['project'] = {**project(), 'pm_id': 'ou_pm'}
+    tokens = []
+    s.fake.fault('POST', f'{TASKS}/records', lambda request: tokens.append(request.url.params.get('client_token')), times=4)
+    body = start(s, 'r2').json()
+    assert (body['started'], body['complete']) == (True, True)
+    assert len(tokens) == 4 and all(tokens)
+    assert len(field_tasks(s)) == 1
+
+
+FIELD_TITLE = '外業：依計畫數量完成'
+
+
+def task_tokens(s, first_response=None):
+    """Every task create's client token by task title. The first create answers `first_response` without landing."""
+    seen, tokens = [], {}
+
+    def record(request):
+        title = json.loads(request.content)['fields']['標題']
+        tokens.setdefault(title, []).append(request.url.params['client_token'])
+        seen.append(1)
+        return first_response if len(seen) == 1 else None
+    s.fake.fault('POST', f'{TASKS}/records', record, times=50)
+    return tokens
+
+
+def test_an_unlanded_create_is_retried_under_the_same_token_until_the_stale_window_passes(s):
+    tokens = task_tokens(s, httpx.Response(504, text='gateway timeout'))
+    assert start(s, 'r1').json()['results'][0]['error'] == 'outcome_unknown'
+    assert len(s.fake.rows(TASKS)) == 3
+    body = start(s, 'r2').json()
+    assert (body['complete'], body['results'][0]['task']) == (True, 'created')
+    assert len(tokens[FIELD_TITLE]) == 2 and tokens[FIELD_TITLE][0] == tokens[FIELD_TITLE][1]
+    assert len(field_tasks(s)) == 1
+
+
+def test_a_pending_attempt_older_than_the_stale_window_is_abandoned_and_recreated_under_a_new_token(s):
+    tokens = task_tokens(s, httpx.Response(504, text='gateway timeout'))
+    start(s, 'r1')
+    s.clock[0] += 901
+    body = start(s, 'r2').json()
+    assert (body['complete'], body['results'][0]['task']) == (True, 'created')
+    assert len(tokens[FIELD_TITLE]) == 2 and tokens[FIELD_TITLE][0] != tokens[FIELD_TITLE][1]
+    assert len(field_tasks(s)) == 1
+    again = start(s, 'r3').json()
+    assert (again['started'], again['complete']) == (False, True)
+    assert len(field_tasks(s)) == 1
+
+
+def test_a_plan_changed_after_a_failed_create_is_created_once_with_the_new_content_after_the_window(s):
+    tokens = task_tokens(s, httpx.Response(504, text='gateway timeout'))
+    assert start(s, 'r1').json()['results'][0]['error'] == 'outcome_unknown'
+    set_plan(s, 外業=counts('130', 2, 5, items_native=5))
+    s.clock[0] += 901
+    body = start(s, 'r2').json()
+    assert (body['complete'], body['started']) == (True, True)
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None, 'sync': 'ok'}
+    assert [r['task'] for r in body['results'][1:]] == ['existing'] * 3
+    assert [f['內容'].split('\n')[1] for f in field_tasks(s)] == ['計畫數量：130']
+    assert len(tokens[FIELD_TITLE]) == 2 and tokens[FIELD_TITLE][0] != tokens[FIELD_TITLE][1]
+    assert len(s.fake.rows(TASKS)) == 4
+    again = start(s, 'r3').json()
+    assert (again['started'], again['complete']) == (False, True)
+    assert len(field_tasks(s)) == 1
+
+
+def test_a_changed_plan_waits_for_a_create_that_may_still_land_instead_of_sending_a_second_one(s):
+    task_tokens(s, httpx.Response(504, text='gateway timeout'))
+    start(s, 'r1')
+    set_plan(s, 外業=counts('130', 2, 5, items_native=5))
+    s.clock[0] += 60
+    waiting = start(s, 'r2').json()
+    assert (waiting['complete'], waiting['results'][0]['error']) == (False, 'outcome_unknown')
+    assert not field_tasks(s)
+    s.clock[0] += 900
+    assert start(s, 'r3').json()['complete'] is True
+    assert [f['內容'].split('\n')[1] for f in field_tasks(s)] == ['計畫數量：130']
+
+
+def test_a_changed_plan_adopts_an_old_create_that_had_landed_and_warns_that_its_content_differs(s):
+    lose_and_hide_the_first_task(s)
+    assert start(s, 'r1').json()['results'][0]['error'] == 'outcome_unknown'
+    s.fake.hidden.clear()
+    set_plan(s, 外業=counts('130', 2, 5, items_native=5))
+    s.clock[0] += 60
+    body = start(s, 'r2').json()
+    assert (body['started'], body['complete']) == (False, True)
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok',
+                                  'warning': 'content_differs'}
+    assert [f['內容'].split('\n')[1] for f in field_tasks(s)] == ['計畫數量：123.45']
+    again = start(s, 'r3').json()
+    assert again['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
+    assert len(field_tasks(s)) == 1 and len(s.fake.rows(TASKS)) == 4
+
+
+def test_a_landed_seed_whose_marker_was_edited_before_the_ledger_is_adopted_instead_of_failing_forever(s):
+    lose_and_hide_the_first_task(s)
+    start(s, 'r1')
+    s.fake.hidden.clear()
+    field_tasks(s)[0]['內容'] = 'edited without marker'
+    for rid in ('r2', 'r3', 'r4', 'r5'):
+        body = start(s, rid).json()
+        assert body['complete'] is True and body['results'][0]['error'] is None
+    assert [f['內容'] for f in field_tasks(s)] == ['edited without marker']
+    assert len(s.fake.rows(TASKS)) == 4
+    final = preview(s)
+    assert (final['already_started'], final['nodes'][0]['seed_task_exists']) == (True, True)
+    assert start(s, 'r6').json()['started'] is False
+
+
+def test_a_landed_seed_that_is_edited_while_still_invisible_on_its_node_is_adopted_on_the_next_press(s):
+    lose_and_hide_the_first_task(s)
+    start(s, 'r1')
+    field_tasks(s)[0]['內容'] = 'edited without marker'
+    second = start(s, 'r2').json()
+    assert (second['complete'], second['results'][0]['error']) == (False, 'readback_mismatch')
+    s.fake.hidden.clear()
+    for rid in ('r3', 'r4'):
+        assert start(s, rid).json()['complete'] is True
+    assert len(field_tasks(s)) == 1 and len(s.fake.rows(TASKS)) == 4
+    assert preview(s)['already_started'] is True
+
+
+def test_a_seed_task_hard_deleted_in_lark_counts_as_unseeded_and_the_new_seed_gets_a_new_sequence(s):
+    start(s, 'r1')
+    old = next(rid for rid, f in s.fake.tables[TASKS].items() if f['標題'] == FIELD_TITLE)
+    del s.fake.tables[TASKS][old]
+    s.clock[0] += 3600
+    before = preview(s)['nodes'][0]
+    assert (before['seed_task_exists'], before['will_create_task']) == (False, True)
+    tokens = task_tokens(s)
+    body = start(s, 'r2').json()
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None, 'sync': 'ok'}
+    assert len(field_tasks(s)) == 1 and next(iter(field_tasks(s)))['內容'].endswith('[SOP-START:v1:field]')
+    assert len(tokens[FIELD_TITLE]) == 1
+    s.clock[0] += 3600
+    assert start(s, 'r3').json()['started'] is False
+    assert len(field_tasks(s)) == 1
+
+
+def test_a_replayed_error_body_becomes_a_failed_node_with_its_stored_code():
+    failure = stored_failure({'detail': '先前送出的結果無法確認', 'code': 'revision_conflict'})
+    assert (failure.code, failure.message, failure.status) == ('revision_conflict', '先前送出的結果無法確認', 409)
+    assert stored_failure({'detail': 'x', 'code': 'unheard_of'}).code == 'lark_error'

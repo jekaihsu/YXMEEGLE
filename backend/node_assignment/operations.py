@@ -3,6 +3,7 @@ import re
 import unicodedata
 from dataclasses import dataclass, field, replace
 from datetime import date
+from enum import StrEnum
 
 from .domain import (
     NODE_DEPARTMENTS, OPEN, STARTED, Actor, AssignmentMethod, Denied, IllegalTransition, NodeAction,
@@ -169,6 +170,27 @@ class Situation:
     confirmation_record: str | None = None
 
 
+class CreatePhase(StrEnum):
+    """How far a task-create plan got. Only the last two can have reached Lark."""
+    PLANNED = 'planned'
+    NODE_PINNED = 'node_pinned'
+    TASK_ATTEMPTED = 'task_attempted'
+    TASK_CREATED = 'task_created'
+
+    @property
+    def may_have_landed(self) -> bool:
+        return self in (CreatePhase.TASK_ATTEMPTED, CreatePhase.TASK_CREATED)
+
+
+def _inferred_phase(data) -> CreatePhase:
+    """Receipts written before the phase was stored: the baseline is pinned right before the create is sent."""
+    if data.get('record_id'):
+        return CreatePhase.TASK_CREATED
+    if data.get('pre_create_task_ids') is not None:
+        return CreatePhase.TASK_ATTEMPTED
+    return CreatePhase.NODE_PINNED if 'node' in data['changes'] else CreatePhase.PLANNED
+
+
 @dataclass(frozen=True)
 class Plan:
     """A single verified write. `changes` uses semantic keys of NODE_FIELDS or TASK_FIELDS."""
@@ -181,19 +203,20 @@ class Plan:
     before: dict = field(default_factory=dict)
     pre_create_task_ids: tuple[str, ...] | None = None
     created_node: bool = False
+    phase: CreatePhase = CreatePhase.PLANNED
 
     def to_json(self):
         return {'kind': self.kind, 'record_id': self.record_id, 'base_revision': self.base_revision,
                 'changes': self.changes, 'client_token': self.client_token, 'warnings': list(self.warnings),
                 'before': self.before, 'pre_create_task_ids': self.pre_create_task_ids,
-                'created_node': self.created_node}
+                'created_node': self.created_node, 'phase': self.phase.value}
 
     @classmethod
     def from_json(cls, data):
         return cls(data['kind'], data['record_id'], data['base_revision'], data['changes'], data.get('client_token'),
                    tuple(data.get('warnings', ())), data.get('before', {}),
                    tuple(data['pre_create_task_ids']) if data.get('pre_create_task_ids') is not None else None,
-                   data.get('created_node', False))
+                   data.get('created_node', False), CreatePhase(data['phase']) if data.get('phase') else _inferred_phase(data))
 
 
 def facts_of(snapshot: CaseSnapshot, skipped, overrides=None) -> dict[NodeKey, NodeFacts]:

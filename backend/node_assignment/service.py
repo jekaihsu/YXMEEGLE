@@ -33,13 +33,14 @@ from .errors import Failure
 from .lark_table import (
     NODE_FIELDS, TASK_FIELDS, BitableClient, CaseSnapshot, Table, assignment_key, check_schema, mismatches,
     parse_node, parse_task, read_case, wire)
-from .operations import Plan, Situation, facts_of, mirror
+from .operations import CreatePhase, Plan, Situation, facts_of, mirror
 from .roster import Roster, fetch_roster
 from .views import case_view, node_detail
 
 logger = logging.getLogger(__name__)
 TAIPEI = timezone(timedelta(hours=8))
 UNCERTAIN = frozenset({'outcome_unknown', 'readback_mismatch'})
+SYNC_FAILED = 'node_status_sync_failed'
 SCHEMA_RECHECK_SECONDS = 600
 
 
@@ -56,6 +57,10 @@ class Context:
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+
+
+def fingerprint_of(action, project_id, key, payload):
+    return digest({'action': action, 'project_id': project_id, 'node': key.value, **payload})
 
 
 def create_token(receipt, assignment, purpose):
@@ -126,8 +131,8 @@ class RateLimit:
 
 
 class Receipts:
-    def __init__(self, sessions, model):
-        self.sessions, self.model = sessions, model
+    def __init__(self, sessions, model, clock=time.time):
+        self.sessions, self.model, self.clock = sessions, model, clock
 
     @staticmethod
     def key(wid, actor_id, request_id):
@@ -153,9 +158,12 @@ class Receipts:
             return None if row is None else deepcopy(row.result)
 
     def save(self, key, fingerprint, result):
+        """A pending result is stamped `at` with the time it was first saved, so a stuck one can age out."""
         try:
             with self.sessions.begin() as db:
                 row = db.get(self.model, key)
+                if result.get('state') == 'pending':
+                    result = {**result, 'at': ((row.result or {}).get('at') if row else None) or self.clock()}
                 if row is None:
                     db.add(self.model(id=key, fingerprint=fingerprint, result=result))
                 elif row.fingerprint != fingerprint:
@@ -179,9 +187,9 @@ class NodeAssignmentService:
         self.cfg = cfg
         self.config = NodeAssignmentConfig.from_env(cfg)
         self.sessions, self.Audit = sessions, audit_model
-        self.receipts = Receipts(sessions, receipt_model)
         self.skipped_nodes = skipped_nodes
         self.transport, self.clock = transport, clock
+        self.receipts = Receipts(sessions, receipt_model, clock)
         self.client_options = client_options or {}
         self.case_cache = StaleCache(self.config.read_ttl_seconds, self.config.stale_max_seconds, clock)
         self.roster_cache = StaleCache(self.config.roster_ttl_seconds, self.config.stale_max_seconds, clock)
@@ -299,18 +307,23 @@ class NodeAssignmentService:
     # Writes
 
     def mutate(self, ctx: Context, key: NodeKey, action: str, request_id, payload, plan_fn, *, finish=None,
-               landed=None, receipt_id=None):
+               landed=None, receipt_id=None, charge_per_write=False, recognize=None):
         """plan_fn(situation, resumed_plan) -> Plan, or None when there is nothing to write (body is then None).
 
         `finish` replaces the default node-detail response. `landed`, when given, collects every plan pinned before
         a failure so the caller can tell what already reached Lark. `receipt_id` replaces the request-derived receipt
         key, and with it the client tokens, for operations whose identity is the work rather than the request.
+        `recognize(client, snapshot, plan)` may name the record of a pending create that landed but no longer matches
+        its fields (someone edited it), which then counts as applied instead of a conflict.
+        A call costs one rate charge, or one per outbound write with `charge_per_write`.
         Returns (http_status, body, replayed).
         """
         finish = finish or self._finish
         code = self.open(ctx, write=True)
+        if not charge_per_write:
+            self.rate.take(ctx.wid, ctx.user['id'])
         receipt = receipt_id or self.receipts.key(ctx.wid, ctx.user['id'], request_id)
-        fingerprint = digest({'action': action, 'project_id': ctx.project['id'], 'node': key.value, **payload})
+        fingerprint = fingerprint_of(action, ctx.project['id'], key, payload)
         akey = assignment_key(code, key)
 
         def record(result, **details):
@@ -351,7 +364,8 @@ class NodeAssignmentService:
                     if planned is not None and (checked is None or checked.changes != planned.changes):
                         raise Failure('forbidden', '操作權限已變更，請重新整理後再操作',
                                       writes_started=bool(write_attempts))
-                self.rate.take(ctx.wid, ctx.user['id'])
+                if charge_per_write:
+                    self.rate.take(ctx.wid, ctx.user['id'])
                 write_attempts += 1
 
             with self.client(before_write=authorize_write) as client:
@@ -360,6 +374,8 @@ class NodeAssignmentService:
                 resumed = None
                 if stored:
                     outcome, previous = self._reconcile(client, snapshot, key, Plan.from_json(stored['plan']))
+                    if outcome != 'applied' and recognize and (found := recognize(client, snapshot, previous)):
+                        outcome, previous = 'applied', replace(previous, record_id=found, phase=CreatePhase.TASK_CREATED)
                     if outcome == 'applied':
                         return finish(ctx, client, code, key, previous, roster, receipt, fingerprint, record)
                     if outcome == 'conflict':
@@ -380,8 +396,11 @@ class NodeAssignmentService:
                         return 200, None, False
                     planned = plan
                     if plan.kind == 'task_create':
-                        plan = replace(plan, client_token=resumed.client_token if resumed else create_token(receipt, akey, 'task-create'),
-                            pre_create_task_ids=resumed.pre_create_task_ids if resumed else None)
+                        # Only a create that may have reached Lark keeps its token. Any other attempt is new work.
+                        sent = resumed is not None and resumed.kind == 'task_create' and resumed.phase.may_have_landed
+                        plan = replace(plan, client_token=resumed.client_token if sent else create_token(
+                            receipt, akey, 'task-create:' + digest(plan.changes)),
+                            pre_create_task_ids=resumed.pre_create_task_ids if sent else None)
                     if resumed:
                         plan = replace(plan, created_node=plan.created_node or resumed.created_node)
                 except Denied as exc:
@@ -466,12 +485,13 @@ class NodeAssignmentService:
             if 'node' not in plan.changes:
                 row, created = self._node_row(client, s, receipt)
                 plan = pin(replace(plan, changes={**plan.changes, 'node': [row.record_id]},
-                                     created_node=created or plan.created_node))
+                                     created_node=created or plan.created_node, phase=CreatePhase.NODE_PINNED))
             if plan.pre_create_task_ids is None:
                 row = client.get(Table.NODES, plan.changes['node'][0])
-                plan = pin(replace(plan, pre_create_task_ids=parse_node(row).task_ids))
+                plan = pin(replace(plan, pre_create_task_ids=parse_node(row).task_ids, phase=CreatePhase.TASK_ATTEMPTED))
             fields = wire(TASK_FIELDS, plan.changes)
-            plan = pin(replace(plan, record_id=client.create(Table.TASKS, fields, plan.client_token)))
+            plan = pin(replace(plan, record_id=client.create(Table.TASKS, fields, plan.client_token),
+                                     phase=CreatePhase.TASK_CREATED))
             self._verify(client, Table.TASKS, TASK_FIELDS, plan.record_id, fields)
             return plan
         table, spec = (Table.NODES, NODE_FIELDS) if plan.kind == 'node' else (Table.TASKS, TASK_FIELDS)
@@ -489,7 +509,7 @@ class NodeAssignmentService:
                 landed = not mismatches(TASK_FIELDS, fields, client.get(Table.TASKS, plan.record_id))
                 return ('applied' if landed else 'conflict'), plan
             row = snapshot.row(key)
-            if row is None or 'node' not in plan.changes:
+            if row is None or not plan.phase.may_have_landed:
                 return 'not_applied', plan
             if plan.pre_create_task_ids is None:
                 raise Failure('outcome_unknown', '先前任務建立結果無法安全核對；請重新整理確認')
@@ -554,7 +574,7 @@ class NodeAssignmentService:
         snapshot = read_case(client, code)
         synced = self._sync_node(client, ctx, snapshot, key, plan)
         if synced == 'failed':
-            warnings.append('node_status_sync_failed')
+            warnings.append(SYNC_FAILED)
         elif synced == 'written':
             snapshot = read_case(client, code)
         self.case_cache.put((ctx.wid, code), snapshot)
