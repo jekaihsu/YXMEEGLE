@@ -52,6 +52,8 @@ All routes sit under `/api/projects/{project_id}/node-assignments`. Mutations ne
 | POST | `/nodes/{key}/reject` | `{request_id, expected_revision, reason (1..500)}` |
 | POST | `/nodes/{key}/tasks` | `{request_id, title (1..200), detail? (..2000), assignee_open_id?, deadline? YYYY-MM-DD, department?}` |
 | PATCH | `/nodes/{key}/tasks/{task_id}` | `{request_id, expected_revision, status?, assignee_open_id?, deadline?, detail?}` |
+| GET | `/start-sop` | none |
+| POST | `/start-sop` | `{request_id, preview_hash}` |
 
 `key` is one of `sales, pm, confirmation, field, control, mapping, report, pricing, settlement`. `expected_revision` is the `revision` from the last read, or `null` for a node that has no Lark row yet.
 
@@ -119,6 +121,8 @@ Errors are `{detail, code, ...}` with `detail` in Traditional Chinese.
 | `idempotency_conflict` | 409 | The `request_id` was used with a different body |
 | `readback_mismatch` | 409 | The written values did not read back; replay the same `request_id` to reconcile |
 | `busy` | 409 | Another write on the same node did not finish in time |
+| `preview_stale` | 409 | 啟動 SOP: the plan or a quote deadline changed since the preview |
+| `nothing_to_start` | 409 | 啟動 SOP: no confirmation code or no planned quantity; `blockers` included |
 | `outcome_unknown` | 502 | Lark did not confirm a write; replay the same `request_id` to reconcile |
 | `lark_permission` | 502 | Lark scope or Base permission missing; `lark_code`, `missing_scopes` included |
 | `lark_error` | 502 | Lark rejected a request or returned incomplete pages |
@@ -188,3 +192,34 @@ Task details sort all authorized tasks before rendering. Open overdue tasks come
 The client preserves `fetched_at` and `stale_reason`. Panels identify `fetched_at` as the workbench read time, not the Lark modification time. The nine-node summary and each node's task counts remain the existing Lark read model. Local SOP templates appear in an expandable section and do not change those counts.
 
 Assignment reads start when flow, tasks, or assignment participants become visible. Hover or keyboard focus can prefetch after 150 ms. Save Data and slow 2G connections disable extra prefetch. Overview responses still contain the existing embedded `node_details`. This stream does not change the service to omit those fields. Successful writes still use version checks, idempotent request IDs, remote readback, and the existing server permissions.
+
+## 啟動 SOP
+
+A project lead previews, then confirms, and the app seeds one 節點指派 row and ONE 任務 row for each production category with a planned quantity. Categories map to nodes 外業 `field`, 控制 `control`, 圖資 `mapping`, 報告 `report`. At most 8 rows are written (4 nodes and 4 tasks). Node status stays derived from the nine-node chain; the operation never writes a status, and no 進度 or 開始時間 either.
+
+**Source.** Quantities, line and item counts and link-basis counts come from `state['derived_plan'][project_id]` (`plan_summary`). A category with a planned quantity of 0 is absent. Deadlines come from the project's quotes (direct `project_id`/`project_ids`, or through the case's confirmations, as `frontend/src/sourceQuotes.ts projectQuotes` does) using 外業期限, 內業期限(控), 內業期限(圖), 內業期限(報), normalized with `sources.day()`. If dated quotes disagree on a node's date, the deadline is null and the warning `deadline_conflict` names the dates. Nothing is picked.
+
+**Seed task.** Unassigned, status 待處理, 指派人 is the person who pressed start. Title `<外業|控制|圖資|報告>：依計畫數量完成`. Detail lists the planned quantity, contract lines and items, link-basis counts and the node's warnings, and ends with the marker `[SOP-START:v1:<node key>]`. Department is the first of the node's departments (外業, 控制, 圖報A, 圖報A) because existing task creation requires one of them. A node counts as seeded when any non-cancelled task of that node carries its marker. A manually created task without the marker does not count, and a 已完成 or 略過 node gets its row but no task (`task: "skipped"`).
+
+**Who.** The system administrator (`can_manage_roles`), the project's PM or supervisor, the node's supervisor, or a manager of the node's departments (the same rule as `Actor.manages`). Authority is checked per node. Everyone else gets 403 `forbidden`, audited as `node_assignment.start_sop` with result `denied`.
+
+**Blockers** (`eligible` is true only with none and at least one row to write): `disabled`, `writes_disabled` (workspace `external_enabled` off), `no_confirmation_code`, `no_planned_quantity`, `forbidden`, `lark_unavailable`. The flag-off case answers 404 `disabled` like every route, so `disabled` is not sent as a blocker. **Warnings** never block: `no_pm`, `deadline_conflict`, `ambiguous_links`, `needs_review`, `derived_links`, `plan_truncated`. `items_basis.unlinked` also counts native links that could not be resolved.
+
+**Preview** (`GET`, same authorization and caches as the other reads, never writes):
+
+```json
+{"project_id": "p1", "code": "A115001-01", "eligible": true, "already_started": false,
+ "blockers": [{"code": "forbidden", "message": "..."}],
+ "warnings": [{"code": "deadline_conflict", "message": "...", "node": "field"}],
+ "nodes": [{"key": "field", "label": "外業", "category": "外業", "planned_qty": "123.45", "lines": 2, "items": 5,
+   "items_basis": {"native": 5, "derived": 0, "ambiguous": 0, "unlinked": 0}, "deadline": "2026-10-30",
+   "node_exists": false, "seed_task_exists": false, "will_create_node": true, "will_create_task": true,
+   "task_title": "外業：依計畫數量完成", "task_detail": "..."}],
+ "chain_note": "...", "preview_hash": "<sha256>", "plan_rule_version": "contract-links-20261017.1"}
+```
+
+`preview_hash` is the sha256 of the canonical JSON of each node's quantity, counts, deadline, task title and detail plus both rule versions. It does not include Lark state, so it stays the same while a run progresses and a changed plan or quote makes it stale.
+
+**Run** (`POST`, body `{request_id, preview_hash}`) answers `{"started", "complete", "results": [{"key", "node": "created|existing|failed", "task": "created|existing|failed|skipped", "error"}], "overview": <case overview>}`. `started` is true when this call created a row. Before writing it checks, in order, `writes_disabled` (403), a stored result for the `request_id` (replayed with `Idempotent-Replayed`, or `idempotency_conflict` for a different body), `nothing_to_start` (409), `forbidden` (403) and `preview_stale` (409).
+
+Each node runs as its own write under that node's lock with the request id `start-sop:<request_id>:<key>`, so it gets the fresh read, duplicate protection, read-back and pending-receipt reconcile of the other writes, and counts once against the rate limit. A partial failure answers 200 with `complete: false`; repeating the same `request_id` resumes: finished nodes replay their stored result and an uncertain write is reconciled by reading. A new press re-plans from Lark and finds the markers. A Lark failure on every node answers with that failure (`lark_permission`, `lark_error`, `outcome_unknown`, `busy`, `rate_limited`, ...). `lark_permission`, `lark_unavailable`, `rate_limited` and similar stop the run, and the remaining nodes report the same `error`.

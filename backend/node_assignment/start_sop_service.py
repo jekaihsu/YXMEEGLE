@@ -1,0 +1,186 @@
+"""啟動 SOP over the node-assignment service: a read-only preview and a resumable seeding run.
+
+Each seed node is one `service.mutate` call under that node's lock, so it reuses
+the fresh-read planning, duplicate protection, read-back and pending-receipt
+reconciliation of every other write. The run itself holds a receipt that binds
+the request_id to the reviewed preview hash.
+"""
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, replace
+
+from .. import audit
+from .domain import Denied, NodeKey, TaskStatus
+from .errors import Failure
+from .lark_table import assignment_key, date_millis, read_case
+from .operations import Plan, StartSopCommand
+from .service import NodeAssignmentService, actor_for, digest
+from .start_sop import (
+    BLOCKER_MESSAGES, SEED_NODES, BlockerCode, Outcome, PlannedNode, may_start, observe, plan_start,
+    preview_body)
+
+ACTION = 'start_sop'
+# Retrying the next node would fail the same way, so a run stops at the first of these.
+SYSTEMIC = frozenset({'lark_permission', 'lark_unconfigured', 'lark_unavailable', 'rate_limited', 'roster_unavailable',
+                      'writes_disabled'})
+STALE_MESSAGE = '計畫數量或期限已變更，請重新檢視預覽後再啟動'
+
+
+@dataclass(frozen=True)
+class NodeResult:
+    key: NodeKey
+    node: Outcome
+    task: Outcome
+    failure: Failure | None = None
+
+    def public(self):
+        return {'key': self.key.value, 'node': self.node.value, 'task': self.task.value,
+                'error': self.failure.code if self.failure else None}
+
+
+def failed(key: NodeKey, failure: Failure) -> NodeResult:
+    return NodeResult(key, Outcome.FAILED, Outcome.FAILED, failure)
+
+
+class StartSopRunner:
+    def __init__(self, service: NodeAssignmentService):
+        self.svc = service
+
+    def _code(self, ctx):
+        try:
+            return self.svc.open(ctx)
+        except Failure as exc:
+            if exc.code != 'not_found':
+                raise
+            return None
+
+    def _authority(self, ctx, keys, roster):
+        actor = actor_for(ctx.user, roster.value if roster else None)
+        return {k: may_start(ctx.user, ctx.project, k, actor.manages(k)) for k in keys}
+
+    # Preview
+
+    def preview(self, ctx) -> dict:
+        svc = self.svc
+        code = self._code(ctx)
+        plan = plan_start(ctx.state, ctx.project, code)
+        blockers = []
+        if (reason := svc.write_block(ctx)):
+            blockers.append((BlockerCode.WRITES_DISABLED, reason))
+        if code is None:
+            blockers.append((BlockerCode.NO_CONFIRMATION_CODE, BLOCKER_MESSAGES[BlockerCode.NO_CONFIRMATION_CODE]))
+        if not plan.nodes:
+            blockers.append((BlockerCode.NO_PLANNED_QUANTITY, BLOCKER_MESSAGES[BlockerCode.NO_PLANNED_QUANTITY]))
+        states = None
+        if code is not None:
+            try:
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    roster_future = pool.submit(svc._roster, fresh=False)
+                    case_future = pool.submit(svc._case, ctx, code)
+                    roster, cached = roster_future.result(), case_future.result()
+                skipped = svc.skipped(ctx)
+                states = {n.key: observe(cached.value, skipped, n.key) for n in plan.nodes}
+                if not any(self._authority(ctx, [n.key for n in plan.nodes] or SEED_NODES, roster).values()):
+                    blockers.append((BlockerCode.FORBIDDEN, BLOCKER_MESSAGES[BlockerCode.FORBIDDEN]))
+            except Failure as exc:
+                blockers.append((BlockerCode.LARK_UNAVAILABLE, exc.message))
+        return preview_body(plan, states, blockers)
+
+    # Run
+
+    def run(self, ctx, request_id, command: StartSopCommand):
+        """Returns (http_status, body, replayed)."""
+        svc = self.svc
+        code = self._code(ctx)
+        if (reason := svc.write_block(ctx)):
+            raise Failure('writes_disabled', reason)
+        ctx = replace(ctx, user=ctx.authorize())
+        plan = plan_start(ctx.state, ctx.project, code)
+        receipt = svc.receipts.key(ctx.wid, ctx.user['id'], 'start-sop:' + request_id)
+        fingerprint = digest({'action': ACTION, 'project_id': ctx.project['id'],
+                              'body': {'preview_hash': command.preview_hash}})
+        stored = svc.receipts.load(receipt, fingerprint)
+        if stored and stored['state'] == 'done':
+            return stored['status'], stored['body'], True
+        if code is None or not plan.nodes:
+            missing = BlockerCode.NO_CONFIRMATION_CODE if code is None else BlockerCode.NO_PLANNED_QUANTITY
+            raise Failure('nothing_to_start', BLOCKER_MESSAGES[missing],
+                          blockers=[{'code': missing.value, 'message': BLOCKER_MESSAGES[missing]}])
+        allowed = self._authority(ctx, [n.key for n in plan.nodes], svc._roster(fresh=False))
+        refused = [k for k, ok in allowed.items() if not ok]
+        if refused:
+            self._deny(ctx, request_id, refused)
+        if not any(allowed.values()):
+            raise Failure('forbidden', BLOCKER_MESSAGES[BlockerCode.FORBIDDEN])
+        if plan.preview_hash != command.preview_hash:
+            raise Failure('preview_stale', STALE_MESSAGE)
+        svc.receipts.save(receipt, fingerprint, {'state': 'pending'})
+
+        results, halt = [], None
+        for node in plan.nodes:
+            if not allowed[node.key]:
+                results.append(failed(node.key, Failure('forbidden', BLOCKER_MESSAGES[BlockerCode.FORBIDDEN])))
+            elif halt is not None:
+                results.append(failed(node.key, halt))
+            else:
+                results.append(self._seed(ctx, request_id, node, command.preview_hash))
+                if results[-1].failure and results[-1].failure.code in SYSTEMIC:
+                    halt = results[-1].failure
+        failures = [r.failure for r in results if r.failure]
+        if len(failures) == len(results):
+            raise failures[0]
+        body = {'started': any(Outcome.CREATED in (r.node, r.task) for r in results), 'complete': not failures,
+                'results': [r.public() for r in results], 'overview': self._overview(ctx, code)}
+        if not failures:
+            svc.receipts.save(receipt, fingerprint, {'state': 'done', 'status': 200, 'body': body})
+        return 200, body, False
+
+    def _deny(self, ctx, request_id, keys):
+        svc = self.svc
+        with svc.sessions.begin() as db:
+            db.add(audit.record(svc.Audit, ctx.wid, ctx.user['id'], 'node_assignment.' + ACTION, result='denied',
+                                request_id=request_id, details={'project_id': ctx.project['id'],
+                                                                'nodes': [k.value for k in keys]}))
+
+    def _overview(self, ctx, code):
+        svc = self.svc
+        try:
+            with svc.client() as client:
+                svc.case_cache.put((ctx.wid, code), read_case(client, code))
+        except Failure:
+            pass
+        return svc.overview(ctx)
+
+    def _seed(self, ctx, request_id, node: PlannedNode, preview_hash) -> NodeResult:
+        svc, key = self.svc, node.key
+        seen = {'node_created': False, 'task': Outcome.EXISTING}
+
+        def plan_fn(s, _resumed):
+            if not may_start(ctx.user, ctx.project, key, s.actor.manages(key)):
+                raise Denied(BLOCKER_MESSAGES[BlockerCode.FORBIDDEN])
+            state = observe(s.snapshot, s.skipped, key)
+            seen['node_created'] = state.will_create_node
+            if not state.open and not state.seed_task_exists:
+                seen['task'] = Outcome.SKIPPED
+            if state.will_create_task:
+                return Plan('task_create', None, None, {
+                    'title': node.title, 'detail': node.detail, 'assignee': None, 'assigned_by': [s.actor.open_id],
+                    'department': node.department, 'deadline': date_millis(node.deadline) if node.deadline else None,
+                    'status': TaskStatus.TODO.value})
+            return Plan('node', None, None, {}) if state.will_create_node else None
+
+        def finish(fin_ctx, _client, fin_code, fin_key, plan, _roster, fin_receipt, fingerprint, record):
+            body = {'node_created': seen['node_created'], 'task_created': plan.kind == 'task_create'}
+            svc.receipts.save(fin_receipt, fingerprint, {'state': 'done', 'status': 200, 'body': body})
+            record('success', record_id=plan.record_id,
+                   changes=svc._changes(fin_ctx, assignment_key(fin_code, fin_key), plan))
+            return 200, body, False
+
+        try:
+            _, body, _ = svc.mutate(ctx, key, ACTION, f'start-sop:{request_id}:{key.value}',
+                                    {'body': {'preview_hash': preview_hash}}, plan_fn, finish=finish)
+        except Failure as exc:
+            return failed(key, exc)
+        if body is None:
+            return NodeResult(key, Outcome.EXISTING, seen['task'])
+        return NodeResult(key, Outcome.CREATED if body['node_created'] else Outcome.EXISTING,
+                          Outcome.CREATED if body['task_created'] else Outcome.SKIPPED)

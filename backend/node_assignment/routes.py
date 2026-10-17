@@ -12,8 +12,9 @@ from .domain import NodeAction, NodeKey
 from .errors import Failure
 from .operations import (
     find_task, parse_create_task, parse_node_command, parse_patch_task, plan_create_task, plan_node,
-    plan_patch_task, request_id)
+    parse_start_sop, plan_patch_task, request_id)
 from .service import Context, NodeAssignmentService
+from .start_sop_service import StartSopRunner
 
 PREFIX = '/api/projects/{project_id}/node-assignments'
 MAX_BODY = 16 * 1024
@@ -30,6 +31,7 @@ def register(app, *, identity, load_case, sessions, receipt_model, audit_model, 
     service = NodeAssignmentService(cfg, sessions=sessions, receipt_model=receipt_model, audit_model=audit_model,
                                     skipped_nodes=skipped_nodes, **options)
     enabled = service.config.enabled
+    start_sop = StartSopRunner(service)
 
     def respond(result=None, failure=None):
         if failure is not None:
@@ -92,6 +94,17 @@ def register(app, *, identity, load_case, sessions, receipt_model, audit_model, 
         if not enabled:
             return disabled()
         return guarded(lambda: (200, service.overview(context(request, project_id)), False))
+
+    @app.get(PREFIX + '/start-sop')
+    def start_sop_preview(request: Request, project_id: str):
+        if not enabled:
+            return disabled()
+        return guarded(lambda: (200, start_sop.preview(context(request, project_id)), False))
+
+    @app.post(PREFIX + '/start-sop')
+    async def start_sop_run(request: Request, project_id: str):
+        return await mutation(request, project_id, lambda ctx, body: start_sop.run(
+            ctx, request_id(body), parse_start_sop(body)))
 
     @app.get(PREFIX + '/nodes/{key}')
     def detail(request: Request, project_id: str, key: str):

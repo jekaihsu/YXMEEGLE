@@ -1,5 +1,7 @@
 import json
+import threading
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 import httpx
@@ -154,11 +156,28 @@ def project(code=CODE, skipped=()):
                                 'url': f'https://x.larksuite.com/base/{BASE}?table=tblmSQrcCs9vPQZx&record=recCONF1'}]}
 
 
+class SerializedSessions:
+    """StaticPool shares one sqlite connection, so transactions from concurrent request threads must not interleave."""
+
+    def __init__(self, factory):
+        self.factory, self.lock = factory, threading.RLock()
+
+    @contextmanager
+    def __call__(self):
+        with self.lock, self.factory() as db:
+            yield db
+
+    @contextmanager
+    def begin(self):
+        with self.lock, self.factory.begin() as db:
+            yield db
+
+
 @pytest.fixture
 def h():
     engine = create_engine('sqlite://', connect_args={'check_same_thread': False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
-    sessions = sessionmaker(engine, expire_on_commit=False)
+    sessions = SerializedSessions(sessionmaker(engine, expire_on_commit=False))
     fake = FakeBitable()
     cfg = {'NODE_ASSIGNMENT_ENABLED': 'true', 'LARK_WORKER_IDENTITY': 'application', 'LARK_APP_ID': 'app-na',
            'LARK_APP_SECRET': 'synthetic', 'LARK_WORKER_ORGANIZATION': 'company'}
