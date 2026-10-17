@@ -23,13 +23,14 @@ export function useStartSop(id: string, enabled: boolean, refreshOverview: () =>
  const [state, setState] = useState<State>({kind: 'hidden'});
  const [busy, setBusy] = useState(false), [notice, setNotice] = useState('');
  const life = useRef({active: false, epoch: getSessionEpoch()});
+ const pendingSync = useRef(false);
  const posting = useRef(false), attempt = useRef<{hash: string; id: string}|null>(null);
  const current = () => life.current.active && life.current.epoch === getSessionEpoch();
  const reload = useCallback(async (force = false) => {
-  try {const data = await prefetchStartSop(id, force); if (current()) setState({kind: 'ready', data})}
+  try {const data = await prefetchStartSop(id, force); if (current()) setState({kind: 'ready', data: pendingSync.current ? {...data, already_started: false, eligible: data.can_start && !data.blockers.length} : data})}
   catch (e) {if (current()) setState(e instanceof NodeAssignmentError && e.status === 403 ? {kind: 'forbidden', reason: assignmentErrorMessage(e)} : {kind: 'hidden'})}
  }, [id]);
- useEffect(() => {life.current = {active: true, epoch: getSessionEpoch()}; setNotice(''); attempt.current = null; setState(enabled && epoch === getSessionEpoch() && cache.has(id) ? {kind: 'ready', data: cache.get(id)!} : {kind: 'hidden'}); if (enabled) void reload(); return () => {life.current.active = false}}, [id, enabled, reload]);
+ useEffect(() => {life.current = {active: true, epoch: getSessionEpoch()}; setNotice(''); pendingSync.current = false; attempt.current = null; setState(enabled && epoch === getSessionEpoch() && cache.has(id) ? {kind: 'ready', data: cache.get(id)!} : {kind: 'hidden'}); if (enabled) void reload(); return () => {life.current.active = false}}, [id, enabled, reload]);
  const confirm = async () => {
   if (posting.current || state.kind !== 'ready' || !state.data.can_start || !state.data.eligible || state.data.blockers.length || state.data.already_started) return false;
   posting.current = true; setBusy(true); setNotice('');
@@ -40,6 +41,7 @@ export function useStartSop(id: string, enabled: boolean, refreshOverview: () =>
    const result = parseSopResult(await assignmentRequest(sopPath(id), {method: 'POST', body: JSON.stringify({request_id: attempt.current.id, preview_hash: hash})}, valid));
    if (!valid()) return false;
    attempt.current = null;
+   pendingSync.current = result.results.some(node => node.sync === 'failed');
    setNotice(sopResultMessage(result, state.data));
    await refreshOverview(); await reload(true); return result.complete;
   } catch (e) {
