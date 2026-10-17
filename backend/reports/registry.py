@@ -24,7 +24,7 @@ TABLES = (
     Table('工作預排', 'tblN8c3WN44233aG', 'plan', ('條類型','開始日期','結束日期','業別','組別','案件','預估營業額點數','車輛','儀器','人員','預排工作項目','工作內容'), ('progress','assets')),
     Table('車輛', 'tblryKpRlYXJ9Y2E', 'vehicle', ('車牌','啟用','備註','第一台車紀錄','第二台車紀錄','第三台車紀錄'), ('assets',)),
     Table('儀器費率', 'tblfgeEtMuBTg72O', 'instrument', ('儀器名稱','日租金','啟用','狀態','類別','備註','使用此儀器的成本單'), ('assets',)),
-    Table('人員名單', 'tblmlpA6nG5Ou7NQ', 'people', ('姓名','所屬組別'), ('review',)),
+    Table('人員名單', 'tblmlpA6nG5Ou7NQ', 'people', ('姓名','所屬組別'), ('review','progress')),
     Table('外業組別營業額統計', 'tblCys3XcRulzlQ4', 'monthly', ('組別月份','月份日期','組別','營業額點數'), ('progress',)),
     Table('回報問題', 'tblwKTWB3AIM786y', 'issue', ('文字','文字 2','單選','日期'), ('sources',)),
 )

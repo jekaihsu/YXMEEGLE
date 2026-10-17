@@ -316,6 +316,9 @@ def test_progress_detail_snapshot_privacy_bounds_and_validation():
         response=client.get('/api/reports/progress/case',params={'key':key,'week':'2026-10-12'})
         assert response.status_code==200,response.text
         body=response.json()
+        assert set(body)=={'case','week','link','meta'}
+        assert set(body['meta'])=={'fetched_at','stale','refresh_error','snapshot','gaps'}
+        assert all(set(gap)=={'id','severity','message'} for gap in body['meta']['gaps'])
         assert body['case']['code']=='C01'
         assert body['case']['contract']=={'expected':100.0,'actual':None}
         assert len(body['week']['plan_rows'])==200

@@ -17,10 +17,13 @@ globalThis.fetch=async(url,options={})=>{
  if(holdSearch&&u.searchParams.get('q'))return new Promise(()=>{});
  const d=mockReport(u.pathname.endsWith('/case')?'progress/case':'progress',u.searchParams);
  if(u.pathname.endsWith('/case')){d.week.plan_rows=[{date:'2026-10-12',group:'A',people:'王小明',items:'測量 · 水深',points:10}];}
- else {if(posts&&refreshStatus===202&&++polls>=changeAfter)snapshot='new';d.meta.can_refresh=true;if(u.searchParams.get('q')==='absent')d.options.status=[];d.items[0]&&(d.items[0].case_name=snapshot==='new'?'更新後案件':d.items[0].case_name);}
+ else {if(d.items[1])d.items[1].case_key=null;if(posts&&refreshStatus===202&&++polls>=changeAfter)snapshot='new';d.meta.can_refresh=true;if(u.searchParams.get('q')==='absent')d.options.status=[];d.items[0]&&(d.items[0].case_name=snapshot==='new'?'更新後案件':d.items[0].case_name);}
  d.meta.snapshot=snapshot;return new Response(JSON.stringify(d));
 };
 const root=createRoot(document.getElementById('root'));await act(async()=>root.render(React.createElement(Progress)));
+assert.match(document.querySelector('button.reports-progress-card').getAttribute('aria-label'),/^YX-.* .* .* 達成率 .* 剩餘 .* 點$/);
+assert.match(document.querySelector('div.reports-progress-card').textContent,/案件資料未建立/);
+assert.equal(document.querySelector('div.reports-progress-card').querySelector('button'),null);
 const button=text=>[...document.querySelectorAll('button')].find(e=>e.textContent===text);
 const click=async el=>{assert.ok(el);await act(async()=>el.click())};
 await click(document.querySelector('.reports-progress-table .reports-pagination button:last-child'));

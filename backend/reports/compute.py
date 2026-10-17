@@ -386,7 +386,7 @@ def report_gaps(data, endpoint, dept='field'):
         'review/rows': {department+'-date',department+'-group'} | ({'office-review-coverage','PM檢核','內業組長檢核'} if department=='office' else set()),
         'progress': {department+'-date',department+'-group','plan-negative-span'},
     }
-    source_kinds={'review': {department,department+'_cost'}, 'review/rows': {department,department+'_cost'}, 'sales': {'case'}, 'assets': {'vehicle','instrument','field_cost','plan'}, 'progress': {'case','plan','contract',department}}
+    source_kinds={'review': {department,department+'_cost'}, 'review/rows': {department,department+'_cost'}, 'sales': {'case'}, 'assets': {'vehicle','instrument','field_cost','plan'}, 'progress': {'case','plan','contract','people',department}}
     allowed=relevant.get(endpoint,set()) | {'source-'+k for k in source_kinds.get(endpoint,set())}
     gaps=[g for g in data['gaps'] if endpoint=='sources' or g['id'] in allowed]
     if endpoint=='sales':
