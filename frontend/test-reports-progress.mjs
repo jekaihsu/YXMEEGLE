@@ -10,7 +10,7 @@ const {Progress,caseStatus,progressHash,readProgressContext,mockReport}=mod.expo
 assert.deepEqual(caseStatus('未填'),{label:'狀態未填',tone:'unset'});
 assert.deepEqual(caseStatus('新狀態'),{label:'新狀態',tone:'neutral'});
 assert.deepEqual(['報價中','執行中','已完工','已結案','中止','內部'].map(x=>caseStatus(x).tone),['quote','active','complete','closed','stopped','internal']);
-assert.deepEqual(readProgressContext('#view=reports&tab=progress&case=rec1&dept=office&week=2026-10-12&group=A','2026-10-05'),{caseKey:'rec1',dept:'office',week:'2026-10-12',group:'A'});
+assert.deepEqual(readProgressContext('#view=reports&tab=progress&case=rec1&dept=office&week=2026-10-12&group=A','2026-10-05'),{caseKey:'rec1',dept:'office',week:'2026-10-12',group:'A',status:'',q:''});
 assert.equal(progressHash('#view=reports&tab=progress',{dept:'field',week:'2026-10-12',group:'',caseKey:'rec1'}),'#view=reports&tab=progress&dept=field&week=2026-10-12&case=rec1');
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=reports&tab=progress&week=2026-10-12'});
 Object.assign(globalThis,{window:dom.window,document:dom.window.document,location:dom.window.location,localStorage:dom.window.localStorage,Element:dom.window.Element,getComputedStyle:dom.window.getComputedStyle,IS_REACT_ACT_ENVIRONMENT:true});

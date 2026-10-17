@@ -1,0 +1,56 @@
+import assert from 'node:assert/strict';
+import {mock} from 'node:test';
+import {build} from 'esbuild';
+import {createRequire} from 'node:module';
+import {JSDOM} from 'jsdom';
+import React,{act} from 'react';
+const bundle=await build({stdin:{contents:"export {default as Progress} from './src/reports/ProgressTab';export {mockReport} from './src/reports/mock';export {pollProgressRefresh,clearReportCache} from './src/reports/useReport';export {readProgressContext,progressHash} from './src/reports/progressView';",resolveDir:process.cwd(),loader:'tsx'},loader:{'.css':'empty'},bundle:true,write:false,platform:'node',format:'cjs',packages:'external',jsx:'automatic'});
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=reports&tab=progress&week=2026-10-12'});
+Object.assign(globalThis,{window:dom.window,document:dom.window.document,location:dom.window.location,localStorage:dom.window.localStorage,Element:dom.window.Element,getComputedStyle:dom.window.getComputedStyle,IS_REACT_ACT_ENVIRONMENT:true});
+const {createRoot}=await import('react-dom/client');
+const mod={exports:{}};new Function('require','module','exports',bundle.outputFiles[0].text)(createRequire(import.meta.url),mod,mod.exports);
+const {Progress,mockReport,pollProgressRefresh,clearReportCache,readProgressContext,progressHash}=mod.exports;
+let snapshot='old',posts=0,polls=0,refreshStatus=202,changeAfter=2,holdSearch=false;const requests=[];
+globalThis.fetch=async(url,options={})=>{
+ requests.push({url,options});if(options.method==='POST'){posts++;polls=0;return new Response('{}',{status:refreshStatus})}
+ const u=new URL(url,'http://localhost');
+ if(holdSearch&&u.searchParams.get('q'))return new Promise(()=>{});
+ const d=mockReport(u.pathname.endsWith('/case')?'progress/case':'progress',u.searchParams);
+ if(u.pathname.endsWith('/case')){d.week.plan_rows=[{date:'2026-10-12',group:'A',people:'王小明',items:'測量 · 水深',points:10}];}
+ else {if(posts&&refreshStatus===202&&++polls>=changeAfter)snapshot='new';d.meta.can_refresh=true;if(u.searchParams.get('q')==='absent')d.options.status=[];d.items[0]&&(d.items[0].case_name=snapshot==='new'?'更新後案件':d.items[0].case_name);}
+ d.meta.snapshot=snapshot;return new Response(JSON.stringify(d));
+};
+const root=createRoot(document.getElementById('root'));await act(async()=>root.render(React.createElement(Progress)));
+const button=text=>[...document.querySelectorAll('button')].find(e=>e.textContent===text);
+const click=async el=>{assert.ok(el);await act(async()=>el.click())};
+await click(document.querySelector('.reports-progress-table .reports-pagination button:last-child'));
+assert.equal(new URL(requests.at(-1).url,'http://localhost').searchParams.get('offset'),'50');
+const trigger=document.querySelector('tbody tr button');trigger.focus();await click(trigger);
+assert.ok(trigger.isConnected);
+assert.match(document.querySelector('[role=dialog]').getAttribute('aria-label'),/案件詳情 · .* /);
+assert.match(document.querySelector('[role=dialog]').textContent,/王小明/);
+assert.match(document.querySelector('[role=dialog]').textContent,/測量 · 水深/);
+window.history.replaceState(null,'',location.hash);await click(document.querySelector('[role=dialog] [aria-label=關閉]'));
+assert.equal(document.querySelector('tbody tr button'),trigger);assert.equal(document.activeElement,trigger);
+assert.match(document.querySelector('.reports-progress-table .reports-pagination').textContent,/51/);
+assert.equal(new URL(requests.filter(r=>!r.url.includes('/case')).at(-1).url,'http://localhost').searchParams.get('offset'),'50');
+await click([...document.querySelectorAll('.reports-status-filters button')].find(e=>e.textContent.includes('執行中')));
+const input=document.querySelector('input[type=search]');input.focus();mock.timers.enable({apis:['setTimeout']});
+const inputChange=async value=>act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new dom.window.Event('input',{bubbles:true}))});
+holdSearch=true;await inputChange('absent');await act(async()=>mock.timers.tick(251));
+assert.equal(document.querySelector('input[type=search]'),input);assert.ok(input.isConnected);assert.equal(document.activeElement,input);assert.match(document.body.textContent,/正在讀取/);
+holdSearch=false;clearReportCache();await act(async()=>{window.dispatchEvent(new dom.window.HashChangeEvent('hashchange'))});
+await inputChange('absent2');await act(async()=>mock.timers.tick(251));await inputChange('absent');await act(async()=>mock.timers.tick(251));
+const selected=document.querySelector('.reports-status-filters [aria-pressed=true]');assert.match(selected.textContent,/執行中.*0/);assert.ok(button('清除狀態篩選'));
+const restored=readProgressContext(location.hash,'2026-10-05');assert.equal(restored.q,'absent');assert.equal(restored.status,'執行中');assert.match(progressHash('',restored),/status=/);
+await click(button('清除狀態篩選'));await inputChange('');await act(async()=>mock.timers.tick(251));
+await click(button('重新整理資料'));assert.equal(posts,1);assert.equal(polls,0);
+await act(async()=>mock.timers.tick(2999));assert.equal(polls,0);
+await act(async()=>mock.timers.tick(1));assert.equal(polls,1);assert.equal(document.querySelector('[role=status]'),null);
+await act(async()=>mock.timers.tick(3000));assert.match(document.querySelector('[role=status]').textContent,/資料已更新/);assert.match(document.querySelector('tbody').textContent,/更新後案件/);
+refreshStatus=429;await click(button('重新整理資料'));assert.equal(posts,2);assert.match(document.querySelector('[role=status]').textContent,/每 60 秒只能重新整理一次/);
+refreshStatus=202;changeAfter=Infinity;await click(button('重新整理資料'));for(let i=0;i<6;i++)await act(async()=>mock.timers.tick(3000));assert.equal(posts,3);assert.match(document.querySelector('[role=status]').textContent,/資料仍在更新，稍後會自動出現/);
+const count=requests.length;await act(async()=>mock.timers.tick(30000));assert.equal(requests.length,count);
+let reads=0;globalThis.fetch=async()=>{reads++;return new Response(JSON.stringify({meta:{snapshot:'same',fingerprint:reads===2?'new':'old'}}))};
+const poll=pollProgressRefresh({dept:'field'},{snapshot:'same',fingerprint:'old'});await act(async()=>mock.timers.tick(3000));assert.equal(reads,1);await act(async()=>mock.timers.tick(3000));assert.equal(await poll,true);assert.equal(reads,2);
+mock.timers.reset();await act(async()=>root.unmount());console.log('Progress regression behavior checks passed. Focus, page 2 identity, zero chip, hash, detail, 202, 429, bounded refresh and fingerprint.');

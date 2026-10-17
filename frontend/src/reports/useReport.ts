@@ -48,3 +48,14 @@ export function useReportSearch(onApply:()=>void){
  useEffect(()=>{if(state.search===state.q)return;const timer=setTimeout(()=>{setState(s=>({...s,q:s.search}));apply.current()},250);return()=>clearTimeout(timer)},[state.search,state.q]);
  return {...state,setSearch:(search:string)=>setState(s=>({...s,search})),applySearch:(search:string)=>setState({search,q:search})};
 }
+
+export function clearReportCache(){cache.clear()}
+export async function pollProgressRefresh(params:Query,previous?:{snapshot?:string;fingerprint?:string}){
+ const before=JSON.stringify([previous?.snapshot,previous?.fingerprint]);
+ for(let attempt=0;attempt<6;attempt++){
+  await new Promise(resolve=>setTimeout(resolve,3000));
+  const data=await readReport<{meta:{snapshot?:string;fingerprint?:string}}>(`/api/reports/progress?${query(params)}`,new AbortController().signal,()=>true);
+  if(JSON.stringify([data.meta.snapshot,data.meta.fingerprint])!==before)return true;
+ }
+ return false;
+}

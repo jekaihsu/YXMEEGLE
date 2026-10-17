@@ -1,3 +1,4 @@
+import {useEffect} from 'react';
 import {Sheet} from '../design';
 import {money,number,rate,safeLink,statusLabel} from './reportsView';
 import {MetaNotice,ReportState} from './shared';
@@ -5,9 +6,10 @@ import {useReport} from './useReport';
 import {caseStatus} from './progressView';
 import type {ProgressDetail as Detail} from './types';
 export function CaseStatus({status}:{status:string}){const s=caseStatus(status);return <span className={`reports-case-status status-${s.tone}`}>{s.label}</span>}
-export default function ProgressDetail({caseKey,dept,week,onClose}:{caseKey:string;dept:string;week:string;onClose:()=>void}){
+export default function ProgressDetail({caseKey,dept,week,onClose,refreshVersion=0}:{refreshVersion?:number;caseKey:string;dept:string;week:string;onClose:()=>void}){
  const result=useReport<Detail>('progress/case',{key:caseKey,dept,week});const d=result.data;
- return <div className="reports-case-drawer"><Sheet title="案件詳情" onClose={onClose}>{!d?<>{result.error==='case_not_found'?<div role="alert"><h3>找不到這個案件</h3><p>案件可能已移除，請關閉面板並重新整理資料。</p><button onClick={result.retry}>重試</button></div>:<ReportState loading={result.loading} error={result.error} warming={result.warming} retry={result.retry}/>}</>:<>
+ useEffect(()=>{if(refreshVersion)result.retry()},[refreshVersion]);
+ return <div className="reports-case-drawer"><Sheet title={d?`案件詳情 · ${d.case.code} ${d.case.name}`:'案件詳情'} onClose={onClose}>{!d?<>{result.error==='case_not_found'?<div role="alert"><h3>找不到這個案件</h3><p>案件可能已移除，請關閉面板並重新整理資料。</p><button onClick={result.retry}>重試</button></div>:<ReportState loading={result.loading} error={result.error} warming={result.warming} retry={result.retry}/>}</>:<>
   <p className="reports-caption">{d.case.code}</p><h3>{d.case.name||'案件名稱未填'}</h3><CaseStatus status={d.case.status}/>
   <dl className="reports-case-facts">{[
    ['業主',d.case.client||'未填'],['PM',d.case.pm||'未填'],['預期合約',money(d.case.contract.expected)],['實際合約',money(d.case.contract.actual)],
