@@ -110,7 +110,7 @@ export function overviewDetail(list: NodeAssignmentList, n: AssignmentNode): Nod
   return {...list, ...payload, node: {...n, assigned_by: named(n.assigned_by), approver: named(n.approver)}, record_id: n.record_id, can: list.can[n.key] || {}, tasks: payload.tasks.map(t => ({...t, assignee: named(t.assignee), assigned_by: named(t.assigned_by)}))};
 }
 const basePath = (projectId: string) => `/api/projects/${encodeURIComponent(projectId)}/node-assignments`;
-async function request(url: string, init: RequestInit, isCurrent: () => boolean): Promise<unknown> {
+export async function assignmentRequest(url: string, init: RequestInit, isCurrent: () => boolean): Promise<unknown> {
   try {return await api<unknown>(url, {...init, timeoutMs: 20000}, isCurrent)}
   catch (error) {
     if (!(error instanceof ApiError)) throw error;
@@ -131,7 +131,7 @@ async function request(url: string, init: RequestInit, isCurrent: () => boolean)
   }
 }
 export async function fetchNodeAssignments(projectId: string, signal: AbortSignal, isCurrent: () => boolean): Promise<NodeAssignmentList> {
-  const result = record(await request(basePath(projectId), {signal, cache: 'no-store'}, isCurrent));
+  const result = record(await assignmentRequest(basePath(projectId), {signal, cache: 'no-store'}, isCurrent));
   if (result.code === 'disabled') throw new NodeAssignmentError(404, '', 'disabled');
   const actions = record(result.can);
   if (typeof result.stale !== 'boolean') throw malformed();
@@ -144,7 +144,7 @@ export async function fetchNodeAssignments(projectId: string, signal: AbortSigna
     nodes: NODE_ASSIGNMENT_ORDER.flatMap(key => nodes.filter(n => n.key === key)), stale: result.stale, can};
 }
 export async function fetchNodeAssignmentDetail(projectId: string, key: string, signal: AbortSignal, isCurrent: () => boolean): Promise<NodeAssignmentDetail> {
-  const result = record(await request(`${basePath(projectId)}/nodes/${encodeURIComponent(key)}`, {signal, cache: 'no-store'}, isCurrent));
+  const result = record(await assignmentRequest(`${basePath(projectId)}/nodes/${encodeURIComponent(key)}`, {signal, cache: 'no-store'}, isCurrent));
   return parseDetail(result, key);
 }
 function parseDetail(result: Record<string, unknown>, key: string): NodeAssignmentDetail {
@@ -175,7 +175,7 @@ export async function mutateNodeAssignment(projectId: string, mutation: Assignme
     default: url = `${nodePath}/${mutation.action}`; body = {};
   }
   if (mutation.action !== 'create_task') body = {...body, expected_revision: mutation.expected_revision};
-  return parseDetail(record(await request(url, {signal, method, body: JSON.stringify({...body, request_id: id})}, isCurrent)), mutation.nodeKey);
+  return parseDetail(record(await assignmentRequest(url, {signal, method, body: JSON.stringify({...body, request_id: id})}, isCurrent)), mutation.nodeKey);
 }
 const ERROR_MESSAGES: Record<string, string> = {
   revision_conflict: '資料已被他人更新，已為你重新載入', illegal_transition: '目前狀態不允許此操作，請重新讀取後再試。',
