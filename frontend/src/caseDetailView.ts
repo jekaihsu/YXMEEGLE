@@ -15,8 +15,23 @@ export interface DetailRow {
  sourceLink: {label: string; url: string | null; reason: string | null};
  amount: DisplayField | null; fields: DisplayField[]; children: DetailRow[];
 }
+export const PLAN_CATEGORIES = ['外業', '控制', '圖資', '報告'] as const;
+export type PlanCategory = typeof PLAN_CATEGORIES[number];
+export interface PlanCategoryCounts {
+ lines: number; planned_qty: string; items: number; items_native: number; items_derived: number;
+ items_ambiguous: number; items_unlinked: number; items_native_unresolved: number; needs_review: number;
+}
+export interface PlanSummary {
+ rule_version: string;
+ basis: Record<'native' | 'derived' | 'ambiguous' | 'unlinked' | 'native_unresolved', number>;
+ lines_basis: {native: number; derived: number};
+ categories: Record<PlanCategory, PlanCategoryCounts>;
+ review_groups: {key: string; category: PlanCategory; line_ids: string[]}[];
+ items: {id: string; category: string | null; line_id: string | null; basis: keyof PlanSummary['basis']; reason: string}[];
+ truncated: boolean;
+}
 export interface SectionView extends StateView {
- key: string; title: string; sourceTime: DisplayField; freshness: string | null; rows: DetailRow[];
+ planSummary: PlanSummary | null; key: string; title: string; sourceTime: DisplayField; freshness: string | null; rows: DetailRow[];
 }
 export interface CaseDetailView {
  page: StateView; header: DisplayField[]; sourceLink: {label: string; url: string | null; reason: string | null}; sections: SectionView[];
@@ -56,10 +71,40 @@ function validRow(v: unknown, history = false, depth = 0): boolean {
  optional(v, 'unresolved', x => rec(x) && str(x.reason) && str(x.verification)) &&
  optional(v, 'tasks', x => v.kind === 'node' && array(x, r => rec(r) && r.kind === 'task' && validRow(r, false, depth + 1)));
 }
+const count = (v: unknown) => Number.isSafeInteger(v) && Number(v) >= 0;
+const planCategory = (v: unknown): v is PlanCategory => PLAN_CATEGORIES.some(c => c === v);
+function validPlanSummary(v: unknown): v is PlanSummary {
+ return rec(v) && str(v.rule_version) && rec(v.basis) &&
+ ['native','derived','ambiguous','unlinked','native_unresolved'].every(k => count(v.basis[k])) &&
+ rec(v.lines_basis) && count(v.lines_basis.native) && count(v.lines_basis.derived) && rec(v.categories) &&
+ PLAN_CATEGORIES.every(k => {
+  const c = v.categories[k];
+  return rec(c) && typeof c.planned_qty === 'string' && /^-?\d+(?:\.\d+)?$/.test(c.planned_qty) &&
+   ['lines','items','items_native','items_derived','items_ambiguous','items_unlinked','items_native_unresolved','needs_review'].every(n => count(c[n]));
+ }) && array(v.review_groups, g => rec(g) && str(g.key) && planCategory(g.category) && array(g.line_ids, str)) &&
+ array(v.items, i => rec(i) && str(i.id) && nullable(i.category) && nullable(i.line_id) &&
+  ['native','derived','ambiguous','unlinked','native_unresolved'].includes(i.basis) && str(i.reason)) && typeof v.truncated === 'boolean';
+}
+function projectPlanSummary(value: unknown): PlanSummary | null {
+ if (!validPlanSummary(value)) return null;
+ return {
+  rule_version: value.rule_version,
+  basis: {native: value.basis.native, derived: value.basis.derived, ambiguous: value.basis.ambiguous, unlinked: value.basis.unlinked, native_unresolved: value.basis.native_unresolved},
+  lines_basis: {native: value.lines_basis.native, derived: value.lines_basis.derived},
+  categories: Object.fromEntries(PLAN_CATEGORIES.map(k => {
+   const c = value.categories[k];
+   return [k, {lines: c.lines, planned_qty: c.planned_qty, items: c.items, items_native: c.items_native, items_derived: c.items_derived, items_ambiguous: c.items_ambiguous, items_unlinked: c.items_unlinked, items_native_unresolved: c.items_native_unresolved, needs_review: c.needs_review}];
+  })) as Record<PlanCategory, PlanCategoryCounts>,
+  review_groups: value.review_groups.map(g => ({key: g.key, category: g.category, line_ids: [...g.line_ids]})),
+  items: value.items.map(i => ({id: i.id, category: i.category, line_id: i.line_id, basis: i.basis, reason: i.reason})),
+  truncated: value.truncated,
+ };
+}
 function validSection(v: unknown, name: string): boolean {
  return rec(v) && withStates(v) && (!v.states.some((s: string) => ['complete_empty', 'filtered_empty'].includes(s)) || Array.isArray(v.rows) && v.rows.length === 0) && (v.freshness === null || v.freshness === 'stale') && nullable(v.reason) &&
  rec(v.source_time) && nullable(v.source_time.value) && v.source_time.basis === 'source_sync_completed' && nullable(v.source_time.fetched_at) &&
  array(v.rows, r => validRow(r, name === 'history') && (name === 'history' || r.kind === ({versions: 'confirmation', contract_lines: 'contract', work_items: 'work_item', workflow_nodes: 'node', reports_documents: 'evidence'} as Record<string, string>)[name])) && rec(v.details) &&
+ optional(v.details, 'plan_summary', x => x === null || validPlanSummary(x)) &&
  optional(v.details, 'unresolved_edges', x => array(x, edge)) &&
  optional(v.details, 'entry_point', x => rec(x) && x.view === 'project' && str(x.project) && x.tab === 'data' && x.section === 'files') &&
  optional(v.details, 'case_identity', str) && optional(v.details, 'read_only', x => x === true) && optional(v.details, 'note', str);
@@ -139,7 +184,7 @@ export function buildCaseDetailView(input: unknown, options: CaseDetailOptions =
  try {
   sections = names.map(n => {
    const s = b.sections[n], blocked = s.states.some((x: string) => ['forbidden','loading','read_failed','unlocated'].includes(x));
-   return {key: n, title: TITLES[n], ...state(s.states, s.reason), sourceTime: blocked && s.states.includes('forbidden') ? field('來源同步完成時間', null, 'forbidden') : field('來源同步完成時間', s.source_time.value, 'source_time_unknown'), freshness: s.freshness === 'stale' || s.states.includes('stale') ? DATA_STATE_LABELS.stale : null, rows: blocked ? [] : s.rows.map((r: Rec) => row(n === 'history' ? str(r.confirmation_key) ? {confirmation_key: r.confirmation_key, revision: r.revision, replaced_at: r.replaced_at} : {event_id: r.event_id, action: r.action, created_at: r.created_at} : r))};
+   return {planSummary: n === 'work_items' && !blocked ? projectPlanSummary(s.details.plan_summary) : null, key: n, title: TITLES[n], ...state(s.states, s.reason), sourceTime: blocked && s.states.includes('forbidden') ? field('來源同步完成時間', null, 'forbidden') : field('來源同步完成時間', s.source_time.value, 'source_time_unknown'), freshness: s.freshness === 'stale' || s.states.includes('stale') ? DATA_STATE_LABELS.stale : null, rows: blocked ? [] : s.rows.map((r: Rec) => row(n === 'history' ? str(r.confirmation_key) ? {confirmation_key: r.confirmation_key, revision: r.revision, replaced_at: r.replaced_at} : {event_id: r.event_id, action: r.action, created_at: r.created_at} : r))};
   });
  } catch {return blank('duplicate_identity');}
  const warnings: DetailRow[] = [];
