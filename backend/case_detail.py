@@ -291,8 +291,10 @@ def build_case_detail(state, project_id, *, confirmation_key=None, as_of=None, s
                         details={'unresolved_edges': unresolved})
 
     def work_items(src, stale):
+        from .contract_links import plan_summary
+        planning={'plan_summary':plan_summary(state,project_id)}
         if not skey:
-            return _section(['unknown'], [], source_time=src, reason=selection_reason, stale=stale)
+            return _section(['unknown'], [], source_time=src, reason=selection_reason, stale=stale, details=planning)
         keys = sorted(set(item_keys) | set(orphan_items))
         rows = [_row(tree, k, source_url=tree['nodes'][k].get('source_url')) for k in keys]
         status = (state.get('source_work_items_status') or {}).get(project_id)
@@ -301,7 +303,7 @@ def build_case_detail(state, project_id, *, confirmation_key=None, as_of=None, s
                       if not _children(tree, ck) or tree['ct_unresolved'].get(ck)]
         states = ['partial'] if rows and (partial or unresolved or orphan_items) else [] if rows else ['unknown']
         return _section(states, rows, source_time=src, stale=stale,
-                        reason=None if rows else NO_TARGET, details={'unresolved_edges': unresolved})
+                        reason=None if rows else NO_TARGET, details={'unresolved_edges': unresolved, **planning})
 
     def workflow_nodes(src, stale):
         rows = []

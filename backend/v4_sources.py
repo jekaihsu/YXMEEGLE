@@ -516,6 +516,16 @@ def import_v4(ws, records, complete_tables=None):
     for p in ws['projects']:
         for ident in p.get('source_record_ids',[]): assignments[ident]=p['id']
         for entry in p.get('daily_reports',[]): assignments[entry['id']]=p['id']
+    from .contract_links import build_projection,record_key
+    projection=build_projection(records,
+        {record_key(r):p['id'] for r in records if r.get('kind')=='confirmation'
+         and (p:=by_ref.get((r['base_token'],r['record_id'])))},
+        {record_key(r):p['id'] for r in records if r.get('kind')=='contract'
+         and (p:=contract_projects.get((r['base_token'],r['record_id'])))},
+        native_item_projects={record_key(r):p['id'] for r in records if r.get('kind')=='reporting'
+         and (p:=report_projects.get((r['base_token'],r['record_id'])))})
+    ws['derived_plan']=projection.plans
+    ws['derived_plan_status']=projection.status
     update_attachments(ws,records,complete_tables,assignments)
     from .source_entities import update_entities
     update_entities(ws,records,complete_tables,assignments)

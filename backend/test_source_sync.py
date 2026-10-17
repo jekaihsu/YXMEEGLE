@@ -423,3 +423,23 @@ def test_page_authorization_does_not_exhaust_lark_budget_loading_unrelated_cases
         return snapshot(h.clock[0])
     h.service.fetcher = fetch
     assert h.service.fetch(h.wid)['status'] == 'ready'
+
+
+def test_derived_plan_root_persists_and_participates_in_projection_fingerprint(harness):
+    from .contract_links import build_projection,plan_summary
+    from .test_contract_links import line,item,row as source_row
+    h=harness
+    state,_=h.read()
+    assert plan_summary({},'p') is None
+    before=source_sync.projection_fingerprint(state)
+    projection=build_projection([line(),item(),source_row('confirmation','c',工程確認單編號='X')],{'b/confirmation/c':'p'}, {})
+    state.update(derived_plan=projection.plans,derived_plan_status=projection.status)
+    assert source_sync.projection_fingerprint(state)!=before
+    with h.sessions.begin() as db:
+        workspace=db.get(h.W,h.wid)
+        workspace.data=storage.save(db,h.B,h.wid,state)
+    loaded,_=h.read()
+    assert loaded['derived_plan']==projection.plans and loaded['derived_plan_status']==projection.status
+    with h.sessions() as db:
+        partial=storage.load_partial(db,h.B,db.get(h.W,h.wid),collections=(),project_ids=())
+    assert partial['derived_plan']==projection.plans

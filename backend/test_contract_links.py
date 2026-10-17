@@ -3,7 +3,7 @@ from copy import deepcopy
 import json
 import pytest
 from .contract_links import (parse_records, resolve_line, resolve_item, build_projection,
-                             Status, Reason, code_key)
+                             Status, Reason, code_key, plan_summary)
 
 
 def row(kind, ident, **fields):
@@ -99,7 +99,7 @@ def test_payload_is_bounded_and_native_unresolved_does_not_fall_back():
     records=[line(),row('confirmation','c',工程確認單編號='X')]+[item(str(i)) for i in range(240)]
     projection=build_projection(records,{'b/confirmation/c':'p'}, {})
     assert len(projection.plans['p']['items'])<=200
-    assert len(json.dumps(projection.plans['p'],ensure_ascii=False,separators=(',',':')).encode())<=24_000
+    assert len(json.dumps(plan_summary({'derived_plan':projection.plans},'p'),ensure_ascii=False,separators=(',',':')).encode())<=24_000
     assert projection.plans['p']['truncated'] is True
     records[0]['fields']['所屬成案確認單（日報關聯）']=[{'id':'missing'}]
     assert build_projection(records,{'b/confirmation/c':'p'}, {}).plans=={}
@@ -109,3 +109,55 @@ def test_invalid_nonfinite_quantities_are_not_planned():
     parsed=parse_records([line(qty='NaN'),item(qty='Infinity')])
     assert parsed.lines[0].qty['外業'] is None and parsed.items[0].base_qty is None
     assert parse_records([line(qty='12.50')]).lines[0].qty['外業']==Decimal('12.50')
+
+
+def test_importer_is_additive_and_replaces_stale_projection(monkeypatch):
+    from .seed import seed
+    from .sources import import_sources
+    from . import contract_links
+    from .test_new_daily_acceptance import row as source_row
+    records=[source_row('confirmation','recCase',{'工程確認單編號':'X','狀態':'執行中'}),
+             source_row('contract','recLine',{'工編號碼':'X-1','控制工項':'Synthetic','控制數量':12}),
+             source_row('reporting','recItem',{'工編號碼':'X-1','工項類別':'控制','工項名稱':'Synthetic','基準數量':0})]
+    state=seed(True);import_sources(state,records)
+    pid=next(p['id'] for p in state['projects'] if p['code']=='X')
+    assert state['derived_plan'][pid]['categories']['控制']['planned_qty']=='12'
+    assert state['derived_plan_status']==dict(lines_total=1,lines_derived=1,lines_unmatched=0,items_native=0,items_derived=1,items_ambiguous=0,items_unlinked=0)
+    assert next(c for c in state['contract_items'] if c['source_identity']['record_id']=='recLine')['project_id'] is None
+    before=deepcopy(state)
+    monkeypatch.setattr(contract_links,'build_projection',lambda *args,**kwargs:contract_links.Projection({},{}))
+    import_sources(state,records)
+    for key in ('projects','contract_items','source_work_items','source_work_items_status'):
+        assert state[key]==before[key]
+    assert state['derived_plan']=={} and state['derived_plan_status']=={}
+
+
+def test_visibility_never_exposes_hidden_project_or_source_dependencies():
+    from .source_case_policy import filter_visible_cases
+    projection=build_projection([line(),item(),row('confirmation','c',工程確認單編號='X')],{'b/confirmation/c':'p'}, {})
+    state=dict(environment='production',projects=[dict(id='p',nodes=[],case_visibility='new_case')],
+               derived_plan=projection.plans,derived_plan_status=projection.status,
+               source_visible_record_ids=['b|contract|l','b|reporting|i','b|confirmation|c'])
+    assert 'p' in filter_visible_cases(deepcopy(state))['derived_plan']
+    state['source_visible_record_ids'].remove('b|contract|l')
+    filtered=filter_visible_cases(deepcopy(state))
+    assert filtered['derived_plan']=={} and 'derived_plan_status' not in filtered
+    state['projects'][0]['case_visibility']='excluded_history'
+    assert filter_visible_cases(state)['derived_plan']=={}
+
+
+def test_zero_line_quantity_is_present_and_native_never_overrides():
+    assert resolve([line(qty=0),item(qty=0)]).status==Status.UNIQUE
+    records=[line('native',code='Y-1',qty=2),line('derived'),
+             item(**{'來源合約明細（日報關聯）':[{'id':'native'}]}),
+             row('confirmation','c',工程確認單編號='X')]
+    projection=build_projection(records,{'b/confirmation/c':'p'},{'b/contract/native':'q'})
+    assert projection.plans['q']['items']==[dict(id='b/reporting/i',category='外業',line_id='b/contract/native',basis='native',reason='native_link_present')]
+    assert projection.plans['p']['basis']['derived']==0
+
+
+def test_explicit_native_target_table_is_required():
+    records=[line(),item(**{'來源合約明細（日報關聯）':[{'table_id':'other','record_id':'l'}]})]
+    parsed=parse_records(records)
+    assert parsed.items[0].native_line_ids==()
+    assert resolve_item(parsed.items[0],parsed.lines).reason==Reason.NATIVE_LINK_PRESENT

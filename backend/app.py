@@ -449,6 +449,8 @@ def create_app(overrides=None):
             if task_details: project['source_attachment_coverage']=source_attachment_coverage(project)
         result.pop('source_work_items',None)
         result.pop('source_work_items_status',None)
+        result.pop('derived_plan',None)
+        result.pop('derived_plan_status',None)
         result.pop('source_work_items_enabled',None)
         out=filter_private_workspace(result,user,task_details=task_details)
         restrict_hr(out,user)

@@ -361,3 +361,19 @@ def test_partial_status_with_independent_stale_flag_marks_sections_partial_and_s
     assert any(s['states'] == ['partial', 'stale'] for s in sections.values())
     state['source_status'] = dict(status='partial', last_sync='2026-10-14T01:00:00')
     assert all(s['freshness'] is None for s in build_case_detail(state, 'p', confirmation_key='b/conf/c1')['sections'].values())
+
+
+def test_work_items_details_forward_plan_without_changing_native_tree():
+    from .contract_links import build_projection
+    from .test_contract_links import line, item, row
+    state=fixture()
+    before=build_case_detail(state,'p',confirmation_key='b/conf/c1')
+    projection=build_projection([line(),item(),row('confirmation','c',工程確認單編號='X')],{'b/confirmation/c':'p'}, {})
+    state['derived_plan']=projection.plans
+    result=build_case_detail(state,'p',confirmation_key='b/conf/c1')
+    summary=result['sections']['work_items']['details'].pop('plan_summary')
+    assert summary['categories']['外業']['planned_qty']=='12'
+    assert summary['items']==[dict(id='b/reporting/i',category='外業',line_id='b/contract/l',basis='derived',reason='exact_match')]
+    assert '_source_ids' not in summary
+    before['sections']['work_items']['details'].pop('plan_summary')
+    assert result==before

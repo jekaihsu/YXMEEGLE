@@ -179,7 +179,11 @@ def build_projection(records,confirmation_projects,native_line_projects,*,native
         result=resolve_line(line,parsed.confirmations)
         pid=confirmation_projects.get(result.confirmation_id) if result.status==Status.UNIQUE else None
         if pid: line_projects[line.record_id]=pid;derived+=1
-    plans={};basis=Counter();native_item_projects=native_item_projects or {}
+    plans={};basis=Counter();native_item_projects=native_item_projects or {};dependencies=defaultdict(set)
+    for line in parsed.lines:
+        if pid:=line_projects.get(line.record_id): dependencies[pid].add(line.record_id)
+    for confirmation in parsed.confirmations:
+        if pid:=confirmation_projects.get(confirmation.record_id): dependencies[pid].add(confirmation.record_id)
     def plan(pid):
         if pid not in plans:
             plans[pid]=dict(rule_version=RULE_VERSION,basis=dict.fromkeys(('native','derived','ambiguous','unlinked'),0),
@@ -209,8 +213,9 @@ def build_projection(records,confirmation_projects,native_line_projects,*,native
             item_basis={Status.UNIQUE:'derived',Status.AMBIGUOUS:'ambiguous',Status.NONE:'unlinked'}[result.status]
             pids={line_projects.get(l) for l in result.candidate_ids}
         basis[item_basis]+=1
-        pid=next(iter(pids)) if len(pids)==1 and None not in pids else native_item_projects.get(item.record_id)
+        pid=(next(iter(pids)) if len(pids)==1 and None not in pids else None) if pids else native_item_projects.get(item.record_id)
         if not pid: continue
+        dependencies[pid].update((item.record_id,*(item.native_line_ids if item.native_link_present else result.candidate_ids)))
         summary=plan(pid);summary['basis'][item_basis]+=1
         if item.category in CATEGORY_FIELDS:
             counts=summary['categories'][item.category];counts['items']+=1;counts['items_'+item_basis]+=1
@@ -224,6 +229,14 @@ def build_projection(records,confirmation_projects,native_line_projects,*,native
             if summary['items']: summary['items'].pop()
             elif summary['review_groups']: summary['review_groups'].pop()
             else: break
+    for pid,summary in plans.items(): summary['_source_ids']=sorted(dependencies[pid])
     return Projection(plans,dict(lines_total=len(parsed.lines),lines_derived=derived,
         lines_unmatched=sum(l.record_id not in line_projects for l in parsed.lines),
         **{'items_'+k:basis[k] for k in ('native','derived','ambiguous','unlinked')}))
+
+
+def plan_summary(state,pid):
+    from copy import deepcopy
+    summary=deepcopy((state.get('derived_plan') or {}).get(pid))
+    if summary is not None: summary.pop('_source_ids',None)
+    return summary
