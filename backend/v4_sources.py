@@ -517,15 +517,28 @@ def import_v4(ws, records, complete_tables=None):
         for ident in p.get('source_record_ids',[]): assignments[ident]=p['id']
         for entry in p.get('daily_reports',[]): assignments[entry['id']]=p['id']
     from .contract_links import build_projection,record_key
-    projection=build_projection(records,
-        {record_key(r):p['id'] for r in records if r.get('kind')=='confirmation'
-         and (p:=by_ref.get((r['base_token'],r['record_id'])))},
-        {record_key(r):p['id'] for r in records if r.get('kind')=='contract'
-         and (p:=contract_projects.get((r['base_token'],r['record_id'])))},
-        native_item_projects={record_key(r):p['id'] for r in records if r.get('kind')=='reporting'
-         and (p:=report_projects.get((r['base_token'],r['record_id'])))})
-    ws['derived_plan']=projection.plans
-    ws['derived_plan_status']=projection.status
+    plan_kinds={'confirmation','contract','reporting'}
+    from .sources import KNOWN_TABLES
+    required={(r['base_token'],r['table_id']) for r in records if r.get('kind') in plan_kinds}
+    required.update((t['base_token'],t['table_id']) for t in complete_tables or [] if t.get('kind') in plan_kinds)
+    bases={base for base,table in required}
+    required.update((base,table) for base in bases for table,kind in KNOWN_TABLES.get(base,{}).items() if kind in plan_kinds)
+    required.update(tuple(ident.split('/')[:2]) for summary in ws.get('derived_plan',{}).values()
+                    for ident in summary.get('_source_ids',[]))
+    ready={(t.get('base_token'),t.get('table_id')) for t in complete_tables or [] if t.get('status')=='ready'}
+    ready_kinds={t.get('kind') for t in complete_tables or [] if t.get('status')=='ready'}
+    if required <= ready and plan_kinds <= ready_kinds:
+        projection=build_projection(records,
+            {record_key(r):p['id'] for r in records if r.get('kind')=='confirmation'
+             and (p:=by_ref.get((r['base_token'],r['record_id'])))},
+            {record_key(r):p['id'] for r in records if r.get('kind')=='contract'
+             and (p:=contract_projects.get((r['base_token'],r['record_id'])))},
+            native_item_projects={record_key(r):p['id'] for r in records if r.get('kind')=='reporting'
+             and (p:=report_projects.get((r['base_token'],r['record_id'])))})
+        ws['derived_plan']=projection.plans
+        ws['derived_plan_status']={**projection.status,'partial':False}
+    else:
+        ws.setdefault('derived_plan_status',{})['partial']=True
     update_attachments(ws,records,complete_tables,assignments)
     from .source_entities import update_entities
     update_entities(ws,records,complete_tables,assignments)

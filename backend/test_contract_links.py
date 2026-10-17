@@ -119,17 +119,18 @@ def test_importer_is_additive_and_replaces_stale_projection(monkeypatch):
     records=[source_row('confirmation','recCase',{'工程確認單編號':'X','狀態':'執行中'}),
              source_row('contract','recLine',{'工編號碼':'X-1','控制工項':'Synthetic','控制數量':12}),
              source_row('reporting','recItem',{'工編號碼':'X-1','工項類別':'控制','工項名稱':'Synthetic','基準數量':0})]
-    state=seed(True);import_sources(state,records)
+    tables=[dict(base_token=r['base_token'],table_id=r['table_id'],kind=r['kind'],status='ready') for r in records]
+    state=seed(True);import_sources(state,records,complete_tables=tables)
     pid=next(p['id'] for p in state['projects'] if p['code']=='X')
     assert state['derived_plan'][pid]['categories']['控制']['planned_qty']=='12'
-    assert state['derived_plan_status']==dict(lines_total=1,lines_derived=1,lines_unmatched=0,items_native=0,items_derived=1,items_ambiguous=0,items_unlinked=0)
+    assert state['derived_plan_status']==dict(lines_total=1,lines_derived=1,lines_unmatched=0,items_native=0,items_derived=1,items_ambiguous=0,items_unlinked=0,partial=False)
     assert next(c for c in state['contract_items'] if c['source_identity']['record_id']=='recLine')['project_id'] is None
     before=deepcopy(state)
     monkeypatch.setattr(contract_links,'build_projection',lambda *args,**kwargs:contract_links.Projection({},{}))
-    import_sources(state,records)
+    import_sources(state,records,complete_tables=tables)
     for key in ('projects','contract_items','source_work_items','source_work_items_status'):
         assert state[key]==before[key]
-    assert state['derived_plan']=={} and state['derived_plan_status']=={}
+    assert state['derived_plan']=={} and state['derived_plan_status']=={'partial':False}
 
 
 def test_visibility_never_exposes_hidden_project_or_source_dependencies():
@@ -183,3 +184,17 @@ def test_nonpositive_lines_are_not_planned_or_candidates(qty):
     assert projection.plans['p']['review_groups']==[]
     assert projection.plans['p']['items']==[dict(id='b/reporting/i',category='外業',
         line_id='b/contract/positive',basis='derived',reason='exact_match')]
+
+
+@pytest.mark.parametrize('missing', [None,'confirmation','contract','reporting'])
+def test_partial_import_preserves_previous_plan(missing):
+    from .seed import seed
+    from .v4_sources import import_v4
+    records=[row('confirmation','c',工程確認單編號='X'),line(),item()]
+    tables=[dict(base_token='b',table_id=kind,kind=kind,status='ready' if kind!=missing else 'error')
+            for kind in ('confirmation','contract','reporting')]
+    state=seed(True)
+    state.update(derived_plan={'previous':{'marker':42}},derived_plan_status={'lines_derived':7})
+    import_v4(state,records,complete_tables=tables if missing else None)
+    assert state['derived_plan']=={'previous':{'marker':42}}
+    assert state['derived_plan_status']=={'lines_derived':7,'partial':True}
