@@ -356,7 +356,7 @@ def test_progress_normalized_search_and_detail_key_rejected_before_scan():
     app,store=app_for()
     store.result=lambda *args:pytest.fail('invalid keys must not access the snapshot')
     with TestClient(app) as client:
-        for key in ('','bad','rec','rec!','rec'+'a'*65,'rec中文'):
+        for key in ('','bad','rec','rec!','rec'+'a'*65,'rec中文',' recCase1 '):
             response=client.get('/api/reports/progress/case',params={'key':key})
             assert response.status_code==404
             assert response.json()=={'detail':'case_not_found'}

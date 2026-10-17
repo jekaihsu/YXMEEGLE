@@ -35,7 +35,7 @@ def parameters(endpoint, query):
     if 'q' in p: p['q']=unicodedata.normalize('NFKC',p['q']).strip()
     unknown=set(p)-ALLOWED[endpoint]
     if unknown: raise HTTPException(422,'不支援的查詢欄位：'+', '.join(sorted(unknown)))
-    p={k:v.strip() if isinstance(v,str) else v for k,v in p.items()}
+    p={k:v.strip() if isinstance(v,str) and k!='key' else v for k,v in p.items()}
     p={k:v for k,v in p.items() if v!=''}
     if p.get('group'):
         from .compute import normalize_group
