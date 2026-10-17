@@ -65,7 +65,7 @@ Conventions:
 | sales | done / rule | code starts with `C` + digit, or a confirmation with ≥1 contract line exists; otherwise unknown / none |
 | pm, confirmation | done / rule | confirmation with ≥1 line. Confirmation without lines: active / rule. No confirmation: waiting / rule |
 | field, control, mapping, report | active / source | only when a mapped daily row (or, for field with exactly one v3 match, a positive v3 `累計外業營業額點數`) gives an actual. Never `done`. No confirmation: waiting / rule. Otherwise unknown / none |
-| billing | active / source: source 累計已請款 > 0. done / source: 案件已入帳. Otherwise unknown / none |
+| billing | active / source: source 累計已請款 > 0. done / source: 案件已入帳. Otherwise unknown / none. Without amount access (`finance.restricted`) billing and settlement are always unknown / none with no finance evidence |
 | settlement | done / source: 案件已入帳. Otherwise unknown / none |
 
 ## Production actual
@@ -73,7 +73,7 @@ Conventions:
 - `v4_daily`: sum of `points` (營業額點數) of `p.daily_reports` whose `department` is the stage's group (外業組/控制組/圖資組/報告組). It is reported work, not accepted delivery and not contract quantity (`unit_note` says so).
 - Rows mapped but none has points: `known: false`, reason `已有日報連結，但完成數量尚未投影`.
 - No row mapped to the case: `known: false`, reason `尚無日報連結到此案件`. Rows exist for other groups only: `此案件的日報沒有歸屬到<類別>`.
-- `v3_reports` (field only, exactly one v3 case, positive cumulative): `known: true`. Ambiguous v3 never lends an actual.
+- `v3_reports` (field only, exactly one v3 case, positive cumulative): `known: true`, whether or not the case has weekly rows. Ambiguous v3 never lends an actual.
 
 ## Gap ids
 
