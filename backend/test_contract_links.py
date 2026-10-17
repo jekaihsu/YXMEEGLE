@@ -223,3 +223,48 @@ def test_line_and_unresolved_native_provenance_is_additive_and_private():
 def test_plan_quantity_uses_plain_decimal_strings(quantity, expected):
     projection=build_projection([row('confirmation','c',工程確認單編號='X'),line(qty=quantity)], {'b/confirmation/c':'p'}, {})
     assert projection.plans['p']['categories']['外業']['planned_qty']==expected
+
+
+REMAINING='本工項剩餘營ˊ業額'
+
+
+@pytest.mark.parametrize('planned,remaining,expected',[
+    (4.625,'1.5',{'planned_points':'4.625','remaining_points':'1.5'}),
+    ('10',[{'text':'0','type':'text'}],{'planned_points':'10','remaining_points':'0'}),
+    (None,'3',{'remaining_points':'3'}),
+    ('10','-3',{'planned_points':'10'}),
+    ('NaN','1e9999999999',{}),
+    ('',None,{}),
+])
+def test_plan_items_carry_lark_points_only_when_they_parse(planned,remaining,expected):
+    fields={'對應營業額':planned,REMAINING:remaining}
+    rows=[line(),item(**{k:v for k,v in fields.items() if v is not None})]
+    plans=build_projection(rows,{},{'b/contract/l':'p1'}).plans
+    [found]=plans['p1']['items']
+    assert {k:v for k,v in found.items() if k.endswith('_points')}==expected
+
+
+def test_the_projection_reads_the_remaining_field_by_its_exact_name():
+    rows=[line(),item(**{'本工項剩餘營業額':'1','對應營業額':'4'})]
+    [found]=build_projection(rows,{},{'b/contract/l':'p1'}).plans['p1']['items']
+    assert found['planned_points']=='4' and 'remaining_points' not in found
+
+
+def test_a_changing_remaining_never_flags_a_started_task_as_changed():
+    from .seed import seed
+    from .sources import import_sources
+    from .test_new_daily_acceptance import row as source_row
+    def rows(remaining):
+        return [source_row('confirmation','recCase',{'工程確認單編號':'X','狀態':'執行中'}),
+                source_row('contract','recLine',{'工編號碼':'X-1','控制工項':'Synthetic','控制數量':12}),
+                source_row('reporting','recItem',{'工編號碼':'X-1','工項類別':'控制','工項名稱':'Synthetic','基準數量':12,'對應營業額':'4',REMAINING:remaining,'所屬案件':'X'})]
+    state=seed(True);first=rows('4');tables=[dict(base_token=r['base_token'],table_id=r['table_id'],kind=r['kind'],status='ready') for r in first]
+    import_sources(state,first,complete_tables=tables)
+    task=next(t for p in state['projects'] if p['code']=='X' for n in p['nodes'] for t in n['tasks'] if t['id'].startswith('src-'))
+    held=task['source_snapshot']['source_fields']
+    assert REMAINING not in held and held['對應營業額']=='4'
+    task['started_at']='2026-10-01T00:00:00+08:00'
+    second=rows('1');import_sources(state,second,complete_tables=tables)
+    assert not task.get('source_change_pending')
+    pid=next(p['id'] for p in state['projects'] if p['code']=='X')
+    assert state['derived_plan'][pid]['items'][0]['remaining_points']=='1'

@@ -193,6 +193,32 @@ Each production node in the overview and detail payload carries `evidence` and `
 
 `planned_qty` is a decimal string, `null` (with `lines` and `items` null) while the contract plan is unavailable. `work_orders` is 0 with no linked rows, and then `actual_known` is false: unknown is never rendered as 0 or 0%. `actual_source` is `v4_daily`, `v3_reports` or `null`; the v3 figure is withheld (`actual_value: null`) from viewers who may not see the reports register, but the status it implies is the same for everyone. `can_submit_hint` is true only when the actual is known, the plan is greater than 0, the actual is at least the plan, and the node is 待處理 or 進行中. The actual is a points figure (`unit_note` in `/progress`), not contract units, so it is a hint to look, never an approval.
 
+### Item progress from Lark's own revenue points (added 2026-10-17)
+
+Lark's 合約填報工項 holds `對應營業額` (the item's planned revenue points) and the formula `本工項剩餘營ˊ業額` (the field name really contains U+02CA between 營 and 業; `sources.REMAINING_POINTS_FIELD` copies it). Both are projected additively; a snapshot without the field reads as unknown. Both are the same unit, so a node percentage is legitimate. They are parsed with `Decimal` (non-negative, at most 10^9; anything else is unknown) and carried on the derived plan's items as `planned_points` and `remaining_points`. The remaining value is deliberately kept out of the task snapshot, because it changes with every linked daily row.
+
+| Item case | Status |
+| --- | --- |
+| planned > 0 and remaining <= 0 | `done` |
+| 0 < remaining < planned | `partial` |
+| remaining == planned (nothing done, or nothing linked: ambiguous) | `no_signal` |
+| remaining or planned unknown, malformed, negative, huge, or remaining > planned | `no_signal` |
+
+`no_signal` is labelled 尚無進度資料 and is never shown as 0%. Per node, over the items whose remaining is a valid number not above the plan: `earned = sum(planned - remaining)`, `planned_points = sum(planned)`, `percent = earned / planned * 100` (one decimal, half up, 0..100, shown as at most 99.9 until every item is done). `progress` is `null` until at least one item is `partial` or `done`, and while the plan is truncated.
+
+Extra `evidence` keys (existing keys unchanged; `items` stays the fill-item count):
+
+```json
+{"progress": {"percent": "30", "earned_points": "60", "planned_points": "200", "items_done": 0, "items_total": 2},
+ "items_total": 2, "items_truncated": false,
+ "work_items": [{"code": "C1-1", "name": "導線測量", "planned_qty": "50", "planned_points": "100",
+                 "remaining_points": "40", "status": "partial", "link_basis": "native"}]}
+```
+
+`work_items` holds at most 50 rows. Viewers without the reports gate (the same gate as the v3 figure) get `percent`, `earned_points`, `planned_points` and every row's points as `null`; statuses and counts stay.
+
+Effect on status: a `partial` or `done` item is evidence that the node started (進行中 by evidence, never 待審核 or 已完成). `can_submit_hint` is true only when every planned item of the node is `done` and the node is 待處理 or 進行中 (`Signal.complete_by == 'item_points'`). The `quantity` source guard for daily points against contract units is unchanged. The 流程與交付 card shows the bar, 「完成 X%（已完成 N/M 工項）」 and a collapsible 「工項明細（M）」; without progress it says 尚無進度資料（日報未連結或尚未開工）.
+
 ## Who may act
 
 | Action | Allowed for | From status |

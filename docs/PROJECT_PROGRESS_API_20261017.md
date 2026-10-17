@@ -39,7 +39,9 @@ stages          [ { key, label, state: done|active|waiting|unknown, basis: rule|
                     evidence: [ { label, value, tone: ok|warn|muted } ] } ]    // 9, in order:
                                                                                // sales pm confirmation field control mapping report billing settlement
 production      { field|control|mapping|report: { planned: {lines, items, qty: string, basis: {native, derived, ambiguous, unlinked}, needs_review}|null,
-                                                  items: [ { item_id, code, name, planned_qty: string|null, link_basis } ],   // max 50
+                                                  items: [ { item_id, code, name, planned_qty: string|null, planned_points: string|null, remaining_points: string|null,
+                                             status: done|partial|no_signal, link_basis } ],   // max 50
+                                                  progress: { percent, earned_points, planned_points, items_done, items_total }|null,
                                                   items_total, items_truncated,
                                                   actual: { known, value: string|null, unit_note, reason, source: v4_daily|v3_reports|null },
                                                   work_orders: { count: int|null, latest_date: string|null } },
@@ -82,6 +84,7 @@ Conventions:
 
 ## Known limits
 
+- `planned_points`, `remaining_points` and `status` come from Lark's own 對應營業額 and 本工項剩餘營ˊ業額 (rules in NODE_ASSIGNMENT_20261014.md, "Item progress"). `progress` is `null` until an item is `partial` or `done`; without the amounts gate the points and `percent` are `null` and only statuses and counts remain. A `partial` or `done` item makes the stage `active` with basis `source`.
 - Item `code`/`name`/`planned_qty` come from the item's linked contract line. An ambiguous or unlinked item has `null` for all three.
 - `PM告知可請款日期` and `計價進度` are not in `sources.FIELDS`, so they are not returned. Adding them needs a projection change, not a change here.
 - `report_rows` cover the newest 6 weeks with activity per department (`report_rows_truncated`). Office rows are not split into control/mapping/report.

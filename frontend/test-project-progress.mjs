@@ -17,3 +17,13 @@ test('SOP label offers the start only before the node rows exist; a started case
 test('starting needs eligibility; seeds are a separate opt-in and a started case confirms neither',()=>{const p={can_start:true,blockers:[],already_started:false,seeds_pending:4,eligible:true};assert.equal(m.canConfirmSop(p),true);assert.equal(m.canConfirmSop(p,true),true);assert.equal(m.canConfirmSop({...p,eligible:false}),false);assert.equal(m.canConfirmSop({...p,seeds_pending:0},true),false);assert.equal(m.canConfirmSop({...p,already_started:true}),false);assert.equal(m.canConfirmSop({...p,already_started:true},true),false);assert.equal(m.canConfirmSop({...p,can_start:false}),false);assert.equal(m.canConfirmSop({...p,blockers:[{}]}),false)});
 
 test('ambiguous report links list every candidate without choosing one',()=>{const cases=[{case_key:'a',case_code:'C115264'},{case_key:'b',case_code:'115588'}];assert.deepEqual(m.caseReportTargets(cases,[], 'office'),[{case_code:'C115264',dept:'office',week:undefined},{case_code:'115588',dept:'office',week:undefined}])});
+
+test('the parser keeps the item progress and statuses and an older payload without them still parses',()=>{
+  const d=m.parseProjectProgress(fixture);assert.equal(d.production.field.progress,undefined);
+  const next=structuredClone(fixture);
+  next.production.field.progress={percent:'30',earned_points:'60',planned_points:'200',items_done:0,items_total:2};
+  Object.assign(next.production.field.items[0],{planned_points:'100',remaining_points:'40',status:'partial'});
+  const parsed=m.parseProjectProgress(next);
+  assert.deepEqual(parsed.production.field.progress,next.production.field.progress);
+  assert.equal(parsed.production.field.items[0].status,'partial');
+});

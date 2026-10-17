@@ -19,6 +19,7 @@ from typing import Literal, TypedDict
 
 from .case_evidence import is_c_code, live_confirmation_fields, live_contract_lines, proves_sales_by_code
 from .contract_links import CATEGORY_FIELDS, plan_summary
+from .item_progress import item_status, node_progress, parse_points
 from .sources import day, text
 
 SCHEMA_VERSION = 1
@@ -99,6 +100,9 @@ class PlannedItem(TypedDict):
     code: str | None
     name: str | None
     planned_qty: str | None
+    planned_points: str | None
+    remaining_points: str | None
+    status: Literal['done', 'partial', 'no_signal']
     link_basis: Literal['native', 'derived', 'ambiguous', 'unlinked']
 
 
@@ -115,9 +119,18 @@ class WorkOrders(TypedDict):
     latest_date: str | None
 
 
+class ItemsProgress(TypedDict):
+    percent: str | None
+    earned_points: str | None
+    planned_points: str | None
+    items_done: int
+    items_total: int
+
+
 class StageProduction(TypedDict):
     planned: Planned | None
     items: list[PlannedItem]
+    progress: ItemsProgress | None
     items_total: int
     items_truncated: bool
     actual: Actual
@@ -360,20 +373,33 @@ def work_orders_of(project, key):
     return {'count': len(orders) or None, 'latest_date': dates[-1] if dates else None}
 
 
-def _planned_items(state, project, summary, key):
+def planned_items(state, project, summary, key):
+    """(planned totals, up to MAX_ITEMS items, items total, truncated, NodeProgress or None) of one production category.
+
+    Progress is None while the plan is unavailable or truncated: a partial list would overstate the percentage.
+    Items carry Lark's own revenue points and the status computed from them; callers apply the amounts gate.
+    """
     if summary is None:
-        return None, [], 0, False
+        return None, [], 0, False, None
     category = PRODUCTION[key][0]
     lines = {c['id']: c for c in state.get('contract_items', []) if c.get('project_id') == project['id']}
     mine = [i for i in summary.get('items', []) if i.get('category') == category]
+    points = [(parse_points(i.get('planned_points')), parse_points(i.get('remaining_points'))) for i in mine]
     items = []
-    for item in mine[:MAX_ITEMS]:
+    for item, (planned, remaining) in list(zip(mine, points))[:MAX_ITEMS]:
         fields = (lines.get(item.get('line_id')) or {}).get('fields') or {}
         items.append({'item_id': item['id'], 'code': text(fields.get('工編號碼')) or None,
                       'name': text(fields.get(CATEGORY_FIELDS[category][1])) or None,
                       'planned_qty': _fmt(_dec(fields.get(CATEGORY_FIELDS[category][0]))),
-                      'link_basis': BASIS_LABEL[item['basis']]})
-    return planned_of(summary, key), items, len(mine), len(mine) > MAX_ITEMS
+                      'planned_points': _fmt(planned), 'remaining_points': _fmt(remaining),
+                      'status': item_status(planned, remaining), 'link_basis': BASIS_LABEL[item['basis']]})
+    progress = None if summary.get('truncated') else node_progress(points)
+    return planned_of(summary, key), items, len(mine), len(mine) > MAX_ITEMS, progress
+
+
+def without_points(items):
+    """The same items for a viewer without the amounts gate: quantity and status stay, revenue points go."""
+    return [{**i, 'planned_points': None, 'remaining_points': None} for i in items]
 
 
 def _finance(project, amounts, rows):
@@ -420,8 +446,13 @@ def _stages(identity, production, finance, project, amounts):
         evidence = []
         if part['planned']:
             evidence.append(_ev('合約規劃', f"{part['planned']['lines']} 筆明細 / {part['planned']['qty']}", 'muted'))
+        done = part['progress']
+        if done:
+            evidence.append(_ev('工項進度', f"已完成 {done['items_done']}/{done['items_total']} 工項" + (f"，{done['percent']}%" if done['percent'] else ''), 'ok'))
         if part['actual']['known']:
             stages.append(_stage(key, label, 'active', 'source', *evidence, _ev('回報', f"{part['actual']['value']}（{part['actual']['unit_note']}）", 'ok')))
+        elif done:
+            stages.append(_stage(key, label, 'active', 'source', *evidence))
         elif not conf['present']:
             stages.append(_stage(key, label, 'waiting', 'rule', _ev('確認單', '尚未成立', 'warn')))
         else:
@@ -507,8 +538,9 @@ def build_project_progress(state, project_id, *, reports=None, amounts=False, as
     field_total = v3_field_total(project, reports)
     production = {}
     for key in PRODUCTION:
-        planned, items, total, truncated = _planned_items(state, project, summary, key)
-        production[key] = {'planned': planned, 'items': items, 'items_total': total, 'items_truncated': truncated,
+        planned, items, total, truncated, progress = planned_items(state, project, summary, key)
+        production[key] = {'planned': planned, 'items': items if amounts else without_points(items), 'items_total': total,
+                           'items_truncated': truncated, 'progress': progress.public(amounts) if progress else None,
                            'actual': actual_of(project, key, field_total), 'work_orders': work_orders_of(project, key)}
     production.update(report_rows=v3_rows, report_rows_truncated=rows_truncated)
     finance = _finance(project, amounts, conf_rows)

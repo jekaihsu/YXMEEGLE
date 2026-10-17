@@ -7,10 +7,19 @@ export type NodePermissions = Partial<Record<NodeAction, boolean>>;
 export interface AssignmentPerson {open_id: string; name: string; avatar_url?: string}
 export interface AssignablePerson extends AssignmentPerson {departments: string[]}
 export interface AutoDone {rule: string; reason: string}
+export type WorkItemStatus = 'done' | 'partial' | 'no_signal';
+export interface WorkItem {
+  code: string | null; name: string | null; planned_qty: string | null; planned_points: string | null; remaining_points: string | null;
+  status: WorkItemStatus; link_basis: string;
+}
+// percent and the points are null for a viewer without the reports gate; the counts stay.
+export interface ItemsProgress {percent: string | null; earned_points: string | null; planned_points: string | null; items_done: number; items_total: number}
 export interface NodeEvidence {
   planned_qty: string | null; lines: number | null; items: number | null; work_orders: number; latest_date: string | null;
   actual_known: boolean; actual_value: string | null; actual_source: string | null; reason: string; drives_status: boolean;
+  progress: ItemsProgress | null; items_total: number; items_truncated: boolean; work_items: WorkItem[];
 }
+export const MAX_WORK_ITEMS = 50;
 export interface AssignmentNode {
   key: string; label: string; status: string | null; derived_status: string; record_id: string | null; revision: string | null;
   departments: string[]; assignment_method: string | null; started_at: string | null; finished_at: string | null;
@@ -75,12 +84,34 @@ function autoDone(value: unknown): AutoDone | null {
 function optionalCount(value: unknown): number | null {return value == null ? null : count(value)}
 function decimalText(value: unknown): string | null {return isPlainDecimal(value) ? value : null}
 function flag(value: unknown): boolean {if (typeof value !== 'boolean') throw malformed(); return value}
+const isCount = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 0;
+function percentText(value: unknown): string | null {return isPlainDecimal(value) && Number(value) >= 0 && Number(value) <= 100 ? value : null}
+// These fields are additive and display-only, so a bad value is neutralized instead of rejecting the whole payload.
+function itemsProgress(value: unknown): ItemsProgress | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const p = Object.fromEntries(Object.entries(value));
+  if (!isCount(p.items_total) || !isCount(p.items_done) || p.items_done > p.items_total) return null;
+  return {percent: percentText(p.percent), earned_points: decimalText(p.earned_points), planned_points: decimalText(p.planned_points),
+    items_done: p.items_done, items_total: p.items_total};
+}
+function workItem(value: unknown): WorkItem | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const i = Object.fromEntries(Object.entries(value));
+  const code = typeof i.code === 'string' ? i.code : null, name = typeof i.name === 'string' ? i.name : null;
+  if (code === null && name === null) return null;
+  return {code, name, planned_qty: decimalText(i.planned_qty), planned_points: decimalText(i.planned_points), remaining_points: decimalText(i.remaining_points),
+    status: i.status === 'done' || i.status === 'partial' ? i.status : 'no_signal', link_basis: typeof i.link_basis === 'string' ? i.link_basis : ''};
+}
 function evidence(value: unknown): NodeEvidence | null {
   if (value == null) return null;
   const e = record(value);
+  const work_items = (Array.isArray(e.work_items) ? e.work_items : []).slice(0, MAX_WORK_ITEMS).flatMap(i => workItem(i) ?? []);
+  const shown = (Array.isArray(e.work_items) ? e.work_items : []).length;
   return {planned_qty: decimalText(e.planned_qty), lines: optionalCount(e.lines), items: optionalCount(e.items), work_orders: count(e.work_orders),
     latest_date: optionalText(e.latest_date), actual_known: flag(e.actual_known), actual_value: decimalText(e.actual_value),
-    actual_source: optionalText(e.actual_source), reason: text(e.reason), drives_status: flag(e.drives_status)};
+    actual_source: optionalText(e.actual_source), reason: text(e.reason), drives_status: flag(e.drives_status),
+    progress: itemsProgress(e.progress), items_total: isCount(e.items_total) ? Math.max(e.items_total, work_items.length) : work_items.length,
+    items_truncated: e.items_truncated === true || shown > MAX_WORK_ITEMS, work_items};
 }
 function node(value: unknown): AssignmentNode {
   const n = record(value), tasks = record(n.tasks);

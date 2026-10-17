@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from ..case_evidence import live_confirmation_fields, live_contract_lines, proves_sales_by_code
 from ..contract_links import plan_summary
-from ..project_progress import PRODUCTION, NO_DAILY, actual_of, parse_decimal, planned_of, v3_field_total, work_orders_of
+from ..project_progress import PRODUCTION, NO_DAILY, actual_of, parse_decimal, planned_items, v3_field_total, work_orders_of
 from .domain import NodeKey
 
 
@@ -73,8 +73,10 @@ PRODUCTION_NODES = tuple(NodeKey(key) for key in PRODUCTION)
 
 
 # Daily and v3 actuals are revenue points; a plan quantity is in contract units, so they must not be compared.
-# Only an actual measured in contract units may drive the 可送審 hint, and no source provides one yet.
+# Only an actual measured in contract units may drive the 可送審 hint through the quantity guard, and no source provides one yet.
 QUANTITY_SOURCE = 'quantity'
+# The fill items' own planned and remaining revenue points are the same unit, so every item done is a legitimate basis.
+ITEM_POINTS_SOURCE = 'item_points'
 
 
 @dataclass(frozen=True)
@@ -90,22 +92,35 @@ class Signal:
     actual_source: str | None
     started: bool
     reason_zh: str
+    progress: dict | None = None
+    item_rows: tuple = ()
+    items_total: int = 0
+    items_truncated: bool = False
+    items_all_done: bool = False
+
+    @property
+    def complete_by(self) -> str | None:
+        planned, actual = parse_decimal(self.planned_qty), parse_decimal(self.actual_value)
+        if (self.actual_source == QUANTITY_SOURCE and self.actual_known and planned is not None
+                and actual is not None and planned > Decimal(0) and actual >= planned):
+            return QUANTITY_SOURCE
+        return ITEM_POINTS_SOURCE if self.items_all_done else None
 
     @property
     def can_submit(self) -> bool:
-        planned, actual = parse_decimal(self.planned_qty), parse_decimal(self.actual_value)
-        return bool(self.actual_source == QUANTITY_SOURCE and self.actual_known and planned is not None
-                    and actual is not None and planned > Decimal(0) and actual >= planned)
+        return self.complete_by is not None
 
     def public(self) -> dict:
         return {'planned_qty': self.planned_qty, 'lines': self.lines, 'items': self.items,
                 'work_orders': self.work_orders, 'latest_date': self.latest_date,
                 'actual_known': self.actual_known, 'actual_value': self.actual_value, 'reason': self.reason_zh,
-                'actual_source': self.actual_source}
+                'actual_source': self.actual_source, 'progress': self.progress,
+                'items_total': self.items_total, 'items_truncated': self.items_truncated,
+                'work_items': [{k: v for k, v in row.items() if k != 'item_id'} for row in self.item_rows]}
 
 
 def production_signal(project, state, reports=None) -> dict[NodeKey, Signal]:
-    """Per production node, from the case's contract plan, linked daily rows and (外業 only) the v3 register.
+    """Per production node, from the case's contract plan, linked daily rows, the fill items' own points and (外業 only) the v3 register.
 
     `reports` is an already-built ReportsView, or None; this never reads Lark and never waits for the register.
     """
@@ -114,20 +129,25 @@ def production_signal(project, state, reports=None) -> dict[NodeKey, Signal]:
     found = {}
     for node in PRODUCTION_NODES:
         key = node.value
-        planned, orders = planned_of(summary, key), work_orders_of(project, key)
+        planned, rows, items_total, truncated, progress = planned_items(state or {}, project, summary, key)
+        orders = work_orders_of(project, key)
         actual = actual_of(project, key, total)
         count = orders['count'] or 0
-        started = bool(count) or actual['source'] == 'v3_reports'
+        by_items = bool(progress and progress.known)
+        started = bool(count) or actual['source'] == 'v3_reports' or by_items
         if count:
             reason = f'已有 {count} 筆日報連結到此案件'
-        elif started:
+        elif actual['source'] == 'v3_reports':
             reason = '週報登記冊顯示此案件外業累計大於 0'
+        elif by_items:
+            reason = '合約填報工項已有進度（來源剩餘營業額小於對應營業額）'
         else:
             reason = actual['reason'] or NO_DAILY
         found[node] = Signal(
             planned['qty'] if planned else None, planned['lines'] if planned else None,
             planned['items'] if planned else None, count, orders['latest_date'], actual['known'], actual['value'],
-            actual['source'], started, reason)
+            actual['source'], started, reason, progress.public() if by_items else None, tuple(rows), items_total,
+            truncated, bool(progress and progress.all_done))
     return found
 
 

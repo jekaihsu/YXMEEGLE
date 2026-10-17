@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 import json
-from .sources import normalized_case, text
+from .sources import REMAINING_POINTS_FIELD, normalized_case, text
+from .item_progress import PLANNED_POINTS_FIELD, fmt, parse_points
 from .source_work_items import MAX_BYTES, MAX_ROWS
 
 RULE_VERSION='contract-links-20261017.1'
@@ -50,6 +51,8 @@ class Item:
     base_qty: Decimal | None
     native_line_ids: tuple[str, ...]=()
     native_link_present: bool=False
+    planned_points: Decimal | None=None
+    remaining_points: Decimal | None=None
 
 
 @dataclass(frozen=True)
@@ -141,7 +144,8 @@ def parse_records(records):
             # Missing native targets remain unresolved instead of falling back to a code match.
             native_ids=tuple(sorted(targets)) if len(targets)==len(refs) else ()
             name=text(f.get('填報工項')).rsplit('|',1)[-1] or text(f.get('工項名稱'))
-            items.append(Item(ident,key,name_key(f.get('工項類別')),name_key(name),quantity(f.get('基準數量')),native_ids,bool(refs)))
+            items.append(Item(ident,key,name_key(f.get('工項類別')),name_key(name),quantity(f.get('基準數量')),native_ids,bool(refs),
+                              parse_points(f.get(PLANNED_POINTS_FIELD)),parse_points(f.get(REMAINING_POINTS_FIELD))))
         elif kind=='confirmation':
             confirmations.append(Confirmation(ident,code_key(f.get('工程確認單編號'))))
     return Parsed(tuple(lines),tuple(items),tuple(confirmations))
@@ -225,7 +229,11 @@ def build_projection(records,confirmation_projects,native_line_projects,*,native
         summary=plan(pid);summary['basis'][item_basis]+=1
         if item.category in CATEGORY_FIELDS:
             counts=summary['categories'][item.category];counts['items']+=1;counts['items_'+item_basis]+=1
-        summary['items'].append(dict(id=item.record_id,category=item.category,line_id=line_id,basis=item_basis,reason=result.reason.value))
+        row=dict(id=item.record_id,category=item.category,line_id=line_id,basis=item_basis,reason=result.reason.value)
+        # Lark's own revenue points; absent when blank or malformed, which every reader treats as unknown.
+        for name,value in (('planned_points',item.planned_points),('remaining_points',item.remaining_points)):
+            if value is not None: row[name]=fmt(value)
+        summary['items'].append(row)
     for summary in plans.values():
         for counts in summary['categories'].values(): counts['planned_qty']=format(counts['planned_qty'], 'f')
         rows=summary['items'];summary['items']=rows[:MAX_ROWS];summary['truncated']=len(rows)>MAX_ROWS

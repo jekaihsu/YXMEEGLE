@@ -5,7 +5,8 @@ import {NODE_ASSIGNMENT_ORDER, overviewDetail, assignmentErrorMessage, assignmen
   type AssignmentNode, type AssignmentPerson, type AssignmentMutation, type NewAssignmentTask, type NodeAssignmentDetail, type NodeAssignmentError, type NodePermissions, type NodeAssignmentList} from './nodeAssignmentApi';
 import {prefetchNodeAssignmentDetail, useNodeAssignments} from './useNodeAssignments';
 import {Avatar} from './Avatar';
-import {DRIVES_STATUS_TEXT, OPTIONAL_TASKS_LABEL, SUBMIT_HINT_TEXT, evidenceLine, progressHref, showsEvidence} from './nodeEvidence';
+import {DRIVES_STATUS_TEXT, ITEM_STATUS_LABEL, OPTIONAL_TASKS_LABEL, SUBMIT_HINT_TEXT, SUBMIT_HINT_TITLE, evidenceLine, itemPoints, itemsSummary, itemsTruncatedNote, progressHref, progressLine, showsEvidence} from './nodeEvidence';
+import {formatPlanQuantity} from './caseDetailView';
 import './NodeAssignments.css';
 import {useStartSop} from './useStartSop';
 import {PlanLine, SopControls, UsageMap} from './StartSopControls';
@@ -25,6 +26,17 @@ function People({people, compact = false}: {people: AssignmentPerson[]; compact?
 const personColor = (id: string) => Array.from(id).reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0) % 6;
 const FLOW_LABELS: Record<string, string> = {sales: '業務', pm: 'PM', confirmation: '確認單', field: '外業', control: '控制', mapping: '圖資', report: '報告', pricing: '計價', settlement: '結算'};
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+function WorkItems({evidence}: {evidence: NonNullable<AssignmentNode['evidence']>}) {
+  if (!evidence.work_items.length) return null;
+  return <details className="na-items"><summary>{itemsSummary(evidence)}</summary>
+    <ul>{evidence.work_items.map((item, i) => {
+      const points = itemPoints(item.remaining_points, item.planned_points);
+      return <li key={i}><span className="na-item-name">{item.code && <code>{item.code}</code>} {item.name}</span>
+        <span className="na-item-meta">{item.planned_qty !== null && <span>數量 {formatPlanQuantity(item.planned_qty)}</span>}<span className={`na-item-status na-item-${item.status}`}>{ITEM_STATUS_LABEL[item.status]}</span>{points && <small>{points}</small>}</span></li>;
+    })}</ul>
+    {evidence.items_truncated && <p className="na-muted">{itemsTruncatedNote(evidence)}</p>}
+  </details>;
+}
 function Overview({data, selected = '', onSelect, onPrefetch, preview, projectId = ''}: {projectId?: string; preview?: SopPreview; data?: NodeAssignmentList; selected?: string; onSelect?: (key: string) => void; onPrefetch?: (key: string) => void}) {
   const card = (key: string) => {
     const n = data?.nodes.find(n => n.key === key), label = n?.label || FLOW_LABELS[key];
@@ -33,16 +45,16 @@ function Overview({data, selected = '', onSelect, onPrefetch, preview, projectId
     const overdue = !!nextDue && !done && new Date(nextDue.length === 10 ? `${nextDue}T23:59:59+08:00` : nextDue).getTime() < Date.now();
     const percent = n ? Math.round(Math.min(1, n.progress) * 100) : 0;
     const hint = n ? actionHint(n, data?.writes_enabled ? data.can[key] || {} : {}) : '';
-    const evidence = n && showsEvidence(n) ? n.evidence : null, line = evidence ? evidenceLine(evidence) : null;
+    const evidence = n && showsEvidence(n) ? n.evidence : null, line = evidence ? evidenceLine(evidence) : null, progress = evidence ? progressLine(evidence) : null;
     const flowCard = <button key={key} onMouseEnter={() => onPrefetch?.(key)} onFocus={() => onPrefetch?.(key)} className={`na-flow-card na-card-${statusTone(n?.derived_status || '')}${data?.summary.current_node === key ? ' is-current' : ''}${selected === key ? ' is-selected' : ''}${!data ? ' is-skeleton' : ''}`} disabled={!n} aria-current={data?.summary.current_node === key ? 'step' : undefined} aria-expanded={n ? selected === key : undefined} aria-label={`${label}節點，${status || '讀取中'}，${n?.owners.map(p => p.name).join('、') || '尚未指派'}`} onClick={() => onSelect?.(key)}>
       <span className="na-card-top"><strong>{label}</strong>{n ? <><StatusChip status={n.derived_status}/>{n.auto_done && <small className="na-auto-done" title={n.auto_done.reason}>自動判定 · {n.auto_done.reason}</small>}{evidence?.drives_status && <small className="na-auto-done" title={evidence.reason}>{DRIVES_STATUS_TEXT}</small>}</> : <span className="na-placeholder na-placeholder-status"/>}</span>
       {n ? <People people={n.owners} compact/> : <span className="na-placeholder na-placeholder-people"/>}
-      <PlanLine node={preview?.nodes.find(n => n.key === key)} chipsOnly={!!evidence}/>{line && <span className="na-evidence">{line.known ? <span>{line.text}</span> : <>{line.plan && <span>{line.plan}</span>}<span className="na-muted">{line.text}</span></>}{n?.can_submit_hint && <strong className="na-evidence-hint">{SUBMIT_HINT_TEXT}</strong>}</span>}<span className="na-card-progress">{n ? <><span>{evidence ? `${OPTIONAL_TASKS_LABEL} ${n.tasks.done}/${n.tasks.total}` : `${n.tasks.done}/${n.tasks.total} 項任務`}</span><strong>{n.tasks.total ? `${percent}%` : '無任務'}</strong></> : <span className="na-placeholder"/>}</span>
+      <PlanLine node={preview?.nodes.find(n => n.key === key)} chipsOnly={!!evidence}/>{line && progress && <span className="na-evidence">{line.known ? <span>{line.text}</span> : line.plan && <span>{line.plan}</span>}{progress.known ? <><span className="na-evidence-percent">{progress.text.split('（')[0]}{progress.text.includes('（') && <small>（{progress.text.split('（')[1]}</small>}</span>{progress.percent !== null && <span className="na-progress-bar" role="progressbar" aria-label="工項完成度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress.percent)}><span style={{width: `${progress.percent}%`}}/></span>}</> : !line.known && <span className="na-muted">{line.text}</span>}{n?.can_submit_hint && <strong className="na-evidence-hint" title={SUBMIT_HINT_TITLE}>{SUBMIT_HINT_TEXT}</strong>}</span>}<span className="na-card-progress">{n ? <><span>{evidence ? `${OPTIONAL_TASKS_LABEL} ${n.tasks.done}/${n.tasks.total}` : `${n.tasks.done}/${n.tasks.total} 項任務`}</span><strong>{n.tasks.total ? `${percent}%` : '無任務'}</strong></> : <span className="na-placeholder"/>}</span>
       <span className="na-progress-track" aria-hidden="true" hidden={!n?.tasks.total}><span style={{width: `${percent}%`}}/></span>
       {!(evidence && !nextDue) && <span className={`na-card-deadline${overdue ? ' is-overdue' : ''}`}>{n ? <><Clock3 size={12}/>{deadlineLabel(nextDue)}{overdue && <strong>{status === '未開始' ? '期限已過，等待條件' : '逾期'}</strong>}</> : <span className="na-placeholder"/>}</span>}
       {n && <span className="na-card-footer"><span className={hint ? 'needs-action' : 'na-muted'}>{hint || '檢視交接'}</span>{!!n.warnings.length && <span className="na-warning-dot" title={n.warnings.join('、')} aria-label="有節點警告"/>}</span>}
     </button>;
-    return evidence ? <div className="na-card-wrap" key={key}>{flowCard}<a className="na-evidence-link" href={progressHref(projectId)}>到工程進度看完整證據 <ArrowRight size={12} aria-hidden="true"/></a></div> : flowCard;
+    return evidence ? <div className="na-card-wrap" key={key}>{flowCard}<WorkItems evidence={evidence}/><a className="na-evidence-link" href={progressHref(projectId)}>到工程進度看完整證據 <ArrowRight size={12} aria-hidden="true"/></a></div> : flowCard;
   };
   const arrow = (keys: readonly string[]) => <ArrowRight className={`na-flow-arrow${data && keys.every(key => nodeStatusLabel(data.nodes.find(n => n.key === key)?.derived_status || '') === '已完成') ? ' is-done' : ''}`} size={18} aria-hidden="true"/>;
   return <><div className="na-overview" aria-label="案件流程總覽" aria-busy={!data} aria-hidden={!data || undefined}>

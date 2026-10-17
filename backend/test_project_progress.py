@@ -401,3 +401,68 @@ def test_zero_points_daily_is_a_known_zero_report():
     assert body['production']['field']['actual']['known'] is True and body['production']['field']['actual']['value'] == '0'
     assert stage(body, 'field')['state'] == 'active'
     assert stage(body, 'field')['evidence'][-1]['value'].startswith('0（')
+
+
+def set_points(state, vis, category, values):
+    """Give the category's plan items (in plan order) Lark's own planned and remaining revenue points."""
+    mine = [i for i in state['derived_plan'][vis]['items'] if i['category'] == category]
+    assert len(mine) == len(values)
+    for item, (planned, remaining) in zip(mine, values):
+        item.update({k: v for k, v in (('planned_points', planned), ('remaining_points', remaining)) if v is not None})
+
+
+def test_fill_item_points_give_item_status_and_a_node_percent(progress):
+    run, _, _ = progress
+    state, vis, _ = chain_state()
+    set_points(state, vis, '外業', [('10', '0'), ('20', '5'), ('4', '4')])
+    body = run(state, vis).json()
+    field = body['production']['field']
+    assert field['progress'] == {'percent': '73.5', 'earned_points': '25', 'planned_points': '34', 'items_done': 1, 'items_total': 3}
+    assert sorted(i['status'] for i in field['items']) == ['done', 'no_signal', 'partial']
+    assert sorted((i['planned_points'], i['remaining_points']) for i in field['items']) == [('10', '0'), ('20', '5'), ('4', '4')]
+    assert field['actual']['known'] is False   # no daily row: the items alone are the evidence
+    assert (stage(body, 'field')['state'], stage(body, 'field')['basis']) == ('active', 'source')
+    assert {'label': '工項進度', 'value': '已完成 1/3 工項，73.5%', 'tone': 'ok'} in stage(body, 'field')['evidence']
+    assert all(body['production'][k]['progress'] is None for k in ('control', 'mapping', 'report'))
+    assert (stage(body, 'control')['state'], stage(body, 'control')['basis']) == ('unknown', 'none')
+
+
+def test_items_without_signal_stay_unknown_not_zero(progress):
+    run, _, _ = progress
+    state, vis, _ = chain_state()
+    set_points(state, vis, '外業', [('10', '10'), ('20', None), (None, '3')])
+    body = run(state, vis).json()
+    assert body['production']['field']['progress'] is None
+    assert {i['status'] for i in body['production']['field']['items']} == {'no_signal'}
+    assert (stage(body, 'field')['state'], stage(body, 'field')['basis']) == ('unknown', 'none')
+
+
+def test_a_viewer_without_the_amounts_gate_sees_statuses_and_counts_only(progress):
+    run, _, _ = progress
+    state, vis, _ = chain_state()
+    set_points(state, vis, '外業', [('10', '0'), ('20', '5'), ('4', '4')])
+    body = run(state, vis, uid='u-field').json()
+    field = body['production']['field']
+    assert field['progress'] == {'percent': None, 'earned_points': None, 'planned_points': None, 'items_done': 1, 'items_total': 3}
+    assert all(i['planned_points'] is None and i['remaining_points'] is None for i in field['items'])
+    assert sorted(i['status'] for i in field['items']) == ['done', 'no_signal', 'partial']
+    assert {'label': '工項進度', 'value': '已完成 1/3 工項', 'tone': 'ok'} in stage(body, 'field')['evidence']
+    assert '73.5' not in json.dumps(body)
+
+
+def test_progress_tab_and_node_evidence_agree(progress):
+    from .node_assignment.domain import NodeKey
+    from .node_assignment.evidence import production_signal
+    run, _, _ = progress
+    state, vis, _ = chain_state()
+    set_points(state, vis, '外業', [('10', '0'), ('20', '5'), ('4', '4')])
+    set_points(state, vis, '控制', [('3', '0'), ('3', '0'), ('1', '0')])
+    body = run(state, vis).json()
+    project = next(p for p in state['projects'] if p['id'] == vis)
+    found = production_signal(project, state)
+    for key, node in (('field', NodeKey.FIELD), ('control', NodeKey.CONTROL), ('mapping', NodeKey.MAPPING)):
+        part, signal = body['production'][key], found[node]
+        assert signal.progress == part['progress'], key
+        assert [{k: v for k, v in i.items() if k != 'item_id'} for i in part['items']] == signal.public()['work_items'], key
+        assert (signal.items_total, signal.items_truncated) == (part['items_total'], part['items_truncated'])
+    assert found[NodeKey.CONTROL].items_all_done is True and found[NodeKey.FIELD].items_all_done is False

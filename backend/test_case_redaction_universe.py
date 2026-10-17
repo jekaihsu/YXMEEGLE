@@ -306,3 +306,19 @@ def test_source_cache_excluded_history_keeps_rows_without_case_identity(isolated
     masked=next(r for r in response.json()['records'] if r['kind']=='confirmation' and r['record_id'] is None)
     assert masked['fields']['工程確認單編號'] is None
     assert app.state.case_redaction_stats.fallback==0
+
+
+def test_fill_item_remaining_points_never_reach_the_public_workspace(isolated_http):
+    from .sources import REMAINING_POINTS_FIELD
+    app,client,_,signin=isolated_http
+    state,records,pid=build_universe()
+    marker='31337.3133'
+    # The plan and the importer's task snapshot are the only holders; the plan is server-side only.
+    state['derived_plan']={pid:{'items':[{'id':'x','category':'控制','remaining_points':marker,'planned_points':marker}],'categories':{}}}
+    for project in state['projects']:
+        for n in project['nodes']:
+            for t in n['tasks']:
+                t.setdefault('source_fields',{})[REMAINING_POINTS_FIELD]=marker
+    install(app,state);signin('u-manager')
+    response=client.get('/api/workspace');assert response.status_code==200
+    assert marker not in response.text

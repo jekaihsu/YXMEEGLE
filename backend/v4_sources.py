@@ -9,7 +9,7 @@ import json
 from collections import defaultdict
 from copy import deepcopy
 from urllib.parse import urlparse, parse_qs
-from .sources import text, number, day, source_id, normalized_case, link_ids, new_task, canonical_department, unique_value, PROVISIONAL_CASE_FIELD
+from .sources import text, number, day, source_id, normalized_case, link_ids, new_task, canonical_department, unique_value, PROVISIONAL_CASE_FIELD, REMAINING_POINTS_FIELD
 from .source_lifecycle import summarize
 from .seed import STAGES
 from .policy import upgrade, template, TECHNICAL, VERSION
@@ -401,7 +401,7 @@ def import_v4(ws, records, complete_tables=None):
         if not key: continue  # 外業 remains its SOP, not a duplicated confirmation work item.
         node=next(n for n in p['nodes'] if n['key']==key); ident=source_id(r)
         source={'title':text(f.get('工項名稱') or f.get('填報工項')) or 'V4 工項','points':number(f.get('對應營業額')),'work_item_id':'|'.join(sorted(refs)) or ident,
-                'source_fields':deepcopy(f),'source_url':url(r)}
+                'source_fields':{k:deepcopy(v) for k,v in f.items() if k!=REMAINING_POINTS_FIELD},'source_url':url(r)}  # the remaining changes with every linked daily row; it would flag started tasks as changed
         elsewhere=[(oldp,oldn,t) for oldp in ws['projects'] for oldn in oldp['nodes'] for t in oldn['tasks'] if t['id']==ident and oldn is not node]
         protected=[(oldp,oldn,t) for oldp,oldn,t in elsewhere if t.get('started_at') or t.get('manual_updated') or t.get('status')!='pending' or t.get('output') or t.get('comments')]
         if protected:

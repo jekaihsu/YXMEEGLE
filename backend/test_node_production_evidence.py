@@ -39,7 +39,8 @@ def test_mapped_field_rows_and_no_tasks_start_the_field_node_by_evidence(h):
     assert field['evidence'] == {
         'planned_qty': '123.45', 'lines': 2, 'items': 5, 'work_orders': 2, 'latest_date': '2026-10-12',
         'actual_known': True, 'actual_value': '5', 'actual_source': 'v4_daily',
-        'reason': '已有 2 筆日報連結到此案件', 'drives_status': True}
+        'reason': '已有 2 筆日報連結到此案件', 'drives_status': True,
+        'progress': None, 'items_total': 0, 'items_truncated': False, 'work_items': []}
     assert field['can_submit_hint'] is False
     assert field['tasks'] == {'done': 0, 'total': 0} and field['status'] == '未開始'
     assert field['warnings'] == []
@@ -55,7 +56,8 @@ def test_no_rows_leave_the_node_pending_and_say_so_without_a_zero(h):
     field = node(body, 'field')
     assert field['evidence'] == {
         'planned_qty': '123.45', 'lines': 2, 'items': 5, 'work_orders': 0, 'latest_date': None,
-        'actual_known': False, 'actual_value': None, 'actual_source': None, 'reason': NO_DAILY, 'drives_status': False}
+        'actual_known': False, 'actual_value': None, 'actual_source': None, 'reason': NO_DAILY, 'drives_status': False,
+        'progress': None, 'items_total': 0, 'items_truncated': False, 'work_items': []}
     assert field['can_submit_hint'] is False and field['progress'] == 0.0
 
 

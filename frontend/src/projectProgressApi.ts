@@ -1,4 +1,5 @@
 import {api} from './api';
+import type {ItemsProgress, WorkItemStatus} from './nodeAssignmentApi';
 export const STAGE_KEYS = ['sales','pm','confirmation','field','control','mapping','report','billing','settlement'] as const;
 export type StageKey = typeof STAGE_KEYS[number];
 export type ProductionKey = 'field'|'control'|'mapping'|'report';
@@ -6,7 +7,8 @@ export type LinkBasis = 'native'|'derived'|'ambiguous'|'unlinked';
 export interface ProgressStage {key: StageKey; label: string; state: 'done'|'active'|'waiting'|'unknown'; basis: 'rule'|'source'|'none'; evidence: {label: string; value: string; tone: 'ok'|'warn'|'muted'}[]}
 export interface ProductionStage {
  planned: {lines: number; items: number; qty: string; basis: Record<LinkBasis, number>; needs_review: number}|null;
- items: {item_id: string; code: string|null; name: string|null; planned_qty: string|null; link_basis: LinkBasis}[];
+ items: {item_id: string; code: string|null; name: string|null; planned_qty: string|null; planned_points?: string|null; remaining_points?: string|null; status?: WorkItemStatus; link_basis: LinkBasis}[];
+ progress?: ItemsProgress|null;
  items_total: number; items_truncated: boolean;
  actual: {known: boolean; value: string|null; unit_note: string|null; reason: string|null; source: 'v4_daily'|'v3_reports'|null};
  work_orders: {count: number|null; latest_date: string|null};

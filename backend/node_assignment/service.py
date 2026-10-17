@@ -29,6 +29,7 @@ from ..sources import normalized_case
 from .cache import Cached, StaleCache
 from .config import NodeAssignmentConfig
 from .domain import NODE_LABELS, Actor, Denied, IllegalTransition, NodeKey, derive_chain, task_counts
+from ..project_progress import without_points
 from .evidence import applicable, evidence_of
 from .errors import Failure
 from .lark_table import (
@@ -57,12 +58,18 @@ class Context:
 
 
 def hide_report_figures(body):
-    """The v3 register's cumulative points follow the reports gate; the status they imply stays the same for everyone."""
+    """Revenue points follow the reports gate (the v3 register's cumulative points, the items' own points and the
+    percentage they give); the status they imply and the item counts stay the same for everyone."""
     nodes = body['nodes'] if 'nodes' in body else [body['node']]
     for node in nodes:
         found = node.get('evidence')
-        if found and found.get('actual_source') == 'v3_reports':
+        if not found:
+            continue
+        if found.get('actual_source') == 'v3_reports':
             found['actual_value'] = None
+        if found.get('progress'):
+            found['progress'] = {**found['progress'], 'percent': None, 'earned_points': None, 'planned_points': None}
+        found['work_items'] = without_points(found.get('work_items', []))
 
 
 def digest(value):
