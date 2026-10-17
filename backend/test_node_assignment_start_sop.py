@@ -949,6 +949,23 @@ def test_a_landed_seed_that_is_edited_while_still_invisible_on_its_node_is_adopt
     assert preview(s)['already_started'] is True
 
 
+def test_a_seed_task_hard_deleted_in_lark_counts_as_unseeded_and_the_new_seed_gets_a_new_sequence(s):
+    start(s, 'r1')
+    old = next(rid for rid, f in s.fake.tables[TASKS].items() if f['標題'] == FIELD_TITLE)
+    del s.fake.tables[TASKS][old]
+    s.clock[0] += 3600
+    before = preview(s)['nodes'][0]
+    assert (before['seed_task_exists'], before['will_create_task']) == (False, True)
+    tokens = task_tokens(s)
+    body = start(s, 'r2').json()
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None, 'sync': 'ok'}
+    assert len(field_tasks(s)) == 1 and next(iter(field_tasks(s)))['內容'].endswith('[SOP-START:v1:field]')
+    assert len(tokens[FIELD_TITLE]) == 1
+    s.clock[0] += 3600
+    assert start(s, 'r3').json()['started'] is False
+    assert len(field_tasks(s)) == 1
+
+
 def test_a_replayed_error_body_becomes_a_failed_node_with_its_stored_code():
     failure = stored_failure({'detail': '先前送出的結果無法確認', 'code': 'revision_conflict'})
     assert (failure.code, failure.message, failure.status) == ('revision_conflict', '先前送出的結果無法確認', 409)
