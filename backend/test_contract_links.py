@@ -161,3 +161,15 @@ def test_explicit_native_target_table_is_required():
     parsed=parse_records(records)
     assert parsed.items[0].native_line_ids==()
     assert resolve_item(parsed.items[0],parsed.lines).reason==Reason.NATIVE_LINK_PRESENT
+
+
+@pytest.mark.parametrize('native_link', [True, False])
+def test_native_item_project_wins_over_line_placement(native_link):
+    fields={'來源合約明細（日報關聯）':[{'id':'l'}]} if native_link else {}
+    records=[line(),item(**fields),row('confirmation','c',工程確認單編號='X')]
+    projection=build_projection(records,{} if native_link else {'b/confirmation/c':'other'}, {},
+                                native_item_projects={'b/reporting/i':'native'})
+    assert projection.plans['native']['items']==[dict(id='b/reporting/i',category='外業',
+        line_id='b/contract/l',basis='native' if native_link else 'derived',
+        reason='native_link_present' if native_link else 'exact_match')]
+    assert projection.plans.get('other',{}).get('items',[])==[]

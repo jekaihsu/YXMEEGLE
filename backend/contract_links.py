@@ -213,7 +213,9 @@ def build_projection(records,confirmation_projects,native_line_projects,*,native
             item_basis={Status.UNIQUE:'derived',Status.AMBIGUOUS:'ambiguous',Status.NONE:'unlinked'}[result.status]
             pids={line_projects.get(l) for l in result.candidate_ids}
         basis[item_basis]+=1
-        pid=(next(iter(pids)) if len(pids)==1 and None not in pids else None) if pids else native_item_projects.get(item.record_id)
+        pid=native_item_projects.get(item.record_id)
+        if item.record_id not in native_item_projects:
+            pid=next(iter(pids)) if len(pids)==1 and None not in pids else None
         if not pid: continue
         dependencies[pid].update((item.record_id,*(item.native_line_ids if item.native_link_present else result.candidate_ids)))
         summary=plan(pid);summary['basis'][item_basis]+=1
