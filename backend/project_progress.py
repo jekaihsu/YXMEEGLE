@@ -352,13 +352,14 @@ def _finance(project, amounts, rows):
         f = q.get('fields') or {}
         total = {k: _dec(f.get(k)) for k in ('累計已請款', '可請款未請', '案件可請款總額', '累計已入帳')}
         flag = f.get('案件已入帳')
-        quotes.append({'number': text(q.get('quote_code')) or None, 'case_received': True if _truthy(flag) else None,
-                       'received_date': day(f.get('入帳日期')) or None,
+        quotes.append({'number': text(q.get('quote_code')) or None,
+                       'case_received': True if amounts and _truthy(flag) else None,
+                       'received_date': (day(f.get('入帳日期')) or None) if amounts else None,
                        **{name: _fmt(total[field]) if amounts else None for name, field in
                           (('invoiced_total', '累計已請款'), ('billable_unrequested', '可請款未請'),
                            ('billable_total', '案件可請款總額'), ('received_total', '累計已入帳'))}})
-    received = any(_truthy(f.get('案件已入帳')) for f in rows) or any(q['case_received'] for q in quotes)
-    dates = sorted({d for d in [day(f.get('入帳日期')) for f in rows] + [q['received_date'] for q in quotes] if d})
+    received = amounts and (any(_truthy(f.get('案件已入帳')) for f in rows) or any(q['case_received'] for q in quotes))
+    dates = sorted({d for d in [day(f.get('入帳日期')) for f in rows] + [q['received_date'] for q in quotes] if d}) if amounts else []
     return {'restricted': not amounts, 'quotes': quotes, 'case_received': True if received else None,
             'received_date': dates[-1] if dates else None}
 

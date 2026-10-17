@@ -251,6 +251,8 @@ def test_finance_only_for_pm_and_manager_and_never_zero_for_blank(progress):
     restricted = member.json()
     assert restricted['finance']['restricted'] is True
     assert restricted['finance']['quotes'][0]['invoiced_total'] is None
+    assert restricted['finance']['case_received'] is None and restricted['finance']['received_date'] is None
+    assert restricted['finance']['quotes'][0]['case_received'] is None
     assert restricted['sources']['reports_status'] == 'restricted'
     assert '1200' not in member.text and '1,200' not in member.text
     assert {'finance_restricted', 'reports_restricted'} <= {g['id'] for g in restricted['gaps']}
