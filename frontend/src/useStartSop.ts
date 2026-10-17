@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {getSessionEpoch} from './api';
 import {assignmentErrorMessage, assignmentRequest, NodeAssignmentError, requestId} from './nodeAssignmentApi';
-import {fetchSop, parseSopResult, sopPath, type SopPreview} from './startSop';
+import {fetchSop, parseSopResult, sopResultMessage, SOP_ERRORS, sopPath, type SopPreview} from './startSop';
 type State = {kind: 'hidden'} | {kind: 'forbidden'; reason: string} | {kind: 'ready'; data: SopPreview};
 let epoch = getSessionEpoch();
 const cache = new Map<string, SopPreview>();
@@ -31,7 +31,7 @@ export function useStartSop(id: string, enabled: boolean, refreshOverview: () =>
  }, [id]);
  useEffect(() => {life.current = {active: true, epoch: getSessionEpoch()}; setNotice(''); attempt.current = null; setState(enabled && epoch === getSessionEpoch() && cache.has(id) ? {kind: 'ready', data: cache.get(id)!} : {kind: 'hidden'}); if (enabled) void reload(); return () => {life.current.active = false}}, [id, enabled, reload]);
  const confirm = async () => {
-  if (posting.current || state.kind !== 'ready' || !state.data.eligible || state.data.blockers.length || state.data.already_started) return false;
+  if (posting.current || state.kind !== 'ready' || !state.data.can_start || !state.data.eligible || state.data.blockers.length || state.data.already_started) return false;
   posting.current = true; setBusy(true); setNotice('');
   const scope = life.current, valid = () => scope.active && scope === life.current && scope.epoch === getSessionEpoch();
   const hash = state.data.preview_hash;
@@ -40,12 +40,13 @@ export function useStartSop(id: string, enabled: boolean, refreshOverview: () =>
    const result = parseSopResult(await assignmentRequest(sopPath(id), {method: 'POST', body: JSON.stringify({request_id: attempt.current.id, preview_hash: hash})}, valid));
    if (!valid()) return false;
    attempt.current = null;
-   setNotice(result.complete ? `已啟動 SOP。${result.results.map(r => `${state.data.nodes.find(n => n.key === r.key)?.label || r.key}：${r.node === 'created' || r.task === 'created' ? '已建立' : '已存在'}`).join('、')}` : `未完成：${result.results.filter(r => r.node === 'failed' || r.task === 'failed' || r.task === 'skipped').map(r => `${state.data.nodes.find(n => n.key === r.key)?.label || r.key}（${r.error || '未建立'}）`).join('、')}。再按一次可續做。`);
+   setNotice(sopResultMessage(result, state.data));
    await refreshOverview(); await reload(true); return result.complete;
   } catch (e) {
    if (!valid()) return false;
    if (e instanceof NodeAssignmentError && e.code === 'preview_stale') {attempt.current = null; await reload(true); setNotice('計畫已變更，已重新讀取預覽，請確認後再啟動。')}
-   else {setNotice(assignmentErrorMessage(e)); if (e instanceof NodeAssignmentError && [403,404].includes(e.status)) await reload(true)}
+   else if (e instanceof NodeAssignmentError && e.code === 'rate_limited') {setNotice(`已完成 ${state.data.nodes.filter(n => n.seed_task_exists).length} 個節點。${SOP_ERRORS.rate_limited}`)}
+   else {setNotice(e instanceof NodeAssignmentError ? SOP_ERRORS[e.code || ""] || assignmentErrorMessage(e) : assignmentErrorMessage(e)); if (e instanceof NodeAssignmentError && [403,404].includes(e.status)) await reload(true)}
    return false;
   } finally {posting.current = false; if (valid()) setBusy(false)}
  };
