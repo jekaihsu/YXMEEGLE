@@ -146,8 +146,7 @@ def test_visibility_never_exposes_hidden_project_or_source_dependencies():
     assert filter_visible_cases(state)['derived_plan']=={}
 
 
-def test_zero_line_quantity_is_present_and_native_never_overrides():
-    assert resolve([line(qty=0),item(qty=0)]).status==Status.UNIQUE
+def test_native_line_link_never_overrides():
     records=[line('native',code='Y-1',qty=2),line('derived'),
              item(**{'來源合約明細（日報關聯）':[{'id':'native'}]}),
              row('confirmation','c',工程確認單編號='X')]
@@ -173,3 +172,14 @@ def test_native_item_project_wins_over_line_placement(native_link):
         line_id='b/contract/l',basis='native' if native_link else 'derived',
         reason='native_link_present' if native_link else 'exact_match')]
     assert projection.plans.get('other',{}).get('items',[])==[]
+
+
+@pytest.mark.parametrize('qty', [0, -2])
+def test_nonpositive_lines_are_not_planned_or_candidates(qty):
+    projection=build_projection([line('zero',qty=qty),line('positive'),item(),
+        row('confirmation','c',工程確認單編號='X')],{'b/confirmation/c':'p'}, {})
+    counts=projection.plans['p']['categories']['外業']
+    assert (counts['lines'],counts['planned_qty'],counts['needs_review'])==(1,'12',0)
+    assert projection.plans['p']['review_groups']==[]
+    assert projection.plans['p']['items']==[dict(id='b/reporting/i',category='外業',
+        line_id='b/contract/positive',basis='derived',reason='exact_match')]

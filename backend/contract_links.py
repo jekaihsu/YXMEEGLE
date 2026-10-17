@@ -131,7 +131,7 @@ def parse_records(records):
         if kind=='contract':
             prefix,separator,item_no=key.rpartition('-')
             lines.append(Line(ident,key,prefix if separator else '',item_no if separator else '',
-                {c:quantity(f.get(q)) for c,(q,n) in CATEGORY_FIELDS.items()},
+                {c:value if (value:=quantity(f.get(q))) is not None and value>0 else None for c,(q,n) in CATEGORY_FIELDS.items()},
                 {c:name_key(f.get(n)) for c,(q,n) in CATEGORY_FIELDS.items()},bool(native_refs(f.get(NATIVE_CASE_FIELD)))))
         elif kind=='reporting':
             refs=native_refs(f.get(NATIVE_ITEM_FIELD),r.get('linked_tables',{}).get(NATIVE_ITEM_FIELD));targets=[]
