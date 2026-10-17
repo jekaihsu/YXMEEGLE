@@ -524,8 +524,9 @@ class NodeAssignmentService:
         return [{'kind': kind, 'id': plan.record_id or akey, 'project_id': ctx.project['id'],
                  'before': plan.before, 'after': plan.changes}]
 
-    def _finish(self, ctx, client, code, key, plan: Plan, roster: Cached, receipt, fingerprint, record):
-        warnings = list(plan.warnings)
+    def _converge(self, ctx, client, code, key, plan: Plan):
+        """Read the case back, mirror the derived status onto the node row, and refresh the cache."""
+        warnings = []
         snapshot = read_case(client, code)
         synced = self._sync_node(client, ctx, snapshot, key, plan)
         if synced == 'failed':
@@ -533,6 +534,11 @@ class NodeAssignmentService:
         elif synced == 'written':
             snapshot = read_case(client, code)
         self.case_cache.put((ctx.wid, code), snapshot)
+        return snapshot, warnings
+
+    def _finish(self, ctx, client, code, key, plan: Plan, roster: Cached, receipt, fingerprint, record):
+        snapshot, warnings = self._converge(ctx, client, code, key, plan)
+        warnings = list(plan.warnings) + warnings
         body = node_detail(snapshot, self.skipped(ctx), actor_for(ctx.user, roster.value), roster.value, key,
                            self.write_block(ctx) is None, self.now_ms())
         body['warnings'] += warnings

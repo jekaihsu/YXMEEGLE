@@ -195,7 +195,7 @@ Assignment reads start when flow, tasks, or assignment participants become visib
 
 ## 啟動 SOP
 
-A project lead previews, then confirms, and the app seeds one 節點指派 row and ONE 任務 row for each production category with a planned quantity. Categories map to nodes 外業 `field`, 控制 `control`, 圖資 `mapping`, 報告 `report`. At most 8 rows are written (4 nodes and 4 tasks). Node status stays derived from the nine-node chain; the operation never writes a status, and no 進度 or 開始時間 either.
+A project lead previews, then confirms, and the app seeds one 節點指派 row and ONE 任務 row for each production category with a planned quantity. Categories map to nodes 外業 `field`, 控制 `control`, 圖資 `mapping`, 報告 `report`. Each node costs at most three Lark writes: the node row create, the task create, and the same node sync every task create runs (進度, and 開始時間 once work has started), so one press writes at most 12 times. Node status stays derived from the nine-node chain: the operation never forces a status, and the sync only mirrors the derived one onto the row.
 
 **Source.** Quantities, line and item counts and link-basis counts come from `state['derived_plan'][project_id]` (`plan_summary`). A category with a planned quantity of 0 is absent. Deadlines come from the project's quotes (direct `project_id`/`project_ids`, or through the case's confirmations, as `frontend/src/sourceQuotes.ts projectQuotes` does) using 外業期限, 內業期限(控), 內業期限(圖), 內業期限(報), normalized with `sources.day()`. If dated quotes disagree on a node's date, the deadline is null and the warning `deadline_conflict` names the dates. Nothing is picked.
 

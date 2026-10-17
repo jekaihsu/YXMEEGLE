@@ -100,7 +100,7 @@ def test_start_creates_four_nodes_and_one_marked_task_each(s):
     assert (body['started'], body['complete']) == (True, True)
     assert body['results'] == [{'key': k, 'node': 'created', 'task': 'created', 'error': None}
                                for k in ('field', 'control', 'mapping', 'report')]
-    assert post_methods(s) == ['POST'] * 8
+    assert post_methods(s) == ['POST', 'POST', 'PUT'] * 4
     assert seeded_nodes(s) == ['圖資', '報告', '外業', '控制']
     tasks = {f['標題']: f for f in s.fake.rows(TASKS).values()}
     assert sorted(tasks) == ['圖資：依計畫數量完成', '報告：依計畫數量完成', '外業：依計畫數量完成', '控制：依計畫數量完成']
@@ -476,12 +476,34 @@ def test_a_finished_node_is_not_given_a_task(s):
     assert len(s.fake.rows(NODES)) == 4 and len(s.fake.rows(TASKS)) == 3
 
 
-def test_start_never_forces_node_status(s):
-    s.fake.add(NODES, {'指派鍵': 'A115001-01|外業', '確認單編號': 'A115001-01', '節點': '外業', '狀態': '進行中'})
+def approve_earlier_nodes(s):
+    for label in ('業務', 'PM', '確認單'):
+        s.fake.add(NODES, {'指派鍵': f'A115001-01|{label}', '確認單編號': 'A115001-01', '節點': label, '狀態': '已完成',
+                           '核准人': [{'id': 'ou_vp'}], '核准時間': date_millis('2026-10-01')})
+
+
+def test_a_fresh_node_mirrors_its_derived_status_and_progress(s):
     start(s)
-    field = next(f for f in s.fake.rows(NODES).values() if f['節點'] == '外業')
-    assert field['狀態'] == '進行中'
-    assert [m for m, _ in s.fake.writes()].count('PUT') == 0
+    nodes = {f['節點']: f for f in s.fake.rows(NODES).values()}
+    assert [(nodes[k]['狀態'], nodes[k]['進度'], '開始時間' in nodes[k]) for k in ('外業', '控制', '圖資', '報告')] == [
+        ('未開始', 0.0, False)] * 4
+
+
+def test_start_derives_status_from_the_chain_and_never_forces_it(s):
+    approve_earlier_nodes(s)
+    s.fake.add(NODES, {'指派鍵': 'A115001-01|控制', '確認單編號': 'A115001-01', '節點': '控制', '狀態': '進行中'})
+    start(s)
+    nodes = {f['節點']: f for f in s.fake.rows(NODES).values()}
+    assert (nodes['外業']['狀態'], nodes['外業']['進度'], '開始時間' in nodes['外業']) == ('待處理', 0.0, False)
+    assert (nodes['控制']['狀態'], nodes['控制']['進度'], '開始時間' in nodes['控制']) == ('未開始', 0.0, False)
+    assert nodes['報告']['狀態'] == '未開始'
+
+
+def test_a_second_press_after_the_mirror_writes_nothing(s):
+    start(s, 'r1')
+    writes = len(s.fake.writes())
+    assert start(s, 'r2').json()['started'] is False
+    assert len(s.fake.writes()) == writes
 
 
 def test_every_run_leaves_an_audit_row_per_node(s):

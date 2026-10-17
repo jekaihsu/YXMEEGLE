@@ -172,6 +172,7 @@ class StartSopRunner:
 
         def finish(fin_ctx, _client, fin_code, fin_key, plan, _roster, fin_receipt, fingerprint, record):
             body = {'node_created': seen['node_created'], 'task_created': plan.kind == 'task_create'}
+            svc._converge(fin_ctx, _client, fin_code, fin_key, plan)
             svc.receipts.save(fin_receipt, fingerprint, {'state': 'done', 'status': 200, 'body': body})
             record('success', record_id=plan.record_id,
                    changes=svc._changes(fin_ctx, assignment_key(fin_code, fin_key), plan))
