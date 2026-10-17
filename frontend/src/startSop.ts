@@ -1,10 +1,11 @@
+import {taipeiTime} from './taipeiTime';
 import {assignmentRequest, type NodeAssignmentList, nodeStatusLabel} from './nodeAssignmentApi';
 export const PRODUCTION = {field: '外業', control: '控制', mapping: '圖資', report: '報告'} as const;
 export type ProductionKey = keyof typeof PRODUCTION;
 export interface PlanNode {key: ProductionKey; label: string; category: string; planned_qty: string; lines: number; items: number; items_basis: Record<'native'|'derived'|'ambiguous'|'unlinked', number>; deadline: string|null; node_exists: boolean; seed_task_exists: boolean; will_create_node: boolean; will_create_task: boolean; task_title: string; task_detail: string}
-interface Issue {code: string; message: string; node?: ProductionKey|null}
+interface Issue {code: string; message: string; node?: ProductionKey|null; duplicates?: string[]}
 export interface SopPreview {project_id: string; code: string|null; eligible: boolean; can_start: boolean; already_started: boolean; blockers: Issue[]; warnings: Issue[]; nodes: PlanNode[]; chain_note: string; preview_hash: string; plan_rule_version: string}
-export interface SopResult {started: boolean; complete: boolean; results: {key: ProductionKey; node: 'created'|'existing'|'failed'; task: 'created'|'existing'|'failed'|'skipped'; error: string|null; sync?: 'ok'|'failed'; warning?: 'content_differs'}[]; overview: unknown}
+export interface SopResult {started: boolean; complete: boolean; results: {key: ProductionKey; node: 'created'|'existing'|'failed'; task: 'created'|'existing'|'failed'|'skipped'; error: string|null; sync?: 'ok'|'failed'; warning?: 'content_differs'|'duplicate_seed'; duplicates?: string[]; first_sent_at?: number}[]; overview: unknown}
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const str = (v: unknown) => typeof v === 'string';
 const nullable = (v: unknown) => v === null || str(v);
@@ -18,14 +19,17 @@ export function parseSopPreview(v: unknown): SopPreview {
   if (!object(n) || !key(n.key) || !['label','category','task_title','task_detail'].every(k => str(n[k])) || !str(n.planned_qty) || !/^\d+(?:\.\d+)?(?:[eE][+-]?\d{1,4})?$/.test(n.planned_qty as string) || (n.planned_qty as string).length > 100 || !count(n.lines) || !count(n.items) || !nullable(n.deadline) || !object(n.items_basis) || !['native','derived','ambiguous','unlinked'].every(k => count((n.items_basis as Record<string, unknown>)[k])) || !['node_exists','seed_task_exists','will_create_node','will_create_task'].every(k => typeof n[k] === 'boolean')) return fail();
  }
  if (new Set(v.nodes.map(n => n.key)).size !== v.nodes.length) return fail();
- return v as unknown as SopPreview;
+ const preview = v as unknown as SopPreview;
+ return {...preview, warnings: preview.warnings.map(({duplicates, ...warning}) => ({...warning, ...(Array.isArray(duplicates) && duplicates.every(str) ? {duplicates} : {})}))};
 }
 export function parseSopResult(v: unknown): SopResult {
  if (!object(v) || typeof v.started !== 'boolean' || typeof v.complete !== 'boolean' || !object(v.overview) || !Array.isArray(v.results) || !v.results.every(r => object(r) && key(r.key) && ['created','existing','failed'].includes(String(r.node)) && ['created','existing','failed','skipped'].includes(String(r.task)) && nullable(r.error))) throw new Error('啟動結果格式不正確，請重新讀取。');
  const result = v as unknown as SopResult;
- return {...result, results: result.results.map(({sync, warning, ...node}) => ({...node,
+ return {...result, results: result.results.map(({key, node, task, error, sync, warning, duplicates, first_sent_at}) => ({key, node, task, error,
   ...(sync === 'ok' || sync === 'failed' ? {sync} : {}),
-  ...(warning === 'content_differs' ? {warning} : {}),
+  ...(warning === 'content_differs' || warning === 'duplicate_seed' ? {warning} : {}),
+  ...(Array.isArray(duplicates) && duplicates.every(str) ? {duplicates} : {}),
+  ...(typeof first_sent_at === 'number' && Number.isFinite(first_sent_at) && Math.abs(first_sent_at) <= 8640000000000 ? {first_sent_at} : {}),
  }))};
 }
 export const sopPath = (id: string) => `/api/projects/${encodeURIComponent(id)}/node-assignments/start-sop`;
@@ -59,17 +63,22 @@ export const SOP_ERRORS: Record<string, string> = {
  lark_unconfigured: 'Lark 連線尚未設定，請聯絡管理員。',
  roster_unavailable: '人員資料暫時無法使用，請稍後再試。',
  writes_disabled: '節點修改已停用，請聯絡管理員。',
- outcome_unknown: '上次建立結果不確定，請稍後（約 15 分鐘內）再試',
+ outcome_unknown: '上次建立結果不確定，請稍後再試',
  busy: '其他啟動操作進行中，請稍後再試。',
 };
+export function sopWarningMessage(warning: Issue): string {
+ if (warning.code !== 'duplicate_seed') return warning.message;
+ const ids = warning.duplicates || warning.message.match(/（多出：([^）]+)）/)?.[1].split('、');
+ return '偵測到重複的種子任務，未自動刪除，請由主管取消多餘的任務' + (ids ? `（多出 ${ids.length} 筆）` : '');
+}
 export function sopResultMessage(result: SopResult, preview: SopPreview): string {
  const outcomes = {created: '已建立', existing: '已存在', failed: '失敗', skipped: '略過'};
  const notes = result.results.flatMap(r => {
   const label = preview.nodes.find(n => n.key === r.key)?.label || r.key;
-  return [r.sync === 'failed' ? `${label}：節點進度同步失敗，再按一次可補同步` : '', r.warning === 'content_differs' ? `${label}：已存在的種子任務內容與目前計畫不同，未覆寫；如需更新請手動編輯任務` : ''].filter(Boolean);
+  return [r.sync === 'failed' ? `${label}：節點進度同步失敗，再按一次可補同步` : '', r.warning === 'content_differs' ? `${label}：已存在的種子任務內容與目前計畫不同，未覆寫；如需更新請手動編輯任務` : '', r.warning === 'duplicate_seed' ? `${label}：${sopWarningMessage({code: r.warning, message: '', duplicates: r.duplicates})}` : ''].filter(Boolean);
  }).join('\n');
- if (result.complete) return '已啟動 SOP。' + result.results.map(r => `${preview.nodes.find(n => n.key === r.key)?.label || r.key}：節點${outcomes[r.node]}／任務${outcomes[r.task]}`).join('、') + (notes ? `。\n${notes}` : '');
+ if (result.complete) return (!result.started && result.results.length > 0 && result.results.every(r => r.node === 'existing' && r.task === 'existing') ? '已啟動，無需再建立。' : '已啟動 SOP。') + result.results.map(r => `${preview.nodes.find(n => n.key === r.key)?.label || r.key}：節點${outcomes[r.node]}／任務${outcomes[r.task]}`).join('、') + (notes ? `。\n${notes}` : '');
  const finished = result.results.filter(r => r.node !== 'failed' && ['created','existing','skipped'].includes(r.task) && !r.error && r.sync !== 'failed').length;
- const errors = result.results.filter(r => r.error).map(r => `${preview.nodes.find(n => n.key === r.key)?.label || r.key}（${SOP_ERRORS[r.error || ''] || r.error}）`).join('、');
+ const errors = result.results.filter(r => r.error).map(r => `${preview.nodes.find(n => n.key === r.key)?.label || r.key}（${SOP_ERRORS[r.error || ''] || r.error}${r.error === 'outcome_unknown' && r.first_sent_at !== undefined ? `；首次送出 ${taipeiTime(new Date(r.first_sent_at * 1000).toISOString())}` : ''}）`).join('、');
  return `已完成 ${finished} 個節點。未完成：${errors || '部分節點尚未建立'}。稍後再按一次可安全續做。${notes ? `\n${notes}` : ''}`;
 }
