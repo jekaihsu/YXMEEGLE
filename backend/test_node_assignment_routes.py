@@ -43,6 +43,7 @@ class FakeBitable:
         self.tables = {NODES: {}, TASKS: {}, PEOPLE: {}}
         self.requests, self.faults, self.tokens, self.seq = [], [], {}, 0
         self.hidden = set()  # task ids that exist but are not linked from their node yet (read-after-write lag)
+        self.dedupe = True  # False: a repeated client_token creates again, as after Lark's idempotency window
         for ident, name, groups, rank, employed in STAFF:
             self.add(PEOPLE, {'姓名': name, '所屬組別': groups, '職級': rank, '在職': employed,
                               'Lark帳號': [{'id': ident}], '同步_OpenID': ident})
@@ -119,7 +120,7 @@ class FakeBitable:
                        'absent_record_ids': [rid for rid in ids if rid not in self.tables[table]]})
         if rest == ['records'] and method == 'POST':
             token = request.url.params['client_token']
-            if token not in self.tokens:
+            if not self.dedupe or token not in self.tokens:
                 self.tokens[token] = self.add(table, body['fields'])
             return ok({'record': self.render(table, self.tokens[token], 'get')})
         if len(rest) == 2 and method == 'GET':
@@ -208,7 +209,7 @@ def h():
             return [(r.action, r.actor_id, r.data) for r in db.scalars(select(AuditRow).order_by(AuditRow.created_at))]
 
     yield SimpleNamespace(client=build(), build=build, fake=fake, clock=clock, state=state, case=case, who=who,
-                          audits=audits, user_fields=user_fields)
+                          audits=audits, user_fields=user_fields, sessions=sessions)
     engine.dispose()
 
 

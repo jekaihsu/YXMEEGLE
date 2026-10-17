@@ -1,12 +1,14 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 
 import httpx
 import pytest
+from sqlalchemy import select
 
+from .models import Receipt
 from .node_assignment.lark_table import date_millis
 from .node_assignment.service import Receipts
-from .node_assignment.start_sop_service import stored_failure
 from .test_node_assignment_routes import NODES, PEOPLE, TASKS, URL, act, h, project  # noqa: F401  (h is the shared fixture)
 
 SOP = URL + '/start-sop'
@@ -389,7 +391,7 @@ def test_partial_failure_then_the_same_request_resumes_without_duplicates(s):
     assert len(s.fake.rows(NODES)) == 4 and len(s.fake.rows(TASKS)) == 4
 
 
-def test_a_task_create_lost_after_landing_is_reconciled_not_repeated(s):
+def test_a_task_create_lost_after_landing_is_adopted_not_repeated(s):
     def lost_response(request):
         s.fake.add(TASKS, json.loads(request.content)['fields'])
         return httpx.Response(504, text='gateway timeout')
@@ -401,7 +403,7 @@ def test_a_task_create_lost_after_landing_is_reconciled_not_repeated(s):
     assert resumed['complete'] is True
     assert len(s.fake.rows(TASKS)) == 4
     assert sorted(f['標題'] for f in s.fake.rows(TASKS).values()).count('外業：依計畫數量完成') == 1
-    assert (resumed['results'][0]['task'], resumed['results'][0]['error']) == ('created', None)
+    assert (resumed['results'][0]['task'], resumed['results'][0]['error']) == ('existing', None)
 
 
 def test_a_rejected_task_after_the_node_landed_is_a_partial_success(s):
@@ -427,7 +429,7 @@ def test_every_task_rejected_still_answers_200_because_the_nodes_landed(s):
     assert len(s.fake.rows(NODES)) == 4 and len(s.fake.rows(TASKS)) == 0
 
 
-def test_resume_after_a_crash_that_landed_reports_created_then_a_plain_press_reports_existing(s):
+def test_resume_after_a_crash_that_landed_adopts_the_seed_then_a_plain_press_reports_existing(s):
     def lost_response(request):
         s.fake.tokens[request.url.params['client_token']] = s.fake.add(TASKS, json.loads(request.content)['fields'])
         return httpx.Response(504, text='gateway timeout')
@@ -437,7 +439,7 @@ def test_resume_after_a_crash_that_landed_reports_created_then_a_plain_press_rep
         ('created', 'failed', 'outcome_unknown'), ('created', 'created', None)]
     resumed = start(s, 'r1').json()
     assert (resumed['started'], resumed['complete']) == (True, True)
-    assert [(r['node'], r['task']) for r in resumed['results']] == [('created', 'created')] * 4
+    assert [(r['node'], r['task']) for r in resumed['results']] == [('existing', 'existing')] + [('created', 'created')] * 3
     plain = start(s, 'r2').json()
     assert (plain['started'], plain['complete']) == (False, True)
     assert [(r['node'], r['task']) for r in plain['results']] == [('existing', 'existing')] * 4
@@ -500,7 +502,7 @@ def field_tasks(s):
     return [f for f in s.fake.tables[TASKS].values() if f['標題'].startswith('外業')]
 
 
-def test_a_new_request_by_another_person_reconciles_an_uncertain_create_instead_of_duplicating(s):
+def test_a_new_request_by_another_person_resends_an_uncertain_create_under_the_same_token(s):
     s.case['project'] = {**s.case['project'], 'supervisor_id': 'ou_sup'}
     lose_and_hide_the_first_task(s)
     first = start(s, 'r1').json()
@@ -508,7 +510,7 @@ def test_a_new_request_by_another_person_reconciles_an_uncertain_create_instead_
         ('created', 'failed', 'outcome_unknown'), ('created', 'created', None)]
     second = start(s, 'r2', who='ou_sup').json()
     assert [(r['key'], r['node'], r['task'], r['error']) for r in second['results']] == [
-        ('field', 'created', 'created', None), ('control', 'existing', 'existing', None),
+        ('field', 'existing', 'created', None), ('control', 'existing', 'existing', None),
         ('mapping', 'existing', 'existing', None), ('report', 'existing', 'existing', None)]
     s.fake.hidden.clear()
     assert len(field_tasks(s)) == 1 and len(s.fake.rows(TASKS)) == 4
@@ -518,12 +520,12 @@ def test_a_new_request_by_another_person_reconciles_an_uncertain_create_instead_
     assert len(s.fake.rows(TASKS)) == 4
 
 
-def test_an_uncertain_create_is_reconciled_even_when_the_task_became_visible_before_the_retry(s):
+def test_an_uncertain_create_that_became_visible_before_the_retry_is_adopted_by_its_marker(s):
     lose_and_hide_the_first_task(s)
     start(s, 'r1')
     s.fake.hidden.clear()
     body = start(s, 'r2').json()
-    assert body['results'][0] == {'key': 'field', 'node': 'created', 'task': 'created', 'error': None, 'sync': 'ok'}
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
     assert len(field_tasks(s)) == 1
     assert start(s, 'r3').json()['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
 
@@ -777,41 +779,36 @@ def test_repeating_the_same_request_after_a_failed_sync_retries_it_too(s):
     assert start(s, 'r1').json() == again
 
 
-def die_right_after(monkeypatch, saved):
-    """The process dies once, immediately after the first receipt write for which `saved(plan)` holds."""
+def die_after_sent(monkeypatch):
+    """The process dies once, right after the first seed receipt is persisted as sent and before its create goes out."""
     original, fired = Receipts.save, []
 
     def save(self, key, fingerprint, result):
         original(self, key, fingerprint, result)
-        if not fired and (plan := result.get('plan')) and saved(plan):
+        if not fired and result.get('state') == 'sent':
             fired.append(True)
             raise RuntimeError('process died')
     monkeypatch.setattr(Receipts, 'save', save)
 
 
-def test_a_press_after_the_process_died_with_only_the_node_pinned_completes_without_a_second_seed(s, monkeypatch):
-    die_right_after(monkeypatch, lambda p: p['kind'] == 'task_create' and p['changes'].get('node')
-                    and p['pre_create_task_ids'] is None)
+def test_a_press_after_the_process_died_before_the_create_completes_without_a_second_seed(s, monkeypatch):
+    die_after_sent(monkeypatch)
     with pytest.raises(RuntimeError):
         start(s, 'r1')
     monkeypatch.undo()
     assert len(s.fake.rows(NODES)) == 1 and not s.fake.rows(TASKS)
     tokens = []
     s.fake.fault('POST', f'{TASKS}/records', lambda request: tokens.append(request.url.params.get('client_token')), times=4)
-    second = start(s, 'r2').json()
-    assert (second['started'], second['complete']) == (True, True)
-    assert second['results'][0] == {'key': 'field', 'node': 'created', 'task': 'created', 'error': None, 'sync': 'ok'}
-    assert all(tokens) and len(set(tokens)) == 4
-    for rid in ('r3', 'r4'):
+    for rid in ('r2', 'r3', 'r4'):
         again = start(s, rid).json()
-        assert (again['started'], again['complete']) == (False, True)
+        assert again['complete'] is True
+    assert all(tokens) and len(set(tokens)) == 4
     assert len(field_tasks(s)) == 1 and len(s.fake.rows(TASKS)) == 4 and len(s.fake.rows(NODES)) == 4
 
 
 def test_a_pending_attempt_left_by_one_person_is_finished_by_another(s, monkeypatch):
     s.case['project'] = {**s.case['project'], 'supervisor_id': 'ou_sup'}
-    die_right_after(monkeypatch, lambda p: p['kind'] == 'task_create' and p['changes'].get('node')
-                    and p['pre_create_task_ids'] is None)
+    die_after_sent(monkeypatch)
     with pytest.raises(RuntimeError):
         start(s, 'r1', who='ou_pm')
     monkeypatch.undo()
@@ -820,20 +817,18 @@ def test_a_pending_attempt_left_by_one_person_is_finished_by_another(s, monkeypa
     assert len(field_tasks(s)) == 1 and field_tasks(s)[0]['指派人'] == [{'id': 'ou_sup'}]
 
 
-def test_a_node_attempt_resumed_as_a_task_create_is_sent_under_a_client_token(s, monkeypatch):
+def test_a_node_seeded_while_skipped_gets_its_task_under_a_token_once_it_is_not_skipped(s):
     s.case['project'] = {**project(skipped=('field',)), 'pm_id': 'ou_pm'}
-    die_right_after(monkeypatch, lambda p: p['kind'] == 'node' and not p['record_id'])
-    with pytest.raises(RuntimeError):
-        start(s, 'r1')
-    monkeypatch.undo()
-    assert not s.fake.rows(NODES) and not s.fake.rows(TASKS)
+    first = start(s, 'r1').json()
+    assert first['results'][0] == {'key': 'field', 'node': 'created', 'task': 'skipped', 'error': None, 'sync': 'ok'}
+    assert not field_tasks(s)
     s.case['project'] = {**project(), 'pm_id': 'ou_pm'}
     tokens = []
     s.fake.fault('POST', f'{TASKS}/records', lambda request: tokens.append(request.url.params.get('client_token')), times=4)
     body = start(s, 'r2').json()
     assert (body['started'], body['complete']) == (True, True)
-    assert len(tokens) == 4 and all(tokens)
-    assert len(field_tasks(s)) == 1
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None, 'sync': 'ok'}
+    assert len(tokens) == 1 and all(tokens) and len(field_tasks(s)) == 1
 
 
 FIELD_TITLE = '外業：依計畫數量完成'
@@ -852,7 +847,7 @@ def task_tokens(s, first_response=None):
     return tokens
 
 
-def test_an_unlanded_create_is_retried_under_the_same_token_until_the_stale_window_passes(s):
+def test_an_unlanded_create_is_retried_under_the_same_token(s):
     tokens = task_tokens(s, httpx.Response(504, text='gateway timeout'))
     assert start(s, 'r1').json()['results'][0]['error'] == 'outcome_unknown'
     assert len(s.fake.rows(TASKS)) == 3
@@ -862,63 +857,101 @@ def test_an_unlanded_create_is_retried_under_the_same_token_until_the_stale_wind
     assert len(field_tasks(s)) == 1
 
 
-def test_a_pending_attempt_older_than_the_stale_window_is_abandoned_and_recreated_under_a_new_token(s):
+def test_the_stale_window_does_not_change_the_token_of_an_unlanded_create(s):
     tokens = task_tokens(s, httpx.Response(504, text='gateway timeout'))
     start(s, 'r1')
     s.clock[0] += 901
     body = start(s, 'r2').json()
     assert (body['complete'], body['results'][0]['task']) == (True, 'created')
-    assert len(tokens[FIELD_TITLE]) == 2 and tokens[FIELD_TITLE][0] != tokens[FIELD_TITLE][1]
-    assert len(field_tasks(s)) == 1
+    assert len(tokens[FIELD_TITLE]) == 2 and tokens[FIELD_TITLE][0] == tokens[FIELD_TITLE][1]
     again = start(s, 'r3').json()
     assert (again['started'], again['complete']) == (False, True)
     assert len(field_tasks(s)) == 1
 
 
-def test_a_plan_changed_after_a_failed_create_is_created_once_with_the_new_content_after_the_window(s):
+def test_a_plan_changed_after_an_unlanded_create_is_created_once_with_the_new_content_under_the_same_token(s):
     tokens = task_tokens(s, httpx.Response(504, text='gateway timeout'))
     assert start(s, 'r1').json()['results'][0]['error'] == 'outcome_unknown'
     set_plan(s, 外業=counts('130', 2, 5, items_native=5))
-    s.clock[0] += 901
     body = start(s, 'r2').json()
     assert (body['complete'], body['started']) == (True, True)
     assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None, 'sync': 'ok'}
     assert [r['task'] for r in body['results'][1:]] == ['existing'] * 3
     assert [f['內容'].split('\n')[1] for f in field_tasks(s)] == ['計畫數量：130']
-    assert len(tokens[FIELD_TITLE]) == 2 and tokens[FIELD_TITLE][0] != tokens[FIELD_TITLE][1]
-    assert len(s.fake.rows(TASKS)) == 4
+    assert len(tokens[FIELD_TITLE]) == 2 and tokens[FIELD_TITLE][0] == tokens[FIELD_TITLE][1]
     again = start(s, 'r3').json()
     assert (again['started'], again['complete']) == (False, True)
-    assert len(field_tasks(s)) == 1
-
-
-def test_a_changed_plan_waits_for_a_create_that_may_still_land_instead_of_sending_a_second_one(s):
-    task_tokens(s, httpx.Response(504, text='gateway timeout'))
-    start(s, 'r1')
-    set_plan(s, 外業=counts('130', 2, 5, items_native=5))
-    s.clock[0] += 60
-    waiting = start(s, 'r2').json()
-    assert (waiting['complete'], waiting['results'][0]['error']) == (False, 'outcome_unknown')
-    assert not field_tasks(s)
-    s.clock[0] += 900
-    assert start(s, 'r3').json()['complete'] is True
-    assert [f['內容'].split('\n')[1] for f in field_tasks(s)] == ['計畫數量：130']
-
-
-def test_a_changed_plan_adopts_an_old_create_that_had_landed_and_warns_that_its_content_differs(s):
-    lose_and_hide_the_first_task(s)
-    assert start(s, 'r1').json()['results'][0]['error'] == 'outcome_unknown'
-    s.fake.hidden.clear()
-    set_plan(s, 外業=counts('130', 2, 5, items_native=5))
-    s.clock[0] += 60
-    body = start(s, 'r2').json()
-    assert (body['started'], body['complete']) == (False, True)
-    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok',
-                                  'warning': 'content_differs'}
-    assert [f['內容'].split('\n')[1] for f in field_tasks(s)] == ['計畫數量：123.45']
-    again = start(s, 'r3').json()
-    assert again['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
     assert len(field_tasks(s)) == 1 and len(s.fake.rows(TASKS)) == 4
+
+
+def seed_receipts(s):
+    with s.sessions() as db:
+        return {r.id: r.result for r in db.scalars(select(Receipt).where(Receipt.id.like('start-sop-seed:%')))}
+
+
+def sent_receipt(s):
+    [stored] = [r for r in seed_receipts(s).values() if r['state'] == 'sent']
+    return stored
+
+
+def field_creates(s, *script):
+    """Answer the field seed's successive creates as scripted, then let the rest through.
+
+    'land': Lark made the task but the answer was lost and the node does not list it yet. 'lost': the request never
+    reached Lark. 'forbid': Lark refused it with 403. Returns the client tokens sent and the ids that landed.
+    """
+    log = SimpleNamespace(tokens=[], landed=[])
+
+    def respond(request):
+        fields = json.loads(request.content)['fields']
+        if not fields['標題'].startswith('外業'):
+            return None
+        log.tokens.append(request.url.params['client_token'])
+        step = script[len(log.tokens) - 1] if len(log.tokens) <= len(script) else 'pass'
+        if step == 'land':
+            rid = s.fake.add(TASKS, fields)
+            s.fake.tokens[log.tokens[-1]] = rid
+            s.fake.hidden.add(rid)
+            log.landed.append(rid)
+            return httpx.Response(504, text='gateway timeout')
+        if step == 'lost':
+            return httpx.Response(504, text='gateway timeout')
+        if step == 'forbid':
+            return httpx.Response(403, json={'code': 91403, 'msg': 'forbidden'})
+        return None
+    s.fake.fault('POST', f'{TASKS}/records', respond, times=50)
+    return log
+
+
+def duplicate_warning(rid):
+    return {'code': 'duplicate_seed', 'node': 'field',
+            'message': f'外業有多筆啟動 SOP 種子任務（多出：{rid}），請管理員取消多餘的任務'}
+
+
+@pytest.mark.parametrize('dedupe', [True, False])
+def test_content_drift_after_an_uncertain_landed_create(s, dedupe):
+    s.fake.dedupe = dedupe
+    sent = field_creates(s, 'land')
+    assert start(s, 'r1').json()['results'][0]['error'] == 'outcome_unknown'
+    set_plan(s, 外業=counts('130', 2, 5, items_native=5))
+    body = start(s, 'r2').json()
+    assert len(set(sent.tokens)) == 1 and len(sent.tokens) == 2
+    s.fake.hidden.clear()
+    s.clock[0] += 3600
+    contents = sorted(f['內容'].split('\n')[1] for f in field_tasks(s))
+    final = start(s, 'r3').json()
+    assert (body['complete'], final['complete']) == (True, True)
+    if dedupe:
+        assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None,
+                                      'sync': 'ok', 'warning': 'content_differs'}
+        assert contents == ['計畫數量：123.45']
+        assert final['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
+    else:
+        assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None, 'sync': 'ok'}
+        assert contents == ['計畫數量：123.45', '計畫數量：130']
+        assert final['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None,
+                                       'sync': 'ok', 'warning': 'duplicate_seed', 'duplicates': sent.landed}
+        assert duplicate_warning(sent.landed[0]) in preview(s)['warnings']
 
 
 def test_a_landed_seed_whose_marker_was_edited_before_the_ledger_is_adopted_instead_of_failing_forever(s):
@@ -941,10 +974,12 @@ def test_a_landed_seed_that_is_edited_while_still_invisible_on_its_node_is_adopt
     start(s, 'r1')
     field_tasks(s)[0]['內容'] = 'edited without marker'
     second = start(s, 'r2').json()
-    assert (second['complete'], second['results'][0]['error']) == (False, 'readback_mismatch')
+    assert (second['complete'], second['results'][0]['task'], second['results'][0]['warning']) == (
+        True, 'existing', 'content_differs')
     s.fake.hidden.clear()
     for rid in ('r3', 'r4'):
-        assert start(s, rid).json()['complete'] is True
+        assert start(s, rid).json()['results'][0] == {
+            'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
     assert len(field_tasks(s)) == 1 and len(s.fake.rows(TASKS)) == 4
     assert preview(s)['already_started'] is True
 
@@ -966,7 +1001,154 @@ def test_a_seed_task_hard_deleted_in_lark_counts_as_unseeded_and_the_new_seed_ge
     assert len(field_tasks(s)) == 1
 
 
-def test_a_replayed_error_body_becomes_a_failed_node_with_its_stored_code():
-    failure = stored_failure({'detail': '先前送出的結果無法確認', 'code': 'revision_conflict'})
-    assert (failure.code, failure.message, failure.status) == ('revision_conflict', '先前送出的結果無法確認', 409)
-    assert stored_failure({'detail': 'x', 'code': 'unheard_of'}).code == 'lark_error'
+def test_a_stale_pending_content_is_never_written_under_a_new_confirmation(s):
+    fail_nth_create(s, TASKS, 1, httpx.Response(400, json={'code': 1254001, 'msg': 'bad'}))
+    assert start(s, 'r1').json()['complete'] is False
+    set_plan(s, 外業=counts('999', 2, 5, items_native=5))
+    body = start(s, 'r2').json()
+    assert body['complete'] is True
+    assert [f['內容'].split('\n')[1] for f in field_tasks(s)] == ['計畫數量：999']
+
+
+@pytest.mark.parametrize('dedupe', [True, False])
+def test_a_different_person_after_repeated_uncertain_resends_keeps_the_token(s, dedupe):
+    s.case['project'] = {**s.case['project'], 'supervisor_id': 'ou_sup'}
+    s.fake.dedupe = dedupe
+    sent = field_creates(s, 'land', 'lost')
+    assert start(s, 'r1').json()['results'][0]['error'] == 'outcome_unknown'
+    assert start(s, 'r2').json()['results'][0]['error'] == 'outcome_unknown'
+    third = start(s, 'r3', who='ou_sup').json()
+    assert third['complete'] is True and len(sent.tokens) == 3 and len(set(sent.tokens)) == 1
+    s.fake.hidden.clear()
+    fourth = start(s, 'r4', who='ou_sup').json()
+    assert fourth['complete'] is True
+    if dedupe:
+        assert len(field_tasks(s)) == 1
+        assert fourth['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
+    else:
+        assert len(field_tasks(s)) == 2
+        assert fourth['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None,
+                                        'sync': 'ok', 'warning': 'duplicate_seed', 'duplicates': sent.landed}
+
+
+@pytest.mark.parametrize('dedupe', [True, False])
+def test_a_definitive_failure_on_the_resend_keeps_the_receipt_and_the_token(s, dedupe):
+    s.case['project'] = {**s.case['project'], 'supervisor_id': 'ou_sup'}
+    s.fake.dedupe = dedupe
+    sent = field_creates(s, 'land', 'forbid')
+    start(s, 'r1')
+    first = sent_receipt(s)
+    s.clock[0] += 60
+    refused = start(s, 'r2', expect=502).json()
+    assert (refused['code'], len(sent.tokens)) == ('lark_permission', 2)
+    assert sent_receipt(s) == first == {'state': 'sent', 'at': first['at']}
+    third = start(s, 'r3', who='ou_sup').json()
+    assert third['complete'] is True and len(set(sent.tokens)) == 1
+    s.fake.hidden.clear()
+    assert len(field_tasks(s)) == (1 if dedupe else 2)
+    assert start(s, 'r4').json()['results'][0].get('warning') == (None if dedupe else 'duplicate_seed')
+
+
+@pytest.mark.parametrize('dedupe', [True, False])
+def test_the_stale_window_never_replaces_the_token_of_a_hidden_landed_create(s, dedupe):
+    s.fake.dedupe = dedupe
+    sent = field_creates(s, 'land')
+    start(s, 'r1')
+    s.clock[0] += 901
+    body = start(s, 'r2').json()
+    assert body['complete'] is True and len(sent.tokens) == 2 and len(set(sent.tokens)) == 1
+    s.fake.hidden.clear()
+    assert len(field_tasks(s)) == (1 if dedupe else 2)
+
+
+def test_a_manual_task_with_the_seed_title_is_not_adopted_and_the_real_seed_is_still_created(s):
+    sent = field_creates(s, 'lost')
+    start(s, 'r1')
+    node = next(rid for rid, f in s.fake.rows(NODES).items() if f['節點'] == '外業')
+    s.fake.add(TASKS, {'標題': FIELD_TITLE, '內容': 'manual unrelated work', '節點指派': [node], '狀態': '待處理', '部門': '外業'})
+    body = start(s, 'r2').json()
+    assert body['complete'] is True
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None, 'sync': 'ok'}
+    assert sorted(f['內容'].endswith('[SOP-START:v1:field]') for f in field_tasks(s)) == [False, True]
+    assert len(set(sent.tokens)) == 1
+
+
+def test_a_cancelled_landed_seed_gets_a_replacement_under_a_new_token(s):
+    sent = field_creates(s, 'land')
+    start(s, 'r1')
+    s.fake.hidden.clear()
+    field_tasks(s)[0]['狀態'] = '取消'
+    body = start(s, 'r2').json()
+    assert body['complete'] is True
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None, 'sync': 'ok'}
+    assert sorted(f['狀態'] for f in field_tasks(s)) == ['取消', '待處理']
+    assert len(sent.tokens) == 2 and sent.tokens[0] != sent.tokens[1]
+
+
+def test_a_resend_answered_with_a_cancelled_seed_is_replaced_before_the_press_completes(s):
+    sent = field_creates(s, 'land')
+    start(s, 'r1')
+    s.fake.tables[TASKS][sent.landed[0]]['狀態'] = '取消'
+    body = start(s, 'r2').json()
+    assert body['complete'] is True
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'created', 'error': None, 'sync': 'ok'}
+    assert sent.tokens[0] == sent.tokens[1] != sent.tokens[2]
+    s.fake.hidden.clear()
+    assert sorted(f['狀態'] for f in field_tasks(s)) == ['取消', '待處理']
+    assert start(s, 'r3').json()['started'] is False
+
+
+def test_a_sent_receipt_without_a_timestamp_is_stamped_once_and_the_press_proceeds(s):
+    field_creates(s, 'lost', 'lost')
+    start(s, 'r1')
+    with s.sessions.begin() as db:
+        for row in db.scalars(select(Receipt).where(Receipt.id.like('start-sop-seed:%'))):
+            if row.result['state'] == 'sent':
+                row.result = {'state': 'sent'}
+    s.clock[0] += 3600
+    assert start(s, 'r2').json()['results'][0]['error'] == 'outcome_unknown'
+    assert sent_receipt(s) == {'state': 'sent', 'at': s.clock[0]}
+    s.clock[0] += 3600
+    assert start(s, 'r3').json()['complete'] is True
+    stamped = [r for r in seed_receipts(s).values() if r['at'] == s.clock[0] - 3600]
+    assert [r['state'] for r in stamped] == ['done']
+    assert len(field_tasks(s)) == 1
+
+
+def test_an_uncertain_resend_on_every_node_answers_with_the_retry_message(s):
+    s.fake.fault('POST', f'{TASKS}/records', lambda request: httpx.Response(504, text='gateway timeout'), times=8)
+    assert start(s, 'r1').json()['started'] is True
+    s.clock[0] += 60
+    refused = start(s, 'r2', expect=502).json()
+    assert (refused['code'], refused['detail'], refused['first_sent_at']) == (
+        'outcome_unknown', '上次建立結果不確定，請稍後再試', 1_790_000_000.0)
+
+
+def test_a_recorded_seed_the_node_link_does_not_list_yet_is_still_the_seed(s):
+    s.fake.dedupe = False
+    start(s, 'r1')
+    seed = next(rid for rid, f in s.fake.tables[TASKS].items() if f['標題'] == FIELD_TITLE)
+    s.fake.hidden.add(seed)
+    writes = len(s.fake.writes())
+    body = start(s, 'r2').json()
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
+    assert len(field_tasks(s)) == 1 and len(s.fake.writes()) == writes
+
+
+def test_extra_live_seeds_are_reported_but_never_removed_and_a_cancelled_one_is_not_extra(s):
+    start(s, 'r1')
+    node = next(rid for rid, f in s.fake.rows(NODES).items() if f['節點'] == '外業')
+    extra = s.fake.add(TASKS, {'標題': '外業：複製的任務', '內容': '複製\n[SOP-START:v1:field]', '節點指派': [node],
+                               '狀態': '進行中', '部門': '外業'})
+    s.clock[0] += 3600
+    assert duplicate_warning(extra) in preview(s)['warnings']
+    body = start(s, 'r2').json()
+    assert (body['started'], body['complete']) == (False, True)
+    assert body['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok',
+                                  'warning': 'duplicate_seed', 'duplicates': [extra]}
+    assert len(field_tasks(s)) == 2
+    s.fake.tables[TASKS][extra]['狀態'] = '取消'
+    s.clock[0] += 3600
+    assert start(s, 'r3').json()['results'][0] == {
+        'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
+    assert [w for w in preview(s)['warnings'] if w['code'] == 'duplicate_seed'] == []

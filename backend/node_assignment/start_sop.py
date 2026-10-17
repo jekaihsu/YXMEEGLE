@@ -39,6 +39,7 @@ class WarningCode(StrEnum):
     NEEDS_REVIEW = 'needs_review'
     DERIVED_LINKS = 'derived_links'
     PLAN_TRUNCATED = 'plan_truncated'
+    DUPLICATE_SEED = 'duplicate_seed'
 
 
 class Outcome(StrEnum):
@@ -128,12 +129,9 @@ class PlannedNode:
 
     @property
     def seed_fields(self) -> dict:
-        """The content of the seed task, which is what a pending create is compared against."""
+        """The content of the seed task, which an adopted earlier seed is compared against."""
         return {'title': self.title, 'detail': self.detail, 'department': self.department,
                 'deadline': date_millis(self.deadline) if self.deadline else None}
-
-    def matches(self, changes: dict) -> bool:
-        return all(changes.get(k) == v for k, v in self.seed_fields.items())
 
     def reviewed(self):
         return {'key': self.key.value, 'planned_qty': self.planned_qty, 'lines': self.lines, 'items': self.items,
@@ -161,8 +159,18 @@ class StartPlan:
 class NodeState:
     """What Lark holds for one seed node right now."""
     node_exists: bool
-    seed_task_exists: bool
+    # Every seed recognised for the node, oldest first, cancelled ones included: its length is the next seed's sequence.
+    seeds: tuple[str, ...]
+    live: tuple[str, ...]
     open: bool
+
+    @property
+    def seed_task_exists(self) -> bool:
+        return bool(self.live)
+
+    @property
+    def duplicates(self) -> tuple[str, ...]:
+        return self.live[1:]
 
     @property
     def will_create_node(self) -> bool:
@@ -170,18 +178,20 @@ class NodeState:
 
     @property
     def will_create_task(self) -> bool:
-        return self.open and not self.seed_task_exists
+        return self.open and not self.live
 
 
-def observe(snapshot: CaseSnapshot, skipped, key: NodeKey, seed_ids: frozenset[str] = frozenset()) -> NodeState:
-    """A node is seeded by a live task this app recorded as its seed, or one that still carries the marker.
+def observe(snapshot: CaseSnapshot, skipped, key: NodeKey, recorded: tuple[str, ...] = (), unlisted=()) -> NodeState:
+    """Seeds are the recorded ledger ids, then any task of the node that still carries the marker.
 
-    A cancelled seed counts as absent on purpose, so a manager can cancel it and start again.
+    Only a seed that is not cancelled is live, so a manager can cancel one and start again. `unlisted` are recorded
+    seeds read by id because the node's task link does not list them yet.
     """
-    seeded = any(t.status is not TaskStatus.CANCELLED and (t.record_id in seed_ids or marker(key) in t.detail)
-                 for t in snapshot.node_tasks(key))
+    tasks = {t.record_id: t for t in (*snapshot.node_tasks(key), *unlisted)}
+    seeds = (*recorded, *sorted(i for i, t in tasks.items() if marker(key) in t.detail and i not in recorded))
+    live = tuple(i for i in seeds if i in tasks and tasks[i].status is not TaskStatus.CANCELLED)
     status = derive_chain(facts_of(snapshot, skipped))[key]
-    return NodeState(bool(snapshot.rows.get(key)), seeded, status not in FINISHED)
+    return NodeState(bool(snapshot.rows.get(key)), seeds, live, status not in FINISHED)
 
 
 def start_denial(actor: Actor, project, key: NodeKey) -> str | None:
@@ -288,9 +298,12 @@ def plan_start(state, project, code: str | None) -> StartPlan:
 
 def preview_body(plan: StartPlan, states: dict[NodeKey, NodeState] | None, blockers, can_start: bool) -> dict:
     """The GET contract. `states` is None while Lark cannot be read, so nothing is promised."""
-    rows = []
+    rows, warnings = [], [n.public() for n in plan.notices]
     for node in plan.nodes:
         state = (states or {}).get(node.key)
+        if state and state.duplicates:
+            warnings.append(Notice(WarningCode.DUPLICATE_SEED, f'{node.category.label}有多筆啟動 SOP 種子任務（多出：'
+                                   + '、'.join(state.duplicates) + '），請管理員取消多餘的任務', node.key).public())
         rows.append({
             'key': node.key.value, 'label': node.category.label, 'category': node.category.label,
             'planned_qty': node.planned_qty, 'lines': node.lines, 'items': node.items,
@@ -304,5 +317,5 @@ def preview_body(plan: StartPlan, states: dict[NodeKey, NodeState] | None, block
         'project_id': plan.project_id, 'code': plan.code, 'eligible': not blockers and pending, 'can_start': can_start,
         'already_started': states is not None and bool(rows) and not pending,
         'blockers': [{'code': b.value, 'message': m} for b, m in blockers],
-        'warnings': [n.public() for n in plan.notices], 'nodes': rows, 'chain_note': CHAIN_NOTE,
+        'warnings': warnings, 'nodes': rows, 'chain_note': CHAIN_NOTE,
         'preview_hash': plan.preview_hash, 'plan_rule_version': plan.plan_rule_version}

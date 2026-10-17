@@ -131,8 +131,8 @@ class RateLimit:
 
 
 class Receipts:
-    def __init__(self, sessions, model, clock=time.time):
-        self.sessions, self.model, self.clock = sessions, model, clock
+    def __init__(self, sessions, model):
+        self.sessions, self.model = sessions, model
 
     @staticmethod
     def key(wid, actor_id, request_id):
@@ -158,12 +158,9 @@ class Receipts:
             return None if row is None else deepcopy(row.result)
 
     def save(self, key, fingerprint, result):
-        """A pending result is stamped `at` with the time it was first saved, so a stuck one can age out."""
         try:
             with self.sessions.begin() as db:
                 row = db.get(self.model, key)
-                if result.get('state') == 'pending':
-                    result = {**result, 'at': ((row.result or {}).get('at') if row else None) or self.clock()}
                 if row is None:
                     db.add(self.model(id=key, fingerprint=fingerprint, result=result))
                 elif row.fingerprint != fingerprint:
@@ -189,7 +186,7 @@ class NodeAssignmentService:
         self.sessions, self.Audit = sessions, audit_model
         self.skipped_nodes = skipped_nodes
         self.transport, self.clock = transport, clock
-        self.receipts = Receipts(sessions, receipt_model, clock)
+        self.receipts = Receipts(sessions, receipt_model)
         self.client_options = client_options or {}
         self.case_cache = StaleCache(self.config.read_ttl_seconds, self.config.stale_max_seconds, clock)
         self.roster_cache = StaleCache(self.config.roster_ttl_seconds, self.config.stale_max_seconds, clock)
@@ -306,22 +303,14 @@ class NodeAssignmentService:
 
     # Writes
 
-    def mutate(self, ctx: Context, key: NodeKey, action: str, request_id, payload, plan_fn, *, finish=None,
-               landed=None, receipt_id=None, charge_per_write=False, recognize=None):
+    def mutate(self, ctx: Context, key: NodeKey, action: str, request_id, payload, plan_fn):
         """plan_fn(situation, resumed_plan) -> Plan, or None when there is nothing to write (body is then None).
 
-        `finish` replaces the default node-detail response. `landed`, when given, collects every plan pinned before
-        a failure so the caller can tell what already reached Lark. `receipt_id` replaces the request-derived receipt
-        key, and with it the client tokens, for operations whose identity is the work rather than the request.
-        `recognize(client, snapshot, plan)` may name the record of a pending create that landed but no longer matches
-        its fields (someone edited it), which then counts as applied instead of a conflict.
-        A call costs one rate charge taken at its first authorized outbound write (replays, denials and no-ops
-        cost nothing), or one per outbound write with `charge_per_write`.
-        Returns (http_status, body, replayed).
+        A call costs one rate charge, taken at its first authorized outbound write: replays, denials and
+        no-ops cost nothing. Returns (http_status, body, replayed).
         """
-        finish = finish or self._finish
         code = self.open(ctx, write=True)
-        receipt = receipt_id or self.receipts.key(ctx.wid, ctx.user['id'], request_id)
+        receipt = self.receipts.key(ctx.wid, ctx.user['id'], request_id)
         fingerprint = fingerprint_of(action, ctx.project['id'], key, payload)
         akey = assignment_key(code, key)
 
@@ -363,7 +352,7 @@ class NodeAssignmentService:
                     if planned is not None and (checked is None or checked.changes != planned.changes):
                         raise Failure('forbidden', '操作權限已變更，請重新整理後再操作',
                                       writes_started=bool(write_attempts))
-                if charge_per_write or not write_attempts:
+                if not write_attempts:
                     self.rate.take(ctx.wid, ctx.user['id'])
                 write_attempts += 1
 
@@ -373,10 +362,8 @@ class NodeAssignmentService:
                 resumed = None
                 if stored:
                     outcome, previous = self._reconcile(client, snapshot, key, Plan.from_json(stored['plan']))
-                    if outcome != 'applied' and recognize and (found := recognize(client, snapshot, previous)):
-                        outcome, previous = 'applied', replace(previous, record_id=found, phase=CreatePhase.TASK_CREATED)
                     if outcome == 'applied':
-                        return finish(ctx, client, code, key, previous, roster, receipt, fingerprint, record)
+                        return self._finish(ctx, client, code, key, previous, roster, receipt, fingerprint, record)
                     if outcome == 'conflict':
                         failure = Failure('revision_conflict', '先前送出的結果無法確認，且資料已被他人更新；請重新整理後再操作')
                         self.receipts.save(receipt, fingerprint, {'state': 'done', 'status': failure.status,
@@ -408,7 +395,7 @@ class NodeAssignmentService:
                 except IllegalTransition as exc:
                     raise Failure('illegal_transition', str(exc)) from None
                 self.receipts.save(receipt, fingerprint, {'state': 'pending', 'plan': plan.to_json()})
-                pinned = landed if landed is not None else []
+                pinned = []
                 try:
                     plan = self._execute(client, situation, plan, receipt, fingerprint, pinned)
                 except Failure as exc:
@@ -421,7 +408,7 @@ class NodeAssignmentService:
                         self.receipts.drop(receipt)
                     record('failed', code=exc.code, changes=self._changes(ctx, akey, plan))
                     raise
-                return finish(ctx, client, code, key, plan, roster, receipt, fingerprint, record)
+                return self._finish(ctx, client, code, key, plan, roster, receipt, fingerprint, record)
 
     def _ensure_schemas(self, client):
         for table in (Table.NODES, Table.TASKS):
@@ -567,10 +554,10 @@ class NodeAssignmentService:
         return [{'kind': kind, 'id': plan.record_id or akey, 'project_id': ctx.project['id'],
                  'before': plan.before, 'after': plan.changes}]
 
-    def _converge(self, ctx, client, code, key, plan: Plan):
-        """Read the case back, mirror the derived status onto the node row, and refresh the cache."""
+    def _converge(self, ctx, client, code, key, plan: Plan, snapshot: CaseSnapshot | None = None):
+        """Mirror the derived status onto the node row and refresh the cache, from `snapshot` or a fresh read."""
         warnings = []
-        snapshot = read_case(client, code)
+        snapshot = snapshot or read_case(client, code)
         synced = self._sync_node(client, ctx, snapshot, key, plan)
         if synced == 'failed':
             warnings.append(SYNC_FAILED)
