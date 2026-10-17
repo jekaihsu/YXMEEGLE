@@ -178,6 +178,7 @@ export async function mutateNodeAssignment(projectId: string, mutation: Assignme
   return parseDetail(record(await assignmentRequest(url, {signal, method, body: JSON.stringify({...body, request_id: id})}, isCurrent)), mutation.nodeKey);
 }
 const ERROR_MESSAGES: Record<string, string> = {
+  preview_stale: '計畫已變更，請重新確認預覽。', nothing_to_start: '目前沒有可建立的節點或任務，請重新讀取。',
   revision_conflict: '資料已被他人更新，已為你重新載入', illegal_transition: '目前狀態不允許此操作，請重新讀取後再試。',
   forbidden: '目前沒有此操作權限。', writes_disabled: '節點修改已停用，請聯絡管理員。', rate_limited: '操作過於頻繁，請稍後重試。',
   busy: '其他操作尚未完成，請稍後重試。', outcome_unknown: '尚無法確認儲存結果，請重試此操作。', readback_mismatch: '尚無法確認儲存結果，請重試此操作。',

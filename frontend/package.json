@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "test:start-sop": "node test-start-sop.mjs",
     "test:plan-panel": "node test-plan-panel.mjs",
     "test:taipei-time": "node test-taipei-time.mjs",
     "test:lark-pilot": "node test-lark-pilot.mjs",

@@ -15,7 +15,7 @@ export function parseSopPreview(v: unknown): SopPreview {
  const fail = () => {throw new Error('啟動預覽格式不正確。')};
  if (!object(v) || !str(v.project_id) || !nullable(v.code) || typeof v.eligible !== 'boolean' || typeof v.already_started !== 'boolean' || !str(v.chain_note) || !str(v.preview_hash) || !str(v.plan_rule_version) || !Array.isArray(v.blockers) || !v.blockers.every(issue) || !Array.isArray(v.warnings) || !v.warnings.every(issue) || !Array.isArray(v.nodes)) return fail();
  for (const n of v.nodes) {
-  if (!object(n) || !key(n.key) || !['label','category','task_title','task_detail'].every(k => str(n[k])) || !str(n.planned_qty) || !/^\d+(?:\.\d+)?$/.test(n.planned_qty as string) || (n.planned_qty as string).length > 100 || !count(n.lines) || !count(n.items) || !nullable(n.deadline) || !object(n.items_basis) || !['native','derived','ambiguous','unlinked'].every(k => count((n.items_basis as Record<string, unknown>)[k])) || !['node_exists','seed_task_exists','will_create_node','will_create_task'].every(k => typeof n[k] === 'boolean')) return fail();
+  if (!object(n) || !key(n.key) || !['label','category','task_title','task_detail'].every(k => str(n[k])) || !str(n.planned_qty) || !/^\d+(?:\.\d+)?(?:[eE][+-]?\d{1,4})?$/.test(n.planned_qty as string) || (n.planned_qty as string).length > 100 || !count(n.lines) || !count(n.items) || !nullable(n.deadline) || !object(n.items_basis) || !['native','derived','ambiguous','unlinked'].every(k => count((n.items_basis as Record<string, unknown>)[k])) || !['node_exists','seed_task_exists','will_create_node','will_create_task'].every(k => typeof n[k] === 'boolean')) return fail();
  }
  if (new Set(v.nodes.map(n => n.key)).size !== v.nodes.length) return fail();
  return v as unknown as SopPreview;
@@ -37,8 +37,9 @@ export const SOP_STEPS = [
 export function currentSopStep(data: NodeAssignmentList, preview?: SopPreview): number {
  if (!(preview ? preview.code : data.code)) return 1;
  if (preview?.eligible && !preview.already_started) return 2;
- const nodes = data.nodes.filter(n => Object.hasOwn(PRODUCTION, n.key));
- if ((preview?.already_started || nodes.some(n => n.record_id)) && nodes.some(n => !n.owners.length)) return 3;
+ const nodes = data.nodes;
+ const started = preview ? preview.already_started : nodes.some(n => Object.hasOwn(PRODUCTION, n.key) && n.record_id);
+ if (started && nodes.some(n => !n.owners.length)) return 3;
  if (nodes.some(n => nodeStatusLabel(n.derived_status) === '進行中')) return 4;
  if (nodes.some(n => nodeStatusLabel(n.derived_status) === '待審核')) return 5;
  if (nodes.length && nodes.every(n => ['已完成','略過'].includes(nodeStatusLabel(n.derived_status)))) return 6;

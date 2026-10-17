@@ -22,6 +22,7 @@ import {NextAction} from './DailyHome';
 import {Badge as Tag,DisabledActionReasons,Button,Progress,Row,Section,Skeleton,Stat} from './design';
 import './ProjectDetail.css';
 import {prefetchNodeAssignments, useNodeAssignments} from './useNodeAssignments';
+import {prefetchStartSop} from './useStartSop';
 import {NodeAssignments} from './NodeAssignments';
 import {assignmentTarget} from './nodeAssignmentApi';
 import {ApprovalList} from './App';
@@ -66,7 +67,7 @@ export function ProjectDetailGate({c}:{c:Ctx}){
 }
 export function ProjectDetail({c}:{c:Ctx}){
  const tabPrefetch=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);useEffect(()=>()=>clearTimeout(tabPrefetch.current),[]);
- const prefetchFlow=(id:string)=>{clearTimeout(tabPrefetch.current);if(!c.s.features?.node_assignment)return;const connection=navigator as Navigator&{connection?:{saveData?:boolean;effectiveType?:string}};if(connection.connection?.saveData||['slow-2g','2g'].includes(connection.connection?.effectiveType||''))return;tabPrefetch.current=setTimeout(()=>{void prefetchNodeAssignments(id).catch(()=>{})},150)};
+ const prefetchFlow=(id:string)=>{clearTimeout(tabPrefetch.current);if(!c.s.features?.node_assignment)return;const connection=navigator as Navigator&{connection?:{saveData?:boolean;effectiveType?:string}};if(connection.connection?.saveData||['slow-2g','2g'].includes(connection.connection?.effectiveType||''))return;tabPrefetch.current=setTimeout(()=>{void prefetchNodeAssignments(id).catch(()=>{});void prefetchStartSop(id).catch(()=>{})},150)};
  const p=c.w.projects.find(p=>p.id===c.route.project);const[modal,setModal]=useState(c.route.focus&&!assignmentTarget(c.route,p?.nodes)?'complete-node':'');useEffect(()=>{if(c.route.focus&&!assignmentTarget(c.route,p?.nodes))setModal('complete-node')},[c.route.focus,c.route.node]);const[approvalType,setApprovalType]=useState<'change'|'extension'>('change');const[expanded,setExpanded]=useState<Record<string,boolean>>({});
 
  if(!p)return <Empty title="找不到這個案件" detail="案件連結可能已失效，請回到案件總覽重新開啟。"/>;

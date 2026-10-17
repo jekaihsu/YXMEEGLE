@@ -56,7 +56,7 @@ test('renders nine rows in chain order with literal task progress and 4/9 summar
   assert.equal(document.querySelector('.na-summary-count').textContent, '4/9');
   assert.equal(document.querySelector('.na-summary strong').textContent, '進行中');
   assert.equal(document.querySelectorAll('.na-flow-card').length, 9);
-  assert.match(document.querySelector('[aria-current="step"]').getAttribute('aria-label'), /控制節點，進行中，林安娜、陳威廷/);
+  assert.match(document.querySelector('.na-flow-card[aria-current="step"]').getAttribute('aria-label'), /控制節點，進行中，林安娜、陳威廷/);
   assert.equal(document.getElementById('legacy-flow'), null);
   await click(document.querySelector('.na-summary'));
   assert.equal(document.activeElement.getAttribute('aria-label'), '案件節點清單');
