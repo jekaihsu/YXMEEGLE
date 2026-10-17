@@ -6,6 +6,7 @@ import pytest
 
 from .node_assignment.lark_table import date_millis
 from .node_assignment.service import Receipts
+from .node_assignment.start_sop_service import stored_failure
 from .test_node_assignment_routes import NODES, PEOPLE, TASKS, URL, act, h, project  # noqa: F401  (h is the shared fixture)
 
 SOP = URL + '/start-sop'
@@ -918,3 +919,37 @@ def test_a_changed_plan_adopts_an_old_create_that_had_landed_and_warns_that_its_
     again = start(s, 'r3').json()
     assert again['results'][0] == {'key': 'field', 'node': 'existing', 'task': 'existing', 'error': None, 'sync': 'ok'}
     assert len(field_tasks(s)) == 1 and len(s.fake.rows(TASKS)) == 4
+
+
+def test_a_landed_seed_whose_marker_was_edited_before_the_ledger_is_adopted_instead_of_failing_forever(s):
+    lose_and_hide_the_first_task(s)
+    start(s, 'r1')
+    s.fake.hidden.clear()
+    field_tasks(s)[0]['內容'] = 'edited without marker'
+    for rid in ('r2', 'r3', 'r4', 'r5'):
+        body = start(s, rid).json()
+        assert body['complete'] is True and body['results'][0]['error'] is None
+    assert [f['內容'] for f in field_tasks(s)] == ['edited without marker']
+    assert len(s.fake.rows(TASKS)) == 4
+    final = preview(s)
+    assert (final['already_started'], final['nodes'][0]['seed_task_exists']) == (True, True)
+    assert start(s, 'r6').json()['started'] is False
+
+
+def test_a_landed_seed_that_is_edited_while_still_invisible_on_its_node_is_adopted_on_the_next_press(s):
+    lose_and_hide_the_first_task(s)
+    start(s, 'r1')
+    field_tasks(s)[0]['內容'] = 'edited without marker'
+    second = start(s, 'r2').json()
+    assert (second['complete'], second['results'][0]['error']) == (False, 'readback_mismatch')
+    s.fake.hidden.clear()
+    for rid in ('r3', 'r4'):
+        assert start(s, rid).json()['complete'] is True
+    assert len(field_tasks(s)) == 1 and len(s.fake.rows(TASKS)) == 4
+    assert preview(s)['already_started'] is True
+
+
+def test_a_replayed_error_body_becomes_a_failed_node_with_its_stored_code():
+    failure = stored_failure({'detail': '先前送出的結果無法確認', 'code': 'revision_conflict'})
+    assert (failure.code, failure.message, failure.status) == ('revision_conflict', '先前送出的結果無法確認', 409)
+    assert stored_failure({'detail': 'x', 'code': 'unheard_of'}).code == 'lark_error'

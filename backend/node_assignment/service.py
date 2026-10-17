@@ -307,12 +307,14 @@ class NodeAssignmentService:
     # Writes
 
     def mutate(self, ctx: Context, key: NodeKey, action: str, request_id, payload, plan_fn, *, finish=None,
-               landed=None, receipt_id=None, charge_per_write=False):
+               landed=None, receipt_id=None, charge_per_write=False, recognize=None):
         """plan_fn(situation, resumed_plan) -> Plan, or None when there is nothing to write (body is then None).
 
         `finish` replaces the default node-detail response. `landed`, when given, collects every plan pinned before
         a failure so the caller can tell what already reached Lark. `receipt_id` replaces the request-derived receipt
         key, and with it the client tokens, for operations whose identity is the work rather than the request.
+        `recognize(client, snapshot, plan)` may name the record of a pending create that landed but no longer matches
+        its fields (someone edited it), which then counts as applied instead of a conflict.
         A call costs one rate charge, or one per outbound write with `charge_per_write`.
         Returns (http_status, body, replayed).
         """
@@ -372,6 +374,8 @@ class NodeAssignmentService:
                 resumed = None
                 if stored:
                     outcome, previous = self._reconcile(client, snapshot, key, Plan.from_json(stored['plan']))
+                    if outcome != 'applied' and recognize and (found := recognize(client, snapshot, previous)):
+                        outcome, previous = 'applied', replace(previous, record_id=found, phase=CreatePhase.TASK_CREATED)
                     if outcome == 'applied':
                         return finish(ctx, client, code, key, previous, roster, receipt, fingerprint, record)
                     if outcome == 'conflict':

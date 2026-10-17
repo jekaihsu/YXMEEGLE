@@ -12,7 +12,7 @@ from dataclasses import dataclass, replace
 
 from .. import audit
 from .domain import Denied, NodeKey, TaskStatus
-from .errors import Failure
+from .errors import STATUS, Failure
 from .lark_table import assignment_key, date_millis, read_case
 from .operations import Plan, StartSopCommand
 from .service import SYNC_FAILED, NodeAssignmentService, actor_for, digest, fingerprint_of
@@ -58,6 +58,12 @@ class NodeResult:
 
 def failed(key: NodeKey, failure: Failure, node: Outcome = Outcome.FAILED) -> NodeResult:
     return NodeResult(key, node, Outcome.FAILED, failure)
+
+
+def stored_failure(body: dict) -> Failure:
+    """The failure a replayed non-200 mutation receipt stands for."""
+    code = body.get('code')
+    return Failure(code if code in STATUS else 'lark_error', body.get('detail') or '先前的操作已失敗')
 
 
 def node_outcome(landed: list[Plan]) -> Outcome:
@@ -271,6 +277,19 @@ class StartSopRunner:
         self.svc.receipts.save(attempt.receipt_id, fingerprint_of(ACTION, ctx.project['id'], key, attempt.payload),
                                {'state': 'abandoned', 'plan': attempt.plan.to_json()})
 
+    @staticmethod
+    def _recognize(snapshot, key: NodeKey, plan: Plan) -> str | None:
+        """The seed an attempt created, found by its pinned id or by title among the tasks added since its baseline.
+
+        Anyone may have edited it before the app recorded it, which the exact-field reconcile cannot match.
+        """
+        if plan.kind != 'task_create' or not plan.phase.may_have_landed:
+            return None
+        if plan.record_id:
+            return plan.record_id
+        added = (t for t in snapshot.node_tasks(key) if t.record_id not in (plan.pre_create_task_ids or ()))
+        return next((t.record_id for t in added if t.title == plan.changes['title']), None)
+
     def _settle(self, ctx, client, snapshot, node: PlannedNode, attempt: Attempt) -> Attempt | None:
         """The pending attempt to resume, or None once it is abandoned. Reads Lark before deciding."""
         svc, plan = self.svc, attempt.plan
@@ -278,7 +297,8 @@ class StartSopRunner:
         sent = plan.kind == 'task_create' and plan.phase.may_have_landed
         if sent:
             try:
-                if svc._reconcile(client, snapshot, node.key, plan)[0] == 'applied':
+                if svc._reconcile(client, snapshot, node.key, plan)[0] == 'applied' or self._recognize(
+                        snapshot, node.key, plan):
                     return attempt
             except Failure as exc:
                 if exc.code != 'outcome_unknown' or not expired:
@@ -349,10 +369,13 @@ class StartSopRunner:
             return 200, body, False
 
         try:
-            _, body, _ = svc.mutate(ctx, key, ACTION, f'start-sop:{request_id}:{key.value}', attempt.payload, plan_fn,
-                                    finish=finish, landed=landed, receipt_id=attempt.receipt_id, charge_per_write=True)
+            status, body, _ = svc.mutate(ctx, key, ACTION, f'start-sop:{request_id}:{key.value}', attempt.payload, plan_fn,
+                                    finish=finish, landed=landed, receipt_id=attempt.receipt_id, charge_per_write=True,
+                                          recognize=lambda _client, snap, pending: self._recognize(snap, key, pending))
         except Failure as exc:
             return failed(key, exc, node_outcome(landed))
+        if status != 200:
+            return failed(key, stored_failure(body), node_outcome(landed))
         if body is None:
             final = observed['state']
             return NodeResult(key, Outcome.EXISTING, Outcome.EXISTING if final.seed_task_exists else Outcome.SKIPPED)
