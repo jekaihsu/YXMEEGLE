@@ -301,3 +301,37 @@ def test_reports_logger_emits_info_when_app_has_no_logging():
     app_for()
     assert logger.isEnabledFor(logging.INFO)
     assert logging.getLogger().handlers or logger.handlers
+
+
+def test_progress_detail_snapshot_privacy_bounds_and_validation():
+    app,store=app_for()
+    with TestClient(app) as client:
+        page=client.get('/api/reports/progress?week=2026-10-12').json()
+        key=page['items'][0]['case_key']
+        snapshot=store.get()
+        snapshot['data']['cases']['C01']['f']['薪資']=999999
+        snapshot['data']['plan_indices'][('field','2026-10-12')]*=201
+        store.reader.read=lambda:pytest.fail('warm detail must not read Lark')
+        response=client.get('/api/reports/progress/case',params={'key':key,'week':'2026-10-12'})
+        assert response.status_code==200,response.text
+        body=response.json()
+        assert body['case']['code']=='C01'
+        assert body['case']['contract']=={'expected':100.0,'actual':None}
+        assert len(body['week']['plan_rows'])==200
+        assert body['week']['truncated'] is True
+        assert '薪資' not in response.text and 'fields' not in response.text
+        assert response.headers['cache-control']=='no-store'
+        assert client.get('/api/reports/progress/case?key=missing').json()=={'detail':'case_not_found'}
+        assert client.get('/api/reports/progress/case?key=missing').status_code==404
+        for query in ('q='+('x'*51),'status=unknown','sort=unknown'):
+            assert client.get('/api/reports/progress?'+query).status_code==422
+        assert client.get('/api/reports/progress?sort=name').status_code==200
+        assert client.get('/api/reports/progress/case').status_code==422
+    store.close()
+
+
+def test_progress_detail_role_gate():
+    app,store=app_for(allow=lambda *_:False)
+    with TestClient(app) as client:
+        assert client.get('/api/reports/progress/case?key=c1').status_code==403
+    store.close()
