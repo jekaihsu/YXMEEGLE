@@ -91,3 +91,47 @@ class CaseDetail(TypedDict):
     case: CaseFacts
     week: CaseWeek
     link: str | None
+
+
+class ProgressOptions(TypedDict):
+    group: list[str]
+    status: list[StatusCount]
+
+
+class ProgressKpi(TypedDict):
+    matched_points: float
+    planned_points: float | None
+    actual_points: float
+    planned_days: int
+    actual_days: int
+    matched_days: int
+    unplanned_days: int
+    achievement: float | None
+    open_cases: int
+    remaining_points: float | None
+
+
+class ProgressGroup(TypedDict):
+    group: str
+    group_label: str
+    matched_points: float
+    planned_days: int
+    matched_days: int
+    planned: float
+    actual: float
+    unplanned_days: int
+    achievement: float | None
+
+
+class ProgressResponse(TypedDict):
+    gaps: list[dict]
+    options: ProgressOptions
+    dept: str
+    week: str
+    basis: str
+    kpi: ProgressKpi
+    by_group: list[ProgressGroup]
+    items: list[ProgressRow]
+    total: int
+    offset: int
+    limit: int

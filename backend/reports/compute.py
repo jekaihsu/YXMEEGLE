@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 import math
 import statistics
 from zoneinfo import ZoneInfo
-from .models import CaseDetail, ProgressRow
+from .models import CaseDetail, ProgressResponse, ProgressRow
 from .registry import BASE_TOKEN, BY_KIND, FLAGS, TABLES
 
 TZ = ZoneInfo('Asia/Taipei')
@@ -304,7 +304,7 @@ def progress_case(data, key: str, dept: str='field', week: str | None=None) -> C
         link=record_link(data['base'],'case',key))
 
 
-def progress(data, **p):
+def progress(data, **p) -> ProgressResponse:
     dept=p.get('dept','field'); week=p['week']; selected=normalize_group(p['group']) if p.get('group') else None
     plans=defaultdict(float); actual=defaultdict(float); matched_points=defaultdict(float)
     planned=defaultdict(set); dates=defaultdict(set); group_plan=defaultdict(set); group_actual=defaultdict(set)
