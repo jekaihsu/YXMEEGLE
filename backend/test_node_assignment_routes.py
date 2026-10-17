@@ -1,5 +1,7 @@
 import json
+import threading
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 import httpx
@@ -40,6 +42,7 @@ class FakeBitable:
     def __init__(self):
         self.tables = {NODES: {}, TASKS: {}, PEOPLE: {}}
         self.requests, self.faults, self.tokens, self.seq = [], [], {}, 0
+        self.hidden = set()  # task ids that exist but are not linked from their node yet (read-after-write lag)
         for ident, name, groups, rank, employed in STAFF:
             self.add(PEOPLE, {'姓名': name, '所屬組別': groups, '職級': rank, '在職': employed,
                               'Lark帳號': [{'id': ident}], '同步_OpenID': ident})
@@ -74,7 +77,7 @@ class FakeBitable:
                 value = [{'text': value, 'type': 'text'}]
             fields[name] = value
         if table == NODES:
-            linked = [t for t, f in self.tables[TASKS].items() if rid in f.get('節點指派', [])]
+            linked = [t for t, f in self.tables[TASKS].items() if rid in f.get('節點指派', []) and t not in self.hidden]
             if linked:
                 fields['任務'] = {'link_record_ids': linked} if style == 'search' else [{'record_ids': linked, 'type': 'text'}]
         return {'record_id': rid, 'fields': fields}
@@ -146,25 +149,42 @@ class NoBucket:
         pass
 
 
-def project(code=CODE, skipped=()):
-    return {'id': 'p1', 'code': code, 'case_type': 'formal',
-            'nodes': [{'id': f'p1-{k}', 'key': k, 'status': 'approved_skipped' if k in skipped else 'pending'}
+def project(code=CODE, skipped=(), pid='p1'):
+    return {'id': pid, 'code': code, 'case_type': 'formal',
+            'nodes': [{'id': f'{pid}-{k}', 'key': k, 'status': 'approved_skipped' if k in skipped else 'pending'}
                       for k in ('sales', 'pm', 'confirmation', 'field', 'control', 'mapping', 'report', 'pricing', 'settlement')],
             'source_records': [{'id': 'src-1', 'kind': 'confirmation',
                                 'url': f'https://x.larksuite.com/base/{BASE}?table=tblmSQrcCs9vPQZx&record=recCONF1'}]}
+
+
+class SerializedSessions:
+    """StaticPool shares one sqlite connection, so transactions from concurrent request threads must not interleave."""
+
+    def __init__(self, factory):
+        self.factory, self.lock = factory, threading.RLock()
+
+    @contextmanager
+    def __call__(self):
+        with self.lock, self.factory() as db:
+            yield db
+
+    @contextmanager
+    def begin(self):
+        with self.lock, self.factory.begin() as db:
+            yield db
 
 
 @pytest.fixture
 def h():
     engine = create_engine('sqlite://', connect_args={'check_same_thread': False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
-    sessions = sessionmaker(engine, expire_on_commit=False)
+    sessions = SerializedSessions(sessionmaker(engine, expire_on_commit=False))
     fake = FakeBitable()
     cfg = {'NODE_ASSIGNMENT_ENABLED': 'true', 'LARK_WORKER_IDENTITY': 'application', 'LARK_APP_ID': 'app-na',
            'LARK_APP_SECRET': 'synthetic', 'LARK_WORKER_ORGANIZATION': 'company'}
     clock = [T0]
     state = {'environment': 'production', 'settings': {'external_enabled': True}}
-    case = {'project': project()}
+    case = {'project': project(), 'others': {}}
     who = ['ou_member']
     user_fields = {}
 
@@ -172,8 +192,7 @@ def h():
         return {'mode': 'lark', 'wid': 'lark-company'}, {'id': who[0], 'active': True, **user_fields}
 
     def load_case(_data, _user, project_id):
-        assert project_id == 'p1'
-        return state, case['project']
+        return state, case['others'].get(project_id) or case['project']
 
     def build(overrides=None):
         app = FastAPI()

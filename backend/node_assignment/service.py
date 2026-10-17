@@ -50,6 +50,8 @@ class Context:
     state: dict
     project: dict
     authorize: Callable[[], dict]
+    # Re-reads the session user, the state and the project, for a run that spans several writes.
+    refresh: Callable[[], 'Context'] | None = None
 
 
 def digest(value):
@@ -131,6 +133,11 @@ class Receipts:
     def key(wid, actor_id, request_id):
         return 'node-assignment:' + hashlib.sha256(f'{wid}\0{actor_id}\0{request_id}'.encode()).hexdigest()
 
+    @staticmethod
+    def scoped(scope, *parts):
+        """A key in its own namespace, for durable facts that are not tied to one request."""
+        return f'{scope}:' + hashlib.sha256('\0'.join(parts).encode()).hexdigest()
+
     def load(self, key, fingerprint):
         with self.sessions() as db:
             row = db.get(self.model, key)
@@ -139,6 +146,11 @@ class Receipts:
             if row.fingerprint != fingerprint:
                 raise Failure('idempotency_conflict', 'request_id 已用於不同操作，請產生新的 request_id')
             return deepcopy(row.result)
+
+    def peek(self, key):
+        with self.sessions() as db:
+            row = db.get(self.model, key)
+            return None if row is None else deepcopy(row.result)
 
     def save(self, key, fingerprint, result):
         try:
@@ -286,11 +298,18 @@ class NodeAssignmentService:
 
     # Writes
 
-    def mutate(self, ctx: Context, key: NodeKey, action: str, request_id, payload, plan_fn):
-        """plan_fn(situation, resumed_plan) -> Plan. Returns (http_status, body, replayed)."""
+    def mutate(self, ctx: Context, key: NodeKey, action: str, request_id, payload, plan_fn, *, finish=None,
+               landed=None, receipt_id=None):
+        """plan_fn(situation, resumed_plan) -> Plan, or None when there is nothing to write (body is then None).
+
+        `finish` replaces the default node-detail response. `landed`, when given, collects every plan pinned before
+        a failure so the caller can tell what already reached Lark. `receipt_id` replaces the request-derived receipt
+        key, and with it the client tokens, for operations whose identity is the work rather than the request.
+        Returns (http_status, body, replayed).
+        """
+        finish = finish or self._finish
         code = self.open(ctx, write=True)
-        self.rate.take(ctx.wid, ctx.user['id'])
-        receipt = self.receipts.key(ctx.wid, ctx.user['id'], request_id)
+        receipt = receipt_id or self.receipts.key(ctx.wid, ctx.user['id'], request_id)
         fingerprint = digest({'action': action, 'project_id': ctx.project['id'], 'node': key.value, **payload})
         akey = assignment_key(code, key)
 
@@ -329,9 +348,10 @@ class NodeAssignmentService:
                         checked = plan_fn(fresh, resumed)
                     except Denied as exc:
                         raise Failure('forbidden', str(exc), writes_started=bool(write_attempts)) from None
-                    if planned is not None and checked.changes != planned.changes:
+                    if planned is not None and (checked is None or checked.changes != planned.changes):
                         raise Failure('forbidden', '操作權限已變更，請重新整理後再操作',
                                       writes_started=bool(write_attempts))
+                self.rate.take(ctx.wid, ctx.user['id'])
                 write_attempts += 1
 
             with self.client(before_write=authorize_write) as client:
@@ -341,7 +361,7 @@ class NodeAssignmentService:
                 if stored:
                     outcome, previous = self._reconcile(client, snapshot, key, Plan.from_json(stored['plan']))
                     if outcome == 'applied':
-                        return self._finish(ctx, client, code, key, previous, roster, receipt, fingerprint, record)
+                        return finish(ctx, client, code, key, previous, roster, receipt, fingerprint, record)
                     if outcome == 'conflict':
                         failure = Failure('revision_conflict', '先前送出的結果無法確認，且資料已被他人更新；請重新整理後再操作')
                         self.receipts.save(receipt, fingerprint, {'state': 'done', 'status': failure.status,
@@ -354,17 +374,23 @@ class NodeAssignmentService:
                                       self.now_ms(), confirmation_record(ctx.project, self.config))
                 try:
                     plan = plan_fn(situation, resumed)
+                    if plan is None:
+                        if stored:
+                            self.receipts.drop(receipt)
+                        return 200, None, False
                     planned = plan
                     if plan.kind == 'task_create':
                         plan = replace(plan, client_token=resumed.client_token if resumed else create_token(receipt, akey, 'task-create'),
                             pre_create_task_ids=resumed.pre_create_task_ids if resumed else None)
+                    if resumed:
+                        plan = replace(plan, created_node=plan.created_node or resumed.created_node)
                 except Denied as exc:
                     record('denied', reason=str(exc))
                     raise Failure('forbidden', str(exc)) from None
                 except IllegalTransition as exc:
                     raise Failure('illegal_transition', str(exc)) from None
                 self.receipts.save(receipt, fingerprint, {'state': 'pending', 'plan': plan.to_json()})
-                pinned = []
+                pinned = landed if landed is not None else []
                 try:
                     plan = self._execute(client, situation, plan, receipt, fingerprint, pinned)
                 except Failure as exc:
@@ -377,7 +403,7 @@ class NodeAssignmentService:
                         self.receipts.drop(receipt)
                     record('failed', code=exc.code, changes=self._changes(ctx, akey, plan))
                     raise
-                return self._finish(ctx, client, code, key, plan, roster, receipt, fingerprint, record)
+                return finish(ctx, client, code, key, plan, roster, receipt, fingerprint, record)
 
     def _ensure_schemas(self, client):
         for table in (Table.NODES, Table.TASKS):
@@ -396,14 +422,17 @@ class NodeAssignmentService:
         return rows
 
     def _node_row(self, client, s: Situation, receipt):
-        """Search first, create once, then search again so a racing duplicate is reported, not picked."""
+        """Search first, create once, then search again so a racing duplicate is reported, not picked.
+
+        Returns the row and whether this request issued the create.
+        """
         row = s.snapshot.row(s.key)
         if row is not None:
-            return row
+            return row, False
         akey = assignment_key(s.code, s.key)
         found = self._rows_for(client, akey)
         if found:
-            return found[0]
+            return found[0], False
         status = derive_chain(facts_of(s.snapshot, s.skipped))[s.key]
         initial = {'assignment_key': akey, 'code': s.code, 'node': NODE_LABELS[s.key], 'status': status.value}
         if s.confirmation_record:
@@ -416,7 +445,7 @@ class NodeAssignmentService:
         found = self._rows_for(client, akey)
         if not found:
             raise Failure('outcome_unknown', '節點指派列建立結果未知；請以同一 request_id 重送以核對結果')
-        return found[0]
+        return found[0], True
 
     def _verify(self, client, table, spec, record_id, fields):
         wrong = mismatches(spec, fields, client.get(table, record_id))
@@ -430,11 +459,14 @@ class NodeAssignmentService:
             return updated
 
         if plan.kind == 'node' and plan.record_id is None:
-            row = self._node_row(client, s, receipt)
-            plan = pin(replace(plan, record_id=row.record_id, base_revision=row.revision))
+            row, created = self._node_row(client, s, receipt)
+            plan = pin(replace(plan, record_id=row.record_id, base_revision=row.revision,
+                                     created_node=created or plan.created_node))
         if plan.kind == 'task_create':
             if 'node' not in plan.changes:
-                plan = pin(replace(plan, changes={**plan.changes, 'node': [self._node_row(client, s, receipt).record_id]}))
+                row, created = self._node_row(client, s, receipt)
+                plan = pin(replace(plan, changes={**plan.changes, 'node': [row.record_id]},
+                                     created_node=created or plan.created_node))
             if plan.pre_create_task_ids is None:
                 row = client.get(Table.NODES, plan.changes['node'][0])
                 plan = pin(replace(plan, pre_create_task_ids=parse_node(row).task_ids))
@@ -516,8 +548,9 @@ class NodeAssignmentService:
         return [{'kind': kind, 'id': plan.record_id or akey, 'project_id': ctx.project['id'],
                  'before': plan.before, 'after': plan.changes}]
 
-    def _finish(self, ctx, client, code, key, plan: Plan, roster: Cached, receipt, fingerprint, record):
-        warnings = list(plan.warnings)
+    def _converge(self, ctx, client, code, key, plan: Plan):
+        """Read the case back, mirror the derived status onto the node row, and refresh the cache."""
+        warnings = []
         snapshot = read_case(client, code)
         synced = self._sync_node(client, ctx, snapshot, key, plan)
         if synced == 'failed':
@@ -525,6 +558,11 @@ class NodeAssignmentService:
         elif synced == 'written':
             snapshot = read_case(client, code)
         self.case_cache.put((ctx.wid, code), snapshot)
+        return snapshot, warnings
+
+    def _finish(self, ctx, client, code, key, plan: Plan, roster: Cached, receipt, fingerprint, record):
+        snapshot, warnings = self._converge(ctx, client, code, key, plan)
+        warnings = list(plan.warnings) + warnings
         body = node_detail(snapshot, self.skipped(ctx), actor_for(ctx.user, roster.value), roster.value, key,
                            self.write_block(ctx) is None, self.now_ms())
         body['warnings'] += warnings
