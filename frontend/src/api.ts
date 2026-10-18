@@ -137,7 +137,7 @@ export const fetchP2=(url:string,signal?:AbortSignal)=>api<unknown>(url,{method:
 
 export function disabledRouteFeature(route:import('./types').Route,features:import('./types').FeatureContract|undefined):'change_extension'|'routines'|'dispatch_board'|undefined {
  const normalized=normalizeRoute(route);
- if(normalized.view==='dispatch'&&features?.dispatch_board!==true)return 'dispatch_board';
+ if(normalized.view==='dispatch'&&features?.dispatch_board!==true&&features?.dispatch_write!==true)return 'dispatch_board';
  if((normalized.view==='approvals'||normalized.approval)&&features?.change_extension!==true)return 'change_extension';
  if((normalized.view==='routines'||(normalized.view==='project'&&normalized.tab==='flow'&&normalized.section==='routines'))&&features?.routines!==true)return 'routines';
  return undefined;

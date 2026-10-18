@@ -29,7 +29,8 @@ const {variants}=JSON.parse(await fs.readFile(new URL('./fixtures/dispatchBoardS
 const frame=(variant,error='')=>new JSDOM(renderToStaticMarkup(React.createElement(m.HomeDispatchFrame,{from:'2026-07-27',read:{data:variant?m.parseDispatchBoard(variant):undefined,loading:!variant&&!error,error,reload(){}}}))).window.document;
 let doc=frame(variants.loaded);
 assert.deepEqual([...doc.querySelectorAll('.home-dispatch-count')].map(el=>el.textContent),['1','2','2']);
-assert.equal(doc.querySelector('a').getAttribute('href'),'#view=dispatch');
+assert.equal(doc.querySelector('a[href="#view=dispatch"]').getAttribute('href'),'#view=dispatch');
+assert.equal(doc.querySelector('a[href="#view=dispatch&tab=work"]').textContent,'查看工作進度與需要我處理');
 for(const state of ['forbidden','empty_future_window']){
  doc=frame(variants[state]);assert.deepEqual([...doc.querySelectorAll('.home-dispatch-count')].map(el=>el.textContent),['—','—','—']);
 }
