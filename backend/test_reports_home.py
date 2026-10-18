@@ -40,10 +40,13 @@ def test_home_fixture_shape_projections_and_literals(home):
             reports.append(report)
             for gap in report['meta']['gaps']: gaps.setdefault(gap['id'],gap)
         if part.name=='assets':
-            expected={kind:{key:report[key] for key in ('kpi','by_category')} for kind,report in zip(('instrument','vehicle'),reports)}
+            expected={}
+            for kind,report in zip(('instrument','vehicle'),reports):
+                other={'instrument':'vehicle','vehicle':'instrument'}[kind]
+                expected[kind]=dict({key:report[key] for key in ('kpi','by_category')},gaps=[gap for gap in report['meta']['gaps'] if not gap['id'].startswith((other+'-','asset-'+other+'-')) and gap['id']!='source-'+other])
         else:
             keys={'quality':('kpi','kpi_prev','trend','by_group','control'),'quality_office':('kpi',),'sales':('kpi','by_status'),'progress':('week','basis','kpi','by_group')}[part.name]
-            expected={key:reports[0][key] for key in keys}
+            expected=dict({key:reports[0][key] for key in keys},gaps=reports[0]['meta']['gaps'])
             if part.name=='sales': expected['top_receivable']=[row for row in reports[0]['items'] if row['receivable'] is not None and row['receivable']>0][:5]
         assert body[part.name]==expected
     assert body['meta']['gaps']==list(gaps.values())
@@ -53,6 +56,8 @@ def test_home_fixture_shape_projections_and_literals(home):
     assert body['sales']['kpi']['contract_total']==100
     assert body['progress']['kpi']['planned_points']==8
     assert body['assets']['instrument']['kpi']['repair']==1
+    assert [g['id'] for g in body['assets']['instrument']['gaps']]==['instrument-類別','asset-planned-coverage','asset-inspections','asset-planned','asset-instrument-coverage']
+    assert [g['id'] for g in body['assets']['vehicle']['gaps']]==['asset-planned-coverage','asset-inspections','asset-planned','asset-vehicle-coverage']
     assert body['sales']['kpi']['billed_total'] is None
     assert body['sales']['kpi']['received_total'] is None
     assert body['sales']['kpi']['unbilled_billable'] is None
@@ -186,6 +191,8 @@ def test_home_composer_deduplicates_gaps_without_mutating_meta(home):
     body=compose(result,meta,'2026-10-12')
     assert body['meta']['gaps']==[shared]
     assert meta==before
+    assert [body[name]['gaps'] for name in ('quality','quality_office','sales','progress')]==[[shared]]*4
+    assert body['assets']['instrument']['gaps']==body['assets']['vehicle']['gaps']==[shared]
 
 
 def test_home_cold_warming_matches_existing_endpoint(home,monkeypatch):
@@ -198,3 +205,23 @@ def test_home_cold_warming_matches_existing_endpoint(home,monkeypatch):
     assert response.json()==other.json()==dict(detail='報表資料正在首次讀取，請稍候',warming=True,retry_after=5)
     assert response.headers['retry-after']=='5'
     assert response.headers['cache-control']=='no-store'
+
+
+def test_home_gaps_stay_with_their_sources(home):
+    client,store=home
+    snapshot=store.get()
+    def gap(ident): return dict(id=ident,severity='warn',message=ident)
+    def result(endpoint,params):
+        report=store.result(endpoint,params,snapshot=snapshot)
+        ident=endpoint+'-'+params.get('dept','')
+        ids=['instrument-category','source-instrument','vehicle-status','source-vehicle','asset-instrument-coverage','asset-vehicle-coverage','source-plan','source-field_cost','asset-planned'] if endpoint=='assets' else [ident,ident]
+        report['meta']['gaps']=[gap(ident) for ident in ids]
+        return report
+    body=compose(result,store.meta(snapshot),'2026-10-12')
+    assert body['quality']['gaps']==[gap('review-field')]
+    assert body['quality_office']['gaps']==[gap('review-office')]
+    assert body['sales']['gaps']==[gap('sales-')]
+    assert body['progress']['gaps']==[gap('progress-field')]
+    assert body['assets']['instrument']['gaps']==[gap(ident) for ident in ['instrument-category','source-instrument','asset-instrument-coverage','source-plan','source-field_cost','asset-planned']]
+    assert body['assets']['vehicle']['gaps']==[gap(ident) for ident in ['vehicle-status','source-vehicle','asset-vehicle-coverage','source-plan','source-field_cost','asset-planned']]
+    assert body['meta']['gaps']==[gap(ident) for ident in ['review-field','review-office','sales-','progress-field','instrument-category','source-instrument','vehicle-status','source-vehicle','asset-instrument-coverage','asset-vehicle-coverage','source-plan','source-field_cost','asset-planned']]

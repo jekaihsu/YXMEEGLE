@@ -182,6 +182,7 @@ class ReviewControl(TypedDict):
 
 
 class HomeOffice(TypedDict):
+    gaps: list[Gap]
     kpi: Kpi
 
 
@@ -224,6 +225,7 @@ class SalesRow(TypedDict):
 
 
 class HomeSales(TypedDict):
+    gaps: list[Gap]
     kpi: SalesKpi
     by_status: list[SalesStatus]
     top_receivable: list[SalesRow]
@@ -249,6 +251,7 @@ class AssetCategory(TypedDict):
 
 
 class HomeAsset(TypedDict):
+    gaps: list[Gap]
     kpi: AssetKpi
     by_category: list[AssetCategory]
 
@@ -259,6 +262,7 @@ class HomeAssets(TypedDict):
 
 
 class HomeProgress(TypedDict):
+    gaps: list[Gap]
     week: str
     basis: Literal['days','points']
     kpi: ProgressKpi

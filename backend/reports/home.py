@@ -16,6 +16,22 @@ class Part(NamedTuple):
 def pick(result, *keys): return {key:result[key] for key in keys}
 
 
+def unique_gaps(reports):
+    gaps={}
+    for report in reports:
+        for gap in report['meta']['gaps']: gaps.setdefault(gap['id'],gap)
+    return list(gaps.values())
+
+
+def asset_cards(results):
+    cards={}
+    for kind,report in zip(('instrument','vehicle'),results):
+        other={'instrument':'vehicle','vehicle':'instrument'}[kind]
+        gaps=[gap for gap in unique_gaps([report]) if not gap['id'].startswith((other+'-','asset-'+other+'-')) and gap['id']!='source-'+other]
+        cards[kind]=dict(pick(report,'kpi','by_category'),gaps=gaps)
+    return cards
+
+
 def sales_card(results):
     report=results[0]
     rows=[row for row in report['items'] if row['receivable'] is not None and row['receivable']>0]
@@ -27,7 +43,7 @@ PARTS=(
     Part('quality_office',(('review',{'dept':'office','weeks':12}),),lambda r:pick(r[0],'kpi'),'內業品質報表暫時無法讀取。'),
     Part('sales',(('sales',{'sort':'receivable','order':'desc','limit':200}),),sales_card,'業務報表暫時無法讀取。'),
     Part('progress',(('progress',{'dept':'field','scope':'week'}),),lambda r:pick(r[0],'week','basis','kpi','by_group'),'外業進度報表暫時無法讀取。'),
-    Part('assets',(('assets',{'kind':'instrument'}),('assets',{'kind':'vehicle'})),lambda r:{kind:pick(report,'kpi','by_category') for kind,report in zip(('instrument','vehicle'),r)},'資產報表暫時無法讀取。'),
+    Part('assets',(('assets',{'kind':'instrument'}),('assets',{'kind':'vehicle'})),asset_cards,'資產報表暫時無法讀取。'),
 )
 
 
@@ -41,6 +57,7 @@ def compose(result: Callable[[str,dict],dict], meta: Meta, week: str) -> HomeRes
                 reports.append(report)
                 for gap in report['meta']['gaps']: gaps.setdefault(gap['id'],gap)
             cards[part.name]=part.project(reports)
+            if part.name!='assets': cards[part.name]['gaps']=unique_gaps(reports)
         except HTTPException:
             raise
         except Exception:
