@@ -180,7 +180,7 @@ def build_board(data: BoardInput, window: Window) -> dict:
         if kind == 'work':
             if not people:
                 gaps.append('no_crew')
-            if not cases:
+            if not cases and _label(fields, '業別') in ('外業', '內業'):
                 gaps.append('no_case')
             if _label(fields, '業別') == '外業' and not instruments:
                 gaps.append('no_instrument_for_field_work')
@@ -219,7 +219,7 @@ def build_board(data: BoardInput, window: Window) -> dict:
             case = {'ref': cases[0], 'code': _label(case_fields, '工程確認單編號'), 'name': _label(case_fields, '工程名稱')}
         ident = f"v4:{TABLES['schedule'].table_id}:{row['record_id']}"
         slots.append(Slot(slot_id=ident, record_id=row['record_id'], kind=kind,
-                          planning_status=PlanningStatus.UNASSIGNED if gaps else PlanningStatus.CONFIRMED,
+                          planning_status=PlanningStatus.UNASSIGNED if 'no_crew' in gaps else PlanningStatus.CONFIRMED,
                           provenance='v4_row', interval=interval.public(), group=group,
                           discipline=_label(fields, '業別'), case=case, work_content=_label(fields, '工作內容'),
                           crew=crew, resources=resources, gaps=gaps, issues=[]))

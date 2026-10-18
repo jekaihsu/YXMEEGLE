@@ -82,9 +82,17 @@ def test_unassigned_missing_requirements_and_leave_is_not_an_unassigned_work_slo
     assert board['kpi'] == {'slots': 2, 'unassigned': 1, 'unknown_overlap': 0, 'conflict': 0}
 
 
+def test_crewed_work_without_case_or_instrument_is_not_unassigned_and_admin_needs_no_case():
+    board = build_board(source([work('recField', 案件=[], 儀器=[]), work('recAdmin', 業別='行政', 案件=[], 儀器=[])]), WINDOW)
+    assert by_id(board, 'recField')['gaps'] == ['no_case', 'no_instrument_for_field_work']
+    assert by_id(board, 'recAdmin')['gaps'] == []
+    assert board['unassigned_queue'] == []
+    assert board['kpi'] == {'slots': 2, 'unassigned': 0, 'unknown_overlap': 2, 'conflict': 0}
+
+
 def test_timed_conflict_date_only_unknown_unavailable_and_literal_kpis():
     board = build_board(acceptance_source(), WINDOW)
-    assert board['kpi'] == {'slots': 6, 'unassigned': 5, 'unknown_overlap': 2, 'conflict': 2}
+    assert board['kpi'] == {'slots': 6, 'unassigned': 1, 'unknown_overlap': 2, 'conflict': 2}
     timed = by_id(board, 'recTimedA')
     assert timed['crew'][0] == {'person_ref': 'recActive', 'name': '合成人員', 'active': True,
                                'feasibility': 'conflict', 'reasons': ['no_leave_source', 'no_capability_source', 'timed_overlap']}
@@ -112,7 +120,7 @@ def test_disjoint_timed_intervals_and_midnight_date_precision():
         work('recA', '2026-07-27T09:00:00+08:00', '2026-07-27T10:00:00+08:00', 儀器=[]),
         work('recB', '2026-07-27T10:00:00+08:00', '2026-07-27T11:00:00+08:00', 儀器=[]),
     ]), WINDOW)
-    assert board['kpi'] == {'slots': 2, 'unassigned': 2, 'unknown_overlap': 0, 'conflict': 0}
+    assert board['kpi'] == {'slots': 2, 'unassigned': 0, 'unknown_overlap': 0, 'conflict': 0}
     assert board['slots'][0]['crew'][0]['feasibility'] == 'unknown'
     ms = int(datetime(2026, 7, 27, tzinfo=TZ).timestamp() * 1000)
     board = build_board(source([work('recMs', ms)]), WINDOW)
