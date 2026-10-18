@@ -4,7 +4,7 @@ export const REPORT_CARDS={
  qualityGroups:{section:'quality',title:'各組失誤率',description:'依已檢核樣本比較各組',tab:'review'},
  funnel:{section:'business',title:'合約 → 請款 → 入帳',description:'合約、請款與入帳金額',tab:'sales'},
  receivables:{section:'business',title:'應收未收前 5 案',description:'依應收未收金額排序',tab:'sales'},
- achievement:{section:'progress',title:'預排達成率',description:'本週實際與預排比較',tab:'progress'},
+ achievement:{section:'progress',title:'預排達成率',description:'報告週實際與預排比較',tab:'progress'},
  instruments:{section:'resources',title:'儀器',description:'儀器使用、閒置與送修',tab:'assets'},
  vehicles:{section:'resources',title:'車輛',description:'車輛使用與閒置',tab:'assets'},
 } as const;

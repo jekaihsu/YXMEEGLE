@@ -7,10 +7,10 @@ const file=new URL('./.home-reports-test.mjs',import.meta.url);await fs.writeFil
 let m;try{m=await import(file.href)}finally{await fs.unlink(file)}
 let checks=0;const equal=(actual,expected)=>{assert.deepEqual(actual,expected);checks++};
 const r=m.parseHomeReport(homeReportFixture());
-equal(m.reportInsight(r,'qualityTrend').sentence,'本週 11.5%，較上週 +2.1pt。47 筆已退回中，測量二組 佔 38%');
+equal(m.reportInsight(r,'qualityTrend').sentence,'報告週 11.5%，較前一週 +2.1pt。47 筆已退回中，測量二組 佔 38%');
 equal(m.reportInsight(r,'qualityTrend').notes,['檢核覆蓋率 50% (408 / 813)；405 筆待檢核未計入；內業失誤率目前無法由檢核狀態計算 (覆蓋 3%)','另有 1 項資料缺口，詳見 PM 週報']);
-equal(m.reportInsight({...r,quality:{...r.quality,kpi:{...r.quality.kpi,error_rate:null,returned:0}}},'qualityTrend').sentence,'本週尚無已檢核資料');
-equal(m.reportInsight({...r,quality:{...r.quality,kpi_prev:{...r.quality.kpi_prev,error_rate:null}}},'qualityTrend').sentence,'本週 11.5%，上週無可比數據。47 筆已退回中，測量二組 佔 38%');
+equal(m.reportInsight({...r,quality:{...r.quality,kpi:{...r.quality.kpi,error_rate:null,returned:0}}},'qualityTrend').sentence,'報告週尚無已檢核資料');
+equal(m.reportInsight({...r,quality:{...r.quality,kpi_prev:{...r.quality.kpi_prev,error_rate:null}}},'qualityTrend').sentence,'報告週 11.5%，前一週無可比數據。47 筆已退回中，測量二組 佔 38%');
 equal(m.reportInsight(r,'qualityGroups').sentence,'測量二組最高 (18%)');
 equal(m.reportInsight(r,'qualityGroups').bars.at(-1),{label:'內業組 · 樣本少 · n=12',value:.04,display:'4%',muted:true});
 equal(m.reportInsight({...r,quality:{...r.quality,by_group:[r.quality.by_group.at(-1)]}},'qualityGroups').sentence,'尚無足夠已檢核樣本可比較各組');
@@ -35,7 +35,7 @@ for(const mutate of [r=>r.sales.gaps=null,r=>r.progress.gaps=[{id:'x',severity:'
 equal(m.reportWeek(r.week),'2026/10/12～2026/10/18');
 const summary=m.copySummary(empty);
 equal(summary,`PM 週報 · 2026/10/12～2026/10/18
-週報待追蹤：追蹤本週檢核、請款與資源事項。外業已退回 · 待複查 —；可請款未請 —；應收未收 —；儀器送修 —
+週報待追蹤：追蹤報告週檢核、請款與資源事項。外業已退回 · 待複查 —；可請款未請 —；應收未收 —；儀器送修 —
 各項依週報來源；缺少資料以 — 顯示。
 外業失誤率 · 12 週：週報資料暫時無法提供。
 來源尚未提供，未以 0 代替。

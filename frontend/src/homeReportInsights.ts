@@ -23,7 +23,7 @@ export function attentionTiles(r:HomeReport){return [
 function qualityTrend(r:HomeReport):ReportInsight{
  const q=r.quality;if(!q)return unavailable();
  const now=q.kpi.error_rate,prev=q.kpi_prev.error_rate;
- let sentence=now===null?'本週尚無已檢核資料':`本週 ${percent(now,1)}，`+(prev===null?'上週無可比數據':`較上週 ${now>=prev?'+':''}${((now-prev)*100).toFixed(1)}pt`);
+ let sentence=now===null?'報告週尚無已檢核資料':`報告週 ${percent(now,1)}，`+(prev===null?'前一週無可比數據':`較前一週 ${now>=prev?'+':''}${((now-prev)*100).toFixed(1)}pt`);
  const most=[...q.by_group].sort((a,b)=>b.returned-a.returned)[0];
  if(q.kpi.returned>0&&most&&most.returned>0)sentence+=`。${q.kpi.returned} 筆已退回中，${most.group} 佔 ${percent(most.returned/q.kpi.returned)}`;
  const notes=[`檢核覆蓋率 ${percent(q.kpi.coverage)} (${q.kpi.passed+q.kpi.returned} / ${q.kpi.total})；${q.kpi.pending} 筆待檢核未計入`];
@@ -66,6 +66,6 @@ function assets(r:HomeReport,kind:'instrument'|'vehicle'):ReportInsight{
  const rows=[bar('總數',k.total,`${k.total} ${unit}`),bar('使用中',k.in_use,`${k.in_use} ${unit}`),bar('閒置',k.idle,`${k.idle} ${unit}`),...(kind==='instrument'?[bar('送修',k.repair,`${k.repair} ${unit}`)]:[])];
  return {available:true,sentence:`共 ${k.total} ${unit}，使用中 ${k.in_use} ${unit}，閒置 ${k.idle} ${unit}`+(kind==='instrument'?`，送修 ${k.repair} ${unit}`:''),notes:cappedNotes(['依週報資源狀態統計。',...r.assets[kind].gaps.filter(g=>g.id==='asset-inspections').map(g=>g.message)],r.assets[kind].gaps.filter(g=>g.id!=='asset-inspections')),bars:rows};
 }
-const insights:Record<ReportCardId,(r:HomeReport)=>ReportInsight>={attention:r=>({available:true,sentence:'追蹤本週檢核、請款與資源事項',notes:['各項依週報來源；缺少資料以 — 顯示。'],bars:attentionTiles(r).map(t=>bar(t.label,null,t.value))}),qualityTrend,qualityGroups,funnel,receivables,achievement,instruments:r=>assets(r,'instrument'),vehicles:r=>assets(r,'vehicle')};
+const insights:Record<ReportCardId,(r:HomeReport)=>ReportInsight>={attention:r=>({available:true,sentence:'追蹤報告週檢核、請款與資源事項',notes:['各項依週報來源；缺少資料以 — 顯示。'],bars:attentionTiles(r).map(t=>bar(t.label,null,t.value))}),qualityTrend,qualityGroups,funnel,receivables,achievement,instruments:r=>assets(r,'instrument'),vehicles:r=>assets(r,'vehicle')};
 export const reportInsight=(r:HomeReport,id:ReportCardId)=>insights[id](r);
 export function copySummary(r:HomeReport){return [`PM 週報 · ${reportWeek(r.week)}`,...Object.entries(REPORT_CARDS).map(([id,card])=>{const insight=reportInsight(r,id as ReportCardId);return `${card.title}：${insight.sentence}${id==='attention'?'。'+attentionTiles(r).map(t=>`${t.label} ${t.value}`).join('；'):''}\n${insight.notes.join('；')}`}),...(r.meta.stale||r.meta.refresh_error?['週報資料為舊快照']:[])].join('\n')}
