@@ -29,5 +29,5 @@ export function useHomeReports(c:Ctx,view:HomeViewId,ids:HomeCardId[]):HomeRepor
   });
   return()=>controller.abort();
  },[identity,enabled,token]);
- return enabled?(state.identity===identity?state:{loading:true,error:'',unavailable:denied.has(identity)}):{loading:false,error:'',unavailable:true};
+ return enabled?(state.identity===identity?state:{loading:true,error:'',unavailable:denied.has(identity)}):{loading:false,error:'',unavailable:denied.has(identity)};
 }

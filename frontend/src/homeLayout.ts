@@ -1,4 +1,4 @@
-import {REPORT_CARDS} from './homeReportCards';
+import {REPORT_CARDS,canReadHomeReports,isReportCard} from './homeReportCards';
 export const HOME_VIEWS={mine:{label:'我的工作'},assign:{label:'分配工作'},company:{label:'全公司'}} as const;
 export type HomeViewId=keyof typeof HOME_VIEWS;
 export const HOME_SECTIONS={todo:{label:'需要處理',hint:'需要你決定或追蹤的項目'},quality:{label:'品質',hint:'PM 週報 · 檢核品質'},business:{label:'業務',hint:'PM 週報 · 請款與應收'},progress:{label:'進度',hint:'預排達成與各組工作概況'},resources:{label:'資源',hint:'PM 週報 · 儀器與車輛'},people:{label:'人',hint:'本週出勤與人員工作安排'},shortcuts:{label:'捷徑',hint:'開啟完整管理頁面'}} as const;
@@ -74,4 +74,8 @@ export function deadlineLabel(deadline:string|null|undefined):string {
 
 export function homeSections(view:HomeViewId,layout:HomeLayout){
  return SECTION_ORDER[view].map(id=>({id,...HOME_SECTIONS[id],cards:layout.order.filter(card=>HOME_CARDS[card].section===id&&!layout.hidden.includes(card)).sort((a,b)=>Number(b==='attention')-Number(a==='attention'))})).filter(section=>section.cards.length);
+}
+
+export function availableCardIds(view:HomeViewId,user:PersonaUser,reportsState:{unavailable:boolean}):HomeCardId[]{
+ return DEFAULT_LAYOUT[view].order.filter(id=>!isReportCard(id)||canReadHomeReports(user?.role)&&!reportsState.unavailable);
 }

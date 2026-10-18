@@ -45,3 +45,6 @@ assert.deepEqual(m.homeSections('company',pinned)[0].cards,['attention','confirm
 assert.deepEqual(m.moveHomeCard(pinned,'attention',-1),pinned);
 assert.deepEqual(m.moveHomeCard(pinned,'confirmation',1).order,['cases','confirmation','attention']);
 console.log('Home reports layout: 6 literal section order, cases placement and old v2 migration checks passed.');
+assert.deepEqual(m.availableCardIds('company',{role:'member'},{unavailable:false}),['kpi','confirmation','cases','statuses','groups','leave','trips','absence','links']);
+assert.deepEqual(m.availableCardIds('company',{role:'pm'},{unavailable:true}),['kpi','confirmation','cases','statuses','groups','leave','trips','absence','links']);
+assert.deepEqual(m.availableCardIds('company',{role:'pm'},{unavailable:false}),['kpi','attention','confirmation','cases','qualityTrend','qualityGroups','funnel','receivables','achievement','statuses','groups','instruments','vehicles','leave','trips','absence','links']);
