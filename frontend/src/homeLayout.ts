@@ -1,10 +1,13 @@
+import {REPORT_CARDS} from './homeReportCards';
 export const HOME_VIEWS={mine:{label:'我的工作'},assign:{label:'分配工作'},company:{label:'全公司'}} as const;
 export type HomeViewId=keyof typeof HOME_VIEWS;
-export const HOME_SECTIONS={todo:{label:'需要處理',hint:'需要你決定或追蹤的項目'},cases:{label:'案件',hint:'案件進度與各組工作概況'},people:{label:'人',hint:'本週出勤與人員工作安排'},shortcuts:{label:'捷徑',hint:'開啟完整管理頁面'}} as const;
+export const HOME_SECTIONS={todo:{label:'需要處理',hint:'需要你決定或追蹤的項目'},quality:{label:'品質',hint:'PM 週報 · 檢核品質'},business:{label:'業務',hint:'PM 週報 · 請款與應收'},progress:{label:'進度',hint:'預排達成與各組工作概況'},resources:{label:'資源',hint:'PM 週報 · 儀器與車輛'},people:{label:'人',hint:'本週出勤與人員工作安排'},shortcuts:{label:'捷徑',hint:'開啟完整管理頁面'}} as const;
 export type HomeSectionId=keyof typeof HOME_SECTIONS;
-export const SECTION_ORDER:Record<HomeViewId,HomeSectionId[]>={mine:['todo','people'],assign:['people','todo'],company:['todo','cases','people','shortcuts']};
+export const SECTION_ORDER:Record<HomeViewId,HomeSectionId[]>={mine:['todo','people'],assign:['people','todo'],company:['todo','quality','business','progress','resources','people','shortcuts']};
 type CardDefinition={section:HomeSectionId|null;title:string;description:string;views:HomeViewId[];kind:'kpi'|'table'|'chart'};
+const reportCards=Object.fromEntries(Object.entries(REPORT_CARDS).map(([id,card])=>[id,{...card,views:['company'],kind:'chart'}])) as {[K in keyof typeof REPORT_CARDS]:typeof REPORT_CARDS[K]&{views:['company'];kind:'chart'}};
 export const HOME_CARDS={
+ ...reportCards,
  kpi:{section:null,title:'工作摘要',description:'目前視圖的重點數字',views:['mine', 'assign', 'company'],kind:'kpi'},
  work:{section:'todo',title:'我的工作',description:'依急迫程度排序的工作與期限',views:['mine', 'assign'],kind:'table'},
  confirmation:{section:'todo',title:'待我確認',description:'需要你覆核或確認的事項',views:['mine', 'company'],kind:'table'},
@@ -12,9 +15,9 @@ export const HOME_CARDS={
  allocation:{section:'todo',title:'待分配與待審核',description:'所管理組別的指派與覆核',views:['assign'],kind:'table'},
  workload:{section:'people',title:'組員工作量',description:'各組員的未完成工作與逾期數',views:['assign'],kind:'chart'},
  delegated:{section:'todo',title:'我交辦的',description:'追蹤交辦內容與目前進度',views:['assign'],kind:'table'},
- groups:{section:'cases',title:'各組工作量',description:'已完成、未完成與逾期任務',views:['company'],kind:'chart'},
- cases:{section:'cases',title:'需留意案件',description:'逾期與待確認案件優先',views:['company'],kind:'table'},
- statuses:{section:'cases',title:'案件狀態分布',description:'工作台執行狀態',views:['company'],kind:'chart'},
+ groups:{section:'progress',title:'各組工作量',description:'已完成、未完成與逾期任務',views:['company'],kind:'chart'},
+ cases:{section:'todo',title:'需留意案件',description:'逾期與待確認案件優先',views:['company'],kind:'table'},
+ statuses:{section:'progress',title:'案件狀態分布',description:'工作台執行狀態',views:['company'],kind:'chart'},
  links:{section:'shortcuts',title:'管理捷徑',description:'開啟完整管理頁面',views:['company'],kind:'table'},
  leave:{section:'people',title:'今日請假',description:'今天已核實的請假人員',views:['mine', 'company'],kind:'table'},
  trips:{section:'people',title:'今日出差',description:'今天的出差人員與期間',views:['mine', 'company'],kind:'table'},
@@ -27,7 +30,7 @@ export type HomeSettings={version:2;view:HomeViewId|null;layouts:Record<HomeView
 export const DEFAULT_LAYOUT:Record<HomeViewId,HomeLayout>={
  mine:{order:['kpi','work','confirmation','deadlines','leave','trips'],hidden:[]},
  assign:{order:['kpi','allocation','workload','delegated','absence','impact','work'],hidden:[]},
- company:{order:['kpi','groups','cases','statuses','links','confirmation','leave','trips','absence'],hidden:[]},
+ company:{order:['kpi','attention','confirmation','cases','qualityTrend','qualityGroups','funnel','receivables','achievement','statuses','groups','instruments','vehicles','leave','trips','absence','links'],hidden:[]},
 };
 type PersonaUser={role?:string|null;department?:string|null}|null|undefined;
 const companyPersona=(user:PersonaUser)=>!!user&&(user.role==='pm'||user.role==='manager'||/專案|PM|業務|管理/i.test(user.department||''));
