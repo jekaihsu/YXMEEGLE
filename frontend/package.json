@@ -56,7 +56,8 @@
     "test:reports-progress": "node test-reports-progress.mjs && node test-reports-progress-fixes.mjs",
     "test:reports": "node test-reports-view.mjs && node test-reports-requests.mjs && node test-reports-mock.mjs",
     "test:unified-home": "node test-home-layout.mjs && node test-home-counts.mjs && node test-unified-home.mjs",
-    "test:project-progress": "node test-project-progress.mjs"
+    "test:project-progress": "node test-project-progress.mjs",
+    "test:dispatch-publish": "node test-dispatch-publish.mjs && node test-dispatch-publish-ui.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",

@@ -3,7 +3,7 @@ export type DispatchQuality = 'complete'|'partial'|'stale'|'read_failed'|'forbid
 export type DispatchCrew = {person_ref:string;name:string|null;active:boolean|null;feasibility:Feasibility;reasons:string[]};
 export type DispatchResource = {kind:'instrument'|'vehicle'|'unknown';ref:string;label:string|null;feasibility:Feasibility;reasons:string[]};
 export type DispatchSlot = {
- slot_id:string;record_id:string;kind:'work'|'leave'|'standby'|'support'|'unknown';planning_status:'unassigned'|'confirmed'|'unknown';provenance:'v4_row'|'unknown';
+ slot_id:string;record_id:string;kind:'work'|'execution'|'leave'|'standby'|'support'|'unknown';planning_status:'unassigned'|'confirmed'|'publishing'|'unknown';provenance:'v4_row'|'v4_task'|'unknown';
  interval:{start:string|null;end:string|null;precision:'date'|'datetime'|'unknown'};group:string|null;discipline:string|null;
  case:{ref:string|null;code:string|null;name:string|null};work_content:string|null;crew:DispatchCrew[];resources:DispatchResource[];gaps:string[];issues:string[];
 };
@@ -34,7 +34,7 @@ function parseSlot(value:unknown):DispatchSlot|null {
  const interval=object(s.interval),c=object(s.case),precision=enumValue(interval.precision,['date','datetime']);
  const start=precision==='date'?dateOnly(interval.start):precision==='datetime'?timestamp(interval.start):null;
  const end=precision==='date'?dateOnly(interval.end):precision==='datetime'?timestamp(interval.end):null;
- return {slot_id:id,record_id:text(s.record_id)??'',kind:enumValue(s.kind,['work','leave','standby','support']),planning_status:enumValue(s.planning_status,['unassigned','confirmed']),provenance:enumValue(s.provenance,['v4_row']),
+ return {slot_id:id,record_id:text(s.record_id)??'',kind:enumValue(s.kind,['work','execution','leave','standby','support']),planning_status:enumValue(s.planning_status,['unassigned','confirmed','publishing']),provenance:enumValue(s.provenance,['v4_row','v4_task']),
  interval:{start,end:end&&start&&Date.parse(end)>=Date.parse(start)?end:null,precision},group:text(s.group),discipline:text(s.discipline),case:{ref:text(c.ref),code:text(c.code),name:text(c.name)},work_content:text(s.work_content),
  crew:list(s.crew).map(parseCrew),resources:list(s.resources).map(value=>{const r=object(value);return {kind:enumValue(r.kind,['instrument','vehicle']),ref:text(r.ref)??'',label:text(r.label),feasibility:strings(r.reasons).some(v=>v==='repair'||v==='inactive')?'unavailable':enumValue(r.feasibility,['feasible','conflict','unavailable','unknown']),reasons:strings(r.reasons)}}),gaps:strings(s.gaps),issues:strings(s.issues)};
 }
