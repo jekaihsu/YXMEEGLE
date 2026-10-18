@@ -7,6 +7,7 @@ import unicodedata
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from .compute import TZ, monday, UnknownStatus, CaseNotFound
+from .home import compose
 from .reader import LarkReader
 from .snapshot import SnapshotStore, ensure_visible_logs
 
@@ -27,6 +28,7 @@ ALLOWED={
     'sales':PAGE_KEYS|{'status','pm'},
     'assets':PAGE_KEYS|{'kind','from','to','status','category','owner','idle_days','q'},
     'sources':set(),
+    'home':set(),
 }
 
 
@@ -105,7 +107,11 @@ def register(app, identity, cfg=None, *, reader=None, authorize=None, live_enabl
             try:
                 data,user=gate(request)
                 try:
-                    result=store.result(endpoint,parameters(endpoint,request.query_params))
+                    params=parameters(endpoint,request.query_params)
+                    if endpoint=='home':
+                        snapshot=store.get()
+                        result=compose(lambda name,p:store.result(name,p,snapshot=snapshot),store.meta(snapshot),parameters('review',{})['week'])
+                    else: result=store.result(endpoint,params)
                 except UnknownStatus as exc: raise HTTPException(422,str(exc)) from None
                 except CaseNotFound: raise HTTPException(404,'case_not_found') from None
                 if endpoint=='progress':
@@ -121,7 +127,7 @@ def register(app, identity, cfg=None, *, reader=None, authorize=None, live_enabl
                 return JSONResponse(exc.detail if isinstance(exc.detail,dict) else {'detail':str(exc.detail)},status_code=exc.status_code,headers={'Cache-Control':'no-store',**(exc.headers or {})})
         read.__name__='reports_'+endpoint.replace('/','_')
         return read
-    for endpoint in ('review','review/rows','sales','assets','progress','progress/case','sources'):
+    for endpoint in ('review','review/rows','sales','assets','progress','progress/case','sources','home'):
         app.add_api_route('/api/reports/'+endpoint,handler(endpoint),methods=['GET'])
     @app.post('/api/reports/refresh')
     def refresh(request: Request):
