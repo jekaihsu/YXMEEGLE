@@ -1,9 +1,13 @@
 """Home cards projected from cached reports on one snapshot."""
+import logging
 from collections.abc import Callable
 from copy import deepcopy
 from typing import NamedTuple
 from fastapi import HTTPException
 from .models import HomeResponse, Meta
+
+
+logger = logging.getLogger('backend.reports')
 
 
 class Part(NamedTuple):
@@ -60,7 +64,8 @@ def compose(result: Callable[[str,dict],dict], meta: Meta, week: str) -> HomeRes
             if part.name!='assets': cards[part.name]['gaps']=unique_gaps(reports)
         except HTTPException:
             raise
-        except Exception:
+        except Exception as exc:
+            logger.warning('home part failed part=%s error_class=%s',part.name,type(exc).__name__)
             cards[part.name]=None
             ident='home-'+part.name+'-failed'
             gaps[ident]=dict(id=ident,severity='warn',message=part.failure)

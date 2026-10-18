@@ -225,3 +225,19 @@ def test_home_gaps_stay_with_their_sources(home):
     assert body['assets']['instrument']['gaps']==[gap(ident) for ident in ['instrument-category','source-instrument','asset-instrument-coverage','source-plan','source-field_cost','asset-planned']]
     assert body['assets']['vehicle']['gaps']==[gap(ident) for ident in ['vehicle-status','source-vehicle','asset-vehicle-coverage','source-plan','source-field_cost','asset-planned']]
     assert body['meta']['gaps']==[gap(ident) for ident in ['review-field','review-office','sales-','progress-field','instrument-category','source-instrument','vehicle-status','source-vehicle','asset-instrument-coverage','asset-vehicle-coverage','source-plan','source-field_cost','asset-planned']]
+
+
+def test_home_part_failure_logs_only_class(home, monkeypatch, caplog):
+    client, store = home
+    original = store.result
+    def failing(endpoint, params, **kwargs):
+        if endpoint == 'sales':
+            raise ValueError('secret customer diagnostic')
+        return original(endpoint, params, **kwargs)
+    monkeypatch.setattr(store, 'result', failing)
+    with caplog.at_level('WARNING', logger='backend.reports'):
+        body = client.get('/api/reports/home').json()
+    assert body['sales'] is None
+    assert [record.getMessage() for record in caplog.records if record.name == 'backend.reports'] == ['home part failed part=sales error_class=ValueError']
+    assert 'secret customer diagnostic' not in caplog.text
+    assert all(record.exc_info is None for record in caplog.records)
