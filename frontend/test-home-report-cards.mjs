@@ -50,5 +50,14 @@ try{
  let release;status=200;held={promise:new Promise(resolve=>{release=resolve})};await fresh({...c,s:{...c.s,user:{id:'slow-pm',role:'pm'}}});await render({...c,s:{...c.s,user:{id:'new-member',role:'member'}}});held=undefined;await act(async()=>release());equal(reportIds.some(id=>cardIds().includes(id)),false);
  const withGap={...fixture,quality:{...fixture.quality,trend:[{week:'1',error_rate:.1,total:1,passed:1,returned:0},{week:'2',error_rate:null,total:1,passed:1,returned:0},{week:'3',error_rate:.2,total:1,passed:1,returned:0}]}};
  await act(async()=>root.render(React.createElement(m.ReportCard,{id:'qualityTrend',read:{data:withGap,loading:false,error:'',unavailable:false}})));equal(document.querySelectorAll('.home-report-line').length,0);equal(document.querySelectorAll('circle').length,1);
+ const gaps=['第一項缺口','第二項缺口','第三項缺口'].map((message,i)=>({id:'sales-'+i,severity:'warn',message}));
+ for(const [cardGaps,expected] of [[[],['僅涵蓋週報已納入的案件與金額。']],[[gaps[0]],['第一項缺口']],[gaps,['第一項缺口','另有 2 項資料缺口，詳見 PM 週報']]]){
+  const data={...fixture,sales:{...fixture.sales,by_status:[],gaps:cardGaps}};
+  await act(async()=>root.render(React.createElement(m.ReportCard,{id:'funnel',read:{data,loading:false,error:'',unavailable:false}})));
+  equal([...document.querySelectorAll('.home-source-note')].map(el=>el.textContent),expected);
+ }
+ const data={...fixture,assets:{instrument:{...fixture.assets.instrument,gaps:[{id:'instrument-category',severity:'warn',message:'儀器專屬缺口'}]},vehicle:{...fixture.assets.vehicle,gaps:[]}}};
+ await act(async()=>root.render(React.createElement(m.ReportCard,{id:'vehicles',read:{data,loading:false,error:'',unavailable:false}})));
+ equal([...document.querySelectorAll('.home-source-note')].map(el=>el.textContent),['依週報資源狀態統計。']);
  console.log(`Home report cards: ${checks} rendered access, request, stale, cancellation, trend-gap and clipboard checks passed.`);
 }finally{await act(async()=>root.unmount())}
