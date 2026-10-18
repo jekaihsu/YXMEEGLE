@@ -8,7 +8,7 @@ const view=m.parsePeopleAttendance({status:'ok',days:['2026-10-12','2026-10-13',
 const check=(actual,expected)=>assert.deepEqual(actual,expected);
 check(m.weekDays('2026-10-18'),['2026-10-12','2026-10-13','2026-10-14','2026-10-15','2026-10-16']);
 check(m.weekDays('2026-10-19'),['2026-10-19','2026-10-20','2026-10-21','2026-10-22','2026-10-23']);
-check(m.weeklyPeople(view,view.people,'2026-10-14').map(row=>row.cells),[['請假','請假','出差','在','在'],['請假','在','在','在','在'],['在','在','在','在','出差'],['出差','在','在','在','在']]);
+check(m.weeklyPeople(view,view.people,'2026-10-14').map(row=>row.cells),[['請假','請假','出差','—','—'],['請假','—','—','—','—'],['—','—','—','—','出差'],['出差','—','—','—','—']]);
 check(m.absenceCell({...view,leaves_available:true},view.people[1],'2026-10-12'),'在');
 check(m.scopedAttendance(view,'assign',null),{known:false,people:[]});
 check(m.scopedAttendance(view,'assign','管理部'),{known:false,people:[]});

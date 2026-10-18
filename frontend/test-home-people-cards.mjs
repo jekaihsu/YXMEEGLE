@@ -39,3 +39,7 @@ assert.match(doc.body.textContent,/更新失敗；/);
 doc=render({view:undefined,loading:true});
 assert.ok(doc.querySelector('.skeleton-row'));
 console.log('Home people cards: 18 rendered scope, summary, table, navigation and honest-state checks passed.');
+
+doc=render({view:{...view,days:view.days.slice(0,4)}});
+assert.equal(doc.querySelector('.home-people-summary').textContent,'目前已載入資料中，本週 1 人有缺席，影響 1 項未完成工作，其中 1 項本週到期。');
+assert.equal(doc.querySelector('.is-unknown .sr-only').textContent,'資料未提供');
