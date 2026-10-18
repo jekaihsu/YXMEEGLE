@@ -1,8 +1,9 @@
+import {PRODUCTION_NODE_KEYS} from './nodeAssignmentApi';
 import {api} from './api';
 import type {ItemsProgress, WorkItemStatus} from './nodeAssignmentApi';
 export const STAGE_KEYS = ['sales','pm','confirmation','field','control','mapping','report','billing','settlement'] as const;
 export type StageKey = typeof STAGE_KEYS[number];
-export type ProductionKey = 'field'|'control'|'mapping'|'report';
+export type ProductionKey = typeof PRODUCTION_NODE_KEYS[number];
 export type LinkBasis = 'native'|'derived'|'ambiguous'|'unlinked';
 export interface ProgressStage {key: StageKey; label: string; state: 'done'|'active'|'waiting'|'unknown'; basis: 'rule'|'source'|'none'; evidence: {label: string; value: string; tone: 'ok'|'warn'|'muted'}[]}
 export interface ProductionStage {
@@ -47,7 +48,7 @@ export function parseProjectProgress(value: unknown): ProjectProgress {
  if (!schema(value)) return fail();
  const data = value as ProjectProgress;
  if (data.stages.length !== STAGE_KEYS.length || data.stages.some((s,i) => s.key !== STAGE_KEYS[i])) return fail();
- for (const key of ['field','control','mapping','report'] as const) if (data.production[key].actual.known && data.production[key].actual.value === null) return fail();
+ for (const key of PRODUCTION_NODE_KEYS) if (data.production[key].actual.known && data.production[key].actual.value === null) return fail();
  return data;
 }
 export async function fetchProjectProgress(id: string, current: () => boolean) {

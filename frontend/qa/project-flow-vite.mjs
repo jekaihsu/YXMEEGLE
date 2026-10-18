@@ -22,6 +22,8 @@ function reset(){
   ]:[];
   n.tasks={done:payload.tasks.filter(t=>t.status==='已完成').length,total:payload.tasks.length};n.derived_status=['sales','pm','confirmation'].includes(n.key)?'已完成':n.key==='field'?'進行中':'未開始';n.next_due=payload.tasks.length?'2026-10-10':null;n.deadline=payload.tasks.length?'2026-10-20':null;
  }
+ if(state==='completed'){assignments.list.nodes.find(n=>n.key==='control').derived_status='已完成';assignments.list.nodes.find(n=>n.key==='mapping').derived_status='略過'}
+ for(const key of ['field','control'])assignments.list.nodes.find(n=>n.key===key).evidence={planned_qty:'12',lines:1,items:1,work_orders:0,latest_date:null,actual_known:false,actual_value:null,actual_source:null,reason:'實際完成量來源未連結',drives_status:false,progress:null,items_total:1,items_truncated:false,work_items:[{code:'X1',name:'現場控制點',planned_qty:'12',planned_points:null,remaining_points:null,status:'no_signal',link_basis:'native'}]};
  for(const n of base.project.nodes)n.tasks=n.key==='field'?[{id:'legacyTask',title:'合成本地核對任務',owner_id:base.user.id,status:'pending',required:true,start_date:null,due_date:'2026-10-23',original_due_date:null,started_at:null,completed_at:null,points:null,work_item_id:'',description:'合成本地流程',input:'',output:'',comments:[],revision:1}]:[];
  progress=structuredClone(sourceProgress);progress.project_id='p1';progress.production.field.planned.qty='187';progress.production.control.planned.qty='348';progress.production.field.actual={known:false,value:null,unit_note:null,source:null,reason:'實際完成量來源未連結。日報尚未指定所屬案件與合約工項。'};
 }

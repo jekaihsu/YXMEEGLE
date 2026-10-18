@@ -22,26 +22,28 @@ test('task basis excludes cancellation and superseded work and does not use opaq
  const n=flow.nodes.find(n=>n.key==='control');
  assert.deepEqual(n.tasks,{done:1,total:2});assert.deepEqual(n.progress,{basis:'tasks',percent:50,label:'Lark 任務完成度'});
  assert.equal(n.overdue,true);assert.equal(n.deadline,'2026-10-20');assert.equal(n.owners[0].name,'林安娜');
- assert.equal(flow.overall.percent,93);assert.equal(flow.overall.label,'Lark 任務完成度');
+ assert.equal(flow.overall.percent,null);assert.equal(flow.overall.label,'部分節點進度未知（略過不計）');
 });
 test('missing daily quantity remains unknown even with zero item counts and completed tasks',()=>{
  const {list}=assignmentFixture();const n=m.buildFlowModel({project:projectFixture().project,assignments:list,progress,today:'2026-10-21'}).nodes.find(n=>n.key==='field');
  assert.equal(n.quantity.actual,null);assert.equal(n.quantity.planned,'65');assert.match(n.quantity.reason,/未知|關聯|連結/);
- assert.equal(n.quantity.unit,null);assert.equal(n.progress.percent,100);assert.equal(n.progress.basis,'tasks');
+ assert.equal(n.quantity.unit,null);assert.equal(n.progress.percent,100);assert.equal(n.progress.basis,'nodes');
  const empty=structuredClone(list);empty.nodes.forEach(n=>n.tasks={done:0,total:0});
  const unknown=m.buildFlowModel({project:projectFixture().project,assignments:empty,progress,today:'2026-10-21'}).nodes.find(n=>n.key==='field');
- assert.deepEqual(unknown.progress,{basis:'unknown',percent:null,label:'進度未知'});
+ assert.deepEqual(unknown.progress,{basis:'nodes',percent:100,label:'節點已完成'});
+ empty.nodes.find(n=>n.key==='field').derived_status='進行中';
+ assert.deepEqual(m.buildFlowModel({project:projectFixture().project,assignments:empty,progress,today:'2026-10-21'}).nodes.find(n=>n.key==='field').progress,{basis:'unknown',percent:null,label:'進度未知'});
 });
 test('known quantities retain unit text without adding unlike quantities',()=>{
  const p=structuredClone(progress);p.production.field.actual={known:true,value:'12.50',unit_note:'公尺',source:'v4_daily',reason:null};
  const n=m.buildFlowModel({project:projectFixture().project,progress:p,today:'2026-10-21'}).nodes.find(n=>n.key==='field');
  assert.equal(n.quantity.actual,'12.50');assert.equal(n.quantity.unit,'公尺');assert.equal(n.quantity.planned,'65');
- assert.equal(n.progress.percent,null);
+ assert.equal(n.progress.percent,100);
 });
 test('legacy has one honest local-task number and source state never overwrites workflow authority',()=>{
  const project=projectFixture().project;project.nodes[3].tasks=[{id:'local1',status:'completed'},{id:'local2',status:'pending'},{id:'old',status:'superseded'}];
  const flow=m.buildFlowModel({project,progress,today:'2026-10-21'});
- assert.equal(flow.overall.percent,50);assert.equal(flow.overall.label,'本地流程任務完成度');assert.equal(flow.nodes[3].state,'已完成');
+ assert.equal(flow.overall.percent,null);assert.equal(flow.overall.label,'部分節點進度未知（略過不計）');assert.equal(flow.nodes[3].state,'已完成');
  assert.equal(m.buildFlowModel({project:{...project,nodes:[]},today:'2026-10-21'}).overall.percent,null);
 });
 test('task filters compose for mine, unassigned and overdue without hiding other source identities',()=>{
@@ -54,4 +56,22 @@ test('dispatch proposal uses stable case references and never treats the assignm
  assert.deepEqual(m.nodeDispatchProposal({project,node:{key:'field',label:'外業',departments:['外業組'],deadline:'2026-10-23'},parentTaskId:'recObligation'}),{
  project_ref:'project-native',case_ref:'recConfirmation',title:'南港基地測量與成果交付 · 外業',content:'',phase:'正式',kind:'execution',department:'外業組',parent_task_ref:'recObligation',deadline:'2026-10-23'
  });
+});
+
+test('round2 node state overrides task ratio and skipped nodes have no bar',()=>{
+ const {list}=assignmentFixture();list.nodes=list.nodes.filter(n=>['sales','field','control'].includes(n.key));
+ Object.assign(list.nodes.find(n=>n.key==='sales'),{derived_status:'已完成',tasks:{done:0,total:0}});
+ Object.assign(list.nodes.find(n=>n.key==='field'),{derived_status:'略過',tasks:{done:0,total:0}});
+ Object.assign(list.nodes.find(n=>n.key==='control'),{derived_status:'已完成',tasks:{done:1,total:3}});
+ const flow=m.buildFlowModel({project:projectFixture().project,assignments:list,today:'2026-10-21'});
+ assert.deepEqual(flow.nodes.find(n=>n.key==='sales').progress,{basis:'nodes',percent:100,label:'節點已完成'});
+ assert.deepEqual(flow.nodes.find(n=>n.key==='control').progress,{basis:'nodes',percent:100,label:'節點已完成'});
+ assert.deepEqual(flow.nodes.find(n=>n.key==='field').progress,{basis:'skipped',percent:null,label:'略過'});
+ assert.deepEqual(flow.overall,{basis:'nodes',percent:100,label:'節點完成度（略過不計）'});
+});
+
+test('round2 overall stays unknown when a counted node has unknown progress',()=>{
+ const {list}=assignmentFixture();list.nodes=list.nodes.filter(n=>['sales','control'].includes(n.key));list.nodes.find(n=>n.key==='control').tasks={done:0,total:0};
+ const flow=m.buildFlowModel({project:projectFixture().project,assignments:list,today:'2026-10-21'});
+ assert.deepEqual(flow.overall,{basis:'unknown',percent:null,label:'部分節點進度未知（略過不計）'});
 });

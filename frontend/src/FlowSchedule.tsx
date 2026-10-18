@@ -20,7 +20,7 @@ async function readParents(projectId:string,signal:AbortSignal){
  if(!signal.aborted && epoch===getSessionEpoch())parentCache.set(projectId,{rows:work.rows,at:Date.now()});
  return work.rows;
 }
-export function FlowSchedule({project,node,session,allowed,reason,onPublished}:{project:Project;node:FlowNode;session:Session;allowed:boolean;reason:string;onPublished:()=>void}){
+export function FlowSchedule({project,node,session,onPublished}:{project:Project;node:FlowNode;session:Session;onPublished:()=>void}){
  const [flow,setFlow]=useState<DispatchFlow>();
  const [parents,setParents]=useState<WorkRow[]>();
  const [loading,setLoading]=useState(false),[error,setError]=useState('');
@@ -38,7 +38,7 @@ export function FlowSchedule({project,node,session,allowed,reason,onPublished}:{
   finally{if(!request.signal.aborted)setLoading(false)}
  };
  if(!canWriteDispatch(session) || !productionKey(node.key))return null;
- return <><FlowAction allowed={allowed && !loading} reason={loading ? '正在讀取父義務。' : reason} onClick={()=>void load()}>{loading ? '讀取排班…' : '排班'}</FlowAction>
+ return <><FlowAction allowed={!loading} reason="正在讀取父義務。" onClick={()=>void load()}>{loading ? '讀取排班…' : '排班'}</FlowAction>
  {error && <p role="alert">{error}<Button onClick={()=>void load()}>重試排班來源</Button></p>}
  {parents && createPortal(<Sheet title="選擇排班的父義務" onClose={()=>{controller.current?.abort();setParents(undefined)}}><div className="pf-inspector">{parents.length ? parents.map(parent=><Button key={parent.task_id} onClick={()=>open(parent)}>{parent.title} · {parent.department}</Button>) : <><p>此節點尚無可核實的父義務，請先在派工工作流程建立義務，再回來排班。</p><Button onClick={()=>setParents(undefined)}>返回流程</Button></>}</div></Sheet>,document.body)}
  {flow && createPortal(<DispatchPublishDialog flow={flow} session={session} onClose={()=>setFlow(undefined)} onSaved={save} onPublished={()=>{parentCache.delete(project.id);onPublished()}}/>,document.body)}</>;

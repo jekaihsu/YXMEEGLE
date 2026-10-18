@@ -1,0 +1,141 @@
+▲ [WARNING] Import "NodeAssignments" will always be undefined because the file "src/NodeAssignments.css" has no exports [import-is-undefined]
+
+    <stdin>:1:110:
+      1 │ .../ProjectDetail'; export {NodeAssignments} from './src/NodeAssign...
+        ╵                             ~~~~~~~~~~~~~~~
+
+✔ home node and task targets preserve legacy identities (0.534ms)
+(node:99546) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ home deep link expands the real node and focuses the task without a legacy inspector (56.104375ms)
+✖ a task-only link discovers its node from authorized embedded tasks (28.258042ms)
+✔ unknown remote tasks have a readable scoped error (22.954625ms)
+Warning: React.createElement: type is invalid -- expected a string (for built-in components) or a class/function (for composite components) but got: undefined. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+Error: Uncaught [Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.]
+    at reportException (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/helpers/runtime-script-errors.js:66:24)
+    at innerInvokeEventListeners (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:353:9)
+    at invokeEventListeners (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:286:3)
+    at HTMLUnknownElementImpl._dispatch (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:233:9)
+    at HTMLUnknownElementImpl.dispatchEvent (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:104:17)
+    at HTMLUnknownElement.dispatchEvent (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js:241:34)
+    at Object.invokeGuardedCallbackDev (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:4213:16)
+    at invokeGuardedCallback (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:4277:31)
+    at beginWork$1 (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:27490:7)
+    at performUnitOfWork (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:26599:12) Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+    at createFiberFromTypeAndProps (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:28478:17)
+    at createFiberFromElement (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:28504:15)
+    at reconcileSingleElement (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:13986:23)
+    at reconcileChildFibers (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:14044:35)
+    at reconcileChildren (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:19193:28)
+    at updateHostRoot (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:19912:5)
+    at beginWork (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:21654:14)
+    at HTMLUnknownElement.callCallback (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserObjectsOperation (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/generated/EventListener.js:26:30)
+    at innerInvokeEventListeners (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:350:25)
+✖ zero Lark tasks remain separate from expandable local templates (1.701792ms)
+Warning: React.createElement: type is invalid -- expected a string (for built-in components) or a class/function (for composite components) but got: undefined. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+Error: Uncaught [Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.]
+    at reportException (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/helpers/runtime-script-errors.js:66:24)
+    at innerInvokeEventListeners (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:353:9)
+    at invokeEventListeners (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:286:3)
+    at HTMLUnknownElementImpl._dispatch (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:233:9)
+    at HTMLUnknownElementImpl.dispatchEvent (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:104:17)
+    at HTMLUnknownElement.dispatchEvent (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js:241:34)
+    at Object.invokeGuardedCallbackDev (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:4213:16)
+    at invokeGuardedCallback (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:4277:31)
+    at beginWork$1 (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:27490:7)
+    at performUnitOfWork (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:26599:12) Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+    at createFiberFromTypeAndProps (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:28478:17)
+    at createFiberFromElement (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:28504:15)
+    at reconcileSingleElement (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:13986:23)
+    at reconcileChildFibers (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:14044:35)
+    at reconcileChildren (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:19193:28)
+    at updateHostRoot (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:19912:5)
+    at beginWork (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:21654:14)
+    at HTMLUnknownElement.callCallback (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:4164:14)
+    at HTMLUnknownElement.callTheUserObjectsOperation (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/generated/EventListener.js:26:30)
+    at innerInvokeEventListeners (/Users/vc/Local/YXMEEGLE/frontend/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:350:25)
+✖ an unavailable remote link does not pretend to focus local workflow (0.340084ms)
+✖ opening logs does not read assignments before the flow tab is selected (13.12525ms)
+✔ disabled approval form has no creation controls or mutations (10.214917ms)
+✔ daily reports preserve business date crew and unknown points (14.18075ms)
+✔ literal date number and status sorts keep unknown values last (0.634833ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 5
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 149.747584
+
+✖ failing tests:
+
+test at test-ux-case-detail.mjs:46:1
+✖ home deep link expands the real node and focuses the task without a legacy inspector (56.104375ms)
+  TypeError: Cannot read properties of null (reading 'getAttribute')
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-ux-case-detail.mjs:50:74)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test-ux-case-detail.mjs:57:1
+✖ a task-only link discovers its node from authorized embedded tasks (28.258042ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  null !== 'recTask1'
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-ux-case-detail.mjs:61:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 'recTask1',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test-ux-case-detail.mjs:71:1
+✖ zero Lark tasks remain separate from expandable local templates (1.701792ms)
+  Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+      at createFiberFromTypeAndProps (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:28478:17)
+      at createFiberFromElement (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:28504:15)
+      at reconcileSingleElement (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:13986:23)
+      at reconcileChildFibers (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:14044:35)
+      at reconcileChildren (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:19193:28)
+      at updateHostRoot (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:19912:5)
+      at beginWork (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:21654:14)
+      at beginWork$1 (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:27465:14)
+      at performUnitOfWork (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:26599:12)
+      at workLoopSync (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:26505:5)
+
+test at test-ux-case-detail.mjs:83:1
+✖ an unavailable remote link does not pretend to focus local workflow (0.340084ms)
+  Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+      at createFiberFromTypeAndProps (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:28478:17)
+      at createFiberFromElement (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:28504:15)
+      at reconcileSingleElement (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:13986:23)
+      at reconcileChildFibers (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:14044:35)
+      at reconcileChildren (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:19193:28)
+      at updateHostRoot (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:19912:5)
+      at beginWork (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:21654:14)
+      at beginWork$1 (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:27465:14)
+      at performUnitOfWork (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:26599:12)
+      at workLoopSync (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react-dom/cjs/react-dom.development.js:26505:5)
+
+test at test-ux-case-detail.mjs:89:1
+✖ opening logs does not read assignments before the flow tab is selected (13.12525ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-ux-case-detail.mjs:94:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

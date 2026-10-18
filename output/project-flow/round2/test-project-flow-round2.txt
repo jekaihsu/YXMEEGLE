@@ -1,0 +1,14 @@
+PASS round2 local workflow stays available with assignments
+PASS round2 local flow list translates both pending and in-progress task statuses
+PASS round2 completed and skipped node mounted progress
+PASS round2 keyboard replaces history and never scrolls the selected panel
+PASS round2 one selected node for panel and local operations
+PASS round2 dispatch independent of node writes
+PASS round2 source timestamp and honest manager fallback
+PASS round2 overview goes to page header
+PASS round2 attention excludes manager-wide completion and unowned not-started nodes
+PASS round2 attention includes actual pending task, approval and owned not-started work
+PASS round2 manager resolved from loaded users and absent source distinguished
+PASS round2 background and file shortcut restored collapsed
+PASS round2 assignment readback wins over an in-flight stale detail and avoids refetch
+PASS round2 failed evidence retains node and offers retry in item sheet

@@ -22,7 +22,7 @@ export function TaskPersonPicker({detail,taskId,busy,error,mutate,onClose}:{deta
  const people=detail.assignable_people.filter(p=>!department || p.departments.includes(department));
  const valid=people.some(p=>p.open_id===person);
  if(!task)return null;
- return <form className="pf-task-picker" aria-label={`指派 ${task.title}`} onSubmit={event=>{event.preventDefault();if(!busy && task.can.assign && valid)void mutate({action:'update_task',nodeKey:detail.node.key,taskId:task.id,expected_revision:task.revision,patch:{assignee_open_id:person}}).then(ok=>{if(ok)onClose()})}}>
+ return <form className="pf-task-picker assignment-edit" aria-label={`指派 ${task.title}`} onSubmit={event=>{event.preventDefault();if(!busy && task.can.assign && valid)void mutate({action:'update_task',nodeKey:detail.node.key,taskId:task.id,expected_revision:task.revision,patch:{assignee_open_id:person}}).then(ok=>{if(ok)onClose()})}}>
   <p>指派既有任務 · {task.title}</p><small>僅列出來源已核實的此組在職人員。</small>
   <label>組別<select value={department} onChange={e=>{setDepartment(e.target.value);setPerson('')}} disabled={busy}>{detail.node.departments.map(d=><option key={d}>{d}</option>)}</select></label>
   <label>負責人<select aria-label="任務負責人" value={person} onChange={e=>setPerson(e.target.value)} disabled={busy}><option value="">選擇負責人</option>{people.map(p=><option key={p.open_id} value={p.open_id}>{p.name}</option>)}</select></label>

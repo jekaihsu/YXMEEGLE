@@ -5,12 +5,13 @@ import type {Project} from './types';
 import type {AssignmentMutation,NodeAssignmentDetail,NodeAssignmentError} from './nodeAssignmentApi';
 import {filterFlowTasks,overdueTask,type FlowNode} from './flowModel';
 import {FlowAction,TaskPersonPicker} from './FlowActions';
-import {TaskInspector} from './ProjectDetail';
+import {AssignmentTaskInspector} from './AssignmentTaskInspector';
 export function FlowTasks({c,p,nodes,selected,details,all,onScope,busy,reason,error,mutate,loading,incomplete}:{c:Ctx;p:Project;nodes:FlowNode[];selected:string;details:Record<string,NodeAssignmentDetail>;all:boolean;onScope:(all:boolean)=>void;busy:boolean;reason:string;error:NodeAssignmentError|null;mutate:(m:AssignmentMutation)=>Promise<boolean>;loading:boolean;incomplete:boolean}){
  const [filters,setFilters]=useState({mine:false,unassigned:false,overdue:false});
  const [assigning,setAssigning]=useState('');
  const rows=nodes.flatMap(n=>n.taskRows);
  const filtered=filterFlowTasks(rows,{...filters,node:all ? undefined : selected,userId:c.s.user?.id || '',today:c.w.as_of});
+ const localTask=p.nodes.some(n=>n.tasks.some(t=>t.id===c.route.task));
  const selectedRow=rows.find(r=>r.id===c.route.task && r.task);
  return <section id="flow-tasks" className="pf-tasks" aria-label="流程任務列表" tabIndex={-1}>
   <header><h3>任務</h3><div className="pf-actions" aria-label="任務範圍">{[false,true].map(value=><Button key={String(value)} aria-pressed={all===value} onClick={()=>onScope(value)}>{value ? '全部任務' : '此節點'}</Button>)}</div></header>
@@ -24,7 +25,7 @@ export function FlowTasks({c,p,nodes,selected,details,all,onScope,busy,reason,er
    {assigning===row.id && details[row.nodeKey] && <TaskPersonPicker key={row.id} taskId={row.id} detail={details[row.nodeKey]} busy={busy} error={error} mutate={mutate} onClose={()=>setAssigning('')}/>}
   </li>)}</ul>
   {!loading && !incomplete && !filtered.length && <p className="pf-empty">{rows.length ? '沒有符合篩選條件的任務。' : '尚無可見任務。新增具體工作後即可指派與追蹤。'}</p>}
-  {selectedRow?.task && <TaskInspector key={selectedRow.id} c={c} assignment={selectedRow.task} nodeLabel={nodes.find(n=>n.key===selectedRow.nodeKey)?.label || ''} busy={busy} reason={reason} mutate={m=>mutate(m)} nodeKey={selectedRow.nodeKey} onClose={()=>c.go({...c.route,task:undefined})}/>}
-  {c.route.task && !selectedRow && !loading && nodes.some(n=>n.assignment) && <p role="alert">找不到此 Lark 任務，可能已移除或不在可見範圍。</p>}
+  {selectedRow?.task && <AssignmentTaskInspector key={selectedRow.id} assignment={selectedRow.task} nodeLabel={nodes.find(n=>n.key===selectedRow.nodeKey)?.label || ''} busy={busy} reason={reason} mutate={m=>mutate(m)} nodeKey={selectedRow.nodeKey} onClose={()=>c.go({...c.route,task:undefined})}/>}
+  {c.route.task && !localTask && !selectedRow && !loading && nodes.some(n=>n.assignment) && <p role="alert">找不到此 Lark 任務，可能已移除或不在可見範圍。</p>}
  </section>;
 }

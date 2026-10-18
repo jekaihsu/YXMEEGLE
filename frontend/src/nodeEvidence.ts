@@ -1,3 +1,5 @@
+import {isProductionNode} from './nodeAssignmentApi';
+export {isProductionNode} from './nodeAssignmentApi';
 import {formatPlanQuantity} from './caseDetailView';
 import type {AssignmentNode, NodeEvidence, WorkItem, WorkItemStatus} from './nodeAssignmentApi';
 
@@ -6,9 +8,6 @@ export const SUBMIT_HINT_TEXT = '可送審';
 export const SUBMIT_HINT_TITLE = '所有工項依來源的營業額點數皆已完成，可送審';
 export const DRIVES_STATUS_TEXT = '依案件資料判定';
 export const OPTIONAL_TASKS_LABEL = '任務（選用）';
-const PRODUCTION_NODES = new Set(['field', 'control', 'mapping', 'report']);
-export const isProductionNode = (key: string) => PRODUCTION_NODES.has(key);
-
 const shortDate = (value: string) => value.length >= 10 ? `${value.slice(5, 7)}/${value.slice(8, 10)}` : value;
 
 export interface EvidenceLine {text: string; known: boolean; plan: string}
@@ -24,7 +23,7 @@ export function evidenceLine(e: NodeEvidence): EvidenceLine {
 }
 
 export const showsEvidence = (n: AssignmentNode) => isProductionNode(n.key) && !!n.evidence;
-export const progressHref = (projectId: string) => `#view=project&project=${encodeURIComponent(projectId)}&tab=progress`;
+export const progressHref = (projectId: string, nodeKey?: string) => `#view=project&project=${encodeURIComponent(projectId)}&tab=progress${nodeKey ? `&node=${encodeURIComponent(nodeKey)}` : ''}`;
 
 export const ITEM_STATUS_LABEL: Record<WorkItemStatus, string> = {done: '已完成', partial: '進行中', no_signal: '尚無進度資料'};
 export const UNCERTAIN_LINK_LABEL = '關聯待確認';

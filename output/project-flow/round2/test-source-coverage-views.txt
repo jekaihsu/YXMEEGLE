@@ -1,0 +1,1 @@
+Source coverage views: production Daily scope and case-only Documents metadata render correctly

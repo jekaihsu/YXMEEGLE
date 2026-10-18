@@ -2,6 +2,9 @@ import {api, ApiError} from './api';
 import {isPlainDecimal} from './caseDetailView';
 
 export const NODE_ASSIGNMENT_ORDER = ['sales', 'pm', 'confirmation', 'field', 'control', 'mapping', 'report', 'pricing', 'settlement'] as const;
+export const PRODUCTION_NODE_KEYS = ['field','control','mapping','report'] as const;
+export const FINISHED_NODE_STATES: readonly string[] = ['已完成','略過'];
+export const isProductionNode = (key: string): key is typeof PRODUCTION_NODE_KEYS[number] => PRODUCTION_NODE_KEYS.some(value => value === key);
 export type NodeAction = 'claim' | 'assign' | 'complete' | 'approve' | 'reject' | 'create_task';
 export type NodePermissions = Partial<Record<NodeAction, boolean>>;
 export interface AssignmentPerson {open_id: string; name: string; avatar_url?: string}

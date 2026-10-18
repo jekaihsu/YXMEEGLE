@@ -14,13 +14,13 @@ function syncEpoch() {
 export function prefetchNodeAssignmentDetail(projectId: string, nodeKey: string, expectedRevision?: string | null, force = false): Promise<NodeAssignmentDetail> {
   syncEpoch();
   const key = `${projectId}/${nodeKey}`, cached = details.get(key), pending = detailRequests.get(key);
-  if (pending) return pending;
+  if (pending && !force) return pending;
   if (!force && cached && Date.now() - cached.readAt < 60000 && (expectedRevision === undefined || cached.data.node.revision === expectedRevision)) return Promise.resolve(cached.data);
   const epoch = getSessionEpoch();
   const request = fetchNodeAssignmentDetail(projectId, nodeKey, new AbortController().signal, () => epoch === getSessionEpoch()).then(data => {
     if (epoch === getSessionEpoch() && detailRequests.get(key) === request) details.set(key, {data, readAt: Date.now()});
     return data;
-  }).catch(error => {if (epoch === getSessionEpoch()) details.delete(key); throw error}).finally(() => {if (detailRequests.get(key) === request) detailRequests.delete(key)});
+  }).catch(error => {if (epoch === getSessionEpoch() && detailRequests.get(key) === request) details.delete(key); throw error}).finally(() => {if (detailRequests.get(key) === request) detailRequests.delete(key)});
   detailRequests.set(key, request);
   return request;
 }
@@ -84,7 +84,7 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
     return () => {controller.abort(); listRequest.current++};
   }, [reload]);
   useEffect(() => {
-    const refresh = () => {if (enabled && document.visibilityState !== 'hidden' && !refreshing && !mutating.current && !getPendingMutations() && !document.activeElement?.closest('.node-assignments')) void reload(true)};
+    const refresh = () => {if (enabled && document.visibilityState !== 'hidden' && !refreshing && !mutating.current && !getPendingMutations() && !document.activeElement?.closest('.assignment-edit input,.assignment-edit select,.assignment-edit textarea')) void reload(true)};
     const timer = window.setInterval(refresh, 60000);
     document.addEventListener('visibilitychange', refresh);
     return () => {window.clearInterval(timer); document.removeEventListener('visibilitychange', refresh)};
@@ -110,7 +110,7 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
         lists.set(projectId, data);
         return {kind: 'ready', data};
       });
-      setNotice('已儲存變更。'); void reload(); return true;
+      setNotice('已儲存變更。'); return true;
     } catch (failure) {
       const uncertain = !(failure instanceof NodeAssignmentError) || failure.status === 408 || failure.code === 'client_timeout' || failure.code === 'outcome_unknown' || failure.code === 'readback_mismatch' || failure.code === 'busy' || (failure.status >= 500 && !['lark_unconfigured', 'writes_disabled', 'disabled'].includes(failure.code || ''));
       if (!uncertain) retryAttempt.current = null;

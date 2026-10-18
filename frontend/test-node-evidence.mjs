@@ -154,7 +154,7 @@ test('clicking a work item opens its detail and Escape closes it', async () => {
   assert.equal(sheet.getAttribute('aria-label'), '工項明細 · C1-1 導線測量');
   const text = sheet.textContent;
   for (const expected of [/工項編號C1-1/, /工項名稱導線測量/, /所屬節點外業/, /計畫數量50/, /狀態進行中/, /完成度60%/, /營業額點數（計畫）100/, /已完成點數60/, /剩餘點數40/, /Lark 原生關聯/]) assert.match(text, expected);
-  assert.equal(sheet.querySelector('a.na-evidence-link').getAttribute('href'), '#view=project&project=p1&tab=progress');
+  assert.equal(sheet.querySelector('a.na-evidence-link').getAttribute('href'), '#view=project&project=p1&tab=progress&node=field');
   await act(async () => document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})));
   assert.equal(document.querySelector('[role=dialog]'), null);
   await click(document.querySelectorAll('.na-wi-row')[1]);

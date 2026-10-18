@@ -1,3 +1,5 @@
+import {STATUS,NODE_NAMES} from './workflowLabels';
+export {STATUS,NODE_NAMES} from './workflowLabels';
 import {taipeiTime} from './taipeiTime';
 import {Badge as DsBadge,Skeleton,DisabledAction} from './design';
 import {useEffect, useState, type MouseEvent, type ReactNode} from 'react';
@@ -15,8 +17,6 @@ export type Ctx={w:Workspace;s:Session;busy:boolean;error:string;registerDrafts:
 export type ProjectPage={total:number;offset:number;limit:number;facets:{all:number;formal:number;intake:number};items:Project[]};
 export type ProjectSlice={scope:'project';version:number;project:Project;[key:string]:any};
 export type TaskRow={p:Project;n:Node;t:Task};
-export const STATUS:Record<string,string>={approved_skipped:'核准跳過',engineering_complete:'工程完成、財務待結',internal:'內部案',source_conflict:'來源待核對',pending:'尚未開始',in_progress:'進行中',completed:'已完成',paused:'暫停中',superseded:'舊版留存',rework:'退回修正',draft:'草稿',approved:'已核准',executed:'已套用',rejected:'已駁回',withdrawn:'已撤回',active:'進行中',ongoing:'進行中'};
-export const NODE_NAMES:Record<string,string>={sales:'業務',pm:'PM',confirmation:'確認單',field:'外業',control:'控制',mapping:'圖資',report:'報告',pricing:'計價',settlement:'結算'};
 export const SOURCE_KINDS:Record<string,string>={quote:'報價資料',quote_confirmation:'報價確認單',daily:'日報紀錄',case:'案件資料',work:'工作單',confirmation:'工程確認單',contract:'合約明細',reporting:'填報工項',cost:'成本單'};
 export const ACTION_NAMES:Record<string,string>={node_skip_create:'建立節點跳過草稿',node_skip_submit:'送出節點跳過審批',node_skip_vote:'確認節點跳過申請',node_skip_apply:'套用核准跳過',node_skip_withdraw:'撤回節點跳過申請',task_start:'開始作業',task_complete:'完成任務並交付成果',task_return:'退回任務修正',task_update:'更新任務指派與排程',task_add:'新增任務',node_complete:'送交節點確認',participants_update:'更新案件參與人員',comment_add:'新增評論',file_link:'加入檔案連結',approval_create:'建立審批草稿',approval_submit:'送出審批',approval_confirm:'完成審批確認',approval_lark:'更新示範審批結果',approval_execute:'套用已核准的調整',approval_withdraw:'撤回申請',change_resume:'恢復受影響工項',calendar_update:'更新工作日設定',demo_reset:'還原示範工作區'};
 export const eventMessage=(e:{action?:string;message?:string})=>e.message&&e.message!==e.action?e.message:ACTION_NAMES[e.action||'']||e.action||'更新紀錄';

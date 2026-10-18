@@ -1,7 +1,7 @@
 import {createPortal} from 'react-dom';
 import {useState} from 'react';
 import {ArrowRight, ChevronRight} from 'lucide-react';
-import {Row, Section, Sheet} from './design';
+import {Button, Row, Section, Sheet} from './design';
 import {formatPlanQuantity} from './caseDetailView';
 import type {AssignmentNode, WorkItem} from './nodeAssignmentApi';
 import {SUBMIT_HINT_TEXT, SUBMIT_HINT_TITLE, evidenceLine, itemLabel, itemProgress, itemStatusLabel, itemsTruncatedNote, linkBasisText, progressHref, progressLine} from './nodeEvidence';
@@ -16,7 +16,7 @@ function ItemBar({item, empty = '尚無進度資料'}: {item: WorkItem; empty?: 
     : <span className="na-muted">{empty}</span>;
 }
 
-function ItemSheet({item, node, projectId, onClose}: {item: WorkItem; node: AssignmentNode; projectId: string; onClose: () => void}) {
+function ItemSheet({item, node, projectId, onRetryEvidence, onClose}: {item: WorkItem; node: AssignmentNode; projectId: string; onRetryEvidence?:()=>void; onClose: () => void}) {
   const p = itemProgress(item);
   return createPortal(<Sheet title={`工項明細 · ${title(item)}`} onClose={onClose}><div className="na-wi-sheet">
     <Section title="基本資料"><Row label="工項編號" value={item.code ?? '來源未提供'}/>
@@ -29,11 +29,11 @@ function ItemSheet({item, node, projectId, onClose}: {item: WorkItem; node: Assi
       <Row label="已完成點數" value={p ? points(p.earned) : '尚無進度資料'}/>
       <Row label="剩餘點數" value={item.remaining_points === null ? '來源未提供' : formatPlanQuantity(item.remaining_points)}/></Section>
     <Section title="資料來源"><Row label="關聯依據" value={linkBasisText(item)}/></Section>
-    <a className="na-evidence-link" href={progressHref(projectId)}>到工程進度看完整證據 <ArrowRight size={12} aria-hidden="true"/></a>
+    <a className="na-evidence-link" href={progressHref(projectId,node.key)} onClick={onClose}>查看此節點證據 <ArrowRight size={12} aria-hidden="true"/></a>{onRetryEvidence && <Button onClick={()=>{onClose();onRetryEvidence()}}>重試工程證據</Button>}
   </div></Sheet>,document.body);
 }
 
-export function NodeWorkItems({node, projectId}: {node: AssignmentNode; projectId: string}) {
+export function NodeWorkItems({node, projectId, onRetryEvidence}: {node: AssignmentNode; projectId: string; onRetryEvidence?:()=>void}) {
   const evidence = node.evidence, [open, setOpen] = useState<number | null>(null);
   if (!evidence) return null;
   const line = evidenceLine(evidence), progress = progressLine(evidence), items = evidence.work_items;
@@ -52,6 +52,6 @@ export function NodeWorkItems({node, projectId}: {node: AssignmentNode; projectI
       </button></li>)}
     </ul> : <p className="na-empty">此節點尚無對應的合約工項。</p>}
     {evidence.items_truncated && <p className="na-muted">{itemsTruncatedNote(evidence)}</p>}
-    {open !== null && items[open] && <ItemSheet item={items[open]} node={node} projectId={projectId} onClose={() => setOpen(null)}/>}
+    {open !== null && items[open] && <ItemSheet item={items[open]} node={node} projectId={projectId} onRetryEvidence={onRetryEvidence} onClose={() => setOpen(null)}/>}
   </section>;
 }

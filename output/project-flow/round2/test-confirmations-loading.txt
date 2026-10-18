@@ -1,0 +1,2 @@
+PASS pending confirmations render loading without malformed-body fallback
+PASS completed backend snapshot renders six rows, counts and last-success time
