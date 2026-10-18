@@ -1499,6 +1499,9 @@ def create_app(overrides=None):
     app.state.node_assignment=register_node_assignment(app,identity=identity,load_case=node_assignment_case,sessions=sessions,
         receipt_model=Receipt,audit_model=AuditRow,cfg=cfg,skipped_nodes=valid_waiver,reports=node_reports,
         reports_visible=lambda user: user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+    from .dispatch_board.routes import register as register_dispatch_board
+    app.state.dispatch_board=register_dispatch_board(app,identity=identity,cfg=cfg,
+        allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'))
     from .home_panels import register as register_home_panels
     app.state.home_panels=register_home_panels(app,identity=identity,load=load,sessions=sessions,workspace_model=WorkspaceRow,nodes=app.state.node_assignment)
     from .native_poller import NativeApprovalPoller
