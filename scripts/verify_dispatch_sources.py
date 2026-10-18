@@ -31,12 +31,25 @@ def fields_in(payload):
     raise ValueError('field-list output must contain a field array')
 
 
+CLI_TYPE_CODES = {'text': 1, 'number': 2, 'select': 3, 'datetime': 5, 'checkbox': 7, 'user': 11, 'link': 18}
+
+
+def normalized(field):
+    """Accept REST field metadata and the lark-cli shape (name/id/string type)."""
+    if not isinstance(field, dict):
+        return field
+    kind = field.get('type')
+    return {'field_name': field.get('field_name', field.get('name')),
+            'field_id': field.get('field_id', field.get('id')),
+            'type': CLI_TYPE_CODES.get(kind, kind)}
+
+
 def verify(snapshot):
     if not isinstance(snapshot, dict):
         raise ValueError('snapshot must map table IDs to field-list outputs')
     results = []
     for key, table in TABLES.items():
-        fields = fields_in(snapshot[table.table_id]) if table.table_id in snapshot else []
+        fields = [normalized(f) for f in fields_in(snapshot[table.table_id])] if table.table_id in snapshot else []
         if any(not isinstance(field, dict) or not isinstance(field.get('field_name'), str) for field in fields):
             raise ValueError('invalid field metadata')
         actual = {field['field_name']: field for field in fields}
@@ -68,7 +81,7 @@ def main(argv=None):
                 command = [args.cli]
                 if args.profile:
                     command += ['--profile', args.profile]
-                command += ['base', '+field-list', '--base-token', base, '--table-id', table.table_id, '--as', 'bot', '--json']
+                command += ['base', '+field-list', '--base-token', base, '--table-id', table.table_id, '--json']
                 result = subprocess.run(command, capture_output=True, text=True, check=True, timeout=60)
                 snapshot[table.table_id] = json.loads(result.stdout)
         results = verify(snapshot)
