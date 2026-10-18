@@ -173,3 +173,4 @@
 }
 
 .unified-home .home-attendance .is-unknown{color:var(--label-3)}
+.unified-home .home-personal:not([open]){align-self:start}
