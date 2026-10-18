@@ -456,3 +456,78 @@ def test_manifest_unusable_or_incomplete_snapshot_cannot_claim_verified(tmp_path
     path.write_text(json.dumps(payload))
     assert verify_main(['--snapshot', str(path)]) == 2
     assert capsys.readouterr().err == 'Cannot verify dispatch sources (ValueError).\n'
+
+
+def test_group_filter_keeps_cross_group_overlap_and_full_capacity():
+    board = build_board(source([work('recA', 車輛=['recVehicle']),
+                                work('recB', 組別='其他組', 車輛=['recVehicle'])]),
+                        Window(WINDOW.start, WINDOW.end, '水深A組'))
+    assert board['kpi'] == {'slots': 1, 'unassigned': 0, 'unknown_overlap': 1, 'conflict': 0}
+    assert board['slots'][0]['issues'] == ['v4:tblZz6Mkhv9gHrB2:recB']
+    assert board['slots'][0]['resources'][0]['feasibility'] == 'unknown'
+    assert board['slots'][0]['resources'][1]['reasons'] == ['inactive', 'same_day_other_slot']
+    assert board['capacity']['people'][0]['days']['2026-07-27'] == {'booked_slots': 2, 'state': 'overbooked_unknown'}
+
+
+@pytest.mark.parametrize('start,end', [('2026-07-27T00:00:00+08:00', '2026-07-27T11:00:00+08:00'),
+                                       ('2026-07-27T23:00:00+08:00', '2026-07-28T00:00:00+08:00')])
+def test_either_midnight_bound_cannot_prove_conflict(start, end):
+    board = build_board(source([work('recA', start, end),
+                                work('recB', '2026-07-27T10:00:00+08:00', '2026-07-27T23:30:00+08:00')]), WINDOW)
+    assert board['kpi'] == {'slots': 2, 'unassigned': 0, 'unknown_overlap': 2, 'conflict': 0}
+    assert board['slots'][0]['interval']['precision'] == 'date'
+    assert board['capacity']['people'][0]['days']['2026-07-28']['booked_slots'] == 0
+
+
+def test_omitted_checkboxes_are_inactive_without_partial_join():
+    data = source([work('recA', 車輛=['recVehicle'])])
+    for key, field in [('people', '在職'), ('instruments', '啟用'), ('vehicles', '啟用')]:
+        for item in getattr(data, key):
+            item['fields'].pop(field, None)
+    board = build_board(data, WINDOW)
+    assert board['source']['joins'] == {'people': 'ok', 'instruments': 'ok', 'vehicles': 'ok', 'cases': 'ok'}
+    assert board['slots'][0]['crew'][0]['active'] is False
+    assert [r['feasibility'] for r in board['slots'][0]['resources']] == ['unavailable', 'unavailable']
+    data.people[0]['fields'].pop('姓名')
+    assert build_board(data, WINDOW)['source']['joins']['people'] == 'partial'
+    assert build_board(BoardInput(data.schedule, [], [], [], [], AT), WINDOW)['slots'][0]['crew'][0]['active'] is None
+
+
+def test_join_refresh_is_visible_on_next_request():
+    now = [100.0]
+    reader = FakeReader()
+    service = DispatchBoardService({}, reader=reader, clock=lambda: now[0])
+    try:
+        service.board('company', WINDOW)
+        for flight in list(service._joins.values()):
+            flight.future.result(timeout=1)
+        service.board('company', WINDOW)
+        now[0] = 161.0
+        reader.rows['people'][0]['fields']['姓名'] = '更新人員'
+        service.board('company', WINDOW)
+        for flight in list(service._joins.values()):
+            flight.future.result(timeout=1)
+        for future in list(service.cache._flights.values()):
+            future.result(timeout=1)
+        assert service.board('company', WINDOW)[1]['slots'][0]['crew'][0]['name'] == '更新人員'
+    finally:
+        service.close()
+
+
+def test_people_permission_failure_preserves_schedule_last_good():
+    reader = FakeReader()
+    service = DispatchBoardService({}, reader=reader)
+    try:
+        assert service._read('company', 'schedule')[0].value[0]['record_id'] == 'recGood'
+        reader.errors['people'] = ReadBlocked('people denied')
+        service._load_join('company', 'people')
+        reader.errors['schedule'] = ReadFailure('schedule down')
+        assert service._read('company', 'schedule')[0].value[0]['record_id'] == 'recGood'
+        assert reader.calls == ['schedule', 'people']
+    finally:
+        service.close()
+
+
+def test_readme_defines_unassigned_as_no_crew_only():
+    readme = (Path(__file__).parent / 'dispatch_board/README.md').read_text()
+    assert 'A work slot is unassigned when it has no crew.' in readme
