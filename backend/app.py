@@ -567,6 +567,8 @@ def create_app(overrides=None):
                 and cfg.get('LARK_WORKER_IDENTITY') == 'application'
                 and cfg.get('LARK_APP_ID') and cfg.get('LARK_APP_SECRET')):
             flags['node_assignment'] = True
+        from .dispatch_board.config import DispatchBoardConfig
+        if DispatchBoardConfig.from_env(cfg).enabled: flags['dispatch_board'] = True
         return {'features': flags} if flags else {}
 
     @app.get('/api/session')

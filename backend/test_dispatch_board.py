@@ -287,7 +287,8 @@ def test_real_app_flag_absent_default_and_enabled_auth(tmp_path):
     app = create_app({**cfg, 'DISPATCH_BOARD_ENABLED': 'true'})
     client = TestClient(app)
     assert client.get(URL).status_code == 401
-    client.get('/api/session')
+    assert client.get('/api/session').json()['features']['dispatch_board'] is True
+    assert 'dispatch_board' not in TestClient(create_app(cfg)).get('/api/session').json().get('features', {})
     response = client.get(URL)
     assert response.status_code == 403
     assert response.json()['source']['quality'] == {'states': ['forbidden']}
