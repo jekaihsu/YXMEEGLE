@@ -20,7 +20,7 @@ export function createPublishMock(){
   if(state==='flag_off'){send({detail:'未開放'},404);return true}
   if(['forbidden','http_forbidden'].includes(state)){send({detail:'合成權限不足'},403);return true}
   if(state==='http_failed'){send({detail:'合成讀取失敗'},500);return true}
-  let body={};if(req.method==='POST'){let raw='';for await(const chunk of req)raw+=chunk;body=JSON.parse(raw||'{}')}
+  let body={};if(['POST','PUT'].includes(req.method)){let raw='';for await(const chunk of req)raw+=chunk;body=JSON.parse(raw||'{}')}
   const path=url.pathname;
   if(path==='/api/v2/dispatch/work'){
    const work=syntheticWork(state,url.searchParams.get('from'));
@@ -28,16 +28,21 @@ export function createPublishMock(){
    if(!previews.has(id))previews.set(id,{preview_id:id,preview_hash:'synthetic-existing-work-hash',expires_at:new Date(Date.now()+900000).toISOString(),proposal:{task_id:row.task_id,title:row.title,content:row.content,project_ref:row.project_id,case_ref:row.case.ref,phase:row.phase,kind:row.kind,package_id:row.package_id,parent_task_ref:row.parent_task_ref,primary_owner:row.owner.person_ref,crew:row.crew.map(p=>p.person_ref),start:row.interval.start,end:row.interval.end,est_person_hours:row.est_person_hours,instruments:row.instruments.map(r=>r.ref),vehicles:row.vehicles.map(r=>r.ref),department:row.department,deadline:row.deadline},source_vector:{schedule:{fetched_at:stamp()},tasks:{fetched_at:stamp()},schema_version:1},feasibility:[{kind:'person',ref:user.id,label:user.name,state:'feasible',reasons:[]}],required_seats:[{seat:'group_leader_confirmed',holder:people[1],status:'accepted',actor:people[1].person_ref,reason:''},{seat:'manager_review',holder:people[0],status:'pending',actor:'',reason:''},{seat:'pm_final',holder:people[2],status:'pending',actor:'',reason:''}],can_commit:false,conflicts:[],warnings:[],blockers:['approvals_required']});
    work.rows[0].preview_id=id;send(work);return true;
   }
-  if(path==='/api/v2/dispatch/drafts'){
-   if(req.method==='POST'){drafts.set(body.draft_id,{...body,saved_at:stamp()});send(drafts.get(body.draft_id))}else send({drafts:[...drafts.values()]});return true;
+  if(path==='/api/v2/dispatch/options'){send({people:people.map(p=>({...p,active:true,has_lark_account:true})),instruments:[{ref:'synthetic-instrument',label:'合成 測深儀',feasibility:'feasible'}],vehicles:[{ref:'synthetic-vehicle',label:'合成 工務車',feasibility:'feasible'}],cases:[base.case],departments:['外業組'],seats:[],joins:{people:'ok',accounts:'ok',instruments:'ok',vehicles:'ok',cases:'ok'}});return true}
+  if(path.startsWith('/api/v2/dispatch/tasks/')){send({row:base,proposal:{...base,task_id:path.split('/').at(-1),project_ref:base.project_id,case_ref:base.case.ref,primary_owner:base.owner.person_ref,crew:base.crew.map(p=>p.person_ref),start:base.interval.start,end:base.interval.end,instruments:base.instruments.map(r=>r.ref),vehicles:base.vehicles.map(r=>r.ref)},system:{revision:base.revision,scope_version:base.scope_version},unmapped_people:[]});return true}
+  if(path==='/api/v2/dispatch/drafts'){send({drafts:[...drafts.values()]});return true}
+  if(path.startsWith('/api/v2/dispatch/drafts/')){
+   const id=path.split('/').at(-1);
+   if(req.method==='PUT'){const old=drafts.get(id);if(old&&body.version!==old.version){send({detail:'草稿已更新',code:'version_conflict'},409);return true}drafts.set(id,{id,proposal:body.proposal,version:(old?.version??0)+1,updated_at:Date.now()/1000});send(drafts.get(id))}
+   else if(req.method==='DELETE'){drafts.delete(id);send({deleted:id})}else send(drafts.get(id)??{detail:'草稿不存在'},drafts.has(id)?200:404);return true;
   }
-  if(path.includes('/drafts/')&&path.endsWith('/cancel')){drafts.delete(path.split('/').at(-2));send({cancelled:true});return true}
   if(path==='/api/v2/dispatch/previews'){
    const hash=createHash('sha256').update(JSON.stringify(body)).digest('hex');
    if(hashes.has(hash)){send(previews.get(hashes.get(hash)));return true}
    const id=`synthetic-preview-${++serial}`,blocked=state==='blocked_unknown';
    const checks=[...body.crew.map(ref=>({kind:'person',ref,label:people.find(p=>p.person_ref===ref)?.name||'合成人員'})),...body.instruments.map(ref=>({kind:'instrument',ref,label:'合成 測深儀'})),...body.vehicles.map(ref=>({kind:'vehicle',ref,label:'合成 工務車'}))];
-   const preview={preview_id:id,preview_hash:hash,expires_at:new Date(Date.now()+900000).toISOString(),proposal:body,source_vector:{schedule:{fetched_at:stamp()},tasks:{fetched_at:stamp()},schema_version:1},feasibility:checks.map(c=>({...c,state:blocked?'unknown':'feasible',reasons:blocked?['no_capability_source','no_leave_source']:[]})),conflicts:[],warnings:[],required_seats:[{seat:'group_leader_confirmed',holder:people[1],status:'accepted',actor:people[1].person_ref,reason:''},{seat:'manager_review',holder:people[2],status:'accepted',actor:people[2].person_ref,reason:''},{seat:'pm_final',holder:people[0],status:'pending',actor:'',reason:''}],can_commit:false,blockers:blocked?['unknown_feasibility']:['approvals_required']};
+   const hours=(Date.parse(body.end)-Date.parse(body.start))/3600000;
+   const preview={hours,booked_person_hours:hours*new Set(body.crew).size,preview_id:id,preview_hash:hash,expires_at:new Date(Date.now()+900000).toISOString(),proposal:body,source_vector:{schedule:{fetched_at:stamp()},tasks:{fetched_at:stamp()},schema_version:1},feasibility:checks.map(c=>({...c,state:blocked?'unknown':'feasible',reasons:blocked?['no_capability_source','no_leave_source']:[]})),conflicts:[],warnings:[],required_seats:[{seat:'group_leader_confirmed',holder:people[1],status:'accepted',actor:people[1].person_ref,reason:''},{seat:'manager_review',holder:people[2],status:'accepted',actor:people[2].person_ref,reason:''},{seat:'pm_final',holder:people[0],status:'pending',actor:'',reason:''}],can_commit:false,blockers:blocked?['unknown_feasibility']:['approvals_required']};
    previews.set(id,preview);hashes.set(hash,id);send(preview);return true;
   }
   if(path.includes('/previews/')){

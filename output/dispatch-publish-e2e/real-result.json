@@ -1,0 +1,13 @@
+{
+  "checks": [
+    "PM work queue shows progress, needs_me and assignment actions.",
+    "Full form saves a versioned draft, previews 8 person-hours, blocks unknown and records kind:ref verification reasons.",
+    "Three distinct seat holders approve through the UI. Publication confirms task recTask0001; work detail exposes all 21 extension fields.",
+    "Reassignment prefills from /tasks, changes crew and interval, obtains three new decisions and updates the same task to revision 2.",
+    "Two approved proposals for the same task compete. The second publish returns 409 preview_stale and the UI retains the draft.",
+    "timeout_after_success returns 202 and 結果不明. A manager follows next_action to reconcile the same command to 已確認. Exactly one v4_task row carries that command."
+  ],
+  "taskId": "recTask0001",
+  "title": "整合驗證 港區全欄位派工",
+  "errors": []
+}
