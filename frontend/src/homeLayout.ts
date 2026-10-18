@@ -1,3 +1,5 @@
+import {canReadDispatch} from './dispatchAccess';
+import type {Session} from './types';
 import {REPORT_CARDS,canReadHomeReports,isReportCard} from './homeReportCards';
 export const HOME_VIEWS={mine:{label:'我的工作'},assign:{label:'分配工作'},company:{label:'全公司'}} as const;
 export type HomeViewId=keyof typeof HOME_VIEWS;
@@ -8,6 +10,7 @@ type CardDefinition={section:HomeSectionId|null;title:string;description:string;
 const reportCards=Object.fromEntries(Object.entries(REPORT_CARDS).map(([id,card])=>[id,{...card,views:['company'],kind:'chart'}])) as {[K in keyof typeof REPORT_CARDS]:typeof REPORT_CARDS[K]&{views:['company'];kind:'chart'}};
 export const HOME_CARDS={
  ...reportCards,
+ dispatch:{section:'todo',title:'派工看板',description:'本週待派與重疊預排，保留來源缺口',views:['mine','assign','company'],kind:'table'},
  kpi:{section:null,title:'工作摘要',description:'目前視圖的重點數字',views:['mine', 'assign', 'company'],kind:'kpi'},
  work:{section:'todo',title:'我的工作',description:'依急迫程度排序的工作與期限',views:['mine', 'assign'],kind:'table'},
  confirmation:{section:'todo',title:'待我確認',description:'需要你覆核或確認的事項',views:['mine', 'company'],kind:'table'},
@@ -28,9 +31,9 @@ export type HomeCardId=keyof typeof HOME_CARDS;
 export type HomeLayout={order:HomeCardId[];hidden:HomeCardId[]};
 export type HomeSettings={version:2;view:HomeViewId|null;layouts:Record<HomeViewId,HomeLayout>};
 export const DEFAULT_LAYOUT:Record<HomeViewId,HomeLayout>={
- mine:{order:['kpi','work','confirmation','deadlines','leave','trips'],hidden:[]},
- assign:{order:['kpi','allocation','workload','delegated','absence','impact','work'],hidden:[]},
- company:{order:['kpi','attention','confirmation','cases','qualityTrend','qualityGroups','funnel','receivables','achievement','statuses','groups','instruments','vehicles','leave','trips','absence','links'],hidden:[]},
+ mine:{order:['kpi','work','confirmation','deadlines','leave','trips','dispatch'],hidden:[]},
+ assign:{order:['kpi','allocation','workload','delegated','absence','impact','work','dispatch'],hidden:[]},
+ company:{order:['kpi','attention','confirmation','cases','qualityTrend','qualityGroups','funnel','receivables','achievement','statuses','groups','instruments','vehicles','leave','trips','absence','links','dispatch'],hidden:[]},
 };
 type PersonaUser={role?:string|null;department?:string|null}|null|undefined;
 const companyPersona=(user:PersonaUser)=>!!user&&(user.role==='pm'||user.role==='manager'||/專案|PM|業務|管理/i.test(user.department||''));
@@ -76,6 +79,6 @@ export function homeSections(view:HomeViewId,layout:HomeLayout){
  return SECTION_ORDER[view].map(id=>({id,...HOME_SECTIONS[id],cards:layout.order.filter(card=>HOME_CARDS[card].section===id&&!layout.hidden.includes(card)).sort((a,b)=>Number(b==='attention')-Number(a==='attention'))})).filter(section=>section.cards.length);
 }
 
-export function availableCardIds(view:HomeViewId,user:PersonaUser,reportsState:{unavailable:boolean}):HomeCardId[]{
- return DEFAULT_LAYOUT[view].order.filter(id=>!isReportCard(id)||canReadHomeReports(user?.role)&&!reportsState.unavailable);
+export function availableCardIds(view:HomeViewId,user:PersonaUser,reportsState:{unavailable:boolean},session?:Session):HomeCardId[]{
+ return DEFAULT_LAYOUT[view].order.filter(id=>id==='dispatch'?canReadDispatch(session):!isReportCard(id)||canReadHomeReports(user?.role)&&!reportsState.unavailable);
 }

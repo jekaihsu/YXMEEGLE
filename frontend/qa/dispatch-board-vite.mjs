@@ -15,7 +15,7 @@ const server=await createServer({root,configFile:false,plugins:[react(),{
    if(req.method==='POST'){let body='';for await(const chunk of req)body+=chunk;const next=JSON.parse(body);state=next.state;delay=next.delay??0}
    return send({state,delay,label:fixture.label});
   }
-  if(url.pathname==='/api/session')return send({workspace_id:'dispatch-fixture',user,users:[user],mode:'demo',environment:'test',auth_configured:false,features:{workspace_shell:true,dispatch_board:state!=='flag_off',node_assignment:false}});
+  if(url.pathname==='/api/session')return send({workspace_id:'dispatch-fixture',user,users:[user],mode:'lark',environment:'test',auth_configured:false,features:{workspace_shell:true,dispatch_board:state!=='flag_off',node_assignment:false}});
   if(url.pathname==='/api/workspace')return send({scope:'shell',workspace_id:'dispatch-fixture',version:1,as_of:'2026-10-18T02:00:00Z',users:[user],projects:[],approvals:[],events:[],calendar:{holidays:[],workdays:[]},source_status:{status:'ready',last_sync:'2026-10-18T02:00:00Z',message:fixture.label}});
   if(url.pathname==='/api/v2/dispatch/board'){
    const requestedState=state;
@@ -31,6 +31,11 @@ const server=await createServer({root,configFile:false,plugins:[react(),{
    if(body.slots.length&&to>body.source.latest_booking_date)body.source.latest_booking_date=to;
    return send(body);
   }
+  if(url.pathname==='/api/company-dashboard')return send({as_of:'2026-10-18T02:00:00Z',source:{status:'ready'},complete:true,totals:{execution_status_counts:{},tasks_overdue:0,pending_local_reviews:0,pending_native_reviews:0},groups:[],cases:[]});
+  if(url.pathname==='/api/reports/home')return send({detail:'此合成驗證未提供週報權限'},403);
+  if(url.pathname.includes('attendance'))return send({status:'not-connected'});
+  if(url.pathname==='/api/projects')return send({items:[{id:'synthetic-project-c001',code:'示例 C001',name:'合成測量案件'}],total:1});
+  if(url.pathname==='/api/home-panels')return send({panel:url.searchParams.get('panel')||'assigned',scope:url.searchParams.get('scope')||'mine',readState:'ready',snapshot_version:'synthetic-1',as_of:'2026-10-18T02:00:00Z',freshness:{status:'fresh',last_success_at:'2026-10-18T02:00:00Z',refreshing:false},counts:{node_assignments:0,tasks:0,local_workflow:0,complete:true},items:[],next_cursor:null,has_more:false,complete:true,total_count:0,manager_view_available:true});
   if(url.pathname.startsWith('/api/'))return send({detail:'此合成驗證未提供該端點'},404);
   next();
  })}

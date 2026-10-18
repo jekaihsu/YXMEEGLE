@@ -6,6 +6,7 @@ import {useViewData} from './viewData';
 import {useDialogFocus} from './useDialogFocus';
 import {taipeiTime} from './taipeiTime';
 import {addDays,boardDisplay,dispatchReason,dispatchWeek,feasibilityLabels,parseDispatchBoard,personDayGrid,slotTitle,slotsByGroup,slotsPerDay,snapshotAge,unassignedQueue,weekDays,type DispatchBoardData,type DispatchSlot,type Feasibility} from './dispatchBoardModel';
+import {dispatchCaseHref,parseDispatchProjects,type DispatchProject} from './dispatchLinks';
 import './DispatchBoard.css';
 
 const kinds={work:'出工',leave:'休假',standby:'待命',support:'支援',unknown:'類型待確認'};
@@ -15,10 +16,22 @@ function SlotCard({slot,onOpen}:{slot:DispatchSlot;onOpen:(slot:DispatchSlot)=>v
  const warning=[...slot.crew,...slot.resources].find(p=>p.feasibility==='conflict'||p.feasibility==='unavailable');
  return <button className="db-slot" onClick={()=>onOpen(slot)} aria-label={`查看 ${slotTitle(slot)} 派工明細，${slot.crew.length?slot.crew.map(p=>p.name||'姓名待確認').join('、'):'尚未安排人員'}，${planning[slot.planning_status]}${warning||slot.crew.some(p=>p.reasons.includes('same_day_other_slot'))?'，':''}${warning?feasibilityLabels[warning.feasibility]:slot.crew.some(p=>p.reasons.includes('same_day_other_slot'))?'同日重疊待確認':''}`}><strong>{slotTitle(slot)}</strong><span>{slot.work_content||kinds[slot.kind]}</span><small>{slot.interval.precision==='datetime'&&slot.interval.start?new Date(slot.interval.start).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}):'僅日期，時段待確認'}</small><span className="db-crew">{slot.crew.length?slot.crew.map(p=>p.name||'姓名待確認').join('、'):'尚未安排人員'}</span><span>{warning?<FeasibilityBadge value={warning.feasibility}/>:<Badge>{slot.crew.some(p=>p.reasons.includes('same_day_other_slot'))?'同日重疊待確認':planning[slot.planning_status]}</Badge>}</span></button>;
 }
-function SlotDetail({slot,slots,onOpen,onClose}:{slot:DispatchSlot;slots:DispatchSlot[];onOpen:(slot:DispatchSlot)=>void;onClose:()=>void}) {
+function SlotDetail({slot,slots,onOpen,onClose,projects}:{projects:DispatchProject[];slot:DispatchSlot;slots:DispatchSlot[];onOpen:(slot:DispatchSlot)=>void;onClose:()=>void}) {
  const ref=useDialogFocus(onClose);
+ const localHref=dispatchCaseHref(slot.case,projects);
+ const query=[...new Set([slot.case.code,slot.case.name].filter((value):value is string=>!!value?.trim()))];
+ const resolution=useViewData(`dispatch-case:${getSessionEpoch()}:${JSON.stringify(slot.case)}`,async(signal,current)=>{
+  if(localHref||!query.length)return [];
+  const pages=await Promise.all(query.map(q=>api<unknown>(`/api/projects?${new URLSearchParams({view:'overview',tab:'all',q,limit:'100',offset:'0'})}`,{signal,cache:'no-store'},current)));
+  const parsed=pages.map(parseDispatchProjects);
+  if(parsed.some(page=>page===null))return [];
+  const found=parsed.flatMap(page=>page??[]);
+  return [...new Map(found.map(project=>[project.id,project])).values()];
+ });
+ const caseHref=localHref||dispatchCaseHref(slot.case,resolution.data??[]);
  return <div className="db-scrim" onClick={onClose}><section className="db-drawer glass--card" ref={ref} role="dialog" aria-modal="true" aria-labelledby="dispatch-detail-title" tabIndex={-1} onClick={e=>e.stopPropagation()}>
  <header><div><Eyebrow>預排明細 · 唯讀</Eyebrow><h2 id="dispatch-detail-title">{slotTitle(slot)}</h2></div><Button aria-label="關閉派工明細" onClick={onClose}><X size={18}/></Button></header>
+ <p>{caseHref?<a href={caseHref}>開啟案件 {slot.case.code||slot.case.name}</a>:<span>案件連結未能解析</span>}</p>
  <p>{slot.work_content||'工作內容待確認'}</p><p className="db-muted">{slot.group||'組別待確認'} · {slot.discipline||'作業別待確認'} · {kinds[slot.kind]}</p>
  <p>{slot.interval.start?(slot.interval.precision==='datetime'?taipeiTime(slot.interval.start):slot.interval.start):'開始日期待確認'} ～ {slot.interval.end?(slot.interval.precision==='datetime'?taipeiTime(slot.interval.end):slot.interval.end):'結束日期待確認'}</p>
  <p><Badge>{planning[slot.planning_status]}</Badge></p><p className="db-muted">已預排代表 V4 已有紀錄，尚未由此工作台發布或確認回讀。</p>
@@ -30,7 +43,7 @@ function SlotDetail({slot,slots,onOpen,onClose}:{slot:DispatchSlot;slots:Dispatc
  </section></div>;
 }
 export type DispatchRead = {data?:DispatchBoardData;loading:boolean;error:string;reload:()=>void};
-export function DispatchBoardFrame({from,read,onWeek}:{from:string;read:DispatchRead;onWeek:(day:string)=>void}) {
+export function DispatchBoardFrame({from,read,onWeek,projects=[]}:{from:string;read:DispatchRead;onWeek:(day:string)=>void;projects?:DispatchProject[]}) {
  const [selectedId,setSelectedId]=useState(''),[mode,setMode]=useState<'group'|'person'>('group');
  const [now,setNow]=useState(Date.now);
  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(timer)},[]);
@@ -59,11 +72,10 @@ export function DispatchBoardFrame({from,read,onWeek}:{from:string;read:Dispatch
  }}><strong>{d.day.slice(5)}</strong><p>{d.booked_slots?`${d.booked_slots} 筆預排`:'無預排，出勤待確認'}</p>{d.slots.map(s=><SlotCard key={s.slot_id} slot={s} onOpen={s=>setSelectedId(s.slot_id)}/>)}</div>)}</div></section>):<p>人員資料尚未提供。</p>}{board&&!personDayGrid(board,days).length&&<p>本週沒有可核實的人員預排。</p>}</div>}
  </section>
  <section className="db-gaps glass--card"><h2>資料缺口</h2>{hidden?<p>權限不足，無法顯示來源資訊。</p>:skeleton?<Skeleton lines={2}/>:<><p className="db-muted">最後預排日期 · {board?.source.latest_booking_date??'來源未提供'}</p><ul><li>沒有能力與資格來源，所有資格檢核均待確認。</li>{board?.gaps.filter(g=>g.code!=='no_capability_source').map((g,i)=><li key={i}>{g.message}</li>)}{board&&Object.values(board.source.joins).some(s=>s!=='ok')&&<li>部分人員、案件或資源名稱尚未載入，暫以待確認顯示。</li>}{slots.some(s=>!s.interval.start||!s.interval.end)&&<li>部分預排缺少有效日期，保留於摘要與待派清單，無法放入日期格。</li>}</ul></>}</section>
- {selected&&!hidden&&<SlotDetail slot={selected} slots={slots} onOpen={s=>setSelectedId(s.slot_id)} onClose={()=>setSelectedId('')}/>}
+ {selected&&!hidden&&<SlotDetail projects={projects} slot={selected} slots={slots} onOpen={s=>setSelectedId(s.slot_id)} onClose={()=>setSelectedId('')}/>}
  </div>;
 }
-export function DispatchBoard() {
- const [from,setFrom]=useState(dispatchWeek);
+export function useDispatchBoardRead(from:string,reloadVersion=0) {
  const query=new URLSearchParams({from,to:addDays(from,6)});
  const key=`dispatch:${getSessionEpoch()}:${query}`;
  const read=useViewData(key,async(signal,current)=>{
@@ -73,7 +85,7 @@ export function DispatchBoard() {
   const board=parseDispatchBoard(raw);
   if(board.window.from!==from||board.window.to!==addDays(from,6))throw new Error('回應週次與目前查詢不符，請重試。');
   return board;
- });
+ },[reloadVersion]);
  const refreshes=useRef({key,started:Date.now()});
  useEffect(()=>{
   if(refreshes.current.key!==key)refreshes.current={key,started:Date.now()};
@@ -84,5 +96,10 @@ export function DispatchBoard() {
   const timer=setTimeout(()=>{if(epoch===getSessionEpoch()&&Date.now()-refreshes.current.started<30000)read.reload()},1500);
   return()=>clearTimeout(timer);
  },[key,read.data,read.loading,read.error,read.reload]);
- return <DispatchBoardFrame key={key} from={from} read={read} onWeek={setFrom}/>;
+ return read;
+}
+export function DispatchBoard({projects=[]}:{projects?:DispatchProject[]}) {
+ const [from,setFrom]=useState(dispatchWeek);
+ const read=useDispatchBoardRead(from);
+ return <DispatchBoardFrame key={`${getSessionEpoch()}:${from}`} from={from} read={read} onWeek={setFrom} projects={projects}/>;
 }

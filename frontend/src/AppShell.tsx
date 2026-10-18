@@ -1,3 +1,4 @@
+import {canReadDispatch} from './dispatchAccess';
 import { CalendarDays, ChevronRight, Loader2, Menu, TriangleAlert, X } from 'lucide-react';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { BarChart3, ClipboardList, FileBarChart, Clock3, FolderOpen, Gauge, GitBranch, LayoutDashboard, ListTodo, PanelLeftClose, Settings2 } from 'lucide-react';
@@ -30,7 +31,7 @@ export function AppShell({s,w,route,error,setError,callbackError,mobile,setMobil
   window.scrollTo({top:0,left:0,behavior:'instant'});
  },[route.view,route.project,route.tab,route.section,ready]);
  const navigationRef=useDialogFocus(()=>setMobile(false),mobile);
- const dispatchVisible=s.features?.dispatch_board===true&&(s.user?.role==='pm'||s.user?.role==='manager')&&s.mode==='lark'&&!!s.workspace_id&&!s.workspace_id.startsWith('test-')&&!s.workspace_id.startsWith('demo-');
+ const dispatchVisible=canReadDispatch(s);
  const visibleNav=NAV.filter(n=>(n.view!=='dispatch'||dispatchVisible)&&(n.view!=='approvals'||s.features?.change_extension===true)&&(n.view!=='routines'||s.features?.routines===true)&&(n.view!=='reports'||s.user?.role==='pm'||s.user?.role==='manager'));
  const tabs=visibleNav.filter(n=>['dashboard','projects','work','approvals'].includes(n.view));
  return <div className={`app-shell ${compact?'sidebar-compact':''}`}>
