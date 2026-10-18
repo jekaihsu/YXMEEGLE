@@ -65,3 +65,20 @@ Dispatch board gets a 「排班」 flow per unassigned slot or a new task: step 
 ## Out of scope
 
 Capability and equipment verification records (C01-C03), replanning and cancel (C08), external calendar and Lark messages, SOP default task templates, delivery and review flows.
+
+## Addendum A (owner direction 2026-10-18): the whole flow must work in the web app
+
+The PM must be able to, inside the web app: see job progress, see what needs their verification, assign or reassign work to others, and fill the detail of an assignment (people, job title, content, vehicles, instruments, times, case, package) using the 21 V4 task fields. Nothing here may need Lark's own UI.
+
+### PM work queue (read model, projection only)
+
+`GET /api/v2/dispatch/work?from=&to=&group=&scope=mine|group|all` (flag `DISPATCH_WRITE_ENABLED` or `DISPATCH_BOARD_ENABLED`, role pm/manager). Rows come from V4 任務 (all fields incl. the 21) joined to 節點指派 for the nine-node position, plus slice-2 commands. Each row: `task_id` (V4 record id), `title`, `content`, `case` (code/name or unresolved), `project_id`, `package_id`, `kind` (obligation|execution), `phase`, `status` (待處理/進行中/已完成/取消), `planning_status`, `acceptance_status`, `owner`, `crew`, `interval` (precision date|datetime), `instruments`, `vehicles`, `deadline`, `est_person_hours`, `revision`, `command` (id and state when one exists), `source` (v4_task), `needs_me`: list of reasons the current user must act: `approve_seat:<seat>`, `confirm_assignment` (unassigned work they own), `reconcile_command`, `review_returned`, `verify_unknown:<ref>`; and `allowed_actions`: `assign`, `reassign`, `edit_detail`, `approve`, `return`, `reconcile`, `cancel_draft`.
+Grouped response: `progress` (counts by status and planning_status over the same rows), `needs_me` (the rows where needs_me is non-empty, same objects), `rows`. Counts are computed from the listed rows. Unknown stays unknown; a read failure keeps last-good with `stale`, never a zero.
+
+### Assign / reassign form (maps to the 21 fields)
+
+Form fields and their V4 field: title -> 標題, content -> 內容, case -> 工程確認單 (+ 專案編號), phase -> 任務階段, kind -> 任務種類, package -> 工作包編號, parent obligation -> 父義務, owner -> 負責人, crew -> 組員 (owner included once), start/end -> 預定開始/預定結束, est hours -> 預估人時, instruments -> 使用儀器, vehicles -> 使用車輛, department -> 部門, deadline -> 截止日, scope/rule/evidence versions -> 範圍版本/規則版本/證據版本 (system-set, shown read-only), planning status -> 排程狀態 (system-set), revision -> 排程版本 (system-set), command id -> 命令編號 (system-set), read-back time -> 讀回時間 (system-set), acceptance -> 成果接受狀態/接受摘要 (read-only here). Reassign = new proposal against the same task_id with the same obligation; it goes through preview and approval seats again and bumps 排程版本; the old reservations release only after the new revision reads back. Editing detail without changing people/time/resources is an update command with the same safeguards.
+
+### Draft save
+
+Proposals can be saved as draft (planning_status 草稿) without reservations; drafts are workbench-DB rows only until a commit creates/updates the V4 task. A draft never occupies capacity.
