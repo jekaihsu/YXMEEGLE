@@ -8,7 +8,7 @@ export function reportWeek(week:string){const end=new Date(week+'T00:00:00Z');if
 function cappedNotes(coverage:string[],gaps:Gap[]){
  const messages=gaps.map(g=>g.message);
  if(coverage.length+messages.length<=2)return [...coverage,...messages];
- const fixed=coverage.length>1?[coverage.join('；')]:coverage;
+ const fixed=coverage.length>1?[coverage.join('；').replaceAll('。；','。 ')]:coverage;
  const shown=messages.slice(0,1-fixed.length);
  return [...fixed,...shown,`另有 ${messages.length-shown.length} 項資料缺口，詳見 PM 週報`];
 }
@@ -68,4 +68,4 @@ function assets(r:HomeReport,kind:'instrument'|'vehicle'):ReportInsight{
 }
 const insights:Record<ReportCardId,(r:HomeReport)=>ReportInsight>={attention:r=>({available:true,sentence:'追蹤報告週檢核、請款與資源事項',notes:['各項依週報來源；缺少資料以 — 顯示。'],bars:attentionTiles(r).map(t=>bar(t.label,null,t.value))}),qualityTrend,qualityGroups,funnel,receivables,achievement,instruments:r=>assets(r,'instrument'),vehicles:r=>assets(r,'vehicle')};
 export const reportInsight=(r:HomeReport,id:ReportCardId)=>insights[id](r);
-export function copySummary(r:HomeReport){return [`PM 週報 · ${reportWeek(r.week)}`,...Object.entries(REPORT_CARDS).map(([id,card])=>{const insight=reportInsight(r,id as ReportCardId);return `${card.title}：${insight.sentence}${id==='attention'?'。'+attentionTiles(r).map(t=>`${t.label} ${t.value}`).join('；'):''}\n${insight.notes.join('；')}`}),...(r.meta.stale||r.meta.refresh_error?['週報資料為舊快照']:[])].join('\n')}
+export function copySummary(r:HomeReport){return [`PM 週報 · ${reportWeek(r.week)}`,...Object.entries(REPORT_CARDS).map(([id,card])=>{const insight=reportInsight(r,id as ReportCardId);return `${card.title}：${insight.sentence}${id==='attention'?'。'+attentionTiles(r).map(t=>`${t.label} ${t.value}`).join('；'):''}\n${insight.notes.join('\n')}`}),...(r.meta.stale||r.meta.refresh_error?['週報資料為舊快照']:[])].join('\n')}

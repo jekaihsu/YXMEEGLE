@@ -59,17 +59,19 @@ const gapMessages=['第一項缺口','第二項缺口','第三項缺口'].map((m
 for(const [gaps,expected] of [[[],['僅涵蓋週報已納入的案件與金額。']],[[gapMessages[0]],['第一項缺口']],[gapMessages,['第一項缺口','另有 2 項資料缺口，詳見 PM 週報']]]){
  const report={...r,sales:{...r.sales,by_status:[],gaps}};
  equal(m.reportInsight(report,'funnel').notes,expected);
- equal(m.copySummary(report).split('合約 → 請款 → 入帳：')[1].split('\n')[1],expected.join('；'));
+ equal(m.copySummary(report).split('合約 → 請款 → 入帳：')[1].split('\n')[1],expected[0]);
 }
 const withGaps={...r,progress:{...r.progress,gaps:gapMessages},assets:{instrument:{...r.assets.instrument,gaps:[{id:'instrument-category',severity:'warn',message:'儀器專屬缺口'}]},vehicle:{...r.assets.vehicle,gaps:[]}}};
 equal(m.reportInsight(withGaps,'achievement').notes,['依預排天數；未預排工作 6 天','另有 3 項資料缺口，詳見 PM 週報']);
 equal(m.reportInsight(withGaps,'instruments').notes,['依週報資源狀態統計。','儀器專屬缺口']);
 equal(m.reportInsight(withGaps,'vehicles').notes,['依週報資源狀態統計。']);
 equal(m.reportInsight(r,'instruments').notes,['依週報資源狀態統計。','月租型儀器與車輛的檢查紀錄：來源尚未建立']);
-equal(m.reportInsight({...withGaps,assets:{...withGaps.assets,instrument:{...r.assets.instrument,gaps:[...r.assets.instrument.gaps,...gapMessages]}}},'instruments').notes,['依週報資源狀態統計。；月租型儀器與車輛的檢查紀錄：來源尚未建立','另有 3 項資料缺口，詳見 PM 週報']);
+equal(m.reportInsight({...withGaps,assets:{...withGaps.assets,instrument:{...r.assets.instrument,gaps:[...r.assets.instrument.gaps,...gapMessages]}}},'instruments').notes,['依週報資源狀態統計。 月租型儀器與車輛的檢查紀錄：來源尚未建立','另有 3 項資料缺口，詳見 PM 週報']);
 console.log(`Home reports: ${checks} literal parser, insight and summary checks passed.`);
 const partial=homeReportFixture();
 partial.sales.gaps=[{id:'sales-應收未收',severity:'warn',message:'部分應收'},{id:'sales-可請款未請',severity:'warn',message:'部分請款'}];
 partial.assets.instrument.gaps=[{id:'instrument-狀態',severity:'warn',message:'部分狀態'}];
 equal(m.attentionTiles(partial).map(t=>[t.label,t.value,t.note]),[['外業已退回 · 待複查','47',''],['可請款未請','NT$ 3.2M','僅部分案件有值，非完整總額'],['應收未收','NT$ 8.1M','僅部分案件有值，非完整總額'],['儀器送修','7','部分儀器狀態未填，數量可能偏低']]);
 equal(m.reportInsight(partial,'instruments').sentence,'共 148 項，使用中 100 項，閒置 41 項，送修 7 項。部分儀器狀態未填，數量可能偏低');
+
+equal(m.copySummary(r).split('儀器：')[1].split('車輛：')[0],'共 148 項，使用中 100 項，閒置 41 項，送修 7 項\n依週報資源狀態統計。\n月租型儀器與車輛的檢查紀錄：來源尚未建立\n');
