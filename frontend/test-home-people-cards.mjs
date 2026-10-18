@@ -50,3 +50,13 @@ assert.equal(doc.querySelector('.home-people-summary').textContent,'本週 2 人
 const weekend={...team,body:{...team.body,items:[['sat','2026-10-17'],['sun','2026-10-18'],['next','2026-10-19']].map(([id,deadline])=>({id,deadline,assignees:[{id:'a'}],status:'in_progress'}))}};
 doc=render({team:weekend});
 assert.equal(doc.querySelector('.home-people-summary').textContent,'本週 1 人有缺席，影響 3 項未完成工作，其中 2 項本週到期。');
+const departed={...view.people[0],id:'departed',name:'已離職人員',in_service:false};
+for(const scope of ['assign','company']){
+ doc=render({scope,view:{...view,people:[...view.people,departed],leaves:[...view.leaves,{person_id:'departed',start:'2026-10-12',end:'2026-10-16'}]}});
+ assert.equal(doc.querySelector('.home-people-summary').textContent,scope==='assign'?'本週 1 人有缺席，影響 1 項未完成工作，其中 1 項本週到期。':'本週 2 人有缺席。');
+ assert.equal([...doc.querySelectorAll('th[scope="row"]')].map(el=>el.textContent).join(','),scope==='assign'?'組員甲':'組員甲,其他組乙');
+ assert.equal([...doc.querySelectorAll('.home-source-note')].map(el=>el.textContent).join(','),'出勤資料截至 2026/10/14 09:00:00 (台北時間)');
+}
+doc=render({id:'impact',view:{...view,people:[...view.people,departed],leaves:[...view.leaves,{person_id:'departed',start:'2026-10-12',end:'2026-10-16'}]},team:{...team,body:{...team.body,items:[...team.body.items,{id:'departed-task',assignees:[{id:'departed'}],status:'in_progress'}]}}});
+assert.deepEqual([...doc.querySelectorAll('.home-impact-row')].map(el=>el.textContent),['組員甲缺席 2 天（10/12、10/13） · 未完成 1 · 本週到期 1 · 逾期 0重新分配']);
+console.log('PASS 7 departed-person rendered roster, certainty and impact assertions');

@@ -14,9 +14,9 @@ export function absenceCell(view:PeopleAttendance,person:AttendancePerson,day:st
  return cell?.trim()||view.leaves_available===true&&view.summary.on_trip!==null?'在':'—';
 }
 export function scopedAttendance(view:PeopleAttendance,scope:'assign'|'company',department:string|null|undefined){
- const group=department?.trim();
- if(scope==='assign'&&(!group||!view.people.some(person=>person.group===group)))return {known:false,people:[]};
- return {known:true,people:view.people.filter(person=>scope==='company'||person.group===group)};
+ const group=department?.trim(),people=view.people.filter(person=>person.in_service!==false);
+ if(scope==='assign'&&(!group||!people.some(person=>person.group===group)))return {known:false,people:[]};
+ return {known:true,people:people.filter(person=>scope==='company'||person.group===group)};
 }
 export function weeklyPeople(view:PeopleAttendance,people:AttendancePerson[],today:string){
  const days=weekDays(today);

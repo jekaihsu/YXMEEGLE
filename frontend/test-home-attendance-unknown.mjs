@@ -31,3 +31,10 @@ assert.equal(m.absenceCell({...view,leaves:[{person_id:'a',start:'2026-10-19',en
 assert.equal(m.absenceCell({...view,leaves:[{person_id:'a',start:days[0],end:days[0]}]},person,days[0]),'請假');
 assert.equal(m.absenceCell({...view,trips:[{person_id:'a',kind:'trip',start:days[0],end:days[0]}]},person,days[0]),'出差');
 console.log('PASS 24 attendance matrix cells and 5 precedence/day/approval assertions');
+const roster=[{...person,id:'departed',group:'team',in_service:false},{...person,id:'active',group:'team'},{...person,id:'unknown',group:'team',in_service:null}];
+assert.deepEqual(m.scopedAttendance({...view,people:roster},'assign','team').people.map(p=>p.id),['active','unknown']);
+assert.deepEqual(m.scopedAttendance({...view,people:roster},'company',null).people.map(p=>p.id),['active','unknown']);
+assert.deepEqual(m.scopedAttendance({...view,people:[roster[0]]},'assign','team'),{known:false,people:[]});
+assert.equal(m.absenceCell({...view,leaves_available:true,summary:{on_trip:0}},roster[2],days[0]),'在');
+assert.equal(m.absenceCell(view,roster[2],days[0]),'—');
+console.log('PASS 5 active-roster and unknown-service assertions');
