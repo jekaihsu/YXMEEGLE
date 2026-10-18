@@ -8,7 +8,7 @@ import {parseHomeReport} from './homeReports';
 export type HomeReportsRead={data?:HomeReport;loading:boolean;error:string;unavailable:boolean};
 const denied=new Set<string>();
 export function useHomeReports(c:Ctx,view:HomeViewId,ids:HomeCardId[]):HomeReportsRead{
- const identity=JSON.stringify([getSessionEpoch(),c.s.workspace_id,c.s.user]);
+ const identity=JSON.stringify([getSessionEpoch(),c.s.workspace_id,c.s.mode,c.s.user?.id,c.s.user?.role]);
  const enabled=view==='company'&&canReadHomeReports(c.s.user?.role)&&ids.some(isReportCard);
  const token=JSON.stringify([identity,c.reloadVersion]);
  const sequence=useRef(0),completed=useRef('');

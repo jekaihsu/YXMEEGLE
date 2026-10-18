@@ -40,4 +40,8 @@ assert.deepEqual(m.SECTION_ORDER.company,['todo','quality','business','progress'
 assert.equal(m.HOME_CARDS.cases.section,'todo');
 const oldOrder=['kpi','groups','cases','statuses','links','confirmation','leave','trips','absence'];
 assert.deepEqual(m.parseHomeLayout(JSON.stringify({version:2,layouts:{company:{order:oldOrder,hidden:['cases']}}})).layouts.company,{order:[...oldOrder,'attention','qualityTrend','qualityGroups','funnel','receivables','achievement','instruments','vehicles'],hidden:['cases']});
-console.log('Home reports layout: 3 literal section order, cases placement and old v2 migration checks passed.');
+const pinned={order:['confirmation','cases','attention'],hidden:[]};
+assert.deepEqual(m.homeSections('company',pinned)[0].cards,['attention','confirmation','cases']);
+assert.deepEqual(m.moveHomeCard(pinned,'attention',-1),pinned);
+assert.deepEqual(m.moveHomeCard(pinned,'confirmation',1).order,['cases','confirmation','attention']);
+console.log('Home reports layout: 6 literal section order, cases placement and old v2 migration checks passed.');

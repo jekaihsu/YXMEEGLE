@@ -57,7 +57,8 @@ export function parseHomeLayout(raw:string|null):HomeSettings{
  }catch{return fallback}
 }
 export function moveHomeCard(layout:HomeLayout,id:HomeCardId,direction:-1|1):HomeLayout{
- const order=[...layout.order],index=order.indexOf(id),siblings=order.filter(card=>HOME_CARDS[card].section===HOME_CARDS[id].section),neighbour=siblings[siblings.indexOf(id)+direction];
+ if(id==='attention')return layout;
+ const order=[...layout.order],index=order.indexOf(id),siblings=order.filter(card=>card!=='attention'&&HOME_CARDS[card].section===HOME_CARDS[id].section),neighbour=siblings[siblings.indexOf(id)+direction];
  if(index<0||!neighbour)return layout;
  const next=order.indexOf(neighbour);
  [order[index],order[next]]=[order[next],order[index]];
@@ -72,5 +73,5 @@ export function deadlineLabel(deadline:string|null|undefined):string {
 }
 
 export function homeSections(view:HomeViewId,layout:HomeLayout){
- return SECTION_ORDER[view].map(id=>({id,...HOME_SECTIONS[id],cards:layout.order.filter(card=>HOME_CARDS[card].section===id&&!layout.hidden.includes(card))})).filter(section=>section.cards.length);
+ return SECTION_ORDER[view].map(id=>({id,...HOME_SECTIONS[id],cards:layout.order.filter(card=>HOME_CARDS[card].section===id&&!layout.hidden.includes(card)).sort((a,b)=>Number(b==='attention')-Number(a==='attention'))})).filter(section=>section.cards.length);
 }

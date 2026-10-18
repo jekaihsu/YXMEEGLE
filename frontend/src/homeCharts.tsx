@@ -28,7 +28,7 @@ export function StatusChart({counts}:{counts:Record<string,number>}){
 }
 
 export function ReportBars({rows,label}:{rows:import('./homeReportInsights').ReportBar[];label:string}){
- const max=Math.max(1,...rows.flatMap(row=>row.value===null?[]:[row.value]));
+ const max=Math.max(0,...rows.flatMap(row=>row.value===null?[]:[row.value]))||1;
  return <figure className="home-chart home-report-bars" aria-label={label}>{rows.map((row,index)=><div className={`home-chart-row${row.muted?' is-muted':''}`} key={index}><span>{row.label}</span><strong>{row.display}</strong><div className="home-bar" aria-hidden="true">{row.value!==null&&<i style={{width:`${Math.max(0,row.value/max*100)}%`}}/>}</div></div>)}{!rows.length&&<figcaption>目前沒有可比較的資料。</figcaption>}</figure>;
 }
 export function ReportTrend({data}:{data:import('./reports/types').Review['trend']}){
