@@ -4,17 +4,14 @@ import type {HomeItem} from './useHomePanels';
 export const weekDays=(today:string)=>Array.from({length:5},(_,index)=>new Date(Date.parse(taipeiWeek(today)+'T00:00:00Z')+index*86400000).toISOString().slice(0,10));
 export function absenceCell(view:PeopleAttendance,person:AttendancePerson,day:string):'在'|'請假'|'出差'|'—'{
  if(person.in_service===false)return '—';
- if(view.leaves.some(row=>row.person_id===person.id&&row.start<=day&&row.end>=day))return '請假';
- if(view.trips.some(row=>row.person_id===person.id&&row.kind==='trip'&&row.start<=day&&row.end>=day))return '出差';
  const index=view.days.indexOf(day);
  if(index<0)return '—';
- if(view.leaves_available!==true){
-  const cell=person.attendance[index];
-  if(cell?.includes('請假'))return '請假';
-  if(cell?.includes('出差'))return '出差';
-  if(!cell?.trim())return '—';
- }
- return '在';
+ const cell=person.attendance[index];
+ if(cell?.includes('請假'))return '請假';
+ if(cell?.includes('出差'))return '出差';
+ if(view.leaves.some(row=>row.person_id===person.id&&row.start<=day&&row.end>=day))return '請假';
+ if(view.trips.some(row=>row.person_id===person.id&&row.kind==='trip'&&row.start<=day&&row.end>=day))return '出差';
+ return cell?.trim()||view.leaves_available===true&&view.summary.on_trip!==null?'在':'—';
 }
 export function scopedAttendance(view:PeopleAttendance,scope:'assign'|'company',department:string|null|undefined){
  const group=department?.trim();
