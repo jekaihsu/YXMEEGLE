@@ -1,3 +1,4 @@
+import {createPortal} from 'react-dom';
 import {useState} from 'react';
 import {ArrowRight, ChevronRight} from 'lucide-react';
 import {Row, Section, Sheet} from './design';
@@ -17,7 +18,7 @@ function ItemBar({item, empty = '尚無進度資料'}: {item: WorkItem; empty?: 
 
 function ItemSheet({item, node, projectId, onClose}: {item: WorkItem; node: AssignmentNode; projectId: string; onClose: () => void}) {
   const p = itemProgress(item);
-  return <Sheet title={`工項明細 · ${title(item)}`} onClose={onClose}><div className="na-wi-sheet">
+  return createPortal(<Sheet title={`工項明細 · ${title(item)}`} onClose={onClose}><div className="na-wi-sheet">
     <Section title="基本資料"><Row label="工項編號" value={item.code ?? '來源未提供'}/>
       <Row label="工項名稱" value={item.name ?? '來源未提供'}/>
       <Row label="所屬節點" value={node.label}/>
@@ -29,7 +30,7 @@ function ItemSheet({item, node, projectId, onClose}: {item: WorkItem; node: Assi
       <Row label="剩餘點數" value={item.remaining_points === null ? '來源未提供' : formatPlanQuantity(item.remaining_points)}/></Section>
     <Section title="資料來源"><Row label="關聯依據" value={linkBasisText(item)}/></Section>
     <a className="na-evidence-link" href={progressHref(projectId)}>到工程進度看完整證據 <ArrowRight size={12} aria-hidden="true"/></a>
-  </div></Sheet>;
+  </div></Sheet>,document.body);
 }
 
 export function NodeWorkItems({node, projectId}: {node: AssignmentNode; projectId: string}) {

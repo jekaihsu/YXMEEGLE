@@ -4,17 +4,18 @@ import {assignmentErrorMessage, assignmentsDisabled, fetchNodeAssignments, fetch
 
 let cacheEpoch = getSessionEpoch();
 const lists = new Map<string, NodeAssignmentList>();
+const listReadAt = new Map<string, number>();
 const requests = new Map<string, Promise<NodeAssignmentList>>();
 const details = new Map<string, {data: NodeAssignmentDetail; readAt: number}>();
 const detailRequests = new Map<string, Promise<NodeAssignmentDetail>>();
 function syncEpoch() {
-  if (cacheEpoch !== getSessionEpoch()) {lists.clear(); requests.clear(); details.clear(); detailRequests.clear(); cacheEpoch = getSessionEpoch()}
+  if (cacheEpoch !== getSessionEpoch()) {lists.clear(); listReadAt.clear(); requests.clear(); details.clear(); detailRequests.clear(); cacheEpoch = getSessionEpoch()}
 }
-export function prefetchNodeAssignmentDetail(projectId: string, nodeKey: string, expectedRevision?: string | null): Promise<NodeAssignmentDetail> {
+export function prefetchNodeAssignmentDetail(projectId: string, nodeKey: string, expectedRevision?: string | null, force = false): Promise<NodeAssignmentDetail> {
   syncEpoch();
   const key = `${projectId}/${nodeKey}`, cached = details.get(key), pending = detailRequests.get(key);
   if (pending) return pending;
-  if (cached && Date.now() - cached.readAt < 60000 && (expectedRevision === undefined || cached.data.node.revision === expectedRevision)) return Promise.resolve(cached.data);
+  if (!force && cached && Date.now() - cached.readAt < 60000 && (expectedRevision === undefined || cached.data.node.revision === expectedRevision)) return Promise.resolve(cached.data);
   const epoch = getSessionEpoch();
   const request = fetchNodeAssignmentDetail(projectId, nodeKey, new AbortController().signal, () => epoch === getSessionEpoch()).then(data => {
     if (epoch === getSessionEpoch() && detailRequests.get(key) === request) details.set(key, {data, readAt: Date.now()});
@@ -24,13 +25,15 @@ export function prefetchNodeAssignmentDetail(projectId: string, nodeKey: string,
   return request;
 }
 function cached(projectId: string) {syncEpoch(); return lists.get(projectId)}
-export function prefetchNodeAssignments(projectId: string): Promise<NodeAssignmentList> {
+export function prefetchNodeAssignments(projectId: string, force = false): Promise<NodeAssignmentList> {
   syncEpoch();
   const existing = requests.get(projectId);
   if (existing) return existing;
+  const stored=lists.get(projectId);
+  if(!force && stored && Date.now()-(listReadAt.get(projectId)||0)<60000)return Promise.resolve(stored);
   const epoch = getSessionEpoch();
   const request = fetchNodeAssignments(projectId, new AbortController().signal, () => epoch === getSessionEpoch()).then(data => {
-    if (epoch === getSessionEpoch() && requests.get(projectId) === request) lists.set(projectId, data);
+    if (epoch === getSessionEpoch() && requests.get(projectId) === request) {lists.set(projectId, data);listReadAt.set(projectId,Date.now())};
     return data;
   }).catch(failure => {if (epoch === getSessionEpoch() && (assignmentsDisabled(failure) || failure instanceof NodeAssignmentError && [401, 403].includes(failure.status))) lists.delete(projectId); throw failure}).finally(() => {if (requests.get(projectId) === request) requests.delete(projectId)});
   requests.set(projectId, request);
@@ -48,12 +51,12 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
   const retryAttempt = useRef<{mutation: AssignmentMutation; id: string} | null>(null);
   const listRequest = useRef(0), mutating = useRef(false);
   const current = useCallback(() => !lifecycle.current.controller.signal.aborted && lifecycle.current.epoch === getSessionEpoch(), []);
-  const reload = useCallback(async (silent = false) => {
+  const reload = useCallback(async (silent = false, force = true) => {
     if (!enabled) return;
     const sequence = ++listRequest.current;
     if (!silent) setRefreshing(true);
     try {
-      const data = await prefetchNodeAssignments(projectId);
+      const data = await prefetchNodeAssignments(projectId,force);
       if (current() && sequence === listRequest.current) {
         setState(previous => {
           if (!current() || sequence !== listRequest.current) return previous;
@@ -76,7 +79,7 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
     lifecycle.current = {controller: new AbortController(), epoch: getSessionEpoch()};
     const data = enabled ? cached(projectId) : undefined;
     setState(!enabled ? {kind: 'disabled'} : data ? {kind: 'ready', data} : {kind: 'loading'});
-    void reload();
+    void reload(false,false);
     const controller = lifecycle.current.controller;
     return () => {controller.abort(); listRequest.current++};
   }, [reload]);

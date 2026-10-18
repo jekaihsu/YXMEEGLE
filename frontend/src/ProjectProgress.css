@@ -1,22 +1,6 @@
 @layer pages {
-.project-progress{display:grid;gap:24px;min-width:0;line-height:1.55}
-.project-progress h2,.pg-overview h2{margin:0;font-size:19px}
-.project-progress h3{font-size:14px;margin:12px 0 6px}
-.project-progress p{margin:6px 0;overflow-wrap:anywhere}
-.pg-header,.pg-section,.pg-overview{padding:20px;border:1px solid var(--sep);border-radius:var(--radius-m,12px);background:var(--surface)}
-.pg-header{display:grid;grid-template-columns:1fr 1.3fr 1.7fr;gap:20px}
-.pg-header h2{font-size:26px;margin:4px 0 8px}
-.pg-eyebrow,.pg-muted,.pg-basis small{color:var(--label-2);font-size:13px}
-.pg-section>header,.pg-overview>header,.pg-stage-title{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
-.pg-chain{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
-.pg-stage{padding:14px;border:1px solid var(--sep);border-radius:12px;background:var(--surface);min-width:0;font-size:13px}
-.pg-stage h3{margin:0;font-size:16px}
-.pg-stage.pg-done{border-top:3px solid var(--positive,#278052)}
-.pg-stage.pg-active{border-top:3px solid var(--accent)}
-.pg-stage summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--accent)}
-.pg-sop{border-top:1px solid var(--sep);padding-top:8px;margin-top:8px}
-.pg-production{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;min-width:0}
-.pg-section{min-width:0}
+.pg-section>header{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.pg-section{min-width:0;padding:20px;border:1px solid var(--sep);border-radius:12px;background:var(--surface);display:grid;gap:12px}.pg-muted,.pg-basis small{color:var(--label-2);font-size:13px}.pg-section h3{margin-top:12px!important}
 .pg-quantity{font-size:26px;font-weight:600;overflow-wrap:anywhere}
 .pg-quantity small{display:block;font-size:12px;font-weight:400;color:var(--label-2)}
 .pg-basis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:16px 0}
@@ -32,14 +16,8 @@
 .pg-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .pg-facts dt{font-size:12px;color:var(--label-2)}
 .pg-facts dd{margin:4px 0;overflow-wrap:anywhere}
-.pg-strip{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.pg-strip button{display:flex;align-items:center;gap:8px;min-height:44px;padding:8px 12px;border:1px solid var(--sep);background:var(--surface-2);border-radius:10px;color:var(--label);cursor:pointer}
-.project-progress button,.pg-overview button{min-height:44px}
-.pg-overview{grid-column:1/-1;margin-bottom:16px}
+.project-flow .pg-section button{min-height:44px}
 @media(max-width:700px){
-.pg-header,.pg-production,.pg-chain{grid-template-columns:1fr}
-.pg-header,.pg-section,.pg-overview{padding:16px}
-.pg-header{gap:12px}
 .pg-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
 .pg-table thead{display:none}
 .pg-table table,.pg-table tbody,.pg-table tr,.pg-table td{display:block;width:auto}
@@ -48,11 +26,9 @@
 .pg-table td::before{content:attr(data-label);color:var(--label-2)}
 .pg-table td:last-child:has(button){display:block}
 .pg-table button{width:100%}
-.pg-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
-.pg-strip button{flex-direction:column;gap:4px;padding:8px 3px}
 }
 }
 @layer pages {
 .pg-table summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--accent)}
-.na-auto-done{display:block;font-size:11px;color:var(--label-2);white-space:normal;overflow-wrap:anywhere}
+
 }
