@@ -273,3 +273,25 @@ def test_commit_and_reconcile_revalidate_session_and_gate_right_before_the_write
     response = call(h, 'ou_mgr', 'post', f'/api/v2/commands/{CMD(1)}/reconcile')
     assert (response.status_code, response.json()['code']) == (403, 'forbidden')
     assert (stored_command(h, CMD(1)).state, len(h.fake.creates())) == ('outcome_unknown', 1)
+
+
+def test_an_earlier_unknown_preview_of_a_published_draft_does_not_reappear_in_the_work_queue(h):
+    blocked = preview(h, draft_id='draft-0009', title='先未核實', verifications={})
+    assert blocked['blockers']
+    h.clock[0] += 1
+    later = preview(h, draft_id='draft-0009', title='先未核實')
+    approve(h, later['preview_id'])
+    assert commit(h, CMD(40), later['preview_id']).status_code == 200
+    rows = call(h, 'ou_pm', 'get', '/api/v2/dispatch/work?scope=all').json()['rows']
+    assert [(r['source'], r['title']) for r in rows if r['title'] == '先未核實'] == [('v4_task', '先未核實')]
+
+
+def test_a_preview_made_after_the_draft_was_published_still_shows(h):
+    first = preview(h, draft_id='draft-0008', title='發布後再改')
+    approve(h, first['preview_id'])
+    assert commit(h, CMD(41), first['preview_id']).status_code == 200
+    h.clock[0] += 5
+    again = preview(h, draft_id='draft-0008', title='發布後再改', crew=['recP1'], primary_owner='recP1',
+                    verifications={'person:recP1': 'ok'})
+    rows = call(h, 'ou_pm', 'get', '/api/v2/dispatch/work?scope=all').json()['rows']
+    assert again['preview_id'] in [r.get('preview_id') for r in rows if r['source'] == 'workbench_preview']

@@ -331,7 +331,13 @@ class DispatchStore:
             latest = {}
             for row in sorted(previews.values(), key=lambda r: r.created_at):
                 latest[row.preview_hash] = row
-            hashes = [h for h in latest if h not in published]
+            # A draft that has published any of its previews is done; its earlier previews must not resurface.
+            finished = {}
+            for row in previews.values():
+                if row.draft_id and row.preview_hash in published:
+                    finished[row.draft_id] = max(finished.get(row.draft_id, 0), row.created_at)
+            hashes = [h for h in latest if h not in published
+                      and not (latest[h].draft_id in finished and latest[h].created_at <= finished[latest[h].draft_id])]
             decided = {}
             if hashes:
                 for row in db.scalars(select(DispatchDecisionRow).where(
