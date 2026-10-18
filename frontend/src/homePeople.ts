@@ -26,10 +26,11 @@ export function weeklyPeople(view:PeopleAttendance,people:AttendancePerson[],tod
  return people.map(person=>{const cells=days.map(day=>absenceCell(view,person,day));return {person,cells,absenceDays:days.filter((_,index)=>cells[index]==='請假'||cells[index]==='出差')}});
 }
 export function absenceImpact(rows:ReturnType<typeof weeklyPeople>,items:HomeItem[],today:string){
- const days=weekDays(today);
+ const monday=taipeiWeek(today),sunday=new Date(Date.parse(monday+'T00:00:00Z')+6*86400000).toISOString().slice(0,10);
  return rows.filter(row=>row.absenceDays.length).map(row=>{
   const open=[...new Map(items.filter(item=>!['done','completed','cancelled','skipped'].includes(item.status)&&item.assignees.some(person=>person.id===row.person.id)).map(item=>[item.id,item])).values()];
   const deadline=(item:HomeItem)=>(item.deadline||item.next_due)?.slice(0,10);
-  return {...row,open:open.length,due:open.filter(item=>{const day=deadline(item);return day&&day>=days[0]&&day<=days[4]}).length,overdue:open.filter(item=>{const day=deadline(item);return item.overdue||!!day&&day<today}).length};
+  const due=open.filter(item=>{const day=deadline(item);return day&&day>=monday&&day<=sunday});
+  return {...row,itemIds:open.map(item=>item.id),dueItemIds:due.map(item=>item.id),open:open.length,due:due.length,overdue:open.filter(item=>{const day=deadline(item);return item.overdue||!!day&&day<today}).length};
  }).filter(row=>row.open);
 }

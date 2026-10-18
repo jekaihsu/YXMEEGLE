@@ -43,3 +43,10 @@ console.log('Home people cards: 18 rendered scope, summary, table, navigation an
 doc=render({view:{...view,days:view.days.slice(0,4)}});
 assert.equal(doc.querySelector('.home-people-summary').textContent,'目前已載入資料中，本週 1 人有缺席，影響 1 項未完成工作，其中 1 項本週到期。');
 assert.equal(doc.querySelector('.is-unknown .sr-only').textContent,'資料未提供');
+const bothAbsent={...view,people:view.people.map(person=>({...person,group:'測量二組'})),leaves:view.people.map(person=>({person_id:person.id,start:'2026-10-12',end:'2026-10-12'}))};
+const shared={...team,body:{...team.body,items:[{id:'shared',assignees:[{id:'a'},{id:'b'}],status:'in_progress',deadline:'2026-10-16'}]}};
+doc=render({view:bothAbsent,team:shared});
+assert.equal(doc.querySelector('.home-people-summary').textContent,'本週 2 人有缺席，影響 1 項未完成工作，其中 1 項本週到期。');
+const weekend={...team,body:{...team.body,items:[['sat','2026-10-17'],['sun','2026-10-18'],['next','2026-10-19']].map(([id,deadline])=>({id,deadline,assignees:[{id:'a'}],status:'in_progress'}))}};
+doc=render({team:weekend});
+assert.equal(doc.querySelector('.home-people-summary').textContent,'本週 1 人有缺席，影響 3 項未完成工作，其中 2 項本週到期。');
