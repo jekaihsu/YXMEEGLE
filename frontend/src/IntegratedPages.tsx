@@ -13,6 +13,7 @@ import {HOME_PANELS,useHomePanels,type HomePanel} from './useHomePanels';
 import {PanelStatus} from './DailyHome';
 import {Button} from './design';
 import type {Ctx} from './appCommon';
+export {DispatchBoard as DispatchPage} from './DispatchBoard';
 
 const SourceHealth = lazy(() => import('./SourceHealth').then(module => ({default: module.SourceHealth})));
 
