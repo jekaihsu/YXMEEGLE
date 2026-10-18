@@ -13,16 +13,17 @@ export function AssignCard({id,c,today,assigned,team,review,delegated}:{id:HomeC
  if(id==='work')return <details className="home-personal"><summary>我的工作</summary><WorkCard c={c} id="work" panel="assigned" today={today} read={assigned}/></details>;
  if(id==='delegated')return <WorkCard c={c} id={id} panel="delegated" today={today} read={delegated}/>;
  if(id==='kpi'){
-  return <Card id={id} subtitle="管理範圍內已載入的工作" href="#view=work&tab=assigned&ctx=scope%3Dteam"><Kpis values={[
-   {label:'待分配',value:null},{label:'待審核',value:panelCount(review,()=>true)},
-   {label:'逾期',value:panelCount(team,item=>item.overdue)},{label:'今日請假組員',value:null},
-  ]}/><Message>資料尚未完整。來源未提供完整未指派節點與管理組員名冊；今日請假組員總數尚待核對。</Message><PanelNote read={team} also={review}/></Card>;
+  return <Kpis note="未指派節點與今日請假組員總數尚待核對。" values={[
+   {label:'待分配',href:'#view=projects',value:null},{label:'待審核',href:'#view=work&tab=confirmation&ctx=scope%3Dteam',value:panelCount(review,()=>true)},
+   {label:'逾期',href:'#view=work&tab=assigned&ctx=scope%3Dteam',value:panelCount(team,item=>item.overdue)},{label:'今日請假組員',href:'#view=people',value:null},
+  ]}/>;
  }
  if(id==='allocation'){
   const rows=[...new Map([...items.filter(item=>item.assignment_state!=='assigned'),...(review.body?.items||[])].map(item=>[item.id,item])).values()];
   return <Card id={id} subtitle="待核對指派與待審核事項" href="#view=work&tab=assigned&ctx=scope%3Dteam"><PanelRows read={team} also={review} items={rows} today={today}/><Message>資料尚未完整。未指派節點目前不在團隊清單中，請開啟案件處理分配。</Message></Card>;
  }
  if(id==='workload'){
+  if(!team.body||team.body.readState==='disabled')return <Card id={id} compact subtitle="" href="#view=work&tab=assigned&ctx=scope%3Dteam"><Message>{team.pending?'讀取中…':team.error||'組員工作量來源尚未提供。'}</Message></Card>;
   const byPerson=new Map<string,HomeBar>();
   for(const item of items)for(const person of item.assignees){
    const row=byPerson.get(person.id)||{label:person.name,completed:0,open:0,overdue:0};

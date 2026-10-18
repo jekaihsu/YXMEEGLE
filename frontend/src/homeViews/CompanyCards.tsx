@@ -1,5 +1,5 @@
 import type {Ctx} from '../appCommon';
-import {Row,Skeleton} from '../design';
+import {Row} from '../design';
 import {homeHref,type HomeCardId} from '../homeLayout';
 import {Card,Message,WorkCard} from '../homeCards';
 import type {PanelRead} from '../useHomePanels';
@@ -10,22 +10,19 @@ export function CompanyCard({id,c,today,confirmation,read}:{id:HomeCardId;c:Ctx;
  if(id==='confirmation')return <WorkCard id={id} panel="confirmation" c={c} today={today} read={confirmation}/>;
  if(id==='links')return <Card id={id} subtitle="前往完整管理工具" href="#view=company"><nav className="home-quick-links" aria-label="管理捷徑">{[['company','公司駕駛艙'],['reports','PM 週報'],['overview','管理總覽'],['projects','案件總覽']].filter(([view])=>view!=='reports'||c.s.user?.role==='pm'||c.s.user?.role==='manager').map(([view,label])=><a key={view} href={homeHref({view})}>{label}</a>)}</nav></Card>;
  const data=read.data;
- if(!data)return <Card id={id} subtitle="公司授權範圍" href="#view=company">{read.pending?<Skeleton lines={3}/>:<Message>{read.error}</Message>}</Card>;
+ if(!data)return null;
  let content;
- if(id==='kpi')content=<><Kpis values={[
-  {label:'進行中案件',value:data.totals.execution_status_counts.in_progress??0},
-  {label:'逾期任務',value:data.totals.tasks_overdue},
-  {label:'待確認',value:data.totals.pending_local_reviews+data.totals.pending_native_reviews},
-  {label:'本週到期',value:null},
- ]}/><Message>資料尚未完整。公司來源尚未提供本週到期總數。</Message></>;
+ if(id==='kpi')return <Kpis note="本週到期總數尚未提供。" values={[
+  {label:'進行中案件',href:'#view=projects',value:data.totals.execution_status_counts.in_progress??0},
+  {label:'逾期任務',href:'#view=company',value:data.totals.tasks_overdue},
+  {label:'待確認',href:'#view=company',value:data.totals.pending_local_reviews+data.totals.pending_native_reviews},
+  {label:'本週到期',href:'#view=work',value:null},
+ ]}/>;
  if(id==='groups')content=<WorkloadChart label="各組已完成、未逾期與逾期任務數" rows={[...data.groups].sort((a,b)=>b.tasks_total-a.tasks_total).slice(0,5).map(row=>({label:row.group||'未分組',completed:row.tasks_completed,open:Math.max(0,row.tasks_total-row.tasks_completed-row.tasks_overdue),overdue:row.tasks_overdue}))}/>;
  if(id==='statuses')content=<StatusChart counts={data.totals.execution_status_counts}/>;
  if(id==='cases'){
   const rows=data.cases.filter(row=>row.tasks_overdue>0||row.pending_local_reviews+row.pending_native_reviews>0);
   content=<>{rows.slice(0,5).map(row=><Row key={row.id} href={homeHref({view:'project',project:row.id})} label={row.name||row.code} detail={`${row.group} · 逾期 ${row.tasks_overdue} · 待確認 ${row.pending_local_reviews+row.pending_native_reviews}`}/>)}{!rows.length&&<Message>{data.complete?'目前沒有需留意的案件。':'已載入預覽中沒有需留意案件，資料尚未完整。'}</Message>}</>;
  }
- return <Card id={id} subtitle={`授權公司快照 · ${data.as_of}`} href={id==='cases'?'#view=projects':'#view=company'}>{content}
-  {data.complete!==true&&<Message>資料尚未完整，統計僅涵蓋已載入的來源。</Message>}
-  {data.source.status!=='ready'&&<Message>公司來源尚待更新或核對。</Message>}
- </Card>;
+ return <Card id={id} subtitle={`授權公司快照 · ${data.as_of}`} href={id==='cases'?'#view=projects':'#view=company'}>{content}</Card>;
 }
