@@ -1,0 +1,41 @@
+{
+  "joins": {
+    "before": {
+      "name": "姓名待確認",
+      "rawId": false
+    },
+    "after": {
+      "name": "示例 林安娜",
+      "rawId": false
+    }
+  },
+  "groupKeyboard": {
+    "arrowRightFocused": "查看 示例 C002 派工明細",
+    "day": "2026-10-13 預排",
+    "focusVisible": true,
+    "outlineStyle": "solid",
+    "outlineWidth": "2px",
+    "enterOpened": "示例 C002",
+    "timedReasonInChinese": true,
+    "rawRecordIdVisible": false,
+    "escapeClosed": true,
+    "focusReturned": "查看 示例 C002 派工明細"
+  },
+  "personKeyboard": {
+    "people": 3,
+    "documentWidth": 390,
+    "arrowRightDay": "示例 林安娜 2026-10-13 預排",
+    "focusVisible": true,
+    "enterOpened": "示例 C002"
+  },
+  "flagOff": {
+    "disabledTitle": "派工看板尚未開放",
+    "boardRequests": 0
+  },
+  "repairDrawer": {
+    "width": 390,
+    "documentWidth": 390,
+    "inactivePersonUnavailable": true,
+    "repairInstrumentUnavailable": true
+  }
+}

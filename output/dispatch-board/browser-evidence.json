@@ -1,0 +1,400 @@
+[
+  {
+    "scenario": "loaded",
+    "state": "ready",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "counts": [
+      "6",
+      "1",
+      "2",
+      "2"
+    ],
+    "geometry": {
+      ".db-week": {
+        "top": 251.296875,
+        "height": 82,
+        "width": 984
+      },
+      ".db-kpis": {
+        "top": 417.296875,
+        "height": 124,
+        "width": 984
+      },
+      ".db-queue": {
+        "top": 655.296875,
+        "height": 270,
+        "width": 984
+      },
+      ".db-days": {
+        "top": 1037.296875,
+        "height": 440,
+        "width": 984
+      }
+    }
+  },
+  {
+    "scenario": "loaded",
+    "state": "ready",
+    "width": 390,
+    "scrollWidth": 390,
+    "counts": [
+      "6",
+      "1",
+      "2",
+      "2"
+    ],
+    "geometry": {
+      ".db-week": {
+        "top": 280.09375,
+        "height": 132,
+        "width": 358
+      },
+      ".db-kpis": {
+        "top": 488.09375,
+        "height": 248,
+        "width": 358
+      },
+      ".db-queue": {
+        "top": 878.09375,
+        "height": 270,
+        "width": 358
+      },
+      ".db-days": {
+        "top": 1288.140625,
+        "height": 1752,
+        "width": 358
+      }
+    }
+  },
+  {
+    "scenario": "stale",
+    "state": "stale",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "counts": [
+      "6",
+      "1",
+      "2",
+      "2"
+    ],
+    "geometry": {
+      ".db-week": {
+        "top": 251.296875,
+        "height": 82,
+        "width": 984
+      },
+      ".db-kpis": {
+        "top": 417.296875,
+        "height": 124,
+        "width": 984
+      },
+      ".db-queue": {
+        "top": 655.296875,
+        "height": 270,
+        "width": 984
+      },
+      ".db-days": {
+        "top": 1037.296875,
+        "height": 440,
+        "width": 984
+      }
+    }
+  },
+  {
+    "scenario": "stale",
+    "state": "stale",
+    "width": 390,
+    "scrollWidth": 390,
+    "counts": [
+      "6",
+      "1",
+      "2",
+      "2"
+    ],
+    "geometry": {
+      ".db-week": {
+        "top": 280.09375,
+        "height": 132,
+        "width": 358
+      },
+      ".db-kpis": {
+        "top": 488.09375,
+        "height": 248,
+        "width": 358
+      },
+      ".db-queue": {
+        "top": 878.09375,
+        "height": 270,
+        "width": 358
+      },
+      ".db-days": {
+        "top": 1288.140625,
+        "height": 1752,
+        "width": 358
+      }
+    }
+  },
+  {
+    "scenario": "failed",
+    "state": "retained",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "counts": [
+      "6",
+      "1",
+      "2",
+      "2"
+    ],
+    "geometry": {
+      ".db-week": {
+        "top": 251.296875,
+        "height": 82,
+        "width": 984
+      },
+      ".db-kpis": {
+        "top": 417.296875,
+        "height": 124,
+        "width": 984
+      },
+      ".db-queue": {
+        "top": 655.296875,
+        "height": 270,
+        "width": 984
+      },
+      ".db-days": {
+        "top": 1037.296875,
+        "height": 440,
+        "width": 984
+      }
+    }
+  },
+  {
+    "scenario": "failed",
+    "state": "retained",
+    "width": 390,
+    "scrollWidth": 390,
+    "counts": [
+      "6",
+      "1",
+      "2",
+      "2"
+    ],
+    "geometry": {
+      ".db-week": {
+        "top": 280.09375,
+        "height": 132,
+        "width": 358
+      },
+      ".db-kpis": {
+        "top": 488.09375,
+        "height": 248,
+        "width": 358
+      },
+      ".db-queue": {
+        "top": 878.09375,
+        "height": 270,
+        "width": 358
+      },
+      ".db-days": {
+        "top": 1288.140625,
+        "height": 1752,
+        "width": 358
+      }
+    }
+  },
+  {
+    "scenario": "forbidden",
+    "state": "forbidden",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "counts": [
+      "—",
+      "—",
+      "—",
+      "—"
+    ],
+    "geometry": {
+      ".db-week": {
+        "top": 251.296875,
+        "height": 82,
+        "width": 984
+      },
+      ".db-kpis": {
+        "top": 417.296875,
+        "height": 124,
+        "width": 984
+      },
+      ".db-queue": {
+        "top": 655.296875,
+        "height": 270,
+        "width": 984
+      },
+      ".db-days": {
+        "top": 1037.296875,
+        "height": 440,
+        "width": 984
+      }
+    }
+  },
+  {
+    "scenario": "forbidden",
+    "state": "forbidden",
+    "width": 390,
+    "scrollWidth": 390,
+    "counts": [
+      "—",
+      "—",
+      "—",
+      "—"
+    ],
+    "geometry": {
+      ".db-week": {
+        "top": 280.09375,
+        "height": 132,
+        "width": 358
+      },
+      ".db-kpis": {
+        "top": 488.09375,
+        "height": 248,
+        "width": 358
+      },
+      ".db-queue": {
+        "top": 878.09375,
+        "height": 270,
+        "width": 358
+      },
+      ".db-days": {
+        "top": 1288.140625,
+        "height": 1752,
+        "width": 358
+      }
+    }
+  },
+  {
+    "scenario": "empty",
+    "state": "empty",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "counts": [
+      "—",
+      "—",
+      "—",
+      "—"
+    ],
+    "geometry": {
+      ".db-week": {
+        "top": 251.296875,
+        "height": 82,
+        "width": 984
+      },
+      ".db-kpis": {
+        "top": 417.296875,
+        "height": 124,
+        "width": 984
+      },
+      ".db-queue": {
+        "top": 655.296875,
+        "height": 270,
+        "width": 984
+      },
+      ".db-days": {
+        "top": 1037.296875,
+        "height": 440,
+        "width": 984
+      }
+    }
+  },
+  {
+    "scenario": "empty",
+    "state": "empty",
+    "width": 390,
+    "scrollWidth": 390,
+    "counts": [
+      "—",
+      "—",
+      "—",
+      "—"
+    ],
+    "geometry": {
+      ".db-week": {
+        "top": 280.09375,
+        "height": 132,
+        "width": 358
+      },
+      ".db-kpis": {
+        "top": 488.09375,
+        "height": 248,
+        "width": 358
+      },
+      ".db-queue": {
+        "top": 878.09375,
+        "height": 270,
+        "width": 358
+      },
+      ".db-days": {
+        "top": 1288.140625,
+        "height": 1752,
+        "width": 358
+      }
+    }
+  },
+  {
+    "scenario": "loading",
+    "state": "loading",
+    "width": 1280,
+    "scrollWidth": 1280,
+    "counts": [],
+    "geometry": {
+      ".db-week": {
+        "top": 251.296875,
+        "height": 82,
+        "width": 984
+      },
+      ".db-kpis": {
+        "top": 417.296875,
+        "height": 124,
+        "width": 984
+      },
+      ".db-queue": {
+        "top": 655.296875,
+        "height": 270,
+        "width": 984
+      },
+      ".db-days": {
+        "top": 1037.296875,
+        "height": 440,
+        "width": 984
+      }
+    }
+  },
+  {
+    "scenario": "loading",
+    "state": "loading",
+    "width": 390,
+    "scrollWidth": 390,
+    "counts": [],
+    "geometry": {
+      ".db-week": {
+        "top": 280.09375,
+        "height": 132,
+        "width": 358
+      },
+      ".db-kpis": {
+        "top": 488.09375,
+        "height": 248,
+        "width": 358
+      },
+      ".db-queue": {
+        "top": 878.09375,
+        "height": 270,
+        "width": 358
+      },
+      ".db-days": {
+        "top": 1288.140625,
+        "height": 1752,
+        "width": 358
+      }
+    }
+  }
+]
