@@ -172,5 +172,7 @@
 @media(max-width:760px){.unified-home .home-report-attention{grid-template-columns:repeat(2,minmax(0,1fr))}.unified-home .ds-actions{max-width:100%}}
 }
 
+@layer pages{
 .unified-home .home-attendance .is-unknown{color:var(--label-3)}
 .unified-home .home-personal:not([open]){align-self:start}
+}
