@@ -269,6 +269,9 @@ def build_board(data: BoardInput, window: Window) -> dict:
     ]
     if invalid_dates:
         source_gaps.append({'code': 'invalid_schedule_interval', 'message': 'Schedule rows without a usable interval are excluded.', 'count': invalid_dates})
+    unresolved_cases = sum(1 for slot in slots if slot['case'] and slot['case']['code'] is None and slot['case']['name'] is None)
+    if unresolved_cases:
+        source_gaps.append({'code': 'unresolved_case_links', 'message': 'Case links do not resolve to a V4 confirmation row.', 'count': unresolved_cases})
     if latest and window.start > latest:
         source_gaps.append({'code': f'no_bookings_after_{latest.isoformat()}',
                             'message': f'No bookings after {latest.isoformat()}.', 'count': 0})

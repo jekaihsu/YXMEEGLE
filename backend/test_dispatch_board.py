@@ -143,7 +143,8 @@ def test_invalid_dates_remain_visible_as_source_gap_and_joins_degrade_independen
     assert board['source']['quality'] == {'states': ['partial'], 'reason': 'incomplete_source_or_joins'}
     assert board['slots'][0]['crew'][0]['name'] is None
     assert board['slots'][0]['case'] == {'ref': 'recCase', 'code': None, 'name': None}
-    assert board['gaps'][-1] == {'code': 'invalid_schedule_interval', 'message': 'Schedule rows without a usable interval are excluded.', 'count': 2}
+    assert board['gaps'][-2] == {'code': 'invalid_schedule_interval', 'message': 'Schedule rows without a usable interval are excluded.', 'count': 2}
+    assert board['gaps'][-1] == {'code': 'unresolved_case_links', 'message': 'Case links do not resolve to a V4 confirmation row.', 'count': 1}
 
 
 def test_foreign_case_table_is_never_reinterpreted_as_v4():
