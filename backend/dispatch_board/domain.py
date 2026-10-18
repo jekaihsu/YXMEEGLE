@@ -344,13 +344,15 @@ def build_board(data: BoardInput, window: Window) -> dict:
     queue = [slot['slot_id'] for slot in slots if slot['planning_status'] == PlanningStatus.UNASSIGNED]
     def count_issue(reason):
         return sum(any(reason in member['reasons'] for member in slot['crew'] + slot['resources']) for slot in slots)
-    partial = invalid_dates or any(value != 'ok' for value in joins.values())
+    published = {'v4_tasks': 'ok' if data.tasks is not None else 'unavailable',
+                 'accounts': 'ok' if data.accounts is not None else 'unavailable'} if data.published else {}
+    partial = invalid_dates or any(value != 'ok' for value in [*joins.values(), *published.values()])
     return {
         'schema_version': 1, 'window': {'from': window.start.isoformat(), 'to': window.end.isoformat(), 'tz': 'Asia/Taipei'},
         'source': {'dataset_key': 'operational_schedule', 'registry_key': 'v4', 'table_id': TABLES['schedule'].table_id,
                    'fetched_at': data.fetched_at, 'latest_booking_date': latest.isoformat() if latest else None,
                    'quality': {'states': ['partial' if partial else 'complete'], 'reason': 'incomplete_source_or_joins' if partial else None},
-                   'joins': joins, **({'v4_tasks': 'ok' if data.tasks is not None else 'unavailable'} if data.published else {})},
+                   'joins': joins, **published},
         'kpi': {'slots': len(slots), 'unassigned': len(queue), 'unknown_overlap': count_issue('same_day_other_slot'), 'conflict': count_issue('timed_overlap')},
         'unassigned_queue': queue, 'slots': slots, 'capacity': {'people': capacity}, 'gaps': source_gaps,
     }

@@ -10,13 +10,13 @@ import time
 from contextlib import contextmanager
 from copy import deepcopy
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import and_, exists, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from .. import audit
 from ..models import (DispatchCommandRow, DispatchDecisionRow, DispatchDraftRow, DispatchLockRow, DispatchPreviewRow,
                       DispatchReservationRow)
-from .domain import IN_FLIGHT, LIVE, CommandResult, Overlay, Refusal, from_millis
+from .domain import IN_FLIGHT, CommandResult, Overlay, Refusal, from_millis
 
 HISTORY_SECONDS = 30 * 86400
 
@@ -26,10 +26,27 @@ def duplicate(command_id, state):
 
 
 def _command(row: DispatchCommandRow):
+    # The pre-command snapshot of the target row rides in the receipt column (no table migration);
+    # it is split back out here and never reaches a response.
+    receipt = deepcopy(row.receipt) or {}
+    base = receipt.pop('base', None)
     return {'command_id': row.command_id, 'preview_id': row.preview_id, 'preview_hash': row.preview_hash,
             'action': row.action, 'task_id': row.task_id, 'actor_id': row.actor_id, 'state': row.state,
             'revision': row.revision, 'attempt': row.attempt, 'payload': deepcopy(row.payload),
-            'receipt': deepcopy(row.receipt), 'created_at': row.created_at, 'updated_at': row.updated_at}
+            'receipt': receipt or None, 'base': base, 'created_at': row.created_at, 'updated_at': row.updated_at}
+
+
+def _live(wid):
+    """Commands that still own their content: in flight, or committed and still holding reservations.
+
+    A committed command whose reservations a later revision released is history, not a duplicate.
+    """
+    holding = exists().where(DispatchReservationRow.workspace_id == wid,
+                             DispatchReservationRow.command_id == DispatchCommandRow.command_id,
+                             DispatchReservationRow.state == 'held')
+    return and_(DispatchCommandRow.workspace_id == wid, or_(
+        DispatchCommandRow.state.in_([s.value for s in IN_FLIGHT]),
+        and_(DispatchCommandRow.state == CommandResult.COMMITTED.value, holding)))
 
 
 def _preview(row: DispatchPreviewRow):
@@ -135,8 +152,7 @@ class DispatchStore:
     def live_for_hash(self, wid, preview_hash):
         with self.sessions() as db:
             row = db.scalars(select(DispatchCommandRow).where(
-                DispatchCommandRow.workspace_id == wid, DispatchCommandRow.preview_hash == preview_hash,
-                DispatchCommandRow.state.in_([s.value for s in LIVE]))).first()
+                _live(wid), DispatchCommandRow.preview_hash == preview_hash)).first()
             return _command(row) if row is not None else None
 
     def held(self, wid):
@@ -150,16 +166,18 @@ class DispatchStore:
                 DispatchReservationRow.workspace_id == wid, DispatchReservationRow.command_id == command_id)
                 .order_by(DispatchReservationRow.resource_kind, DispatchReservationRow.ref))]
 
-    def open_command(self, wid, command, items, start_ms, end_ms):
-        """Persist the command as pending with its reservations, or refuse. Returns (created, command)."""
+    def open_command(self, wid, command, items, start_ms, end_ms, recheck=lambda: None):
+        """Persist the command as pending with its reservations, or refuse. Returns (created, command).
+
+        recheck() runs under the workspace lock and refuses when the target row moved since it was assessed.
+        """
         now = self.clock()
         with self.exclusive(wid) as db:
             existing = db.get(DispatchCommandRow, (wid, command['command_id']))
             if existing is not None:
                 return False, _command(existing)
             live = db.scalars(select(DispatchCommandRow).where(
-                DispatchCommandRow.workspace_id == wid, DispatchCommandRow.preview_hash == command['preview_hash'],
-                DispatchCommandRow.state.in_([s.value for s in LIVE]))).first()
+                _live(wid), DispatchCommandRow.preview_hash == command['preview_hash'])).first()
             if live is not None:
                 raise duplicate(live.command_id, live.state)
             if command['task_id']:
@@ -168,6 +186,14 @@ class DispatchStore:
                     DispatchCommandRow.state.in_([s.value for s in IN_FLIGHT]))).first()
                 if busy is not None:
                     raise Refusal('busy', '此任務仍有處理中的發布命令', command_id=busy.command_id, state=busy.state)
+                newer = db.scalars(select(DispatchCommandRow).where(
+                    DispatchCommandRow.workspace_id == wid, DispatchCommandRow.task_id == command['task_id'],
+                    DispatchCommandRow.state == CommandResult.COMMITTED.value,
+                    DispatchCommandRow.revision >= command['revision'])).first()
+                if newer is not None:
+                    raise Refusal('stale_revision', '任務已由其他發布更新，請重新預覽', command_id=newer.command_id,
+                                  revision=newer.revision)
+                recheck()
             query = select(DispatchReservationRow).where(
                 DispatchReservationRow.workspace_id == wid, DispatchReservationRow.state == 'held',
                 DispatchReservationRow.ref.in_([ref for _, ref in items]),
@@ -194,7 +220,9 @@ class DispatchStore:
                                      preview_hash=command['preview_hash'], action=command['action'],
                                      task_id=command['task_id'], actor_id=command['actor_id'],
                                      state=CommandResult.PENDING.value, revision=command['revision'], attempt=1,
-                                     payload=command['payload'], receipt=None, created_at=now, updated_at=now)
+                                     payload=command['payload'],
+                                     receipt={'base': command['base']} if command['base'] is not None else None,
+                                     created_at=now, updated_at=now)
             db.add(row)
             for kind, ref in items:
                 db.add(DispatchReservationRow(id=secrets.token_hex(16), workspace_id=wid, resource_kind=kind.value,
@@ -226,7 +254,9 @@ class DispatchStore:
             row = db.get(DispatchCommandRow, (wid, command_id))
             if row.attempt != attempt:
                 return _command(row)
-            row.state, row.receipt, row.updated_at = state.value, receipt, self.clock()
+            base = (row.receipt or {}).get('base')
+            row.state, row.updated_at = state.value, self.clock()
+            row.receipt = {**receipt, 'base': base} if base is not None else receipt
             if task_id:
                 row.task_id = task_id
             mine = (DispatchReservationRow.workspace_id == wid) & (DispatchReservationRow.command_id == command_id)
@@ -297,7 +327,7 @@ class DispatchStore:
                     found = db.get(DispatchPreviewRow, command.preview_id)
                     if found is not None:
                         previews[found.id] = found
-            published = {c.preview_hash for c in commands if c.state in {s.value for s in LIVE}}
+            published = set(db.scalars(select(DispatchCommandRow.preview_hash).where(_live(wid))))
             latest = {}
             for row in sorted(previews.values(), key=lambda r: r.created_at):
                 latest[row.preview_hash] = row

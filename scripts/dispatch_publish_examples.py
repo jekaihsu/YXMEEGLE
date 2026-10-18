@@ -22,7 +22,7 @@ from sqlalchemy.orm import sessionmaker  # noqa: E402
 from backend.dispatch_publish.routes import register  # noqa: E402
 from backend.live_read.token_cache import TenantTokenCache  # noqa: E402
 from backend.models import AuditRow, Base  # noqa: E402
-from backend.test_dispatch_publish import APPROVERS, CFG, PROPOSAL, ROLES, T0, NoBucket, seed  # noqa: E402
+from backend.test_dispatch_publish import APPROVERS, CFG, PROPOSAL, ROLES, T0, USERS, NoBucket, seed  # noqa: E402
 from backend.test_dispatch_publish_fake import SCHEDULE, TASKS, FakeLark, timeout_after  # noqa: E402
 
 OUT = ROOT / 'docs' / 'dispatch-publish-api-examples.json'
@@ -36,7 +36,7 @@ class Harness:
         self.fake = FakeLark()
         seed(self.fake)
         self.who, self.clock = ['ou_pm'], [T0]
-        self.workspace = {'settings': {'external_enabled': True}, 'environment': 'production'}
+        self.workspace = {'settings': {'external_enabled': True}, 'environment': 'production', 'users': USERS}
         self.examples = []
 
     def client(self, overrides=None):
@@ -93,19 +93,21 @@ def main():
            {'seat': 'manager_review', 'decision': 'accepted'})
     h.call('decision: PM final accepts', 'ou_pmf', 'post', f'/api/v2/dispatch/previews/{pid}/decisions',
            {'seat': 'pm_final', 'decision': 'accepted'})
+    h.call('commit refused: command_id is not a UUIDv4 (it is sent unchanged as Lark client_token)', 'ou_pm', 'post',
+           '/api/v2/dispatch/commits', {'command_id': 'cmd-b-area-0001', 'preview_id': pid})
     h.call('commit refused: blockers', 'ou_pm', 'post', '/api/v2/dispatch/commits',
-           {'command_id': 'cmd-blocked-0001', 'preview_id': blocked['preview_id']})
+           {'command_id': '0d15ea5e-0000-4000-8000-000000000014', 'preview_id': blocked['preview_id']})
     h.workspace['settings']['external_enabled'] = False
     h.call('commit refused: external connection off (no remote call)', 'ou_pm', 'post', '/api/v2/dispatch/commits',
-           {'command_id': 'cmd-b-area-0001', 'preview_id': pid})
+           {'command_id': '0d15ea5e-0000-4000-8000-000000000011', 'preview_id': pid})
     h.workspace['settings']['external_enabled'] = True
     committed = h.call('commit: committed after read-back', 'ou_pm', 'post', '/api/v2/dispatch/commits',
-                       {'command_id': 'cmd-b-area-0001', 'preview_id': pid}).json()
+                       {'command_id': '0d15ea5e-0000-4000-8000-000000000011', 'preview_id': pid}).json()
     h.call('commit replay: same command_id', 'ou_pm', 'post', '/api/v2/dispatch/commits',
-           {'command_id': 'cmd-b-area-0001', 'preview_id': pid})
+           {'command_id': '0d15ea5e-0000-4000-8000-000000000011', 'preview_id': pid})
     h.call('commit refused: another command for a live preview', 'ou_pm', 'post', '/api/v2/dispatch/commits',
-           {'command_id': 'cmd-b-area-0002', 'preview_id': pid})
-    h.call('command status', 'ou_pm', 'get', '/api/v2/commands/cmd-b-area-0001')
+           {'command_id': '0d15ea5e-0000-4000-8000-000000000012', 'preview_id': pid})
+    h.call('command status', 'ou_pm', 'get', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000011')
     task_id = committed['command']['task_id']
 
     unknown = h.call('preview: C area', 'ou_pm', 'post', '/api/v2/dispatch/previews',
@@ -114,9 +116,9 @@ def main():
     approve(h, unknown['preview_id'])
     h.fake.on('POST', f'/{TASKS}/records', timeout_after)
     h.call('commit: timeout after remote success is outcome_unknown (202)', 'ou_pm', 'post', '/api/v2/dispatch/commits',
-           {'command_id': 'cmd-c-area-0001', 'preview_id': unknown['preview_id']})
-    h.call('command status for a manager: reconcile offered', 'ou_mgr', 'get', '/api/v2/commands/cmd-c-area-0001')
-    h.call('reconcile: row found by 命令編號, committed', 'ou_mgr', 'post', '/api/v2/commands/cmd-c-area-0001/reconcile')
+           {'command_id': '0d15ea5e-0000-4000-8000-000000000015', 'preview_id': unknown['preview_id']})
+    h.call('command status for a manager: reconcile offered', 'ou_mgr', 'get', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000015')
+    h.call('reconcile: row found by 命令編號, committed', 'ou_mgr', 'post', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000015/reconcile')
 
     reassign = h.call('preview: reassign the same task', 'ou_pm', 'post', '/api/v2/dispatch/previews',
                       {**PROPOSAL, 'task_id': task_id, 'primary_owner': 'recP2', 'crew': ['recP2'],
@@ -124,7 +126,7 @@ def main():
                        'verifications': {'person:recP2': '主管核實 L2 資格'}}).json()
     approve(h, reassign['preview_id'])
     h.call('commit: reassignment updates the same task, revision 2', 'ou_pm', 'post', '/api/v2/dispatch/commits',
-           {'command_id': 'cmd-b-area-0002r', 'preview_id': reassign['preview_id']})
+           {'command_id': '0d15ea5e-0000-4000-8000-000000000013', 'preview_id': reassign['preview_id']})
 
     first = h.call('preview: D area', 'ou_pm', 'post', '/api/v2/dispatch/previews',
                    {**PROPOSAL, 'title': 'D 區外業', 'crew': ['recP3'], 'instruments': [], 'start': '2026-10-23T08:00+08:00',
@@ -140,8 +142,8 @@ def main():
     h.who[0] = 'ou_pm'
     with ThreadPoolExecutor(2) as pool:
         results = list(pool.map(lambda args: args[0].post('/api/v2/dispatch/commits', json=args[1]),
-                                [(h.default, {'command_id': 'cmd-d-area-0001', 'preview_id': first['preview_id']}),
-                                 (other, {'command_id': 'cmd-e-area-0001', 'preview_id': second['preview_id']})]))
+                                [(h.default, {'command_id': '0d15ea5e-0000-4000-8000-000000000016', 'preview_id': first['preview_id']}),
+                                 (other, {'command_id': '0d15ea5e-0000-4000-8000-000000000017', 'preview_id': second['preview_id']})]))
     loser = next(r for r in results if r.status_code == 409)
     h.examples.append({'name': 'commit refused: concurrent overlapping commit lost the reservation race',
                        'actor': {'open_id': 'ou_pm', 'role': 'pm'},
@@ -169,13 +171,21 @@ def main():
     h.call('work queue: group leader seat holder, mine', 'ou_lead', 'get', '/api/v2/dispatch/work?scope=mine')
     h.call('assign form for an existing task', 'ou_pm', 'get', f'/api/v2/dispatch/tasks/{task_id}')
     h.call('picker options', 'ou_pm', 'get', '/api/v2/dispatch/options')
+    derived = h.client({'DISPATCH_SEAT_GROUP_LEADER': '', 'DISPATCH_SEAT_MANAGER_REVIEW': '', 'DISPATCH_SEAT_PM_FINAL': ''})
+    h.call('picker options: seats derived from 人員名單 職級/所屬組別 and session PMs (no DISPATCH_SEAT_*)', 'ou_pm', 'get',
+           '/api/v2/dispatch/options', client=derived)
+    h.call('preview: derived seat holders; a department without a 組長 names the unconfigured seat', 'ou_pm', 'post',
+           '/api/v2/dispatch/previews', {**PROPOSAL, 'title': 'I 區測繪', 'department': '測繪', 'instruments': [],
+                                          'start': '2026-10-28T08:00+08:00', 'end': '2026-10-28T12:00+08:00'},
+           client=derived)
     h.call('draft: delete (cancel_draft)', 'ou_pm', 'delete', '/api/v2/dispatch/drafts/draft-f-area-01')
 
     OUT.write_text(json.dumps({
         '_about': 'Generated by scripts/dispatch_publish_examples.py from real calls against the fake V4 Bitable '
                   '(backend/test_dispatch_publish_fake.py). Clock fixed at 2026-10-19T10:00+08:00. Ids prefixed pv_ '
                   'are random per run. Seat holders: ou_lead (group_leader_confirmed), ou_mgr (manager_review), '
-                  'ou_pmf (pm_final). person_ref values are 人員名單 record ids.',
+                  'ou_pmf (pm_final) via DISPATCH_SEAT_*, except the examples marked derived. person_ref values are 人員名單 '
+                  'record ids. command_id is a lowercase UUIDv4.',
         'examples': h.examples}, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
     h.engine.dispose()
     print(f'{len(h.examples)} examples -> {OUT.relative_to(ROOT)}')

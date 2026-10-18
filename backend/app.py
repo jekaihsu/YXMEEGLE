@@ -106,7 +106,9 @@ def _reidentify_pilot_project(project,occupied_ids=()):
     copied['pilot_source_id']=source_id
     return copied,id_map
 
-def create_app(overrides=None):
+def create_app(overrides=None,*,dispatch_transport=None):
+    """dispatch_transport replaces the Lark HTTP transport of the dispatch board and publish routes only
+    (scripts/dev_dispatch_fake_server.py passes an in-memory Bitable); None keeps the real one."""
     cfg=dict(os.environ); cfg.update(overrides or {})
     from .features import resolve_features, guard_action
     production=cfg.get('APP_ENV','development')=='production'
@@ -1504,14 +1506,20 @@ def create_app(overrides=None):
         receipt_model=Receipt,audit_model=AuditRow,cfg=cfg,skipped_nodes=valid_waiver,reports=node_reports,
         reports_visible=lambda user: user['role'] in ('pm','manager') or capable(user,'manage_sources'))
     from .dispatch_board.routes import register as register_dispatch_board
+    from .dispatch_board.service import DispatchBoardService
+    from .dispatch_board.lark_table import DispatchReader
     app.state.dispatch_board=register_dispatch_board(app,identity=identity,cfg=cfg,
-        allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+        allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'),
+        service=DispatchBoardService(cfg,reader=DispatchReader(cfg,transport=dispatch_transport)) if dispatch_transport else None)
     from .dispatch_publish.routes import register as register_dispatch_publish
     def dispatch_workspace(wid):
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,wid),collections=())
-        return {'settings':state.get('settings',{}),'environment':state.get('environment')}
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,wid),collections=('users',))
+        # Session people feed the pm_final seat (role pm); only the fields the seat needs leave here.
+        users=[{k:u.get(k) for k in ('id','name','role','active')} for u in state.get('users',[])]
+        return {'settings':state.get('settings',{}),'environment':state.get('environment'),'users':users}
     app.state.dispatch_publish=register_dispatch_publish(app,identity=identity,cfg=cfg,sessions=sessions,audit_model=AuditRow,
-        workspace=dispatch_workspace,allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+        workspace=dispatch_workspace,allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'),
+        transport=dispatch_transport)
     from .home_panels import register as register_home_panels
     app.state.home_panels=register_home_panels(app,identity=identity,load=load,sessions=sessions,workspace_model=WorkspaceRow,nodes=app.state.node_assignment)
     from .native_poller import NativeApprovalPoller

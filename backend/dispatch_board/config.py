@@ -20,7 +20,7 @@ TABLES = {
     'vehicles': SourceTable('tblTQv8l5ntnbwyp', {'車牌': (1,), '啟用': (7,)}),
     'cases': SourceTable('tblmSQrcCs9vPQZx', {'工程確認單編號': (1,), '工程名稱': (1,)}),
 }
-# Slice 2: the published task rows, their node position and the roster's Lark accounts.
+# Slice 2: the published task rows, their node position and the roster's Lark accounts, ranks and groups (seat holders).
 PUBLISH_TABLES = {
     'tasks': SourceTable('tblsoyGcC6K5AipF', {
         '標題': (1,), '內容': (1,), '負責人': (11,), '指派人': (11,), '截止日': (5,), '部門': (3,), '狀態': (3,),
@@ -30,7 +30,7 @@ PUBLISH_TABLES = {
         '排程狀態': (3,), '排程版本': (2,), '命令編號': (1,), '讀回時間': (5,), '成果接受狀態': (3,), '接受摘要': (1,),
     }),
     'nodes': SourceTable('tblcPZPmezkyeVb7', {'節點': (3,), '確認單編號': (1,)}),
-    'accounts': SourceTable('tblfaCO2xPUNptQH', {'Lark帳號': (11,)}),
+    'accounts': SourceTable('tblfaCO2xPUNptQH', {'Lark帳號': (11,), '職級': (3,), '所屬組別': (4,)}),
 }
 SOURCES = {**TABLES, **PUBLISH_TABLES}
 

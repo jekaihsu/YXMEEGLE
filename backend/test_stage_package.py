@@ -129,3 +129,11 @@ def test_staged_package_includes_ops_sync_and_boots_with_the_feature_flag_on(tmp
     out = subprocess.run([sys.executable, '-c', probe, str(stage), str(tmp_path / 'boot.db'), str(tmp_path / 'u')], cwd=tmp_path,
                          capture_output=True, text=True, timeout=120, env={'PATH': '/usr/bin:/bin'})
     assert out.returncode == 0 and out.stdout.strip() == 'booted', out.stderr[-2000:]
+
+
+def test_staged_package_never_ships_the_dispatch_dev_server_or_its_fake_bitable(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_prepare, 'RUNTIME', tmp_path)
+    deploy_prepare.staging()
+    manifest = {f['path'] for f in json.loads((tmp_path / 'zeabur-stage-manifest.json').read_text())['files']}
+    assert {'backend/dispatch_publish/service.py', 'backend/app.py'} <= manifest
+    assert sorted(m for m in manifest if 'dev_dispatch' in m or 'dispatch_publish_fake' in m) == []

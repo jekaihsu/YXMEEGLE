@@ -33,8 +33,8 @@ def test_overlapping_commits_one_wins_the_other_conflicts_and_keeps_its_draft(h)
     approve(h, second['preview_id'])
     both_past_the_fresh_read(h)
     with ThreadPoolExecutor(2) as pool:
-        a = pool.submit(commit, h, 'cmd-race-first-1', first['preview_id'])
-        b = pool.submit(commit, h, 'cmd-race-second', second['preview_id'], other)
+        a = pool.submit(commit, h, '0d15ea5e-0000-4000-8000-000000000004', first['preview_id'])
+        b = pool.submit(commit, h, '0d15ea5e-0000-4000-8000-000000000005', second['preview_id'], other)
         responses = {'first': a.result(), 'second': b.result()}
     assert sorted(r.status_code for r in responses.values()) == [200, 409]
     winner = next(k for k, r in responses.items() if r.status_code == 200)
@@ -59,13 +59,13 @@ def test_one_command_id_sent_twice_at_once_writes_once(h):
     approve(h, found['preview_id'])
     both_past_the_fresh_read(h)
     with ThreadPoolExecutor(2) as pool:
-        a = pool.submit(commit, h, 'cmd-race-same-01', found['preview_id'])
-        b = pool.submit(commit, h, 'cmd-race-same-01', found['preview_id'], other)
+        a = pool.submit(commit, h, '0d15ea5e-0000-4000-8000-000000000006', found['preview_id'])
+        b = pool.submit(commit, h, '0d15ea5e-0000-4000-8000-000000000006', found['preview_id'], other)
         results = [a.result(), b.result()]
     # The second request sees the stored command: still pending (202) or already committed (200), never a new write.
     assert 200 in [r.status_code for r in results] and {r.status_code for r in results} <= {200, 202}
-    assert {r.json()['command']['command_id'] for r in results} == {'cmd-race-same-01'}
+    assert {r.json()['command']['command_id'] for r in results} == {'0d15ea5e-0000-4000-8000-000000000006'}
     assert len(h.fake.creates()) == 1
-    assert call(h, 'ou_pm', 'get', '/api/v2/commands/cmd-race-same-01').json()['command']['state'] == 'committed'
+    assert call(h, 'ou_pm', 'get', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000006').json()['command']['state'] == 'committed'
     assert len([f for f in h.fake.task_rows().values() if f.get('命令編號')]) == 1
     engine.dispose()

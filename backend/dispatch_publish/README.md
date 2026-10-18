@@ -9,12 +9,24 @@ Design: `docs/SOP_R1_SLICE2_DISPATCH_PUBLISH_20261018.md`, including Addendum A.
 | `DISPATCH_WRITE_ENABLED` | `false` | Registers every write route and `GET /api/v2/dispatch/work`, exposes `features.dispatch_write` in `/api/session`, and adds published 任務 rows to the board. |
 | `DISPATCH_BOARD_ENABLED` | `false` | Also registers `GET /api/v2/dispatch/work` (read only). |
 | `DISPATCH_APPROVAL_POLICY` | `required` | Only the literal `direct` drops the three approval seats. Any other value keeps them. |
-| `DISPATCH_SEAT_GROUP_LEADER`, `DISPATCH_SEAT_MANAGER_REVIEW`, `DISPATCH_SEAT_PM_FINAL` | empty | Comma-separated Lark open_ids per seat. An empty required seat makes commit answer `approval_not_configured`. |
+| `DISPATCH_SEAT_GROUP_LEADER`, `DISPATCH_SEAT_MANAGER_REVIEW`, `DISPATCH_SEAT_PM_FINAL` | empty | Comma-separated Lark open_ids. When set, they replace the derived holders of that seat (see Seats). |
 | `DISPATCH_ALLOW_UNKNOWN` | `false` | When true, an unverified `unknown` item is a warning instead of a blocker. |
 | `DISPATCH_PREVIEW_TTL_SECONDS` | `900` | Preview lifetime. Decisions belong to the proposal hash and outlive the preview. |
 | `DISPATCH_PENDING_GRACE_SECONDS` | `60` | A `pending` command can be reconciled only after this long without progress. |
 
 A commit also needs the workspace setting `external_enabled`, the formal `lark-<org>` production workspace, the application identity and the code-level write allowlist entry for 任務. Without them it is refused before any Lark request.
+
+## Seats
+
+Holders are resolved per proposal from the 人員名單 columns 職級, 所屬組別, 在職 and Lark帳號, and from the workspace's session people:
+
+| Seat | Holders |
+| --- | --- |
+| `group_leader_confirmed` | Active people with 職級 組長 whose 所屬組別 contains the proposal's `department` |
+| `manager_review` | Active people with 職級 經理 whose 所屬組別 contains the `department`, and every active 副總 or 老闆 |
+| `pm_final` | Active session users with role `pm` |
+
+A seat with no holder blocks with `approval_not_configured` plus `approval_not_configured:<seat>`, and commit answers 422 with `seats`. Each `required_seats` entry in a preview names its holders as `holders` (person_refs), `names` and `people`, with `configured` and `source` (`env`, `roster` or `session`). `/options` lists the same per seat, and per 所屬組別 for the two department-scoped seats. Seat holders who are not dispatchers may read previews and the work queue.
 
 ## Identities
 
@@ -22,17 +34,37 @@ A commit also needs the workspace setting `external_enabled`, the formal `lark-<
 
 ## Feasibility
 
-Every person is `unknown` because no capability or leave source exists. An `unknown` item blocks commit unless the proposal carries a manual verification reason for it (`verifications: {"person:recX": "reason"}`) or `DISPATCH_ALLOW_UNKNOWN` is on. Verifications are part of the proposal, so adding one changes the hash and needs fresh decisions. Occupancy comes from 工作預排 rows, 任務 rows with 預定開始/預定結束 and 排程狀態 已確認 or 發布中, and held reservations. Two timed intervals that intersect are `conflict`. A date-only row on a shared day is `unknown`.
+Every person is `unknown` because no capability or leave source exists. An `unknown` item blocks commit unless the proposal carries a manual verification reason for it (`verifications: {"person:recX": "reason"}`) or `DISPATCH_ALLOW_UNKNOWN` is on. Verifications are part of the proposal, so adding one changes the hash and needs fresh decisions. Occupancy comes from 工作預排 rows, 任務 rows with 預定開始/預定結束 and 排程狀態 已確認 or 發布中, and held reservations. Two timed intervals that intersect are `conflict`. A date-only row on a shared day makes a person, instrument or vehicle `unknown`.
+
+A commit re-reads every source and compares it with the preview: blockers, conflicts, the target 任務 row's written fields and the Lark account each person_ref resolves to. Any difference answers 409 `preview_stale`.
 
 ## Commands
 
-A commit verifies the stored preview against fresh reads and the seats, then persists the command as `pending` with its reservations in one transaction. The transaction first updates the workspace row in `dispatch_locks`, which serializes dispatch writes across processes on SQLite (RESERVED lock) and PostgreSQL (row lock). The 任務 write carries `client_token = command_id`. Success is reported only after a read-back of every written field matches.
+`command_id` must be a lowercase UUIDv4 (`crypto.randomUUID()`); anything else is 422 `invalid` with `field: command_id`, because Lark accepts only a UUIDv4 `client_token` and the command id is sent unchanged.
+
+A commit verifies the stored preview against fresh reads and the seats, re-reads the session, role and `external_enabled`, then persists the command as `pending` with its reservations in one transaction. The transaction first updates the workspace row in `dispatch_locks`, which serializes dispatch writes across processes on SQLite (RESERVED lock) and PostgreSQL (row lock). Inside it, an update is refused with 409 `stale_revision` when another command already committed this or a later revision of the task, or when the target row no longer matches what the commit assessed. The command also records that pre-command snapshot of the row. The 任務 write carries `client_token = command_id`. Success is reported only after a read-back of every written field matches, timestamps to the millisecond, and a search by 命令編號 finds exactly that one row.
 
 | Remote result | Command | Reservations |
 | --- | --- | --- |
 | Read-back matches | `committed` (200) | held; a reassignment releases the previous revision's now |
 | Lark refused the write | `failed` (502) | released |
 | Timeout, 5xx, no receipt, or read-back unreadable | `outcome_unknown` (202) | held |
+| Read-back matches but the 命令編號 search finds no row, or the search fails | `outcome_unknown` (202) | held |
 | Read-back differs, or several rows carry the command id | `reconciliation_required` (202) | held |
 
-`POST /api/v2/commands/{id}/reconcile` (manager) searches 任務 by 命令編號. One row is compared with the stored payload. Several rows stay `reconciliation_required`. No row sends the identical payload again with the same client_token. A row that differs is never overwritten.
+`POST /api/v2/commands/{id}/reconcile` (manager) searches 任務 by 命令編號. One row is compared with the stored payload. Several rows stay `reconciliation_required`. When no row carries the command id, an update first reads its target row: if the written fields differ from the pre-command snapshot, someone edited it and the command becomes `reconciliation_required` with `changed_since_commit`; it is never overwritten. Otherwise, after re-reading the session, the manager role and `external_enabled`, the identical payload is sent again with the same client_token.
+
+A committed command stops counting as a duplicate of its preview hash once a later revision released its reservations, so earlier content can be published again.
+
+## Local end-to-end server
+
+`scripts/dev_dispatch_fake_server.py` runs the real app (`create_app`) with both dispatch flags on, a `lark-company` production-like workspace on a fresh SQLite file, and the in-memory Bitable from `backend/test_dispatch_publish_fake.py` behind every dispatch Lark read and write. Every other Lark read is denied, so nothing leaves the machine. The fake is seeded with schedule rows, a roster with 職級, 所屬組別 and Lark帳號, instruments, vehicles, cases and three 任務 rows.
+
+```
+.venv/bin/python scripts/dev_dispatch_fake_server.py            # port 8000, the Vite proxy target
+cd frontend && npm run dev
+open http://localhost:5173/api/dev/login?as=pm                  # pm, lead, manager, pmfinal, staff
+curl -X POST localhost:8000/api/dev/faults -H 'content-type: application/json' -d '{"fault":"timeout_after_success"}'
+```
+
+`lead` holds 組長, `manager` holds 經理, `pmfinal` and `pm` hold `pm_final`, and `staff` is a crew member. A fault is one-shot on the next 任務 write: `timeout_after_success` lands the write and then times out, `error_before_landing` refuses it, and `mismatch` alters the next read-back. `GET /api/dev/faults` shows the armed fault and `DELETE` disarms it. The `/api/dev/*` routes exist only in this script, and `scripts/deploy_prepare.py` never ships it (`backend/test_stage_package.py` checks).

@@ -1,5 +1,6 @@
 """In-memory V4 Bitable for dispatch publish tests: real REST shapes, client_token dedupe and fault hooks."""
 import json
+import re
 import threading
 from urllib.parse import parse_qs
 
@@ -11,6 +12,7 @@ BASE = 'H7W6b0PFWaVF1BsgqXJj3pQ9pXb'
 TASKS = SOURCES['tasks'].table_id
 SCHEDULE = SOURCES['schedule'].table_id
 PEOPLE = SOURCES['people'].table_id
+UUID4 = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}')
 NAMES = {'ou_jia': '甲', 'ou_yi': '乙', 'ou_bing': '丙', 'ou_gone': '離職', 'ou_pm': '派工PM', 'ou_lead': '組長',
          'ou_mgr': '經理', 'ou_pmf': '專案PM'}
 
@@ -111,6 +113,8 @@ class FakeLark:
                           {'has_more': False, 'total': 0})
             if rest == ['records'] and method == 'POST':
                 token = query['client_token']
+                if not UUID4.fullmatch(token):
+                    return httpx.Response(200, json={'code': 1254037, 'msg': 'InvalidClientToken'})
                 if not self.dedupe or token not in self.tokens:
                     self.seq += 1
                     self.tokens[token] = self.add(table, f'recTask{self.seq:04d}', body['fields'])

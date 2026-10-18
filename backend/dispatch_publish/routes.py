@@ -18,7 +18,10 @@ COMMIT_STATUS = {CommandResult.COMMITTED: 200, CommandResult.FAILED: 502}
 
 def register(app, *, identity, allow, cfg, sessions, audit_model, workspace, transport=None, client_options=None,
              clock=None, reader=None):
-    """workspace(wid) -> {'settings': ..., 'environment': ...}; allow(data, user) -> may dispatch."""
+    """workspace(wid) -> {'settings', 'environment', 'users'}; allow(data, user) -> may dispatch.
+
+    users are the workspace's session people ({id, name, role, active}); role pm holds the pm_final seat.
+    """
     config = DispatchPublishConfig.from_env(cfg)
     if not (config.enabled or config.board_enabled):
         return None
@@ -35,11 +38,12 @@ def register(app, *, identity, allow, cfg, sessions, audit_model, workspace, tra
         if data.get('mode') != 'lark' or str(data.get('wid', '')).startswith(('test-', 'demo-')):
             raise Refusal('forbidden', '派工僅限公司正式工作區')
         dispatcher = bool(allow(data, user))
-        permitted = {'dispatch': dispatcher, 'view': dispatcher or bool(config.holds(user['id'])),
-                     'manager': user.get('role') == 'manager'}[need]
-        if not permitted or not user.get('active', True):
+        ctx = Context(data['wid'], user, workspace(data['wid']), dispatcher, lambda again: context(request, again))
+        permitted = {'dispatch': lambda: dispatcher, 'view': lambda: dispatcher or service.holds_any_seat(ctx),
+                     'manager': lambda: user.get('role') == 'manager'}[need]
+        if not user.get('active', True) or not permitted():
             raise Refusal('forbidden', '需要 PM、主管或核定席次權限')
-        return Context(data['wid'], user, workspace(data['wid']), dispatcher)
+        return ctx
 
     async def body_of(request):
         raw = await request.body()

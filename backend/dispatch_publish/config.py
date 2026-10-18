@@ -1,4 +1,4 @@
-"""Dispatch publish rollout, approval policy and seat holders, read once from the environment."""
+"""Dispatch publish rollout, approval policy and seat-holder overrides, read once from the environment."""
 import math
 import re
 from dataclasses import dataclass, field
@@ -56,6 +56,3 @@ class DispatchPublishConfig:
     @property
     def required_seats(self):
         return () if self.policy == 'direct' else SEAT_ORDER
-
-    def holds(self, open_id):
-        return frozenset(seat for seat in self.required_seats if open_id in self.seats.get(seat, ()))

@@ -5,7 +5,7 @@ No I/O. Requests are parsed into Proposal at the route boundary; V4 rows arrive 
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import StrEnum
 
@@ -64,7 +64,6 @@ PLANNING_LABEL = {PlanningStatus.UNASSIGNED: '未分配', PlanningStatus.DRAFT: 
 PLANNING_OF_LABEL = {label: status for status, label in PLANNING_LABEL.items()}
 BOOKING_LABELS = frozenset({'已確認', '發布中'})
 IN_FLIGHT = frozenset({CommandResult.PENDING, CommandResult.OUTCOME_UNKNOWN, CommandResult.RECONCILIATION_REQUIRED})
-LIVE = IN_FLIGHT | {CommandResult.COMMITTED}
 COMMAND_PLANNING = {CommandResult.PENDING: PlanningStatus.PUBLISHING,
                     CommandResult.OUTCOME_UNKNOWN: PlanningStatus.PUBLISHING,
                     CommandResult.RECONCILIATION_REQUIRED: PlanningStatus.CONFLICT,
@@ -74,13 +73,15 @@ COMMAND_LABEL = {CommandResult.PENDING: '處理中', CommandResult.OUTCOME_UNKNO
                  CommandResult.FAILED: '失敗', CommandResult.REJECTED: '已拒絕'}
 
 REF = re.compile(r'rec[A-Za-z0-9]{1,40}')
-COMMAND_ID = re.compile(r'[A-Za-z0-9_-]{8,64}')
+DRAFT_ID = re.compile(r'[A-Za-z0-9_-]{8,64}')
+# Lark accepts only a UUIDv4 as client_token (else 1254037); the command id is sent unchanged.
+COMMAND_ID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}')
 MAX_SPAN = timedelta(days=14)
 
 STATUS = {'invalid': 422, 'blocked': 422, 'approval_not_configured': 422, 'forbidden': 403,
           'writes_disabled': 403, 'not_found': 404, 'disabled': 404, 'preview_expired': 409,
           'preview_stale': 409, 'reservation_conflict': 409, 'duplicate_command': 409, 'idempotency_conflict': 409,
-          'busy': 409, 'seat_conflict': 409, 'version_conflict': 409, 'nothing_to_reconcile': 409,
+          'busy': 409, 'stale_revision': 409, 'seat_conflict': 409, 'version_conflict': 409, 'nothing_to_reconcile': 409,
           'payload_too_large': 413, 'lark_unconfigured': 503, 'sources_unavailable': 503}
 
 
@@ -158,17 +159,17 @@ def _invalid(field, message):
     return Refusal('invalid', message, field=field)
 
 
-def _text_field(raw, key, *, required=False, limit=200):
+def _text_field(raw, key, limit=200):
     value = raw.get(key)
     if value is None or value == '':
-        if required:
-            raise _invalid(key, f'{key} 為必填')
         return None
     if not isinstance(value, str) or len(value.strip()) > limit or any(ord(c) < 32 and c not in '\n\t' for c in value):
         raise _invalid(key, f'{key} 須為 {limit} 字以內的文字')
-    if required and not value.strip():
-        raise _invalid(key, f'{key} 為必填')
     return value.strip() or None
+
+
+def _text(limit):
+    return lambda raw, key: _text_field(raw, key, limit)
 
 
 def _ref_field(raw, key):
@@ -181,7 +182,9 @@ def _ref_field(raw, key):
 
 
 def _refs_field(raw, key, limit=30):
-    value = raw.get(key, [])
+    value = raw.get(key)
+    if value is None:
+        return ()
     if not isinstance(value, list) or len(value) > limit or not all(isinstance(v, str) and REF.fullmatch(v) for v in value):
         raise _invalid(key, f'{key} 須為最多 {limit} 筆 Lark 紀錄識別碼')
     return tuple(dict.fromkeys(value))
@@ -189,6 +192,8 @@ def _refs_field(raw, key, limit=30):
 
 def _moment(raw, key):
     value = raw.get(key)
+    if value is None:
+        return None
     try:
         parsed = datetime.fromisoformat(value) if isinstance(value, str) and len(value) <= 40 else None
     except ValueError:
@@ -198,56 +203,89 @@ def _moment(raw, key):
     return parsed.astimezone(TZ)
 
 
-def parse_proposal(raw) -> Proposal:
-    if not isinstance(raw, dict):
-        raise _invalid('proposal', '提案內容須為 JSON 物件')
-    unknown = sorted(set(raw) - PROPOSAL_KEYS)
-    if unknown:
-        raise _invalid(unknown[0], f'不支援的欄位：{unknown[0]}')
-
-    def enum(key, kind, required=False):
+def _enum(kind):
+    def parse(raw, key):
         value = raw.get(key)
-        if value is None and not required:
+        if value is None:
             return None
         try:
             return kind(value)
         except ValueError:
             raise _invalid(key, f'{key} 須為 {"、".join(k.value for k in kind)}') from None
+    return parse
 
-    owner = _ref_field(raw, 'primary_owner')
-    if owner is None:
-        raise _invalid('primary_owner', '請指定主要負責人')
-    crew = (owner,) + tuple(ref for ref in _refs_field(raw, 'crew') if ref != owner)
-    start, end = _moment(raw, 'start'), _moment(raw, 'end')
+
+def _hours(raw, key):
+    hours = raw.get(key)
+    if hours is not None and (type(hours) not in (int, float) or not 0 <= hours <= 10000):
+        raise _invalid(key, '預估人時須為 0 至 10000 的數字')
+    return None if hours is None else round(float(hours), 1)
+
+
+def _deadline(raw, key):
+    value = raw.get(key)
+    if value is None:
+        return None
+    try:
+        parsed = date.fromisoformat(value) if isinstance(value, str) and len(value) == 10 else None
+    except ValueError:
+        parsed = None
+    if parsed is None:
+        raise _invalid(key, '截止日須為 YYYY-MM-DD')
+    return parsed
+
+
+def _verifications(raw, key):
+    found = raw.get(key) or {}
+    if not isinstance(found, dict) or len(found) > 60 or not all(
+            isinstance(reason, str) and 0 < len(reason.strip()) <= 500 for reason in found.values()):
+        raise _invalid(key, '人工核實須對應本提案的人員或資源，且每項附 500 字以內理由')
+    return tuple(sorted((k, v.strip()) for k, v in found.items()))
+
+
+# Field -> (parser, required). A draft runs the same parsers but may leave required fields empty.
+FIELDS = {
+    'task_id': (_ref_field, False), 'project_ref': (_text(120), True), 'case_ref': (_ref_field, False),
+    'title': (_text(200), True), 'content': (_text(5000), False), 'kind': (_enum(TaskKind), True),
+    'phase': (_enum(Phase), False), 'package_id': (_text(120), False), 'parent_task_ref': (_ref_field, False),
+    'department': (_text(60), False), 'primary_owner': (_ref_field, True), 'crew': (_refs_field, False),
+    'start': (_moment, True), 'end': (_moment, True), 'est_person_hours': (_hours, False),
+    'instruments': (_refs_field, False), 'vehicles': (_refs_field, False), 'deadline': (_deadline, False),
+    'verifications': (_verifications, False),
+}
+REQUIRED_MESSAGE = {'primary_owner': '請指定主要負責人'}
+
+
+def _fields(raw, *, draft):
+    if not isinstance(raw, dict):
+        raise _invalid('proposal', '提案內容須為 JSON 物件')
+    unknown = sorted(set(raw) - PROPOSAL_KEYS)
+    if unknown:
+        raise _invalid(unknown[0], f'不支援的欄位：{unknown[0]}')
+    values = {}
+    for key, (parse, required) in FIELDS.items():
+        values[key] = parse(raw, key)
+        if required and not draft and values[key] is None:
+            raise _invalid(key, REQUIRED_MESSAGE.get(key, f'{key} 為必填'))
+    return values
+
+
+def check_draft(raw):
+    """Refuse a draft whose present fields have the wrong type; missing fields are fine."""
+    _fields(raw, draft=True)
+
+
+def parse_proposal(raw) -> Proposal:
+    values = _fields(raw, draft=False)
+    owner, start, end = values['primary_owner'], values['start'], values['end']
     if not start < end or end - start > MAX_SPAN:
         raise _invalid('end', '結束須晚於開始，且一段排程最多 14 天')
-    hours = raw.get('est_person_hours')
-    if hours is not None and (type(hours) not in (int, float) or not 0 <= hours <= 10000):
-        raise _invalid('est_person_hours', '預估人時須為 0 至 10000 的數字')
-    deadline = raw.get('deadline')
-    if deadline is not None:
-        try:
-            deadline = date.fromisoformat(deadline) if isinstance(deadline, str) and len(deadline) == 10 else None
-        except ValueError:
-            deadline = None
-        if deadline is None:
-            raise _invalid('deadline', '截止日須為 YYYY-MM-DD')
-    proposal = Proposal(
-        task_id=_ref_field(raw, 'task_id'), project_ref=_text_field(raw, 'project_ref', required=True, limit=120),
-        case_ref=_ref_field(raw, 'case_ref'), title=_text_field(raw, 'title', required=True),
-        content=_text_field(raw, 'content', limit=5000) or '', kind=enum('kind', TaskKind, required=True),
-        phase=enum('phase', Phase), package_id=_text_field(raw, 'package_id', limit=120),
-        parent_task_ref=_ref_field(raw, 'parent_task_ref'), department=_text_field(raw, 'department', limit=60),
-        primary_owner=owner, crew=crew, start=start, end=end,
-        est_person_hours=None if hours is None else round(float(hours), 1),
-        instruments=_refs_field(raw, 'instruments'), vehicles=_refs_field(raw, 'vehicles'), deadline=deadline,
-        verifications=())
-    found = raw.get('verifications') or {}
+    proposal = Proposal(**{**values, 'content': values['content'] or '',
+                           'crew': (owner,) + tuple(ref for ref in values['crew'] if ref != owner)})
     allowed = {item_key(kind, ref) for kind, ref in proposal.items()}
-    if not isinstance(found, dict) or len(found) > 60 or not set(found) <= allowed or not all(
-            isinstance(reason, str) and 0 < len(reason.strip()) <= 500 for reason in found.values()):
+    if not {key for key, _ in proposal.verifications} <= allowed:
         raise _invalid('verifications', '人工核實須對應本提案的人員或資源，且每項附 500 字以內理由')
-    return Proposal(**{**proposal.__dict__, 'verifications': tuple(sorted((k, v.strip()) for k, v in found.items()))})
+    return proposal
 
 
 def digest(value):
@@ -293,6 +331,8 @@ class Directory:
     active: dict
     open_ids: dict
     refs: dict
+    ranks: dict = field(default_factory=dict)
+    groups: dict = field(default_factory=dict)
 
     @classmethod
     def of(cls, sources: Sources):
@@ -307,11 +347,19 @@ class Directory:
         open_ids = {ref: ident for ref, ident in open_ids.items() if refs.get(ident) == ref}
         names = {ref: text(f.get('姓名')).strip() or None for ref, f in people.items()}
         active = {ref: (f.get('在職') is True) for ref, f in people.items()} if sources.people is not None else {}
-        return cls(names, active, open_ids, refs)
+        accounts = sources.index('accounts')
+        ranks = {ref: text(f.get('職級')).strip() or None for ref, f in accounts.items()}
+        groups = {ref: frozenset(text(g).strip() for g in _values(f.get('所屬組別')) if text(g).strip())
+                  for ref, f in accounts.items()}
+        return cls(names, active, open_ids, refs, ranks, groups)
 
     def person(self, open_id, name=None):
         ref = self.refs.get(open_id)
         return {'person_ref': ref, 'open_id': open_id, 'name': (self.names.get(ref) if ref else None) or name or None}
+
+
+def _values(raw):
+    return raw if isinstance(raw, list) else [raw] if raw else []
 
 
 def task_users(fields, name):
@@ -402,6 +450,8 @@ def assess(proposal: Proposal, sources: Sources, reservations, *, allow_unknown:
                 reasons.append(reason)
             if state is Feasibility.CONFLICT and feasibility is not Feasibility.UNAVAILABLE:
                 feasibility = Feasibility.CONFLICT
+            elif state is Feasibility.UNKNOWN and feasibility is Feasibility.FEASIBLE:
+                feasibility = Feasibility.UNKNOWN
         key = item_key(kind, ref)
         if feasibility in (Feasibility.CONFLICT, Feasibility.UNAVAILABLE):
             blockers.append(f'{feasibility.value}:{key}')
@@ -439,7 +489,7 @@ def assess(proposal: Proposal, sources: Sources, reservations, *, allow_unknown:
                 'name': text((fields or {}).get('工程名稱')).strip() or None}
         if fields is None:
             blockers.append('case_unresolved')
-    base_revision = 0
+    base_revision, row = 0, None
     if proposal.task_id:
         row = sources.index('tasks').get(proposal.task_id) if sources.tasks is not None else None
         if row is None:
@@ -453,30 +503,84 @@ def assess(proposal: Proposal, sources: Sources, reservations, *, allow_unknown:
     result = {'crew': crew, 'resources': resources, 'case': case, 'conflicts': conflicts, 'warnings': warnings,
               'blockers': blockers, 'hours': proposal.hours, 'booked_person_hours': proposal.booked_person_hours,
               'base_revision': base_revision}
+    # Anything the approvers saw that a commit would act on: the target row as it stands and who each
+    # person_ref resolves to in Lark. A change to either after the preview forces a new preview.
     result['digest'] = digest({'blockers': blockers, 'base_revision': base_revision,
                                'conflicts': sorted((c['kind'], c['ref'], c['other']['source'], c['other']['id'])
-                                                   for c in conflicts)})
+                                                   for c in conflicts),
+                               'row': snapshot(row) if row is not None else None,
+                               'accounts': [(ref, directory.open_ids.get(ref)) for ref in proposal.crew]})
     return result
 
 
 # Approval seats
 
 
-def seat_board(required, holders, decisions):
+LEADER_RANK, MANAGER_RANK, EXECUTIVE_RANKS = '組長', '經理', frozenset({'副總', '老闆'})
+ANY_DEPARTMENT = object()
+
+
+@dataclass(frozen=True)
+class Seats:
+    """Who may decide each seat, where that list came from, and session names the roster cannot supply."""
+    holders: dict
+    origin: dict
+    names: dict
+
+    def mine(self, open_id):
+        return frozenset(seat for seat, found in self.holders.items() if open_id in found)
+
+    def people(self, seat, directory: Directory):
+        return [{'person_ref': p['person_ref'], 'name': p['name']}
+                for p in (directory.person(ident, self.names.get(ident)) for ident in sorted(self.holders.get(seat, ())))]
+
+
+def resolve_seats(required, directory: Directory, department, session_users, overrides) -> Seats:
+    """DISPATCH_SEAT_* when set; else 組長 of the proposal's 所屬組別, its 經理 or any 副總/老闆, and session PMs."""
+    def roster(match):
+        return frozenset(directory.open_ids[ref] for ref, rank in directory.ranks.items()
+                         if directory.active.get(ref) and ref in directory.open_ids
+                         and match(rank, directory.groups.get(ref, frozenset())))
+
+    def ours(groups):
+        return bool(groups) if department is ANY_DEPARTMENT else department in groups
+
+    rules = {
+        Seat.GROUP_LEADER: lambda: roster(lambda rank, groups: rank == LEADER_RANK and ours(groups)),
+        Seat.MANAGER_REVIEW: lambda: roster(lambda rank, groups: rank in EXECUTIVE_RANKS or (
+            rank == MANAGER_RANK and ours(groups))),
+        Seat.PM_FINAL: lambda: frozenset(u['id'] for u in session_users
+                                         if u.get('role') == 'pm' and u.get('active', True) and isinstance(u.get('id'), str)),
+    }
+    holders, origin = {}, {}
+    for seat in required:
+        if overrides.get(seat):
+            holders[seat], origin[seat] = frozenset(overrides[seat]), 'env'
+        else:
+            holders[seat], origin[seat] = rules[seat](), 'session' if seat is Seat.PM_FINAL else 'roster'
+    names = {u['id']: text(u.get('name')).strip() or None for u in session_users if isinstance(u.get('id'), str)}
+    return Seats(holders, origin, names)
+
+
+def seat_board(required, seats: Seats, decisions, directory: Directory):
     """Seat status for one hash, in approval order, plus the blockers that keep it from publishing."""
     by_seat = {d['seat']: d for d in decisions}
-    seats, blockers = [], []
+    board, blockers = [], []
     for seat in required:
         found = by_seat.get(seat.value)
-        seats.append({'seat': seat.value, 'holders': sorted(holders.get(seat, ())),
+        people = seats.people(seat, directory)
+        board.append({'seat': seat.value, 'holders': [p['person_ref'] for p in people if p['person_ref']],
+                      'names': [p['name'] for p in people if p['name']], 'people': people,
+                      'configured': bool(people), 'source': seats.origin.get(seat),
                       'decision': found['decision'] if found else None, 'actor': found['actor_id'] if found else None,
                       'reason': found['reason'] if found else None, 'at': found['at'] if found else None})
-    if any(not holders.get(seat) for seat in required):
-        blockers.append('approval_not_configured')
+    unconfigured = [seat.value for seat in required if not seats.holders.get(seat)]
+    if unconfigured:
+        blockers += ['approval_not_configured'] + [f'approval_not_configured:{seat}' for seat in unconfigured]
     if any(d['decision'] == Decision.RETURNED for d in decisions):
         blockers.append('approval_returned')
-    blockers += [f"approval_missing:{s['seat']}" for s in seats if s['decision'] != Decision.ACCEPTED]
-    return seats, blockers
+    blockers += [f"approval_missing:{s['seat']}" for s in board if s['decision'] != Decision.ACCEPTED]
+    return board, blockers
 
 
 def next_seat(required, decisions):
@@ -536,8 +640,26 @@ def task_fields(proposal: Proposal, directory: Directory, *, actor_open_id, comm
     return fields
 
 
+def _canon(kind, raw):
+    # node_assignment's canon rounds dates to the minute; dispatch writes and compares epoch milliseconds.
+    if kind is Kind.DATE:
+        return raw if type(raw) is int else None
+    found = canon(kind, raw)
+    return list(found) if isinstance(found, tuple) else found
+
+
 def mismatches(written, fields):
-    return sorted(name for name, value in written.items() if canon(TASK_SPEC[name], fields.get(name)) != canon(TASK_SPEC[name], value))
+    return sorted(name for name, value in written.items() if _canon(TASK_SPEC[name], fields.get(name)) != _canon(TASK_SPEC[name], value))
+
+
+def snapshot(fields):
+    """Every field a command may write, in comparable form: the row as a command found it."""
+    return {name: _canon(kind, fields.get(name)) for name, kind in TASK_SPEC.items()}
+
+
+def changed(before, fields):
+    now = snapshot(fields)
+    return sorted(name for name in TASK_SPEC if before.get(name) != now[name])
 
 
 # PM work queue
@@ -638,7 +760,7 @@ class Overlay:
     drafts: list
 
 
-def _overlay_row(row, viewer: Viewer, *, command=None, approval=None, draft=None, required=(), holders=None,
+def _overlay_row(row, viewer: Viewer, *, command=None, approval=None, draft=None, required=(), seats_for=None,
                  allow_unknown=False, reconcilable=frozenset()):
     needs, planning = [], PlanningStatus(row['planning_status'])
     if draft is not None:
@@ -651,8 +773,8 @@ def _overlay_row(row, viewer: Viewer, *, command=None, approval=None, draft=None
         planning = PlanningStatus.DRAFT if returned else PlanningStatus.PENDING_APPROVAL
         seat = next_seat(required, decisions)
         # Approving a hash that still has feasibility blockers is wasted: fixing them changes the hash.
-        if (not returned and seat and not approval['blockers']
-                and decision_refusal(seat, viewer.open_id, required, holders, decisions) is None):
+        if (not returned and seat and not approval['blockers'] and decision_refusal(
+                seat, viewer.open_id, required, seats_for(approval['proposal']).holders, decisions) is None):
             needs.append(f'approve_seat:{seat.value}')
         if approval['actor_id'] == viewer.open_id:
             if returned:
@@ -693,22 +815,38 @@ def _overlay_row(row, viewer: Viewer, *, command=None, approval=None, draft=None
     return row
 
 
-def build_work(sources: Sources, overlay: Overlay, viewer: Viewer, *, required, holders, allow_unknown,
+def build_work(sources: Sources, overlay: Overlay, viewer: Viewer, *, required, seats_for, allow_unknown,
                reconcilable, window=None, group=None, scope='all'):
+    """seats_for(proposal dict) -> Seats for that proposal's department."""
     directory = Directory.of(sources)
-    latest_command = {}
-    for command in sorted(overlay.commands, key=lambda c: (c['created_at'], c['revision'], c['updated_at'])):
+    order = lambda c: (c['created_at'], c['revision'], c['updated_at'])
+    latest_command, by_id = {}, {}
+    for command in sorted(overlay.commands, key=order):
         latest_command[command['task_id'] or ('preview', command['preview_hash'])] = command
-    approvals, drafts = {}, {}
+        by_id[command['command_id']] = command
+    approvals, drafts, gaps = {}, {}, []
     for approval in sorted(overlay.approvals, key=lambda a: a['created_at']):
         approvals[approval['task_id'] or ('draft', approval['draft_id'] or approval['preview_hash'])] = approval
     for draft in overlay.drafts:
+        try:
+            check_draft(draft['proposal'])
+        except Refusal as exc:
+            gaps.append({'code': 'invalid_draft', 'draft_id': draft['id'], 'field': exc.extra.get('field')})
+            continue
         drafts[draft['task_id'] or ('draft', draft['id'])] = draft
-    options = dict(required=required, holders=holders, allow_unknown=allow_unknown, reconcilable=reconcilable)
+    options = dict(required=required, seats_for=seats_for, allow_unknown=allow_unknown, reconcilable=reconcilable)
     rows = []
     for record in sources.tasks or []:
         rid = record['record_id']
-        command = latest_command.pop(rid, None)
+        found = [latest_command.pop(rid, None)]
+        # A create whose response was lost has no local task id; the row it landed carries its 命令編號.
+        landed = by_id.get(text(record['fields'].get('命令編號')).strip())
+        if landed is not None and landed['task_id'] is None:
+            key = ('preview', landed['preview_hash'])
+            if latest_command.get(key) is landed:
+                found.append(latest_command.pop(key))
+            approvals = {k: a for k, a in approvals.items() if a['preview_hash'] != landed['preview_hash']}
+        command = max((c for c in found if c is not None), key=order, default=None)
         approval = approvals.pop(rid, None)
         if approval is not None and command is not None and command['preview_hash'] == approval['preview_hash']:
             approval = None
@@ -737,7 +875,7 @@ def build_work(sources: Sources, overlay: Overlay, viewer: Viewer, *, required, 
         planning_counts[row['planning_status']] = planning_counts.get(row['planning_status'], 0) + 1
     return {'progress': {'total': len(rows), 'status': status_counts, 'planning_status': planning_counts,
                          'needs_me': sum(1 for r in rows if r['needs_me'])},
-            'needs_me': [row for row in rows if row['needs_me']], 'rows': rows}
+            'needs_me': [row for row in rows if row['needs_me']], 'rows': rows, 'gaps': gaps}
 
 
 def _visible(row, viewer: Viewer, window, group, scope):

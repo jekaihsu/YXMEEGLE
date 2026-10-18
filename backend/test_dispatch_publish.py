@@ -15,7 +15,7 @@ from .dispatch_publish.routes import register
 from .live_read.token_cache import TenantTokenCache
 from .models import AuditRow, Base, DispatchReservationRow
 from .test_dispatch_publish_fake import (
-    PEOPLE, SCHEDULE, TASKS, Crash, FakeLark, crash_after, rejected, timeout_after, timeout_before)
+    NAMES, PEOPLE, SCHEDULE, TASKS, Crash, FakeLark, crash_after, rejected, timeout_after, timeout_before)
 
 T0 = datetime(2026, 10, 19, 10, 0, tzinfo=TZ).timestamp()
 SEATS = {'DISPATCH_SEAT_GROUP_LEADER': 'ou_lead', 'DISPATCH_SEAT_MANAGER_REVIEW': 'ou_mgr', 'DISPATCH_SEAT_PM_FINAL': 'ou_pmf'}
@@ -27,6 +27,7 @@ PROPOSAL = {'project_ref': 'DEMO-01', 'case_ref': 'recCase1', 'title': 'B 區外
             'crew': ['recP3', 'recP2'], 'start': '2026-10-20T08:00+08:00', 'end': '2026-10-20T12:00+08:00',
             'instruments': ['recI1'],
             'verifications': {'person:recP3': '主管核實 L2 資格', 'person:recP2': '主管核實 L2 資格'}}
+USERS = [{'id': ident, 'name': NAMES.get(ident, ident), 'role': role, 'active': True} for ident, role in ROLES.items()]
 APPROVERS = [('ou_lead', 'group_leader_confirmed'), ('ou_mgr', 'manager_review'), ('ou_pmf', 'pm_final')]
 
 
@@ -43,10 +44,13 @@ class NoBucket:
 
 
 def seed(fake):
-    for rid, name, ident, active in [('recP1', '甲', 'ou_jia', True), ('recP2', '乙', 'ou_yi', True),
-                                     ('recP3', '丙', 'ou_bing', True), ('recP4', '離職', 'ou_gone', False),
-                                     ('recP5', '無帳號', None, True)]:
-        fake.add(PEOPLE, rid, {'姓名': name, '在職': active, 'Lark帳號': [{'id': ident}] if ident else None})
+    for rid, name, ident, active, rank, groups in [
+            ('recP1', '甲', 'ou_jia', True, '組員', ['外業']), ('recP2', '乙', 'ou_yi', True, '組員', ['外業']),
+            ('recP3', '丙', 'ou_bing', True, '組員', ['外業']), ('recP4', '離職', 'ou_gone', False, '組長', ['外業']),
+            ('recP5', '無帳號', None, True, '組員', ['外業']), ('recP6', '組長', 'ou_lead', True, '組長', ['外業']),
+            ('recP7', '經理', 'ou_mgr', True, '經理', ['外業', '測繪']), ('recP8', '專案PM', 'ou_pmf', True, '組員', ['PM'])]:
+        fake.add(PEOPLE, rid, {'姓名': name, '在職': active, 'Lark帳號': [{'id': ident}] if ident else None,
+                               '職級': rank, '所屬組別': groups})
     fake.add(SOURCES['instruments'].table_id, 'recI1', {'儀器名稱': 'GNSS-01', '啟用': True, '狀態': '正常'})
     fake.add(SOURCES['instruments'].table_id, 'recI2', {'儀器名稱': 'GNSS-02', '啟用': True, '狀態': '送修-損壞'})
     fake.add(SOURCES['vehicles'].table_id, 'recV1', {'車牌': 'SYN-001', '啟用': True})
@@ -69,7 +73,7 @@ def h(tmp_path):
     fake = FakeLark()
     seed(fake)
     clock, who = [T0], ['ou_pm']
-    workspace = {'settings': {'external_enabled': True}, 'environment': 'production'}
+    workspace = {'settings': {'external_enabled': True}, 'environment': 'production', 'users': USERS}
 
     def identity(_request):
         return {'mode': 'lark', 'wid': 'lark-company'}, {'id': who[0], 'role': ROLES[who[0]], 'active': True}
@@ -120,7 +124,7 @@ def commit(h, command_id, preview_id, client=None):
     return call(h, 'ou_pm', 'post', '/api/v2/dispatch/commits', {'command_id': command_id, 'preview_id': preview_id}, client)
 
 
-def published(h, command_id='cmd-publish-0001', **changes):
+def published(h, command_id='0d15ea5e-0000-4000-8000-000000000001', **changes):
     found = preview(h, **changes)
     approve(h, found['preview_id'])
     response = commit(h, command_id, found['preview_id'])
@@ -133,7 +137,7 @@ EXPECTED_ROW = {
     '部門': '外業', '專案編號': 'DEMO-01', '工程確認單': ['recCase1'], '任務階段': '正式', '任務種類': '執行',
     '預定開始': ms('2026-10-20T08:00+08:00'), '預定結束': ms('2026-10-20T12:00+08:00'), '預估人時': 8.0,
     '組員': [{'id': 'ou_yi'}], '使用儀器': ['recI1'], '排程狀態': '已確認', '排程版本': 1,
-    '命令編號': 'cmd-publish-0001', '讀回時間': int(T0 * 1000), '狀態': '待處理'}
+    '命令編號': '0d15ea5e-0000-4000-8000-000000000001', '讀回時間': int(T0 * 1000), '狀態': '待處理'}
 
 
 def test_flag_off_answers_404_on_every_route_and_reads_nothing(h):
@@ -188,8 +192,9 @@ def test_same_content_reuses_preview_and_a_changed_field_voids_decisions(h):
     response = call(h, 'ou_lead', 'post', f"/api/v2/dispatch/previews/{first['preview_id']}/decisions",
                     {'seat': 'group_leader_confirmed', 'decision': 'accepted'})
     assert response.json()['required_seats'][0] | {'at': None} == {
-        'seat': 'group_leader_confirmed', 'holders': ['ou_lead'], 'decision': 'accepted', 'actor': 'ou_lead',
-        'reason': None, 'at': None}
+        'seat': 'group_leader_confirmed', 'holders': ['recP6'], 'names': ['組長'],
+        'people': [{'person_ref': 'recP6', 'name': '組長'}], 'configured': True, 'source': 'env',
+        'decision': 'accepted', 'actor': 'ou_lead', 'reason': None, 'at': None}
     changed = preview(h, end='2026-10-20T12:15+08:00')
     assert changed['preview_hash'] != first['preview_hash']
     assert [s['decision'] for s in changed['required_seats']] == [None, None, None]
@@ -217,26 +222,26 @@ def test_commit_publishes_one_task_row_after_read_back(h):
     rid = body['command']['task_id']
     assert h.fake.task_rows()[rid] == EXPECTED_ROW
     assert body['command'] | {'created_at': None, 'updated_at': None} == {
-        'command_id': 'cmd-publish-0001', 'preview_id': found['preview_id'], 'preview_hash': found['preview_hash'],
+        'command_id': '0d15ea5e-0000-4000-8000-000000000001', 'preview_id': found['preview_id'], 'preview_hash': found['preview_hash'],
         'action': 'create', 'task_id': rid, 'actor_id': 'ou_pm', 'state': 'committed', 'label': '已確認',
         'planning_status': 'confirmed', 'revision': 1, 'created_at': None, 'updated_at': None}
     assert body['receipt'] == {'record_id': rid, 'read_back_at': '2026-10-19T02:00:00+00:00', 'mismatches': [], 'revision': 1}
     assert body['next_action'] == 'none'
     assert [(r['resource_kind'], r['ref'], r['state'], r['task_id']) for r in body['reservations']] == [
         ('instrument', 'recI1', 'held', rid), ('person', 'recP2', 'held', rid), ('person', 'recP3', 'held', rid)]
-    assert [q['client_token'] for _, _, q in h.fake.creates()] == ['cmd-publish-0001']
+    assert [q['client_token'] for _, _, q in h.fake.creates()] == ['0d15ea5e-0000-4000-8000-000000000001']
     assert h.audits() == ['dispatch.preview', 'dispatch.decision', 'dispatch.decision', 'dispatch.decision',
                           'dispatch.command.pending', 'dispatch.command.committed']
 
 
 def test_same_command_id_replays_the_stored_result_without_a_second_write(h):
     found, first = published(h)
-    again = commit(h, 'cmd-publish-0001', found['preview_id'])
+    again = commit(h, '0d15ea5e-0000-4000-8000-000000000001', found['preview_id'])
     assert (again.status_code, again.headers['Idempotent-Replayed'], again.json()) == (200, 'true', first)
     assert len(h.fake.creates()) == 1
-    other = commit(h, 'cmd-publish-0002', found['preview_id'])
-    assert (other.status_code, other.json()['code'], other.json()['command_id']) == (409, 'duplicate_command', 'cmd-publish-0001')
-    reused = commit(h, 'cmd-publish-0001', 'pv_other')
+    other = commit(h, '0d15ea5e-0000-4000-8000-000000000002', found['preview_id'])
+    assert (other.status_code, other.json()['code'], other.json()['command_id']) == (409, 'duplicate_command', '0d15ea5e-0000-4000-8000-000000000001')
+    reused = commit(h, '0d15ea5e-0000-4000-8000-000000000001', 'pv_other')
     assert (reused.status_code, reused.json()['code']) == (409, 'idempotency_conflict')
 
 
@@ -245,7 +250,7 @@ def test_external_connection_off_blocks_commit_before_any_remote_call(h):
     approve(h, pid)
     h.fake.requests.clear()
     h.workspace['settings']['external_enabled'] = False
-    response = commit(h, 'cmd-publish-0001', pid)
+    response = commit(h, '0d15ea5e-0000-4000-8000-000000000001', pid)
     assert (response.status_code, response.json()['code']) == (403, 'writes_disabled')
     assert h.fake.requests == []
     assert preview(h)['can_commit'] is False
@@ -254,43 +259,45 @@ def test_external_connection_off_blocks_commit_before_any_remote_call(h):
 def test_unknown_blocks_by_default_and_allow_unknown_relaxes_it(h):
     pid = preview(h, verifications={})['preview_id']
     approve(h, pid)
-    response = commit(h, 'cmd-publish-0001', pid)
+    response = commit(h, '0d15ea5e-0000-4000-8000-000000000001', pid)
     assert (response.status_code, response.json()['blockers']) == (422, ['unknown:person:recP3', 'unknown:person:recP2'])
     assert h.fake.writes() == []
     relaxed = h.build({'DISPATCH_ALLOW_UNKNOWN': 'true'})
     body = preview(h, relaxed, verifications={})
     assert body['warnings'] == ['no_capability_source', 'no_leave_source', 'unverified_unknown:person:recP3',
                                 'unverified_unknown:person:recP2']
-    assert commit(h, 'cmd-publish-0002', body['preview_id'], relaxed).status_code == 200
+    assert commit(h, '0d15ea5e-0000-4000-8000-000000000002', body['preview_id'], relaxed).status_code == 200
 
 
 def test_missing_seat_holders_and_direct_policy(h):
     unconfigured = h.build({'DISPATCH_SEAT_PM_FINAL': ''})
+    h.workspace['users'] = [u for u in h.workspace['users'] if u['role'] != 'pm']
     pid = preview(h, unconfigured)['preview_id']
-    response = commit(h, 'cmd-publish-0001', pid, unconfigured)
-    assert (response.status_code, response.json()['code']) == (422, 'approval_not_configured')
+    response = commit(h, '0d15ea5e-0000-4000-8000-000000000001', pid, unconfigured)
+    assert (response.status_code, response.json()['code'], response.json()['seats']) == (
+        422, 'approval_not_configured', ['pm_final'])
     direct = h.build({'DISPATCH_APPROVAL_POLICY': 'direct'})
     body = preview(h, direct)
     assert (body['required_seats'], body['blockers'], body['can_commit']) == ([], [], True)
-    assert commit(h, 'cmd-publish-0002', body['preview_id'], direct).json()['command']['state'] == 'committed'
+    assert commit(h, '0d15ea5e-0000-4000-8000-000000000002', body['preview_id'], direct).json()['command']['state'] == 'committed'
 
 
 def test_timeout_after_remote_success_then_reconcile_commits_one_row(h):
     pid = preview(h)['preview_id']
     approve(h, pid)
     h.fake.on('POST', f'/{TASKS}/records', timeout_after)
-    response = commit(h, 'cmd-publish-0001', pid)
+    response = commit(h, '0d15ea5e-0000-4000-8000-000000000001', pid)
     body = response.json()
     assert (response.status_code, body['command']['state'], body['command']['planning_status'], body['command']['label']) == (
         202, 'outcome_unknown', 'publishing', '結果未知')
     assert {r['state'] for r in body['reservations']} == {'held'}
-    assert call(h, 'ou_pm', 'get', '/api/v2/commands/cmd-publish-0001').json()['next_action'] == 'none'
-    assert call(h, 'ou_mgr', 'get', '/api/v2/commands/cmd-publish-0001').json()['next_action'] == 'reconcile'
-    assert call(h, 'ou_pm', 'post', '/api/v2/commands/cmd-publish-0001/reconcile').status_code == 403
-    resolved = call(h, 'ou_mgr', 'post', '/api/v2/commands/cmd-publish-0001/reconcile')
+    assert call(h, 'ou_pm', 'get', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000001').json()['next_action'] == 'none'
+    assert call(h, 'ou_mgr', 'get', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000001').json()['next_action'] == 'reconcile'
+    assert call(h, 'ou_pm', 'post', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000001/reconcile').status_code == 403
+    resolved = call(h, 'ou_mgr', 'post', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000001/reconcile')
     assert (resolved.status_code, resolved.json()['command']['state']) == (200, 'committed')
     rows = h.fake.task_rows()
-    assert [rid for rid, f in rows.items() if f.get('命令編號') == 'cmd-publish-0001'] == [resolved.json()['command']['task_id']]
+    assert [rid for rid, f in rows.items() if f.get('命令編號') == '0d15ea5e-0000-4000-8000-000000000001'] == [resolved.json()['command']['task_id']]
     assert len(h.fake.creates()) == 1
 
 
@@ -298,10 +305,10 @@ def test_nothing_landed_reconcile_resends_with_the_same_client_token(h):
     pid = preview(h)['preview_id']
     approve(h, pid)
     h.fake.on('POST', f'/{TASKS}/records', timeout_before)
-    assert commit(h, 'cmd-publish-0001', pid).json()['command']['state'] == 'outcome_unknown'
-    resolved = call(h, 'ou_mgr', 'post', '/api/v2/commands/cmd-publish-0001/reconcile')
+    assert commit(h, '0d15ea5e-0000-4000-8000-000000000001', pid).json()['command']['state'] == 'outcome_unknown'
+    resolved = call(h, 'ou_mgr', 'post', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000001/reconcile')
     assert resolved.json()['command']['state'] == 'committed'
-    assert [q['client_token'] for _, _, q in h.fake.creates()] == ['cmd-publish-0001', 'cmd-publish-0001']
+    assert [q['client_token'] for _, _, q in h.fake.creates()] == ['0d15ea5e-0000-4000-8000-000000000001', '0d15ea5e-0000-4000-8000-000000000001']
     assert len([f for f in h.fake.task_rows().values() if f.get('命令編號')]) == 1
 
 
@@ -315,7 +322,7 @@ def test_read_back_mismatch_requires_reconciliation_and_is_never_overwritten(h):
         record['fields']['預定結束'] = ms('2026-10-20T13:00+08:00')
         return httpx.Response(200, json={'code': 0, 'data': {'record': record}})
     h.fake.on('GET', '/records/recTask0001', edited)
-    response = commit(h, 'cmd-publish-0001', pid)
+    response = commit(h, '0d15ea5e-0000-4000-8000-000000000001', pid)
     body = response.json()
     assert (response.status_code, body['command']['state'], body['command']['planning_status']) == (
         202, 'reconciliation_required', 'conflict')
@@ -324,7 +331,7 @@ def test_read_back_mismatch_requires_reconciliation_and_is_never_overwritten(h):
     rid = body['command']['task_id']
     h.fake.tables[TASKS][rid]['預定結束'] = ms('2026-10-20T13:00+08:00')
     writes = len(h.fake.writes())
-    again = call(h, 'ou_mgr', 'post', '/api/v2/commands/cmd-publish-0001/reconcile')
+    again = call(h, 'ou_mgr', 'post', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000001/reconcile')
     assert (again.json()['command']['state'], again.json()['receipt']['mismatches']) == ('reconciliation_required', ['預定結束'])
     assert len(h.fake.writes()) == writes
 
@@ -339,7 +346,7 @@ def test_partial_row_is_reconciliation_required(h):
         h.fake.tables[TASKS][rid].pop('組員')
         return response
     h.fake.on('POST', f'/{TASKS}/records', partial)
-    body = commit(h, 'cmd-publish-0001', pid).json()
+    body = commit(h, '0d15ea5e-0000-4000-8000-000000000001', pid).json()
     assert (body['command']['state'], body['receipt']['mismatches']) == ('reconciliation_required', ['組員'])
 
 
@@ -347,21 +354,21 @@ def test_error_before_landing_fails_and_releases_reservations(h):
     pid = preview(h)['preview_id']
     approve(h, pid)
     h.fake.on('POST', f'/{TASKS}/records', rejected)
-    response = commit(h, 'cmd-publish-0001', pid)
+    response = commit(h, '0d15ea5e-0000-4000-8000-000000000001', pid)
     assert (response.status_code, response.json()['command']['state'], response.json()['receipt']['error']) == (
         502, 'failed', 'lark_error')
     assert {r['state'] for r in response.json()['reservations']} == {'released'}
     assert h.fake.task_rows().keys() == {'recLegacy'}
-    assert commit(h, 'cmd-publish-0002', pid).json()['command']['state'] == 'committed'
+    assert commit(h, '0d15ea5e-0000-4000-8000-000000000002', pid).json()['command']['state'] == 'committed'
 
 
 def test_duplicate_rows_for_one_command_require_reconciliation(h):
     pid = preview(h)['preview_id']
     approve(h, pid)
     h.fake.on('POST', f'/{TASKS}/records', timeout_after)
-    commit(h, 'cmd-publish-0001', pid)
+    commit(h, '0d15ea5e-0000-4000-8000-000000000001', pid)
     h.fake.add(TASKS, 'recDuplicate', dict(next(f for f in h.fake.task_rows().values() if f.get('命令編號'))))
-    body = call(h, 'ou_mgr', 'post', '/api/v2/commands/cmd-publish-0001/reconcile').json()
+    body = call(h, 'ou_mgr', 'post', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000001/reconcile').json()
     assert (body['command']['state'], body['receipt']['duplicates']) == (
         'reconciliation_required', ['recDuplicate', 'recTask0001'])
 
@@ -371,14 +378,14 @@ def test_restart_mid_command_keeps_pending_until_reconciled(h):
     approve(h, pid)
     h.fake.on('POST', f'/{TASKS}/records', crash_after)
     with pytest.raises(Crash):
-        commit(h, 'cmd-publish-0001', pid)
+        commit(h, '0d15ea5e-0000-4000-8000-000000000001', pid)
     restarted = h.build()
-    view = call(h, 'ou_mgr', 'get', '/api/v2/commands/cmd-publish-0001', client=restarted).json()
+    view = call(h, 'ou_mgr', 'get', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000001', client=restarted).json()
     assert (view['command']['state'], view['command']['label'], view['next_action']) == ('pending', '處理中', 'none')
-    early = call(h, 'ou_mgr', 'post', '/api/v2/commands/cmd-publish-0001/reconcile', client=restarted)
+    early = call(h, 'ou_mgr', 'post', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000001/reconcile', client=restarted)
     assert (early.status_code, early.json()['code']) == (409, 'busy')
     h.clock[0] += 61
-    resolved = call(h, 'ou_mgr', 'post', '/api/v2/commands/cmd-publish-0001/reconcile', client=restarted)
+    resolved = call(h, 'ou_mgr', 'post', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000001/reconcile', client=restarted)
     assert (resolved.status_code, resolved.json()['command']['state']) == (200, 'committed')
     assert len(h.fake.creates()) == 1
 
@@ -391,26 +398,27 @@ def test_reassign_keeps_task_and_obligation_bumps_revision_and_releases_after_re
     def read_back(request, proceed):
         observed.append(h.held())
         return proceed()
-    h.fake.on('GET', f'/records/{rid}', read_back)
-    _, second = published(h, 'cmd-reassign-0001', task_id=rid, primary_owner='recP2', crew=['recP2'],
+    # The first GET is the in-lock recheck before the command exists; the second is the read-back.
+    h.fake.on('GET', f'/records/{rid}', read_back, times=2)
+    _, second = published(h, '0d15ea5e-0000-4000-8000-000000000003', task_id=rid, primary_owner='recP2', crew=['recP2'],
                           start='2026-10-20T13:00+08:00', end='2026-10-20T17:00+08:00',
                           verifications={'person:recP2': '主管核實 L2 資格'})
     assert (second['command']['action'], second['command']['task_id'], second['command']['revision']) == ('update', rid, 2)
     row = h.fake.task_rows()[rid]
     assert (row['負責人'], row.get('組員'), row['排程版本'], row['命令編號'], row['狀態']) == (
-        [{'id': 'ou_yi'}], None, 2, 'cmd-reassign-0001', '待處理')
-    assert observed == [[('instrument', 'recI1', 'held', 'cmd-publish-0001', rid),
-                         ('instrument', 'recI1', 'held', 'cmd-reassign-0001', rid),
-                         ('person', 'recP2', 'held', 'cmd-publish-0001', rid),
-                         ('person', 'recP2', 'held', 'cmd-reassign-0001', rid),
-                         ('person', 'recP3', 'held', 'cmd-publish-0001', rid)]]
-    assert h.held() == [('instrument', 'recI1', 'held', 'cmd-reassign-0001', rid),
-                        ('instrument', 'recI1', 'released', 'cmd-publish-0001', rid),
-                        ('person', 'recP2', 'held', 'cmd-reassign-0001', rid),
-                        ('person', 'recP2', 'released', 'cmd-publish-0001', rid),
-                        ('person', 'recP3', 'released', 'cmd-publish-0001', rid)]
+        [{'id': 'ou_yi'}], None, 2, '0d15ea5e-0000-4000-8000-000000000003', '待處理')
+    assert observed[1:] == [[('instrument', 'recI1', 'held', '0d15ea5e-0000-4000-8000-000000000001', rid),
+                         ('instrument', 'recI1', 'held', '0d15ea5e-0000-4000-8000-000000000003', rid),
+                         ('person', 'recP2', 'held', '0d15ea5e-0000-4000-8000-000000000001', rid),
+                         ('person', 'recP2', 'held', '0d15ea5e-0000-4000-8000-000000000003', rid),
+                         ('person', 'recP3', 'held', '0d15ea5e-0000-4000-8000-000000000001', rid)]]
+    assert h.held() == [('instrument', 'recI1', 'held', '0d15ea5e-0000-4000-8000-000000000003', rid),
+                        ('instrument', 'recI1', 'released', '0d15ea5e-0000-4000-8000-000000000001', rid),
+                        ('person', 'recP2', 'held', '0d15ea5e-0000-4000-8000-000000000003', rid),
+                        ('person', 'recP2', 'released', '0d15ea5e-0000-4000-8000-000000000001', rid),
+                        ('person', 'recP3', 'released', '0d15ea5e-0000-4000-8000-000000000001', rid)]
     row = next(r for r in call(h, 'ou_pm', 'get', '/api/v2/dispatch/work').json()['rows'] if r['task_id'] == rid)
-    assert (row['command']['command_id'], row['revision'], row['owner']['person_ref']) == ('cmd-reassign-0001', 2, 'recP2')
+    assert (row['command']['command_id'], row['revision'], row['owner']['person_ref']) == ('0d15ea5e-0000-4000-8000-000000000003', 2, 'recP2')
     moved = preview(h, task_id=rid, parent_task_ref='recLegacy')
     h.fake.tables[TASKS][rid]['父義務'] = ['recObligation']
     h.clock[0] += 61
@@ -464,7 +472,7 @@ def test_work_queue_rows_progress_and_needs_me(h):
                  {'person_ref': 'recP2', 'open_id': 'ou_yi', 'name': '乙'}],
         'instruments': [{'ref': 'recI1', 'label': 'GNSS-01'}],
         'case': {'ref': 'recCase1', 'code': 'SYN-001', 'name': '合成示範案', 'resolved': True},
-        'command': {'command_id': 'cmd-publish-0001', 'state': 'committed', 'label': '已確認'},
+        'command': {'command_id': '0d15ea5e-0000-4000-8000-000000000001', 'state': 'committed', 'label': '已確認'},
         'allowed_actions': ['reassign', 'edit_detail']}
     assert len(pm['needs_me']) == sum(1 for r in pm['rows'] if r['needs_me'])
     assert call(h, 'ou_staff', 'get', '/api/v2/dispatch/work').status_code == 403
@@ -474,7 +482,7 @@ def test_work_queue_flags_unknown_commands_for_managers_and_keeps_last_good_on_f
     pid = preview(h)['preview_id']
     approve(h, pid)
     h.fake.on('POST', f'/{TASKS}/records', timeout_after)
-    commit(h, 'cmd-publish-0001', pid)
+    commit(h, '0d15ea5e-0000-4000-8000-000000000001', pid)
     first = call(h, 'ou_mgr', 'get', '/api/v2/dispatch/work').json()
     unknown = next(r for r in first['rows'] if r['command'])
     assert (unknown['planning_status'], unknown['needs_me'], unknown['allowed_actions']) == (
@@ -501,7 +509,7 @@ def test_task_form_prefills_the_21_fields_and_marks_system_fields_read_only(h):
                                 'start': '2026-10-20T08:00+08:00', 'end': '2026-10-20T12:00+08:00',
                                 'est_person_hours': 8.0, 'vehicles': [], 'deadline': None, 'verifications': {}}
     assert body['system'] == {'scope_version': None, 'rule_version': None, 'evidence_version': None,
-                              'planning_status': '已確認', 'revision': 1, 'command_id': 'cmd-publish-0001',
+                              'planning_status': '已確認', 'revision': 1, 'command_id': '0d15ea5e-0000-4000-8000-000000000001',
                               'readback_at': '2026-10-19T10:00+08:00', 'acceptance_status': None,
                               'acceptance_summary': None}
     assert [f['v4_field'] for f in body['form_fields'] if not f['editable']] == [
@@ -511,7 +519,7 @@ def test_task_form_prefills_the_21_fields_and_marks_system_fields_read_only(h):
 
 def test_options_list_people_resources_and_cases(h):
     body = call(h, 'ou_pm', 'get', '/api/v2/dispatch/options').json()
-    assert body['people'][3:] == [{'person_ref': 'recP4', 'name': '離職', 'active': False, 'has_lark_account': True},
+    assert body['people'][3:5] == [{'person_ref': 'recP4', 'name': '離職', 'active': False, 'has_lark_account': True},
                                   {'person_ref': 'recP5', 'name': '無帳號', 'active': True, 'has_lark_account': False}]
     assert body['instruments'] == [{'ref': 'recI1', 'label': 'GNSS-01', 'feasibility': 'feasible'},
                                    {'ref': 'recI2', 'label': 'GNSS-02', 'feasibility': 'unavailable'}]
@@ -533,7 +541,7 @@ def test_task_writer_refuses_fields_outside_the_allowlist():
     fake = FakeLark()
     table = TaskTable(CFG, 'H7W6b0PFWaVF1BsgqXJj3pQ9pXb', httpx.MockTransport(fake))
     with pytest.raises(ValueError, match='成果接受狀態'):
-        table.create({'標題': 'x', '成果接受狀態': '已接受'}, 'cmd-allowlist-01')
+        table.create({'標題': 'x', '成果接受狀態': '已接受'}, '0d15ea5e-0000-4000-8000-000000000007')
     assert fake.requests == []
 
 
