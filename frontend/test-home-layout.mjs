@@ -48,3 +48,11 @@ console.log('Home reports layout: 6 literal section order, cases placement and o
 assert.deepEqual(m.availableCardIds('company',{role:'member'},{unavailable:false}),['kpi','confirmation','cases','statuses','groups','leave','trips','absence','links']);
 assert.deepEqual(m.availableCardIds('company',{role:'pm'},{unavailable:true}),['kpi','confirmation','cases','statuses','groups','leave','trips','absence','links']);
 assert.deepEqual(m.availableCardIds('company',{role:'pm'},{unavailable:false}),['kpi','attention','confirmation','cases','qualityTrend','qualityGroups','funnel','receivables','achievement','statuses','groups','instruments','vehicles','leave','trips','absence','links']);
+const unavailableMiddle={order:['statuses','achievement','groups'],hidden:[]};
+const availableProgress=['statuses','groups'];
+assert.deepEqual(m.moveHomeCard(unavailableMiddle,'statuses',1,availableProgress),{order:['groups','achievement','statuses'],hidden:[]});
+assert.deepEqual(m.moveHomeCard(unavailableMiddle,'groups',-1,availableProgress),{order:['groups','achievement','statuses'],hidden:[]});
+assert.deepEqual(m.moveHomeCard(unavailableMiddle,'statuses',-1,availableProgress),{order:['statuses','achievement','groups'],hidden:[]});
+assert.deepEqual(m.moveHomeCard(unavailableMiddle,'groups',1,availableProgress),{order:['statuses','achievement','groups'],hidden:[]});
+assert.deepEqual(m.moveHomeCard(unavailableMiddle,'achievement',1,availableProgress),{order:['statuses','achievement','groups'],hidden:[]});
+console.log('PASS 5 available-neighbour and section-edge assertions');

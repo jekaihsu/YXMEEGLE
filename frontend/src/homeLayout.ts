@@ -56,9 +56,9 @@ export function parseHomeLayout(raw:string|null):HomeSettings{
   return fallback;
  }catch{return fallback}
 }
-export function moveHomeCard(layout:HomeLayout,id:HomeCardId,direction:-1|1):HomeLayout{
- if(id==='attention')return layout;
- const order=[...layout.order],index=order.indexOf(id),siblings=order.filter(card=>card!=='attention'&&HOME_CARDS[card].section===HOME_CARDS[id].section),neighbour=siblings[siblings.indexOf(id)+direction];
+export function moveHomeCard(layout:HomeLayout,id:HomeCardId,direction:-1|1,available:HomeCardId[]=layout.order):HomeLayout{
+ if(id==='attention'||!available.includes(id))return layout;
+ const order=[...layout.order],index=order.indexOf(id),siblings=order.filter(card=>card!=='attention'&&available.includes(card)&&HOME_CARDS[card].section===HOME_CARDS[id].section),neighbour=siblings[siblings.indexOf(id)+direction];
  if(index<0||!neighbour)return layout;
  const next=order.indexOf(neighbour);
  [order[index],order[next]]=[order[next],order[index]];
