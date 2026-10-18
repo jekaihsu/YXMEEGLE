@@ -10,7 +10,7 @@ const PREVIEW_LIMIT=5;
 
 export function Card({id,subtitle,children,href,action='查看全部',compact=false}:{id:HomeCardId;subtitle:string;children:ReactNode;href:string;action?:string;compact?:boolean}) {
  return <section className={`home-card glass--flat${compact?' home-card-compact':''}`} data-home-card={id} aria-labelledby={`home-${id}`}>
-  <header><h2 id={`home-${id}`}>{HOME_CARDS[id].title}</h2>{!compact&&<p>{subtitle}</p>}</header>
+  <header><h3 id={`home-${id}`}>{HOME_CARDS[id].title}</h3>{!compact&&<p>{subtitle}</p>}</header>
   <div className="home-card-content">{children}</div>
   <a className="home-card-more" href={href}>{action}<ArrowUpRight size={16} aria-hidden="true"/></a>
  </section>;
