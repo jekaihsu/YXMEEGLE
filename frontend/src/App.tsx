@@ -14,7 +14,7 @@ import {Administration, Routines} from './Operations';
 import {MentionInbox} from './MentionInbox';
 import {Picker,Segmented} from './design';
 import {AppearanceControl} from './design/AppearanceControl';
-import {HomePreviewPicker} from './homePreview';
+import {HomePreviewPicker} from './homeRolePreview';
 import {AppShell, Avatar, ROLE} from './AppShell';
 import {LegacyTabs, SourceHealthPage, WorkPage} from './IntegratedPages';
 import {isLegacyTab} from './integrationRoutes.ts';

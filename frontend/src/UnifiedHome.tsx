@@ -14,7 +14,7 @@ import {MineCard} from './homeViews/MineCards';
 import {AssignCard,useAssignData} from './homeViews/AssignCards';
 import {CompanyCard} from './homeViews/CompanyCards';
 import {useHomeCompany} from './useHomeCompany';
-import {HOME_PREVIEWS,useHomePreview} from './homePreview';
+import {HOME_PREVIEWS,useHomePreview} from './homeRolePreview';
 import './UnifiedHome.css';
 
 type ViewProps={ids:HomeCardId[];c:Ctx;today:string;assigned:PanelRead;confirmation:PanelRead;attendance:(id:'leave'|'trips')=>ReactNode};
