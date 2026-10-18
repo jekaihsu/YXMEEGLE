@@ -14,6 +14,7 @@ import {MineCard} from './homeViews/MineCards';
 import {AssignCard,useAssignData} from './homeViews/AssignCards';
 import {CompanyCard} from './homeViews/CompanyCards';
 import {useHomeCompany} from './useHomeCompany';
+import {HOME_PREVIEWS,useHomePreview} from './homePreview';
 import './UnifiedHome.css';
 
 type ViewProps={ids:HomeCardId[];c:Ctx;today:string;assigned:PanelRead;confirmation:PanelRead;attendance:(id:'leave'|'trips')=>ReactNode};
@@ -30,9 +31,11 @@ function CompanyView(props:ViewProps){
 }
 export function UnifiedHome({c}:{c:Ctx}){
  const key=homeLayoutKey(c.s.workspace_id||c.w.workspace_id||'default',c.s.user?.id||'anonymous',c.s.user?.role||'',c.s.mode);
- return <HomeWorkspace key={key} c={c} storageKey={key}/>;
+ const preview=useHomePreview();
+ return <HomeWorkspace key={key+'|'+(preview||'')} c={c} storageKey={key} preview={preview}/>;
 }
-function HomeWorkspace({c,storageKey}:{c:Ctx;storageKey:string}){
+function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:keyof typeof HOME_PREVIEWS|null}){
+ const [previewView,setPreviewView]=useState<HomeViewId|null>(null);
  const [settings,setSettings]=useState<HomeSettings>(()=>{try{return parseHomeLayout(localStorage.getItem(storageKey))}catch{return parseHomeLayout(null)}});
  const [editing,setEditing]=useState(false),[saved,setSaved]=useState(true),[notice,setNotice]=useState('');
  const [today,setToday]=useState(taipeiToday);
@@ -41,8 +44,9 @@ function HomeWorkspace({c,storageKey}:{c:Ctx;storageKey:string}){
  const assigned=useHomePanels(homeContext,{panel:'assigned',scope:'mine',limit:100});
  const confirmation=useHomePanels(homeContext,{panel:'confirmation',scope:'mine',limit:100});
  const manager=assigned.body?.manager_view_available??null;
- const views=availableViews(c.s.user,manager);
- const view=settings.view&&views.includes(settings.view)?settings.view:assigned.pending&&!assigned.body?'mine':resolvePersona(c.s.user,manager);
+ const views:HomeViewId[]=preview?[...HOME_PREVIEWS[preview].views]:availableViews(c.s.user,manager);
+ const chosen=preview?previewView:settings.view;
+ const view=chosen&&views.includes(chosen)?chosen:preview?views[0]:assigned.pending&&!assigned.body?'mine':resolvePersona(c.s.user,manager);
  const layout=settings.layouts[view];
  const refresh=async()=>{setRefreshing(true);setRefreshError('');try{await c.refresh()}catch{setRefreshError('工作區重新讀取失敗；已保留上次資料，請稍後再試。')}finally{setRefreshTick(value=>value+1);setRefreshing(false)}};
  useEffect(()=>{const timer=window.setInterval(()=>setToday(taipeiToday()),60000);return()=>window.clearInterval(timer)},[]);
@@ -55,7 +59,7 @@ function HomeWorkspace({c,storageKey}:{c:Ctx;storageKey:string}){
   try{localStorage.setItem(storageKey,JSON.stringify(next));setSaved(true)}catch{setSaved(false)}
  };
  const update=(next:HomeLayout,message:string)=>persist({...settings,layouts:{...settings.layouts,[view]:next}},message);
- const choose=(next:HomeViewId)=>persist({...settings,view:next},`已切換至${HOME_VIEWS[next].label}`);
+ const choose=(next:HomeViewId)=>preview?(setPreviewView(next),setNotice(`已切換至${HOME_VIEWS[next].label}`)):persist({...settings,view:next},`已切換至${HOME_VIEWS[next].label}`);
  const visible=layout.order.filter(id=>!layout.hidden.includes(id));
  const asOf=c.w.as_of;
  const freshnessDays=asOf?Math.floor((Date.parse(`${taipeiToday()}T00:00:00Z`)-Date.parse(`${asOf.slice(0,10)}T00:00:00Z`))/86400000):null;
@@ -65,7 +69,7 @@ function HomeWorkspace({c,storageKey}:{c:Ctx;storageKey:string}){
  const missingMine=!assigned.pending&&!confirmation.pending&&!workSource(homeContext,'assigned',today,assigned)&&!workSource(homeContext,'confirmation',today,confirmation);
  const renderCard=(id:HomeCardId)=>id==='leave'||id==='trips'?attendanceCard(id):<MineCard key={id} id={id} {...props}/>;
  return <div className="unified-home" data-home-view={view}><div className="ds-page"><header className="ds-page-head"><div>
-  <Eyebrow>{today.replaceAll('-','/')+' · '+(c.s.user?.name||'我的工作空間')}</Eyebrow><h1>今日工作台</h1><p>{HOME_VIEWS[view].label}，掌握今天需要處理的事。</p>
+  <Eyebrow>{today.replaceAll('-','/')+' · '+(c.s.user?.name||'我的工作空間')}</Eyebrow><h1>今日工作台</h1><p>{HOME_VIEWS[view].label}，掌握今天需要處理的事。{preview&&<> · 預覽角色：{HOME_PREVIEWS[preview].label}</>}</p>
   {views.length>1&&<div className="home-view-switcher" role="group" aria-label="首頁視圖">{views.map(id=><Button key={id} aria-pressed={view===id} onClick={()=>choose(id)}>{HOME_VIEWS[id].label}</Button>)}</div>}
  </div><div className="ds-actions">
   <Button disabled={refreshing||c.busy} onClick={()=>void refresh()}><RefreshCw size={16}/>{refreshing?'讀取中…':'重新讀取'}</Button>

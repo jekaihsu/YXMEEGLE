@@ -101,3 +101,10 @@
 .unified-home .ds-actions{padding-top:var(--space-6)}
 @media(max-width:760px){.unified-home .ds-actions{padding-top:0}}
 }
+
+.home-preview-picker{display:grid;gap:4px}
+.home-preview-picker>p{margin:0 0 8px;color:var(--label-2);font-size:var(--fs-caption)}
+.home-preview-picker .role-option{display:flex;align-items:center;gap:12px;cursor:pointer;border-radius:18px}
+.home-preview-picker .role-option input{accent-color:var(--accent);width:18px;height:18px;flex:none}
+.home-preview-picker .role-option span{display:grid;text-align:left}
+.home-preview-picker .role-option small{color:var(--label-2)}
