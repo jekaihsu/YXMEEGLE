@@ -68,7 +68,7 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
  const update=(next:HomeLayout,message:string)=>persist({...settings,layouts:{...settings.layouts,[view]:next}},message);
  const choose=(next:HomeViewId)=>preview?(setPreviewView(next),setNotice(`已切換至${HOME_VIEWS[next].label}`)):persist({...settings,view:next},`已切換至${HOME_VIEWS[next].label}`);
  const visible=layout.order.filter(id=>!layout.hidden.includes(id));
- const reports=useHomeReports(homeContext,view,visible);
+ const reports=useHomeReports(homeContext,view,visible,today);
  const available=availableCardIds(view,c.s.user,reports);
  const availableOrder=layout.order.filter(id=>available.includes(id));
  const availableVisible=visible.filter(id=>available.includes(id));

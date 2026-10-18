@@ -8,7 +8,7 @@ export const getPendingMutations=()=>pendingMutations.get(sessionEpoch)||0;
 const mutationChanged=()=>{if(typeof window!=='undefined')window.dispatchEvent(new Event('yx:mutation-state'))};
 export const getSessionEpoch=()=>sessionEpoch;
 export const invalidateSessionEpoch=()=>{sessionEpoch++;etagCache.clear()};
-export class ApiError extends Error {constructor(public status:number,message:string,public code?:string,public ceiling_seconds?:number){super(message)}}
+export class ApiError extends Error {constructor(public status:number,message:string,public code?:string,public ceiling_seconds?:number,public warming?:boolean,public retry_after?:number){super(message)}}
 export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boolean=()=>true,onResponse?:(status:number)=>void):Promise<T>{
   const epoch=getSessionEpoch();
   const mutating=!!init?.method&&!['GET','HEAD'].includes(init.method.toUpperCase());
@@ -40,7 +40,7 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
   let data:any;let parsed=true;
   try{const text=await bounded(response.text());data=JSON.parse(text);perfParsed(trace,text)}catch(error){if(controller?.signal.aborted)throw error;data={detail:malformed};parsed=false}
   if(response.status===401&&epoch===getSessionEpoch()&&isCurrent())window.dispatchEvent(new Event('yx:session-expired'));
-  if(!response.ok)throw new ApiError(response.status,typeof data?.message==='string'?data.message:typeof data?.detail==='string'?data.detail:JSON.stringify(data?.detail||'操作未完成'),typeof data?.code==='string'?data.code:undefined,Number.isFinite(data?.ceiling_seconds)?data.ceiling_seconds:undefined);
+  if(!response.ok)throw new ApiError(response.status,typeof data?.message==='string'?data.message:typeof data?.detail==='string'?data.detail:JSON.stringify(data?.detail||'操作未完成'),typeof data?.code==='string'?data.code:undefined,Number.isFinite(data?.ceiling_seconds)?data.ceiling_seconds:undefined,data?.warming===true,Number.isFinite(data?.retry_after)?data.retry_after:undefined);
   if(!parsed||data===null||typeof data!=='object')throw new ApiError(response.status,malformed);
   if(cacheable&&epoch===getSessionEpoch()&&isCurrent()&&!init?.signal?.aborted){
    const value=response.headers.get('ETag');
