@@ -1,5 +1,5 @@
 """Canonical database schema, importable without starting the application."""
-from sqlalchemy import Column, String, Integer, JSON, Index, Boolean
+from sqlalchemy import Column, String, Integer, JSON, Index, Boolean, Float, BigInteger, UniqueConstraint
 from sqlalchemy.orm import declarative_base
 from . import storage
 
@@ -86,5 +86,81 @@ class WorkspaceCounter(Base):
     subject_id=Column(String(120),primary_key=True,default='')
     value=Column(Integer,nullable=False,default=0)
     source_version=Column(Integer,nullable=False,default=0)
+
+
+class DispatchLockRow(Base):
+    """One row per workspace; updating it first serializes dispatch writes across processes."""
+    __tablename__='dispatch_locks'
+    workspace_id=Column(String(120),primary_key=True)
+    counter=Column(Integer,nullable=False,default=0)
+
+class DispatchPreviewRow(Base):
+    __tablename__='dispatch_previews'
+    __table_args__=(Index('ix_dispatch_previews_hash','workspace_id','preview_hash'),)
+    id=Column(String(64),primary_key=True)
+    workspace_id=Column(String(120),nullable=False)
+    preview_hash=Column(String(64),nullable=False)
+    task_id=Column(String(64),nullable=True)
+    draft_id=Column(String(64),nullable=True)
+    actor_id=Column(String(120),nullable=False)
+    created_at=Column(Float,nullable=False)
+    expires_at=Column(Float,nullable=False)
+    data=Column(JSON,nullable=False)
+
+class DispatchDraftRow(Base):
+    __tablename__='dispatch_drafts'
+    workspace_id=Column(String(120),primary_key=True)
+    id=Column(String(64),primary_key=True)
+    actor_id=Column(String(120),nullable=False)
+    task_id=Column(String(64),nullable=True)
+    version=Column(Integer,nullable=False)
+    updated_at=Column(Float,nullable=False)
+    data=Column(JSON,nullable=False)
+
+class DispatchDecisionRow(Base):
+    """Append-only; at most one decision per seat on one proposal hash."""
+    __tablename__='dispatch_decisions'
+    __table_args__=(UniqueConstraint('workspace_id','preview_hash','seat',name='uq_dispatch_decision_seat'),)
+    id=Column(String(64),primary_key=True)
+    workspace_id=Column(String(120),nullable=False)
+    preview_hash=Column(String(64),nullable=False)
+    preview_id=Column(String(64),nullable=False)
+    seat=Column(String(40),nullable=False)
+    actor_id=Column(String(120),nullable=False)
+    decision=Column(String(20),nullable=False)
+    reason=Column(String(500),nullable=True)
+    at=Column(Float,nullable=False)
+
+class DispatchCommandRow(Base):
+    __tablename__='dispatch_commands'
+    __table_args__=(Index('ix_dispatch_commands_hash','workspace_id','preview_hash'),
+                    Index('ix_dispatch_commands_task','workspace_id','task_id'))
+    workspace_id=Column(String(120),primary_key=True)
+    command_id=Column(String(64),primary_key=True)
+    preview_id=Column(String(64),nullable=False)
+    preview_hash=Column(String(64),nullable=False)
+    action=Column(String(10),nullable=False)
+    task_id=Column(String(64),nullable=True)
+    actor_id=Column(String(120),nullable=False)
+    state=Column(String(30),nullable=False)
+    revision=Column(Integer,nullable=False)
+    attempt=Column(Integer,nullable=False,default=1)
+    payload=Column(JSON,nullable=False)
+    receipt=Column(JSON,nullable=True)
+    created_at=Column(Float,nullable=False)
+    updated_at=Column(Float,nullable=False)
+
+class DispatchReservationRow(Base):
+    __tablename__='dispatch_reservations'
+    __table_args__=(Index('ix_dispatch_reservations_resource','workspace_id','state','resource_kind','ref'),)
+    id=Column(String(64),primary_key=True)
+    workspace_id=Column(String(120),nullable=False)
+    resource_kind=Column(String(20),nullable=False)
+    ref=Column(String(64),nullable=False)
+    start_ms=Column(BigInteger,nullable=False)
+    end_ms=Column(BigInteger,nullable=False)
+    command_id=Column(String(64),nullable=False)
+    task_id=Column(String(64),nullable=True)
+    state=Column(String(20),nullable=False)
 
 BusinessRow,PersonRow=storage.models(Base)

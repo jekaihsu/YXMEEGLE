@@ -140,6 +140,7 @@ def staging():
     files += [p for p in (ROOT/'backend'/'lark_pilot').rglob('*.py') if not p.name.startswith('test')]
     files += [p for p in (ROOT/'backend'/'node_assignment').rglob('*.py') if not p.name.startswith('test')]
     files += [p for p in (ROOT/'backend'/'dispatch_board').rglob('*.py') if not p.name.startswith('test')]
+    files += [p for p in (ROOT/'backend'/'dispatch_publish').rglob('*.py') if not p.name.startswith('test')]
     # PM weekly reports; dev_* helpers are local-only bridges and never ship.
     files += [p for p in (ROOT/'backend'/'reports').rglob('*.py') if not p.name.startswith(('test','dev_'))]
     for part in ('frontend/src', 'frontend/public'):

@@ -569,6 +569,8 @@ def create_app(overrides=None):
             flags['node_assignment'] = True
         from .dispatch_board.config import DispatchBoardConfig
         if DispatchBoardConfig.from_env(cfg).enabled: flags['dispatch_board'] = True
+        from .dispatch_publish.config import DispatchPublishConfig
+        if DispatchPublishConfig.from_env(cfg).enabled: flags['dispatch_write'] = True
         return {'features': flags} if flags else {}
 
     @app.get('/api/session')
@@ -1504,6 +1506,12 @@ def create_app(overrides=None):
     from .dispatch_board.routes import register as register_dispatch_board
     app.state.dispatch_board=register_dispatch_board(app,identity=identity,cfg=cfg,
         allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+    from .dispatch_publish.routes import register as register_dispatch_publish
+    def dispatch_workspace(wid):
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,wid),collections=())
+        return {'settings':state.get('settings',{}),'environment':state.get('environment')}
+    app.state.dispatch_publish=register_dispatch_publish(app,identity=identity,cfg=cfg,sessions=sessions,audit_model=AuditRow,
+        workspace=dispatch_workspace,allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'))
     from .home_panels import register as register_home_panels
     app.state.home_panels=register_home_panels(app,identity=identity,load=load,sessions=sessions,workspace_model=WorkspaceRow,nodes=app.state.node_assignment)
     from .native_poller import NativeApprovalPoller
