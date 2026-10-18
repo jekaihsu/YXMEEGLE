@@ -109,7 +109,7 @@ export function useHomePanels(c:Ctx, query:HomeQuery, enabled=true, full=false):
     if (disposed || signal.aborted || epoch !== getSessionEpoch()) return;
     const denied=error instanceof ApiError && (error.status===401 || error.status===403);
     if (denied) snapshots.delete(key);
-    setState(previous=>({key,scope,read:{body:denied?null:cachedSnapshot(key) ?? (previous.scope===scope?previous.read.body:null),pending:false,error:error instanceof ApiError && error.status===409 ? '清單已更新，請回第一頁' : '更新失敗'}}));
+    setState(previous=>({key,scope,read:{body:denied?null:cachedSnapshot(key) ?? (previous.scope===scope?previous.read.body:null),pending:false,error:error instanceof ApiError&&error.status===403?'無法核實工作讀取權限，請切換視圖或洽管理員。':error instanceof ApiError && error.status===409 ? '清單已更新，請回第一頁' : '更新失敗'}}));
    });
   };
   load();

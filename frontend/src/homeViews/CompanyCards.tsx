@@ -18,7 +18,7 @@ export function CompanyCard({id,c,today,confirmation,read}:{id:HomeCardId;c:Ctx;
   {label:'待確認',value:data.totals.pending_local_reviews+data.totals.pending_native_reviews},
   {label:'本週到期',value:null},
  ]}/><Message>資料尚未完整。公司來源尚未提供本週到期總數。</Message></>;
- if(id==='groups')content=<WorkloadChart label="各組已完成、未逾期與逾期任務數" rows={data.groups.slice(0,5).map(row=>({label:row.group||'未分組',completed:row.tasks_completed,open:Math.max(0,row.tasks_total-row.tasks_completed-row.tasks_overdue),overdue:row.tasks_overdue}))}/>;
+ if(id==='groups')content=<WorkloadChart label="各組已完成、未逾期與逾期任務數" rows={[...data.groups].sort((a,b)=>b.tasks_total-a.tasks_total).slice(0,5).map(row=>({label:row.group||'未分組',completed:row.tasks_completed,open:Math.max(0,row.tasks_total-row.tasks_completed-row.tasks_overdue),overdue:row.tasks_overdue}))}/>;
  if(id==='statuses')content=<StatusChart counts={data.totals.execution_status_counts}/>;
  if(id==='cases'){
   const rows=data.cases.filter(row=>row.tasks_overdue>0||row.pending_local_reviews+row.pending_native_reviews>0);

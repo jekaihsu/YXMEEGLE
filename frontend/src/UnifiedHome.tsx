@@ -3,7 +3,7 @@ import {ArrowDown,ArrowUp,CalendarDays,Check,Settings2,RotateCcw,RefreshCw} from
 import {Button,Page} from './design';
 import {type Ctx,date} from './appCommon';
 import {useHomePanels,type PanelRead} from './useHomePanels';
-import {fetchPeopleAttendance,parsePeopleAttendance,taipeiWeek,type PeopleAttendance} from './peopleAttendance';
+import {fetchPeopleAttendance,parsePeopleAttendance,taipeiWeek} from './peopleAttendance';
 import {useViewData} from './viewData';
 import {ApiError} from './api';
 import {HOME_CARDS,HOME_VIEWS,availableViews,resolvePersona,defaultHomeLayout,parseHomeLayout,moveHomeCard,homeLayoutKey,taipeiToday,type HomeCardId,type HomeLayout,type HomeSettings,type HomeViewId} from './homeLayout';
@@ -15,7 +15,7 @@ import {CompanyCard} from './homeViews/CompanyCards';
 import {useHomeCompany} from './useHomeCompany';
 import './UnifiedHome.css';
 
-type ViewProps={ids:HomeCardId[];c:Ctx;today:string;assigned:PanelRead;confirmation:PanelRead;attendance:(id:'leave'|'trips')=>ReactNode;attendanceData?:PeopleAttendance};
+type ViewProps={ids:HomeCardId[];c:Ctx;today:string;assigned:PanelRead;confirmation:PanelRead;attendance:(id:'leave'|'trips')=>ReactNode};
 function AssignView(props:ViewProps){
  const data=useAssignData(props.c);
  return <>{props.ids.map(id=>id==='leave'||id==='trips'?props.attendance(id):<AssignCard key={id} id={id} {...props} {...data}/> )}</>;
@@ -57,7 +57,7 @@ function HomeWorkspace({c,storageKey}:{c:Ctx;storageKey:string}){
  const freshnessDays=asOf?Math.floor((Date.parse(`${taipeiToday()}T00:00:00Z`)-Date.parse(`${asOf.slice(0,10)}T00:00:00Z`))/86400000):null;
  const stale=freshnessDays!==null&&freshnessDays>1;
  const attendanceCard=(id:'leave'|'trips')=><AttendanceCard key={id} id={id} view={attendance.data} loading={attendance.loading} error={attendance.error} today={today}/>;
- const props:ViewProps={ids:visible,c:homeContext,today,assigned,confirmation,attendance:attendanceCard,attendanceData:attendance.data};
+ const props:ViewProps={ids:visible,c:homeContext,today,assigned,confirmation,attendance:attendanceCard};
  const renderCard=(id:HomeCardId)=>id==='leave'||id==='trips'?attendanceCard(id):<MineCard key={id} id={id} {...props}/>;
  return <div className="unified-home" data-home-view={view}><Page title="今日工作台" eyebrow={today.replaceAll('-','/')+' · '+(c.s.user?.name||'我的工作空間')} subtitle={HOME_VIEWS[view].label+'，掌握今天需要處理的事。'} actions={<>
   <Button disabled={refreshing||c.busy} onClick={()=>void refresh()}><RefreshCw size={16}/>{refreshing?'讀取中…':'重新讀取'}</Button>

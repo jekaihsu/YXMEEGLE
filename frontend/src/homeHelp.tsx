@@ -18,7 +18,7 @@ export function HomeHelp({view}:{view:HomeViewId}){
   return()=>document.removeEventListener('keydown',key);
  },[open]);
  return <div className="home-help-wrap" ref={trigger}><Button variant="plain" aria-label="使用說明" aria-expanded={open} aria-controls="home-help" onClick={()=>setOpen(value=>!value)}>?</Button>
-  {open&&<div id="home-help" className="home-help glass--flat" ref={panel} tabIndex={-1} role="region" aria-label="今日工作台使用說明">
+  {open&&<div id="home-help" className="home-help" ref={panel} tabIndex={-1} role="region" aria-label="今日工作台使用說明">
    <h2>使用說明</h2><p>{HELP[view]}</p>
    <p>我的工作提供所有人使用。分配工作提供已核實的組別主管，以及專案、業務與管理人員切換。全公司提供 PM、管理角色，以及部門名稱含專案、PM、業務或管理的人員；實際資料仍依來源權限顯示。</p>
    <p>自訂首頁可顯示、隱藏與排序卡片。設定依登入身分及視圖儲存在此瀏覽器。還原建議配置只影響目前視圖。</p>
