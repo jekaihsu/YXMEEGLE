@@ -49,3 +49,32 @@
 @layer polish{
  body:has(.unified-home){background-image:radial-gradient(48rem 34rem at 10% 4%,color-mix(in srgb,var(--accent) 5%,transparent),transparent 72%),radial-gradient(42rem 32rem at 96% 16%,color-mix(in srgb,var(--accent) 3%,transparent),transparent 72%)}
 }
+@layer pages {
+.unified-home [data-home-card=kpi]{grid-column:1/-1}
+.unified-home .home-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-4)}
+.unified-home .home-view-switcher{display:flex;flex-wrap:wrap;border:1px solid var(--sep);border-radius:var(--radius-control);padding:3px;gap:2px}
+.unified-home .home-view-switcher button[aria-pressed=true]{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.unified-home .home-help-wrap{position:relative}
+.unified-home .home-help-wrap>button{min-width:44px;font-weight:700}
+.unified-home .home-help{position:absolute;z-index:20;right:0;top:100%;width:min(32rem,calc(100vw - 48px));max-height:70vh;overflow:auto;background:var(--glass-fill-strong);backdrop-filter:var(--glass-blur);border:1px solid var(--sep);border-radius:var(--radius-card);box-shadow:var(--glass-shadow-flat);padding:var(--space-5)}
+.unified-home .home-help p{font-size:var(--fs-subhead);line-height:1.7;margin:var(--space-3) 0;color:var(--label-2)}
+.unified-home .home-chart{margin:0;display:grid;gap:var(--space-4)}
+.unified-home .home-chart-row{display:grid;gap:var(--space-1);font-size:var(--fs-subhead)}
+.unified-home .home-chart-row small,.unified-home figcaption{color:var(--label-2);font-size:var(--fs-caption);line-height:1.7}
+.unified-home .home-bar{height:14px;display:flex;background:color-mix(in srgb,var(--label-2) 8%,transparent);border-radius:4px;overflow:hidden}
+.unified-home .home-bar i{height:100%;display:block}
+.unified-home .home-bar-completed{background:var(--positive)}
+.unified-home .home-bar-open{background:var(--accent)}
+.unified-home .home-bar-overdue{background:var(--critical)}
+.unified-home .home-status-bar{display:flex;height:20px;gap:3px;border-radius:4px;overflow:hidden}
+.unified-home .home-status-bar i{background:var(--accent)}
+.unified-home .home-deadline-chart{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:var(--space-2);margin:0;text-align:center;font-size:var(--fs-caption)}
+.unified-home .home-deadline-chart>div{min-width:0;display:grid;gap:var(--space-2)}
+.unified-home .home-deadline-chart>div>div{height:72px;background:color-mix(in srgb,var(--accent) 6%,transparent);display:flex;align-items:flex-end;justify-content:center;border-radius:4px}
+.unified-home .home-deadline-chart i{display:block;background:var(--accent);width:65%;border-radius:3px}
+.unified-home .home-personal{min-width:0;border:1px solid var(--sep);border-radius:var(--radius-card)}
+.unified-home .home-personal summary{padding:var(--space-4);cursor:pointer;min-height:44px}
+.unified-home .home-quick-links{display:flex;gap:var(--space-3);flex-wrap:wrap}
+.unified-home .home-quick-links a{min-height:44px;display:flex;align-items:center;color:var(--accent)}
+@media(max-width:600px){.unified-home .home-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.unified-home .home-view-switcher{width:100%}.unified-home .home-view-switcher button{flex:1}.unified-home .home-help{position:fixed;top:15vh;right:24px}}
+}
