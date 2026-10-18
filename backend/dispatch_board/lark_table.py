@@ -2,7 +2,7 @@
 import json
 
 from ..live_read.client import LiveLarkClient, ReadFailure
-from .config import DispatchBoardConfig, TABLES
+from .config import DispatchBoardConfig, SOURCES
 
 
 class DispatchReader:
@@ -13,7 +13,7 @@ class DispatchReader:
         self.client_options = client_options or {}
 
     def read_table(self, key):
-        table = TABLES[key]
+        table = SOURCES[key]
         params = {'page_size': 500, 'field_names': json.dumps(list(table.fields), ensure_ascii=False)}
         records, ids, cursors = [], set(), set()
         with LiveLarkClient(self.cfg, transport=self.transport, **self.client_options) as client:

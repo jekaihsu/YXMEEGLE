@@ -5,7 +5,9 @@ from enum import StrEnum
 from typing import Literal, TypedDict
 
 from ..sources import link_ids, text
-from .config import TABLES
+from .config import PUBLISH_TABLES, TABLES
+
+TASK_TABLE = PUBLISH_TABLES['tasks'].table_id
 
 TZ = timezone(timedelta(hours=8))
 
@@ -20,6 +22,7 @@ class Feasibility(StrEnum):
 class PlanningStatus(StrEnum):
     UNASSIGNED = 'unassigned'
     CONFIRMED = 'confirmed'
+    PUBLISHING = 'publishing'
 
 
 class RawRow(TypedDict):
@@ -46,9 +49,9 @@ class Resource(TypedDict):
 class Slot(TypedDict):
     slot_id: str
     record_id: str
-    kind: Literal['work', 'leave', 'standby', 'support', 'unknown']
+    kind: Literal['work', 'leave', 'standby', 'support', 'unknown', 'execution']
     planning_status: PlanningStatus
-    provenance: Literal['v4_row']
+    provenance: Literal['v4_row', 'v4_task']
     interval: dict
     group: str | None
     discipline: str | None
@@ -102,6 +105,10 @@ class BoardInput:
     vehicles: list[RawRow] | None
     cases: list[RawRow] | None
     fetched_at: str
+    # Published 任務 rows (slice 2); None when that source is off or unreadable.
+    tasks: list[RawRow] | None = None
+    accounts: list[RawRow] | None = None
+    published: bool = False
 
 
 def _date(raw):
@@ -141,6 +148,19 @@ def _refs(raw):
 
 def _index(rows):
     return {row['record_id']: row['fields'] for row in rows or []}
+
+
+def resource_state(kind, resource):
+    """Availability of one instrument or vehicle from its resolved fields; {} when unresolved."""
+    reasons = []
+    if resource.get('啟用') is False:
+        reasons.append('inactive')
+    status = _label(resource, '狀態') if kind == 'instrument' else None
+    if status and status != '正常':
+        reasons.append('repair' if status == '送修-損壞' else 'abnormal_status')
+    known = resource.get('啟用') is True and (kind == 'vehicle' or status == '正常')
+    feasibility = Feasibility.UNAVAILABLE if reasons else Feasibility.FEASIBLE if known else Feasibility.UNKNOWN
+    return feasibility, reasons or ([] if known else ['resource_status_unknown'])
 
 
 def _same_day(left, right, days):
@@ -200,16 +220,9 @@ def build_board(data: BoardInput, window: Window) -> dict:
                                                 ('vehicle', 'vehicles', vehicles, '車牌')):
             for ref in refs:
                 resource = resolve(key, ref)
-                reasons = []
-                if resource.get('啟用') is False:
-                    reasons.append('inactive')
-                status = _label(resource, '狀態') if resource_kind == 'instrument' else None
-                if status and status != '正常':
-                    reasons.append('repair' if status == '送修-損壞' else 'abnormal_status')
-                known = resource.get('啟用') is True and (resource_kind == 'vehicle' or status == '正常')
-                feasibility = Feasibility.UNAVAILABLE if reasons else Feasibility.FEASIBLE if known else Feasibility.UNKNOWN
+                feasibility, reasons = resource_state(resource_kind, resource)
                 resources.append(Resource(kind=resource_kind, ref=ref, label=_label(resource, label),
-                                          feasibility=feasibility, reasons=reasons or ([] if known else ['resource_status_unknown'])))
+                                          feasibility=feasibility, reasons=reasons))
         case = None
         if cases:
             case_fields = resolve('cases', cases[0]) if len(cases) == 1 else {}
@@ -228,6 +241,51 @@ def build_board(data: BoardInput, window: Window) -> dict:
                           discipline=_label(fields, '業別'), case=case, work_content=_label(fields, '工作內容'),
                           crew=crew, resources=resources, gaps=gaps, issues=[]))
         intervals[ident] = interval
+
+    if data.published:
+        accounts = {}
+        for ref, fields in _index(data.accounts).items():
+            found = [u.get('id') for u in fields.get('Lark帳號') or [] if isinstance(u, dict)]
+            if len(found) == 1:
+                accounts.setdefault(found[0], []).append(ref)
+        for row in sorted(data.tasks or [], key=lambda r: r['record_id']):
+            fields = row['fields']
+            status = text(fields.get('排程狀態')).strip()
+            start, end = (_date(fields.get(name)) if type(fields.get(name)) is int else None for name in ('預定開始', '預定結束'))
+            if status not in ('已確認', '發布中') or start is None or end is None or not start < end:
+                continue
+            interval = Interval(start, end, 'datetime')
+            if not any(interval.on(day) for day in days):
+                continue
+            crew = []
+            users = [u for name in ('負責人', '組員') for u in fields.get(name) or [] if isinstance(u, dict) and u.get('id')]
+            for user in {u['id']: u for u in users}.values():
+                refs = accounts.get(user['id'], [])
+                ref = refs[0] if len(refs) == 1 else user['id']
+                person = resolve('people', ref) if len(refs) == 1 else {}
+                active = person.get('在職') if type(person.get('在職')) is bool else None
+                crew.append(Crew(person_ref=ref, name=_label(person, '姓名') or text(user.get('name')).strip() or None,
+                                 active=active,
+                                 feasibility=Feasibility.UNAVAILABLE if active is False else Feasibility.UNKNOWN,
+                                 reasons=(['inactive'] if active is False else []) + ['no_leave_source', 'no_capability_source']))
+            resources = []
+            for resource_kind, key, name, label in (('instrument', 'instruments', '使用儀器', '儀器名稱'),
+                                                    ('vehicle', 'vehicles', '使用車輛', '車牌')):
+                for ref in _refs(fields.get(name)):
+                    resource = resolve(key, ref)
+                    feasibility, reasons = resource_state(resource_kind, resource)
+                    resources.append(Resource(kind=resource_kind, ref=ref, label=_label(resource, label),
+                                              feasibility=feasibility, reasons=reasons))
+            cases = _refs(fields.get('工程確認單'))
+            case_fields = resolve('cases', cases[0]) if cases else {}
+            ident = f"v4:{TASK_TABLE}:{row['record_id']}"
+            slots.append(Slot(slot_id=ident, record_id=row['record_id'], kind='execution',
+                              planning_status=PlanningStatus.CONFIRMED if status == '已確認' else PlanningStatus.PUBLISHING,
+                              provenance='v4_task', interval=interval.public(), group=_label(fields, '部門'),
+                              discipline=None, case={'ref': cases[0], 'code': _label(case_fields, '工程確認單編號'),
+                                                     'name': _label(case_fields, '工程名稱')} if cases else None,
+                              work_content=_label(fields, '標題'), crew=crew, resources=resources, gaps=[], issues=[]))
+            intervals[ident] = interval
 
     bookings = {}
     for slot in slots:
@@ -292,7 +350,7 @@ def build_board(data: BoardInput, window: Window) -> dict:
         'source': {'dataset_key': 'operational_schedule', 'registry_key': 'v4', 'table_id': TABLES['schedule'].table_id,
                    'fetched_at': data.fetched_at, 'latest_booking_date': latest.isoformat() if latest else None,
                    'quality': {'states': ['partial' if partial else 'complete'], 'reason': 'incomplete_source_or_joins' if partial else None},
-                   'joins': joins},
+                   'joins': joins, **({'v4_tasks': 'ok' if data.tasks is not None else 'unavailable'} if data.published else {})},
         'kpi': {'slots': len(slots), 'unassigned': len(queue), 'unknown_overlap': count_issue('same_day_other_slot'), 'conflict': count_issue('timed_overlap')},
         'unassigned_queue': queue, 'slots': slots, 'capacity': {'people': capacity}, 'gaps': source_gaps,
     }

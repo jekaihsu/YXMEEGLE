@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 import httpx
 import pytest
 
-from .dispatch_board.config import TABLES
+from .dispatch_board.config import SOURCES, TABLES
 from .dispatch_board.domain import BoardInput, TZ, Window, build_board
 from .dispatch_board.lark_table import DispatchReader
 from .dispatch_board.routes import register, parameters, URL
@@ -440,9 +440,11 @@ def test_synthetic_fixtures_are_plain_contract_responses_with_last_good_variants
 
 
 def test_manifest_complete_recorded_metadata_is_verified(tmp_path, capsys):
-    snapshot = {table.table_id: [{'field_name': name, 'type': kinds[0], 'field_id': f'fld{n}'}
-                                for n, (name, kinds) in enumerate(table.fields.items())]
-                for table in TABLES.values()}
+    snapshot = {}
+    for table in SOURCES.values():
+        fields = snapshot.setdefault(table.table_id, [])
+        fields += [{'field_name': name, 'type': kinds[0], 'field_id': f'fld{len(fields) + n}'}
+                   for n, (name, kinds) in enumerate(table.fields.items())]
     path = tmp_path / 'synthetic-fields.json'
     path.write_text(json.dumps(snapshot))
     assert verify_main(['--snapshot', str(path)]) == 0

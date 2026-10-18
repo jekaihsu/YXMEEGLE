@@ -16,7 +16,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from backend.dispatch_board.config import DispatchBoardConfig, TABLES
+from backend.dispatch_board.config import DispatchBoardConfig, SOURCES as TABLES
 
 
 def fields_in(payload):

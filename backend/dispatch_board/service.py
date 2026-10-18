@@ -8,7 +8,7 @@ import time
 
 from ..data_state import data_state
 from ..node_assignment.cache import Cached, ReadScope, StaleCache, permission_failure
-from .config import DispatchBoardConfig, TABLES
+from .config import DispatchBoardConfig, SOURCES
 from .domain import BoardInput, Window, build_board
 from .lark_table import DispatchReader
 
@@ -41,7 +41,7 @@ class DispatchBoardService:
                          wid, str(self.cfg.get('LARK_AUTHZ_VERSION', '0')) + ':' + key)
 
     def _cache_key(self, wid, key):
-        table = TABLES[key]
+        table = SOURCES[key]
         return self._scope(wid, key).key(self.config.base + '/' + table.table_id, projection=table.fields)
 
     def _read(self, wid, key):
@@ -103,13 +103,15 @@ class DispatchBoardService:
         schedule, failure = self._read(wid, 'schedule')
         if failure == 'forbidden':
             return 403, {'source': {'quality': data_state('forbidden')}}
-        joined = {key: self._join(wid, key) for key in ('people', 'instruments', 'vehicles', 'cases')}
+        keys = ('people', 'instruments', 'vehicles', 'cases') + (('tasks', 'accounts') if self.config.published_tasks else ())
+        joined = {key: self._join(wid, key) for key in keys}
         with self._lock:
             joined = {key: (entry, self._errors.get(self._cache_key(wid, key), error))
                       for key, (entry, error) in joined.items()}
         rows = {key: entry.value if entry and not error else None for key, (entry, error) in joined.items()}
         fetched = datetime.fromtimestamp(schedule.fetched_at, timezone.utc).isoformat()
-        body = build_board(BoardInput(schedule.value, **rows, fetched_at=fetched), window)
+        body = build_board(BoardInput(schedule.value, **rows, fetched_at=fetched, published=self.config.published_tasks),
+                           window)
         quality = body['source']['quality']
         stale = schedule.stale or any(entry and entry.stale and not error for entry, error in joined.values())
         if failure:
