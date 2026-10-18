@@ -24,6 +24,6 @@ export function HomePreviewPicker(){
  return <div className="modal-body home-preview-picker" role="radiogroup" aria-label="預覽首頁角色">
   <strong>預覽首頁角色</strong>
   <p>只改變「今日工作台」的版面，方便測試；不會改變你的權限，沒有權限的資料仍會顯示無法讀取。</p>
-  {options.map(([id,label,detail])=><label key={label} className={`role-option ${preview===id?'selected':''}`}><input type="radio" name="home-preview" checked={preview===id} onChange={()=>setHomePreview(id)}/><span><strong>{label}</strong><small>{detail}</small></span></label>)}
+  {options.map(([id,label,detail])=><label key={label} className={`home-preview-option ${preview===id?'selected':''}`}><input type="radio" name="home-preview" checked={preview===id} onChange={()=>setHomePreview(id)}/><span><strong>{label}</strong><small>{detail}</small></span></label>)}
  </div>;
 }

@@ -104,7 +104,9 @@
 
 .home-preview-picker{display:grid;gap:4px}
 .home-preview-picker>p{margin:0 0 8px;color:var(--label-2);font-size:var(--fs-caption)}
-.home-preview-picker .role-option{display:flex;align-items:center;gap:12px;cursor:pointer;border-radius:18px}
-.home-preview-picker .role-option input{accent-color:var(--accent);width:18px;height:18px;flex:none}
-.home-preview-picker .role-option span{display:grid;text-align:left}
-.home-preview-picker .role-option small{color:var(--label-2)}
+.home-preview-option{display:flex;align-items:center;gap:12px;cursor:pointer;min-height:68px;padding:12px 16px;border-radius:18px;border:1px solid transparent;color:var(--label);transition:background var(--dur-fast) var(--ease)}
+.home-preview-option:hover{background:var(--surface-2)}
+.home-preview-option.selected{background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
+.home-preview-option input{accent-color:var(--accent);width:18px;height:18px;flex:none}
+.home-preview-option span{display:grid;text-align:left}
+.home-preview-option small{color:var(--label-2)}
