@@ -61,7 +61,7 @@ commandStatus=404;await mount('retry-restored',{draft:saved.at(-1)});commitStatu
 commitExample='commit refused: another command for a live preview';commitStatus=409;
 await mount('duplicate');await click('檢核並預覽');await click('查看核准席位');await click('發布排班');assert.ok(calls.at(-1).url.endsWith(response(commitExample).command_id));assert.equal(saved.at(-1).command_id,response(commitExample).command_id);
 previewBody=response('preview: verified crew, waiting for approval seats');
-await mount('member-seat',{action:'approve',draft:{draft_id:'seat-draft',proposal,preview_id:previewBody.preview_id,command_id:'',saved_at:''}},{...session,user:{id:'ou_lead',role:'member'}});
+await mount('member-seat',{action:'approve',row:{...row,preview_id:previewBody.preview_id}},{...session,user:{id:'ou_lead',role:'member'}});
 decisionConflict=true;await click('核准此席');assert.ok(document.body.textContent.includes('前一席尚未核准'));decisionConflict=false;
 await click('核准此席');assert.equal(calls.at(-1).body.seat,'group_leader_confirmed');assert.equal(calls.at(-1).body.decision,'accepted');
 await act(async()=>{root.render(React.createElement(m.DispatchWork,{from:'2026-10-19',write:false,onProposal(){},onAction(){}}));await settle()});

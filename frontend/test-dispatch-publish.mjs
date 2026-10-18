@@ -34,7 +34,7 @@ assert.ok(unconfigured.blockers.includes('approval_not_configured:manager_review
 assert.ok(m.blockerLabel('approval_not_configured:manager_review').includes('經理審核'));
 const work=m.parseWork(response('work queue: PM'));
 assert.equal(work.rows.length,9);
-assert.equal(work.rows.filter(r=>r.source==='workbench_preview').length,5);
+assert.equal(work.rows.filter(r=>r.source==='workbench_preview').length,4);
 assert.equal(work.rows.filter(r=>r.source==='workbench_draft').length,1);
 assert.equal(new Set(work.rows.map(r=>r.row_id)).size,9);
 assert.equal(work.needs_me.length,3);

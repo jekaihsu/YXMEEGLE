@@ -10,7 +10,7 @@
   "source": {
     "registry_key": "v4",
     "table_id": "tblsoyGcC6K5AipF",
-    "fetched_at": "2026-10-18T11:49:57+00:00",
+    "fetched_at": "2026-10-18T12:16:45+00:00",
     "quality": {
       "states": [
         "complete"
@@ -112,7 +112,7 @@
       "command_ref": null,
       "readback_at": null,
       "source": "workbench_preview",
-      "preview_id": "pv_e50829215ac6ebd55564206a",
+      "preview_id": "pv_2a1e9086ec7947e342852fde",
       "command": null,
       "draft_id": null,
       "needs_me": [],
@@ -181,7 +181,7 @@
         "rule": null,
         "evidence": null
       },
-      "command_ref": "c2bf315d-0415-4f51-935e-bedef50d4207",
+      "command_ref": "ba61e88c-7c3a-4646-b227-c3d108b48908",
       "readback_at": "2026-10-18T09:00+08:00",
       "source": "v4_task",
       "command": null,
@@ -256,12 +256,12 @@
         "rule": null,
         "evidence": null
       },
-      "command_ref": "30c19b96-f2de-4bf4-9fc7-9bc133b84c01",
-      "readback_at": "2026-10-18T19:49+08:00",
+      "command_ref": "a89a0c18-b7e3-435d-b11d-2df8974775c6",
+      "readback_at": "2026-10-18T20:16+08:00",
       "source": "v4_task",
-      "preview_id": "pv_228e5e8906b0569270fa3661",
+      "preview_id": "pv_285de06cdea98186785b6df5",
       "command": {
-        "command_id": "30c19b96-f2de-4bf4-9fc7-9bc133b84c01",
+        "command_id": "a89a0c18-b7e3-435d-b11d-2df8974775c6",
         "state": "committed",
         "label": "已確認"
       },
@@ -338,7 +338,7 @@
       "command_ref": null,
       "readback_at": null,
       "source": "workbench_preview",
-      "preview_id": "pv_cf8fb8a905bc960939c48d25",
+      "preview_id": "pv_02074b28cc356137246840ff",
       "command": null,
       "draft_id": null,
       "needs_me": [],
@@ -412,11 +412,11 @@
         "rule": null,
         "evidence": null
       },
-      "command_ref": "565a955e-fece-492e-8794-500a3ee9d80e",
-      "readback_at": "2026-10-18T19:49+08:00",
+      "command_ref": "8c43e790-65c9-49dc-845e-8bb895175b1a",
+      "readback_at": "2026-10-18T20:16+08:00",
       "source": "v4_task",
       "command": {
-        "command_id": "565a955e-fece-492e-8794-500a3ee9d80e",
+        "command_id": "8c43e790-65c9-49dc-845e-8bb895175b1a",
         "state": "committed",
         "label": "已確認"
       },

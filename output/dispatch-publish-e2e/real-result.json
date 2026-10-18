@@ -2,6 +2,7 @@
   "checks": [
     "PM work queue shows progress, needs_me and assignment actions.",
     "Full form saves a versioned draft, previews 8 person-hours, blocks unknown and records kind:ref verification reasons.",
+    "R1 edited verification on an approved preview, saved, closed and reopened the draft. The new reason survives; all three old approvals are void and refresh cannot enable publication. A fresh preview requires three new decisions.",
     "Three distinct seat holders approve through the UI. Publication confirms task recTask0001; work detail exposes all 21 extension fields.",
     "Reassignment prefills from /tasks, changes crew and interval, obtains three new decisions and updates the same task to revision 2.",
     "Two approved proposals for the same task compete. The second publish returns 409 preview_stale and the UI retains the draft.",

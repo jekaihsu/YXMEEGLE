@@ -25,7 +25,11 @@ export function DispatchWork({from,write,onProposal,onAction,refreshVersion=0}:{
  const [scope,setScope]=useState(write?'all':'mine'),[group,setGroup]=useState(''),[query,setQuery]=useState(''),[status,setStatus]=useState(''),[planning,setPlanning]=useState(''),[selected,setSelected]=useState<WorkRow>();
  const read=useDispatchWork(from,scope,group,refreshVersion),[now,setNow]=useState(Date.now);
  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(timer)},[]);
- const forbidden=read.data?.states.includes('forbidden'),rows=forbidden?[]:read.data?.rows??[];
+ const epoch=getSessionEpoch();
+ useEffect(()=>{setSelected(undefined)},[epoch]);
+ const forbidden=read.data?.states.includes('forbidden');
+ useEffect(()=>{if(forbidden)setSelected(undefined)},[forbidden]);
+ const rows=forbidden?[]:read.data?.rows??[];
  const filtered=rows.filter(r=>(!status||r.status===status)&&(!planning||r.planning_status===planning)&&(!query||[r.title,r.content,r.case.code,r.case.name,r.owner.name,...r.crew.map(p=>p.name),...r.instruments.map(p=>p.label),...r.vehicles.map(p=>p.label)].join(' ').includes(query)));
  const counts=(key:'status'|'planning_status')=>filtered.reduce<Record<string,number>>((a,r)=>{a[r[key]]=(a[r[key]]??0)+1;return a},{});
  const action=(row:WorkRow,a:Action)=>{setSelected(undefined);if(['assign','reassign','edit_detail'].includes(a))onProposal(rowProposal(row),row,a);else onAction(row,a)};
@@ -36,5 +40,5 @@ export function DispatchWork({from,write,onProposal,onAction,refreshVersion=0}:{
  {read.data?.gaps.length? <p className="dp-warning">{read.data.gaps.length} 份草稿格式不正確，未列入工作進度。請從草稿清單載入並修正。</p>:null}
  <div className="dp-progress glass--flat" aria-busy={cold}>{cold?<Skeleton lines={3}/>:!read.data||forbidden?<p>進度 · —</p>:<>{read.error||read.data.states.includes('stale')?<p>以下為上次快照筆數。</p>:null}<p>依目前篩選清單 · {filtered.length} 件</p><p>狀態 · {Object.entries(counts('status')).map(([k,n])=>`${k==='unknown'?'待核實':k} ${n}`).join(' ／ ')||'清單為空'}</p><p>排程狀態 · {Object.entries(counts('planning_status')).map(([k,n])=>`${planningLabels[k as keyof typeof planningLabels]} ${n}`).join(' ／ ')||'清單為空'}</p></>}</div>
  <section className="dp-needs glass--card"><h2>需要我處理</h2><div className="dp-work-list">{cold?Array.from({length:4},(_,i)=><div className="dp-work-row" key={i}><Skeleton lines={7}/></div>):filtered.filter(r=>r.needs_me.length).map(card)}</div>{!cold&&!filtered.some(r=>r.needs_me.length)&&<p>{forbidden||!read.data?'待核實處理事項。':'目前篩選清單沒有需要你處理的事項。'}</p>}</section>
- <section><h2>工作清單</h2><div className="dp-work-list">{cold?Array.from({length:4},(_,i)=><div className="dp-work-row" key={i}><Skeleton lines={7}/></div>):filtered.map(card)}</div>{!cold&&!filtered.length&&<p>{!read.data||forbidden?'尚無可核實的工作清單。':'目前篩選清單沒有工作。'}</p>}</section>{selected&&<WorkDetail row={selected} onClose={()=>setSelected(undefined)} onAction={action} write={write}/>}</section>;
+ <section><h2>工作清單</h2><div className="dp-work-list">{cold?Array.from({length:4},(_,i)=><div className="dp-work-row" key={i}><Skeleton lines={7}/></div>):filtered.map(card)}</div>{!cold&&!filtered.length&&<p>{!read.data||forbidden?'尚無可核實的工作清單。':'目前篩選清單沒有工作。'}</p>}</section>{selected&&!forbidden&&<WorkDetail row={selected} onClose={()=>setSelected(undefined)} onAction={action} write={write}/>}</section>;
 }

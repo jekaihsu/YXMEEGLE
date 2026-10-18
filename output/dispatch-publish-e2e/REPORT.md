@@ -1,5 +1,7 @@
 # Dispatch publish frontend integration verification
 
+The sections through Changed files record round 1. The round 2 results at the end supersede them.
+
 Worktree `/Users/vc/.t3/worktrees/YXMEEGLE/dispatch-s2`, branch `t3/dispatch-s2`. Starting commit `1be34e5`. Only `frontend/` and `output/` are changed by this implementation delegate. No push or deployment.
 
 ## Completed frontend checks
@@ -100,7 +102,7 @@ Start the scratch Vite proxies first. The main script expects a fresh fake datab
 
 ## Remaining backend observation and verification limits
 
-An earlier unknown preview can reappear beside the committed task after its replacement preview is published. This is a stale workbench proposal, not a second remote task. `BACKEND_FEEDBACK.md` records the reproduction and the backend join that causes it. The frontend labels preview proposals and written tasks separately and preserves the server's rows. It does not hide distinct proposals by comparing titles.
+Round 1 observed an earlier unknown preview reappearing beside the committed task after its replacement preview was published. Commit `899091e` fixes that backend observation. This is a stale workbench proposal, not a second remote task. `BACKEND_FEEDBACK.md` records the reproduction and the backend join that causes it. The frontend labels preview proposals and written tasks separately and preserves the server's rows. It does not hide distinct proposals by comparing titles.
 
 The browser's competing-proposal 409 is a stale-version conflict on the same task. A simultaneous new-task reservation race was not reproduced in the browser. The captured `reservation_conflict` response is exercised by the model and mounted UI tests. Reconciliation was tested against the fake Lark only. The task required no real tenant writes, push or deployment.
 
@@ -113,3 +115,66 @@ Tests and browser verification are in `frontend/test-dispatch-publish.mjs`, `tes
 Only frontend and output paths are committed. The backend agent's commit remains separate.
 
 Model the Domain kept external parsing, identity mapping and wire serialization in one adapter. Type System Discipline kept external response payloads unknown until that adapter parsed them. Prove It Works changed the verification from provisional mock assertions to a repeatable real FastAPI browser run, which found the scope-reset bug.
+
+
+## Review round 2
+
+Frontend implementation in `/Users/vc/.t3/worktrees/YXMEEGLE/dispatch-s2`, starting from `899091e`. Only `frontend/` and `output/` changed in this implementation. The concurrent backend agent owns backend, scripts and docs changes, committed as `63be12a`. The final browser runs use those changes. No push, deployment or real Lark tenant write occurred.
+
+### Regression tests
+
+`frontend/test-dispatch-round2.mjs` mounts the real React dialog and work view in jsdom. The initial run reproduced all six defects and both variants of defect 6. `round2-red.txt` preserves those failures. `round2-green.txt` records the final model, existing mounted UI and new regression results.
+
+| Defect | Test name | Result |
+| --- | --- | --- |
+| 1 | R1 saved proposal wins over approved preview and approvals are void | PASS. Edit a reason on the approved preview, save, remount with the saved draft and an older flow proposal, assert the new reason and void seat labels, disabled publication and the next saved payload. |
+| 2 | R2 failed reconciliation restores options task and parent obligation | PASS. Recover a command, reconcile to failed, enter the form, assert a named picker and the literal task and parent references in the next preview request. |
+| 3 | R3 seat holder sees every hashed proposal field and exclusive interval | PASS. A member seat holder sees 20 read-only summary entries, with literal content, start, end, owner, case and exclusive-end wording. |
+| 4 | R4 absent hours stay null omitted and show estimation hint | PASS. Null stays null, is absent from the wire payload, leaves the input blank and shows 系統依組員與時段估算. An explicitly entered zero still serializes as zero. |
+| 5 | R5 unresolved display names never expose record IDs | PASS. Missing resource and feasibility names resolve to 名稱未能解析. Named summaries retain their display names. |
+| 6 | R6 forbidden read clears open detail and actions | PASS. Open a real drawer, refresh to 403, assert the forbidden message and no dialog. A later successful read does not restore the drawer. |
+| 6 | R6 identity epoch clears open detail before new read | PASS. Open a drawer, invalidate the session epoch, re-render and assert no dialog. |
+| Wire changes | wire errors use plain Chinese and receipt reasons survive parsing | PASS. Covers changed seat holders, recheck unavailability, unknown department, department/node mismatch, own-preview refusal, search lag and missing base snapshot. |
+
+The domain changes keep saved proposals separate from immutable previews, retain nullable estimates and parse preview case names and command preview references at the boundary. Approval-only entry points no longer create placeholder empty drafts. The summary displays each written proposal field from the preview that owns the hash. Task and parent identifiers are displayed as reference fields; unresolved display names never use those identifiers as names.
+
+### Final commands
+
+Run from `frontend/`.
+
+```sh
+npm run build
+npx tsc --noEmit -p tsconfig.json
+node test-dispatch-board.mjs
+node test-contrast.mjs
+npm run test:dispatch-publish
+```
+
+All five commands pass. The publish suite covers all 40 regenerated backend API examples, the existing mounted UI suite and eight round 2 checks. The board suite includes its nine regression tests. The unrelated nine baseline frontend failures were not part of this run. `git diff --check -- frontend output` also passes.
+
+Before completion, both `docs/dispatch-publish-wire-changes.md` and `docs/dispatch-publish-api-examples.json` were re-read, including the round 2 section. The adapter translates `decision_holder_changed:<seat>`, `recheck_unavailable`, `invalid` with `field: department` and `reason: unknown_department`, `department_not_node_group`, `own_preview`, `already_published`, `search_lag` and `no_base_snapshot`. A 503 retry retains the original command identifier.
+
+### Real browser evidence
+
+Both runs use headless installed Chrome, the real React app, real FastAPI routes and SQLite, the dev server's in-memory fake Bitable, Taipei time and zh-TW locale. The full run uses the unmodified `scripts/dev_dispatch_fake_server.py` on 8768 with a scratch Vite proxy on 5201. The recovery run uses `frontend/qa/dispatch-round2-server.py` on 8769 with a proxy on 5202. That QA-only wrapper imports the existing dev server and adds a one-shot timeout before the fake remote write lands, plus a seeded parent obligation. It changes no backend application code. No browser request was mocked or fulfilled by Playwright.
+
+```sh
+/Users/vc/Local/YXMEEGLE/.venv/bin/python scripts/dev_dispatch_fake_server.py --port 8768
+DISPATCH_E2E_URL=http://localhost:5201 DISPATCH_PLAYWRIGHT_MODULE=file:///tmp/dispatch-playwright-runtime/node_modules/playwright/index.mjs node frontend/qa/dispatch-real-e2e.mjs
+/Users/vc/Local/YXMEEGLE/.venv/bin/python frontend/qa/dispatch-round2-server.py --port 8769
+DISPATCH_E2E_RECOVERY_ONLY=1 DISPATCH_E2E_URL=http://localhost:5202 DISPATCH_PLAYWRIGHT_MODULE=file:///tmp/dispatch-playwright-runtime/node_modules/playwright/index.mjs node frontend/qa/dispatch-real-e2e.mjs
+```
+
+The two scratch Vite proxies point `/api` to their corresponding backend, with `changeOrigin: false`. Each run starts with a fresh fake database. The full run repeats assignment, drafts, unknown feasibility, three distinct approvals, publication, reassignment, competing-proposal 409 and successful reconciliation. It adds R1 by changing an approved reason, saving, closing, reopening, refreshing approvals, confirming publication remains disabled, and obtaining a fresh preview plus three new decisions. The recovery run adds R2 with a real update command that times out before landing, followed by manager reconciliation that returns 502 failed. The recovered form has named pickers and the original content. Its next preview keeps `task_id: recLegacy` and `parent_task_ref: recObligationQA`.
+
+Results and requests are saved in `real-result.json`, `real-network.json`, `real-recovery-result.json` and `real-recovery-network.json`. Both result files report no page errors. Each screenshot below has `-1280.png` and `-390.png` variants in this directory. Both widths are checked for document overflow.
+
+- `real-draft-reopened-changed` shows the void-approval warning and disabled publication.
+- `real-draft-reopened-reason` shows the saved reason after reopening.
+- `real-draft-approvals-void` shows the old seat decisions marked invalid.
+- `real-reconcile-failed-form` shows the restored content after failed reconciliation.
+- `real-reconcile-failed-form-parent` shows the preserved parent.
+- `real-reconcile-failed-form-pickers` shows restored named people pickers.
+- `real-recovery-seats-approved` shows the separate recovery scenario's seat holders.
+
+Model the Domain kept nullable estimates and preview ownership in the existing model. Test Behavior, Not Implementation changed each regression into mounted UI or literal wire assertions. Prove It Works required real-browser replay and screenshots before completion. Architecture and implementation remained in-thread under the assigned implementation-subagent role. Independent review belongs to the parent task. No nested delegates or PRs were created.
