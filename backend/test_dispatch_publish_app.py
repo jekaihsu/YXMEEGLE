@@ -17,7 +17,7 @@ def test_session_exposes_dispatch_write_only_when_enabled(tmp_path):
 def test_real_app_routes_are_absent_when_off_and_formal_only_when_on(tmp_path):
     off = build(tmp_path)
     off.get('/api/session')
-    assert off.post('/api/v2/dispatch/previews', json={}).status_code == 404
+    assert not [r.path for r in off.app.routes if r.path.startswith(('/api/v2/dispatch', '/api/v2/commands'))]
     on = build(tmp_path, DISPATCH_WRITE_ENABLED='true')
     assert on.get('/api/v2/dispatch/work').json() == {'detail': '請先登入'}
     on.get('/api/session')
