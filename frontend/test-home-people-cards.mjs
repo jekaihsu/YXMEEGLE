@@ -60,3 +60,8 @@ for(const scope of ['assign','company']){
 doc=render({id:'impact',view:{...view,people:[...view.people,departed],leaves:[...view.leaves,{person_id:'departed',start:'2026-10-12',end:'2026-10-16'}]},team:{...team,body:{...team.body,items:[...team.body.items,{id:'departed-task',assignees:[{id:'departed'}],status:'in_progress'}]}}});
 assert.deepEqual([...doc.querySelectorAll('.home-impact-row')].map(el=>el.textContent),['組員甲缺席 2 天（10/12、10/13） · 未完成 1 · 本週到期 1 · 逾期 0重新分配']);
 console.log('PASS 7 departed-person rendered roster, certainty and impact assertions');
+doc=render({});
+assert.deepEqual([...doc.querySelectorAll('.home-attendance td')].map(el=>el.getAttribute('class')),['','','is-today','','']);
+doc=render({view:{...view,days:view.days.slice(0,2)}});
+assert.deepEqual([...doc.querySelectorAll('.home-attendance td')].map(el=>el.getAttribute('class')),['','','is-today is-unknown','is-unknown','is-unknown']);
+console.log('PASS 2 literal rendered class-attribute arrays');
