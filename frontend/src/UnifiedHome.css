@@ -1,12 +1,12 @@
 @layer pages {
 .unified-home{min-width:0}
-.unified-home .ds-page-head{align-items:flex-end;gap:var(--space-5);margin-bottom:var(--space-5)}
+.unified-home .ds-page-head{align-items:flex-end;gap:var(--space-6);margin-bottom:var(--space-6)}
 .unified-home .ds-page-head h1{font-size:clamp(1.75rem,2vw,2.15rem);letter-spacing:-.025em;line-height:1.2}
 .unified-home .ds-page-head .ds-eyebrow{margin-bottom:var(--space-2)}
 .unified-home .ds-page-head>div:first-child>p:last-child{margin-top:var(--space-2);max-width:52ch}
 .unified-home .ds-actions{gap:var(--space-2)}
 .unified-home .home-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-4);align-items:start}
-.unified-home .home-card,.unified-home .home-customize,.unified-home .home-empty{border:1px solid var(--glass-border);border-radius:var(--radius-card);background:var(--glass-fill-strong);box-shadow:var(--glass-highlight),var(--glass-shadow-flat);backdrop-filter:var(--glass-blur);padding:var(--card-padding,var(--space-5));min-width:0}
+.unified-home .home-card,.unified-home .home-customize,.unified-home .home-empty{border:1px solid var(--glass-border);border-radius:var(--radius-card);background:var(--glass-fill-strong);box-shadow:var(--glass-highlight),var(--glass-shadow-flat);backdrop-filter:var(--glass-blur);padding:var(--card-padding,var(--space-6));min-width:0}
 .unified-home .home-card{display:flex;flex-direction:column;gap:var(--space-4)}
 .unified-home .home-card header{background:none;box-shadow:none;backdrop-filter:none}
 .unified-home h2{font-size:var(--fs-headline);font-weight:600;margin:0;line-height:1.5}
@@ -28,7 +28,6 @@
 .unified-home .home-message{font-size:var(--fs-subhead);line-height:1.7;color:var(--label-2);padding:var(--space-3) 0;margin:0}
 .unified-home .home-source-note{color:var(--label-2);font-size:var(--fs-caption);line-height:1.65;margin:0}
 .unified-home .home-freshness{margin:0 0 var(--space-4);color:var(--label-2);font-size:var(--fs-caption);line-height:1.5}
-.unified-home .home-freshness.is-stale{color:var(--warning)}
 .unified-home .home-customize{margin-bottom:var(--space-6)}
 .unified-home .home-customize>header{display:flex;align-items:start;justify-content:space-between;gap:var(--space-4);background:none;box-shadow:none}
 .unified-home .home-customize ol{list-style:none;margin:var(--space-4) 0 0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-2) var(--space-6)}
@@ -49,9 +48,17 @@
 }
 @layer pages {
 .unified-home [data-home-card=kpi]{grid-column:1/-1}
+.unified-home .home-kpi-strip{padding:var(--space-3) 0;border-block:1px solid var(--sep);min-width:0}
+.unified-home .home-kpis>a{padding:var(--space-2) var(--space-4);border-radius:var(--radius-control);color:inherit;min-width:0}
+.unified-home .home-kpis>a:hover{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.unified-home .home-kpis .ds-stat strong{font-size:var(--fs-title2)}
+.unified-home .home-kpi-strip .home-source-note{padding:0 var(--space-4)}
+.unified-home .home-view-notice{grid-column:1/-1;font-size:var(--fs-footnote);color:var(--label-2);padding:0;border-bottom:1px solid var(--sep)}
+.unified-home .home-view-notice a{color:var(--accent);display:inline-flex;align-items:center;min-height:32px}
+.unified-home .home-card-compact{gap:var(--space-1);padding-block:var(--space-3)}
+.unified-home .home-card-compact .home-message{padding:0;font-size:var(--fs-footnote)}
 .unified-home .home-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-4)}
-.unified-home .home-view-switcher{display:flex;flex-wrap:nowrap;flex-shrink:0;border:1px solid var(--sep);border-radius:var(--radius-control);padding:3px;gap:2px}
-.unified-home .home-view-switcher button[aria-pressed=true]{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.unified-home .home-view-switcher{display:flex;width:fit-content;max-width:100%;flex-wrap:nowrap;border-bottom:1px solid var(--sep);gap:var(--space-2);margin:var(--space-2) 0 0}
 .unified-home .home-help-wrap{position:relative}
 .unified-home .home-help-wrap>button{min-width:44px;font-weight:700}
 .unified-home .home-help{position:absolute;z-index:20;right:0;top:100%;width:min(32rem,calc(100vw - 48px));max-height:70vh;overflow:auto;background:var(--surface);backdrop-filter:var(--glass-blur);border:1px solid var(--sep);border-radius:var(--radius-card);box-shadow:var(--glass-shadow-flat);padding:var(--space-6)}
@@ -77,13 +84,20 @@
 @media(max-width:600px){.unified-home .home-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.unified-home .home-view-switcher{width:100%}.unified-home .home-view-switcher button{flex:1}.unified-home .home-help{position:fixed;top:15vh;right:24px}}
 }
 @layer pages {
-.unified-home .ds-page-head{flex-wrap:wrap;align-items:center}
+.unified-home .ds-page-head{flex-wrap:nowrap;align-items:center}
 .unified-home .ds-page-head>div:first-child{flex:1 1 260px}
-.unified-home .ds-actions{align-items:center;flex-wrap:wrap;justify-content:flex-end}
-.unified-home [data-home-card=kpi] .home-message{padding:var(--space-1) 0;font-size:var(--fs-caption)}
+.unified-home .ds-actions{align-items:center;flex-wrap:nowrap;justify-content:flex-end;flex-shrink:0}
 .unified-home .home-source-note{margin-top:var(--space-2)}
-@media(max-width:760px){.unified-home .ds-page-head>div:first-child{flex-basis:auto}.unified-home .ds-actions{justify-content:flex-start}}
+@media(max-width:760px){.unified-home .ds-page-head>div:first-child{flex-basis:auto}.unified-home .ds-actions{justify-content:flex-start;flex-wrap:wrap}}
 }
 @layer pages {
 .unified-home .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+}
+
+@layer polish {
+.unified-home .home-view-switcher button{border:0;border-bottom:2px solid transparent;border-radius:0;box-shadow:none;background:none;padding:0 var(--space-3);white-space:nowrap;min-width:0}
+.unified-home .home-view-switcher button[aria-pressed=true]{border-bottom-color:var(--accent);color:var(--accent);background:none}
+.unified-home .ds-page-head{align-items:flex-start}
+.unified-home .ds-actions{padding-top:var(--space-6)}
+@media(max-width:760px){.unified-home .ds-actions{padding-top:0}}
 }

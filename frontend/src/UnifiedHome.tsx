@@ -1,6 +1,6 @@
 import {useEffect,useState,type ReactNode} from 'react';
 import {ArrowDown,ArrowUp,CalendarDays,Check,Settings2,RotateCcw,RefreshCw} from 'lucide-react';
-import {Button,Page} from './design';
+import {Button,Eyebrow} from './design';
 import {type Ctx,date} from './appCommon';
 import {useHomePanels,type PanelRead} from './useHomePanels';
 import {fetchPeopleAttendance,parsePeopleAttendance,taipeiWeek} from './peopleAttendance';
@@ -9,6 +9,7 @@ import {ApiError} from './api';
 import {HOME_CARDS,HOME_VIEWS,availableViews,resolvePersona,defaultHomeLayout,parseHomeLayout,moveHomeCard,homeLayoutKey,taipeiToday,type HomeCardId,type HomeLayout,type HomeSettings,type HomeViewId} from './homeLayout';
 import {AttendanceCard,Message} from './homeCards';
 import {HomeHelp} from './homeHelp';
+import {panelSource,workSource} from './homeWorkSource';
 import {MineCard} from './homeViews/MineCards';
 import {AssignCard,useAssignData} from './homeViews/AssignCards';
 import {CompanyCard} from './homeViews/CompanyCards';
@@ -18,11 +19,14 @@ import './UnifiedHome.css';
 type ViewProps={ids:HomeCardId[];c:Ctx;today:string;assigned:PanelRead;confirmation:PanelRead;attendance:(id:'leave'|'trips')=>ReactNode};
 function AssignView(props:ViewProps){
  const data=useAssignData(props.c);
- return <>{props.ids.map(id=>id==='leave'||id==='trips'?props.attendance(id):<AssignCard key={id} id={id} {...props} {...data}/> )}</>;
+ const unavailable=!data.team.pending&&!data.review.pending&&!panelSource(data.team)&&!panelSource(data.review);
+ return <>{unavailable&&<div className="home-view-notice" role="status">{data.team.error||data.review.error||'團隊工作來源尚未提供。'} <a href="#view=projects">前往案件分配</a></div>}{props.ids.filter(id=>!unavailable||!['allocation','workload'].includes(id)).map(id=>id==='leave'||id==='trips'?props.attendance(id):<AssignCard key={id} id={id} {...props} {...data}/> )}</>;
 }
 function CompanyView(props:ViewProps){
  const read=useHomeCompany(props.c);
- return <>{props.ids.map(id=>id==='leave'||id==='trips'?props.attendance(id):<CompanyCard key={id} id={id} {...props} read={read}/> )}</>;
+ const missing=!read.data&&!read.pending;
+ const unavailable=read.data&&read.data.source.status!=='ready'&&!read.data.groups.length&&!read.data.cases.length;
+ return <>{(missing||unavailable||read.data?.complete===false)&&<div className="home-view-notice" role="status">{read.error||(unavailable?'公司來源尚未提供，僅顯示已載入總數。':'公司快照尚未完整，統計僅涵蓋已載入來源。')} <a href="#view=company">開啟公司駕駛艙</a></div>}{props.ids.filter(id=>!unavailable||!['groups','cases','statuses'].includes(id)).map(id=>id==='leave'||id==='trips'?props.attendance(id):<CompanyCard key={id} id={id} {...props} read={read}/> )}</>;
 }
 export function UnifiedHome({c}:{c:Ctx}){
  const key=homeLayoutKey(c.s.workspace_id||c.w.workspace_id||'default',c.s.user?.id||'anonymous',c.s.user?.role||'',c.s.mode);
@@ -58,14 +62,17 @@ function HomeWorkspace({c,storageKey}:{c:Ctx;storageKey:string}){
  const stale=freshnessDays!==null&&freshnessDays>1;
  const attendanceCard=(id:'leave'|'trips')=><AttendanceCard key={id} id={id} view={attendance.data} loading={attendance.loading} error={attendance.error} today={today}/>;
  const props:ViewProps={ids:visible,c:homeContext,today,assigned,confirmation,attendance:attendanceCard};
+ const missingMine=!assigned.pending&&!confirmation.pending&&!workSource(homeContext,'assigned',today,assigned)&&!workSource(homeContext,'confirmation',today,confirmation);
  const renderCard=(id:HomeCardId)=>id==='leave'||id==='trips'?attendanceCard(id):<MineCard key={id} id={id} {...props}/>;
- return <div className="unified-home" data-home-view={view}><Page title="今日工作台" eyebrow={today.replaceAll('-','/')+' · '+(c.s.user?.name||'我的工作空間')} subtitle={HOME_VIEWS[view].label+'，掌握今天需要處理的事。'} actions={<>
+ return <div className="unified-home" data-home-view={view}><div className="ds-page"><header className="ds-page-head"><div>
+  <Eyebrow>{today.replaceAll('-','/')+' · '+(c.s.user?.name||'我的工作空間')}</Eyebrow><h1>今日工作台</h1><p>{HOME_VIEWS[view].label}，掌握今天需要處理的事。</p>
+  {views.length>1&&<div className="home-view-switcher" role="group" aria-label="首頁視圖">{views.map(id=><Button key={id} aria-pressed={view===id} onClick={()=>choose(id)}>{HOME_VIEWS[id].label}</Button>)}</div>}
+ </div><div className="ds-actions">
   <Button disabled={refreshing||c.busy} onClick={()=>void refresh()}><RefreshCw size={16}/>{refreshing?'讀取中…':'重新讀取'}</Button>
   <Button onClick={()=>c.go({view:'schedule'})}><CalendarDays size={16}/>查看排程</Button>
-  {views.length>1&&<div className="home-view-switcher" role="group" aria-label="首頁視圖">{views.map(id=><Button key={id} aria-pressed={view===id} onClick={()=>choose(id)}>{HOME_VIEWS[id].label}</Button>)}</div>}
   <Button variant="plain" aria-expanded={editing} aria-controls="home-customize" onClick={()=>setEditing(value=>!value)}>{editing?<Check size={16}/>:<Settings2 size={16}/>} {editing?'完成設定':'自訂首頁'}</Button>
   <HomeHelp view={view}/>
- </>}>
+ </div></header>
   {editing&&<section className="home-customize glass--flat" id="home-customize" aria-label="自訂首頁卡片">
    <header><div><h2>安排你的首頁 · {HOME_VIEWS[view].label}</h2><p>顯示、隱藏與排序目前視圖的卡片。設定依登入身分與視圖儲存在此瀏覽器。</p></div><Button onClick={()=>update(defaultHomeLayout(view),'已還原目前視圖的建議配置')}><RotateCcw size={15}/>還原建議配置</Button></header>
    <ol>{layout.order.map((id,index)=>{const card=HOME_CARDS[id];return <li key={id}>
@@ -78,6 +85,6 @@ function HomeWorkspace({c,storageKey}:{c:Ctx;storageKey:string}){
   {refreshError&&<Message>{refreshError}</Message>}
   {!saved&&<Message>瀏覽器無法儲存設定；目前配置在離開此頁後可能重設。</Message>}
   {!visible.length&&<div className="home-empty glass--flat"><h2>挑選今天需要的內容</h2><p>尚未顯示任何卡片。開啟「自訂首頁」加入工作、案件或團隊動向。</p><Button onClick={()=>setEditing(true)}>選擇首頁卡片</Button></div>}
-  <div className="home-card-grid">{view==='mine'?visible.map(renderCard):view==='assign'?<AssignView {...props}/>:<CompanyView {...props}/>}</div>
- </Page></div>;
+  <div className="home-card-grid">{view==='mine'?<>{missingMine&&<div className="home-view-notice" role="status">{assigned.error||confirmation.error||'個人工作來源尚未提供。'} <a href="#view=work">開啟我的工作</a></div>}{visible.filter(id=>!missingMine||!['work','confirmation','deadlines'].includes(id)).map(renderCard)}</>:view==='assign'?<AssignView {...props}/>:<CompanyView {...props}/>}</div>
+ </div></div>;
 }
