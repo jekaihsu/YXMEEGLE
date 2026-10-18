@@ -1,5 +1,5 @@
-"""Public progress shapes. Raw source records never cross this boundary."""
-from typing import TypedDict
+"""Public report shapes. Raw source records never cross this boundary."""
+from typing import Literal, NotRequired, TypedDict
 
 
 class StatusCount(TypedDict):
@@ -135,3 +135,141 @@ class ProgressResponse(TypedDict):
     total: int
     offset: int
     limit: int
+
+
+class Gap(TypedDict):
+    id: str
+    severity: Literal['info','warn']
+    message: str
+
+
+class Meta(TypedDict):
+    fetched_at: str
+    stale: bool
+    snapshot: str
+    gaps: list[Gap]
+    refresh_error: NotRequired[bool]
+    can_refresh: NotRequired[bool]
+
+
+class Kpi(TypedDict):
+    total: int
+    passed: int
+    returned: int
+    pending: int
+    unset: int
+    error_rate: float | None
+    pending_rate: float | None
+    coverage: float | None
+
+
+class ReviewTrend(TypedDict):
+    week: str
+    total: int
+    returned: int
+    passed: int
+    error_rate: float | None
+
+
+class ReviewGroup(Kpi):
+    group: str
+
+
+class ReviewControl(TypedDict):
+    checked: int
+    unchecked: int
+    violated: int
+
+
+class HomeOffice(TypedDict):
+    kpi: Kpi
+
+
+class HomeQuality(HomeOffice):
+    kpi_prev: Kpi
+    trend: list[ReviewTrend]
+    by_group: list[ReviewGroup]
+    control: ReviewControl
+
+
+class SalesKpi(TypedDict):
+    cases: int
+    contract_total: float | None
+    billed_total: float | None
+    received_total: float | None
+    unbilled_billable: float | None
+    receivable: float | None
+
+
+class SalesStatus(TypedDict):
+    status: str
+    count: int
+    contract_total: float | None
+
+
+class SalesRow(TypedDict):
+    id: str
+    code: str
+    name: str
+    client: str
+    pm: str
+    status: str
+    contract: float | None
+    progress_revenue: float | None
+    progress_cost: float | None
+    progress_billing: float | None
+    billable_unbilled: float | None
+    receivable: float | None
+    link: str
+
+
+class HomeSales(TypedDict):
+    kpi: SalesKpi
+    by_status: list[SalesStatus]
+    top_receivable: list[SalesRow]
+
+
+class AssetKpi(TypedDict):
+    total: int
+    active: int
+    in_use: int
+    idle: int
+    repair: int
+    km: float | None
+    daily_rent_total: float | None
+    mileage_excluded: NotRequired[int]
+    coverage: NotRequired[float | None]
+
+
+class AssetCategory(TypedDict):
+    category: str
+    total: int
+    in_use: int
+    repair: int
+
+
+class HomeAsset(TypedDict):
+    kpi: AssetKpi
+    by_category: list[AssetCategory]
+
+
+class HomeAssets(TypedDict):
+    instrument: HomeAsset
+    vehicle: HomeAsset
+
+
+class HomeProgress(TypedDict):
+    week: str
+    basis: Literal['days','points']
+    kpi: ProgressKpi
+    by_group: list[ProgressGroup]
+
+
+class HomeResponse(TypedDict):
+    meta: Meta
+    week: str
+    quality: HomeQuality | None
+    quality_office: HomeOffice | None
+    sales: HomeSales | None
+    progress: HomeProgress | None
+    assets: HomeAssets | None

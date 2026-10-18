@@ -89,10 +89,11 @@ class SnapshotStore:
             return dict(fetched_at='',stale=True,refresh_error=self._refresh_error,snapshot='',gaps=[compute.gap('cold','報表來源正在讀取')])
         return dict(fetched_at=snapshot['fetched_at'],refresh_error=self._refresh_error,stale=self._refresh_error or self.clock()-snapshot['at']>=self.ttl,snapshot=snapshot['fingerprint'][:12],gaps=deepcopy(snapshot['gaps'][(endpoint,'field')]))
 
-    def result(self, endpoint, params):
+    def result(self, endpoint, params, *, snapshot=None):
         from .routes import parameters
         params=parameters(endpoint,params)
-        snapshot=self.get();key=(endpoint,tuple(sorted(params.items())))
+        if snapshot is None: snapshot=self.get()
+        key=(endpoint,tuple(sorted(params.items())))
         with self._lock:
             result=snapshot['cache'].get(key)
             if result is not None: snapshot['cache'].move_to_end(key)
