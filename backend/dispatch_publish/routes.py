@@ -17,7 +17,7 @@ COMMIT_STATUS = {CommandResult.COMMITTED: 200, CommandResult.FAILED: 502}
 
 
 def register(app, *, identity, allow, cfg, sessions, audit_model, workspace, transport=None, client_options=None,
-             clock=None, reader=None):
+             clock=None, sleep=None, reader=None):
     """workspace(wid) -> {'settings', 'environment', 'users'}; allow(data, user) -> may dispatch.
 
     users are the workspace's session people ({id, name, role, active}); role pm holds the pm_final seat.
@@ -28,6 +28,8 @@ def register(app, *, identity, allow, cfg, sessions, audit_model, workspace, tra
     options = {'transport': transport, 'client_options': client_options, 'reader': reader}
     if clock is not None:
         options['clock'] = clock
+    if sleep is not None:
+        options['sleep'] = sleep
     service = DispatchPublishService(cfg, sessions=sessions, audit_model=audit_model, **options)
 
     def respond(status, body, headers=None):

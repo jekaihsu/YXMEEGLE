@@ -10,6 +10,7 @@ from ..node_assignment.lark_table import BitableClient, Table
 from .domain import WRITABLE
 
 READ_FIELDS = list(PUBLISH_TABLES['tasks'].fields)
+RECHECK_SECONDS = 5
 
 
 class TaskTable:
@@ -17,8 +18,8 @@ class TaskTable:
         self.cfg, self.transport, self.client_options = cfg, transport, client_options or {}
         self.config = NodeAssignmentConfig(base=base, task_table=PUBLISH_TABLES['tasks'].table_id)
 
-    def _client(self):
-        return BitableClient(self.cfg, self.config, self.transport, **self.client_options)
+    def _client(self, **limits):
+        return BitableClient(self.cfg, self.config, self.transport, **{**self.client_options, **limits})
 
     @staticmethod
     def _allowed(fields):
@@ -38,6 +39,11 @@ class TaskTable:
 
     def get(self, record_id):
         with self._client() as client:
+            return client.get(Table.TASKS, record_id)
+
+    def recheck(self, record_id):
+        """A read made while holding the workspace lock: one attempt within RECHECK_SECONDS, no retries."""
+        with self._client(budget_seconds=RECHECK_SECONDS, max_attempts=1) as client:
             return client.get(Table.TASKS, record_id)
 
     def by_command(self, command_id):

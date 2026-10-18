@@ -23,7 +23,7 @@ from backend.dispatch_publish.routes import register  # noqa: E402
 from backend.live_read.token_cache import TenantTokenCache  # noqa: E402
 from backend.models import AuditRow, Base  # noqa: E402
 from backend.test_dispatch_publish import APPROVERS, CFG, PROPOSAL, ROLES, T0, USERS, NoBucket, seed  # noqa: E402
-from backend.test_dispatch_publish_fake import SCHEDULE, TASKS, FakeLark, timeout_after  # noqa: E402
+from backend.test_dispatch_publish_fake import PEOPLE, SCHEDULE, TASKS, FakeLark, ok, timeout_after, timeout_before  # noqa: E402
 
 OUT = ROOT / 'docs' / 'dispatch-publish-api-examples.json'
 
@@ -47,7 +47,7 @@ class Harness:
                  sessions=self.sessions, audit_model=AuditRow, workspace=lambda _wid: self.workspace,
                  transport=httpx.MockTransport(self.fake),
                  client_options={'token_cache': TenantTokenCache(), 'bucket': NoBucket(), 'sleep': lambda _s: None},
-                 clock=lambda: self.clock[0])
+                 clock=lambda: self.clock[0], sleep=lambda _s: None)
         return TestClient(app)
 
     def call(self, name, who, method, path, body=None, client=None, record=True, note=None):
@@ -66,10 +66,15 @@ class Harness:
         return response
 
 
-def approve(h, preview_id, record=False):
+def approve(h, preview_id, record=False, client=None):
     for who, seat in APPROVERS:
         h.call(f'decision {seat}', who, 'post', f'/api/v2/dispatch/previews/{preview_id}/decisions',
-               {'seat': seat, 'decision': 'accepted'}, record=record)
+               {'seat': seat, 'decision': 'accepted'}, record=record, client=client)
+
+
+def area(title, day, **changes):
+    return {**PROPOSAL, 'title': title, 'crew': ['recP3'], 'instruments': [], 'start': f'{day}T08:00+08:00',
+            'end': f'{day}T12:00+08:00', 'verifications': {'person:recP3': 'ok'}, **changes}
 
 
 def main():
@@ -127,6 +132,8 @@ def main():
     approve(h, reassign['preview_id'])
     h.call('commit: reassignment updates the same task, revision 2', 'ou_pm', 'post', '/api/v2/dispatch/commits',
            {'command_id': '0d15ea5e-0000-4000-8000-000000000013', 'preview_id': reassign['preview_id']})
+    h.call('preview again of the published create: already_published, earlier decisions not reused', 'ou_pm', 'post',
+           '/api/v2/dispatch/previews', PROPOSAL)
 
     first = h.call('preview: D area', 'ou_pm', 'post', '/api/v2/dispatch/previews',
                    {**PROPOSAL, 'title': 'D 區外業', 'crew': ['recP3'], 'instruments': [], 'start': '2026-10-23T08:00+08:00',
@@ -179,6 +186,45 @@ def main():
                                           'start': '2026-10-28T08:00+08:00', 'end': '2026-10-28T12:00+08:00'},
            client=derived)
     h.call('draft: delete (cancel_draft)', 'ou_pm', 'delete', '/api/v2/dispatch/drafts/draft-f-area-01')
+
+    h.call('preview refused: department is not a known 所屬組別 or 部門', 'ou_pm', 'post', '/api/v2/dispatch/previews',
+           area('未知組工作', '2026-10-29', department='不存在組'))
+    own = h.call('preview by a manager', 'ou_mgr', 'post', '/api/v2/dispatch/previews',
+                 area('L 區外業', '2026-10-30'), record=False).json()
+    h.call('decision', 'ou_lead', 'post', f"/api/v2/dispatch/previews/{own['preview_id']}/decisions",
+           {'seat': 'group_leader_confirmed', 'decision': 'accepted'}, record=False)
+    h.call('decision refused: the proposer cannot review their own preview', 'ou_mgr', 'post',
+           f"/api/v2/dispatch/previews/{own['preview_id']}/decisions", {'seat': 'manager_review', 'decision': 'accepted'})
+
+    lapsed = h.call('preview (derived seats)', 'ou_pm', 'post', '/api/v2/dispatch/previews', area('K 區外業', '2026-10-29'),
+                    client=derived, record=False).json()
+    approve(h, lapsed['preview_id'], client=derived)
+    h.fake.tables[PEOPLE]['recP6']['在職'] = False
+    h.call('commit refused (derived seats): the 組長 who accepted is no longer active', 'ou_pm', 'post',
+           '/api/v2/dispatch/commits', {'command_id': '0d15ea5e-0000-4000-8000-000000000018',
+                                        'preview_id': lapsed['preview_id']}, client=derived)
+    h.fake.tables[PEOPLE]['recP6']['在職'] = True
+
+    moved = h.call('preview: reassign again', 'ou_pm', 'post', '/api/v2/dispatch/previews',
+                   area('B 區外業', '2026-10-22', task_id=task_id, crew=['recP2'], primary_owner='recP2',
+                        verifications={'person:recP2': 'ok'}), record=False).json()
+    approve(h, moved['preview_id'])
+    h.fake.on('GET', f'/records/{task_id}', lambda request, proceed: timeout_before(request, proceed))
+    h.call('commit refused: the in-lock re-read of the task failed (one attempt, nothing persisted)', 'ou_pm', 'post',
+           '/api/v2/dispatch/commits', {'command_id': '0d15ea5e-0000-4000-8000-000000000019',
+                                        'preview_id': moved['preview_id']})
+
+    lag = h.call('preview: J area', 'ou_pm', 'post', '/api/v2/dispatch/previews', area('J 區外業', '2026-10-27'),
+                 record=False).json()
+    approve(h, lag['preview_id'])
+    empty = lambda request, proceed: ok({'has_more': False, 'total': 0})
+    h.fake.on('POST', f'/{TASKS}/records/search', empty, times=2)
+    h.call('commit: row read back but the 命令編號 search still lags after one retry (202)', 'ou_pm', 'post',
+           '/api/v2/dispatch/commits', {'command_id': '0d15ea5e-0000-4000-8000-000000000020',
+                                        'preview_id': lag['preview_id']})
+    h.fake.on('POST', f'/{TASKS}/records/search', empty)
+    h.call('reconcile: the known record reads back and the retried search finds it; nothing is re-sent', 'ou_mgr',
+           'post', '/api/v2/commands/0d15ea5e-0000-4000-8000-000000000020/reconcile')
 
     OUT.write_text(json.dumps({
         '_about': 'Generated by scripts/dispatch_publish_examples.py from real calls against the fake V4 Bitable '

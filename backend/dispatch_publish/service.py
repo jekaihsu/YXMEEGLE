@@ -20,15 +20,16 @@ from ..sources import link_ids, text
 from .config import DispatchPublishConfig, Seat
 from .domain import (
     ANY_DEPARTMENT, COMMAND_ID, COMMAND_LABEL, COMMAND_PLANNING, DRAFT_ID, CommandResult, Decision, Directory,
-    PlanningStatus, Refusal, Sources, Viewer, assess, build_work, changed, check_draft, decision_refusal, from_millis,
-    millis, mismatches, parse_proposal, proposal_hash, resolve_seats, seat_board, snapshot, task_fields,
-    task_interval, task_row, task_users)
+    PlanningStatus, Refusal, Sources, Viewer, assess, build_work, changed, check_draft, decision_refusal,
+    department_problem, from_millis, millis, mismatches, parse_proposal, proposal_hash, resolve_seats, seat_board,
+    snapshot, task_fields, task_interval, task_row, task_users)
 from .lark_task import TaskTable
 from .store import DispatchStore, duplicate
 
 logger = logging.getLogger(__name__)
 KEYS = ('schedule', 'tasks', 'people', 'accounts', 'instruments', 'vehicles', 'cases', 'nodes')
 WORK_KEYS = ('tasks', 'nodes', 'people', 'accounts', 'instruments', 'vehicles', 'cases')
+SEARCH_RETRY_SECONDS = 1
 FORM_FIELDS = [
     ('title', '標題', True), ('content', '內容', True), ('case_ref', '工程確認單', True), ('project_ref', '專案編號', True),
     ('phase', '任務階段', True), ('kind', '任務種類', True), ('package_id', '工作包編號', True),
@@ -65,10 +66,11 @@ def _iso(seconds):
 
 
 class DispatchPublishService:
-    def __init__(self, cfg, *, sessions, audit_model, transport=None, client_options=None, clock=time.time, reader=None):
+    def __init__(self, cfg, *, sessions, audit_model, transport=None, client_options=None, clock=time.time,
+                 sleep=time.sleep, reader=None):
         self.cfg = dict(cfg)
         self.config = DispatchPublishConfig.from_env(cfg)
-        self.clock = clock
+        self.clock, self.sleep = clock, sleep
         self.store = DispatchStore(sessions, audit_model, clock)
         self.reader = reader or DispatchReader(cfg, transport=transport, client_options=client_options)
         self.tasks = TaskTable(cfg, self.config.base, transport, client_options)
@@ -141,6 +143,11 @@ class DispatchPublishService:
         return resolve_seats(self.config.required_seats, directory, department, ctx.workspace.get('users') or [],
                              self.config.seats)
 
+    def preview_seats(self, ctx: Context, directory, preview):
+        """Holders for one preview: its department's, without the people who proposed this hash on 組長 and 經理."""
+        proposers = self.store.proposers(ctx.wid, preview['preview_hash'])
+        return self.seats(ctx, directory, preview['proposal']['department']).excluding(proposers), proposers
+
     def holds_any_seat(self, ctx: Context):
         return bool(self.seats(ctx, self.directory(ctx.wid), ANY_DEPARTMENT).mine(ctx.actor))
 
@@ -158,6 +165,9 @@ class DispatchPublishService:
     def preview(self, ctx: Context, raw):
         proposal, draft_id = self._proposal_and_draft(raw)
         sources, entries = self.sources(ctx.wid)
+        problem = department_problem(proposal, sources, Directory.of(sources))
+        if problem:
+            raise Refusal('invalid', '部門須為已知的所屬組別，且須是任務節點所屬的組別', field='department', reason=problem)
         assessment = assess(proposal, sources, self.store.held(ctx.wid), allow_unknown=self.config.allow_unknown)
         stored = self.store.save_preview(ctx.wid, ctx.actor, {
             'preview_hash': proposal_hash(proposal), 'proposal': proposal.public(), 'assessment': assessment,
@@ -173,11 +183,13 @@ class DispatchPublishService:
     def present_preview(self, ctx: Context, preview):
         decisions = self.store.decisions(ctx.wid, preview['preview_hash'])
         directory = self.directory(ctx.wid)
-        holders = self.seats(ctx, directory, preview['proposal']['department'])
+        holders, _ = self.preview_seats(ctx, directory, preview)
         seats, seat_blockers = seat_board(self.config.required_seats, holders, decisions, directory)
         assessment = preview['assessment']
         expired = preview['expires_at'] <= self.clock()
-        blockers = list(dict.fromkeys(assessment['blockers'] + seat_blockers + (['preview_expired'] if expired else [])))
+        published = self.store.live_for_hash(ctx.wid, preview['preview_hash']) is not None
+        blockers = list(dict.fromkeys(assessment['blockers'] + seat_blockers + (['preview_expired'] if expired else [])
+                                      + (['already_published'] if published else [])))
         enabled = self.writes_enabled(ctx)
         mine = holders.mine(ctx.actor)
         return {
@@ -206,10 +218,13 @@ class DispatchPublishService:
         reason = (reason or '').strip() or None
         if decision is Decision.RETURNED and not reason:
             raise Refusal('invalid', '退回須附理由', field='reason')
+        live = self.store.live_for_hash(ctx.wid, found['preview_hash'])
+        if live is not None:
+            raise duplicate(live['command_id'], live['state'])
         required = self.config.required_seats
-        holders = self.seats(ctx, self.directory(ctx.wid), found['proposal']['department']).holders
+        holders, proposers = self.preview_seats(ctx, self.directory(ctx.wid), found)
         self.store.decide(ctx.wid, found, seat.value, ctx.actor, decision.value, reason,
-                          lambda current: decision_refusal(seat, ctx.actor, required, holders, current))
+                          lambda current: decision_refusal(seat, ctx.actor, required, holders, current, proposers))
         return self.present_preview(ctx, found)
 
     # Commands
@@ -243,8 +258,12 @@ class DispatchPublishService:
         assessment = assess(proposal, sources, self.store.held(ctx.wid), allow_unknown=self.config.allow_unknown)
         decisions = self.store.decisions(ctx.wid, preview['preview_hash'])
         directory = Directory.of(sources)
-        holders = self.seats(ctx, directory, proposal.department)
+        holders, _ = self.preview_seats(ctx, directory, preview)
         _, seat_blockers = seat_board(self.config.required_seats, holders, decisions, directory)
+        lapsed = [b.split(':', 1)[1] for b in seat_blockers if b.startswith('decision_holder_changed:')]
+        if lapsed:
+            raise Refusal('decision_holder_changed', '核定人已不再擔任此席次，請由現任持有人重新核定',
+                          seats=lapsed, blockers=seat_blockers)
         if 'approval_not_configured' in seat_blockers:
             raise Refusal('approval_not_configured', '核定席次尚無可核定的人，無法發布', blockers=seat_blockers,
                           seats=[b.split(':', 1)[1] for b in seat_blockers if b.startswith('approval_not_configured:')])
@@ -253,7 +272,6 @@ class DispatchPublishService:
             raise Refusal('blocked', '尚有未解除的發布條件', blockers=blockers, conflicts=assessment['conflicts'])
         if assessment['digest'] != preview['assessment']['digest']:
             raise Refusal('preview_stale', '排程、任務或人員帳號已變更，請重新預覽', conflicts=assessment['conflicts'])
-        ctx = self.revalidated(ctx, 'dispatch')
         revision = assessment['base_revision'] + 1
         payload = task_fields(proposal, directory, actor_open_id=ctx.actor, command_id=command_id, revision=revision,
                               now_ms=int(self.clock() * 1000), create=proposal.task_id is None)
@@ -261,9 +279,9 @@ class DispatchPublishService:
 
         def recheck():
             try:
-                current = self.tasks.get(proposal.task_id)
+                current = self.tasks.recheck(proposal.task_id)
             except Failure:
-                raise Refusal('sources_unavailable', '無法重新讀取任務，暫停發布', source='tasks') from None
+                raise Refusal('recheck_unavailable', '無法在發布前重新讀取任務，請稍後重試', retryable=True) from None
             if snapshot(current.get('fields') or {}) != base:
                 raise Refusal('stale_revision', '任務已在預覽後變更，請重新預覽')
         created, command = self.store.open_command(ctx.wid, {
@@ -275,6 +293,11 @@ class DispatchPublishService:
             if command['preview_id'] != preview_id:
                 raise Refusal('idempotency_conflict', 'command_id 已用於其他預覽，請產生新的 command_id')
             return command
+        try:
+            ctx = self.revalidated(ctx, 'dispatch')
+        except Exception as exc:
+            self.store.abandon(ctx.wid, command_id, ctx.actor, getattr(exc, 'code', type(exc).__name__))
+            raise
         return self._write(ctx, command)
 
     def _write(self, ctx: Context, command):
@@ -307,16 +330,20 @@ class DispatchPublishService:
             diff = ['record_id']
         if diff:
             return finish(CommandResult.RECONCILIATION_REQUIRED, mismatches=diff, **read)
-        if rows is None:
-            try:
+        try:
+            if rows is None:
                 rows = self.tasks.by_command(command['command_id'])
-            except Failure as exc:
-                return finish(CommandResult.OUTCOME_UNKNOWN, error='search_' + exc.code, at=_iso(self.clock()))
+            if not rows:
+                # The row already read back as written; Lark search can lag a fresh write, so ask once more.
+                self.sleep(SEARCH_RETRY_SECONDS)
+                rows = self.tasks.by_command(command['command_id'])
+        except Failure as exc:
+            return finish(CommandResult.OUTCOME_UNKNOWN, error='search_' + exc.code, at=_iso(self.clock()))
         carrying = sorted({r['record_id'] for r in rows} | {record_id})
         if len(carrying) > 1:
             return finish(CommandResult.RECONCILIATION_REQUIRED, mismatches=[], duplicates=carrying, **read)
         if not rows:
-            return finish(CommandResult.OUTCOME_UNKNOWN, error='search_missing', at=_iso(self.clock()))
+            return finish(CommandResult.OUTCOME_UNKNOWN, error='search_lag', at=_iso(self.clock()))
         return finish(CommandResult.COMMITTED, mismatches=[], **read)
 
     def reconcile(self, ctx: Context, command_id):
@@ -343,6 +370,14 @@ class DispatchPublishService:
             return self.store.finish(ctx.wid, command_id, claimed['attempt'], CommandResult.RECONCILIATION_REQUIRED,
                                      {**(claimed['receipt'] or {}), 'row_missing': True, 'at': _iso(self.clock())},
                                      ctx.actor)
+        landed = (claimed['receipt'] or {}).get('record_id') if claimed['action'] == 'create' else None
+        if landed:
+            # The create returned its row; read that row back instead of sending the create again.
+            try:
+                current = self.tasks.get(landed)
+            except Failure:
+                raise Refusal('sources_unavailable', '無法讀取任務列以對帳，命令狀態未變') from None
+            return self._read_back(ctx, claimed, landed, current, rows)
         if claimed['action'] == 'update':
             try:
                 current = self.tasks.get(claimed['task_id'])
@@ -351,6 +386,10 @@ class DispatchPublishService:
             fields = current.get('fields') or {}
             if not mismatches(claimed['payload'], fields):
                 return self._read_back(ctx, claimed, claimed['task_id'], current, rows)
+            if claimed['base'] is None:
+                return self.store.finish(ctx.wid, command_id, claimed['attempt'], CommandResult.RECONCILIATION_REQUIRED,
+                                         {'record_id': claimed['task_id'], 'reason': 'no_base_snapshot',
+                                          'at': _iso(self.clock())}, ctx.actor)
             # Someone edited the row since the command was opened: report it, never overwrite it.
             moved = changed(claimed['base'], fields)
             if moved:

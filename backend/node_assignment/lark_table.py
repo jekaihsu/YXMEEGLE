@@ -254,13 +254,14 @@ def assignment_key(code, key: NodeKey):
 
 class BitableClient:
     def __init__(self, cfg, config: NodeAssignmentConfig, transport=None, *, before_write: Callable[[], None] | None = None,
-                 token_cache=None, bucket=None, clock=time.monotonic, sleep=time.sleep, budget_seconds=25):
+                 token_cache=None, bucket=None, clock=time.monotonic, sleep=time.sleep, budget_seconds=25,
+                 max_attempts=RetryPolicy.max_attempts):
         self.cfg, self.config = cfg, config
         self.http = httpx.Client(transport=transport, follow_redirects=False)
         self.before_write = before_write or (lambda: None)
         self.token_cache = token_cache or process_token_cache
         self.bucket = bucket or process_bucket(LiveReadConfig.from_env(cfg).max_rps)
-        self.clock, self.sleep = clock, sleep
+        self.clock, self.sleep, self.max_attempts = clock, sleep, max_attempts
         self.deadline = clock() + budget_seconds
         self.deny = transport is None and cfg.get('LARK_LIVE_READ_TRANSPORT') == 'deny'
         self.calls = 0
@@ -450,7 +451,7 @@ class BitableClient:
             return data
 
     def _backoff(self, response, attempt):
-        if attempt >= RetryPolicy.max_attempts:
+        if attempt >= self.max_attempts:
             return False
         delay = RetryPolicy.after(response, attempt, jitter=True) if response is not None else 2 ** (attempt - 1)
         if response is not None:

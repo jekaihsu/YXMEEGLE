@@ -72,7 +72,7 @@ def h(tmp_path):
     sessions = sessionmaker(engine, expire_on_commit=False)
     fake = FakeLark()
     seed(fake)
-    clock, who = [T0], ['ou_pm']
+    clock, who, sleeps = [T0], ['ou_pm'], []
     workspace = {'settings': {'external_enabled': True}, 'environment': 'production', 'users': USERS}
 
     def identity(_request):
@@ -84,7 +84,7 @@ def h(tmp_path):
                  cfg={**CFG, **(overrides or {})}, sessions=store or sessions, audit_model=AuditRow,
                  workspace=lambda _wid: workspace, transport=httpx.MockTransport(fake),
                  client_options={'token_cache': TenantTokenCache(), 'bucket': NoBucket(), 'sleep': lambda _s: None},
-                 clock=lambda: clock[0])
+                 clock=lambda: clock[0], sleep=sleeps.append)
         return TestClient(app)
 
     def audits():
@@ -96,7 +96,7 @@ def h(tmp_path):
             return sorted((r.resource_kind, r.ref, r.state, r.command_id, r.task_id)
                           for r in db.scalars(select(DispatchReservationRow)))
 
-    yield SimpleNamespace(client=build(), build=build, fake=fake, clock=clock, who=who, workspace=workspace,
+    yield SimpleNamespace(client=build(), build=build, fake=fake, clock=clock, who=who, workspace=workspace, sleeps=sleeps,
                           audits=audits, held=held, sessions=sessions, url=f'sqlite:///{tmp_path}/dispatch.db')
     engine.dispose()
 

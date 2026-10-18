@@ -10,6 +10,7 @@ from datetime import date, datetime, timedelta
 from enum import StrEnum
 
 from ..dispatch_board.domain import TZ, Feasibility, Interval, _interval as schedule_interval, resource_state
+from ..node_assignment.domain import EXECUTIVE_RANKS, MANAGER_RANK, NODE_DEPARTMENTS, NODE_LABELS
 from ..node_assignment.lark_table import Kind, canon
 from ..sources import link_ids, text
 from .config import Seat
@@ -82,7 +83,8 @@ STATUS = {'invalid': 422, 'blocked': 422, 'approval_not_configured': 422, 'forbi
           'writes_disabled': 403, 'not_found': 404, 'disabled': 404, 'preview_expired': 409,
           'preview_stale': 409, 'reservation_conflict': 409, 'duplicate_command': 409, 'idempotency_conflict': 409,
           'busy': 409, 'stale_revision': 409, 'seat_conflict': 409, 'version_conflict': 409, 'nothing_to_reconcile': 409,
-          'payload_too_large': 413, 'lark_unconfigured': 503, 'sources_unavailable': 503}
+          'decision_holder_changed': 409, 'payload_too_large': 413, 'lark_unconfigured': 503,
+          'sources_unavailable': 503, 'recheck_unavailable': 503}
 
 
 class Refusal(Exception):
@@ -420,6 +422,38 @@ def overlap(booking: Booking, start: datetime, end: datetime):
     return Feasibility.UNKNOWN if span.start.date() <= last and start.date() <= span.end.date() else None
 
 
+NODE_OF_LABEL = {label: key for key, label in NODE_LABELS.items()}
+
+
+def known_departments(sources: Sources, directory: Directory):
+    """The /options choices: 任務 部門 values and roster 所屬組別."""
+    return ({text(f.get('部門')).strip() for f in sources.index('tasks').values()}
+            | set().union(*directory.groups.values())) - {''}
+
+
+def owning_groups(proposal: Proposal, sources: Sources):
+    """The 所屬組別 that own the node the target task, or else its parent obligation, is assigned to."""
+    tasks, nodes = sources.index('tasks'), sources.index('nodes')
+    for rid in (proposal.task_id, proposal.parent_task_ref):
+        node = next(iter(link_ids((tasks.get(rid) or {}).get('節點指派'))), None) if rid else None
+        key = NODE_OF_LABEL.get(text(nodes.get(node, {}).get('節點')).strip()) if node else None
+        if key is not None:
+            return frozenset(NODE_DEPARTMENTS[key])
+    return None
+
+
+def department_problem(proposal: Proposal, sources: Sources, directory: Directory):
+    """The department chooses the 組長 and 經理 who approve, so it must be a real group and the node's own."""
+    if proposal.department is None:
+        return None
+    if proposal.department not in known_departments(sources, directory):
+        return 'unknown_department'
+    owners = owning_groups(proposal, sources)
+    if owners is not None and proposal.department not in owners:
+        return 'department_not_node_group'
+    return None
+
+
 def assess(proposal: Proposal, sources: Sources, reservations, *, allow_unknown: bool) -> dict:
     """Per-person and per-resource feasibility, conflicts and commit blockers for one proposal."""
     directory = Directory.of(sources)
@@ -489,6 +523,8 @@ def assess(proposal: Proposal, sources: Sources, reservations, *, allow_unknown:
                 'name': text((fields or {}).get('工程名稱')).strip() or None}
         if fields is None:
             blockers.append('case_unresolved')
+    if problem := department_problem(proposal, sources, directory):
+        blockers.append(problem)
     base_revision, row = 0, None
     if proposal.task_id:
         row = sources.index('tasks').get(proposal.task_id) if sources.tasks is not None else None
@@ -516,8 +552,10 @@ def assess(proposal: Proposal, sources: Sources, reservations, *, allow_unknown:
 # Approval seats
 
 
-LEADER_RANK, MANAGER_RANK, EXECUTIVE_RANKS = '組長', '經理', frozenset({'副總', '老闆'})
+LEADER_RANK = '組長'
 ANY_DEPARTMENT = object()
+# The proposer may not confirm or review their own preview; pm_final may be their own role.
+PROPOSER_EXCLUDED = frozenset({Seat.GROUP_LEADER, Seat.MANAGER_REVIEW})
 
 
 @dataclass(frozen=True)
@@ -529,6 +567,10 @@ class Seats:
 
     def mine(self, open_id):
         return frozenset(seat for seat, found in self.holders.items() if open_id in found)
+
+    def excluding(self, proposers):
+        return Seats({seat: found - proposers if seat in PROPOSER_EXCLUDED else found
+                      for seat, found in self.holders.items()}, self.origin, self.names)
 
     def people(self, seat, directory: Directory):
         return [{'person_ref': p['person_ref'], 'name': p['name']}
@@ -562,9 +604,16 @@ def resolve_seats(required, directory: Directory, department, session_users, ove
     return Seats(holders, origin, names)
 
 
+def standing(decisions, seats: Seats):
+    """Decisions that still count: an acceptance only while its actor holds the seat, a return always."""
+    return [d for d in decisions if d['decision'] == Decision.RETURNED
+            or d['actor_id'] in seats.holders.get(Seat(d['seat']), ())]
+
+
 def seat_board(required, seats: Seats, decisions, directory: Directory):
     """Seat status for one hash, in approval order, plus the blockers that keep it from publishing."""
-    by_seat = {d['seat']: d for d in decisions}
+    valid = standing(decisions, seats)
+    by_seat = {d['seat']: d for d in valid}
     board, blockers = [], []
     for seat in required:
         found = by_seat.get(seat.value)
@@ -577,8 +626,10 @@ def seat_board(required, seats: Seats, decisions, directory: Directory):
     unconfigured = [seat.value for seat in required if not seats.holders.get(seat)]
     if unconfigured:
         blockers += ['approval_not_configured'] + [f'approval_not_configured:{seat}' for seat in unconfigured]
-    if any(d['decision'] == Decision.RETURNED for d in decisions):
+    if any(d['decision'] == Decision.RETURNED for d in valid):
         blockers.append('approval_returned')
+    lapsed = {d['seat'] for d in decisions} - set(by_seat)
+    blockers += [f'decision_holder_changed:{seat.value}' for seat in required if seat.value in lapsed]
     blockers += [f"approval_missing:{s['seat']}" for s in board if s['decision'] != Decision.ACCEPTED]
     return board, blockers
 
@@ -588,12 +639,15 @@ def next_seat(required, decisions):
     return next((seat for seat in required if seat.value not in decided), None)
 
 
-def decision_refusal(seat: Seat, actor, required, holders, decisions):
+def decision_refusal(seat: Seat, actor, required, seats: Seats, decisions, proposers):
     """Why this actor may not decide this seat now, or None."""
     if seat not in required:
         return 'seat_not_required'
-    if actor not in holders.get(seat, ()):
+    if seat in PROPOSER_EXCLUDED and actor in proposers:
+        return 'own_preview'
+    if actor not in seats.holders.get(seat, ()):
         return 'not_seat_holder'
+    decisions = standing(decisions, seats)
     if any(d['decision'] == Decision.RETURNED for d in decisions):
         return 'hash_returned'
     if any(d['seat'] == seat.value for d in decisions):
@@ -774,7 +828,8 @@ def _overlay_row(row, viewer: Viewer, *, command=None, approval=None, draft=None
         seat = next_seat(required, decisions)
         # Approving a hash that still has feasibility blockers is wasted: fixing them changes the hash.
         if (not returned and seat and not approval['blockers'] and decision_refusal(
-                seat, viewer.open_id, required, seats_for(approval['proposal']).holders, decisions) is None):
+                seat, viewer.open_id, required, seats_for(approval['proposal']), decisions,
+                {approval['actor_id']}) is None):
             needs.append(f'approve_seat:{seat.value}')
         if approval['actor_id'] == viewer.open_id:
             if returned:

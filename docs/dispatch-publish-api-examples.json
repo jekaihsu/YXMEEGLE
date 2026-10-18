@@ -75,7 +75,7 @@
    "response": {
     "status": 200,
     "body": {
-     "preview_id": "pv_9de6779b173aa6ba04a0346d",
+     "preview_id": "pv_0943ff7f22c912355ae74feb",
      "preview_hash": "731a42c31a470a3edfe18ab8e52d3eb1e1d7215a8cbe0e19c4124b917ec1dc60",
      "expires_at": "2026-10-19T02:15:00+00:00",
      "expired": false,
@@ -316,7 +316,7 @@
    "response": {
     "status": 200,
     "body": {
-     "preview_id": "pv_33683e8b6b56cb405014e55f",
+     "preview_id": "pv_2babd11401212514c8afb5e5",
      "preview_hash": "f18f7e3cafa1164e1ae95132abeedfc327fde39afc06e92c06f029001fbb24dd",
      "expires_at": "2026-10-19T02:15:00+00:00",
      "expired": false,
@@ -497,12 +497,12 @@
    },
    "request": {
     "method": "GET",
-    "path": "/api/v2/dispatch/previews/pv_33683e8b6b56cb405014e55f"
+    "path": "/api/v2/dispatch/previews/pv_2babd11401212514c8afb5e5"
    },
    "response": {
     "status": 200,
     "body": {
-     "preview_id": "pv_33683e8b6b56cb405014e55f",
+     "preview_id": "pv_2babd11401212514c8afb5e5",
      "preview_hash": "f18f7e3cafa1164e1ae95132abeedfc327fde39afc06e92c06f029001fbb24dd",
      "expires_at": "2026-10-19T02:15:00+00:00",
      "expired": false,
@@ -685,7 +685,7 @@
    },
    "request": {
     "method": "POST",
-    "path": "/api/v2/dispatch/previews/pv_33683e8b6b56cb405014e55f/decisions",
+    "path": "/api/v2/dispatch/previews/pv_2babd11401212514c8afb5e5/decisions",
     "body": {
      "seat": "group_leader_confirmed",
      "decision": "accepted"
@@ -694,7 +694,7 @@
    "response": {
     "status": 200,
     "body": {
-     "preview_id": "pv_33683e8b6b56cb405014e55f",
+     "preview_id": "pv_2babd11401212514c8afb5e5",
      "preview_hash": "f18f7e3cafa1164e1ae95132abeedfc327fde39afc06e92c06f029001fbb24dd",
      "expires_at": "2026-10-19T02:15:00+00:00",
      "expired": false,
@@ -876,7 +876,7 @@
    },
    "request": {
     "method": "POST",
-    "path": "/api/v2/dispatch/previews/pv_33683e8b6b56cb405014e55f/decisions",
+    "path": "/api/v2/dispatch/previews/pv_2babd11401212514c8afb5e5/decisions",
     "body": {
      "seat": "pm_final",
      "decision": "accepted"
@@ -899,7 +899,7 @@
    },
    "request": {
     "method": "POST",
-    "path": "/api/v2/dispatch/previews/pv_33683e8b6b56cb405014e55f/decisions",
+    "path": "/api/v2/dispatch/previews/pv_2babd11401212514c8afb5e5/decisions",
     "body": {
      "seat": "manager_review",
      "decision": "accepted"
@@ -908,7 +908,7 @@
    "response": {
     "status": 200,
     "body": {
-     "preview_id": "pv_33683e8b6b56cb405014e55f",
+     "preview_id": "pv_2babd11401212514c8afb5e5",
      "preview_hash": "f18f7e3cafa1164e1ae95132abeedfc327fde39afc06e92c06f029001fbb24dd",
      "expires_at": "2026-10-19T02:15:00+00:00",
      "expired": false,
@@ -1089,7 +1089,7 @@
    },
    "request": {
     "method": "POST",
-    "path": "/api/v2/dispatch/previews/pv_33683e8b6b56cb405014e55f/decisions",
+    "path": "/api/v2/dispatch/previews/pv_2babd11401212514c8afb5e5/decisions",
     "body": {
      "seat": "pm_final",
      "decision": "accepted"
@@ -1098,7 +1098,7 @@
    "response": {
     "status": 200,
     "body": {
-     "preview_id": "pv_33683e8b6b56cb405014e55f",
+     "preview_id": "pv_2babd11401212514c8afb5e5",
      "preview_hash": "f18f7e3cafa1164e1ae95132abeedfc327fde39afc06e92c06f029001fbb24dd",
      "expires_at": "2026-10-19T02:15:00+00:00",
      "expired": false,
@@ -1280,7 +1280,7 @@
     "path": "/api/v2/dispatch/commits",
     "body": {
      "command_id": "cmd-b-area-0001",
-     "preview_id": "pv_33683e8b6b56cb405014e55f"
+     "preview_id": "pv_2babd11401212514c8afb5e5"
     }
    },
    "response": {
@@ -1303,7 +1303,7 @@
     "path": "/api/v2/dispatch/commits",
     "body": {
      "command_id": "0d15ea5e-0000-4000-8000-000000000014",
-     "preview_id": "pv_9de6779b173aa6ba04a0346d"
+     "preview_id": "pv_0943ff7f22c912355ae74feb"
     }
    },
    "response": {
@@ -1351,7 +1351,7 @@
     "path": "/api/v2/dispatch/commits",
     "body": {
      "command_id": "0d15ea5e-0000-4000-8000-000000000011",
-     "preview_id": "pv_33683e8b6b56cb405014e55f"
+     "preview_id": "pv_2babd11401212514c8afb5e5"
     }
    },
    "response": {
@@ -1373,7 +1373,7 @@
     "path": "/api/v2/dispatch/commits",
     "body": {
      "command_id": "0d15ea5e-0000-4000-8000-000000000011",
-     "preview_id": "pv_33683e8b6b56cb405014e55f"
+     "preview_id": "pv_2babd11401212514c8afb5e5"
     }
    },
    "response": {
@@ -1381,7 +1381,7 @@
     "body": {
      "command": {
       "command_id": "0d15ea5e-0000-4000-8000-000000000011",
-      "preview_id": "pv_33683e8b6b56cb405014e55f",
+      "preview_id": "pv_2babd11401212514c8afb5e5",
       "preview_hash": "f18f7e3cafa1164e1ae95132abeedfc327fde39afc06e92c06f029001fbb24dd",
       "action": "create",
       "task_id": "recTask0001",
@@ -1440,7 +1440,7 @@
     "path": "/api/v2/dispatch/commits",
     "body": {
      "command_id": "0d15ea5e-0000-4000-8000-000000000011",
-     "preview_id": "pv_33683e8b6b56cb405014e55f"
+     "preview_id": "pv_2babd11401212514c8afb5e5"
     }
    },
    "response": {
@@ -1448,7 +1448,7 @@
     "body": {
      "command": {
       "command_id": "0d15ea5e-0000-4000-8000-000000000011",
-      "preview_id": "pv_33683e8b6b56cb405014e55f",
+      "preview_id": "pv_2babd11401212514c8afb5e5",
       "preview_hash": "f18f7e3cafa1164e1ae95132abeedfc327fde39afc06e92c06f029001fbb24dd",
       "action": "create",
       "task_id": "recTask0001",
@@ -1510,7 +1510,7 @@
     "path": "/api/v2/dispatch/commits",
     "body": {
      "command_id": "0d15ea5e-0000-4000-8000-000000000012",
-     "preview_id": "pv_33683e8b6b56cb405014e55f"
+     "preview_id": "pv_2babd11401212514c8afb5e5"
     }
    },
    "response": {
@@ -1538,7 +1538,7 @@
     "body": {
      "command": {
       "command_id": "0d15ea5e-0000-4000-8000-000000000011",
-      "preview_id": "pv_33683e8b6b56cb405014e55f",
+      "preview_id": "pv_2babd11401212514c8afb5e5",
       "preview_hash": "f18f7e3cafa1164e1ae95132abeedfc327fde39afc06e92c06f029001fbb24dd",
       "action": "create",
       "task_id": "recTask0001",
@@ -1597,7 +1597,7 @@
     "path": "/api/v2/dispatch/commits",
     "body": {
      "command_id": "0d15ea5e-0000-4000-8000-000000000015",
-     "preview_id": "pv_2013cc7cfcb0c24aafa0f308"
+     "preview_id": "pv_58129d1ab0072ae6f3a73170"
     }
    },
    "response": {
@@ -1605,7 +1605,7 @@
     "body": {
      "command": {
       "command_id": "0d15ea5e-0000-4000-8000-000000000015",
-      "preview_id": "pv_2013cc7cfcb0c24aafa0f308",
+      "preview_id": "pv_58129d1ab0072ae6f3a73170",
       "preview_hash": "19dbe8dd3632f5d62146675b6aae04af757f1535befb429a82bf264b9fd9e8f5",
       "action": "create",
       "task_id": null,
@@ -1666,7 +1666,7 @@
     "body": {
      "command": {
       "command_id": "0d15ea5e-0000-4000-8000-000000000015",
-      "preview_id": "pv_2013cc7cfcb0c24aafa0f308",
+      "preview_id": "pv_58129d1ab0072ae6f3a73170",
       "preview_hash": "19dbe8dd3632f5d62146675b6aae04af757f1535befb429a82bf264b9fd9e8f5",
       "action": "create",
       "task_id": null,
@@ -1727,7 +1727,7 @@
     "body": {
      "command": {
       "command_id": "0d15ea5e-0000-4000-8000-000000000015",
-      "preview_id": "pv_2013cc7cfcb0c24aafa0f308",
+      "preview_id": "pv_58129d1ab0072ae6f3a73170",
       "preview_hash": "19dbe8dd3632f5d62146675b6aae04af757f1535befb429a82bf264b9fd9e8f5",
       "action": "create",
       "task_id": "recTask0002",
@@ -1810,7 +1810,7 @@
    "response": {
     "status": 200,
     "body": {
-     "preview_id": "pv_387eaa6c0ea1bd52c8b0820f",
+     "preview_id": "pv_2400f7a14fc09b647d89e6f8",
      "preview_hash": "7b65e4bd6dc9f6c7056c719abeb3dc28cba69082f2a4ae866c76bbf764e82513",
      "expires_at": "2026-10-19T02:15:00+00:00",
      "expired": false,
@@ -1980,7 +1980,7 @@
     "path": "/api/v2/dispatch/commits",
     "body": {
      "command_id": "0d15ea5e-0000-4000-8000-000000000013",
-     "preview_id": "pv_387eaa6c0ea1bd52c8b0820f"
+     "preview_id": "pv_2400f7a14fc09b647d89e6f8"
     }
    },
    "response": {
@@ -1988,7 +1988,7 @@
     "body": {
      "command": {
       "command_id": "0d15ea5e-0000-4000-8000-000000000013",
-      "preview_id": "pv_387eaa6c0ea1bd52c8b0820f",
+      "preview_id": "pv_2400f7a14fc09b647d89e6f8",
       "preview_hash": "7b65e4bd6dc9f6c7056c719abeb3dc28cba69082f2a4ae866c76bbf764e82513",
       "action": "update",
       "task_id": "recTask0001",
@@ -2029,6 +2029,216 @@
    }
   },
   {
+   "name": "preview again of the published create: already_published, earlier decisions not reused",
+   "actor": {
+    "open_id": "ou_pm",
+    "role": "pm"
+   },
+   "request": {
+    "method": "POST",
+    "path": "/api/v2/dispatch/previews",
+    "body": {
+     "project_ref": "DEMO-01",
+     "case_ref": "recCase1",
+     "title": "B 區外業",
+     "content": "B 區水深測量",
+     "kind": "execution",
+     "phase": "formal",
+     "department": "外業",
+     "primary_owner": "recP3",
+     "crew": [
+      "recP3",
+      "recP2"
+     ],
+     "start": "2026-10-20T08:00+08:00",
+     "end": "2026-10-20T12:00+08:00",
+     "instruments": [
+      "recI1"
+     ],
+     "verifications": {
+      "person:recP3": "主管核實 L2 資格",
+      "person:recP2": "主管核實 L2 資格"
+     }
+    }
+   },
+   "response": {
+    "status": 200,
+    "body": {
+     "preview_id": "pv_2babd11401212514c8afb5e5",
+     "preview_hash": "f18f7e3cafa1164e1ae95132abeedfc327fde39afc06e92c06f029001fbb24dd",
+     "expires_at": "2026-10-19T02:15:00+00:00",
+     "expired": false,
+     "created_by": "ou_pm",
+     "draft_id": "draft-b-area-01",
+     "proposal": {
+      "task_id": null,
+      "project_ref": "DEMO-01",
+      "case_ref": "recCase1",
+      "title": "B 區外業",
+      "content": "B 區水深測量",
+      "kind": "execution",
+      "phase": "formal",
+      "package_id": null,
+      "parent_task_ref": null,
+      "department": "外業",
+      "primary_owner": "recP3",
+      "crew": [
+       "recP3",
+       "recP2"
+      ],
+      "start": "2026-10-20T08:00+08:00",
+      "end": "2026-10-20T12:00+08:00",
+      "est_person_hours": null,
+      "instruments": [
+       "recI1"
+      ],
+      "vehicles": [],
+      "deadline": null,
+      "verifications": {
+       "person:recP2": "主管核實 L2 資格",
+       "person:recP3": "主管核實 L2 資格"
+      }
+     },
+     "source_vector": {
+      "schedule": "2026-10-19T02:00:00+00:00",
+      "tasks": "2026-10-19T02:00:00+00:00",
+      "people": "2026-10-19T02:00:00+00:00",
+      "accounts": "2026-10-19T02:00:00+00:00",
+      "instruments": "2026-10-19T02:00:00+00:00",
+      "vehicles": "2026-10-19T02:00:00+00:00",
+      "cases": "2026-10-19T02:00:00+00:00",
+      "nodes": "2026-10-19T02:00:00+00:00",
+      "schema_version": 1
+     },
+     "crew": [
+      {
+       "person_ref": "recP3",
+       "name": "丙",
+       "active": true,
+       "has_lark_account": true,
+       "feasibility": "unknown",
+       "reasons": [
+        "no_leave_source",
+        "no_capability_source"
+       ],
+       "verification": "主管核實 L2 資格"
+      },
+      {
+       "person_ref": "recP2",
+       "name": "乙",
+       "active": true,
+       "has_lark_account": true,
+       "feasibility": "unknown",
+       "reasons": [
+        "no_leave_source",
+        "no_capability_source"
+       ],
+       "verification": "主管核實 L2 資格"
+      }
+     ],
+     "resources": [
+      {
+       "kind": "instrument",
+       "ref": "recI1",
+       "label": "GNSS-01",
+       "feasibility": "feasible",
+       "reasons": [],
+       "verification": null
+      }
+     ],
+     "case": {
+      "ref": "recCase1",
+      "resolved": true,
+      "code": "SYN-001",
+      "name": "合成示範案"
+     },
+     "conflicts": [],
+     "warnings": [
+      "no_capability_source",
+      "no_leave_source"
+     ],
+     "blockers": [
+      "approval_missing:group_leader_confirmed",
+      "approval_missing:manager_review",
+      "approval_missing:pm_final",
+      "already_published"
+     ],
+     "hours": 4.0,
+     "booked_person_hours": 8.0,
+     "base_revision": 0,
+     "approval_policy": "required",
+     "required_seats": [
+      {
+       "seat": "group_leader_confirmed",
+       "holders": [
+        "recP6"
+       ],
+       "names": [
+        "組長"
+       ],
+       "people": [
+        {
+         "person_ref": "recP6",
+         "name": "組長"
+        }
+       ],
+       "configured": true,
+       "source": "env",
+       "decision": null,
+       "actor": null,
+       "reason": null,
+       "at": null
+      },
+      {
+       "seat": "manager_review",
+       "holders": [
+        "recP7"
+       ],
+       "names": [
+        "經理"
+       ],
+       "people": [
+        {
+         "person_ref": "recP7",
+         "name": "經理"
+        }
+       ],
+       "configured": true,
+       "source": "env",
+       "decision": null,
+       "actor": null,
+       "reason": null,
+       "at": null
+      },
+      {
+       "seat": "pm_final",
+       "holders": [
+        "recP8"
+       ],
+       "names": [
+        "專案PM"
+       ],
+       "people": [
+        {
+         "person_ref": "recP8",
+         "name": "專案PM"
+        }
+       ],
+       "configured": true,
+       "source": "env",
+       "decision": null,
+       "actor": null,
+       "reason": null,
+       "at": null
+      }
+     ],
+     "my_seats": [],
+     "can_commit": false,
+     "writes_enabled": true
+    }
+   }
+  },
+  {
    "name": "commit refused: concurrent overlapping commit lost the reservation race",
    "actor": {
     "open_id": "ou_pm",
@@ -2038,8 +2248,8 @@
     "method": "POST",
     "path": "/api/v2/dispatch/commits",
     "body": {
-     "command_id": "0d15ea5e-0000-4000-8000-000000000016",
-     "preview_id": "pv_24318df60600bef65402923e"
+     "command_id": "0d15ea5e-0000-4000-8000-000000000017",
+     "preview_id": "pv_7a42453990179c92d784b21c"
     }
    },
    "response": {
@@ -2052,11 +2262,11 @@
        "kind": "person",
        "ref": "recP3",
        "task_id": "recTask0003",
-       "command_id": "0d15ea5e-0000-4000-8000-000000000017",
-       "title": "E 區外業",
+       "command_id": "0d15ea5e-0000-4000-8000-000000000016",
+       "title": "D 區外業",
        "interval": {
-        "start": "2026-10-23T10:00+08:00",
-        "end": "2026-10-23T14:00+08:00",
+        "start": "2026-10-23T08:00+08:00",
+        "end": "2026-10-23T12:00+08:00",
         "precision": "datetime"
        }
       }
@@ -2194,7 +2404,7 @@
    },
    "request": {
     "method": "POST",
-    "path": "/api/v2/dispatch/previews/pv_5286591c06de87a24543e09d/decisions",
+    "path": "/api/v2/dispatch/previews/pv_cbd67d204093cb6d1e4e4ecc/decisions",
     "body": {
      "seat": "group_leader_confirmed",
      "decision": "returned",
@@ -2204,7 +2414,7 @@
    "response": {
     "status": 200,
     "body": {
-     "preview_id": "pv_5286591c06de87a24543e09d",
+     "preview_id": "pv_cbd67d204093cb6d1e4e4ecc",
      "preview_hash": "212ac4b4ba23153e330643f619f49fd471908c79334545a582cca7e394da1ee4",
      "expires_at": "2026-10-19T02:15:00+00:00",
      "expired": false,
@@ -2400,14 +2610,14 @@
      "progress": {
       "total": 9,
       "status": {
-       "unknown": 6,
-       "待處理": 3
+       "unknown": 5,
+       "待處理": 4
       },
       "planning_status": {
-       "pending_approval": 4,
+       "pending_approval": 3,
        "draft": 2,
        "unassigned": 1,
-       "confirmed": 2
+       "confirmed": 3
       },
       "needs_me": 3
      },
@@ -2479,7 +2689,7 @@
        "command_ref": null,
        "readback_at": null,
        "source": "workbench_preview",
-       "preview_id": "pv_9de6779b173aa6ba04a0346d",
+       "preview_id": "pv_0943ff7f22c912355ae74feb",
        "command": null,
        "draft_id": null,
        "needs_me": [
@@ -2540,7 +2750,7 @@
        "command_ref": null,
        "readback_at": null,
        "source": "workbench_preview",
-       "preview_id": "pv_5286591c06de87a24543e09d",
+       "preview_id": "pv_cbd67d204093cb6d1e4e4ecc",
        "command": null,
        "draft_id": null,
        "needs_me": [
@@ -2668,7 +2878,7 @@
        "command_ref": null,
        "readback_at": null,
        "source": "workbench_preview",
-       "preview_id": "pv_9de6779b173aa6ba04a0346d",
+       "preview_id": "pv_0943ff7f22c912355ae74feb",
        "command": null,
        "draft_id": null,
        "needs_me": [
@@ -2729,7 +2939,7 @@
        "command_ref": null,
        "readback_at": null,
        "source": "workbench_preview",
-       "preview_id": "pv_5286591c06de87a24543e09d",
+       "preview_id": "pv_cbd67d204093cb6d1e4e4ecc",
        "command": null,
        "draft_id": null,
        "needs_me": [
@@ -2787,74 +2997,6 @@
         "assign",
         "edit_detail"
        ]
-      },
-      {
-       "task_id": null,
-       "title": "B 區外業",
-       "content": "B 區水深測量",
-       "case": {
-        "ref": "recCase1",
-        "code": null,
-        "name": null,
-        "resolved": false
-       },
-       "project_id": "DEMO-01",
-       "package_id": null,
-       "parent_task_ref": null,
-       "kind": "execution",
-       "phase": "formal",
-       "node": null,
-       "department": "外業",
-       "status": null,
-       "planning_status": "pending_approval",
-       "acceptance_status": null,
-       "acceptance_summary": null,
-       "owner": {
-        "person_ref": "recP3",
-        "open_id": "ou_bing",
-        "name": "丙"
-       },
-       "crew": [
-        {
-         "person_ref": "recP3",
-         "open_id": "ou_bing",
-         "name": "丙"
-        },
-        {
-         "person_ref": "recP2",
-         "open_id": "ou_yi",
-         "name": "乙"
-        }
-       ],
-       "assigned_by": null,
-       "interval": {
-        "start": "2026-10-20T08:00+08:00",
-        "end": "2026-10-20T12:00+08:00",
-        "precision": "datetime"
-       },
-       "instruments": [
-        {
-         "ref": "recI1",
-         "label": null
-        }
-       ],
-       "vehicles": [],
-       "deadline": null,
-       "est_person_hours": null,
-       "revision": null,
-       "versions": {
-        "scope": null,
-        "rule": null,
-        "evidence": null
-       },
-       "command_ref": null,
-       "readback_at": null,
-       "source": "workbench_preview",
-       "preview_id": "pv_33683e8b6b56cb405014e55f",
-       "command": null,
-       "draft_id": null,
-       "needs_me": [],
-       "allowed_actions": []
       },
       {
        "task_id": "recTask0001",
@@ -3010,8 +3152,77 @@
        ]
       },
       {
-       "task_id": null,
+       "task_id": "recTask0003",
        "title": "D 區外業",
+       "content": "B 區水深測量",
+       "case": {
+        "ref": "recCase1",
+        "code": "SYN-001",
+        "name": "合成示範案",
+        "resolved": true
+       },
+       "project_id": "DEMO-01",
+       "package_id": null,
+       "parent_task_ref": null,
+       "kind": "execution",
+       "phase": "formal",
+       "node": null,
+       "department": "外業",
+       "status": "待處理",
+       "planning_status": "confirmed",
+       "acceptance_status": null,
+       "acceptance_summary": null,
+       "owner": {
+        "person_ref": "recP3",
+        "open_id": "ou_bing",
+        "name": "丙"
+       },
+       "crew": [
+        {
+         "person_ref": "recP3",
+         "open_id": "ou_bing",
+         "name": "丙"
+        }
+       ],
+       "assigned_by": {
+        "person_ref": null,
+        "open_id": "ou_pm",
+        "name": "派工PM"
+       },
+       "interval": {
+        "start": "2026-10-23T08:00:00+08:00",
+        "end": "2026-10-23T12:00:00+08:00",
+        "precision": "datetime"
+       },
+       "instruments": [],
+       "vehicles": [],
+       "deadline": null,
+       "est_person_hours": 4.0,
+       "revision": 1,
+       "versions": {
+        "scope": null,
+        "rule": null,
+        "evidence": null
+       },
+       "command_ref": "0d15ea5e-0000-4000-8000-000000000016",
+       "readback_at": "2026-10-19T10:00+08:00",
+       "source": "v4_task",
+       "command": {
+        "command_id": "0d15ea5e-0000-4000-8000-000000000016",
+        "state": "committed",
+        "label": "已確認"
+       },
+       "preview_id": null,
+       "draft_id": null,
+       "needs_me": [],
+       "allowed_actions": [
+        "reassign",
+        "edit_detail"
+       ]
+      },
+      {
+       "task_id": null,
+       "title": "E 區外業",
        "content": "B 區水深測量",
        "case": {
         "ref": "recCase1",
@@ -3044,8 +3255,8 @@
        ],
        "assigned_by": null,
        "interval": {
-        "start": "2026-10-23T08:00+08:00",
-        "end": "2026-10-23T12:00+08:00",
+        "start": "2026-10-23T10:00+08:00",
+        "end": "2026-10-23T14:00+08:00",
         "precision": "datetime"
        },
        "instruments": [],
@@ -3061,7 +3272,7 @@
        "command_ref": null,
        "readback_at": null,
        "source": "workbench_preview",
-       "preview_id": "pv_24318df60600bef65402923e",
+       "preview_id": "pv_7a42453990179c92d784b21c",
        "command": null,
        "draft_id": null,
        "needs_me": [],
@@ -3119,7 +3330,7 @@
        "command_ref": null,
        "readback_at": null,
        "source": "workbench_preview",
-       "preview_id": "pv_4ca66dabad24684bd62b73f7",
+       "preview_id": "pv_69c8ed0811d302e5b88d5cac",
        "command": null,
        "draft_id": null,
        "needs_me": [],
@@ -3282,7 +3493,7 @@
        "command_ref": null,
        "readback_at": null,
        "source": "workbench_preview",
-       "preview_id": "pv_4ca66dabad24684bd62b73f7",
+       "preview_id": "pv_69c8ed0811d302e5b88d5cac",
        "command": null,
        "draft_id": null,
        "needs_me": [
@@ -3347,7 +3558,7 @@
        "command_ref": null,
        "readback_at": null,
        "source": "workbench_preview",
-       "preview_id": "pv_4ca66dabad24684bd62b73f7",
+       "preview_id": "pv_69c8ed0811d302e5b88d5cac",
        "command": null,
        "draft_id": null,
        "needs_me": [
@@ -3443,7 +3654,7 @@
       "command_ref": null,
       "readback_at": null,
       "source": "workbench_preview",
-      "preview_id": "pv_9de6779b173aa6ba04a0346d",
+      "preview_id": "pv_0943ff7f22c912355ae74feb",
       "command": null,
       "draft_id": null,
       "needs_me": [
@@ -3966,7 +4177,7 @@
    "response": {
     "status": 200,
     "body": {
-     "preview_id": "pv_6c7aebef6e62d3371bcc80ac",
+     "preview_id": "pv_85b35c93a440b2cc32a5785c",
      "preview_hash": "e43e89603b7439a18c099f092f16b2b5a18bddb08cccbb41bcc3eac999c3cb40",
      "expires_at": "2026-10-19T02:15:00+00:00",
      "expired": false,
@@ -4147,6 +4358,219 @@
     "status": 200,
     "body": {
      "deleted": "draft-f-area-01"
+    }
+   }
+  },
+  {
+   "name": "preview refused: department is not a known 所屬組別 or 部門",
+   "actor": {
+    "open_id": "ou_pm",
+    "role": "pm"
+   },
+   "request": {
+    "method": "POST",
+    "path": "/api/v2/dispatch/previews",
+    "body": {
+     "project_ref": "DEMO-01",
+     "case_ref": "recCase1",
+     "title": "未知組工作",
+     "content": "B 區水深測量",
+     "kind": "execution",
+     "phase": "formal",
+     "department": "不存在組",
+     "primary_owner": "recP3",
+     "crew": [
+      "recP3"
+     ],
+     "start": "2026-10-29T08:00+08:00",
+     "end": "2026-10-29T12:00+08:00",
+     "instruments": [],
+     "verifications": {
+      "person:recP3": "ok"
+     }
+    }
+   },
+   "response": {
+    "status": 422,
+    "body": {
+     "detail": "部門須為已知的所屬組別，且須是任務節點所屬的組別",
+     "code": "invalid",
+     "field": "department",
+     "reason": "unknown_department"
+    }
+   }
+  },
+  {
+   "name": "decision refused: the proposer cannot review their own preview",
+   "actor": {
+    "open_id": "ou_mgr",
+    "role": "manager"
+   },
+   "request": {
+    "method": "POST",
+    "path": "/api/v2/dispatch/previews/pv_3a6a20879bf5639ef249f47b/decisions",
+    "body": {
+     "seat": "manager_review",
+     "decision": "accepted"
+    }
+   },
+   "response": {
+    "status": 409,
+    "body": {
+     "detail": "此席次目前不能由你決定",
+     "code": "seat_conflict",
+     "reason": "own_preview"
+    }
+   }
+  },
+  {
+   "name": "commit refused (derived seats): the 組長 who accepted is no longer active",
+   "actor": {
+    "open_id": "ou_pm",
+    "role": "pm"
+   },
+   "request": {
+    "method": "POST",
+    "path": "/api/v2/dispatch/commits",
+    "body": {
+     "command_id": "0d15ea5e-0000-4000-8000-000000000018",
+     "preview_id": "pv_084a000794bab617bedeeca8"
+    }
+   },
+   "response": {
+    "status": 409,
+    "body": {
+     "detail": "核定人已不再擔任此席次，請由現任持有人重新核定",
+     "code": "decision_holder_changed",
+     "seats": [
+      "group_leader_confirmed"
+     ],
+     "blockers": [
+      "approval_not_configured",
+      "approval_not_configured:group_leader_confirmed",
+      "decision_holder_changed:group_leader_confirmed",
+      "approval_missing:group_leader_confirmed"
+     ]
+    }
+   }
+  },
+  {
+   "name": "commit refused: the in-lock re-read of the task failed (one attempt, nothing persisted)",
+   "actor": {
+    "open_id": "ou_pm",
+    "role": "pm"
+   },
+   "request": {
+    "method": "POST",
+    "path": "/api/v2/dispatch/commits",
+    "body": {
+     "command_id": "0d15ea5e-0000-4000-8000-000000000019",
+     "preview_id": "pv_fbe9b9f1a41c5fca34d1ba23"
+    }
+   },
+   "response": {
+    "status": 503,
+    "body": {
+     "detail": "無法在發布前重新讀取任務，請稍後重試",
+     "code": "recheck_unavailable",
+     "retryable": true
+    }
+   }
+  },
+  {
+   "name": "commit: row read back but the 命令編號 search still lags after one retry (202)",
+   "actor": {
+    "open_id": "ou_pm",
+    "role": "pm"
+   },
+   "request": {
+    "method": "POST",
+    "path": "/api/v2/dispatch/commits",
+    "body": {
+     "command_id": "0d15ea5e-0000-4000-8000-000000000020",
+     "preview_id": "pv_5b42cede8792f4ef632f3530"
+    }
+   },
+   "response": {
+    "status": 202,
+    "body": {
+     "command": {
+      "command_id": "0d15ea5e-0000-4000-8000-000000000020",
+      "preview_id": "pv_5b42cede8792f4ef632f3530",
+      "preview_hash": "133dcaaf67ea5ec7242d2427dfdf74a381a802caa24a3e028861bdfa05037470",
+      "action": "create",
+      "task_id": "recTask0004",
+      "actor_id": "ou_pm",
+      "state": "outcome_unknown",
+      "label": "結果未知",
+      "planning_status": "publishing",
+      "revision": 1,
+      "created_at": "2026-10-19T02:00:00+00:00",
+      "updated_at": "2026-10-19T02:00:00+00:00"
+     },
+     "receipt": {
+      "record_id": "recTask0004",
+      "error": "search_lag",
+      "at": "2026-10-19T02:00:00+00:00"
+     },
+     "reservations": [
+      {
+       "resource_kind": "person",
+       "ref": "recP3",
+       "state": "held",
+       "task_id": null,
+       "start": "2026-10-27T08:00+08:00",
+       "end": "2026-10-27T12:00+08:00"
+      }
+     ],
+     "next_action": "none"
+    }
+   }
+  },
+  {
+   "name": "reconcile: the known record reads back and the retried search finds it; nothing is re-sent",
+   "actor": {
+    "open_id": "ou_mgr",
+    "role": "manager"
+   },
+   "request": {
+    "method": "POST",
+    "path": "/api/v2/commands/0d15ea5e-0000-4000-8000-000000000020/reconcile"
+   },
+   "response": {
+    "status": 200,
+    "body": {
+     "command": {
+      "command_id": "0d15ea5e-0000-4000-8000-000000000020",
+      "preview_id": "pv_5b42cede8792f4ef632f3530",
+      "preview_hash": "133dcaaf67ea5ec7242d2427dfdf74a381a802caa24a3e028861bdfa05037470",
+      "action": "create",
+      "task_id": "recTask0004",
+      "actor_id": "ou_pm",
+      "state": "committed",
+      "label": "已確認",
+      "planning_status": "confirmed",
+      "revision": 1,
+      "created_at": "2026-10-19T02:00:00+00:00",
+      "updated_at": "2026-10-19T02:00:00+00:00"
+     },
+     "receipt": {
+      "record_id": "recTask0004",
+      "mismatches": [],
+      "read_back_at": "2026-10-19T02:00:00+00:00",
+      "revision": 1
+     },
+     "reservations": [
+      {
+       "resource_kind": "person",
+       "ref": "recP3",
+       "state": "held",
+       "task_id": "recTask0004",
+       "start": "2026-10-27T08:00+08:00",
+       "end": "2026-10-27T12:00+08:00"
+      }
+     ],
+     "next_action": "none"
     }
    }
   }

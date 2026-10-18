@@ -1,4 +1,4 @@
-"""Workbench-owned dispatch facts: previews, drafts, append-only decisions, commands and reservations.
+"""Workbench-owned dispatch facts: previews, drafts, decisions, commands and reservations.
 
 Every write that must see a consistent set of commands and reservations runs inside `exclusive`, which
 first updates the workspace's lock row. On SQLite that write takes the database RESERVED lock (the same
@@ -10,7 +10,7 @@ import time
 from contextlib import contextmanager
 from copy import deepcopy
 
-from sqlalchemy import and_, exists, or_, select, update
+from sqlalchemy import and_, delete, exists, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from .. import audit
@@ -37,16 +37,18 @@ def _command(row: DispatchCommandRow):
 
 
 def _live(wid):
-    """Commands that still own their content: in flight, or committed and still holding reservations.
+    """Commands that still own their content: in flight, a committed create, or a committed update still holding.
 
-    A committed command whose reservations a later revision released is history, not a duplicate.
+    A committed update whose reservations a later revision released is history, not a duplicate. A committed
+    create stays live: its content has no task_id, so publishing it again would create a second row.
     """
     holding = exists().where(DispatchReservationRow.workspace_id == wid,
                              DispatchReservationRow.command_id == DispatchCommandRow.command_id,
                              DispatchReservationRow.state == 'held')
     return and_(DispatchCommandRow.workspace_id == wid, or_(
         DispatchCommandRow.state.in_([s.value for s in IN_FLIGHT]),
-        and_(DispatchCommandRow.state == CommandResult.COMMITTED.value, holding)))
+        and_(DispatchCommandRow.state == CommandResult.COMMITTED.value,
+             or_(DispatchCommandRow.action == 'create', holding))))
 
 
 def _preview(row: DispatchPreviewRow):
@@ -123,10 +125,21 @@ class DispatchStore:
     # Decisions
 
     def decisions(self, wid, preview_hash):
+        """Decisions on a hash, except those a committed create of that hash already used."""
+        used = select(func.max(DispatchCommandRow.created_at)).where(
+            DispatchCommandRow.workspace_id == wid, DispatchCommandRow.preview_hash == preview_hash,
+            DispatchCommandRow.action == 'create',
+            DispatchCommandRow.state == CommandResult.COMMITTED.value).scalar_subquery()
         with self.sessions() as db:
             return [_decision(r) for r in db.scalars(select(DispatchDecisionRow).where(
-                DispatchDecisionRow.workspace_id == wid, DispatchDecisionRow.preview_hash == preview_hash)
+                DispatchDecisionRow.workspace_id == wid, DispatchDecisionRow.preview_hash == preview_hash,
+                DispatchDecisionRow.at > func.coalesce(used, 0))
                 .order_by(DispatchDecisionRow.at, DispatchDecisionRow.id))]
+
+    def proposers(self, wid, preview_hash):
+        with self.sessions() as db:
+            return frozenset(db.scalars(select(DispatchPreviewRow.actor_id).where(
+                DispatchPreviewRow.workspace_id == wid, DispatchPreviewRow.preview_hash == preview_hash)))
 
     def decide(self, wid, preview, seat, actor, decision, reason, refuse):
         """refuse(current decisions) -> refusal code or None, evaluated under the workspace lock."""
@@ -136,6 +149,14 @@ class DispatchStore:
             code = refuse(current)
             if code is not None:
                 raise Refusal('seat_conflict', '此席次目前不能由你決定', reason=code)
+            # refuse() lets a decided seat through only when its decider no longer holds it: replace that decision.
+            lapsed = next((d for d in current if d['seat'] == seat), None)
+            if lapsed is not None:
+                db.execute(delete(DispatchDecisionRow).where(
+                    DispatchDecisionRow.workspace_id == wid, DispatchDecisionRow.preview_hash == preview['preview_hash'],
+                    DispatchDecisionRow.seat == seat))
+                self.audit(db, wid, actor, 'dispatch.decision.lapsed', preview_hash=preview['preview_hash'], seat=seat,
+                           lapsed_actor=lapsed['actor_id'], lapsed_decision=lapsed['decision'])
             db.add(DispatchDecisionRow(id=secrets.token_hex(16), workspace_id=wid, preview_hash=preview['preview_hash'],
                                        preview_id=preview['preview_id'], seat=seat, actor_id=actor, decision=decision,
                                        reason=reason, at=self.clock()))
@@ -234,6 +255,16 @@ class DispatchStore:
             db.flush()
             return True, _command(row)
 
+    def abandon(self, wid, command_id, actor, code):
+        """Drop a pending command and its reservations before anything was sent to Lark."""
+        with self.exclusive(wid) as db:
+            db.execute(delete(DispatchReservationRow).where(DispatchReservationRow.workspace_id == wid,
+                                                            DispatchReservationRow.command_id == command_id))
+            db.execute(delete(DispatchCommandRow).where(DispatchCommandRow.workspace_id == wid,
+                                                        DispatchCommandRow.command_id == command_id,
+                                                        DispatchCommandRow.state == CommandResult.PENDING.value))
+            self.audit(db, wid, actor, 'dispatch.command.abandoned', command_id=command_id, code=code)
+
     def claim(self, wid, command_id, actor, grace_before):
         """Take over a command for reconciliation; a pending one only after its worker's grace period."""
         with self.exclusive(wid) as db:
@@ -331,11 +362,13 @@ class DispatchStore:
             latest = {}
             for row in sorted(previews.values(), key=lambda r: r.created_at):
                 latest[row.preview_hash] = row
-            # A draft that has published any of its previews is done; its earlier previews must not resurface.
+            # A draft is done once a command for any of its previews committed or is in flight; previews made
+            # before that command never resurface, even after a later revision supersedes it.
             finished = {}
-            for row in previews.values():
-                if row.draft_id and row.preview_hash in published:
-                    finished[row.draft_id] = max(finished.get(row.draft_id, 0), row.created_at)
+            for command in commands:
+                found = previews.get(command.preview_id)
+                if found is not None and found.draft_id and command.state != CommandResult.FAILED.value:
+                    finished[found.draft_id] = max(finished.get(found.draft_id, 0), command.created_at)
             hashes = [h for h in latest if h not in published
                       and not (latest[h].draft_id in finished and latest[h].created_at <= finished[latest[h].draft_id])]
             decided = {}
