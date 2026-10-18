@@ -64,7 +64,7 @@ function assets(r:HomeReport,kind:'instrument'|'vehicle'):ReportInsight{
  if(!r.assets)return unavailable();
  const k=r.assets[kind].kpi,unit=kind==='instrument'?'項':'台';
  const rows=[bar('總數',k.total,`${k.total} ${unit}`),bar('使用中',k.in_use,`${k.in_use} ${unit}`),bar('閒置',k.idle,`${k.idle} ${unit}`),...(kind==='instrument'?[bar('送修',k.repair,`${k.repair} ${unit}`)]:[])];
- return {available:true,sentence:`共 ${k.total} ${unit}，使用中 ${k.in_use} ${unit}，閒置 ${k.idle} ${unit}`+(kind==='instrument'?`，送修 ${k.repair} ${unit}`:'')+(kind==='instrument'&&r.assets.instrument.gaps.some(g=>g.id==='instrument-狀態')?'。部分儀器狀態未填，數量可能偏低':''),notes:cappedNotes(['依週報資源狀態統計。',...r.assets[kind].gaps.filter(g=>g.id==='asset-inspections').map(g=>g.message)],r.assets[kind].gaps.filter(g=>g.id!=='asset-inspections')),bars:rows};
+ return {available:true,sentence:`共 ${k.total} ${unit}，使用中 ${k.in_use} ${unit}，閒置 ${k.idle} ${unit}`+(kind==='instrument'?`，送修 ${k.repair} ${unit}`:'')+(kind==='instrument'&&r.assets.instrument.gaps.some(g=>g.id==='instrument-狀態')?'。部分儀器狀態未填，數量可能偏低':''),notes:cappedNotes(['依週報資源狀態統計。',...r.assets[kind].gaps.filter(g=>g.id==='asset-inspections').map(g=>g.message)],r.assets[kind].gaps.filter(g=>g.id!=='asset-inspections'&&g.id!=='instrument-狀態')),bars:rows};
 }
 const insights:Record<ReportCardId,(r:HomeReport)=>ReportInsight>={attention:r=>({available:true,sentence:'追蹤報告週檢核、請款與資源事項',notes:['各項依週報來源；缺少資料以 — 顯示。'],bars:attentionTiles(r).map(t=>bar(t.label,null,t.value))}),qualityTrend,qualityGroups,funnel,receivables,achievement,instruments:r=>assets(r,'instrument'),vehicles:r=>assets(r,'vehicle')};
 export const reportInsight=(r:HomeReport,id:ReportCardId)=>insights[id](r);

@@ -75,3 +75,6 @@ equal(m.attentionTiles(partial).map(t=>[t.label,t.value,t.note]),[['外業已退
 equal(m.reportInsight(partial,'instruments').sentence,'共 148 項，使用中 100 項，閒置 41 項，送修 7 項。部分儀器狀態未填，數量可能偏低');
 
 equal(m.copySummary(r).split('儀器：')[1].split('車輛：')[0],'共 148 項，使用中 100 項，閒置 41 項，送修 7 項\n依週報資源狀態統計。\n月租型儀器與車輛的檢查紀錄：來源尚未建立\n');
+equal(m.reportInsight(partial,'instruments').notes,['依週報資源狀態統計。']);
+equal(m.reportInsight({...partial,assets:{...partial.assets,instrument:{...partial.assets.instrument,gaps:[...partial.assets.instrument.gaps,{id:'asset-inspections',severity:'warn',message:'校驗未建立'},{id:'instrument-other',severity:'warn',message:'其他缺口'}]}}},'instruments').notes,['依週報資源狀態統計。 校驗未建立','另有 1 項資料缺口，詳見 PM 週報']);
+console.log(`Home reports final total: ${checks} literal assertions passed.`);
