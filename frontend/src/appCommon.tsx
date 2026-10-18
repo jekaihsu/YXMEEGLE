@@ -90,4 +90,4 @@ export function FullWorkspaceGate({c,children}:{c:Ctx;children:(c:Ctx)=>ReactNod
  return full.error?<div className="error-banner" role="alert"><TriangleAlert size={18}/><span>{full.error}</span><button className="text-button" onClick={full.reload}>重試</button></div>:<div role="status"><p className="co-loading">正在載入完整資料…</p><Skeleton lines={4}/></div>;
 }
 
-export function DisabledFeature({feature,onHome}:{feature:'change_extension'|'routines';onHome:()=>void}){return <section className="empty" aria-label="功能尚未開放"><h1>{feature==='change_extension'?'變更與展延':'追蹤與檢討'}尚未開放</h1><p>目前保留歷史紀錄，暫停此功能操作。</p><button className="button" onClick={onHome}>回首頁</button></section>}
+export function DisabledFeature({feature,onHome}:{feature:'change_extension'|'routines'|'dispatch_board';onHome:()=>void}){return <section className="empty" aria-label="功能尚未開放"><h1>{feature==='dispatch_board'?'派工看板':feature==='change_extension'?'變更與展延':'追蹤與檢討'}尚未開放</h1><p>{feature==='dispatch_board'?'派工看板尚未啟用。':'目前保留歷史紀錄，暫停此功能操作。'}</p><button className="button" onClick={onHome}>回首頁</button></section>}
