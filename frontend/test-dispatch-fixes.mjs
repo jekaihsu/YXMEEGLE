@@ -55,8 +55,8 @@ test('F11 snapshot age stays outside status live region',()=>{
  dom.window.close();
 });
 test('F10 member navigation hides dispatch while PM company navigation shows it',()=>{
- for(const [role,expected] of [['member',false],['pm',true],['manager',true]]){
-  const html=renderToStaticMarkup(React.createElement(ui.AppShell,{s:{features:{dispatch_board:true},user:{name:'測試',role},mode:'lark',workspace_id:'company'},route:{view:'dashboard'},error:'',ready:true,go(){},children:null}));
+ for(const [role,workspace,mode,expected] of [['member','company','lark',false],['pm','company','lark',true],['manager','lark-org','lark',true],['pm','test-one','lark',false],['manager','demo-one','demo',false]]){
+  const html=renderToStaticMarkup(React.createElement(ui.AppShell,{s:{features:{dispatch_board:true},user:{name:'測試',role},mode,workspace_id:workspace},route:{view:'dashboard'},error:'',ready:true,go(){},children:null}));
   assert.equal(html.includes('派工看板'),expected);
  }
 });

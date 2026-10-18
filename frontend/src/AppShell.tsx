@@ -30,7 +30,8 @@ export function AppShell({s,w,route,error,setError,callbackError,mobile,setMobil
   window.scrollTo({top:0,left:0,behavior:'instant'});
  },[route.view,route.project,route.tab,route.section,ready]);
  const navigationRef=useDialogFocus(()=>setMobile(false),mobile);
- const visibleNav=NAV.filter(n=>(n.view!=='dispatch'||s.features?.dispatch_board===true)&&(n.view!=='approvals'||s.features?.change_extension===true)&&(n.view!=='routines'||s.features?.routines===true)&&(n.view!=='reports'||s.user?.role==='pm'||s.user?.role==='manager'));
+ const dispatchVisible=s.features?.dispatch_board===true&&(s.user?.role==='pm'||s.user?.role==='manager')&&s.mode==='lark'&&!!s.workspace_id&&!s.workspace_id.startsWith('test-')&&!s.workspace_id.startsWith('demo-');
+ const visibleNav=NAV.filter(n=>(n.view!=='dispatch'||dispatchVisible)&&(n.view!=='approvals'||s.features?.change_extension===true)&&(n.view!=='routines'||s.features?.routines===true)&&(n.view!=='reports'||s.user?.role==='pm'||s.user?.role==='manager'));
  const tabs=visibleNav.filter(n=>['dashboard','projects','work','approvals'].includes(n.view));
  return <div className={`app-shell ${compact?'sidebar-compact':''}`}>
   <div className="compact-brand glass--bar"><a href="#view=dashboard" aria-label="詠翔工作台首頁"><span className="brand-mark"><i/><i/><i/><i/></span><strong>詠翔工作台</strong></a><button ref={openSidebarRef} className="sidebar-toggle" aria-label="展開側邊導覽" aria-expanded={!compact} aria-controls="workspace-navigation" onClick={()=>toggleSidebar(false)}><Menu size={20}/></button></div>

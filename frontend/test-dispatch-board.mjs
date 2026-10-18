@@ -40,7 +40,7 @@ eq(model.boardDisplay(model.parseDispatchBoard(variants.forbidden)),{kind:'forbi
 eq(model.boardDisplay(model.parseDispatchBoard(variants.empty_future_window)),{kind:'empty',counts:null,message:'來源在 2026-08-19 之後沒有預排紀錄。本週尚無可核實的預排。'});
 eq(model.boardDisplay(loaded,'failed'),{kind:'retained',counts:{slots:6,unassigned:1,unknown_overlap:2,conflict:2},message:'failed'});
 eq(model.boardDisplay(model.parseDispatchBoard(variants.stale)).kind,'stale');
-eq(model.boardDisplay(model.parseDispatchBoard(variants.read_failed)),{kind:'failed',counts:null,message:'派工資料讀取失敗，請重試。'});
+eq(model.boardDisplay(model.parseDispatchBoard(variants.read_failed)),{kind:'retained',counts:{slots:6,unassigned:1,unknown_overlap:2,conflict:2},message:'派工資料讀取失敗，請重試。'});
 eq(model.snapshotAge('2026-10-18T01:00:00Z',Date.parse('2026-10-18T02:00:00Z')),'60 分鐘前');
 assert.throws(()=>model.parseDispatchBoard({...variants.loaded,window:{...variants.loaded.window,from:'2026-02-30'}}),/派工資料格式不正確/);checks++;
 const bundle=await build({stdin:{contents:"export {DispatchBoard,DispatchBoardFrame} from './src/DispatchBoard';export {AppShell} from './src/AppShell';export {disabledRouteFeature,invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
@@ -68,9 +68,9 @@ globalThis.fetch=async(url,init)=>{
 };
 const root=createRoot(document.getElementById('root'));
 const render=async()=>act(async()=>{root.render(React.createElement(m.DispatchBoard))});
-const click=async(text)=>act(async()=>{const button=[...document.querySelectorAll('button')].find(b=>b.textContent===text||b.getAttribute('aria-label')===text);assert.ok(button,text);button.click()});
+const click=async(text)=>act(async()=>{const button=[...document.querySelectorAll('button')].find(b=>b.textContent===text||b.getAttribute('aria-label')?.startsWith(text));assert.ok(button,text);button.click()});
 try{
- for(const enabled of [false,true]){await act(async()=>root.render(React.createElement(m.AppShell,{s:{features:{dispatch_board:enabled},user:{name:'測試',role:'member'}},route:{view:'dashboard'},error:'',ready:true,go(){},children:null})));eq(document.querySelector('.workspace-nav-groups').textContent.includes('派工看板'),enabled)}
+ for(const enabled of [false,true]){await act(async()=>root.render(React.createElement(m.AppShell,{s:{features:{dispatch_board:enabled},user:{name:'測試',role:'member'}},route:{view:'dashboard'},error:'',ready:true,go(){},children:null})));eq(document.querySelector('.workspace-nav-groups').textContent.includes('派工看板'),false)}
  let resolve;deferred=new Promise(r=>{resolve=r});await render();eq(document.querySelector('.dispatch-board').dataset.dispatchState,'loading');
  await act(async()=>{deferred=null;resolve()});eq(document.querySelector('.dispatch-board').dataset.dispatchState,'ready');eq(requests[0].method,'GET');
  reply={status:500,body:{detail:'read failed'}};await click('重新讀取');eq(document.querySelector('.dispatch-board').dataset.dispatchState,'retained');eq(document.querySelector('.db-kpi strong').textContent,'6');eq(document.body.textContent.includes('已保留上次成功資料。'),true);
@@ -85,3 +85,5 @@ try{
  m.invalidateSessionEpoch();let resolveEpoch;deferred=new Promise(r=>{resolveEpoch=r});await render();eq(document.querySelector('.dispatch-board').dataset.dispatchState,'loading');eq(document.body.textContent.includes('示例 C001'),false);await act(async()=>{deferred=null;resolveEpoch()});
 }finally{await act(async()=>root.unmount());dom.window.close()}
 console.log(`Dispatch board: ${checks} literal parser, selector, rendered state, route, request and retention checks passed.`);
+
+await import('./test-dispatch-fixes.mjs');

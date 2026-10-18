@@ -125,7 +125,9 @@ def _interval(fields):
     if end is None or end < start:
         return None
     # Midnight values carry no evidence of a time of day in this V4 source.
-    precision = 'date' if start.time() == time.min and end.time() == time.min else 'datetime'
+    precision = 'date' if start.time() == time.min or end.time() == time.min else 'datetime'
+    if start.time() != time.min and end.time() == time.min and end.date() > start.date():
+        end -= timedelta(days=1)
     return Interval(start, end, precision)
 
 
@@ -157,9 +159,13 @@ def build_board(data: BoardInput, window: Window) -> dict:
 
     def resolve(key, ref):
         fields = indices[key].get(ref)
-        if (fields is None or any(name not in fields for name in TABLES[key].fields)) and joins[key] == 'ok':
+        if (fields is None or any(name not in fields and 7 not in kinds
+                                  for name, kinds in TABLES[key].fields.items())) and joins[key] == 'ok':
             joins[key] = 'partial'
-        return fields or {}
+        if fields is None:
+            return {}
+        checkboxes = {name: False for name, kinds in TABLES[key].fields.items() if 7 in kinds}
+        return {**checkboxes, **fields}
 
     for row in sorted(data.schedule, key=lambda r: r['record_id']):
         fields = row['fields']
@@ -172,8 +178,6 @@ def build_board(data: BoardInput, window: Window) -> dict:
         if not any(interval.on(day) for day in days):
             continue
         group = _label(fields, '組別')
-        if window.group and group != window.group:
-            continue
         kind = {'出工': 'work', '休假': 'leave', '待命': 'standby', '支援': 'support'}.get(text(fields.get('條類型')), 'unknown')
         people, instruments, vehicles, cases = (_refs(fields.get(name)) for name in ('人員', '儀器', '車輛', '案件'))
         gaps = []
@@ -263,6 +267,8 @@ def build_board(data: BoardInput, window: Window) -> dict:
             count = sum(intervals[slot['slot_id']].on(day) for slot, _ in booked)
             per_day[day] = {'booked_slots': count, 'state': 'overbooked_unknown' if count > 1 else 'booked' if count else 'unknown'}
         capacity.append({'person_ref': ref, 'name': _label(person, '姓名'), 'days': per_day})
+    if window.group:
+        slots = [slot for slot in slots if slot['group'] == window.group]
     source_gaps = [
         {'code': 'no_capability_source', 'message': 'No qualification or capability source is registered.', 'count': len(slots)},
         {'code': 'no_leave_source', 'message': 'No complete leave availability source is registered.', 'count': len(slots)},

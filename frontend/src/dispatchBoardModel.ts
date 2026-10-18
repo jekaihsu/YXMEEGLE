@@ -10,7 +10,7 @@ export type DispatchSlot = {
 export type CapacityDay = {booked_slots:number;state:'free'|'booked'|'overbooked_unknown'|'unknown'};
 export type DispatchBoardData = {
  schema_version:1;window:{from:string;to:string;tz:'Asia/Taipei'};
- source:{dataset_key:string;registry_key:string;table_id:string;fetched_at:string|null;latest_booking_date:string|null;quality:{states:DispatchQuality[];reason:string|null};joins:Record<'people'|'instruments'|'vehicles'|'cases','ok'|'partial'|'unavailable'|'unknown'>};
+ source:{dataset_key:string;registry_key:string;table_id:string;fetched_at:string|null;latest_booking_date:string|null;quality:{states:DispatchQuality[];reason:string|null;age_seconds:number|null};joins:Record<'people'|'instruments'|'vehicles'|'cases','ok'|'partial'|'unavailable'|'unknown'>};
  kpi:{slots:number;unassigned:number;unknown_overlap:number;conflict:number};unassigned_queue:string[];slots:DispatchSlot[];
  capacity:{people:{person_ref:string;name:string|null;days:Record<string,CapacityDay>}[]};gaps:{code:string;message:string;count:number|null}[];
 };
@@ -59,7 +59,7 @@ export function parseDispatchBoard(value:unknown):DispatchBoardData {
   source:{
    dataset_key:text(source.dataset_key)??'',registry_key:text(source.registry_key)??'',table_id:forbidden?'':text(source.table_id)??'',
    fetched_at:forbidden?null:timestamp(source.fetched_at),latest_booking_date:forbidden?null:dateOnly(source.latest_booking_date),
-   quality:{states:forbidden?['forbidden']:[...new Set(states.length?states:['unknown' as const])],reason:forbidden?null:text(quality.reason)},
+   quality:{states:forbidden?['forbidden']:[...new Set(states.length?states:['unknown' as const])],reason:forbidden?null:text(quality.reason),age_seconds:forbidden?null:count(quality.age_seconds)},
    joins:{people:enumValue(joins.people,['ok','partial','unavailable']),instruments:enumValue(joins.instruments,['ok','partial','unavailable']),vehicles:enumValue(joins.vehicles,['ok','partial','unavailable']),cases:enumValue(joins.cases,['ok','partial','unavailable'])}
   },
   slots,kpi:dispatchKpi(slots),unassigned_queue:unassignedQueue(slots).map(s=>s.slot_id),
@@ -70,13 +70,18 @@ export function parseDispatchBoard(value:unknown):DispatchBoardData {
 }
 export function unassignedQueue(slots:DispatchSlot[]) {return slots.filter(s=>s.planning_status==='unassigned')}
 export function dispatchKpi(slots:DispatchSlot[]) {
- return {slots:slots.length,unassigned:unassignedQueue(slots).length,unknown_overlap:slots.filter(s=>[...s.crew,...s.resources].some(p=>p.reasons.includes('same_day_other_slot'))).length,conflict:slots.filter(s=>[...s.crew,...s.resources].some(p=>p.feasibility==='conflict')).length};
+ return {slots:slots.length,unassigned:unassignedQueue(slots).length,unknown_overlap:slots.filter(s=>[...s.crew,...s.resources].some(p=>p.reasons.includes('same_day_other_slot'))).length,conflict:slots.filter(s=>[...s.crew,...s.resources].some(p=>p.reasons.includes('timed_overlap'))).length};
 }
 export function addDays(day:string,offset:number) {return new Date(Date.parse(day+'T00:00:00Z')+offset*86400000).toISOString().slice(0,10)}
 export function weekDays(from:string) {return Array.from({length:7},(_,i)=>addDays(from,i))}
 export function dispatchWeek(today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Taipei'})) {return addDays(today,-((new Date(today+'T00:00:00Z').getUTCDay()+6)%7))}
 function intervalDay(value:string) {return value.length===10?value:new Date(value).toLocaleDateString('sv-SE',{timeZone:'Asia/Taipei'})}
-export function slotsPerDay(slots:DispatchSlot[],day:string) {return slots.filter(s=>s.interval.start&&s.interval.end&&intervalDay(s.interval.start)<=day&&intervalDay(s.interval.end)>=day)}
+export function slotsPerDay(slots:DispatchSlot[],day:string) {return slots.filter(s=>{
+ const {start,end,precision}=s.interval;if(!start||!end)return false;
+ if(precision==='date')return intervalDay(start)<=day&&intervalDay(end)>=day;
+ const low=Date.parse(day+'T00:00:00+08:00');
+ return Date.parse(start)<low+86400000&&Date.parse(end)>low;
+})}
 export function slotsByGroup(slots:DispatchSlot[]) {return [...new Set(slots.map(s=>s.group))].map(group=>({group,label:group??'組別待確認',slots:slots.filter(s=>s.group===group)}))}
 export function personDayGrid(board:DispatchBoardData,days=weekDays(board.window.from)) {
  const people=new Map(board.capacity.people.map(p=>[p.person_ref,{person_ref:p.person_ref,name:p.name}]));
@@ -87,7 +92,7 @@ export function boardDisplay(board:DispatchBoardData|undefined,error='') {
  if(board?.source.quality.states.includes('forbidden'))return {kind:'forbidden' as const,counts:null,message:'沒有派工資料的檢視權限。'};
  if(!board)return {kind:error?'failed' as const:'loading' as const,counts:null,message:error||'派工資料載入中'};
  const states=board.source.quality.states;
- if(states.includes('read_failed'))return {kind:'failed' as const,counts:null,message:'派工資料讀取失敗，請重試。'};
+ if(states.includes('read_failed'))return board.slots.length?{kind:'retained' as const,counts:dispatchKpi(board.slots),message:'派工資料讀取失敗，請重試。'}:{kind:'failed' as const,counts:null,message:'派工資料讀取失敗，請重試。'};
  if(!board.slots.length)return {kind:'empty' as const,counts:null,message:board.source.latest_booking_date?(board.window.from>board.source.latest_booking_date?`來源在 ${board.source.latest_booking_date} 之後沒有預排紀錄。本週尚無可核實的預排。`:`本週沒有預排紀錄，最後預排日期為 ${board.source.latest_booking_date}。`):'本週沒有預排紀錄，來源未提供最後預排日期。'};
  return {kind:error?'retained' as const:states.includes('stale')?'stale' as const:'ready' as const,counts:dispatchKpi(board.slots),message:error||''};
 }

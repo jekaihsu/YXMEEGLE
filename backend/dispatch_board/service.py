@@ -16,7 +16,6 @@ from .lark_table import DispatchReader
 @dataclass(frozen=True)
 class JoinFlight:
     future: Future
-    started: float
     previous: tuple[Cached | None, str | None]
 
 
@@ -36,14 +35,14 @@ class DispatchBoardService:
     def close(self):
         self._executor.shutdown(wait=True)
 
-    def _scope(self, wid):
+    def _scope(self, wid, key='schedule'):
         return ReadScope(str(self.cfg.get('LARK_WORKER_ORGANIZATION', '')),
                          str(self.cfg.get('LARK_APP_ID', '')), str(self.cfg.get('LARK_WORKER_IDENTITY', '')),
-                         wid, str(self.cfg.get('LARK_AUTHZ_VERSION', '0')))
+                         wid, str(self.cfg.get('LARK_AUTHZ_VERSION', '0')) + ':' + key)
 
     def _cache_key(self, wid, key):
         table = TABLES[key]
-        return self._scope(wid).key(self.config.base + '/' + table.table_id, projection=table.fields)
+        return self._scope(wid, key).key(self.config.base + '/' + table.table_id, projection=table.fields)
 
     def _read(self, wid, key):
         cache_key = self._cache_key(wid, key)
@@ -76,16 +75,21 @@ class DispatchBoardService:
                 if not current.future.done():
                     return current.previous
                 previous = current.future.result()
-                if self.clock() - current.started <= self.config.ttl_seconds:
-                    return previous
-                del self._joins[scope]
+                if previous[0] is None or previous[1] is not None:
+                    del self._joins[scope]
+        if previous[0] is not None and previous[1] is None:
+            return self._load_join(wid, key)
+        with self._lock:
+            current = self._joins.get(scope)
+            if current:
+                return current.previous
             if len(self._joins) >= 128:
                 completed = next((k for k, flight in self._joins.items() if flight.future.done()), None)
                 if completed is None:
                     return previous
                 del self._joins[completed]
             future = self._executor.submit(self._load_join, wid, key)
-            self._joins[scope] = JoinFlight(future, self.clock(), previous)
+            self._joins[scope] = JoinFlight(future, previous)
         return previous
 
     def _load_join(self, wid, key):

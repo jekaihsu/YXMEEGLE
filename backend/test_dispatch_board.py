@@ -68,7 +68,7 @@ def test_multiday_window_and_group_filter_preserve_source_interval():
     assert board['slots'][0]['interval'] == {'start': '2026-07-24', 'end': '2026-07-29', 'precision': 'date'}
     assert board['source']['latest_booking_date'] == '2026-07-29'
     assert board['capacity']['people'][0]['days'] == {
-        '2026-07-27': {'booked_slots': 1, 'state': 'booked'},
+        '2026-07-27': {'booked_slots': 2, 'state': 'overbooked_unknown'},
         '2026-07-28': {'booked_slots': 1, 'state': 'booked'}}
 
 
@@ -396,7 +396,7 @@ def test_incomplete_resource_attributes_and_missing_duration_stay_unknown():
     assert body['kpi'] == {'slots': 2, 'unassigned': 0, 'unknown_overlap': 2, 'conflict': 0}
     assert body['source']['joins']['instruments'] == 'partial'
     assert body['slots'][0]['resources'][0] == {'kind': 'instrument', 'ref': 'recInstrument', 'label': 'Unknown condition',
-                                               'feasibility': 'unknown', 'reasons': ['resource_status_unknown', 'same_day_other_slot']}
+                                               'feasibility': 'unavailable', 'reasons': ['inactive', 'same_day_other_slot']}
 
 
 def test_forbidden_refresh_discards_last_good_and_cache_is_workspace_scoped():
@@ -519,7 +519,7 @@ def test_people_permission_failure_preserves_schedule_last_good():
     service = DispatchBoardService({}, reader=reader)
     try:
         assert service._read('company', 'schedule')[0].value[0]['record_id'] == 'recGood'
-        reader.errors['people'] = ReadBlocked('people denied')
+        reader.errors['people'] = HTTPException(403, 'people denied')
         service._load_join('company', 'people')
         reader.errors['schedule'] = ReadFailure('schedule down')
         assert service._read('company', 'schedule')[0].value[0]['record_id'] == 'recGood'
