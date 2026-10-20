@@ -262,3 +262,8 @@ test('participant choices come only from eligible case people', async () => {
  const executor = [...dialog().querySelectorAll('.sop-field')].find(f => f.textContent.startsWith('執行人員')).querySelector('select');
  assert.deepEqual([...executor.options].map(o => o.textContent), ['未指派', '王經理', '林組員']);
 });
+
+test('suggestion controls remain inside the task block without an internal separator', async()=>{
+ const style=document.createElement('style');style.textContent=await fs.readFile(new URL('./src/SopTasks.css',import.meta.url),'utf8');document.head.append(style);
+ try{const t=clone(examples.sop_tasks_with_suggestions.tasks.find(t=>t.suggestion));await mount({tasks:[t]});const suggestion=document.querySelector('.sop-suggestion');assert.ok(suggestion.closest('[data-sop-task]'));assert.equal(getComputedStyle(suggestion).borderTopWidth,'0px');assert.equal(getComputedStyle(suggestion).paddingLeft,'32px');assert.equal(getComputedStyle(document.querySelector('.sop-task-select input')).marginLeft,'0px')}finally{style.remove()}
+});
