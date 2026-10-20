@@ -1,5 +1,6 @@
 """Server-owned workspace normalization shared by runtime and inspection tools."""
 from copy import deepcopy
+from . import storage
 from sqlalchemy import select, func, or_
 from .models import BusinessRow, PersonRow
 from .workflow import require

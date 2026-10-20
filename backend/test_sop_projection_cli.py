@@ -37,3 +37,15 @@ def test_task_list_batches_projection_status_reads(h):
         event.remove(engine, 'before_cursor_execute', count)
     assert response.status_code == 200 and len(response.json()['tasks']) > 1
     assert len(selects) <= 1
+
+
+def test_shared_seal_preserves_partial_load_fallback(p):
+    from . import storage
+    from .models import BusinessRow, WorkspaceRow
+    from .workspace_seal import seal
+    with p.sessions.begin() as db:
+        db.add(BusinessRow(workspace_id='lark-org', kind='projects', entity_id='legacy', parent_id='', ordinal=0,
+                           data={'id': 'legacy', 'source_kind': 'lark'}))
+    with p.sessions() as db, pytest.raises(storage.PartialUnavailable):
+        seal(db, db.get(WorkspaceRow, 'lark-org'), {'environment': 'production', 'projects': [], 'users': []},
+             {**p.cfg, 'LARK_ALLOWED_TENANTS': 'org'}, scoped=True)
