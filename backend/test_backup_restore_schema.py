@@ -100,3 +100,22 @@ def test_backup_cli_import_does_not_start_app_or_open_database(tmp_path):
         assert result.returncode==0,result.stderr
     assert not (tmp_path/'must-not-open.db').exists()
     assert not (tmp_path/'must-not-create').exists()
+
+
+def test_postgres_constraint_backing_indexes_are_not_extra_schema(tmp_path, monkeypatch):
+    source, uploads = app_source(tmp_path)
+    original = br.inspect
+    def reflected(connection):
+        inspector = original(connection)
+        indexes = inspector.get_indexes
+        def get_indexes(name):
+            found = indexes(name)
+            if name == 'sop_local_tasks':
+                found.append({'name': 'uq_sop_task_origin', 'column_names': ['workspace_id', 'project_id',
+                              'template_family_id', 'source_row_key', 'instance_scope'],
+                              'unique': True, 'duplicates_constraint': 'uq_sop_task_origin'})
+            return found
+        inspector.get_indexes = get_indexes
+        return inspector
+    monkeypatch.setattr(br, 'inspect', reflected)
+    br.assert_schema(source)

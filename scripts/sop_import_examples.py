@@ -90,7 +90,7 @@ def suggestions(client, pid, vid):
                    {'action': 'dismiss_suggestion', 'facts_hash': dismissed['suggestion']['facts_hash'], 'reason': '待補佐證'})
     bulk = call(client, 'POST', url + '/sop-tasks/suggestions/accept',
                 {'tasks': [{'task_id': indicator['id'], 'facts_hash': indicator['suggestion']['facts_hash'],
-                            'expected_revision': indicator['revision']}], 'confirm': True, 'reason': '回簽附件已上傳'})
+                            'expected_revision': indicator['revision']}], 'confirm': True, 'confirmed_task_ids': [indicator['id']], 'reason': '回簽附件已上傳'})
     return {'sop_tasks_with_suggestions': {**listing, 'tasks': [proof, indicator]},
             'accept_suggestion': accepted, 'accept_suggestion_stale': stale, 'dismiss_suggestion': dismiss,
             'accept_suggestions': bulk}

@@ -13,7 +13,7 @@ await fs.writeFile(bundlePath,bundle.outputFiles[0].text);
 let App;try{App=(await import(bundlePath.href)).default}finally{await fs.unlink(bundlePath)}
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json'}});
 let checks=0;
-async function scenario(kind,change,status=200,body){
+async function scenario(kind,change,status=200,body,hasDraft=false){
  const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=projects'});
  for(const key of ['window','document','location','history','sessionStorage','FormData','Event'])globalThis[key]=dom.window[key];
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
@@ -29,7 +29,7 @@ async function scenario(kind,change,status=200,body){
  const root=createRoot(document.getElementById('root'));
  const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(resolve=>setTimeout(resolve,0))});
  await flush(()=>root.render(React.createElement(App)));
- let pending;await flush(()=>{if(kind==='switch'){document.querySelector('.user-button').click();return}pending=kind==='run'?window.epochContext.run('task_start',{}, {project_id:'pA',node_id:'nA'}):window.epochContext.upload(new FormData())});
+ let pending;await flush(()=>{if(kind==='switch'){document.querySelector('.user-button').click();return}pending=kind==='run'?window.epochContext.run('task_start',hasDraft?{_entity_versions:'{}'}:{}, {project_id:'pA',node_id:'nA'}):window.epochContext.upload(new FormData())});
  if(kind==='switch')await flush(()=>document.querySelector('.role-option:not(.selected)').click());
  assert.equal(calls,1);
  const oldRelease=release;
@@ -82,6 +82,9 @@ async function scenario(kind,change,status=200,body){
   assert.equal(window.epochContext.s.user,null);
   assert.match(document.querySelector('.login-card').textContent,/請重新登入/);
   assert.equal(document.querySelector('.login-card a').textContent,'使用 Lark 登入');
+ }else if(status===409){
+  await flush(async()=>{oldRelease(json({detail:'changed'},409));if(hasDraft)await assert.rejects(pending,e=>e.status===409);else await pending});
+  assert.equal(window.epochContext.error,hasDraft?'changed。草稿已保留。':'changed');
  }else if(body!==undefined){
   const before=window.epochContext.w;
   let result;await flush(async()=>{oldRelease(new Response(body,{status}));result=await pending});
@@ -113,3 +116,7 @@ for(const kind of ['run','upload']){
 }
 for(const change of ['actor','workspace','environment','mode','recovery','logout','expiry'])await scenario('switch',change,401);
 console.log(`Session epoch: ${checks} App regression scenarios passed`);
+
+await scenario('run',null,409);
+await scenario('run',null,409,undefined,true);
+console.log('conflict banners: 2 scenarios passed');

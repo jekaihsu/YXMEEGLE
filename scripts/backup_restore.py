@@ -49,7 +49,7 @@ def assert_schema(engine):
             have={'columns':{c['name']:c['nullable'] for c in inspector.get_columns(table.name)},
                   'pk':sorted(inspector.get_pk_constraint(table.name)['constrained_columns']),
                   'fks':sorted((tuple(f['constrained_columns']),f['referred_table'],tuple(f['referred_columns'])) for f in inspector.get_foreign_keys(table.name)),
-                  'indexes':sorted((tuple(i['column_names']),bool(i['unique'])) for i in inspector.get_indexes(table.name))}
+                  'indexes':sorted((tuple(i['column_names']),bool(i['unique'])) for i in inspector.get_indexes(table.name) if not i.get('duplicates_constraint'))}
             for key in want:
                 if want[key]!=have[key]: raise ValueError(f'Restore schema mismatch: {table.name} {key}')
 

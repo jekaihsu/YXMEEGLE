@@ -51,10 +51,26 @@ const value=async(el,v)=>act(async()=>{Object.getOwnPropertyDescriptor(el.tagNam
 
 const failures=[];
 async function check(name,run){try{await run();console.log('PASS '+name)}catch(error){failures.push(name);console.error('FAIL '+name+' '+error.stack)}}
+const otherTasks=()=>document.querySelector('#flow-selected details.pf-other');
 const secondary=name=>[...document.querySelectorAll('details')].find(d=>d.querySelector('summary')?.textContent===name);
 await check('round2 local workflow stays available with assignments',async()=>{
  await mount({node:'control',configure(base){base.project.nodes[4].tasks=[{id:'local',title:'本地驗收',status:'in_progress',owner_id:'ou_anna',required:true,can_execute:true,confirmation_hash:'fixture-confirmation',comments:[],description:'範本',revision:1}];}});
- const local=secondary('範本與本地流程');assert.equal(local?.open,false);assert.match(local.textContent,/增補任務/);assert.match(local.textContent,/本地驗收/);assert.match(local.textContent,/進行中/);assert.match(local.textContent,/一次確認我的成果（1）/);await click([...local.querySelectorAll('button')].find(b=>b.textContent==='本地驗收'));assert.equal(document.querySelector('[role=dialog]').getAttribute('aria-label'),'本地驗收');assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/找不到此 Lark 任務/);
+ const local=otherTasks();assert.equal(local?.open,false);assert.match(local.textContent,/增補任務/);assert.match(local.textContent,/本地驗收/);assert.match(local.textContent,/進行中/);assert.match(local.textContent,/一次確認我的成果（1）/);await click([...local.querySelectorAll('button')].find(b=>b.textContent==='本地驗收'));assert.equal(document.querySelector('[role=dialog]').getAttribute('aria-label'),'本地驗收');assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/找不到此 Lark 任務/);
+});
+await check('legacy task drawer shows facts, tabs and one footer reason',async()=>{
+ await mount({node:'control',configure(base){base.project.nodes[4].tasks=[{id:'local',title:'本地驗收',status:'in_progress',owner_id:'ou_anna',required:true,can_execute:true,confirmation_hash:'fixture-confirmation',comments:[],description:'範本',revision:1}];}});
+ await click([...otherTasks().querySelectorAll('button')].find(b=>b.textContent==='本地驗收'));
+ const drawer=document.querySelector('[role=dialog]');
+ assert.equal(drawer.dataset.kind,'legacy');
+ assert.deepEqual([...drawer.querySelectorAll('.task-drawer-trail>span')].map(s=>s.textContent),['YX-2026-042','控制']);
+ assert.deepEqual([...drawer.querySelectorAll('.inspector-tabs button')].map(b=>b.textContent),['任務詳情','評論0','歷程']);
+ assert.deepEqual([...drawer.querySelectorAll('.task-drawer-facts dt')].map(d=>d.textContent),['負責人','排程','期限','工項','營業額點數']);
+ const footer=drawer.querySelector('.task-drawer-footer');
+ assert.equal(footer.querySelector('.task-drawer-off').textContent,'展延未開放');
+ assert.deepEqual([...footer.querySelectorAll('.disabled-action-reason')].map(r=>r.textContent),['請填寫成果']);
+ assert.equal(drawer.textContent.split('請填寫成果').length,2);
+ await click(drawer.querySelector('[aria-label=關閉]'));
+ assert.equal(document.querySelector('[role=dialog]'),null);
 });
 await check('round2 local flow list translates both pending and in-progress task statuses',async()=>{
  await mount({enabled:false,node:'node_control',configure(base){base.project.nodes[4].tasks=[{id:'l1',title:'待開始工作',status:'pending',owner_id:'ou_anna'},{id:'l2',title:'進行工作',status:'in_progress',owner_id:'ou_anna'}]}});
@@ -99,11 +115,11 @@ await check('round2 manager resolved from loaded users and absent source disting
  await mount({node:'control',configure(base){base.workspace.users[0].department='控制'}});
  const manager=()=>[...document.querySelectorAll('.pf-facts>div')].find(d=>d.querySelector('dt').textContent==='組別主管').querySelector('dd').textContent;
  assert.equal(manager(),'林安娜');
- await mount({node:'control',configure(base,f){f.list.nodes.find(n=>n.key==='control').departments=[]}});assert.equal(manager(),'來源未提供負責組別，未能對應到本組主管');
+ await mount({node:'control',configure(base,f){f.list.nodes.find(n=>n.key==='control').departments=[]}});assert.equal(manager(),'主管未設定');assert.doesNotMatch(document.querySelector('.pf-facts').textContent,/來源未提供負責組別，未能對應到本組主管/);
 });
 await check('round2 background and file shortcut restored collapsed',async()=>{
  await mount({node:'control',configure(base){Object.assign(base.project.nodes[4],{description:'節點背景說明',collaborator_ids:['ou_anna'],started_at:'2026-10-10'})}});
- const background=secondary('節點說明與背景');assert.equal(background?.open,false);assert.match(background.textContent,/節點背景說明/);assert.match(background.textContent,/林安娜/);assert.match(background.textContent,/經過.*4.*天/);assert.match(background.textContent,/開啟 作業資料與成果/);
+ const background=secondary('節點資訊');assert.equal(background?.open,false);assert.match(background.textContent,/節點背景說明/);assert.match(background.textContent,/林安娜/);assert.match(background.textContent,/經過.*4.*天/);assert.match(background.textContent,/開啟 作業資料與成果/);
 });
 await check('round2 assignment readback wins over an in-flight stale detail and avoids refetch',async()=>{
  await mount({node:'control',detailHold:true});await click(button('指派'));await value(document.querySelector('select[aria-label="任務負責人"]'),'ou_anna');

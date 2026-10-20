@@ -212,3 +212,39 @@ python3 -m pytest backend -q
 Local intake creators with `sop_task_import` can manage the checklist while no PM is assigned. After PM assignment, management requires that PM, a manager, or an explicit SOP delegate.
 
 `quote_number_taken` checks even hidden source numbers. The existence disclosure is an accepted trade-off for official number uniqueness.
+
+## V4 SOP task projection
+
+Local `sop_*` tables remain authoritative. Every task insert, edit, transition, accepted suggestion, and node-link addition refreshes `sop_lark_outbox` in the task's SQL transaction. Imports and local quote creation enqueue even when projection is disabled. A rollback removes the task and its outbox changes together. Local planning cases retain their local intents but never make projection HTTP calls.
+
+`SOP_LARK_PROJECTION_ENABLED` defaults to false. Projection also requires `settings.external_enabled`, the formal `lark-<LARK_WORKER_ORGANIZATION>` workspace with environment `production`, application identity `cli_aa3cab98b2789e17`, and the literal remote allowlist. Only V4 `SOP任務`, `tbl28TBWLqd2Stg0` in base `H7W6b0PFWaVF1BsgqXJj3pQ9pXb`, receives SOP rows. The existing `任務` table and node status calculations are unchanged.
+
+The app starts one drain thread. PostgreSQL uses a database advisory lock across processes. SQLite uses a host file lock keyed by database URL. Each drain validates the pinned field IDs, names, types, and multiple-user properties before projecting. Schema failures pause the affected outbox rows with `schema_drift`. Restoring the schema permits a later drain to resume them. Duplicate sync keys pause a task until an operator resolves the rows and runs `--enqueue-all` to locally requeue it. No automatic merge or deletion occurs.
+
+A sync key is `sop1|<project_id>|<task_id>|g<generation>`. Create requests use a UUID derived only from the workspace, project, task, and generation. The worker commits `sent` before creating. An uncertain create is recovered by searching the key, adopting one row, or resending with the same token when no row exists. Updates replace all 18 owned fields and read back the fingerprint. Missing remote rows cause a new generation. Archives set `已封存` and never delete a row. Writes use the shared Lark table bucket, capped at two requests per second. Failed attempts use an exponential local retry delay capped at 512 seconds.
+
+Manual task `標題` and `案件名稱` are visible to everyone with Base access.
+
+Only the 18 fields in `lark_projection.FIELDS` are projected. Instructions, catalog snapshots, evidence, and source text are absent. Shared office tasks have one row with three node values. People are included only when their exact open IDs resolve in the V4 roster. `PUBLIC_ORIGIN` supplies the origin for the case flow hash route. Without it the stored link is relative.
+
+After a drain, reconciliation searches by canonical `專案編號`. Idle cases reconcile every ten minutes. Reading `sop-tasks` wakes the background worker if the last reconciliation is older than ten minutes. Reads make no synchronous Lark request. Reconciliation reports unknown keys, duplicates, and missing rows. A remote edit records a `lark_drift` task event with only the allowlisted Lark values, marks the task `Lark 已變更`, and reasserts the local values. The drift badge remains available after repair. There is no Lark-side write-back to the local task.
+
+Every task response adds `lark_sync` with `state`, `synced_at` in Unix seconds, and `record_id`. Enabled projection responses also include `base_id` and `table_id` for the row link. State is one of `同步中`, `已同步`, `Lark 已變更`, `同步失敗`, and `未啟用`. The list and drawer show that label. The drawer shows `開啟 Lark 列` only when all three row coordinates exist. `error` gives the safe outbox error code when a production projection fails.
+
+Inspect a case without remote writes, or enqueue every existing task locally. Supply the same application environment as the server.
+
+```sh
+python -m backend.sop_import.lark_projection --database-url "$DATABASE_URL" --workspace "lark-$LARK_WORKER_ORGANIZATION" --check SRC-example
+python -m backend.sop_import.lark_projection --database-url "$DATABASE_URL" --enqueue-all
+```
+
+`--check` reports local outbox state, V4 rows, and reconciliation issues. All projection gates apply to its remote reads. `--enqueue-all` makes no HTTP calls and leaves cleaned canary intents paused. Apply the app's normal schema initialization before either command on an older database.
+
+The operator can run the canary after deployment. It is never run by the application or tests. It requires `--yes`, all real projection gates, a new receipt manifest path, and the designated case `SRC-TEST-SOPV4-20261021` to be absent locally. It creates three local tasks, projects only that case, checks the shared and archived rows, and forces a resend to verify that there is no fourth row.
+
+```sh
+python scripts/sop_v4_canary.py --yes --manifest /absolute/path/sop-v4-canary.json
+python scripts/sop_v4_canary.py --yes --cleanup --manifest /absolute/path/sop-v4-canary.json
+```
+
+Cleanup requires a separate operator run. It asserts that a project search returns exactly the recorded IDs, pauses the local canary outbox, and deletes only those IDs. The application role currently has no delete permission. Cleanup therefore needs an operator application identity with delete permission on this table, or manual deletion of the receipt IDs in Lark. Keep the local canary outbox paused after manual cleanup so the worker does not recreate those rows.
