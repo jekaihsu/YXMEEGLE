@@ -241,7 +241,7 @@ class Projection:
                 if project_id:
                     query = query.where(LarkOutbox.project_id == project_id)
                 cases = list(db.execute(query))
-            states = {}
+            states, state_errors = {}, {}
             for wid, pid in cases:
                 if (str(self.cfg.get('SOP_LARK_PROJECTION_ENABLED', 'false')).lower() != 'true'
                         or not self.cfg.get('LARK_WORKER_ORGANIZATION')
@@ -249,8 +249,14 @@ class Projection:
                         or self._case_retry.get((wid, pid), (0, 0))[0] > self.clock()):
                     continue
                 try:
+                    if wid in state_errors:
+                        raise state_errors[wid]
                     if wid not in states:
-                        states[wid] = self.state(wid)
+                        try:
+                            states[wid] = self.state(wid)
+                        except Exception as exc:
+                            state_errors[wid] = exc
+                            raise
                     state = states[wid]
                     if not gates(self.cfg, wid, state):
                         continue

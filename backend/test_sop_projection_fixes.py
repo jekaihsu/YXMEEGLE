@@ -131,3 +131,16 @@ def test_readback_mismatch_pauses_after_three_attempts(p):
         p.clock[0] += 700
     assert row(p).state == 'paused' and row(p).last_error == 'readback_mismatch'
     assert sum(c[0] == 'PUT' for c in p.fake.calls) == 3
+
+
+def test_workspace_load_error_is_cached_for_other_cases(p):
+    with p.sessions.begin() as db:
+        db.add(LarkOutbox(workspace_id='lark-org', project_id='other', task_id='other', generation=1,
+                         target_revision=1, state='none'))
+    calls = []
+    def load(wid):
+        calls.append(wid)
+        raise ValueError('bad workspace')
+    p.worker.load_state = load
+    p.worker.drain()
+    assert calls == ['lark-org']
