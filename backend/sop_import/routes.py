@@ -156,7 +156,7 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
 
     @app.post('/api/quotes')
     async def local_create(request: Request):
-        return await mutation(request, None, lambda who, body: service.local_create(*who, persist_case, body), actor)
+        return await mutation(request, None, lambda who, body: service.local_create(*who, persist_case, body, lambda: actor(request, None)), actor)
 
     @app.get('/api/quotes/requests/{request_id}')
     def local_receipt(request: Request, request_id: str):

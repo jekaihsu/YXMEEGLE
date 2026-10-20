@@ -99,3 +99,21 @@ def test_oversized_body_stops_before_consuming_stream(h, declared):
     response = asyncio.run(endpoint(request, 'p1'))
     assert response.status_code == 422
     assert len(consumed) == (0 if declared else 1)
+
+from .models import PersonRow
+
+
+@pytest.mark.parametrize('capability', ['create_local_case', 'sop_task_import'])
+def test_local_create_rechecks_identity_under_lock(local, capability):
+    app, client, _, _ = local
+    draft = call(client, 'POST', '/api/quotes/preview', FORM)
+    service = app.state.sop_import
+    original = service.lock_workspace_row
+    def revoke(db, wid):
+        with app.state.sessions.begin() as other:
+            person = other.get(PersonRow, (WID, 'u-field'))
+            person.data = {**person.data, 'capabilities': [c for c in person.data['capabilities'] if c != capability]}
+        return original(db, wid)
+    service.lock_workspace_row = revoke
+    result = call(client, 'POST', '/api/quotes', {'draft_id': draft['draft_id'], 'request_id': 'revoke'}, 403)
+    assert result['code'] == ('local_case_forbidden' if capability == 'create_local_case' else 'sop_import_forbidden')

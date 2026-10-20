@@ -618,13 +618,17 @@ class Service:
         imported = None if plan is None else {**{k: v for k, v in plan.items() if k != 'input'}, 'selection': plan['input']}
         return {'draft_id': ident, 'expires_at': expires, 'case': case, 'import': imported}
 
-    def local_create(self, wid, user, persist, body):
+    def local_create(self, wid, user, persist, body, refresh):
         fields(body, {'draft_id', 'request_id'})
         draft_id, rid = identifier(body.get('draft_id')), identifier(body.get('request_id'))
         require(explicitly_granted(user, 'create_local_case'), 'local_case_forbidden', 403)
         fingerprint = digest({'draft_id': draft_id, 'actor_id': user['id']})
         with self.sessions.begin() as db:
             self.lock_workspace_row(db, wid)
+            fresh_wid, fresh_user = refresh()
+            require(fresh_wid == wid and fresh_user['id'] == user['id'], 'local_case_forbidden', 403)
+            user = fresh_user
+            require(explicitly_granted(user, 'create_local_case'), 'local_case_forbidden', 403)
             run = db.get(LocalCaseRun, (wid, rid))
             if run:
                 require(run.request_hash == fingerprint, 'idempotency_mismatch', 409)
