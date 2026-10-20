@@ -47,7 +47,7 @@ def h(tmp_path, monkeypatch):
         v = stage(db, 'w', 'r1', load_catalog(), source_verified=True)
         publish(db, v, 'publisher', 100)
         vid = v.id
-    who, wid, hidden = ['pm'], ['w'], set()
+    who, wid, hidden, extra = ['pm'], ['w'], set(), {}
     cfg = {'SOP_TASK_WRITES_ENABLED': 'true'}
 
     def identity(request):
@@ -58,7 +58,8 @@ def h(tmp_path, monkeypatch):
     def load_case(data, user, project_id):
         with sessions() as db:
             row = db.get(BusinessRow, (data['wid'], 'projects', project_id))
-            state = {'users': list(users.values()), 'source_case_policy_revision': 'all-authorized-lark-cases-20260930'}
+            state = {'users': list(users.values()), 'source_case_policy_revision': 'all-authorized-lark-cases-20260930',
+                     **deepcopy(extra)}
             if row is None or project_id in hidden or not visible_project(state, row.data):
                 raise HTTPException(404)
             return state, deepcopy(row.data)
@@ -74,7 +75,7 @@ def h(tmp_path, monkeypatch):
     monkeypatch.setattr(httpx.HTTPTransport, 'handle_request', no_outbound)
     with TestClient(app) as client:
         yield SimpleNamespace(client=client, sessions=sessions, engine=engine, vid=vid, who=who, wid=wid,
-                              users=users, hidden=hidden, cfg=cfg, service=service, writes=writes)
+                              users=users, hidden=hidden, cfg=cfg, service=service, writes=writes, extra=extra)
     assert writes == []
     engine.dispose()
 

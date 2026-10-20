@@ -11,8 +11,9 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from ..models import WorkspaceRow, BusinessRow
 from .catalog import digest, publish
 from .case_stage import stage, start_node
+from . import suggestions
 from .domain import (Applicability, Lifecycle, Disposition, TRANSITIONS, NODE_MAP, SUBCONTRACT,
-                     CONDITIONAL, PARTICIPANT_ROLES, require)
+                     CONDITIONAL, PARTICIPANT_ROLES, Failure, require)
 from .models import Family, Version, TemplateRow, CaseState, LocalTask, TaskNodeLink, Preview, ImportRun, TaskEvent
 from .quote_facts import case_facts
 
@@ -107,11 +108,13 @@ class Service:
     def today(self):
         return datetime.fromtimestamp(self.clock(), ZoneInfo('Asia/Taipei')).date()
 
-    def position(self, db, ctx):
+    def facts(self, ctx):
+        return case_facts(ctx.project, ctx.state, self.today())
+
+    def position(self, db, ctx, facts):
         nodes = db.scalars(select(BusinessRow).where(BusinessRow.workspace_id == ctx.wid,
                                                     BusinessRow.kind == 'nodes',
                                                     BusinessRow.parent_id == ctx.project['id']))
-        facts = case_facts(ctx.project, ctx.state, self.today())
         return {'start_node': start_node(ctx.project, [n.data for n in nodes], facts), 'stage': stage(facts).value}
 
     def version(self, db, wid, version_id):
@@ -275,7 +278,7 @@ class Service:
                 missing.append('dates')
             if missing:
                 unresolved.append({'source_row_key': outcome['source_row_key'], 'fields': missing})
-        position = self.position(db, ctx)
+        position = self.position(db, ctx, self.facts(ctx))
         context = {'start_node': position['start_node'], 'identity_revision': state.identity_revision, 'checklist_revision': state.checklist_revision,
                    'nodes': nodes, 'template': self.version_json(version), 'input': normalized, 'outcomes': outcomes}
         return {**context, 'context_hash': digest(context), 'stage': position['stage'], 'outcomes': outcomes, 'unresolved_items': unresolved,
@@ -418,16 +421,22 @@ class Service:
             by_task = {t.id: [l for l in links if l.task_id == t.id] for t in tasks}
             selected = [t for t in tasks if node_key is None or any(l.node_key == node_key for l in by_task[t.id])]
             selected.sort(key=lambda t: (t.template_family_id == 'manual', min((l.ordinal for l in by_task[t.id]), default=0), t.id))
-            return {'project_id': ctx.project['id'], 'task_source': 'sop_local', **self.position(db, ctx),
+            facts = self.facts(ctx)
+            dismissed = self.decided(db, ctx, 'suggestion_dismissed')
+            suggested = {t.id: found for t in selected if (found := suggestions.current(t, facts))
+                         and (t.id, found['facts_hash']) not in dismissed}
+            source = explicitly_granted(ctx.user, 'sop_task_read_source')
+            return {'project_id': ctx.project['id'], 'task_source': 'sop_local', **self.position(db, ctx, facts),
                     'checklist_revision': state.checklist_revision if state else 0,
                     'identity_revision': state.identity_revision if state else 0, 'scope': {'node_key': node_key},
                     'counts': self.counts(selected), 'case_counts': self.counts(tasks),
                     'node_counts': {key: self.counts([t for t in tasks if any(l.node_key == key for l in by_task[t.id])])
                                     for key in NODE_MAP.values()},
-                    'tasks': [self.task_json(t, by_task[t.id], explicitly_granted(ctx.user, 'sop_task_read_source')) for t in selected],
+                    'tasks': [{**self.task_json(t, by_task[t.id], source), 'suggestion': suggested.get(t.id)} for t in selected],
                     'allowed_actions': {'import': can_manage(ctx) and self.writes_enabled(),
                                         'manage': can_manage(ctx) and self.writes_enabled(),
-                                        'work': explicitly_granted(ctx.user, 'sop_task_work') and self.writes_enabled()}}
+                                        'work': explicitly_granted(ctx.user, 'sop_task_work') and self.writes_enabled(),
+                                        'decide_suggestions': can_manage(ctx) and self.writes_enabled()}}
 
     def manual(self, ctx, body):
         fields(body, {'title', 'instructions', 'node_keys', 'participants'})
@@ -459,8 +468,7 @@ class Service:
         require(type(body.get('expected_revision')) is int, 'invalid_request')
         with self.sessions.begin() as db:
             ctx, state = self.lock(db, ctx, manager=not transition)
-            task = db.get(LocalTask, (ctx.wid, task_id))
-            require(task is not None and task.project_id == ctx.project['id'], 'task_not_found', 404)
+            task = self.task(db, ctx, task_id)
             manager = can_manage(ctx)
             if transition:
                 require(manager or (explicitly_granted(ctx.user, 'sop_task_work')
@@ -493,11 +501,12 @@ class Service:
                     'state': task.state.value, 'applicability': task.applicability.value}
 
     @staticmethod
-    def completion(task):
+    def completion(task, evidence=None):
         require(task.applicability == Applicability.APPLICABLE, 'applicability_unresolved')
-        require(task.local.get('completion_rule_status') == 'no_typed_obligations', 'completion_evidence_missing')
+        require(evidence is not None or task.local.get('completion_rule_status') == 'no_typed_obligations',
+                'completion_evidence_missing')
 
-    def transition(self, task, body, manager):
+    def transition(self, task, body, manager, evidence=None):
         action = body.get('action')
         if action == 'set_applicability':
             require(manager, 'sop_import_forbidden', 403)
@@ -512,7 +521,7 @@ class Service:
             require(manager and task.state == Lifecycle.ARCHIVED, 'invalid_transition', 409)
             text(body.get('reason'), 1000, empty=False)
             if task.previous_state == Lifecycle.DONE:
-                self.completion(task)
+                self.completion(task, task.local.get('evidence_basis'))
             task.state, task.previous_state = task.previous_state, None
             return
         require(action in TRANSITIONS, 'invalid_transition')
@@ -526,5 +535,106 @@ class Service:
         if target == Lifecycle.IN_PROGRESS:
             require(task.applicability == Applicability.APPLICABLE, 'applicability_unresolved')
         if target == Lifecycle.DONE:
-            self.completion(task)
+            self.completion(task, evidence)
         task.state = target
+
+    @staticmethod
+    def task(db, ctx, task_id):
+        task = db.get(LocalTask, (ctx.wid, identifier(task_id)))
+        require(task is not None and task.project_id == ctx.project['id'], 'task_not_found', 404)
+        return task
+
+    @staticmethod
+    def decided(db, ctx, kind):
+        return {(e.task_id, e.changes.get('facts_hash')): e
+                for e in db.scalars(select(TaskEvent).where(TaskEvent.workspace_id == ctx.wid,
+                                                            TaskEvent.project_id == ctx.project['id'],
+                                                            TaskEvent.kind == kind).order_by(TaskEvent.at, TaskEvent.id))}
+
+    @staticmethod
+    def decision_json(task, changes, replayed):
+        return {'task_id': task.id, 'revision': task.revision, 'state': task.state.value,
+                'applicability': task.applicability.value, 'replayed': replayed,
+                'suggestion': {k: changes[k] for k in ('rule_id', 'rule_revision', 'tier', 'suggested_state', 'facts_hash')}}
+
+    def decide_suggestion(self, ctx, task_id, body):
+        action = body.get('action')
+        if action == 'dismiss_suggestion':
+            return self.dismiss(ctx, task_id, body)
+        require(action == 'accept_suggestion', 'invalid_request')
+        fields(body, {'action', 'facts_hash', 'expected_revision', 'confirm', 'reason'})
+        item = {'task_id': task_id, **{k: body[k] for k in ('facts_hash', 'expected_revision') if k in body}}
+        result = self.accept(ctx, [item], body)
+        return {**result['results'][0], 'checklist_revision': result['checklist_revision']}
+
+    def accept_suggestions(self, ctx, body):
+        fields(body, {'tasks', 'confirm', 'reason'})
+        items = body.get('tasks')
+        require(isinstance(items, list) and 0 < len(items) <= 62, 'invalid_request')
+        for item in items:
+            fields(item, {'task_id', 'facts_hash', 'expected_revision'})
+        require(len({identifier(i.get('task_id')) for i in items}) == len(items), 'invalid_request')
+        return self.accept(ctx, items, body)
+
+    def accept(self, ctx, items, body):
+        confirm = body.get('confirm', False)
+        require(isinstance(confirm, bool), 'invalid_request')
+        reason = text(body['reason'], 1000, empty=False) if 'reason' in body else None
+        for item in items:
+            text(item.get('facts_hash'), 64, empty=False)
+        authorize(ctx, True)
+        with self.sessions.begin() as db:
+            ctx, state = self.lock(db, ctx)
+            facts = self.facts(ctx)
+            accepted = self.decided(db, ctx, 'suggestion_accepted')
+            results = []
+            for item in items:
+                try:
+                    results.append(self.accept_one(db, ctx, item, facts, accepted, confirm, reason))
+                except Failure as exc:
+                    raise Failure(exc.code, exc.status, task_id=item['task_id']) from None
+            if any(not r['replayed'] for r in results):
+                state.checklist_revision += 1
+            return {'project_id': ctx.project['id'], 'checklist_revision': state.checklist_revision, 'results': results}
+
+    def accept_one(self, db, ctx, item, facts, accepted, confirm, reason):
+        task = self.task(db, ctx, item['task_id'])
+        previous = accepted.get((task.id, item['facts_hash']))
+        if previous and task.state.value == previous.changes['to_state']:
+            return self.decision_json(task, previous.changes, True)
+        self.writable()
+        found = suggestions.current(task, facts)
+        require(found is not None and found['facts_hash'] == item['facts_hash'], 'suggestion_stale', 409)
+        require(type(item.get('expected_revision')) is int, 'invalid_request')
+        require(task.revision == item['expected_revision'], 'task_revision_conflict', 409)
+        if found['tier'] == suggestions.Tier.INDICATOR.value:
+            require(confirm and reason is not None, 'suggestion_confirmation_required')
+        target = Lifecycle(found['suggested_state'])
+        origin = task.state
+        basis = {'rule_id': found['rule_id'], 'rule_revision': found['rule_revision'], 'tier': found['tier'],
+                 'facts_hash': found['facts_hash'], 'actor_id': ctx.user['id'], 'at': self.clock(), 'confirmed': confirm}
+        self.transition(task, {'action': suggestions.ACTIONS[target]}, True, evidence=basis)
+        task.local = {**task.local, 'evidence_basis': basis}
+        task.revision += 1
+        changes = {**{k: v for k, v in found.items() if k != 'task_id'}, 'transition': suggestions.ACTIONS[target],
+                   'from_state': origin.value, 'to_state': target.value, 'confirm': confirm, 'reason': reason}
+        self.event(db, ctx, task, 'suggestion_accepted', changes)
+        return self.decision_json(task, changes, False)
+
+    def dismiss(self, ctx, task_id, body):
+        fields(body, {'action', 'facts_hash', 'reason'})
+        facts_hash = text(body.get('facts_hash'), 64, empty=False)
+        reason = text(body['reason'], 1000, empty=False) if 'reason' in body else None
+        authorize(ctx, True)
+        with self.sessions.begin() as db:
+            ctx, _ = self.lock(db, ctx)
+            task = self.task(db, ctx, task_id)
+            previous = self.decided(db, ctx, 'suggestion_dismissed').get((task.id, facts_hash))
+            if previous:
+                return {**self.decision_json(task, previous.changes, True), 'dismissed': True}
+            self.writable()
+            found = suggestions.current(task, self.facts(ctx))
+            require(found is not None and found['facts_hash'] == facts_hash, 'suggestion_stale', 409)
+            changes = {**{k: v for k, v in found.items() if k != 'task_id'}, 'reason': reason}
+            self.event(db, ctx, task, 'suggestion_dismissed', changes)
+            return {**self.decision_json(task, changes, False), 'dismissed': True}

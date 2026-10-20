@@ -40,8 +40,8 @@ PARTICIPANT_ROLES = {'executor', 'checker', 'confirmer'}
 
 
 class Failure(Exception):
-    def __init__(self, code, status=422):
-        self.code, self.status = code, status
+    def __init__(self, code, status=422, **context):
+        self.code, self.status, self.context = code, status, context
         super().__init__(code)
 
 

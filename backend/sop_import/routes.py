@@ -25,7 +25,7 @@ def register(app, *, identity, load_case, sessions, cfg):
         try:
             body, status = run(), 200
         except Failure as exc:
-            body, status = {'code': exc.code, 'detail': exc.code}, exc.status
+            body, status = {'code': exc.code, 'detail': exc.code, **exc.context}, exc.status
         except HTTPException as exc:
             code = {401: 'session_expired', 403: 'sop_import_forbidden', 404: 'case_not_found'}.get(exc.status_code, 'invalid_request')
             body, status = {'code': code, 'detail': code}, exc.status_code
@@ -100,5 +100,13 @@ def register(app, *, identity, load_case, sessions, cfg):
     @app.post(PREFIX + '/sop-tasks/{task_id}/transition')
     async def transition(request: Request, project_id: str, task_id: str):
         return await mutation(request, project_id, lambda ctx, body: service.mutate(ctx, task_id, body, transition=True))
+
+    @app.post(PREFIX + '/sop-tasks/suggestions/accept')
+    async def accept_suggestions(request: Request, project_id: str):
+        return await mutation(request, project_id, service.accept_suggestions)
+
+    @app.post(PREFIX + '/sop-tasks/{task_id}/suggestion')
+    async def suggestion(request: Request, project_id: str, task_id: str):
+        return await mutation(request, project_id, lambda ctx, body: service.decide_suggestion(ctx, task_id, body))
 
     return service

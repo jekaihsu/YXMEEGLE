@@ -27,6 +27,7 @@ TEXT_FIELDS = {'project_name': '工程名稱', 'client': '行號單位', 'contac
 class QuoteFacts:
     quote_nos: tuple[str, ...] = ()
     source_rows: int = 0
+    duplicated: bool = False
     project_name: str = ''
     client: str = ''
     contact: str = ''
@@ -75,7 +76,8 @@ class QuoteFacts:
                     or self.confirmation_link and self.returned_date)
 
     def plain(self, keys):
-        return {key: getattr(self, key) for key in keys}
+        return {key: list(value) if isinstance(value, tuple) else value
+                for key in keys for value in [getattr(self, key)]}
 
 
 def has_confirmation_link(value):
@@ -133,8 +135,9 @@ def collect(rows, *, today: date, v4_confirmation=False) -> QuoteFacts:
     codes = [c for r in found for c in r['codes']]
     numbered = next((c for c in codes if engineering_no(c)), '')
     statuses = {r['quote_status'] for r in found}
+    numbers = [r['quote_no'] for r in found if r['quote_no']]
     facts = QuoteFacts(
-        quote_nos=tuple(sorted({r['quote_no'] for r in found if r['quote_no']})), source_rows=len(found),
+        quote_nos=tuple(sorted(set(numbers))), source_rows=len(found), duplicated=len(numbers) != len(set(numbers)),
         **{key: max((r[key] for r in found), default='') for key in DATE_FIELDS},
         **{key: first(key) for key in TEXT_FIELDS},
         engineering_no=numbered or (codes[0] if codes else ''), numbered=bool(numbered),

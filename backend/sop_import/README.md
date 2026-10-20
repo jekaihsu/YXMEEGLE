@@ -93,9 +93,41 @@ Create a manual task with `POST /api/projects/{id}/sop-tasks` and `{"title":"Rev
 
 Transition with `POST /api/projects/{id}/sop-tasks/{task_id}/transition` and `{"expected_revision":1,"action":"start"}`. Actions are `start`, `block`, `resume`, `reset`, `complete`, `reopen`, `archive`, `restore`, and `set_applicability`. Block, resume, reset, reopen, archive, restore, and applicability decisions require a reason. `set_applicability` also requires `applicability` and management authority. Assignment changes clear local attestations. Completed work must reopen before edits.
 
+## Evidence suggestions
+
+`GET /api/projects/{id}/sop-tasks` adds `suggestion` to every task. It is null unless quote evidence would move that task forward. Suggestions are computed on each read from the merged quote facts and are never stored. They never change a task by themselves and never write to Lark.
+
+```json
+{"task_id":"…","rule_id":"quote-evidence:A:12","rule_revision":1,"tier":"proof","suggested_state":"done",
+ "facts":{"returned_date":"2026-09-17","quote_deadline":"2026-08-24","deadline_passed":true},"facts_hash":"…"}
+```
+
+`suggestions.py` holds the rule table. Each rule speaks for one catalog row and lists ordered claims, each with a tier, a suggested state, and a predicate over the facts. The first claim that holds is the suggestion. A suggestion appears only for an applicable, non-archived imported task whose state the suggested transition can leave: `done` from pending, in progress, or blocked through `complete`, and `in_progress` from pending through `start`. `facts_hash` covers the rule ID, revision, tier, suggested state, and facts. `facts` hold plain values. Money and revenue points appear only as booleans.
+
+| Rule rows | Tier and state |
+| --- | --- |
+| #2 unique 報價編號, #12 `回傳單日期` or `報價期限` passed, #44 `案件已入帳` or `入帳日期` | proof, `done` |
+| #2 duplicated 報價編號, #44 `狀態 (1)` G, and #1, #3, #8, #15, #16, #17, #19, #24, #29, #30, #32, #36 to #39, #41, #43, #59 to #61 | indicator, `done` |
+| #9 open quote, #15 returned without a price, #21, #25, #26, #33 to #35, #46 | indicator, `in_progress` |
+
+Rows #4, #7, #10, #18, #20, #22, #23, #49, #51, #52, and #54 to #56 have no rule because the source holds no evidence for them or only an applicability hint. Three rules differ from the evidence dive on purpose. #16 is an indicator because its 回傳本 upload has no field. #19 ignores a confirmation link without `回傳單日期`. #46 follows its predicate text, E or F, so a G case does not stay in tracking.
+
+Decide one suggestion with `POST /api/projects/{id}/sop-tasks/{task_id}/suggestion`.
+
+```json
+{"action":"accept_suggestion","facts_hash":"…","expected_revision":1,"confirm":true,"reason":"回簽附件已上傳"}
+{"action":"dismiss_suggestion","facts_hash":"…","reason":"待補佐證"}
+```
+
+Accept several in one case with `POST /api/projects/{id}/sop-tasks/suggestions/accept` and `{"tasks":[{"task_id":"…","facts_hash":"…","expected_revision":1}],"confirm":true,"reason":"…"}`. The batch is all or nothing. A failure names the offending `task_id` beside `code`.
+
+Both commands require case task management, the same authority as import, and the write flag. Each command recomputes the current suggestion and rejects a different `facts_hash` with `suggestion_stale` (409). Accept also checks `expected_revision`. A proof claim satisfies that row's completion evidence. An indicator claim needs `confirm: true` and a reason, otherwise `suggestion_confirmation_required` (422). The state change runs through the transition table. The command records `local.evidence_basis` and appends a `suggestion_accepted` event with the rule ID, revision, tier, facts, hash, transition, and actor. Restoring an archived task that was completed this way reuses that basis.
+
+Repeating an accept whose hash already moved the task to its state replays the stored outcome without a new event, even with writes disabled. A dismissal appends a `suggestion_dismissed` event and hides that exact hash for good. Changed facts produce a new hash, and the suggestion returns. Repeating a dismissal replays. A dismissed hash can still be accepted explicitly.
+
 ## Completion and deferred work
 
-Imported completion rules remain unresolved until reviewed typed evidence obligations are available. All imported tasks currently reject `complete` with `completion_evidence_missing`. Unresolved applicability rejects completion first. Manual tasks have no typed obligations and can complete. No note or URL can manufacture an approval. This backend slice does not yet satisfy the full M1 user demonstration.
+Imported completion rules remain unresolved until reviewed typed evidence obligations are available. Imported tasks reject `complete` with `completion_evidence_missing`; an accepted evidence suggestion is the only path to `done`. Unresolved applicability rejects completion first. Manual tasks have no typed obligations and can complete. No note or URL can manufacture an approval. This backend slice does not yet satisfy the full M1 user demonstration.
 
 Deferred work includes attachments, reviewed completion evidence and checker/confirmation commands, M2 local case creation, date calculation, source identity remapping, and the frontend. Raw dates, role text, TODOs, and source procedures remain inert snapshots. There is no dependency engine or remote approval adapter.
 

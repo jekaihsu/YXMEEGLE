@@ -817,13 +817,363 @@
           "content_hash": "d93935223c0dca161ce85092c5e3d2ab7b01581ef6f6cadc4ee64f0d24472b28",
           "related_references": []
         },
-        "source_restriction": null
+        "source_restriction": null,
+        "suggestion": null
       }
     ],
     "allowed_actions": {
       "import": true,
       "manage": true,
-      "work": true
+      "work": true,
+      "decide_suggestions": true
     }
+  },
+  "sop_tasks_with_suggestions": {
+    "project_id": "e166bc5726784b8eb9f34608f78e87ac",
+    "task_source": "sop_local",
+    "start_node": "pm",
+    "stage": "numbered",
+    "checklist_revision": 1,
+    "identity_revision": 0,
+    "scope": {
+      "node_key": "sales"
+    },
+    "counts": {
+      "done": 0,
+      "total": 9,
+      "unresolved": 0,
+      "not_applicable": 0,
+      "archived": 0
+    },
+    "case_counts": {
+      "done": 0,
+      "total": 12,
+      "unresolved": 1,
+      "not_applicable": 0,
+      "archived": 0
+    },
+    "node_counts": {
+      "sales": {
+        "done": 0,
+        "total": 9,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "pm": {
+        "done": 0,
+        "total": 3,
+        "unresolved": 1,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "confirmation": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "field": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "control": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "mapping": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "report": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "pricing": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "settlement": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      }
+    },
+    "tasks": [
+      {
+        "id": "ad43282b-2958-4510-8386-ec14840df71f",
+        "task_source": "sop_local",
+        "project_id": "e166bc5726784b8eb9f34608f78e87ac",
+        "origin": {
+          "template_family_id": "plumb-case-sop",
+          "source_row_key": "meegle-v137:A:12",
+          "instance_scope": "case",
+          "imported_version_id": "ba4edcf6-04e3-43ec-bffb-71eb7eeb3455"
+        },
+        "title": "報價單是否回傳",
+        "instructions": "每日查回傳單日期；收到含回簽附件的信 → 寫回傳單日期、附件存 Drive → 自動判「是」；到期仍無 → 判「無」",
+        "participants": {},
+        "applicability": "applicable",
+        "state": "pending",
+        "revision": 1,
+        "local": {
+          "due_date": null,
+          "timezone": "Asia/Taipei",
+          "date_status": "unresolved",
+          "applicability_decision": null,
+          "completion_rule_status": "unresolved",
+          "attestations": {}
+        },
+        "overdue": false,
+        "nodes": [
+          {
+            "node_key": "sales",
+            "node_id": "e166bc5726784b8eb9f34608f78e87ac-sales",
+            "order": 12
+          }
+        ],
+        "source_snapshot": {
+          "row": {
+            "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A14:U14",
+            "source_sheet_row": 14,
+            "source_row_key": "meegle-v137:A:12",
+            "raw": {
+              "source_group": "1 報價",
+              "source_order": 13,
+              "meegle_id": 12,
+              "title": "報價單是否回傳",
+              "source_kind": "gate",
+              "owner_role_raw": "報價組（業務經理轄下）",
+              "trigger_raw": "#8 完成",
+              "anchor_raw": "報價日期",
+              "deadline_raw": "+10 工作日",
+              "inputs_raw": "報價總表.回傳單日期；Email 收件（回簽附件）",
+              "procedure_raw": "每日查回傳單日期；收到含回簽附件的信 → 寫回傳單日期、附件存 Drive → 自動判「是」；到期仍無 → 判「無」",
+              "human_decision_raw": "否（證據不明時問業務）",
+              "outputs_raw": "報價總表.回傳單日期；Meegle 必填「報價單是否回傳」",
+              "done_when_raw": "回傳單日期有值 或 到期",
+              "next_raw": "是→#13→#15；無→#14→#9",
+              "escalation_raw": null,
+              "kpi_raw": null,
+              "source_reference_raw": "Meegle#12；SOP圖1",
+              "applicability_raw": null,
+              "unresolved_raw": null,
+              "version_note_raw": "v0.2"
+            },
+            "proposed_import": {
+              "disposition": "task",
+              "candidate_node_keys": [
+                "N01"
+              ],
+              "instance_scope": "case",
+              "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+              "is_business_approval": false,
+              "target_branch_node_keys": [
+                "sales"
+              ]
+            }
+          },
+          "template": {
+            "version_id": "ba4edcf6-04e3-43ec-bffb-71eb7eeb3455",
+            "template_family_id": "plumb-case-sop",
+            "revision": "plumb-v0.2-1",
+            "mapping_revision": "yx-company-node-mapping-1",
+            "content_hash": "2096ea7a152deb61e02fa038bf6c954a60dbce64ec54f613fa4931565bc20008"
+          },
+          "content_hash": "c1f7e266046ad05dc7be3fafc4b480dc410fea60ccabac4c306b3daa4758ee3d",
+          "related_references": []
+        },
+        "source_restriction": null,
+        "suggestion": {
+          "task_id": "ad43282b-2958-4510-8386-ec14840df71f",
+          "rule_id": "quote-evidence:A:12",
+          "rule_revision": 1,
+          "tier": "proof",
+          "suggested_state": "done",
+          "facts": {
+            "returned_date": "2026-09-17",
+            "quote_deadline": "2026-08-24",
+            "deadline_passed": true
+          },
+          "facts_hash": "0d6b2beab559aca1b2bfd48bc30b7eb5456748a4146dac99c7e763df24c2cf3b"
+        }
+      },
+      {
+        "id": "e2d94279-56ee-403e-af5b-cf26d7ad333e",
+        "task_source": "sop_local",
+        "project_id": "e166bc5726784b8eb9f34608f78e87ac",
+        "origin": {
+          "template_family_id": "plumb-case-sop",
+          "source_row_key": "meegle-v137:A:15",
+          "instance_scope": "case",
+          "imported_version_id": "ba4edcf6-04e3-43ec-bffb-71eb7eeb3455"
+        },
+        "title": "收到回傳單，合約成立",
+        "instructions": "回簽附件存 Meegle 必填欄；寫契約價格(未稅／含稅)、付款條件、合約開始日期；狀態＝成案；通知 PM 派工段啟動",
+        "participants": {},
+        "applicability": "applicable",
+        "state": "pending",
+        "revision": 1,
+        "local": {
+          "due_date": null,
+          "timezone": "Asia/Taipei",
+          "date_status": "unresolved",
+          "applicability_decision": null,
+          "completion_rule_status": "unresolved",
+          "attestations": {}
+        },
+        "overdue": false,
+        "nodes": [
+          {
+            "node_key": "sales",
+            "node_id": "e166bc5726784b8eb9f34608f78e87ac-sales",
+            "order": 15
+          }
+        ],
+        "source_snapshot": {
+          "row": {
+            "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A17:U17",
+            "source_sheet_row": 17,
+            "source_row_key": "meegle-v137:A:15",
+            "raw": {
+              "source_group": "1 報價",
+              "source_order": 16,
+              "meegle_id": 15,
+              "title": "收到回傳單，合約成立",
+              "source_kind": "confirm",
+              "owner_role_raw": "報價組（業務經理轄下）",
+              "trigger_raw": "#13",
+              "anchor_raw": "回傳單日期",
+              "deadline_raw": "—",
+              "inputs_raw": "回簽報價單／合約附件",
+              "procedure_raw": "回簽附件存 Meegle 必填欄；寫契約價格(未稅／含稅)、付款條件、合約開始日期；狀態＝成案；通知 PM 派工段啟動",
+              "human_decision_raw": "否（附件由人上傳或從信抓）",
+              "outputs_raw": "報價總表.狀態＝成案、契約價格、付款條件、合約開始日期；Meegle 附件",
+              "done_when_raw": "回簽附件已上傳 + 契約價格有值",
+              "next_raw": "#16",
+              "escalation_raw": null,
+              "kpi_raw": null,
+              "source_reference_raw": "Meegle#15",
+              "applicability_raw": null,
+              "unresolved_raw": "付款條件要結構化（目前文字欄 74% 空），#30 要用",
+              "version_note_raw": "v0.2"
+            },
+            "proposed_import": {
+              "disposition": "task",
+              "candidate_node_keys": [
+                "N01"
+              ],
+              "instance_scope": "case",
+              "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+              "is_business_approval": false,
+              "target_branch_node_keys": [
+                "sales"
+              ]
+            }
+          },
+          "template": {
+            "version_id": "ba4edcf6-04e3-43ec-bffb-71eb7eeb3455",
+            "template_family_id": "plumb-case-sop",
+            "revision": "plumb-v0.2-1",
+            "mapping_revision": "yx-company-node-mapping-1",
+            "content_hash": "2096ea7a152deb61e02fa038bf6c954a60dbce64ec54f613fa4931565bc20008"
+          },
+          "content_hash": "94757d12974e55b4cea724a22aee731341d964a51542d41a333c69503fe9376e",
+          "related_references": []
+        },
+        "source_restriction": null,
+        "suggestion": {
+          "task_id": "e2d94279-56ee-403e-af5b-cf26d7ad333e",
+          "rule_id": "quote-evidence:A:15",
+          "rule_revision": 1,
+          "tier": "indicator",
+          "suggested_state": "done",
+          "facts": {
+            "returned_date": "2026-09-17",
+            "price_positive": true
+          },
+          "facts_hash": "1d94c2b9488eb151d802939fc8fdf047f4ac7d5a8d69f161bbc2f5dc33c3ab40"
+        }
+      }
+    ],
+    "allowed_actions": {
+      "import": true,
+      "manage": true,
+      "work": true,
+      "decide_suggestions": true
+    }
+  },
+  "accept_suggestion": {
+    "task_id": "ad43282b-2958-4510-8386-ec14840df71f",
+    "revision": 2,
+    "state": "done",
+    "applicability": "applicable",
+    "replayed": false,
+    "suggestion": {
+      "rule_id": "quote-evidence:A:12",
+      "rule_revision": 1,
+      "tier": "proof",
+      "suggested_state": "done",
+      "facts_hash": "0d6b2beab559aca1b2bfd48bc30b7eb5456748a4146dac99c7e763df24c2cf3b"
+    },
+    "checklist_revision": 2
+  },
+  "accept_suggestion_stale": {
+    "code": "suggestion_stale",
+    "detail": "suggestion_stale",
+    "task_id": "e2d94279-56ee-403e-af5b-cf26d7ad333e"
+  },
+  "dismiss_suggestion": {
+    "task_id": "b04bc99c-7179-4972-87d9-509ba8c339a8",
+    "revision": 1,
+    "state": "pending",
+    "applicability": "applicable",
+    "replayed": false,
+    "suggestion": {
+      "rule_id": "quote-evidence:A:1",
+      "rule_revision": 1,
+      "tier": "indicator",
+      "suggested_state": "done",
+      "facts_hash": "250dbb12fcb8dc25619dde61476d6c4fc8a57fc0535e7998f65c697d6d25f5de"
+    },
+    "dismissed": true
+  },
+  "accept_suggestions": {
+    "project_id": "e166bc5726784b8eb9f34608f78e87ac",
+    "checklist_revision": 3,
+    "results": [
+      {
+        "task_id": "e2d94279-56ee-403e-af5b-cf26d7ad333e",
+        "revision": 2,
+        "state": "done",
+        "applicability": "applicable",
+        "replayed": false,
+        "suggestion": {
+          "rule_id": "quote-evidence:A:15",
+          "rule_revision": 1,
+          "tier": "indicator",
+          "suggested_state": "done",
+          "facts_hash": "1d94c2b9488eb151d802939fc8fdf047f4ac7d5a8d69f161bbc2f5dc33c3ab40"
+        }
+      }
+    ]
   }
 }
