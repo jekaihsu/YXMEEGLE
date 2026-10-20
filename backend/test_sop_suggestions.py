@@ -68,6 +68,9 @@ def test_c_prefix_case_suggests_quote_tasks_done(case):
         key(15): ('done', 'indicator'), key(16): ('done', 'indicator')}
     assert task(h, url, 16)['suggestion']['facts'] == {'engineering_no': 'C115264', 'numbered': True, 'numbers_consistent': True}
     assert task(h, url, 15)['suggestion']['facts'] == {'returned_date': '2026-09-17', 'price_positive': True}
+    assert task(h, url, 12)['allowed_actions'] == ['start', 'block', 'archive', 'set_applicability', 'edit',
+                                                   'accept_suggestion', 'dismiss_suggestion']
+    assert task(h, url, 17)['allowed_actions'] == ['start', 'block', 'archive', 'set_applicability', 'edit']
 
 
 def test_quote_stage_case_suggests_nothing_that_needs_a_won_quote(case):

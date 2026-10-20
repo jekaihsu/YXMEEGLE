@@ -422,8 +422,53 @@ class Service:
                                 and task.applicability == Applicability.APPLICABLE
                                 and task.state not in {Lifecycle.DONE, Lifecycle.ARCHIVED}),
                 'nodes': [{'node_key': l.node_key, 'node_id': l.node_id, 'order': l.ordinal} for l in links],
+                'node_keys': [key for key in NODE_MAP.values() if key in {l.node_key for l in links}],
+                'instance_scope': task.instance_scope,
+                'is_shared': task.instance_scope != 'case' or len({l.node_key for l in links}) > 1,
+                'is_conditional': task.snapshot.get('row', {}).get('raw', {}).get('meegle_id') in CONDITIONAL,
                 'source_snapshot': task.snapshot if source else None,
                 'source_restriction': None if source else 'sop_task_read_source_required'}
+
+    def task_views(self, db, ctx, tasks, links=None):
+        """Tasks as the list shows them to this actor: suggestion and the actions the actor may take now."""
+        if links is None:
+            rows = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == ctx.wid,
+                                                             TaskNodeLink.task_id.in_([t.id for t in tasks]))
+                                   .order_by(TaskNodeLink.ordinal, TaskNodeLink.node_key)))
+            links = {t.id: [l for l in rows if l.task_id == t.id] for t in tasks}
+        facts = self.facts(ctx)
+        dismissed = self.decided(db, ctx, 'suggestion_dismissed')
+        source = explicitly_granted(ctx.user, 'sop_task_read_source')
+        views = []
+        for task in tasks:
+            found = suggestions.current(task, facts)
+            found = None if found and (task.id, found['facts_hash']) in dismissed else found
+            views.append({**self.task_json(task, links[task.id], source), 'suggestion': found,
+                          'allowed_actions': self.task_actions(ctx, task, found)})
+        return views
+
+    def task_actions(self, ctx, task, suggestion):
+        if not self.writes_enabled():
+            return []
+        manager = can_manage(ctx)
+        executor = explicitly_granted(ctx.user, 'sop_task_work') and task.participants.get('executor') == ctx.user['id']
+        actions = [action for action, (origins, target, _) in TRANSITIONS.items()
+                   if (manager or executor and action != 'archive') and task.state in origins
+                   and self.reachable(task, target)]
+        if manager:
+            if task.state == Lifecycle.ARCHIVED and (task.previous_state != Lifecycle.DONE or self.reachable(
+                    task, Lifecycle.DONE, task.local.get('evidence_basis'))):
+                actions.append('restore')
+            if task.state not in {Lifecycle.DONE, Lifecycle.ARCHIVED}:
+                actions += ['set_applicability', 'edit']
+            if suggestion:
+                actions += ['accept_suggestion', 'dismiss_suggestion']
+        return actions
+
+    def reachable(self, task, target, evidence=None):
+        if target == Lifecycle.IN_PROGRESS:
+            return task.applicability == Applicability.APPLICABLE
+        return target != Lifecycle.DONE or self.completion_failure(task, evidence) is None
 
     def overview(self, ctx, node_key=None):
         authorize(ctx)
@@ -437,18 +482,13 @@ class Service:
             by_task = {t.id: [l for l in links if l.task_id == t.id] for t in tasks}
             selected = [t for t in tasks if node_key is None or any(l.node_key == node_key for l in by_task[t.id])]
             selected.sort(key=lambda t: (t.template_family_id == 'manual', min((l.ordinal for l in by_task[t.id]), default=0), t.id))
-            facts = self.facts(ctx)
-            dismissed = self.decided(db, ctx, 'suggestion_dismissed')
-            suggested = {t.id: found for t in selected if (found := suggestions.current(t, facts))
-                         and (t.id, found['facts_hash']) not in dismissed}
-            source = explicitly_granted(ctx.user, 'sop_task_read_source')
-            return {'project_id': ctx.project['id'], 'task_source': 'sop_local', **self.position(db, ctx, facts),
+            return {'project_id': ctx.project['id'], 'task_source': 'sop_local', **self.position(db, ctx, self.facts(ctx)),
                     'checklist_revision': state.checklist_revision if state else 0,
                     'identity_revision': state.identity_revision if state else 0, 'scope': {'node_key': node_key},
                     'counts': self.counts(selected), 'case_counts': self.counts(tasks),
                     'node_counts': {key: self.counts([t for t in tasks if any(l.node_key == key for l in by_task[t.id])])
                                     for key in NODE_MAP.values()},
-                    'tasks': [{**self.task_json(t, by_task[t.id], source), 'suggestion': suggested.get(t.id)} for t in selected],
+                    'tasks': self.task_views(db, ctx, selected, by_task),
                     'allowed_actions': {'import': can_manage(ctx) and self.writes_enabled(),
                                         'manage': can_manage(ctx) and self.writes_enabled(),
                                         'work': explicitly_granted(ctx.user, 'sop_task_work') and self.writes_enabled(),
@@ -616,7 +656,8 @@ class Service:
                                     node_id=n['node_id'], node_key=n['node_key'], ordinal=10000))
             self.event(db, ctx, task, 'created', {})
             state.checklist_revision += 1
-            return {'task_id': task.id, 'revision': task.revision, 'checklist_revision': state.checklist_revision}
+            return {'task_id': task.id, 'revision': task.revision, 'checklist_revision': state.checklist_revision,
+                    'task': self.task_views(db, ctx, [task])[0]}
 
     def mutate(self, ctx, task_id, body, *, transition=False):
         self.writable()
@@ -655,13 +696,20 @@ class Service:
             state.checklist_revision += 1
             self.event(db, ctx, task, 'transition' if transition else 'edited', deepcopy(body))
             return {'task_id': task.id, 'revision': task.revision, 'checklist_revision': state.checklist_revision,
-                    'state': task.state.value, 'applicability': task.applicability.value}
+                    'state': task.state.value, 'applicability': task.applicability.value,
+                    'task': self.task_views(db, ctx, [task])[0]}
 
     @staticmethod
-    def completion(task, evidence=None):
-        require(task.applicability == Applicability.APPLICABLE, 'applicability_unresolved')
-        require(evidence is not None or task.local.get('completion_rule_status') == 'no_typed_obligations',
-                'completion_evidence_missing')
+    def completion_failure(task, evidence=None):
+        if task.applicability != Applicability.APPLICABLE:
+            return 'applicability_unresolved'
+        if evidence is None and task.local.get('completion_rule_status') != 'no_typed_obligations':
+            return 'completion_evidence_missing'
+        return None
+
+    def completion(self, task, evidence=None):
+        failure = self.completion_failure(task, evidence)
+        require(failure is None, failure)
 
     def transition(self, task, body, manager, evidence=None):
         action = body.get('action')
@@ -752,7 +800,9 @@ class Service:
                     raise Failure(exc.code, exc.status, task_id=item['task_id']) from None
             if any(not r['replayed'] for r in results):
                 state.checklist_revision += 1
-            return {'project_id': ctx.project['id'], 'checklist_revision': state.checklist_revision, 'results': results}
+            views = self.task_views(db, ctx, [self.task(db, ctx, r['task_id']) for r in results])
+            return {'project_id': ctx.project['id'], 'checklist_revision': state.checklist_revision,
+                    'results': [{**r, 'task': view} for r, view in zip(results, views)]}
 
     def accept_one(self, db, ctx, item, facts, accepted, confirm, reason):
         task = self.task(db, ctx, item['task_id'])
@@ -788,10 +838,12 @@ class Service:
             task = self.task(db, ctx, task_id)
             previous = self.decided(db, ctx, 'suggestion_dismissed').get((task.id, facts_hash))
             if previous:
-                return {**self.decision_json(task, previous.changes, True), 'dismissed': True}
-            self.writable()
-            found = suggestions.current(task, self.facts(ctx))
-            require(found is not None and found['facts_hash'] == facts_hash, 'suggestion_stale', 409)
-            changes = {**{k: v for k, v in found.items() if k != 'task_id'}, 'reason': reason}
-            self.event(db, ctx, task, 'suggestion_dismissed', changes)
-            return {**self.decision_json(task, changes, False), 'dismissed': True}
+                changes = previous.changes
+            else:
+                self.writable()
+                found = suggestions.current(task, self.facts(ctx))
+                require(found is not None and found['facts_hash'] == facts_hash, 'suggestion_stale', 409)
+                changes = {**{k: v for k, v in found.items() if k != 'task_id'}, 'reason': reason}
+                self.event(db, ctx, task, 'suggestion_dismissed', changes)
+            return {**self.decision_json(task, changes, bool(previous)), 'dismissed': True,
+                    'task': self.task_views(db, ctx, [task])[0]}

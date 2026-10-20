@@ -93,6 +93,10 @@ Create a manual task with `POST /api/projects/{id}/sop-tasks` and `{"title":"Rev
 
 Transition with `POST /api/projects/{id}/sop-tasks/{task_id}/transition` and `{"expected_revision":1,"action":"start"}`. Actions are `start`, `block`, `resume`, `reset`, `complete`, `reopen`, `archive`, `restore`, and `set_applicability`. Block, resume, reset, reopen, archive, restore, and applicability decisions require a reason. `set_applicability` also requires `applicability` and management authority. Assignment changes clear local attestations. Completed work must reopen before edits.
 
+Manual creation, edits, transitions, and suggestion decisions return the updated `task` exactly as the list shows it, beside `checklist_revision`.
+
+Every listed task carries fields that need no `sop_task_read_source` grant. `node_keys` lists its linked node keys in canonical order. `instance_scope` is `case` or `office_shared`. `is_shared` is true for an `office_shared` task or one linked to several nodes. `is_conditional` is true for catalog rows #7, #18, #20, #22, #49, and #54 to #56, and it stays true after the applicability decision. `allowed_actions` lists what this actor may do to this task now, in this order: the transitions from the table above whose origin state matches, then `restore`, `set_applicability`, `edit`, `accept_suggestion`, and `dismiss_suggestion`. A case manager gets every applicable one. The assigned executor with `sop_task_work` gets the transitions except `archive`. `start`, `resume`, and `reopen` need an applicable task. `complete` also needs completion evidence, so imported tasks never list it; an accepted suggestion completes them. `restore` of a completed task needs the same. With writes disabled the list is empty.
+
 ## Evidence suggestions
 
 `GET /api/projects/{id}/sop-tasks` adds `suggestion` to every task. It is null unless quote evidence would move that task forward. Suggestions are computed on each read from the merged quote facts and are never stored. They never change a task by themselves and never write to Lark.
