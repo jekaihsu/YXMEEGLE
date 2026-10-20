@@ -5,24 +5,29 @@ uniqueness check, and the source boundary has no outbound writes. A local case c
 mistaken for an official number, and holds an official 報價編號 only as a display field after a uniqueness check.
 """
 import re
+import unicodedata
 
 from ..sources import normalized_case
 from ..v4_sources import blank_nodes
 from . import quotes
 from .domain import require
 
-OFFICIAL_NUMBER = re.compile(r'\d{6}(?:-\d{1,2}){0,2}(?:-?[A-Z])?')
+OFFICIAL_NUMBER = re.compile(r'[0-9]{6}(?:-[0-9]{1,2}){0,2}(?:-?[A-Z])?', re.ASCII)
 
 
 def reference(project_id):
     return 'LOCAL-' + project_id[:8].upper()
 
 
+def number_key(value):
+    return normalized_case(unicodedata.normalize('NFKC', value)).upper()
+
+
 def official_number(value):
     if value is None or value == '':
         return None
     require(isinstance(value, str), 'quote_number_invalid')
-    number = normalized_case(value).upper()
+    number = number_key(value)
     require(bool(OFFICIAL_NUMBER.fullmatch(number)), 'quote_number_invalid')
     return number
 
@@ -30,7 +35,9 @@ def official_number(value):
 def require_unused(number, state):
     """An official 報價編號 must not exist in the merged source register or on another local case."""
     if number:
-        used = set(quotes.groups(state)) | {p.get('official_quote_no') for p in state.get('projects', [])}
+        used = {number_key(key) for key in quotes.groups(state)}
+        used.update(number_key(p['official_quote_no']) for p in state.get('projects', [])
+                    if p.get('official_quote_no'))
         require(number not in used, 'quote_number_taken', 409)
 
 
