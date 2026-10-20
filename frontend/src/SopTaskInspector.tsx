@@ -100,9 +100,9 @@ export function SopTaskInspector({task, project, users, sop, onClose}: {task: So
     <Button type="submit" disabled={!!editReason || busy || (due || null) === task.dueDate || !dueReason.trim()}>儲存期限</Button>
    </form>
    {task.allowedActions.includes('set_applicability') && <form className="sop-form" onSubmit={e => {e.preventDefault(); void transition('set_applicability', {applicability, reason: appReason.trim()})}}>
-    <Field label="適用"><select value={applicability} disabled={!!editReason || busy} onChange={e => setApplicability(e.target.value as Applicability)}>{(Object.keys(APPLICABILITY_LABEL) as Applicability[]).map(a => <option key={a} value={a}>{APPLICABILITY_LABEL[a]}</option>)}</select></Field>
-    <Field label="適用原因"><input value={appReason} maxLength={1000} disabled={!!editReason || busy} onChange={e => setAppReason(e.target.value)}/></Field>
-    <Button type="submit" disabled={!!editReason || busy || applicability === task.applicability || !appReason.trim()}>儲存適用</Button>
+    <Field label="適用"><select value={applicability} disabled={busy} onChange={e => setApplicability(e.target.value as Applicability)}>{(Object.keys(APPLICABILITY_LABEL) as Applicability[]).map(a => <option key={a} value={a}>{APPLICABILITY_LABEL[a]}</option>)}</select></Field>
+    <Field label="適用原因"><input value={appReason} maxLength={1000} disabled={busy} onChange={e => setAppReason(e.target.value)}/></Field>
+    <Button type="submit" disabled={busy || applicability === task.applicability || !appReason.trim()}>儲存適用</Button>
    </form>}
    <TaskSuggestion projectId={project.id} task={task} current={sop.current} reload={sop.reload} onAccept={()=>setReview(true)}/><Provenance task={task}/>{review && <SuggestionReview projectId={project.id} tasks={'data' in sop.state ? sop.state.data?.tasks||[] : []} initial={[task.id]} current={sop.current} reload={sop.reload} onClose={()=>setReview(false)}/>}
   </div>

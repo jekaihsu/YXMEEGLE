@@ -59,7 +59,7 @@ export function SopTasks({c, p, nodeKey, sop, importing, setImporting}: {c: Ctx;
  const {state} = sop;
  const data = 'data' in state ? state.data : undefined;
  const me = c.s.user?.id || '';
- const people = new Map(c.w.users.map(u => [u.id, u.name]));
+ const people = new Map([...c.w.users,...sop.assignees].map(u => [u.id, u.name]));
  const routeTask = c.route.task_source === SOP_TASK_SOURCE ? c.route.task : undefined;
  const openTask = data?.tasks.find(t => t.id === routeTask);
  const openRoute = (task?: string) => c.go({...c.route, tab: 'flow', task, task_source: task ? SOP_TASK_SOURCE : undefined});
