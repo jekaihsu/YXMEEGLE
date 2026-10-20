@@ -21,7 +21,8 @@ def ready(db,model,row):
 
 def visibility(pi,environment):
     """SQL twin of source_case_policy.visible_project: isolated environments show every case."""
-    return [] if environment in ('test','demo') else [pi.c.case_visibility.in_(VISIBLE_CASES)]
+    if environment in ('test','demo'): return [pi.c.case_visibility!='local_planning']
+    return [pi.c.case_visibility.in_(VISIBLE_CASES)]
 
 
 def _binary(column,db):

@@ -117,6 +117,17 @@ class ImportRun(Base):
     receipt = Column(JSON, nullable=False)
 
 
+class LocalCaseRun(Base):
+    __tablename__ = 'sop_local_case_runs'
+    workspace_id = Column(String(120), primary_key=True)
+    request_id = Column(String(120), primary_key=True)
+    id = Column(String(64), nullable=False)
+    actor_id = Column(String(120), nullable=False)
+    request_hash = Column(String(64), nullable=False)
+    project_id = Column(String(160), nullable=False)
+    receipt = Column(JSON, nullable=False)
+
+
 class TaskEvent(Base):
     __tablename__ = 'sop_task_events'
     __table_args__ = (ForeignKeyConstraint(['workspace_id', 'project_id', 'task_id'],

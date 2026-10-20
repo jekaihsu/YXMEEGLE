@@ -89,17 +89,29 @@ def register(client):
     return {'quotes': call(client, 'GET', '/api/quotes?q=115588'), 'quote': call(client, 'GET', '/api/quotes/115588')}
 
 
+def local_case(client):
+    form = {'name': '新竹科學園區地形測量', 'pm_id': 'u-pm', 'client': '竹科管理局', 'description': '初步詢價',
+            'official_quote_no': '115950', 'node_keys': ['sales']}
+    draft = call(client, 'POST', '/api/quotes/preview', form)
+    body = {'draft_id': draft['draft_id'], 'request_id': 'examples-local-case'}
+    created = call(client, 'POST', '/api/quotes', body)
+    return {'quote_preview': draft, 'quote_create': created, 'quote_create_replay': call(client, 'POST', '/api/quotes', body),
+            'quote_request': call(client, 'GET', '/api/quotes/requests/examples-local-case'),
+            'quote_number_taken': call(client, 'POST', '/api/quotes/preview', {**form, 'official_quote_no': '115588'}, 409),
+            'quotes_with_local': call(client, 'GET', '/api/quotes?q=115950')}
+
+
 def main():
     with tempfile.TemporaryDirectory() as folder:
         config = {'DATABASE_URL': f'sqlite:///{folder}/examples.db', 'UPLOAD_DIR': f'{folder}/uploads',
                   'SESSION_SECRET': 'examples-secret' * 4, 'APP_ENV': 'development', 'DEMO_MODE': 'true',
-                  'SOP_TASK_WRITES_ENABLED': 'true'}
+                  'SOP_TASK_WRITES_ENABLED': 'true', 'LOCAL_CASE_CREATION_ENABLED': 'true'}
         app = create_app(config)
         with TestClient(app) as client:
             client.get('/api/session')
             call(client, 'POST', '/api/demo/session', {'user_id': 'u-pm'})
             pid, vid = setup(app)
-            captured = {**suggestions(client, pid, vid), **register(client)}
+            captured = {**suggestions(client, pid, vid), **register(client), **local_case(client)}
         app.state.engine.dispose()
     examples = json.loads(OUT.read_text())
     examples.update(captured)

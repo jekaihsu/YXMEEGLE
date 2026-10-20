@@ -829,7 +829,7 @@
     }
   },
   "sop_tasks_with_suggestions": {
-    "project_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43",
+    "project_id": "01a2aac8c05a4cd8bb474f6b19a8c254",
     "task_source": "sop_local",
     "start_node": "pm",
     "stage": "numbered",
@@ -919,14 +919,14 @@
     },
     "tasks": [
       {
-        "id": "e2608dbe-3036-40f9-8ba2-4366c4719652",
+        "id": "766c383b-7608-477f-94b0-5fb8ca3b3077",
         "task_source": "sop_local",
-        "project_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43",
+        "project_id": "01a2aac8c05a4cd8bb474f6b19a8c254",
         "origin": {
           "template_family_id": "plumb-case-sop",
           "source_row_key": "meegle-v137:A:12",
           "instance_scope": "case",
-          "imported_version_id": "45f43bb7-efc8-4017-94a2-50104d81a07d"
+          "imported_version_id": "f3a91d67-70e4-4742-805c-f9e9d9f1c839"
         },
         "title": "報價單是否回傳",
         "instructions": "每日查回傳單日期；收到含回簽附件的信 → 寫回傳單日期、附件存 Drive → 自動判「是」；到期仍無 → 判「無」",
@@ -946,7 +946,7 @@
         "nodes": [
           {
             "node_key": "sales",
-            "node_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43-sales",
+            "node_id": "01a2aac8c05a4cd8bb474f6b19a8c254-sales",
             "order": 12
           }
         ],
@@ -992,7 +992,7 @@
             }
           },
           "template": {
-            "version_id": "45f43bb7-efc8-4017-94a2-50104d81a07d",
+            "version_id": "f3a91d67-70e4-4742-805c-f9e9d9f1c839",
             "template_family_id": "plumb-case-sop",
             "revision": "plumb-v0.2-1",
             "mapping_revision": "yx-company-node-mapping-1",
@@ -1003,7 +1003,7 @@
         },
         "source_restriction": null,
         "suggestion": {
-          "task_id": "e2608dbe-3036-40f9-8ba2-4366c4719652",
+          "task_id": "766c383b-7608-477f-94b0-5fb8ca3b3077",
           "rule_id": "quote-evidence:A:12",
           "rule_revision": 1,
           "tier": "proof",
@@ -1017,14 +1017,14 @@
         }
       },
       {
-        "id": "cf81ea07-ecf0-4a9f-9a1d-94ffc5f82838",
+        "id": "9a482bfe-61a1-4744-904e-ca07aea349ce",
         "task_source": "sop_local",
-        "project_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43",
+        "project_id": "01a2aac8c05a4cd8bb474f6b19a8c254",
         "origin": {
           "template_family_id": "plumb-case-sop",
           "source_row_key": "meegle-v137:A:15",
           "instance_scope": "case",
-          "imported_version_id": "45f43bb7-efc8-4017-94a2-50104d81a07d"
+          "imported_version_id": "f3a91d67-70e4-4742-805c-f9e9d9f1c839"
         },
         "title": "收到回傳單，合約成立",
         "instructions": "回簽附件存 Meegle 必填欄；寫契約價格(未稅／含稅)、付款條件、合約開始日期；狀態＝成案；通知 PM 派工段啟動",
@@ -1044,7 +1044,7 @@
         "nodes": [
           {
             "node_key": "sales",
-            "node_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43-sales",
+            "node_id": "01a2aac8c05a4cd8bb474f6b19a8c254-sales",
             "order": 15
           }
         ],
@@ -1090,7 +1090,7 @@
             }
           },
           "template": {
-            "version_id": "45f43bb7-efc8-4017-94a2-50104d81a07d",
+            "version_id": "f3a91d67-70e4-4742-805c-f9e9d9f1c839",
             "template_family_id": "plumb-case-sop",
             "revision": "plumb-v0.2-1",
             "mapping_revision": "yx-company-node-mapping-1",
@@ -1101,7 +1101,7 @@
         },
         "source_restriction": null,
         "suggestion": {
-          "task_id": "cf81ea07-ecf0-4a9f-9a1d-94ffc5f82838",
+          "task_id": "9a482bfe-61a1-4744-904e-ca07aea349ce",
           "rule_id": "quote-evidence:A:15",
           "rule_revision": 1,
           "tier": "indicator",
@@ -1122,7 +1122,7 @@
     }
   },
   "accept_suggestion": {
-    "task_id": "e2608dbe-3036-40f9-8ba2-4366c4719652",
+    "task_id": "766c383b-7608-477f-94b0-5fb8ca3b3077",
     "revision": 2,
     "state": "done",
     "applicability": "applicable",
@@ -1139,10 +1139,10 @@
   "accept_suggestion_stale": {
     "code": "suggestion_stale",
     "detail": "suggestion_stale",
-    "task_id": "cf81ea07-ecf0-4a9f-9a1d-94ffc5f82838"
+    "task_id": "9a482bfe-61a1-4744-904e-ca07aea349ce"
   },
   "dismiss_suggestion": {
-    "task_id": "79c0ac36-fa94-4012-a587-0cbd326cb569",
+    "task_id": "0cd051a1-b5ba-4dcc-a15c-749b242bd17f",
     "revision": 1,
     "state": "pending",
     "applicability": "applicable",
@@ -1157,11 +1157,11 @@
     "dismissed": true
   },
   "accept_suggestions": {
-    "project_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43",
+    "project_id": "01a2aac8c05a4cd8bb474f6b19a8c254",
     "checklist_revision": 3,
     "results": [
       {
-        "task_id": "cf81ea07-ecf0-4a9f-9a1d-94ffc5f82838",
+        "task_id": "9a482bfe-61a1-4744-904e-ca07aea349ce",
         "revision": 2,
         "state": "done",
         "applicability": "applicable",
@@ -1185,6 +1185,7 @@
       {
         "origin": "source",
         "quote_no": "115588",
+        "local_reference": null,
         "engineering_no": "C115264",
         "name": "新昇案-33筆地號(鑽探)",
         "client": "永達能源工程股份有限公司",
@@ -1202,9 +1203,9 @@
         "status": "成案",
         "stage_label": null,
         "stage": "numbered",
-        "project_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43",
+        "project_id": "01a2aac8c05a4cd8bb474f6b19a8c254",
         "project_ids": [
-          "fe9db58b5f1f43bd9d5c58eddaaa7b43"
+          "01a2aac8c05a4cd8bb474f6b19a8c254"
         ],
         "source_rows": 1,
         "duplicated": false,
@@ -1221,6 +1222,7 @@
   "quote": {
     "origin": "source",
     "quote_no": "115588",
+    "local_reference": null,
     "engineering_no": "C115264",
     "name": "新昇案-33筆地號(鑽探)",
     "client": "永達能源工程股份有限公司",
@@ -1238,9 +1240,9 @@
     "status": "成案",
     "stage_label": null,
     "stage": "numbered",
-    "project_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43",
+    "project_id": "01a2aac8c05a4cd8bb474f6b19a8c254",
     "project_ids": [
-      "fe9db58b5f1f43bd9d5c58eddaaa7b43"
+      "01a2aac8c05a4cd8bb474f6b19a8c254"
     ],
     "source_rows": 1,
     "duplicated": false,
@@ -1295,5 +1297,1476 @@
       "not_applicable": 0,
       "archived": 0
     }
+  },
+  "quote_preview": {
+    "draft_id": "15d7f0c6-03f8-40ae-adea-c7780dce8a4e",
+    "expires_at": 1792498561.1533089,
+    "case": {
+      "project_id": "b00c3e7c0d3c436c95a30e15666ff7f6",
+      "local_reference": "LOCAL-B00C3E7C",
+      "official_quote_no": "115950",
+      "name": "新竹科學園區地形測量",
+      "client": "竹科管理局",
+      "description": "初步詢價",
+      "pm_id": "u-pm",
+      "planning_origin": "local",
+      "case_type": "intake",
+      "nodes": [
+        {
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "node_key": "pm",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-pm"
+        },
+        {
+          "node_key": "confirmation",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-confirmation"
+        },
+        {
+          "node_key": "field",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-field"
+        },
+        {
+          "node_key": "control",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-control"
+        },
+        {
+          "node_key": "mapping",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-mapping"
+        },
+        {
+          "node_key": "report",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-report"
+        },
+        {
+          "node_key": "pricing",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-pricing"
+        },
+        {
+          "node_key": "settlement",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-settlement"
+        }
+      ]
+    },
+    "import": {
+      "start_node": "sales",
+      "identity_revision": 0,
+      "checklist_revision": 0,
+      "nodes": [
+        {
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        }
+      ],
+      "template": {
+        "version_id": "f3a91d67-70e4-4742-805c-f9e9d9f1c839",
+        "template_family_id": "plumb-case-sop",
+        "revision": "plumb-v0.2-1",
+        "mapping_revision": "yx-company-node-mapping-1",
+        "content_hash": "2096ea7a152deb61e02fa038bf6c954a60dbce64ec54f613fa4931565bc20008"
+      },
+      "outcomes": [
+        {
+          "source_row_key": "meegle-v137:A:0",
+          "title": "Start",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:1",
+          "title": "業主提出報價需求",
+          "disposition": "task",
+          "selected": true,
+          "outcome": "new",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [
+            {
+              "task_id": null,
+              "node_key": "sales",
+              "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+            }
+          ],
+          "reason_code": "new",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:2",
+          "title": "建立報價編號",
+          "disposition": "task",
+          "selected": true,
+          "outcome": "new",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [
+            {
+              "task_id": null,
+              "node_key": "sales",
+              "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+            }
+          ],
+          "reason_code": "new",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:3",
+          "title": "通知業主報價成立",
+          "disposition": "task",
+          "selected": true,
+          "outcome": "new",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [
+            {
+              "task_id": null,
+              "node_key": "sales",
+              "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+            }
+          ],
+          "reason_code": "new",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:4",
+          "title": "是否有下包需求",
+          "disposition": "task",
+          "selected": true,
+          "outcome": "new",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [
+            {
+              "task_id": null,
+              "node_key": "sales",
+              "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+            }
+          ],
+          "reason_code": "new",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:5",
+          "title": "無（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:6",
+          "title": "有（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:7",
+          "title": "下包提出報價",
+          "disposition": "task",
+          "selected": false,
+          "outcome": "excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "unresolved",
+          "links_to_add": [],
+          "reason_code": "excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:8",
+          "title": "提出報價，同時通知業主已提供報價",
+          "disposition": "task",
+          "selected": true,
+          "outcome": "new",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [
+            {
+              "task_id": null,
+              "node_key": "sales",
+              "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+            }
+          ],
+          "reason_code": "new",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:9",
+          "title": "追蹤報價",
+          "disposition": "task",
+          "selected": true,
+          "outcome": "new",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [
+            {
+              "task_id": null,
+              "node_key": "sales",
+              "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+            }
+          ],
+          "reason_code": "new",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:10",
+          "title": "業主告知未得標／報價單有效期限到期",
+          "disposition": "task",
+          "selected": true,
+          "outcome": "new",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [
+            {
+              "task_id": null,
+              "node_key": "sales",
+              "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+            }
+          ],
+          "reason_code": "new",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:11",
+          "title": "本報價工作結束",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:12",
+          "title": "報價單是否回傳",
+          "disposition": "task",
+          "selected": true,
+          "outcome": "new",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [
+            {
+              "task_id": null,
+              "node_key": "sales",
+              "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+            }
+          ],
+          "reason_code": "new",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:13",
+          "title": "是（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:14",
+          "title": "無（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:15",
+          "title": "收到回傳單，合約成立",
+          "disposition": "task",
+          "selected": true,
+          "outcome": "new",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [
+            {
+              "task_id": null,
+              "node_key": "sales",
+              "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+            }
+          ],
+          "reason_code": "new",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:27",
+          "title": "節點檢討與紀錄",
+          "disposition": "routine_excluded",
+          "selected": false,
+          "outcome": "routine_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routine_excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:57",
+          "title": "節點檢討與紀錄（計價段）",
+          "disposition": "routine_excluded",
+          "selected": false,
+          "outcome": "routine_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routine_excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:28",
+          "title": "考評與結算計算",
+          "disposition": "disabled_excluded",
+          "selected": false,
+          "outcome": "disabled_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "disabled_excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:58",
+          "title": "考評與結算計算（計價段）",
+          "disposition": "disabled_excluded",
+          "selected": false,
+          "outcome": "disabled_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "disabled_excluded",
+          "exclusion_reason": null
+        }
+      ],
+      "context_hash": "2ffe16f13a966ec02c36bf1f7fabc5d44056d0fe8fbb798d420aa4835094d545",
+      "stage": "inquiry",
+      "unresolved_items": [
+        {
+          "source_row_key": "meegle-v137:A:1",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:2",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:3",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:4",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:8",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:9",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:10",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:12",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:15",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        }
+      ],
+      "unresolved_counts": {
+        "applicability": 0,
+        "participants": 9,
+        "dates": 9
+      },
+      "counts": {
+        "new_tasks": 9,
+        "existing_tasks": 0,
+        "added_links": 9
+      },
+      "selection": {
+        "template_version_id": "f3a91d67-70e4-4742-805c-f9e9d9f1c839",
+        "node_keys": [
+          "sales"
+        ],
+        "row_keys": [
+          "meegle-v137:A:1",
+          "meegle-v137:A:10",
+          "meegle-v137:A:12",
+          "meegle-v137:A:15",
+          "meegle-v137:A:2",
+          "meegle-v137:A:3",
+          "meegle-v137:A:4",
+          "meegle-v137:A:8",
+          "meegle-v137:A:9"
+        ],
+        "participant_bindings": {},
+        "applicability_decisions": {},
+        "exclusion_reasons": {}
+      }
+    }
+  },
+  "quote_create": {
+    "request_id": "examples-local-case",
+    "project_id": "b00c3e7c0d3c436c95a30e15666ff7f6",
+    "local_reference": "LOCAL-B00C3E7C",
+    "official_quote_no": "115950",
+    "name": "新竹科學園區地形測量",
+    "client": "竹科管理局",
+    "description": "初步詢價",
+    "pm_id": "u-pm",
+    "planning_origin": "local",
+    "case_type": "intake",
+    "replayed": false,
+    "import": {
+      "run_id": "89eb9b5c-824b-4967-b728-8b5dfa89e595",
+      "request_id": "examples-local-case",
+      "project_id": "b00c3e7c0d3c436c95a30e15666ff7f6",
+      "template_version_id": "f3a91d67-70e4-4742-805c-f9e9d9f1c839",
+      "start_node": "sales",
+      "stage": "inquiry",
+      "replayed": false,
+      "created_task_ids": [
+        "6f91c091-598e-4774-98ae-0217f5bedf14",
+        "b5bfd280-60ef-4b71-ad1a-5bb6097a9ad5",
+        "ba625b81-bac5-4780-8128-fc4e16ccf400",
+        "93da5699-a587-44fc-8e02-4a94b3c2abfa",
+        "58162197-550f-4c26-853d-48f1b38ed17a",
+        "39f5ae9b-42ef-483e-9135-38d79db5148f",
+        "182eed03-5005-4f78-92c8-e85d6d50f210",
+        "27c42756-7b44-4707-9c68-b8311f082973",
+        "df38a12e-bc40-4ab0-afa4-64a2efb4cf91"
+      ],
+      "existing_task_ids": [],
+      "added_links": [
+        {
+          "task_id": "6f91c091-598e-4774-98ae-0217f5bedf14",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "b5bfd280-60ef-4b71-ad1a-5bb6097a9ad5",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "ba625b81-bac5-4780-8128-fc4e16ccf400",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "93da5699-a587-44fc-8e02-4a94b3c2abfa",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "58162197-550f-4c26-853d-48f1b38ed17a",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "39f5ae9b-42ef-483e-9135-38d79db5148f",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "182eed03-5005-4f78-92c8-e85d6d50f210",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "27c42756-7b44-4707-9c68-b8311f082973",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "df38a12e-bc40-4ab0-afa4-64a2efb4cf91",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        }
+      ],
+      "exclusions": [
+        {
+          "source_row_key": "meegle-v137:A:0",
+          "title": "Start",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:5",
+          "title": "無（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:6",
+          "title": "有（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:7",
+          "title": "下包提出報價",
+          "disposition": "task",
+          "selected": false,
+          "outcome": "excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "unresolved",
+          "links_to_add": [],
+          "reason_code": "excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:11",
+          "title": "本報價工作結束",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:13",
+          "title": "是（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:14",
+          "title": "無（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:27",
+          "title": "節點檢討與紀錄",
+          "disposition": "routine_excluded",
+          "selected": false,
+          "outcome": "routine_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routine_excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:57",
+          "title": "節點檢討與紀錄（計價段）",
+          "disposition": "routine_excluded",
+          "selected": false,
+          "outcome": "routine_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routine_excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:28",
+          "title": "考評與結算計算",
+          "disposition": "disabled_excluded",
+          "selected": false,
+          "outcome": "disabled_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "disabled_excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:58",
+          "title": "考評與結算計算（計價段）",
+          "disposition": "disabled_excluded",
+          "selected": false,
+          "outcome": "disabled_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "disabled_excluded",
+          "exclusion_reason": null
+        }
+      ],
+      "unresolved_items": [
+        {
+          "source_row_key": "meegle-v137:A:1",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:2",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:3",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:4",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:8",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:9",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:10",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:12",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:15",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        }
+      ],
+      "unresolved_counts": {
+        "applicability": 0,
+        "participants": 9,
+        "dates": 9
+      },
+      "checklist_revision": 1
+    }
+  },
+  "quote_create_replay": {
+    "request_id": "examples-local-case",
+    "project_id": "b00c3e7c0d3c436c95a30e15666ff7f6",
+    "local_reference": "LOCAL-B00C3E7C",
+    "official_quote_no": "115950",
+    "name": "新竹科學園區地形測量",
+    "client": "竹科管理局",
+    "description": "初步詢價",
+    "pm_id": "u-pm",
+    "planning_origin": "local",
+    "case_type": "intake",
+    "replayed": true,
+    "import": {
+      "run_id": "89eb9b5c-824b-4967-b728-8b5dfa89e595",
+      "request_id": "examples-local-case",
+      "project_id": "b00c3e7c0d3c436c95a30e15666ff7f6",
+      "template_version_id": "f3a91d67-70e4-4742-805c-f9e9d9f1c839",
+      "start_node": "sales",
+      "stage": "inquiry",
+      "replayed": false,
+      "created_task_ids": [
+        "6f91c091-598e-4774-98ae-0217f5bedf14",
+        "b5bfd280-60ef-4b71-ad1a-5bb6097a9ad5",
+        "ba625b81-bac5-4780-8128-fc4e16ccf400",
+        "93da5699-a587-44fc-8e02-4a94b3c2abfa",
+        "58162197-550f-4c26-853d-48f1b38ed17a",
+        "39f5ae9b-42ef-483e-9135-38d79db5148f",
+        "182eed03-5005-4f78-92c8-e85d6d50f210",
+        "27c42756-7b44-4707-9c68-b8311f082973",
+        "df38a12e-bc40-4ab0-afa4-64a2efb4cf91"
+      ],
+      "existing_task_ids": [],
+      "added_links": [
+        {
+          "task_id": "6f91c091-598e-4774-98ae-0217f5bedf14",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "b5bfd280-60ef-4b71-ad1a-5bb6097a9ad5",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "ba625b81-bac5-4780-8128-fc4e16ccf400",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "93da5699-a587-44fc-8e02-4a94b3c2abfa",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "58162197-550f-4c26-853d-48f1b38ed17a",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "39f5ae9b-42ef-483e-9135-38d79db5148f",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "182eed03-5005-4f78-92c8-e85d6d50f210",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "27c42756-7b44-4707-9c68-b8311f082973",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "df38a12e-bc40-4ab0-afa4-64a2efb4cf91",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        }
+      ],
+      "exclusions": [
+        {
+          "source_row_key": "meegle-v137:A:0",
+          "title": "Start",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:5",
+          "title": "無（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:6",
+          "title": "有（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:7",
+          "title": "下包提出報價",
+          "disposition": "task",
+          "selected": false,
+          "outcome": "excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "unresolved",
+          "links_to_add": [],
+          "reason_code": "excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:11",
+          "title": "本報價工作結束",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:13",
+          "title": "是（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:14",
+          "title": "無（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:27",
+          "title": "節點檢討與紀錄",
+          "disposition": "routine_excluded",
+          "selected": false,
+          "outcome": "routine_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routine_excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:57",
+          "title": "節點檢討與紀錄（計價段）",
+          "disposition": "routine_excluded",
+          "selected": false,
+          "outcome": "routine_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routine_excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:28",
+          "title": "考評與結算計算",
+          "disposition": "disabled_excluded",
+          "selected": false,
+          "outcome": "disabled_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "disabled_excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:58",
+          "title": "考評與結算計算（計價段）",
+          "disposition": "disabled_excluded",
+          "selected": false,
+          "outcome": "disabled_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "disabled_excluded",
+          "exclusion_reason": null
+        }
+      ],
+      "unresolved_items": [
+        {
+          "source_row_key": "meegle-v137:A:1",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:2",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:3",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:4",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:8",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:9",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:10",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:12",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:15",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        }
+      ],
+      "unresolved_counts": {
+        "applicability": 0,
+        "participants": 9,
+        "dates": 9
+      },
+      "checklist_revision": 1
+    }
+  },
+  "quote_request": {
+    "request_id": "examples-local-case",
+    "project_id": "b00c3e7c0d3c436c95a30e15666ff7f6",
+    "local_reference": "LOCAL-B00C3E7C",
+    "official_quote_no": "115950",
+    "name": "新竹科學園區地形測量",
+    "client": "竹科管理局",
+    "description": "初步詢價",
+    "pm_id": "u-pm",
+    "planning_origin": "local",
+    "case_type": "intake",
+    "replayed": false,
+    "import": {
+      "run_id": "89eb9b5c-824b-4967-b728-8b5dfa89e595",
+      "request_id": "examples-local-case",
+      "project_id": "b00c3e7c0d3c436c95a30e15666ff7f6",
+      "template_version_id": "f3a91d67-70e4-4742-805c-f9e9d9f1c839",
+      "start_node": "sales",
+      "stage": "inquiry",
+      "replayed": false,
+      "created_task_ids": [
+        "6f91c091-598e-4774-98ae-0217f5bedf14",
+        "b5bfd280-60ef-4b71-ad1a-5bb6097a9ad5",
+        "ba625b81-bac5-4780-8128-fc4e16ccf400",
+        "93da5699-a587-44fc-8e02-4a94b3c2abfa",
+        "58162197-550f-4c26-853d-48f1b38ed17a",
+        "39f5ae9b-42ef-483e-9135-38d79db5148f",
+        "182eed03-5005-4f78-92c8-e85d6d50f210",
+        "27c42756-7b44-4707-9c68-b8311f082973",
+        "df38a12e-bc40-4ab0-afa4-64a2efb4cf91"
+      ],
+      "existing_task_ids": [],
+      "added_links": [
+        {
+          "task_id": "6f91c091-598e-4774-98ae-0217f5bedf14",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "b5bfd280-60ef-4b71-ad1a-5bb6097a9ad5",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "ba625b81-bac5-4780-8128-fc4e16ccf400",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "93da5699-a587-44fc-8e02-4a94b3c2abfa",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "58162197-550f-4c26-853d-48f1b38ed17a",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "39f5ae9b-42ef-483e-9135-38d79db5148f",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "182eed03-5005-4f78-92c8-e85d6d50f210",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "27c42756-7b44-4707-9c68-b8311f082973",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        },
+        {
+          "task_id": "df38a12e-bc40-4ab0-afa4-64a2efb4cf91",
+          "node_key": "sales",
+          "node_id": "b00c3e7c0d3c436c95a30e15666ff7f6-sales"
+        }
+      ],
+      "exclusions": [
+        {
+          "source_row_key": "meegle-v137:A:0",
+          "title": "Start",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:5",
+          "title": "無（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:6",
+          "title": "有（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:7",
+          "title": "下包提出報價",
+          "disposition": "task",
+          "selected": false,
+          "outcome": "excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "unresolved",
+          "links_to_add": [],
+          "reason_code": "excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:11",
+          "title": "本報價工作結束",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:13",
+          "title": "是（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:14",
+          "title": "無（分支出口）",
+          "disposition": "routing_reference",
+          "selected": false,
+          "outcome": "routing_reference",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routing_reference",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:27",
+          "title": "節點檢討與紀錄",
+          "disposition": "routine_excluded",
+          "selected": false,
+          "outcome": "routine_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routine_excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:57",
+          "title": "節點檢討與紀錄（計價段）",
+          "disposition": "routine_excluded",
+          "selected": false,
+          "outcome": "routine_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "routine_excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:28",
+          "title": "考評與結算計算",
+          "disposition": "disabled_excluded",
+          "selected": false,
+          "outcome": "disabled_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "disabled_excluded",
+          "exclusion_reason": null
+        },
+        {
+          "source_row_key": "meegle-v137:A:58",
+          "title": "考評與結算計算（計價段）",
+          "disposition": "disabled_excluded",
+          "selected": false,
+          "outcome": "disabled_excluded",
+          "existing_task_id": null,
+          "existing_state": null,
+          "existing_revision": null,
+          "applicability": "applicable",
+          "links_to_add": [],
+          "reason_code": "disabled_excluded",
+          "exclusion_reason": null
+        }
+      ],
+      "unresolved_items": [
+        {
+          "source_row_key": "meegle-v137:A:1",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:2",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:3",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:4",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:8",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:9",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:10",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:12",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        },
+        {
+          "source_row_key": "meegle-v137:A:15",
+          "fields": [
+            "participants",
+            "dates"
+          ]
+        }
+      ],
+      "unresolved_counts": {
+        "applicability": 0,
+        "participants": 9,
+        "dates": 9
+      },
+      "checklist_revision": 1
+    }
+  },
+  "quote_number_taken": {
+    "code": "quote_number_taken",
+    "detail": "quote_number_taken"
+  },
+  "quotes_with_local": {
+    "total": 1,
+    "offset": 0,
+    "limit": 30,
+    "amount_restricted": false,
+    "items": [
+      {
+        "origin": "local",
+        "quote_no": "115950",
+        "local_reference": "LOCAL-B00C3E7C",
+        "engineering_no": null,
+        "name": "新竹科學園區地形測量",
+        "client": "竹科管理局",
+        "quoted_on": null,
+        "quote_deadline": null,
+        "contract_amount": null,
+        "amount_restricted": false,
+        "quote_owners": [],
+        "pm_names": [],
+        "pm_id": "u-pm",
+        "status": null,
+        "stage_label": null,
+        "stage": "inquiry",
+        "project_id": "b00c3e7c0d3c436c95a30e15666ff7f6",
+        "project_ids": [
+          "b00c3e7c0d3c436c95a30e15666ff7f6"
+        ],
+        "source_rows": 0,
+        "duplicated": false,
+        "sop_counts": {
+          "done": 0,
+          "total": 9,
+          "unresolved": 0,
+          "not_applicable": 0,
+          "archived": 0
+        }
+      }
+    ]
   }
 }

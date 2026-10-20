@@ -21,6 +21,7 @@ def isolated(ws):
 
 def execution_allowed(ws,project):
     # Missing environment must not grant production business authority.
+    if project.get('planning_origin')=='local': return False
     return isolated(ws) or project.get('case_visibility')!='excluded_history' and execution_system(project)=='workbench'
 
 

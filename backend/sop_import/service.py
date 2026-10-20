@@ -9,13 +9,16 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from ..models import WorkspaceRow, BusinessRow
+from ..source_case_policy import local_viewer
 from ..sources import normalized_case
+from ..workflow import now
 from .catalog import digest, publish
 from .case_stage import stage, start_node
-from . import quotes, suggestions
+from . import local_case, quotes, suggestions
 from .domain import (Applicability, Lifecycle, Disposition, TRANSITIONS, NODE_MAP, SUBCONTRACT,
                      CONDITIONAL, PARTICIPANT_ROLES, Failure, require)
-from .models import Family, Version, TemplateRow, CaseState, LocalTask, TaskNodeLink, Preview, ImportRun, TaskEvent
+from .models import (Family, Version, TemplateRow, CaseState, LocalTask, TaskNodeLink, Preview, ImportRun, TaskEvent,
+                     LocalCaseRun)
 from .quote_facts import case_facts
 
 
@@ -60,6 +63,11 @@ def fields(body, allowed):
     require(isinstance(body, dict) and not set(body) - set(allowed), 'invalid_request')
 
 
+LOCAL_FORM = frozenset({'name', 'pm_id', 'client', 'description', 'official_quote_no', 'import_tasks'})
+LOCAL_SELECTION = frozenset({'template_version_id', 'node_keys', 'row_keys', 'participant_bindings',
+                             'applicability_decisions', 'exclusion_reasons'})
+
+
 def row_keys(value):
     require(isinstance(value, list) and len(value) <= 62 and all(isinstance(k, str) for k in value), 'invalid_request')
     require(len(value) == len(set(value)), 'invalid_request')
@@ -67,11 +75,15 @@ def row_keys(value):
 
 
 class Service:
-    def __init__(self, sessions, *, writes_enabled=lambda: False, clock=time.time):
-        self.sessions, self.writes_enabled, self.clock = sessions, writes_enabled, clock
+    def __init__(self, sessions, *, writes_enabled=lambda: False, local_cases_enabled=lambda: False, clock=time.time):
+        self.sessions, self.writes_enabled, self.local_cases_enabled, self.clock = (
+            sessions, writes_enabled, local_cases_enabled, clock)
 
     def writable(self):
         require(self.writes_enabled(), 'import_unavailable', 503)
+
+    def creatable(self):
+        require(self.local_cases_enabled(), 'local_case_unavailable', 503)
 
     @staticmethod
     def lock_workspace_row(db, wid):
@@ -223,8 +235,8 @@ class Service:
                 'row_keys': sorted(selected), 'participant_bindings': bindings,
                 'applicability_decisions': normalized_decisions, 'exclusion_reasons': exclusions}
 
-    def plan(self, db, ctx, state, version, normalized):
-        nodes = self.nodes(db, ctx, normalized['node_keys'])
+    def plan(self, db, ctx, state, version, normalized, nodes=None):
+        nodes = self.nodes(db, ctx, normalized['node_keys']) if nodes is None else nodes
         by_node = {n['node_key']: n['node_id'] for n in nodes}
         existing = {(t.template_family_id, t.source_row_key, t.instance_scope): t for t in self.tasks(db, ctx)}
         links = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == ctx.wid,
@@ -320,7 +332,7 @@ class Service:
                 return {**run.receipt, 'replayed': True}
             self.writable()
             preview = db.get(Preview, (ctx.wid, pid))
-            require(preview is not None and preview.project_id == ctx.project['id']
+            require(preview is not None and preview.project_id == ctx.project['id'] and 'kind' not in preview.data
                     and preview.actor_id == ctx.user['id'], 'preview_not_found', 404)
             require(preview.expires_at > self.clock(), 'preview_stale', 409)
             plan = preview.data
@@ -328,51 +340,54 @@ class Service:
             normalized = self.normalize(ctx, plan['input'], self.rows(db, version))
             live = self.plan(db, ctx, state, version, normalized)
             require(live['context_hash'] == preview.context_hash, 'preview_stale', 409)
-            rows = {r.source_row_key: r for r in self.rows(db, version)}
-            created, existing, added = [], [], []
-            for outcome in plan['outcomes']:
-                if not outcome['selected']:
-                    continue
-                key = outcome['source_row_key']
-                row = rows[key]
-                task = db.get(LocalTask, (ctx.wid, outcome['existing_task_id'])) if outcome['existing_task_id'] else None
-                if task:
-                    existing.append(task.id)
-                else:
-                    related = {30: [31], 41: [31, 47], 46: [47]}.get(row.snapshot['raw']['meegle_id'], [])
-                    references = [r.snapshot for r in rows.values() if r.snapshot['raw']['meegle_id'] in related]
-                    task = LocalTask(workspace_id=ctx.wid, id=str(uuid4()), project_id=ctx.project['id'],
-                                     template_family_id=version.family_id, source_row_key=key,
-                                     instance_scope=row.snapshot['proposed_import']['instance_scope'], imported_version_id=version.id,
-                                     snapshot={'row': deepcopy(row.snapshot), 'template': self.version_json(version),
-                                               'content_hash': digest(row.snapshot), 'related_references': references},
-                                     title=row.snapshot['raw']['title'], instructions=row.snapshot['raw']['procedure_raw'] or '',
-                                     participants=normalized['participant_bindings'].get(key, {}),
-                                     applicability=Applicability(outcome['applicability']), state=Lifecycle.PENDING, revision=1,
-                                     local={'due_date': None, 'timezone': 'Asia/Taipei', 'date_status': 'unresolved',
-                                            'applicability_decision': normalized['applicability_decisions'].get(key),
-                                            'completion_rule_status': 'unresolved', 'attestations': {}})
-                    db.add(task)
-                    db.flush()
-                    created.append(task.id)
-                    self.event(db, ctx, task, 'imported', {'template_version_id': version.id})
-                for link in outcome['links_to_add']:
-                    db.add(TaskNodeLink(workspace_id=ctx.wid, project_id=ctx.project['id'], task_id=task.id,
-                                        node_id=link['node_id'], node_key=link['node_key'], ordinal=row.ordinal))
-                    added.append({**link, 'task_id': task.id})
-                    self.event(db, ctx, task, 'node_link_added', {'node_id': link['node_id'], 'node_key': link['node_key']})
-            if created or added:
-                state.checklist_revision += 1
-            receipt = {'run_id': str(uuid4()), 'request_id': rid, 'project_id': ctx.project['id'],
-                       'template_version_id': version.id, 'start_node': plan['start_node'], 'stage': live['stage'],
-                       'replayed': False, 'created_task_ids': created,
-                       'existing_task_ids': existing, 'added_links': added,
-                       'exclusions': [o for o in plan['outcomes'] if not o['selected']],
-                       'unresolved_items': plan['unresolved_items'], 'unresolved_counts': plan['unresolved_counts'],
-                       'checklist_revision': state.checklist_revision}
-            db.add(ImportRun(workspace_id=ctx.wid, project_id=ctx.project['id'], request_id=rid, id=receipt['run_id'],
-                             actor_id=ctx.user['id'], request_hash=fingerprint, receipt=receipt))
-            return receipt
+            return self.commit_import(db, ctx, state, version, normalized, plan, live, rid, fingerprint)
+
+    def commit_import(self, db, ctx, state, version, normalized, plan, live, rid, fingerprint):
+        rows = {r.source_row_key: r for r in self.rows(db, version)}
+        created, existing, added = [], [], []
+        for outcome in plan['outcomes']:
+            if not outcome['selected']:
+                continue
+            key = outcome['source_row_key']
+            row = rows[key]
+            task = db.get(LocalTask, (ctx.wid, outcome['existing_task_id'])) if outcome['existing_task_id'] else None
+            if task:
+                existing.append(task.id)
+            else:
+                related = {30: [31], 41: [31, 47], 46: [47]}.get(row.snapshot['raw']['meegle_id'], [])
+                references = [r.snapshot for r in rows.values() if r.snapshot['raw']['meegle_id'] in related]
+                task = LocalTask(workspace_id=ctx.wid, id=str(uuid4()), project_id=ctx.project['id'],
+                                 template_family_id=version.family_id, source_row_key=key,
+                                 instance_scope=row.snapshot['proposed_import']['instance_scope'], imported_version_id=version.id,
+                                 snapshot={'row': deepcopy(row.snapshot), 'template': self.version_json(version),
+                                           'content_hash': digest(row.snapshot), 'related_references': references},
+                                 title=row.snapshot['raw']['title'], instructions=row.snapshot['raw']['procedure_raw'] or '',
+                                 participants=normalized['participant_bindings'].get(key, {}),
+                                 applicability=Applicability(outcome['applicability']), state=Lifecycle.PENDING, revision=1,
+                                 local={'due_date': None, 'timezone': 'Asia/Taipei', 'date_status': 'unresolved',
+                                        'applicability_decision': normalized['applicability_decisions'].get(key),
+                                        'completion_rule_status': 'unresolved', 'attestations': {}})
+                db.add(task)
+                db.flush()
+                created.append(task.id)
+                self.event(db, ctx, task, 'imported', {'template_version_id': version.id})
+            for link in outcome['links_to_add']:
+                db.add(TaskNodeLink(workspace_id=ctx.wid, project_id=ctx.project['id'], task_id=task.id,
+                                    node_id=link['node_id'], node_key=link['node_key'], ordinal=row.ordinal))
+                added.append({**link, 'task_id': task.id})
+                self.event(db, ctx, task, 'node_link_added', {'node_id': link['node_id'], 'node_key': link['node_key']})
+        if created or added:
+            state.checklist_revision += 1
+        receipt = {'run_id': str(uuid4()), 'request_id': rid, 'project_id': ctx.project['id'],
+                   'template_version_id': version.id, 'start_node': plan['start_node'], 'stage': live['stage'],
+                   'replayed': False, 'created_task_ids': created,
+                   'existing_task_ids': existing, 'added_links': added,
+                   'exclusions': [o for o in plan['outcomes'] if not o['selected']],
+                   'unresolved_items': plan['unresolved_items'], 'unresolved_counts': plan['unresolved_counts'],
+                   'checklist_revision': state.checklist_revision}
+        db.add(ImportRun(workspace_id=ctx.wid, project_id=ctx.project['id'], request_id=rid, id=receipt['run_id'],
+                         actor_id=ctx.user['id'], request_hash=fingerprint, receipt=receipt))
+        return receipt
 
     def receipt(self, ctx, request_id):
         authorize(ctx)
@@ -458,11 +473,127 @@ class Service:
                 'items': self.with_sop_counts(wid, items[offset:offset + limit])}
 
     def quote_detail(self, wid, state, amounts, quote_no):
-        key = normalized_case(text(quote_no, 120, empty=False))
-        rows = quotes.groups(state).get(key)
-        require(bool(rows), 'quote_not_found', 404)
-        projects = {p['id']: p for p in state.get('projects', [])}
-        return self.with_sop_counts(wid, [quotes.entry(key, rows, projects, today=self.today(), amounts=amounts, detail=True)])[0]
+        found = quotes.find(state, normalized_case(text(quote_no, 120, empty=False)), today=self.today(), amounts=amounts)
+        require(found is not None, 'quote_not_found', 404)
+        return self.with_sop_counts(wid, [found])[0]
+
+    def default_version(self, db, wid):
+        family = db.scalar(select(Family).where(Family.workspace_id == wid, Family.is_default.is_(True),
+                                                Family.lifecycle == 'active'))
+        require(family is not None, 'template_unavailable', 409)
+        version = db.scalar(select(Version).where(Version.workspace_id == wid, Version.family_id == family.id,
+                                                  Version.status == 'published')
+                            .order_by(Version.published_at.desc(), Version.id.desc()).limit(1))
+        require(version is not None, 'template_unavailable', 409)
+        return version
+
+    def local_form(self, body, users):
+        fields(body, LOCAL_FORM | LOCAL_SELECTION)
+        require('pm_id' in body and (body['pm_id'] is None or isinstance(body['pm_id'], str)), 'invalid_request')
+        pm_id = '' if body['pm_id'] is None else identifier(body['pm_id'])
+        local_case.require_pm(pm_id, users)
+        import_tasks = body.get('import_tasks', True)
+        require(isinstance(import_tasks, bool), 'invalid_request')
+        selection = {k: body[k] for k in LOCAL_SELECTION if k in body}
+        require(import_tasks or not selection, 'invalid_request')
+        return {'name': text(body.get('name'), 300, empty=False).strip(), 'pm_id': pm_id,
+                'client': text(body.get('client', ''), 300).strip(),
+                'description': text(body.get('description', ''), 2000).strip(),
+                'official_quote_no': local_case.official_number(body.get('official_quote_no')),
+                'import_tasks': import_tasks, 'selection': selection}
+
+    @staticmethod
+    def case_json(project):
+        return {k: project[k] for k in ('local_reference', 'official_quote_no', 'name', 'client', 'description', 'pm_id',
+                                        'planning_origin', 'case_type')}
+
+    def local_preview(self, wid, user, workspace, body):
+        self.creatable()
+        require(explicitly_granted(user, 'create_local_case'), 'local_case_forbidden', 403)
+        state = workspace(wid)
+        form = self.local_form(body, state['users'])
+        local_case.require_unused(form['official_quote_no'], state)
+        pid = uuid4().hex
+        project = local_case.project(pid, form, user['id'], local_case.published_template(state), None)
+        ctx = Context(wid, user, {'users': state['users']}, project, None)
+        with self.sessions.begin() as db:
+            normalized = plan = None
+            if form['import_tasks']:
+                self.writable()
+                require(explicitly_granted(user, 'sop_task_import'), 'sop_import_forbidden', 403)
+                version = (self.version(db, wid, form['selection']['template_version_id'])
+                           if 'template_version_id' in form['selection'] else self.default_version(db, wid))
+                normalized = self.normalize(ctx, {**form['selection'], 'template_version_id': version.id}, self.rows(db, version))
+                blank = CaseState(workspace_id=wid, project_id=pid, checklist_revision=0, identity_revision=0)
+                plan = self.plan(db, ctx, blank, version, normalized,
+                                 nodes=[{'node_key': k, 'node_id': f'{pid}-{k}'} for k in normalized['node_keys']])
+            case = {'project_id': pid, **self.case_json(project), 'nodes': [{'node_key': n['key'], 'node_id': n['id']}
+                                                                          for n in project['nodes']]}
+            ident, expires = str(uuid4()), self.clock() + 900
+            db.add(Preview(workspace_id=wid, id=ident, project_id=pid, actor_id=user['id'], expires_at=expires,
+                           context_hash=digest({'case': case, 'plan': plan and plan['context_hash']}),
+                           data={'kind': 'local_case', 'form': form, 'case': case, 'import': normalized, 'plan': plan}))
+        imported = None if plan is None else {**{k: v for k, v in plan.items() if k != 'input'}, 'selection': plan['input']}
+        return {'draft_id': ident, 'expires_at': expires, 'case': case, 'import': imported}
+
+    def local_create(self, wid, user, persist, body):
+        fields(body, {'draft_id', 'request_id'})
+        draft_id, rid = identifier(body.get('draft_id')), identifier(body.get('request_id'))
+        require(explicitly_granted(user, 'create_local_case'), 'local_case_forbidden', 403)
+        fingerprint = digest({'draft_id': draft_id, 'actor_id': user['id']})
+        with self.sessions.begin() as db:
+            self.lock_workspace_row(db, wid)
+            run = db.get(LocalCaseRun, (wid, rid))
+            if run:
+                require(run.request_hash == fingerprint, 'idempotency_mismatch', 409)
+                require(self.local_case_visible(db, wid, user, run.project_id), 'local_case_forbidden', 403)
+                return {**run.receipt, 'replayed': True}
+            self.creatable()
+            draft = db.get(Preview, (wid, draft_id))
+            require(draft is not None and draft.data.get('kind') == 'local_case' and draft.actor_id == user['id'],
+                    'preview_not_found', 404)
+            require(draft.expires_at > self.clock(), 'preview_stale', 409)
+            form, pid = draft.data['form'], draft.project_id
+            built = {}
+
+            def build(state):
+                local_case.require_pm(form['pm_id'], state['users'])
+                local_case.require_unused(form['official_quote_no'], state)
+                built.update(users=state['users'], project=local_case.project(
+                    pid, form, user['id'], local_case.published_template(state), now()))
+                return built['project']
+            persist(db, wid, user['id'], build)
+            imported = None
+            if draft.data['import'] is not None:
+                self.writable()
+                require(explicitly_granted(user, 'sop_task_import'), 'sop_import_forbidden', 403)
+                ctx = Context(wid, user, {'users': built['users']}, built['project'], None)
+                state = CaseState(workspace_id=wid, project_id=pid, checklist_revision=0, identity_revision=0, lock_counter=1)
+                db.add(state)
+                db.flush()
+                version = self.version(db, wid, draft.data['import']['template_version_id'])
+                normalized = self.normalize(ctx, draft.data['import'], self.rows(db, version))
+                live = self.plan(db, ctx, state, version, normalized)
+                require(live['context_hash'] == draft.data['plan']['context_hash'], 'preview_stale', 409)
+                imported = self.commit_import(db, ctx, state, version, normalized, draft.data['plan'], live, rid, fingerprint)
+            receipt = {'request_id': rid, 'project_id': pid, **self.case_json(built['project']), 'replayed': False,
+                       'import': imported}
+            db.add(LocalCaseRun(workspace_id=wid, request_id=rid, id=str(uuid4()), actor_id=user['id'],
+                                request_hash=fingerprint, project_id=pid, receipt=receipt))
+            db.delete(draft)
+            return receipt
+
+    @staticmethod
+    def local_case_visible(db, wid, user, project_id):
+        row = db.get(BusinessRow, (wid, 'projects', project_id))
+        return row is not None and local_viewer(user, row.data)
+
+    def local_receipt(self, wid, user, request_id):
+        with self.sessions() as db:
+            run = db.get(LocalCaseRun, (wid, identifier(request_id)))
+            require(run is not None and (run.actor_id == user['id'] or self.local_case_visible(db, wid, user, run.project_id)),
+                    'run_not_found', 404)
+            return run.receipt
 
     def manual(self, ctx, body):
         fields(body, {'title', 'instructions', 'node_keys', 'participants'})

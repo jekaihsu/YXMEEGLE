@@ -147,11 +147,35 @@ The register reads the cached `source_quotes` collection and the stored cases. I
 
 The register stage is per 報價編號. The `sop-tasks` stage merges every 報價編號 of a case, so a formal case with several quotes can differ from one register entry. The case-level `sop-tasks` merge counts only sibling rows in the last admitted source snapshot.
 
+## Local planning quotes
+
+A local planning quote is a case created in this app only. Nothing is written to the 報價總表: the Base runs automations this app cannot read, 報價編號 is typed by hand with no uniqueness check, and the source boundary has no outbound writes.
+
+Set `LOCAL_CASE_CREATION_ENABLED=true` to allow creation. The default is false, and turning it off leaves every read, receipt, and replay working. Creating needs the explicit `create_local_case` grant. Importing tasks at creation also needs `sop_task_import` and `SOP_TASK_WRITES_ENABLED`. Neither grant is a manager default.
+
+Preview with `POST /api/quotes/preview`.
+
+```json
+{"name":"新竹科學園區地形測量","pm_id":"u-pm","client":"竹科管理局","description":"初步詢價","official_quote_no":"115950"}
+```
+
+`name` and the `pm_id` key are required. `pm_id` is an active PM or manager, or `null` for an explicitly unassigned case. `client`, `description`, and `official_quote_no` are optional. Tasks import by default from the latest published default template, all nine nodes starting with `sales`. The same selection fields as an import preview narrow it: `template_version_id`, `node_keys`, `row_keys`, `participant_bindings`, `applicability_decisions`, `exclusion_reasons`. `"import_tasks": false` creates the case without tasks and allows no selection fields.
+
+The preview allocates the canonical project ID and returns `draft_id`, `expires_at` (900 seconds), `case` with the nine node IDs, and `import`, the same plan an import preview returns, or null. The draft belongs to its actor and holds the normalized form; any change needs a new preview.
+
+Create with `POST /api/quotes` and `{"draft_id":"…","request_id":"client-operation-id"}`. One transaction locks the workspace, appends the case through the full workspace save, imports the tasks, writes an audit row, stores the receipt, and consumes the draft. Any failure rolls all of it back. Replaying the request ID returns the stored receipt with `replayed: true`, after the current grant and case visibility are rechecked. The same request ID with another draft returns `idempotency_mismatch` (409). Recover an ambiguous outcome with `GET /api/quotes/requests/{request_id}`.
+
+The case is `case_type=intake` with `planning_origin=local`, `case_visibility=local_planning`, `execution_system=pending`, and nine canonical nodes whose operational task arrays are empty. `v4_sources.blank_nodes` builds them without the old task seeding. `local_reference` is `LOCAL-` and eight characters of the project ID, so it never reads as an official 報價編號 or 工程編號. `official_quote_no` is a display field. It must look like `115950`, `115950-01`, or `115950-01A`, and must not already exist in the merged source register or on another local case, checked at preview and again under the creation lock. Otherwise the codes are `quote_number_invalid` (422) or `quote_number_taken` (409).
+
+Only the creator, the selected PM, collaborators, and managers see the case: in `GET /api/quotes` as an `origin: local` entry, in `GET /api/quotes/{local_reference}`, and through the `sop-tasks` routes. `visible_project`, `filter_visible_cases`, and the index visibility clause leave it out of every official view, including the case list, case detail, workspace payload, company dashboard, and manager overview, in every environment, so it never enters engineering or finance totals. Operational execution is refused for it in every environment. Source refresh never matches it to a Lark row.
+
+`quote_publish.py` is a prepared, disabled adapter for a later step that would publish a local quote to the 報價總表. Nothing calls it. See that module for the exact field mapping and its guards.
+
 ## Completion and deferred work
 
 Imported completion rules remain unresolved until reviewed typed evidence obligations are available. Imported tasks reject `complete` with `completion_evidence_missing`; an accepted evidence suggestion is the only path to `done`. Unresolved applicability rejects completion first. Manual tasks have no typed obligations and can complete. No note or URL can manufacture an approval. This backend slice does not yet satisfy the full M1 user demonstration.
 
-Deferred work includes attachments, reviewed completion evidence and checker/confirmation commands, M2 local case creation, date calculation, source identity remapping, and the frontend. Raw dates, role text, TODOs, and source procedures remain inert snapshots. There is no dependency engine or remote approval adapter.
+Deferred work includes attachments, reviewed typed completion evidence and checker/confirmation commands, date calculation, source identity remapping, local planning cases in the case list and case detail routes, publishing a local quote to the 報價總表, and the frontend. Raw dates, role text, TODOs, and source procedures remain inert snapshots. There is no dependency engine or remote approval adapter.
 
 Canonical identity merge/remap must remain disabled for cases with checklist history until a preservation adapter is verified. This slice does not intercept the existing reconciliation paths. Keep canonical IDs stable. Ordinary source refresh and `storage.save` cannot delete feature tables. Missing canonical nodes block further import and retain historical links.
 

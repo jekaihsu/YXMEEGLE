@@ -11,8 +11,10 @@ PREFIX = '/api/projects/{project_id}'
 MAX_BODY = 64 * 1024
 
 
-def register(app, *, identity, load_case, sessions, cfg, quote_view=None):
-    service = Service(sessions, writes_enabled=lambda: str(cfg.get('SOP_TASK_WRITES_ENABLED', 'false')).lower() == 'true')
+def register(app, *, identity, load_case, sessions, cfg, quote_view=None, workspace=None, persist_case=None):
+    flag = lambda name: lambda: str(cfg.get(name, 'false')).lower() == 'true'
+    service = Service(sessions, writes_enabled=flag('SOP_TASK_WRITES_ENABLED'),
+                      local_cases_enabled=flag('LOCAL_CASE_CREATION_ENABLED'))
 
     def context(request, project_id):
         data, user = identity(request)
@@ -27,15 +29,16 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None):
         except Failure as exc:
             body, status = {'code': exc.code, 'detail': exc.code, **exc.context}, exc.status
         except HTTPException as exc:
-            code = {401: 'session_expired', 403: 'sop_import_forbidden', 404: 'case_not_found'}.get(exc.status_code, 'invalid_request')
+            code = {401: 'session_expired', 403: 'sop_import_forbidden', 404: 'case_not_found',
+                    409: 'workspace_conflict'}.get(exc.status_code, 'invalid_request')
             body, status = {'code': code, 'detail': code}, exc.status_code
         except (IntegrityError, OperationalError):
             body, status = {'code': 'import_unavailable', 'detail': 'import_unavailable'}, 503
         return JSONResponse(body, status_code=status, headers={'Cache-Control': 'no-store'})
 
-    async def mutation(request, project_id, run):
+    async def mutation(request, project_id, run, resolve=None):
         try:
-            ctx = await run_in_threadpool(context, request, project_id)
+            ctx = await run_in_threadpool(resolve or context, request, project_id)
         except (Failure, HTTPException) as exc:
             def denied():
                 raise exc
@@ -124,5 +127,24 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None):
     @app.get('/api/quotes/{quote_no}')
     def quote_detail(request: Request, quote_no: str):
         return respond(lambda: service.quote_detail(*quotes(request), quote_no))
+
+    if workspace is None or persist_case is None:
+        return service
+
+    def actor(request, _):
+        data, user = identity(request)
+        return data['wid'], user
+
+    @app.post('/api/quotes/preview')
+    async def local_preview(request: Request):
+        return await mutation(request, None, lambda who, body: service.local_preview(*who, workspace, body), actor)
+
+    @app.post('/api/quotes')
+    async def local_create(request: Request):
+        return await mutation(request, None, lambda who, body: service.local_create(*who, persist_case, body), actor)
+
+    @app.get('/api/quotes/requests/{request_id}')
+    def local_receipt(request: Request, request_id: str):
+        return respond(lambda: service.local_receipt(*actor(request, None), request_id))
 
     return service

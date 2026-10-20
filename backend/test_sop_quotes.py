@@ -26,12 +26,11 @@ def quote_row(record_id, quote_no, project_id=None, **fields):
             'fields': {'報價編號': quote_no, **fields}}
 
 
-@pytest.fixture
-def quotes_http(tmp_path):
+def harness(tmp_path, caps=None, **config):
     app = create_app({'DATABASE_URL': f'sqlite:///{tmp_path}/quotes.db', 'UPLOAD_DIR': str(tmp_path / 'files'),
                       'DEMO_MODE': 'false', 'APP_ENV': 'development', 'SESSION_SECRET': 'quotes-only' * 4,
                       'LARK_WORKER_ORGANIZATION': 'quotes', 'LARK_ALLOWED_TENANTS': 'quotes',
-                      'SOP_TASK_WRITES_ENABLED': 'true'})
+                      'SOP_TASK_WRITES_ENABLED': 'true', **config})
     state = upgrade(seed())
     state['environment'] = 'production'
     for p in state['projects']:
@@ -70,7 +69,7 @@ def quotes_http(tmp_path):
         row.data = storage.save(db, BusinessRow, WID, state)
         db.add(AuthRow(id='quotes-session', data={'wid': WID, 'expires': time.time() + 3600}))
         for user in state['users']:
-            granted = CAPS if user['id'] == 'u-manager' else []
+            granted = (caps or {'u-manager': CAPS}).get(user['id'], [])
             db.add(PersonRow(organization_id=WID, person_id=user['id'], data={**deepcopy(user), 'capabilities': granted}))
         version = stage(db, WID, 'plumb-v0.2-1', load_catalog(), source_verified=True)
         publish(db, version, 'u-manager', 100)
@@ -79,8 +78,14 @@ def quotes_http(tmp_path):
     def signin(ident):
         client.cookies.set('meegle_session', app.state.signer.dumps({'mode': 'lark', 'sid': 'quotes-session', 'wid': WID, 'uid': ident}))
     signin('u-manager')
-    yield app, client, signin, {'formal': formal['id'], 'intake': intake['id'], 'twin': twin['id'], 'version': version.id}
-    app.state.engine.dispose()
+    return app, client, signin, {'formal': formal['id'], 'intake': intake['id'], 'twin': twin['id'], 'version': version.id}
+
+
+@pytest.fixture
+def quotes_http(tmp_path):
+    built = harness(tmp_path)
+    yield built
+    built[0].state.engine.dispose()
 
 
 def get(client, path, status=200):
@@ -94,7 +99,7 @@ def test_register_merges_rows_by_quote_number_and_hides_what_the_viewer_cannot_s
     body = get(client, '/api/quotes')
     assert (body['total'], body['offset'], body['limit'], body['amount_restricted']) == (2, 0, 30, False)
     merged, formal = body['items']
-    assert merged == {'origin': 'source', 'quote_no': '115600', 'engineering_no': None, 'name': '雲林布袋戲館',
+    assert merged == {'origin': 'source', 'quote_no': '115600', 'local_reference': None, 'engineering_no': None, 'name': '雲林布袋戲館',
                       'client': '雲林縣政府', 'quoted_on': '2026-10-05', 'quote_deadline': '2026-11-05',
                       'contract_amount': 0.0, 'amount_restricted': False, 'quote_owners': [], 'pm_names': [], 'pm_id': None,
                       'status': None, 'stage_label': None, 'stage': 'returned', 'project_id': min(ids['intake'], ids['twin']),
