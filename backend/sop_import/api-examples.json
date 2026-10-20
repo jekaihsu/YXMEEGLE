@@ -812,7 +812,12 @@
           "archive",
           "set_applicability",
           "edit"
-        ]
+        ],
+        "lark_sync": {
+          "state": "未啟用",
+          "synced_at": null,
+          "record_id": null
+        }
       }
     ],
     "allowed_actions": {
@@ -1023,7 +1028,12 @@
           "edit",
           "accept_suggestion",
           "dismiss_suggestion"
-        ]
+        ],
+        "lark_sync": {
+          "state": "未啟用",
+          "synced_at": null,
+          "record_id": null
+        }
       },
       {
         "id": "9c5006be-76ee-4261-9058-a3f771a5c1b6",
@@ -1135,7 +1145,12 @@
           "edit",
           "accept_suggestion",
           "dismiss_suggestion"
-        ]
+        ],
+        "lark_sync": {
+          "state": "未啟用",
+          "synced_at": null,
+          "record_id": null
+        }
       }
     ],
     "allowed_actions": {
@@ -1261,7 +1276,12 @@
       "allowed_actions": [
         "reopen",
         "archive"
-      ]
+      ],
+      "lark_sync": {
+        "state": "未啟用",
+        "synced_at": null,
+        "record_id": null
+      }
     },
     "checklist_revision": 2
   },
@@ -1381,7 +1401,12 @@
         "archive",
         "set_applicability",
         "edit"
-      ]
+      ],
+      "lark_sync": {
+        "state": "未啟用",
+        "synced_at": null,
+        "record_id": null
+      }
     }
   },
   "accept_suggestions": {
@@ -1504,7 +1529,12 @@
           "allowed_actions": [
             "reopen",
             "archive"
-          ]
+          ],
+          "lark_sync": {
+            "state": "未啟用",
+            "synced_at": null,
+            "record_id": null
+          }
         }
       }
     ]
@@ -3117,7 +3147,12 @@
         "edit",
         "accept_suggestion",
         "dismiss_suggestion"
-      ]
+      ],
+      "lark_sync": {
+        "state": "未啟用",
+        "synced_at": null,
+        "record_id": null
+      }
     }
   },
   "task_transition": {
@@ -3234,7 +3269,12 @@
         "edit",
         "accept_suggestion",
         "dismiss_suggestion"
-      ]
+      ],
+      "lark_sync": {
+        "state": "未啟用",
+        "synced_at": null,
+        "record_id": null
+      }
     }
   },
   "manual_task": {
@@ -3288,7 +3328,12 @@
         "archive",
         "set_applicability",
         "edit"
-      ]
+      ],
+      "lark_sync": {
+        "state": "未啟用",
+        "synced_at": null,
+        "record_id": null
+      }
     }
   },
   "preview_error_node_mapping_invalid": {

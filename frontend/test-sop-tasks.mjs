@@ -158,8 +158,8 @@ test('the section lists the node tasks with executor, state, due and badges', as
  const section = document.querySelector('#sop-tasks');
  assert.equal(section.querySelector('h3').firstChild.textContent, 'SOP 任務');
  assert.deepEqual([...section.querySelectorAll('.pf-task-open strong')].map(s => s.textContent), ['業主提出報價需求', '共用檢核']);
- assert.equal(section.querySelector('[data-sop-task=t1] span').textContent, '未指派 · 待處理 · 期限待確認');
- assert.equal(section.querySelector('[data-sop-task=shared] span').textContent, '林組員 · 待處理 · 期限待確認共用條件');
+ assert.equal(section.querySelector('[data-sop-task=t1] span').textContent, '未指派 · 待處理 · 期限待確認未啟用');
+ assert.equal(section.querySelector('[data-sop-task=shared] span').textContent, '林組員 · 待處理 · 期限待確認未啟用共用條件');
  assert.equal(section.querySelector('.sop-progress').textContent, '0/1');
  await click(button('全案'));
  assert.equal(section.querySelector('[data-sop-task=shared] small').textContent, '報價、PM 派工');
@@ -274,4 +274,22 @@ test('link confirmation shows completion actor, time, state and evidence before 
  await click(button('匯入預設任務'));await click(button('下一步'));await click(button('下一步'));
  for(const value of ['完成人員','王經理','完成時間','已完成','reviewed','abc123','evidence-123'])assert.ok(dialog().textContent.includes(value),value);
  assert.equal(server.apply.length,0);
+});
+
+
+test('sync badge and Lark row link follow the task receipt', async () => {
+ const sync = {state: 'Lark 已變更', synced_at: 1000, record_id: 'recKnown', base_id: 'baseKnown', table_id: 'tblKnown'};
+ await mount({tasks: [task('t1', {lark_sync: sync})], route: {task: 't1', task_source: 'sop_local'}});
+ assert.match(document.querySelector('[data-sop-task=t1]').textContent, /Lark 已變更/);
+ const link = [...document.querySelectorAll('a')].find(a => a.textContent === '開啟 Lark 列');
+ assert.ok(link);
+ assert.equal(link.href, 'https://yong-xiang-survey.jp.larksuite.com/base/baseKnown?table=tblKnown&record=recKnown');
+});
+
+test('unsynced task has a plain badge without a Lark row link', async () => {
+ await mount({tasks: [task('t1', {lark_sync: {state: '同步中', synced_at: null, record_id: null}})], route: {task: 't1', task_source: 'sop_local'}});
+ assert.match(document.querySelector('[data-sop-task=t1]').textContent, /同步中/);
+ assert.ok(![...document.querySelectorAll('a')].some(a => a.textContent === '開啟 Lark 列'));
+ const invalid = overview([task('t1', {lark_sync: {state: 'unknown'}})]);
+ assert.throws(() => ui.parseOverview(invalid), e => e.code === 'malformed');
 });

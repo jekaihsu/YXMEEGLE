@@ -1,3 +1,4 @@
+import {SopLarkSync} from './SopLarkSync';
 import {TaskSuggestion,SuggestionReview} from './SopSuggestions';
 import {createPortal} from 'react-dom';
 import {useState, type ReactNode} from 'react';
@@ -72,7 +73,7 @@ export function SopTaskInspector({task, project, users, sop, onClose}: {task: So
 
  return createPortal(<Sheet title={`SOP 任務 · ${task.title}`} onClose={() => {if (!busy) onClose()}}>
   <div className="sop-inspector">
-   <div className="sop-badges"><Badge tone="accent">SOP 任務</Badge><Badge>{stateLabel(task)}</Badge>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.applicability !== 'applicable' && <Badge tone="warning">{APPLICABILITY_LABEL[task.applicability]}</Badge>}</div>
+   <div className="sop-badges"><Badge tone="accent">SOP 任務</Badge><SopLarkSync task={task} link/><Badge>{stateLabel(task)}</Badge>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.applicability !== 'applicable' && <Badge tone="warning">{APPLICABILITY_LABEL[task.applicability]}</Badge>}</div>
    {error && <p role="alert" className="pg-callout">{error}</p>}
    {notice && <p role="status" className="sop-muted">{notice}</p>}
    <Section>
