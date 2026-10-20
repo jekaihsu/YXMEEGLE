@@ -299,3 +299,46 @@ test('disabled projection hides stale receipt links', async () => {
  await mount({tasks: [task('t1', {lark_sync: {state: '未啟用', record_id: 'recOld', base_id: 'baseOld', table_id: 'tblOld'}})], route: {task: 't1', task_source: 'sop_local'}});
  assert.ok(![...document.querySelectorAll('a')].some(a => a.textContent === '開啟 Lark 列'));
 });
+
+
+test('background projection completion refreshes badge and receipt link', async () => {
+ const originalSet = globalThis.setInterval, originalClear = globalThis.clearInterval;
+ const timers = new Map(); let next = 0;
+ globalThis.setInterval = (fn, delay) => {assert.equal(delay, 10000); timers.set(++next, fn); return next};
+ globalThis.clearInterval = id => timers.delete(id);
+ try {
+  await mount({tasks: [task('t1', {lark_sync: {state: '同步中'}})], route: {task: 't1', task_source: 'sop_local'}});
+  assert.equal(timers.size, 1);
+  server.overview = overview([task('t1', {lark_sync: {state: '已同步', record_id: 'recNew', base_id: 'baseNew', table_id: 'tblNew'}})]);
+  await act(async () => {await [...timers.values()][0](); await tick()});
+  assert.match(document.querySelector('[data-sop-task=t1]').textContent, /已同步/);
+  assert.ok([...document.querySelectorAll('a')].some(a => a.href.includes('record=recNew')));
+  assert.equal(timers.size, 0);
+  assert.ok(button('重新整理'));
+  await click(button('重新整理'));
+ } finally {globalThis.setInterval = originalSet; globalThis.clearInterval = originalClear}
+});
+
+test('projection polling stops after five minutes and on session change or unmount', async () => {
+ const originalSet = globalThis.setInterval, originalClear = globalThis.clearInterval;
+ const timers = new Map(); let next = 0;
+ globalThis.setInterval = (fn, delay) => {assert.equal(delay, 10000); timers.set(++next, fn); return next};
+ globalThis.clearInterval = id => timers.delete(id);
+ try {
+  await mount({tasks: [task('t1', {lark_sync: {state: '同步中'}})]});
+  const poll = [...timers.values()][0]; assert.equal(typeof poll, 'function');
+  for (let i = 0; i < 31; i++) await act(async () => {await poll(); await tick()});
+  assert.equal(calls.filter(c => c.url.endsWith('/sop-tasks')).length, 31);
+  assert.equal(timers.size, 0);
+  await act(async () => root.unmount()); root = null;
+  assert.equal(timers.size, 0);
+  document.body.innerHTML = '<div id="root"></div>';
+  await mount({tasks: [task('t1', {lark_sync: {state: '同步中'}})]});
+  const stale = [...timers.values()][0], before = calls.length;
+  ui.invalidateSessionEpoch();
+  await act(async () => {await stale(); await tick()});
+  assert.equal(calls.length, before);
+  await act(async () => root.unmount()); root = null;
+  assert.equal(timers.size, 0);
+ } finally {globalThis.setInterval = originalSet; globalThis.clearInterval = originalClear}
+});

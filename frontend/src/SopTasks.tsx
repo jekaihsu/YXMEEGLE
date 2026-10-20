@@ -76,6 +76,7 @@ export function SopTasks({c, p, nodeKey, sop, importing, setImporting}: {c: Ctx;
   <header>
    <h3>SOP 任務{counts && <span className="sop-progress" aria-label={`完成 ${progressLabel(counts)}`}>{progressLabel(counts)}</span>}{counts && checklistComplete(counts) && <Badge tone="positive">檢查清單已完成</Badge>}</h3>
    <div className="pf-actions">
+    <Button onClick={() => {void sop.reload()}} disabled={state.kind === 'loading' || state.kind === 'ready' && state.refreshing}>重新整理</Button>
     {allowed && <FlowAction allowed={allowed.import} reason="需 SOP 匯入權限" onClick={() => setImporting('case')}>匯入預設任務</FlowAction>}
     {allowed && <FlowAction allowed={allowed.manage} reason="需 SOP 任務管理權限" onClick={() => setCreating(true)}>新增任務</FlowAction>}
    {data && suggestionSelection(data.tasks).length>0 && <Button onClick={()=>setReview([])}>採用全部建議</Button>}</div>
