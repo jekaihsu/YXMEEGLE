@@ -1,4 +1,3 @@
-"""Feature-owned persistence. Canonical case and node membership is checked in transactions."""
 from sqlalchemy import Column, String, Integer, JSON, Float, Boolean, UniqueConstraint, ForeignKeyConstraint, Enum
 from ..models import Base
 from .domain import Disposition, Applicability, Lifecycle

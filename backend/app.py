@@ -126,6 +126,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         database_path=make_url(db_url).database
         if database_path and database_path!=':memory:': Path(database_path).resolve().parent.mkdir(parents=True,exist_ok=True)
     engine=create_engine(db_url,connect_args={'check_same_thread':False,'timeout':20} if db_url.startswith('sqlite') else {},pool_pre_ping=True)
+    from .sop_import import models as sop_import_models
     Base.metadata.create_all(engine); sessions=sessionmaker(engine,expire_on_commit=False,info={'index_tables':str(cfg.get('INDEX_TABLES_ENABLED','false')).lower()=='true'})
     # Migration is reversible: preserve the original JSON before normalizing.
     from .workspace_migration import migrate_workspaces
@@ -1495,6 +1496,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
         project=next((p for p in state['projects'] if p['id']==project_id and visible_project(state,p)),None)
         require(project is not None,'找不到這個案件',404)
         return state,project
+    from .sop_import.routes import register as register_sop_import
+    app.state.sop_import = register_sop_import(app, identity=identity, load_case=node_assignment_case,
+        sessions=sessions, cfg=cfg)
     from .node_assignment.routes import register as register_node_assignment
     from .node_skip import valid_waiver
     def node_reports():

@@ -1,4 +1,3 @@
-"""Controlled publication. Run with python3 -m backend.sop_import --help."""
 import argparse
 import hashlib
 import json

@@ -1,4 +1,3 @@
-"""Local checklist vocabulary and lifecycle policy."""
 from enum import Enum
 
 

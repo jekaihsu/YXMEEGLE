@@ -1,0 +1,364 @@
+from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
+from types import SimpleNamespace
+
+import httpx
+import pytest
+from fastapi import FastAPI, HTTPException
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, select, event
+from sqlalchemy.orm import sessionmaker
+
+from .models import Base, BusinessRow, WorkspaceRow
+from .sop_import.catalog import load_catalog, stage, publish
+from .sop_import.domain import NODE_MAP
+from .sop_import.models import LocalTask, TaskNodeLink, ImportRun, TaskEvent, Preview, CaseState, Version
+from .sop_import.routes import register
+from .source_case_policy import visible_project
+
+URL = '/api/projects/p1'
+CAPS = ['sop_task_read', 'sop_task_import', 'sop_task_work', 'sop_task_read_source', 'sop_template_publish']
+
+
+@pytest.fixture
+def h(tmp_path, monkeypatch):
+    engine = create_engine(f'sqlite:///{tmp_path}/sop.db', connect_args={'check_same_thread': False, 'timeout': 20})
+
+    @event.listens_for(engine, 'connect')
+    def foreign_keys(connection, record):
+        connection.execute('PRAGMA foreign_keys=ON')
+
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(engine, expire_on_commit=False)
+    users = {'pm': {'id': 'pm', 'role': 'pm', 'active': True, 'capabilities': CAPS[:]},
+             'other': {'id': 'other', 'role': 'pm', 'active': True, 'capabilities': CAPS[:]},
+             'member': {'id': 'member', 'role': 'member', 'active': True, 'capabilities': ['sop_task_work', 'sop_task_read']},
+             'manager': {'id': 'manager', 'role': 'manager', 'active': True, 'capabilities': []}}
+    with sessions.begin() as db:
+        for wid in ('w', 'other-w'):
+            db.add(WorkspaceRow(id=wid, version=1, data={}))
+        db.flush()
+        for pid in ('p1', 'p2'):
+            db.add(BusinessRow(workspace_id='w', kind='projects', entity_id=pid, parent_id='', ordinal=0,
+                               data={'id': pid, 'pm_id': 'pm', 'collaborator_ids': ['member'], 'case_visibility': 'source_reference'}))
+            for i, key in enumerate(NODE_MAP.values()):
+                db.add(BusinessRow(workspace_id='w', kind='nodes', entity_id=f'real-{pid}-{i}', parent_id=pid,
+                                   ordinal=8-i, data={'id': f'real-{pid}-{i}', 'key': key, 'title': 'unreliable', 'tasks': []}))
+        v = stage(db, 'w', 'r1', load_catalog(), source_verified=True)
+        publish(db, v, 'publisher', 100)
+        vid = v.id
+    who, wid, hidden = ['pm'], ['w'], set()
+    cfg = {'SOP_TASK_WRITES_ENABLED': 'true'}
+
+    def identity(request):
+        if who[0] == 'expired':
+            raise HTTPException(401)
+        return {'wid': wid[0], 'mode': 'lark'}, users[who[0]]
+
+    def load_case(data, user, project_id):
+        with sessions() as db:
+            row = db.get(BusinessRow, (data['wid'], 'projects', project_id))
+            state = {'users': list(users.values()), 'source_case_policy_revision': 'all-authorized-lark-cases-20260930'}
+            if row is None or project_id in hidden or not visible_project(state, row.data):
+                raise HTTPException(404)
+            return state, deepcopy(row.data)
+
+    app = FastAPI()
+    service = register(app, identity=identity, load_case=load_case, sessions=sessions, cfg=cfg)
+    service.clock = lambda: 1000
+    writes = []
+
+    def no_outbound(*args, **kwargs):
+        writes.append(1)
+        raise AssertionError('outbound network is forbidden')
+    monkeypatch.setattr(httpx.HTTPTransport, 'handle_request', no_outbound)
+    with TestClient(app) as client:
+        yield SimpleNamespace(client=client, sessions=sessions, engine=engine, vid=vid, who=who, wid=wid,
+                              users=users, hidden=hidden, cfg=cfg, service=service, writes=writes)
+    assert writes == []
+    engine.dispose()
+
+
+def post(h, path, body, status=200):
+    response = h.client.post(path, json=body)
+    assert response.status_code == status, response.text
+    return response.json()
+
+
+def preview(h, *, url=URL, **extra):
+    return post(h, url + '/sop-import/preview', {'template_version_id': h.vid, **extra})
+
+
+def apply(h, plan=None, rid='r1', *, url=URL, status=200):
+    plan = plan or preview(h, url=url)
+    return post(h, url + '/sop-import/apply', {'preview_id': plan['preview_id'], 'request_id': rid}, status)
+
+
+def overview(h, url=URL, query=''):
+    response = h.client.get(url + '/sop-tasks' + query)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def change(h, task, body, status=200):
+    response = h.client.patch(URL + '/sop-tasks/' + task['id'], json={'expected_revision': task['revision'], **body})
+    assert response.status_code == status, response.text
+    return response.json()
+
+
+def test_at02_at03_node_ids_are_persisted_keys_not_order_or_title(h):
+    plan = preview(h, node_keys=['confirmation'])
+    assert plan['nodes'] == [{'node_key': 'confirmation', 'node_id': 'real-p1-2'}]
+    assert [o['source_row_key'] for o in plan['outcomes']] == [f'meegle-v137:A:{i}' for i in (19, 59, 60, 61, 22)] + [
+        'meegle-v137:A:27', 'meegle-v137:A:57', 'meegle-v137:A:28', 'meegle-v137:A:58']
+    receipt = apply(h, plan)
+    assert len(receipt['created_task_ids']) == 5
+    assert overview(h)['counts'] == {'done': 0, 'total': 4, 'unresolved': 1, 'not_applicable': 0, 'archived': 0}
+    with h.sessions.begin() as db:
+        db.delete(db.get(BusinessRow, ('w', 'nodes', 'real-p1-2')))
+    assert post(h, URL + '/sop-import/preview', {'template_version_id': h.vid, 'node_keys': ['confirmation']}, 422)['code'] == 'node_mapping_invalid'
+
+
+def test_at04_at05_case_isolation_repeat_preserves_local_edits_and_template(h):
+    first = apply(h)
+    apply(h, rid='case-b', url='/api/projects/p2')
+    before = overview(h)
+    task = before['tasks'][0]
+    change(h, task, {'title': 'Local title', 'instructions': 'Local procedure'})
+    repeat = apply(h, rid='r2')
+    assert repeat['created_task_ids'] == [] and repeat['added_links'] == []
+    assert set(repeat['existing_task_ids']) == set(first['created_task_ids'])
+    assert overview(h)['tasks'][0]['title'] == 'Local title'
+    assert overview(h, '/api/projects/p2')['tasks'][0]['title'] == task['title']
+    catalog = h.client.get('/api/sop-templates/' + h.vid).json()
+    assert catalog['rows'][1]['raw']['title'] == task['title']
+    assert len(first['created_task_ids']) == 38
+    assert len(first['added_links']) == 42
+    assert before['checklist_revision'] == 1
+    assert overview(h)['checklist_revision'] == 2
+
+
+def test_at06_concurrent_replay_and_stale_selection_converge(h):
+    plan = preview(h)
+    body = {'preview_id': plan['preview_id'], 'request_id': 'parallel'}
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        responses = list(executor.map(lambda _: h.client.post(URL + '/sop-import/apply', json=body), range(4)))
+    assert [r.status_code for r in responses] == [200] * 4
+    assert sum(not r.json()['replayed'] for r in responses) == 1
+    assert len({tuple(r.json()['created_task_ids']) for r in responses}) == 1
+    stale = plan
+    assert apply(h, stale, 'different', status=409)['code'] == 'preview_stale'
+    assert apply(h, rid='refreshed')['created_task_ids'] == []
+    assert len(overview(h)['tasks']) == 38
+    with h.sessions() as db:
+        assert len(list(db.scalars(select(LocalTask)))) == 38
+        assert len(list(db.scalars(select(TaskNodeLink)))) == 42
+        assert len(list(db.scalars(select(ImportRun)))) == 2
+
+
+def test_at07_at08_new_revision_only_adds_missing_origins_and_renames_do_not_merge(h):
+    apply(h, preview(h, row_keys=['meegle-v137:A:1']))
+    original = overview(h)['tasks'][0]
+    change(h, original, {'title': 'Keep local'})
+    catalog = deepcopy(load_catalog())
+    catalog['case_sop_rows'][1]['raw']['title'] = 'New template title'
+    with h.sessions.begin() as db:
+        v = stage(db, 'w', 'r2', catalog, source_verified=True)
+        publish(db, v, 'publisher', 1001)
+        h.vid = v.id
+    result = apply(h, rid='new-revision')
+    assert len(result['created_task_ids']) == 37
+    assert result['existing_task_ids'] == [original['id']]
+    task = next(t for t in overview(h)['tasks'] if t['id'] == original['id'])
+    assert task['title'] == 'Keep local'
+    assert task['origin']['imported_version_id'] != h.vid
+    assert task['source_snapshot']['row']['raw']['title'] == '業主提出報價需求'
+
+
+def test_at09_at10_shared_reload_and_link_addition_preserve_state(h):
+    first = apply(h, preview(h, node_keys=['control']))
+    assert len(first['created_task_ids']) == 3
+    shared = next(t for t in overview(h)['tasks'] if t['origin']['source_row_key'] == 'meegle-v137:A:36')
+    post(h, URL + f"/sop-tasks/{shared['id']}/transition", {'expected_revision': 1, 'action': 'start'})
+    plan = preview(h, node_keys=['mapping'])
+    assert sum(o['outcome'] == 'link_addition' for o in plan['outcomes']) == 2
+    result = apply(h, plan, 'mapping')
+    assert len(result['created_task_ids']) == 1
+    assert len(result['existing_task_ids']) == 2
+    task = next(t for t in overview(h)['tasks'] if t['id'] == shared['id'])
+    assert task['state'] == 'in_progress' and task['revision'] == 2
+    assert {n['node_key'] for n in task['nodes']} == {'control', 'mapping'}
+    assert len(overview(h)['tasks']) == 4
+    assert len(overview(h, query='?node_key=mapping')['tasks']) == 3
+    with h.sessions.begin() as db:
+        node = db.get(BusinessRow, ('w', 'nodes', 'real-p1-4'))
+        node.data = {**node.data, 'title': 'Refreshed', 'tasks': []}
+    assert len(overview(h)['tasks']) == 4
+
+
+def test_at11_at12_applicability_and_exclusions(h):
+    plan = preview(h)
+    assert len([o for o in plan['outcomes'] if o['disposition'] == 'routing_reference']) == 13
+    assert next(o for o in plan['outcomes'] if o['source_row_key'].endswith(':42'))['selected'] is False
+    assert len([o for o in plan['outcomes'] if o['selected']]) == 38
+    for number in (7, 20, 49, 54, 55, 56, 27, 57, 28, 58, 42):
+        assert not next(o for o in plan['outcomes'] if o['source_row_key'].endswith(f':{number}'))['selected']
+    for number in (0, 27, 28, 42):
+        post(h, URL + '/sop-import/preview', {'template_version_id': h.vid,
+                                           'row_keys': [f'meegle-v137:A:{number}']}, 422)
+    apply(h, plan)
+    task = next(t for t in overview(h)['tasks'] if t['origin']['source_row_key'].endswith(':22'))
+    assert task['applicability'] == 'unresolved'
+    path = URL + f"/sop-tasks/{task['id']}/transition"
+    assert post(h, path, {'expected_revision': 1, 'action': 'complete'}, 422)['code'] == 'applicability_unresolved'
+    post(h, path, {'expected_revision': 1, 'action': 'set_applicability', 'applicability': 'not_applicable', 'reason': 'No correction'})
+    post(h, path, {'expected_revision': 2, 'action': 'set_applicability', 'applicability': 'applicable', 'reason': 'New scope'})
+    assert post(h, path, {'expected_revision': 3, 'action': 'complete'}, 422)['code'] == 'completion_evidence_missing'
+    assert overview(h)['counts']['done'] == 0
+    selected = preview(h, row_keys=['meegle-v137:A:7'], applicability_decisions={
+        'meegle-v137:A:7': {'value': 'applicable', 'reason': 'Confirmed subcontract'}})
+    assert apply(h, selected, 'subcontract')['created_task_ids']
+
+
+def test_at13_participants_are_explicit_active_and_authorized(h):
+    apply(h, preview(h, node_keys=['confirmation']))
+    assert all(t['participants'] == {} for t in overview(h)['tasks'])
+    request = {'template_version_id': h.vid, 'row_keys': ['meegle-v137:A:1'],
+               'participant_bindings': {'meegle-v137:A:1': {'executor': 'other'}}}
+    assert post(h, URL + '/sop-import/preview', request, 422)['code'] == 'participant_unresolved'
+    request['participant_bindings']['meegle-v137:A:1']['executor'] = 'member'
+    plan = post(h, URL + '/sop-import/preview', request)
+    apply(h, plan, 'bound')
+    assert next(t for t in overview(h)['tasks'] if t['origin']['source_row_key'].endswith(':1'))['participants'] == {'executor': 'member'}
+    h.users['member']['active'] = False
+    post(h, URL + '/sop-import/preview', request, 422)
+
+
+def test_at20_permissions_workspace_hidden_revoked_replay_and_publish(h):
+    plan = preview(h)
+    apply(h, plan)
+    h.who[0] = 'manager'
+    assert h.client.get(URL + '/sop-tasks').status_code == 403
+    h.who[0] = 'other'
+    post(h, URL + '/sop-import/preview', {'template_version_id': h.vid}, 403)
+    h.who[0] = 'pm'
+    h.hidden.add('p1')
+    assert h.client.get(URL + '/sop-tasks').status_code == 404
+    assert apply(h, plan, status=404)['code'] == 'case_not_found'
+    h.hidden.clear()
+    h.users['pm']['capabilities'].remove('sop_task_import')
+    assert apply(h, plan, status=403)['code'] == 'sop_import_forbidden'
+    h.wid[0] = 'other-w'
+    assert h.client.get(URL + '/sop-tasks').status_code == 404
+    h.wid[0] = 'w'
+    h.who[0] = 'expired'
+    assert h.client.get(URL + '/sop-tasks').json()['code'] == 'session_expired'
+    h.who[0] = 'pm'
+    h.users['pm']['capabilities'] = ['sop_task_read', 'publish_sop']
+    assert h.client.post('/api/sop-templates/' + h.vid + '/publish').status_code == 403
+
+
+def test_at22_at23_replay_before_expiry_or_live_revision_and_mismatch(h):
+    plan = preview(h)
+    first = apply(h, plan)
+    h.service.clock = lambda: 99999
+    replay = apply(h, plan)
+    assert replay == {**first, 'replayed': True}
+    assert h.client.get(URL + '/sop-import/runs/r1').json() == first
+    newer = preview(h)
+    assert apply(h, newer, status=409)['code'] == 'idempotency_mismatch'
+    h.cfg['SOP_TASK_WRITES_ENABLED'] = 'false'
+    assert apply(h, plan)['replayed'] is True
+    assert h.client.get(URL + '/sop-import/runs/r1').status_code == 200
+    assert h.client.get(URL + '/sop-tasks').status_code == 200
+    post(h, URL + '/sop-import/preview', {'template_version_id': h.vid}, 503)
+
+
+def test_at22_rollback_has_no_tasks_links_events_or_success_receipt(h, monkeypatch):
+    plan = preview(h)
+    original = h.service.event
+
+    def fail(*args):
+        raise RuntimeError('injected failure')
+    monkeypatch.setattr(h.service, 'event', fail)
+    with pytest.raises(RuntimeError, match='injected failure'):
+        apply(h, plan)
+    with h.sessions() as db:
+        for model in (LocalTask, TaskNodeLink, TaskEvent, ImportRun):
+            assert list(db.scalars(select(model))) == []
+        assert db.get(CaseState, ('w', 'p1')).checklist_revision == 0
+    monkeypatch.setattr(h.service, 'event', original)
+    assert len(apply(h, plan)['created_task_ids']) == 38
+
+
+def test_at24_stale_edit_never_overwrites(h):
+    apply(h)
+    task = overview(h)['tasks'][0]
+    change(h, task, {'title': 'First'})
+    assert change(h, task, {'title': 'Stale'}, 409)['code'] == 'task_revision_conflict'
+    assert overview(h)['tasks'][0]['title'] == 'First'
+    assert change(h, {**task, 'revision': 2}, {'due_date': '2026-10-30', 'reason': 'PM agreed'})['revision'] == 3
+    assert overview(h)['tasks'][0]['local']['date_status'] == 'manual'
+
+
+def test_at28_manual_lifecycle_counts_are_two_of_four(h):
+    for i in range(4):
+        task = post(h, URL + '/sop-tasks', {'title': f'Manual {i}', 'node_keys': ['sales', 'pm']})
+        path = URL + f"/sop-tasks/{task['task_id']}/transition"
+        if i < 2:
+            post(h, path, {'expected_revision': 1, 'action': 'complete'})
+        elif i == 2:
+            post(h, path, {'expected_revision': 1, 'action': 'block', 'reason': 'Waiting'})
+    body = overview(h)
+    assert body['counts'] == {'done': 2, 'total': 4, 'unresolved': 0, 'not_applicable': 0, 'archived': 0}
+    assert body['node_counts']['sales'] == body['node_counts']['pm'] == body['counts']
+    done = next(t for t in body['tasks'] if t['state'] == 'done')
+    path = URL + f"/sop-tasks/{done['id']}/transition"
+    post(h, path, {'expected_revision': 2, 'action': 'reopen', 'reason': 'More work'})
+    post(h, path, {'expected_revision': 3, 'action': 'archive', 'reason': 'Removed'})
+    post(h, path, {'expected_revision': 4, 'action': 'restore', 'reason': 'Restored'})
+    assert overview(h)['counts']['done'] == 1
+
+
+def test_at17_at21_local_only_and_restricted_source(h):
+    apply(h)
+    h.users['pm']['capabilities'].remove('sop_task_read_source')
+    body = overview(h)
+    assert all(t['source_snapshot'] is None and t['instructions'] is None for t in body['tasks'])
+    assert h.client.get('/api/sop-templates/' + h.vid).status_code == 403
+    assert h.writes == []
+    with h.sessions() as db:
+        assert all(r.data['tasks'] == [] for r in db.scalars(select(BusinessRow).where(BusinessRow.kind == 'nodes')))
+
+
+def test_case_and_node_previews_converge_after_concurrent_staleness(h):
+    whole, node = preview(h), preview(h, node_keys=['mapping'])
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(lambda item: h.client.post(URL + '/sop-import/apply', json={
+            'preview_id': item[0]['preview_id'], 'request_id': item[1]}), [(whole, 'whole'), (node, 'node')]))
+    assert sorted(r.status_code for r in responses) == [200, 409]
+    retry = apply(h, rid='fresh')
+    assert len(overview(h)['tasks']) == 38
+    assert len({(t['origin']['source_row_key'], t['origin']['instance_scope']) for t in overview(h)['tasks']}) == 38
+    assert len(retry['existing_task_ids']) >= 3
+
+
+def test_expired_actor_bound_preview_and_changed_mapping(h):
+    plan = preview(h)
+    h.who[0] = 'other'
+    h.users['other']['role'] = 'manager'
+    assert apply(h, plan, status=404)['code'] == 'preview_not_found'
+    h.who[0] = 'pm'
+    h.service.clock = lambda: 1900
+    assert apply(h, plan, status=409)['code'] == 'preview_stale'
+    plan = preview(h)
+    with h.sessions.begin() as db:
+        n = db.get(BusinessRow, ('w', 'nodes', 'real-p1-4'))
+        n.data = {**n.data, 'key': 'mapping'}
+    assert apply(h, plan, status=422)['code'] == 'node_mapping_invalid'
+
+
+def test_capabilities_are_registered_without_automatic_manager_grants():
+    from .policy import CAPABILITIES, MANAGER_CAPABILITIES
+    assert set(CAPS) <= set(CAPABILITIES)
+    assert not set(CAPS) & set(MANAGER_CAPABILITIES)

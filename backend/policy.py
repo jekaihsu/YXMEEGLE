@@ -6,6 +6,7 @@ TECHNICAL = {'field', 'control', 'mapping', 'report'}
 FINANCIAL = {'pricing', 'settlement'}
 CAPABILITIES = ['manage_people','publish_sop','edit_sop','manage_sources','finance_approve','finance_edit','calendar_edit','issue_confirmation','review_mapping','manage_handover','manage_training','approve_capability']
 MANAGER_CAPABILITIES = [cap for cap in CAPABILITIES if cap != 'approve_capability']
+CAPABILITIES += ['sop_task_read', 'sop_task_read_source', 'sop_task_import', 'sop_task_work', 'sop_template_publish']
 REQUIREMENTS = {
  'sales': [('demand','業主需求日期與佐證'),('quote','報價單、提出日期及通知紀錄'),('signed','回簽報價單或合約')],
  'pm': [('assignment','各組負責人與核定排程')],

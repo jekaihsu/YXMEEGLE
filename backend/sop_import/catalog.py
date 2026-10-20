@@ -1,4 +1,3 @@
-"""Validate inert catalog data and publish content-addressed revisions."""
 import hashlib
 import json
 from collections import Counter
@@ -88,7 +87,6 @@ def publish(db, version, actor_id, at):
     require(version.status in {'draft', 'published'}, 'template_unavailable', 409)
     if version.status == 'published':
         return version
-    # Hash persisted rows, so publication cannot rely on the caller's claimed digest.
     rows = list(db.scalars(select(TemplateRow).where(TemplateRow.workspace_id == version.workspace_id,
                                                    TemplateRow.version_id == version.id).order_by(TemplateRow.ordinal)))
     catalog = load_catalog()
