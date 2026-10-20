@@ -159,3 +159,11 @@ def test_production_grant_is_visible_in_session_and_admin_form(tmp_path):
             assert db.get(PersonRow,(WID,'u-pm')).data['capabilities']==caps
     finally:
         app.state.engine.dispose()
+
+
+def test_unknown_settings_key_is_validation_error(admin):
+    _,c=admin
+    ws=c.get('/api/workspace').json()
+    response=c.post('/api/actions',json=command(ws,'admin_settings',{'unknown_setting':True}))
+    assert response.status_code==422,response.text
+    assert response.json()['detail']=='未知設定'

@@ -26,5 +26,6 @@ def check(state,action,payload,expected):
         target=next((u for u in state['users'] if u['id']==str(payload.get('id','')).strip()),None)
         valid=set(expected)=={'person'} and expected['person']==person_revision(target)
     else:
+        require(set(payload)<=set(state['settings']),'未知設定',422)
         valid=set(expected)==set(payload) and all(key in state['settings'] and expected[key]==revision(state['settings'][key]) for key in payload)
     require(valid,'此人員或設定已被更新，請核對最新內容後再儲存',409)
