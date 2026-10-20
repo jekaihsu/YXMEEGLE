@@ -27,7 +27,7 @@ Grant capabilities explicitly through the existing capability administration sys
 
 - `sop_task_read` permits local checklist reads.
 - `sop_task_read_source` permits full source procedures and snapshots. Without it, task `instructions` and `source_snapshot` are null with a restriction reason. Manual instructions remain readable.
-- `sop_task_import` permits import and management for the case PM, a manager, or a user named in the case's `sop_task_delegate_ids`.
+- `sop_task_import` permits import and management for the case PM, a manager, or a user named in the case's `sop_task_delegate_ids`. For an intake case without a PM, the explicit grant and current case visibility permit local planning.
 - `sop_task_work` permits an explicitly assigned executor to transition their task. It does not permit import, applicability decisions, or archive.
 - `sop_template_publish` permits publication and does not inherit `publish_sop`.
 

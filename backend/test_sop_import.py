@@ -426,7 +426,7 @@ def intake(h):
     case = state['projects'][0]
     assert case['case_type'] == 'intake'
     assert case['intake_status'] == 'awaiting_confirmation'
-    case.update(pm_id='pm', case_visibility='source_reference', execution_system='pending')
+    case.update(case_visibility='source_reference', execution_system='pending')
     with h.sessions.begin() as db:
         workspace = db.get(WorkspaceRow, 'w')
         workspace.data = storage.save(db, BusinessRow, 'w', state)
@@ -450,6 +450,7 @@ def test_intake_defaults_start_at_sales_and_include_all_nine_nodes(intake):
     assert {t['state'] for t in tasks['tasks']} == {'pending'}
     assert {n['node_key'] for t in tasks['tasks'] for n in t['nodes']} == set(NODE_MAP.values())
     assert case['case_type'] == 'intake' and case['execution_system'] == 'pending'
+    assert case['pm_id'] == ''
 
 
 def test_intake_sales_scoped_import_needs_no_case_number_or_confirmation(intake):
@@ -525,3 +526,14 @@ def test_start_node_uses_verified_engineering_lifecycle(intake, canonical, expec
         row = db.get(BusinessRow, ('w', 'projects', case['id']))
         row.data = {**row.data, 'source_lifecycle': {'state': 'needs_verification', 'canonical': canonical, 'reasons': ['conflict']}}
     assert overview(h, url)['start_node'] == 'sales'
+
+
+def test_unassigned_intake_requires_visibility_and_explicit_local_task_grant(intake):
+    h, url, case = intake
+    assert case['pm_id'] == ''
+    h.who[0] = 'member'
+    post(h, url + '/sop-import/preview', {'template_version_id': h.vid}, 403)
+    h.who[0] = 'other'
+    assert preview(h, url=url)['start_node'] == 'sales'
+    h.hidden.add(case['id'])
+    assert h.client.get(url + '/sop-tasks').status_code == 404

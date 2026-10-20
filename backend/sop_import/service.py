@@ -31,7 +31,8 @@ def explicitly_granted(user, capability):
 
 def can_manage(ctx):
     return explicitly_granted(ctx.user, 'sop_task_import') and (
-        ctx.user.get('role') == 'manager' or ctx.user['id'] == ctx.project.get('pm_id')
+        ctx.project.get('case_type') == 'intake' or ctx.user.get('role') == 'manager'
+        or ctx.user['id'] == ctx.project.get('pm_id')
         or ctx.user['id'] in ctx.project.get('sop_task_delegate_ids', []))
 
 

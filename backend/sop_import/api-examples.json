@@ -1,19 +1,19 @@
 {
   "preview": {
-    "preview_id": "26064dd1-76b8-4766-8cef-67ee301078c7",
+    "preview_id": "d6ced379-6deb-4a51-a0d6-b8feb0d7e9d9",
     "expires_at": 1900,
-    "project_id": "697f98488cf7408d9557494373f35abc",
+    "project_id": "209ccc072f0d41faa9c97bec9efdc131",
     "start_node": "sales",
     "identity_revision": 0,
     "checklist_revision": 0,
     "nodes": [
       {
         "node_key": "sales",
-        "node_id": "697f98488cf7408d9557494373f35abc-sales"
+        "node_id": "209ccc072f0d41faa9c97bec9efdc131-sales"
       }
     ],
     "template": {
-      "version_id": "d365e1c4-17c8-4856-ba4d-f31d918a8fe4",
+      "version_id": "494b6410-2d83-4013-90aa-aa737f1c3e54",
       "template_family_id": "plumb-case-sop",
       "revision": "r1",
       "mapping_revision": "yx-company-node-mapping-1",
@@ -48,7 +48,7 @@
           {
             "task_id": null,
             "node_key": "sales",
-            "node_id": "697f98488cf7408d9557494373f35abc-sales"
+            "node_id": "209ccc072f0d41faa9c97bec9efdc131-sales"
           }
         ],
         "reason_code": "new",
@@ -307,7 +307,7 @@
         "exclusion_reason": null
       }
     ],
-    "context_hash": "13883584e87c83e3dee1bfe3445f2ebabea9cfb86377d027dc220dd4e108b328",
+    "context_hash": "3b3e8e91e86d709f55fc02356488c246428bbde7daf81bea94dc0b7f9d3e2325",
     "unresolved_items": [
       {
         "source_row_key": "meegle-v137:A:1",
@@ -328,7 +328,7 @@
       "added_links": 1
     },
     "selection": {
-      "template_version_id": "d365e1c4-17c8-4856-ba4d-f31d918a8fe4",
+      "template_version_id": "494b6410-2d83-4013-90aa-aa737f1c3e54",
       "node_keys": [
         "sales"
       ],
@@ -341,21 +341,21 @@
     }
   },
   "apply": {
-    "run_id": "08ed2cdd-3364-4d30-b3fb-c0e56d2668a8",
+    "run_id": "98b5d42a-05c8-466b-b562-ac83bd30d8ca",
     "request_id": "r1",
-    "project_id": "697f98488cf7408d9557494373f35abc",
-    "template_version_id": "d365e1c4-17c8-4856-ba4d-f31d918a8fe4",
+    "project_id": "209ccc072f0d41faa9c97bec9efdc131",
+    "template_version_id": "494b6410-2d83-4013-90aa-aa737f1c3e54",
     "start_node": "sales",
     "replayed": false,
     "created_task_ids": [
-      "d4301c58-1961-41c7-b802-5405714b882c"
+      "86b54c26-92b8-454f-8209-dd666de8f1aa"
     ],
     "existing_task_ids": [],
     "added_links": [
       {
-        "task_id": "d4301c58-1961-41c7-b802-5405714b882c",
+        "task_id": "86b54c26-92b8-454f-8209-dd666de8f1aa",
         "node_key": "sales",
-        "node_id": "697f98488cf7408d9557494373f35abc-sales"
+        "node_id": "209ccc072f0d41faa9c97bec9efdc131-sales"
       }
     ],
     "exclusions": [
@@ -643,7 +643,7 @@
     "checklist_revision": 1
   },
   "sop_tasks": {
-    "project_id": "697f98488cf7408d9557494373f35abc",
+    "project_id": "209ccc072f0d41faa9c97bec9efdc131",
     "task_source": "sop_local",
     "start_node": "sales",
     "checklist_revision": 1,
@@ -732,14 +732,14 @@
     },
     "tasks": [
       {
-        "id": "d4301c58-1961-41c7-b802-5405714b882c",
+        "id": "86b54c26-92b8-454f-8209-dd666de8f1aa",
         "task_source": "sop_local",
-        "project_id": "697f98488cf7408d9557494373f35abc",
+        "project_id": "209ccc072f0d41faa9c97bec9efdc131",
         "origin": {
           "template_family_id": "plumb-case-sop",
           "source_row_key": "meegle-v137:A:1",
           "instance_scope": "case",
-          "imported_version_id": "d365e1c4-17c8-4856-ba4d-f31d918a8fe4"
+          "imported_version_id": "494b6410-2d83-4013-90aa-aa737f1c3e54"
         },
         "title": "業主提出報價需求",
         "instructions": "結構化需求：工項類型、數量（面積／點數／公里）、行政區、時程、特殊進場條件 → 需求卡；抽不出的欄位反問業務，不猜；需求佐證文件存案件資料夾",
@@ -759,7 +759,7 @@
         "nodes": [
           {
             "node_key": "sales",
-            "node_id": "697f98488cf7408d9557494373f35abc-sales",
+            "node_id": "209ccc072f0d41faa9c97bec9efdc131-sales",
             "order": 1
           }
         ],
@@ -805,7 +805,7 @@
             }
           },
           "template": {
-            "version_id": "d365e1c4-17c8-4856-ba4d-f31d918a8fe4",
+            "version_id": "494b6410-2d83-4013-90aa-aa737f1c3e54",
             "template_family_id": "plumb-case-sop",
             "revision": "r1",
             "mapping_revision": "yx-company-node-mapping-1",
