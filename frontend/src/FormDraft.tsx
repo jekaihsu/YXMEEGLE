@@ -54,7 +54,12 @@ function ScopedDraftForm({title,draftId,onSubmit,children,busy,concurrency,stora
   const changed=Object.keys(fresh).filter(name=>draft.initial&&!same(fresh[name],draft.initial[name]));
   apply(ref.current,edits);
   persist({value:snapshot(ref.current),initial:fresh,concurrency:baseline.current,at:Date.now()});
-  setNotice(changed.length?`已更新：${changed.join('、')}`:'已套用，請核對後儲存。');
+  const controls=fields(ref.current);
+  const titles=changed.map(name=>{
+   const element=controls.find(field=>field.name===name);const label=element?.closest('label');
+   return element?.closest('fieldset')?.querySelector('legend')?.textContent||label?.firstChild?.textContent||label?.textContent||name;
+  });
+  setNotice(titles.length?`已更新：${titles.join('、')}`:'已套用，請核對後儲存。');
  },[fieldTick]);
  const capture=()=>{if(ref.current)persist({value:snapshot(ref.current),initial:initial.current,at:Date.now(),concurrency:baseline.current})};
  const restore=()=>{
