@@ -116,3 +116,7 @@ Git hooks 是本機保護，不會隨 clone 自動啟用，也可被 `git push -
 正式服務設定 `APP_ENV=production`、`DEMO_MODE=false`、PostgreSQL `DATABASE_URL`、至少 32 字元 `SESSION_SECRET` 及 HTTPS `PUBLIC_ORIGIN`。需公開雲端示範時，明確設定 `DEMO_MODE=true` 且 `ALLOW_CLOUD_DEMO=true`；仍使用 PostgreSQL，示範身分無法存取真實來源。建議 preview 與正式服務分開資料庫、volume 及密鑰。
 
 未設定 OAuth 時，正式服務不會自動切回示範角色。其他環境部署取得網域後，依 [部署文件](docs/DEPLOYMENT.md)完成各自回呼設定及驗收；不能直接沿用此 preview 的回呼設定。
+
+Local intake creators with `sop_task_import` retain management authority while no PM is assigned. Once a PM is assigned, management requires being that PM, a manager, or an explicit SOP delegate.
+
+The `quote_number_taken` response checks all source numbers, including numbers outside the actor's register. This existence disclosure is an accepted trade-off to prevent duplicate official numbers.
