@@ -167,6 +167,7 @@ class Projection:
         self._stop = threading.Event()
         self._wake = threading.Event()
         self._thread = None
+        self._case_retry = {}
 
     def state(self, wid):
         return self.load_state(wid)
@@ -174,8 +175,8 @@ class Projection:
     def allowed(self, wid):
         return gates(self.cfg, wid, self.state(wid))
 
-    def before_write(self, wid, pid):
-        state = self.state(wid)
+    def before_write(self, wid, pid, state=None):
+        state = self.state(wid) if state is None else state
         project = next((p for p in state.get('projects', []) if p['id'] == pid), None)
         if not gates(self.cfg, wid, state) or project is None or excluded(project):
             raise Failure('writes_disabled', 'SOP 投影未啟用')
@@ -225,26 +226,34 @@ class Projection:
                 if project_id:
                     query = query.where(LarkOutbox.project_id == project_id)
                 cases = list(db.execute(query))
+            states = {}
             for wid, pid in cases:
-                if not self.allowed(wid):
+                if (str(self.cfg.get('SOP_LARK_PROJECTION_ENABLED', 'false')).lower() != 'true'
+                        or not self.cfg.get('LARK_WORKER_ORGANIZATION')
+                        or wid != 'lark-' + self.cfg['LARK_WORKER_ORGANIZATION']
+                        or self._case_retry.get((wid, pid), (0, 0))[0] > self.clock()):
                     continue
-                state = self.state(wid)
-                project = next((p for p in state.get('projects', []) if p['id'] == pid), None)
-                if project is None:
-                    with self.sessions.begin() as db:
-                        for row in self.current_rows(db, wid, pid):
-                            row.state, row.last_error = 'paused', 'case_not_found'
-                    continue
-                if excluded(project):
-                    continue
-                with self.sessions() as db:
-                    rows = self.current_rows(db, wid, pid)
-                    receipt = db.get(LarkReconcile, (wid, pid))
-                    pending = any(r.state not in {'done', 'paused'} and r.retry_at <= self.clock() for r in rows)
-                    if not pending and receipt and receipt.checked_at > self.clock() - 600:
-                        continue
                 try:
-                    with self.client_factory(lambda: self.before_write(wid, pid)) as client:
+                    if wid not in states:
+                        states[wid] = self.state(wid)
+                    state = states[wid]
+                    if not gates(self.cfg, wid, state):
+                        continue
+                    project = next((p for p in state.get('projects', []) if p['id'] == pid), None)
+                    if project is None:
+                        with self.sessions.begin() as db:
+                            for row in self.current_rows(db, wid, pid):
+                                row.state, row.last_error = 'paused', 'case_not_found'
+                        continue
+                    if excluded(project):
+                        continue
+                    with self.sessions() as db:
+                        rows = self.current_rows(db, wid, pid)
+                        receipt = db.get(LarkReconcile, (wid, pid))
+                        pending = any(r.state not in {'done', 'paused'} and r.retry_at <= self.clock() for r in rows)
+                        if not pending and receipt and receipt.checked_at > self.clock() - 600:
+                            continue
+                    with self.client_factory(lambda: self.before_write(wid, pid, state)) as client:
                         check_schema(client)
                         roster = fetch_roster(client)
                         with self.sessions.begin() as db:
@@ -258,25 +267,30 @@ class Projection:
                     for tid in pending:
                         if self._stop.is_set():
                             return
-                        with self.client_factory(lambda: self.before_write(wid, pid)) as client:
+                        with self.client_factory(lambda: self.before_write(wid, pid, state)) as client:
                             self.project_task(client, wid, pid, tid, project, state, roster)
-                    with self.client_factory(lambda: self.before_write(wid, pid)) as client:
+                    with self.client_factory(lambda: self.before_write(wid, pid, state)) as client:
                         report = self.reconcile(client, wid, pid, project, state, roster)
                     remaining = max(0, min(limit, 50) - len(pending))
                     for issue in [i for i in report['issues'] if i['kind'] == 'lark_drift'][:remaining]:
-                        with self.client_factory(lambda: self.before_write(wid, pid)) as client:
+                        with self.client_factory(lambda: self.before_write(wid, pid, state)) as client:
                             self.project_task(client, wid, pid, issue['task_id'], project, state, roster)
-                except Failure as exc:
+                    self._case_retry.pop((wid, pid), None)
+                except Exception as exc:
+                    code = exc.code if isinstance(exc, Failure) else 'case_error'
+                    attempts = self._case_retry.get((wid, pid), (0, 0))[1] + 1
+                    retry_at = self.clock() + 2 ** min(attempts, 9)
+                    self._case_retry[(wid, pid)] = (retry_at, attempts)
                     with self.sessions.begin() as db:
                         for row in self.current_rows(db, wid, pid):
-                            if row.state == 'paused' and not (row.last_error or '').startswith('schema_drift'):
+                            if row.state == 'done' or row.state == 'paused' and not (row.last_error or '').startswith('schema_drift'):
                                 continue
-                            if row.state == 'done':
-                                continue
-                            row.last_error = exc.code + (': ' + ','.join(exc.extra['fields']) if 'fields' in exc.extra else '')
-                            if exc.code == 'schema_drift':
+                            row.last_error = code + (': ' + ','.join(exc.extra['fields']) if isinstance(exc, Failure) and 'fields' in exc.extra else '')
+                            row.retry_at = retry_at
+                            if code == 'schema_drift':
                                 row.state = 'paused'
-                    log.warning('sop_projection case paused project=%s reason=%s', pid, exc.code)
+                    log.warning('sop_projection case deferred project=%s reason=%s', pid, code, exc_info=True)
+            return True
 
     @staticmethod
     def current_rows(db, wid, pid):

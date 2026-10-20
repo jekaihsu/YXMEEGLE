@@ -88,3 +88,31 @@ def test_local_payload_change_is_not_remote_drift(p, change):
         assert list(db.scalars(select(TaskEvent).where(TaskEvent.kind == 'lark_drift'))) == []
     p.worker.drain()
     assert row(p).state == 'done'
+
+
+def test_workspace_load_failure_does_not_abort_drain(p, caplog):
+    with p.sessions.begin() as db:
+        db.add(LarkOutbox(workspace_id='demo-a', project_id='X', task_id='x', generation=1, target_revision=1, state='none'))
+    original = p.worker.load_state
+    calls = []
+    def load(wid):
+        calls.append(wid)
+        if wid != 'lark-org':
+            raise RuntimeError('invalid workspace')
+        return original(wid)
+    p.worker.load_state = load
+    p.worker.drain()
+    assert row(p).state == 'done'
+    assert calls == ['lark-org']
+
+
+def test_case_exception_is_deferred_and_logged(p, caplog):
+    original = p.worker.load_state
+    p.worker.load_state = lambda wid: (_ for _ in ()).throw(ValueError('broken state'))
+    assert p.worker.drain() is True
+    assert row(p).retry_at > p.clock[0]
+    assert any(r.exc_info and 'broken state' in str(r.exc_info[1]) for r in caplog.records)
+    p.worker.load_state = original
+    p.clock[0] += 700
+    p.worker.drain()
+    assert row(p).state == 'done'
