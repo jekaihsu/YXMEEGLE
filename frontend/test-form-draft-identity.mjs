@@ -95,6 +95,7 @@ await type('REC','REVISION_ONE_EDIT');
 await show({record:'REC',id:'recurring:R1:2'});
 await type('REC','REVISION_TWO');
 await act(async()=>{finish(true)});
+assert.equal(text('REC').value,'REVISION_TWO','a late save from the old record cannot remount the current draft');
 assert.equal(keys().length,1);
 assert.ok(keys()[0].endsWith(encodeURIComponent('recurring:R1:2')),'only the saved revision draft was cleared');
 sessionStorage.clear();

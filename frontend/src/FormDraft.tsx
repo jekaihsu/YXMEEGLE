@@ -34,8 +34,9 @@ export function DraftForm(props:DraftFormProps){
  const {title,draftId}=props;const[savedTick,setSavedTick]=useState(0);
  const namespace=useContext(DraftNamespace);const params=new URLSearchParams(location.hash.slice(1));
  const key=`yx:draft:v2:${namespace}:form:${params.get('project')||''}:${params.get('node')||''}:${encodeURIComponent(title)}:${encodeURIComponent(draftId)}`;
+ const activeKey=useRef(key);activeKey.current=key;
  // Field defaults and their revision must advance together.
- return <ScopedDraftForm key={`${key}:${savedTick}`} {...props} storageKey={key} namespace={namespace} onSaved={()=>setSavedTick(t=>t+1)}/>;
+ return <ScopedDraftForm key={`${key}:${savedTick}`} {...props} storageKey={key} namespace={namespace} onSaved={()=>{if(activeKey.current===key)setSavedTick(t=>t+1)}}/>;
 }
 function ScopedDraftForm({title,draftId,onSubmit,children,busy,concurrency,storageKey:key,namespace,onSaved}:DraftFormProps&{storageKey:string;namespace:string;onSaved:()=>void}){
  const ref=useRef<HTMLFormElement>(null);
