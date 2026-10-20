@@ -117,7 +117,7 @@ def test_encrypted_remote_copy_restores_all_tables_and_referenced_files(tmp_path
     offsite.decrypt_bundle(next(downloaded.glob('*-manifest.fernet')),recovered,settings)
     restored=create_engine('sqlite:///'+str(tmp_path/'restored.db'));restored_uploads=tmp_path/'restored-files'
     result=br.restore(restored,restored_uploads,recovered)
-    assert all(result['tables'][table.name]==1 for table in br.TABLES)
+    assert result['tables'] == {table.name: 0 if table.name.startswith('sop_') else 1 for table in br.TABLES}
     assert result['files']==2 and result['sessions_restored'] is False
     replay=tmp_path/'replay.zip';br.backup(restored,restored_uploads,replay)
     assert database_payload(archive)==database_payload(replay)

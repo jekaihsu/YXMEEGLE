@@ -24,6 +24,12 @@
 
 已部署的隔離 preview：https://yongxiang-projects-20260925.zeabur.app 。部署與重啟持久性實測結果見 [部署回執](docs/DEPLOYMENT_RECEIPT.md)；真實登入、來源讀取及審批能力分別驗收。
 
+## 報價總表與 SOP
+
+報價列開啟詳情後，已有案件且伺服器允許匯入時顯示「開始 SOP」，使用既有匯入預覽與確認流程，預設從報價開始選取全部九個節點。已有任務時顯示「開啟流程」。無 `project_id` 的列及詳情顯示「未納入案件」，不建立另一份案件。
+
+2026-10-20 的唯讀報價匯出在隔離 SQLite 重播後，423 列中有 374 列帶報價編號，合併為 333 組，333 組皆有案件，0 組缺少案件。49 列空白編號不列入報價總表。這是既有來源管線的重播結果，不是正式工作區的即時查詢。來源身分、可見性與匯入權限規則見 [SOP API 說明](backend/sop_import/README.md#source-quote-case-coverage)。
+
 ## 快速啟動：Windows PowerShell
 
 在 `meegle` 目錄執行，需要 Python 3.12 相容環境與 Node.js 22。若使用虛擬環境，先建立並啟用，再安裝套件。
@@ -116,3 +122,7 @@ Git hooks 是本機保護，不會隨 clone 自動啟用，也可被 `git push -
 正式服務設定 `APP_ENV=production`、`DEMO_MODE=false`、PostgreSQL `DATABASE_URL`、至少 32 字元 `SESSION_SECRET` 及 HTTPS `PUBLIC_ORIGIN`。需公開雲端示範時，明確設定 `DEMO_MODE=true` 且 `ALLOW_CLOUD_DEMO=true`；仍使用 PostgreSQL，示範身分無法存取真實來源。建議 preview 與正式服務分開資料庫、volume 及密鑰。
 
 未設定 OAuth 時，正式服務不會自動切回示範角色。其他環境部署取得網域後，依 [部署文件](docs/DEPLOYMENT.md)完成各自回呼設定及驗收；不能直接沿用此 preview 的回呼設定。
+
+Local intake creators with `sop_task_import` retain management authority while no PM is assigned. Once a PM is assigned, management requires being that PM, a manager, or an explicit SOP delegate.
+
+The `quote_number_taken` response checks all source numbers, including numbers outside the actor's register. This existence disclosure is an accepted trade-off to prevent duplicate official numbers.

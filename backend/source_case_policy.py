@@ -209,12 +209,27 @@ def mark_imported_new(ws,new_ids):
             project.setdefault('execution_assignment',{'basis':'verified_post_cutover_source','recorded_by':'system:cutover','recorded_at':now()})
 
 
+def local_planning(project):
+    return project.get('planning_origin')=='local'
+
+
+def local_viewer(user,project):
+    """A local planning case is visible only to its creator, PM, collaborators and managers, in every environment."""
+    people={project.get('created_by'),project.get('pm_id'),*project.get('collaborator_ids',[])}-{'',None}
+    return (local_planning(project) and bool(user) and user.get('active',True)
+            and (user.get('role')=='manager' or user.get('id') in people))
+
+
 def visible_project(ws,project):
+    # Official views never list local planning cases, so they stay out of every case total.
+    if local_planning(project):return False
     return ws.get('environment') in ('test','demo') or project.get('case_visibility') in ('new_case','source_reference')
 
 
 def filter_visible_cases(state):
-    if state.get('environment') in ('test','demo'):return state
+    if state.get('environment') in ('test','demo'):
+        state['projects']=[p for p in state.get('projects',[]) if not local_planning(p)]
+        return state
     visible={p['id'] for p in state.get('projects',[]) if visible_project(state,p)}
     allowed_sources=set(state.get('source_visible_record_ids',[]))
     state['projects']=[p for p in state.get('projects',[]) if p['id'] in visible]

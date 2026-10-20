@@ -21,7 +21,7 @@
 .pf-owner{display:flex;align-items:center;gap:4px;min-height:32px;overflow-wrap:anywhere}.pf-owner .avatar{width:22px;height:22px;min-width:22px;font-size:11px}.pf-owner>span:last-child{font-size:11px}
 .pf-node progress{appearance:none;width:100%;height:5px;border:0;border-radius:6px;background:var(--surface-2)}.pf-node progress::-webkit-progress-bar{background:var(--sep);border-radius:6px}.pf-node progress::-webkit-progress-value{background:var(--accent);border-radius:6px}.pf-node progress::-moz-progress-bar{background:var(--accent);border-radius:6px}
 .pf-node small,.pf-progress-unknown{font-size:10px;color:var(--label-2)}.pf-quantity{font-size:10px;display:grid;gap:4px;color:var(--label-2);overflow-wrap:anywhere;margin-top:auto}.pf-due{display:flex;gap:4px;align-items:center;font-size:10px;overflow-wrap:anywhere}.pf-due:has(svg){color:var(--status-error-fg);background:var(--status-error-bg);border-radius:4px;padding:3px}
-.pf-help{font-size:12px;color:var(--label-2);margin-top:16px!important}
+
 .pf-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:16px 0 24px}.pf-facts dt{font-size:12px;color:var(--label-2)}.pf-facts dd{margin:4px 0 0;overflow-wrap:anywhere}
 .pf-actions{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}.pf-actions .disabled-action{max-width:200px}.pf-actions .disabled-action-reason{font-size:11px}
 .pf-node-actions{margin-bottom:24px}.pf-evidence{margin:24px 0;min-width:0}.pf-node-gaps{padding:16px;border:1px solid var(--sep);border-radius:12px;font-size:13px;display:grid;gap:8px;background:var(--surface-2);margin-top:16px}

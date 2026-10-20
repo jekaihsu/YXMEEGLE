@@ -11,7 +11,8 @@ from sqlalchemy import Column, Integer, JSON, MetaData, String, Table, create_en
 from backend.models import Base, BusinessRow
 from scripts import backup_restore as br
 
-PORTABLE={'workspaces','receipts','source_caches','business_records','company_people','action_audit'}
+PORTABLE={'workspaces','receipts','source_caches','business_records','company_people','action_audit'} | {
+    name for name in Base.metadata.tables if name.startswith('sop_')}
 
 
 def app_source(tmp_path):

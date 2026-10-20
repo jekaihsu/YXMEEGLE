@@ -23,7 +23,7 @@ def source(tmp_path, *, attachment=True):
         files=[{'id':'file_one','storage':'local','size':16}]
     with engine.begin() as db:
         db.execute(br.TABLES[0].insert(),{'id':'company','version':3,'data':{'projects':[{'id':'p1','files':files}]}})
-        db.execute(br.TABLES[-1].insert(),{'id':'audit1','workspace_id':'company','actor_id':'owner','action':'file_upload','created_at':'2026-09-28','data':{'outcome':'success'}})
+        db.execute(br.META.tables['action_audit'].insert(),{'id':'audit1','workspace_id':'company','actor_id':'owner','action':'file_upload','created_at':'2026-09-28','data':{'outcome':'success'}})
     return engine,uploads
 
 
@@ -60,7 +60,7 @@ def test_restore_preserves_audit_and_attachment_bytes(tmp_path):
     assert result['sessions_restored'] is False
     assert next(output.rglob('file_one')).read_bytes()==b'company evidence'
     with restored.connect() as db:
-        assert db.execute(select(br.TABLES[-1].c.data)).scalar_one()=={'outcome':'success'}
+        assert db.execute(select(br.META.tables['action_audit'].c.data)).scalar_one()=={'outcome':'success'}
 
 
 def test_restore_rejects_live_session_only_target(tmp_path):

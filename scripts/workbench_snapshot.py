@@ -26,7 +26,8 @@ DIRECTORY=ROOT/'.runtime/workbench-snapshot'
 MAX_BYTES=128*1024*1024
 MARKER='YX_WORKBENCH_SNAPSHOT='
 MODULES=('scripts/backup_restore.py','scripts/backup_live_legacy.py','scripts/backup_publish.py',
-         'backend/models.py','backend/storage.py')
+         'backend/models.py','backend/storage.py','backend/sop_import/__init__.py',
+         'backend/sop_import/models.py','backend/sop_import/domain.py')
 
 
 class SnapshotError(Exception):pass

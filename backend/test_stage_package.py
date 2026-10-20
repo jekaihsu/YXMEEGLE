@@ -14,10 +14,12 @@ def test_staged_app_and_catalog_work_without_repository_fallback(tmp_path, monke
     monkeypatch.setattr(deploy_prepare, 'RUNTIME', tmp_path)
     stage = deploy_prepare.staging()
     assert (stage / 'backend' / 'sop_source_contracts.json').is_file()
+    assert (stage / 'backend' / 'sop_import' / 'catalog.json').is_file()
     manifest = json.loads((tmp_path / 'zeabur-stage-manifest.json').read_text())
     assert any(f['path'] == 'backend/sop_source_contracts.json' for f in manifest['files'])
     receipt = json.loads((tmp_path / (stage.name + '-smoke.json')).read_text())
     assert receipt['ok'] and receipt['checks']['workspace'] and receipt['inventory_sha256']
+    assert receipt['checks']['local_sop_catalog']
     assert (tmp_path / (stage.name + '-manifest.json')).is_file()
     # Even poisoned production settings must not reach the isolated probe.
     monkeypatch.setenv('DATABASE_URL', 'postgresql://do-not-connect.invalid/production')

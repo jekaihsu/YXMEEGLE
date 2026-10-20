@@ -126,6 +126,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         database_path=make_url(db_url).database
         if database_path and database_path!=':memory:': Path(database_path).resolve().parent.mkdir(parents=True,exist_ok=True)
     engine=create_engine(db_url,connect_args={'check_same_thread':False,'timeout':20} if db_url.startswith('sqlite') else {},pool_pre_ping=True)
+    from .sop_import import models as sop_import_models
     Base.metadata.create_all(engine); sessions=sessionmaker(engine,expire_on_commit=False,info={'index_tables':str(cfg.get('INDEX_TABLES_ENABLED','false')).lower()=='true'})
     # Migration is reversible: preserve the original JSON before normalizing.
     from .workspace_migration import migrate_workspaces
@@ -563,6 +564,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
         from .node_assignment.config import NodeAssignmentConfig
         node_config = NodeAssignmentConfig.from_env(cfg)
         flags = resolve_features(cfg)
+        flags['local_case_creation'] = str(cfg.get('LOCAL_CASE_CREATION_ENABLED', 'false')).lower() == 'true'
+        flags['sop_task_writes'] = str(cfg.get('SOP_TASK_WRITES_ENABLED', 'false')).lower() == 'true'
         flags['mock_ui']=environment in ('demo','test') and str(cfg.get('FEATURE_LARK_AUTHORITATIVE_OPS','false')).lower()=='true'
         if shell_enabled: flags['workspace_shell']=True
         if (node_config.enabled and node_config.writable and cfg.get('LARK_WORKER_ORGANIZATION')
@@ -1495,6 +1498,39 @@ def create_app(overrides=None,*,dispatch_transport=None):
         project=next((p for p in state['projects'] if p['id']==project_id and visible_project(state,p)),None)
         require(project is not None,'找不到這個案件',404)
         return state,project
+    def sop_case(data,user,project_id):
+        """node_assignment_case plus the local planning cases this viewer may see; node assignment never gets those."""
+        from .source_case_policy import visible_project,local_viewer
+        require(len(project_id)<=200,'查詢參數過長',422)
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
+        project=next((p for p in state['projects'] if p['id']==project_id and (visible_project(state,p) or local_viewer(user,p))),None)
+        require(project is not None,'找不到這個案件',404)
+        return state,project
+    def quote_view(data,user):
+        """The quote register's cases and rows as the viewer may see them, and the /progress amounts gate."""
+        from .source_case_policy import filter_visible_cases,local_viewer
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=('projects','source_quotes'))
+        local=[p for p in state['projects'] if local_viewer(user,p)]
+        filter_visible_cases(state)
+        state['local_cases']=local
+        return state,data.get('access_mode','normal')=='normal' and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+    def quote_workspace(wid):
+        with sessions() as db: return load(db,db.get(WorkspaceRow,wid),collections=('users','projects','source_quotes','sop_templates'))
+    def persist_local_case(db,wid,actor_id,build):
+        """Append one case inside the caller's transaction through the full save, so index rows and versions stay exact."""
+        row=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one()
+        state=load(db,row)
+        before=audit.entities(state)
+        project=build(state)
+        state['projects'].append(project); state['version']=row.version+1
+        root=storage.save(db,BusinessRow,wid,state)
+        updated=db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==row.version).values(version=row.version+1,data=root))
+        require(updated.rowcount==1,'資料版本衝突，請重新整理',409)
+        db.add(audit.record(AuditRow,wid,actor_id,'create_local_case',details={'version':state['version'],'project_id':project['id'],
+                                                                               'changes':audit.changes(before,state)}))
+    from .sop_import.routes import register as register_sop_import
+    app.state.sop_import = register_sop_import(app, identity=identity, load_case=sop_case,
+        sessions=sessions, cfg=cfg, quote_view=quote_view, workspace=quote_workspace, persist_case=persist_local_case)
     from .node_assignment.routes import register as register_node_assignment
     from .node_skip import valid_waiver
     def node_reports():

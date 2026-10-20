@@ -5,11 +5,11 @@ import type {AssignmentMutation,NodeAssignmentDetail,NodeAssignmentError} from '
 export function FlowAction({allowed,reason,children,onClick}:{allowed:boolean;reason:string;children:ReactNode;onClick:()=>void}){
  return <DisabledAction disabled={!allowed} reason={reason}>{id=><button className="button compact" type="button" disabled={!allowed} aria-describedby={id} onClick={onClick}>{children}</button>}</DisabledAction>;
 }
-export function FlowNodeActions({detail,busy,error,reason,mutate}:{detail:NodeAssignmentDetail;busy:boolean;error:NodeAssignmentError|null;reason:string;mutate:(m:AssignmentMutation)=>Promise<boolean>}){
+export function FlowNodeActions({detail,busy,error,reason,mutate,extra}:{detail:NodeAssignmentDetail;busy:boolean;error:NodeAssignmentError|null;reason:string;mutate:(m:AssignmentMutation)=>Promise<boolean>;extra?:ReactNode}){
  const [form,setForm]=useState<'assign'|'task'|'reject'|''>('');
  const save=async(m:AssignmentMutation)=>{if(await mutate(m))setForm('')};
  const action=(name:'claim'|'assign'|'create_task'|'complete'|'approve'|'reject',label:string)=> <FlowAction allowed={!busy && detail.can[name]===true} reason={busy ? reason : '需有此節點操作權限，且節點狀態允許。'} onClick={()=>name==='assign' ? setForm('assign') : name==='create_task' ? setForm('task') : name==='reject' ? setForm('reject') : void save({action:name,nodeKey:detail.node.key,expected_revision:detail.node.revision})}>{label}</FlowAction>;
- return <div className="pf-node-actions"><div className="pf-actions">{action('claim','認領節點')}{action('assign','指派負責人')}{action('create_task','新增任務')}{action('complete','完成節點')}{action('approve','核准')}{action('reject','退回')}</div>
+ return <div className="pf-node-actions"><div className="pf-actions">{action('claim','認領節點')}{action('assign','指派負責人')}{action('create_task','新增任務')}{action('complete','完成節點')}{action('approve','核准')}{action('reject','退回')}{extra}</div>
   {form==='assign' && <AssignForm detail={detail} busy={busy} error={error} onCancel={()=>setForm('')} onSubmit={ids=>save({action:'assign',nodeKey:detail.node.key,owner_open_ids:ids,expected_revision:detail.node.revision})}/>}
   {form==='task' && <TaskCreator detail={detail} busy={busy} error={error} onCancel={()=>setForm('')} onSubmit={task=>save({action:'create_task',nodeKey:detail.node.key,task})}/>}
   {form==='reject' && <RejectForm busy={busy} error={error} onCancel={()=>setForm('')} onSubmit={reason=>save({action:'reject',nodeKey:detail.node.key,reason,expected_revision:detail.node.revision})}/>}

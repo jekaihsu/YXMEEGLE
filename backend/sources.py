@@ -18,8 +18,9 @@ API='https://open.larksuite.com/open-apis'
 PROVISIONAL_CASE_FIELD='可能的確認單工編(若暫無確認單才需填寫)'
 # Lark's own spelling carries a stray U+02CA between 營 and 業; copy it exactly, never "fix" it.
 REMAINING_POINTS_FIELD='本工項剩餘營\u02ca業額'
+QUOTE_POINT_FIELDS=('外業確認單營業額','控制確認單營業額','圖資確認單營業額','報告確認單營業額','行政確認單營業額')
 # Read from Lark for server-side progress only; FIELDS drives the fetch, so the public source views subtract this set.
-SERVER_ONLY_FIELDS=frozenset({REMAINING_POINTS_FIELD})
+SERVER_ONLY_FIELDS=frozenset({REMAINING_POINTS_FIELD,'契約價格(含稅)',*QUOTE_POINT_FIELDS})
 FIELDS={
  'quote':['工程編號','報價編號','此案確認單','工程名稱','行號單位','契約價格(未稅)','備註','案件負責人','報價期限','外業期限','內業期限(控)','內業期限(圖)','內業期限(報)','合約開始日期','合約結束日期'],
  'confirmation':['工程確認單編號','所屬案件','SourceID','工程名稱','狀態','合約總額','預估總成本','實際總成本','案件負責人','合約結束日期','備註','報價編號'],
@@ -29,6 +30,10 @@ FIELDS={
  'cost':['出工日期','工作日期','日期','組別','內業組別','所屬組別','填報帳號','組長帳號-津貼自動化','組員帳號-津貼自動化']}
 FIELDS['quote_confirmation']=FIELDS['confirmation'][:]
 FIELDS['quote']+=['狀態','案件狀態','案件已入帳','累計已入帳','累計已請款','案件可請款總額','入帳資料檢核','可請款未請','入帳日期','付款條件']
+# Quote lifecycle evidence read by sop_import.quote_facts.
+FIELDS['quote']+=['詢價日期','第一次聯繫日期','報價日期','提供給PM日期','回傳單日期','編號','狀態 (1)','確認單回傳開會日期',
+                  '提供行政回傳確認單時間','成案後聯繫日期','契約價格(含稅)',*QUOTE_POINT_FIELDS,'外業負責組別','內業負責組別',
+                  'MEEGLE日報填報情形','PM告知可請款日期','連絡人','報價負責人']
 FIELDS['confirmation']+=['案件已入帳','入帳日期']
 FIELDS['quote_confirmation']+=['案件已入帳','入帳日期']
 REVIEW_FIELDS=['檢核狀態','工務助理檢核','外業經理檢核','控制組檢核','品管檢核','雅雯檢核','檢核時間','PM檢核','內業組長檢核']

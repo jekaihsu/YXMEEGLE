@@ -1,0 +1,3778 @@
+{
+  "title": "YXMEEGLE SOP default task implementation catalog",
+  "version": "1.0",
+  "status": "Review catalog for publication validation",
+  "generated_for": "YX-SOP-IMPORT-1",
+  "source_files": [
+    {
+      "name": "Plumb-playbook-v0.2.xlsx",
+      "sha256": "bc53bac73405df632cd55c367ae8d193879e06a3458c93c601c479abd058c28b"
+    },
+    {
+      "name": "PM-Solution-playbook-v0.1.xlsx",
+      "sha256": "c9a233234dd17429f88d05698befa8b70151d9ec233392650ed8d5e26f0656f9"
+    },
+    {
+      "name": "節點負責 v2.pdf",
+      "sha256": "e9ca189a1d065ecaa89e5d3ca55b61269efb49559d07a581a621d1726e41cce6"
+    }
+  ],
+  "source_column_names": {
+    "source_group": "大節點",
+    "source_order": "子任務序",
+    "meegle_id": "Meegle#",
+    "title": "節點名稱",
+    "source_kind": "類型 kind",
+    "owner_role_raw": "負責角色 owner_role",
+    "trigger_raw": "觸發 trigger",
+    "anchor_raw": "起算點 anchor",
+    "deadline_raw": "期限 deadline",
+    "inputs_raw": "讀取 inputs",
+    "procedure_raw": "agent 動作 action",
+    "human_decision_raw": "人類決策 human_decision",
+    "outputs_raw": "產出 outputs",
+    "done_when_raw": "完成條件 done_when",
+    "next_raw": "下一節點 next",
+    "escalation_raw": "升級 escalation",
+    "kpi_raw": "考評指標 KPI",
+    "source_reference_raw": "來源 source",
+    "applicability_raw": "適用組別／版本",
+    "unresolved_raw": "TODO／待確認",
+    "version_note_raw": "版本備註"
+  },
+  "proposed_node_keys": {
+    "N01": "報價",
+    "N02": "PM 派工",
+    "N03": "確認單",
+    "N04": "外業",
+    "N05": "控制",
+    "N06": "圖資",
+    "N07": "報告",
+    "N08": "計價請款",
+    "N09": "入帳結算"
+  },
+  "disposition_counts": {
+    "routing_reference": 13,
+    "task": 44,
+    "review_required": 1,
+    "routine_excluded": 2,
+    "disabled_excluded": 2
+  },
+  "notes": [
+    "Raw fields preserve the supplied source, including proposed automation, source-write references, TODOs and contradictory statements. They are not executable instructions or approvals.",
+    "The nine-node display mapping and shared-task behavior are PRD design proposals; original group values remain unchanged.",
+    "Business applicability and participant bindings remain case-specific. Forty-four is a ceiling of standard task definitions before applicability and selections, not tasks due immediately.",
+    "No PDF handwriting is converted automatically into user identities, permissions or seed assignments.",
+    "Branch mappings are proposed implementation mappings; verify canonical local node IDs per case. Workbook Meegle IDs are not runtime state IDs."
+  ],
+  "case_sop_rows": [
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A2:U2",
+      "source_sheet_row": 2,
+      "source_row_key": "meegle-v137:A:0",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 1,
+        "meegle_id": 0,
+        "title": "Start",
+        "source_kind": "branch",
+        "owner_role_raw": "—",
+        "trigger_raw": "新報價需求事件：報價總表新增一列（v1）；Email 進件 / 群組 @agent（v2）",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "報價總表",
+        "procedure_raw": "建立案件 Lark 群（one thread）與 Meegle 工作項；寫 SOP 案件總覽一列",
+        "human_decision_raw": "否",
+        "outputs_raw": "案件群、Meegle 工作項、SOP 案件總覽列",
+        "done_when_raw": "案件群與工作項都建立",
+        "next_raw": "#1",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#0",
+        "applicability_raw": null,
+        "unresolved_raw": "Email 進件尚未串接（程式裡沒有 SMTP/IMAP），v1 以報價總表新增列為觸發",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "routing_reference",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Keep as reference metadata; do not create an ordinary checklist task or execute source automation.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A3:U3",
+      "source_sheet_row": 3,
+      "source_row_key": "meegle-v137:A:1",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 2,
+        "meegle_id": 1,
+        "title": "業主提出報價需求",
+        "source_kind": "confirm",
+        "owner_role_raw": "報價組（業務經理轄下）",
+        "trigger_raw": "#0",
+        "anchor_raw": "詢價日期",
+        "deadline_raw": "—",
+        "inputs_raw": "需求原文（Email／口述）、業主連絡資訊表、報價總表.詢價日期、案件類型選項",
+        "procedure_raw": "結構化需求：工項類型、數量（面積／點數／公里）、行政區、時程、特殊進場條件 → 需求卡；抽不出的欄位反問業務，不猜；需求佐證文件存案件資料夾",
+        "human_decision_raw": "否（缺欄位時問業務）",
+        "outputs_raw": "報價總表新列：詢價日期、工程名稱、業主、連絡人、執行地點、案件類型；Meegle 附件「業主需求佐證文件」",
+        "done_when_raw": "需求卡必填欄齊 + 佐證文件已上傳",
+        "next_raw": "#2",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#1；SOP圖1",
+        "applicability_raw": null,
+        "unresolved_raw": "需求卡的必填欄位清單要跟報價組定稿；案件類型 55% 空、執行地點 47% 空，agent 必須補齊",
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A4:U4",
+      "source_sheet_row": 4,
+      "source_row_key": "meegle-v137:A:2",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 3,
+        "meegle_id": 2,
+        "title": "建立報價編號",
+        "source_kind": "action",
+        "owner_role_raw": "報價組（業務經理轄下）",
+        "trigger_raw": "#1 完成",
+        "anchor_raw": "詢價日期",
+        "deadline_raw": "+0 工作日",
+        "inputs_raw": "報價總表（年度流水、編號規則）",
+        "procedure_raw": "依規則產生報價編號，寫回報價總表.報價編號 與 Meegle 必填欄「報價編號」；登錄報價案件管制表",
+        "human_decision_raw": "否",
+        "outputs_raw": "報價總表.報價編號；報價案件管制表一列",
+        "done_when_raw": "報價編號有值且唯一",
+        "next_raw": "#3",
+        "escalation_raw": null,
+        "kpi_raw": "報價逾期次數",
+        "source_reference_raw": "Meegle#2；SOP圖1 期限「報價需求後0日」",
+        "applicability_raw": null,
+        "unresolved_raw": "報價編號格式規則",
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A5:U5",
+      "source_sheet_row": 5,
+      "source_row_key": "meegle-v137:A:3",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 4,
+        "meegle_id": 3,
+        "title": "通知業主報價成立",
+        "source_kind": "action",
+        "owner_role_raw": "報價組（業務經理轄下）",
+        "trigger_raw": "#2 完成",
+        "anchor_raw": "詢價日期",
+        "deadline_raw": "+1 工作日",
+        "inputs_raw": "業主連絡資訊（Email；LINE 往來由人轉貼進案件群）、需求卡",
+        "procedure_raw": "草擬通知（SOP 四項：告知報價聯絡人、了解案件需求與期程、確認報價時程、特殊進場條件）→ 卡片給專案經理 → 按「寄出」才寄；寫回第一次聯繫日期；聯絡證明存業主往來紀錄表",
+        "human_decision_raw": "是（對外訊息）",
+        "outputs_raw": "報價總表.第一次聯繫日期；聯絡證明（業主往來紀錄表）",
+        "done_when_raw": "第一次聯繫日期有值 + 證明已存",
+        "next_raw": "#4",
+        "escalation_raw": "第 1 工作日 17:00 未寄 → 私訊專案經理",
+        "kpi_raw": "未在期限內連繫業主(1日)",
+        "source_reference_raw": "Meegle#3；SOP圖1",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A6:U6",
+      "source_sheet_row": 6,
+      "source_row_key": "meegle-v137:A:4",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 5,
+        "meegle_id": 4,
+        "title": "是否有下包需求",
+        "source_kind": "gate",
+        "owner_role_raw": "報價組（業務經理轄下）",
+        "trigger_raw": "#3 完成",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "需求卡；工項→能力對照表；能力地圖；下包廠商表",
+        "procedure_raw": "依公司給定的下包規則自動判定；規則未定前預設『無』",
+        "human_decision_raw": "否（規則命中時才問主管）",
+        "outputs_raw": "Meegle 必填「是否下包」；報價總表.下包廠商",
+        "done_when_raw": "選定有／無",
+        "next_raw": "有→#6→#7；無→#5→#8",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#4",
+        "applicability_raw": null,
+        "unresolved_raw": "公司提供下包規則清單",
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A7:U7",
+      "source_sheet_row": 7,
+      "source_row_key": "meegle-v137:A:5",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 6,
+        "meegle_id": 5,
+        "title": "無（分支出口）",
+        "source_kind": "branch",
+        "owner_role_raw": "—",
+        "trigger_raw": "#4 = 無",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "—",
+        "procedure_raw": "自動通過",
+        "human_decision_raw": "否",
+        "outputs_raw": "—",
+        "done_when_raw": "—",
+        "next_raw": "#8",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#5",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "routing_reference",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Keep as reference metadata; do not create an ordinary checklist task or execute source automation.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A8:U8",
+      "source_sheet_row": 8,
+      "source_row_key": "meegle-v137:A:6",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 7,
+        "meegle_id": 6,
+        "title": "有（分支出口）",
+        "source_kind": "branch",
+        "owner_role_raw": "—",
+        "trigger_raw": "#4 = 有",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "—",
+        "procedure_raw": "自動通過",
+        "human_decision_raw": "否",
+        "outputs_raw": "—",
+        "done_when_raw": "—",
+        "next_raw": "#7",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#6",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "routing_reference",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Keep as reference metadata; do not create an ordinary checklist task or execute source automation.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A9:U9",
+      "source_sheet_row": 9,
+      "source_row_key": "meegle-v137:A:7",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 8,
+        "meegle_id": 7,
+        "title": "下包提出報價",
+        "source_kind": "track",
+        "owner_role_raw": "報價組（業務經理轄下）",
+        "trigger_raw": "#6",
+        "anchor_raw": "#4 決定日",
+        "deadline_raw": "TODO（SOP 無定義）",
+        "inputs_raw": "下包廠商表、需求卡",
+        "procedure_raw": "草擬下包詢價（工項、數量、期程）→ PM 按寄出；收到下包報價 → 寫入合約明細工項.下包成本；登錄「下包詢價紀錄與簽呈」；簽呈卡片給主管",
+        "human_decision_raw": "是（寄出；簽呈核准）",
+        "outputs_raw": "合約明細工項.下包成本；下包簽呈",
+        "done_when_raw": "下包報價已登錄且簽呈核准",
+        "next_raw": "#8",
+        "escalation_raw": "詢價 5 工作日無回覆 → 提醒 PM 換廠商",
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#7；SOP圖1 表格4",
+        "applicability_raw": "條件：僅下包案",
+        "unresolved_raw": "下包詢價期限；簽呈金額門檻",
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A10:U10",
+      "source_sheet_row": 10,
+      "source_row_key": "meegle-v137:A:8",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 9,
+        "meegle_id": 8,
+        "title": "提出報價，同時通知業主已提供報價",
+        "source_kind": "action（會簽）",
+        "owner_role_raw": "報價組（業務經理轄下）；PM 核價",
+        "trigger_raw": "#5 或 #7 完成",
+        "anchor_raw": "詢價日期",
+        "deadline_raw": "+3 工作日",
+        "inputs_raw": "需求卡；相似案（報價總表＋合約明細工項＋外業工作單實際產能）；人力成本方案；儀器費率；行政區對照表；確認單參數；下包成本",
+        "procedure_raw": "【報價 agent】檢索相似案 → 分解成合約明細工項 → 成本（工天×人力＋儀器＋車資津貼＋行政％）→ 定價（成本÷(1−目標毛利)，對照單價帶）→ 寫合約明細工項（項次、工項、數量、單位、分項金額(報出)）→ 產報價單 PDF ＋「為什麼」→ 核價卡片（毛利 vs 底線）→ 主管核准 → 寄業主並通知",
+        "human_decision_raw": "是：核價（主管）＋寄出（業務）",
+        "outputs_raw": "報價總表.報價日期／報價期限／契約價格(未稅)；合約明細工項；報價單 PDF；Meegle 必填：通知業主已報價、提交報價單、提出報價日期",
+        "done_when_raw": "會簽通過 + 報價日期有值 + 報價單已寄",
+        "next_raw": "#12",
+        "escalation_raw": "第 3 工作日 12:00 未核 → 私訊主管；風險旗標（新客戶、新工項、無圖、相似案<2、毛利低於底線）→ 直接升級",
+        "kpi_raw": "報價逾期次數；報價評估逾期(3日)",
+        "source_reference_raw": "Meegle#8；SOP圖1 期限「報價需求後3日」",
+        "applicability_raw": null,
+        "unresolved_raw": "目標毛利與底線；升級的總價門檻；報價單範本；工程確認單公式搬成程式",
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A11:U11",
+      "source_sheet_row": 11,
+      "source_row_key": "meegle-v137:A:9",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 10,
+        "meegle_id": 9,
+        "title": "追蹤報價",
+        "source_kind": "track",
+        "owner_role_raw": "報價組（業務經理轄下）",
+        "trigger_raw": "#14（未回傳）",
+        "anchor_raw": "報價日期",
+        "deadline_raw": "首次 +10 工作日，之後每 5 工作日",
+        "inputs_raw": "報價總表.報價日期／報價期限／回傳單日期；業主連絡",
+        "procedure_raw": "草擬追蹤信（附報價摘要、有效期限）→ 卡片 → 業務按寄出；追蹤次數 +1；記錄業主往來紀錄表",
+        "human_decision_raw": "是（對外訊息）",
+        "outputs_raw": "聯絡證明；追蹤次數",
+        "done_when_raw": "回傳→#15；未得標或期限到期→#10；追蹤 3 次無回應 → 問業務是否結束",
+        "next_raw": "#15 / #10",
+        "escalation_raw": "卡片 2 工作日未按 → 私訊業務經理；記違反 SOP",
+        "kpi_raw": "違反SOP次數",
+        "source_reference_raw": "Meegle#9；SOP圖1 期限「提出報價後10日」",
+        "applicability_raw": null,
+        "unresolved_raw": "追蹤次數上限",
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A12:U12",
+      "source_sheet_row": 12,
+      "source_row_key": "meegle-v137:A:10",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 11,
+        "meegle_id": 10,
+        "title": "業主告知未得標／報價單有效期限到期",
+        "source_kind": "confirm",
+        "owner_role_raw": "報價組（業務經理轄下）",
+        "trigger_raw": "#9：業主回覆未得標，或 報價期限到期",
+        "anchor_raw": "報價期限",
+        "deadline_raw": "—",
+        "inputs_raw": "報價期限；業主回覆",
+        "procedure_raw": "到期自動建議關閉；請業務選未得標原因；未得標價格帶回饋定價引擎",
+        "human_decision_raw": "是（填未得標原因）",
+        "outputs_raw": "Meegle 必填「未得標原因」；報價總表.狀態＝未得標",
+        "done_when_raw": "原因已填",
+        "next_raw": "#11",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#10",
+        "applicability_raw": null,
+        "unresolved_raw": "未得標原因選項清單",
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A13:U13",
+      "source_sheet_row": 13,
+      "source_row_key": "meegle-v137:A:11",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 12,
+        "meegle_id": 11,
+        "title": "本報價工作結束",
+        "source_kind": "terminal",
+        "owner_role_raw": "—",
+        "trigger_raw": "#10",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "—",
+        "procedure_raw": "關閉案件群、歸檔、寫結案記錄；報價資料保留給檢索",
+        "human_decision_raw": "否",
+        "outputs_raw": "結案記錄",
+        "done_when_raw": "—",
+        "next_raw": "—",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#11",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "routing_reference",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Keep as reference metadata; do not create an ordinary checklist task or execute source automation.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A14:U14",
+      "source_sheet_row": 14,
+      "source_row_key": "meegle-v137:A:12",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 13,
+        "meegle_id": 12,
+        "title": "報價單是否回傳",
+        "source_kind": "gate",
+        "owner_role_raw": "報價組（業務經理轄下）",
+        "trigger_raw": "#8 完成",
+        "anchor_raw": "報價日期",
+        "deadline_raw": "+10 工作日",
+        "inputs_raw": "報價總表.回傳單日期；Email 收件（回簽附件）",
+        "procedure_raw": "每日查回傳單日期；收到含回簽附件的信 → 寫回傳單日期、附件存 Drive → 自動判「是」；到期仍無 → 判「無」",
+        "human_decision_raw": "否（證據不明時問業務）",
+        "outputs_raw": "報價總表.回傳單日期；Meegle 必填「報價單是否回傳」",
+        "done_when_raw": "回傳單日期有值 或 到期",
+        "next_raw": "是→#13→#15；無→#14→#9",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#12；SOP圖1",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A15:U15",
+      "source_sheet_row": 15,
+      "source_row_key": "meegle-v137:A:13",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 14,
+        "meegle_id": 13,
+        "title": "是（分支出口）",
+        "source_kind": "branch",
+        "owner_role_raw": "—",
+        "trigger_raw": "#12 = 是",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "—",
+        "procedure_raw": "自動通過",
+        "human_decision_raw": "否",
+        "outputs_raw": "—",
+        "done_when_raw": "—",
+        "next_raw": "#15",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#13",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "routing_reference",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Keep as reference metadata; do not create an ordinary checklist task or execute source automation.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A16:U16",
+      "source_sheet_row": 16,
+      "source_row_key": "meegle-v137:A:14",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 15,
+        "meegle_id": 14,
+        "title": "無（分支出口）",
+        "source_kind": "branch",
+        "owner_role_raw": "—",
+        "trigger_raw": "#12 = 無",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "—",
+        "procedure_raw": "自動通過",
+        "human_decision_raw": "否",
+        "outputs_raw": "—",
+        "done_when_raw": "—",
+        "next_raw": "#9",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#14",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "routing_reference",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Keep as reference metadata; do not create an ordinary checklist task or execute source automation.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A17:U17",
+      "source_sheet_row": 17,
+      "source_row_key": "meegle-v137:A:15",
+      "raw": {
+        "source_group": "1 報價",
+        "source_order": 16,
+        "meegle_id": 15,
+        "title": "收到回傳單，合約成立",
+        "source_kind": "confirm",
+        "owner_role_raw": "報價組（業務經理轄下）",
+        "trigger_raw": "#13",
+        "anchor_raw": "回傳單日期",
+        "deadline_raw": "—",
+        "inputs_raw": "回簽報價單／合約附件",
+        "procedure_raw": "回簽附件存 Meegle 必填欄；寫契約價格(未稅／含稅)、付款條件、合約開始日期；狀態＝成案；通知 PM 派工段啟動",
+        "human_decision_raw": "否（附件由人上傳或從信抓）",
+        "outputs_raw": "報價總表.狀態＝成案、契約價格、付款條件、合約開始日期；Meegle 附件",
+        "done_when_raw": "回簽附件已上傳 + 契約價格有值",
+        "next_raw": "#16",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#15",
+        "applicability_raw": null,
+        "unresolved_raw": "付款條件要結構化（目前文字欄 74% 空），#30 要用",
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N01"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "sales"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A18:U18",
+      "source_sheet_row": 18,
+      "source_row_key": "meegle-v137:A:16",
+      "raw": {
+        "source_group": "2 PM 派工",
+        "source_order": 1,
+        "meegle_id": 16,
+        "title": "建立案件編號 製作案件回傳本",
+        "source_kind": "action",
+        "owner_role_raw": "專案經理（SOP 圖泳道：行政）",
+        "trigger_raw": "#15 完成",
+        "anchor_raw": "回傳單日期",
+        "deadline_raw": "+1 工作日",
+        "inputs_raw": "報價總表、合約明細工項、案件回傳本範本",
+        "procedure_raw": "依規則產生工程編號 → 同時寫報價總表.工程編號、v4 案件、Meegle（三處同一主鍵）；生成案件回傳本；建立案件電子資料夾",
+        "human_decision_raw": "否（回傳本由 PM 過目）",
+        "outputs_raw": "工程編號；案件回傳本；案件資料夾；Meegle 必填：建立案件編號、製作案件回傳本",
+        "done_when_raw": "工程編號唯一且三處一致 + 回傳本上傳",
+        "next_raw": "#17",
+        "escalation_raw": null,
+        "kpi_raw": "案件逾期次數",
+        "source_reference_raw": "Meegle#16；SOP圖1 期限「回簽合約後1日」",
+        "applicability_raw": null,
+        "unresolved_raw": "工程編號規則；回傳本範本；泳道是行政還是 PM（SOP 圖與 Meegle 不同）",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N02"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "pm"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A19:U19",
+      "source_sheet_row": 19,
+      "source_row_key": "meegle-v137:A:17",
+      "raw": {
+        "source_group": "2 PM 派工",
+        "source_order": 2,
+        "meegle_id": 17,
+        "title": "得標後聯絡業主",
+        "source_kind": "action",
+        "owner_role_raw": "專案經理",
+        "trigger_raw": "#16 完成",
+        "anchor_raw": "回傳單日期",
+        "deadline_raw": "+2 工作日",
+        "inputs_raw": "業主連絡（Email；LINE 往來由人轉貼）、合約、需求卡",
+        "procedure_raw": "草擬得標聯絡（SOP 四項：告知案件負責人及聯絡方式、確認業主聯絡人、再次確認進場條件需求與期程、確定成果繳交日期與形式）→ 卡片 → 寄出；回填成案後聯繫日期、成果繳交日期",
+        "human_decision_raw": "是（對外訊息）",
+        "outputs_raw": "報價總表.成案後聯繫日期、成果繳交日期；聯絡證明(得標)",
+        "done_when_raw": "聯絡證明 + 成果繳交日期有值",
+        "next_raw": "#19（或 #18 展延）",
+        "escalation_raw": null,
+        "kpi_raw": "案件逾期次數",
+        "source_reference_raw": "Meegle#17；SOP圖1 期限「回簽合約後2日」",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N02"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "pm"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A20:U20",
+      "source_sheet_row": 20,
+      "source_row_key": "meegle-v137:A:18",
+      "raw": {
+        "source_group": "2 PM 派工",
+        "source_order": 3,
+        "meegle_id": 18,
+        "title": "展延",
+        "source_kind": "gate",
+        "owner_role_raw": "專案經理",
+        "trigger_raw": "#17 或 #39 或 業主來信要求展延",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "合約結束日期、業主來信",
+        "procedure_raw": "偵測展延要求 → 整理展延會議資料（影響的節點與期限）→ 卡片",
+        "human_decision_raw": "是（展延會議決議）",
+        "outputs_raw": "Meegle 必填「展延會議」；合約結束日期更新；相關節點期限重算",
+        "done_when_raw": "展延決議已記錄",
+        "next_raw": "#19",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#18",
+        "applicability_raw": null,
+        "unresolved_raw": "誰能核准展延；展延後哪些期限重算",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N02"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "pm"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A21:U21",
+      "source_sheet_row": 21,
+      "source_row_key": "meegle-v137:A:23",
+      "raw": {
+        "source_group": "2 PM 派工",
+        "source_order": 4,
+        "meegle_id": 23,
+        "title": "執行中業主聯繫",
+        "source_kind": "track",
+        "owner_role_raw": "專案經理",
+        "trigger_raw": "#24 外業作業開始",
+        "anchor_raw": "外業作業開始日",
+        "deadline_raw": "工作期間內每 5 工作日",
+        "inputs_raw": "外業工作單／工作預排進度；業主往來紀錄表（Email；LINE 由人轉貼）",
+        "procedure_raw": "彙整本週進度（出工天、完成數量、下週預排）→ 草擬業主進度通知 → 卡片 → 寄出；記錄",
+        "human_decision_raw": "是（對外訊息）",
+        "outputs_raw": "聯絡證明（Mail／LINE 記錄到業主往來紀錄表）",
+        "done_when_raw": "外業完工（#29）",
+        "next_raw": "—",
+        "escalation_raw": "逾 7 日未聯繫 → 記違反 SOP + 私訊 PM",
+        "kpi_raw": "違反SOP次數",
+        "source_reference_raw": "Meegle#23；SOP圖2 期限「工作期間內每5日」",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N02"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "pm"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A22:U22",
+      "source_sheet_row": 22,
+      "source_row_key": "meegle-v137:A:19",
+      "raw": {
+        "source_group": "3 確認單",
+        "source_order": 1,
+        "meegle_id": 19,
+        "title": "確認單製作並將確認單傳遞至各單位",
+        "source_kind": "action（會簽）",
+        "owner_role_raw": "專案經理（計算）；外業經理、內業經理、報價組（看過）",
+        "trigger_raw": "#17 完成",
+        "anchor_raw": "回傳單日期",
+        "deadline_raw": "+5 工作日",
+        "inputs_raw": "報價總表；合約明細工項；確認單參數；人力成本方案（外業／內業／行政）；行政區對照表；儀器費率",
+        "procedure_raw": "程式算 A 變動成本／B 報價成本／C 工務行政成本與各組工天、營業額拆分（外業／控制／圖資／報告／行政確認單營業額）→ 寫工程確認單（報價 Base，同步 v4）→ 產 PDF → 建 #59／#60／#61（下包時加 #20）子任務並分配",
+        "human_decision_raw": "PM 定稿；外業經理、內業經理、報價組 三方看過",
+        "outputs_raw": "工程確認單紀錄（PM 定稿）；三方看過紀錄；確認單 PDF；Meegle 必填：上傳確認單、分配任務；報價總表.提供給PM日期、確認單回傳開會日期",
+        "done_when_raw": "三方看過 + PM 定稿 + PDF 上傳",
+        "next_raw": "#59、#60、#61（、#20）",
+        "escalation_raw": "第 5 工作日未看完 → 私訊未看者",
+        "kpi_raw": "案件待出確認單(期程內)；案件未出確認單(逾期)",
+        "source_reference_raw": "Meegle#19；SOP圖1/2 期限「回簽合約後5日」",
+        "applicability_raw": null,
+        "unresolved_raw": "確認單自 8/25 起 0 張新單，124 欄公式要搬成程式；106 張舊單當測試題",
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N03"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "confirmation"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A23:U23",
+      "source_sheet_row": 23,
+      "source_row_key": "meegle-v137:A:59",
+      "raw": {
+        "source_group": "3 確認單",
+        "source_order": 2,
+        "meegle_id": 59,
+        "title": "外業確認單確認",
+        "source_kind": "confirm",
+        "owner_role_raw": "外業經理",
+        "trigger_raw": "#19 完成",
+        "anchor_raw": "確認單發出日",
+        "deadline_raw": "TODO（SOP 無）",
+        "inputs_raw": "工程確認單（外業段：工天、人數、儀器、里程、住宿）",
+        "procedure_raw": "推卡片給外業經理：確認／有異議（異議 → #22）；同時觸發派工迴圈 B2 建立工作總表",
+        "human_decision_raw": "是",
+        "outputs_raw": "確認紀錄",
+        "done_when_raw": "確認",
+        "next_raw": "#21 → #24（異議 → #22）",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#59；SOP圖2",
+        "applicability_raw": null,
+        "unresolved_raw": "確認期限",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N03"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "confirmation"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A24:U24",
+      "source_sheet_row": 24,
+      "source_row_key": "meegle-v137:A:60",
+      "raw": {
+        "source_group": "3 確認單",
+        "source_order": 3,
+        "meegle_id": 60,
+        "title": "內業確認單確認",
+        "source_kind": "confirm",
+        "owner_role_raw": "內業經理",
+        "trigger_raw": "#19 完成",
+        "anchor_raw": "確認單發出日",
+        "deadline_raw": "TODO（SOP 無）",
+        "inputs_raw": "工程確認單（內業段：控制／圖資／報告工天）",
+        "procedure_raw": "推卡片給內業經理：確認／有異議（異議 → #22）；觸發派工迴圈 B2（內業）",
+        "human_decision_raw": "是",
+        "outputs_raw": "確認紀錄",
+        "done_when_raw": "確認",
+        "next_raw": "#32（異議 → #22）",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#60；SOP圖2",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N03"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "confirmation"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A25:U25",
+      "source_sheet_row": 25,
+      "source_row_key": "meegle-v137:A:61",
+      "raw": {
+        "source_group": "3 確認單",
+        "source_order": 4,
+        "meegle_id": 61,
+        "title": "執行公務單確認(行政)",
+        "source_kind": "action",
+        "owner_role_raw": "工務助理（PM 轄下）／行政",
+        "trigger_raw": "#19 完成",
+        "anchor_raw": "確認單發出日",
+        "deadline_raw": "各項目依申請時限（TODO）",
+        "inputs_raw": "確認單 C 段（保險、出入場申請、履約保證金、航拍／水域申請、JSA、職安資料、合約製作…）",
+        "procedure_raw": "依 C 段項目在「工務行政事項」建立待辦（每項：申請、寄件、期限）；逐項追蹤到期；完成證明存檔",
+        "human_decision_raw": "是（行政執行）",
+        "outputs_raw": "工務行政事項紀錄；辦妥證明",
+        "done_when_raw": "全部項目完成",
+        "next_raw": "（橫向，終點）",
+        "escalation_raw": "到期前 3 日未完成 → 提醒行政；到期 → 通知 PM",
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#61；SOP圖1/2「執行保險、出入場申請、履約保證金、航拍申請等各項工務行政工項」",
+        "applicability_raw": null,
+        "unresolved_raw": "工務行政事項表目前只有 1 筆，要重新啟用；各申請的法定時限",
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N03"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "confirmation"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A26:U26",
+      "source_sheet_row": 26,
+      "source_row_key": "meegle-v137:A:22",
+      "raw": {
+        "source_group": "3 確認單",
+        "source_order": 5,
+        "meegle_id": 22,
+        "title": "確認單修正",
+        "source_kind": "action",
+        "owner_role_raw": "專案經理",
+        "trigger_raw": "#59／#60 有異議，或 #21 聯繫後發現差異",
+        "anchor_raw": "異議提出日",
+        "deadline_raw": "TODO",
+        "inputs_raw": "異議內容；工程確認單",
+        "procedure_raw": "重算受影響段 → 確認單新版本 → 只影響一組時由該組經理 + PM 確認，否則回 #19 會簽",
+        "human_decision_raw": "是",
+        "outputs_raw": "確認單 v2；版本記錄",
+        "done_when_raw": "新版確認",
+        "next_raw": "#24 / #23",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#22；SOP圖2",
+        "applicability_raw": null,
+        "unresolved_raw": "修正是否需重新三人會簽",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N03"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "confirmation"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A27:U27",
+      "source_sheet_row": 27,
+      "source_row_key": "meegle-v137:A:21",
+      "raw": {
+        "source_group": "4 外業",
+        "source_order": 1,
+        "meegle_id": 21,
+        "title": "外業派工前聯繫",
+        "source_kind": "action",
+        "owner_role_raw": "專案經理 → 外業組長",
+        "trigger_raw": "#59 確認 + 派工迴圈 B5 預排已核",
+        "anchor_raw": "預排出工日",
+        "deadline_raw": "派工前 3 工作日",
+        "inputs_raw": "工作預排(v4)；業主連絡；確認單；人員名單；儀器／車輛",
+        "procedure_raw": "向業主確認派工日期與進場（Mail／LINE，記錄業主往來紀錄表）；推派工卡給外業組長（案、日期、人、儀器、車、住宿）→ 組長「接單／有問題／看詳情」；有問題 → 回派工迴圈重排",
+        "human_decision_raw": "是：組長接單；PM 寄業主",
+        "outputs_raw": "Meegle 必填「聯繫各外業人員」；工作預排確認；聯絡證明",
+        "done_when_raw": "組長已接單 + 業主已確認日期",
+        "next_raw": "#22（有修正）/ #24",
+        "escalation_raw": "組長 2 小時未回 → 再提醒 → 4 小時 → 通知外業經理",
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#21；SOP圖2 期限「外業派工前3日」",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N04"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "field"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A28:U28",
+      "source_sheet_row": 28,
+      "source_row_key": "meegle-v137:A:24",
+      "raw": {
+        "source_group": "4 外業",
+        "source_order": 2,
+        "meegle_id": 24,
+        "title": "外業作業開始",
+        "source_kind": "confirm（會簽）",
+        "owner_role_raw": "外業經理、專案經理、行政經理",
+        "trigger_raw": "#21 完成",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "派工卡、確認單",
+        "procedure_raw": "三方確認開工（卡片）；啟動 #23 每 5 日計時、#25 每日出工流程、#26 節點追蹤",
+        "human_decision_raw": "會簽",
+        "outputs_raw": "開工記錄",
+        "done_when_raw": "三人確認",
+        "next_raw": "#25（、#32 若內外業並行）",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#24",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N04"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "field"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A29:U29",
+      "source_sheet_row": 29,
+      "source_row_key": "meegle-v137:A:25",
+      "raw": {
+        "source_group": "4 外業",
+        "source_order": 3,
+        "meegle_id": 25,
+        "title": "外業作業",
+        "source_kind": "action（每日）",
+        "owner_role_raw": "外業組長；專案經理",
+        "trigger_raw": "#24 完成",
+        "anchor_raw": "每個出工日",
+        "deadline_raw": "當日 24:00 前工作單通過",
+        "inputs_raw": "工作預排；外業工作單／外業成本單(v4)；出發／結束里程；天氣；儀器；合約填報工項",
+        "procedure_raw": "【外業 agent】07:00 出工提醒（案、地點、人、儀器、車）；17:30 三問（完成數量／面積、是否過夜、異常）→ 自動填外業工作單＋成本單（里程津貼、住宿津貼、儀器租金由程式算）→ QA 規則（沿用雲端日報稽核）→ 審核卡給內業／工務助理 → 核准／退回",
+        "human_decision_raw": "是：組長答三問；審核人核准／退回",
+        "outputs_raw": "外業工作單、外業成本單（檢核狀態＝已通過）；營業額＋津貼匯整明細（自動化）",
+        "done_when_raw": "當日工作單與成本單皆已通過",
+        "next_raw": "#26",
+        "escalation_raw": "21:00 未答三問 → 再問；24:00 未通過 → 進稽核卡；待檢核 >2 日 → 通知外業經理",
+        "kpi_raw": "繳交資料完整率；缺失單",
+        "source_reference_raw": "Meegle#25；SOP圖3 每日檢討",
+        "applicability_raw": null,
+        "unresolved_raw": "三問清單定稿；QA 規則清單（Cloudflare Worker）；v4 外業工作單 131 欄哪些由程式填",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N04"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "field"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A30:U30",
+      "source_sheet_row": 30,
+      "source_row_key": "meegle-v137:A:26",
+      "raw": {
+        "source_group": "4 外業",
+        "source_order": 4,
+        "meegle_id": 26,
+        "title": "外業節點追蹤",
+        "source_kind": "track",
+        "owner_role_raw": "外業經理、行政、專案經理",
+        "trigger_raw": "#25 每日",
+        "anchor_raw": "—",
+        "deadline_raw": "每日檢討",
+        "inputs_raw": "工作預排；外業工作單累計數量 vs 合約明細工項.外業數量；預估工天 vs 實際工天",
+        "procedure_raw": "算進度（完成率、工天偏差）→ 更新「預排、實際發生節點表」；偏差 → 提「工作預排需調整」給 PM（B9）；可階段完成 → 提醒 PM 判 #29",
+        "human_decision_raw": "否（偏差時 PM 決定）",
+        "outputs_raw": "進度；調整建議；節點表",
+        "done_when_raw": "外業數量達合約數量 或 PM 判階段完成",
+        "next_raw": "#29、#27",
+        "escalation_raw": null,
+        "kpi_raw": "案件逾期次數；總營業額達成率",
+        "source_reference_raw": "Meegle#26；SOP圖3「工作進度管控」",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N04"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "field"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A31:U31",
+      "source_sheet_row": 31,
+      "source_row_key": "meegle-v137:A:29",
+      "raw": {
+        "source_group": "4 外業",
+        "source_order": 5,
+        "meegle_id": 29,
+        "title": "外業完工或階段性通知",
+        "source_kind": "action",
+        "owner_role_raw": "專案經理",
+        "trigger_raw": "#26 判完工／階段",
+        "anchor_raw": "完工日",
+        "deadline_raw": "+2 工作日（通知）；+3 工作日（完工確認單）",
+        "inputs_raw": "進度、成果、業主連絡",
+        "procedure_raw": "草擬完工／階段通知（長期案件定期通知）→ 卡片 → 寄出；組長提交完工確認單 → PM 簽核",
+        "human_decision_raw": "是：PM 判階段完成（人類決策）+ 寄出；PM 簽完工確認單",
+        "outputs_raw": "聯絡證明；完工確認單",
+        "done_when_raw": "通知已寄 + 完工確認單簽核",
+        "next_raw": "#30",
+        "escalation_raw": null,
+        "kpi_raw": "案件逾期次數",
+        "source_reference_raw": "Meegle#29；SOP圖2 期限「外業完工後2日」；SOP圖3「工作完成後3日簽核確認單」",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N04"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "field"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A32:U32",
+      "source_sheet_row": 32,
+      "source_row_key": "meegle-v137:A:20",
+      "raw": {
+        "source_group": "4 外業",
+        "source_order": 6,
+        "meegle_id": 20,
+        "title": "下包出工",
+        "source_kind": "track（條件：#4＝有）",
+        "owner_role_raw": "專案經理",
+        "trigger_raw": "#19 完成且是否下包＝有",
+        "anchor_raw": "下包合約開工日",
+        "deadline_raw": "TODO",
+        "inputs_raw": "下包合約；下包回報",
+        "procedure_raw": "追蹤下包進度與回報；收下包成果；異常升級 PM",
+        "human_decision_raw": "是",
+        "outputs_raw": "下包回報報告",
+        "done_when_raw": "下包成果交付",
+        "next_raw": "#37",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#20",
+        "applicability_raw": "條件：僅下包案",
+        "unresolved_raw": "下包回報格式與頻率",
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N04"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "field"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A33:U33",
+      "source_sheet_row": 33,
+      "source_row_key": "meegle-v137:A:32",
+      "raw": {
+        "source_group": "5 控制／圖資／報告",
+        "source_order": 1,
+        "meegle_id": 32,
+        "title": "內業作業開始",
+        "source_kind": "confirm（會簽）",
+        "owner_role_raw": "專案經理、內業經理、行政經理",
+        "trigger_raw": "#60 確認（+ 外業資料到位，或與外業並行）",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "確認單（內業段）；外業成果到位狀態",
+        "procedure_raw": "三方確認；由確認單展開內業工作總表；開 控制／圖資／報告 三組子任務",
+        "human_decision_raw": "會簽",
+        "outputs_raw": "內業工作總表；三組子任務",
+        "done_when_raw": "三人確認",
+        "next_raw": "#33、#34、#35",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#32",
+        "applicability_raw": "控制／圖資／報告 共用",
+        "unresolved_raw": "內業是否等外業完工才開始；三組共用一個節點，工作台預設掛「控制」或複製三份",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N05",
+          "N06",
+          "N07"
+        ],
+        "instance_scope": "office_shared",
+        "reason": "PRD design: one shared interior-work task linked to applicable N05/N06/N07 nodes; never three independent copies.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "control",
+          "mapping",
+          "report"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A34:U34",
+      "source_sheet_row": 34,
+      "source_row_key": "meegle-v137:A:35",
+      "raw": {
+        "source_group": "5 控制／圖資／報告",
+        "source_order": 2,
+        "meegle_id": 35,
+        "title": "控制",
+        "source_kind": "action（每日）",
+        "owner_role_raw": "內業經理／控制組",
+        "trigger_raw": "#32",
+        "anchor_raw": "每個工作日",
+        "deadline_raw": "當日工作單通過",
+        "inputs_raw": "內業工作單／內業成本單(v4)；合約填報工項（控制）；內業營業額標準",
+        "procedure_raw": "【內業 agent】每日追內業工作單（工項、數量、工時）→ 自動建營業額明細（沿用自動化）→ 進度 vs 控制數量 → 組長審核卡",
+        "human_decision_raw": "組員填；組長審",
+        "outputs_raw": "內業工作單（控制）",
+        "done_when_raw": "控制工項數量達成",
+        "next_raw": "#36",
+        "escalation_raw": null,
+        "kpi_raw": "工作良率",
+        "source_reference_raw": "Meegle#35",
+        "applicability_raw": "控制",
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N05"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "control"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A35:U35",
+      "source_sheet_row": 35,
+      "source_row_key": "meegle-v137:A:34",
+      "raw": {
+        "source_group": "5 控制／圖資／報告",
+        "source_order": 3,
+        "meegle_id": 34,
+        "title": "圖資",
+        "source_kind": "action（每日）",
+        "owner_role_raw": "內業經理／圖報組",
+        "trigger_raw": "#32",
+        "anchor_raw": "每個工作日",
+        "deadline_raw": "當日工作單通過",
+        "inputs_raw": "內業工作單／成本單；合約填報工項（圖資）",
+        "procedure_raw": "同 #35（圖資）",
+        "human_decision_raw": "組員填；組長審",
+        "outputs_raw": "內業工作單（圖資）",
+        "done_when_raw": "圖資工項數量達成",
+        "next_raw": "#36",
+        "escalation_raw": null,
+        "kpi_raw": "工作良率",
+        "source_reference_raw": "Meegle#34",
+        "applicability_raw": "圖資",
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N06"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "mapping"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A36:U36",
+      "source_sheet_row": 36,
+      "source_row_key": "meegle-v137:A:33",
+      "raw": {
+        "source_group": "5 控制／圖資／報告",
+        "source_order": 4,
+        "meegle_id": 33,
+        "title": "報告",
+        "source_kind": "action（每日）",
+        "owner_role_raw": "內業經理／圖報組",
+        "trigger_raw": "#32",
+        "anchor_raw": "每個工作日",
+        "deadline_raw": "當日工作單通過",
+        "inputs_raw": "內業工作單／成本單；合約填報工項（報告）；案件技師",
+        "procedure_raw": "同 #35（報告）；需技師簽證時建簽證任務",
+        "human_decision_raw": "組員填；組長審；技師簽證",
+        "outputs_raw": "內業工作單（報告）；報告成果",
+        "done_when_raw": "報告工項數量達成",
+        "next_raw": "#36",
+        "escalation_raw": null,
+        "kpi_raw": "工作良率",
+        "source_reference_raw": "Meegle#33",
+        "applicability_raw": "報告",
+        "unresolved_raw": "技師簽證流程是否要獨立節點",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N07"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "report"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A37:U37",
+      "source_sheet_row": 37,
+      "source_row_key": "meegle-v137:A:36",
+      "raw": {
+        "source_group": "5 控制／圖資／報告",
+        "source_order": 5,
+        "meegle_id": 36,
+        "title": "內業節點追蹤",
+        "source_kind": "track",
+        "owner_role_raw": "內業經理、行政",
+        "trigger_raw": "#33／#34／#35 每日",
+        "anchor_raw": "—",
+        "deadline_raw": "每日檢討",
+        "inputs_raw": "內業工作單累計 vs 控制／圖資／報告數量；預估工天 vs 實際",
+        "procedure_raw": "進度彙整、偏差 → 預排調整（B9）；三組皆完成 → 觸發 #37",
+        "human_decision_raw": "否",
+        "outputs_raw": "進度；節點表",
+        "done_when_raw": "三組完成",
+        "next_raw": "#37、#27",
+        "escalation_raw": null,
+        "kpi_raw": "案件逾期次數",
+        "source_reference_raw": "Meegle#36",
+        "applicability_raw": "控制／圖資／報告 共用",
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N05",
+          "N06",
+          "N07"
+        ],
+        "instance_scope": "office_shared",
+        "reason": "PRD design: one shared interior-work task linked to applicable N05/N06/N07 nodes; never three independent copies.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "control",
+          "mapping",
+          "report"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A38:U38",
+      "source_sheet_row": 38,
+      "source_row_key": "meegle-v137:A:37",
+      "raw": {
+        "source_group": "6 計價請款",
+        "source_order": 1,
+        "meegle_id": 37,
+        "title": "提交成果及計價數量",
+        "source_kind": "action（會簽）",
+        "owner_role_raw": "專案經理、行政經理（工務助理（PM 轄下）執行）",
+        "trigger_raw": "#36 完成（下包時含 #20）",
+        "anchor_raw": "成果繳交日",
+        "deadline_raw": "+0 工作日",
+        "inputs_raw": "內外業工作單累計數量；合約明細工項；成果檔",
+        "procedure_raw": "彙整計價數量表（逐項：合約數量 vs 完成數量 vs 本期計價）；整理成果清單；填成果繳交日期",
+        "human_decision_raw": "會簽",
+        "outputs_raw": "Meegle 必填：成果繳交日期、提交成果與計價數量；計價數量表",
+        "done_when_raw": "會簽 + 數量表",
+        "next_raw": "#38",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#37；SOP圖2 期限「成果繳交0日」",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N08"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "pricing"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A39:U39",
+      "source_sheet_row": 39,
+      "source_row_key": "meegle-v137:A:38",
+      "raw": {
+        "source_group": "6 計價請款",
+        "source_order": 2,
+        "meegle_id": 38,
+        "title": "通知業主成果已繳交 業主確認計價單內容",
+        "source_kind": "action",
+        "owner_role_raw": "專案經理、工務助理（PM 轄下）",
+        "trigger_raw": "#37 完成",
+        "anchor_raw": "成果繳交日",
+        "deadline_raw": "+0 工作日",
+        "inputs_raw": "成果清單、計價數量表、業主連絡",
+        "procedure_raw": "草擬繳交通知（附成果清單、計價數量）→ 卡片 → 寄出；記錄",
+        "human_decision_raw": "是（對外訊息）",
+        "outputs_raw": "通知證明",
+        "done_when_raw": "已寄",
+        "next_raw": "#39、#30",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#38",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N08"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "pricing"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A40:U40",
+      "source_sheet_row": 40,
+      "source_row_key": "meegle-v137:A:39",
+      "raw": {
+        "source_group": "6 計價請款",
+        "source_order": 3,
+        "meegle_id": 39,
+        "title": "成果是否需補充修改",
+        "source_kind": "gate／track",
+        "owner_role_raw": "專案經理、工務助理（PM 轄下）",
+        "trigger_raw": "#38 完成",
+        "anchor_raw": "成果繳交日",
+        "deadline_raw": "每 5 工作日檢查",
+        "inputs_raw": "業主回覆",
+        "procedure_raw": "每 5 日詢問／偵測業主回覆；需修改 → 建修改任務回 #33／#34／#35（重做）；需展延 → #18",
+        "human_decision_raw": "是（PM 判重做：人類決策）",
+        "outputs_raw": "Meegle 必填「成果補充修改＝是／否」",
+        "done_when_raw": "業主確認無需修改",
+        "next_raw": "否→#40→#41；是→內業修改",
+        "escalation_raw": "3 輪仍需修改 → 通知副總",
+        "kpi_raw": "客戶滿意度",
+        "source_reference_raw": "Meegle#39；SOP圖2 期限「提交成果後每5日」",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N08"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "pricing"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A41:U41",
+      "source_sheet_row": 41,
+      "source_row_key": "meegle-v137:A:40",
+      "raw": {
+        "source_group": "6 計價請款",
+        "source_order": 4,
+        "meegle_id": 40,
+        "title": "否（分支出口）",
+        "source_kind": "branch",
+        "owner_role_raw": "—",
+        "trigger_raw": "#39 = 否",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "—",
+        "procedure_raw": "自動通過",
+        "human_decision_raw": "否",
+        "outputs_raw": "—",
+        "done_when_raw": "—",
+        "next_raw": "#41",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#40",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "routing_reference",
+        "candidate_node_keys": [
+          "N08"
+        ],
+        "instance_scope": "case",
+        "reason": "Keep as reference metadata; do not create an ordinary checklist task or execute source automation.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "pricing"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A42:U42",
+      "source_sheet_row": 42,
+      "source_row_key": "meegle-v137:A:30",
+      "raw": {
+        "source_group": "6 計價請款",
+        "source_order": 5,
+        "meegle_id": 30,
+        "title": "是否達成請款條件",
+        "source_kind": "gate",
+        "owner_role_raw": "專案經理",
+        "trigger_raw": "#29（階段）或 #38",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "報價總表.付款條件（結構化後）；完工／繳交證據",
+        "procedure_raw": "比對付款條件（例：外業完成 30%、成果繳交 60%、驗收 10%）→ 建議達成與否 + 需上傳的證據清單",
+        "human_decision_raw": "是（PM 上傳證據並確認）",
+        "outputs_raw": "Meegle 必填：上傳是否達成計價條件之證據；可達成請款條件日期",
+        "done_when_raw": "證據已上傳 + 日期有值",
+        "next_raw": "#31 → #41",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#30",
+        "applicability_raw": null,
+        "unresolved_raw": "付款條件結構化",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N08"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "pricing"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A43:U43",
+      "source_sheet_row": 43,
+      "source_row_key": "meegle-v137:A:31",
+      "raw": {
+        "source_group": "6 計價請款",
+        "source_order": 6,
+        "meegle_id": 31,
+        "title": "是（分支出口，需填可達成請款條件日期）",
+        "source_kind": "branch",
+        "owner_role_raw": "專案經理",
+        "trigger_raw": "#30 = 是",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "—",
+        "procedure_raw": "自動通過；要求填日期",
+        "human_decision_raw": "否",
+        "outputs_raw": "可達成請款條件日期",
+        "done_when_raw": "日期有值",
+        "next_raw": "#41",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#31",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "routing_reference",
+        "candidate_node_keys": [
+          "N08"
+        ],
+        "instance_scope": "case",
+        "reason": "Route reference only. Preserve the required billing-eligibility date and surface it on the linked billing task detail; do not discard the source obligation.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "pricing"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A44:U44",
+      "source_sheet_row": 44,
+      "source_row_key": "meegle-v137:A:41",
+      "raw": {
+        "source_group": "6 計價請款",
+        "source_order": 7,
+        "meegle_id": 41,
+        "title": "繳交計價單",
+        "source_kind": "action（會簽）",
+        "owner_role_raw": "專案經理、行政經理",
+        "trigger_raw": "#31 與 #40 皆完成",
+        "anchor_raw": "達成計價條件日",
+        "deadline_raw": "+3 工作日",
+        "inputs_raw": "計價數量表；合約明細工項.合約單價；累計已請款；保留款規則",
+        "procedure_raw": "產計價單（逐項金額、本期／累計、保留款）→ 會簽 → 送業主；更新累計計價金額",
+        "human_decision_raw": "會簽 + 送出",
+        "outputs_raw": "計價單；報價總表.累計計價金額；Meegle 必填「繳交計價單」",
+        "done_when_raw": "會簽 + 已送",
+        "next_raw": "#43、#42、#27",
+        "escalation_raw": null,
+        "kpi_raw": "案件逾期次數",
+        "source_reference_raw": "Meegle#41；SOP圖2 期限「達成計價條件後3日」",
+        "applicability_raw": null,
+        "unresolved_raw": "計價單範本；保留款規則",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N08"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "pricing"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A45:U45",
+      "source_sheet_row": 45,
+      "source_row_key": "meegle-v137:A:42",
+      "raw": {
+        "source_group": "6 計價請款",
+        "source_order": 8,
+        "meegle_id": 42,
+        "title": "初次繳交確認單",
+        "source_kind": "confirm",
+        "owner_role_raw": "—",
+        "trigger_raw": "#41",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "—",
+        "procedure_raw": "歸檔",
+        "human_decision_raw": "否",
+        "outputs_raw": "—",
+        "done_when_raw": "—",
+        "next_raw": "（終點）",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#42",
+        "applicability_raw": null,
+        "unresolved_raw": "疑為「完工確認單」（內外業經理 SOP：工作完成後 3 日由組長提交、PM 簽核）；建議改掛各組完成節點，與 #29 合併",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "review_required",
+        "candidate_node_keys": [
+          "N08"
+        ],
+        "instance_scope": "case",
+        "reason": "Meaning/owner/completion and suggested merge are unresolved in the workbook. Default unselected until template owner reviews.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "pricing"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A46:U46",
+      "source_sheet_row": 46,
+      "source_row_key": "meegle-v137:A:43",
+      "raw": {
+        "source_group": "6 計價請款",
+        "source_order": 9,
+        "meegle_id": 43,
+        "title": "案件請款，進行客戶滿意度調查",
+        "source_kind": "action",
+        "owner_role_raw": "行政經理",
+        "trigger_raw": "#41 完成",
+        "anchor_raw": "計價單送出日",
+        "deadline_raw": "TODO",
+        "inputs_raw": "計價單；業主資料（統編、地址）；發票資訊",
+        "procedure_raw": "產請款文件（發票申請、請款函）→ 行政按送出；寄滿意度調查表；記錄",
+        "human_decision_raw": "是（請款單送出：人類決策）",
+        "outputs_raw": "Meegle 必填：請款證明、滿意度調查回復；報價總表.累計已請款",
+        "done_when_raw": "請款證明已上傳",
+        "next_raw": "#44",
+        "escalation_raw": null,
+        "kpi_raw": "客戶滿意度",
+        "source_reference_raw": "Meegle#43；SOP圖2",
+        "applicability_raw": null,
+        "unresolved_raw": "電子發票／會計系統未串接（v2）；滿意度問卷格式",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N08"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "pricing"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A47:U47",
+      "source_sheet_row": 47,
+      "source_row_key": "meegle-v137:A:44",
+      "raw": {
+        "source_group": "7 入帳結算",
+        "source_order": 1,
+        "meegle_id": 44,
+        "title": "是否入帳",
+        "source_kind": "gate／track",
+        "owner_role_raw": "行政經理",
+        "trigger_raw": "#43 完成",
+        "anchor_raw": "請款日",
+        "deadline_raw": "請款後每 5 工作日檢查",
+        "inputs_raw": "入帳日期；收據／匯款水單／驗收單",
+        "procedure_raw": "每 5 日問行政是否入帳（v2：讀會計匯入）；入帳 → 寫入帳日期、案件已入帳＝勾",
+        "human_decision_raw": "是（行政確認並上傳水單）",
+        "outputs_raw": "Meegle 必填：是否入帳、收據／水單／驗收單；報價總表.入帳日期、案件已入帳",
+        "done_when_raw": "入帳",
+        "next_raw": "是→#48→#49；否→#45→#46",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#44；SOP圖2 期限「請款後每5日」",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N09"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "settlement"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A48:U48",
+      "source_sheet_row": 48,
+      "source_row_key": "meegle-v137:A:45",
+      "raw": {
+        "source_group": "7 入帳結算",
+        "source_order": 2,
+        "meegle_id": 45,
+        "title": "否（分支出口）",
+        "source_kind": "branch",
+        "owner_role_raw": "—",
+        "trigger_raw": "#44 = 否",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "—",
+        "procedure_raw": "自動通過",
+        "human_decision_raw": "否",
+        "outputs_raw": "—",
+        "done_when_raw": "—",
+        "next_raw": "#46",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#45",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "routing_reference",
+        "candidate_node_keys": [
+          "N09"
+        ],
+        "instance_scope": "case",
+        "reason": "Keep as reference metadata; do not create an ordinary checklist task or execute source automation.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "settlement"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A49:U49",
+      "source_sheet_row": 49,
+      "source_row_key": "meegle-v137:A:46",
+      "raw": {
+        "source_group": "7 入帳結算",
+        "source_order": 3,
+        "meegle_id": 46,
+        "title": "請款情況追蹤",
+        "source_kind": "track",
+        "owner_role_raw": "行政經理",
+        "trigger_raw": "#45",
+        "anchor_raw": "請款日",
+        "deadline_raw": "每 5 工作日",
+        "inputs_raw": "請款日、業主連絡、付款條件",
+        "procedure_raw": "草擬催款 → 行政寄出；第 15 日升級 PM；計價條件變動 → #47",
+        "human_decision_raw": "是（對外訊息）",
+        "outputs_raw": "催款記錄",
+        "done_when_raw": "入帳 或 計價條件變動",
+        "next_raw": "#44 / #47",
+        "escalation_raw": "第 15 日 → 通知 PM；第 30 日 → 通知副總",
+        "kpi_raw": "應收未收",
+        "source_reference_raw": "Meegle#46",
+        "applicability_raw": null,
+        "unresolved_raw": "催款階梯定稿",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N09"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "settlement"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A50:U50",
+      "source_sheet_row": 50,
+      "source_row_key": "meegle-v137:A:47",
+      "raw": {
+        "source_group": "7 入帳結算",
+        "source_order": 4,
+        "meegle_id": 47,
+        "title": "計價條件變動(回到繳交計價單)",
+        "source_kind": "branch",
+        "owner_role_raw": "—",
+        "trigger_raw": "#46 發現條件變動",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "—",
+        "procedure_raw": "記錄變動原因 → 回 #41",
+        "human_decision_raw": "否",
+        "outputs_raw": "變動記錄",
+        "done_when_raw": "—",
+        "next_raw": "#41",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#47",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "routing_reference",
+        "candidate_node_keys": [
+          "N09"
+        ],
+        "instance_scope": "case",
+        "reason": "Route reference only. Preserve the change-reason and return-to-pricing instruction; do not start a workflow loop.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "settlement"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A51:U51",
+      "source_sheet_row": 51,
+      "source_row_key": "meegle-v137:A:48",
+      "raw": {
+        "source_group": "7 入帳結算",
+        "source_order": 5,
+        "meegle_id": 48,
+        "title": "是（分支出口）",
+        "source_kind": "branch",
+        "owner_role_raw": "—",
+        "trigger_raw": "#44 = 是",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "—",
+        "procedure_raw": "自動通過",
+        "human_decision_raw": "否",
+        "outputs_raw": "—",
+        "done_when_raw": "—",
+        "next_raw": "#49",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#48",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "routing_reference",
+        "candidate_node_keys": [
+          "N09"
+        ],
+        "instance_scope": "case",
+        "reason": "Keep as reference metadata; do not create an ordinary checklist task or execute source automation.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "settlement"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A52:U52",
+      "source_sheet_row": 52,
+      "source_row_key": "meegle-v137:A:49",
+      "raw": {
+        "source_group": "7 入帳結算",
+        "source_order": 6,
+        "meegle_id": 49,
+        "title": "是否有下包",
+        "source_kind": "gate",
+        "owner_role_raw": "—",
+        "trigger_raw": "#48",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "報價總表.下包廠商",
+        "procedure_raw": "自動判（有下包廠商＝有）；有 → 要求上傳下包回報報告",
+        "human_decision_raw": "否",
+        "outputs_raw": "Meegle 必填「上傳下包回報報告」",
+        "done_when_raw": "判定完成",
+        "next_raw": "有→#53→#54；無→#50→#51",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#49",
+        "applicability_raw": "條件：僅下包案",
+        "unresolved_raw": null,
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N09"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "settlement"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A53:U53",
+      "source_sheet_row": 53,
+      "source_row_key": "meegle-v137:A:50",
+      "raw": {
+        "source_group": "7 入帳結算",
+        "source_order": 7,
+        "meegle_id": 50,
+        "title": "無（分支出口）",
+        "source_kind": "branch",
+        "owner_role_raw": "—",
+        "trigger_raw": "#49 = 無",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "—",
+        "procedure_raw": "自動通過",
+        "human_decision_raw": "否",
+        "outputs_raw": "—",
+        "done_when_raw": "—",
+        "next_raw": "#51",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#50",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "routing_reference",
+        "candidate_node_keys": [
+          "N09"
+        ],
+        "instance_scope": "case",
+        "reason": "Keep as reference metadata; do not create an ordinary checklist task or execute source automation.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "settlement"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A54:U54",
+      "source_sheet_row": 54,
+      "source_row_key": "meegle-v137:A:53",
+      "raw": {
+        "source_group": "7 入帳結算",
+        "source_order": 8,
+        "meegle_id": 53,
+        "title": "有（分支出口）",
+        "source_kind": "branch",
+        "owner_role_raw": "—",
+        "trigger_raw": "#49 = 有",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "—",
+        "procedure_raw": "自動通過",
+        "human_decision_raw": "否",
+        "outputs_raw": "—",
+        "done_when_raw": "—",
+        "next_raw": "#54",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#53",
+        "applicability_raw": "條件：僅下包案",
+        "unresolved_raw": null,
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "routing_reference",
+        "candidate_node_keys": [
+          "N09"
+        ],
+        "instance_scope": "case",
+        "reason": "Keep as reference metadata; do not create an ordinary checklist task or execute source automation.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "settlement"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A55:U55",
+      "source_sheet_row": 55,
+      "source_row_key": "meegle-v137:A:54",
+      "raw": {
+        "source_group": "7 入帳結算",
+        "source_order": 9,
+        "meegle_id": 54,
+        "title": "通知下包廠商請款及撥款",
+        "source_kind": "action",
+        "owner_role_raw": "行政",
+        "trigger_raw": "#53",
+        "anchor_raw": "入帳日",
+        "deadline_raw": "TODO",
+        "inputs_raw": "下包合約；下包成本；約定帳戶",
+        "procedure_raw": "通知下包請款；建撥款申請（支出單審批）→ 行政送審",
+        "human_decision_raw": "是（撥款核准）",
+        "outputs_raw": "支出單；通知記錄",
+        "done_when_raw": "撥款申請已送",
+        "next_raw": "#55",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#54",
+        "applicability_raw": "條件：僅下包案",
+        "unresolved_raw": "撥款核准人",
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N09"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "settlement"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A56:U56",
+      "source_sheet_row": 56,
+      "source_row_key": "meegle-v137:A:55",
+      "raw": {
+        "source_group": "7 入帳結算",
+        "source_order": 10,
+        "meegle_id": 55,
+        "title": "下包入帳追蹤",
+        "source_kind": "track",
+        "owner_role_raw": "行政經理",
+        "trigger_raw": "#54",
+        "anchor_raw": "下包請款日",
+        "deadline_raw": "每 5 工作日",
+        "inputs_raw": "支出單狀態",
+        "procedure_raw": "追蹤撥款完成；未付 → 提醒",
+        "human_decision_raw": "是",
+        "outputs_raw": "付款記錄",
+        "done_when_raw": "下包款已付",
+        "next_raw": "#56",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#55；SOP圖2 期限「下包請款後每5日」",
+        "applicability_raw": "條件：僅下包案",
+        "unresolved_raw": null,
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N09"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "settlement"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A57:U57",
+      "source_sheet_row": 57,
+      "source_row_key": "meegle-v137:A:56",
+      "raw": {
+        "source_group": "7 入帳結算",
+        "source_order": 11,
+        "meegle_id": 56,
+        "title": "入帳",
+        "source_kind": "confirm（會簽）",
+        "owner_role_raw": "行政經理、專案經理",
+        "trigger_raw": "#55",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "付款記錄",
+        "procedure_raw": "雙方確認下包款項已結清",
+        "human_decision_raw": "會簽",
+        "outputs_raw": "確認記錄",
+        "done_when_raw": "兩人確認",
+        "next_raw": "#51",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#56",
+        "applicability_raw": "條件：僅下包案",
+        "unresolved_raw": null,
+        "version_note_raw": "v0.2"
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N09"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "settlement"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A58:U58",
+      "source_sheet_row": 58,
+      "source_row_key": "meegle-v137:A:51",
+      "raw": {
+        "source_group": "7 入帳結算",
+        "source_order": 12,
+        "meegle_id": 51,
+        "title": "案件結算表製作",
+        "source_kind": "action",
+        "owner_role_raw": "副總、專案經理、工務助理",
+        "trigger_raw": "#50 或 #56",
+        "anchor_raw": "入帳日",
+        "deadline_raw": "TODO（SOP 圖：每月結算）",
+        "inputs_raw": "案件累計成本／營業額／津貼（v4）；工程確認單（預估）；計價／入帳；外業工作單實際工天",
+        "procedure_raw": "程式產結算表：預估 vs 實際（工天、成本、毛利）；各組案件結算表／阿米巴計算表；回饋定價引擎（產能、成本係數）",
+        "human_decision_raw": "是（副總核准：結案決策）",
+        "outputs_raw": "案件結算表；報價總表.實際毛利率等；定價引擎更新記錄；Meegle 必填「上傳案件結算表」",
+        "done_when_raw": "副總核准",
+        "next_raw": "#52",
+        "escalation_raw": null,
+        "kpi_raw": "總營業額達成率",
+        "source_reference_raw": "Meegle#51；SOP圖2/3",
+        "applicability_raw": null,
+        "unresolved_raw": "結算表範本；阿米巴計算規則",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N09"
+        ],
+        "instance_scope": "case",
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "settlement"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A59:U59",
+      "source_sheet_row": 59,
+      "source_row_key": "meegle-v137:A:52",
+      "raw": {
+        "source_group": "7 入帳結算",
+        "source_order": 13,
+        "meegle_id": 52,
+        "title": "案件結束",
+        "source_kind": "terminal",
+        "owner_role_raw": "—",
+        "trigger_raw": "#51 核准",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "結算表",
+        "procedure_raw": "上傳結案證明與結案會議紀錄；關閉案件群；歸檔；Meegle 結案",
+        "human_decision_raw": "是（結案會議）",
+        "outputs_raw": "Meegle 必填：結案證明、結案會議紀錄",
+        "done_when_raw": "兩項已上傳",
+        "next_raw": "—",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#52",
+        "applicability_raw": null,
+        "unresolved_raw": null,
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "task",
+        "candidate_node_keys": [
+          "N09"
+        ],
+        "instance_scope": "case",
+        "reason": "PRD design: retain as a closure-evidence checklist task because source requires human meeting/evidence, despite terminal kind. Does not close the business case automatically.",
+        "is_business_approval": false,
+        "target_branch_node_keys": [
+          "settlement"
+        ]
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A60:U60",
+      "source_sheet_row": 60,
+      "source_row_key": "meegle-v137:A:27",
+      "raw": {
+        "source_group": "例行（不屬單一案件）",
+        "source_order": 1,
+        "meegle_id": 27,
+        "title": "節點檢討與紀錄",
+        "source_kind": "routine",
+        "owner_role_raw": "行政經理",
+        "trigger_raw": "每週五（工作台例行「週五週檢討」）",
+        "anchor_raw": "—",
+        "deadline_raw": "每週",
+        "inputs_raw": "本週所有案件節點狀態；逾期；違反 SOP 計數；缺失單",
+        "procedure_raw": "產週檢討卡（各案逾期節點、違反 SOP 次數、缺失單）→ 併入現有主管週報卡（週五 19:30）",
+        "human_decision_raw": "否",
+        "outputs_raw": "週檢討紀錄",
+        "done_when_raw": "已發送",
+        "next_raw": "#28",
+        "escalation_raw": null,
+        "kpi_raw": "案件逾期次數；違反SOP次數",
+        "source_reference_raw": "Meegle#27；SOP圖2/3「每周檢討」",
+        "applicability_raw": null,
+        "unresolved_raw": "Meegle 有兩個同名節點（#27、#57），建議做成例行任務而非案件子任務",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "routine_excluded",
+        "candidate_node_keys": [],
+        "instance_scope": "case",
+        "reason": "Workbook classifies this outside a single case. Do not instantiate per case.",
+        "is_business_approval": false,
+        "target_branch_node_keys": []
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A61:U61",
+      "source_sheet_row": 61,
+      "source_row_key": "meegle-v137:A:57",
+      "raw": {
+        "source_group": "例行（不屬單一案件）",
+        "source_order": 2,
+        "meegle_id": 57,
+        "title": "節點檢討與紀錄（計價段）",
+        "source_kind": "routine",
+        "owner_role_raw": "行政經理",
+        "trigger_raw": "同 #27",
+        "anchor_raw": "—",
+        "deadline_raw": "每週",
+        "inputs_raw": "同 #27",
+        "procedure_raw": "同 #27（合併）",
+        "human_decision_raw": "否",
+        "outputs_raw": "—",
+        "done_when_raw": "—",
+        "next_raw": "#58",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#57",
+        "applicability_raw": null,
+        "unresolved_raw": "與 #27 合併",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "routine_excluded",
+        "candidate_node_keys": [],
+        "instance_scope": "case",
+        "reason": "Workbook classifies this outside a single case. Do not instantiate per case.",
+        "is_business_approval": false,
+        "target_branch_node_keys": []
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A62:U62",
+      "source_sheet_row": 62,
+      "source_row_key": "meegle-v137:A:28",
+      "raw": {
+        "source_group": "例行（不屬單一案件）",
+        "source_order": 3,
+        "meegle_id": 28,
+        "title": "考評與結算計算",
+        "source_kind": "disabled",
+        "owner_role_raw": "行政經理",
+        "trigger_raw": "（業主已停用）",
+        "anchor_raw": "—",
+        "deadline_raw": "每月",
+        "inputs_raw": "考評指標：報價逾期次數、案件逾期次數、違反SOP次數、客戶滿意度、營業額達成率、工作良率",
+        "procedure_raw": "停用；若恢復：agent 每月自動算指標、產月考評與結算表，不自動考評人",
+        "human_decision_raw": "—",
+        "outputs_raw": "—",
+        "done_when_raw": "—",
+        "next_raw": "—",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#28；SOP圖 考評指標",
+        "applicability_raw": null,
+        "unresolved_raw": "是否由 agent 自動產月報但不做考評",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "disabled_excluded",
+        "candidate_node_keys": [],
+        "instance_scope": "case",
+        "reason": "Workbook explicitly marks disabled. Keep in the catalog; do not instantiate.",
+        "is_business_approval": false,
+        "target_branch_node_keys": []
+      }
+    },
+    {
+      "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A63:U63",
+      "source_sheet_row": 63,
+      "source_row_key": "meegle-v137:A:58",
+      "raw": {
+        "source_group": "例行（不屬單一案件）",
+        "source_order": 4,
+        "meegle_id": 58,
+        "title": "考評與結算計算（計價段）",
+        "source_kind": "disabled",
+        "owner_role_raw": "行政經理",
+        "trigger_raw": "（業主已停用）",
+        "anchor_raw": "—",
+        "deadline_raw": "—",
+        "inputs_raw": "同 #28",
+        "procedure_raw": "同 #28（合併）",
+        "human_decision_raw": "—",
+        "outputs_raw": "—",
+        "done_when_raw": "—",
+        "next_raw": "—",
+        "escalation_raw": null,
+        "kpi_raw": null,
+        "source_reference_raw": "Meegle#58",
+        "applicability_raw": null,
+        "unresolved_raw": "與 #28 合併",
+        "version_note_raw": null
+      },
+      "proposed_import": {
+        "disposition": "disabled_excluded",
+        "candidate_node_keys": [],
+        "instance_scope": "case",
+        "reason": "Workbook explicitly marks disabled. Keep in the catalog; do not instantiate.",
+        "is_business_approval": false,
+        "target_branch_node_keys": []
+      }
+    }
+  ],
+  "reference_only_sheets": {
+    "D 說明與統計": {
+      "rows": [
+        {
+          "worksheet_row": 1,
+          "values": [
+            "Plumb · 節點 playbook v0.2",
+            "每列一個節點。結構化欄位給 agent 解譯器讀；白話說明之後放各節點的 Lark Doc。可直接匯入 Lark Base 成「節點 playbook」表。",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 2,
+          "values": [
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 3,
+          "values": [
+            "來源",
+            "Meegle 主範本「詠翔接案SOP」v137 的 62 節點（2026-09-29 快照，取自產品盤點 2.2）＋ 業主 SOP 圖 4 張（20250826：專案經理接案、專案經理案件執行、內外業經理案件執行、內外業經理教育訓練）＋ 工作台 9 大節點／27 子任務的工作日期限規則（盤點 2.3）。期限皆為工作日。",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 4,
+          "values": [
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 5,
+          "values": [
+            "欄位",
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 6,
+          "values": [
+            "大節點",
+            "工作台 9 大節點：1 報價 / 2 PM 派工 / 3 確認單 / 4 外業 / 5 控制／圖資／報告 / 6 計價請款 / 7 入帳結算；另有「例行」(不屬單一案件)、B 派工迴圈、C 能力地圖",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 7,
+          "values": [
+            "類型 kind",
+            "action＝agent 產出東西、人核；gate＝判斷分支；track＝定時追蹤；confirm＝人確認證據；branch＝分支出口（自動）；terminal＝終點；routine＝例行；disabled＝業主停用；data＝資料來源",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 8,
+          "values": [
+            "觸發 / 起算點 / 期限",
+            "觸發＝哪個事件讓節點開始；起算點＝期限從哪個日期算；期限＝SOP 圖或工作台規則（工作日）。TODO＝SOP 沒定義",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 9,
+          "values": [
+            "讀取 / 產出",
+            "agent 讀寫的表與欄位。v4 為系統記錄；報價總表、合約明細工項、工程確認單在報價 Base 並同步 v4",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 10,
+          "values": [
+            "人類決策",
+            "「是」的節點會發卡片等人按；「否」的節點 agent 自己判定並留審計",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 11,
+          "values": [
+            "升級",
+            "沒人按、逾期時的升級階梯",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 12,
+          "values": [
+            "TODO／待確認（橘底）",
+            "SOP 沒寫、或 Meegle 與 SOP 圖不一致、或資料目前不足。請業主逐格確認",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 13,
+          "values": [
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 14,
+          "values": [
+            "統計",
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 15,
+          "values": [
+            "大節點",
+            "節點數（A 表）",
+            "其中要人按的"
+          ]
+        },
+        {
+          "worksheet_row": 16,
+          "values": [
+            "1 報價",
+            16,
+            5
+          ]
+        },
+        {
+          "worksheet_row": 17,
+          "values": [
+            "2 PM 派工",
+            4,
+            3
+          ]
+        },
+        {
+          "worksheet_row": 18,
+          "values": [
+            "3 確認單",
+            5,
+            5
+          ]
+        },
+        {
+          "worksheet_row": 19,
+          "values": [
+            "4 外業",
+            6,
+            5
+          ]
+        },
+        {
+          "worksheet_row": 20,
+          "values": [
+            "5 控制／圖資／報告",
+            5,
+            4
+          ]
+        },
+        {
+          "worksheet_row": 21,
+          "values": [
+            "6 計價請款",
+            9,
+            6
+          ]
+        },
+        {
+          "worksheet_row": 22,
+          "values": [
+            "7 入帳結算",
+            13,
+            7
+          ]
+        },
+        {
+          "worksheet_row": 23,
+          "values": [
+            "例行（不屬單一案件）",
+            4,
+            0
+          ]
+        },
+        {
+          "worksheet_row": 24,
+          "values": [
+            "合計",
+            62,
+            35
+          ]
+        },
+        {
+          "worksheet_row": 25,
+          "values": [
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 26,
+          "values": [
+            "類型",
+            "節點數（A 表）",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 27,
+          "values": [
+            "action",
+            20,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 28,
+          "values": [
+            "gate",
+            7,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 29,
+          "values": [
+            "track",
+            8,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 30,
+          "values": [
+            "confirm",
+            9,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 31,
+          "values": [
+            "branch",
+            12,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 32,
+          "values": [
+            "terminal",
+            2,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 33,
+          "values": [
+            "routine",
+            2,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 34,
+          "values": [
+            "disabled",
+            2,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 35,
+          "values": [
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 36,
+          "values": [
+            "待確認清單（從 TODO 欄彙整）",
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 37,
+          "values": [
+            "1. Start（1 報價 · Meegle#0）",
+            "Email 進件尚未串接（程式裡沒有 SMTP/IMAP），v1 以報價總表新增列為觸發",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 38,
+          "values": [
+            "2. 業主提出報價需求（1 報價 · Meegle#1）",
+            "需求卡的必填欄位清單要跟報價組定稿；案件類型 55% 空、執行地點 47% 空，agent 必須補齊",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 39,
+          "values": [
+            "3. 建立報價編號（1 報價 · Meegle#2）",
+            "報價編號格式規則",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 40,
+          "values": [
+            "4. 是否有下包需求（1 報價 · Meegle#4）",
+            "公司提供下包規則清單",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 41,
+          "values": [
+            "5. 下包提出報價（1 報價 · Meegle#7）",
+            "下包詢價期限；簽呈金額門檻",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 42,
+          "values": [
+            "6. 提出報價，同時通知業主已提供報價（1 報價 · Meegle#8）",
+            "目標毛利與底線；升級的總價門檻；報價單範本；工程確認單公式搬成程式",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 43,
+          "values": [
+            "7. 追蹤報價（1 報價 · Meegle#9）",
+            "追蹤次數上限",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 44,
+          "values": [
+            "8. 業主告知未得標／報價單有效期限到期（1 報價 · Meegle#10）",
+            "未得標原因選項清單",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 45,
+          "values": [
+            "9. 收到回傳單，合約成立（1 報價 · Meegle#15）",
+            "付款條件要結構化（目前文字欄 74% 空），#30 要用",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 46,
+          "values": [
+            "10. 建立案件編號 製作案件回傳本（2 PM 派工 · Meegle#16）",
+            "工程編號規則；回傳本範本；泳道是行政還是 PM（SOP 圖與 Meegle 不同）",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 47,
+          "values": [
+            "11. 展延（2 PM 派工 · Meegle#18）",
+            "誰能核准展延；展延後哪些期限重算",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 48,
+          "values": [
+            "12. 確認單製作並將確認單傳遞至各單位（3 確認單 · Meegle#19）",
+            "確認單自 8/25 起 0 張新單，124 欄公式要搬成程式；106 張舊單當測試題",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 49,
+          "values": [
+            "13. 外業確認單確認（3 確認單 · Meegle#59）",
+            "確認期限",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 50,
+          "values": [
+            "14. 執行公務單確認(行政)（3 確認單 · Meegle#61）",
+            "工務行政事項表目前只有 1 筆，要重新啟用；各申請的法定時限",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 51,
+          "values": [
+            "15. 確認單修正（3 確認單 · Meegle#22）",
+            "修正是否需重新三人會簽",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 52,
+          "values": [
+            "16. 外業作業（4 外業 · Meegle#25）",
+            "三問清單定稿；QA 規則清單（Cloudflare Worker）；v4 外業工作單 131 欄哪些由程式填",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 53,
+          "values": [
+            "17. 下包出工（4 外業 · Meegle#20）",
+            "下包回報格式與頻率",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 54,
+          "values": [
+            "18. 內業作業開始（5 控制／圖資／報告 · Meegle#32）",
+            "內業是否等外業完工才開始；三組共用一個節點，工作台預設掛「控制」或複製三份",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 55,
+          "values": [
+            "19. 報告（5 控制／圖資／報告 · Meegle#33）",
+            "技師簽證流程是否要獨立節點",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 56,
+          "values": [
+            "20. 是否達成請款條件（6 計價請款 · Meegle#30）",
+            "付款條件結構化",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 57,
+          "values": [
+            "21. 繳交計價單（6 計價請款 · Meegle#41）",
+            "計價單範本；保留款規則",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 58,
+          "values": [
+            "22. 初次繳交確認單（6 計價請款 · Meegle#42）",
+            "疑為「完工確認單」（內外業經理 SOP：工作完成後 3 日由組長提交、PM 簽核）；建議改掛各組完成節點，與 #29 合併",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 59,
+          "values": [
+            "23. 案件請款，進行客戶滿意度調查（6 計價請款 · Meegle#43）",
+            "電子發票／會計系統未串接（v2）；滿意度問卷格式",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 60,
+          "values": [
+            "24. 請款情況追蹤（7 入帳結算 · Meegle#46）",
+            "催款階梯定稿",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 61,
+          "values": [
+            "25. 通知下包廠商請款及撥款（7 入帳結算 · Meegle#54）",
+            "撥款核准人",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 62,
+          "values": [
+            "26. 案件結算表製作（7 入帳結算 · Meegle#51）",
+            "結算表範本；阿米巴計算規則",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 63,
+          "values": [
+            "27. 節點檢討與紀錄（例行（不屬單一案件） · Meegle#27）",
+            "Meegle 有兩個同名節點（#27、#57），建議做成例行任務而非案件子任務",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 64,
+          "values": [
+            "28. 節點檢討與紀錄（計價段）（例行（不屬單一案件） · Meegle#57）",
+            "與 #27 合併",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 65,
+          "values": [
+            "29. 考評與結算計算（例行（不屬單一案件） · Meegle#28）",
+            "是否由 agent 自動產月報但不做考評",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 66,
+          "values": [
+            "30. 考評與結算計算（計價段）（例行（不屬單一案件） · Meegle#58）",
+            "與 #28 合併",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 67,
+          "values": [
+            "31. 分派與週預排（agent 從能力地圖提案 → 經理核 → 組長收到）（派工迴圈（內外業經理） · Meegle#3）",
+            "能力地圖匯出欄位；工項→能力對照表（前 10 個常用工項先做）；儀器／車輛可用性目前不可靠，v1 只警告不硬擋",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 68,
+          "values": [
+            "32. 簽核確認單（完工確認單）（派工迴圈（內外業經理） · Meegle#10）",
+            "與案件 SOP #42「初次繳交確認單」合併",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 69,
+          "values": [
+            "33. 進行各組案件結算表／阿米巴計算表（派工迴圈（內外業經理） · Meegle#11）",
+            "阿米巴計算規則",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 70,
+          "values": [
+            "34. 能力地圖（資料）（能力地圖／教育訓練（內外業經理） · Meegle#1）",
+            "匯出能力地圖欄位（不含薪資金額）；生存線定義",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 71,
+          "values": [
+            "35. 代理人設定（能力地圖／教育訓練（內外業經理） · Meegle#2）",
+            "代理人表在哪",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 72,
+          "values": [
+            "36. 紀錄並更新能力地圖（能力地圖／教育訓練（內外業經理） · Meegle#7）",
+            "檢核流程與薪資掛鉤的規則不進 agent",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 73,
+          "values": [
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 74,
+          "values": [
+            "三個已定的決定（2026-10-18）",
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 75,
+          "values": [
+            "v0.2 變更（2026-10-19）",
+            "產品暫名 Plumb；報價節點由報價組（業務經理轄下）執行、PM 核價；PM 轄下工務助理負責公務確認單與成果提交；確認單由 PM 計算、外業／內業經理與報價組三方看過；無工作總表，預排即總表（含每日營業額點數與工項剩餘營業額）；分派與週預排合併；下包改依公司規則自動判定、下包節點標「條件：僅下包案」；業主管道 Email、LINE 由人轉貼；能力地圖為目標狀態（現況憑記憶）。版本備註欄標 v0.2 的列為本次更動",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 76,
+          "values": [
+            "系統記錄",
+            "v4（v3 僅為過渡）。報價總表、合約明細工項、工程確認單在報價 Base，同步 v4",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 77,
+          "values": [
+            "SOP 權威",
+            "工作台 9 大節點；Meegle 62 個小節點做成大節點裡的預設子任務（本表 A 的「大節點／子任務序」即預設對應）",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 78,
+          "values": [
+            "能力地圖",
+            "在薪資 Base；派工 agent 只讀能力欄位，不讀薪資金額",
+            null
+          ]
+        }
+      ],
+      "scope": "Reference only; not appended to every case."
+    },
+    "B 派工迴圈": {
+      "rows": [
+        {
+          "worksheet_row": 1,
+          "values": [
+            "大節點",
+            "子任務序",
+            "Meegle#",
+            "節點名稱",
+            "類型 kind",
+            "負責角色 owner_role",
+            "觸發 trigger",
+            "起算點 anchor",
+            "期限 deadline",
+            "讀取 inputs",
+            "agent 動作 action",
+            "人類決策 human_decision",
+            "產出 outputs",
+            "完成條件 done_when",
+            "下一節點 next",
+            "升級 escalation",
+            "考評指標 KPI",
+            "來源 source",
+            "適用組別／版本",
+            "TODO／待確認",
+            "版本備註"
+          ]
+        },
+        {
+          "worksheet_row": 2,
+          "values": [
+            "派工迴圈（內外業經理）",
+            1,
+            null,
+            "收到確認單（由專案經理簽核傳遞）",
+            "confirm",
+            "內、外業經理",
+            "案件 SOP #59／#60 確認單確認",
+            "確認單傳遞日",
+            "—",
+            "工程確認單（該組段）",
+            "等同 #59／#60；此處為派工迴圈的入口",
+            "是",
+            "確認紀錄",
+            "確認",
+            "B2",
+            null,
+            null,
+            "SOP圖3",
+            "v1",
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 3,
+          "values": [
+            "派工迴圈（內外業經理）",
+            2,
+            null,
+            "預排由確認單展開",
+            "action",
+            "內、外業經理",
+            "B1",
+            "收到確認單日",
+            "+1 工作日",
+            "工程確認單；合約填報工項；合約明細工項.外業／控制／圖資／報告數量與預估工天；外業工項標準（標準點數）",
+            "程式由確認單展開預排草案：每工項排哪天、誰去；每日產出營業額點數；每工項剩餘營業額（沒有工作總表，預排就是總表）",
+            "經理確認",
+            "工作預排(v4) 草案：工項 × 日期 × 人、每日營業額點數、工項剩餘營業額",
+            "草案與確認單數量一致且經理確認",
+            "B3",
+            null,
+            null,
+            "SOP圖3 期限「收到確認單後1日」；業主 10/19：無工作總表",
+            "v1",
+            null,
+            "v0.2"
+          ]
+        },
+        {
+          "worksheet_row": 4,
+          "values": [
+            "派工迴圈（內外業經理）",
+            3,
+            null,
+            "分派與週預排（agent 從能力地圖提案 → 經理核 → 組長收到）",
+            "action",
+            "內、外業經理 → 組長",
+            "B2；每週",
+            "每週",
+            "外業：每週三下班前；內業：每週四下班前",
+            "能力地圖（薪資 Base，唯讀；現況憑記憶）；工項→能力對照表；人員名單；Lark 假勤；代理人設定；本月出工天數；儀器／車輛可用性",
+            "【派工 agent】硬約束（能力等級≥工項要求、當天可用、不在假勤）→ 評分（同區域續接、公平輪替、同客戶組長延續、成本）→ 提案（組別、組長、人員、日期）→ 經理核 → 組長收到卡片可調整後確認；無人符合 → 代理人；仍無 → A／B 方案給經理",
+            "經理核（例外才找人）；組長確認",
+            "工作預排(v4)：人員、案件、日期、條類型、儀器、車輛",
+            "經理核 + 組長確認",
+            "B4",
+            "週三／週四 15:00 未確認 → 提醒；下班 → 通知經理；無人符合 → 經理 A／B 方案卡",
+            "違反SOP次數",
+            "SOP圖3；SOP圖4 能力地圖／代理人；業主 10/19：經理分派與組長交預排同一邏輯",
+            "v1",
+            "能力地圖匯出欄位；工項→能力對照表（前 10 個常用工項先做）；儀器／車輛可用性目前不可靠，v1 只警告不硬擋",
+            "v0.2"
+          ]
+        },
+        {
+          "worksheet_row": 5,
+          "values": [
+            "派工迴圈（內外業經理）",
+            4,
+            null,
+            "預排確認（專案經理簽核）",
+            "confirm",
+            "內、外業經理 → 專案經理",
+            "B3",
+            "預排提交日",
+            "TODO（SOP 無）",
+            "各組預排；跨案衝突",
+            "衝突檢查（同人同日兩案、車輛／儀器重複、假勤衝突、超時）→ 簽核卡給經理與 PM；通過 → 投影到 Lark 行事曆；觸發案件 SOP #21 派工前聯繫",
+            "是（簽核）",
+            "工作預排.已核；行事曆事件",
+            "PM 簽核",
+            "B5；#21",
+            null,
+            null,
+            "SOP圖3「預排確認」「由專案經理簽核傳遞」",
+            "v1",
+            null,
+            "v0.2"
+          ]
+        },
+        {
+          "worksheet_row": 6,
+          "values": [
+            "派工迴圈（內外業經理）",
+            5,
+            null,
+            "預排、實際發生節點表",
+            "action",
+            "agent",
+            "B4 之後每日",
+            "—",
+            "每日",
+            "工作預排 vs 外業／內業工作單實際（出工人、數量、工天）",
+            "每日比對預排與實際 → 節點表（預排工天、實際工天、完成數量、偏差、工項剩餘營業額）；寫回 v4",
+            "否",
+            "預排、實際發生節點表",
+            "每日更新",
+            "B6",
+            null,
+            null,
+            "SOP圖3",
+            "v1",
+            null,
+            "v0.2"
+          ]
+        },
+        {
+          "worksheet_row": 7,
+          "values": [
+            "派工迴圈（內外業經理）",
+            6,
+            null,
+            "工作進度管控（每日檢討）",
+            "track",
+            "內、外業經理",
+            "B5",
+            "—",
+            "每日",
+            "節點表；案件逾期；總營業額達成率",
+            "每日進度卡給經理（達成率、逾期案件、衝突、零產出）；異常 → B7",
+            "否",
+            "進度卡；KPI 更新",
+            "每日發送",
+            "B7",
+            null,
+            "總營業額達成率；案件逾期次數",
+            "SOP圖3「每日檢討」",
+            "v1",
+            null,
+            "v0.2"
+          ]
+        },
+        {
+          "worksheet_row": 8,
+          "values": [
+            "派工迴圈（內外業經理）",
+            7,
+            null,
+            "檢討目前工進及工作情況",
+            "gate",
+            "內、外業經理",
+            "B6 異常 或 每日",
+            "—",
+            "每日",
+            "進度卡；缺失單",
+            "agent 整理：完成→B9；需調整→B8（附建議重排）；缺失 → 開缺失單",
+            "是（經理判斷）",
+            "決定；缺失單",
+            "決定記錄",
+            "B9 / B8",
+            null,
+            "缺失單；繳交資料完整率",
+            "SOP圖3",
+            "v1",
+            null,
+            "v0.2"
+          ]
+        },
+        {
+          "worksheet_row": 9,
+          "values": [
+            "派工迴圈（內外業經理）",
+            8,
+            null,
+            "工作預排需調整（專案經理提出）",
+            "action",
+            "專案經理",
+            "B7＝需調整 或 案件 SOP #26／#36 偏差",
+            "—",
+            "—",
+            "調整原因；原預排",
+            "agent 重排（同 B3 規則）→ 新草案 → 回 B4 簽核；通知受影響組長與業主（#23）",
+            "是（PM 提出；經理核）",
+            "預排新版；變更記錄",
+            "新版簽核",
+            "B4",
+            null,
+            null,
+            "SOP圖3",
+            "v1",
+            null,
+            "v0.2"
+          ]
+        },
+        {
+          "worksheet_row": 10,
+          "values": [
+            "派工迴圈（內外業經理）",
+            9,
+            null,
+            "工作完成",
+            "confirm",
+            "組長",
+            "數量達合約數量 或 PM 判階段完成",
+            "—",
+            "—",
+            "節點表",
+            "agent 偵測達成 → 卡片給組長確認完成",
+            "是",
+            "完成記錄",
+            "組長確認",
+            "B10",
+            null,
+            null,
+            "SOP圖3",
+            "v1",
+            null,
+            "v0.2"
+          ]
+        },
+        {
+          "worksheet_row": 11,
+          "values": [
+            "派工迴圈（內外業經理）",
+            10,
+            null,
+            "簽核確認單（完工確認單）",
+            "confirm",
+            "組長提交 → 專案經理簽核",
+            "B9",
+            "工作完成日",
+            "+3 工作日",
+            "完工數量；成果；缺失單",
+            "agent 產完工確認單（實際工天、數量、缺失）→ 組長提交 → PM 簽核；對應案件 SOP #29／#42",
+            "是",
+            "完工確認單",
+            "PM 簽核",
+            "B11；#30",
+            null,
+            "工作良率；繳交資料完整率；案件逾期次數",
+            "SOP圖3 期限「工作完成後3日」",
+            "v1",
+            "與案件 SOP #42「初次繳交確認單」合併",
+            "v0.2"
+          ]
+        },
+        {
+          "worksheet_row": 12,
+          "values": [
+            "派工迴圈（內外業經理）",
+            11,
+            null,
+            "進行各組案件結算表／阿米巴計算表",
+            "action",
+            "內、外業經理",
+            "B10；每月",
+            "月底",
+            "每月結算",
+            "各組營業額點數、成本、津貼（v4 統計表）；案件結算",
+            "程式算各組案件結算表與阿米巴計算表 → 經理核 → 併入案件 SOP #51",
+            "是（核准）",
+            "各組案件結算表；阿米巴計算表",
+            "經理核准",
+            "#51",
+            null,
+            "總營業額達成率",
+            "SOP圖3「每月結算」",
+            "v2",
+            "阿米巴計算規則",
+            "v0.2"
+          ]
+        }
+      ],
+      "scope": "Reference only; not appended to every case."
+    },
+    "C 能力地圖訓練": {
+      "rows": [
+        {
+          "worksheet_row": 1,
+          "values": [
+            "大節點",
+            "子任務序",
+            "Meegle#",
+            "節點名稱",
+            "類型 kind",
+            "負責角色 owner_role",
+            "觸發 trigger",
+            "起算點 anchor",
+            "期限 deadline",
+            "讀取 inputs",
+            "agent 動作 action",
+            "人類決策 human_decision",
+            "產出 outputs",
+            "完成條件 done_when",
+            "下一節點 next",
+            "升級 escalation",
+            "考評指標 KPI",
+            "來源 source",
+            "適用組別／版本",
+            "TODO／待確認",
+            "版本備註"
+          ]
+        },
+        {
+          "worksheet_row": 2,
+          "values": [
+            "能力地圖／教育訓練（內外業經理）",
+            1,
+            null,
+            "能力地圖（資料）",
+            "data",
+            "內、外業經理",
+            "每週預排檢討；每日檢討（工作空檔）",
+            "—",
+            "—",
+            "薪資 Base：人 × 能力 × 等級；生存線（最低門檻）；檢核流程結果",
+            "派工 agent 唯讀；B3 的硬約束來源；能力地圖更新後下一輪派工自動生效。現況：經理憑記憶派工；目標：agent 讀能力地圖",
+            "否",
+            "—",
+            "—",
+            "B3；C3",
+            null,
+            "能力地圖達成率",
+            "SOP圖4",
+            "v1 唯讀",
+            "匯出能力地圖欄位（不含薪資金額）；生存線定義",
+            "v0.2"
+          ]
+        },
+        {
+          "worksheet_row": 3,
+          "values": [
+            "能力地圖／教育訓練（內外業經理）",
+            2,
+            null,
+            "代理人設定",
+            "data",
+            "內、外業經理",
+            "每人設定",
+            "—",
+            "—",
+            "每人代理人；代理人能力",
+            "派工 agent 的 fallback：主責不可用時改派代理人（能力需合格）",
+            "否",
+            "—",
+            "—",
+            "B3；C8",
+            null,
+            null,
+            "SOP圖4",
+            "v1 唯讀",
+            "代理人表在哪",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 4,
+          "values": [
+            "能力地圖／教育訓練（內外業經理）",
+            3,
+            null,
+            "教育訓練需求表（專案經理提出）",
+            "action",
+            "專案經理",
+            "派工例外（無人符合）累積；PM 提出",
+            "—",
+            "—",
+            "派工例外記錄；能力地圖與生存線差異",
+            "agent 從派工例外自動產需求建議（哪個能力缺、缺幾人）→ PM 確認提出",
+            "是",
+            "教育訓練需求表",
+            "提出",
+            "C4",
+            null,
+            null,
+            "SOP圖4",
+            "v2",
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 5,
+          "values": [
+            "能力地圖／教育訓練（內外業經理）",
+            4,
+            null,
+            "教育訓練計畫總表",
+            "action",
+            "內、外業經理",
+            "C3；C1 差異",
+            "—",
+            "每週預排檢討",
+            "需求表；各組教育訓練目標",
+            "彙整計畫總表；排進預排的工作空檔",
+            "是",
+            "教育訓練計畫總表",
+            "經理核",
+            "C5",
+            null,
+            null,
+            "SOP圖4",
+            "v2",
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 6,
+          "values": [
+            "能力地圖／教育訓練（內外業經理）",
+            5,
+            null,
+            "安排教育訓練",
+            "action",
+            "內、外業經理",
+            "C4；工作空檔",
+            "—",
+            "—",
+            "計畫總表；預排空檔",
+            "agent 在預排空檔建議訓練時段（條類型＝支援／待命）→ 經理核 → 寫預排",
+            "是",
+            "預排（訓練）；教育執行紀錄",
+            "已排",
+            "C6",
+            null,
+            "教育訓練執行次數",
+            "SOP圖4",
+            "v2",
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 7,
+          "values": [
+            "能力地圖／教育訓練（內外業經理）",
+            6,
+            null,
+            "檢討教育訓練成果及生存線狀況",
+            "confirm",
+            "內、外業經理",
+            "訓練後",
+            "—",
+            "—",
+            "教育執行紀錄；各組教育訓練執行紀錄；能力地圖與生存線差異",
+            "agent 產檢討摘要（完成率、生存線差異）",
+            "是",
+            "檢討紀錄",
+            "經理確認",
+            "C7",
+            null,
+            null,
+            "SOP圖4",
+            "v2",
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 8,
+          "values": [
+            "能力地圖／教育訓練（內外業經理）",
+            7,
+            null,
+            "紀錄並更新能力地圖",
+            "action",
+            "內、外業經理",
+            "C6",
+            "—",
+            "—",
+            "檢討結果；檢核流程",
+            "更新能力地圖（經檢核流程）→ 派工 agent 下一輪生效",
+            "是（檢核）",
+            "能力地圖新版本",
+            "更新",
+            "C1",
+            null,
+            "能力地圖達成率",
+            "SOP圖4",
+            "v2",
+            "檢核流程與薪資掛鉤的規則不進 agent",
+            null
+          ]
+        },
+        {
+          "worksheet_row": 9,
+          "values": [
+            "能力地圖／教育訓練（內外業經理）",
+            8,
+            null,
+            "檢視代理人能力是否合乎要求",
+            "gate",
+            "內、外業經理",
+            "C2；C7",
+            "—",
+            "—",
+            "代理人；能力地圖",
+            "agent 比對代理人能力 vs 主責工項要求 → 合格／不合格",
+            "是",
+            "判定",
+            "判定",
+            "合格→C9；不合格→持續訓練（C5）或 變更代理人（C2）",
+            null,
+            null,
+            "SOP圖4",
+            "v2",
+            null,
+            null
+          ]
+        },
+        {
+          "worksheet_row": 10,
+          "values": [
+            "能力地圖／教育訓練（內外業經理）",
+            9,
+            null,
+            "合格代理人",
+            "terminal",
+            "—",
+            "C8 合格",
+            "—",
+            "—",
+            "—",
+            "記錄；派工可用",
+            "否",
+            "代理人清單",
+            "—",
+            "—",
+            null,
+            null,
+            "SOP圖4",
+            "v2",
+            null,
+            null
+          ]
+        }
+      ],
+      "scope": "Reference only; not appended to every case."
+    }
+  },
+  "target_repository": "jekaihsu/YXMEEGLE",
+  "target_branch": "ava-apple/yx-company-system",
+  "inspected_commit": "25de79b4a791facb24b73b52ecb4646e78ad364d",
+  "proposed_template_family_id": "plumb-case-sop",
+  "proposed_template_family_name": "案件 SOP 預設任務",
+  "proposed_mapping_revision": "yx-company-node-mapping-1",
+  "branch_node_key_map": {
+    "N01": "sales",
+    "N02": "pm",
+    "N03": "confirmation",
+    "N04": "field",
+    "N05": "control",
+    "N06": "mapping",
+    "N07": "report",
+    "N08": "pricing",
+    "N09": "settlement"
+  },
+  "runtime_boundary": {
+    "storage": "application_database_only",
+    "source_text_executable": false,
+    "outbound_writes": false,
+    "requires_catalog_validation_before_publication": true
+  }
+}

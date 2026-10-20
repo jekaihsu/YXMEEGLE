@@ -20,6 +20,15 @@ STATUS = {'報價中':'pending','執行中':'in_progress','已完工':'engineeri
 def url(r):
     return f"https://yong-xiang-survey.jp.larksuite.com/base/{r['base_token']}?table={r['table_id']}&record={r['record_id']}"
 
+def node_shell(pid, key, name, definition):
+    return dict(id=f'{pid}-{key}',key=key,name=name,owner_id='',supervisor_id='',collaborator_ids=[],status='pending',start_date=None,due_date=None,original_due_date=None,started_at=None,completed_at=None,tasks=[],requirements=deepcopy(definition['requirements']),review_mode=definition['review_mode'],reviewers=[],review_cycles=[],sop_applicability_pending=[])
+
+
+def blank_nodes(pid, sop):
+    """The nine canonical nodes with no operational tasks; local checklists live in the sop_local_tasks tables."""
+    return [node_shell(pid,key,name,next(d for d in sop['nodes'] if d['key']==key)) for key,name,_ in STAGES]
+
+
 def nodes(pid, sop):
     from .sop_contracts import enrich_definition,decorate_task,applicability,VERSION as CONTRACT_VERSION
     result=[]
@@ -34,7 +43,7 @@ def nodes(pid, sop):
                 pending.append({'key':item['key'],'rule':item['applicability'],'title':item['title'],'contract_version':CONTRACT_VERSION})
                 continue
             tasks.append(decorate_task(new_task(f'{pid}-{key}-{i}',item['title'],None),item,sop['id']))
-        result.append(dict(id=f'{pid}-{key}',key=key,name=name,owner_id='',supervisor_id='',collaborator_ids=[],status='pending',start_date=None,due_date=None,original_due_date=None,started_at=None,completed_at=None,tasks=tasks,requirements=deepcopy(definition['requirements']),review_mode=definition['review_mode'],reviewers=[],review_cycles=[],sop_applicability_pending=pending))
+        result.append({**node_shell(pid,key,name,definition),'tasks':tasks,'sop_applicability_pending':pending})
     return result
 
 

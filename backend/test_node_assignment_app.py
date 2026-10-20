@@ -40,7 +40,7 @@ def test_session_feature_flag_requires_enabled_configured_deployment_without_she
            'WORKSPACE_SHELL_ENABLED': 'false', 'NODE_ASSIGNMENT_ENABLED': 'true',
            'LARK_WORKER_IDENTITY': 'application', 'LARK_WORKER_ORGANIZATION': 'company',
            'LARK_APP_ID': 'app-test', 'LARK_APP_SECRET': 'synthetic'}
-    assert TestClient(create_app(cfg)).get('/api/session').json()['features'] == {'node_assignment': True, 'change_extension': False, 'routines': False, 'mock_ui': False}
+    assert TestClient(create_app(cfg)).get('/api/session').json()['features'] == {'node_assignment': True, 'change_extension': False, 'routines': False, 'mock_ui': False, 'local_case_creation': False, 'sop_task_writes': False}
     for changes in ({'NODE_ASSIGNMENT_ENABLED': ''}, {'LARK_APP_SECRET': ''},
                     {'NODE_ASSIGNMENT_TASK_TABLE_ID': 'tblUnapproved'}):
         assert 'node_assignment' not in TestClient(create_app({**cfg, **changes})).get('/api/session').json().get('features', {})
