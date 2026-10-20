@@ -68,7 +68,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  const taskIncomplete=(!isLegacy && assignments.state.kind==='error' && !list) || (all ? Object.keys(details.errors).length>0 : !!details.errors[selected.key]);
  const taskLoading=!isLegacy && !!list && (all ? list.nodes.some(n=>!details.details[n.key] && !details.errors[n.key]) : !!selected.assignment && !detail && !details.errors[selected.key]);
  return <div id="flow-top" className="project-flow">
-  <div className="pf-next">{isLegacy ? <NextAction c={c} rows={p.nodes.flatMap(n=>n.tasks.map(t=>({p,n,t})))}/> : <><strong>下一步</strong><span>{selected.state==='待審核' ? '確認成果後核准或退回。' : selected.owners.length ? '核對本節點證據，指派具體工作並確認交接。' : '先指派或認領節點負責人。'}</span>{list && <div className="pf-attention" aria-label="需要我處理">{model.nodes.filter(n=>needsViewerAction(n,list,c.s.user?.id || '')).map(n=><Button key={n.key} onClick={()=>select(n.key)}>{n.label} · {n.state==='待審核' ? '待審核' : !n.owners.length ? '待認領' : '待處理'}</Button>)}</div>}</>}</div>
+  <div className="pf-next">{isLegacy ? <NextAction c={c} rows={p.nodes.flatMap(n=>n.tasks.map(t=>({p,n,t})))}/> : <><strong>下一步</strong><span>{selected.state==='待審核' ? '待審核' : selected.owners.length ? '待處理' : '待認領'}</span>{list && <div className="pf-attention" aria-label="需要我處理">{model.nodes.filter(n=>needsViewerAction(n,list,c.s.user?.id || '')).map(n=><Button key={n.key} onClick={()=>select(n.key)}>{n.label} · {n.state==='待審核' ? '待審核' : !n.owners.length ? '待認領' : '待處理'}</Button>)}</div>}</>}</div>
   <div className="pf-source"><span>{isLegacy ? '本地流程' : `Lark 節點與任務 · 讀取時間 ${list?.fetched_at ? taipeiTime(list.fetched_at) : '來源未提供'}`}{list?.stale && ' · 上次成功資料，待更新'}</span>{enabled && <SopControls sop={sop}/>}{!isLegacy && <FlowAction allowed={!assignments.refreshing} reason="正在更新節點與任務，請稍候。" onClick={()=>void assignments.reload()}>{assignments.refreshing ? '更新中…' : '更新節點與任務'}</FlowAction>}</div>
   {assignments.state.kind==='error' && <div role="alert" className="pg-callout">節點來源讀取失敗。{assignments.state.message}<Button onClick={()=>void assignments.reload()}>重試節點來源</Button></div>}
   {assignments.notice && <p role="status">{assignments.notice}</p>}
@@ -77,7 +77,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
   <FlowDiagram nodes={model.nodes} overall={model.overall} selected={selected.key} loading={loading} onSelect={select}/>
   {loading ? <FlowPanelSkeleton/> : <section id="flow-selected" className="pf-panel glass--card" aria-label={`${selected.label}節點明細`} tabIndex={-1}>
    <header><div><span className="pf-eyebrow">選定節點</span><h2>{selected.label}</h2></div><FlowSchedule key={selected.key} project={p} node={selected} session={c.s} onPublished={()=>{void assignments.reload();read.retry()}}/></header>
-   <dl className="pf-facts"><div><dt>負責組別</dt><dd>{selected.departments.join('、') || (isLegacy ? '本地流程' : '來源未提供')}</dd></div><div><dt>組別主管</dt><dd>{managers.map(u=>u.name).join('、') || (selected.departments.length ? '未能對應到本組主管' : '來源未提供負責組別，未能對應到本組主管')}</dd></div><div><dt>指派主管</dt><dd>{selected.assignment?.assigned_by?.name || '來源未提供'}</dd></div><div><dt>節點最後期限</dt><dd>{selected.finalDeadline?.slice(0,10) || '未排定'}</dd></div></dl>
+   <dl className="pf-facts"><div><dt>負責組別</dt><dd>{selected.departments.join('、') || (isLegacy ? '本地流程' : '來源未提供')}</dd></div><div><dt>組別主管</dt><dd>{managers.map(u=>u.name).join('、') || (selected.departments.length ? '未能對應到本組主管' : '主管未設定')}</dd></div><div><dt>指派主管</dt><dd>{selected.assignment?.assigned_by?.name || '來源未提供'}</dd></div><div><dt>節點最後期限</dt><dd>{selected.finalDeadline?.slice(0,10) || '未排定'}</dd></div></dl>
    {selected.assignment?.auto_done && <p className="pg-callout">自動判定 · {selected.assignment.auto_done.reason}</p>}
    {detail ? <FlowNodeActions key={selected.key} detail={detail} busy={busy} reason={reason} error={assignments.error} mutate={assignments.mutate} extra={sopNodeAction}/> : !isLegacy && !!selected.assignment && assignments.state.kind==='ready' && !details.errors[selected.key] ? <Skeleton height="3rem"/> : sopNodeAction && <div className="pf-node-actions"><div className="pf-actions">{sopNodeAction}</div></div>}
    {!isLegacy && !selected.assignment && <p className="pf-empty">尚無節點指派</p>}
@@ -98,8 +98,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
   {p.nodes.length>0 && <details className="pf-secondary pf-legacy"><summary>範本與本地流程</summary>
    <label>本地節點<select aria-label="本地節點" value={selectedKey} onChange={e=>select(e.target.value)}>{p.nodes.map(n=><option key={n.id} value={n.key}>{NODE_NAMES[n.key] || n.name}</option>)}</select></label>{legacyActions}
   </details>}
-  <details className="pf-secondary"><summary>節點說明與背景</summary>
-   {(localNode?.guidance || localNode?.description) && <p>{localNode.guidance || localNode.description}</p>}
+  <details className="pf-secondary"><summary>節點資訊</summary>
    <p>協作人員 {localNode?.collaborator_ids.map(id=>nameOf(c.w,id)).join('、') || '尚未設定'}</p>
    <p>經過 {elapsed(localNode?.started_at || selected.assignment?.started_at,c.w.as_of)} 天</p>
    <Button onClick={()=>c.go({...c.route,node:selectedKey,tab:'files'})}>開啟 作業資料與成果</Button>

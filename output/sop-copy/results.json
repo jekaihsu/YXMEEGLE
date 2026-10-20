@@ -1,0 +1,214 @@
+[
+  {
+    "name": "test:dispatch-board",
+    "status": 0
+  },
+  {
+    "name": "test:start-sop",
+    "status": 0
+  },
+  {
+    "name": "test:plan-panel",
+    "status": 1
+  },
+  {
+    "name": "test:taipei-time",
+    "status": 0
+  },
+  {
+    "name": "test:lark-pilot",
+    "status": 0
+  },
+  {
+    "name": "test:lark-pilot-contract",
+    "status": 0
+  },
+  {
+    "name": "test:overview",
+    "status": 0
+  },
+  {
+    "name": "test:view-data",
+    "status": 0
+  },
+  {
+    "name": "test:audit-pagination",
+    "status": 0
+  },
+  {
+    "name": "test:audit-project-switch",
+    "status": 0
+  },
+  {
+    "name": "test:session-epoch",
+    "status": 0
+  },
+  {
+    "name": "test:daily-records",
+    "status": 0
+  },
+  {
+    "name": "test:comment-draft",
+    "status": 0
+  },
+  {
+    "name": "test:input-recovery",
+    "status": 0
+  },
+  {
+    "name": "test:native-approval-version",
+    "status": 0
+  },
+  {
+    "name": "test:native-approval-a11y",
+    "status": 0
+  },
+  {
+    "name": "test:financial-draft",
+    "status": 0
+  },
+  {
+    "name": "test:form-draft",
+    "status": 0
+  },
+  {
+    "name": "test:freshness-wiring",
+    "status": 0
+  },
+  {
+    "name": "test:data-freshness",
+    "status": 0
+  },
+  {
+    "name": "test:company-cockpit",
+    "status": 0
+  },
+  {
+    "name": "test:source-lifecycle",
+    "status": 0
+  },
+  {
+    "name": "test:execution-admission",
+    "status": 0
+  },
+  {
+    "name": "test:api-response",
+    "status": 0
+  },
+  {
+    "name": "test:perf",
+    "status": 0
+  },
+  {
+    "name": "test:integration-routes",
+    "status": 0
+  },
+  {
+    "name": "test:my-work-view",
+    "status": 0
+  },
+  {
+    "name": "test:source-health-view",
+    "status": 0
+  },
+  {
+    "name": "test:contrast",
+    "status": 0
+  },
+  {
+    "name": "test:shell-mode",
+    "status": 1
+  },
+  {
+    "name": "test:case-navigation",
+    "status": 0
+  },
+  {
+    "name": "test:home-executable",
+    "status": 0
+  },
+  {
+    "name": "test:work-assigned-visibility",
+    "status": 0
+  },
+  {
+    "name": "test:dev-tooling",
+    "status": 1
+  },
+  {
+    "name": "test:live-read-regressions",
+    "status": 0
+  },
+  {
+    "name": "test:ops-sync",
+    "status": 1
+  },
+  {
+    "name": "test:home-review-regressions",
+    "status": 0
+  },
+  {
+    "name": "test:source-coverage-views",
+    "status": 0
+  },
+  {
+    "name": "test:project-disabled-reasons",
+    "status": 0
+  },
+  {
+    "name": "test:search-input",
+    "status": 1
+  },
+  {
+    "name": "test:p2-routes",
+    "status": 0
+  },
+  {
+    "name": "test:people-attendance",
+    "status": 0
+  },
+  {
+    "name": "test:pm-glance",
+    "status": 0
+  },
+  {
+    "name": "test:node-assignments",
+    "status": 0
+  },
+  {
+    "name": "test:task-table",
+    "status": 0
+  },
+  {
+    "name": "test:case-amount-label",
+    "status": 0
+  },
+  {
+    "name": "test:reports-progress",
+    "status": 0
+  },
+  {
+    "name": "test:reports",
+    "status": 0
+  },
+  {
+    "name": "test:unified-home",
+    "status": 0
+  },
+  {
+    "name": "test:project-progress",
+    "status": 0
+  },
+  {
+    "name": "test:dispatch-publish",
+    "status": 0
+  },
+  {
+    "name": "test:sop-tasks",
+    "status": 0
+  },
+  {
+    "name": "test:quotes",
+    "status": 0
+  }
+]

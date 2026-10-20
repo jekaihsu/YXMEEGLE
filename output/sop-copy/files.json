@@ -1,0 +1,410 @@
+[
+  {
+    "file": "test-api-response.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-approval-detail-a11y.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-audit-pagination.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-audit-project-switch.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-avatar.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-browser-floor.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-case-amount-label.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-case-detail-view.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-case-navigation.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-comment-draft-scope.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-company-cockpit.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-company-progressive.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-company-route.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-confirmation-list-view.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-confirmations-loading.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-contract-detail-view.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-contrast.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-daily-records.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-data-freshness.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-data-state.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-dev-tooling.mjs",
+    "status": 1
+  },
+  {
+    "file": "test-dispatch-board.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-dispatch-fixes.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-dispatch-publish-ui.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-dispatch-publish.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-dispatch-round2.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-draft-callsites.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-drilldown-context.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-execution-admission.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-financial-draft-scope.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-form-draft-identity.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-freshness-wiring.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-home-attendance-unknown.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-home-counts.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-home-dispatch.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-home-executable.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-home-layout.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-home-panels.mjs",
+    "status": 1
+  },
+  {
+    "file": "test-home-people-cards.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-home-people.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-home-query-refresh.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-home-report-cards.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-home-reports-retry.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-home-reports.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-home-review-regressions.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-home-target-navigation.mjs",
+    "status": 1
+  },
+  {
+    "file": "test-input-recovery.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-integration-routes.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-lark-pilot-contract.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-lark-pilot.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-live-read-regressions.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-manager-overview-view.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-my-work-integrated.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-my-work-return-focus.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-my-work-view.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-native-approval-a11y.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-native-approval-version.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-node-assignment-api.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-node-assignments.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-node-evidence.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-ops-flow-view.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-ops-sync-panel.mjs",
+    "status": 1
+  },
+  {
+    "file": "test-overview-design.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-p2-routes.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-people-attendance.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-perf.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-plan-panel.mjs",
+    "status": 1
+  },
+  {
+    "file": "test-pm-glance.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-project-disabled-reasons.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-project-flow-model.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-project-flow-round2.mjs",
+    "status": 1
+  },
+  {
+    "file": "test-project-flow-ui.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-project-progress.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-quotes-ui.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-quotes.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-recurring-draft-period.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-reload-generation.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-reports-build.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-reports-interactions.mjs",
+    "status": 1
+  },
+  {
+    "file": "test-reports-mock.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-reports-progress-fixes.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-reports-progress.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-reports-requests.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-reports-view.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-search-input.mjs",
+    "status": 1
+  },
+  {
+    "file": "test-session-epoch.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-settings-overview.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-shell-mode.mjs",
+    "status": 1
+  },
+  {
+    "file": "test-sop-tasks.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-source-coverage-views.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-source-health-view.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-source-lifecycle.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-start-sop.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-taipei-time.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-task-table.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-unified-home.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-ux-case-detail.mjs",
+    "status": 1
+  },
+  {
+    "file": "test-ux-disabled.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-ux-table-sort.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-view-data.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-work-assigned-visibility.mjs",
+    "status": 0
+  },
+  {
+    "file": "test-work-item-detail-view.mjs",
+    "status": 0
+  }
+]
