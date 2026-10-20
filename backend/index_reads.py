@@ -20,7 +20,7 @@ def ready(db,model,row):
 
 
 def visibility(pi,environment):
-    """SQL twin of source_case_policy.visible_project: isolated environments show every case."""
+    """SQL twin of source_case_policy.visible_project: isolated environments show every case but local planning ones."""
     if environment in ('test','demo'): return [pi.c.case_visibility!='local_planning']
     return [pi.c.case_visibility.in_(VISIBLE_CASES)]
 

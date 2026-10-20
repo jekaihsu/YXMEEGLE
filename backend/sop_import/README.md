@@ -1,6 +1,6 @@
 # Import published local SOP tasks
 
-This package implements the backend of M1. It stores local checklists independently of operational tasks and makes no outbound calls. Startup adds nine tables through the shared SQLAlchemy metadata. No import or publication runs during workspace upgrade.
+This package implements the backend of M1. It stores local checklists independently of operational tasks and makes no outbound calls. Startup adds ten tables through the shared SQLAlchemy metadata. No import or publication runs during workspace upgrade.
 
 ## Publish a catalog
 
@@ -55,7 +55,7 @@ Send this body to `POST /api/projects/{id}/sop-import/apply`. Recover ambiguous 
 
 `GET /api/projects/{id}/sop-tasks?node_key=confirmation` returns a node scope. Omit the query for a deduplicated case list. `counts` describes the selected scope. `case_counts` always deduplicates the whole case. `node_counts` includes all nine nodes. Numerator and denominator include only applicable, non-archived tasks. Unresolved and not-applicable counts remain separate.
 
-[api-examples.json](api-examples.json) contains complete, actual preview, apply, and list response shapes for one quotation task in an intake case, including a full 21-field snapshot. IDs and timestamps are examples. `expires_at` is UTC epoch seconds. Node IDs come from persisted `business_records`, never titles or array positions.
+[api-examples.json](api-examples.json) contains complete, actual preview, apply, and list response shapes for one quotation task in an intake case, including a full 21-field snapshot. IDs and timestamps are examples. `expires_at` is UTC epoch seconds. Node IDs come from persisted `business_records`, never titles or array positions. `python3 scripts/sop_import_examples.py` replaces every other entry from real calls against a throwaway demo app: `sop_tasks_with_suggestions`, `accept_suggestion`, `accept_suggestion_stale`, `dismiss_suggestion`, `accept_suggestions`, `quotes`, `quote`, `quote_preview`, `quote_create`, `quote_create_replay`, `quote_request`, `quote_number_taken`, and `quotes_with_local`.
 
 `start_node` and `stage` appear in preview, apply, and task-list responses. Neither changes task or business node state. Newly imported tasks under every selected node start `pending`.
 
@@ -179,11 +179,12 @@ Deferred work includes attachments, reviewed typed completion evidence and check
 
 Canonical identity merge/remap must remain disabled for cases with checklist history until a preservation adapter is verified. This slice does not intercept the existing reconciliation paths. Keep canonical IDs stable. Ordinary source refresh and `storage.save` cannot delete feature tables. Missing canonical nodes block further import and retain historical links.
 
-Back up the application database, including all `sop_*` tables. Workspace JSON export does not include them. Restore verification must include templates, tasks, links, previews, runs, and events alongside canonical cases. This slice does not supply a backup or identity migration adapter. Roll back by disabling writes and retaining the tables.
+Back up the application database, including all `sop_*` tables. Workspace JSON export does not include them. Restore verification must include templates, tasks, links, previews, import and local case runs, and events alongside canonical cases. This slice does not supply a backup or identity migration adapter. Roll back by disabling writes and retaining the tables.
 
 Run verification from the repository root.
 
 ```sh
-python3 -m pytest backend/test_sop_import_catalog.py backend/test_sop_import.py -q
+python3 -m pytest backend/test_sop_import_catalog.py backend/test_sop_import.py backend/test_sop_case_stage.py \
+  backend/test_sop_suggestions.py backend/test_sop_quotes.py backend/test_sop_local_case.py backend/test_sop_quote_publish.py -q
 python3 -m pytest backend -q
 ```
