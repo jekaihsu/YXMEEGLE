@@ -95,7 +95,7 @@ def test_deployment_staging_includes_runtime_and_omits_credentials(tmp_path,monk
     paths=['Dockerfile','.dockerignore','backend/requirements.txt','backend/app.py','scripts/backup_restore.py','scripts/backup_live_legacy.py','scripts/run_service.py','scripts/run_worker.py','scripts/backup_schedule.py','frontend/package.json','frontend/package-lock.json','frontend/index.html','frontend/tsconfig.json','frontend/vite.config.ts','frontend/src/app.ts','frontend/public/logo.svg']
     paths.append('scripts/backup_offsite.py')
     paths.append('scripts/restore_drill.py')
-    paths += ['backend/sop_source_contracts.json','scripts/backup_publish.py',
+    paths += ['backend/sop_source_contracts.json','backend/sop_import/catalog.json','scripts/backup_publish.py',
               'scripts/backup_reconcile.py','scripts/backup_offsite_acceptance.py','backend/requirements.lock']
     for name in paths:
         path=root/name; path.parent.mkdir(parents=True,exist_ok=True); path.write_text('source',encoding='utf-8')
