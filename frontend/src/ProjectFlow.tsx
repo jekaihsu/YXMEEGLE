@@ -13,6 +13,9 @@ import {buildFlowModel,needsViewerAction,productionKey,projectFlowRoute} from '.
 import {FlowDiagram,FlowPanelSkeleton} from './FlowDiagram';
 import {FlowAction,FlowNodeActions} from './FlowActions';
 import {FlowTasks} from './FlowTasks';
+import {SopTasks,type SopImportTarget} from './SopTasks';
+import {useSopTasks} from './useSopTasks';
+import {isSopNode} from './sopTaskApi';
 import {FlowSchedule} from './FlowSchedule';
 import {ProductionCard} from './FlowEvidence';
 import {FlowSourceDetails} from './FlowSourceDetails';
@@ -31,6 +34,8 @@ import './ProjectFlow.css';
 export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions}:{c:Ctx;p:Project;assignments:ReturnType<typeof useNodeAssignments>;selectedKey:string;secondary:ReactNode;legacyActions:ReactNode}){
  const route=projectFlowRoute(c.route),enabled=c.s.features?.node_assignment===true;
  const read=useProjectProgress(p.id);
+ const sopTasks=useSopTasks(p.id,c.s.workspace_id || '');
+ const [sopImport,setSopImport]=useState<SopImportTarget>(null);
  const sop=useStartSop(p.id,enabled,assignments.reload);
  const list='data' in assignments.state ? assignments.state.data : undefined;
  const isLegacy=assignments.state.kind==='disabled';
@@ -54,7 +59,10 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
   if(!id)return;const frame=requestAnimationFrame(()=>document.getElementById(id)?.scrollIntoView({block:'start',behavior:'auto'}));return()=>cancelAnimationFrame(frame);
  },[c.route.tab,c.route.node,loading]);
  const reports=(row?:ReportTarget)=>{location.hash=progressHash('#view=reports&tab=progress',{dept:row?.dept || 'field',week:row?.week || '',group:'',caseKey:'',q:row?.case_code || p.code})};
- const select=(node:string,keyboard=false)=>{keyboardMove.current=keyboard;c.go({...c.route,tab:keyboard ? c.route.tab : 'flow',node,task:undefined,focus:undefined},keyboard)};
+ const select=(node:string,keyboard=false)=>{keyboardMove.current=keyboard;c.go({...c.route,tab:keyboard ? c.route.tab : 'flow',node,task:undefined,task_source:undefined,focus:undefined},keyboard)};
+ const sopAllowed=sopTasks.state.kind==='ready' ? sopTasks.state.data.allowed : undefined;
+ const sopNode=isSopNode(selected.key) ? selected.key : undefined;
+ const sopNodeAction=sopAllowed && sopNode ? <FlowAction allowed={sopAllowed.import} reason="需 SOP 匯入權限" onClick={()=>setSopImport(sopNode)}>匯入此節點任務</FlowAction> : null;
  const localNode=p.nodes.find(n=>n.key===selected.key);
  const managers=c.w.users.filter(u=>u.active!==false && u.role==='manager' && selected.departments.includes(u.department));
  const taskIncomplete=(!isLegacy && assignments.state.kind==='error' && !list) || (all ? Object.keys(details.errors).length>0 : !!details.errors[selected.key]);
@@ -73,7 +81,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
    <dl className="pf-facts"><div><dt>負責組別</dt><dd>{selected.departments.join('、') || (isLegacy ? '本地流程' : '來源未提供')}</dd></div><div><dt>組別主管</dt><dd>{managers.map(u=>u.name).join('、') || (selected.departments.length ? '未能對應到本組主管' : '來源未提供負責組別，未能對應到本組主管')}</dd></div><div><dt>指派主管</dt><dd>{selected.assignment?.assigned_by?.name || '來源未提供'}</dd></div><div><dt>節點最後期限</dt><dd>{selected.finalDeadline?.slice(0,10) || '未排定'}</dd></div></dl>
    {selected.assignment?.auto_done && <p className="pg-callout">自動判定 · {selected.assignment.auto_done.reason}</p>}
    {selected.assignment?.evidence?.drives_status && <p className="pg-callout">依案件資料判定進度，成果仍須依原節點權限確認交接。</p>}
-   {detail ? <FlowNodeActions key={selected.key} detail={detail} busy={busy} reason={reason} error={assignments.error} mutate={assignments.mutate}/> : !isLegacy && !!selected.assignment && assignments.state.kind==='ready' && !details.errors[selected.key] ? <Skeleton height="3rem"/> : null}
+   {detail ? <FlowNodeActions key={selected.key} detail={detail} busy={busy} reason={reason} error={assignments.error} mutate={assignments.mutate} extra={sopNodeAction}/> : !isLegacy && !!selected.assignment && assignments.state.kind==='ready' && !details.errors[selected.key] ? <Skeleton height="3rem"/> : sopNodeAction && <div className="pf-node-actions"><div className="pf-actions">{sopNodeAction}</div></div>}
    {!isLegacy && !selected.assignment && <p>此階段尚無節點指派來源。可先核對來源證據，啟動 SOP 後再指派。</p>}
 
    {Object.entries(details.errors).map(([key,error])=><p role="alert" key={key}>{model.nodes.find(n=>n.key===key)?.label}任務明細讀取失敗。{error}<Button onClick={details.retry}>重試任務明細</Button></p>)}
@@ -86,6 +94,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
     {read.state.kind!=='ready' && selected.assignment?.evidence && <NodeWorkItems node={selected.assignment} projectId={p.id} onRetryEvidence={read.state.kind==='error' ? read.retry : undefined}/>}
     {selected.gaps.filter(g=>g!==selected.quantity.reason).length>0 && <div className="pf-node-gaps"><h3>此節點待補</h3>{selected.gaps.filter(g=>g!==selected.quantity.reason).map((g,i)=><p key={i}>{g}</p>)}<p>請核對來源欄位與節點關聯。實際完成量未連結時，請在 Lark 日報填「所屬案件」與「合約工項」，下次同步後再核對。</p></div>}
    </div>
+   <SopTasks c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>
    <FlowTasks c={c} p={p} nodes={model.nodes} selected={selected.key} details={details.details} all={all} onScope={value=>c.go({...c.route,tab:'flow',section:value ? 'all-tasks' : undefined})} busy={busy} reason={reason} error={assignments.error} mutate={assignments.mutate} loading={taskLoading} incomplete={taskIncomplete}/>
   </section>}
   {p.nodes.length>0 && <details className="pf-secondary pf-legacy"><summary>範本與本地流程</summary>
