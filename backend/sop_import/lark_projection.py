@@ -15,7 +15,7 @@ import time
 from urllib.parse import quote
 from uuid import UUID, uuid4
 
-from sqlalchemy import create_engine, select, text as sql_text
+from sqlalchemy import create_engine, select, update, text as sql_text
 from sqlalchemy.orm import sessionmaker
 
 from ..models import BusinessRow, WorkspaceRow
@@ -373,9 +373,15 @@ class Projection:
         with self.sessions.begin() as db:
             row = latest(db, wid, pid, tid)
             task = db.get(LocalTask, (wid, tid))
-            row.state = 'done' if task.revision == values['本地版本'] and row.target_revision == values['本地版本'] else 'none'
-            row.synced_at, row.last_fingerprint, row.last_error = self.clock(), values['投影指紋'], None
-            row.retry_at, row.attempts = 0, 0
+            revision = values['本地版本']
+            where = (LarkOutbox.workspace_id == wid, LarkOutbox.project_id == pid,
+                     LarkOutbox.task_id == tid, LarkOutbox.generation == row.generation)
+            metadata = {'synced_at': self.clock(), 'last_fingerprint': values['投影指紋']}
+            result = db.execute(update(LarkOutbox).where(*where, LarkOutbox.target_revision == revision).values(
+                **metadata, state='done' if task.revision == revision else 'none', last_error=None,
+                retry_at=0, attempts=0).execution_options(synchronize_session=False))
+            if not result.rowcount:
+                db.execute(update(LarkOutbox).where(*where).values(**metadata).execution_options(synchronize_session=False))
 
     def pause(self, wid, pid, tid, reason):
         with self.sessions.begin() as db:
