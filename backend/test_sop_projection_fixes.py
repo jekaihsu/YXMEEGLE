@@ -63,3 +63,28 @@ def test_pending_update_records_remote_drift_before_put(p):
     p.worker.drain()
     assert row(p).drift
     assert p.fake.records['rec1']['fields']['標題'] == 'Local edit'
+
+
+@pytest.mark.parametrize('change', ['name', 'code', 'origin', 'roster'])
+def test_local_payload_change_is_not_remote_drift(p, change):
+    p.project['case_type'] = 'confirmation'
+    p.worker.drain()
+    if change in {'name', 'code'}:
+        p.project[change] = 'local change'
+    elif change == 'origin':
+        p.cfg['PUBLIC_ORIGIN'] = 'https://new.example'
+    else:
+        original = p.fake.__call__
+        def roster(request):
+            response = original(request)
+            if 'tblfaCO2xPUNptQH' in request.url.path and request.url.path.endswith('/records'):
+                return httpx.Response(200, json={'code': 0, 'data': {'items': [], 'has_more': False}})
+            return response
+        p.worker.client_factory = lambda before: ProjectionClient(p.cfg, httpx.MockTransport(roster), before_write=before)
+    p.clock[0] += 601
+    p.worker.drain()
+    assert not row(p).drift
+    with p.sessions() as db:
+        assert list(db.scalars(select(TaskEvent).where(TaskEvent.kind == 'lark_drift'))) == []
+    p.worker.drain()
+    assert row(p).state == 'done'

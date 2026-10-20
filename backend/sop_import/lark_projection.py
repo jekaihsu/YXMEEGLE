@@ -405,14 +405,13 @@ class Projection:
                     continue
                 record = found[0]
                 values = self.values(db, wid, pid, row.task_id, project, state, roster, row.generation)
-                if row.state == 'done' and (fingerprint(record['fields']) != values['投影指紋'] or canon(Kind.TEXT, record['fields'].get('投影指紋')) != values['投影指紋']):
+                if row.state == 'done' and self.remote_changed(row, record):
                     issues.append({'kind': 'lark_drift', 'key': key, 'task_id': row.task_id, 'record_id': record['record_id']})
                     if not readonly:
-                        remote = {name: record['fields'].get(name) for name in FIELDS}
-                        db.add(TaskEvent(workspace_id=wid, project_id=pid, task_id=row.task_id, id=str(uuid4()),
-                                         actor_id='sop_projection', at=self.clock(), kind='lark_drift', revision=row.target_revision,
-                                         changes={'record_id': record['record_id'], 'lark_values': remote}))
-                        row.drift, row.state = True, 'none'
+                        self.record_drift(db, row, record)
+                        row.state = 'none'
+                elif row.state == 'done' and values['投影指紋'] != row.last_fingerprint and not readonly:
+                    row.state = 'none'
             if not readonly:
                 receipt = db.get(LarkReconcile, (wid, pid))
                 if receipt is None:
