@@ -297,6 +297,7 @@ class Projection:
             values = self.values(db, wid, pid, tid, project, state, roster, row.generation)
             row.target_revision = values['本地版本']
             generation, rid = row.generation, row.record_id
+            stored_rid, stored_operation = rid, False
             if not rid:
                 row.state = 'sent'
                 row.first_sent_at = row.first_sent_at or self.clock()
@@ -314,6 +315,7 @@ class Projection:
                 with self.sessions.begin() as db:
                     latest(db, wid, pid, tid).record_id = rid
             else:
+                stored_operation = True
                 record = client.get(Table.TASKS, rid)
                 with self.sessions.begin() as db:
                     self.record_drift(db, latest(db, wid, pid, tid), record)
@@ -324,7 +326,13 @@ class Projection:
                 raise Failure('outcome_unknown', 'SOP 投影讀回未確認')
             self.complete(wid, pid, tid, values)
         except Failure as exc:
-            if rid and (exc.extra.get('upstream_status') == 404 or exc.extra.get('lark_code') == 1254043):
+            deleted = False
+            if stored_operation and stored_rid and exc.extra.get('lark_code') == 1254043:
+                try:
+                    client.get(Table.TASKS, stored_rid)
+                except Failure as confirm:
+                    deleted = confirm.extra.get('lark_code') == 1254043
+            if deleted:
                 with self.sessions.begin() as db:
                     row = latest(db, wid, pid, tid)
                     row.state, row.last_error = 'done', 'lark_row_deleted'
