@@ -251,23 +251,28 @@ class Projection:
                             for row in self.current_rows(db, wid, pid):
                                 if row.state == 'paused' and (row.last_error or '').startswith('schema_drift'):
                                     row.state, row.last_error = 'none', None
-                        with self.sessions() as db:
-                            pending = [r.task_id for r in self.current_rows(db, wid, pid)
-                                       if r.state not in {'done', 'paused'} and r.retry_at <= self.clock()][:limit]
-                        for tid in pending:
-                            if self._stop.is_set():
-                                return
+                    with self.sessions() as db:
+                        eligible = [r for r in self.current_rows(db, wid, pid)
+                                    if r.state not in {'done', 'paused'} and r.retry_at <= self.clock()]
+                        pending = [r.task_id for r in sorted(eligible, key=lambda r: (r.synced_at is not None, r.attempts, r.task_id))][:min(limit, 50)]
+                    for tid in pending:
+                        if self._stop.is_set():
+                            return
+                        with self.client_factory(lambda: self.before_write(wid, pid)) as client:
                             self.project_task(client, wid, pid, tid, project, state, roster)
+                    with self.client_factory(lambda: self.before_write(wid, pid)) as client:
                         report = self.reconcile(client, wid, pid, project, state, roster)
-                        for issue in report['issues']:
-                            if issue['kind'] == 'lark_drift':
-                                self.project_task(client, wid, pid, issue['task_id'], project, state, roster)
+                    remaining = max(0, min(limit, 50) - len(pending))
+                    for issue in [i for i in report['issues'] if i['kind'] == 'lark_drift'][:remaining]:
+                        with self.client_factory(lambda: self.before_write(wid, pid)) as client:
+                            self.project_task(client, wid, pid, issue['task_id'], project, state, roster)
                 except Failure as exc:
                     with self.sessions.begin() as db:
                         for row in self.current_rows(db, wid, pid):
                             if row.state == 'paused' and not (row.last_error or '').startswith('schema_drift'):
                                 continue
-                            row.state = 'none' if row.state == 'done' else row.state
+                            if row.state == 'done':
+                                continue
                             row.last_error = exc.code + (': ' + ','.join(exc.extra['fields']) if 'fields' in exc.extra else '')
                             if exc.code == 'schema_drift':
                                 row.state = 'paused'
