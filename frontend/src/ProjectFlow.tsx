@@ -99,6 +99,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
    <label>本地節點<select aria-label="本地節點" value={selectedKey} onChange={e=>select(e.target.value)}>{p.nodes.map(n=><option key={n.id} value={n.key}>{NODE_NAMES[n.key] || n.name}</option>)}</select></label>{legacyActions}
   </details>}
   <details className="pf-secondary"><summary>節點資訊</summary>
+   {(localNode?.guidance || localNode?.description) && <p>{localNode.guidance || localNode.description}</p>}
    <p>協作人員 {localNode?.collaborator_ids.map(id=>nameOf(c.w,id)).join('、') || '尚未設定'}</p>
    <p>經過 {elapsed(localNode?.started_at || selected.assignment?.started_at,c.w.as_of)} 天</p>
    <Button onClick={()=>c.go({...c.route,node:selectedKey,tab:'files'})}>開啟 作業資料與成果</Button>
