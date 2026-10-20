@@ -50,7 +50,7 @@ test('home deep link expands the real node and focuses the task without a legacy
   assert.equal(document.querySelector('[data-assignment-node="control"]').getAttribute('aria-expanded'), 'true');
   assert.equal(document.activeElement.getAttribute('data-assignment-task'), 'recTask1');
   assert.equal(document.querySelector('[data-assignment-task="recTask1"] details').open, true);
-  assert.equal(document.querySelector('.task-inspector'), null);
+  assert.equal(document.querySelector('.task-drawer[data-kind=legacy]'), null);
   assert.ok(!document.body.textContent.includes('找不到此任務'));
   assert.ok(document.body.textContent.includes('Lark 節點指派 N · Lark 任務 T'));
 });
@@ -66,7 +66,7 @@ test('unknown remote tasks have a readable scoped error', async () => {
   globalThis.fetch = async () => reply(fixture.list);
   await mount(React.createElement(ui.ProjectDetail, {c: context({tab: 'flow', node: 'control', task: 'recMissing'})}));
   assert.ok(document.body.textContent.includes('找不到此 Lark 任務'));
-  assert.equal(document.querySelector('.task-inspector'), null);
+  assert.equal(document.querySelector('.task-drawer[data-kind=legacy]'), null);
 });
 test('zero Lark tasks remain separate from expandable local templates', async () => {
   ui.invalidateSessionEpoch(); const fixture = sourceFixture();

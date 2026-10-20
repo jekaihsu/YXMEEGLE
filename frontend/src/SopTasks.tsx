@@ -21,12 +21,12 @@ type Sop = ReturnType<typeof useSopTasks>;
 
 function TaskLine({task, people, scoped, onOpen, selected, onSelect, projectId, sop, onAccept}: {task: SopTask; people: Map<string, string>; scoped: boolean; onOpen: () => void; selected:boolean; onSelect:()=>void; projectId:string; sop:Sop; onAccept:()=>void}) {
  const executor = task.participants.executor;
- return <li data-sop-task={task.id}><div className="sop-task-select"><input type="checkbox" aria-label={`選取 ${task.title}`} checked={selected} onChange={onSelect}/><button className="pf-task-open" onClick={onOpen} aria-label={`開啟 SOP 任務 ${task.title}`}>
+ return <li data-sop-task={task.id}><div className="sop-task-select"><span className="sop-state" data-state={task.applicability === 'not_applicable' ? 'not_applicable' : task.state} aria-hidden="true"/><button className="pf-task-open" onClick={onOpen} aria-label={`開啟 SOP 任務 ${task.title}`}>
   <strong>{task.title}</strong>
   <span>{executor ? people.get(executor) || '人員待確認' : '未指派'} · {stateLabel(task)} · {dueLabel(task)}
    <SopLarkSync task={task}/>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.conditional && <Badge tone="warning">條件</Badge>}{task.manual && <Badge>手動</Badge>}</span>
   {!scoped && <small>{task.nodes.map(n => sopNodeLabel(n.node_key)).join('、') || '未連結節點'}</small>}
- </button></div><TaskSuggestion projectId={projectId} task={task} current={sop.current} reload={sop.reload} onAccept={onAccept}/></li>;
+ </button><input type="checkbox" aria-label={`選取 ${task.title}`} checked={selected} onChange={onSelect}/></div><TaskSuggestion projectId={projectId} task={task} current={sop.current} reload={sop.reload} onAccept={onAccept}/></li>;
 }
 
 function CreateTask({projectId, node, current, onDone, onClose}: {projectId: string; node: SopNodeKey; current: () => boolean; onDone: () => Promise<void>; onClose: () => void}) {
@@ -76,10 +76,11 @@ export function SopTasks({c, p, nodeKey, sop, importing, setImporting}: {c: Ctx;
   <header>
    <h3>SOP 任務{counts && <span className="sop-progress" aria-label={`完成 ${progressLabel(counts)}`}>{progressLabel(counts)}</span>}{counts && checklistComplete(counts) && <Badge tone="positive">檢查清單已完成</Badge>}</h3>
    <div className="pf-actions">
-    <Button onClick={() => {void sop.reload()}} disabled={state.kind === 'loading' || state.kind === 'ready' && state.refreshing}>重新整理</Button>
-    {allowed && <FlowAction allowed={allowed.import} reason="需 SOP 匯入權限" onClick={() => setImporting('case')}>匯入預設任務</FlowAction>}
+    {allowed && node && <FlowAction allowed={allowed.import} reason="需 SOP 匯入權限" onClick={() => setImporting(node)}>匯入此節點任務</FlowAction>}
     {allowed && <FlowAction allowed={allowed.manage} reason="需 SOP 任務管理權限" onClick={() => setCreating(true)}>新增任務</FlowAction>}
-   {data && suggestionSelection(data.tasks).length>0 && <Button onClick={()=>setReview([])}>採用全部建議</Button>}</div>
+    {data && suggestionSelection(data.tasks).length>0 && <Button onClick={()=>setReview([])}>採用全部建議</Button>}
+    {allowed && <FlowAction allowed={allowed.import} reason="需 SOP 匯入權限" onClick={() => setImporting('case')}>匯入預設任務</FlowAction>}
+    <Button variant="plain" onClick={() => {void sop.reload()}} disabled={state.kind === 'loading' || state.kind === 'ready' && state.refreshing}>重新整理</Button></div>
   </header>
   <div className="pf-filters sop-filters">
    <div className="pf-actions" role="group" aria-label="SOP 任務範圍">{node && <Button aria-pressed={!wholeCase} onClick={() => setWholeCase(false)}>此節點</Button>}<Button aria-pressed={wholeCase || !node} onClick={() => setWholeCase(true)}>全案</Button></div>

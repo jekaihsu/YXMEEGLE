@@ -158,8 +158,8 @@ test('the section lists the node tasks with executor, state, due and badges', as
  const section = document.querySelector('#sop-tasks');
  assert.equal(section.querySelector('h3').firstChild.textContent, 'SOP 任務');
  assert.deepEqual([...section.querySelectorAll('.pf-task-open strong')].map(s => s.textContent), ['業主提出報價需求', '共用檢核']);
- assert.equal(section.querySelector('[data-sop-task=t1] span').textContent, '未指派 · 待處理 · 期限待確認未啟用');
- assert.equal(section.querySelector('[data-sop-task=shared] span').textContent, '林組員 · 待處理 · 期限待確認未啟用共用條件');
+ assert.equal(section.querySelector('[data-sop-task=t1] .pf-task-open>span').textContent, '未指派 · 待處理 · 期限待確認未啟用');
+ assert.equal(section.querySelector('[data-sop-task=shared] .pf-task-open>span').textContent, '林組員 · 待處理 · 期限待確認未啟用共用條件');
  assert.equal(section.querySelector('.sop-progress').textContent, '0/1');
  await click(button('全案'));
  assert.equal(section.querySelector('[data-sop-task=shared] small').textContent, '報價、PM 派工');
@@ -242,6 +242,17 @@ test('a deep link opens the SOP drawer, Escape clears the discriminator and retu
  assert.deepEqual([c.route.task, c.route.task_source], ['t1', 'sop_local']);
  await act(async () => {document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); await tick()});
  assert.equal(document.activeElement, document.querySelector('[data-sop-task=t1] button'));
+});
+
+test('a task row leads with its state marker and ends with the bulk checkbox; the drawer footer ends with the primary action', async () => {
+ await mount({route: {task: 't1', task_source: 'sop_local'}});
+ const row = document.querySelector('[data-sop-task=t1] .sop-task-select');
+ assert.deepEqual([...row.children].map(e => e.className || e.type), ['sop-state', 'pf-task-open', 'checkbox']);
+ assert.equal(row.firstElementChild.dataset.state, 'pending');
+ assert.equal(dialog().dataset.kind, 'sop');
+ assert.deepEqual([...dialog().querySelectorAll('.task-drawer-trail>span')].map(s => s.textContent), ['SOP 任務', '報價']);
+ const actions = [...dialog().querySelectorAll('.task-drawer-footer [aria-label=狀態操作] button')].map(b => b.textContent);
+ assert.equal(actions.at(-1), '開始');
 });
 
 test('a revision conflict reloads the task and keeps the draft for the next save', async () => {
