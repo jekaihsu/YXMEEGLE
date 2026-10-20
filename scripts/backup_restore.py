@@ -25,13 +25,15 @@ def _canonical_base():
         import sys
         sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
         from backend.models import Base
+    from backend.sop_import import models
     return Base
 
 # The application's SQLAlchemy models are the only schema definition. Login
 # sessions are deliberately not portable and are recreated by the app on start.
 META=_canonical_base().metadata
 PORTABLE=('workspaces','receipts','source_caches','business_records','company_people','action_audit')
-TABLES=[META.tables[name] for name in PORTABLE]
+OPTIONAL_TABLES=tuple(name for name in META.tables if name.startswith('sop_'))
+TABLES=[META.tables[name] for name in PORTABLE] + [t for t in META.sorted_tables if t.name in OPTIONAL_TABLES]
 
 def assert_schema(engine):
     """create_all never alters existing tables, so verify the live schema."""
@@ -148,6 +150,7 @@ def restore(engine,uploads,source):
         if manifest['schema']=='yx-workspace-backup/1':
             rows.setdefault('business_records',[]);rows.setdefault('company_people',[])
         if manifest['schema'] in ('yx-workspace-backup/1','yx-workspace-backup/2'): rows.setdefault('action_audit',[])
+        for name in OPTIONAL_TABLES: rows.setdefault(name,[])
         if set(rows)!={t.name for t in TABLES}:raise ValueError('Unexpected database tables')
     # A live target can contain only login sessions after a partial reset. It
     # is still not an empty restore target; inspect every table, not just those

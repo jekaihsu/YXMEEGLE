@@ -185,7 +185,7 @@ Deferred work includes attachments, reviewed typed completion evidence and check
 
 Canonical identity merge/remap must remain disabled for cases with checklist history until a preservation adapter is verified. This slice does not intercept the existing reconciliation paths. Keep canonical IDs stable. Ordinary source refresh and `storage.save` cannot delete feature tables. Missing canonical nodes block further import and retain historical links.
 
-Back up the application database, including all `sop_*` tables. Workspace JSON export does not include them. Restore verification must include templates, tasks, links, previews, import and local case runs, and events alongside canonical cases. This slice does not supply a backup or identity migration adapter. Roll back by disabling writes and retaining the tables.
+Back up the application database, including all `sop_*` tables. Workspace JSON export does not include them. Restore verification must include templates, tasks, links, previews, import and local case runs, and events alongside canonical cases. The portable backup includes all SOP tables and restores older archives with empty SOP tables. Identity migration remains deferred. Roll back by disabling writes and retaining the tables.
 
 Run verification from the repository root.
 
@@ -194,3 +194,7 @@ python3 -m pytest backend/test_sop_import_catalog.py backend/test_sop_import.py 
   backend/test_sop_suggestions.py backend/test_sop_quotes.py backend/test_sop_local_case.py backend/test_sop_quote_publish.py -q
 python3 -m pytest backend -q
 ```
+
+Local intake creators with `sop_task_import` can manage the checklist while no PM is assigned. After PM assignment, management requires that PM, a manager, or an explicit SOP delegate.
+
+`quote_number_taken` checks even hidden source numbers. The existence disclosure is an accepted trade-off for official number uniqueness.
