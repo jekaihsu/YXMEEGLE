@@ -88,7 +88,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
      : read.state.kind==='loading' ? <div aria-label="工程證據載入中" aria-busy="true"><Skeleton height="12rem"/></div>
      : category ? <ProductionCard node={selected} category={category} data={read.state.data} onDetail={setReport} onReports={reports}/>
      : <div className="pg-callout"><h3>來源證據</h3>{read.state.data.stages.find(s=>s.key===(selected.key==='pricing' ? 'billing' : selected.key))?.evidence.map((e,i)=><p key={i}>{e.label} · {e.value}</p>)}</div>}
-    {read.state.kind==='ready' && read.state.data.sources.reports_status!=='ok' && <p className="pg-callout">週報來源{read.state.data.sources.reports_status==='cold' ? '建立中' : read.state.data.sources.reports_status==='restricted' ? '權限不足' : '暫不可用'}。節點與任務仍可查看。<Button onClick={read.retry}>重試週報來源</Button></p>}
+    {read.state.kind==='ready' && read.state.data.sources.reports_status!=='ok' && <p className="pg-callout">週報來源{read.state.data.sources.reports_status==='cold' ? '建立中' : read.state.data.sources.reports_status==='restricted' ? '權限不足' : '暫不可用'}<Button onClick={read.retry}>重試週報來源</Button></p>}
     {read.state.kind!=='ready' && selected.assignment?.evidence && <NodeWorkItems node={selected.assignment} projectId={p.id} onRetryEvidence={read.state.kind==='error' ? read.retry : undefined}/>}
     {selected.gaps.filter(g=>g!==selected.quantity.reason).length>0 && <div className="pf-node-gaps"><h3>此節點待補</h3>{selected.gaps.filter(g=>g!==selected.quantity.reason).map((g,i)=><p key={i}>{g}</p>)}</div>}
    </div>
