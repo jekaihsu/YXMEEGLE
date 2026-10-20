@@ -167,3 +167,23 @@ def test_unknown_settings_key_is_validation_error(admin):
     response=c.post('/api/actions',json=command(ws,'admin_settings',{'unknown_setting':True}))
     assert response.status_code==422,response.text
     assert response.json()['detail']=='未知設定'
+
+
+@pytest.mark.parametrize('role,capabilities,active,exposed',[
+    ('manager',[],True,True),
+    ('member',['manage_people'],True,True),
+    ('manager',[],False,False),
+    ('member',['manage_people'],False,False),
+    ('member',[],True,False),
+])
+def test_capability_projection_matches_active_authority(role,capabilities,active,exposed):
+    from .seed import seed
+    from .workspace_projection import filter_private_workspace
+    state=seed()
+    actor=next(u for u in state['users'] if u['id']=='u-manager')
+    actor.update(role=role,capabilities=capabilities,active=active)
+    target=next(u for u in state['users'] if u['id']=='u-field')
+    target['capabilities']=['finance_approve']
+    out=filter_private_workspace(state,dict(actor))
+    person=next(u for u in out['users'] if u['id']=='u-field')
+    assert ('capabilities' in person)==exposed
