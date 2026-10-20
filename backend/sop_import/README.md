@@ -35,7 +35,7 @@ Set `SOP_TASK_WRITES_ENABLED=true` in server configuration. The default is false
 
 ## Import and edit a case
 
-Read `GET /api/sop-templates`, then preview a published version. Omit `node_keys` for all nine nodes. Node selection uses exactly the same planner.
+Read `GET /api/sop-templates`, then preview a published version. Omit `node_keys` for all nine nodes in canonical order, beginning with `sales`. Node selection uses exactly the same planner. Intake cases need no formal case number or confirmation to import.
 
 ```json
 {
@@ -55,7 +55,11 @@ Send this body to `POST /api/projects/{id}/sop-import/apply`. Recover ambiguous 
 
 `GET /api/projects/{id}/sop-tasks?node_key=confirmation` returns a node scope. Omit the query for a deduplicated case list. `counts` describes the selected scope. `case_counts` always deduplicates the whole case. `node_counts` includes all nine nodes. Numerator and denominator include only applicable, non-archived tasks. Unresolved and not-applicable counts remain separate.
 
-[api-examples.json](api-examples.json) contains complete, actual preview, apply, and list response shapes for one confirmation task, including a full 21-field snapshot. IDs and timestamps are examples. `expires_at` is UTC epoch seconds. Node IDs come from persisted `business_records`, never titles or array positions.
+[api-examples.json](api-examples.json) contains complete, actual preview, apply, and list response shapes for one quotation task in an intake case, including a full 21-field snapshot. IDs and timestamps are examples. `expires_at` is UTC epoch seconds. Node IDs come from persisted `business_records`, never titles or array positions.
+
+`start_node` appears in preview, apply, and task-list responses. It derives from persisted case and node data. An unprogressed intake starts at `sales`. Quote status `成案` or a populated `回傳單日期` advances it to `pm`; a confirmation relationship advances it to `confirmation`. Verified engineering lifecycle and persisted node progress can advance it further. Unverified lifecycle values do not advance it. This field does not change task or business node state. Newly imported tasks under every selected node start `pending`.
+
+Display fields return values and codes. Preview outcomes contain `reason_code` and an optional recorded `exclusion_reason`, without catalog helper prose. Catalog interpretation notes reside under `provenance`; immutable task source content resides under the optional `source_snapshot`.
 
 For an explicit participant binding, add `participant_bindings` keyed by source row key, with `executor`, `checker`, or `confirmer` user IDs. A binding requires one active user with `sop_task_work` and case participation. It never selects the importer or node owner automatically.
 

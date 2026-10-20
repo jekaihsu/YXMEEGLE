@@ -10,6 +10,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from ..models import WorkspaceRow, BusinessRow
 from .catalog import digest, publish
+from .case_stage import start_node
 from .domain import (Applicability, Lifecycle, Disposition, TRANSITIONS, NODE_MAP, SUBCONTRACT,
                      CONDITIONAL, PARTICIPANT_ROLES, require)
 from .models import Family, Version, TemplateRow, CaseState, LocalTask, TaskNodeLink, Preview, ImportRun, TaskEvent
@@ -101,6 +102,13 @@ class Service:
             result.append({'node_key': key, 'node_id': found[0].entity_id})
         return result
 
+    @staticmethod
+    def case_start_node(db, ctx):
+        nodes = db.scalars(select(BusinessRow).where(BusinessRow.workspace_id == ctx.wid,
+                                                    BusinessRow.kind == 'nodes',
+                                                    BusinessRow.parent_id == ctx.project['id']))
+        return start_node(ctx.project, [n.data for n in nodes])
+
     def version(self, db, wid, version_id):
         version = db.get(Version, (wid, identifier(version_id)))
         require(version is not None and version.status == 'published', 'template_unavailable', 409)
@@ -115,7 +123,7 @@ class Service:
             if version_id:
                 require(explicitly_granted(user, 'sop_task_read_source'), 'sop_import_forbidden', 403)
                 version = self.version(db, wid, version_id)
-                return {**self.version_json(version), 'rows': [r.snapshot for r in self.rows(db, version)]}
+                return {**self.version_json(version), 'rows': [self.catalog_row_json(r) for r in self.rows(db, version)]}
             versions = list(db.scalars(select(Version).where(Version.workspace_id == wid, Version.status == 'published')
                                        .order_by(Version.published_at, Version.id)))
             families = {f.id: f for f in db.scalars(select(Family).where(Family.workspace_id == wid, Family.lifecycle == 'active'))}
@@ -123,6 +131,13 @@ class Service:
             return {'templates': [{**self.version_json(v), 'name': families[v.family_id].name,
                                    'is_default': families[v.family_id].is_default and latest[v.family_id] == v.id}
                                   for v in versions if v.family_id in families]}
+
+    @staticmethod
+    def catalog_row_json(row):
+        source = deepcopy(row.snapshot)
+        interpretation = source['proposed_import'].pop('reason', None)
+        source['provenance'] = {'interpretation_reason': interpretation}
+        return source
 
     @staticmethod
     def version_json(v):
@@ -237,7 +252,8 @@ class Service:
                              'existing_revision': old.revision if old else None,
                              'applicability': old.applicability.value if old else app,
                              'links_to_add': missing,
-                             'reason': normalized['exclusion_reasons'].get(row.source_row_key, proposal['reason'])})
+                             'reason_code': outcome,
+                             'exclusion_reason': normalized['exclusion_reasons'].get(row.source_row_key)})
         unresolved = []
         tasks_by_id = {t.id: t for t in existing.values()}
         for outcome in outcomes:
@@ -254,7 +270,7 @@ class Service:
                 missing.append('dates')
             if missing:
                 unresolved.append({'source_row_key': outcome['source_row_key'], 'fields': missing})
-        context = {'identity_revision': state.identity_revision, 'checklist_revision': state.checklist_revision,
+        context = {'start_node': self.case_start_node(db, ctx), 'identity_revision': state.identity_revision, 'checklist_revision': state.checklist_revision,
                    'nodes': nodes, 'template': self.version_json(version), 'input': normalized, 'outcomes': outcomes}
         return {**context, 'context_hash': digest(context), 'outcomes': outcomes, 'unresolved_items': unresolved,
                 'unresolved_counts': {key: sum(key in item['fields'] for item in unresolved)
@@ -338,7 +354,7 @@ class Service:
             if created or added:
                 state.checklist_revision += 1
             receipt = {'run_id': str(uuid4()), 'request_id': rid, 'project_id': ctx.project['id'],
-                       'template_version_id': version.id, 'replayed': False, 'created_task_ids': created,
+                       'template_version_id': version.id, 'start_node': plan['start_node'], 'replayed': False, 'created_task_ids': created,
                        'existing_task_ids': existing, 'added_links': added,
                        'exclusions': [o for o in plan['outcomes'] if not o['selected']],
                        'unresolved_items': plan['unresolved_items'], 'unresolved_counts': plan['unresolved_counts'],
@@ -396,6 +412,7 @@ class Service:
             selected = [t for t in tasks if node_key is None or any(l.node_key == node_key for l in by_task[t.id])]
             selected.sort(key=lambda t: (t.template_family_id == 'manual', min((l.ordinal for l in by_task[t.id]), default=0), t.id))
             return {'project_id': ctx.project['id'], 'task_source': 'sop_local',
+                    'start_node': self.case_start_node(db, ctx),
                     'checklist_revision': state.checklist_revision if state else 0,
                     'identity_revision': state.identity_revision if state else 0, 'scope': {'node_key': node_key},
                     'counts': self.counts(selected), 'case_counts': self.counts(tasks),

@@ -1,18 +1,19 @@
 {
   "preview": {
-    "preview_id": "a3cdf794-e3df-48ec-9b3f-465839c97559",
+    "preview_id": "26064dd1-76b8-4766-8cef-67ee301078c7",
     "expires_at": 1900,
-    "project_id": "p1",
+    "project_id": "697f98488cf7408d9557494373f35abc",
+    "start_node": "sales",
     "identity_revision": 0,
     "checklist_revision": 0,
     "nodes": [
       {
-        "node_key": "confirmation",
-        "node_id": "real-p1-2"
+        "node_key": "sales",
+        "node_id": "697f98488cf7408d9557494373f35abc-sales"
       }
     ],
     "template": {
-      "version_id": "9da4af37-2d3e-45e3-8721-27a26cedaa77",
+      "version_id": "d365e1c4-17c8-4856-ba4d-f31d918a8fe4",
       "template_family_id": "plumb-case-sop",
       "revision": "r1",
       "mapping_revision": "yx-company-node-mapping-1",
@@ -20,21 +21,22 @@
     },
     "outcomes": [
       {
-        "source_row_key": "meegle-v137:A:19",
-        "title": "確認單製作並將確認單傳遞至各單位",
-        "disposition": "task",
+        "source_row_key": "meegle-v137:A:0",
+        "title": "Start",
+        "disposition": "routing_reference",
         "selected": false,
-        "outcome": "excluded",
+        "outcome": "routing_reference",
         "existing_task_id": null,
         "existing_state": null,
         "existing_revision": null,
         "applicability": "applicable",
         "links_to_add": [],
-        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+        "reason_code": "routing_reference",
+        "exclusion_reason": null
       },
       {
-        "source_row_key": "meegle-v137:A:59",
-        "title": "外業確認單確認",
+        "source_row_key": "meegle-v137:A:1",
+        "title": "業主提出報價需求",
         "disposition": "task",
         "selected": true,
         "outcome": "new",
@@ -45,15 +47,16 @@
         "links_to_add": [
           {
             "task_id": null,
-            "node_key": "confirmation",
-            "node_id": "real-p1-2"
+            "node_key": "sales",
+            "node_id": "697f98488cf7408d9557494373f35abc-sales"
           }
         ],
-        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+        "reason_code": "new",
+        "exclusion_reason": null
       },
       {
-        "source_row_key": "meegle-v137:A:60",
-        "title": "內業確認單確認",
+        "source_row_key": "meegle-v137:A:2",
+        "title": "建立報價編號",
         "disposition": "task",
         "selected": false,
         "outcome": "excluded",
@@ -62,11 +65,12 @@
         "existing_revision": null,
         "applicability": "applicable",
         "links_to_add": [],
-        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+        "reason_code": "excluded",
+        "exclusion_reason": null
       },
       {
-        "source_row_key": "meegle-v137:A:61",
-        "title": "執行公務單確認(行政)",
+        "source_row_key": "meegle-v137:A:3",
+        "title": "通知業主報價成立",
         "disposition": "task",
         "selected": false,
         "outcome": "excluded",
@@ -75,11 +79,54 @@
         "existing_revision": null,
         "applicability": "applicable",
         "links_to_add": [],
-        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+        "reason_code": "excluded",
+        "exclusion_reason": null
       },
       {
-        "source_row_key": "meegle-v137:A:22",
-        "title": "確認單修正",
+        "source_row_key": "meegle-v137:A:4",
+        "title": "是否有下包需求",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "excluded",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:5",
+        "title": "無（分支出口）",
+        "disposition": "routing_reference",
+        "selected": false,
+        "outcome": "routing_reference",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "routing_reference",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:6",
+        "title": "有（分支出口）",
+        "disposition": "routing_reference",
+        "selected": false,
+        "outcome": "routing_reference",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "routing_reference",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:7",
+        "title": "下包提出報價",
         "disposition": "task",
         "selected": false,
         "outcome": "excluded",
@@ -88,7 +135,120 @@
         "existing_revision": null,
         "applicability": "unresolved",
         "links_to_add": [],
-        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+        "reason_code": "excluded",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:8",
+        "title": "提出報價，同時通知業主已提供報價",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "excluded",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:9",
+        "title": "追蹤報價",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "excluded",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:10",
+        "title": "業主告知未得標／報價單有效期限到期",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "excluded",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:11",
+        "title": "本報價工作結束",
+        "disposition": "routing_reference",
+        "selected": false,
+        "outcome": "routing_reference",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "routing_reference",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:12",
+        "title": "報價單是否回傳",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "excluded",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:13",
+        "title": "是（分支出口）",
+        "disposition": "routing_reference",
+        "selected": false,
+        "outcome": "routing_reference",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "routing_reference",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:14",
+        "title": "無（分支出口）",
+        "disposition": "routing_reference",
+        "selected": false,
+        "outcome": "routing_reference",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "routing_reference",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:15",
+        "title": "收到回傳單，合約成立",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "excluded",
+        "exclusion_reason": null
       },
       {
         "source_row_key": "meegle-v137:A:27",
@@ -101,7 +261,8 @@
         "existing_revision": null,
         "applicability": "applicable",
         "links_to_add": [],
-        "reason": "Workbook classifies this outside a single case. Do not instantiate per case."
+        "reason_code": "routine_excluded",
+        "exclusion_reason": null
       },
       {
         "source_row_key": "meegle-v137:A:57",
@@ -114,7 +275,8 @@
         "existing_revision": null,
         "applicability": "applicable",
         "links_to_add": [],
-        "reason": "Workbook classifies this outside a single case. Do not instantiate per case."
+        "reason_code": "routine_excluded",
+        "exclusion_reason": null
       },
       {
         "source_row_key": "meegle-v137:A:28",
@@ -127,7 +289,8 @@
         "existing_revision": null,
         "applicability": "applicable",
         "links_to_add": [],
-        "reason": "Workbook explicitly marks disabled. Keep in the catalog; do not instantiate."
+        "reason_code": "disabled_excluded",
+        "exclusion_reason": null
       },
       {
         "source_row_key": "meegle-v137:A:58",
@@ -140,13 +303,14 @@
         "existing_revision": null,
         "applicability": "applicable",
         "links_to_add": [],
-        "reason": "Workbook explicitly marks disabled. Keep in the catalog; do not instantiate."
+        "reason_code": "disabled_excluded",
+        "exclusion_reason": null
       }
     ],
-    "context_hash": "6ca5cb50326ba77c67b17d14f58d5f2fc7fb967dce718343ce0d36a399b360c8",
+    "context_hash": "13883584e87c83e3dee1bfe3445f2ebabea9cfb86377d027dc220dd4e108b328",
     "unresolved_items": [
       {
-        "source_row_key": "meegle-v137:A:59",
+        "source_row_key": "meegle-v137:A:1",
         "fields": [
           "participants",
           "dates"
@@ -164,12 +328,12 @@
       "added_links": 1
     },
     "selection": {
-      "template_version_id": "9da4af37-2d3e-45e3-8721-27a26cedaa77",
+      "template_version_id": "d365e1c4-17c8-4856-ba4d-f31d918a8fe4",
       "node_keys": [
-        "confirmation"
+        "sales"
       ],
       "row_keys": [
-        "meegle-v137:A:59"
+        "meegle-v137:A:1"
       ],
       "participant_bindings": {},
       "applicability_decisions": {},
@@ -177,26 +341,41 @@
     }
   },
   "apply": {
-    "run_id": "dd474825-8e05-4805-bdc6-39ac0a05a8f4",
+    "run_id": "08ed2cdd-3364-4d30-b3fb-c0e56d2668a8",
     "request_id": "r1",
-    "project_id": "p1",
-    "template_version_id": "9da4af37-2d3e-45e3-8721-27a26cedaa77",
+    "project_id": "697f98488cf7408d9557494373f35abc",
+    "template_version_id": "d365e1c4-17c8-4856-ba4d-f31d918a8fe4",
+    "start_node": "sales",
     "replayed": false,
     "created_task_ids": [
-      "0d4ff962-b925-4aef-86db-780b3acaa68e"
+      "d4301c58-1961-41c7-b802-5405714b882c"
     ],
     "existing_task_ids": [],
     "added_links": [
       {
-        "task_id": "0d4ff962-b925-4aef-86db-780b3acaa68e",
-        "node_key": "confirmation",
-        "node_id": "real-p1-2"
+        "task_id": "d4301c58-1961-41c7-b802-5405714b882c",
+        "node_key": "sales",
+        "node_id": "697f98488cf7408d9557494373f35abc-sales"
       }
     ],
     "exclusions": [
       {
-        "source_row_key": "meegle-v137:A:19",
-        "title": "確認單製作並將確認單傳遞至各單位",
+        "source_row_key": "meegle-v137:A:0",
+        "title": "Start",
+        "disposition": "routing_reference",
+        "selected": false,
+        "outcome": "routing_reference",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "routing_reference",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:2",
+        "title": "建立報價編號",
         "disposition": "task",
         "selected": false,
         "outcome": "excluded",
@@ -205,11 +384,12 @@
         "existing_revision": null,
         "applicability": "applicable",
         "links_to_add": [],
-        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+        "reason_code": "excluded",
+        "exclusion_reason": null
       },
       {
-        "source_row_key": "meegle-v137:A:60",
-        "title": "內業確認單確認",
+        "source_row_key": "meegle-v137:A:3",
+        "title": "通知業主報價成立",
         "disposition": "task",
         "selected": false,
         "outcome": "excluded",
@@ -218,11 +398,12 @@
         "existing_revision": null,
         "applicability": "applicable",
         "links_to_add": [],
-        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+        "reason_code": "excluded",
+        "exclusion_reason": null
       },
       {
-        "source_row_key": "meegle-v137:A:61",
-        "title": "執行公務單確認(行政)",
+        "source_row_key": "meegle-v137:A:4",
+        "title": "是否有下包需求",
         "disposition": "task",
         "selected": false,
         "outcome": "excluded",
@@ -231,11 +412,40 @@
         "existing_revision": null,
         "applicability": "applicable",
         "links_to_add": [],
-        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+        "reason_code": "excluded",
+        "exclusion_reason": null
       },
       {
-        "source_row_key": "meegle-v137:A:22",
-        "title": "確認單修正",
+        "source_row_key": "meegle-v137:A:5",
+        "title": "無（分支出口）",
+        "disposition": "routing_reference",
+        "selected": false,
+        "outcome": "routing_reference",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "routing_reference",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:6",
+        "title": "有（分支出口）",
+        "disposition": "routing_reference",
+        "selected": false,
+        "outcome": "routing_reference",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "routing_reference",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:7",
+        "title": "下包提出報價",
         "disposition": "task",
         "selected": false,
         "outcome": "excluded",
@@ -244,7 +454,120 @@
         "existing_revision": null,
         "applicability": "unresolved",
         "links_to_add": [],
-        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+        "reason_code": "excluded",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:8",
+        "title": "提出報價，同時通知業主已提供報價",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "excluded",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:9",
+        "title": "追蹤報價",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "excluded",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:10",
+        "title": "業主告知未得標／報價單有效期限到期",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "excluded",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:11",
+        "title": "本報價工作結束",
+        "disposition": "routing_reference",
+        "selected": false,
+        "outcome": "routing_reference",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "routing_reference",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:12",
+        "title": "報價單是否回傳",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "excluded",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:13",
+        "title": "是（分支出口）",
+        "disposition": "routing_reference",
+        "selected": false,
+        "outcome": "routing_reference",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "routing_reference",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:14",
+        "title": "無（分支出口）",
+        "disposition": "routing_reference",
+        "selected": false,
+        "outcome": "routing_reference",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "routing_reference",
+        "exclusion_reason": null
+      },
+      {
+        "source_row_key": "meegle-v137:A:15",
+        "title": "收到回傳單，合約成立",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason_code": "excluded",
+        "exclusion_reason": null
       },
       {
         "source_row_key": "meegle-v137:A:27",
@@ -257,7 +580,8 @@
         "existing_revision": null,
         "applicability": "applicable",
         "links_to_add": [],
-        "reason": "Workbook classifies this outside a single case. Do not instantiate per case."
+        "reason_code": "routine_excluded",
+        "exclusion_reason": null
       },
       {
         "source_row_key": "meegle-v137:A:57",
@@ -270,7 +594,8 @@
         "existing_revision": null,
         "applicability": "applicable",
         "links_to_add": [],
-        "reason": "Workbook classifies this outside a single case. Do not instantiate per case."
+        "reason_code": "routine_excluded",
+        "exclusion_reason": null
       },
       {
         "source_row_key": "meegle-v137:A:28",
@@ -283,7 +608,8 @@
         "existing_revision": null,
         "applicability": "applicable",
         "links_to_add": [],
-        "reason": "Workbook explicitly marks disabled. Keep in the catalog; do not instantiate."
+        "reason_code": "disabled_excluded",
+        "exclusion_reason": null
       },
       {
         "source_row_key": "meegle-v137:A:58",
@@ -296,12 +622,13 @@
         "existing_revision": null,
         "applicability": "applicable",
         "links_to_add": [],
-        "reason": "Workbook explicitly marks disabled. Keep in the catalog; do not instantiate."
+        "reason_code": "disabled_excluded",
+        "exclusion_reason": null
       }
     ],
     "unresolved_items": [
       {
-        "source_row_key": "meegle-v137:A:59",
+        "source_row_key": "meegle-v137:A:1",
         "fields": [
           "participants",
           "dates"
@@ -316,12 +643,13 @@
     "checklist_revision": 1
   },
   "sop_tasks": {
-    "project_id": "p1",
+    "project_id": "697f98488cf7408d9557494373f35abc",
     "task_source": "sop_local",
+    "start_node": "sales",
     "checklist_revision": 1,
     "identity_revision": 0,
     "scope": {
-      "node_key": "confirmation"
+      "node_key": "sales"
     },
     "counts": {
       "done": 0,
@@ -340,7 +668,7 @@
     "node_counts": {
       "sales": {
         "done": 0,
-        "total": 0,
+        "total": 1,
         "unresolved": 0,
         "not_applicable": 0,
         "archived": 0
@@ -354,7 +682,7 @@
       },
       "confirmation": {
         "done": 0,
-        "total": 1,
+        "total": 0,
         "unresolved": 0,
         "not_applicable": 0,
         "archived": 0
@@ -404,17 +732,17 @@
     },
     "tasks": [
       {
-        "id": "0d4ff962-b925-4aef-86db-780b3acaa68e",
+        "id": "d4301c58-1961-41c7-b802-5405714b882c",
         "task_source": "sop_local",
-        "project_id": "p1",
+        "project_id": "697f98488cf7408d9557494373f35abc",
         "origin": {
           "template_family_id": "plumb-case-sop",
-          "source_row_key": "meegle-v137:A:59",
+          "source_row_key": "meegle-v137:A:1",
           "instance_scope": "case",
-          "imported_version_id": "9da4af37-2d3e-45e3-8721-27a26cedaa77"
+          "imported_version_id": "d365e1c4-17c8-4856-ba4d-f31d918a8fe4"
         },
-        "title": "外業確認單確認",
-        "instructions": "推卡片給外業經理：確認／有異議（異議 → #22）；同時觸發派工迴圈 B2 建立工作總表",
+        "title": "業主提出報價需求",
+        "instructions": "結構化需求：工項類型、數量（面積／點數／公里）、行政區、時程、特殊進場條件 → 需求卡；抽不出的欄位反問業務，不猜；需求佐證文件存案件資料夾",
         "participants": {},
         "applicability": "applicable",
         "state": "pending",
@@ -430,60 +758,60 @@
         "overdue": false,
         "nodes": [
           {
-            "node_key": "confirmation",
-            "node_id": "real-p1-2",
-            "order": 21
+            "node_key": "sales",
+            "node_id": "697f98488cf7408d9557494373f35abc-sales",
+            "order": 1
           }
         ],
         "source_snapshot": {
           "row": {
-            "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A23:U23",
-            "source_sheet_row": 23,
-            "source_row_key": "meegle-v137:A:59",
+            "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A3:U3",
+            "source_sheet_row": 3,
+            "source_row_key": "meegle-v137:A:1",
             "raw": {
-              "source_group": "3 確認單",
+              "source_group": "1 報價",
               "source_order": 2,
-              "meegle_id": 59,
-              "title": "外業確認單確認",
+              "meegle_id": 1,
+              "title": "業主提出報價需求",
               "source_kind": "confirm",
-              "owner_role_raw": "外業經理",
-              "trigger_raw": "#19 完成",
-              "anchor_raw": "確認單發出日",
-              "deadline_raw": "TODO（SOP 無）",
-              "inputs_raw": "工程確認單（外業段：工天、人數、儀器、里程、住宿）",
-              "procedure_raw": "推卡片給外業經理：確認／有異議（異議 → #22）；同時觸發派工迴圈 B2 建立工作總表",
-              "human_decision_raw": "是",
-              "outputs_raw": "確認紀錄",
-              "done_when_raw": "確認",
-              "next_raw": "#21 → #24（異議 → #22）",
+              "owner_role_raw": "報價組（業務經理轄下）",
+              "trigger_raw": "#0",
+              "anchor_raw": "詢價日期",
+              "deadline_raw": "—",
+              "inputs_raw": "需求原文（Email／口述）、業主連絡資訊表、報價總表.詢價日期、案件類型選項",
+              "procedure_raw": "結構化需求：工項類型、數量（面積／點數／公里）、行政區、時程、特殊進場條件 → 需求卡；抽不出的欄位反問業務，不猜；需求佐證文件存案件資料夾",
+              "human_decision_raw": "否（缺欄位時問業務）",
+              "outputs_raw": "報價總表新列：詢價日期、工程名稱、業主、連絡人、執行地點、案件類型；Meegle 附件「業主需求佐證文件」",
+              "done_when_raw": "需求卡必填欄齊 + 佐證文件已上傳",
+              "next_raw": "#2",
               "escalation_raw": null,
               "kpi_raw": null,
-              "source_reference_raw": "Meegle#59；SOP圖2",
+              "source_reference_raw": "Meegle#1；SOP圖1",
               "applicability_raw": null,
-              "unresolved_raw": "確認期限",
-              "version_note_raw": null
+              "unresolved_raw": "需求卡的必填欄位清單要跟報價組定稿；案件類型 55% 空、執行地點 47% 空，agent 必須補齊",
+              "version_note_raw": "v0.2"
             },
             "proposed_import": {
               "disposition": "task",
               "candidate_node_keys": [
-                "N03"
+                "N01"
               ],
               "instance_scope": "case",
               "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
               "is_business_approval": false,
               "target_branch_node_keys": [
-                "confirmation"
+                "sales"
               ]
             }
           },
           "template": {
-            "version_id": "9da4af37-2d3e-45e3-8721-27a26cedaa77",
+            "version_id": "d365e1c4-17c8-4856-ba4d-f31d918a8fe4",
             "template_family_id": "plumb-case-sop",
             "revision": "r1",
             "mapping_revision": "yx-company-node-mapping-1",
             "content_hash": "2096ea7a152deb61e02fa038bf6c954a60dbce64ec54f613fa4931565bc20008"
           },
-          "content_hash": "a22e5d6f3c66e962463714f0c070c4dd61e976fe40956f4dbf6379011d2589c9",
+          "content_hash": "d93935223c0dca161ce85092c5e3d2ab7b01581ef6f6cadc4ee64f0d24472b28",
           "related_references": []
         },
         "source_restriction": null

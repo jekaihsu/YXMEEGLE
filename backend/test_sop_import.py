@@ -410,3 +410,118 @@ def test_invalid_body_never_mutates(h, raw):
     result = h.client.post(URL + '/sop-import/preview', content=raw, headers={'Content-Type': 'application/json'})
     assert result.status_code == 422
     assert overview(h)['tasks'] == []
+
+
+@pytest.fixture
+def intake(h):
+    from .seed import seed
+    from .v4_sources import import_v4
+    from . import storage
+    state = seed(True)
+    state['projects'] = []
+    record = {'kind': 'quote', 'base_token': 'quote-base', 'table_id': 'quote-table', 'record_id': 'quote-row',
+              'fields': {'報價編號': '115588', '工程名稱': 'Quote only', '狀態': '', '案件編號': '',
+                         '回傳單日期': None, '此案確認單': []}}
+    import_v4(state, [record])
+    case = state['projects'][0]
+    assert case['case_type'] == 'intake'
+    assert case['intake_status'] == 'awaiting_confirmation'
+    case.update(pm_id='pm', case_visibility='source_reference', execution_system='pending')
+    with h.sessions.begin() as db:
+        workspace = db.get(WorkspaceRow, 'w')
+        workspace.data = storage.save(db, BusinessRow, 'w', state)
+    return h, '/api/projects/' + case['id'], case
+
+
+def test_intake_defaults_start_at_sales_and_include_all_nine_nodes(intake):
+    h, url, case = intake
+    plan = preview(h, url=url)
+    assert plan['start_node'] == 'sales'
+    assert plan['selection']['node_keys'] == list(NODE_MAP.values())
+    assert [n['node_key'] for n in plan['nodes']] == list(NODE_MAP.values())
+    assert plan['outcomes'][0]['source_row_key'] == 'meegle-v137:A:0'
+    assert plan['outcomes'][1]['source_row_key'] == 'meegle-v137:A:1'
+    result = apply(h, plan, url=url)
+    assert result['start_node'] == 'sales'
+    tasks = overview(h, url)
+    assert tasks['start_node'] == 'sales'
+    assert len(tasks['tasks']) == 38
+    assert tasks['tasks'][0]['origin']['source_row_key'] == 'meegle-v137:A:1'
+    assert {t['state'] for t in tasks['tasks']} == {'pending'}
+    assert {n['node_key'] for t in tasks['tasks'] for n in t['nodes']} == set(NODE_MAP.values())
+    assert case['case_type'] == 'intake' and case['execution_system'] == 'pending'
+
+
+def test_intake_sales_scoped_import_needs_no_case_number_or_confirmation(intake):
+    h, url, case = intake
+    plan = preview(h, url=url, node_keys=['sales'])
+    assert plan['start_node'] == 'sales'
+    assert plan['counts']['new_tasks'] == 9
+    result = apply(h, plan, url=url)
+    assert len(result['created_task_ids']) == 9
+    tasks = overview(h, url)['tasks']
+    assert [t['origin']['source_row_key'] for t in tasks] == [f'meegle-v137:A:{n}' for n in (1, 2, 3, 4, 8, 9, 10, 12, 15)]
+    assert all(t['nodes'][0]['node_key'] == 'sales' and t['state'] == 'pending' for t in tasks)
+
+
+@pytest.mark.parametrize('quote_fields,expected', [
+    ({'狀態': '成案'}, 'pm'),
+    ({'狀態': ['成案']}, 'pm'),
+    ({'回傳單日期': '2026-10-20'}, 'pm'),
+    ({'此案確認單': [{'id': 'recConfirmed'}]}, 'confirmation'),
+    ({'此案確認單': {'record_ids': ['recConfirmed']}}, 'confirmation'),
+    ({'案件編號': 'A115001-01'}, 'sales'),
+])
+def test_intake_start_node_comes_from_persisted_quote_state(intake, quote_fields, expected):
+    h, url, case = intake
+    with h.sessions.begin() as db:
+        row = db.get(BusinessRow, ('w', 'projects', case['id']))
+        project = deepcopy(row.data)
+        for quote in project['quotes'] + project['source_records']:
+            quote['fields'].update(quote_fields)
+        row.data = project
+    assert preview(h, url=url, node_keys=['sales'])['start_node'] == expected
+    assert overview(h, url)['start_node'] == expected
+
+
+def test_start_node_tracks_real_node_progress_and_invalidates_preview(intake):
+    h, url, case = intake
+    plan = preview(h, url=url)
+    with h.sessions.begin() as db:
+        row = db.scalar(select(BusinessRow).where(BusinessRow.workspace_id == 'w', BusinessRow.kind == 'nodes',
+                                                  BusinessRow.parent_id == case['id']))
+        key = row.data['key']
+        row.data = {**row.data, 'status': 'in_progress'}
+    assert overview(h, url)['start_node'] == key
+    with h.sessions.begin() as db:
+        row = db.scalar(select(BusinessRow).where(BusinessRow.workspace_id == 'w', BusinessRow.kind == 'nodes',
+                                                  BusinessRow.parent_id == case['id'], BusinessRow.entity_id == case['id'] + '-report'))
+        row.data = {**row.data, 'status': 'in_progress'}
+    assert overview(h, url)['start_node'] == 'report'
+    assert apply(h, plan, url=url, status=409)['code'] == 'preview_stale'
+
+
+def test_display_payloads_contain_codes_not_catalog_helper_prose(h):
+    plan = preview(h)
+    for outcome in plan['outcomes']:
+        assert 'reason' not in outcome
+        assert outcome['reason_code'] == outcome['outcome']
+        assert outcome['exclusion_reason'] is None
+    receipt = apply(h, plan)
+    assert all('reason' not in row for row in receipt['exclusions'])
+    template = h.client.get('/api/sop-templates/' + h.vid).json()
+    assert all('reason' not in row['proposed_import'] for row in template['rows'])
+    assert all('interpretation_reason' in row['provenance'] for row in template['rows'])
+
+
+@pytest.mark.parametrize('canonical,expected', [('執行中', 'field'), ('已完工', 'pricing'), ('已結案', 'settlement')])
+def test_start_node_uses_verified_engineering_lifecycle(intake, canonical, expected):
+    h, url, case = intake
+    with h.sessions.begin() as db:
+        row = db.get(BusinessRow, ('w', 'projects', case['id']))
+        row.data = {**row.data, 'source_lifecycle': {'state': 'mapped', 'canonical': canonical, 'reasons': []}}
+    assert overview(h, url)['start_node'] == expected
+    with h.sessions.begin() as db:
+        row = db.get(BusinessRow, ('w', 'projects', case['id']))
+        row.data = {**row.data, 'source_lifecycle': {'state': 'needs_verification', 'canonical': canonical, 'reasons': ['conflict']}}
+    assert overview(h, url)['start_node'] == 'sales'
