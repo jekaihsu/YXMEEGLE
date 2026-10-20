@@ -1,8 +1,23 @@
+import asyncio
+from datetime import date
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import select
+from starlette.requests import Request
 
+from . import storage
+from .models import BusinessRow, PersonRow, WorkspaceRow
+from .sop_import.case_stage import stage
+from .sop_import.domain import Lifecycle
+from .sop_import.models import LocalTask, Preview, TaskEvent
+from .sop_import.quote_facts import collect
+from .sop_import.routes import MAX_BODY
 from .sop_import.service import can_manage
+from .test_sop_import import apply, h, intake, overview, post, preview
+from .test_sop_local_case import FORM, call, local
+from .test_sop_quotes import WID, quote_row
+from .test_sop_suggestions import QUOTE_ROW, case, set_quote, task
 
 
 @pytest.mark.parametrize('origin', ['source', 'local'])
@@ -16,12 +31,6 @@ def test_assigned_intake_requires_pm_or_delegate(origin):
     project['pm_id'] = 'creator'
     assert can_manage(ctx)
 
-from .sop_import import local_case
-from .sop_import.domain import Failure
-from .test_sop_local_case import local, call, FORM
-from .test_sop_quotes import WID, quote_row
-from .models import WorkspaceRow, BusinessRow
-from . import storage
 
 
 @pytest.mark.parametrize('number,status,code', [('１１５２３６', 409, 'quote_number_taken'),
@@ -37,8 +46,6 @@ def test_normalized_official_number_uniqueness(local, number, status, code):
     assert call(client, 'POST', '/api/quotes/preview',
                 {**FORM, 'import_tasks': False, 'official_quote_no': number}, status)['code'] == code
 
-from .test_sop_import import h, intake, post, overview
-from .test_sop_suggestions import case, set_quote, task, QUOTE_ROW
 
 
 def test_dismissed_facts_cannot_be_accepted(case):
@@ -66,9 +73,6 @@ def test_bulk_indicator_requires_explicit_ids(case):
     result = post(h, path, {**body, 'confirmed_task_ids': [t['id'] for t in tasks]})
     assert len(result['results']) == len(tasks)
 
-from sqlalchemy import select
-from .sop_import.models import Preview
-from .test_sop_import import preview
 
 
 def test_preview_writes_expire_and_bound_actor_rows(h):
@@ -83,9 +87,6 @@ def test_preview_writes_expire_and_bound_actor_rows(h):
     with h.sessions() as db:
         assert len(list(db.scalars(select(Preview)))) == 2
 
-import asyncio
-from starlette.requests import Request
-from .sop_import.routes import MAX_BODY
 
 
 @pytest.mark.parametrize('declared', [True, False])
@@ -100,7 +101,6 @@ def test_oversized_body_stops_before_consuming_stream(h, declared):
     assert response.status_code == 422
     assert len(consumed) == (0 if declared else 1)
 
-from .models import PersonRow
 
 
 @pytest.mark.parametrize('capability', ['create_local_case', 'sop_task_import'])
@@ -118,9 +118,6 @@ def test_local_create_rechecks_identity_under_lock(local, capability):
     result = call(client, 'POST', '/api/quotes', {'draft_id': draft['draft_id'], 'request_id': 'revoke'}, 403)
     assert result['code'] == ('local_case_forbidden' if capability == 'create_local_case' else 'sop_import_forbidden')
 
-from datetime import date
-from .sop_import.quote_facts import collect
-from .sop_import.case_stage import stage
 
 
 def test_blank_status_row_prevents_merged_cancellation():
@@ -128,9 +125,6 @@ def test_blank_status_row_prevents_merged_cancellation():
     assert facts.stage_label != 'I'
     assert stage(facts) == 'quoted'
 
-from .test_sop_import import apply, URL
-from .sop_import.models import LocalTask, TaskEvent
-from .sop_import.domain import Lifecycle
 
 
 def test_completed_shared_link_preview_includes_completion_history(h):
