@@ -43,3 +43,23 @@ def test_reconcile_failure_preserves_done(p):
     p.clock[0] += 601
     p.worker.drain()
     assert row(p).state == 'done'
+
+
+def test_pending_update_records_remote_drift_before_put(p):
+    p.worker.drain()
+    p.fake.records['rec1']['fields']['標題'] = 'PM edit'
+    with p.sessions.begin() as db:
+        task = db.get(LocalTask, ('lark-org', 't1'))
+        task.title, task.revision = 'Local edit', 2
+    original = p.fake.__call__
+    def inspect(request):
+        if request.method == 'PUT':
+            with p.sessions() as db:
+                event = db.scalar(select(TaskEvent).where(TaskEvent.kind == 'lark_drift'))
+                assert event is not None
+                assert event.changes['lark_values']['標題'] == 'PM edit'
+        return original(request)
+    p.worker.client_factory = lambda before: ProjectionClient(p.cfg, httpx.MockTransport(inspect), before_write=before)
+    p.worker.drain()
+    assert row(p).drift
+    assert p.fake.records['rec1']['fields']['標題'] == 'Local edit'

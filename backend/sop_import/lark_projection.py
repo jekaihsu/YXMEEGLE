@@ -314,7 +314,9 @@ class Projection:
                 with self.sessions.begin() as db:
                     latest(db, wid, pid, tid).record_id = rid
             else:
-                client.get(Table.TASKS, rid)
+                record = client.get(Table.TASKS, rid)
+                with self.sessions.begin() as db:
+                    self.record_drift(db, latest(db, wid, pid, tid), record)
             # An idempotent create can return an earlier payload after a concurrent local edit.
             client.update(Table.TASKS, rid, values)
             verified = client.get(Table.TASKS, rid)
@@ -356,6 +358,22 @@ class Projection:
             row = latest(db, wid, pid, tid)
             row.state, row.last_error = 'paused', reason
         log.error('sop_projection task paused project=%s task=%s reason=%s', pid, tid, reason)
+
+    @staticmethod
+    def remote_changed(row, record):
+        return bool(row.last_fingerprint) and (
+            fingerprint(record['fields']) != row.last_fingerprint
+            or canon(Kind.TEXT, record['fields'].get('投影指紋')) != row.last_fingerprint)
+
+    def record_drift(self, db, row, record):
+        if not self.remote_changed(row, record):
+            return False
+        db.add(TaskEvent(workspace_id=row.workspace_id, project_id=row.project_id, task_id=row.task_id,
+                         id=str(uuid4()), actor_id='sop_projection', at=self.clock(), kind='lark_drift',
+                         revision=row.target_revision, changes={'record_id': record['record_id'],
+                         'lark_values': {name: record['fields'].get(name) for name in FIELDS}}))
+        row.drift = True
+        return True
 
     def reconcile(self, client, wid, pid, project, state, roster, *, readonly=False):
         records = client.search_value('專案編號', pid)
