@@ -337,7 +337,7 @@ class Projection:
             client.update(Table.TASKS, rid, values)
             verified = client.get(Table.TASKS, rid)
             if fingerprint(verified['fields']) != values['投影指紋'] or canon(Kind.TEXT, verified['fields'].get('投影指紋')) != values['投影指紋']:
-                raise Failure('outcome_unknown', 'SOP 投影讀回未確認')
+                raise Failure('readback_mismatch', 'SOP 投影讀回未確認')
             self.complete(wid, pid, tid, values)
         except Failure as exc:
             deleted = False
@@ -364,6 +364,8 @@ class Projection:
             with self.sessions.begin() as db:
                 row = latest(db, wid, pid, tid)
                 row.last_error = exc.code
+                if exc.code == 'readback_mismatch' and row.attempts >= 3:
+                    row.state = 'paused'
                 row.retry_at = self.clock() + min(600, 2 ** min(row.attempts, 9))
             log.warning('sop_projection task deferred project=%s task=%s reason=%s', pid, tid, exc.code)
 

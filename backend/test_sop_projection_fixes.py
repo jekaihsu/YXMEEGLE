@@ -116,3 +116,18 @@ def test_case_exception_is_deferred_and_logged(p, caplog):
     p.clock[0] += 700
     p.worker.drain()
     assert row(p).state == 'done'
+
+
+def test_readback_mismatch_pauses_after_three_attempts(p):
+    original = p.fake.__call__
+    def normalize(request):
+        response = original(request)
+        if request.method == 'PUT':
+            p.fake.records[request.url.path.rsplit('/', 1)[-1]]['fields']['參與者'] = []
+        return response
+    p.worker.client_factory = lambda before: ProjectionClient(p.cfg, httpx.MockTransport(normalize), before_write=before)
+    for _ in range(5):
+        p.worker.drain()
+        p.clock[0] += 700
+    assert row(p).state == 'paused' and row(p).last_error == 'readback_mismatch'
+    assert sum(c[0] == 'PUT' for c in p.fake.calls) == 3
