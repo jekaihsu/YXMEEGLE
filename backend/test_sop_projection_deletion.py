@@ -19,3 +19,15 @@ def test_search_404_does_not_create_generation(p):
     p.clock[0] += 700
     p.worker.drain()
     assert len(p.fake.records) == 1 and row(p).state == 'done'
+
+
+def test_third_deleted_generation_pauses(p):
+    from .sop_import.outbox import latest
+    p.worker.drain()
+    del p.fake.records['rec1']
+    with p.sessions.begin() as db:
+        current = latest(db, 'lark-org', 'SRC-test', 't1')
+        current.generation, current.state = 3, 'none'
+    p.worker.drain()
+    assert row(p).generation == 3
+    assert row(p).state == 'paused' and row(p).last_error == 'generation_limit'

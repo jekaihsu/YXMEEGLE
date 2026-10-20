@@ -347,6 +347,9 @@ class Projection:
                     client.get(Table.TASKS, stored_rid)
                 except Failure as confirm:
                     deleted = confirm.extra.get('lark_code') == 1254043
+            if deleted and generation >= 3:
+                self.pause(wid, pid, tid, 'generation_limit')
+                return
             if deleted:
                 with self.sessions.begin() as db:
                     row = latest(db, wid, pid, tid)
