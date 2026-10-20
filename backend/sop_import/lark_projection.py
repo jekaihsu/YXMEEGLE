@@ -190,7 +190,15 @@ class Projection:
         return {'state': state, 'synced_at': row.synced_at if row else None, 'record_id': row.record_id if row else None,
                 'base_id': BASE, 'table_id': TABLE, 'error': row.last_error if row else None}
 
-    def request_reconcile(self, wid, pid):
+    def request_reconcile(self, wid, pid, state=None):
+        if (str(self.cfg.get('SOP_LARK_PROJECTION_ENABLED', 'false')).lower() != 'true'
+                or not self.cfg.get('LARK_WORKER_ORGANIZATION')
+                or wid != 'lark-' + self.cfg['LARK_WORKER_ORGANIZATION']):
+            return
+        state = self.state(wid) if state is None else state
+        project = next((p for p in state.get('projects', []) if p['id'] == pid), None)
+        if not gates(self.cfg, wid, state) or project is None or excluded(state, project):
+            return
         with self.sessions() as db:
             row = db.get(LarkReconcile, (wid, pid))
             if row and row.checked_at > self.clock() - 600:

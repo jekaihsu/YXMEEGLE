@@ -533,7 +533,7 @@ class Service:
         authorize(ctx)
         require(node_key is None or node_key in NODE_MAP.values(), 'node_mapping_invalid')
         if self.projection:
-            self.projection.request_reconcile(ctx.wid, ctx.project['id'])
+            self.projection.request_reconcile(ctx.wid, ctx.project['id'], ctx.state)
         with self.sessions() as db:
             state = db.get(CaseState, (ctx.wid, ctx.project['id']))
             tasks = self.tasks(db, ctx)
