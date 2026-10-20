@@ -140,7 +140,7 @@ class ProjectionClient(BitableClient):
 @contextmanager
 def drain_lock(engine):
     if engine.dialect.name == 'postgresql':
-        with engine.connect() as connection:
+        with engine.connect().execution_options(isolation_level='AUTOCOMMIT') as connection:
             acquired = connection.execute(sql_text('SELECT pg_try_advisory_lock(1971412084)')).scalar()
             try:
                 yield acquired
