@@ -83,7 +83,7 @@ The source fetch reads these quote fields: `詢價日期`, `第一次聯繫日�
 
 The quote-base `合約明細工項` table is not read. On the 2026-10-20 dump, 19 of 333 quote groups have contract lines without a quote date, so they derive `inquiry` here where the evidence dive counted them as quoted. All other stage counts match the dive.
 
-Display fields return values and codes. Preview outcomes contain `reason_code` and an optional recorded `exclusion_reason`, without catalog helper prose. Catalog interpretation notes reside under `provenance`; immutable task source content resides under the optional `source_snapshot`.
+Display fields return values and codes. Preview outcomes contain `reason_code`, an optional recorded `exclusion_reason`, and `node_keys`, the selected nodes the row maps to (empty for node-less rows), without catalog helper prose. The node-less routine and disabled rows (#27, #28, #57, #58) appear only in a case-wide preview of all nine nodes. Errors name what failed beside `code`: `node_mapping_invalid` carries the unknown or unmapped `node_key` (none for an empty selection), `row_not_importable` and `applicability_unresolved` carry `source_row_key`, and `template_mapping_conflict` carries `source_row_key`. Catalog interpretation notes reside under `provenance`; immutable task source content resides under the optional `source_snapshot`.
 
 For an explicit participant binding, add `participant_bindings` keyed by source row key, with `executor`, `checker`, or `confirmer` user IDs. A binding requires one active user with `sop_task_work` and case participation. It never selects the importer or node owner automatically.
 

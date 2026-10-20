@@ -83,6 +83,13 @@ def case_roles(person, project):
     return [role for role in CASE_ROLES if held[role]]
 
 
+def canonical_node_keys(keys):
+    require(bool(keys), 'node_mapping_invalid')
+    unknown = next((key for key in keys if key not in NODE_MAP.values()), None)
+    require(unknown is None, 'node_mapping_invalid', node_key=unknown)
+    return keys
+
+
 def row_keys(value):
     require(isinstance(value, list) and len(value) <= 62 and all(isinstance(k, str) for k in value), 'invalid_request')
     require(len(value) == len(set(value)), 'invalid_request')
@@ -120,7 +127,7 @@ class Service:
         return fresh, state
 
     def nodes(self, db, ctx, keys):
-        require(set(keys) <= set(NODE_MAP.values()) and bool(keys), 'node_mapping_invalid')
+        canonical_node_keys(keys)
         rows = list(db.scalars(select(BusinessRow).where(BusinessRow.workspace_id == ctx.wid,
                                                         BusinessRow.kind == 'nodes',
                                                         BusinessRow.parent_id == ctx.project['id'])))
@@ -129,7 +136,7 @@ class Service:
             if key not in keys:
                 continue
             found = [r for r in rows if r.data.get('key') == key]
-            require(len(found) == 1, 'node_mapping_invalid')
+            require(len(found) == 1, 'node_mapping_invalid', node_key=key)
             result.append({'node_key': key, 'node_id': found[0].entity_id})
         return result
 
@@ -225,9 +232,7 @@ class Service:
     def normalize(self, ctx, body, rows):
         fields(body, {'template_version_id', 'node_keys', 'row_keys', 'participant_bindings',
                       'applicability_decisions', 'exclusion_reasons'})
-        keys = body.get('node_keys', list(NODE_MAP.values()))
-        row_keys(keys)
-        require(bool(keys) and set(keys) <= set(NODE_MAP.values()), 'node_mapping_invalid')
+        keys = canonical_node_keys(row_keys(body.get('node_keys', list(NODE_MAP.values()))))
         eligible = {r.source_row_key: r for r in rows if r.disposition == Disposition.TASK
                     and set(r.snapshot['proposed_import']['target_branch_node_keys']) & set(keys)}
         decisions = body.get('applicability_decisions', {})
@@ -241,10 +246,12 @@ class Service:
                                         if r.snapshot['raw']['meegle_id'] not in SUBCONTRACT
                                         or normalized_decisions.get(key, {}).get('value') == 'applicable'])
         row_keys(selected)
-        require(set(selected) <= eligible.keys(), 'row_not_importable')
+        foreign = next((key for key in selected if key not in eligible), None)
+        require(foreign is None, 'row_not_importable', source_row_key=foreign)
         for key in selected:
             if eligible[key].snapshot['raw']['meegle_id'] in SUBCONTRACT:
-                require(normalized_decisions.get(key, {}).get('value') == 'applicable', 'applicability_unresolved')
+                require(normalized_decisions.get(key, {}).get('value') == 'applicable', 'applicability_unresolved',
+                        source_row_key=key)
         bindings = body.get('participant_bindings', {})
         fields(bindings, selected)
         bindings = {key: self.participants(ctx, value, source_row_key=key) for key, value in bindings.items()}
@@ -266,7 +273,8 @@ class Service:
         for row in self.rows(db, version):
             source, proposal = row.snapshot, row.snapshot['proposed_import']
             mapped = set(proposal['target_branch_node_keys']) & by_node.keys()
-            if proposal['target_branch_node_keys'] and not mapped:
+            # Node-less routine and disabled rows belong only to a case-wide preview.
+            if not mapped and (proposal['target_branch_node_keys'] or by_node.keys() != set(NODE_MAP.values())):
                 continue
             selected = row.source_row_key in normalized['row_keys']
             old = existing.get((version.family_id, row.source_row_key, proposal['instance_scope']))
@@ -280,13 +288,14 @@ class Service:
                     outcome = 'already_present' if old else 'new'
                     if old:
                         original = set(old.snapshot['row']['proposed_import']['target_branch_node_keys'])
-                        require(mapped <= original, 'template_mapping_conflict', 409)
+                        require(mapped <= original, 'template_mapping_conflict', 409, source_row_key=row.source_row_key)
                     missing = [{'task_id': old.id if old else None, 'node_key': key, 'node_id': by_node[key]}
                                for key in NODE_MAP.values() if key in mapped
                                and (not old or (old.id, key, by_node[key]) not in linked)]
                     if old and missing:
                         outcome = 'link_addition'
             outcomes.append({'source_row_key': row.source_row_key, 'title': source['raw']['title'],
+                             'node_keys': [key for key in NODE_MAP.values() if key in mapped],
                              'disposition': row.disposition.value, 'selected': selected, 'outcome': outcome,
                              'existing_task_id': old.id if old else None,
                              'existing_state': old.state.value if old else None,

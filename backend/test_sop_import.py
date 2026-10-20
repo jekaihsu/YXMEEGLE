@@ -111,14 +111,30 @@ def change(h, task, body, status=200):
 def test_at02_at03_node_ids_are_persisted_keys_not_order_or_title(h):
     plan = preview(h, node_keys=['confirmation'])
     assert plan['nodes'] == [{'node_key': 'confirmation', 'node_id': 'real-p1-2'}]
-    assert [o['source_row_key'] for o in plan['outcomes']] == [f'meegle-v137:A:{i}' for i in (19, 59, 60, 61, 22)] + [
-        'meegle-v137:A:27', 'meegle-v137:A:57', 'meegle-v137:A:28', 'meegle-v137:A:58']
+    assert [(o['source_row_key'], o['node_keys']) for o in plan['outcomes']] == [
+        (f'meegle-v137:A:{i}', ['confirmation']) for i in (19, 59, 60, 61, 22)]
+    routine = [(o['source_row_key'], o['disposition'], o['node_keys']) for o in preview(h)['outcomes'] if not o['node_keys']]
+    assert routine == [('meegle-v137:A:27', 'routine_excluded', []), ('meegle-v137:A:57', 'routine_excluded', []),
+                       ('meegle-v137:A:28', 'disabled_excluded', []), ('meegle-v137:A:58', 'disabled_excluded', [])]
     receipt = apply(h, plan)
     assert len(receipt['created_task_ids']) == 5
     assert overview(h)['counts'] == {'done': 0, 'total': 4, 'unresolved': 1, 'not_applicable': 0, 'archived': 0}
     with h.sessions.begin() as db:
         db.delete(db.get(BusinessRow, ('w', 'nodes', 'real-p1-2')))
-    assert post(h, URL + '/sop-import/preview', {'template_version_id': h.vid, 'node_keys': ['confirmation']}, 422)['code'] == 'node_mapping_invalid'
+    assert post(h, URL + '/sop-import/preview', {'template_version_id': h.vid, 'node_keys': ['confirmation']}, 422) == {
+        'code': 'node_mapping_invalid', 'detail': 'node_mapping_invalid', 'node_key': 'confirmation'}
+
+
+def test_preview_errors_name_the_offending_row_or_node(h):
+    body = {'template_version_id': h.vid, 'node_keys': ['sales']}
+    assert post(h, URL + '/sop-import/preview', {**body, 'node_keys': ['sales', 'N02']}, 422)['node_key'] == 'N02'
+    assert post(h, URL + '/sop-import/preview', {**body, 'node_keys': []}, 422) == {
+        'code': 'node_mapping_invalid', 'detail': 'node_mapping_invalid'}
+    foreign = post(h, URL + '/sop-import/preview', {**body, 'row_keys': ['meegle-v137:A:1', 'meegle-v137:A:19']}, 422)
+    assert (foreign['code'], foreign['source_row_key']) == ('row_not_importable', 'meegle-v137:A:19')
+    unresolved = post(h, URL + '/sop-import/preview', {'template_version_id': h.vid, 'node_keys': ['sales'],
+                                                      'row_keys': ['meegle-v137:A:1', 'meegle-v137:A:7']}, 422)
+    assert (unresolved['code'], unresolved['source_row_key']) == ('applicability_unresolved', 'meegle-v137:A:7')
 
 
 def test_at04_at05_case_isolation_repeat_preserves_local_edits_and_template(h):
