@@ -201,6 +201,6 @@ def test_bulk_accept_is_all_or_nothing(case):
     with_indicator = items + [{'task_id': indicator['id'], 'facts_hash': indicator['suggestion']['facts_hash'],
                                'expected_revision': 1}]
     assert post(h, f'{url}/sop-tasks/suggestions/accept', {'tasks': with_indicator}, 422)['task_id'] == indicator['id']
-    done = post(h, f'{url}/sop-tasks/suggestions/accept', {'tasks': with_indicator, 'confirm': True, 'reason': '三處一致'})
+    done = post(h, f'{url}/sop-tasks/suggestions/accept', {'tasks': with_indicator, 'confirm': True, 'confirmed_task_ids': [indicator['id']], 'reason': '三處一致'})
     assert [(r['state'], r['suggestion']['tier']) for r in done['results']] == [('done', 'proof'), ('done', 'proof'), ('done', 'indicator')]
     assert done['checklist_revision'] == 2

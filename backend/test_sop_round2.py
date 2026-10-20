@@ -52,3 +52,16 @@ def test_dismissed_facts_cannot_be_accepted(case):
                            'confirm': True, 'reason': 'checked'}, 409)
     assert result['code'] == 'suggestion_dismissed'
     assert task(h, url, 1)['state'] == 'pending'
+
+
+def test_bulk_indicator_requires_explicit_ids(case):
+    h, url, project = case
+    set_quote(h, project, **QUOTE_ROW)
+    tasks = [t for t in overview(h, url)['tasks'] if t['suggestion'] and t['suggestion']['tier'] == 'indicator']
+    items = [{'task_id': t['id'], 'facts_hash': t['suggestion']['facts_hash'], 'expected_revision': t['revision']} for t in tasks]
+    body = {'tasks': items, 'confirm': True, 'reason': 'checked'}
+    path = url + '/sop-tasks/suggestions/accept'
+    assert post(h, path, body, 422)['code'] == 'suggestion_confirmation_required'
+    assert post(h, path, {**body, 'confirmed_task_ids': [tasks[0]['id']]}, 422)['code'] == 'suggestion_confirmation_required'
+    result = post(h, path, {**body, 'confirmed_task_ids': [t['id'] for t in tasks]})
+    assert len(result['results']) == len(tasks)

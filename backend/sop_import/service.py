@@ -803,13 +803,15 @@ class Service:
         return {**result['results'][0], 'checklist_revision': result['checklist_revision']}
 
     def accept_suggestions(self, ctx, body):
-        fields(body, {'tasks', 'confirm', 'reason'})
+        fields(body, {'tasks', 'confirm', 'reason', 'confirmed_task_ids'})
         items = body.get('tasks')
         require(isinstance(items, list) and 0 < len(items) <= 62, 'invalid_request')
         for item in items:
             fields(item, {'task_id', 'facts_hash', 'expected_revision'})
         require(len({identifier(i.get('task_id')) for i in items}) == len(items), 'invalid_request')
-        return self.accept(ctx, items, body)
+        confirmed = row_keys(body.get('confirmed_task_ids', []))
+        require(set(confirmed) <= {i['task_id'] for i in items}, 'invalid_request')
+        return self.accept(ctx, items, {**body, 'confirmed_task_ids': confirmed})
 
     def accept(self, ctx, items, body):
         confirm = body.get('confirm', False)
@@ -825,7 +827,8 @@ class Service:
             results = []
             for item in items:
                 try:
-                    results.append(self.accept_one(db, ctx, item, facts, accepted, confirm, reason))
+                    results.append(self.accept_one(db, ctx, item, facts, accepted,
+                                                   confirm and ('tasks' not in body or item['task_id'] in body['confirmed_task_ids']), reason))
                 except Failure as exc:
                     raise Failure(exc.code, exc.status, task_id=item['task_id']) from None
             if any(not r['replayed'] for r in results):

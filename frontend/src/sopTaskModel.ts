@@ -89,7 +89,7 @@ export function taskActions(t: SopTask) {return ACTIONS.filter(a => t.allowedAct
 export const suggestionLabel = (s: NonNullable<SopTask['suggestion']>) => s.state === 'done' ? '建議完成' : '建議進行中';
 export const suggestionTier = (s: NonNullable<SopTask['suggestion']>) => s.tier === 'proof' ? '佐證' : '指標';
 export const suggestionSelection = (tasks: SopTask[]) => tasks.filter(t => t.suggestion && t.allowedActions.includes('accept_suggestion'));
-export function suggestionBody(tasks: SopTask[], confirm: boolean, reason: string) {
- return {tasks: tasks.flatMap(t => t.suggestion ? [{task_id:t.id,facts_hash:t.suggestion.hash,expected_revision:t.revision}] : []),confirm,reason:reason.trim()};
+export function suggestionBody(tasks: SopTask[], confirm: boolean, reason: string, confirmedTaskIds: string[] = []) {
+ return {tasks: tasks.flatMap(t => t.suggestion ? [{task_id:t.id,facts_hash:t.suggestion.hash,expected_revision:t.revision}] : []),confirm,reason:reason.trim(),confirmed_task_ids:confirmedTaskIds};
 }
 export const requiresSuggestionConfirmation = (tasks: SopTask[]) => tasks.some(t => t.suggestion?.tier === 'indicator');
