@@ -272,6 +272,21 @@ class Service:
                 'row_keys': sorted(selected), 'participant_bindings': bindings,
                 'applicability_decisions': normalized_decisions, 'exclusion_reasons': exclusions}
 
+    def completion_summary(self, db, ctx, task):
+        if task is None or task.state != Lifecycle.DONE:
+            return None
+        history = db.scalars(select(TaskEvent).where(TaskEvent.workspace_id == ctx.wid,
+                                                      TaskEvent.task_id == task.id)
+                             .order_by(TaskEvent.revision.desc(), TaskEvent.at.desc(), TaskEvent.id.desc()))
+        completed = next((event for event in history if event.changes.get('to_state') == 'done'
+                          or (event.kind == 'transition' and event.changes.get('action') == 'complete')), None)
+        actor = completed.actor_id if completed else None
+        return {'state': task.state.value, 'actor_id': actor,
+                'actor_name': next((u['name'] for u in ctx.state.get('users', []) if u['id'] == actor), actor),
+                'at': completed.at if completed else None,
+                'evidence_basis': task.local.get('evidence_basis'),
+                'evidence_refs': task.local.get('evidence_refs', [])}
+
     def plan(self, db, ctx, state, version, normalized, nodes=None):
         nodes = self.nodes(db, ctx, normalized['node_keys']) if nodes is None else nodes
         by_node = {n['node_key']: n['node_id'] for n in nodes}
@@ -310,6 +325,7 @@ class Service:
                              'existing_task_id': old.id if old else None,
                              'existing_state': old.state.value if old else None,
                              'existing_revision': old.revision if old else None,
+                             'completion': self.completion_summary(db, ctx, old),
                              'applicability': old.applicability.value if old else app,
                              'links_to_add': missing,
                              'reason_code': outcome,

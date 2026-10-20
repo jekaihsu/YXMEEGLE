@@ -267,3 +267,11 @@ test('suggestion controls remain inside the task block without an internal separ
  const style=document.createElement('style');style.textContent=await fs.readFile(new URL('./src/SopTasks.css',import.meta.url),'utf8');document.head.append(style);
  try{const t=clone(examples.sop_tasks_with_suggestions.tasks.find(t=>t.suggestion));await mount({tasks:[t]});const suggestion=document.querySelector('.sop-suggestion');assert.ok(suggestion.closest('[data-sop-task]'));assert.equal(getComputedStyle(suggestion).borderTopWidth,'0px');assert.equal(getComputedStyle(suggestion).paddingLeft,'32px');assert.equal(getComputedStyle(document.querySelector('.sop-task-select input')).marginLeft,'0px')}finally{style.remove()}
 });
+
+test('link confirmation shows completion actor, time, state and evidence before importing',async()=>{
+ await mount();const previous=globalThis.fetch;
+ globalThis.fetch=async(url,init={})=>{if(url.endsWith('/sop-import/preview')){const p=previewFixture(JSON.parse(init.body));p.outcomes[1]={...p.outcomes[1],outcome:'link_addition',existing_state:'done',completion:{state:'done',actor_id:'pm',actor_name:'王經理',at:1792490000,evidence_basis:{rule_id:'reviewed',facts_hash:'abc123'},evidence_refs:['evidence-123']}};return response(p)}return previous(url,init)};
+ await click(button('匯入預設任務'));await click(button('下一步'));await click(button('下一步'));
+ for(const value of ['完成人員','王經理','完成時間','已完成','reviewed','abc123','evidence-123'])assert.ok(dialog().textContent.includes(value),value);
+ assert.equal(server.apply.length,0);
+});

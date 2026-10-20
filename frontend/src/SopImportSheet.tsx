@@ -12,6 +12,12 @@ function Unresolved({counts}: {counts: ImportPreview['unresolved']}) {
  return <>{counts.dates > 0 && <Row label="期限待確認" value={counts.dates}/>}{counts.participants > 0 && <Row label="人員未指派" value={counts.participants}/>}{counts.applicability > 0 && <Row label="適用待確認" value={counts.applicability}/>}</>;
 }
 
+function Completion({o}: {o:PreviewOutcome}) {
+ const c=o.completion;
+ if(!c)return null;
+ return <Section title={o.title}><Row label="狀態" value={STATE_LABEL[c.state]}/><Row label="完成人員" value={c.actorName||c.actorId||'未設定'}/><Row label="完成時間" value={c.at==null?'未設定':new Date(c.at*1000).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'})}/>{c.ruleId&&<Row label="完成依據" value={c.ruleId}/>}<Row label="依據編號" value={[c.factsHash,...c.evidenceRefs].filter(Boolean).join('、')||'未設定'}/></Section>;
+}
+
 function OutcomeRow({o, flow}: {o: PreviewOutcome; flow: Flow}) {
  const id = useId();
  const checked = flow.selected.has(o.source_row_key), blocked = flow.blockers[o.source_row_key];
@@ -63,6 +69,7 @@ export function SopImportSheet({projectId, startNode, only, onApplied, onClose, 
      <Row label="新增節點連結" value={preview.counts.added_links}/>
      <Unresolved counts={preview.unresolved}/>
     </Section>
+    {preview.outcomes.filter(o=>o.selected&&o.outcome==='link_addition'&&o.completion).map(o=><Completion key={o.source_row_key} o={o}/>)}
     {status === 'confirming' && <p role="status" className="sop-status">正在確認匯入結果</p>}
     {status === 'applying' && <p role="status" className="sop-status">匯入中…</p>}
     <div className="sop-sheet-actions">

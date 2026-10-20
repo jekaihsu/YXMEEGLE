@@ -127,3 +127,25 @@ def test_blank_status_row_prevents_merged_cancellation():
     facts = collect([{'狀態 (1)': 'I'}, {'狀態 (1)': '', '報價日期': '2026-10-01'}], today=date(2026, 10, 20))
     assert facts.stage_label != 'I'
     assert stage(facts) == 'quoted'
+
+from .test_sop_import import apply, URL
+from .sop_import.models import LocalTask, TaskEvent
+from .sop_import.domain import Lifecycle
+
+
+def test_completed_shared_link_preview_includes_completion_history(h):
+    apply(h, preview(h, node_keys=['control']))
+    with h.sessions.begin() as db:
+        target = db.scalar(select(LocalTask).where(LocalTask.source_row_key == 'meegle-v137:A:36'))
+        target.state = Lifecycle.DONE
+        target.local = {**target.local, 'evidence_basis': {'rule_id': 'reviewed', 'facts_hash': 'a' * 64},
+                        'evidence_refs': ['evidence-123']}
+        db.add(TaskEvent(workspace_id='w', id='completion', project_id='p1', task_id=target.id,
+                         actor_id='pm', at=900, kind='suggestion_accepted', revision=2,
+                         changes={'to_state': 'done', 'facts_hash': 'a' * 64}))
+    plan = preview(h, node_keys=['mapping'])
+    row = next(o for o in plan['outcomes'] if o['source_row_key'] == 'meegle-v137:A:36')
+    assert row['outcome'] == 'link_addition'
+    assert row['completion'] == {'state': 'done', 'actor_id': 'pm', 'actor_name': '林育寬', 'at': 900,
+                                 'evidence_basis': {'rule_id': 'reviewed', 'facts_hash': 'a' * 64},
+                                 'evidence_refs': ['evidence-123']}

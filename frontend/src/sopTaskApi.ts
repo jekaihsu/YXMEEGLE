@@ -28,7 +28,8 @@ export interface SopOverview {
 }
 export interface SopTemplate {version_id: string; template_family_id: string; revision: string; name: string; is_default: boolean}
 export type Outcome = 'new'|'already_present'|'link_addition'|'excluded'|'routing_reference'|'review_required'|'routine_excluded'|'disabled_excluded';
-export interface PreviewOutcome {source_row_key: string; title: string; disposition: string; selected: boolean; outcome: Outcome; existing_task_id: string|null; existing_state: Lifecycle|null; applicability: Applicability; links_to_add: {node_key: SopNodeKey}[]}
+export interface CompletionSummary {state: Lifecycle; actorId:string|null; actorName:string|null; at:number|null; ruleId:string|null; factsHash:string|null; evidenceRefs:string[]}
+export interface PreviewOutcome {completion:CompletionSummary|null; source_row_key: string; title: string; disposition: string; selected: boolean; outcome: Outcome; existing_task_id: string|null; existing_state: Lifecycle|null; applicability: Applicability; links_to_add: {node_key: SopNodeKey}[]}
 export interface ImportPreview {
  previewId: string; expiresAt: number; startNode: SopNodeKey; template: {version_id: string; revision: string};
  nodeKeys: SopNodeKey[]; outcomes: PreviewOutcome[]; unresolved: {applicability: number; participants: number; dates: number};
@@ -87,12 +88,17 @@ export function parseTemplates(v: unknown): SopTemplate[] {
  return list(object(v).templates, t => {const x = object(t); return {version_id: str(x.version_id), template_family_id: str(x.template_family_id), revision: str(x.revision), name: str(x.name), is_default: bool(x.is_default)}});
 }
 const OUTCOMES: readonly Outcome[] = ['new','already_present','link_addition','excluded','routing_reference','review_required','routine_excluded','disabled_excluded'];
+function parseCompletion(value:unknown):CompletionSummary|null {
+ if(value==null)return null;
+ const c=object(value),basis=c.evidence_basis==null?null:object(c.evidence_basis);
+ return {state:lifecycle(c.state),actorId:optStr(c.actor_id),actorName:optStr(c.actor_name),at:c.at==null?null:seconds(c.at),ruleId:optStr(basis?.rule_id),factsHash:optStr(basis?.facts_hash),evidenceRefs:list(c.evidence_refs,str)};
+}
 export function parsePreview(v: unknown): ImportPreview {
  const p = object(v), template = object(p.template), selection = object(p.selection);
  return {previewId: str(p.preview_id), expiresAt: seconds(p.expires_at), startNode: node(p.start_node), template: {version_id: str(template.version_id), revision: str(template.revision)},
   nodeKeys: list(selection.node_keys, node), rowKeys: list(selection.row_keys, str),
   outcomes: list(p.outcomes, item => {const o = object(item); return {source_row_key: str(o.source_row_key), title: str(o.title), disposition: str(o.disposition), selected: bool(o.selected), outcome: oneOf(OUTCOMES)(o.outcome),
-   existing_task_id: optStr(o.existing_task_id), existing_state: o.existing_state == null ? null : lifecycle(o.existing_state), applicability: applicability(o.applicability),
+   completion: parseCompletion(o.completion), existing_task_id: optStr(o.existing_task_id), existing_state: o.existing_state == null ? null : lifecycle(o.existing_state), applicability: applicability(o.applicability),
    links_to_add: list(o.links_to_add, l => ({node_key: node(object(l).node_key)}))}}),
   unresolved: unresolvedCounts(p.unresolved_counts),
   counts: (c => ({new_tasks: int(c.new_tasks), existing_tasks: int(c.existing_tasks), added_links: int(c.added_links)}))(object(p.counts))};
