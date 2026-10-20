@@ -17,6 +17,7 @@ def enqueue(db, wid, pid, tid, *, resume=False):
     revision = connection.execute(select(LocalTask.revision).where(LocalTask.workspace_id == wid,
                                                                   LocalTask.id == tid)).scalar_one()
     if current:
+        resume = resume and current['last_error'] != 'canary_cleanup'
         # A sent create must retain its identity until recovery has established its outcome.
         connection.execute(table.update().where(*where, table.c.generation == current['generation']).values(
             target_revision=revision, state='paused' if current['state'] == 'paused' and not resume else 'sent' if current['state'] == 'sent' else 'none',

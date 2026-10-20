@@ -334,3 +334,13 @@ def test_readonly_check_reports_drift_without_side_effects(p):
     with p.sessions() as db:
         assert list(db.scalars(select(TaskEvent))) == []
     assert row(p).state == 'done'
+
+
+def test_backfill_preserves_canary_cleanup_pause(p):
+    with p.sessions.begin() as db:
+        current = latest(db, 'lark-org', 'SRC-test', 't1')
+        current.state, current.last_error = 'paused', 'canary_cleanup'
+    enqueue_all(p.sessions)
+    p.worker.drain()
+    assert row(p).state == 'paused'
+    assert not p.fake.records

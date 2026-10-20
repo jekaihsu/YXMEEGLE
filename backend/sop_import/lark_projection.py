@@ -290,6 +290,7 @@ class Projection:
         with self.sessions.begin() as db:
             row = latest(db, wid, pid, tid)
             values = self.values(db, wid, pid, tid, project, state, roster, row.generation)
+            row.target_revision = values['本地版本']
             generation, rid = row.generation, row.record_id
             if not rid:
                 row.state = 'sent'
@@ -316,7 +317,7 @@ class Projection:
                 raise Failure('outcome_unknown', 'SOP 投影讀回未確認')
             self.complete(wid, pid, tid, values)
         except Failure as exc:
-            if rid and (exc.extra.get('upstream_status') == 404 or exc.extra.get('lark_code') in {1254043, 1254040}):
+            if rid and (exc.extra.get('upstream_status') == 404 or exc.extra.get('lark_code') == 1254043):
                 with self.sessions.begin() as db:
                     row = latest(db, wid, pid, tid)
                     row.state, row.last_error = 'done', 'lark_row_deleted'

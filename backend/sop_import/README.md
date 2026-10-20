@@ -236,7 +236,7 @@ python -m backend.sop_import.lark_projection --database-url "$DATABASE_URL" --wo
 python -m backend.sop_import.lark_projection --database-url "$DATABASE_URL" --enqueue-all
 ```
 
-`--check` reports local outbox state, V4 rows, and reconciliation issues. All projection gates apply to its remote reads. `--enqueue-all` makes no HTTP calls. Apply the app's normal schema initialization before either command on an older database.
+`--check` reports local outbox state, V4 rows, and reconciliation issues. All projection gates apply to its remote reads. `--enqueue-all` makes no HTTP calls and leaves cleaned canary intents paused. Apply the app's normal schema initialization before either command on an older database.
 
 The operator can run the canary after deployment. It is never run by the application or tests. It requires `--yes`, all real projection gates, a new receipt manifest path, and the designated case `SRC-TEST-SOPV4-20261021` to be absent locally. It creates three local tasks, projects only that case, checks the shared and archived rows, and forces a resend to verify that there is no fourth row.
 
