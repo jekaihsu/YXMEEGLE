@@ -342,3 +342,22 @@ test('projection polling stops after five minutes and on session change or unmou
   assert.equal(timers.size, 0);
  } finally {globalThis.setInterval = originalSet; globalThis.clearInterval = originalClear}
 });
+
+
+test('slow overview requests do not extend the projection polling window', async () => {
+ const originalSet = globalThis.setInterval, originalClear = globalThis.clearInterval;
+ const timers = new Map(); let next = 0, release;
+ globalThis.setInterval = fn => {timers.set(++next, fn); return next};
+ globalThis.clearInterval = id => timers.delete(id);
+ try {
+  await mount({tasks: [task('t1', {lark_sync: {state: '同步中'}})]});
+  const originalFetch = globalThis.fetch;
+  const held = new Promise(resolve => {release = resolve});
+  globalThis.fetch = async (...args) => {await held; return originalFetch(...args)};
+  const poll = [...timers.values()][0]; let pending;
+  await act(async () => {pending = poll(); await tick()});
+  for (let i = 1; i < 31; i++) await poll();
+  assert.equal(timers.size, 0);
+  await act(async () => {release(); await pending; await tick()});
+ } finally {release?.(); globalThis.setInterval = originalSet; globalThis.clearInterval = originalClear}
+});

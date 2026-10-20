@@ -51,9 +51,11 @@ export function useSopTasks(projectId: string, workspace: string) {
   let attempts = 0, pending = false;
   const timer = setInterval(async () => {
    if (!scope.active || scope !== life.current || scope.epoch !== getSessionEpoch() || attempts >= 30) {clearInterval(timer); return}
+   attempts += 1;
+   if (attempts >= 30) clearInterval(timer);
    if (pending) return;
-   attempts += 1; pending = true;
-   try {await reload()} finally {pending = false; if (attempts >= 30) clearInterval(timer)}
+   pending = true;
+   try {await reload()} finally {pending = false}
   }, 10000);
   return () => clearInterval(timer);
  }, [key, reload, syncing]);
