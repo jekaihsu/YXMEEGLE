@@ -2,7 +2,8 @@ import json
 import httpx
 import pytest
 
-from .models import WorkspaceRow
+from .models import WorkspaceRow, BusinessRow
+from . import storage
 from .sop_import.lark_projection import Projection, ProjectionClient
 from .test_sop_lark_projection import p
 from scripts import sop_v4_canary as canary
@@ -36,6 +37,10 @@ def test_canary_and_cleanup_with_injected_fake_only(p, tmp_path, monkeypatch):
     canary.main()
     assert p.fake.records == {}
     with p.sessions() as db:
+        workspace = db.get(WorkspaceRow, 'lark-org')
+        assert workspace.version == 3
+        assert not any(p['id'] == canary.PROJECT for p in storage.load(db, BusinessRow, workspace)['projects'])
+    with p.sessions() as db:
         assert all(row.state == 'paused' for row in p.worker.current_rows(db, 'lark-org', canary.PROJECT))
 
 
@@ -54,3 +59,10 @@ def test_cleanup_refuses_unrecorded_row(p, tmp_path, monkeypatch):
         canary.main()
     assert 'recExtra' in p.fake.records
     assert not any(call[0] == 'DELETE' for call in p.fake.calls)
+
+
+def test_drain_reports_lock_ownership(p):
+    from .sop_import.lark_projection import drain_lock
+    with drain_lock(p.engine):
+        assert p.worker.drain() is False
+    assert p.worker.drain() is True

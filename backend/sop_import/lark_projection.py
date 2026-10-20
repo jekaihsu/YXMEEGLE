@@ -220,7 +220,7 @@ class Projection:
         engine = self.sessions.kw['bind']
         with drain_lock(engine) as acquired:
             if not acquired:
-                return
+                return False
             with self.sessions() as db:
                 query = select(LarkOutbox.workspace_id, LarkOutbox.project_id).distinct()
                 if project_id:
@@ -266,7 +266,7 @@ class Projection:
                         pending = [r.task_id for r in sorted(eligible, key=lambda r: (r.synced_at is not None, r.attempts, r.task_id))][:min(limit, 50)]
                     for tid in pending:
                         if self._stop.is_set():
-                            return
+                            return True
                         with self.client_factory(lambda: self.before_write(wid, pid, state)) as client:
                             self.project_task(client, wid, pid, tid, project, state, roster)
                     with self.client_factory(lambda: self.before_write(wid, pid, state)) as client:

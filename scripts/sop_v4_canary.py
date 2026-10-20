@@ -23,6 +23,17 @@ def check(condition, message):
         raise RuntimeError(message)
 
 
+def save_case(db, wid, project=None):
+    workspace = db.scalar(select(WorkspaceRow).where(WorkspaceRow.id == wid).with_for_update())
+    state = storage.load(db, BusinessRow, workspace)
+    state['projects'] = [p for p in state.get('projects', []) if p['id'] != PROJECT]
+    if project is not None:
+        state['projects'].append(project)
+    workspace.version += 1
+    state['version'] = workspace.version
+    workspace.data = storage.save(db, BusinessRow, wid, state)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--yes', action='store_true')
@@ -34,7 +45,7 @@ def main():
         parser.error('Explicit --yes is required. This command writes to the dedicated SOP任務 table.')
     cfg = dict(os.environ)
     wid = 'lark-' + cfg.get('LARK_WORKER_ORGANIZATION', '')
-    sessions = sessionmaker(create_engine(args.database_url), expire_on_commit=False)
+    sessions = sessionmaker(create_engine(args.database_url), expire_on_commit=False, info={'index_tables': True})
     def load(workspace):
         with sessions() as db:
             return storage.load(db, BusinessRow, db.get(WorkspaceRow, workspace))
@@ -55,16 +66,18 @@ def main():
                 for row in worker.current_rows(db, wid, PROJECT):
                     row.state, row.last_error = 'paused', 'canary_cleanup'
             for rid in sorted(recorded):
+                client._writable(Table.TASKS)
                 client._call('DELETE', client._root(Table.TASKS) + '/records/' + rid, write=True)
+            with sessions.begin() as db:
+                save_case(db, wid)
         print(f'Deleted only the {len(recorded)} recorded canary rows. Local canary outbox remains paused.')
         return
     if args.manifest.exists():
         parser.error('Manifest exists. Inspect or clean up that run before starting another.')
     with sessions.begin() as db:
         check(db.get(BusinessRow, (wid, 'projects', PROJECT)) is None, 'Canary case already exists')
-        db.add(BusinessRow(workspace_id=wid, kind='projects', entity_id=PROJECT, parent_id='', ordinal=999999,
-                           data={'id': PROJECT, 'code': PROJECT, 'name': 'SOP V4 canary', 'case_type': 'intake',
-                                 'case_visibility': 'source_reference', 'source_kind': 'lark'}))
+        save_case(db, wid, {'id': PROJECT, 'code': PROJECT, 'name': 'SOP V4 canary', 'case_type': 'intake',
+                            'case_visibility': 'source_reference', 'source_kind': 'lark', 'nodes': []})
         db.add(CaseState(workspace_id=wid, project_id=PROJECT))
         db.flush()
         for index, tid in enumerate(TASKS):
@@ -78,7 +91,7 @@ def main():
             for ordinal, key in enumerate(('control', 'mapping', 'report') if index == 1 else ('sales',)):
                 db.add(TaskNodeLink(workspace_id=wid, project_id=PROJECT, task_id=tid, node_id=PROJECT + '-' + key,
                                     node_key=key, ordinal=ordinal))
-    worker.drain(project_id=PROJECT)
+    check(worker.drain(project_id=PROJECT), 'Projection drain is active. Retry after it finishes.')
     with ProjectionClient(cfg) as client:
         records = client.search_value('專案編號', PROJECT)
         ids = [r['record_id'] for r in records]
@@ -91,7 +104,7 @@ def main():
     with sessions.begin() as db:
         for row in worker.current_rows(db, wid, PROJECT):
             row.state, row.record_id, row.retry_at = 'sent', None, 0
-    worker.drain(project_id=PROJECT)
+    check(worker.drain(project_id=PROJECT), 'Projection drain is active. Retry after it finishes.')
     with ProjectionClient(cfg) as client:
         after = client.search_value('專案編號', PROJECT)
         check(len(after) == 3 and {r['record_id'] for r in after} == set(ids), 'Resend produced another row')
