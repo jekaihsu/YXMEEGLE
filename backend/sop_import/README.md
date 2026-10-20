@@ -17,7 +17,7 @@ python3 -m backend.sop_import \
   --workbook /absolute/path/Plumb-playbook-v0.2.xlsx
 ```
 
-The command checks the workbook SHA-256, validates all 62 rows and 21 raw fields, recomputes the content hash, and publishes atomically. Repeating the same revision and content returns the existing version. Changed content requires a new revision. Database operator access is the authorization boundary for this command. The HTTP publish endpoint requires the separate `sop_template_publish` grant and publishes only an already staged, source-verified draft. There is no HTTP catalog upload.
+The command checks the workbook SHA-256, validates all 62 rows and 21 raw fields, recomputes the content hash, and publishes atomically. Repeating the same revision and content returns the existing version. Changed content requires a new revision. After the strict baseline publication, reviewed successor catalogs may add stable origins with reconciled disposition counts, up to 62 task definitions per catalog. Database operator access is the authorization boundary for this command. The HTTP publish endpoint requires the separate `sop_template_publish` grant and publishes only an already staged, source-verified draft. There is no HTTP catalog upload.
 
 The latest published revision of the active default family is the default selection. Publication does not import any case. Existing task snapshots remain unchanged when a later revision is imported.
 

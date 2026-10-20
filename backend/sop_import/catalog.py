@@ -28,14 +28,22 @@ def load_catalog():
         return json.load(source)
 
 
-def validate(catalog):
+def validate(catalog, *, baseline=True):
     rows = catalog['case_sop_rows']
-    require(len(rows) == 62, 'catalog_row_count_invalid')
+    require(len(rows) == 62 if baseline else 1 <= len(rows) <= 2000, 'catalog_row_count_invalid')
     require(catalog['branch_node_key_map'] == NODE_MAP, 'catalog_mapping_invalid')
-    require(Counter(r['proposed_import']['disposition'] for r in rows) == COUNTS, 'catalog_dispositions_invalid')
-    require(len({r['source_row_key'] for r in rows}) == 62, 'catalog_origin_invalid')
-    require({r['raw']['meegle_id'] for r in rows} == set(range(62)), 'catalog_origin_invalid')
-    require({r['source_sheet_row'] for r in rows} == set(range(2, 64)), 'catalog_locator_invalid')
+    counts = Counter(r['proposed_import']['disposition'] for r in rows)
+    require(set(counts) <= {d.value for d in Disposition}, 'catalog_dispositions_invalid')
+    require(counts == (COUNTS if baseline else catalog['disposition_counts']), 'catalog_dispositions_invalid')
+    require(counts['task'] <= 62, 'catalog_row_count_invalid')
+    require(len({r['source_row_key'] for r in rows}) == len(rows), 'catalog_origin_invalid')
+    numbers = [r['raw']['meegle_id'] for r in rows]
+    require(all(type(n) is int and n >= 0 for n in numbers) and len(set(numbers)) == len(rows), 'catalog_origin_invalid')
+    locators = [r['source_sheet_row'] for r in rows]
+    require(all(type(n) is int and n >= 2 for n in locators) and len(set(locators)) == len(rows), 'catalog_locator_invalid')
+    if baseline:
+        require(set(numbers) == set(range(62)), 'catalog_origin_invalid')
+        require(set(locators) == set(range(2, 64)), 'catalog_locator_invalid')
     for row in rows:
         raw, proposal = row['raw'], row['proposed_import']
         require(set(raw) == RAW_FIELDS, 'catalog_fields_invalid')
@@ -53,13 +61,19 @@ def validate(catalog):
         if number in {32, 36}:
             require(keys == ['N05', 'N06', 'N07'], 'catalog_mapping_invalid')
     confirmation = [r['raw']['meegle_id'] for r in rows if r['proposed_import']['candidate_node_keys'] == ['N03']]
-    require(confirmation == [19, 59, 60, 61, 22], 'catalog_confirmation_invalid')
+    if baseline:
+        require(confirmation == [19, 59, 60, 61, 22], 'catalog_confirmation_invalid')
     return digest(catalog)
 
 
+def published_family(db, wid, family_id):
+    return db.scalar(select(Version.id).where(Version.workspace_id == wid, Version.family_id == family_id,
+                                               Version.published_at.is_not(None)).limit(1)) is not None
+
+
 def stage(db, wid, revision, catalog, *, source_verified=False):
-    content_hash = validate(catalog)
     family_id = catalog['proposed_template_family_id']
+    content_hash = validate(catalog, baseline=not published_family(db, wid, family_id))
     family = db.get(Family, (wid, family_id))
     if family is None:
         family = Family(workspace_id=wid, id=family_id, name='Plumb case SOP', is_default=True)
@@ -93,6 +107,6 @@ def publish(db, version, actor_id, at):
     catalog = dict(version.catalog_manifest)
     catalog['case_sop_rows'] = [r.snapshot for r in rows]
     catalog['proposed_mapping_revision'] = version.mapping_revision
-    version.content_hash = validate(catalog)
+    version.content_hash = validate(catalog, baseline=not published_family(db, version.workspace_id, version.family_id))
     version.status, version.published_by, version.published_at = 'published', actor_id, at
     return version

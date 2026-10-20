@@ -537,3 +537,27 @@ def test_unassigned_intake_requires_visibility_and_explicit_local_task_grant(int
     assert preview(h, url=url)['start_node'] == 'sales'
     h.hidden.add(case['id'])
     assert h.client.get(url + '/sop-tasks').status_code == 404
+
+
+def test_at07_published_revision_adds_one_genuinely_new_origin(h):
+    first = apply(h)
+    local = overview(h)['tasks'][0]
+    change(h, local, {'title': 'Preserved local edit'})
+    catalog = deepcopy(load_catalog())
+    extra = deepcopy(catalog['case_sop_rows'][1])
+    extra.update(source_row_key='meegle-v137:A:62', source_sheet_row=64,
+                 source_locator='Reviewed revision / A64:U64')
+    extra['raw'].update(meegle_id=62, title='New reviewed task', source_order=17)
+    catalog['case_sop_rows'].append(extra)
+    catalog['disposition_counts']['task'] += 1
+    with h.sessions.begin() as db:
+        version = stage(db, 'w', 'r2-with-new-origin', catalog, source_verified=True)
+        publish(db, version, 'publisher', 1001)
+        h.vid = version.id
+    result = apply(h, rid='new-origin')
+    assert len(result['created_task_ids']) == 1
+    assert set(result['existing_task_ids']) == set(first['created_task_ids'])
+    tasks = overview(h)['tasks']
+    assert len(tasks) == 39
+    assert next(t for t in tasks if t['id'] == local['id'])['title'] == 'Preserved local edit'
+    assert next(t for t in tasks if t['id'] == result['created_task_ids'][0])['origin']['source_row_key'] == 'meegle-v137:A:62'
