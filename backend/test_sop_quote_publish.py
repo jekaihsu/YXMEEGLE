@@ -84,3 +84,13 @@ def test_no_route_reaches_the_adapter(tmp_path):
     assert quote_routes == ['GET /api/quotes', 'GET /api/quotes/requests/{request_id}', 'GET /api/quotes/{quote_no}',
                             'POST /api/quotes', 'POST /api/quotes/preview']
     app.state.engine.dispose()
+
+
+@pytest.mark.parametrize('token', [None, '', '   '])
+def test_missing_base_token_never_calls_client(token):
+    table = FakeTable()
+    cfg = {'QUOTE_PUBLISH_ENABLED': 'true'}
+    if token is not None:
+        cfg['LARK_QUOTE_BASE_TOKEN'] = token
+    assert refused(cfg=cfg, client=table) == ('quote_publish_unready', 503)
+    assert table.calls == []

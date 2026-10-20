@@ -33,7 +33,9 @@ class QuoteTable(Protocol):
 
 
 def table(cfg):
-    return (cfg.get('LARK_QUOTE_BASE_TOKEN', 'JoOqbggsVar0ATsVgbcjh6IIp1g'), 'tblENZvYAya93Twa')
+    token = cfg.get('LARK_QUOTE_BASE_TOKEN')
+    require(isinstance(token, str) and bool(token.strip()), 'quote_publish_unready', 503)
+    return (token.strip(), 'tblENZvYAya93Twa')
 
 
 def wire(kind, value):
