@@ -244,6 +244,17 @@ test('a deep link opens the SOP drawer, Escape clears the discriminator and retu
  assert.equal(document.activeElement, document.querySelector('[data-sop-task=t1] button'));
 });
 
+test('a task row leads with its state marker and ends with the bulk checkbox; the drawer footer ends with the primary action', async () => {
+ await mount({route: {task: 't1', task_source: 'sop_local'}});
+ const row = document.querySelector('[data-sop-task=t1] .sop-task-select');
+ assert.deepEqual([...row.children].map(e => e.className || e.type), ['sop-state', 'pf-task-open', 'checkbox']);
+ assert.equal(row.firstElementChild.dataset.state, 'pending');
+ assert.equal(dialog().dataset.kind, 'sop');
+ assert.deepEqual([...dialog().querySelectorAll('.task-drawer-trail>span')].map(s => s.textContent), ['SOP 任務', '報價']);
+ const actions = [...dialog().querySelectorAll('.task-drawer-footer [aria-label=狀態操作] button')].map(b => b.textContent);
+ assert.equal(actions.at(-1), '開始');
+});
+
 test('a revision conflict reloads the task and keeps the draft for the next save', async () => {
  await mount({route: {task: 't1', task_source: 'sop_local'}});
  const input = dialog().querySelector('.sop-field input');

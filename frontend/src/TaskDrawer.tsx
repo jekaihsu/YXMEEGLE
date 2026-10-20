@@ -6,7 +6,6 @@ import './TaskDrawer.css';
 
 export type DrawerFact={label:string;value:ReactNode};
 
-/** Right-side task drawer shared by legacy, SOP and Lark task inspectors. */
 export function TaskDrawer({kind,label,trail,eyebrow,title,status,tools,tabs,footer,onClose,children}:{kind:'legacy'|'sop'|'lark';label:string;trail:string[];eyebrow?:ReactNode;title:string;status?:ReactNode;tools?:ReactNode;tabs?:ReactNode;footer?:ReactNode;onClose:()=>void;children:ReactNode}){
  const ref=useDialogFocus(onClose);
  return createPortal(<div className="task-drawer-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}>

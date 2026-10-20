@@ -21,12 +21,12 @@ type Sop = ReturnType<typeof useSopTasks>;
 
 function TaskLine({task, people, scoped, onOpen, selected, onSelect, projectId, sop, onAccept}: {task: SopTask; people: Map<string, string>; scoped: boolean; onOpen: () => void; selected:boolean; onSelect:()=>void; projectId:string; sop:Sop; onAccept:()=>void}) {
  const executor = task.participants.executor;
- return <li data-sop-task={task.id}><div className="sop-task-select"><span className="sop-state" data-state={task.applicability === 'not_applicable' ? 'not_applicable' : task.state} aria-hidden="true"/><input type="checkbox" aria-label={`選取 ${task.title}`} checked={selected} onChange={onSelect}/><button className="pf-task-open" onClick={onOpen} aria-label={`開啟 SOP 任務 ${task.title}`}>
+ return <li data-sop-task={task.id}><div className="sop-task-select"><span className="sop-state" data-state={task.applicability === 'not_applicable' ? 'not_applicable' : task.state} aria-hidden="true"/><button className="pf-task-open" onClick={onOpen} aria-label={`開啟 SOP 任務 ${task.title}`}>
   <strong>{task.title}</strong>
   <span>{executor ? people.get(executor) || '人員待確認' : '未指派'} · {stateLabel(task)} · {dueLabel(task)}
    <SopLarkSync task={task}/>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.conditional && <Badge tone="warning">條件</Badge>}{task.manual && <Badge>手動</Badge>}</span>
   {!scoped && <small>{task.nodes.map(n => sopNodeLabel(n.node_key)).join('、') || '未連結節點'}</small>}
- </button></div><TaskSuggestion projectId={projectId} task={task} current={sop.current} reload={sop.reload} onAccept={onAccept}/></li>;
+ </button><input type="checkbox" aria-label={`選取 ${task.title}`} checked={selected} onChange={onSelect}/></div><TaskSuggestion projectId={projectId} task={task} current={sop.current} reload={sop.reload} onAccept={onAccept}/></li>;
 }
 
 function CreateTask({projectId, node, current, onDone, onClose}: {projectId: string; node: SopNodeKey; current: () => boolean; onDone: () => Promise<void>; onClose: () => void}) {

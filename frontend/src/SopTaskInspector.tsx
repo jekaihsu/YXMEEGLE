@@ -74,7 +74,7 @@ export function SopTaskInspector({task, project, users, sop, onClose}: {task: So
  const nodes = task.nodes.map(n => sopNodeLabel(n.node_key)).join('、') || '未連結節點';
  const person = (role: Role) => task.participants[role] ? names.get(task.participants[role]!) || '人員待確認' : '未指派';
  const status = <><Badge>{stateLabel(task)}</Badge><SopLarkSync task={task} link/>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.applicability !== 'applicable' && <Badge tone="warning">{APPLICABILITY_LABEL[task.applicability]}</Badge>}</>;
- const footer = <div className="task-drawer-primary sop-transitions" role="group" aria-label="狀態操作">{taskActions(task).map(a => a.reason
+ const footer = <div className="task-drawer-primary sop-transitions" role="group" aria-label="狀態操作">{taskActions(task).reverse().map(a => a.reason
   ? <Reasoned key={a.action} label={a.label} busy={busy} onSubmit={reason => void transition(a.action, {reason})}/>
   : <FlowAction key={a.action} allowed={!busy} reason="處理中" onClick={() => void transition(a.action)}>{a.label}</FlowAction>)}</div>;
  return <TaskDrawer kind="sop" label={`SOP 任務 · ${task.title}`} trail={['SOP 任務', nodes]} title={task.title} status={status} footer={taskActions(task).length ? footer : undefined} onClose={() => {if (!busy) onClose()}}>
