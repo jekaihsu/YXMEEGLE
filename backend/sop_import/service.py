@@ -497,12 +497,13 @@ class Service:
         dismissed = self.decided(db, ctx, 'suggestion_dismissed')
         source = explicitly_granted(ctx.user, 'sop_task_read_source')
         views = []
+        sync = self.projection.statuses(db, ctx, tasks) if self.projection else {}
         for task in tasks:
             found = suggestions.current(task, facts)
             found = None if found and (task.id, found['facts_hash']) in dismissed else found
             views.append({**self.task_json(task, links[task.id], source), 'suggestion': found,
                           'allowed_actions': self.task_actions(ctx, task, found),
-                          'lark_sync': self.projection.status(db, ctx, task) if self.projection else
+                          'lark_sync': sync[task.id] if self.projection else
                           {'state': '未啟用', 'synced_at': None, 'record_id': None}})
         return views
 

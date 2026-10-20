@@ -182,8 +182,12 @@ class Projection:
         if not gates(self.cfg, wid, state) or project is None or excluded(state, project):
             raise Failure('writes_disabled', 'SOP 投影未啟用')
 
-    def status(self, db, ctx, task):
-        row = latest(db, ctx.wid, task.project_id, task.id)
+    def statuses(self, db, ctx, tasks):
+        rows = {r.task_id: r for r in self.current_rows(db, ctx.wid, ctx.project['id'])}
+        return {task.id: self.status(db, ctx, task, rows=rows) for task in tasks}
+
+    def status(self, db, ctx, task, *, rows=None):
+        row = latest(db, ctx.wid, task.project_id, task.id) if rows is None else rows.get(task.id)
         enabled = gates(self.cfg, ctx.wid, ctx.state) and not excluded(ctx.state, ctx.project)
         if not enabled:
             return {'state': '未啟用', 'synced_at': None, 'record_id': None, 'error': None}
@@ -477,13 +481,20 @@ def main():
     sessions = sessionmaker(engine, expire_on_commit=False)
     def load(wid):
         with sessions() as db:
-            return storage.load(db, BusinessRow, db.get(WorkspaceRow, wid))
+            from ..policy import upgrade
+            from ..workspace_seal import seal
+            workspace = db.get(WorkspaceRow, wid)
+            if workspace is None:
+                parser.error('Workspace not found: ' + wid)
+            return seal(db, workspace, upgrade(storage.load(db, BusinessRow, workspace)), dict(os.environ))
     projection = Projection(sessions, dict(os.environ), load)
     if args.enqueue_all:
         print(json.dumps({'enqueued': enqueue_all(sessions)}))
         return
     state = load(args.workspace)
-    project = next(p for p in state['projects'] if p['id'] == args.check)
+    project = next((p for p in state.get('projects', []) if p['id'] == args.check), None)
+    if project is None:
+        parser.error('Project not found: ' + args.check)
     with sessions() as db:
         outbox = [{'task_id': r.task_id, 'generation': r.generation, 'state': r.state, 'last_error': r.last_error,
                    'record_id': r.record_id} for r in projection.current_rows(db, args.workspace, args.check)]
