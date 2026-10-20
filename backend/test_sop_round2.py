@@ -82,3 +82,20 @@ def test_preview_writes_expire_and_bound_actor_rows(h):
     preview(h)
     with h.sessions() as db:
         assert len(list(db.scalars(select(Preview)))) == 2
+
+import asyncio
+from starlette.requests import Request
+from .sop_import.routes import MAX_BODY
+
+
+@pytest.mark.parametrize('declared', [True, False])
+def test_oversized_body_stops_before_consuming_stream(h, declared):
+    consumed = []
+    async def receive():
+        consumed.append(1)
+        return {'type': 'http.request', 'body': b'x' * (MAX_BODY + 1), 'more_body': len(consumed) == 1}
+    request = Request({'type': 'http', 'headers': [(b'content-length', b'1000000')] if declared else []}, receive)
+    endpoint = next(r.endpoint for r in h.client.app.routes if r.path.endswith('/sop-import/preview'))
+    response = asyncio.run(endpoint(request, 'p1'))
+    assert response.status_code == 422
+    assert len(consumed) == (0 if declared else 1)

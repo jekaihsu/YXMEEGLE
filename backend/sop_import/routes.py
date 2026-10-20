@@ -44,7 +44,17 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
             def denied():
                 raise exc
             return respond(denied)
-        raw = await request.body()
+        try:
+            length = request.headers.get('content-length')
+            if length is not None:
+                require(length.isascii() and length.isdigit() and int(length) <= MAX_BODY, 'invalid_request')
+            raw = bytearray()
+            async for chunk in request.stream():
+                require(len(raw) + len(chunk) <= MAX_BODY, 'invalid_request')
+                raw.extend(chunk)
+        except Failure as exc:
+            return JSONResponse({'code': exc.code, 'detail': exc.code}, status_code=exc.status,
+                                headers={'Cache-Control': 'no-store'})
 
         def execute():
             require(len(raw) <= MAX_BODY, 'invalid_request')
