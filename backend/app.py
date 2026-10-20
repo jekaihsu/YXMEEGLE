@@ -18,7 +18,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, Column, String, Integer, JSON, select, update, cast, or_, and_, func
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.engine import make_url
 from .seed import seed, USERS
 from .workflow import apply_action, require, find, event, now, uid, is_pm, is_owner, valid_date
@@ -44,6 +44,7 @@ class Action(BaseModel):
     action:str; version:int; request_id:str=Field(min_length=1,max_length=120)
     project_id:str|None=None; node_id:str|None=None; task_id:str|None=None; payload:dict=Field(default_factory=dict)
     project_versions:dict[str,int]=Field(default_factory=dict)
+    entity_versions:dict[str,str]=Field(default_factory=dict)
 
 
 def _copy_local_pilot_attachments(upload_dir,source_wid,target_wid,project,id_map):
@@ -169,7 +170,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             response.delete_cookie('lark_oauth_state'); return response
         body = {'detail': exc.detail}
         if isinstance(exc.detail,dict) and exc.detail.get('code')=='feature_disabled': body=exc.detail
-        if getattr(exc,'code',None)=='user_token_expired': body['code']=exc.code
+        if getattr(exc,'code',None) in ('user_token_expired','workspace_cas_conflict'): body['code']=exc.code
         if request.url.path == '/api/lark-pilot/shadow':
             body['code'] = getattr(exc, 'code', 'pilot_method_not_allowed' if exc.status_code == 405 else 'pilot_read_failed')
         response=JSONResponse(body,status_code=exc.status_code,headers=exc.headers)
@@ -432,8 +433,12 @@ def create_app(overrides=None,*,dispatch_transport=None):
         result.pop('derived_plan',None)
         result.pop('derived_plan_status',None)
         result.pop('source_work_items_enabled',None)
+        from .admin_concurrency import revisions
+        admin_revisions=revisions(result)
         out=filter_private_workspace(result,user,task_details=task_details)
         restrict_hr(out,user)
+        if capable(user,'manage_people'):
+            out['admin_revisions']={**admin_revisions,'people':{u['id']:admin_revisions['people'][u['id']] for u in out['users']}}
         if out.get('environment') not in ('test','demo'):
             app.state.case_redaction_stats=case_redaction.apply(out,case_redaction.make_plan(pre,out))
         return out
@@ -442,7 +447,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
     app.state.partial_writes={'committed':0,'declined':0}
     app.state.last_write={}  # diagnostics: which path the last write took and how long it held the workspace row lock
 
-    def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None,footprint=None):
+    def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None,footprint=None,entity_guard=None):
         """Run callback on the workspace and commit it as the next version.
 
         footprint, when given, is a function from a Lookup to the Footprint of this request
@@ -460,14 +465,26 @@ def create_app(overrides=None,*,dispatch_transport=None):
             except HTTPException as exc:
                 if exc.status_code!=404: raise
                 declined(action_name,exc)  # a case outside the footprint looks missing; the full path decides
-        return persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,None)
+        for attempt in range(4):
+            try:
+                return persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,None,entity_guard)
+            except HTTPException as exc:
+                if entity_guard is None or getattr(exc,'code',None)!='workspace_cas_conflict' or attempt==3: raise
+            except OperationalError as exc:
+                if entity_guard is None or not any(word in str(exc).lower() for word in ('locked','busy')): raise
+                if attempt==3:
+                    busy=HTTPException(409,'儲存忙碌，請重試')
+                    busy.code='workspace_cas_conflict'
+                    raise busy from exc
+            import random,time
+            time.sleep(random.uniform(.005,.025)*(attempt+1))
 
     def declined(action_name,reason):
         import logging
         app.state.partial_writes['declined']+=1
         logging.getLogger(__name__).warning('partial_write_declined action=%s reason=%s',action_name,str(getattr(reason,'detail',reason))[:200])
 
-    def persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,resolver):
+    def persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,resolver,entity_guard=None):
         replay=False
         with sessions.begin() as db:
             row=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one()
@@ -488,7 +505,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 else:
                     state,order=load_for_write(db,row,footprint)
                     view=WorkspaceView(state,footprint.collections,order)
-                if project_versions:
+                if entity_guard is not None:
+                    entity_guard(state)
+                elif project_versions:
                     require(all(find(view['projects'],pid).get('concurrency_version',0)==version for pid,version in project_versions.items()),'此案件已被更新，請核對最新內容後重試',409)
                 else: require(row.version==expected,'資料已被其他操作更新，請重新整理後重試',409)
                 expected=row.version
@@ -510,7 +529,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 if footprint is None: root=storage.save(db,BusinessRow,wid,state)
                 else: root=storage.save_partial(db,BusinessRow,wid,state,sorted(footprint.collections|{'events'}),footprint.project_ids,order,view=view)
                 updated=db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==expected).values(version=expected+1,data=root))
-                require(updated.rowcount==1,'資料版本衝突，請重新整理',409)
+                if updated.rowcount!=1:
+                    exc=HTTPException(409,'資料版本衝突，請重新整理')
+                    exc.code='workspace_cas_conflict'
+                    raise exc
                 if receipt_key: db.add(Receipt(id=receipt_key,fingerprint=fingerprint,result={'version':state['version']}))
                 db.add(audit.record(AuditRow,wid,actor_id,action_name,request_id=receipt_key,
                                    details={'version':state['version'],'changes':audit.changes(before,state),
@@ -823,7 +845,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 db.add(audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,
                                    details={'status':exc.status_code,'reason':'validation'}))
             raise
-        fingerprint=hashlib.sha256(json.dumps({k:v for k,v in raw.items() if k not in ('version','request_id','project_versions')},sort_keys=True).encode()).hexdigest()
+        fingerprint=hashlib.sha256(json.dumps({k:v for k,v in raw.items() if k not in ('version','request_id','project_versions','entity_versions')},sort_keys=True).encode()).hexdigest()
         versions=None
         if body.project_versions:
             scoped=body.action.startswith(('task_','comment','input_','evidence_','review_','delivery_','file_','participants_')) and body.action!='file_category_save'
@@ -865,8 +887,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
                     for n in p['nodes']:
                         for t in n['tasks']:
                             if t['id']==body.task_id: t['manual_updated']=True
+        from .admin_concurrency import check
+        entity_guard=(lambda ws:check(ws,body.action,body.payload,body.entity_versions)) if body.entity_versions and body.action in ('admin_person','admin_settings') else None
         try:
-            with phase(request,'mutate'): return persist_mutation(data['wid'],body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=(lambda lookup:resolve_footprint(raw,lookup)) if raw['action'] in FOOTPRINT_RULES else None)
+            with phase(request,'mutate'): return persist_mutation(data['wid'],body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=(lambda lookup:resolve_footprint(raw,lookup)) if raw['action'] in FOOTPRINT_RULES else None,entity_guard=entity_guard)
         except HTTPException as exc:
             with sessions.begin() as db:
                 db.add(audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,

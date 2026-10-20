@@ -216,6 +216,8 @@ def filter_private_workspace(state, user, *, task_details=True):
             _sanitize_person_event(item)
     for person in state.get('users', []):
         safe = public_person(person, include_authority=person.get('id') == ident)
+        if actor and (actor.get('role')=='manager' or 'manage_people' in actor.get('capabilities',[])):
+            safe['capabilities']=deepcopy(person.get('capabilities',[]))
         person.clear()
         person.update(safe)
     return state
