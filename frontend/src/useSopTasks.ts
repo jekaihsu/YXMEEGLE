@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {getSessionEpoch} from './api';
 import {requestId} from './nodeAssignmentApi';
-import {SOP_NODE_KEYS, SopError, sopApi, sopErrorText, type ImportPreview, type ImportReceipt, type SopNodeKey, type SopOverview, type SopTemplate} from './sopTaskApi';
+import {SOP_NODE_KEYS, SopError, sopApi, sopErrorText, type ImportPreview, type ImportReceipt, type SopNodeKey, type SopOverview, type SopTemplate, type SopAssignee} from './sopTaskApi';
 import {previewBody, sameSelection, selectionBlockers, type Decisions} from './sopTaskModel';
 
 export type SopListState = {kind: 'loading'} | {kind: 'forbidden'} | {kind: 'error'; message: string; data?: SopOverview} | {kind: 'ready'; data: SopOverview; refreshing: boolean};
@@ -14,6 +14,8 @@ const cached = (key: string) => {
 
 export function useSopTasks(projectId: string, workspace: string) {
  const key = `${workspace}:${projectId}`;
+ const [assignees,setAssignees]=useState<SopAssignee[]>([]);
+ const [assigneeError,setAssigneeError]=useState('');
  const [state, setState] = useState<SopListState>(() => {const data = cached(key); return data ? {kind: 'ready', data, refreshing: true} : {kind: 'loading'}});
  const life = useRef({key, epoch: getSessionEpoch(), active: true, seq: 0});
  const reload = useCallback(async () => {
@@ -37,10 +39,13 @@ export function useSopTasks(projectId: string, workspace: string) {
   const data = cached(key);
   setState(data ? {kind: 'ready', data, refreshing: true} : {kind: 'loading'});
   void reload();
+  setAssignees([]); setAssigneeError('');
+  const scope=life.current; const valid=()=>scope===life.current&&scope.active&&scope.epoch===getSessionEpoch();
+  void sopApi.assignees(projectId,valid).then(people=>{if(valid())setAssignees(people)}).catch(e=>{if(valid())setAssigneeError(sopErrorText(e))});
   return () => {life.current.active = false};
  }, [key, reload]);
  const current = useCallback(() => life.current.active && life.current.epoch === getSessionEpoch(), []);
- return {state, reload, current};
+ return {state, reload, current, assignees, assigneeError};
 }
 
 export type ImportStep = 'version'|'select'|'confirm'|'receipt';

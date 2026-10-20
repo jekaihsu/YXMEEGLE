@@ -79,33 +79,17 @@ export function previewBody(preview: ImportPreview, selected: ReadonlySet<string
 export const sameSelection = (preview: ImportPreview, selected: ReadonlySet<string>) => preview.rowKeys.length === selected.size && preview.rowKeys.every(k => selected.has(k));
 
 export type TaskAction = 'start'|'block'|'resume'|'reset'|'complete'|'reopen'|'archive'|'restore';
-export const ACTIONS: {action: TaskAction; label: string; from: Lifecycle[]; reason: boolean; manager: boolean}[] = [
- {action: 'start', label: '開始', from: ['pending'], reason: false, manager: false},
- {action: 'complete', label: '完成', from: ['pending','in_progress','blocked'], reason: false, manager: false},
- {action: 'block', label: '標記受阻', from: ['pending','in_progress'], reason: true, manager: false},
- {action: 'resume', label: '繼續', from: ['blocked'], reason: true, manager: false},
- {action: 'reset', label: '退回待處理', from: ['blocked'], reason: true, manager: false},
- {action: 'reopen', label: '重新開啟', from: ['done'], reason: true, manager: false},
- {action: 'archive', label: '封存', from: ['pending','in_progress','blocked','done'], reason: true, manager: true},
- {action: 'restore', label: '還原', from: ['archived'], reason: true, manager: true},
+export const ACTIONS: {action: TaskAction; label: string; reason: boolean}[] = [
+ {action:'start',label:'開始',reason:false}, {action:'complete',label:'完成',reason:false},
+ {action:'block',label:'標記受阻',reason:true}, {action:'resume',label:'繼續',reason:true},
+ {action:'reset',label:'退回待處理',reason:true}, {action:'reopen',label:'重新開啟',reason:true},
+ {action:'archive',label:'封存',reason:true}, {action:'restore',label:'還原',reason:true},
 ];
-export interface Authority {manage: boolean; work: boolean; me: string}
-export const canWork = (t: SopTask, a: Authority) => a.manage || (a.work && !!a.me && t.participants.executor === a.me);
-export function taskActions(t: SopTask, a: Authority) {
- const worker = canWork(t, a);
- return ACTIONS.filter(x => x.from.includes(t.state)).map(x => {
-  const allowed = x.manager ? a.manage : worker;
-  const disabled = !allowed ? (x.manager ? '需 SOP 任務管理權限' : '僅執行人或管理者')
-   : (x.action === 'start' || x.action === 'complete') && t.applicability !== 'applicable' ? '需先確認適用'
-   : x.action === 'complete' && t.completionRule !== 'no_typed_obligations' ? '完成條件待審核' : '';
-  return {...x, disabled};
- });
+export function taskActions(t: SopTask) {return ACTIONS.filter(a => t.allowedActions.includes(a.action))}
+export const suggestionLabel = (s: NonNullable<SopTask['suggestion']>) => s.state === 'done' ? '建議完成' : '建議進行中';
+export const suggestionTier = (s: NonNullable<SopTask['suggestion']>) => s.tier === 'proof' ? '佐證' : '指標';
+export const suggestionSelection = (tasks: SopTask[]) => tasks.filter(t => t.suggestion && t.allowedActions.includes('accept_suggestion'));
+export function suggestionBody(tasks: SopTask[], confirm: boolean, reason: string) {
+ return {tasks: tasks.flatMap(t => t.suggestion ? [{task_id:t.id,facts_hash:t.suggestion.hash,expected_revision:t.revision}] : []),confirm,reason:reason.trim()};
 }
-
-export interface Person {id: string; name: string; role: string; active?: boolean; capabilities?: string[]|null}
-export interface CaseRoles {pm_id?: string; admin_id?: string; supervisor_id?: string; sop_task_delegate_ids?: string[]; collaborator_ids?: string[]}
-// The server exposes no candidate list and hides other people's capabilities, so unknown capabilities pass here and the server has the final say.
-export function participantCandidates(users: Person[], project: CaseRoles): Person[] {
- const named = new Set([project.pm_id, project.admin_id, project.supervisor_id, ...(project.sop_task_delegate_ids || []), ...(project.collaborator_ids || [])].filter(Boolean));
- return users.filter(u => u.active !== false && (u.capabilities == null || u.capabilities.includes('sop_task_work')) && (u.role === 'manager' || named.has(u.id)));
-}
+export const requiresSuggestionConfirmation = (tasks: SopTask[]) => tasks.some(t => t.suggestion?.tier === 'indicator');

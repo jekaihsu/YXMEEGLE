@@ -20,7 +20,7 @@ const zero = () => ({done: 0, total: 0, unresolved: 0, not_applicable: 0, archiv
 
 function task(id, patch = {}) {
  const t = clone(examples.sop_tasks.tasks[0]);
- return {...t, id, ...patch, local: {...t.local, ...(patch.local || {})}, origin: {...t.origin, ...(patch.origin || {})}};
+ return {...t, id, ...patch, is_shared: patch.is_shared ?? (patch.nodes?.length > 1 || t.is_shared), is_conditional: patch.is_conditional ?? (patch.applicability === 'unresolved' || t.is_conditional), local: {...t.local, ...(patch.local || {})}, origin: {...t.origin, ...(patch.origin || {})}};
 }
 function overview(tasks) {
  const o = clone(examples.sop_tasks);
@@ -63,6 +63,7 @@ async function mount({tasks = [task('t1')], route = {}, overviewStatus = 200} = 
   const method = init.method || 'GET', body = init.body ? JSON.parse(init.body) : null;
   calls.push({url, method, body});
   if (url === '/api/projects/p1/sop-tasks' && method === 'GET') return overviewStatus === 200 ? response(server.overview) : response({code: 'sop_import_forbidden'}, overviewStatus);
+  if (url.endsWith('/sop-assignees')) return response({people:[{id:'pm',name:'王經理',case_roles:['pm']},{id:'member',name:'林組員',case_roles:['collaborator']}]});
   if (url === '/api/sop-templates') return response({templates: [{...examples.preview.template, name: 'Plumb 案件 SOP', is_default: true}]});
   if (url.endsWith('/sop-import/preview')) return response(previewFixture(body));
   if (url.endsWith('/sop-import/apply')) {server.apply.push(body); return server.applyReply ? server.applyReply(body) : response({...examples.apply, request_id: body.request_id})}
@@ -146,14 +147,10 @@ test('import grouping, decision blockers and the preview body', () => {
  assert.deepEqual(ui.defaultImportNodes('field', 'pm'), ['pm']);
 });
 
-test('task actions carry disabled reasons from state, authority and completion rule', () => {
- const [imported] = ui.parseOverview(overview([task('t', {participants: {executor: 'member'}})])).tasks;
- const actions = auth => Object.fromEntries(ui.taskActions(imported, auth).map(a => [a.action, a.disabled]));
- assert.deepEqual(actions({manage: true, work: true, me: 'pm'}), {start: '', complete: '完成條件待審核', block: '', archive: ''});
- assert.deepEqual(actions({manage: false, work: true, me: 'pm'}), {start: '僅執行人或管理者', complete: '僅執行人或管理者', block: '僅執行人或管理者', archive: '需 SOP 任務管理權限'});
- assert.equal(actions({manage: false, work: true, me: 'member'}).start, '');
- const people = [{id: 'pm', name: 'PM', role: 'pm', capabilities: ['sop_task_work']}, {id: 'boss', name: '主管', role: 'manager', capabilities: ['sop_task_work']}, {id: 'x', name: '外部', role: 'member', capabilities: ['sop_task_work']}, {id: 'ro', name: '唯讀', role: 'manager', capabilities: ['sop_task_read']}, {id: 'crew', name: '組員', role: 'member', capabilities: null}, {id: 'left', name: '離職', role: 'member', active: false}];
- assert.deepEqual(ui.participantCandidates(people, {pm_id: 'pm', collaborator_ids: ['crew', 'left', 'x2']}).map(u => u.id), ['pm', 'boss', 'crew']);
+test('task actions use the per-task server actions', () => {
+ const [imported] = ui.parseOverview(overview([task('t', {allowed_actions:['block','edit']})])).tasks;
+ assert.deepEqual(ui.taskActions(imported).map(a=>a.action), ['block']);
+ assert.deepEqual(ui.taskActions({...imported, allowedActions:[]}), []);
 });
 
 test('the section lists the node tasks with executor, state, due and badges', async () => {

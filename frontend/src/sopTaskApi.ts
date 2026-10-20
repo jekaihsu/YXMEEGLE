@@ -11,7 +11,10 @@ export type Lifecycle = 'pending'|'in_progress'|'blocked'|'done'|'archived';
 export type Role = 'executor'|'checker'|'confirmer';
 export const ROLES: readonly Role[] = ['executor','checker','confirmer'];
 export interface SopCounts {done: number; total: number; unresolved: number; not_applicable: number; archived: number}
+export interface SopAssignee {id: string; name: string; case_roles: string[]}
+export interface SopSuggestion {taskId: string; ruleId: string; ruleRevision: number; tier: 'proof'|'indicator'; state: 'done'|'in_progress'; facts: Record<string, unknown>; hash: string}
 export interface SopTask {
+ allowedActions: string[]; suggestion: SopSuggestion|null; shared: boolean; conditional: boolean;
  id: string; title: string; instructions: string|null; participants: Partial<Record<Role,string>>;
  applicability: Applicability; state: Lifecycle; revision: number; overdue: boolean; manual: boolean;
  dueDate: string|null; dateStatus: string; completionRule: string;
@@ -54,13 +57,17 @@ const lifecycle = oneOf<Lifecycle>(['pending','in_progress','blocked','done','ar
 const counts = (v: unknown): SopCounts => {const c = object(v); return {done: int(c.done), total: int(c.total), unresolved: int(c.unresolved), not_applicable: int(c.not_applicable), archived: int(c.archived)}};
 const unresolvedCounts = (v: unknown) => {const c = object(v); return {applicability: int(c.applicability), participants: int(c.participants), dates: int(c.dates)}};
 
+export function parseSuggestion(v: unknown): SopSuggestion {
+ const s = object(v); return {taskId: str(s.task_id), ruleId: str(s.rule_id), ruleRevision: int(s.rule_revision), tier: oneOf(['proof','indicator'] as const)(s.tier), state: oneOf(['done','in_progress'] as const)(s.suggested_state), facts: object(s.facts), hash: str(s.facts_hash)};
+}
+export function parseAssignees(v: unknown): SopAssignee[] {return list(object(v).people, p => {const x=object(p);return {id:str(x.id),name:str(x.name),case_roles:list(x.case_roles,str)}})}
 function task(v: unknown): SopTask {
  const t = object(v), local = object(t.local), origin = object(t.origin), people = object(t.participants);
  const participants: SopTask['participants'] = {};
  for (const [role, id] of Object.entries(people)) {if (!ROLES.includes(role as Role)) throw malformed(); participants[role as Role] = str(id)}
  const dueDate = optStr(local.due_date);
  if (dueDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) throw malformed();
- return {id: str(t.id), title: str(t.title), instructions: optStr(t.instructions), participants, applicability: applicability(t.applicability),
+ return {allowedActions: list(t.allowed_actions,str), suggestion: t.suggestion == null ? null : parseSuggestion(t.suggestion), shared: bool(t.is_shared), conditional: bool(t.is_conditional), id: str(t.id), title: str(t.title), instructions: optStr(t.instructions), participants, applicability: applicability(t.applicability),
   state: lifecycle(t.state), revision: int(t.revision), overdue: bool(t.overdue), manual: origin.template_family_id === 'manual',
   dueDate, dateStatus: str(local.date_status), completionRule: str(local.completion_rule_status),
   nodes: list(t.nodes, n => {const l = object(n); return {node_key: node(l.node_key), node_id: str(l.node_id), order: int(l.order)}}),
@@ -111,6 +118,9 @@ async function request(url: string, init: RequestInit, current: () => boolean): 
 const base = (id: string) => `/api/projects/${encodeURIComponent(id)}`;
 const post = (body: unknown, method = 'POST'): RequestInit => ({method, body: JSON.stringify(body)});
 export const sopApi = {
+ assignees: (id: string, current: () => boolean) => request(`${base(id)}/sop-assignees`, {}, current).then(parseAssignees),
+ suggestion: (id: string, taskId: string, body: Record<string, unknown>, current: () => boolean) => request(`${base(id)}/sop-tasks/${encodeURIComponent(taskId)}/suggestion`, post(body), current).then(parseMutation),
+ acceptSuggestions: (id: string, body: Record<string, unknown>, current: () => boolean) => request(`${base(id)}/sop-tasks/suggestions/accept`, post(body), current),
  overview: (id: string, current: () => boolean) => request(`${base(id)}/sop-tasks`, {}, current).then(parseOverview),
  templates: (current: () => boolean) => request('/api/sop-templates', {}, current).then(parseTemplates),
  preview: (id: string, body: {template_version_id: string; node_keys: SopNodeKey[]; row_keys?: string[]; applicability_decisions?: Record<string, {value: Applicability; reason: string}>}, current: () => boolean) =>
@@ -123,7 +133,7 @@ export const sopApi = {
 };
 
 export const SOP_ERROR_TEXT: Record<string, string> = {
- session_expired: '登入已過期', sop_import_forbidden: '沒有 SOP 任務權限', case_not_found: '找不到此案件', task_not_found: '找不到此 SOP 任務',
+ quote_number_taken: '報價編號已使用', quote_number_invalid: '報價編號格式不正確', local_case_creation_disabled: '本地建立暫停', quote_not_found: '找不到報價', suggestion_stale: '建議已更新', suggestion_confirmation_required: '需確認建議並填寫原因', session_expired: '登入已過期', sop_import_forbidden: '沒有 SOP 任務權限', case_not_found: '找不到此案件', task_not_found: '找不到此 SOP 任務',
  preview_stale: '預覽已過期，已重新產生', preview_not_found: '預覽已失效，已重新產生', idempotency_mismatch: '匯入請求不一致，請重新預覽',
  task_revision_conflict: '任務已被更新，已重新載入', node_mapping_invalid: '節點對應有誤', row_not_importable: '此列不可匯入',
  applicability_unresolved: '需先確認適用', completion_evidence_missing: '完成條件待審核', import_unavailable: 'SOP 任務暫停寫入',

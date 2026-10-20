@@ -23,7 +23,7 @@
 .sop-blocker{font-size:12px;color:var(--critical,#c62828);padding-left:26px}
 .sop-reason,.sop-field,.sop-inline label{display:grid;gap:6px;font-size:13px}
 .sop-reason{padding-left:26px}
-.sop-reason input,.sop-field :is(input,select,textarea),.sop-inline input,.sop-form>label>input{min-height:44px;border:1px solid var(--sep);background:var(--surface);color:var(--label);border-radius:12px;padding:8px;width:100%;box-sizing:border-box;font:inherit}
+.sop-reason input,.sop-field :is(input,select,textarea),.sop-inline input,.sop-form>label>input:not([type=checkbox]):not([type=radio]),.sop-form>label>select,.sop-form>label>textarea{min-height:44px;border:1px solid var(--sep);background:var(--surface);color:var(--label);border-radius:12px;padding:8px;width:100%;box-sizing:border-box;font:inherit}
 .sop-field textarea{min-height:96px;resize:vertical}
 .sop-form{display:grid;gap:12px;padding-top:12px;border-top:1px solid var(--sep)}
 .sop-form>button,.sop-form>.disabled-action{justify-self:start}
@@ -35,3 +35,7 @@
 .sop-raw{white-space:pre-wrap;overflow-wrap:anywhere;text-align:left}
 .ds-sheet:has(.sop-import,.sop-inspector){width:min(640px,100%)}
 @media(max-width:640px){.ds-backdrop:has(.sop-import,.sop-inspector){padding:0}.ds-sheet:has(.sop-import,.sop-inspector){width:100%;max-height:100dvh;height:100dvh;border-radius:0}.sop-filters>.pf-actions+.pf-actions{padding-left:0;border-left:0}}
+
+.sop-bulk{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 0}.sop-task-select{display:flex;align-items:center;gap:10px}.sop-task-select>.pf-task-open{flex:1}.sop-suggestion{padding:8px 12px;border-top:1px solid var(--line)}.sop-suggestion .pf-actions{margin-top:8px}.sop-batch-list{list-style:none;padding:0;display:grid;gap:12px}.sop-batch-list label{display:flex;gap:8px;align-items:center}.sop-batch-list .ds-badge{flex-shrink:0}
+
+.sop-form>label{display:grid;gap:6px;font-size:13px}.sop-form>label:has(input[type=checkbox]){display:flex;align-items:center;gap:8px}.sop-form input[type=checkbox]{width:18px;height:18px;flex:none}.sop-task-select input[type=checkbox]{width:18px;height:18px;flex:none}.sop-batch-list label{flex-wrap:wrap}.sop-suggestion{border-color:var(--sep)}
