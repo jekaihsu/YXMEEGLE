@@ -5,7 +5,7 @@ from datetime import date, datetime
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from ..models import WorkspaceRow, BusinessRow
@@ -98,6 +98,15 @@ def row_keys(value):
 
 
 class Service:
+    preview_limit = 20
+
+    def prune_previews(self, db, wid, actor_id):
+        db.execute(delete(Preview).where(Preview.workspace_id == wid, Preview.expires_at <= self.clock()))
+        old = list(db.scalars(select(Preview).where(Preview.workspace_id == wid, Preview.actor_id == actor_id)
+                              .order_by(Preview.expires_at.desc(), Preview.id.desc()).offset(self.preview_limit - 1)))
+        for draft in old:
+            db.delete(draft)
+
     def __init__(self, sessions, *, writes_enabled=lambda: False, local_cases_enabled=lambda: False, clock=time.time):
         self.sessions, self.writes_enabled, self.local_cases_enabled, self.clock = (
             sessions, writes_enabled, local_cases_enabled, clock)
@@ -339,6 +348,7 @@ class Service:
             version = self.version(db, ctx.wid, body.get('template_version_id'))
             normalized = self.normalize(ctx, body, self.rows(db, version))
             plan = self.plan(db, ctx, state, version, normalized)
+            self.prune_previews(db, ctx.wid, ctx.user['id'])
             ident, expires = str(uuid4()), self.clock() + 900
             db.add(Preview(workspace_id=ctx.wid, id=ident, project_id=ctx.project['id'], actor_id=ctx.user['id'],
                            expires_at=expires, context_hash=plan['context_hash'], data=plan))
@@ -587,6 +597,8 @@ class Service:
         project = local_case.project(pid, form, user['id'], local_case.published_template(state), None)
         ctx = Context(wid, user, {'users': state['users']}, project, None)
         with self.sessions.begin() as db:
+            self.lock_workspace_row(db, wid)
+            self.prune_previews(db, wid, user['id'])
             normalized = plan = None
             if form['import_tasks']:
                 self.writable()

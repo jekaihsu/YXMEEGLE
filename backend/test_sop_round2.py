@@ -65,3 +65,20 @@ def test_bulk_indicator_requires_explicit_ids(case):
     assert post(h, path, {**body, 'confirmed_task_ids': [tasks[0]['id']]}, 422)['code'] == 'suggestion_confirmation_required'
     result = post(h, path, {**body, 'confirmed_task_ids': [t['id'] for t in tasks]})
     assert len(result['results']) == len(tasks)
+
+from sqlalchemy import select
+from .sop_import.models import Preview
+from .test_sop_import import preview
+
+
+def test_preview_writes_expire_and_bound_actor_rows(h):
+    h.service.preview_limit = 2
+    first = preview(h)['preview_id']
+    h.service.clock = lambda: 2000
+    second = preview(h)['preview_id']
+    with h.sessions() as db:
+        assert db.get(Preview, ('w', first)) is None
+    preview(h)
+    preview(h)
+    with h.sessions() as db:
+        assert len(list(db.scalars(select(Preview)))) == 2
