@@ -44,6 +44,7 @@ const object = (v: unknown): Record<string, unknown> => {if (!v || typeof v !== 
 const str = (v: unknown): string => {if (typeof v !== 'string') throw malformed(); return v};
 const optStr = (v: unknown): string|null => v == null ? null : str(v);
 const int = (v: unknown): number => {if (!Number.isSafeInteger(v) || (v as number) < 0) throw malformed(); return v as number};
+const seconds = (v: unknown): number => {if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) throw malformed(); return v};
 const bool = (v: unknown): boolean => {if (typeof v !== 'boolean') throw malformed(); return v};
 const list = <T>(v: unknown, parse: (item: unknown) => T): T[] => {if (!Array.isArray(v)) throw malformed(); return v.map(parse)};
 const oneOf = <T extends string>(values: readonly T[]) => (v: unknown): T => {if (!values.includes(v as T)) throw malformed(); return v as T};
@@ -81,7 +82,7 @@ export function parseTemplates(v: unknown): SopTemplate[] {
 const OUTCOMES: readonly Outcome[] = ['new','already_present','link_addition','excluded','routing_reference','review_required','routine_excluded','disabled_excluded'];
 export function parsePreview(v: unknown): ImportPreview {
  const p = object(v), template = object(p.template), selection = object(p.selection);
- return {previewId: str(p.preview_id), expiresAt: int(p.expires_at), startNode: node(p.start_node), template: {version_id: str(template.version_id), revision: str(template.revision)},
+ return {previewId: str(p.preview_id), expiresAt: seconds(p.expires_at), startNode: node(p.start_node), template: {version_id: str(template.version_id), revision: str(template.revision)},
   nodeKeys: list(selection.node_keys, node), rowKeys: list(selection.row_keys, str),
   outcomes: list(p.outcomes, item => {const o = object(item); return {source_row_key: str(o.source_row_key), title: str(o.title), disposition: str(o.disposition), selected: bool(o.selected), outcome: oneOf(OUTCOMES)(o.outcome),
    existing_task_id: optStr(o.existing_task_id), existing_state: o.existing_state == null ? null : lifecycle(o.existing_state), applicability: applicability(o.applicability),

@@ -60,8 +60,8 @@ export function groupOutcomes(preview: ImportPreview) {
  return {groups: groups.filter(g => g.rows.length), references: preview.outcomes.filter(o => outcomeGroup(o) === null).length};
 }
 export type Decisions = Record<string, string>;
-// Rows the planner leaves unselected while applicability is unknown need an explicit applicable decision.
-export const needsDecision = (o: PreviewOutcome, defaults: ReadonlySet<string>) => o.applicability === 'unresolved' && !o.existing_task_id && !defaults.has(o.source_row_key);
+// The default plan leaves only subcontract rows unselected, and the server requires an applicable decision to select one, even when its task already exists.
+export const needsDecision = (o: PreviewOutcome, defaults: ReadonlySet<string>) => selectable(o) && !defaults.has(o.source_row_key);
 export function selectionBlockers(preview: ImportPreview, selected: ReadonlySet<string>, decisions: Decisions, defaults: ReadonlySet<string>): Record<string, string> {
  const blocked: Record<string, string> = {};
  for (const o of preview.outcomes) {
@@ -102,10 +102,10 @@ export function taskActions(t: SopTask, a: Authority) {
  });
 }
 
-export interface Person {id: string; name: string; role: string; active?: boolean; capabilities?: string[]}
+export interface Person {id: string; name: string; role: string; active?: boolean; capabilities?: string[]|null}
 export interface CaseRoles {pm_id?: string; admin_id?: string; supervisor_id?: string; sop_task_delegate_ids?: string[]; collaborator_ids?: string[]}
-// The server exposes no candidate list, so this mirrors its participant rule; the server still rejects anyone else.
+// The server exposes no candidate list and hides other people's capabilities, so unknown capabilities pass here and the server has the final say.
 export function participantCandidates(users: Person[], project: CaseRoles): Person[] {
  const named = new Set([project.pm_id, project.admin_id, project.supervisor_id, ...(project.sop_task_delegate_ids || []), ...(project.collaborator_ids || [])].filter(Boolean));
- return users.filter(u => u.active !== false && u.capabilities?.includes('sop_task_work') && (u.role === 'manager' || named.has(u.id)));
+ return users.filter(u => u.active !== false && (u.capabilities == null || u.capabilities.includes('sop_task_work')) && (u.role === 'manager' || named.has(u.id)));
 }

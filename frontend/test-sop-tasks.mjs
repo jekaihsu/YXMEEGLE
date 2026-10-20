@@ -84,6 +84,7 @@ test('parsers accept the backend example payloads and reject foreign node keys',
  assert.deepEqual([o.startNode, o.checklistRevision, o.tasks[0].title, o.tasks[0].dueDate, o.tasks[0].manual, o.tasks[0].nodes[0].node_key], ['sales', 1, '業主提出報價需求', null, false, 'sales']);
  assert.deepEqual(o.caseCounts, {done: 0, total: 1, unresolved: 0, not_applicable: 0, archived: 0});
  assert.deepEqual(ui.parsePreview(examples.preview).counts, {new_tasks: 1, existing_tasks: 0, added_links: 1});
+ assert.equal(ui.parsePreview({...examples.preview, expires_at: 1792496832.94495}).expiresAt, 1792496832.94495);
  const receipt = ui.parseReceipt(examples.apply);
  assert.deepEqual([receipt.created.length, receipt.existing.length, receipt.links, receipt.unresolved.dates], [1, 0, 1, 1]);
  const foreign = clone(examples.sop_tasks); foreign.tasks[0].nodes[0].node_key = 'N01';
@@ -137,6 +138,8 @@ test('import grouping, decision blockers and the preview body', () => {
  const defaults = new Set(preview.rowKeys), selected = new Set([...defaults, 'meegle-v137:A:7']);
  assert.deepEqual(ui.selectionBlockers(preview, selected, {}, defaults), {'meegle-v137:A:7': '需填寫適用原因'});
  assert.deepEqual(ui.selectionBlockers(preview, new Set(['meegle-v137:A:42']), {}, defaults), {'meegle-v137:A:42': '此列不可匯入'});
+ const existing = ui.parsePreview({...previewFixture({}), outcomes: [outcome('meegle-v137:A:7', '下包提出報價', {selected: false, outcome: 'excluded', applicability: 'applicable', existing_task_id: 'old', existing_state: 'pending', links_to_add: []})]});
+ assert.deepEqual(ui.selectionBlockers(existing, new Set(['meegle-v137:A:7']), {}, new Set()), {'meegle-v137:A:7': '需填寫適用原因'});
  assert.deepEqual(ui.previewBody(preview, selected, {'meegle-v137:A:7': ' 有下包 '}, defaults).applicability_decisions, {'meegle-v137:A:7': {value: 'applicable', reason: '有下包'}});
  assert.deepEqual(ui.defaultImportNodes('sales'), NODES);
  assert.deepEqual(ui.defaultImportNodes('field'), NODES.slice(3));
@@ -149,8 +152,8 @@ test('task actions carry disabled reasons from state, authority and completion r
  assert.deepEqual(actions({manage: true, work: true, me: 'pm'}), {start: '', complete: '完成條件待審核', block: '', archive: ''});
  assert.deepEqual(actions({manage: false, work: true, me: 'pm'}), {start: '僅執行人或管理者', complete: '僅執行人或管理者', block: '僅執行人或管理者', archive: '需 SOP 任務管理權限'});
  assert.equal(actions({manage: false, work: true, me: 'member'}).start, '');
- const people = [{id: 'pm', name: 'PM', role: 'pm', capabilities: ['sop_task_work']}, {id: 'boss', name: '主管', role: 'manager', capabilities: ['sop_task_work']}, {id: 'x', name: '外部', role: 'member', capabilities: ['sop_task_work']}, {id: 'ro', name: '唯讀', role: 'manager', capabilities: ['sop_task_read']}];
- assert.deepEqual(ui.participantCandidates(people, {pm_id: 'pm'}).map(u => u.id), ['pm', 'boss']);
+ const people = [{id: 'pm', name: 'PM', role: 'pm', capabilities: ['sop_task_work']}, {id: 'boss', name: '主管', role: 'manager', capabilities: ['sop_task_work']}, {id: 'x', name: '外部', role: 'member', capabilities: ['sop_task_work']}, {id: 'ro', name: '唯讀', role: 'manager', capabilities: ['sop_task_read']}, {id: 'crew', name: '組員', role: 'member', capabilities: null}, {id: 'left', name: '離職', role: 'member', active: false}];
+ assert.deepEqual(ui.participantCandidates(people, {pm_id: 'pm', collaborator_ids: ['crew', 'left', 'x2']}).map(u => u.id), ['pm', 'boss', 'crew']);
 });
 
 test('the section lists the node tasks with executor, state, due and badges', async () => {
