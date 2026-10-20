@@ -187,3 +187,32 @@ def test_capability_projection_matches_active_authority(role,capabilities,active
     out=filter_private_workspace(state,dict(actor))
     person=next(u for u in out['users'] if u['id']=='u-field')
     assert ('capabilities' in person)==exposed
+
+
+def test_exhausted_client_retry_records_one_denial(admin):
+    from sqlalchemy import event
+    app,c=admin
+    ws=c.get('/api/workspace').json()
+    body=command(ws,'admin_person',{'id':'u-field','name':'Never committed'},'one-intent')
+    attempts=[]
+    def miss_cas(conn,cursor,statement,parameters,context,executemany):
+        if statement.startswith('UPDATE workspaces SET version='):
+            attempts.append(statement)
+            statement+=' AND 1=0'
+        return statement,parameters
+    event.listen(app.state.engine,'before_cursor_execute',miss_cas,retval=True)
+    try:
+        for _ in range(2):
+            response=c.post('/api/actions',json=body)
+            assert response.status_code==409,response.text
+            assert response.json()['code']=='workspace_cas_conflict'
+            body['version']=c.get('/api/workspace').json()['version']
+    finally:
+        event.remove(app.state.engine,'before_cursor_execute',miss_cas)
+    assert len(attempts)==8
+    with app.state.sessions() as db:
+        rows=list(db.scalars(select(AuditRow).where(AuditRow.action=='admin_person')))
+        assert [row.data['result'] for row in rows]==['denied']
+        state=storage.load(db,BusinessRow,db.scalar(select(WorkspaceRow)))
+        assert not [e for e in state['events'] if e['action']=='admin_person']
+        assert next(u for u in state['users'] if u['id']=='u-field')['name']!='Never committed'

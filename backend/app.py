@@ -893,8 +893,15 @@ def create_app(overrides=None,*,dispatch_transport=None):
             with phase(request,'mutate'): return persist_mutation(data['wid'],body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=(lambda lookup:resolve_footprint(raw,lookup)) if raw['action'] in FOOTPRINT_RULES else None,entity_guard=entity_guard)
         except HTTPException as exc:
             with sessions.begin() as db:
-                db.add(audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,
-                                   details={'status':exc.status_code,'project_id':body.project_id,'node_id':body.node_id,'task_id':body.task_id}))
+                denied=audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,
+                                    details={'status':exc.status_code,'project_id':body.project_id,'node_id':body.node_id,'task_id':body.task_id})
+                denied.id=hashlib.sha256(json.dumps([data['wid'],user['id'],body.request_id,fingerprint,'denied']).encode()).hexdigest()
+                try:
+                    with db.begin_nested():
+                        db.add(denied)
+                        db.flush()
+                except IntegrityError:
+                    if db.get(AuditRow,denied.id) is None: raise
             raise
 
     @app.post('/api/files')
