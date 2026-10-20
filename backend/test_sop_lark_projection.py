@@ -85,7 +85,7 @@ def p(tmp_path):
     sessions = sessionmaker(engine, expire_on_commit=False)
     cfg = {'SOP_LARK_PROJECTION_ENABLED': 'true', 'LARK_WORKER_ORGANIZATION': 'org',
            'LARK_WORKER_IDENTITY': 'application', 'LARK_APP_ID': APP_ID, 'LARK_APP_SECRET': 'fake'}
-    project = {'id': 'SRC-test', 'name': 'Case', 'case_type': 'intake', 'code': 'SRC-test'}
+    project = {'id': 'SRC-test', 'name': 'Case', 'case_type': 'intake', 'code': 'SRC-test', 'case_visibility': 'source_reference'}
     state = {'environment': 'production', 'settings': {'external_enabled': True}, 'projects': [project]}
     with sessions.begin() as db:
         db.add(WorkspaceRow(id='lark-org', version=1, data={}))

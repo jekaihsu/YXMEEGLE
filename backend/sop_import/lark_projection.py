@@ -20,6 +20,7 @@ from sqlalchemy.orm import sessionmaker
 
 from ..models import BusinessRow, WorkspaceRow
 from ..remote_policy import formal_write_allowed
+from ..source_case_policy import visible_project
 from ..node_assignment.config import NodeAssignmentConfig
 from ..node_assignment.errors import Failure
 from ..node_assignment.lark_table import BitableClient, Table, Kind, canon, LARK_TYPES
@@ -51,8 +52,8 @@ APPLICABILITY = dict(zip(('applicable', 'not_applicable', 'unresolved'), ('適�
 log = logging.getLogger(__name__)
 
 
-def excluded(project):
-    return project.get('case_visibility') == 'local_planning' or project.get('planning_origin') == 'local'
+def excluded(state, project):
+    return not visible_project(state, project)
 
 
 def gates(cfg, wid, state):
@@ -178,12 +179,12 @@ class Projection:
     def before_write(self, wid, pid, state=None):
         state = self.state(wid) if state is None else state
         project = next((p for p in state.get('projects', []) if p['id'] == pid), None)
-        if not gates(self.cfg, wid, state) or project is None or excluded(project):
+        if not gates(self.cfg, wid, state) or project is None or excluded(state, project):
             raise Failure('writes_disabled', 'SOP 投影未啟用')
 
     def status(self, db, ctx, task):
         row = latest(db, ctx.wid, task.project_id, task.id)
-        enabled = gates(self.cfg, ctx.wid, ctx.state) and not excluded(ctx.project)
+        enabled = gates(self.cfg, ctx.wid, ctx.state) and not excluded(ctx.state, ctx.project)
         state = ('未啟用' if not enabled else '同步失敗' if row and row.last_error else
                  'Lark 已變更' if row and row.drift else '已同步' if row and row.state == 'done' else '同步中')
         return {'state': state, 'synced_at': row.synced_at if row else None, 'record_id': row.record_id if row else None,
@@ -245,7 +246,7 @@ class Projection:
                             for row in self.current_rows(db, wid, pid):
                                 row.state, row.last_error = 'paused', 'case_not_found'
                         continue
-                    if excluded(project):
+                    if excluded(state, project):
                         continue
                     with self.sessions() as db:
                         rows = self.current_rows(db, wid, pid)
@@ -474,7 +475,7 @@ def main():
         outbox = [{'task_id': r.task_id, 'generation': r.generation, 'state': r.state, 'last_error': r.last_error,
                    'record_id': r.record_id} for r in projection.current_rows(db, args.workspace, args.check)]
     report = {'outbox': outbox, 'remote': 'disabled'}
-    if gates(projection.cfg, args.workspace, state) and not excluded(project):
+    if gates(projection.cfg, args.workspace, state) and not excluded(state, project):
         with projection.client_factory(lambda: (_ for _ in ()).throw(RuntimeError('read only'))) as client:
             check_schema(client)
             report['remote'] = projection.reconcile(client, args.workspace, args.check, project, state, fetch_roster(client), readonly=True)
