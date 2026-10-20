@@ -75,3 +75,15 @@ def test_publication_hash_uses_persisted_manifest(tmp_path):
         assert v.content_hash == digest(catalog)
     with sessions.begin() as db:
         assert stage(db, 'w', 'r1', catalog).content_hash == digest(catalog)
+
+
+def test_postgresql_enum_constraint_names_are_unique():
+    from sqlalchemy import CheckConstraint
+    from sqlalchemy.dialects import postgresql
+    from sqlalchemy.schema import CreateTable
+    from .sop_import.models import LocalTask
+    constraints = [c.name for c in LocalTask.__table__.constraints if isinstance(c, CheckConstraint)]
+    assert len(constraints) == len(set(constraints)) == 3
+    ddl = str(CreateTable(LocalTask.__table__).compile(dialect=postgresql.dialect()))
+    assert 'CONSTRAINT sop_task_state CHECK (state IN' in ddl
+    assert 'CONSTRAINT sop_task_previous_state CHECK (previous_state IN' in ddl

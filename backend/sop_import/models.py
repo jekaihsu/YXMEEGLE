@@ -3,8 +3,8 @@ from ..models import Base
 from .domain import Disposition, Applicability, Lifecycle
 
 
-def enum_type(cls):
-    return Enum(cls, values_callable=lambda values: [v.value for v in values], native_enum=False,
+def enum_type(cls, name=None):
+    return Enum(cls, name=name or cls.__name__.lower(), values_callable=lambda values: [v.value for v in values], native_enum=False,
                 create_constraint=True, validate_strings=True)
 
 
@@ -76,8 +76,8 @@ class LocalTask(Base):
     instructions = Column(String(20000), nullable=False)
     participants = Column(JSON, nullable=False)
     applicability = Column(enum_type(Applicability), nullable=False)
-    state = Column(enum_type(Lifecycle), nullable=False, default=Lifecycle.PENDING)
-    previous_state = Column(enum_type(Lifecycle))
+    state = Column(enum_type(Lifecycle, 'sop_task_state'), nullable=False, default=Lifecycle.PENDING)
+    previous_state = Column(enum_type(Lifecycle, 'sop_task_previous_state'))
     revision = Column(Integer, nullable=False, default=1)
     local = Column(JSON, nullable=False)
 
