@@ -204,3 +204,13 @@ def test_source_refresh_never_adopts_a_local_case():
     assert [(n['id'], n['tasks']) for n in local['nodes']] == [(n['id'], []) for n in before['nodes']]
     assert 'source_identity' not in local
     assert (intake['case_type'], intake['code'], intake['id'] != project['id']) == ('intake', '115950', True)
+
+@pytest.mark.parametrize('enabled', ['true', 'false'])
+def test_session_exposes_local_planning_write_flags(tmp_path, enabled):
+    app, client, _, _ = harness(tmp_path, LOCAL_CASE_CREATION_ENABLED=enabled, SOP_TASK_WRITES_ENABLED=enabled)
+    try:
+        flags = call(client, 'GET', '/api/session')['features']
+        assert flags['local_case_creation'] is (enabled == 'true')
+        assert flags['sop_task_writes'] is (enabled == 'true')
+    finally:
+        app.state.engine.dispose()

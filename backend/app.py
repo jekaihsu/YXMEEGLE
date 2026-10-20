@@ -564,6 +564,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
         from .node_assignment.config import NodeAssignmentConfig
         node_config = NodeAssignmentConfig.from_env(cfg)
         flags = resolve_features(cfg)
+        flags['local_case_creation'] = str(cfg.get('LOCAL_CASE_CREATION_ENABLED', 'false')).lower() == 'true'
+        flags['sop_task_writes'] = str(cfg.get('SOP_TASK_WRITES_ENABLED', 'false')).lower() == 'true'
         flags['mock_ui']=environment in ('demo','test') and str(cfg.get('FEATURE_LARK_AUTHORITATIVE_OPS','false')).lower()=='true'
         if shell_enabled: flags['workspace_shell']=True
         if (node_config.enabled and node_config.writable and cfg.get('LARK_WORKER_ORGANIZATION')
