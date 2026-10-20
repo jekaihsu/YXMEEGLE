@@ -185,6 +185,8 @@ class Projection:
     def status(self, db, ctx, task):
         row = latest(db, ctx.wid, task.project_id, task.id)
         enabled = gates(self.cfg, ctx.wid, ctx.state) and not excluded(ctx.state, ctx.project)
+        if not enabled:
+            return {'state': '未啟用', 'synced_at': None, 'record_id': None, 'error': None}
         state = ('未啟用' if not enabled else '同步失敗' if row and row.last_error else
                  'Lark 已變更' if row and row.drift else '已同步' if row and row.state == 'done' else '同步中')
         return {'state': state, 'synced_at': row.synced_at if row else None, 'record_id': row.record_id if row else None,

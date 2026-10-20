@@ -293,3 +293,9 @@ test('unsynced task has a plain badge without a Lark row link', async () => {
  const invalid = overview([task('t1', {lark_sync: {state: 'unknown'}})]);
  assert.throws(() => ui.parseOverview(invalid), e => e.code === 'malformed');
 });
+
+
+test('disabled projection hides stale receipt links', async () => {
+ await mount({tasks: [task('t1', {lark_sync: {state: '未啟用', record_id: 'recOld', base_id: 'baseOld', table_id: 'tblOld'}})], route: {task: 't1', task_source: 'sop_local'}});
+ assert.ok(![...document.querySelectorAll('a')].some(a => a.textContent === '開啟 Lark 列'));
+});
