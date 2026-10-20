@@ -57,7 +57,31 @@ Send this body to `POST /api/projects/{id}/sop-import/apply`. Recover ambiguous 
 
 [api-examples.json](api-examples.json) contains complete, actual preview, apply, and list response shapes for one quotation task in an intake case, including a full 21-field snapshot. IDs and timestamps are examples. `expires_at` is UTC epoch seconds. Node IDs come from persisted `business_records`, never titles or array positions.
 
-`start_node` appears in preview, apply, and task-list responses. It derives from persisted case and node data. An unprogressed intake starts at `sales`. Quote status `成案` or a populated `回傳單日期` advances it to `pm`; a confirmation relationship advances it to `confirmation`. Verified engineering lifecycle and persisted node progress can advance it further. Unverified lifecycle values do not advance it. This field does not change task or business node state. Newly imported tasks under every selected node start `pending`.
+`start_node` and `stage` appear in preview, apply, and task-list responses. Neither changes task or business node state. Newly imported tasks under every selected node start `pending`.
+
+`stage` is the quote lifecycle derived from the case's 報價總表 rows. Rows are merged first: every live source row carrying one of the case's 報價編號 counts, including duplicated rows that belong to other intake records. `quote_facts.py` reads the rows and `case_stage.py` holds the ordered predicate table. The first stage that holds wins.
+
+| `stage` | Holds when | `start_node` |
+| --- | --- | --- |
+| `paid` | `狀態 (1)` is G | `settlement` |
+| `pricing` | `狀態 (1)` is D, E, F or H | `pricing` |
+| `office` | `狀態 (1)` is C | `control` |
+| `field` | `狀態 (1)` is B | `field` |
+| `confirmation` | `狀態 (1)` is 0 or A, a V4 confirmation record exists, or the case is won and numbered with `確認單回傳開會日期`, `提供行政回傳確認單時間`, or a confirmation link plus `回傳單日期` | `confirmation` |
+| `numbered` | won, and `工程編號` or `編號` is C, A, B, K or X followed by digits that are not all zero | `pm` |
+| `returned` | won without such a number; `報編` placeholders do not count | `pm` |
+| `quote_expired` | `報價日期` or `提供給PM日期` is set and `報價期限` is before today in Asia/Taipei | `sales` |
+| `quoted` | `報價日期` or `提供給PM日期` is set | `sales` |
+| `inquiry` | otherwise | `sales` |
+| `cancelled` | the merged `狀態 (1)` is I; a live letter on another row wins | as if not cancelled |
+
+Won means `回傳單日期` is set, or the case is numbered and `狀態` is `成案` or `舊案`, or `狀態 (1)` is A to H. `成案` alone does not win a case. A `此案確認單` link or a quote-base `工程確認單` alone is a quote-time costing sheet and advances nothing. Merged `狀態 (1)` is the furthest live letter. I counts only when every row says I.
+
+`start_node` is the furthest of the stage's node, the verified engineering lifecycle, and persisted node progress. Unverified lifecycle values do not advance it.
+
+The source fetch reads these quote fields: `詢價日期`, `第一次聯繫日期`, `報價日期`, `提供給PM日期`, `回傳單日期`, `編號`, `狀態 (1)`, `確認單回傳開會日期`, `提供行政回傳確認單時間`, `成案後聯繫日期`, `契約價格(含稅)`, the five `確認單營業額` fields, `外業負責組別`, `內業負責組別`, `MEEGLE日報填報情形`, `PM告知可請款日期`, `連絡人`, and `報價負責人`. `契約價格(含稅)` and the `確認單營業額` fields are server only and never leave in public source views.
+
+The quote-base `合約明細工項` table is not read. On the 2026-10-20 dump, 19 of 333 quote groups have contract lines without a quote date, so they derive `inquiry` here where the evidence dive counted them as quoted. All other stage counts match the dive.
 
 Display fields return values and codes. Preview outcomes contain `reason_code` and an optional recorded `exclusion_reason`, without catalog helper prose. Catalog interpretation notes reside under `provenance`; immutable task source content resides under the optional `source_snapshot`.
 

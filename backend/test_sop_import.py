@@ -465,15 +465,24 @@ def test_intake_sales_scoped_import_needs_no_case_number_or_confirmation(intake)
     assert all(t['nodes'][0]['node_key'] == 'sales' and t['state'] == 'pending' for t in tasks)
 
 
-@pytest.mark.parametrize('quote_fields,expected', [
-    ({'狀態': '成案'}, 'pm'),
-    ({'狀態': ['成案']}, 'pm'),
-    ({'回傳單日期': '2026-10-20'}, 'pm'),
-    ({'此案確認單': [{'id': 'recConfirmed'}]}, 'confirmation'),
-    ({'此案確認單': {'record_ids': ['recConfirmed']}}, 'confirmation'),
-    ({'案件編號': 'A115001-01'}, 'sales'),
+@pytest.mark.parametrize('quote_fields,start,stage', [
+    ({'狀態': '成案'}, 'sales', 'inquiry'),
+    ({'狀態': ['成案'], '工程編號': 'A115001'}, 'pm', 'numbered'),
+    ({'回傳單日期': '2026-10-20'}, 'pm', 'returned'),
+    ({'回傳單日期': 1790208000000, '工程編號': 'C115243'}, 'pm', 'numbered'),
+    ({'回傳單日期': '2026-10-20', '工程編號': '報編115588'}, 'pm', 'returned'),
+    ({'此案確認單': [{'id': 'recConfirmed'}]}, 'sales', 'inquiry'),
+    ({'此案確認單': {'record_ids': ['recConfirmed']}, '回傳單日期': '2026-10-20', '工程編號': 'B115001'},
+     'confirmation', 'confirmation'),
+    ({'報價日期': '2026-10-01', '報價期限': '2026-10-30'}, 'sales', 'quoted'),
+    ({'狀態 (1)': 'B.外業執行中'}, 'field', 'field'),
+    ({'狀態 (1)': 'C.內業執行中'}, 'control', 'office'),
+    ({'狀態 (1)': 'E.已計價'}, 'pricing', 'pricing'),
+    ({'狀態 (1)': 'G.已付款'}, 'settlement', 'paid'),
+    ({'狀態 (1)': 'I.案件取消(母案)', '回傳單日期': '2026-10-20'}, 'pm', 'cancelled'),
+    ({'案件編號': 'A115001-01'}, 'sales', 'inquiry'),
 ])
-def test_intake_start_node_comes_from_persisted_quote_state(intake, quote_fields, expected):
+def test_intake_start_node_comes_from_persisted_quote_state(intake, quote_fields, start, stage):
     h, url, case = intake
     with h.sessions.begin() as db:
         row = db.get(BusinessRow, ('w', 'projects', case['id']))
@@ -481,8 +490,11 @@ def test_intake_start_node_comes_from_persisted_quote_state(intake, quote_fields
         for quote in project['quotes'] + project['source_records']:
             quote['fields'].update(quote_fields)
         row.data = project
-    assert preview(h, url=url, node_keys=['sales'])['start_node'] == expected
-    assert overview(h, url)['start_node'] == expected
+    plan = preview(h, url=url, node_keys=['sales'])
+    assert (plan['start_node'], plan['stage']) == (start, stage)
+    tasks = overview(h, url)
+    assert (tasks['start_node'], tasks['stage']) == (start, stage)
+    assert apply(h, plan, url=url)['stage'] == stage
 
 
 def test_start_node_tracks_real_node_progress_and_invalidates_preview(intake):

@@ -4,6 +4,7 @@
     "expires_at": 1900,
     "project_id": "209ccc072f0d41faa9c97bec9efdc131",
     "start_node": "sales",
+    "stage": "inquiry",
     "identity_revision": 0,
     "checklist_revision": 0,
     "nodes": [
@@ -346,6 +347,7 @@
     "project_id": "209ccc072f0d41faa9c97bec9efdc131",
     "template_version_id": "494b6410-2d83-4013-90aa-aa737f1c3e54",
     "start_node": "sales",
+    "stage": "inquiry",
     "replayed": false,
     "created_task_ids": [
       "86b54c26-92b8-454f-8209-dd666de8f1aa"
@@ -646,6 +648,7 @@
     "project_id": "209ccc072f0d41faa9c97bec9efdc131",
     "task_source": "sop_local",
     "start_node": "sales",
+    "stage": "inquiry",
     "checklist_revision": 1,
     "identity_revision": 0,
     "scope": {

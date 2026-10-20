@@ -10,10 +10,11 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from ..models import WorkspaceRow, BusinessRow
 from .catalog import digest, publish
-from .case_stage import start_node
+from .case_stage import stage, start_node
 from .domain import (Applicability, Lifecycle, Disposition, TRANSITIONS, NODE_MAP, SUBCONTRACT,
                      CONDITIONAL, PARTICIPANT_ROLES, require)
 from .models import Family, Version, TemplateRow, CaseState, LocalTask, TaskNodeLink, Preview, ImportRun, TaskEvent
+from .quote_facts import case_facts
 
 
 @dataclass
@@ -103,12 +104,15 @@ class Service:
             result.append({'node_key': key, 'node_id': found[0].entity_id})
         return result
 
-    @staticmethod
-    def case_start_node(db, ctx):
+    def today(self):
+        return datetime.fromtimestamp(self.clock(), ZoneInfo('Asia/Taipei')).date()
+
+    def position(self, db, ctx):
         nodes = db.scalars(select(BusinessRow).where(BusinessRow.workspace_id == ctx.wid,
                                                     BusinessRow.kind == 'nodes',
                                                     BusinessRow.parent_id == ctx.project['id']))
-        return start_node(ctx.project, [n.data for n in nodes])
+        facts = case_facts(ctx.project, ctx.state, self.today())
+        return {'start_node': start_node(ctx.project, [n.data for n in nodes], facts), 'stage': stage(facts).value}
 
     def version(self, db, wid, version_id):
         version = db.get(Version, (wid, identifier(version_id)))
@@ -271,9 +275,10 @@ class Service:
                 missing.append('dates')
             if missing:
                 unresolved.append({'source_row_key': outcome['source_row_key'], 'fields': missing})
-        context = {'start_node': self.case_start_node(db, ctx), 'identity_revision': state.identity_revision, 'checklist_revision': state.checklist_revision,
+        position = self.position(db, ctx)
+        context = {'start_node': position['start_node'], 'identity_revision': state.identity_revision, 'checklist_revision': state.checklist_revision,
                    'nodes': nodes, 'template': self.version_json(version), 'input': normalized, 'outcomes': outcomes}
-        return {**context, 'context_hash': digest(context), 'outcomes': outcomes, 'unresolved_items': unresolved,
+        return {**context, 'context_hash': digest(context), 'stage': position['stage'], 'outcomes': outcomes, 'unresolved_items': unresolved,
                 'unresolved_counts': {key: sum(key in item['fields'] for item in unresolved)
                                       for key in ('applicability', 'participants', 'dates')},
                 'counts': {'new_tasks': sum(o['outcome'] == 'new' for o in outcomes),
@@ -355,7 +360,8 @@ class Service:
             if created or added:
                 state.checklist_revision += 1
             receipt = {'run_id': str(uuid4()), 'request_id': rid, 'project_id': ctx.project['id'],
-                       'template_version_id': version.id, 'start_node': plan['start_node'], 'replayed': False, 'created_task_ids': created,
+                       'template_version_id': version.id, 'start_node': plan['start_node'], 'stage': live['stage'],
+                       'replayed': False, 'created_task_ids': created,
                        'existing_task_ids': existing, 'added_links': added,
                        'exclusions': [o for o in plan['outcomes'] if not o['selected']],
                        'unresolved_items': plan['unresolved_items'], 'unresolved_counts': plan['unresolved_counts'],
@@ -386,7 +392,7 @@ class Service:
                 'archived': len(tasks) - len(active)}
 
     def task_json(self, task, links, source=False):
-        today = datetime.fromtimestamp(self.clock(), ZoneInfo('Asia/Taipei')).date().isoformat()
+        today = self.today().isoformat()
         return {'id': task.id, 'task_source': 'sop_local', 'project_id': task.project_id,
                 'origin': {'template_family_id': task.template_family_id, 'source_row_key': task.source_row_key,
                            'instance_scope': task.instance_scope, 'imported_version_id': task.imported_version_id},
@@ -412,8 +418,7 @@ class Service:
             by_task = {t.id: [l for l in links if l.task_id == t.id] for t in tasks}
             selected = [t for t in tasks if node_key is None or any(l.node_key == node_key for l in by_task[t.id])]
             selected.sort(key=lambda t: (t.template_family_id == 'manual', min((l.ordinal for l in by_task[t.id]), default=0), t.id))
-            return {'project_id': ctx.project['id'], 'task_source': 'sop_local',
-                    'start_node': self.case_start_node(db, ctx),
+            return {'project_id': ctx.project['id'], 'task_source': 'sop_local', **self.position(db, ctx),
                     'checklist_revision': state.checklist_revision if state else 0,
                     'identity_revision': state.identity_revision if state else 0, 'scope': {'node_key': node_key},
                     'counts': self.counts(selected), 'case_counts': self.counts(tasks),
