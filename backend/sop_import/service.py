@@ -836,6 +836,8 @@ class Service:
 
     def accept_one(self, db, ctx, item, facts, accepted, confirm, reason):
         task = self.task(db, ctx, item['task_id'])
+        require((task.id, item['facts_hash']) not in self.decided(db, ctx, 'suggestion_dismissed'),
+                'suggestion_dismissed', 409)
         previous = accepted.get((task.id, item['facts_hash']))
         if previous and task.state.value == previous.changes['to_state']:
             return self.decision_json(task, previous.changes, True)

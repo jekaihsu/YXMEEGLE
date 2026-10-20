@@ -36,3 +36,19 @@ def test_normalized_official_number_uniqueness(local, number, status, code):
         ws.data = storage.save(db, BusinessRow, WID, state)
     assert call(client, 'POST', '/api/quotes/preview',
                 {**FORM, 'import_tasks': False, 'official_quote_no': number}, status)['code'] == code
+
+from .test_sop_import import h, intake, post, overview
+from .test_sop_suggestions import case, set_quote, task, QUOTE_ROW
+
+
+def test_dismissed_facts_cannot_be_accepted(case):
+    h, url, project = case
+    set_quote(h, project, **QUOTE_ROW)
+    found = task(h, url, 1)
+    body = {'facts_hash': found['suggestion']['facts_hash']}
+    path = f"{url}/sop-tasks/{found['id']}/suggestion"
+    post(h, path, {**body, 'action': 'dismiss_suggestion'})
+    result = post(h, path, {**body, 'action': 'accept_suggestion', 'expected_revision': found['revision'],
+                           'confirm': True, 'reason': 'checked'}, 409)
+    assert result['code'] == 'suggestion_dismissed'
+    assert task(h, url, 1)['state'] == 'pending'
