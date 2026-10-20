@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {build} from 'esbuild';
+import {JSDOM} from 'jsdom';
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=admin&tab=people'});
+for(const key of ['window','document','sessionStorage','location','HTMLElement','HTMLInputElement','HTMLTextAreaElement','HTMLSelectElement','Event','FormData','MutationObserver','Node'])globalThis[key]=dom.window[key];
+globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const React=(await import('react')).default,{act}=await import('react');
+const {createRoot}=await import('react-dom/client');
+const bundle=await build({entryPoints:['src/Operations.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const path=new URL('./.admin-capabilities.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);
+let Administration;try{({Administration}=await import(path.href))}finally{await fs.unlink(path)}
+const person={id:'target',name:'Target',role:'member',active:true,department:'Field',capabilities:['future_permission','approve_capability','manage_training','finance_approve']};
+let submitted;
+const c={w:{users:[person],projects:[],settings:{},admin_revisions:{people:{target:'r1'},new_person:'new'}},s:{user:{id:'manager',role:'manager',active:true},features:{}},busy:false,refresh:async()=>{},run:async(action,payload)=>{submitted={action,payload}}};
+const root=createRoot(document.getElementById('root'));
+const flush=fn=>act(async()=>{await fn();await new Promise(r=>setTimeout(r,0))});
+await flush(()=>root.render(React.createElement(Administration,{c})));
+await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='編輯').click());
+const form=document.querySelector('form');
+await flush(()=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+assert.equal(submitted.action,'admin_person');
+assert.deepEqual(submitted.payload.capabilities.sort(),person.capabilities.toSorted(),'saving preserves every unlisted capability');
+await flush(()=>root.unmount());
+console.log('admin capability preservation: 1 scenario passed');
