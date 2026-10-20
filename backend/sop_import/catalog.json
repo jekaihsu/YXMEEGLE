@@ -3756,6 +3756,7 @@
   "target_branch": "ava-apple/yx-company-system",
   "inspected_commit": "25de79b4a791facb24b73b52ecb4646e78ad364d",
   "proposed_template_family_id": "plumb-case-sop",
+  "proposed_template_family_name": "案件 SOP 預設任務",
   "proposed_mapping_revision": "yx-company-node-mapping-1",
   "branch_node_key_map": {
     "N01": "sales",

@@ -74,11 +74,13 @@ def published_family(db, wid, family_id):
 def stage(db, wid, revision, catalog, *, source_verified=False):
     family_id = catalog['proposed_template_family_id']
     content_hash = validate(catalog, baseline=not published_family(db, wid, family_id))
+    name = catalog.get('proposed_template_family_name') or family_id
     family = db.get(Family, (wid, family_id))
     if family is None:
-        family = Family(workspace_id=wid, id=family_id, name='Plumb case SOP', is_default=True)
+        family = Family(workspace_id=wid, id=family_id, name=name, is_default=True)
         db.add(family)
         db.flush()
+    family.name = name
     existing = db.scalar(select(Version).where(Version.workspace_id == wid, Version.family_id == family_id,
                                               Version.revision == revision))
     if existing:

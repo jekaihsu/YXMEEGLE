@@ -591,3 +591,8 @@ def test_at07_published_revision_adds_one_genuinely_new_origin(h):
     assert len(tasks) == 39
     assert next(t for t in tasks if t['id'] == local['id'])['title'] == 'Preserved local edit'
     assert next(t for t in tasks if t['id'] == result['created_task_ids'][0])['origin']['source_row_key'] == 'meegle-v137:A:62'
+
+
+def test_template_list_shows_the_chinese_family_name(h):
+    templates = h.client.get('/api/sop-templates').json()['templates']
+    assert [(t['template_family_id'], t['name'], t['is_default']) for t in templates] == [('plumb-case-sop', '案件 SOP 預設任務', True)]

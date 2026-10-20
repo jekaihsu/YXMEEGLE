@@ -87,3 +87,17 @@ def test_postgresql_enum_constraint_names_are_unique():
     ddl = str(CreateTable(LocalTask.__table__).compile(dialect=postgresql.dialect()))
     assert 'CONSTRAINT sop_task_state CHECK (state IN' in ddl
     assert 'CONSTRAINT sop_task_previous_state CHECK (previous_state IN' in ddl
+
+
+def test_family_display_name_comes_from_the_catalog_and_restaging_renames_a_legacy_family(tmp_path):
+    from .sop_import.models import Family
+    engine = create_engine(f'sqlite:///{tmp_path}/catalog.db')
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(engine)
+    with sessions.begin() as db:
+        db.add(Family(workspace_id='legacy', id='plumb-case-sop', name='Plumb case SOP', is_default=True))
+    with sessions.begin() as db:
+        stage(db, 'fresh', 'r1', load_catalog())
+        stage(db, 'legacy', 'r1', load_catalog())
+    with sessions() as db:
+        assert [db.get(Family, (wid, 'plumb-case-sop')).name for wid in ('fresh', 'legacy')] == ['案件 SOP 預設任務'] * 2
