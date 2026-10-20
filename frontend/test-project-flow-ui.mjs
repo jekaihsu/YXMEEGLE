@@ -38,6 +38,7 @@ async function mount({tab,node,task,enabled=true,role='manager',dispatch=false,a
   if(url.endsWith('/dispatch/options'))return response({people:[{person_ref:'ou_anna',open_id:'ou_anna',name:'林安娜',active:true,has_lark_account:true}],instruments:[],vehicles:[],cases:[{ref:'recCase',code:'C001',name:'合成確認單'}],departments:['控制'],seats:[],joins:{}});
   if(url.endsWith('/dispatch/previews')){const data=dispatchExample('decision: PM final accepts');data.proposal=JSON.parse(init.body);data.crew=data.proposal.crew.map(person_ref=>({person_ref,name:'林安娜',feasibility:'feasible'}));data.resources=[];data.expires_at='2099-01-01T00:00:00Z';return response(data)}
   if(url.endsWith('/dispatch/commits')){fixture.list.node_details.control.tasks.push({...fixture.detail.tasks[0],id:'recPublished',record_id:'recPublished',title:'已發布的新排班'});return response({command:{command_id:JSON.parse(init.body).command_id,state:'committed',revision:1,task_record_id:'recPublished'}})}
+  if(url.endsWith('/sop-tasks')&&globalThis.sopOverview)return response(globalThis.sopOverview);
   return response({detail:'disabled'},404);
  };
  root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(ui.ProjectDetail,{c}));await tick()});
@@ -80,4 +81,6 @@ nodeStatus=500;await mount({node:'control'});assert.equal(document.querySelector
 await mount({node:'control',embedded:false});await click(button('更新節點與任務'));await click(document.querySelector('.pf-node[aria-label^="外業節點"]'));await click(document.querySelector('.pf-node[aria-label^="控制節點"]'));assert.equal(calls.filter(r=>r.url.endsWith('/nodes/control')).length,2);
 detailStatus=500;await mount({node:'control',embedded:false});assert.match(document.querySelector('#flow-tasks').textContent,/來源未完整/);assert.match(document.querySelector('#flow-evidence').textContent,/實際完成量未知/);fixture.list.node_details=globalThis.detailPayloads;await click(button('更新節點與任務'));assert.equal(document.querySelectorAll('.pf-task-open').length,2);assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/來源未完整/);detailStatus=200;
 await mount({enabled:false,node:'node_control'});assert.equal(calls.some(r=>r.url.includes('/node-assignments')),false);assert.equal(document.querySelectorAll('.pf-node').length,9);assert.match(document.querySelector('.pf-legacy').textContent,/本地/);
+globalThis.sopOverview=JSON.parse(await readFile(new URL('../backend/sop_import/api-examples.json',import.meta.url),'utf8')).sop_tasks;
+await mount({node:'sales'});assert.equal(document.querySelector('#flow-selected #sop-tasks .pf-task-open strong').textContent,'業主提出報價需求');assert.ok([...document.querySelectorAll('.pf-node-actions button')].some(b=>b.textContent==='匯入此節點任務'));globalThis.sopOverview=undefined;
 await act(async()=>root.unmount());console.log('Unified project flow rendered checks passed');

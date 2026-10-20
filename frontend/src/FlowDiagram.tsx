@@ -12,7 +12,7 @@ export function FlowDiagram({nodes,overall,selected,loading,onSelect}:{nodes:Flo
   if(next<0)return;event.preventDefault();const node=nodes[next];onSelect(node.key,true);buttons.current.get(node.key)?.focus({preventScroll:true});
  };
  return <section className="pf-diagram glass--card" aria-label="SOP 流程圖" aria-busy={loading}>
-  <header><div><span className="pf-eyebrow">案件流程</span><h2>從接案到結算</h2></div><div className="pf-overall">{loading ? <Skeleton width="7rem" height="2rem"/> : <><strong>{overall.percent === null ? '未知' : `${overall.percent}%`}</strong><span>{overall.label}</span><small>任務完成不等於實際完成量</small></>}</div></header>
+  <header><div><span className="pf-eyebrow">案件流程</span><h2>從接案到結算</h2></div><div className="pf-overall">{loading ? <Skeleton width="7rem" height="2rem"/> : <><strong>{overall.percent === null ? '未知' : `${overall.percent}%`}</strong><span>{overall.label}</span></>}</div></header>
   <ol className="pf-chain">{nodes.map((node,index) => {const Icon=stateIcons[node.state] || Circle;return <li key={node.key}>
    <button ref={element=>{if(element)buttons.current.set(node.key,element);else buttons.current.delete(node.key)}} className="pf-node" data-state={node.state} data-production={isProductionNode(node.key) || undefined} aria-current={selected === node.key ? 'step' : undefined} aria-label={`${node.label}節點，${loading ? '讀取中' : node.state}，${node.tasks.done}/${node.tasks.total} 項任務，${node.progress.label}${node.progress.percent === null ? '' : `${node.progress.percent}%`}${node.overdue ? '，逾期' : ''}`} tabIndex={selected===node.key || !selected && index===0 ? 0 : -1} disabled={loading} onKeyDown={e=>navigate(e,index)} onClick={()=>onSelect(node.key)}>
     <span className="pf-node-title"><span className="pf-step-index">{String(index+1).padStart(2,'0')}</span><strong>{node.label}</strong></span>
@@ -25,7 +25,7 @@ export function FlowDiagram({nodes,overall,selected,loading,onSelect}:{nodes:Flo
      {node.assignment?.can_submit_hint && <strong className="pf-submit-hint">可送審</strong>}<span className="pf-due">{node.overdue && <TriangleAlert size={13} aria-hidden="true"/>}{node.overdue ? '逾期 · ' : '期限 · '}{node.deadline?.slice(0,10) || '未排定'}</span>
     </>}
    </button>{index<nodes.length-1 && <ArrowRight size={14} className="pf-chain-arrow" aria-hidden="true"/>}
-  </li>})}</ol><p className="pf-help">選擇節點查看證據與任務。方向鍵切換，Home／End 跳至首尾。生產作業可依工項並行。</p>
+  </li>})}</ol>
  </section>;
 }
 export function FlowPanelSkeleton(){return <section className="pf-panel glass--card" aria-label="節點明細載入中" aria-busy="true"><Skeleton width="40%" height="2rem"/><div className="pf-facts"><Skeleton lines={2}/><Skeleton lines={2}/><Skeleton lines={2}/></div><Skeleton height="10rem"/><Skeleton height="3rem" lines={3}/></section>}

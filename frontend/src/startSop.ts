@@ -1,5 +1,5 @@
 import {taipeiTime} from './taipeiTime';
-import {assignmentRequest, type NodeAssignmentList, nodeStatusLabel} from './nodeAssignmentApi';
+import {assignmentRequest} from './nodeAssignmentApi';
 export const PRODUCTION = {field: '外業', control: '控制', mapping: '圖資', report: '報告'} as const;
 export type ProductionKey = keyof typeof PRODUCTION;
 export interface PlanNode {key: ProductionKey; label: string; category: string; planned_qty: string; lines: number; items: number; items_basis: Record<'native'|'derived'|'ambiguous'|'unlinked', number>; deadline: string|null; node_exists: boolean; seed_task_exists: boolean; will_create_node: boolean; will_create_task: boolean; task_title: string; task_detail: string}
@@ -35,26 +35,6 @@ export function parseSopResult(v: unknown): SopResult {
 }
 export const sopPath = (id: string) => `/api/projects/${encodeURIComponent(id)}/node-assignments/start-sop`;
 export async function fetchSop(id: string, current: () => boolean) {return parseSopPreview(await assignmentRequest(sopPath(id), {cache: 'no-store'}, current))}
-export const SOP_STEPS = [
- ['確認單建立','PM／行政','在來源 Lark 建立確認單'],
- ['啟動 SOP','PM 或主管','可在 Lark 或此處啟動；只建立節點，節點已存在即已啟動'],
- ['指派負責人','節點主管','在節點上指派或認領'],
- ['執行與回報','負責人','進度自動來自案件資料；需指派具體工作時再建立任務'],
- ['送審','主管','全部任務完成後完成節點'],
- ['核准','節點主管或副總以上','核准；退回會回到進行中'],
-] as const;
-// `already_started` means node rows exist, made by Lark's own button or by this app, so seeds may still be pending.
-export function currentSopStep(data: NodeAssignmentList, preview?: SopPreview): number {
- const nodes = data.nodes;
- const status = (n: typeof nodes[number]) => nodeStatusLabel(n.derived_status);
- if (nodes.length && nodes.every(n => ['已完成','略過'].includes(status(n)))) return 6;
- if (nodes.some(n => status(n) === '待審核')) return 5;
- if (nodes.some(n => Object.hasOwn(PRODUCTION, n.key) && ['進行中','已完成','略過'].includes(status(n)))) return 4;
- if (preview?.already_started && nodes.some(n => !n.owners.length)) return 3;
- if (preview?.eligible && !preview.already_started) return 2;
- if (!(preview ? preview.code : data.code) || nodes.slice(0, 3).some(n => !['已完成','略過'].includes(status(n)))) return 1;
- return 4;
-}
 export const SOP_ERRORS: Record<string, string> = {
  forbidden: '僅案件 PM、主管或節點主管可以啟動',
  preview_stale: '計畫已變更，請重新讀取預覽後確認。',
@@ -86,7 +66,6 @@ export function sopResultMessage(result: SopResult, preview: SopPreview, seed = 
 }
 
 export const SEED_ACTION_LABEL = '另外建立計畫任務（選用）';
-export const SEED_EXPLANATION = '進度會自動來自案件資料，只有需要指派具體工作時才建立任務。';
 // Starting only creates the missing node rows, as Lark's own button does; a case Lark already started has nothing left to start.
 export function sopActionLabel(preview: Pick<SopPreview, 'already_started'>) {return preview.already_started ? null : '啟動 SOP'}
 export const canSeedTasks = (preview: SopPreview) => !preview.already_started && preview.seeds_pending > 0;
