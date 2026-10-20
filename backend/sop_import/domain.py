@@ -45,6 +45,6 @@ class Failure(Exception):
         super().__init__(code)
 
 
-def require(condition, code, status=422):
+def require(condition, code, status=422, **context):
     if not condition:
-        raise Failure(code, status)
+        raise Failure(code, status, **context)

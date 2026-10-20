@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, OperationalError
 from starlette.concurrency import run_in_threadpool
 
+from ..production_access import hr_view_allowed
 from .domain import Failure, require
 from .service import Context, Service, authorize
 
@@ -87,6 +88,10 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
     @app.post(PREFIX + '/sop-import/apply')
     async def apply(request: Request, project_id: str):
         return await mutation(request, project_id, service.apply)
+
+    @app.get(PREFIX + '/sop-assignees')
+    def assignees(request: Request, project_id: str):
+        return respond(lambda: service.assignees(context(request, project_id), lambda user: hr_view_allowed(user, cfg)))
 
     @app.get(PREFIX + '/sop-import/runs/{request_id}')
     def receipt(request: Request, project_id: str, request_id: str):

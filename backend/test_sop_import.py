@@ -30,10 +30,11 @@ def h(tmp_path, monkeypatch):
 
     Base.metadata.create_all(engine)
     sessions = sessionmaker(engine, expire_on_commit=False)
-    users = {'pm': {'id': 'pm', 'role': 'pm', 'active': True, 'capabilities': CAPS[:]},
-             'other': {'id': 'other', 'role': 'pm', 'active': True, 'capabilities': CAPS[:]},
-             'member': {'id': 'member', 'role': 'member', 'active': True, 'capabilities': ['sop_task_work', 'sop_task_read']},
-             'manager': {'id': 'manager', 'role': 'manager', 'active': True, 'capabilities': []}}
+    users = {'pm': {'id': 'pm', 'name': '林育寬', 'role': 'pm', 'active': True, 'capabilities': CAPS[:]},
+             'other': {'id': 'other', 'name': '吳柏頤', 'role': 'pm', 'active': True, 'capabilities': CAPS[:]},
+             'member': {'id': 'member', 'name': '陳柏翰', 'role': 'member', 'active': True,
+                        'capabilities': ['sop_task_work', 'sop_task_read']},
+             'manager': {'id': 'manager', 'name': '張智偉', 'role': 'manager', 'active': True, 'capabilities': []}}
     with sessions.begin() as db:
         for wid in ('w', 'other-w'):
             db.add(WorkspaceRow(id=wid, version=1, data={}))

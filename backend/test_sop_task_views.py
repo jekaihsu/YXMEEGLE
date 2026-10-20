@@ -61,3 +61,25 @@ def test_edit_and_transition_return_the_updated_task(h):
     assert (started['task']['state'], started['task']['revision'], started['task']['allowed_actions'], started['checklist_revision']) == (
         'in_progress', 3, ['block', 'archive', 'set_applicability', 'edit'], before + 2)
     assert started['task'] == by_row(h, 19)
+
+
+def test_assignable_people_follow_the_participant_rule_and_people_visibility(h):
+    response = h.client.get(URL + '/sop-assignees')
+    assert response.status_code == 200, response.text
+    assert response.json() == {'project_id': 'p1', 'restricted': False, 'people': [
+        {'id': 'pm', 'name': '林育寬', 'case_roles': ['pm']}, {'id': 'member', 'name': '陳柏翰', 'case_roles': ['collaborator']}]}
+    h.users['manager']['capabilities'] = ['sop_task_work']
+    assert [p['id'] for p in h.client.get(URL + '/sop-assignees').json()['people']] == ['pm', 'member', 'manager']
+    assert manual(h, {'executor': 'manager'})['participants'] == {'executor': 'manager'}
+    failed = post(h, URL + '/sop-tasks', {'title': 'x', 'node_keys': ['pm'], 'participants': {'checker': 'other'}}, 422)
+    assert failed == {'code': 'participant_unresolved', 'detail': 'participant_unresolved', 'role': 'checker'}
+    h.cfg['HR_VIEWERS'] = 'pm'
+    h.who[0] = 'member'
+    assert h.client.get(URL + '/sop-assignees').json() == {'project_id': 'p1', 'restricted': True, 'people': [
+        {'id': 'member', 'name': '陳柏翰', 'case_roles': ['collaborator']}]}
+    h.who[0] = 'pm'
+    assert h.client.get(URL + '/sop-assignees').json()['restricted'] is False
+    h.users['member']['active'] = False
+    assert [p['id'] for p in h.client.get(URL + '/sop-assignees').json()['people']] == ['pm', 'manager']
+    h.hidden.add('p1')
+    assert h.client.get(URL + '/sop-assignees').status_code == 404

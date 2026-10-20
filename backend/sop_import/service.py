@@ -68,6 +68,21 @@ LOCAL_SELECTION = frozenset({'template_version_id', 'node_keys', 'row_keys', 'pa
                              'applicability_decisions', 'exclusion_reasons'})
 
 
+CASE_ROLES = ('pm', 'admin', 'supervisor', 'delegate', 'collaborator', 'manager')
+
+
+def case_roles(person, project):
+    """The roles that make an active person assignable to this case's tasks, in display order."""
+    if not person.get('active', True):
+        return []
+    ident = person['id']
+    held = {'pm': ident == project.get('pm_id'), 'admin': ident == project.get('admin_id'),
+            'supervisor': ident == project.get('supervisor_id'),
+            'delegate': ident in project.get('sop_task_delegate_ids', []),
+            'collaborator': ident in project.get('collaborator_ids', []), 'manager': person.get('role') == 'manager'}
+    return [role for role in CASE_ROLES if held[role]]
+
+
 def row_keys(value):
     require(isinstance(value, list) and len(value) <= 62 and all(isinstance(k, str) for k in value), 'invalid_request')
     require(len(value) == len(set(value)), 'invalid_request')
@@ -185,22 +200,27 @@ class Service:
         return list(db.scalars(select(LocalTask).where(LocalTask.workspace_id == ctx.wid,
                                                       LocalTask.project_id == ctx.project['id'])))
 
-    def participants(self, ctx, bindings):
+    def participants(self, ctx, bindings, **context):
         fields(bindings, PARTICIPANT_ROLES)
         result = {}
         for role, ident in bindings.items():
             identifier(ident)
-            candidates = [u for u in ctx.state.get('users', []) if u['id'] == ident and u.get('active', True)
-                          and explicitly_granted(u, 'sop_task_work')]
-            require(len(candidates) == 1, 'participant_unresolved')
-            person = candidates[0]
-            permitted = (person.get('role') == 'manager' or ident in
-                         {ctx.project.get('pm_id'), ctx.project.get('admin_id'), ctx.project.get('supervisor_id')}
-                         or ident in ctx.project.get('sop_task_delegate_ids', [])
-                         or ident in ctx.project.get('collaborator_ids', []))
-            require(permitted, 'participant_unresolved')
+            candidates = [u for u in ctx.state.get('users', []) if u['id'] == ident and explicitly_granted(u, 'sop_task_work')]
+            require(len(candidates) == 1 and bool(case_roles(candidates[0], ctx.project)), 'participant_unresolved',
+                    role=role, **context)
             result[role] = ident
         return result
+
+    def assignees(self, ctx, people_visible):
+        authorize(ctx)
+        people = [(roles, u) for u in ctx.state.get('users', [])
+                  if explicitly_granted(u, 'sop_task_work') and (roles := case_roles(u, ctx.project))]
+        restricted = not (can_manage(ctx) or people_visible(ctx.user))
+        if restricted:
+            people = [(roles, u) for roles, u in people if u['id'] == ctx.user['id']]
+        people.sort(key=lambda p: (CASE_ROLES.index(p[0][0]), p[1].get('name') or '', p[1]['id']))
+        return {'project_id': ctx.project['id'], 'restricted': restricted,
+                'people': [{'id': u['id'], 'name': u.get('name'), 'case_roles': roles} for roles, u in people]}
 
     def normalize(self, ctx, body, rows):
         fields(body, {'template_version_id', 'node_keys', 'row_keys', 'participant_bindings',
@@ -227,7 +247,7 @@ class Service:
                 require(normalized_decisions.get(key, {}).get('value') == 'applicable', 'applicability_unresolved')
         bindings = body.get('participant_bindings', {})
         fields(bindings, selected)
-        bindings = {key: self.participants(ctx, value) for key, value in bindings.items()}
+        bindings = {key: self.participants(ctx, value, source_row_key=key) for key, value in bindings.items()}
         exclusions = body.get('exclusion_reasons', {})
         fields(exclusions, eligible.keys() - set(selected))
         exclusions = {key: text(value, 1000, empty=False) for key, value in exclusions.items()}

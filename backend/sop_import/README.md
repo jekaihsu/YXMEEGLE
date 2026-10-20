@@ -87,6 +87,8 @@ Display fields return values and codes. Preview outcomes contain `reason_code` a
 
 For an explicit participant binding, add `participant_bindings` keyed by source row key, with `executor`, `checker`, or `confirmer` user IDs. A binding requires one active user with `sop_task_work` and case participation. It never selects the importer or node owner automatically.
 
+`GET /api/projects/{id}/sop-assignees` lists exactly the people a binding accepts: `{"project_id":"…","restricted":false,"people":[{"id":"u-pm","name":"林育寬","case_roles":["pm"]}]}`. `case_roles` holds every case role that makes the person eligible, ordered `pm`, `admin`, `supervisor`, `delegate`, `collaborator`, `manager`. It needs a local checklist read grant and case visibility. A viewer who is neither a case manager nor admitted by `HR_VIEWERS` gets only their own entry with `restricted: true`. A rejected binding names the offending `role` and, during import, the `source_row_key`.
+
 Subcontract rows #7, #20, #49, #54, #55, and #56 start unselected. Selecting one requires an `applicability_decisions` entry with `value=applicable` and a reason. #18 and #22 start unresolved. Reference, review, routine, and disabled rows cannot be selected. No baseline row is configured mandatory. Optional deselection may include an `exclusion_reasons` map. #31 and #47 remain in related billing task snapshots.
 
 Create a manual task with `POST /api/projects/{id}/sop-tasks` and `{"title":"Review plans","node_keys":["pm"]}`. Imported and manual origins never merge by title. Patch local title, instructions, participants, or due date with `expected_revision`. Due dates are ISO dates and require a reason. Source snapshots are immutable.
