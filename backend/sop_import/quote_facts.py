@@ -125,7 +125,7 @@ def merged_label(labels):
     live = [x for x in labels if x and x != 'I']
     if live:
         return max(live, key=LIVE_ORDER.index)
-    return 'I' if 'I' in labels else ''
+    return 'I' if labels and all(label == 'I' for label in labels) else ''
 
 
 def collect(rows, *, today: date, v4_confirmation=False) -> QuoteFacts:

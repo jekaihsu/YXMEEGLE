@@ -117,3 +117,13 @@ def test_local_create_rechecks_identity_under_lock(local, capability):
     service.lock_workspace_row = revoke
     result = call(client, 'POST', '/api/quotes', {'draft_id': draft['draft_id'], 'request_id': 'revoke'}, 403)
     assert result['code'] == ('local_case_forbidden' if capability == 'create_local_case' else 'sop_import_forbidden')
+
+from datetime import date
+from .sop_import.quote_facts import collect
+from .sop_import.case_stage import stage
+
+
+def test_blank_status_row_prevents_merged_cancellation():
+    facts = collect([{'狀態 (1)': 'I'}, {'狀態 (1)': '', '報價日期': '2026-10-01'}], today=date(2026, 10, 20))
+    assert facts.stage_label != 'I'
+    assert stage(facts) == 'quoted'
