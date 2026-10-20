@@ -9,9 +9,10 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from ..models import WorkspaceRow, BusinessRow
+from ..sources import normalized_case
 from .catalog import digest, publish
 from .case_stage import stage, start_node
-from . import suggestions
+from . import quotes, suggestions
 from .domain import (Applicability, Lifecycle, Disposition, TRANSITIONS, NODE_MAP, SUBCONTRACT,
                      CONDITIONAL, PARTICIPANT_ROLES, Failure, require)
 from .models import Family, Version, TemplateRow, CaseState, LocalTask, TaskNodeLink, Preview, ImportRun, TaskEvent
@@ -437,6 +438,31 @@ class Service:
                                         'manage': can_manage(ctx) and self.writes_enabled(),
                                         'work': explicitly_granted(ctx.user, 'sop_task_work') and self.writes_enabled(),
                                         'decide_suggestions': can_manage(ctx) and self.writes_enabled()}}
+
+    def with_sop_counts(self, wid, items):
+        ids = sorted({pid for item in items for pid in item['project_ids']})
+        with self.sessions() as db:
+            tasks = list(db.scalars(select(LocalTask).where(LocalTask.workspace_id == wid,
+                                                          LocalTask.project_id.in_(ids)))) if ids else []
+        for item in items:
+            mine = [t for t in tasks if t.project_id in item['project_ids']]
+            item['sop_counts'] = self.counts(mine) if mine else None
+        return items
+
+    def quote_list(self, wid, state, amounts, *, stage='', q='', offset=0, limit=30):
+        require(not stage or stage in quotes.STAGES, 'invalid_request')
+        require(offset >= 0 and 1 <= limit <= 100 and len(q) <= 240, 'invalid_request')
+        items = [item for item in quotes.register(state, today=self.today(), amounts=amounts)
+                 if (not stage or item['stage'] == stage) and (not q or quotes.matches(item, q))]
+        return {'total': len(items), 'offset': offset, 'limit': limit, 'amount_restricted': not amounts,
+                'items': self.with_sop_counts(wid, items[offset:offset + limit])}
+
+    def quote_detail(self, wid, state, amounts, quote_no):
+        key = normalized_case(text(quote_no, 120, empty=False))
+        rows = quotes.groups(state).get(key)
+        require(bool(rows), 'quote_not_found', 404)
+        projects = {p['id']: p for p in state.get('projects', [])}
+        return self.with_sop_counts(wid, [quotes.entry(key, rows, projects, today=self.today(), amounts=amounts, detail=True)])[0]
 
     def manual(self, ctx, body):
         fields(body, {'title', 'instructions', 'node_keys', 'participants'})

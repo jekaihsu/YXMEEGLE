@@ -28,7 +28,8 @@ CAPS = ['sop_task_read', 'sop_task_import', 'sop_task_work', 'sop_task_read_sour
 QUOTE = {'報價編號': '115588', '工程名稱': '新昇案-33筆地號(鑽探)', '行號單位': '永達能源工程股份有限公司',
          '詢價日期': 1787068800000, '第一次聯繫日期': 1787068800000, '報價日期': 1786291200000,
          '提供給PM日期': 1786291200000, '報價期限': 1787500800000, '回傳單日期': 1789574400000,
-         '契約價格(未稅)': 24000, '工程編號': 'C115264', '狀態': '成案', '此案確認單': []}
+         '契約價格(未稅)': 24000, '工程編號': 'C115264', '狀態': '成案', '此案確認單': [],
+         '報價負責人': [{'id': 'ou_quote_owner', 'name': '吳柏頤'}], '案件負責人': [{'id': 'ou_case_pm', 'name': '林育寬'}]}
 
 
 def call(client, method, path, body=None, status=200):
@@ -84,6 +85,10 @@ def suggestions(client, pid, vid):
             'accept_suggestions': bulk}
 
 
+def register(client):
+    return {'quotes': call(client, 'GET', '/api/quotes?q=115588'), 'quote': call(client, 'GET', '/api/quotes/115588')}
+
+
 def main():
     with tempfile.TemporaryDirectory() as folder:
         config = {'DATABASE_URL': f'sqlite:///{folder}/examples.db', 'UPLOAD_DIR': f'{folder}/uploads',
@@ -94,7 +99,7 @@ def main():
             client.get('/api/session')
             call(client, 'POST', '/api/demo/session', {'user_id': 'u-pm'})
             pid, vid = setup(app)
-            captured = suggestions(client, pid, vid)
+            captured = {**suggestions(client, pid, vid), **register(client)}
         app.state.engine.dispose()
     examples = json.loads(OUT.read_text())
     examples.update(captured)

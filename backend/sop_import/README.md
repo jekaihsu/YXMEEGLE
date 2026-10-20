@@ -125,6 +125,28 @@ Both commands require case task management, the same authority as import, and th
 
 Repeating an accept whose hash already moved the task to its state replays the stored outcome without a new event, even with writes disabled. A dismissal appends a `suggestion_dismissed` event and hides that exact hash for good. Changed facts produce a new hash, and the suggestion returns. Repeating a dismissal replays. A dismissed hash can still be accepted explicitly.
 
+## Quote register
+
+`GET /api/quotes` lists one entry per 報價編號, newest number first. Query parameters are `stage` (one `stage` code), `q` (case-insensitive match on 報價編號, 工程名稱, or 行號單位, at most 240 characters), `offset`, and `limit` (1 to 100, default 30). `GET /api/quotes/{quote_no}` returns one entry plus `facts`, the merged quote facts, and `records`, the source row IDs and links. An unknown or hidden number returns `quote_not_found` (404).
+
+The register reads the cached `source_quotes` collection and the stored cases. It never reads Lark during a request. The same `filter_visible_cases` policy as the case list decides which rows and cases appear; no extra capability is needed. Rows deleted at the source and rows without a 報價編號 are left out. Rows sharing a 報價編號 merge, and `stage` uses the same predicate table as `sop-tasks`, with a V4 confirmation on any linked case counting.
+
+| Field | Source |
+| --- | --- |
+| `quote_no` | `報價編號` |
+| `engineering_no` | first `工程編號` or `編號` with a valid engineering letter, else the first code present |
+| `name`, `client` | `工程名稱`, `行號單位` (`業主` and `合約金額` are empty in the register) |
+| `quoted_on`, `quote_deadline` | latest `報價日期`, `報價期限` |
+| `contract_amount` | first `契約價格(未稅)`; null with `amount_restricted: true` unless the viewer passes the `/progress` amounts gate (normal access and PM, manager, or `manage_sources`) |
+| `quote_owners`, `pm_names` | display names in `報價負責人`, `案件負責人` |
+| `pm_id` | the linked case's PM |
+| `status`, `stage_label` | first `狀態` text, merged `狀態 (1)` letter |
+| `project_id`, `project_ids` | linked visible cases, formal first |
+| `source_rows`, `duplicated` | merged row count, whether one 報價編號 repeats |
+| `sop_counts` | local checklist counts summed over the linked cases, or null without tasks |
+
+The register stage is per 報價編號. The `sop-tasks` stage merges every 報價編號 of a case, so a formal case with several quotes can differ from one register entry. The case-level `sop-tasks` merge counts only sibling rows in the last admitted source snapshot.
+
 ## Completion and deferred work
 
 Imported completion rules remain unresolved until reviewed typed evidence obligations are available. Imported tasks reject `complete` with `completion_evidence_missing`; an accepted evidence suggestion is the only path to `done`. Unresolved applicability rejects completion first. Manual tasks have no typed obligations and can complete. No note or URL can manufacture an approval. This backend slice does not yet satisfy the full M1 user demonstration.

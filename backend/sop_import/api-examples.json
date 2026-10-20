@@ -829,7 +829,7 @@
     }
   },
   "sop_tasks_with_suggestions": {
-    "project_id": "e166bc5726784b8eb9f34608f78e87ac",
+    "project_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43",
     "task_source": "sop_local",
     "start_node": "pm",
     "stage": "numbered",
@@ -919,14 +919,14 @@
     },
     "tasks": [
       {
-        "id": "ad43282b-2958-4510-8386-ec14840df71f",
+        "id": "e2608dbe-3036-40f9-8ba2-4366c4719652",
         "task_source": "sop_local",
-        "project_id": "e166bc5726784b8eb9f34608f78e87ac",
+        "project_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43",
         "origin": {
           "template_family_id": "plumb-case-sop",
           "source_row_key": "meegle-v137:A:12",
           "instance_scope": "case",
-          "imported_version_id": "ba4edcf6-04e3-43ec-bffb-71eb7eeb3455"
+          "imported_version_id": "45f43bb7-efc8-4017-94a2-50104d81a07d"
         },
         "title": "報價單是否回傳",
         "instructions": "每日查回傳單日期；收到含回簽附件的信 → 寫回傳單日期、附件存 Drive → 自動判「是」；到期仍無 → 判「無」",
@@ -946,7 +946,7 @@
         "nodes": [
           {
             "node_key": "sales",
-            "node_id": "e166bc5726784b8eb9f34608f78e87ac-sales",
+            "node_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43-sales",
             "order": 12
           }
         ],
@@ -992,7 +992,7 @@
             }
           },
           "template": {
-            "version_id": "ba4edcf6-04e3-43ec-bffb-71eb7eeb3455",
+            "version_id": "45f43bb7-efc8-4017-94a2-50104d81a07d",
             "template_family_id": "plumb-case-sop",
             "revision": "plumb-v0.2-1",
             "mapping_revision": "yx-company-node-mapping-1",
@@ -1003,7 +1003,7 @@
         },
         "source_restriction": null,
         "suggestion": {
-          "task_id": "ad43282b-2958-4510-8386-ec14840df71f",
+          "task_id": "e2608dbe-3036-40f9-8ba2-4366c4719652",
           "rule_id": "quote-evidence:A:12",
           "rule_revision": 1,
           "tier": "proof",
@@ -1017,14 +1017,14 @@
         }
       },
       {
-        "id": "e2d94279-56ee-403e-af5b-cf26d7ad333e",
+        "id": "cf81ea07-ecf0-4a9f-9a1d-94ffc5f82838",
         "task_source": "sop_local",
-        "project_id": "e166bc5726784b8eb9f34608f78e87ac",
+        "project_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43",
         "origin": {
           "template_family_id": "plumb-case-sop",
           "source_row_key": "meegle-v137:A:15",
           "instance_scope": "case",
-          "imported_version_id": "ba4edcf6-04e3-43ec-bffb-71eb7eeb3455"
+          "imported_version_id": "45f43bb7-efc8-4017-94a2-50104d81a07d"
         },
         "title": "收到回傳單，合約成立",
         "instructions": "回簽附件存 Meegle 必填欄；寫契約價格(未稅／含稅)、付款條件、合約開始日期；狀態＝成案；通知 PM 派工段啟動",
@@ -1044,7 +1044,7 @@
         "nodes": [
           {
             "node_key": "sales",
-            "node_id": "e166bc5726784b8eb9f34608f78e87ac-sales",
+            "node_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43-sales",
             "order": 15
           }
         ],
@@ -1090,7 +1090,7 @@
             }
           },
           "template": {
-            "version_id": "ba4edcf6-04e3-43ec-bffb-71eb7eeb3455",
+            "version_id": "45f43bb7-efc8-4017-94a2-50104d81a07d",
             "template_family_id": "plumb-case-sop",
             "revision": "plumb-v0.2-1",
             "mapping_revision": "yx-company-node-mapping-1",
@@ -1101,7 +1101,7 @@
         },
         "source_restriction": null,
         "suggestion": {
-          "task_id": "e2d94279-56ee-403e-af5b-cf26d7ad333e",
+          "task_id": "cf81ea07-ecf0-4a9f-9a1d-94ffc5f82838",
           "rule_id": "quote-evidence:A:15",
           "rule_revision": 1,
           "tier": "indicator",
@@ -1122,7 +1122,7 @@
     }
   },
   "accept_suggestion": {
-    "task_id": "ad43282b-2958-4510-8386-ec14840df71f",
+    "task_id": "e2608dbe-3036-40f9-8ba2-4366c4719652",
     "revision": 2,
     "state": "done",
     "applicability": "applicable",
@@ -1139,10 +1139,10 @@
   "accept_suggestion_stale": {
     "code": "suggestion_stale",
     "detail": "suggestion_stale",
-    "task_id": "e2d94279-56ee-403e-af5b-cf26d7ad333e"
+    "task_id": "cf81ea07-ecf0-4a9f-9a1d-94ffc5f82838"
   },
   "dismiss_suggestion": {
-    "task_id": "b04bc99c-7179-4972-87d9-509ba8c339a8",
+    "task_id": "79c0ac36-fa94-4012-a587-0cbd326cb569",
     "revision": 1,
     "state": "pending",
     "applicability": "applicable",
@@ -1157,11 +1157,11 @@
     "dismissed": true
   },
   "accept_suggestions": {
-    "project_id": "e166bc5726784b8eb9f34608f78e87ac",
+    "project_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43",
     "checklist_revision": 3,
     "results": [
       {
-        "task_id": "e2d94279-56ee-403e-af5b-cf26d7ad333e",
+        "task_id": "cf81ea07-ecf0-4a9f-9a1d-94ffc5f82838",
         "revision": 2,
         "state": "done",
         "applicability": "applicable",
@@ -1175,5 +1175,125 @@
         }
       }
     ]
+  },
+  "quotes": {
+    "total": 1,
+    "offset": 0,
+    "limit": 30,
+    "amount_restricted": false,
+    "items": [
+      {
+        "origin": "source",
+        "quote_no": "115588",
+        "engineering_no": "C115264",
+        "name": "新昇案-33筆地號(鑽探)",
+        "client": "永達能源工程股份有限公司",
+        "quoted_on": "2026-08-10",
+        "quote_deadline": "2026-08-24",
+        "contract_amount": 24000.0,
+        "amount_restricted": false,
+        "quote_owners": [
+          "吳柏頤"
+        ],
+        "pm_names": [
+          "林育寬"
+        ],
+        "pm_id": "u-pm",
+        "status": "成案",
+        "stage_label": null,
+        "stage": "numbered",
+        "project_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43",
+        "project_ids": [
+          "fe9db58b5f1f43bd9d5c58eddaaa7b43"
+        ],
+        "source_rows": 1,
+        "duplicated": false,
+        "sop_counts": {
+          "done": 2,
+          "total": 12,
+          "unresolved": 1,
+          "not_applicable": 0,
+          "archived": 0
+        }
+      }
+    ]
+  },
+  "quote": {
+    "origin": "source",
+    "quote_no": "115588",
+    "engineering_no": "C115264",
+    "name": "新昇案-33筆地號(鑽探)",
+    "client": "永達能源工程股份有限公司",
+    "quoted_on": "2026-08-10",
+    "quote_deadline": "2026-08-24",
+    "contract_amount": 24000.0,
+    "amount_restricted": false,
+    "quote_owners": [
+      "吳柏頤"
+    ],
+    "pm_names": [
+      "林育寬"
+    ],
+    "pm_id": "u-pm",
+    "status": "成案",
+    "stage_label": null,
+    "stage": "numbered",
+    "project_id": "fe9db58b5f1f43bd9d5c58eddaaa7b43",
+    "project_ids": [
+      "fe9db58b5f1f43bd9d5c58eddaaa7b43"
+    ],
+    "source_rows": 1,
+    "duplicated": false,
+    "facts": {
+      "quote_nos": [
+        "115588"
+      ],
+      "source_rows": 1,
+      "duplicated": false,
+      "project_name": "新昇案-33筆地號(鑽探)",
+      "client": "永達能源工程股份有限公司",
+      "contact": "",
+      "inquiry_date": "2026-08-19",
+      "first_contact_date": "2026-08-19",
+      "quoted_date": "2026-08-10",
+      "pm_handoff_date": "2026-08-10",
+      "quote_deadline": "2026-08-24",
+      "deadline_passed": true,
+      "returned_date": "2026-09-17",
+      "engineering_no": "C115264",
+      "numbered": true,
+      "numbers_consistent": true,
+      "quote_status": "成案",
+      "stage_label": "",
+      "confirmation_link": false,
+      "confirmation_meeting_date": "",
+      "admin_return_date": "",
+      "v4_confirmation": false,
+      "post_win_contact_date": "",
+      "contract_end_date": "",
+      "price_positive": true,
+      "field_points": false,
+      "office_points": false,
+      "admin_points": false,
+      "field_team": "",
+      "field_deadline": "",
+      "meegle_daily": "",
+      "billable_date": "",
+      "received": false,
+      "received_date": ""
+    },
+    "records": [
+      {
+        "id": "quote-base/quote-table/recQuote115588",
+        "source_url": null
+      }
+    ],
+    "sop_counts": {
+      "done": 2,
+      "total": 12,
+      "unresolved": 1,
+      "not_applicable": 0,
+      "archived": 0
+    }
   }
 }

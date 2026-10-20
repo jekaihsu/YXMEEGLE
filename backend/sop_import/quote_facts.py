@@ -163,9 +163,14 @@ def case_rows(project, state):
         if live(row) and row.get('id') not in rows:
             rows[row.get('id')] = row.get('fields') or {}
     numbers = {normalized_case(f.get('報價編號')) for f in rows.values()} - {''}
-    for entity in (state or {}).get('source_quotes') or []:
+    state = state or {}
+    admitted = None if state.get('environment') in ('test', 'demo') else state.get('source_visible_record_ids')
+    admitted = None if admitted is None else set(admitted)
+    for entity in state.get('source_quotes') or []:
         identity = entity.get('source_identity') or {}
         if not live(entity) or normalized_case((entity.get('fields') or {}).get('報價編號')) not in numbers:
+            continue
+        if admitted is not None and '|'.join(str(identity.get(k, '')) for k in ('base_token', 'table_id', 'record_id')) not in admitted:
             continue
         key = source_id(identity) if all(identity.get(k) for k in ('base_token', 'table_id', 'record_id')) else entity.get('id')
         rows.setdefault(key, entity.get('fields') or {})

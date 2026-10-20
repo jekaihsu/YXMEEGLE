@@ -11,7 +11,7 @@ PREFIX = '/api/projects/{project_id}'
 MAX_BODY = 64 * 1024
 
 
-def register(app, *, identity, load_case, sessions, cfg):
+def register(app, *, identity, load_case, sessions, cfg, quote_view=None):
     service = Service(sessions, writes_enabled=lambda: str(cfg.get('SOP_TASK_WRITES_ENABLED', 'false')).lower() == 'true')
 
     def context(request, project_id):
@@ -108,5 +108,21 @@ def register(app, *, identity, load_case, sessions, cfg):
     @app.post(PREFIX + '/sop-tasks/{task_id}/suggestion')
     async def suggestion(request: Request, project_id: str, task_id: str):
         return await mutation(request, project_id, lambda ctx, body: service.decide_suggestion(ctx, task_id, body))
+
+    if quote_view is None:
+        return service
+
+    def quotes(request):
+        data, user = identity(request)
+        state, amounts = quote_view(data, user)
+        return data['wid'], state, amounts
+
+    @app.get('/api/quotes')
+    def quote_list(request: Request, stage: str = '', q: str = '', offset: int = 0, limit: int = 30):
+        return respond(lambda: service.quote_list(*quotes(request), stage=stage, q=q, offset=offset, limit=limit))
+
+    @app.get('/api/quotes/{quote_no}')
+    def quote_detail(request: Request, quote_no: str):
+        return respond(lambda: service.quote_detail(*quotes(request), quote_no))
 
     return service

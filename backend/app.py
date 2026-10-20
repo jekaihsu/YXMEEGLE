@@ -1496,9 +1496,15 @@ def create_app(overrides=None,*,dispatch_transport=None):
         project=next((p for p in state['projects'] if p['id']==project_id and visible_project(state,p)),None)
         require(project is not None,'找不到這個案件',404)
         return state,project
+    def quote_view(data,user):
+        """The quote register's cases and rows as the viewer may see them, and the /progress amounts gate."""
+        from .source_case_policy import filter_visible_cases
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=('projects','source_quotes'))
+        filter_visible_cases(state)
+        return state,data.get('access_mode','normal')=='normal' and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
     from .sop_import.routes import register as register_sop_import
     app.state.sop_import = register_sop_import(app, identity=identity, load_case=node_assignment_case,
-        sessions=sessions, cfg=cfg)
+        sessions=sessions, cfg=cfg, quote_view=quote_view)
     from .node_assignment.routes import register as register_node_assignment
     from .node_skip import valid_waiver
     def node_reports():

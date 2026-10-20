@@ -99,3 +99,12 @@ def test_quote_projection_fetches_evidence_and_keeps_money_and_points_server_sid
         '回傳單日期': 1790208000000, '狀態 (1)': 'B.外業執行中', '外業確認單營業額': 1.5, '契約價格(含稅)': 105000}}]})
     assert public['records'][0]['fields'] == {'回傳單日期': 1790208000000, '狀態 (1)': 'B.外業執行中'}
     assert {'契約價格(含稅)', '行政確認單營業額'} <= SERVER_ONLY_FIELDS
+
+
+def test_sibling_rows_outside_the_admitted_source_snapshot_are_not_evidence():
+    project = {'id': 'p1', 'quotes': [quote('recA', 回傳單日期='2026-09-17', 工程編號='C115243')], 'source_records': []}
+    state = {'environment': 'production', 'source_quotes': [entity('recB', 確認單回傳開會日期='2026-09-20')],
+             'source_visible_record_ids': []}
+    assert stage(case_facts(project, state, TODAY)).value == 'numbered'
+    state['source_visible_record_ids'] = ['base|quotes|recB']
+    assert stage(case_facts(project, state, TODAY)).value == 'confirmation'
