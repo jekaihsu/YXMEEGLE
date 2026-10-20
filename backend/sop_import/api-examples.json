@@ -3318,5 +3318,72 @@
         "is_default": true
       }
     ]
+  },
+  "quote_without_case": {
+    "origin": "source",
+    "quote_no": "115702",
+    "local_reference": null,
+    "engineering_no": null,
+    "name": "未納入案件",
+    "client": null,
+    "quoted_on": null,
+    "quote_deadline": null,
+    "contract_amount": null,
+    "amount_restricted": false,
+    "quote_owners": [],
+    "pm_names": [],
+    "pm_id": null,
+    "status": null,
+    "stage_label": null,
+    "stage": "inquiry",
+    "project_id": null,
+    "project_ids": [],
+    "source_rows": 1,
+    "duplicated": false,
+    "facts": {
+      "quote_nos": [
+        "115702"
+      ],
+      "source_rows": 1,
+      "duplicated": false,
+      "project_name": "未納入案件",
+      "client": "",
+      "contact": "",
+      "inquiry_date": "",
+      "first_contact_date": "",
+      "quoted_date": "",
+      "pm_handoff_date": "",
+      "quote_deadline": "",
+      "deadline_passed": false,
+      "returned_date": "",
+      "engineering_no": "",
+      "numbered": false,
+      "numbers_consistent": true,
+      "quote_status": "",
+      "stage_label": "",
+      "confirmation_link": false,
+      "confirmation_meeting_date": "",
+      "admin_return_date": "",
+      "v4_confirmation": false,
+      "post_win_contact_date": "",
+      "contract_end_date": "",
+      "price_positive": false,
+      "field_points": false,
+      "office_points": false,
+      "admin_points": false,
+      "field_team": "",
+      "field_deadline": "",
+      "meegle_daily": "",
+      "billable_date": "",
+      "received": false,
+      "received_date": ""
+    },
+    "records": [
+      {
+        "id": "quote-base/quote-table/recOrphan115702",
+        "source_url": null
+      }
+    ],
+    "sop_counts": null
   }
 }

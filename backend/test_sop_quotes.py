@@ -148,3 +148,66 @@ def test_detail_carries_merged_facts_records_and_sop_counts(quotes_http):
     assert {k: detail['facts'][k] for k in ('quote_nos', 'source_rows', 'duplicated', 'returned_date', 'price_positive')} == {
         'quote_nos': ['115600'], 'source_rows': 2, 'duplicated': True, 'returned_date': '2026-10-15', 'price_positive': False}
     assert get(client, f"{url}/sop-tasks")['stage'] == 'returned'
+
+
+def test_quote_pipeline_covers_duplicates_placeholders_and_blank_shells():
+    from .sources import import_sources, source_id
+    from .source_case_policy import apply_source_reference_policy, filter_visible_cases
+    from .sop_import.quotes import register
+
+    records = [
+        {'kind': 'quote', 'base_token': 'b', 'table_id': 'quotes', 'record_id': rid, 'fields': fields}
+        for rid, fields in [
+            ('recA', {'報價編號': '115701', '工程名稱': 'Intake'}),
+            ('recB', {'報價編號': '115701', '工程編號': '報編115701'}),
+            ('recC', {'報價編號': '115702', '此案確認單': [{'record_id': 'recMissing'}]}),
+            ('recBlank', {}),
+            ('recFormal', {'報價編號': '115703', '此案確認單': [{'record_id': 'recConfirmation'}]}),
+        ]
+    ] + [{'kind': 'confirmation', 'base_token': 'b', 'table_id': 'confirmations',
+          'record_id': 'recConfirmation', 'fields': {'工程確認單編號': 'C115703'}}]
+    state = seed(True)
+    state['environment'] = 'production'
+    import_sources(state, records)
+    apply_source_reference_policy(state, {'records': records}, {'id': 'scratch', 'name': 'Scratch'})
+    before = {source_id(p['source_identity']): p['id'] for p in state['projects']}
+    import_sources(state, records)
+    assert before == {source_id(p['source_identity']): p['id'] for p in state['projects']}
+    assert len(state['projects']) == 5
+    blank = next(p for p in state['projects'] if p['source_identity']['record_id'] == 'recBlank')
+    assert blank['case_type'] == 'intake'
+    filter_visible_cases(state)
+    entries = {q['quote_no']: q for q in register(state, today='2026-10-20', amounts=True)}
+    assert set(entries) == {'115701', '115702', '115703'}
+    assert len(entries['115701']['project_ids']) == 2
+    assert entries['115702']['project_id'] == before[source_id(records[2])]
+    assert all(q['project_id'] for q in entries.values())
+    projects = {p['id']: p for p in state['projects']}
+    assert projects[entries['115702']['project_id']]['intake_status'] == 'unresolved_confirmation'
+    assert projects[entries['115703']['project_id']]['case_type'] == 'formal'
+
+
+def test_orphan_quote_is_withheld_even_when_its_source_identity_is_admitted(quotes_http):
+    app, client, signin, ids = quotes_http
+    with app.state.sessions.begin() as db:
+        row = db.get(WorkspaceRow, WID)
+        state = storage.load(db, BusinessRow, row)
+        state['source_visible_record_ids'].append('qbase|qtable|recUnadmitted')
+        row.data = storage.save(db, BusinessRow, WID, state)
+    assert get(client, '/api/quotes/115700', 404)['code'] == 'quote_not_found'
+    assert get(client, '/api/quotes?q=115700')['total'] == 0
+
+
+def test_demo_orphan_quote_has_no_case_or_tasks(tmp_path):
+    app = create_app({'DATABASE_URL': f'sqlite:///{tmp_path}/demo.db', 'UPLOAD_DIR': str(tmp_path / 'files'),
+                      'DEMO_MODE': 'true', 'APP_ENV': 'development', 'SESSION_SECRET': 'demo-quotes' * 4})
+    with TestClient(app) as client:
+        client.get('/api/session')
+        with app.state.sessions.begin() as db:
+            row = db.scalar(select(WorkspaceRow))
+            state = storage.load(db, BusinessRow, row)
+            state['source_quotes'] = [quote_row('recOrphan', '115700', 工程名稱='未納入案件')]
+            row.data = storage.save(db, BusinessRow, row.id, state)
+        orphan = get(client, '/api/quotes/115700')
+        assert (orphan['project_id'], orphan['project_ids'], orphan['sop_counts']) == (None, [], None)
+    app.state.engine.dispose()

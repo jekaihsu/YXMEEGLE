@@ -22,3 +22,54 @@ test('ambiguous creation recovers and retries the exact request with explicit un
 test('number conflict stays inline and creation without SOP sends no import selection',async()=>{let body;await sheet(async(url,init)=>{body=JSON.parse(init.body);return reply({code:'quote_number_taken'},409)},{canImport:false});assert.equal(document.querySelectorAll('input[type=radio]').length,1);await type(document.querySelector('input[required]'),'新案件');await type(document.querySelector('input[aria-label="報價編號"]'),'115600');await click(button('預覽'));assert.equal(body.import_tasks,false);assert.equal('node_keys' in body,false);assert.equal(document.querySelector('input[aria-invalid=true]').getAttribute('aria-describedby'),'quote-number-error');assert.equal(document.getElementById('quote-number-error').textContent,'報價編號已使用')});
 test('create entry is absent without both flag and capability',async()=>{globalThis.fetch=async()=>reply({total:0,items:[]});const c={s:{user:{capabilities:['create_local_case']}},w:{users:[]},route:{view:'quotes'},go(){}};root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});assert.equal(button('建立報價'),undefined);await act(async()=>{root.render(React.createElement(m.Quotes,{c:{...c,s:{features:{local_case_creation:true},user:{capabilities:[]}}}}));await tick()});assert.equal(button('建立報價'),undefined);await act(async()=>{root.render(React.createElement(m.Quotes,{c:{...c,s:{features:{local_case_creation:true},user:{capabilities:['create_local_case']}}}}));await tick()});assert.ok(button('建立報價'))});
 test('register reads all API pages before sorting, paginates and resets the page after search',async()=>{const offsets=[];const rows=Array.from({length:101},(_,i)=>({...x.quotes.items[0],quote_no:String(115000+i),name:`案件${i}`,contract_amount:i}));globalThis.fetch=async url=>{const offset=Number(new URL(url,'http://localhost').searchParams.get('offset'));offsets.push(offset);return reply({total:rows.length,items:rows.slice(offset,offset+100)})};root=createRoot(document.getElementById('root'));const c={s:{user:{}},w:{users:[]},route:{view:'quotes'},go(){}};await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});assert.deepEqual(offsets,[0,100]);assert.equal(document.querySelectorAll('tbody tr').length,25);assert.match(document.querySelector('tbody tr').textContent,/115100/);await click(button('下一頁'));assert.match(document.querySelector('tbody tr').textContent,/115075/);await type(document.querySelector('[aria-label="搜尋報價"]'),'案件100');assert.equal(document.querySelectorAll('tbody tr').length,1);assert.match(document.querySelector('tbody tr').textContent,/115100/);assert.equal(button('上一頁').disabled,true)});
+
+async function registerDetail(quote,allowed=true) {
+ const calls=[];let imported=false;
+ globalThis.fetch=async url=>{calls.push(url);if(url.endsWith('/sop-import/preview'))return reply(x.preview);if(url.endsWith('/sop-import/apply')){imported=true;return reply(x.apply)}if(url.includes('/sop-assignees'))return reply(x.sop_assignees);if(url.includes('/sop-tasks'))return reply({...x.sop_tasks,allowed_actions:{...x.sop_tasks.allowed_actions,import:allowed}});if(url==='/api/sop-templates')return reply(x.templates);if(url.startsWith('/api/quotes?'))return reply({total:1,items:[quote]});if(url===`/api/quotes/${quote.quote_no}`)return reply({...quote,sop_counts:imported?{done:0,total:1}:quote.sop_counts,facts:{},records:[]});throw Error(url)};
+ root=createRoot(document.getElementById('root'));
+ const destinations=[];
+ const c={s:{workspace_id:`quote-${quote.quote_no}-${allowed}`,features:{sop_task_writes:true},user:{capabilities:['sop_task_import']}},w:{users:[]},route:{view:'quotes'},go:route=>destinations.push(route)};
+ await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});
+ await click(button(quote.quote_no));
+ return {calls,destinations};
+}
+test('source quote starts SOP at 報價 with all nodes and opens its canonical case',async()=>{
+ const quote={...x.quotes.items[0],quote_no:'115701',sop_counts:null};
+ const {destinations}=await registerDetail(quote);
+ await click(button('開始 SOP'));
+ const sheet=[...document.querySelectorAll('[role=dialog]')].at(-1);
+ assert.match(sheet.textContent,/從 報價 開始/);
+ assert.equal(sheet.querySelectorAll('.sop-nodes [aria-pressed=true]').length,9);
+ await click([...sheet.querySelectorAll('button')].find(b=>b.textContent==='取消'));
+ await click(button('開啟流程'));
+ assert.deepEqual(destinations,[{view:'project',project:quote.project_id,tab:'flow'}]);
+});
+test('no-case quote has plain admission label and makes no case or import request',async()=>{
+ const {calls}=await registerDetail(x.quote_without_case);
+ assert.match(document.querySelector('tbody tr').textContent,/未納入案件/);
+ assert.match(document.querySelector('[role=dialog]').textContent,/未納入案件/);
+ assert.equal(Boolean(button('開始 SOP')),false);
+ assert.equal(button('開啟流程'),undefined);
+ assert.equal(calls.some(url=>url.includes('/api/projects/')),false);
+});
+test('start action follows server import authority',async()=>{
+ await registerDetail({...x.quotes.items[0],quote_no:'115703',sop_counts:null},false);
+ assert.equal(Boolean(button('開始 SOP')),false);
+ assert.ok(button('開啟流程'));
+});
+test('quote with imported tasks offers open without a second start action',async()=>{
+ await registerDetail({...x.quotes.items[0],quote_no:'115704'});
+ assert.ok(button('開啟流程'));
+ assert.equal(Boolean(button('開始 SOP')),false);
+});
+
+test('completed import refreshes the open detail and removes the start action',async()=>{
+ await registerDetail({...x.quotes.items[0],quote_no:'115705',sop_counts:null});
+ await click(button('開始 SOP'));
+ await click(button('下一步'));
+ await click(button('下一步'));
+ await click(button('確認匯入'));
+ await click(button('關閉'));
+ assert.equal(Boolean(button('開始 SOP')),false);
+ assert.match(document.querySelector('[role=dialog]').textContent,/0\/1/);
+});

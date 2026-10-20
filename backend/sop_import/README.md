@@ -153,6 +153,20 @@ The register reads the cached `source_quotes` collection and the stored cases. I
 
 The register stage is per 報價編號. The `sop-tasks` stage merges every 報價編號 of a case, so a formal case with several quotes can differ from one register entry. The case-level `sop-tasks` merge counts only sibling rows in the last admitted source snapshot.
 
+## Source quote case coverage
+
+The source importer creates an intake case for each quote record without one resolved confirmation. An unresolved confirmation or several confirmations also creates an intake with a review reason. A quote with one resolved confirmation belongs to the formal case. Existing source identity owns the case on replay; the quote number is a register grouping key, not a new case identity. A previously confirmed quote that loses its link retains its existing owner and history.
+
+Duplicate quote numbers can therefore have several intake cases. The register reports all visible owners in `project_ids` and chooses the first formal case, then the first intake by ID, for `project_id`. A blank quote number still gets an intake from the importer but has no register entry. `報編` in an engineering field does not prevent intake creation. Neither a matching name nor a matching local planning quote number attaches a local case to Lark.
+
+The current source sync imports all authorized snapshot records and applies `apply_source_reference_policy`. In production, `filter_visible_cases` requires an admitted source identity and at least one visible related case, with no hidden related case. Unadmitted rows, orphan quotes, and rows related to hidden cases are withheld, so their detail returns `quote_not_found`. The register also omits blank numbers and source-missing rows. Demo and test environments can expose an unmapped quote. Its API detail has `project_id: null`, `project_ids: []`, and `sop_counts: null`; `api-examples.json` includes `quote_without_case`.
+
+The register row and detail display `未納入案件` when `project_id` is absent. They offer no start or open action. For a mapped quote without imported tasks, detail reads the case's `sop-tasks` response and shows `開始 SOP` only when `allowed_actions.import` is true. This includes `SOP_TASK_WRITES_ENABLED`, the explicit `sop_task_import` grant, case management authority, and visibility checks. Start uses the existing preview/apply transaction and idempotency receipt, with all nine nodes selected from `sales`. `開啟流程` navigates to the canonical case. Existing tasks suppress the start action. Applying an import refreshes the open quote detail and the register counts.
+
+The 2026-10-20 export replay used 423 raw quote rows and no confirmation snapshot. The CLI export's native link `id` values were adapted to REST `record_id` values before import. All 423 records became intake cases, 407 awaiting confirmation and 16 with unresolved confirmations. The 374 nonblank quote rows merged into 333 real groups, including 41 duplicate pairs. All 333 register entries and all 333 detail responses had a case. There were zero real groups without a case. Repeating the import preserved every canonical ID. The 49 blank-number records are outside the register. Six rows across four real quote groups have `報編` engineering placeholders; all four groups have cases. This proves quote-only intake coverage in the scratch pipeline, not the number or type of cases in a live production workspace. Resolving native confirmation snapshots can promote or link cases through the same pipeline.
+
+No case-creation endpoint was added because every real group in the replay already has an owner. The UI fix exposes the existing authorized import flow for source quotes and labels the unmapped demo state. The export and scratch evidence remain local under `output/sop-quotes-ui/round3/` and are not committed.
+
 ## Local planning quotes
 
 A local planning quote is a case created in this app only. Nothing is written to the 報價總表: the Base runs automations this app cannot read, 報價編號 is typed by hand with no uniqueness check, and the source boundary has no outbound writes.

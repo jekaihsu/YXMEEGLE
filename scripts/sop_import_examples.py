@@ -61,6 +61,12 @@ def setup(app):
                                    'source_identity': {k: record[k] for k in ('base_token', 'table_id', 'record_id')},
                                    'source_missing': False, 'project_id': case['id'], 'project_ids': [case['id']],
                                    'code': '115588', 'fields': deepcopy(QUOTE), 'readonly': True}]
+        state['source_quotes'].append({'id': 'quote-base/quote-table/recOrphan115702', 'source_kind': 'quote',
+                                       'source_identity': {'base_token': 'quote-base', 'table_id': 'quote-table',
+                                                           'record_id': 'recOrphan115702'},
+                                       'source_missing': False, 'project_id': None, 'project_ids': [],
+                                       'code': '115702', 'fields': {'報價編號': '115702', '工程名稱': '未納入案件'},
+                                       'readonly': True})
         workspace.data = storage.save(db, BusinessRow, workspace.id, state)
         workspace.version += 1
         version = stage(db, workspace.id, 'plumb-v0.2-1', load_catalog(), source_verified=True)
@@ -139,7 +145,8 @@ def task_commands(client, pid, vid):
 
 
 def register(client):
-    return {'quotes': call(client, 'GET', '/api/quotes?q=115588'), 'quote': call(client, 'GET', '/api/quotes/115588')}
+    return {'quotes': call(client, 'GET', '/api/quotes?q=115588'), 'quote': call(client, 'GET', '/api/quotes/115588'),
+            'quote_without_case': call(client, 'GET', '/api/quotes/115702')}
 
 
 def local_case(client):
