@@ -30,6 +30,7 @@ class Version(Base):
     content_hash = Column(String(64), nullable=False)
     source_hash = Column(String(64), nullable=False)
     source_verified = Column(Boolean, nullable=False, default=False)
+    catalog_manifest = Column(JSON, nullable=False)
     status = Column(String(20), nullable=False)
     published_by = Column(String(120))
     published_at = Column(Float)

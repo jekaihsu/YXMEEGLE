@@ -72,7 +72,8 @@ def stage(db, wid, revision, catalog, *, source_verified=False):
         return existing
     version = Version(workspace_id=wid, id=str(uuid4()), family_id=family_id, revision=revision,
                       mapping_revision=catalog['proposed_mapping_revision'], content_hash=content_hash,
-                      source_hash=catalog['source_files'][0]['sha256'], source_verified=source_verified, status='draft')
+                      source_hash=catalog['source_files'][0]['sha256'], source_verified=source_verified,
+                      catalog_manifest={k: v for k, v in catalog.items() if k != 'case_sop_rows'}, status='draft')
     db.add(version)
     db.flush()
     for ordinal, row in enumerate(catalog['case_sop_rows']):
@@ -89,7 +90,7 @@ def publish(db, version, actor_id, at):
         return version
     rows = list(db.scalars(select(TemplateRow).where(TemplateRow.workspace_id == version.workspace_id,
                                                    TemplateRow.version_id == version.id).order_by(TemplateRow.ordinal)))
-    catalog = load_catalog()
+    catalog = dict(version.catalog_manifest)
     catalog['case_sop_rows'] = [r.snapshot for r in rows]
     catalog['proposed_mapping_revision'] = version.mapping_revision
     version.content_hash = validate(catalog)

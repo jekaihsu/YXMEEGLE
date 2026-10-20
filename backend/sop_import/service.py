@@ -238,9 +238,22 @@ class Service:
                              'applicability': old.applicability.value if old else app,
                              'links_to_add': missing,
                              'reason': normalized['exclusion_reasons'].get(row.source_row_key, proposal['reason'])})
-        unresolved = [{'source_row_key': o['source_row_key'], 'fields':
-                       (['applicability'] if o['applicability'] == 'unresolved' else []) + ['participants', 'dates']}
-                      for o in outcomes if o['selected'] and not o['existing_task_id']]
+        unresolved = []
+        tasks_by_id = {t.id: t for t in existing.values()}
+        for outcome in outcomes:
+            if not outcome['selected']:
+                continue
+            old = tasks_by_id.get(outcome['existing_task_id'])
+            people = old.participants if old else normalized['participant_bindings'].get(outcome['source_row_key'], {})
+            missing = []
+            if outcome['applicability'] == 'unresolved':
+                missing.append('applicability')
+            if not PARTICIPANT_ROLES <= people.keys():
+                missing.append('participants')
+            if not old or not old.local.get('due_date'):
+                missing.append('dates')
+            if missing:
+                unresolved.append({'source_row_key': outcome['source_row_key'], 'fields': missing})
         context = {'identity_revision': state.identity_revision, 'checklist_revision': state.checklist_revision,
                    'nodes': nodes, 'template': self.version_json(version), 'input': normalized, 'outcomes': outcomes}
         return {**context, 'context_hash': digest(context), 'outcomes': outcomes, 'unresolved_items': unresolved,

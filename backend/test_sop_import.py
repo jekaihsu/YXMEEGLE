@@ -362,3 +362,51 @@ def test_capabilities_are_registered_without_automatic_manager_grants():
     from .policy import CAPABILITIES, MANAGER_CAPABILITIES
     assert set(CAPS) <= set(CAPABILITIES)
     assert not set(CAPS) & set(MANAGER_CAPABILITIES)
+
+
+def test_real_app_registration_restart_and_storage_save_preserve_checklist(tmp_path):
+    from .app import create_app
+    from . import storage
+    config = {'DATABASE_URL': f'sqlite:///{tmp_path}/real.db', 'UPLOAD_DIR': str(tmp_path/'uploads'),
+              'SESSION_SECRET': 'test-secret'*5, 'APP_ENV': 'development', 'DEMO_MODE': 'true',
+              'SOP_TASK_WRITES_ENABLED': 'true'}
+    app = create_app(config)
+    with TestClient(app) as client:
+        client.get('/api/session')
+        assert client.post('/api/demo/session', json={'user_id': 'u-manager'}).status_code == 200
+        assert client.get(URL + '/sop-tasks').status_code == 403
+        with app.state.sessions.begin() as db:
+            workspace = db.scalar(select(WorkspaceRow))
+            wid = workspace.id
+            user = db.get(BusinessRow, (wid, 'users', 'u-manager'))
+            user.data = {**user.data, 'capabilities': user.data.get('capabilities', []) + CAPS}
+            version = stage(db, wid, 'r1', load_catalog(), source_verified=True)
+            publish(db, version, 'u-manager', 100)
+            vid = version.id
+        plan = client.post(URL + '/sop-import/preview', json={'template_version_id': vid, 'node_keys': ['confirmation']})
+        assert plan.status_code == 200, plan.text
+        result = client.post(URL + '/sop-import/apply', json={'preview_id': plan.json()['preview_id'], 'request_id': 'real'})
+        assert result.status_code == 200, result.text
+        ids = result.json()['created_task_ids']
+        assert len(ids) == 5
+        with app.state.sessions.begin() as db:
+            workspace = db.get(WorkspaceRow, wid)
+            state = storage.load(db, BusinessRow, workspace)
+            state['projects'][0]['name'] = 'Source renamed'
+            workspace.data = storage.save(db, BusinessRow, wid, state)
+        assert {t['id'] for t in client.get(URL + '/sop-tasks').json()['tasks']} == set(ids)
+    app.state.engine.dispose()
+    restarted = create_app(config)
+    with TestClient(restarted) as after_restart:
+        after_restart.cookies.update(client.cookies)
+        response = after_restart.get(URL + '/sop-tasks')
+        assert response.status_code == 200, response.text
+        assert {t['id'] for t in response.json()['tasks']} == set(ids)
+    restarted.state.engine.dispose()
+
+
+@pytest.mark.parametrize('raw', [b'[]', b'null', b'1', b'"x"', b'true', b'{bad', b'', b'\xff', b'{"x":' * 2000])
+def test_invalid_body_never_mutates(h, raw):
+    result = h.client.post(URL + '/sop-import/preview', content=raw, headers={'Content-Type': 'application/json'})
+    assert result.status_code == 422
+    assert overview(h)['tasks'] == []

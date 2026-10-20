@@ -1,0 +1,498 @@
+{
+  "preview": {
+    "preview_id": "a3cdf794-e3df-48ec-9b3f-465839c97559",
+    "expires_at": 1900,
+    "project_id": "p1",
+    "identity_revision": 0,
+    "checklist_revision": 0,
+    "nodes": [
+      {
+        "node_key": "confirmation",
+        "node_id": "real-p1-2"
+      }
+    ],
+    "template": {
+      "version_id": "9da4af37-2d3e-45e3-8721-27a26cedaa77",
+      "template_family_id": "plumb-case-sop",
+      "revision": "r1",
+      "mapping_revision": "yx-company-node-mapping-1",
+      "content_hash": "2096ea7a152deb61e02fa038bf6c954a60dbce64ec54f613fa4931565bc20008"
+    },
+    "outcomes": [
+      {
+        "source_row_key": "meegle-v137:A:19",
+        "title": "確認單製作並將確認單傳遞至各單位",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+      },
+      {
+        "source_row_key": "meegle-v137:A:59",
+        "title": "外業確認單確認",
+        "disposition": "task",
+        "selected": true,
+        "outcome": "new",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [
+          {
+            "task_id": null,
+            "node_key": "confirmation",
+            "node_id": "real-p1-2"
+          }
+        ],
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+      },
+      {
+        "source_row_key": "meegle-v137:A:60",
+        "title": "內業確認單確認",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+      },
+      {
+        "source_row_key": "meegle-v137:A:61",
+        "title": "執行公務單確認(行政)",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+      },
+      {
+        "source_row_key": "meegle-v137:A:22",
+        "title": "確認單修正",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "unresolved",
+        "links_to_add": [],
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+      },
+      {
+        "source_row_key": "meegle-v137:A:27",
+        "title": "節點檢討與紀錄",
+        "disposition": "routine_excluded",
+        "selected": false,
+        "outcome": "routine_excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason": "Workbook classifies this outside a single case. Do not instantiate per case."
+      },
+      {
+        "source_row_key": "meegle-v137:A:57",
+        "title": "節點檢討與紀錄（計價段）",
+        "disposition": "routine_excluded",
+        "selected": false,
+        "outcome": "routine_excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason": "Workbook classifies this outside a single case. Do not instantiate per case."
+      },
+      {
+        "source_row_key": "meegle-v137:A:28",
+        "title": "考評與結算計算",
+        "disposition": "disabled_excluded",
+        "selected": false,
+        "outcome": "disabled_excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason": "Workbook explicitly marks disabled. Keep in the catalog; do not instantiate."
+      },
+      {
+        "source_row_key": "meegle-v137:A:58",
+        "title": "考評與結算計算（計價段）",
+        "disposition": "disabled_excluded",
+        "selected": false,
+        "outcome": "disabled_excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason": "Workbook explicitly marks disabled. Keep in the catalog; do not instantiate."
+      }
+    ],
+    "context_hash": "6ca5cb50326ba77c67b17d14f58d5f2fc7fb967dce718343ce0d36a399b360c8",
+    "unresolved_items": [
+      {
+        "source_row_key": "meegle-v137:A:59",
+        "fields": [
+          "participants",
+          "dates"
+        ]
+      }
+    ],
+    "unresolved_counts": {
+      "applicability": 0,
+      "participants": 1,
+      "dates": 1
+    },
+    "counts": {
+      "new_tasks": 1,
+      "existing_tasks": 0,
+      "added_links": 1
+    },
+    "selection": {
+      "template_version_id": "9da4af37-2d3e-45e3-8721-27a26cedaa77",
+      "node_keys": [
+        "confirmation"
+      ],
+      "row_keys": [
+        "meegle-v137:A:59"
+      ],
+      "participant_bindings": {},
+      "applicability_decisions": {},
+      "exclusion_reasons": {}
+    }
+  },
+  "apply": {
+    "run_id": "dd474825-8e05-4805-bdc6-39ac0a05a8f4",
+    "request_id": "r1",
+    "project_id": "p1",
+    "template_version_id": "9da4af37-2d3e-45e3-8721-27a26cedaa77",
+    "replayed": false,
+    "created_task_ids": [
+      "0d4ff962-b925-4aef-86db-780b3acaa68e"
+    ],
+    "existing_task_ids": [],
+    "added_links": [
+      {
+        "task_id": "0d4ff962-b925-4aef-86db-780b3acaa68e",
+        "node_key": "confirmation",
+        "node_id": "real-p1-2"
+      }
+    ],
+    "exclusions": [
+      {
+        "source_row_key": "meegle-v137:A:19",
+        "title": "確認單製作並將確認單傳遞至各單位",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+      },
+      {
+        "source_row_key": "meegle-v137:A:60",
+        "title": "內業確認單確認",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+      },
+      {
+        "source_row_key": "meegle-v137:A:61",
+        "title": "執行公務單確認(行政)",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+      },
+      {
+        "source_row_key": "meegle-v137:A:22",
+        "title": "確認單修正",
+        "disposition": "task",
+        "selected": false,
+        "outcome": "excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "unresolved",
+        "links_to_add": [],
+        "reason": "Import one case-specific task; preserve source text. Trigger text is not executed."
+      },
+      {
+        "source_row_key": "meegle-v137:A:27",
+        "title": "節點檢討與紀錄",
+        "disposition": "routine_excluded",
+        "selected": false,
+        "outcome": "routine_excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason": "Workbook classifies this outside a single case. Do not instantiate per case."
+      },
+      {
+        "source_row_key": "meegle-v137:A:57",
+        "title": "節點檢討與紀錄（計價段）",
+        "disposition": "routine_excluded",
+        "selected": false,
+        "outcome": "routine_excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason": "Workbook classifies this outside a single case. Do not instantiate per case."
+      },
+      {
+        "source_row_key": "meegle-v137:A:28",
+        "title": "考評與結算計算",
+        "disposition": "disabled_excluded",
+        "selected": false,
+        "outcome": "disabled_excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason": "Workbook explicitly marks disabled. Keep in the catalog; do not instantiate."
+      },
+      {
+        "source_row_key": "meegle-v137:A:58",
+        "title": "考評與結算計算（計價段）",
+        "disposition": "disabled_excluded",
+        "selected": false,
+        "outcome": "disabled_excluded",
+        "existing_task_id": null,
+        "existing_state": null,
+        "existing_revision": null,
+        "applicability": "applicable",
+        "links_to_add": [],
+        "reason": "Workbook explicitly marks disabled. Keep in the catalog; do not instantiate."
+      }
+    ],
+    "unresolved_items": [
+      {
+        "source_row_key": "meegle-v137:A:59",
+        "fields": [
+          "participants",
+          "dates"
+        ]
+      }
+    ],
+    "unresolved_counts": {
+      "applicability": 0,
+      "participants": 1,
+      "dates": 1
+    },
+    "checklist_revision": 1
+  },
+  "sop_tasks": {
+    "project_id": "p1",
+    "task_source": "sop_local",
+    "checklist_revision": 1,
+    "identity_revision": 0,
+    "scope": {
+      "node_key": "confirmation"
+    },
+    "counts": {
+      "done": 0,
+      "total": 1,
+      "unresolved": 0,
+      "not_applicable": 0,
+      "archived": 0
+    },
+    "case_counts": {
+      "done": 0,
+      "total": 1,
+      "unresolved": 0,
+      "not_applicable": 0,
+      "archived": 0
+    },
+    "node_counts": {
+      "sales": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "pm": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "confirmation": {
+        "done": 0,
+        "total": 1,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "field": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "control": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "mapping": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "report": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "pricing": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      },
+      "settlement": {
+        "done": 0,
+        "total": 0,
+        "unresolved": 0,
+        "not_applicable": 0,
+        "archived": 0
+      }
+    },
+    "tasks": [
+      {
+        "id": "0d4ff962-b925-4aef-86db-780b3acaa68e",
+        "task_source": "sop_local",
+        "project_id": "p1",
+        "origin": {
+          "template_family_id": "plumb-case-sop",
+          "source_row_key": "meegle-v137:A:59",
+          "instance_scope": "case",
+          "imported_version_id": "9da4af37-2d3e-45e3-8721-27a26cedaa77"
+        },
+        "title": "外業確認單確認",
+        "instructions": "推卡片給外業經理：確認／有異議（異議 → #22）；同時觸發派工迴圈 B2 建立工作總表",
+        "participants": {},
+        "applicability": "applicable",
+        "state": "pending",
+        "revision": 1,
+        "local": {
+          "due_date": null,
+          "timezone": "Asia/Taipei",
+          "date_status": "unresolved",
+          "applicability_decision": null,
+          "completion_rule_status": "unresolved",
+          "attestations": {}
+        },
+        "overdue": false,
+        "nodes": [
+          {
+            "node_key": "confirmation",
+            "node_id": "real-p1-2",
+            "order": 21
+          }
+        ],
+        "source_snapshot": {
+          "row": {
+            "source_locator": "Plumb-playbook-v0.2.xlsx / A 案件SOP 62節點!A23:U23",
+            "source_sheet_row": 23,
+            "source_row_key": "meegle-v137:A:59",
+            "raw": {
+              "source_group": "3 確認單",
+              "source_order": 2,
+              "meegle_id": 59,
+              "title": "外業確認單確認",
+              "source_kind": "confirm",
+              "owner_role_raw": "外業經理",
+              "trigger_raw": "#19 完成",
+              "anchor_raw": "確認單發出日",
+              "deadline_raw": "TODO（SOP 無）",
+              "inputs_raw": "工程確認單（外業段：工天、人數、儀器、里程、住宿）",
+              "procedure_raw": "推卡片給外業經理：確認／有異議（異議 → #22）；同時觸發派工迴圈 B2 建立工作總表",
+              "human_decision_raw": "是",
+              "outputs_raw": "確認紀錄",
+              "done_when_raw": "確認",
+              "next_raw": "#21 → #24（異議 → #22）",
+              "escalation_raw": null,
+              "kpi_raw": null,
+              "source_reference_raw": "Meegle#59；SOP圖2",
+              "applicability_raw": null,
+              "unresolved_raw": "確認期限",
+              "version_note_raw": null
+            },
+            "proposed_import": {
+              "disposition": "task",
+              "candidate_node_keys": [
+                "N03"
+              ],
+              "instance_scope": "case",
+              "reason": "Import one case-specific task; preserve source text. Trigger text is not executed.",
+              "is_business_approval": false,
+              "target_branch_node_keys": [
+                "confirmation"
+              ]
+            }
+          },
+          "template": {
+            "version_id": "9da4af37-2d3e-45e3-8721-27a26cedaa77",
+            "template_family_id": "plumb-case-sop",
+            "revision": "r1",
+            "mapping_revision": "yx-company-node-mapping-1",
+            "content_hash": "2096ea7a152deb61e02fa038bf6c954a60dbce64ec54f613fa4931565bc20008"
+          },
+          "content_hash": "a22e5d6f3c66e962463714f0c070c4dd61e976fe40956f4dbf6379011d2589c9",
+          "related_references": []
+        },
+        "source_restriction": null
+      }
+    ],
+    "allowed_actions": {
+      "import": true,
+      "manage": true,
+      "work": true
+    }
+  }
+}

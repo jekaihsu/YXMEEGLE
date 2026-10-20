@@ -129,7 +129,7 @@ def staging():
              'scripts/run_service.py', 'scripts/run_worker.py', 'scripts/backup_schedule.py', 'scripts/backup_offsite.py', 'deployment/source-tables.json',
              'frontend/package.json', 'frontend/package-lock.json', 'frontend/index.html',
              'frontend/tsconfig.json', 'frontend/vite.config.ts']
-    exact.append('backend/sop_source_contracts.json')
+    exact += ['backend/sop_source_contracts.json', 'backend/sop_import/catalog.json']
     exact += ['scripts/backup_publish.py','scripts/backup_reconcile.py',
               'scripts/backup_offsite_acceptance.py','backend/requirements.lock']
     files = [ROOT / x for x in exact]
@@ -138,6 +138,7 @@ def staging():
     # ops_sync is imported by app.py when FEATURE_LARK_AUTHORITATIVE_OPS is on; its test-only helpers (testing*.py) stay out.
     files += [p for p in (ROOT/'backend'/'ops_sync').rglob('*.py') if not p.name.startswith('test')]
     files += [p for p in (ROOT/'backend'/'lark_pilot').rglob('*.py') if not p.name.startswith('test')]
+    files += [p for p in (ROOT/'backend'/'sop_import').rglob('*.py') if not p.name.startswith('test')]
     files += [p for p in (ROOT/'backend'/'node_assignment').rglob('*.py') if not p.name.startswith('test')]
     files += [p for p in (ROOT/'backend'/'dispatch_board').rglob('*.py') if not p.name.startswith('test')]
     files += [p for p in (ROOT/'backend'/'dispatch_publish').rglob('*.py') if not p.name.startswith('test')]

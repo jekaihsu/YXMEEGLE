@@ -61,3 +61,17 @@ def test_publication_requires_verified_source_and_is_immutable(tmp_path):
     with pytest.raises(Failure, match='immutable_template_version'):
         with sessions.begin() as db:
             db.get(Version, ('w', ident)).revision = 'edited'
+
+
+def test_publication_hash_uses_persisted_manifest(tmp_path):
+    engine = create_engine(f'sqlite:///{tmp_path}/manifest.db')
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(engine)
+    catalog = deepcopy(load_catalog())
+    catalog['notes'].append('Reviewed by the template maintainer')
+    with sessions.begin() as db:
+        v = stage(db, 'w', 'r1', catalog, source_verified=True)
+        publish(db, v, 'publisher', 100)
+        assert v.content_hash == digest(catalog)
+    with sessions.begin() as db:
+        assert stage(db, 'w', 'r1', catalog).content_hash == digest(catalog)
