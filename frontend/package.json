@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "test:admin-concurrency": "node test-admin-concurrency.mjs",
     "test:dispatch-board": "node test-dispatch-board.mjs",
     "test:start-sop": "node test-start-sop.mjs",
     "test:plan-panel": "node test-plan-panel.mjs",
