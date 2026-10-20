@@ -6,11 +6,10 @@ import {ProjectExecutionNotice, executionAllowed, executionReason} from './Proje
 import {projectQuotes} from './sourceQuotes';
 import {SourceContractIndex} from './ProjectReadiness';
 import {useEffect, useState, useRef, type FormEvent} from 'react';
-import {ArrowRight, ArrowUpRight, CalendarDays, Check, ChevronLeft, ChevronRight, CircleCheck, Clock3, Download, ExternalLink, FileCheck2, FilePlus2, GitBranch, Link2, Network, Pause, Play, Plus, Send, ShieldCheck, SlidersHorizontal, TriangleAlert, Upload, Users, X} from 'lucide-react';
+import {ArrowRight, ArrowUpRight, CalendarDays, Check, ChevronLeft, CircleCheck, Clock3, Download, ExternalLink, FileCheck2, FilePlus2, GitBranch, Link2, Network, Pause, Play, Plus, Send, ShieldCheck, SlidersHorizontal, TriangleAlert, Upload, Users} from 'lucide-react';
 import {useViewData} from './viewData';
 import {api, ApiError, getSessionEpoch, perfMark} from './api';
 import {ProjectOperations, ActionForm, Field as OpsField} from './Operations';
-import {useDialogFocus} from './useDialogFocus';
 import {MentionComposer, MentionText, MentionDelivery} from './MentionComposer';
 import {Avatar} from './AppShell';
 import {NativeApprovalControls, FinancialApprovalRequests} from './NativeApprovalControls';

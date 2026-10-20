@@ -6,7 +6,7 @@ import type {AssignmentMutation,NodeAssignmentDetail,NodeAssignmentError} from '
 import {filterFlowTasks,overdueTask,type FlowNode} from './flowModel';
 import {FlowAction,TaskPersonPicker} from './FlowActions';
 import {AssignmentTaskInspector} from './AssignmentTaskInspector';
-export function FlowTasks({c,p,nodes,selected,details,all,onScope,busy,reason,error,mutate,loading,incomplete}:{c:Ctx;p:Project;nodes:FlowNode[];selected:string;details:Record<string,NodeAssignmentDetail>;all:boolean;onScope:(all:boolean)=>void;busy:boolean;reason:string;error:NodeAssignmentError|null;mutate:(m:AssignmentMutation)=>Promise<boolean>;loading:boolean;incomplete:boolean}){
+export function FlowTasks({c,p,title,nodes,selected,details,all,onScope,busy,reason,error,mutate,loading,incomplete}:{c:Ctx;p:Project;title:string;nodes:FlowNode[];selected:string;details:Record<string,NodeAssignmentDetail>;all:boolean;onScope:(all:boolean)=>void;busy:boolean;reason:string;error:NodeAssignmentError|null;mutate:(m:AssignmentMutation)=>Promise<boolean>;loading:boolean;incomplete:boolean}){
  const [filters,setFilters]=useState({mine:false,unassigned:false,overdue:false});
  const [assigning,setAssigning]=useState('');
  const rows=nodes.flatMap(n=>n.taskRows);
@@ -15,7 +15,7 @@ export function FlowTasks({c,p,nodes,selected,details,all,onScope,busy,reason,er
  const localTask=sopTask || p.nodes.some(n=>n.tasks.some(t=>t.id===c.route.task));
  const selectedRow=sopTask ? undefined : rows.find(r=>r.id===c.route.task && r.task);
  return <section id="flow-tasks" className="pf-tasks" aria-label="流程任務列表" tabIndex={-1}>
-  <header><h3>任務</h3><div className="pf-actions" aria-label="任務範圍">{[false,true].map(value=><Button key={String(value)} aria-pressed={all===value} onClick={()=>onScope(value)}>{value ? '全部任務' : '此節點'}</Button>)}</div></header>
+  <header><h3>{title}</h3><div className="pf-actions" aria-label="任務範圍">{[false,true].map(value=><Button key={String(value)} aria-pressed={all===value} onClick={()=>onScope(value)}>{value ? '全部任務' : '此節點'}</Button>)}</div></header>
   <div className="pf-filters" aria-label="任務篩選">{([['mine','我的'],['unassigned','未指派'],['overdue','逾期']] as const).map(([key,label])=><Button key={key} aria-pressed={filters[key]} onClick={()=>setFilters(f=>({...f,[key]:!f[key]}))}>{label}</Button>)}<span role="status">{`${filtered.length} 項`}</span></div>
   {incomplete && <p role="status">任務來源暫不可用</p>}
   {loading && <div aria-label="任務載入中" aria-busy="true"><Skeleton lines={3} height="3.5rem"/></div>}

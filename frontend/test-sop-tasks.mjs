@@ -158,8 +158,8 @@ test('the section lists the node tasks with executor, state, due and badges', as
  const section = document.querySelector('#sop-tasks');
  assert.equal(section.querySelector('h3').firstChild.textContent, 'SOP 任務');
  assert.deepEqual([...section.querySelectorAll('.pf-task-open strong')].map(s => s.textContent), ['業主提出報價需求', '共用檢核']);
- assert.equal(section.querySelector('[data-sop-task=t1] span').textContent, '未指派 · 待處理 · 期限待確認未啟用');
- assert.equal(section.querySelector('[data-sop-task=shared] span').textContent, '林組員 · 待處理 · 期限待確認未啟用共用條件');
+ assert.equal(section.querySelector('[data-sop-task=t1] .pf-task-open>span').textContent, '未指派 · 待處理 · 期限待確認未啟用');
+ assert.equal(section.querySelector('[data-sop-task=shared] .pf-task-open>span').textContent, '林組員 · 待處理 · 期限待確認未啟用共用條件');
  assert.equal(section.querySelector('.sop-progress').textContent, '0/1');
  await click(button('全案'));
  assert.equal(section.querySelector('[data-sop-task=shared] small').textContent, '報價、PM 派工');
