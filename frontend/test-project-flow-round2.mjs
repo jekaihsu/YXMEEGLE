@@ -99,11 +99,11 @@ await check('round2 manager resolved from loaded users and absent source disting
  await mount({node:'control',configure(base){base.workspace.users[0].department='控制'}});
  const manager=()=>[...document.querySelectorAll('.pf-facts>div')].find(d=>d.querySelector('dt').textContent==='組別主管').querySelector('dd').textContent;
  assert.equal(manager(),'林安娜');
- await mount({node:'control',configure(base,f){f.list.nodes.find(n=>n.key==='control').departments=[]}});assert.equal(manager(),'來源未提供負責組別，未能對應到本組主管');
+ await mount({node:'control',configure(base,f){f.list.nodes.find(n=>n.key==='control').departments=[]}});assert.equal(manager(),'主管未設定');assert.doesNotMatch(document.querySelector('.pf-facts').textContent,/來源未提供負責組別，未能對應到本組主管/);
 });
 await check('round2 background and file shortcut restored collapsed',async()=>{
  await mount({node:'control',configure(base){Object.assign(base.project.nodes[4],{description:'節點背景說明',collaborator_ids:['ou_anna'],started_at:'2026-10-10'})}});
- const background=secondary('節點說明與背景');assert.equal(background?.open,false);assert.match(background.textContent,/節點背景說明/);assert.match(background.textContent,/林安娜/);assert.match(background.textContent,/經過.*4.*天/);assert.match(background.textContent,/開啟 作業資料與成果/);
+ const background=secondary('節點資訊');assert.equal(background?.open,false);assert.doesNotMatch(background.textContent,/節點背景說明/);assert.match(background.textContent,/林安娜/);assert.match(background.textContent,/經過.*4.*天/);assert.match(background.textContent,/開啟 作業資料與成果/);
 });
 await check('round2 assignment readback wins over an in-flight stale detail and avoids refetch',async()=>{
  await mount({node:'control',detailHold:true});await click(button('指派'));await value(document.querySelector('select[aria-label="任務負責人"]'),'ou_anna');
