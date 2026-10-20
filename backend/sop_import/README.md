@@ -169,7 +169,7 @@ The case is `case_type=intake` with `planning_origin=local`, `case_visibility=lo
 
 Only the creator, the selected PM, collaborators, and managers see the case: in `GET /api/quotes` as an `origin: local` entry, in `GET /api/quotes/{local_reference}`, and through the `sop-tasks` routes. `visible_project`, `filter_visible_cases`, and the index visibility clause leave it out of every official view, including the case list, case detail, workspace payload, company dashboard, and manager overview, in every environment, so it never enters engineering or finance totals. Operational execution is refused for it in every environment. Source refresh never matches it to a Lark row.
 
-`quote_publish.py` is a prepared, disabled adapter for a later step that would publish a local quote to the 報價總表. Nothing calls it. See that module for the exact field mapping and its guards.
+`quote_publish.py` is a prepared, disabled adapter for a later step that would publish a local quote to the 報價總表. No route, job, or command calls it. It would write `報價編號`, `工程名稱`, `行號單位`, `備註`, `案件負責人`, and `詢價日期` (the local creation day) and never the lifecycle evidence fields, links, money, or Lark-computed fields. It refuses to run unless `QUOTE_PUBLISH_ENABLED=true`, the actor is an active manager holding `publish_local_quote`, the case has an official 報價編號 the register does not hold, and a client is injected. It builds no Lark client of its own.
 
 ## Completion and deferred work
 
