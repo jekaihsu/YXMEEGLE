@@ -143,8 +143,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 for dataset in ('roster','attendance','sources'):
                     app.state.live_read.ensure(wid,dataset,wait=False)
                 app.state.people_attendance.view(wid)
+            app.state.sop_projection.start()
             yield
         finally:
+            app.state.sop_projection.close()
             app.state.people_attendance.close()
             app.state.live_read.close()
 
@@ -1531,6 +1533,12 @@ def create_app(overrides=None,*,dispatch_transport=None):
     from .sop_import.routes import register as register_sop_import
     app.state.sop_import = register_sop_import(app, identity=identity, load_case=sop_case,
         sessions=sessions, cfg=cfg, quote_view=quote_view, workspace=quote_workspace, persist_case=persist_local_case)
+    from .sop_import.lark_projection import Projection
+    def sop_projection_state(wid):
+        with sessions() as db:
+            return load(db, db.get(WorkspaceRow, wid), collections=('projects','users','source_quotes'))
+    app.state.sop_projection = Projection(sessions, cfg, sop_projection_state)
+    app.state.sop_import.projection = app.state.sop_projection
     from .node_assignment.routes import register as register_node_assignment
     from .node_skip import valid_waiver
     def node_reports():
