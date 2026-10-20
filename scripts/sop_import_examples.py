@@ -2,7 +2,9 @@
 
 Usage: python3 scripts/sop_import_examples.py
 The app runs on a temporary SQLite file with no Lark configuration. The original preview, apply and sop_tasks
-entries keep their recorded values; every other entry is replaced by this run. IDs and timestamps differ per run.
+entries keep their recorded values because frontend tests read them; amend() only adds the fields later slices
+introduced, computed by the same backend code. Every other entry is replaced by this run. IDs and timestamps differ
+per run.
 """
 import json
 import sys
@@ -21,6 +23,9 @@ from backend.app import create_app  # noqa: E402
 from backend.models import BusinessRow, WorkspaceRow  # noqa: E402
 from backend.seed import seed  # noqa: E402
 from backend.sop_import.catalog import load_catalog, publish, stage  # noqa: E402
+from backend.sop_import.domain import CONDITIONAL, NODE_MAP, Applicability, Lifecycle  # noqa: E402
+from backend.sop_import.models import LocalTask  # noqa: E402
+from backend.sop_import.service import Context, Service  # noqa: E402
 from backend.v4_sources import import_v4  # noqa: E402
 
 OUT = ROOT / 'backend' / 'sop_import' / 'api-examples.json'
@@ -85,6 +90,54 @@ def suggestions(client, pid, vid):
             'accept_suggestions': bulk}
 
 
+def amend(examples):
+    rows = {r['source_row_key']: r for r in load_catalog()['case_sop_rows']}
+    preview = examples['preview']
+    selected = preview['selection']['node_keys']
+
+    def outcomes(items):
+        for item in items:
+            item['node_keys'] = [k for k in NODE_MAP.values()
+                                 if k in selected and k in rows[item['source_row_key']]['proposed_import']['target_branch_node_keys']]
+        whole = set(selected) == set(NODE_MAP.values())
+        return [item for item in items if item['node_keys'] or whole]
+    preview['outcomes'] = outcomes(preview['outcomes'])
+    examples['apply']['exclusions'] = outcomes(examples['apply']['exclusions'])
+    if isinstance(preview['expires_at'], int):
+        preview['expires_at'] = 1792496832.94495
+    listing = examples['sop_tasks']
+    user = {'id': 'u-pm', 'role': 'pm', 'active': True, 'capabilities': CAPS}
+    ctx = Context('w', user, {}, {'id': listing['project_id'], 'case_type': 'intake', 'pm_id': 'u-pm'}, None)
+    service = Service(None, writes_enabled=lambda: True)
+    for task in listing['tasks']:
+        keys = {n['node_key'] for n in task['nodes']}
+        task['node_keys'] = [k for k in NODE_MAP.values() if k in keys]
+        task['instance_scope'] = task['origin']['instance_scope']
+        task['is_shared'] = task['instance_scope'] != 'case' or len(keys) > 1
+        task['is_conditional'] = rows[task['origin']['source_row_key']]['raw']['meegle_id'] in CONDITIONAL
+        state = LocalTask(state=Lifecycle(task['state']), applicability=Applicability(task['applicability']),
+                          participants=task['participants'], local=task['local'], previous_state=None)
+        task['allowed_actions'] = service.task_actions(ctx, state, task['suggestion'])
+
+
+def task_commands(client, pid, vid):
+    url = f'/api/projects/{pid}'
+    target = next(t for t in call(client, 'GET', url + '/sop-tasks')['tasks'] if t['origin']['source_row_key'] == 'meegle-v137:A:3')
+    edited = call(client, 'PATCH', f"{url}/sop-tasks/{target['id']}", {'expected_revision': target['revision'], 'title': '通知業主報價成立（本案）'})
+    started = call(client, 'POST', f"{url}/sop-tasks/{target['id']}/transition",
+                   {'expected_revision': edited['revision'], 'action': 'start'})
+    created = call(client, 'POST', url + '/sop-tasks', {'title': '確認圖資格式', 'node_keys': ['sales']})
+    preview = url + '/sop-import/preview'
+    return {'templates': call(client, 'GET', '/api/sop-templates'),
+            'sop_assignees': call(client, 'GET', url + '/sop-assignees'), 'task_edit': edited, 'task_transition': started,
+            'manual_task': created,
+            'preview_error_node_mapping_invalid': call(client, 'POST', preview, {'template_version_id': vid, 'node_keys': ['sales', 'N02']}, 422),
+            'preview_error_row_not_importable': call(client, 'POST', preview, {'template_version_id': vid, 'node_keys': ['sales'],
+                                                                                'row_keys': ['meegle-v137:A:19']}, 422),
+            'preview_error_applicability_unresolved': call(client, 'POST', preview, {'template_version_id': vid, 'node_keys': ['sales'],
+                                                                                      'row_keys': ['meegle-v137:A:7']}, 422)}
+
+
 def register(client):
     return {'quotes': call(client, 'GET', '/api/quotes?q=115588'), 'quote': call(client, 'GET', '/api/quotes/115588')}
 
@@ -111,9 +164,11 @@ def main():
             client.get('/api/session')
             call(client, 'POST', '/api/demo/session', {'user_id': 'u-pm'})
             pid, vid = setup(app)
-            captured = {**suggestions(client, pid, vid), **register(client), **local_case(client)}
+            captured = {**suggestions(client, pid, vid), **task_commands(client, pid, vid), **register(client),
+                        **local_case(client)}
         app.state.engine.dispose()
     examples = json.loads(OUT.read_text())
+    amend(examples)
     examples.update(captured)
     OUT.write_text(json.dumps(examples, ensure_ascii=False, indent=2) + '\n')
     print('\n'.join(sorted(captured)))
