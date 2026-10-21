@@ -106,6 +106,21 @@ python -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
 
 容器內前端位置為 `/app/frontend/dist`，由 FastAPI 提供。Dockerfile 中預設 APP_ENV=production、DEMO_MODE=false、UPLOAD_DIR=/data/uploads。不需要另外啟動 Vite 開發伺服器。
 
+### 啟用案件索引與單案讀取
+
+`WORKSPACE_SHELL_ENABLED` 與 `INDEX_TABLES_ENABLED` 預設關閉。只開旗標不會回填既有索引；索引缺少或版本落後時，系統會退回完整工作區讀取。部署包必須包含以下兩個 operator，使用容器既有的 `DATABASE_URL`，不把連線字串放進參數或日誌：
+
+```sh
+python scripts/migrate_index_tables.py
+python scripts/backfill_index.py --workspace <已核對的工作區識別> --batch 25
+```
+
+先在獨立 staging 的代表資料上驗證 migration 與 backfill。兩者可重跑；backfill 只改衍生索引，遇工作區版本持續變更時會停止，須查明並重跑。確認索引專案數、counter 的 `source_version` 與目前工作區版本相符，再以完整環境設定開啟兩個讀取旗標；保留登入、資料庫、權限及所有寫入旗標。
+
+切換設定後只安排一次部署，等待該次 deployment ID 完成、HTTP 健康檢查及 runtime 原始碼核對。不要把歷史 CRASHED pod 或最新 CANCELED build 當作目前執行版本，也不要在尚未釐清結果前連續 restart／upload。若切換期間背景同步更新了工作區，使用相同 backfill 命令補齊，然後由管理員核對 `/api/admin/index-health`、shell 回應的 `scope`、單案 API 及實際頁面。
+
+SOP 唯讀權限另由既有 `admin_person` 授權流程明確加入 `sop_task_read`；完整原始程序另需 `sop_task_read_source`。開啟讀取最佳化不代表授予 SOP 權限，也不需開啟 SOP 寫入。
+
 ## 4. Lark 實際設定及限制
 
 OAuth 使用瀏覽器綁定 state 與一次性 nonce；tenant 與 open_id 取自 Lark 使用者資訊。手動來源同步使用目前登入者 access token，不讀取本機 lark-cli 憑證。登入失效後需重新登入，目前未實作 user token refresh。
