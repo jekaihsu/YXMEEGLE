@@ -466,3 +466,30 @@ def test_progress_tab_and_node_evidence_agree(progress):
         assert [{k: v for k, v in i.items() if k != 'item_id'} for i in part['items']] == signal.public()['work_items'], key
         assert (signal.items_total, signal.items_truncated) == (part['items_total'], part['items_truncated'])
     assert found[NodeKey.CONTROL].items_all_done is True and found[NodeKey.FIELD].items_all_done is False
+
+@pytest.mark.parametrize('uid', ['u-manager', 'u-field'])
+def test_scoped_progress_matches_full_capture_without_other_project_trees(progress, monkeypatch, uid):
+    from . import storage
+    run, client, _ = progress
+    state, vis, _ = chain_state(daily=[daily()])
+    real = storage.load_partial
+    captures = []
+
+    def scoped(db, model, row, **kwargs):
+        result = real(db, model, row, **kwargs)
+        if kwargs.get('project_ids') is not None:
+            captures.append(result)
+        return result
+
+    monkeypatch.setattr(storage, 'load_partial', scoped)
+    response = run(state, vis, uid=uid)
+    assert response.status_code == 200
+    assert captures and all([p['id'] for p in capture['projects']] == [vis] for capture in captures)
+
+    def full(db, model, row, **kwargs):
+        return storage.load(db, model, row) if kwargs.get('project_ids') is not None else real(db, model, row, **kwargs)
+
+    monkeypatch.setattr(storage, 'load_partial', full)
+    legacy = client.get(f'/api/projects/{vis}/progress')
+    assert legacy.status_code == 200
+    assert response.json() == legacy.json()

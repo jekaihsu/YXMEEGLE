@@ -1067,11 +1067,12 @@ def create_app(overrides=None,*,dispatch_transport=None):
         data=(cache.data or {}) if cache else {}
         return (row.version if row else None,data.get('status'),data.get('last_attempt_at'),data.get('last_sync'),data.get('as_of'))
 
-    def p2_read(data,user,keep_lines=False):
+    def p2_read(data,user,keep_lines=False,*,project_id=None):
         """Health and module input come from ONE capture fenced by a generation read BEFORE the first input read
         (freshness, cache, workspace) and re-checked after the last. A capture is returned only after its fence
         passed; when the bounded retries are exhausted nothing from any rejected capture is returned: the input is an
-        empty state under a read_failed page state (rows/counts/ids/labels absent, never current)."""
+        empty state under a read_failed page state (rows/counts/ids/labels absent, never current).
+        Single-project progress retains shared policy/redaction facts but loads only that project's tree."""
         wid=data['wid']
         app.state.live_read.ensure(wid,'sources')
         for _ in range(3):
@@ -1079,7 +1080,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             freshness=app.state.live_read.status(wid)
             with sessions() as db:
                 cache=db.get(CacheRow,wid);cache_data=deepcopy(cache.data) if cache else None
-                state=load(db,db.get(WorkspaceRow,wid))
+                state=load(db,db.get(WorkspaceRow,wid),project_ids=[project_id] if project_id is not None else None)
             health=source_health_from(data,user,freshness,cache_data,deepcopy(state))
             with sessions() as db: unchanged=p2_generation(db,wid)==generation
             if unchanged: return data,user,health,p2_narrowed_state(state,user,health.get('page_state'),freshness,keep_lines)
@@ -1149,9 +1150,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
             card['drilldown']['filters']={k:v for k,v in card['drilldown']['filters'].items() if k not in P2_CASE_PARAMS}
         return result
 
-    def p2_visible_case_state(data,user,project_id,keep_lines=False):
+    def p2_visible_case_state(data,user,project_id,keep_lines=False,*,scoped=False):
         """The narrowed P2 state, or 404 (identical for absent and not visible) unless the case is visible to the viewer."""
-        _,_,_,state=p2_read(data,user,keep_lines)
+        _,_,_,state=p2_read(data,user,keep_lines,project_id=project_id if scoped else None)
         from .source_case_policy import visible_project
         require(any(p['id']==project_id and visible_project(state,p) for p in state.get('projects',[])),P2_NOT_FOUND,404)
         return state
@@ -1164,7 +1165,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         data,user=identity(request)
         require(len(project_id)<=200,'查詢參數過長',422)
         require(not request.query_params,'查詢參數錯誤',422)
-        state=p2_visible_case_state(data,user,project_id,keep_lines=True)
+        state=p2_visible_case_state(data,user,project_id,keep_lines=True,scoped=True)
         privileged=data.get('access_mode','normal')=='normal' and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
         if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true': reports=ReportsView(status='disabled')
         elif not privileged or data.get('mode')!='lark' or data['wid'].startswith(('test-','demo-')): reports=ReportsView(status='restricted')
