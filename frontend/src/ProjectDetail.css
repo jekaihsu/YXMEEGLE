@@ -77,7 +77,7 @@
 
 /* Page rhythm: header to tabs 24, tabs to content 24, notes sit flush with the content edge, sections 32 apart. */
 .workspace .project-detail>.ds-footer,.workspace .project-detail>.tab-scroll-hint{padding:0;margin:0 0 var(--space-4);font-size:var(--fs-footnote);color:var(--label-2)}
-.workspace .project-detail>:is(section,div):not(.project-topline,.project-title,.case-data-navigation)+:is(section,div){margin-top:var(--section-gap)}
+.workspace .project-detail>:is(section,div):not(.project-topline,.project-title,.case-data-navigation)+:is(section,div):not(.drawer-backdrop,.modal-backdrop,.ds-backdrop){margin-top:var(--section-gap)}
 .workspace .project-detail .ds-section{margin-bottom:var(--section-gap)}
 .workspace .project-detail .ds-section>h2{margin-bottom:var(--space-3)}
 }

@@ -29,3 +29,26 @@
 .reports-status-filters{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 12px}.reports-status-filters>button{border:1px solid var(--separator,#d7dde3);border-radius:22px;padding:5px 10px;min-height:44px;background:var(--surface,#fff);color:inherit}.reports-status-filters>button[aria-pressed=true]{outline:2px solid #3778bd;outline-offset:2px}.reports-reading{margin:12px 0}.reports-reading summary{cursor:pointer}.reports-reading p{line-height:1.8}.reports-field input{min-width:0;max-width:100%;padding:9px;border:1px solid var(--separator,#ccd3dc);border-radius:8px}.reports-no-work{display:block;font-weight:400;color:var(--label-secondary,#66717d);font-size:11px}.reports-progress-table tbody tr[tabindex]{cursor:pointer}.reports-progress-table tbody tr:focus-visible{outline:2px solid #3778bd;outline-offset:-2px}.reports-progress-table th:nth-child(1),.reports-progress-table td:nth-child(1){position:sticky;left:0;z-index:2;background:var(--surface,#fff);min-width:132px}.reports-progress-table th:nth-child(2),.reports-progress-table td:nth-child(2){position:sticky;left:132px;z-index:2;background:var(--surface,#fff);min-width:200px}.reports-progress-cards{display:none}
 .reports-case-drawer .ds-backdrop{align-items:stretch;justify-content:flex-end}.reports-case-drawer .ds-sheet{width:min(760px,100%);height:100dvh;max-height:100dvh;border-radius:18px 0 0 18px!important;padding:24px;box-sizing:border-box}.reports-case-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:24px 0}.reports-case-facts dt{font-size:12px;color:var(--label-secondary,#66717d)}.reports-case-facts dd{margin:4px 0 0;overflow-wrap:anywhere}.reports-detail-table{max-width:100%;overflow:auto;margin:12px 0 24px}.reports-detail-table table{width:100%;border-collapse:collapse;font-size:13px}.reports-detail-table td,.reports-detail-table th{text-align:left;padding:8px;border-bottom:1px solid var(--separator,#d7dde3);min-width:70px}.reports-source-secondary{font-size:13px;color:var(--label-secondary,#66717d)}
 @media(max-width:600px){.reports-progress-table{display:none}.reports-progress-cards{display:grid;gap:12px}.reports-progress-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;text-align:left;padding:16px;border:1px solid var(--separator,#d7dde3);border-radius:14px;background:var(--surface,#fff);color:inherit;width:100%;min-width:0}.reports-progress-card strong{grid-column:1/-1;overflow-wrap:anywhere}.reports-progress-card>.reports-case-status{grid-column:2;grid-row:1}.reports-progress-card:disabled{opacity:.75}.reports-case-drawer .ds-sheet{border-radius:0!important;padding:18px}.reports-filters>*{max-width:100%}.reports-field input{width:100%}.reports-case-drawer h3{overflow-wrap:anywhere}}
+
+.reports-case-drawer .ds-sheet{padding:0;display:flex;flex-direction:column;overflow:hidden}
+.reports-case-drawer .ds-sheet>header{flex:none;padding:16px 24px;border-bottom:1px solid var(--sep);margin:0}
+.reports-case-drawer .ds-sheet>header h2{font-size:1rem;line-height:1.4;overflow-wrap:anywhere}
+.reports-case-drawer .ds-sheet>:not(header){margin-inline:24px}
+.reports-case-drawer .ds-sheet>.reports-case-head{margin-top:20px}
+.reports-case-drawer .ds-sheet>:last-child{margin-bottom:24px}
+.reports-case-drawer .ds-sheet{overflow-y:auto}
+.reports-case-drawer .ds-sheet>header{position:sticky;top:0;z-index:1;background:inherit;margin-inline:0}
+.reports-case-head{display:flex;align-items:center;gap:8px}
+.reports-case-group{margin-top:20px;padding-top:16px;border-top:1px solid var(--sep)}
+.reports-case-drawer .reports-case-group h4,.reports-case-drawer .reports-case-week h4{margin:0 0 12px;font-size:12px;font-weight:600;color:var(--label-2);letter-spacing:.04em}
+.reports-case-drawer .reports-case-group .reports-case-facts{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin:0;gap:12px 20px}
+.reports-case-drawer .reports-case-group .reports-case-facts dd{margin-top:2px;font-size:15px;font-weight:600}
+.reports-case-week{margin-top:24px;padding-top:20px;border-top:1px solid var(--sep)}
+.reports-case-week h3{margin:0 0 4px;font-size:16px}
+.reports-case-week h4{margin-top:20px}
+
+.reports-case-drawer .ds-backdrop{padding:0}
+.reports-case-drawer .ds-sheet{width:min(720px,100%)}
+.reports-case-drawer .reports-case-head{margin-bottom:4px}
+.reports-case-drawer .ds-sheet{background:var(--surface);backdrop-filter:none}
+.reports-case-drawer .reports-case-head+.reports-case-group{border-top:0;margin-top:12px;padding-top:0}

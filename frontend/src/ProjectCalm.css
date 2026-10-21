@@ -1,0 +1,35 @@
+.project-flow .pf-secondary{border:0;border-top:1px solid var(--sep);border-radius:0;background:none;box-shadow:none;padding:0}
+.project-flow .pf-secondary:last-child{border-bottom:1px solid var(--sep)}
+.project-flow .pf-secondary+.pf-secondary{margin-top:-24px}
+.project-flow .pf-secondary>summary{min-height:52px;font-weight:500;color:var(--label)}
+.project-flow .pf-secondary[open]{padding-bottom:20px}
+.project-flow .pf-secondary.project-discussion{padding:0}
+
+.project-flow .pf-facts{gap:12px 24px;margin:12px 0 20px;padding-bottom:20px;border-bottom:1px solid var(--sep)}
+.project-flow .pf-facts dd{font-size:15px;font-weight:500}
+.project-flow .pf-evidence{margin:0}
+.project-flow .pg-section{border:0;border-radius:0;background:none;box-shadow:none;backdrop-filter:none;padding:0;gap:8px}
+.project-flow .pg-section>header h2{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.project-flow .pg-section h3{margin-top:20px!important;font-size:14px;font-weight:600}
+.project-flow .pg-section .pg-callout{background:none;margin:4px 0;padding:0 0 0 12px;border-left:2px solid var(--sep)}
+.project-flow .pg-quantity.pg-unknown{font-size:14px;font-weight:400;color:var(--label-2)}
+.project-flow .pg-quantity.pg-unknown small{display:inline;margin-left:6px}
+
+.task-inspector .inspector-title{padding:20px 24px 14px}
+.task-inspector .inspector-title h2{font-size:1.25rem;line-height:1.35;margin:0 0 10px}
+.task-inspector .inspector-title .eyebrow{display:block;margin-bottom:4px;font-size:12px;font-weight:500;color:var(--label-2)}
+.app-shell .workspace .task-inspector .inspector-tabs{margin:0;padding:0 24px;width:auto;max-width:none;gap:20px;border:0;border-bottom:1px solid var(--sep);border-radius:0;background:none;box-shadow:none;backdrop-filter:none;overflow-x:auto}
+.app-shell .workspace .task-inspector .inspector-tabs>button{min-height:40px;padding:0 2px;border-radius:0;background:none;color:var(--label-2);border-bottom:2px solid transparent;margin-bottom:-1px}
+.app-shell .workspace .task-inspector .inspector-tabs>button.active{color:var(--label);font-weight:600;border-bottom-color:var(--accent)}
+.task-inspector .tab-scroll-hint{display:none}
+.task-inspector .inspector-content{padding:20px 24px}
+.task-inspector .inspector-footer{padding:12px 24px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;border-top:1px solid var(--sep)}
+.task-inspector .inspector-footer>div:first-child{display:flex;align-items:center;gap:8px}
+.task-inspector .inspector-footer .disabled-action{align-items:flex-end}
+.task-inspector .inspector-footer .disabled-action-reason{white-space:normal;text-align:right}
+.task-inspector.task-inspector{background:var(--surface);backdrop-filter:none}
+.task-inspector .inspector-footer{background:var(--surface)}
+.project-flow .pg-section p:not(.pg-quantity){font-size:14px;line-height:1.5}
+.project-flow .pg-section .pg-callout{font-size:14px}
+.project-flow .pg-section .pg-callout small,.project-flow .pg-section .pg-muted{font-size:12px}
+.project-flow .pf-secondary.project-discussion{background:none;box-shadow:none}
