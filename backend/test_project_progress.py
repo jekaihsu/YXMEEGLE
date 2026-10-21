@@ -493,3 +493,21 @@ def test_scoped_progress_matches_full_capture_without_other_project_trees(progre
     legacy = client.get(f'/api/projects/{vis}/progress')
     assert legacy.status_code == 200
     assert response.json() == legacy.json()
+
+
+def test_progress_generation_fences_do_not_materialize_source_snapshots(progress):
+    from sqlalchemy import event
+    from .models import CacheRow
+    run, _, _ = progress
+    state, vis, _ = chain_state()
+    loaded = []
+
+    def capture(row, context):
+        loaded.append(row.id)
+
+    event.listen(CacheRow, 'load', capture)
+    try:
+        assert run(state, vis).status_code == 200
+    finally:
+        event.remove(CacheRow, 'load', capture)
+    assert loaded == [WID], 'only the actual health capture decodes source records; generation fences read scalars'

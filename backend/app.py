@@ -1063,9 +1063,11 @@ def create_app(overrides=None,*,dispatch_transport=None):
         return state
 
     def p2_generation(db,wid):
-        row,cache=db.get(WorkspaceRow,wid),db.get(CacheRow,wid)
-        data=(cache.data or {}) if cache else {}
-        return (row.version if row else None,data.get('status'),data.get('last_attempt_at'),data.get('last_sync'),data.get('as_of'))
+        version=db.scalar(select(WorkspaceRow.version).where(WorkspaceRow.id==wid))
+        # The generation fence needs four scalars, not the large source snapshot.
+        keys=('status','last_attempt_at','last_sync','as_of')
+        cache=db.execute(select(*(CacheRow.data[key] for key in keys)).where(CacheRow.id==wid)).first()
+        return (version,*(tuple(cache) if cache else (None,)*len(keys)))
 
     def p2_read(data,user,keep_lines=False,*,project_id=None):
         """Health and module input come from ONE capture fenced by a generation read BEFORE the first input read
@@ -1079,7 +1081,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
             with sessions() as db: generation=p2_generation(db,wid)
             freshness=app.state.live_read.status(wid)
             with sessions() as db:
-                cache=db.get(CacheRow,wid);cache_data=deepcopy(cache.data) if cache else None
+                # This session owns the freshly decoded JSON; health projection
+                # makes its own response copy before redacting formal sources.
+                cache=db.get(CacheRow,wid);cache_data=cache.data if cache else None
                 state=load(db,db.get(WorkspaceRow,wid),project_ids=[project_id] if project_id is not None else None)
             health=source_health_from(data,user,freshness,cache_data,deepcopy(state))
             with sessions() as db: unchanged=p2_generation(db,wid)==generation
