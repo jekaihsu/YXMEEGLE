@@ -1,0 +1,677 @@
+[
+  {
+    "round": 2,
+    "complete": true,
+    "marks": [
+      {
+        "name": "yx:1:fetch",
+        "start": 252.80000001192093
+      },
+      {
+        "name": "yx:1:headers",
+        "start": 452.5
+      },
+      {
+        "name": "yx:1:parsed",
+        "start": 454.89999997615814
+      },
+      {
+        "name": "yx:2:fetch",
+        "start": 455.60000002384186
+      },
+      {
+        "name": "yx:2:headers",
+        "start": 1245.800000011921
+      },
+      {
+        "name": "yx:2:parsed",
+        "start": 1274.800000011921
+      },
+      {
+        "name": "yx:first-render",
+        "start": 1290.300000011921
+      },
+      {
+        "name": "yx:shell-first-render",
+        "start": 1290.5
+      },
+      {
+        "name": "yx:3:fetch",
+        "start": 1400.3999999761581
+      },
+      {
+        "name": "yx:4:fetch",
+        "start": 1400.699999988079
+      },
+      {
+        "name": "yx:5:fetch",
+        "start": 1400.699999988079
+      },
+      {
+        "name": "yx:6:fetch",
+        "start": 1400.8999999761581
+      },
+      {
+        "name": "yx:5:headers",
+        "start": 3394.300000011921
+      },
+      {
+        "name": "yx:5:parsed",
+        "start": 3394.699999988079
+      },
+      {
+        "name": "yx:4:headers",
+        "start": 4471.300000011921
+      },
+      {
+        "name": "yx:4:parsed",
+        "start": 4471.699999988079
+      },
+      {
+        "name": "yx:6:headers",
+        "start": 6354.300000011921
+      },
+      {
+        "name": "yx:6:parsed",
+        "start": 6355.199999988079
+      },
+      {
+        "name": "yx:project-detail-render",
+        "start": 6374.300000011921
+      },
+      {
+        "name": "yx:3:headers",
+        "start": 8319.100000023842
+      },
+      {
+        "name": "yx:3:parsed",
+        "start": 8319.699999988079
+      }
+    ],
+    "navigation": {
+      "detailReady": false,
+      "observedAt": 282.30000001192093,
+      "progressFinished": false,
+      "state": "ready",
+      "usefulMs": 1401.3999999761581
+    },
+    "resources": [
+      {
+        "end": 454.30000001192093,
+        "ms": 201.30000001192093,
+        "path": "/api/session",
+        "start": 253
+      },
+      {
+        "end": 1272.6000000238419,
+        "ms": 816.8000000119209,
+        "path": "/api/workspace",
+        "start": 455.80000001192093
+      },
+      {
+        "end": 8318.699999988079,
+        "ms": 6918.099999964237,
+        "path": "/api/projects/src-604c50ce7422171b35dc/progress",
+        "start": 1400.6000000238419
+      },
+      {
+        "end": 4471.100000023842,
+        "ms": 3070.400000035763,
+        "path": "/api/projects/src-604c50ce7422171b35dc/sop-tasks",
+        "start": 1400.699999988079
+      },
+      {
+        "end": 3394,
+        "ms": 1993.199999988079,
+        "path": "/api/projects/src-604c50ce7422171b35dc/sop-assignees",
+        "start": 1400.800000011921
+      },
+      {
+        "end": 6354,
+        "ms": 4953.100000023842,
+        "path": "/api/projects/src-604c50ce7422171b35dc",
+        "start": 1400.8999999761581
+      }
+    ]
+  },
+  {
+    "round": 3,
+    "complete": true,
+    "marks": [
+      {
+        "name": "yx:1:fetch",
+        "start": 110.29999995231628
+      },
+      {
+        "name": "yx:1:headers",
+        "start": 302.2999999523163
+      },
+      {
+        "name": "yx:1:parsed",
+        "start": 302.69999998807907
+      },
+      {
+        "name": "yx:2:fetch",
+        "start": 303
+      },
+      {
+        "name": "yx:2:headers",
+        "start": 696
+      },
+      {
+        "name": "yx:2:parsed",
+        "start": 8358.5
+      },
+      {
+        "name": "yx:first-render",
+        "start": 8372.699999988079
+      },
+      {
+        "name": "yx:shell-first-render",
+        "start": 8372.799999952316
+      },
+      {
+        "name": "yx:3:fetch",
+        "start": 8499.099999964237
+      },
+      {
+        "name": "yx:4:fetch",
+        "start": 8499.399999976158
+      },
+      {
+        "name": "yx:5:fetch",
+        "start": 8499.599999964237
+      },
+      {
+        "name": "yx:6:fetch",
+        "start": 8499.699999988079
+      },
+      {
+        "name": "yx:4:headers",
+        "start": 12196.599999964237
+      },
+      {
+        "name": "yx:4:parsed",
+        "start": 12196.899999976158
+      },
+      {
+        "name": "yx:5:headers",
+        "start": 12424.299999952316
+      },
+      {
+        "name": "yx:5:parsed",
+        "start": 12424.699999988079
+      },
+      {
+        "name": "yx:6:headers",
+        "start": 16570.799999952316
+      },
+      {
+        "name": "yx:6:parsed",
+        "start": 16674.399999976158
+      },
+      {
+        "name": "yx:project-detail-render",
+        "start": 16690.19999998808
+      },
+      {
+        "name": "yx:3:headers",
+        "start": 19490.599999964237
+      },
+      {
+        "name": "yx:3:parsed",
+        "start": 19491.19999998808
+      }
+    ],
+    "navigation": {
+      "detailReady": false,
+      "observedAt": 128.89999997615814,
+      "progressFinished": false,
+      "state": "ready",
+      "usefulMs": 8500.299999952316
+    },
+    "resources": [
+      {
+        "end": 302.19999998807907,
+        "ms": 191.69999998807907,
+        "path": "/api/session",
+        "start": 110.5
+      },
+      {
+        "end": 8355.599999964237,
+        "ms": 8052.5,
+        "path": "/api/workspace",
+        "start": 303.0999999642372
+      },
+      {
+        "end": 19489.899999976158,
+        "ms": 10990.600000023842,
+        "path": "/api/projects/src-604c50ce7422171b35dc/progress",
+        "start": 8499.299999952316
+      },
+      {
+        "end": 12196.5,
+        "ms": 3697,
+        "path": "/api/projects/src-604c50ce7422171b35dc/sop-tasks",
+        "start": 8499.5
+      },
+      {
+        "end": 12422.699999988079,
+        "ms": 3923,
+        "path": "/api/projects/src-604c50ce7422171b35dc/sop-assignees",
+        "start": 8499.699999988079
+      },
+      {
+        "end": 16673.299999952316,
+        "ms": 8173.5,
+        "path": "/api/projects/src-604c50ce7422171b35dc",
+        "start": 8499.799999952316
+      }
+    ]
+  },
+  {
+    "round": 4,
+    "complete": true,
+    "marks": [
+      {
+        "name": "yx:1:fetch",
+        "start": 188
+      },
+      {
+        "name": "yx:1:headers",
+        "start": 412
+      },
+      {
+        "name": "yx:1:parsed",
+        "start": 412.80000001192093
+      },
+      {
+        "name": "yx:2:fetch",
+        "start": 413.4000000357628
+      },
+      {
+        "name": "yx:2:headers",
+        "start": 1101.5
+      },
+      {
+        "name": "yx:2:parsed",
+        "start": 5705.900000035763
+      },
+      {
+        "name": "yx:3:fetch",
+        "start": 5715.300000011921
+      },
+      {
+        "name": "yx:4:fetch",
+        "start": 5715.699999988079
+      },
+      {
+        "name": "yx:5:fetch",
+        "start": 5715.900000035763
+      },
+      {
+        "name": "yx:6:fetch",
+        "start": 5716.100000023842
+      },
+      {
+        "name": "yx:first-render",
+        "start": 5718.400000035763
+      },
+      {
+        "name": "yx:shell-first-render",
+        "start": 5718.5
+      },
+      {
+        "name": "yx:5:headers",
+        "start": 8158.199999988079
+      },
+      {
+        "name": "yx:5:parsed",
+        "start": 8158.5
+      },
+      {
+        "name": "yx:4:headers",
+        "start": 8276.199999988079
+      },
+      {
+        "name": "yx:4:parsed",
+        "start": 8276.600000023842
+      },
+      {
+        "name": "yx:6:headers",
+        "start": 10247
+      },
+      {
+        "name": "yx:6:parsed",
+        "start": 10372.5
+      },
+      {
+        "name": "yx:project-detail-render",
+        "start": 10389.600000023842
+      },
+      {
+        "name": "yx:3:headers",
+        "start": 12257.600000023842
+      },
+      {
+        "name": "yx:3:parsed",
+        "start": 12258.300000011921
+      }
+    ],
+    "navigation": {
+      "detailReady": false,
+      "observedAt": 212.10000002384186,
+      "progressFinished": false,
+      "state": "ready",
+      "usefulMs": 5716.900000035763
+    },
+    "resources": [
+      {
+        "end": 411.69999998807907,
+        "ms": 223.5999999642372,
+        "path": "/api/session",
+        "start": 188.10000002384186
+      },
+      {
+        "end": 5702.900000035763,
+        "ms": 5289.200000047684,
+        "path": "/api/workspace",
+        "start": 413.69999998807907
+      },
+      {
+        "end": 12257.199999988079,
+        "ms": 6541.599999964237,
+        "path": "/api/projects/src-604c50ce7422171b35dc/progress",
+        "start": 5715.600000023842
+      },
+      {
+        "end": 8275.900000035763,
+        "ms": 2560,
+        "path": "/api/projects/src-604c50ce7422171b35dc/sop-tasks",
+        "start": 5715.900000035763
+      },
+      {
+        "end": 8157.800000011921,
+        "ms": 2441.800000011921,
+        "path": "/api/projects/src-604c50ce7422171b35dc/sop-assignees",
+        "start": 5716
+      },
+      {
+        "end": 10371.5,
+        "ms": 4655.300000011921,
+        "path": "/api/projects/src-604c50ce7422171b35dc",
+        "start": 5716.199999988079
+      }
+    ]
+  },
+  {
+    "round": 5,
+    "complete": true,
+    "marks": [
+      {
+        "name": "yx:1:fetch",
+        "start": 154.19999998807907
+      },
+      {
+        "name": "yx:1:headers",
+        "start": 283.60000002384186
+      },
+      {
+        "name": "yx:1:parsed",
+        "start": 329
+      },
+      {
+        "name": "yx:2:fetch",
+        "start": 329.30000001192093
+      },
+      {
+        "name": "yx:2:headers",
+        "start": 886.4000000357628
+      },
+      {
+        "name": "yx:2:parsed",
+        "start": 5505.400000035763
+      },
+      {
+        "name": "yx:3:fetch",
+        "start": 5513.900000035763
+      },
+      {
+        "name": "yx:4:fetch",
+        "start": 5514.100000023842
+      },
+      {
+        "name": "yx:5:fetch",
+        "start": 5514.300000011921
+      },
+      {
+        "name": "yx:6:fetch",
+        "start": 5514.400000035763
+      },
+      {
+        "name": "yx:first-render",
+        "start": 5515.400000035763
+      },
+      {
+        "name": "yx:shell-first-render",
+        "start": 5515.5
+      },
+      {
+        "name": "yx:4:headers",
+        "start": 8302
+      },
+      {
+        "name": "yx:4:parsed",
+        "start": 8302.100000023842
+      },
+      {
+        "name": "yx:5:headers",
+        "start": 9502.699999988079
+      },
+      {
+        "name": "yx:5:parsed",
+        "start": 9503.199999988079
+      },
+      {
+        "name": "yx:6:headers",
+        "start": 13928
+      },
+      {
+        "name": "yx:6:parsed",
+        "start": 14107
+      },
+      {
+        "name": "yx:project-detail-render",
+        "start": 14115.199999988079
+      },
+      {
+        "name": "yx:3:headers",
+        "start": 17631.69999998808
+      },
+      {
+        "name": "yx:3:parsed",
+        "start": 17631.80000001192
+      }
+    ],
+    "navigation": {
+      "detailReady": false,
+      "observedAt": 181.4000000357628,
+      "progressFinished": false,
+      "state": "ready",
+      "usefulMs": 5515.100000023842
+    },
+    "resources": [
+      {
+        "end": 328.80000001192093,
+        "ms": 174.5,
+        "path": "/api/session",
+        "start": 154.30000001192093
+      },
+      {
+        "end": 5502.800000011921,
+        "ms": 5173.399999976158,
+        "path": "/api/workspace",
+        "start": 329.4000000357628
+      },
+      {
+        "end": 17631.5,
+        "ms": 12117.399999976158,
+        "path": "/api/projects/src-604c50ce7422171b35dc/progress",
+        "start": 5514.100000023842
+      },
+      {
+        "end": 8301.900000035763,
+        "ms": 2787.7000000476837,
+        "path": "/api/projects/src-604c50ce7422171b35dc/sop-tasks",
+        "start": 5514.199999988079
+      },
+      {
+        "end": 9502.300000011921,
+        "ms": 3987.899999976158,
+        "path": "/api/projects/src-604c50ce7422171b35dc/sop-assignees",
+        "start": 5514.400000035763
+      },
+      {
+        "end": 14106.600000023842,
+        "ms": 8592.100000023842,
+        "path": "/api/projects/src-604c50ce7422171b35dc",
+        "start": 5514.5
+      }
+    ]
+  },
+  {
+    "round": 6,
+    "complete": true,
+    "marks": [
+      {
+        "name": "yx:1:fetch",
+        "start": 90
+      },
+      {
+        "name": "yx:1:headers",
+        "start": 282
+      },
+      {
+        "name": "yx:1:parsed",
+        "start": 282.0999999642372
+      },
+      {
+        "name": "yx:2:fetch",
+        "start": 282.30000001192093
+      },
+      {
+        "name": "yx:2:headers",
+        "start": 1053.800000011921
+      },
+      {
+        "name": "yx:2:parsed",
+        "start": 4210.599999964237
+      },
+      {
+        "name": "yx:first-render",
+        "start": 4218.800000011921
+      },
+      {
+        "name": "yx:shell-first-render",
+        "start": 4219.099999964237
+      },
+      {
+        "name": "yx:3:fetch",
+        "start": 4397.699999988079
+      },
+      {
+        "name": "yx:4:fetch",
+        "start": 4398
+      },
+      {
+        "name": "yx:5:fetch",
+        "start": 4398.199999988079
+      },
+      {
+        "name": "yx:6:fetch",
+        "start": 4398.399999976158
+      },
+      {
+        "name": "yx:5:headers",
+        "start": 11739
+      },
+      {
+        "name": "yx:5:parsed",
+        "start": 11739.099999964237
+      },
+      {
+        "name": "yx:4:headers",
+        "start": 12245.399999976158
+      },
+      {
+        "name": "yx:4:parsed",
+        "start": 12245.399999976158
+      },
+      {
+        "name": "yx:6:headers",
+        "start": 17554.899999976158
+      },
+      {
+        "name": "yx:6:parsed",
+        "start": 17670.30000001192
+      },
+      {
+        "name": "yx:project-detail-render",
+        "start": 17684.5
+      },
+      {
+        "name": "yx:3:headers",
+        "start": 20515.5
+      },
+      {
+        "name": "yx:3:parsed",
+        "start": 20516.19999998808
+      }
+    ],
+    "navigation": {
+      "detailReady": false,
+      "observedAt": 111.89999997615814,
+      "progressFinished": false,
+      "state": "ready",
+      "usefulMs": 4399.199999988079
+    },
+    "resources": [
+      {
+        "end": 281.80000001192093,
+        "ms": 191.80000001192093,
+        "path": "/api/session",
+        "start": 90
+      },
+      {
+        "end": 4207.599999964237,
+        "ms": 3925.2999999523163,
+        "path": "/api/workspace",
+        "start": 282.30000001192093
+      },
+      {
+        "end": 20515,
+        "ms": 16117,
+        "path": "/api/projects/src-604c50ce7422171b35dc/progress",
+        "start": 4398
+      },
+      {
+        "end": 12245.199999988079,
+        "ms": 7847.100000023842,
+        "path": "/api/projects/src-604c50ce7422171b35dc/sop-tasks",
+        "start": 4398.099999964237
+      },
+      {
+        "end": 11738.899999976158,
+        "ms": 7340.599999964237,
+        "path": "/api/projects/src-604c50ce7422171b35dc/sop-assignees",
+        "start": 4398.300000011921
+      },
+      {
+        "end": 17669.80000001192,
+        "ms": 13271.300000011921,
+        "path": "/api/projects/src-604c50ce7422171b35dc",
+        "start": 4398.5
+      }
+    ]
+  }
+]

@@ -1,0 +1,27 @@
+{
+  "/api/health": {
+    "status": 200,
+    "bytes": 53,
+    "body": {
+      "status": "ok",
+      "mode": "lark",
+      "database": "postgresql"
+    }
+  },
+  "/api/session": {
+    "status": 200,
+    "bytes": 184
+  },
+  "/api/workspace": {
+    "status": 401,
+    "bytes": 25
+  },
+  "/api/settings/overview": {
+    "status": 401,
+    "bytes": 25
+  },
+  "/api/projects/missing/sop-tasks": {
+    "status": 401,
+    "bytes": 53
+  }
+}
