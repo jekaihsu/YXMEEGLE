@@ -35,7 +35,7 @@ function CompanyView(props:ViewProps&{reports:HomeReportsRead}){
  const read=useHomeCompany(props.c);
  const missing=!read.data&&!read.pending;
  const unavailable=read.data&&read.data.source.status!=='ready'&&!read.data.groups.length&&!read.data.cases.length;
- return <>{(missing||unavailable||read.data?.complete===false)&&<div className="home-view-notice" role="status">{read.error||(unavailable?'公司來源尚未提供，僅顯示已載入總數。':'公司快照尚未完整，統計僅涵蓋已載入來源。')} <a href="#view=company">開啟公司駕駛艙</a></div>}<Sections view="company" reportStale={!!(props.reports.data?.meta.stale||props.reports.data?.meta.refresh_error||props.reports.error&&props.reports.data)} ids={props.ids.filter(id=>(!unavailable||!['groups','cases','statuses'].includes(id)))} render={id=>id==='dispatch'?props.dispatch():isReportCard(id)?<ReportCard key={id} id={id} read={props.reports}/>:id==='absence'?<PeopleCard key={id} id={id} scope="company" today={props.today} {...props.attendanceRead}/>:id==='leave'||id==='trips'?props.attendance(id):<CompanyCard key={id} id={id} {...props} read={read}/>}/></>;
+ return <>{(missing||unavailable||read.data?.complete===false)&&<div className="home-view-notice" role="status">{read.error||(unavailable?'公司來源尚未提供，僅顯示已載入總數。':'公司快照尚未完整，統計僅涵蓋已載入來源。')} <a href="#view=projects">開啟案件總覽</a></div>}<Sections view="company" reportStale={!!(props.reports.data?.meta.stale||props.reports.data?.meta.refresh_error||props.reports.error&&props.reports.data)} ids={props.ids.filter(id=>(!unavailable||!['groups','cases','statuses'].includes(id)))} render={id=>id==='dispatch'?props.dispatch():isReportCard(id)?<ReportCard key={id} id={id} read={props.reports}/>:id==='absence'?<PeopleCard key={id} id={id} scope="company" today={props.today} {...props.attendanceRead}/>:id==='leave'||id==='trips'?props.attendance(id):<CompanyCard key={id} id={id} {...props} read={read}/>}/></>;
 }
 export function UnifiedHome({c}:{c:Ctx}){
  const key=homeLayoutKey(c.s.workspace_id||c.w.workspace_id||'default',c.s.user?.id||'anonymous',c.s.user?.role||'',c.s.mode);
@@ -91,7 +91,7 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
  </div><div className="ds-actions">
   {view==='company'&&reports.data&&!reports.unavailable&&<CopyReportSummary report={reports.data}/>}
   <Button disabled={refreshing||c.busy} onClick={()=>void refresh()}><RefreshCw size={16}/>{refreshing?'讀取中…':'重新讀取'}</Button>
-  <Button onClick={()=>c.go({view:'schedule'})}><CalendarDays size={16}/>查看排程</Button>
+  <Button onClick={()=>c.go({view:'projects'})}><CalendarDays size={16}/>查看案件</Button>
   <Button variant="plain" aria-expanded={editing} aria-controls="home-customize" onClick={()=>setEditing(value=>!value)}>{editing?<Check size={16}/>:<Settings2 size={16}/>} {editing?'完成設定':'自訂首頁'}</Button>
   <HomeHelp view={view}/>
  </div></header>

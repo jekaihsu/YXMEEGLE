@@ -21,9 +21,10 @@ export function QuoteCreateSheet({users,canImport,onClose,onCreated,onOpen}:{use
  const recover=async()=>{const pending=attempt.current;if(!pending)return;setStatus('confirming');setError('');try{const r=await quoteApi.recover(pending.request,current);if(current())finish(r)}catch(e){if(!current())return;if(e instanceof SopError&&e.code==='run_not_found'){setStatus('idle');setError('尚未建立')}else{setStatus('unknown');fail(e)}}};
  const create=async()=>{if(step.kind!=='preview'||status!=='idle')return;const draft=step.draft;if(!attempt.current)attempt.current={draft:draft.draft_id,request:crypto.randomUUID()};const pending=attempt.current;setStatus('busy');setError('');try{const r=await quoteApi.create(pending.draft,pending.request,current);if(current())finish(r)}catch(e){if(!current())return;if(e instanceof SopError&&e.ambiguous){await recover();return}attempt.current=null;setStatus('idle');fail(e);if(e instanceof SopError&&['preview_stale','preview_not_found'].includes(e.code))setStep({kind:'form'})}};
  const update=<K extends keyof QuoteForm>(key:K,value:QuoteForm[K])=>setForm(f=>({...f,[key]:value}));
- return createPortal(<Sheet title="建立報價" onClose={()=>{if(!locked)onClose()}}><div className="sop-import">
+ return createPortal(<Sheet title="建立報價" onClose={()=>{if(!locked)onClose()}}><div className="sop-import quote-create-sheet" aria-busy={locked}>
   <Badge>本地規劃</Badge>
   {error&&<p role="alert">{error}</p>}
+  {status==='busy'&&<p className="quote-create-status" role="status">{step.kind==='preview'?'正在建立報價…':'正在產生預覽…'}</p>}
   {step.kind==='form'&&<form className="sop-form" onSubmit={e=>{e.preventDefault();void preview()}}>
    <label>案件名稱<input required maxLength={500} value={form.name} disabled={locked} onChange={e=>update('name',e.target.value)}/></label>
    <label>PM<select value={form.pm_id||''} disabled={locked} onChange={e=>update('pm_id',e.target.value||null)}><option value="">未指派</option>{users.filter(u=>u.active!==false&&['pm','manager'].includes(u.role)).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label>

@@ -125,7 +125,7 @@ test('technical IDs only appear in selected source drawer and chooser stays non-
 });
 test('deadline disabled with backend reason; sorting offers asc desc clear only on supported columns', () => {
  const v = view(body(), {filters: {deadline_from: '2026-01-01'}, sort: {key: 'confirmation_version', dir: 'desc'}});
- assert.deepEqual(v.controls.deadline, {disabled: true, reason: 'VCC-123 provenance unresolved'});
+ assert.deepEqual(v.controls.deadline, {disabled: true, reason: '尚無法判定期限：期限來源待確認'});
  assert.deepEqual(v.controls.sort, {key: 'confirmation_version', dir: 'desc'});
  assert.deepEqual(v.columns.find(c => c.key === 'pm').sortChoices, ['asc', 'desc', 'clear']);
  assert.equal(v.columns.find(c => c.key === 'source_modified').sortable, false);

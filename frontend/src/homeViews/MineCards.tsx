@@ -21,7 +21,7 @@ export function MineCard({id,c,today,assigned,confirmation}:{id:HomeCardId;c:Ctx
  }
  if(id==='deadlines'){
   const source=workSource(c,'assigned',today,assigned);
-  return <Card id={id} compact={!source} subtitle="已載入工作，依期限日期計算" href="#view=schedule">
+  return <Card id={id} compact={!source} subtitle="已載入工作，依期限日期計算" href="#view=projects">
    {source?<><DeadlineStrip days={Array.from({length:7},(_,i)=>{const day=dayOffset(today,i);return {day,count:source.items.filter(item=>item.deadline?.slice(0,10)===day).length}})}/>{!source.complete&&<p className="home-source-note">僅涵蓋已載入的期限預覽。</p>}</>:<p className="home-source-note">{assigned.pending?'期限分布讀取中…':assigned.error||'期限來源尚未提供。'}</p>}
   </Card>;
  }

@@ -1,7 +1,7 @@
 import {parseInstant, taipeiDate} from './taipeiTime';
 import {api, ApiError, getSessionEpoch} from './api';
 import type {ProjectPage} from './appCommon';
-import type {CompanyDashboard} from './CompanyCockpit';
+import type {CompanyDashboard} from './companyDashboardTypes';
 
 const snapshots=new Map<string,CompanyDashboard>();
 const savedAt=new Map<string,number>();

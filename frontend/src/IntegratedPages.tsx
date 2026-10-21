@@ -107,7 +107,7 @@ function AssignmentWorkPage({c}:{c:Ctx}) {
   </div>
   <PanelStatus read={read}/>
   {read.body && <><p>節點責任 {read.body.counts.node_assignments ?? '未知'} 項 · 任務 {read.body.counts.tasks ?? '未知'} 項{read.body.counts.local_workflow ? ` · 本地 SOP ${read.body.counts.local_workflow} 項` : ''}</p>
-   <Suspense fallback={<div aria-hidden="true" className="skeleton skeleton-row"/>}><AssignmentTable items={read.body.items} onNavigate={c.go}/></Suspense>
+  <Suspense fallback={<p className="my-work-loading" role="status">正在載入工作…</p>}><AssignmentTable items={read.body.items} onNavigate={c.go}/></Suspense>
    {!read.body.items.length && <p>{read.body.complete ? '目前沒有符合條件的工作' : '工作來源待核對'}</p>}
   </>}
   <div className="my-work-actions">

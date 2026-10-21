@@ -1,7 +1,7 @@
 import {useEffect,useState} from 'react';
 import {ApiError,getSessionEpoch} from './api';
 import type {Ctx} from './appCommon';
-import type {CompanyDashboard} from './CompanyCockpit';
+import type {CompanyDashboard} from './companyDashboardTypes';
 import {readDashboard} from './companyDashboardCache';
 export function useHomeCompany(c:Ctx){
  const [state,setState]=useState<{data?:CompanyDashboard;error:string;pending:boolean}>({error:'',pending:true});
