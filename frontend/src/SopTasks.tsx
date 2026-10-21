@@ -70,7 +70,7 @@ export function SopTasks({c, p, nodeKey, sop, importing, setImporting}: {c: Ctx;
  const allowed = data?.allowed;
  const selectedTasks=data?.tasks.filter(t=>selected.has(t.id))||[];
  const selectTask=(id:string)=>setSelected(old=>{const next=new Set(old);if(next.has(id))next.delete(id);else next.add(id);return next});
- if (state.kind === 'forbidden') return <section id="sop-tasks" className="pf-tasks sop-tasks" aria-label="SOP 任務"><header><h3>SOP 任務</h3><span className="sop-muted">無 SOP 任務權限</span></header></section>;
+ if (state.kind === 'forbidden') return <section id="sop-tasks" className="pf-tasks sop-tasks" aria-label="SOP 任務"><header><h3>SOP 任務</h3><span className="sop-muted">需由管理員授予 sop_task_read（查看 SOP 任務）權限；完整原始程序另需 sop_task_read_source。</span></header></section>;
  return <section id="sop-tasks" className="pf-tasks sop-tasks" aria-label="SOP 任務" tabIndex={-1}>
   <header>
    <h3>SOP 任務{counts && <span className="sop-progress" aria-label={`完成 ${progressLabel(counts)}`}>{progressLabel(counts)}</span>}{counts && checklistComplete(counts) && <Badge tone="positive">檢查清單已完成</Badge>}</h3>

@@ -139,7 +139,7 @@ export const sopApi = {
 };
 
 export const SOP_ERROR_TEXT: Record<string, string> = {
- quote_number_taken: '報價編號已使用', quote_number_invalid: '報價編號格式不正確', local_case_creation_disabled: '本地建立暫停', quote_not_found: '找不到報價', suggestion_stale: '建議已更新', suggestion_confirmation_required: '需確認建議並填寫原因', session_expired: '登入已過期', sop_import_forbidden: '沒有 SOP 任務權限', case_not_found: '找不到此案件', task_not_found: '找不到此 SOP 任務',
+ quote_number_taken: '報價編號已使用', quote_number_invalid: '報價編號格式不正確', local_case_creation_disabled: '本地建立暫停', quote_not_found: '找不到報價', suggestion_stale: '建議已更新', suggestion_confirmation_required: '需確認建議並填寫原因', identity_forbidden:'帳號或工作區尚未獲准存取，請聯絡管理員核對身分與名冊', session_expired: '登入已過期', sop_import_forbidden: '沒有 SOP 任務權限', case_not_found: '找不到此案件', task_not_found: '找不到此 SOP 任務',
  preview_stale: '預覽已過期，已重新產生', preview_not_found: '預覽已失效，已重新產生', idempotency_mismatch: '匯入請求不一致，請重新預覽',
  task_revision_conflict: '任務已被更新，已重新載入', node_mapping_invalid: '節點對應有誤', row_not_importable: '此列不可匯入',
  applicability_unresolved: '需先確認適用', completion_evidence_missing: '完成條件待審核', import_unavailable: 'SOP 任務暫停寫入',

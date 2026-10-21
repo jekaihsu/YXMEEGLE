@@ -5,7 +5,7 @@ type State = {kind: 'loading'}|{kind: 'ready'; data: ProjectProgress}|{kind: 'er
 let epoch = getSessionEpoch();
 const cache = new Map<string, {data: ProjectProgress; at: number}>();
 const pending = new Map<string, Promise<ProjectProgress>>();
-function read(id: string, force = false) {
+export function prefetchProjectProgress(id: string, force = false) {
  if (epoch !== getSessionEpoch()) {cache.clear(); pending.clear(); epoch = getSessionEpoch()}
  const currentEpoch = epoch;
  if (pending.has(id)) return pending.get(id)!;
@@ -24,7 +24,7 @@ export function useProjectProgress(id: string, enabled = true) {
   let active = true;
   const currentEpoch = getSessionEpoch();
   setState({kind: 'loading'});
-  void read(id, version > 0).then(data => {if (active && currentEpoch === getSessionEpoch()) setState({kind: 'ready', data})}).catch(error => {if (active && currentEpoch === getSessionEpoch()) setState({kind: 'error', message: error instanceof Error ? error.message : '工程進度暫不可用。'})});
+  void prefetchProjectProgress(id, version > 0).then(data => {if (active && currentEpoch === getSessionEpoch()) setState({kind: 'ready', data})}).catch(error => {if (active && currentEpoch === getSessionEpoch()) setState({kind: 'error', message: error instanceof Error ? error.message : '工程進度暫不可用。'})});
   return () => {active = false};
  }, [id, enabled, version]);
  return {state, retry};

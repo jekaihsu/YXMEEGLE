@@ -173,7 +173,7 @@ test('an empty case shows plain labels and a denied read shows the denial', asyn
  assert.equal(document.querySelector('#sop-tasks .pf-empty').textContent, '無 SOP 任務');
  await act(async () => root.unmount()); root = null;
  await mount({overviewStatus: 403});
- assert.equal(document.querySelector('#sop-tasks').textContent, 'SOP 任務無 SOP 任務權限');
+ assert.match(document.querySelector('#sop-tasks').textContent, /sop_task_read.*sop_task_read_source/);
 });
 
 test('quote-stage import starts from 報價, needs a reason for subcontract rows, and recovers a lost apply by request id', async () => {

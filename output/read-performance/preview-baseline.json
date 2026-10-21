@@ -1,0 +1,140 @@
+{
+  "started": "2026-10-20T23:37:22.703Z",
+  "origin": "https://yongxiang-projects-20260925.zeabur.app",
+  "identity": {
+    "role": "manager",
+    "capabilities": [],
+    "active": true,
+    "workspace": "lark-1aad6a938e891946"
+  },
+  "initial": [
+    {
+      "path": "/api/session",
+      "status": 200,
+      "ms": 8753.699999988079,
+      "bytes": 17691,
+      "timing": null
+    },
+    {
+      "path": "/api/settings/overview",
+      "status": 404,
+      "ms": 190.0999999642372,
+      "bytes": 26,
+      "timing": null
+    },
+    {
+      "path": "/api/admin/runtime-health",
+      "status": 200,
+      "ms": 174.80000001192093,
+      "bytes": 947,
+      "timing": null,
+      "keys": [
+        "checked_at",
+        "status",
+        "worker",
+        "backup",
+        "directory",
+        "scope",
+        "external_integrations_verified",
+        "backup_archive_verified_by_this_request"
+      ]
+    },
+    {
+      "path": "/api/workspace",
+      "status": 200,
+      "ms": 20412.400000035763,
+      "bytes": 18861439,
+      "timing": null
+    }
+  ],
+  "samples": [
+    {
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "status": 404,
+      "ms": 132.30000001192093,
+      "bytes": 26,
+      "timing": null
+    },
+    {
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-tasks",
+      "status": 404,
+      "ms": 53.700000047683716,
+      "bytes": 26,
+      "timing": null
+    },
+    {
+      "path": "/api/projects/src-604c50ce7422171b35dc/sop-assignees",
+      "status": 404,
+      "ms": 50.80000001192093,
+      "bytes": 26,
+      "timing": null
+    },
+    {
+      "path": "/api/session",
+      "status": 200,
+      "ms": 5139.899999976158,
+      "bytes": 17691,
+      "timing": null
+    },
+    {
+      "path": "/api/workspace",
+      "status": 200,
+      "ms": 18665.100000023842,
+      "bytes": 18861439,
+      "timing": null
+    },
+    {
+      "path": "/api/session",
+      "status": 200,
+      "ms": 9730.699999988079,
+      "bytes": 17691,
+      "timing": null
+    },
+    {
+      "path": "/api/workspace",
+      "error": "TimeoutError: signal timed out",
+      "ms": 45003.10000002384
+    },
+    {
+      "path": "/api/session",
+      "status": 200,
+      "ms": 4338,
+      "bytes": 17691,
+      "timing": null
+    },
+    {
+      "path": "/api/workspace",
+      "error": "TimeoutError: signal timed out",
+      "ms": 45002.799999952316
+    },
+    {
+      "path": "/api/session",
+      "status": 200,
+      "ms": 8888.200000047684,
+      "bytes": 17691,
+      "timing": null
+    },
+    {
+      "path": "/api/workspace",
+      "error": "TimeoutError: signal timed out",
+      "ms": 45002.69999998808
+    },
+    {
+      "path": "/api/session",
+      "status": 200,
+      "ms": 9378.099999964237,
+      "bytes": 17691,
+      "timing": null
+    },
+    {
+      "path": "/api/workspace",
+      "error": "TimeoutError: signal timed out",
+      "ms": 45002.700000047684
+    }
+  ],
+  "workspace": {
+    "environment": "production",
+    "version": 35334,
+    "projectCount": 420
+  }
+}

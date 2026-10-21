@@ -43,10 +43,14 @@ def can_manage(ctx):
         or ctx.user['id'] in ctx.project.get('sop_task_delegate_ids', []))
 
 
-def authorize(ctx, write=False):
-    require(ctx.user.get('active', True), 'sop_import_forbidden', 403)
-    require(any(explicitly_granted(ctx.user, c) for c in ('sop_task_read', 'sop_task_import', 'sop_task_work')),
+def authorize_reader(user):
+    require(user.get('active', True), 'sop_import_forbidden', 403)
+    require(any(explicitly_granted(user, c) for c in ('sop_task_read', 'sop_task_import', 'sop_task_work')),
             'sop_import_forbidden', 403)
+
+
+def authorize(ctx, write=False):
+    authorize_reader(ctx.user)
     if write:
         require(can_manage(ctx), 'sop_import_forbidden', 403)
 

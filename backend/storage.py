@@ -60,6 +60,17 @@ PROJECT_LINKED=frozenset({'approvals','sop_requests','financial_requests','deleg
                           'input_mappings','input_revisions','cost_allocations','daily_reviews','handover_requests',
                           'source_quotes','source_confirmations','contract_items','source_work_items'})
 
+# Detail preserves shared authority/policy inputs and the existing response contract.
+# Global training/leave/schedule/template inputs remain shared. Quote facts explicitly
+# union duplicate quote numbers across projects, so source_quotes stays workspace-wide.
+DETAIL_COLLECTIONS=tuple(c for c in COLLECTIONS if c!='projects')
+CASE_COLLECTIONS=('users','source_quotes','source_confirmations','contract_items','source_work_items')
+# JSON rows with a project_id can be filtered without losing truly global rows.
+# source_quotes is excluded for duplicate-number facts; source_confirmations
+# supplies the complete hidden-identity universe to case_redaction.make_plan.
+# Filtering those before taking the privacy snapshot could leak cross-case IDs.
+READ_PROJECT_LINKED=(PROJECT_LINKED | {'events'})-{'source_quotes','source_confirmations','source_work_items'}
+
 def _project_resolver(desired,existing):
     def project_of(key,value):
         kind,ident=key
@@ -309,12 +320,13 @@ def save_partial(db,model,wid,state,collections,project_ids,project_order,*,view
     root['storage_schema']=2
     return root
 
-def load_partial(db,model,row,*,collections=(),project_ids=None,project_children=()):
+def load_partial(db,model,row,*,collections=(),project_ids=None,project_children=(),filter_project_rows=False):
     """Read selected collections and project trees; never pass this to save.
 
     Project IDs also select their headers, nodes, tasks and review cycles.
     Without IDs, project headers have empty nested lists. Other project lists
-    are loaded only when explicitly named in project_children.
+    are loaded only when explicitly named in project_children. filter_project_rows
+    is read-only opt-in: scoped writes need complete shared collections for diffs.
     """
     collections=tuple(collections)
     project_children=tuple(project_children)
@@ -326,7 +338,11 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
     result={key:deepcopy(value) for key,value in row.data.items() if key not in COLLECTIONS}
     for collection in COLLECTIONS: result[collection]=[]
     if row.data.get('storage_schema')!=2:
-        for collection in kinds: result[collection]=deepcopy(row.data.get(collection,[]))
+        for collection in kinds:
+            values=row.data.get(collection,[])
+            if filter_project_rows and project_ids is not None and collection in READ_PROJECT_LINKED:
+                values=[item for item in values if item.get('project_id') is None or item.get('project_id') in project_ids]
+            result[collection]=deepcopy(values)
         if project_ids is not None:
             result['projects']=[p for p in result['projects'] if p['id'] in project_ids]
         for p in result['projects']:
@@ -337,6 +353,10 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
         def fetch(selected,**filters):
             query=select(model.kind,model.parent_id,model.data).where(model.workspace_id==row.id,model.kind.in_(selected))
             for column,values in filters.items(): query=query.where(getattr(model,column).in_(values))
+            if filter_project_rows and project_ids is not None and set(selected) & READ_PROJECT_LINKED:
+                # Mixed top-level kinds: retain shared policy rows and legacy globals.
+                linked=model.data['project_id'].as_string()
+                query=query.where((~model.kind.in_(READ_PROJECT_LINKED)) | linked.is_(None) | linked.in_(project_ids))
             return db.execute(query.order_by(model.ordinal))
         top=kinds-{'projects','source_work_items'}
         if top:

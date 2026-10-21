@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {api} from './api';
+import {api,perfMark} from './api';
 import {taipeiTime} from './taipeiTime';
 import {ROLE} from './AppShell';
 import {RuntimeHealthPanel} from './RuntimeHealthPanel';
@@ -12,7 +12,7 @@ const stamp=(value:string|null)=>taipeiTime(value,'尚無成功同步');
 const labels:Record<string,string>={unknown:'尚未核實',unconfigured:'尚未設定',restricted:'無權限查看',ready:'已讀取',complete:'完整',complete_empty:'已核實空表',partial:'部分資料',stale:'資料待更新',error:'讀取失敗',read_failed:'讀取失敗',fresh:'有效',never:'尚無成功同步',review_required:'部分資料待核對',refreshing:'更新中',demo:'示範',production:'正式',test:'測試',application:'應用程式',user:'使用者'};
 const label=(value:string)=>labels[value]||value;
 const featureLabels:Record<string,string>={node_assignment:'節點指派',change_extension:'變更與展延',routines:'追蹤與檢討'};
-const permissionLabels:Record<string,string>={read_own_work:'查看本人工作',manage_people:'人員授權',publish_sop:'發布 SOP',edit_sop:'編修 SOP',manage_sources:'來源管理',finance_approve:'金額核准',finance_edit:'財務編輯',calendar_edit:'工作日曆',issue_confirmation:'發出確認單',review_mapping:'日報核對',manage_handover:'人員交接',manage_training:'訓練管理',approve_capability:'能力核准'};
+const permissionLabels:Record<string,string>={sop_task_read:'查看 SOP 任務',sop_task_read_source:'查看 SOP 原始程序',read_own_work:'查看本人工作',manage_people:'人員授權',publish_sop:'發布 SOP',edit_sop:'編修 SOP',manage_sources:'來源管理',finance_approve:'金額核准',finance_edit:'財務編輯',calendar_edit:'工作日曆',issue_confirmation:'發出確認單',review_mapping:'日報核對',manage_handover:'人員交接',manage_training:'訓練管理',approve_capability:'能力核准'};
 export function SettingsOverview({s,workspaceId}:{s:Session;workspaceId?:string}){
  const[read,setRead]=useState<Read>({kind:'loading'});const[retry,setRetry]=useState(0);
  useEffect(()=>{const controller=new AbortController();setRead({kind:'loading'});
@@ -23,7 +23,7 @@ export function SettingsOverview({s,workspaceId}:{s:Session;workspaceId?:string}
     !Array.isArray(data.datasets)||!data.datasets.every(row=>row&&typeof row.name==='string'&&typeof row.status==='string')||
     !Array.isArray(data.node_connection)||!data.node_connection.every(row=>row&&typeof row.name==='string'&&typeof row.status==='string')||
     !data.directory||typeof data.directory.status!=='string'||!data.features||typeof data.features!=='object'||Array.isArray(data.features)||!Object.values(data.features).every(value=>typeof value==='boolean'))throw Error('invalid');
-   if(!controller.signal.aborted)setRead({kind:'ready',data});
+   if(!controller.signal.aborted){setRead({kind:'ready',data});perfMark('settings-summary-ready')}
   }).catch(()=>{if(!controller.signal.aborted)setRead({kind:'error'})});return()=>controller.abort();
  },[s.user?.id,s.user?.role,s.mode,workspaceId,retry]);
  return <section className="owned-view" aria-label="設定概況"><h2>設定概況</h2>
