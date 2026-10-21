@@ -7,7 +7,7 @@ from starlette.concurrency import run_in_threadpool
 
 from ..production_access import hr_view_allowed
 from .domain import Failure, require
-from .service import Context, Service, authorize, authorize_reader
+from .service import Context, Service, authorize, has_reader_grant
 
 PREFIX = '/api/projects/{project_id}'
 MAX_BODY = 64 * 1024
@@ -20,10 +20,13 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
 
     def context(request, project_id):
         data, user = identity(request)
-        authorize_reader(user)
+        require(user.get('active', True), 'sop_import_forbidden', 403)
+        assigned_only = not has_reader_grant(user)
+        require(not assigned_only or service.participates(data['wid'], user['id'], project_id), 'sop_import_forbidden', 403)
         with (phase(request, 'load') if phase else nullcontext()):
             state, project = load_case(data, user, project_id)
-        ctx = Context(data['wid'], user, state, project, lambda: context(request, project_id))
+        ctx = Context(data['wid'], user, state, project, lambda: context(request, project_id),
+                      assigned_only=assigned_only)
         authorize(ctx)
         return ctx
 
@@ -121,6 +124,10 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
     @app.post(PREFIX + '/sop-tasks/{task_id}/transition')
     async def transition(request: Request, project_id: str, task_id: str):
         return await mutation(request, project_id, lambda ctx, body: service.mutate(ctx, task_id, body, transition=True))
+
+    @app.post(PREFIX + '/sop-tasks/close-node')
+    async def close_node(request: Request, project_id: str):
+        return await mutation(request, project_id, service.close_node)
 
     @app.post(PREFIX + '/sop-tasks/suggestions/accept')
     async def accept_suggestions(request: Request, project_id: str):

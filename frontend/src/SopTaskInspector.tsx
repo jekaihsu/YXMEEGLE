@@ -90,7 +90,10 @@ export function SopTaskInspector({task, project, users, sop, onClose}: {task: So
     <Button type="submit" disabled={!!editReason || busy || !contentChanged || !title.trim()}>儲存內容</Button>
    </form>
    <form className="sop-form" onSubmit={e => {e.preventDefault(); if (peopleChanged) void patch({participants: Object.fromEntries(ROLES.filter(r => people[r]).map(r => [r, people[r]]))}, '已更新人員')}}>
-    {ROLES.map(r => <Field key={r} label={`${ROLE_LABEL[r]}人員`}><select value={people[r] || ''} disabled={!!editReason || busy} onChange={e => setPeople(p => ({...p, [r]: e.target.value || undefined}))}>{options(r)}</select></Field>)}
+    <Field label="執行人員"><select value={people.executor || ''} disabled={!!editReason || busy} onChange={e => setPeople(p => ({...p, executor: e.target.value || undefined}))}>{options('executor')}</select></Field>
+    <details className="sop-more-roles"><summary>檢核與確認人員</summary>
+     {(['checker','confirmer'] as const).map(r => <Field key={r} label={`${ROLE_LABEL[r]}人員`}><select value={people[r] || ''} disabled={!!editReason || busy} onChange={e => setPeople(p => ({...p, [r]: e.target.value || undefined}))}>{options(r)}</select></Field>)}
+    </details>
     {sop.assigneeError && <small role="alert">{sop.assigneeError}</small>}{!candidates.length && <small className="sop-muted">無可指派人員</small>}
     <Button type="submit" disabled={!!editReason || busy || !peopleChanged}>儲存人員</Button>
    </form>

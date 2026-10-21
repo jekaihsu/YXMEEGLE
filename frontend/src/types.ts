@@ -9,7 +9,7 @@ export interface DatasetFreshness {
 }
 export interface Freshness {server_time:string;enabled:boolean;datasets:Record<LiveDataset,DatasetFreshness>}
 export type Status = 'pending'|'in_progress'|'completed'|'paused'|'superseded'|'rework'|string;
-export interface User {can_business_override?:boolean;can_mention?:boolean;id:string;name:string;role:string;department:string;avatar:string;avatar_url?:string;active?:boolean;capabilities?:string[];default_workspace?:string}
+export interface User {can_business_override?:boolean;can_mention?:boolean;id:string;name:string;role:string;department:string;avatar:string;avatar_url?:string;active?:boolean;capabilities?:string[];authz_version?:number;default_workspace?:string}
 export interface Comment {id:string;author_id:string;body:string;created_at:string;mentions?:string[];notifications?:{recipient_id:string;status:string;error?:string;simulated?:boolean}[]}
 export type HomeWaitingKind = 'paused'|'correction'|'prerequisite'|'upcoming'|'proxy';
 export interface HomeTaskDetail {

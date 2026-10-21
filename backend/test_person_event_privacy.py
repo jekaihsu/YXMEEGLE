@@ -116,3 +116,20 @@ def test_audit_receipt_redacts_company_admin_authorization():
     grant = {'grant_id': 'g', 'reason': REASON_SENTINEL}
     out = scrub({'company_admin_authorization': grant, 'ok': 1, 'nested': {'company_admin_authorization': grant}})
     assert REASON_SENTINEL not in json.dumps(out) and out['ok'] == 1
+
+
+def test_person_edit_conflicts_only_with_a_change_to_that_person():
+    import pytest
+    from fastapi import HTTPException
+    ws, manager, target = workspace()
+    version = target.get('authz_version', 0)
+    apply_operation(ws, manager, {'action': 'admin_person', 'payload': {'id': target['id'], 'name': 'A', 'expected_authz_version': version}}, True)
+    assert target['name'] == 'A' and target['authz_version'] == version + 1
+    with pytest.raises(HTTPException) as stale:
+        apply_operation(ws, manager, {'action': 'admin_person', 'payload': {'id': target['id'], 'name': 'B', 'expected_authz_version': version}}, True)
+    assert stale.value.status_code == 409 and target['name'] == 'A'
+    apply_operation(ws, manager, {'action': 'admin_person', 'payload': {'id': target['id'], 'name': 'B', 'expected_authz_version': version + 1}}, True)
+    assert target['name'] == 'B'
+    with pytest.raises(HTTPException) as bad:
+        apply_operation(ws, manager, {'action': 'admin_person', 'payload': {'id': target['id'], 'expected_authz_version': '1'}}, True)
+    assert bad.value.status_code == 422

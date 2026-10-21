@@ -242,7 +242,7 @@ def test_at13_participants_are_explicit_active_and_authorized(h):
     apply(h, preview(h, node_keys=['confirmation']))
     assert all(t['participants'] == {} for t in overview(h)['tasks'])
     request = {'template_version_id': h.vid, 'row_keys': ['meegle-v137:A:1'],
-               'participant_bindings': {'meegle-v137:A:1': {'executor': 'other'}}}
+               'participant_bindings': {'meegle-v137:A:1': {'executor': 'ghost'}}}
     assert post(h, URL + '/sop-import/preview', request, 422)['code'] == 'participant_unresolved'
     request['participant_bindings']['meegle-v137:A:1']['executor'] = 'member'
     plan = post(h, URL + '/sop-import/preview', request)

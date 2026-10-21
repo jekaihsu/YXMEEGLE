@@ -11,7 +11,7 @@ export type Lifecycle = 'pending'|'in_progress'|'blocked'|'done'|'archived';
 export type Role = 'executor'|'checker'|'confirmer';
 export const ROLES: readonly Role[] = ['executor','checker','confirmer'];
 export interface SopCounts {done: number; total: number; unresolved: number; not_applicable: number; archived: number}
-export interface SopAssignee {id: string; name: string; case_roles: string[]}
+export interface SopAssignee {id: string; name: string; case_roles: string[]; department: string|null}
 export interface SopSuggestion {taskId: string; ruleId: string; ruleRevision: number; tier: 'proof'|'indicator'; state: 'done'|'in_progress'; facts: Record<string, unknown>; hash: string}
 export interface SopTask {
  allowedActions: string[]; suggestion: SopSuggestion|null; shared: boolean; conditional: boolean;
@@ -25,7 +25,9 @@ export interface SopTask {
 export interface SopOverview {
  projectId: string; startNode: SopNodeKey; checklistRevision: number; caseCounts: SopCounts; nodeCounts: Record<SopNodeKey, SopCounts>;
  tasks: SopTask[]; allowed: {import: boolean; manage: boolean; work: boolean};
+ nodeDone: Partial<Record<SopNodeKey, {rule: string; reason: string}>>;
 }
+export interface CloseNodeResult {closed: number; leftOpen: {shared: number; unresolved: number}}
 export interface SopTemplate {version_id: string; template_family_id: string; revision: string; name: string; is_default: boolean}
 export type Outcome = 'new'|'already_present'|'link_addition'|'excluded'|'routing_reference'|'review_required'|'routine_excluded'|'disabled_excluded';
 export interface CompletionSummary {state: Lifecycle; actorId:string|null; actorName:string|null; at:number|null; ruleId:string|null; factsHash:string|null; evidenceRefs:string[]}
@@ -61,7 +63,7 @@ const unresolvedCounts = (v: unknown) => {const c = object(v); return {applicabi
 export function parseSuggestion(v: unknown): SopSuggestion {
  const s = object(v); return {taskId: str(s.task_id), ruleId: str(s.rule_id), ruleRevision: int(s.rule_revision), tier: oneOf(['proof','indicator'] as const)(s.tier), state: oneOf(['done','in_progress'] as const)(s.suggested_state), facts: object(s.facts), hash: str(s.facts_hash)};
 }
-export function parseAssignees(v: unknown): SopAssignee[] {return list(object(v).people, p => {const x=object(p);return {id:str(x.id),name:str(x.name),case_roles:list(x.case_roles,str)}})}
+export function parseAssignees(v: unknown): SopAssignee[] {return list(object(v).people, p => {const x=object(p);return {id:str(x.id),name:str(x.name),case_roles:list(x.case_roles,str),department:optStr(x.department)}})}
 function task(v: unknown): SopTask {
  const t = object(v), local = object(t.local), origin = object(t.origin), people = object(t.participants);
  const participants: SopTask['participants'] = {};
@@ -82,7 +84,8 @@ export function parseOverview(v: unknown): SopOverview {
  if (new Set(tasks.map(t => t.id)).size !== tasks.length) throw malformed();
  return {projectId: str(o.project_id), startNode: node(o.start_node), checklistRevision: int(o.checklist_revision), caseCounts: counts(o.case_counts),
   nodeCounts: Object.fromEntries(SOP_NODE_KEYS.map(key => [key, counts(nodeCounts[key])])) as Record<SopNodeKey, SopCounts>,
-  tasks, allowed: {import: bool(allowed.import), manage: bool(allowed.manage), work: bool(allowed.work)}};
+  tasks, allowed: {import: bool(allowed.import), manage: bool(allowed.manage), work: bool(allowed.work)},
+  nodeDone: Object.fromEntries(Object.entries(o.node_done == null ? {} : object(o.node_done)).filter(([key]) => isSopNode(key)).map(([key, v]) => {const d = object(v); return [key, {rule: str(d.rule), reason: str(d.reason)}]}))};
 }
 export function parseTemplates(v: unknown): SopTemplate[] {
  return list(object(v).templates, t => {const x = object(t); return {version_id: str(x.version_id), template_family_id: str(x.template_family_id), revision: str(x.revision), name: str(x.name), is_default: bool(x.is_default)}});
@@ -135,6 +138,7 @@ export const sopApi = {
  run: (id: string, requestId: string, current: () => boolean) => request(`${base(id)}/sop-import/runs/${encodeURIComponent(requestId)}`, {}, current).then(parseReceipt),
  create: (id: string, body: {title: string; node_keys: SopNodeKey[]}, current: () => boolean) => request(`${base(id)}/sop-tasks`, post(body), current).then(r => ({task_id: str(object(r).task_id), checklist_revision: int(object(r).checklist_revision)})),
  patch: (id: string, taskId: string, body: Record<string, unknown>, current: () => boolean) => request(`${base(id)}/sop-tasks/${encodeURIComponent(taskId)}`, post(body, 'PATCH'), current).then(parseMutation),
+ closeNode: (id: string, nodeKey: SopNodeKey, current: () => boolean): Promise<CloseNodeResult> => request(`${base(id)}/sop-tasks/close-node`, post({node_key: nodeKey}), current).then(r => {const o = object(r), left = object(o.left_open); return {closed: int(o.closed), leftOpen: {shared: int(left.shared), unresolved: int(left.unresolved)}}}),
  transition: (id: string, taskId: string, body: Record<string, unknown>, current: () => boolean) => request(`${base(id)}/sop-tasks/${encodeURIComponent(taskId)}/transition`, post(body), current).then(parseMutation),
 };
 
@@ -143,7 +147,7 @@ export const SOP_ERROR_TEXT: Record<string, string> = {
  preview_stale: '預覽已過期，已重新產生', preview_not_found: '預覽已失效，已重新產生', idempotency_mismatch: '匯入請求不一致，請重新預覽',
  task_revision_conflict: '任務已被更新，已重新載入', node_mapping_invalid: '節點對應有誤', row_not_importable: '此列不可匯入',
  applicability_unresolved: '需先確認適用', completion_evidence_missing: '完成條件待審核', import_unavailable: 'SOP 任務暫停寫入',
- template_unavailable: '範本版本不可用', template_mapping_conflict: '範本節點對應衝突', participant_unresolved: '人員不符資格',
+ template_unavailable: '範本版本不可用', template_mapping_conflict: '範本節點對應衝突', participant_unresolved: '此人員已停用或不存在', node_not_done_by_data: '資料尚未判定此節點完成',
  task_reopen_required: '需先重新開啟', invalid_transition: '目前狀態不可執行', invalid_request: '內容格式不正確', run_not_found: '找不到匯入紀錄',
  network: '連線中斷', client_timeout: '連線逾時', malformed: '回應格式不正確',
 };

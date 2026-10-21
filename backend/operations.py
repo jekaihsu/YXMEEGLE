@@ -413,6 +413,10 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         ident=str(data.get('id','')).strip(); require(bool(ident),'請提供已核對的 Lark open_id 或測試人員識別',422)
         target=next((x for x in ws['users'] if x['id']==ident),None)
         require(demo or target is not None,'正式人員須由已核實的公司名冊建立，不能手填帳號造人',403)
+        if 'expected_authz_version' in data:
+            # A person edit conflicts only with another change to this person, not with unrelated workspace writes.
+            require(type(data['expected_authz_version']) is int,'人員版本格式錯誤',422)
+            require((target or {}).get('authz_version',0)==data['expected_authz_version'],'這位人員的資料剛被其他人更新，請重新整理後再編輯',409)
         role=data.get('role',(target or {}).get('role','member')); require(role in ('manager','pm','member'),'角色錯誤',422)
         if role=='manager' or (target or {}).get('role')=='manager': require(user['role']=='manager','只有最高管理員可以調整管理員身分',403)
         caps=list(dict.fromkeys(data.get('capabilities',(target or {}).get('capabilities',[])))); require(set(caps)<=set(CAPABILITIES),'未知操作權限',422)

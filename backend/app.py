@@ -513,7 +513,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                     view=WorkspaceView(state,footprint.collections,order)
                 if project_versions:
                     require(all(find(view['projects'],pid).get('concurrency_version',0)==version for pid,version in project_versions.items()),'此案件已被更新，請核對最新內容後重試',409)
-                else: require(row.version==expected,'資料已被其他操作更新，請重新整理後重試',409)
+                elif expected is not None: require(row.version==expected,'資料已被其他操作更新，請重新整理後重試',409)
                 expected=row.version
                 if actor_id: require(find(state['users'],actor_id).get('active',True),'帳號已停權',403)
                 if admission_required and wid.startswith(('lark-','test-lark-')):
@@ -892,7 +892,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                         for t in n['tasks']:
                             if t['id']==body.task_id: t['manual_updated']=True
         try:
-            with phase(request,'mutate'): return persist_mutation(data['wid'],body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=(lambda lookup:resolve_footprint(raw,lookup)) if raw['action'] in FOOTPRINT_RULES else None)
+            with phase(request,'mutate'): return persist_mutation(data['wid'],None if body.action=='admin_person' and 'expected_authz_version' in body.payload else body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=(lambda lookup:resolve_footprint(raw,lookup)) if raw['action'] in FOOTPRINT_RULES else None)
         except HTTPException as exc:
             with sessions.begin() as db:
                 db.add(audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,

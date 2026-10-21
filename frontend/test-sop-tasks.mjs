@@ -53,11 +53,11 @@ const tick = () => new Promise(r => setTimeout(r, 10));
 const response = (b, s = 200) => new Response(JSON.stringify(b), {status: s, headers: {'Content-Type': 'application/json'}});
 function Harness() {const sop = ui.useSopTasks('p1', 'w1'); const [importing, setImporting] = React.useState(null); return React.createElement(ui.SopTasks, {c, p: {id: 'p1', pm_id: 'pm', collaborator_ids: ['member'], nodes: []}, nodeKey: c.route.node, sop, importing, setImporting})}
 const render = () => root.render(React.createElement(Harness));
-async function mount({tasks = [task('t1')], route = {}, overviewStatus = 200} = {}) {
+async function mount({tasks = [task('t1')], route = {}, overviewStatus = 200, extra = {}} = {}) {
  ui.invalidateSessionEpoch();
- server = {overview: overview(tasks), apply: [], run: [], patch: []};
+ server = {overview: {...overview(tasks), ...extra}, apply: [], run: [], patch: []};
  calls = [];
- c = {s: {user: {id: 'pm'}, workspace_id: 'w1'}, w: {users: [{id: 'pm', name: '王經理', role: 'pm', capabilities: ['sop_task_work']}, {id: 'member', name: '林組員', role: 'member', capabilities: ['sop_task_work']}, {id: 'outsider', name: '外部', role: 'member', capabilities: ['sop_task_work']}]},
+ c = {s: {user: {id: 'pm', capabilities: ['sop_task_read']}, workspace_id: 'w1'}, w: {users: [{id: 'pm', name: '王經理', role: 'pm', capabilities: ['sop_task_work']}, {id: 'member', name: '林組員', role: 'member', capabilities: ['sop_task_work']}, {id: 'outsider', name: '外部', role: 'member', capabilities: ['sop_task_work']}]},
   route: {view: 'project', project: 'p1', tab: 'flow', node: 'sales', ...route}, go(next) {c = {...c, route: next}; render()}};
  globalThis.fetch = async (url, init = {}) => {
   const method = init.method || 'GET', body = init.body ? JSON.parse(init.body) : null;
@@ -68,6 +68,7 @@ async function mount({tasks = [task('t1')], route = {}, overviewStatus = 200} = 
   if (url.endsWith('/sop-import/preview')) return response(previewFixture(body));
   if (url.endsWith('/sop-import/apply')) {server.apply.push(body); return server.applyReply ? server.applyReply(body) : response({...examples.apply, request_id: body.request_id})}
   if (url.includes('/sop-import/runs/')) {server.run.push(url); if (server.hold) await server.hold; return server.runReply ? server.runReply(url) : response({...examples.apply, request_id: decodeURIComponent(url.split('/').at(-1))})}
+  if (url.endsWith('/sop-tasks/close-node')) {server.close = [...(server.close || []), body]; return response({closed: 1, left_open: {shared: 0, unresolved: 0}, checklist_revision: 5})}
   if (method === 'PATCH') {server.patch.push(body); return server.patchReply ? server.patchReply(body) : response({task_id: 't1', revision: body.expected_revision + 1, checklist_revision: 9, state: 'pending', applicability: 'applicable'})}
   return response({code: 'not_found'}, 404);
  };
@@ -274,4 +275,34 @@ test('link confirmation shows completion actor, time, state and evidence before 
  await click(button('匯入預設任務'));await click(button('下一步'));await click(button('下一步'));
  for(const value of ['完成人員','王經理','完成時間','已完成','reviewed','abc123','evidence-123'])assert.ok(dialog().textContent.includes(value),value);
  assert.equal(server.apply.length,0);
+});
+
+test('a manager assigns the executor from the list row without opening the task', async () => {
+ await mount({tasks: [task('t1', {allowed_actions: ['start', 'edit']})]});
+ const select = document.querySelector('select[aria-label="指派 業主提出報價需求"]');
+ assert.ok(select, 'row has an inline assignee picker');
+ assert.deepEqual([...select.options].map(o => o.textContent), ['未指派', '王經理', '林組員']);
+ await act(async () => {Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'member'); select.dispatchEvent(new Event('change', {bubbles: true})); await tick()});
+ assert.deepEqual(server.patch, [{expected_revision: 1, participants: {executor: 'member'}}]);
+ assert.equal(document.querySelector('[role=dialog]'), null);
+});
+
+test('a task a person cannot edit has no inline assignee picker', async () => {
+ await mount({tasks: [task('t1', {allowed_actions: ['start']})]});
+ assert.equal(document.querySelector('.sop-quick-assign'), null);
+});
+
+test('a node the data proves done offers one manager action that closes its open tasks', async () => {
+ const proven = {sales: {rule: 'c_code', reason: '工編以 C 開頭，業務階段已完成'}};
+ await mount({tasks: [task('t1'), task('t2', {state: 'done'})], extra: {node_done: proven, allowed_actions: {...examples.sop_tasks.allowed_actions, manage: true}}});
+ assert.match(document.querySelector('.sop-node-done').textContent, /節點已完成 · 工編以 C 開頭，業務階段已完成/);
+ await click(button('依節點完成，全部標為已完成（1）'));
+ assert.deepEqual(server.close, [{node_key: 'sales'}]);
+});
+
+test('without manager authority or open tasks there is no close action', async () => {
+ const proven = {sales: {rule: 'c_code', reason: '工編以 C 開頭，業務階段已完成'}};
+ await mount({tasks: [task('t1')], extra: {node_done: proven, allowed_actions: {...examples.sop_tasks.allowed_actions, manage: false}}});
+ assert.ok(document.querySelector('.sop-node-done'));
+ assert.equal(button('依節點完成，全部標為已完成（1）'), undefined);
 });

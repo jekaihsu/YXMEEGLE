@@ -37,7 +37,7 @@ for(const shell of [false,true]){
  function Restricted(){const sop=ui.useSopTasks('p','A',false);return React.createElement('p',null,sop.state.kind)}
  const root=createRoot(document.getElementById('root'));await flush(()=>root.render(React.createElement(Restricted)));
  assert.equal(document.body.textContent,'forbidden');assert.deepEqual(calls,[]);
- assert.equal(ui.canReadSop({role:'manager',capabilities:[]}),false);
+ assert.equal(ui.canReadSop({role:'member',capabilities:[]}),true);
  assert.equal(ui.canReadSop({capabilities:['sop_task_read']}),true);
  assert.equal(ui.canReadSop({active:false,capabilities:['sop_task_read']}),false);
  await flush(()=>root.unmount());dom.window.close();

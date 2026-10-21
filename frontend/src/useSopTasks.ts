@@ -12,30 +12,34 @@ const assigneeRequests = new Map<string, Promise<SopAssignee[]>>();
 const assigneeCache = new Map<string, SopAssignee[]>();
 const readAt = new Map<string, number>();
 const denied = new Map<string, SopError>();
+const deniedAt = new Map<string, number>();
+// A denial lapses so a person newly assigned a task is not locked out of it until the session resets.
+const deniedFor = (key: string) => {const error = denied.get(key); if (error && Date.now() - (deniedAt.get(key) || 0) > 30000) {denied.delete(key); return undefined} return error};
+const deny = (key: string, error: SopError) => {denied.set(key, error); deniedAt.set(key, Date.now())};
 const cached = (key: string) => {
  if (cacheEpoch !== getSessionEpoch()) {cache.clear(); requests.clear(); assigneeRequests.clear(); assigneeCache.clear(); readAt.clear(); denied.clear(); cacheEpoch = getSessionEpoch()}
  return cache.get(key);
 };
 
-export function canReadSop(user: {active?:boolean; capabilities?:string[]} | null | undefined){
- return !!user && user.active!==false && ['sop_task_read','sop_task_import','sop_task_work'].some(cap=>user.capabilities?.includes(cap));
+export function canReadSop(user: {active?:boolean} | null | undefined){
+ return !!user && user.active!==false;
 }
 export function prefetchSopTasks(projectId:string,workspace:string,force=false){
  const key=`${workspace}:${projectId}`, stored=cached(key), epoch=getSessionEpoch();
- const failure=denied.get(key);if(failure)return Promise.reject(failure);
+ const failure=deniedFor(key);if(failure)return Promise.reject(failure);
  const pending=requests.get(key);if(pending&&!force)return pending;
  if(!force&&stored&&Date.now()-(readAt.get(key)||0)<60000)return Promise.resolve(stored);
  const request=sopApi.overview(projectId,()=>epoch===getSessionEpoch()).then(data=>{
   if(epoch===getSessionEpoch()&&requests.get(key)===request){const prior=cache.get(key);if(!prior||prior.checklistRevision<=data.checklistRevision)cache.set(key,data);readAt.set(key,Date.now())}return data;
- }).catch(error=>{if(epoch===getSessionEpoch()&&requests.get(key)===request){cache.delete(key);readAt.delete(key);if(error instanceof SopError&&[401,403,404].includes(error.status))denied.set(key,error)}throw error}).finally(()=>{if(requests.get(key)===request)requests.delete(key)});
+ }).catch(error=>{if(epoch===getSessionEpoch()&&requests.get(key)===request){cache.delete(key);readAt.delete(key);if(error instanceof SopError&&[401,403,404].includes(error.status))deny(key,error)}throw error}).finally(()=>{if(requests.get(key)===request)requests.delete(key)});
  requests.set(key,request);return request;
 }
 export function prefetchSopAssignees(projectId:string,workspace:string){
  const key=`${workspace}:${projectId}`;cached(key);const epoch=getSessionEpoch();
- const failure=denied.get(key+':assignees');if(failure)return Promise.reject(failure);
+ const failure=deniedFor(key+':assignees');if(failure)return Promise.reject(failure);
  const pending=assigneeRequests.get(key);if(pending)return pending;
  const stored=assigneeCache.get(key);if(stored&&Date.now()-(readAt.get(key+':assignees')||0)<60000)return Promise.resolve(stored);
- const request=sopApi.assignees(projectId,()=>epoch===getSessionEpoch()).then(data=>{if(epoch===getSessionEpoch()){assigneeCache.set(key,data);readAt.set(key+':assignees',Date.now())}return data}).catch(error=>{if(epoch===getSessionEpoch()&&error instanceof SopError&&[401,403,404].includes(error.status)){assigneeCache.delete(key);denied.set(key+':assignees',error)}throw error}).finally(()=>{if(assigneeRequests.get(key)===request)assigneeRequests.delete(key)});
+ const request=sopApi.assignees(projectId,()=>epoch===getSessionEpoch()).then(data=>{if(epoch===getSessionEpoch()){assigneeCache.set(key,data);readAt.set(key+':assignees',Date.now())}return data}).catch(error=>{if(epoch===getSessionEpoch()&&error instanceof SopError&&[401,403,404].includes(error.status)){assigneeCache.delete(key);deny(key+':assignees',error)}throw error}).finally(()=>{if(assigneeRequests.get(key)===request)assigneeRequests.delete(key)});
  assigneeRequests.set(key,request);return request;
 }
 
