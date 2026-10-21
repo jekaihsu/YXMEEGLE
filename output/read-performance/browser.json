@@ -1,0 +1,555 @@
+{
+  "method": "DOM-observed readiness from navigation start; five alternating builds, synthetic 319-project SQLite fixture; API entries are completed resource timings",
+  "samples": [
+    {
+      "surface": "settings",
+      "side": "before",
+      "round": 0,
+      "observedReadyMs": 1187.8999999761581,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 22.80000001192093,
+          "end": 46.80000001192093,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 47.5,
+          "end": 104.30000001192093,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/workspace",
+          "start": 105.59999996423721,
+          "end": 882.1999999880791,
+          "bytes": 14978462
+        },
+        {
+          "path": "/api/settings/overview",
+          "start": 973.5999999642372,
+          "end": 1176.8999999761581,
+          "bytes": 944
+        }
+      ]
+    },
+    {
+      "surface": "settings",
+      "side": "after",
+      "round": 0,
+      "observedReadyMs": 51.59999996423721,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 17.599999964237213,
+          "end": 33.59999996423721,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/settings/overview",
+          "start": 38.19999998807907,
+          "end": 50.5,
+          "bytes": 944
+        }
+      ]
+    },
+    {
+      "surface": "settings",
+      "side": "before",
+      "round": 1,
+      "observedReadyMs": 1111,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 5.599999964237213,
+          "end": 22.19999998807907,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 22.69999998807907,
+          "end": 66,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/workspace",
+          "start": 67.19999998807907,
+          "end": 858,
+          "bytes": 14978462
+        },
+        {
+          "path": "/api/settings/overview",
+          "start": 944.8000000119209,
+          "end": 1107.800000011921,
+          "bytes": 944
+        }
+      ]
+    },
+    {
+      "surface": "settings",
+      "side": "after",
+      "round": 1,
+      "observedReadyMs": 44.60000002384186,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 7.600000023841858,
+          "end": 27.399999976158142,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/settings/overview",
+          "start": 30,
+          "end": 38.5,
+          "bytes": 944
+        }
+      ]
+    },
+    {
+      "surface": "settings",
+      "side": "before",
+      "round": 2,
+      "observedReadyMs": 1117.300000011921,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 6.300000011920929,
+          "end": 25.69999998807907,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 26.19999998807907,
+          "end": 67.40000003576279,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/workspace",
+          "start": 68.60000002384186,
+          "end": 829.6000000238419,
+          "bytes": 14978462
+        },
+        {
+          "path": "/api/settings/overview",
+          "start": 920.5,
+          "end": 1111.300000011921,
+          "bytes": 944
+        }
+      ]
+    },
+    {
+      "surface": "settings",
+      "side": "after",
+      "round": 2,
+      "observedReadyMs": 47.30000001192093,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 7.800000011920929,
+          "end": 24.69999998807907,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/settings/overview",
+          "start": 27.5,
+          "end": 35.40000003576279,
+          "bytes": 944
+        }
+      ]
+    },
+    {
+      "surface": "settings",
+      "side": "before",
+      "round": 3,
+      "observedReadyMs": 1089.5,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 6.199999988079071,
+          "end": 22,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 22.5,
+          "end": 64.89999997615814,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/workspace",
+          "start": 66.39999997615814,
+          "end": 830.5999999642372,
+          "bytes": 14978462
+        },
+        {
+          "path": "/api/settings/overview",
+          "start": 906.5,
+          "end": 1077.3999999761581,
+          "bytes": 944
+        }
+      ]
+    },
+    {
+      "surface": "settings",
+      "side": "after",
+      "round": 3,
+      "observedReadyMs": 42.39999997615814,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 7.399999976158142,
+          "end": 22.19999998807907,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/settings/overview",
+          "start": 24.599999964237213,
+          "end": 32.80000001192093,
+          "bytes": 944
+        }
+      ]
+    },
+    {
+      "surface": "settings",
+      "side": "before",
+      "round": 4,
+      "observedReadyMs": 1085.9000000357628,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 5.600000023841858,
+          "end": 20.80000001192093,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 21.400000035762787,
+          "end": 59.60000002384186,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/workspace",
+          "start": 60.90000003576279,
+          "end": 823.6000000238419,
+          "bytes": 14978462
+        },
+        {
+          "path": "/api/settings/overview",
+          "start": 895.1999999880791,
+          "end": 1082.699999988079,
+          "bytes": 944
+        }
+      ]
+    },
+    {
+      "surface": "settings",
+      "side": "after",
+      "round": 4,
+      "observedReadyMs": 52.200000047683716,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 7.5,
+          "end": 22.900000035762787,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/settings/overview",
+          "start": 25.700000047683716,
+          "end": 40.700000047683716,
+          "bytes": 944
+        }
+      ]
+    },
+    {
+      "surface": "project",
+      "side": "before",
+      "round": 0,
+      "observedReadyMs": 170.10000002384186,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 4,
+          "end": 22.80000001192093,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 23.5,
+          "end": 57.80000001192093,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/projects/p001",
+          "start": 75.70000004768372,
+          "end": 154.10000002384186,
+          "bytes": 63592
+        }
+      ]
+    },
+    {
+      "surface": "project",
+      "side": "after",
+      "round": 0,
+      "observedReadyMs": 163.39999997615814,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 13.600000023841858,
+          "end": 37.10000002384186,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 37.80000001192093,
+          "end": 85.89999997615814,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/projects/p001",
+          "start": 104.19999998807907,
+          "end": 151.5,
+          "bytes": 63592
+        }
+      ]
+    },
+    {
+      "surface": "project",
+      "side": "before",
+      "round": 1,
+      "observedReadyMs": 730.1000000238419,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 20.5,
+          "end": 334.80000001192093,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 335.10000002384186,
+          "end": 622.5,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/projects/p001",
+          "start": 626.3000000119209,
+          "end": 719.4000000357628,
+          "bytes": 63592
+        }
+      ]
+    },
+    {
+      "surface": "project",
+      "side": "after",
+      "round": 1,
+      "observedReadyMs": 133.20000004768372,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 9.300000011920929,
+          "end": 29.600000023841858,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 30.100000023841858,
+          "end": 71.70000004768372,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/projects/p001",
+          "start": 75.20000004768372,
+          "end": 125.40000003576279,
+          "bytes": 63592
+        }
+      ]
+    },
+    {
+      "surface": "project",
+      "side": "before",
+      "round": 2,
+      "observedReadyMs": 735.5,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 6.900000035762787,
+          "end": 316.10000002384186,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 316.60000002384186,
+          "end": 627.3000000119209,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/projects/p001",
+          "start": 629.6999999880791,
+          "end": 727.6999999880791,
+          "bytes": 63592
+        }
+      ]
+    },
+    {
+      "surface": "project",
+      "side": "after",
+      "round": 2,
+      "observedReadyMs": 130,
+      "marks": [
+        {
+          "name": "yx:project-detail-render",
+          "ms": 129.0999999642372
+        }
+      ],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 5.899999976158142,
+          "end": 29,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 29.69999998807907,
+          "end": 75.09999996423721,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/projects/p001",
+          "start": 77.69999998807907,
+          "end": 121,
+          "bytes": 63592
+        }
+      ]
+    },
+    {
+      "surface": "project",
+      "side": "before",
+      "round": 3,
+      "observedReadyMs": 700.3000000119209,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 5,
+          "end": 301.30000001192093,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 301.69999998807907,
+          "end": 625.3999999761581,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/projects/p001",
+          "start": 627.5,
+          "end": 691.5999999642372,
+          "bytes": 63592
+        }
+      ]
+    },
+    {
+      "surface": "project",
+      "side": "after",
+      "round": 3,
+      "observedReadyMs": 178.69999998807907,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 4.699999988079071,
+          "end": 32.39999997615814,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 33.10000002384186,
+          "end": 89.30000001192093,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/projects/p001",
+          "start": 91.5,
+          "end": 171.10000002384186,
+          "bytes": 63592
+        }
+      ]
+    },
+    {
+      "surface": "project",
+      "side": "before",
+      "round": 4,
+      "observedReadyMs": 727.2000000476837,
+      "marks": [],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 5,
+          "end": 350.5,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 350.9000000357628,
+          "end": 648.4000000357628,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/projects/p001",
+          "start": 650.6000000238419,
+          "end": 717.2000000476837,
+          "bytes": 63592
+        }
+      ]
+    },
+    {
+      "surface": "project",
+      "side": "after",
+      "round": 4,
+      "observedReadyMs": 145.19999998807907,
+      "marks": [
+        {
+          "name": "yx:project-detail-render",
+          "ms": 144.29999995231628
+        }
+      ],
+      "requests": [
+        {
+          "path": "/api/session",
+          "start": 5.099999964237213,
+          "end": 27.5,
+          "bytes": 9429
+        },
+        {
+          "path": "/api/workspace",
+          "start": 28.299999952316284,
+          "end": 77.5,
+          "bytes": 153195
+        },
+        {
+          "path": "/api/projects/p001",
+          "start": 80.29999995231628,
+          "end": 134,
+          "bytes": 63592
+        }
+      ]
+    }
+  ]
+}

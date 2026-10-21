@@ -7,18 +7,18 @@ import {sopErrorText,SOP_NODES,type SopNodeKey} from './sopTaskApi';
 import {QuoteCreateSheet} from './QuoteCreateSheet';
 import {SopImportSheet} from './SopImportSheet';
 import {SopTasks,type SopImportTarget} from './SopTasks';
-import {useSopTasks} from './useSopTasks';
+import {useSopTasks,canReadSop} from './useSopTasks';
 import type {Ctx} from './appCommon';
 import './SopTasks.css';
 import './Quotes.css';
 
 function QuoteSopStart({c,projectId,onStart}:{c:Ctx;projectId:string;onStart:()=>void}) {
- const sop=useSopTasks(projectId,c.s.workspace_id||'');
+ const sop=useSopTasks(projectId,c.s.workspace_id||'',canReadSop(c.s.user));
  return sop.state.kind==='ready'&&sop.state.data.allowed.import?<Button onClick={onStart}>開始 SOP</Button>:null;
 }
 function QuoteFields({q,pmName}:{q:Quote;pmName?:string}) {return <Section><Row label="報價編號" value={q.quote_no}/><Row label="工程編號" value={q.engineering_no||'未設定'}/><Row label="案件名稱" value={q.name}/><Row label="業主" value={q.client||'未設定'}/><Row label="報價日期" value={q.quoted_on||'未設定'}/><Row label="報價期限" value={q.quote_deadline||'未設定'}/><Row label="合約金額" value={amountLabel(q)}/><Row label="報價負責人" value={q.quote_owners.join('、')||'未指派'}/><Row label="PM" value={q.pm_names.join('、')||pmName||'未指派'}/><Row label="SOP 進度" value={!q.project_id?'未納入案件':q.sop_counts?`${q.sop_counts.done}/${q.sop_counts.total}`:'無任務'}/></Section>}
 function LocalFlow({c,q}:{c:Ctx;q:Quote}) {
- const sop=useSopTasks(q.project_id||'',c.s.workspace_id||'');
+ const sop=useSopTasks(q.project_id||'',c.s.workspace_id||'',canReadSop(c.s.user));
  const [node,setNode]=useState<SopNodeKey>('sales'),[importing,setImporting]=useState<SopImportTarget>(null);
  return <><div className="quote-stages" role="group" aria-label="SOP 節點">{SOP_NODES.map(([key,label])=><Button key={key} aria-pressed={node===key} onClick={()=>setNode(key)}>{label}</Button>)}</div><SopTasks c={c} p={{id:q.project_id!}} nodeKey={node} sop={sop} importing={importing} setImporting={setImporting}/></>;
 }

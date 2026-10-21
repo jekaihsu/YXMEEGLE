@@ -1,3 +1,5 @@
+import {canReadSop,prefetchSopTasks,prefetchSopAssignees} from './useSopTasks';
+import {prefetchProjectProgress} from './useProjectProgress';
 import {ProjectFlow} from './ProjectFlow';
 import {FlowWorkspaceSkeleton} from './FlowDiagram';
 import {projectFlowRoute,selectedFlowNode} from './flowModel';
@@ -38,12 +40,18 @@ const latestProjectReads=new Map<string,Promise<ProjectSlice>>();
 function cachedProject(id:string|undefined){if(projectEpoch!==getSessionEpoch()){projectSnapshots.clear();projectRequests.clear();latestProjectReads.clear();deniedProjects.clear();projectEpoch=getSessionEpoch()}return id?projectSnapshots.get(id):undefined}
 function fetchProjectSnapshot(id:string,reloadVersion:number|undefined){
  cachedProject(id);const key=JSON.stringify([id,reloadVersion]);const pending=projectRequests.get(key);if(pending)return pending;
- const epoch=getSessionEpoch();const request=api<ProjectSlice>(`/api/projects/${encodeURIComponent(id)}`,{},()=>epoch===getSessionEpoch()).then(data=>{if(epoch===getSessionEpoch()&&latestProjectReads.get(id)===request){deniedProjects.delete(id);projectSnapshots.set(id,data);if(projectSnapshots.size>20)projectSnapshots.delete(projectSnapshots.keys().next().value!)}return data}).catch(error=>{if(epoch===getSessionEpoch()&&latestProjectReads.get(id)===request&&error instanceof ApiError&&[401,403,404].includes(error.status)){projectSnapshots.delete(id);deniedProjects.add(id)}throw error}).finally(()=>{if(projectRequests.get(key)===request)projectRequests.delete(key)});projectRequests.set(key,request);latestProjectReads.set(id,request);return request;
+ const epoch=getSessionEpoch();const request=api<ProjectSlice>(`/api/projects/${encodeURIComponent(id)}`,{timeoutMs:20000},()=>epoch===getSessionEpoch()).then(data=>{if(epoch===getSessionEpoch()&&latestProjectReads.get(id)===request){deniedProjects.delete(id);projectSnapshots.set(id,data);if(projectSnapshots.size>20)projectSnapshots.delete(projectSnapshots.keys().next().value!)}return data}).catch(error=>{if(epoch===getSessionEpoch()&&latestProjectReads.get(id)===request&&error instanceof ApiError&&[401,403,404].includes(error.status)){projectSnapshots.delete(id);deniedProjects.add(id)}throw error}).finally(()=>{if(projectRequests.get(key)===request)projectRequests.delete(key)});projectRequests.set(key,request);latestProjectReads.set(id,request);return request;
 }
 
 export function ProjectDetailGate({c}:{c:Ctx}){
  // Shell mode reads only this project (tree plus its own approvals, events and records); a full workspace, after any mutation, takes the legacy path unchanged.
- const shell=c.w.scope==='shell';const id=c.route.project;
+ const shell=c.w.scope==='shell';const id=c.route.project;const sopRead=canReadSop(c.s.user);
+ useEffect(()=>{
+  if(!shell||!id)return;
+  if(c.s.features?.node_assignment){void prefetchNodeAssignments(id).catch(()=>{});void prefetchStartSop(id).catch(()=>{})}
+  void prefetchProjectProgress(id).catch(()=>{});
+  if(sopRead){void prefetchSopTasks(id,c.s.workspace_id||'',!!c.reloadVersion).catch(()=>{});void prefetchSopAssignees(id,c.s.workspace_id||'').catch(()=>{})}
+ },[shell,id,c.s.workspace_id,sopRead,c.s.features?.node_assignment,c.reloadVersion]);
  const detail=useViewData<ProjectSlice|undefined>(shell?`project:${id}`:'project-legacy',()=>shell&&id?fetchProjectSnapshot(id,c.reloadVersion):Promise.resolve(undefined),[c.reloadVersion]);
  useEffect(()=>{if(shell&&detail.data)perfMark('project-detail-render')},[shell,detail.data]);
  if(!shell)return <ProjectDetail key={id} c={c}/>;

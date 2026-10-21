@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 import json
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -6,20 +7,22 @@ from starlette.concurrency import run_in_threadpool
 
 from ..production_access import hr_view_allowed
 from .domain import Failure, require
-from .service import Context, Service, authorize
+from .service import Context, Service, authorize, authorize_reader
 
 PREFIX = '/api/projects/{project_id}'
 MAX_BODY = 64 * 1024
 
 
-def register(app, *, identity, load_case, sessions, cfg, quote_view=None, workspace=None, persist_case=None):
+def register(app, *, identity, load_case, sessions, cfg, quote_view=None, workspace=None, persist_case=None, phase=None):
     flag = lambda name: lambda: str(cfg.get(name, 'false')).lower() == 'true'
     service = Service(sessions, writes_enabled=flag('SOP_TASK_WRITES_ENABLED'),
                       local_cases_enabled=flag('LOCAL_CASE_CREATION_ENABLED'))
 
     def context(request, project_id):
         data, user = identity(request)
-        state, project = load_case(data, user, project_id)
+        authorize_reader(user)
+        with (phase(request, 'load') if phase else nullcontext()):
+            state, project = load_case(data, user, project_id)
         ctx = Context(data['wid'], user, state, project, lambda: context(request, project_id))
         authorize(ctx)
         return ctx
@@ -30,7 +33,7 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
         except Failure as exc:
             body, status = {'code': exc.code, 'detail': exc.code, **exc.context}, exc.status
         except HTTPException as exc:
-            code = {401: 'session_expired', 403: 'sop_import_forbidden', 404: 'case_not_found',
+            code = {401: 'session_expired', 403: 'identity_forbidden', 404: 'case_not_found',
                     409: 'workspace_conflict'}.get(exc.status_code, 'invalid_request')
             body, status = {'code': code, 'detail': code}, exc.status_code
         except (IntegrityError, OperationalError):

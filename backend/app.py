@@ -190,7 +190,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         return (MANAGER_CAPABILITIES[:] if role=='manager' else [])+(['approve_capability'] if ident in capability_approvers else [])
 
     shell_enabled=str(cfg.get('WORKSPACE_SHELL_ENABLED','false')).lower()=='true'
-    TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('POST','/api/actions')}
+    TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('GET','/api/settings/overview'),('POST','/api/actions')}
     @contextmanager
     def phase(request,name):
         started=perf_counter()
@@ -227,7 +227,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         response.headers['X-Content-Type-Options']='nosniff'
         response.headers['Referrer-Policy']='same-origin'
         if request.url.path.startswith('/api'): response.headers['Cache-Control']='no-store'
-        if (request.method,request.url.path) in TIMED_ROUTES or (request.method=='GET' and re.fullmatch(r'/api/projects/[^/]+',request.url.path)):
+        if (request.method,request.url.path) in TIMED_ROUTES or (request.method=='GET' and re.fullmatch(r'/api/projects/[^/]+(?:/(?:node-assignments|start-sop|sop-tasks|sop-assignees))?',request.url.path)):
             # Durations only. 'serialize' is the unmeasured remainder (response encoding and framework time).
             phases=dict(request.scope.get('phases',{})); total=perf_counter()-started
             phases['serialize']=max(total-sum(phases.values()),0)
@@ -271,9 +271,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 row.data=storage.save(db,BusinessRow,wid,data)
 
     def load(db,row,*,collections=None,project_ids=None):
-        if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=[c for c in storage.COLLECTIONS if c!='projects'],project_ids=project_ids,project_children=storage.PROJECT_CHILDREN)
+        if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections if collections is not None else storage.DETAIL_COLLECTIONS,project_ids=project_ids,project_children=storage.PROJECT_CHILDREN,filter_project_rows=True)
         else: state=storage.load(db,BusinessRow,row) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections)
-        state=upgrade(state)
+        state=upgrade(state,generate_sop_candidate=collections is None or 'sop_templates' in collections)
         return seal(db,row,state)
 
     def seal(db,row,state,*,scoped=False):
@@ -370,7 +370,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             row=db.get(WorkspaceRow,data['wid']); require(row is not None,'工作區不存在',401)
             if data.get('mode')=='lark':
                 profile=db.get(PersonRow,(organization(data),data['uid']))
-                user=deepcopy(profile.data) if profile else find(load(db,row)['users'],data['uid'],'登入人員')
+                user=deepcopy(profile.data) if profile else find(load(db,row,collections=('users',))['users'],data['uid'],'登入人員')
             else: user=find(load(db,row,collections=('users',))['users'],data['uid'],'登入人員')
             if (data.get('mode')=='lark' and not data['wid'].startswith('test-')
                     and request.url.path not in NO_ROSTER_REFRESH_PATHS):
@@ -698,7 +698,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
         require(len(result['projects'])==1,'找不到這個案件',404)
         mine=lambda item:not isinstance(item,dict) or item.get('project_id',project_id)==project_id
         records={k:[i for i in v if mine(i)] if isinstance(v,list) else v for k,v in result.items() if k not in DETAIL_SKIP}
-        return dict(records,scope='project',version=result['version'],as_of=result['as_of'],project=result['projects'][0])
+        with phase(request,'encode'):
+            from fastapi.responses import JSONResponse
+            from fastapi.encoders import jsonable_encoder
+            return JSONResponse(jsonable_encoder(dict(records,scope='project',version=result['version'],as_of=result['as_of'],project=result['projects'][0])))
 
     @app.get('/api/daily-reports')
     def daily_reports(request:Request,project_id:str='',department:str='',actor_id:str='',date_from:str='',date_to:str='',status:str='all',q:str='',offset:int=0,limit:int=50):
@@ -1494,7 +1497,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
     def node_assignment_case(data,user,project_id):
         from .source_case_policy import visible_project
         require(len(project_id)<=200,'查詢參數過長',422)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=storage.CASE_COLLECTIONS,project_ids=[project_id])
         project=next((p for p in state['projects'] if p['id']==project_id and visible_project(state,p)),None)
         require(project is not None,'找不到這個案件',404)
         return state,project
@@ -1502,7 +1505,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         """node_assignment_case plus the local planning cases this viewer may see; node assignment never gets those."""
         from .source_case_policy import visible_project,local_viewer
         require(len(project_id)<=200,'查詢參數過長',422)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=storage.CASE_COLLECTIONS,project_ids=[project_id])
         project=next((p for p in state['projects'] if p['id']==project_id and (visible_project(state,p) or local_viewer(user,p))),None)
         require(project is not None,'找不到這個案件',404)
         return state,project
@@ -1529,7 +1532,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         db.add(audit.record(AuditRow,wid,actor_id,'create_local_case',details={'version':state['version'],'project_id':project['id'],
                                                                                'changes':audit.changes(before,state)}))
     from .sop_import.routes import register as register_sop_import
-    app.state.sop_import = register_sop_import(app, identity=identity, load_case=sop_case,
+    app.state.sop_import = register_sop_import(app, identity=identity, load_case=sop_case, phase=phase,
         sessions=sessions, cfg=cfg, quote_view=quote_view, workspace=quote_workspace, persist_case=persist_local_case)
     from .node_assignment.routes import register as register_node_assignment
     from .node_skip import valid_waiver
@@ -1540,7 +1543,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         return ReportsView(app.state.reports,warm=False)
     app.state.node_assignment=register_node_assignment(app,identity=identity,load_case=node_assignment_case,sessions=sessions,
         receipt_model=Receipt,audit_model=AuditRow,cfg=cfg,skipped_nodes=valid_waiver,reports=node_reports,
-        reports_visible=lambda user: user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+        phase=phase,reports_visible=lambda user: user['role'] in ('pm','manager') or capable(user,'manage_sources'))
     from .dispatch_board.routes import register as register_dispatch_board
     from .dispatch_board.service import DispatchBoardService
     from .dispatch_board.lark_table import DispatchReader
@@ -1627,7 +1630,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
     from .runtime_health import register as register_runtime_health
     register_runtime_health(app,identity,sessions,CacheRow,cfg,workspace_model=WorkspaceRow,coordinator=app.state.live_read)
     from .settings_overview import register as register_settings_overview
-    register_settings_overview(app,identity,load,sessions,WorkspaceRow,CacheRow,cfg)
+    register_settings_overview(app,identity,load,sessions,WorkspaceRow,CacheRow,cfg,phase=phase)
 
     @app.post('/api/attendance/sync')
     async def sync_attendance(request:Request):
