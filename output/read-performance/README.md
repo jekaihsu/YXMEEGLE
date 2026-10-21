@@ -1,5 +1,7 @@
 # Settings and project read performance
 
+**Latest deployment and authenticated results: [FINAL_VERIFICATION.md](FINAL_VERIFICATION.md).** The baseline and local comparisons below are historical; subsequent rollout resolved index activation and explicitly provisioned the signed-in reader.
+
 Branch: `fix/settings-project-read-performance`; reviewed and fetched integration head: `6ae352962cd008f8e589636b3ca1f456f2be5605` (no intervening changes, rechecked 2026-10-21).
 
 ## Authenticated preview evidence and limits

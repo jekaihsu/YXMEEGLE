@@ -1,0 +1,43 @@
+{
+  "files_match": true,
+  "checked_files": 196,
+  "mismatches": [],
+  "processes": [
+    {
+      "name": "service",
+      "pid": 1,
+      "uid": 10001
+    },
+    {
+      "name": "web",
+      "pid": 7,
+      "uid": 10001
+    },
+    {
+      "name": "worker",
+      "pid": 18,
+      "uid": 10001
+    }
+  ],
+  "flags": {
+    "WORKSPACE_SHELL_ENABLED": "false",
+    "INDEX_TABLES_ENABLED": "false",
+    "NODE_ASSIGNMENT_ENABLED": "false",
+    "SOP_TASK_WRITES_ENABLED": "false",
+    "LARK_LIVE_READ_ENABLED": "false"
+  },
+  "storage_schemas": [
+    {
+      "storage_schema": "2",
+      "workspaces": 37
+    }
+  ],
+  "postgres_version": "17.11",
+  "index_readiness": [
+    {
+      "version": 35389,
+      "indexed_projects": 0,
+      "counter_version": 35382
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "service_status": "RUNNING",
+  "health_http": 200,
+  "health": {
+    "status": "ok",
+    "mode": "lark",
+    "database": "postgresql"
+  }
+}
