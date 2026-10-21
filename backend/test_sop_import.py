@@ -256,7 +256,7 @@ def test_at20_permissions_workspace_hidden_revoked_replay_and_publish(h):
     plan = preview(h)
     apply(h, plan)
     h.who[0] = 'manager'
-    assert h.client.get(URL + '/sop-tasks').status_code == 403
+    assert h.client.get(URL + '/sop-tasks').status_code == 200
     h.who[0] = 'other'
     post(h, URL + '/sop-import/preview', {'template_version_id': h.vid}, 403)
     h.who[0] = 'pm'
@@ -392,7 +392,7 @@ def test_real_app_registration_restart_and_storage_save_preserve_checklist(tmp_p
     with TestClient(app) as client:
         client.get('/api/session')
         assert client.post('/api/demo/session', json={'user_id': 'u-manager'}).status_code == 200
-        assert client.get(URL + '/sop-tasks').status_code == 403
+        assert client.get(URL + '/sop-tasks').status_code == 200
         with app.state.sessions.begin() as db:
             workspace = db.scalar(select(WorkspaceRow))
             wid = workspace.id

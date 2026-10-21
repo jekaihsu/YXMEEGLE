@@ -36,7 +36,7 @@ class Context:
 
 
 def explicitly_granted(user, capability):
-    return user.get('active', True) and capability in user.get('capabilities', [])
+    return user.get('active', True) and (user.get('role') == 'manager' or capability in user.get('capabilities', []))
 
 
 def can_manage(ctx):

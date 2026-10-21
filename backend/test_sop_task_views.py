@@ -156,6 +156,16 @@ def test_close_node_leaves_unresolved_tasks_open_and_needs_a_manager(h):
     assert by_row(h, 1)['state'] == 'pending'
 
 
+def test_a_system_manager_without_any_grant_can_do_everything(h):
+    apply(h)
+    prove_sales(h)
+    h.users['boss'] = {'id': 'boss', 'name': '系統管理員', 'role': 'manager', 'active': True, 'capabilities': []}
+    h.who[0] = 'boss'
+    allowed = overview(h)['allowed_actions']
+    assert allowed['import'] and allowed['manage'] and allowed['work']
+    assert close(h, 'sales')['closed'] > 0
+
+
 def test_a_checker_only_person_and_the_assignee_list_stay_closed_to_assigned_only_users(h):
     checker = grantless(h, 'checker')
     manual(h, {'checker': checker})

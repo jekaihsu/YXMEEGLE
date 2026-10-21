@@ -147,7 +147,7 @@ def test_only_case_task_managers_decide(case):
     set_quote(h, project, **C_ROW)
     target = task(h, url, 12)
     body = {'action': 'accept_suggestion', 'facts_hash': target['suggestion']['facts_hash'], 'expected_revision': 1}
-    for who in ('member', 'manager'):
+    for who in ('member',):
         h.who[0] = who
         assert post(h, f"{url}/sop-tasks/{target['id']}/suggestion", body, 403)['code'] == 'sop_import_forbidden'
         item = {'task_id': target['id'], 'facts_hash': body['facts_hash'], 'expected_revision': 1}
