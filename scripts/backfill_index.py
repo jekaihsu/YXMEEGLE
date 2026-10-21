@@ -15,6 +15,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.engine import make_url
 
 from backend import index_tables, storage
 from backend.policy import upgrade
@@ -58,6 +59,8 @@ def main():
     args=parser.parse_args()
     url=os.getenv('DATABASE_URL')
     if not url: raise SystemExit('DATABASE_URL is required')
+    url=make_url(url)
+    if url.drivername in ('postgres','postgresql'): url=url.set(drivername='postgresql+psycopg')
     engine=create_engine(url)
     try:
         for result in backfill(engine,workspace=args.workspace,batch=args.batch,dry_run=args.dry_run): print(result)

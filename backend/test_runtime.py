@@ -96,7 +96,8 @@ def test_deployment_staging_includes_runtime_and_omits_credentials(tmp_path,monk
     paths.append('scripts/backup_offsite.py')
     paths.append('scripts/restore_drill.py')
     paths += ['backend/sop_source_contracts.json','backend/sop_import/catalog.json','scripts/backup_publish.py',
-              'scripts/backup_reconcile.py','scripts/backup_offsite_acceptance.py','backend/requirements.lock']
+              'scripts/backup_reconcile.py','scripts/backup_offsite_acceptance.py','backend/requirements.lock',
+              'scripts/migrate_index_tables.py','scripts/backfill_index.py']
     for name in paths:
         path=root/name; path.parent.mkdir(parents=True,exist_ok=True); path.write_text('source',encoding='utf-8')
     config=root/'deployment/source-tables.json'; config.parent.mkdir()
