@@ -15,6 +15,7 @@ import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.engine import make_url
 
 from backend.models import Base, ProjectIndex, TaskIndex, WorkspaceCounter
 
@@ -54,6 +55,8 @@ def main():
     url=os.getenv('DATABASE_URL')
     if not url:
         raise SystemExit('DATABASE_URL is required')
+    url=make_url(url)
+    if url.drivername in ('postgres','postgresql'): url=url.set(drivername='postgresql+psycopg')
     engine=create_engine(url)
     try:
         migrate(engine)

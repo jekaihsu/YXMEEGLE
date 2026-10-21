@@ -15,6 +15,11 @@ def test_staged_app_and_catalog_work_without_repository_fallback(tmp_path, monke
     stage = deploy_prepare.staging()
     assert (stage / 'backend' / 'sop_source_contracts.json').is_file()
     assert (stage / 'backend' / 'sop_import' / 'catalog.json').is_file()
+    for script in ('migrate_index_tables.py', 'backfill_index.py'):
+        import subprocess, sys
+        result = subprocess.run([sys.executable, '-B', str(stage / 'scripts' / script), '--help'],
+                                cwd=tmp_path, capture_output=True, text=True)
+        assert result.returncode == 0 and 'usage' in result.stdout
     manifest = json.loads((tmp_path / 'zeabur-stage-manifest.json').read_text())
     assert any(f['path'] == 'backend/sop_source_contracts.json' for f in manifest['files'])
     receipt = json.loads((tmp_path / (stage.name + '-smoke.json')).read_text())

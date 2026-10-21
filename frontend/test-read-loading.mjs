@@ -5,7 +5,7 @@ import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {a,b,workspace} from './session-epoch-fixture.mjs';
-const bundle=await build({stdin:{contents:"export {default as App} from './src/App';export {ProjectFlow} from './src/ProjectFlow';export {useSopTasks,canReadSop,prefetchSopTasks} from './src/useSopTasks';export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {default as App} from './src/App';export {ProjectFlow} from './src/ProjectFlow';export {ProjectDetailGate} from './src/ProjectDetail';export {useSopTasks,canReadSop,prefetchSopTasks} from './src/useSopTasks';export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const path=new URL('./.read-loading-test.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);let ui;try{ui=await import(path.href)}finally{await fs.unlink(path)}
 const json=data=>new Response(JSON.stringify(data),{headers:{'content-type':'application/json'}});
 const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(r=>setTimeout(r,10))});
@@ -82,5 +82,19 @@ for(const shell of [false,true]){
  assert.equal(cached.checklistRevision,1,'late response from the previous session cannot replace current data');
  assert.equal(calls,2);
  dom.window.close();
+}
+{
+ const dom=environment('');ui.invalidateSessionEpoch();const pending=[];
+ globalThis.fetch=(url)=>new Promise(resolve=>pending.push({url,resolve}));
+ const c={w:{...workspace,scope:'shell'},s:{user:a,users:[a],mode:'lark',workspace_id:'A',features:{}},route:{view:'project',project:'pA'},go:()=>{},notify:()=>{},busy:false};
+ const root=createRoot(document.getElementById('root'));
+ await flush(()=>root.render(React.createElement(ui.ProjectDetailGate,{c})));
+ assert.equal(document.querySelector('h1').textContent,'PRIVATE_CASE_A','available project identity appears before detail responds');
+ assert.match(document.querySelector('[role=status]').textContent,/載入案件詳細/);
+ await flush(()=>root.render(React.createElement(ui.ProjectDetailGate,{c:{...c,route:{...c.route,project:'pB'}}})));
+ assert.equal(document.querySelector('h1').textContent,'CASE_B','route switches show only the selected summary');
+ await flush(()=>pending.find(p=>p.url==='/api/projects/pB').resolve(new Response(JSON.stringify({error:'not_found'}),{status:404})));
+ assert.equal(document.querySelector('h1'),null,'denied or unavailable detail removes the summary preview');
+ await flush(()=>root.unmount());dom.window.close();
 }
 console.log('Settings bootstrap, deferred edits, cancellation, and explicit SOP read gating passed');
