@@ -1,3 +1,5 @@
+import {SopWorkList} from './SopWorkInbox';
+import {parseSopWork} from './SopWorkSummary';
 // P1-INT pages: #work -> MyWorkTable(buildMyWorkView(...)), #sources -> SourceHealth(buildSourceHealthView(...)).
 // The legacy MyWork / Sources screens stay reachable through tab=legacy. Transport only; all state text comes
 // from the view models. New GETs: /api/my-work and /api/source-health.
@@ -64,7 +66,7 @@ function LegacyWorkPage({c}: {c: Ctx}) {
  const restoreFocus = pendingReturnHash !== null && pendingReturnHash === location.hash;
  const focusRestored = useCallback(() => {pendingReturnHash = null}, []);
  return <main className="page work-page" aria-label="我的工作">
-  <LegacyTabs c={c} view="work"/>
+  <LegacyTabs c={c} view="work"/><SopWorkList data={fetched.status==='ok'&&fetched.body&&typeof fetched.body==='object'&&'sop_work' in fetched.body?parseSopWork(fetched.body.sop_work):null}/>
   <Suspense fallback={<div aria-hidden="true" className="skeleton skeleton-row"/>}><MyWorkTable view={view} onSelect={id => update({selectedId: id}, false)} onModeChange={mode => update({mode, selectedId: null}, true)}
    onSearch={search => update({search}, true)} onNavigate={navigate}
    restoreFocus={restoreFocus} onFocusRestored={focusRestored}/></Suspense>
@@ -96,7 +98,7 @@ function AssignmentWorkPage({c}:{c:Ctx}) {
   c.go({view:'work',tab:nextPanel,ctx:next.toString()},true);
  };
  return <main className="page work-page" aria-label="我的工作完整表格">
-  <h1>我的工作</h1>
+  <h1>我的工作</h1><SopWorkList data={parseSopWork(read.body?.sop_work)}/>
   <div className="my-work-toolbar">
    <label>工作清單<select value={panel} onChange={e=>{const next=HOME_PANELS.find(p=>p===e.target.value);if(next)update({},next)}}>
     <option value="assigned">指派給我</option><option value="confirmation">待我確認</option><option value="delegated">我交辦的</option><option value="proxy">代理給我</option><option value="local">本地 SOP</option><option value="completed">已完成</option>

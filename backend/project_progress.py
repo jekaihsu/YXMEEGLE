@@ -560,3 +560,9 @@ def build_project_progress(state, project_id, *, reports=None, amounts=False, as
                         'reports_status': reports.status, 'reports_fetched_at': reports.fetched_at, 'reports_stale': reports.stale},
             'identity': identity, 'stages': _stages(identity, production, finance, project, amounts), 'production': production,
             'finance': finance, 'gaps': _gaps(identity, production, summary, statuses, reports, finance, project, amounts)}
+
+
+def add_sop_progress(result, projection):
+    result['sop_counts'] = projection['counts']
+    result['sop_signals'] = projection['signals']
+    result['sop_items'] = projection['items']

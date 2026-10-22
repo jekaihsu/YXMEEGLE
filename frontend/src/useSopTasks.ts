@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {getSessionEpoch} from './api';
+import {parseSopWork} from './SopWorkSummary';
+import {api,getSessionEpoch} from './api';
 import {requestId} from './nodeAssignmentApi';
 import {SOP_NODE_KEYS, SopError, sopApi, sopErrorText, type ImportPreview, type ImportReceipt, type SopNodeKey, type SopOverview, type SopTemplate, type SopAssignee} from './sopTaskApi';
 import {previewBody, sameSelection, selectionBlockers, type Decisions} from './sopTaskModel';
@@ -184,4 +185,34 @@ export function useSopImport(projectId: string, onApplied: () => Promise<void>) 
  return {step, status, busy, error, templates, version, setVersion, nodes, toggleNode, preview, defaults, selected, toggle, decisions,
   decide: (row: string, reason: string) => setDecisions(d => ({...d, [row]: reason})), blockers, receipt,
   open, loadDefault, toConfirm, apply, recover, back, hasAttempt: () => attempt.current !== null};
+}
+
+export function useSopReviewOperation(projectId:string, current:()=>boolean) {
+ const attempt=useRef<{key:string;requestId:string}|null>(null);
+ return async (taskId:string, action:'submit_for_review'|'approve'|'return', body:Record<string,unknown>) => {
+  const key=JSON.stringify([projectId,taskId,action,body]);
+  if(attempt.current?.key!==key)attempt.current={key,requestId:requestId()};
+  try {
+   const result=await sopApi.review(projectId,taskId,action,{...body,request_id:attempt.current.requestId},current);
+   attempt.current=null;
+   return result;
+  } catch(error) {
+   if(!(error instanceof SopError)||!error.ambiguous)attempt.current=null;
+   throw error;
+  }
+ };
+}
+
+export function useSopWork(version:unknown,workspace:string,userId:string) {
+ const key=JSON.stringify([workspace,userId,version,getSessionEpoch()]);
+ type Read={kind:'loading'}|{kind:'error'}|{kind:'ready';data:ReturnType<typeof parseSopWork>};
+ const [read,setRead]=useState<{key:string;value:Read}>({key,value:{kind:'loading'}});
+ useEffect(()=>{
+  const controller=new AbortController(),epoch=getSessionEpoch();
+  api<unknown>('/api/my-work',{signal:controller.signal,cache:'no-store'}).then(value=>{
+   if(!controller.signal.aborted&&epoch===getSessionEpoch())setRead({key,value:{kind:'ready',data:value&&typeof value==='object'&&'sop_work' in value?parseSopWork(value.sop_work):null}});
+  }).catch(()=>{if(!controller.signal.aborted&&epoch===getSessionEpoch())setRead({key,value:{kind:'error'}})});
+  return()=>controller.abort();
+ },[key]);
+ return read.key===key?read.value:{kind:'loading'} satisfies Read;
 }

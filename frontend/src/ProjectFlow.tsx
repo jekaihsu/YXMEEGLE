@@ -1,3 +1,4 @@
+import {SopWorkSummary} from './SopWorkSummary';
 import {NODE_NAMES} from './workflowLabels';
 import {taipeiTime} from './taipeiTime';
 import {elapsed,nameOf} from './appCommon';
@@ -35,6 +36,9 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  const route=projectFlowRoute(c.route),enabled=c.s.features?.node_assignment===true;
  const read=useProjectProgress(p.id);
  const sopTasks=useSopTasks(p.id,c.s.workspace_id || '',canReadSop(c.s.user));
+ const sopRevision='data' in sopTasks.state?sopTasks.state.data?.checklistRevision:undefined;
+ const priorSopRevision=useRef(sopRevision);
+ useEffect(()=>{if(sopRevision!==undefined&&priorSopRevision.current!==sopRevision){priorSopRevision.current=sopRevision;read.retry()}},[sopRevision,read.retry]);
  const [sopImport,setSopImport]=useState<SopImportTarget>(null);
  const sop=useStartSop(p.id,enabled,assignments.reload);
  const list='data' in assignments.state ? assignments.state.data : undefined;
@@ -105,7 +109,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
    <Button onClick={()=>c.go({...c.route,node:selectedKey,tab:'files'})}>開啟 作業資料與成果</Button>
   </details>
   {secondary}
-  {read.state.kind==='ready' && <FlowSourceDetails data={read.state.data}/>}
+  {read.state.kind==='ready' && <><SopWorkSummary signals={read.state.data.sop_signals} items={read.state.data.sop_items}/><FlowSourceDetails data={read.state.data}/></>}
   <details className="pf-secondary"><summary>案件就緒條件</summary><ProjectReadiness w={c.w} p={p}/></details>
   {report && createPortal(<ProgressDetail caseKey={report.case_key} dept={report.dept} week={report.week} onClose={()=>setReport(null)}/>,document.body)}
  </div>;

@@ -18,6 +18,7 @@ export type HomeItem = {
  home_detail?:{proxy?:{principal_name:string; start_date:string; end_date:string; basis:string}; prerequisites?:{task_id:string; title:string|null; ready:boolean}[]};
 };
 export type HomeResponse = {
+ sop_work?:unknown;
  panel:HomePanel; scope:'mine'|'team'; readState:string; snapshot_version:string; as_of:string|null;
  freshness:{status:string; last_success_at:string|null; refreshing:boolean};
  counts:{node_assignments:number|null; tasks:number|null; local_workflow:number|null; complete:boolean};

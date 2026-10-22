@@ -279,3 +279,22 @@ def build_my_work_input(ws, viewer, read=None):
     for row in out['rows']:  # the consumer's table and search read the row level title; only a verified parent supplies it
         if row['parent'].get('verified') and row['parent'].get('case_title'): row['case_title'] = row['parent']['case_title']
     return out
+
+
+def sop_projection(tasks):
+    items = []
+    for task in tasks:
+        policy = task['completion_policy']['value']
+        signal = None
+        if task['applicability'] == 'applicable' and task['state'] != 'archived':
+            if policy == 'executor_self' and task['state'] == 'done':
+                signal = 'routine_completed'
+            elif policy == 'reviewer_required' and task['state'] != 'done':
+                signal = {'submitted': 'important_submitted', 'returned': 'important_returned'}.get(task['local'].get('review_status'))
+        items.append({'id': f"sop_local:{task['project_id']}:{task['id']}", 'task_id': task['id'],
+                      'project_id': task['project_id'], 'title': task['title'], 'signal': signal,
+                      'completion_policy': policy, 'state': task['state'],
+                      'review_status': task['local'].get('review_status'),
+                      'return_reason': task['local'].get('return_reason')})
+    return {'signals': {key: sum(t['signal'] == key for t in items) for key in
+                        ('routine_completed', 'important_submitted', 'important_returned')}, 'items': items}

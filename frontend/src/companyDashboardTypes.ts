@@ -1,6 +1,9 @@
+import type {SopSignals} from './sopTaskApi';
+import type {SopWorkItem} from './SopWorkSummary';
 import type {SourceLifecycle} from './sourceLifecycle';
 
 export interface CompanyDashboard {
+ sop_signals?:SopSignals;sop_items?:SopWorkItem[];
  as_of:string;checked_at:string;date_basis:string;source:{status:string;mapping_status:string;last_success_at:string|null};
  totals:{cases:number;confirmed_cases:number;intake_records:number;workbench_cases:number;deliveries_confirmed:number;source_status_counts:Record<string,number>;lifecycle_counts?:Record<string,number>;execution_status_counts:Record<string,number>;tasks_total:number;tasks_completed:number;tasks_overdue:number;pending_local_reviews:number;pending_native_reviews:number};
  source_deadlines?:{cases:number;tasks:number;buckets:{key:string;cases:number;tasks:number}[]};

@@ -11,7 +11,7 @@ globalThis.requestAnimationFrame = fn => setTimeout(fn, 0);
 HTMLElement.prototype.scrollIntoView = function () {};
 HTMLElement.prototype.getClientRects = function () {return [{width: 40, height: 40}]};
 const React = await import('react'); const {act} = React; const {createRoot} = await import('react-dom/client');
-const bundle = await build({stdin: {contents: "export * from './src/sopTaskApi';export * from './src/sopTaskModel';export {useSopTasks,defaultImportNodes} from './src/useSopTasks';export {SopTasks} from './src/SopTasks';export {invalidateSessionEpoch} from './src/api';", resolveDir: import.meta.dirname}, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
+const bundle = await build({stdin: {contents: "export * from './src/sopTaskApi';export * from './src/sopTaskModel';export {useSopTasks,defaultImportNodes} from './src/useSopTasks';export {SopTasks} from './src/SopTasks';export * from './src/SopWorkSummary';export {SopWorkList} from './src/SopWorkInbox';export {proofFiles} from './src/SopTaskInspector';export {invalidateSessionEpoch} from './src/api';", resolveDir: import.meta.dirname}, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
 const path = new URL('./.sop-tasks-test.mjs', import.meta.url); await fs.writeFile(path, bundle.outputFiles[0].text); let ui; try {ui = await import(path.href)} finally {await fs.unlink(path)}
 const examples = JSON.parse(await fs.readFile(new URL('../backend/sop_import/api-examples.json', import.meta.url), 'utf8'));
 const clone = v => JSON.parse(JSON.stringify(v));
@@ -69,6 +69,15 @@ async function mount({tasks = [task('t1')], route = {}, overviewStatus = 200, ex
   if (url.endsWith('/sop-import/apply')) {server.apply.push(body); return server.applyReply ? server.applyReply(body) : response({...examples.apply, request_id: body.request_id})}
   if (url.includes('/sop-import/runs/')) {server.run.push(url); if (server.hold) await server.hold; return server.runReply ? server.runReply(url) : response({...examples.apply, request_id: decodeURIComponent(url.split('/').at(-1))})}
   if (url.endsWith('/sop-tasks/close-node')) {server.close = [...(server.close || []), body]; return response({closed: 1, left_open: {shared: 0, unresolved: 0}, checklist_revision: 5})}
+  if (url.endsWith('/transition')||url.endsWith('/submit-for-review')||url.endsWith('/approve')||url.endsWith('/return')) {
+   if(server.mutationReply)return server.mutationReply(url,body);
+   const t=server.overview.tasks[0];t.revision+=1;
+   if(url.endsWith('/submit-for-review'))t.local={...t.local,review_status:'submitted',submission:{revision:1,snapshot:{note:body.note,evidence:body.evidence_refs}}};
+   else if(url.endsWith('/return'))t.local={...t.local,review_status:'returned',return_reason:body.reason};
+   else t.state='done';
+   t.allowed_actions=[];server.overview.checklist_revision+=1;
+   return response({task_id:t.id,revision:t.revision,checklist_revision:server.overview.checklist_revision});
+  }
   if (method === 'PATCH') {server.patch.push(body); return server.patchReply ? server.patchReply(body) : response({task_id: 't1', revision: body.expected_revision + 1, checklist_revision: 9, state: 'pending', applicability: 'applicable'})}
   return response({code: 'not_found'}, 404);
  };
@@ -159,8 +168,8 @@ test('the section lists the node tasks with executor, state, due and badges', as
  const section = document.querySelector('#sop-tasks');
  assert.equal(section.querySelector('h3').firstChild.textContent, 'SOP 任務');
  assert.deepEqual([...section.querySelectorAll('.pf-task-open strong')].map(s => s.textContent), ['業主提出報價需求', '共用檢核']);
- assert.equal(section.querySelector('[data-sop-task=t1] span').textContent, '未指派 · 待處理 · 期限待確認');
- assert.equal(section.querySelector('[data-sop-task=shared] span').textContent, '林組員 · 待處理 · 期限待確認共用條件');
+ assert.equal(section.querySelector('[data-sop-task=t1] span').textContent, '未指派 · 待處理 · 一般任務 · 執行人完成 · 期限待確認');
+ assert.equal(section.querySelector('[data-sop-task=shared] span').textContent, '林組員 · 待處理 · 一般任務 · 執行人完成 · 期限待確認共用條件');
  assert.equal(section.querySelector('.sop-progress').textContent, '0/1');
  await click(button('全案'));
  assert.equal(section.querySelector('[data-sop-task=shared] small').textContent, '報價、PM 派工');
@@ -305,4 +314,69 @@ test('without manager authority or open tasks there is no close action', async (
  await mount({tasks: [task('t1')], extra: {node_done: proven, allowed_actions: {...examples.sop_tasks.allowed_actions, manage: false}}});
  assert.ok(document.querySelector('.sop-node-done'));
  assert.equal(button('依節點完成，全部標為已完成（1）'), undefined);
+});
+
+test('routine completion needs no upload and sends the task revision', async()=>{
+ await mount({tasks:[task('t1',{completion_policy:{version:1,value:'executor_self'},completion_evidence:{kind:'none'},allowed_actions:['complete']})],route:{task:'t1',task_source:'sop_local'}});
+ assert.ok(dialog());assert.equal(button('上傳成果檔案'),undefined);
+ await click(button('完成'));
+ const call=calls.find(c=>c.url.endsWith('/transition'));
+ assert.equal(call.body.action,'complete');assert.equal(call.body.expected_revision,1);assert.deepEqual(call.body.evidence_refs,[]);
+ assert.match(dialog().textContent,/已完成/);
+});
+
+test('important submission stays pending and captures request id and revision',async()=>{
+ await mount({tasks:[task('t1',{completion_policy:{version:1,value:'reviewer_required'},completion_evidence:{kind:'none'},allowed_actions:['submit_for_review']})],route:{task:'t1',task_source:'sop_local'}});
+ assert.equal(button('完成'),undefined);
+ await type(dialog().querySelector('textarea'),'成果已備妥');await click(button('提交審核'));
+ const call=calls.find(c=>c.url.endsWith('/submit-for-review'));
+ assert.ok(call.body.request_id);assert.equal(call.body.expected_revision,1);assert.equal(call.body.note,'成果已備妥');
+ assert.match(dialog().textContent,/已提交／待審核/);assert.match(dialog().textContent,/第 1 版/);assert.equal(server.overview.tasks[0].state,'pending');
+});
+
+for(const action of ['approve','return'])test(`reviewer ${action} uses exact submission; return needs reason`,async()=>{
+ await mount({tasks:[task('t1',{completion_policy:{version:1,value:'reviewer_required'},completion_evidence:{kind:'none'},allowed_actions:['approve','return'],revision:3,local:{review_status:'submitted',submission:{revision:2,snapshot:{note:'第二版',evidence:[]}}}})],route:{task:'t1',task_source:'sop_local'}});
+ if(action==='return'){
+  await click(button('退回'));const form=dialog().querySelector('.sop-inline');assert.equal(form.querySelector('button[type=submit]').disabled,true);
+  await type(form.querySelector('input'),'請補正成果');await click(form.querySelector('button[type=submit]'));
+  assert.match(dialog().textContent,/請補正成果/);assert.match(dialog().textContent,/重新提交/);
+ }else await click(button('核准'));
+ const call=calls.find(c=>c.url.endsWith('/'+action));assert.ok(call.body.request_id);assert.equal(call.body.expected_revision,3);assert.equal(call.body.submission_revision,2);
+});
+
+test('formal approval task offers no direct completion even with stale actions',async()=>{
+ await mount({tasks:[task('t1',{completion_policy:{version:1,value:'formal_external'},completion_evidence:{kind:'none'},allowed_actions:['complete']})],route:{task:'t1',task_source:'sop_local'}});
+ assert.equal(button('完成'),undefined);assert.equal(button('提交審核'),undefined);assert.match(dialog().textContent,/此任務由正式審批處理/);
+});
+
+test('ambiguous submit retries reuse the request id and stale review reloads',async()=>{
+ await mount({tasks:[task('t1',{completion_policy:{version:1,value:'reviewer_required'},completion_evidence:{kind:'none'},allowed_actions:['submit_for_review']})],route:{task:'t1',task_source:'sop_local'}});
+ server.mutationReply=()=>response({code:'import_unavailable'},503);
+ await click(button('提交審核'));await click(button('提交審核'));
+ const submissions=calls.filter(c=>c.url.endsWith('/submit-for-review'));assert.equal(submissions.length,2);assert.deepEqual(submissions[0].body,submissions[1].body);
+ server.mutationReply=()=>response({code:'stale_submission'},409);await click(button('提交審核'));assert.match(dialog().textContent,/送審內容已更新，請重新確認/);
+});
+
+test('file evidence selects only current local output and sends typed proof',async()=>{
+ const old={id:'f1',name:'成果',storage:'local',direction:'output',size:10,sha256:'a'.repeat(64),version:'1',file_key:'delivery'};
+ const current={...old,id:'f2',version:'2'};
+ assert.deepEqual(ui.proofFiles([old,current,{...current,id:'link',storage:'link'},{...current,id:'withdrawn',withdrawn:true}]).map(f=>f.id),['f2']);
+ await mount({tasks:[task('t1',{completion_policy:{version:1,value:'executor_self'},completion_evidence:{kind:'file',minimum:1},allowed_actions:['complete']})],route:{task:'t1',task_source:'sop_local'}});
+ c.w.projects=[{id:'p1',files:[old,current]}];await act(async()=>{render();await tick()});
+ assert.equal(button('完成').disabled,true);
+ const check=[...dialog().querySelectorAll('input[type=checkbox]')][0];await act(async()=>{check.click();await tick()});await click(button('完成'));
+ assert.deepEqual(calls.find(c=>c.url.endsWith('/transition')).body.evidence_refs,[{kind:'file',file_id:'f2',version:'2',sha256:'a'.repeat(64)}]);
+});
+
+test('SOP work counters drill into matching items and review entry hides without items',async()=>{
+ const item={id:'sop_local:p1:t1',task_id:'t1',project_id:'p1',title:'待修正成果',signal:'important_returned',completion_policy:'reviewer_required',state:'in_progress',review_status:'returned',return_reason:'補齊圖面'};
+ const projection={signals:{routine_completed:0,important_submitted:0,important_returned:1},items:[item],reviewer_items:[]};
+ assert.deepEqual(ui.parseSopWork(projection),projection);
+ assert.equal(ui.parseSopWork({...projection,signals:{...projection.signals,important_returned:2}}),null);
+ root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(ui.SopWorkList,{data:projection}));await tick()});
+ assert.equal(button('待我審核 0'),undefined);assert.equal(document.querySelectorAll('a').length,0);
+ await click(button('重要任務已退回 1'));assert.equal(document.querySelectorAll('a').length,1);assert.match(document.body.textContent,/補齊圖面/);
+ assert.match(document.querySelector('a').getAttribute('href'),/task_source=sop_local&task=t1/);
+ await act(async()=>{root.render(React.createElement(ui.SopWorkList,{data:{...projection,reviewer_items:[{...item,review_status:'submitted'}]}}));await tick()});
+ await click(button('待我審核 1'));assert.equal(document.querySelectorAll('a').length,2);
 });

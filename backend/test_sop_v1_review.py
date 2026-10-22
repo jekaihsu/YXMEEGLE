@@ -16,7 +16,7 @@ def imported(h, number=59):
     key = f'meegle-v137:A:{number}'
     decisions = {key: {'value': 'applicable', 'reason': 'Applicable'}} if number in {7, 20, 54} else {}
     apply(h, preview(h, row_keys=[key], participant_bindings={key: {'executor': 'member', 'checker': 'pm'}},
-                     applicability_decisions=decisions))
+                     applicability_decisions=decisions), rid=f'v1-{number}')
     return by_row(h, number)
 
 
@@ -180,12 +180,23 @@ def test_real_app_routine_counters_follow_completion(tmp_path, monkeypatch):
         response = client.post(f'{url}/sop-tasks/{task_id}/transition', json={'expected_revision': 1, 'action': 'complete'})
         assert response.status_code == 200, response.text
         assert client.get('/api/my-work').json()['sop_counts']['done'] == 1
+        for path in ('/api/my-work', '/api/my-work?panel=assigned&scope=mine'):
+            payload = client.get(path)
+            assert payload.status_code == 200, payload.text
+            work = payload.json()['sop_work']
+            assert work['signals'] == {'routine_completed': 1, 'important_submitted': 0, 'important_returned': 0}
+            assert [t['task_id'] for t in work['items'] if t['signal'] == 'routine_completed'] == [task_id]
+            assert work['reviewer_items'] == []
         dashboard = client.get('/api/company-dashboard').json()
         assert dashboard['sop_counts']['done'] == 1
+        assert dashboard['sop_signals']['routine_completed'] == 1
+        assert len([t for t in dashboard['sop_items'] if t['signal'] == 'routine_completed']) == 1
         assert next(p for p in dashboard['cases'] if p['id'] == ids['formal'])['sop_counts']['done'] == 1
         progress = client.get(url + '/progress')
         assert progress.status_code == 200, progress.text
         assert progress.json()['sop_counts']['done'] == 1
+        assert progress.json()['sop_signals']['routine_completed'] == 1
+        assert len([t for t in progress.json()['sop_items'] if t['signal'] == 'routine_completed']) == 1
         signin('u-report')
         assert client.get('/api/my-work').json()['sop_counts']['total'] == 0
     finally:
@@ -251,3 +262,45 @@ def test_changed_project_pm_requires_a_fresh_submission(h):
     second = review(h, submitted, 'submit-for-review', request_id='new-pm')['task']
     h.who[0] = 'other'
     assert review(h, second, 'approve', submission_revision=2)['state'] == 'done'
+
+
+def test_v1_signals_drilldowns_and_reviewer_permissions(h):
+    from .my_work import sop_projection
+    from .company_dashboard import add_sop_progress as dashboard
+    from .project_progress import add_sop_progress as progress
+    routine = imported(h, 59)
+    important = imported(h, 24)
+    formal = imported(h, 7)
+    h.who[0] = 'member'
+    post(h, f"{URL}/sop-tasks/{routine['id']}/transition", transition(h, routine))
+    submitted = review(h, important, 'submit-for-review')['task']
+    projection = h.service.read_counts('w', h.users['member'], ['p1'], own=True)
+    assert projection['signals'] == {'routine_completed': 1, 'important_submitted': 1, 'important_returned': 0}
+    assert len(projection['items']) == 3
+    assert all(t['id'] == f"sop_local:p1:{t['task_id']}" for t in projection['items'])
+    for key, count in projection['signals'].items():
+        assert len([t for t in projection['items'] if t['signal'] == key]) == count
+    assert next(t for t in projection['items'] if t['task_id'] == formal['id'])['signal'] is None
+    assert h.service.read_counts('w', h.users['other'], ['p1'], own=True)['items'] == []
+    with h.sessions() as db:
+        project = deepcopy(db.get(BusinessRow, ('w', 'projects', 'p1')).data)
+    state = {'users': list(h.users.values())}
+    assert h.service.read_work('w', h.users['member'], state, [project])['reviewer_items'] == []
+    assert len(h.service.read_work('w', h.users['pm'], state, [project])['reviewer_items']) == 1
+    assert h.service.read_work('w', h.users['other'], state, [project])['reviewer_items'] == []
+    h.users['pm']['capabilities'] = []
+    assert len(h.service.read_work('w', h.users['pm'], state, [project])['reviewer_items']) == 1
+    h.who[0] = 'pm'
+    review(h, submitted, 'return', submission_revision=1, reason='補齊成果')
+    returned = h.service.read_counts('w', h.users['member'], ['p1'], own=True)
+    assert returned['signals'] == {'routine_completed': 1, 'important_submitted': 0, 'important_returned': 1}
+    assert h.service.read_work('w', h.users['pm'], state, [project])['reviewer_items'] == []
+    item = next(t for t in returned['items'] if t['signal'] == 'important_returned')
+    assert item['return_reason'] == '補齊成果'
+    for attach in (dashboard, progress):
+        result = {'cases': [{'id': 'p1'}]}
+        attach(result, returned)
+        assert result['sop_signals'] == returned['signals']
+        assert result['sop_items'] == returned['items']
+    assert result['sop_counts']['done'] == 1
+    assert sop_projection([]) == {'signals': {'routine_completed': 0, 'important_submitted': 0, 'important_returned': 0}, 'items': []}

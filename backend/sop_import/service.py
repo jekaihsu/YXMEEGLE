@@ -1030,8 +1030,29 @@ class Service:
                                                           LocalTask.project_id.in_(project_ids))))
             if own or not has_reader_grant(user):
                 tasks = [t for t in tasks if holds_task(t, user['id'])]
-            return {'counts': self.counts(tasks), 'projects': {pid: self.counts([t for t in tasks if t.project_id == pid])
-                                                            for pid in project_ids}}
+            from ..my_work import sop_projection
+            views = [self.task_json(t, []) for t in tasks]
+            return {'counts': self.counts(tasks), **sop_projection(views),
+                    'projects': {pid: self.counts([t for t in tasks if t.project_id == pid]) for pid in project_ids},
+                    'project_signals': {pid: sop_projection([t for t in views if t['project_id'] == pid])
+                                        for pid in project_ids}}
+
+    def read_work(self, wid, user, state, projects):
+        assigned, reviewers = [], []
+        if not user.get('active', True):
+            return {'signals': {}, 'items': [], 'reviewer_items': []}
+        with self.sessions() as db:
+            for project in projects:
+                ctx = Context(wid, user, state, project, None, assigned_only=not has_reader_grant(user))
+                tasks = self.tasks(db, ctx)
+                views = self.task_views(db, ctx, tasks)
+                for task, view in zip(tasks, views):
+                    if holds_task(task, user['id']):
+                        assigned.append(view)
+                    if completion_policy(task)['value'] == 'reviewer_required' and task.state not in {Lifecycle.DONE, Lifecycle.ARCHIVED} and task.local.get('review_status') == 'submitted' and self.may_review(ctx, task):
+                        reviewers.append(view)
+        from ..my_work import sop_projection
+        return {**sop_projection(assigned), 'reviewer_items': sop_projection(reviewers)['items']}
 
     @staticmethod
     def completion_failure(task, evidence=None):

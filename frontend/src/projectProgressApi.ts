@@ -1,3 +1,5 @@
+import type {SopSignals} from './sopTaskApi';
+import type {SopWorkItem} from './SopWorkSummary';
 import {PRODUCTION_NODE_KEYS} from './nodeAssignmentApi';
 import {api} from './api';
 import type {ItemsProgress, WorkItemStatus} from './nodeAssignmentApi';
@@ -16,6 +18,7 @@ export interface ProductionStage {
 }
 export interface ProgressReportRow {case_key: string; case_code: string; dept: 'field'|'office'; week: string; basis: string; planned: number; actual: number; planned_days: number; actual_days: number; matched_days: number; achievement: number|null; expected_total: number|null; done_total: number|null; remaining: number|null; status: string}
 export interface ProjectProgress {
+ sop_signals?:SopSignals;sop_items?:SopWorkItem[];
  schema_version: 1; project_id: string; as_of: string|null;
  sources: {source_synced_at: string|null; source_status: string|null; reports_status: 'ok'|'cold'|'unavailable'|'restricted'|'disabled'; reports_fetched_at: string|null; reports_stale: boolean|null};
  identity: {code: string|null; is_c_prefix: boolean; confirmation: {present: boolean; line_count: number; fill_item_count: number|null; source_status: string|null}; quotes: {number: string|null; engineering_code: string|null; status: string|null}[]; v3_cases: {case_key: string; case_code: string; status: string; match: 'code'|'quote_number'}[]; v3_ambiguous: boolean};

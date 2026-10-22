@@ -660,8 +660,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
         from .company_dashboard import overview
         result=overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle)
         counts=app.state.sop_import.read_counts(data['wid'],user,[p['id'] for p in safe.get('projects',[])])
-        result['sop_counts']=counts['counts']
-        for case in result['cases']: case['sop_counts']=counts['projects'].get(case['id'])
+        from .company_dashboard import add_sop_progress
+        add_sop_progress(result, counts)
         return result
 
     @app.get('/api/projects')
@@ -1179,7 +1179,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
         elif not privileged or data.get('mode')!='lark' or data['wid'].startswith(('test-','demo-')): reports=ReportsView(status='restricted')
         else: reports=ReportsView(getattr(app.state,'reports',None))
         result=build_project_progress(state,project_id,reports=reports,amounts=privileged,as_of=state['as_of'])
-        result['sop_counts']=app.state.sop_import.read_counts(data['wid'],user,[project_id])['counts']
+        from .project_progress import add_sop_progress
+        add_sop_progress(result, app.state.sop_import.read_counts(data['wid'],user,[project_id]))
         return JSONResponse(result,headers={'Cache-Control':'no-store'})
 
     @app.get('/api/case-detail/{project_id}')
@@ -1223,7 +1224,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
         """Read model for the viewer; same full-workspace load as GET /api/workspace. my_work applies case_redaction itself."""
         from .my_work import build_my_work_input
         data,user=identity(request)
-        if request.query_params: return app.state.home_panels.read_workspace(request,data,user)
         app.state.live_read.ensure(data['wid'],'sources')
         read={'admitted':data.get('access_mode','normal') in ('normal','tenant-read')}
         try:
@@ -1231,11 +1231,12 @@ def create_app(overrides=None,*,dispatch_transport=None):
             read['loaded']=True
         except Exception:
             state={}; read['failed']=True
-        result=build_my_work_input(state,user,read)
+        result=app.state.home_panels.read(request,data,user,state) if request.query_params and read.get('loaded') else build_my_work_input(state,user,read)
         if read.get('loaded'):
             from .source_case_policy import visible_project,local_viewer
             ids=[p['id'] for p in state.get('projects',[]) if visible_project(state,p) or local_viewer(user,p)]
             result['sop_counts']=app.state.sop_import.read_counts(data['wid'],user,ids,own=True)['counts']
+            result['sop_work']=app.state.sop_import.read_work(data['wid'],user,state,[p for p in state.get('projects',[]) if p['id'] in ids])
         return result
 
     @app.post('/api/sources/cutover-baseline')

@@ -3,7 +3,7 @@ import {SOP_NODE_KEYS, type Applicability, type ImportPreview, type Lifecycle, t
 export const STATE_LABEL: Record<Lifecycle, string> = {pending: '待處理', in_progress: '進行中', blocked: '受阻', done: '已完成', archived: '已封存'};
 export const APPLICABILITY_LABEL: Record<Applicability, string> = {applicable: '適用', not_applicable: '不適用', unresolved: '適用待確認'};
 export const ROLE_LABEL = {executor: '執行', checker: '檢核', confirmer: '確認'} as const;
-export const stateLabel = (t: SopTask) => t.applicability === 'not_applicable' && t.state !== 'archived' ? '不適用' : STATE_LABEL[t.state];
+export const stateLabel = (t: SopTask) => t.applicability === 'not_applicable' && t.state !== 'archived' ? '不適用' : t.state !== 'done' && t.state !== 'archived' && t.reviewStatus === 'submitted' ? '已提交／待審核' : t.state !== 'done' && t.state !== 'archived' && t.reviewStatus === 'returned' ? '已退回，請修正後重新提交' : STATE_LABEL[t.state];
 export const dueLabel = (t: SopTask) => t.dueDate || '期限待確認';
 
 const nodeIndex = (key: SopNodeKey) => SOP_NODE_KEYS.indexOf(key);
@@ -89,7 +89,8 @@ export const ACTIONS: {action: TaskAction; label: string; reason: boolean}[] = [
  {action:'reset',label:'退回待處理',reason:true}, {action:'reopen',label:'重新開啟',reason:true},
  {action:'archive',label:'封存',reason:true}, {action:'restore',label:'還原',reason:true},
 ];
-export function taskActions(t: SopTask) {return ACTIONS.filter(a => t.allowedActions.includes(a.action))}
+export const policyLabel = (t:SopTask) => ({executor_self:'一般任務 · 執行人完成',reviewer_required:'重要任務 · 需審核',formal_external:'正式審批處理'})[t.completionPolicy];
+export function taskActions(t: SopTask) {return ACTIONS.filter(a => t.allowedActions.includes(a.action) && (a.action !== 'complete' || t.completionPolicy === 'executor_self'))}
 export const suggestionLabel = (s: NonNullable<SopTask['suggestion']>) => s.state === 'done' ? '建議完成' : '建議進行中';
 export const suggestionTier = (s: NonNullable<SopTask['suggestion']>) => s.tier === 'proof' ? '佐證' : '指標';
 export const suggestionSelection = (tasks: SopTask[]) => tasks.filter(t => t.suggestion && t.allowedActions.includes('accept_suggestion'));

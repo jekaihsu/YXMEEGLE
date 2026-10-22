@@ -180,3 +180,14 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
         'total_count':len(filtered) if complete else None,'loaded_count':len(filtered),
         'cases':filtered[offset:offset+limit],'pagination':{'offset':offset,'limit':limit,'total':len(filtered),'has_more':offset+limit<len(filtered)},
         'metric_scope':'task progress counts only executable workbench cases; source business status is independent'}
+
+
+def add_sop_progress(result, projection):
+    result['sop_counts'] = projection['counts']
+    result['sop_signals'] = projection['signals']
+    result['sop_items'] = projection['items']
+    for case in result['cases']:
+        case['sop_counts'] = projection['projects'].get(case['id'])
+        scoped = projection['project_signals'].get(case['id'], {})
+        case['sop_signals'] = scoped.get('signals')
+        case['sop_items'] = scoped.get('items', [])

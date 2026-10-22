@@ -1,3 +1,4 @@
+import {SopWorkSummary} from '../SopWorkSummary';
 import type {Ctx} from '../appCommon';
 import {Row} from '../design';
 import {homeHref,type HomeCardId} from '../homeLayout';
@@ -12,12 +13,12 @@ export function CompanyCard({id,c,today,confirmation,read}:{id:HomeCardId;c:Ctx;
  const data=read.data;
  if(!data)return null;
  let content;
- if(id==='kpi')return <Kpis note="本週到期總數尚未提供。" values={[
+ if(id==='kpi')return <><SopWorkSummary signals={data.sop_signals} items={data.sop_items}/><Kpis note="本週到期總數尚未提供。" values={[
   {label:'進行中案件',href:'#view=projects',value:data.totals.execution_status_counts.in_progress??0},
   {label:'逾期任務',href:'#view=projects',value:data.totals.tasks_overdue},
   {label:'待確認',href:'#view=projects',value:data.totals.pending_local_reviews+data.totals.pending_native_reviews},
   {label:'本週到期',href:'#view=work',value:null},
- ]}/>;
+ ]}/></>;
  if(id==='groups')content=<WorkloadChart label="各組已完成、未逾期與逾期任務數" rows={[...data.groups].sort((a,b)=>b.tasks_total-a.tasks_total).slice(0,5).map(row=>({label:row.group||'未分組',completed:row.tasks_completed,open:Math.max(0,row.tasks_total-row.tasks_completed-row.tasks_overdue),overdue:row.tasks_overdue}))}/>;
  if(id==='statuses')content=<StatusChart counts={data.totals.execution_status_counts}/>;
  if(id==='cases'){

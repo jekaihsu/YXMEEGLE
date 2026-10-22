@@ -13,7 +13,12 @@ export const ROLES: readonly Role[] = ['executor','checker','confirmer'];
 export interface SopCounts {done: number; total: number; unresolved: number; not_applicable: number; archived: number}
 export interface SopAssignee {id: string; name: string; case_roles: string[]; department: string|null}
 export interface SopSuggestion {taskId: string; ruleId: string; ruleRevision: number; tier: 'proof'|'indicator'; state: 'done'|'in_progress'; facts: Record<string, unknown>; hash: string}
+export type CompletionPolicy = 'executor_self'|'reviewer_required'|'formal_external';
+export type FileProof = {kind:'file'; file_id:string; version:string; sha256:string};
+export interface SopSignals {routine_completed:number; important_submitted:number; important_returned:number}
 export interface SopTask {
+ completionPolicy: CompletionPolicy; completionEvidence: {kind:'none'|'unresolved'}|{kind:'file';minimum:number};
+ reviewStatus: string|null; submission: {revision:number; note:string; evidence:{id:string;name:string;version:string;sha256:string}[]}|null; returnReason:string|null;
  allowedActions: string[]; suggestion: SopSuggestion|null; shared: boolean; conditional: boolean;
  id: string; title: string; instructions: string|null; participants: Partial<Record<Role,string>>;
  applicability: Applicability; state: Lifecycle; revision: number; overdue: boolean; manual: boolean;
@@ -69,8 +74,14 @@ function task(v: unknown): SopTask {
  const participants: SopTask['participants'] = {};
  for (const [role, id] of Object.entries(people)) {if (!ROLES.includes(role as Role)) throw malformed(); participants[role as Role] = str(id)}
  const dueDate = optStr(local.due_date);
+ const policy=t.completion_policy==null?null:object(t.completion_policy), evidence=t.completion_evidence==null?{kind:'unresolved'}:object(t.completion_evidence);
+ if(policy&&policy.version!==1)throw malformed();
+ const kind=oneOf(['none','unresolved','file'] as const)(evidence.kind);
+ const submission=local.submission==null?null:object(local.submission), snapshot=submission?object(submission.snapshot):null;
  if (dueDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) throw malformed();
- return {allowedActions: list(t.allowed_actions,str), suggestion: t.suggestion == null ? null : parseSuggestion(t.suggestion), shared: bool(t.is_shared), conditional: bool(t.is_conditional), id: str(t.id), title: str(t.title), instructions: optStr(t.instructions), participants, applicability: applicability(t.applicability),
+ return {completionPolicy:policy?oneOf<CompletionPolicy>(['executor_self','reviewer_required','formal_external'])(policy.value):'executor_self',
+  completionEvidence:kind==='file'?{kind,minimum:int(evidence.minimum)}:{kind}, reviewStatus:optStr(local.review_status), returnReason:optStr(local.return_reason),
+  submission:submission&&snapshot?{revision:int(submission.revision),note:optStr(snapshot.note)||'',evidence:list(snapshot.evidence,x=>{const f=object(x);return {id:str(f.id),name:optStr(f.name)||'成果檔案',version:typeof f.version==='number'?String(int(f.version)):str(f.version),sha256:str(f.sha256)}})}:null, allowedActions: list(t.allowed_actions,str), suggestion: t.suggestion == null ? null : parseSuggestion(t.suggestion), shared: bool(t.is_shared), conditional: bool(t.is_conditional), id: str(t.id), title: str(t.title), instructions: optStr(t.instructions), participants, applicability: applicability(t.applicability),
   state: lifecycle(t.state), revision: int(t.revision), overdue: bool(t.overdue), manual: origin.template_family_id === 'manual',
   dueDate, dateStatus: str(local.date_status), completionRule: str(local.completion_rule_status),
   nodes: list(t.nodes, n => {const l = object(n); return {node_key: node(l.node_key), node_id: str(l.node_id), order: int(l.order)}}),
@@ -127,6 +138,7 @@ async function request(url: string, init: RequestInit, current: () => boolean): 
 const base = (id: string) => `/api/projects/${encodeURIComponent(id)}`;
 const post = (body: unknown, method = 'POST'): RequestInit => ({method, body: JSON.stringify(body)});
 export const sopApi = {
+ review: (id:string, taskId:string, action:'submit_for_review'|'approve'|'return', body:Record<string,unknown>, current:()=>boolean) => request(`${base(id)}/sop-tasks/${encodeURIComponent(taskId)}/${action.replaceAll('_','-')}`,post(body),current).then(parseMutation),
  assignees: (id: string, current: () => boolean) => request(`${base(id)}/sop-assignees`, {}, current).then(parseAssignees),
  suggestion: (id: string, taskId: string, body: Record<string, unknown>, current: () => boolean) => request(`${base(id)}/sop-tasks/${encodeURIComponent(taskId)}/suggestion`, post(body), current).then(parseMutation),
  acceptSuggestions: (id: string, body: Record<string, unknown>, current: () => boolean) => request(`${base(id)}/sop-tasks/suggestions/accept`, post(body), current),
@@ -143,10 +155,11 @@ export const sopApi = {
 };
 
 export const SOP_ERROR_TEXT: Record<string, string> = {
+ stale_submission:'送審內容已更新，請重新確認', review_assignment_changed:'審核人員已變更，請重新提交審核', request_id_conflict:'操作內容已變更，請重新確認', review_pending:'已提交審核，請等待審核結果', submission_not_found:'尚未提交審核', terminal_task:'此任務已結束，請重新載入', stale_file_proof:'檔案已有新版，請重新選擇', invalid_file_proof:'請選擇本案最新的成果檔案', review_required:'此任務需提交審核', formal_external_required:'此任務由正式審批處理', review_not_required:'此任務不需送審', completion_policy_invalid:'完成方式待確認，請聯絡管理員',
  quote_number_taken: '報價編號已使用', quote_number_invalid: '報價編號格式不正確', local_case_creation_disabled: '本地建立暫停', quote_not_found: '找不到報價', suggestion_stale: '建議已更新', suggestion_confirmation_required: '需確認建議並填寫原因', identity_forbidden:'帳號或工作區尚未獲准存取，請聯絡管理員核對身分與名冊', session_expired: '登入已過期', sop_import_forbidden: '沒有 SOP 任務權限', case_not_found: '找不到此案件', task_not_found: '找不到此 SOP 任務',
  preview_stale: '預覽已過期，已重新產生', preview_not_found: '預覽已失效，已重新產生', idempotency_mismatch: '匯入請求不一致，請重新預覽',
  task_revision_conflict: '任務已被更新，已重新載入', node_mapping_invalid: '節點對應有誤', row_not_importable: '此列不可匯入',
- applicability_unresolved: '需先確認適用', completion_evidence_missing: '完成條件待審核', import_unavailable: 'SOP 任務暫停寫入',
+ applicability_unresolved: '需先確認適用', completion_evidence_missing: '請先補齊完成所需的成果', import_unavailable: 'SOP 任務暫停寫入',
  template_unavailable: '範本版本不可用', template_mapping_conflict: '範本節點對應衝突', participant_unresolved: '此人員已停用或不存在', node_not_done_by_data: '資料尚未判定此節點完成',
  task_reopen_required: '需先重新開啟', invalid_transition: '目前狀態不可執行', invalid_request: '內容格式不正確', run_not_found: '找不到匯入紀錄',
  network: '連線中斷', client_timeout: '連線逾時', malformed: '回應格式不正確',
