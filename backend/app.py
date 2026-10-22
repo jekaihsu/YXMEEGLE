@@ -658,7 +658,11 @@ def create_app(overrides=None,*,dispatch_transport=None):
         require(len(q)<=240 and len(group)<=120 and len(source_status)<=120 and len(lifecycle)<=120,'查詢文字過長',422)
         with sessions() as db: safe=public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'],owned=True,task_details=False)
         from .company_dashboard import overview
-        return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle)
+        result=overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle)
+        counts=app.state.sop_import.read_counts(data['wid'],user,[p['id'] for p in safe.get('projects',[])])
+        result['sop_counts']=counts['counts']
+        for case in result['cases']: case['sop_counts']=counts['projects'].get(case['id'])
+        return result
 
     @app.get('/api/projects')
     def projects(request:Request,q:str='',status:str='',owner:str='',offset:int=0,limit:int=30,view:str='',tab:str='formal',sort:str='due',dir:str='asc'):
@@ -1174,7 +1178,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
         if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true': reports=ReportsView(status='disabled')
         elif not privileged or data.get('mode')!='lark' or data['wid'].startswith(('test-','demo-')): reports=ReportsView(status='restricted')
         else: reports=ReportsView(getattr(app.state,'reports',None))
-        return JSONResponse(build_project_progress(state,project_id,reports=reports,amounts=privileged,as_of=state['as_of']),headers={'Cache-Control':'no-store'})
+        result=build_project_progress(state,project_id,reports=reports,amounts=privileged,as_of=state['as_of'])
+        result['sop_counts']=app.state.sop_import.read_counts(data['wid'],user,[project_id])['counts']
+        return JSONResponse(result,headers={'Cache-Control':'no-store'})
 
     @app.get('/api/case-detail/{project_id}')
     def case_detail(request:Request,project_id:str):
@@ -1225,7 +1231,12 @@ def create_app(overrides=None,*,dispatch_transport=None):
             read['loaded']=True
         except Exception:
             state={}; read['failed']=True
-        return build_my_work_input(state,user,read)
+        result=build_my_work_input(state,user,read)
+        if read.get('loaded'):
+            from .source_case_policy import visible_project,local_viewer
+            ids=[p['id'] for p in state.get('projects',[]) if visible_project(state,p) or local_viewer(user,p)]
+            result['sop_counts']=app.state.sop_import.read_counts(data['wid'],user,ids,own=True)['counts']
+        return result
 
     @app.post('/api/sources/cutover-baseline')
     async def source_case_baseline(request:Request):

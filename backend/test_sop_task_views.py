@@ -124,7 +124,8 @@ def close(h, node, status=200):
 
 
 def test_close_node_completes_open_tasks_of_a_node_the_data_proves_done(h):
-    apply(h)
+    from .test_sop_import import preview
+    apply(h, preview(h, node_keys=['sales'], row_keys=['meegle-v137:A:1', 'meegle-v137:A:2']))
     before = overview(h)
     assert before['node_done'] == {}
     assert close(h, 'sales', 409)['code'] == 'node_not_done_by_data'
@@ -144,7 +145,8 @@ def test_close_node_completes_open_tasks_of_a_node_the_data_proves_done(h):
 
 
 def test_close_node_leaves_unresolved_tasks_open_and_needs_a_manager(h):
-    apply(h)
+    from .test_sop_import import preview
+    apply(h, preview(h, node_keys=['sales'], row_keys=['meegle-v137:A:1', 'meegle-v137:A:2']))
     prove_sales(h)
     h.who[0] = 'member'
     assert post(h, URL + '/sop-tasks/close-node', {'node_key': 'sales'}, 403)['code'] == 'sop_import_forbidden'
@@ -163,7 +165,7 @@ def test_a_system_manager_without_any_grant_can_do_everything(h):
     h.who[0] = 'boss'
     allowed = overview(h)['allowed_actions']
     assert allowed['import'] and allowed['manage'] and allowed['work']
-    assert close(h, 'sales')['closed'] > 0
+    assert close(h, 'sales', 422)['code'] == 'review_required'
 
 
 def test_a_checker_only_person_and_the_assignee_list_stay_closed_to_assigned_only_users(h):

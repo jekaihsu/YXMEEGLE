@@ -166,6 +166,8 @@ def test_cockpit_skips_personal_actions_but_preserves_full_workspace_metrics(tmp
         assert response.status_code == 200
         actual = response.json()
         actual.pop('checked_at')
+        assert actual.pop('sop_counts')['total'] == 0
+        for case in actual['cases']: assert case.pop('sop_counts')['total'] == 0
         expected.pop('checked_at')
         assert actual == expected
         assert actual['totals']['cases'] == 6

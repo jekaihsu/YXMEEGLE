@@ -5,7 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from sqlalchemy import select
-from .domain import Disposition, NODE_MAP, require
+from .domain import CompletionPolicy, Disposition, NODE_MAP, require
 from .models import Family, Version, TemplateRow
 
 RAW_FIELDS = {'source_group', 'source_order', 'meegle_id', 'title', 'source_kind', 'owner_role_raw',
@@ -46,6 +46,15 @@ def validate(catalog, *, baseline=True):
         require(set(locators) == set(range(2, 64)), 'catalog_locator_invalid')
     for row in rows:
         raw, proposal = row['raw'], row['proposed_import']
+        policy = row.get('completion_policy')
+        require(policy is None or isinstance(policy, dict) and set(policy) == {'version', 'value'}
+                and policy['version'] == 1 and policy['value'] in {p.value for p in CompletionPolicy},
+                'completion_policy_invalid')
+        evidence = row.get('completion_evidence')
+        require(evidence is None or isinstance(evidence, dict) and (
+                evidence == {'kind': 'none'} or set(evidence) == {'kind', 'minimum'} and
+                evidence['kind'] == 'file' and type(evidence['minimum']) is int and 1 <= evidence['minimum'] <= 20),
+                'completion_evidence_invalid')
         require(set(raw) == RAW_FIELDS, 'catalog_fields_invalid')
         require(all(v is None or type(v) in (str, int) for v in raw.values()), 'catalog_fields_invalid')
         require(type(raw['title']) is str and 1 <= len(raw['title']) <= 500, 'catalog_title_invalid')

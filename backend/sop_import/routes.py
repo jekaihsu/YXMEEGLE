@@ -125,6 +125,26 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
     async def transition(request: Request, project_id: str, task_id: str):
         return await mutation(request, project_id, lambda ctx, body: service.mutate(ctx, task_id, body, transition=True))
 
+    @app.get(PREFIX + '/sop-tasks/{task_id}/history')
+    def task_history(request: Request, project_id: str, task_id: str):
+        return respond(lambda: service.history(context(request, project_id), task_id))
+
+    @app.get(PREFIX + '/sop-tasks/reviewer-queue')
+    def reviewer_queue(request: Request, project_id: str):
+        return respond(lambda: service.review_queue(context(request, project_id)))
+
+    @app.post(PREFIX + '/sop-tasks/{task_id}/submit-for-review')
+    async def submit_for_review(request: Request, project_id: str, task_id: str):
+        return await mutation(request, project_id, lambda ctx, body: service.review(ctx, task_id, body, 'submit_for_review'))
+
+    @app.post(PREFIX + '/sop-tasks/{task_id}/approve')
+    async def approve(request: Request, project_id: str, task_id: str):
+        return await mutation(request, project_id, lambda ctx, body: service.review(ctx, task_id, body, 'approve'))
+
+    @app.post(PREFIX + '/sop-tasks/{task_id}/return')
+    async def return_submission(request: Request, project_id: str, task_id: str):
+        return await mutation(request, project_id, lambda ctx, body: service.review(ctx, task_id, body, 'return'))
+
     @app.post(PREFIX + '/sop-tasks/close-node')
     async def close_node(request: Request, project_id: str):
         return await mutation(request, project_id, service.close_node)

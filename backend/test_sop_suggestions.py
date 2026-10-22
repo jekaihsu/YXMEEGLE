@@ -123,9 +123,9 @@ def test_proof_tier_completes_an_imported_task_and_records_the_rule(case):
 def test_indicator_tier_needs_explicit_confirmation_and_reason(case):
     h, url, project = case
     set_quote(h, project, **C_ROW)
-    assert decide(h, url, 16, 422)['code'] == 'suggestion_confirmation_required'
-    assert decide(h, url, 16, 422, confirm=True)['code'] == 'suggestion_confirmation_required'
-    assert decide(h, url, 16, confirm=True, reason='回傳本已上傳')['state'] == 'done'
+    assert decide(h, url, 3, 422)['code'] == 'suggestion_confirmation_required'
+    assert decide(h, url, 3, 422, confirm=True)['code'] == 'suggestion_confirmation_required'
+    assert decide(h, url, 3, confirm=True, reason='回傳本已上傳')['state'] == 'done'
     set_quote(h, project, **{'回傳單日期': None, '報價期限': '2026-11-05'})
     assert decide(h, url, 9, confirm=True, reason='追蹤中')['state'] == 'in_progress'
 
@@ -197,7 +197,7 @@ def test_bulk_accept_is_all_or_nothing(case):
     assert (failed['code'], failed['task_id']) == ('suggestion_stale', proof[1]['id'])
     assert [task(h, url, n)['state'] for n in (2, 12)] == ['pending', 'pending']
     assert events(h, 'suggestion_accepted') == []
-    indicator = task(h, url, 16)
+    indicator = task(h, url, 3)
     with_indicator = items + [{'task_id': indicator['id'], 'facts_hash': indicator['suggestion']['facts_hash'],
                                'expected_revision': 1}]
     assert post(h, f'{url}/sop-tasks/suggestions/accept', {'tasks': with_indicator}, 422)['task_id'] == indicator['id']

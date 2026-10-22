@@ -1,6 +1,12 @@
 from enum import Enum
 
 
+class CompletionPolicy(str, Enum):
+    EXECUTOR_SELF = 'executor_self'
+    REVIEWER_REQUIRED = 'reviewer_required'
+    FORMAL_EXTERNAL = 'formal_external'
+
+
 class Disposition(str, Enum):
     TASK = 'task'
     REFERENCE = 'routing_reference'

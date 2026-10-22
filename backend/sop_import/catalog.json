@@ -104,6 +104,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -144,6 +148,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -184,6 +192,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -224,6 +236,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -264,6 +280,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -304,6 +324,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -344,6 +368,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -384,6 +412,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "formal_external"
       }
     },
     {
@@ -424,6 +456,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "reviewer_required"
       }
     },
     {
@@ -464,6 +500,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -504,6 +544,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -544,6 +588,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -584,6 +632,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -624,6 +676,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -664,6 +720,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -704,6 +764,10 @@
         "target_branch_node_keys": [
           "sales"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -744,6 +808,10 @@
         "target_branch_node_keys": [
           "pm"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "reviewer_required"
       }
     },
     {
@@ -784,6 +852,10 @@
         "target_branch_node_keys": [
           "pm"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -824,6 +896,10 @@
         "target_branch_node_keys": [
           "pm"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -864,6 +940,10 @@
         "target_branch_node_keys": [
           "pm"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -904,6 +984,10 @@
         "target_branch_node_keys": [
           "confirmation"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "reviewer_required"
       }
     },
     {
@@ -944,6 +1028,13 @@
         "target_branch_node_keys": [
           "confirmation"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
+      },
+      "completion_evidence": {
+        "kind": "none"
       }
     },
     {
@@ -984,6 +1075,13 @@
         "target_branch_node_keys": [
           "confirmation"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
+      },
+      "completion_evidence": {
+        "kind": "none"
       }
     },
     {
@@ -1024,6 +1122,10 @@
         "target_branch_node_keys": [
           "confirmation"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -1064,6 +1166,10 @@
         "target_branch_node_keys": [
           "confirmation"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -1104,6 +1210,10 @@
         "target_branch_node_keys": [
           "field"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -1144,6 +1254,13 @@
         "target_branch_node_keys": [
           "field"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "reviewer_required"
+      },
+      "completion_evidence": {
+        "kind": "none"
       }
     },
     {
@@ -1184,6 +1301,10 @@
         "target_branch_node_keys": [
           "field"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "reviewer_required"
       }
     },
     {
@@ -1224,6 +1345,10 @@
         "target_branch_node_keys": [
           "field"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -1264,6 +1389,10 @@
         "target_branch_node_keys": [
           "field"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "reviewer_required"
       }
     },
     {
@@ -1304,6 +1433,14 @@
         "target_branch_node_keys": [
           "field"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
+      },
+      "completion_evidence": {
+        "kind": "file",
+        "minimum": 1
       }
     },
     {
@@ -1348,6 +1485,13 @@
           "mapping",
           "report"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "reviewer_required"
+      },
+      "completion_evidence": {
+        "kind": "none"
       }
     },
     {
@@ -1388,6 +1532,10 @@
         "target_branch_node_keys": [
           "control"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "reviewer_required"
       }
     },
     {
@@ -1428,6 +1576,10 @@
         "target_branch_node_keys": [
           "mapping"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "reviewer_required"
       }
     },
     {
@@ -1468,6 +1620,10 @@
         "target_branch_node_keys": [
           "report"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "reviewer_required"
       }
     },
     {
@@ -1512,6 +1668,10 @@
           "mapping",
           "report"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -1552,6 +1712,10 @@
         "target_branch_node_keys": [
           "pricing"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "reviewer_required"
       }
     },
     {
@@ -1592,6 +1756,10 @@
         "target_branch_node_keys": [
           "pricing"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -1632,6 +1800,10 @@
         "target_branch_node_keys": [
           "pricing"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -1672,6 +1844,10 @@
         "target_branch_node_keys": [
           "pricing"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -1712,6 +1888,10 @@
         "target_branch_node_keys": [
           "pricing"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -1752,6 +1932,10 @@
         "target_branch_node_keys": [
           "pricing"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -1792,6 +1976,10 @@
         "target_branch_node_keys": [
           "pricing"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "reviewer_required"
       }
     },
     {
@@ -1832,6 +2020,10 @@
         "target_branch_node_keys": [
           "pricing"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -1872,6 +2064,14 @@
         "target_branch_node_keys": [
           "pricing"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
+      },
+      "completion_evidence": {
+        "kind": "file",
+        "minimum": 1
       }
     },
     {
@@ -1912,6 +2112,10 @@
         "target_branch_node_keys": [
           "settlement"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -1952,6 +2156,10 @@
         "target_branch_node_keys": [
           "settlement"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -1992,6 +2200,10 @@
         "target_branch_node_keys": [
           "settlement"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -2032,6 +2244,10 @@
         "target_branch_node_keys": [
           "settlement"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -2072,6 +2288,10 @@
         "target_branch_node_keys": [
           "settlement"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -2112,6 +2332,10 @@
         "target_branch_node_keys": [
           "settlement"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -2152,6 +2376,10 @@
         "target_branch_node_keys": [
           "settlement"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -2192,6 +2420,10 @@
         "target_branch_node_keys": [
           "settlement"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -2232,6 +2464,10 @@
         "target_branch_node_keys": [
           "settlement"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "formal_external"
       }
     },
     {
@@ -2272,6 +2508,10 @@
         "target_branch_node_keys": [
           "settlement"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -2312,6 +2552,13 @@
         "target_branch_node_keys": [
           "settlement"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "reviewer_required"
+      },
+      "completion_evidence": {
+        "kind": "none"
       }
     },
     {
@@ -2352,6 +2599,10 @@
         "target_branch_node_keys": [
           "settlement"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "reviewer_required"
       }
     },
     {
@@ -2392,6 +2643,14 @@
         "target_branch_node_keys": [
           "settlement"
         ]
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
+      },
+      "completion_evidence": {
+        "kind": "file",
+        "minimum": 2
       }
     },
     {
@@ -2428,6 +2687,10 @@
         "reason": "Workbook classifies this outside a single case. Do not instantiate per case.",
         "is_business_approval": false,
         "target_branch_node_keys": []
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -2464,6 +2727,10 @@
         "reason": "Workbook classifies this outside a single case. Do not instantiate per case.",
         "is_business_approval": false,
         "target_branch_node_keys": []
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -2500,6 +2767,10 @@
         "reason": "Workbook explicitly marks disabled. Keep in the catalog; do not instantiate.",
         "is_business_approval": false,
         "target_branch_node_keys": []
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     },
     {
@@ -2536,6 +2807,10 @@
         "reason": "Workbook explicitly marks disabled. Keep in the catalog; do not instantiate.",
         "is_business_approval": false,
         "target_branch_node_keys": []
+      },
+      "completion_policy": {
+        "version": 1,
+        "value": "executor_self"
       }
     }
   ],
