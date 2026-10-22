@@ -62,7 +62,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  const select=(node:string,keyboard=false)=>{keyboardMove.current=keyboard;c.go({...c.route,tab:keyboard ? c.route.tab : 'flow',node,task:undefined,task_source:undefined,focus:undefined},keyboard)};
  const sopAllowed=sopTasks.state.kind==='ready' ? sopTasks.state.data.allowed : undefined;
  const sopNode=isSopNode(selected.key) ? selected.key : undefined;
- const sopNodeAction=sopAllowed && sopNode ? <FlowAction allowed={sopAllowed.import} reason="需 SOP 匯入權限" onClick={()=>setSopImport(sopNode)}>匯入此節點任務</FlowAction> : null;
+ const sopNodeAction=sopAllowed && sopNode ? <FlowAction allowed={sopAllowed.import} reason="需 SOP 匯入權限" help="從預設 SOP 範本帶入本節點的標準任務清單，匯入前可預覽與勾選。" onClick={()=>setSopImport(sopNode)}>匯入此節點任務</FlowAction> : null;
  const localNode=p.nodes.find(n=>n.key===selected.key);
  const managers=c.w.users.filter(u=>u.active!==false && u.role==='manager' && selected.departments.includes(u.department));
  const taskIncomplete=(!isLegacy && assignments.state.kind==='error' && !list) || (all ? Object.keys(details.errors).length>0 : !!details.errors[selected.key]);

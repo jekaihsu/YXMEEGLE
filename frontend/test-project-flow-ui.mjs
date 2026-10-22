@@ -62,8 +62,8 @@ await click(button('指派'));assert.equal(document.querySelector('select[aria-l
 mutationStatus=403;await value(document.querySelector('select[aria-label="任務負責人"]'),'ou_anna');await click(button('儲存指派'));
 assert.match(document.querySelector('.pf-task-picker').textContent,/沒有|權限/);assert.equal(document.querySelector('select[aria-label="任務負責人"]').value,'ou_anna');
 mutationStatus=200;await click(button('儲存指派'));const patch=calls.findLast(r=>r.method==='PATCH');assert.deepEqual(Object.keys(patch.body).sort(),['assignee_open_id','expected_revision','request_id']);assert.equal(patch.body.assignee_open_id,'ou_anna');
-await mount({node:'control'});await click(button('新增任務'));assert.match(document.querySelector('.na-form').textContent,/新增節點任務/);
-await click(button('建立任務'));assert.match(document.querySelector('.na-form').textContent,/請填寫任務名稱/);
+await mount({node:'control'});await click(button('新增任務'));assert.match(document.querySelector('.ne-form').textContent,/新增節點任務/);
+await click(button('建立任務'));assert.match(document.querySelector('.ne-form').textContent,/請填寫任務名稱/);
 await mount({node:'control',dispatch:true});await click(button('排班'));assert.match(document.querySelector('[role=dialog]').textContent,/新增排班/);
 const field=label=>[...document.querySelectorAll('.dp-field')].find(l=>l.firstElementChild.textContent===label)?.querySelector('input,select');
 assert.equal(field('專案編號').value,'p1');assert.equal(field('工程確認單').value,'recCase');assert.equal(field('部門').value,'控制');assert.equal(field('父義務').value,'recObligation');

@@ -99,11 +99,12 @@ const assign = async (t: SopTask, id: string) => {
   <header>
    <h3>SOP 任務{counts && <span className="sop-progress" aria-label={`完成 ${progressLabel(counts)}`}>{progressLabel(counts)}</span>}{counts && checklistComplete(counts) && <Badge tone="positive">檢查清單已完成</Badge>}</h3>
    <div className="pf-actions">
-    {allowed && <FlowAction allowed={allowed.import} reason="需 SOP 匯入權限" onClick={() => setImporting('case')}>匯入預設任務</FlowAction>}
-    {allowed && <FlowAction allowed={allowed.manage} reason="需 SOP 任務管理權限" onClick={() => setCreating(true)}>新增任務</FlowAction>}
+    {allowed && <FlowAction allowed={allowed.import} reason="需 SOP 匯入權限" help="從預設 SOP 範本帶入整個案件的標準任務清單，匯入前可預覽與勾選。" onClick={() => setImporting('case')}>匯入預設任務</FlowAction>}
+    {allowed && <FlowAction allowed={allowed.manage} reason="需 SOP 任務管理權限" help="手動新增一項此節點的 SOP 任務。" onClick={() => setCreating(true)}>新增任務</FlowAction>}
    {data && suggestionSelection(data.tasks).length>0 && <Button onClick={()=>setReview([])}>採用全部建議</Button>}</div>
   </header>
-  <div className="pf-filters sop-filters">
+  {data && counts && !filtered && !history && rows.length===0 && allowed?.import && <div className="sop-empty-default"><div><strong>{node ? `${sopNodeLabel(node)}節點尚未匯入預設 SOP` : '尚未匯入預設 SOP'}</strong><span>匯入預設範本後，這個節點會帶入標準任務清單，可再指派與調整。</span></div><Button variant="primary" onClick={() => setImporting(node && !wholeCase ? node : 'case')}>{node && !wholeCase ? '匯入此節點預設任務' : '匯入預設任務'}</Button></div>}
+  {(!data || !counts || filtered || history || rows.length>0) && <div className="pf-filters sop-filters">
    <div className="pf-actions" role="group" aria-label="SOP 任務範圍">{node && <Button aria-pressed={!wholeCase} onClick={() => setWholeCase(false)}>此節點</Button>}<Button aria-pressed={wholeCase || !node} onClick={() => setWholeCase(true)}>全案</Button></div>
    <div className="pf-actions" role="group" aria-label="SOP 任務篩選">{FILTERS.map(([key, label]) => <Button key={key} aria-pressed={filters.includes(key)} onClick={() => toggle(key)}>{label}</Button>)}<Button aria-pressed={history} onClick={() => setHistory(h => !h)}>封存紀錄</Button></div>
    {counts && <span role="status" className="sop-counts">
@@ -113,7 +114,7 @@ const assign = async (t: SopTask, id: string) => {
     {!history && counts.archived > 0 && <Badge>已封存 {counts.archived}</Badge>}
     {filtered && !history && <span>篩選後完成 {progressLabel(countTasks(rows))}</span>}
    </span>}
-  </div>
+  </div>}
   {data && rows.length>0 && <div className="sop-bulk"><Button aria-pressed={rows.every(t=>selected.has(t.id))} onClick={()=>setSelected(old=>{const next=new Set(old);const all=rows.every(t=>next.has(t.id));rows.forEach(t=>{if(all)next.delete(t.id);else next.add(t.id)});return next})}>選取此頁</Button><span>{selectedTasks.length} 項</span>{selectedTasks.length>0&&<Button onClick={()=>setSelected(new Set())}>清除選取</Button>}{(['assign','due','start'] as const).map(action=><Button key={action} disabled={!selectedTasks.some(t=>bulkEligible(t,action))} onClick={()=>setBulk(action)}>{{assign:'指派',due:'設期限',start:'標記進行中'}[action]}</Button>)}</div>}
   {proven && <div className="pg-callout sop-node-done" role="status"><strong>{sopNodeLabel(node!)}節點已完成</strong> · {proven.reason}
    {allowed?.manage && closable.length > 0 && <FlowAction allowed={!closing} reason="處理中" onClick={() => void closeNode()}>{closing ? '處理中…' : `依節點完成，全部標為已完成（${closable.length}）`}</FlowAction>}</div>}
@@ -121,7 +122,7 @@ const assign = async (t: SopTask, id: string) => {
   {state.kind === 'error' && <div role="alert" className="pg-callout">SOP 任務讀取失敗 · {state.message}<Button onClick={() => void sop.reload()}>重試 SOP 任務</Button></div>}
   {state.kind === 'loading' ? <div aria-label="SOP 任務載入中" aria-busy="true"><Skeleton lines={3} height="3.5rem"/></div>
    : data && (rows.length ? <ul className="pf-task-list">{rows.map(t => <TaskLine key={t.id} task={t} assignees={sop.assignees} assigning={assigning===t.id} onAssign={id=>void assign(t,id)} selected={selected.has(t.id)} onSelect={()=>selectTask(t.id)} projectId={p.id} sop={sop} onAccept={()=>setReview([t.id])} people={people} scoped={!!scope} onOpen={() => openRoute(t.id)}/>)}</ul>
-    : <p className="pf-empty">{history ? '無封存任務' : filtered ? '沒有符合的任務' : '無 SOP 任務'}</p>)}
+    : (history || filtered || !allowed?.import) && <p className="pf-empty">{history ? '無封存任務' : filtered ? '沒有符合的任務' : '無 SOP 任務'}</p>)}
   {routeTask && data && !openTask && state.kind === 'ready' && !state.refreshing && <p role="alert">找不到此 SOP 任務 <Button onClick={() => openRoute()}>關閉</Button></p>}
   {openTask && data && <SopTaskInspector key={openTask.id} task={openTask} project={p} users={c.w.users} sop={sop} onClose={() => openRoute()}/>}
   {importing && data && <SopImportSheet projectId={p.id} startNode={data.startNode} only={importing === 'case' ? undefined : importing} onApplied={sop.reload} onClose={() => setImporting(null)} onOpenImported={() => {setImporting(null); setWholeCase(true); setFilters([]); setHistory(false); requestAnimationFrame(() => document.getElementById('sop-tasks')?.focus())}}/>}

@@ -43,3 +43,4 @@
 .sop-quick-assign{min-height:36px;max-width:11rem;border:1px solid var(--sep);background:var(--surface);color:var(--label);border-radius:10px;padding:4px 8px;font:inherit;font-size:13px}
 .sop-node-done{display:flex;gap:8px 12px;align-items:center;flex-wrap:wrap}
 .sop-more-roles{display:grid;gap:12px}.sop-more-roles>summary{cursor:pointer;font-size:13px;color:var(--label-2)}
+.sop-empty-default{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px 20px;margin:12px 0;border:1px dashed var(--sep);border-radius:12px;background:var(--surface-2)}.sop-empty-default>div{display:grid;gap:4px}.sop-empty-default span{font-size:13px;color:var(--label-2)}
