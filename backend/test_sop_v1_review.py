@@ -72,7 +72,7 @@ def test_routine_file_proof_is_typed_current_and_no_review_needed(h):
 
 @pytest.mark.parametrize('decision', ['approve', 'return'])
 def test_important_submit_review_exact_revision_and_retry(h, decision):
-    task = imported(h, 19)
+    task = imported(h, 24)
     ref = proof(h)
     h.who[0] = 'member'
     submitted = review(h, task, 'submit-for-review', evidence_refs=[ref], note='Ready')['task']
@@ -101,7 +101,7 @@ def test_important_submit_review_exact_revision_and_retry(h, decision):
     assert h.client.get(URL + '/sop-tasks/reviewer-queue').json()['total'] == 0
     if decision == 'return':
         h.who[0] = 'member'
-        assert by_row(h, 19)['local']['return_reason'] == 'Fix the output'
+        assert by_row(h, 24)['local']['return_reason'] == 'Fix the output'
         second = review(h, result['task'], 'submit-for-review', request_id='second', evidence_refs=[ref])['task']
         assert second['local']['submission']['revision'] == 2
         h.who[0] = 'pm'
@@ -118,7 +118,7 @@ def test_important_submit_review_exact_revision_and_retry(h, decision):
 
 
 def test_assignment_change_conflicts_and_queue_uses_current_authority(h):
-    task = imported(h, 19)
+    task = imported(h, 24)
     ref = proof(h)
     h.who[0] = 'member'
     submitted = review(h, task, 'submit-for-review', evidence_refs=[ref])['task']
@@ -250,6 +250,7 @@ def test_concurrent_approval_retries_append_one_decision(h):
 
 def test_changed_project_pm_requires_a_fresh_submission(h):
     task = imported(h, 24)
+    task = change(h, task, {'participants': {'executor': 'member'}})['task']
     h.who[0] = 'member'
     submitted = review(h, task, 'submit-for-review')['task']
     with h.sessions.begin() as db:
@@ -304,3 +305,172 @@ def test_v1_signals_drilldowns_and_reviewer_permissions(h):
         assert result['sop_items'] == returned['items']
     assert result['sop_counts']['done'] == 1
     assert sop_projection([]) == {'signals': {'routine_completed': 0, 'important_submitted': 0, 'important_returned': 0}, 'items': []}
+
+
+@pytest.mark.parametrize('missing', [False, True])
+def test_unresolved_evidence_rejects_unrelated_output(h, missing):
+    task = imported(h, 1)
+    if missing:
+        with h.sessions.begin() as db:
+            stored = db.get(LocalTask, ('w', task['id']))
+            snapshot = deepcopy(stored.snapshot)
+            snapshot['row'].pop('completion_evidence', None)
+            stored.snapshot = snapshot
+    ref = proof(h)
+    h.who[0] = 'member'
+    assert post(h, f"{URL}/sop-tasks/{task['id']}/transition",
+                transition(h, task, evidence_refs=[ref]), 422)['code'] == 'completion_evidence_missing'
+
+
+def test_history_redacts_source_fields_in_edits(h):
+    task = imported(h, 59)
+    change(h, task, {'instructions': '來源機密作法'})
+    path = f"{URL}/sop-tasks/{task['id']}/history"
+    assert next(e for e in h.client.get(path).json()['events'] if e['kind'] == 'edited')['changes']['instructions'] == '來源機密作法'
+    h.who[0] = 'member'
+    events = h.client.get(path).json()['events']
+    edit = next(e for e in events if e['kind'] == 'edited')
+    assert edit['changes'].get('instructions') is None
+    assert edit['changes']['expected_revision'] == 1
+
+
+@pytest.mark.parametrize('decision', ['approve', 'return'])
+def test_checker_without_grants_can_replay_completed_decision(h, decision):
+    task = imported(h, 24)
+    task = change(h, task, {'participants': {'executor': 'member', 'checker': 'other'}})['task']
+    h.users['other']['capabilities'] = []
+    h.who[0] = 'member'
+    submitted = review(h, task, 'submit-for-review')['task']
+    h.who[0] = 'other'
+    args = {'submission_revision': 1, **({'reason': '請補齊成果'} if decision == 'return' else {})}
+    first = review(h, submitted, decision, **args)
+    replay = review(h, submitted, decision, **args)
+    assert replay['replayed'] and replay['revision'] == first['revision']
+    with h.sessions() as db:
+        assert len(list(db.scalars(select(TaskEvent).where(TaskEvent.kind == decision)))) == 1
+
+
+@pytest.mark.parametrize('decision', ['approve', 'return'])
+def test_pm_fallback_without_grants_can_review(h, decision):
+    task = imported(h, 24)
+    task = change(h, task, {'participants': {'executor': 'member'}})['task']
+    h.who[0] = 'member'
+    submitted = review(h, task, 'submit-for-review')['task']
+    h.users['pm']['capabilities'] = []
+    h.who[0] = 'pm'
+    assert h.client.get(URL + '/sop-tasks/reviewer-queue').json()['total'] == 1
+    assert review(h, submitted, decision, submission_revision=1,
+                  **({'reason': '請修正'} if decision == 'return' else {}))['state'] == ('done' if decision == 'approve' else 'in_progress')
+
+
+@pytest.mark.parametrize('edit', [{'due_date': '2026-11-01', 'reason': '調整期限'},
+                                 {'title': '新標題'}, {'instructions': ''},
+                                 {'participants': {'executor': 'member', 'checker': 'pm', 'confirmer': 'other'}}])
+def test_non_content_edit_keeps_submission_reviewable(h, edit):
+    task = imported(h, 24)
+    # Re-sending identical instructions is also a non-content edit.
+    if 'instructions' in edit:
+        edit = {'instructions': task['instructions']}
+    h.who[0] = 'member'
+    submitted = review(h, task, 'submit-for-review')['task']
+    h.who[0] = 'pm'
+    changed = change(h, submitted, edit)['task']
+    assert changed['local']['review_status'] == 'submitted'
+    assert review(h, changed, 'approve', submission_revision=1)['state'] == 'done'
+
+
+@pytest.mark.parametrize('edit', [{'instructions': '修正作法'},
+                                 {'participants': {'executor': 'other', 'checker': 'pm'}}])
+def test_content_edit_returns_submission_with_history(h, edit):
+    task = imported(h, 24)
+    h.who[0] = 'member'
+    submitted = review(h, task, 'submit-for-review')['task']
+    h.who[0] = 'pm'
+    changed = change(h, submitted, edit)['task']
+    assert changed['local']['review_status'] == 'returned'
+    assert changed['local']['return_reason'] == '任務內容或指派已變更，請修正後重新提交'
+    events = h.client.get(f"{URL}/sop-tasks/{task['id']}/history").json()['events']
+    returned = next(e for e in events if e['kind'] == 'return')
+    assert returned['revision'] == changed['revision']
+    assert returned['changes']['reason'] == changed['local']['return_reason']
+    assert returned['changes']['submission_revision'] == 1
+
+
+@pytest.mark.parametrize('number', [24, 7])
+def test_manager_restores_archived_protected_task(h, number):
+    task = imported(h, number)
+    path = f"{URL}/sop-tasks/{task['id']}/transition"
+    archived = post(h, path, {'expected_revision': task['revision'], 'action': 'archive', 'reason': '暫存'})['task']
+    assert 'restore' in archived['allowed_actions']
+    restored = post(h, path, {'expected_revision': archived['revision'], 'action': 'restore', 'reason': '繼續執行'})['task']
+    assert restored['state'] == task['state']
+    if number == 24:
+        h.who[0] = 'member'
+        submitted = review(h, restored, 'submit-for-review')['task']
+        h.who[0] = 'pm'
+        done = review(h, submitted, 'approve', submission_revision=1)['task']
+        assert post(h, path, {'expected_revision': done['revision'], 'action': 'archive', 'reason': '封存'}, 409)['code'] == 'terminal_task'
+
+
+@pytest.mark.parametrize('applicability', ['not_applicable', 'unresolved'])
+def test_unresolved_applicability_does_not_offer_submission(h, applicability):
+    task = imported(h, 24)
+    task = post(h, f"{URL}/sop-tasks/{task['id']}/transition", {
+        'expected_revision': task['revision'], 'action': 'set_applicability',
+        'applicability': applicability, 'reason': '確認適用性'})['task']
+    h.who[0] = 'member'
+    assert 'submit_for_review' not in by_row(h, 24)['allowed_actions']
+    assert review(h, task, 'submit-for-review', 422)['code'] == 'applicability_unresolved'
+
+
+def test_assignment_changed_pending_submission_offers_resubmit(h):
+    task = imported(h, 24)
+    task = change(h, task, {'participants': {'executor': 'member'}})['task']
+    h.who[0] = 'member'
+    submitted = review(h, task, 'submit-for-review')['task']
+    with h.sessions.begin() as db:
+        project = db.get(BusinessRow, ('w', 'projects', 'p1'))
+        project.data = {**project.data, 'pm_id': 'other'}
+    current = by_row(h, 24)
+    assert 'submit_for_review' in current['allowed_actions']
+    assert review(h, current, 'submit-for-review', request_id='new-authority')['task']['local']['submission']['revision'] == 2
+
+
+@pytest.mark.parametrize('decision', ['approve', 'return'])
+def test_explicit_checker_submission_survives_pm_change(h, decision):
+    task = imported(h, 24)
+    h.who[0] = 'member'
+    submitted = review(h, task, 'submit-for-review')['task']
+    with h.sessions.begin() as db:
+        project = db.get(BusinessRow, ('w', 'projects', 'p1'))
+        project.data = {**project.data, 'pm_id': 'other'}
+    h.who[0] = 'member'
+    assert 'submit_for_review' not in by_row(h, 24)['allowed_actions']
+    assert review(h, submitted, 'submit-for-review', 409, request_id='redundant')['code'] == 'review_pending'
+    h.who[0] = 'pm'
+    assert review(h, submitted, decision, submission_revision=1,
+                  **({'reason': '請修正'} if decision == 'return' else {}))['state'] == ('done' if decision == 'approve' else 'in_progress')
+
+
+@pytest.mark.parametrize('fallback', [False, True])
+def test_restricted_reviewer_counts_match_visible_submitted_tasks(h, fallback):
+    from .company_dashboard import add_sop_progress as dashboard
+    from .project_progress import add_sop_progress as progress
+    task = imported(h, 24)
+    if fallback:
+        task = change(h, task, {'participants': {'executor': 'member'}})['task']
+    h.who[0] = 'member'
+    review(h, task, 'submit-for-review')
+    h.users['pm']['capabilities'] = []
+    counts = h.service.read_counts('w', h.users['pm'], ['p1'])
+    assert counts['signals']['important_submitted'] == 1
+    assert [t['task_id'] for t in counts['items']] == [task['id']]
+    h.who[0] = 'pm'
+    assert [t['id'] for t in overview(h)['tasks']] == [task['id']]
+    assert h.client.get(URL + '/sop-tasks/reviewer-queue').json()['total'] == 1
+    for attach in (dashboard, progress):
+        result = {'cases': [{'id': 'p1'}]}
+        attach(result, counts)
+        assert result['sop_signals']['important_submitted'] == 1
+        assert [t['task_id'] for t in result['sop_items']] == [task['id']]
+    assert h.service.read_counts('w', h.users['other'], ['p1'], own=True)['items'] == []

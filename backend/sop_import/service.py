@@ -282,10 +282,17 @@ class Service:
 
     def participates(self, wid, user_id, project_id):
         with self.sessions() as db:
-            return any(holds_task(t, user_id) or (t.participants.get('checker') == user_id
-                       and completion_policy(t)['value'] == 'reviewer_required'
-                       and t.local.get('review_status') == 'submitted') for t in db.scalars(
-                select(LocalTask).where(LocalTask.workspace_id == wid, LocalTask.project_id == project_id)))
+            project = db.get(BusinessRow, (wid, 'projects', project_id))
+            if project is None:
+                return False
+            ctx = Context(wid, {'id': user_id}, {}, project.data, None, assigned_only=True)
+            tasks = self.tasks(db, ctx)
+            if any(holds_task(t, user_id) or completion_policy(t)['value'] == 'reviewer_required'
+                   and self.may_review(ctx, t) for t in tasks):
+                return True
+            return db.scalar(select(TaskEvent.id).where(
+                TaskEvent.workspace_id == wid, TaskEvent.project_id == project_id,
+                TaskEvent.actor_id == user_id, TaskEvent.kind.in_(['approve', 'return'])).limit(1)) is not None
 
     def normalize(self, ctx, body, rows):
         fields(body, {'template_version_id', 'node_keys', 'row_keys', 'participant_bindings',
@@ -567,7 +574,9 @@ class Service:
                 task.state in TRANSITIONS['complete'][0] and task.applicability == Applicability.APPLICABLE
                 and task.snapshot.get('row', {}).get('completion_evidence', {}).get('kind') == 'file'):
             actions.append('complete')
-        if completion_policy(task)['value'] == 'reviewer_required' and task.state not in {Lifecycle.DONE, Lifecycle.ARCHIVED}:
+        if (completion_policy(task)['value'] == 'reviewer_required'
+                and task.state not in {Lifecycle.DONE, Lifecycle.ARCHIVED}
+                and task.applicability == Applicability.APPLICABLE):
             if task.local.get('review_status') == 'submitted':
                 actions = []
                 if self.submission_assignment_matches(ctx, task):
@@ -588,6 +597,8 @@ class Service:
                     actions.append('accept_suggestion')
                 actions.append('dismiss_suggestion')
         if completion_policy(task)['value'] != 'executor_self' and task.state in {Lifecycle.DONE, Lifecycle.ARCHIVED}:
+            if manager and task.state == Lifecycle.ARCHIVED and task.previous_state != Lifecycle.DONE:
+                return ['restore']
             return []
         return actions
 
@@ -871,15 +882,25 @@ class Service:
                                   'completed_from_revision': body['expected_revision'], 'evidence_refs': evidence or []}
             else:
                 require(task.state not in {Lifecycle.DONE, Lifecycle.ARCHIVED}, 'task_reopen_required', 409)
+                participants = self.participants(ctx, body['participants']) if 'participants' in body else task.participants
+                was_submitted = task.local.get('review_status') == 'submitted'
+                reviewed_content_changed = (
+                    'instructions' in body and body['instructions'] != task.instructions or
+                    'participants' in body and any(participants.get(role) != task.participants.get(role)
+                                                   for role in ('executor', 'checker')))
                 for key in ('title', 'instructions'):
                     if key in body:
                         setattr(task, key, text(body[key], 500 if key == 'title' else 20000, empty=key != 'title'))
                 if task.local.get('review_status') == 'submitted':
-                    task.local = {**task.local, 'review_status': 'returned',
-                                  'return_reason': 'Task changed; submit a new revision'}
-                    task.state = Lifecycle.IN_PROGRESS
+                    if reviewed_content_changed:
+                        reason = '任務內容或指派已變更，請修正後重新提交'
+                        task.local = {**task.local, 'review_status': 'returned', 'return_reason': reason}
+                        task.state = Lifecycle.IN_PROGRESS
+                    else:
+                        task.local = {**task.local, 'submission': {**task.local['submission'],
+                                      'task_revision': task.revision + 1}}
                 if 'participants' in body:
-                    task.participants = self.participants(ctx, body['participants'])
+                    task.participants = participants
                     task.local = {**task.local, 'attestations': {}}
                 if 'due_date' in body:
                     value = body['due_date']
@@ -893,6 +914,11 @@ class Service:
                                   'date_reason': reason}
             task.revision += 1
             state.checklist_revision += 1
+            if not transition and was_submitted and reviewed_content_changed:
+                self.event(db, ctx, task, 'return', {
+                    'submission_revision': task.local['submission']['revision'],
+                    'snapshot_hash': task.local['submission']['snapshot_hash'],
+                    'reason': task.local['return_reason']})
             self.event(db, ctx, task, 'transition' if transition else 'edited', deepcopy(body))
             return {'task_id': task.id, 'revision': task.revision, 'checklist_revision': state.checklist_revision,
                     'state': task.state.value, 'applicability': task.applicability.value,
@@ -907,6 +933,9 @@ class Service:
         refs = body.get('evidence_refs', [])
         require(isinstance(refs, list) and len(refs) <= 20, 'invalid_request')
         requirement = task.snapshot.get('row', {}).get('completion_evidence', {})
+        require(requirement.get('kind') in {'none', 'file'} or
+                not requirement and task.local.get('completion_rule_status') == 'no_typed_obligations',
+                'completion_evidence_missing')
         if not refs:
             require(requirement.get('kind') == 'none' or task.local.get('completion_rule_status') == 'no_typed_obligations',
                     'completion_evidence_missing')
@@ -940,7 +969,9 @@ class Service:
     @staticmethod
     def submission_assignment_matches(ctx, task):
         snapshot = task.local.get('submission', {}).get('snapshot', {})
-        return snapshot.get('participants') == task.participants and snapshot.get('pm_id') == ctx.project.get('pm_id')
+        return all(snapshot.get('participants', {}).get(role) == task.participants.get(role)
+                   for role in ('executor', 'checker')) and (
+            bool(task.participants.get('checker')) or snapshot.get('pm_id') == ctx.project.get('pm_id'))
 
     def history(self, ctx, task_id):
         authorize(ctx)
@@ -951,9 +982,11 @@ class Service:
                     'sop_import_forbidden', 403)
             events = db.scalars(select(TaskEvent).where(TaskEvent.workspace_id == ctx.wid,
                                TaskEvent.task_id == task.id).order_by(TaskEvent.revision, TaskEvent.at, TaskEvent.id))
+            source = explicitly_granted(ctx.user, 'sop_task_read_source')
             return {'task_id': task.id, 'events': [
                 {'id': e.id, 'kind': e.kind, 'revision': e.revision, 'actor_id': e.actor_id, 'at': e.at,
-                 'changes': {k: v for k, v in e.changes.items() if k not in {'response', 'request_hash'}}} for e in events]}
+                 'changes': {k: v for k, v in e.changes.items() if k not in {'response', 'request_hash'}
+                             and (source or k not in {'instructions', 'source_snapshot'})}} for e in events]}
 
     def review_queue(self, ctx):
         authorize(ctx)
@@ -975,8 +1008,6 @@ class Service:
             require(completion_policy(task)['value'] == 'reviewer_required', 'review_not_required', 409)
             if action == 'submit_for_review':
                 require(holds_task(task, ctx.user['id']), 'sop_import_forbidden', 403)
-            else:
-                require(self.may_review(ctx, task), 'sop_import_forbidden', 403)
             events = list(db.scalars(select(TaskEvent).where(TaskEvent.workspace_id == ctx.wid,
                                     TaskEvent.task_id == task.id).order_by(TaskEvent.revision)))
             fingerprint = digest(body)
@@ -989,6 +1020,8 @@ class Service:
                     response['task'].update(instructions=None, source_snapshot=None,
                                             source_restriction='sop_task_read_source_required')
                 return response
+            if action != 'submit_for_review':
+                require(self.may_review(ctx, task), 'sop_import_forbidden', 403)
             require(task.state not in {Lifecycle.DONE, Lifecycle.ARCHIVED}, 'terminal_task', 409)
             require(task.applicability == Applicability.APPLICABLE, 'applicability_unresolved')
             if action == 'submit_for_review':
@@ -999,7 +1032,7 @@ class Service:
                 note = text(body.get('note', ''), 20000)
                 number = 1 + sum(e.kind == 'submit_for_review' for e in events)
                 snapshot = {'evidence': proof or [], 'note': note, 'participants': deepcopy(task.participants),
-                            'pm_id': ctx.project.get('pm_id')}
+                            'pm_id': None if task.participants.get('checker') else ctx.project.get('pm_id')}
                 submission = {'revision': number, 'submitter': ctx.user['id'], 'at': self.clock(),
                               'snapshot': snapshot, 'snapshot_hash': digest(snapshot), 'task_revision': task.revision + 1}
                 task.local = {**task.local, 'review_status': 'submitted', 'submission': submission}
@@ -1029,7 +1062,14 @@ class Service:
             tasks = list(db.scalars(select(LocalTask).where(LocalTask.workspace_id == wid,
                                                           LocalTask.project_id.in_(project_ids))))
             if own or not has_reader_grant(user):
-                tasks = [t for t in tasks if holds_task(t, user['id'])]
+                projects = {row.entity_id: row.data for row in db.scalars(select(BusinessRow).where(
+                    BusinessRow.workspace_id == wid, BusinessRow.kind == 'projects',
+                    BusinessRow.entity_id.in_(project_ids)))}
+                tasks = [t for t in tasks if holds_task(t, user['id']) or
+                         completion_policy(t)['value'] == 'reviewer_required'
+                         and t.state not in {Lifecycle.DONE, Lifecycle.ARCHIVED}
+                         and t.local.get('review_status') == 'submitted'
+                         and self.may_review(Context(wid, user, {}, projects.get(t.project_id, {}), None), t)]
             from ..my_work import sop_projection
             views = [self.task_json(t, []) for t in tasks]
             return {'counts': self.counts(tasks), **sop_projection(views),
@@ -1074,7 +1114,8 @@ class Service:
     def transition(self, task, body, manager, evidence=None):
         action = body.get('action')
         if completion_policy(task)['value'] != 'executor_self':
-            require(task.state not in {Lifecycle.DONE, Lifecycle.ARCHIVED}, 'terminal_task', 409)
+            require(task.state != Lifecycle.DONE and (task.state != Lifecycle.ARCHIVED or
+                    action == 'restore' and task.previous_state != Lifecycle.DONE), 'terminal_task', 409)
             if action == 'complete':
                 self.completion(task, evidence)
             require(task.local.get('review_status') != 'submitted', 'review_pending', 409)
