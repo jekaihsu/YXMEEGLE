@@ -1,6 +1,6 @@
 import {HomeDispatchCard} from './HomeDispatchCard';
 import {useEffect,useState,type ReactNode} from 'react';
-import {ArrowDown,ArrowUp,CalendarDays,Check,Settings2,RotateCcw,RefreshCw} from 'lucide-react';
+import {ArrowDown,ArrowUp,Check,Settings2,RotateCcw,RefreshCw} from 'lucide-react';
 import {Button,Eyebrow} from './design';
 import {type Ctx,date} from './appCommon';
 import {useHomePanels,type PanelRead} from './useHomePanels';
@@ -91,7 +91,6 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
  </div><div className="ds-actions">
   {view==='company'&&reports.data&&!reports.unavailable&&<CopyReportSummary report={reports.data}/>}
   <Button disabled={refreshing||c.busy} onClick={()=>void refresh()}><RefreshCw size={16}/>{refreshing?'讀取中…':'重新讀取'}</Button>
-  <Button onClick={()=>c.go({view:'projects'})}><CalendarDays size={16}/>查看案件</Button>
   <Button variant="plain" aria-expanded={editing} aria-controls="home-customize" onClick={()=>setEditing(value=>!value)}>{editing?<Check size={16}/>:<Settings2 size={16}/>} {editing?'完成設定':'自訂首頁'}</Button>
   <HomeHelp view={view}/>
  </div></header>
