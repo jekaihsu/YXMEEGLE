@@ -1,6 +1,7 @@
 import {ProjectOverview} from './ProjectOverview';
 import {ProjectDetailShell,ProjectExecutionDetails} from './ProjectDetailShell';
-import {ProjectItems,ProjectPeople} from './ProjectDestinations';
+import {ProjectPeople} from './ProjectDestinations';
+import {WorkItemsTab} from './WorkItemsTab';
 import {canReadSop,prefetchSopTasks,prefetchSopAssignees} from './useSopTasks';
 import {prefetchProjectProgress} from './useProjectProgress';
 import {ProjectFlow} from './ProjectFlow';
@@ -20,7 +21,6 @@ import {Avatar} from './AppShell';
 import {NativeApprovalControls, FinancialApprovalRequests} from './NativeApprovalControls';
 import {AuditTrail} from './AuditTrail';
 import {FilePanel, FileModal} from './FileWorkspace';
-import {DailyRecords} from './DailyRecords';
 import {TaskBatchCompletion} from './TaskBatchCompletion';
 import {draftKey, useDraft} from './drafts';
 import {lifecycleGate} from './sourceLifecycle';
@@ -79,7 +79,7 @@ export function ProjectDetail({c}:{c:Ctx}){
  const flowApprovals=<details className="pf-secondary" open={c.route.section==='approvals' || undefined}><summary>審批與歷史</summary><section className="major-approval-summary"><div><h2>重大事項審批</h2><p>財務與節點跳過保留原核准流程。變更與展延尚未開放。</p></div><button className="button compact" onClick={()=>c.go({view:'project',project:p.id,node:selected?.id,tab:'flow',section:'approvals'})}>查看審批（{approvals.filter(a=>(changeEnabled||!['change','extension'].includes(a.type))&&['draft','pending','approved'].includes(a.status)).length+(c.w.financial_requests||[]).filter((r:any)=>r.project_id===p.id&&['draft','pending','approved'].includes(r.status)).length}）</button>{approvals.filter(a=>(changeEnabled||!['change','extension'].includes(a.type))&&['pending','approved'].includes(a.status)).map(a=><p key={a.id}>{a.title} · {a.status==='approved'?'已核准，待套用':'審批中'}</p>)}</section></details>;
  return <DisabledActionReasons.Provider value={true}><div id="project-page-top" className="project-detail"><ProjectDetailShell c={c} p={p} tab={tab} onPeople={()=>setModal('participants')} onPrefetch={()=>prefetchFlow(p.id)} onCancelPrefetch={()=>clearTimeout(tabPrefetch.current)}/>
  {tab==='overview'&&<ProjectOverview c={c} p={p} assignments={assignments}/>}
- {tab==='items'&&<><ProjectItems c={c} p={p} assignments={assignments} selectedKey={c.route.node ? selectedKey : 'field'}/><details id="project-reports" open={route.section==='reports' || undefined}><summary>日報 / 週報作業紀錄</summary><DailyRecords key={p.id} w={c.w} p={p} go={c.go}/></details></>}
+ {tab==='items'&&<WorkItemsTab key={p.id} c={c} p={p} assignments={assignments} selectedKey={c.route.node ? selectedKey : 'field'}/>}
  {tab==='people'&&<ProjectPeople c={c} p={p} assignments={assignments} selectedKey={selectedKey}/>}
  {tab==='files'&&<FilePanel c={c} p={p} node={selected}/>}
  {tab==='data'&&<div className="case-data-navigation"><label>案件資料分類<select value={dataSection} onChange={e=>c.go({view:'project',project:p.id,node:selected?.id,tab:'data',section:e.target.value})}>{[['basic','基本資料'],['quotes',`報價（${projectQuotes(c.w,p).length}）`],['contracts','確認單與合約工項'],['family','母子案'],['participants','參與人員'],['files',`附件索引（${p.files.length}）`],['approvals','審批與變更'],['activity','討論與紀錄'],['sources','資料來源與同步']].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label></div>}

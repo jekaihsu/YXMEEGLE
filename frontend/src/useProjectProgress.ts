@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useState} from 'react';
-import {getSessionEpoch} from './api';
+import {ApiError,getSessionEpoch} from './api';
 import {fetchProjectProgress, type ProjectProgress} from './projectProgressApi';
-type State = {kind: 'loading'}|{kind: 'ready'; data: ProjectProgress}|{kind: 'error'; message: string};
+type State = {kind: 'loading'}|{kind: 'ready'; data: ProjectProgress}|{kind: 'error'; message: string; status?:number};
 let epoch = getSessionEpoch();
 const cache = new Map<string, {data: ProjectProgress; at: number}>();
 const pending = new Map<string, Promise<ProjectProgress>>();
@@ -24,7 +24,7 @@ export function useProjectProgress(id: string, enabled = true) {
   let active = true;
   const currentEpoch = getSessionEpoch();
   setState({kind: 'loading'});
-  void prefetchProjectProgress(id, version > 0).then(data => {if (active && currentEpoch === getSessionEpoch()) setState({kind: 'ready', data})}).catch(error => {if (active && currentEpoch === getSessionEpoch()) setState({kind: 'error', message: error instanceof Error ? error.message : '工程進度暫不可用。'})});
+  void prefetchProjectProgress(id, version > 0).then(data => {if (active && currentEpoch === getSessionEpoch()) setState({kind: 'ready', data})}).catch(error => {if (active && currentEpoch === getSessionEpoch()) setState({kind: 'error', message: error instanceof Error ? error.message : '工程進度暫不可用。',...(error instanceof ApiError ? {status:error.status} : {})})});
   return () => {active = false};
  }, [id, enabled, version]);
  return {state, retry};

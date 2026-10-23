@@ -27,9 +27,10 @@ export function AppShell({s,w,route,error,setError,callbackError,mobile,setMobil
   history.scrollRestoration='manual';
   return()=>{history.scrollRestoration=previous};
  },[]);
+ const pageSection=route.view==='project' && route.tab==='items' ? undefined : route.section;
  useLayoutEffect(()=>{
   window.scrollTo({top:0,left:0,behavior:'instant'});
- },[route.view,route.project,route.tab,route.section,ready]);
+ },[route.view,route.project,route.tab,pageSection,ready]);
  const navigationRef=useDialogFocus(()=>setMobile(false),mobile);
  const dispatchVisible=canReadDispatch(s);
  const visibleNav=NAV.filter(n=>(n.view!=='dispatch'||dispatchVisible)&&(n.view!=='approvals'||s.features?.change_extension===true)&&(n.view!=='routines'||s.features?.routines===true)&&(n.view!=='reports'||s.user?.role==='pm'||s.user?.role==='manager'));
