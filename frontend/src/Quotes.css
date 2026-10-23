@@ -1,2 +1,405 @@
-.quote-register{overflow:hidden}.quote-stages{box-sizing:border-box;display:flex;flex-wrap:nowrap;gap:var(--space-1);padding:var(--space-1);margin:var(--space-4);width:fit-content;max-width:calc(100% - 2 * var(--space-4));overflow-x:auto;overflow-y:hidden;border:1px solid var(--glass-border);border-radius:var(--radius-pill);background:var(--glass-fill);scrollbar-width:thin}.quote-stages button{flex:0 0 auto;min-height:var(--control-height);padding:0 var(--space-3);border:0;border-radius:var(--radius-pill);background:transparent;color:var(--label-2);white-space:nowrap}.quote-stages button.active,.quote-stages button[aria-pressed=true]{background:var(--accent-fill);color:var(--accent);font-weight:600}.quote-register .table-toolbar{display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-4) var(--space-3);border:0;background:none}.quote-register .search-field{max-width:36rem;width:100%;min-height:var(--control-height);border:1px solid var(--glass-border);border-radius:var(--radius-pill);background:var(--surface)}.quote-register .search-field input{flex:1;min-width:0;border:0;outline:0;background:none;color:var(--label);font-size:var(--fs-subhead)}.quote-register .table-scroll{overflow:auto;border:1px solid var(--glass-border);border-radius:var(--radius-card);background:var(--glass-fill);box-shadow:var(--glass-highlight),var(--glass-shadow)}.quote-table{min-width:1420px;width:100%;border-collapse:collapse;color:var(--label);font-size:var(--fs-subhead);background:none}.quote-table th{padding:var(--sp-3) var(--sp-4);text-align:left;font-size:var(--fs-caption);font-weight:600;color:var(--label-2);white-space:nowrap}.quote-table th button{font:inherit;background:none;border:0;color:inherit;cursor:pointer;padding:0}.quote-table td{padding:var(--sp-4);vertical-align:middle;border-top:1px solid var(--sep);background:none}.quote-table td:nth-child(3){min-width:220px;white-space:normal}.quote-table td:first-child .ds-badge{display:block;width:max-content;margin-top:4px}.quote-pagination{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:var(--space-3);padding:var(--space-4)}.quote-pagination label{display:flex;align-items:center;gap:var(--space-2);color:var(--label-2);font-size:var(--fs-footnote)}.quote-pagination select{min-height:var(--control-height);padding:0 var(--space-2);border:1px solid var(--glass-border);border-radius:var(--radius-m);background:var(--surface);color:var(--label)}.quote-loading,.quote-error{margin:var(--space-4);color:var(--label-2)}.quote-error{color:var(--critical)}.quote-register .pf-empty{padding:var(--space-6);text-align:center;color:var(--label-2)}@media(max-width:600px){.quote-stages{margin:var(--space-3);max-width:calc(100% - 2 * var(--space-3))}.quote-pagination{justify-content:center}.sop-task-select{align-items:flex-start}.quote-register .table-toolbar{flex-wrap:wrap;padding-inline:var(--space-3)}}
-.quote-create-sheet .sop-sheet-actions .ds-button{min-width:6rem;min-height:var(--control-height)}.quote-create-status{margin:var(--space-2) 0;color:var(--label-2);font-size:var(--fs-footnote)}
+.quote-register {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 0 var(--page-padding) var(--space-8);
+}
+
+.quote-stages {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  padding: 3px;
+  margin: 0;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--sep);
+  border-radius: var(--radius-control);
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.quote-stages button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: calc(var(--radius-control) - 3px);
+  background: transparent;
+  color: var(--label-2);
+  font-size: var(--fs-footnote);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.quote-stages button:hover:not(.active) {
+  color: var(--label);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.quote-stages button.active,
+.quote-stages button[aria-pressed=true] {
+  background: var(--surface);
+  color: var(--label);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.quote-register .table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0;
+  margin: 0;
+}
+
+.quote-register .search-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  max-width: 28rem;
+  width: 100%;
+  border: 1px solid var(--sep);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+
+.quote-register .search-field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.quote-register .search-icon {
+  color: var(--label-2);
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.quote-register .search-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--label);
+  font-size: var(--fs-subhead);
+  padding: 0;
+}
+
+.quote-register .search-field input::placeholder {
+  color: var(--label-2);
+}
+
+.quote-register .search-clear {
+  background: none;
+  border: 0;
+  color: var(--label-2);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+}
+
+.quote-register .search-clear:hover {
+  color: var(--label);
+}
+
+.quote-register .table-toolbar span[role="status"] {
+  font-size: var(--fs-footnote);
+  color: var(--label-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.quote-table-card {
+  background: var(--surface);
+  border: 1px solid var(--sep);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.quote-register .table-scroll {
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.quote-register .table-scroll:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.quote-table {
+  min-width: 1280px;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: var(--label);
+  font-size: var(--fs-subhead);
+  background: none;
+}
+
+.quote-table th {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  color: var(--label-2);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--sep);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.quote-table th button {
+  font: inherit;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.quote-table th button:hover {
+  color: var(--label);
+}
+
+.quote-table td {
+  padding: var(--space-3) var(--space-4);
+  vertical-align: middle;
+  border-top: 1px solid var(--sep);
+  background: var(--surface);
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.quote-table tbody tr:first-child td {
+  border-top: 0;
+}
+
+.quote-table tr.clickable:hover td {
+  background: var(--surface-2);
+  cursor: pointer;
+}
+
+.col-quote-no {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.col-quote-no .text-button {
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.col-quote-no .text-button:hover {
+  text-decoration: underline;
+}
+
+.col-quote-no .ds-badge {
+  display: inline-block;
+  margin-left: 6px;
+  vertical-align: middle;
+  font-size: var(--fs-caption);
+}
+
+.col-eng-no {
+  font-variant-numeric: tabular-nums;
+  color: var(--label-2);
+  font-size: var(--fs-footnote);
+  white-space: nowrap;
+}
+
+.col-name {
+  min-width: 200px;
+  max-width: 320px;
+  font-weight: 500;
+  color: var(--label);
+  word-break: break-word;
+}
+
+.col-client {
+  min-width: 150px;
+  max-width: 240px;
+  color: var(--label);
+  word-break: break-word;
+}
+
+.col-date {
+  font-variant-numeric: tabular-nums;
+  color: var(--label-2);
+  font-size: var(--fs-footnote);
+  white-space: nowrap;
+}
+
+.col-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+th.col-amount {
+  text-align: right;
+}
+
+th.col-amount button {
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.col-owner,
+.col-pm,
+.col-stage {
+  white-space: nowrap;
+}
+
+.col-sop {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-footnote);
+  white-space: nowrap;
+}
+
+.quote-register .pf-empty {
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  color: var(--label-2);
+  font-size: var(--fs-subhead);
+  background: var(--surface);
+  margin: 0;
+}
+
+.quote-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--sep);
+  background: var(--surface-2);
+  font-size: var(--fs-footnote);
+  color: var(--label-2);
+}
+
+.quote-pagination label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-right: auto;
+  font-size: var(--fs-footnote);
+  color: var(--label-2);
+}
+
+.quote-pagination select {
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--sep);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  color: var(--label);
+  font-size: var(--fs-footnote);
+}
+
+.quote-pagination select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.quote-pagination span {
+  font-variant-numeric: tabular-nums;
+  padding: 0 var(--space-1);
+}
+
+.quote-pagination .ds-button {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  font-size: var(--fs-footnote);
+}
+
+.quote-loading {
+  margin: var(--space-4) 0;
+  color: var(--label-2);
+  font-size: var(--fs-subhead);
+}
+
+.quote-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--status-error-fg);
+  border-radius: var(--radius-m);
+  background: var(--status-error-bg);
+  color: var(--status-error-fg);
+  font-size: var(--fs-subhead);
+}
+
+@media (max-width: 768px) {
+  .quote-register {
+    padding: 0 var(--space-3) var(--space-6);
+  }
+
+  .quote-register .table-toolbar {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .quote-register .search-field {
+    max-width: 100%;
+  }
+
+  .quote-pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .quote-pagination label {
+    margin-right: 0;
+    width: 100%;
+    justify-content: center;
+    margin-bottom: var(--space-1);
+  }
+}
+
+.quote-create-sheet .sop-sheet-actions .ds-button {
+  min-width: 6rem;
+  min-height: var(--control-height);
+}
+
+.quote-create-status {
+  margin: var(--space-2) 0;
+  color: var(--label-2);
+  font-size: var(--fs-footnote);
+}
