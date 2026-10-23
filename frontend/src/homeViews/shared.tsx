@@ -17,7 +17,9 @@ export function PanelRows({read,today,items=read.body?.items||[],also}:{read:Pan
   {!items.length&&<Message>{read.pending?'讀取中…':read.body?.readState==='disabled'?'目前無法讀取這類工作。':read.body?.complete?'目前沒有符合條件的事項。':'清單尚待核對。'}</Message>}<PanelNote read={read} also={also}/></>;
 }
 export function Kpis({values,note}:{values:{label:string;value:number|string|null;href:string}[];note?:string}){
- const partial=values.some(row=>typeof row.value==='string'&&row.value.endsWith('+'));
+ const known=values.filter(row=>row.value!==null);
+ if(!known.length)return null;
+ const partial=known.some(row=>typeof row.value==='string'&&row.value.endsWith('+'));
  const sourceNote=[partial?'+ 表示已載入預覽的至少筆數。':'',note].filter(Boolean).join(' ');
- return <section className="home-kpi-strip" data-home-card="kpi" aria-label="工作摘要"><div className="home-kpis">{values.map(({label,value,href})=><a key={label} href={href}><Stat label={label} value={value===null?'待核對':value}/></a>)}</div>{sourceNote&&<p className="home-source-note">{sourceNote}</p>}</section>;
+ return <section className="home-kpi-strip" data-home-card="kpi" aria-label="工作摘要"><div className="home-kpis">{known.map(({label,value,href})=><a key={label} href={href}><Stat label={label} value={value}/></a>)}</div>{sourceNote&&<p className="home-source-note">{sourceNote}</p>}</section>;
 }

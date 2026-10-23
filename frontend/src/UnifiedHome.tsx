@@ -23,7 +23,11 @@ import {isReportCard} from './homeReportCards';
 import {ReportCard,CopyReportSummary} from './homeViews/ReportCard';
 import './UnifiedHome.css';
 
-function Sections({view,ids,render,reportStale=false}:{view:HomeViewId;ids:HomeCardId[];render:(id:HomeCardId)=>ReactNode;reportStale?:boolean}){return <>{ids.includes('kpi')&&render('kpi')}{homeSections(view,{order:ids,hidden:[]}).map(section=><section className="home-section" data-home-section={section.id} key={section.id} aria-labelledby={`home-section-${section.id}`}><header><h2 id={`home-section-${section.id}`}>{section.label}</h2><p>{section.hint}</p>{reportStale&&section.cards.some(isReportCard)&&<small className="home-source-note">週報資料為舊快照</small>}</header>{section.cards.includes('attention')&&<div className="home-attention-strip">{render('attention')}</div>}<div className="home-card-grid">{section.cards.filter(id=>id!=='attention').map(render)}</div></section>)}</>}
+function Sections({view,ids,render,reportStale=false}:{view:HomeViewId;ids:HomeCardId[];render:(id:HomeCardId)=>ReactNode;reportStale?:boolean}){
+ const sections=homeSections(view,{order:ids,hidden:[]});
+ const renderSection=(section:typeof sections[number])=><section className="home-section" data-home-section={section.id} key={section.id} aria-labelledby={`home-section-${section.id}`}><header><h2 id={`home-section-${section.id}`}>{section.label}</h2>{reportStale&&section.cards.some(isReportCard)&&<small className="home-source-note">週報資料為舊快照</small>}</header>{section.cards.includes('attention')&&<div className="home-attention-strip">{render('attention')}</div>}<div className="home-card-grid">{section.cards.filter(id=>id!=='attention').map(render)}</div></section>;
+ return <>{sections.filter(section=>section.id==='todo').map(renderSection)}{ids.includes('kpi')&&render('kpi')}{sections.filter(section=>section.id!=='todo').map(renderSection)}</>;
+}
 
 type ViewProps={attendanceRead:{view?:PeopleAttendance;loading:boolean;error:string};ids:HomeCardId[];c:Ctx;today:string;assigned:PanelRead;confirmation:PanelRead;dispatch:()=>ReactNode;attendance:(id:'leave'|'trips')=>ReactNode};
 function AssignView(props:ViewProps){
@@ -35,7 +39,7 @@ function CompanyView(props:ViewProps&{reports:HomeReportsRead}){
  const read=useHomeCompany(props.c);
  const missing=!read.data&&!read.pending;
  const unavailable=read.data&&read.data.source.status!=='ready'&&!read.data.groups.length&&!read.data.cases.length;
- return <>{(missing||unavailable||read.data?.complete===false)&&<div className="home-view-notice" role="status">{read.error||(unavailable?'公司來源尚未提供，僅顯示已載入總數。':'公司快照尚未完整，統計僅涵蓋已載入來源。')} <a href="#view=projects">開啟案件總覽</a></div>}<Sections view="company" reportStale={!!(props.reports.data?.meta.stale||props.reports.data?.meta.refresh_error||props.reports.error&&props.reports.data)} ids={props.ids.filter(id=>(!unavailable||!['groups','cases','statuses'].includes(id)))} render={id=>id==='dispatch'?props.dispatch():isReportCard(id)?<ReportCard key={id} id={id} read={props.reports}/>:id==='absence'?<PeopleCard key={id} id={id} scope="company" today={props.today} {...props.attendanceRead}/>:id==='leave'||id==='trips'?props.attendance(id):<CompanyCard key={id} id={id} {...props} read={read}/>}/></>;
+ return <>{(missing||unavailable||read.data?.complete===false)&&<div className="home-view-notice" role="status">{read.error||(unavailable?'公司資料尚未完整。':'公司快照尚未完整，統計僅涵蓋已載入來源。')} <a href="#view=projects">開啟案件總覽</a></div>}<Sections view="company" reportStale={!!(props.reports.data?.meta.stale||props.reports.data?.meta.refresh_error||props.reports.error&&props.reports.data)} ids={props.ids.filter(id=>(!unavailable||!['kpi','groups','cases','statuses'].includes(id)))} render={id=>id==='dispatch'?props.dispatch():isReportCard(id)?<ReportCard key={id} id={id} read={props.reports}/>:id==='absence'?<PeopleCard key={id} id={id} scope="company" today={props.today} {...props.attendanceRead}/>:id==='leave'||id==='trips'?props.attendance(id):<CompanyCard key={id} id={id} {...props} read={read}/>}/></>;
 }
 export function UnifiedHome({c}:{c:Ctx}){
  const key=homeLayoutKey(c.s.workspace_id||c.w.workspace_id||'default',c.s.user?.id||'anonymous',c.s.user?.role||'',c.s.mode);
@@ -83,11 +87,13 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
  const stale=freshnessDays!==null&&freshnessDays>1;
  const attendanceCard=(id:'leave'|'trips')=><AttendanceCard key={id} id={id} view={attendance.data} loading={attendance.loading} error={attendance.error} today={today}/>;
  const dispatchCard=()=><HomeDispatchCard key="dispatch" today={today} reloadVersion={homeContext.reloadVersion}/>;
- const props:ViewProps={dispatch:dispatchCard,attendanceRead:{view:attendance.data,loading:attendance.loading,error:attendance.error},ids:availableVisible,c:homeContext,today,assigned,confirmation,attendance:attendanceCard};
+ const attendanceUnavailable=!attendance.loading&&(!attendance.data||!['ok','incomplete','stale'].includes(attendance.data.status));
+ const contentIds=availableVisible.filter(id=>!attendanceUnavailable||!['leave','trips','absence','impact'].includes(id));
+ const props:ViewProps={dispatch:dispatchCard,attendanceRead:{view:attendance.data,loading:attendance.loading,error:attendance.error},ids:contentIds,c:homeContext,today,assigned,confirmation,attendance:attendanceCard};
  const missingMine=!assigned.pending&&!confirmation.pending&&!workSource(homeContext,'assigned',today,assigned)&&!workSource(homeContext,'confirmation',today,confirmation);
  const renderCard=(id:HomeCardId)=>id==='dispatch'?dispatchCard():id==='leave'||id==='trips'?attendanceCard(id):<MineCard key={id} id={id} {...props}/>;
  return <div className="unified-home" data-home-view={view}><div className="ds-page"><header className="ds-page-head"><div>
-  <Eyebrow>{today.replaceAll('-','/')+' · '+(c.s.user?.name||'我的工作空間')}</Eyebrow><h1>今日工作台</h1><p>{HOME_VIEWS[view].label}，掌握今天需要處理的事。{preview&&<> · 預覽角色：{HOME_PREVIEWS[preview].label}</>}</p>
+  <Eyebrow>{today.replaceAll('-','/')+' · '+(c.s.user?.name||'我的工作空間')}</Eyebrow><h1>今日工作台</h1>{preview&&<p>預覽角色：{HOME_PREVIEWS[preview].label}</p>}
   {views.length>1&&<div className="home-view-switcher" role="group" aria-label="首頁視圖">{views.map(id=><Button key={id} aria-pressed={view===id} onClick={()=>choose(id)}>{HOME_VIEWS[id].label}</Button>)}</div>}
  </div><div className="ds-actions">
   {view==='company'&&reports.data&&!reports.unavailable&&<CopyReportSummary report={reports.data}/>}
@@ -108,6 +114,7 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
   {!saved&&<Message>瀏覽器無法儲存設定；目前配置在離開此頁後可能重設。</Message>}
   {!availableVisible.length&&<div className="home-empty glass--flat"><h2>挑選今天需要的內容</h2><p>尚未顯示任何卡片。開啟「自訂首頁」加入工作、案件或團隊動向。</p><Button onClick={()=>setEditing(true)}>選擇首頁卡片</Button></div>}
   {view==='mine'&&<label className="sop-home-filter">工作類型 <select aria-label="首頁工作類型" value={workKind} onChange={e=>setWorkKind(e.target.value)}><option value="">全部類型</option><option value="sop_task">SOP 任務</option><option value="node_assignment">節點責任</option><option value="task">Lark 任務</option></select></label>}
-  <div className="home-sections">{view==='mine'?<>{missingMine&&<div className="home-view-notice" role="status">{assigned.error||confirmation.error||'個人工作來源尚未提供。'} <a href="#view=work">開啟我的工作</a></div>}<Sections view="mine" ids={availableVisible.filter(id=>!missingMine||!['work','confirmation','deadlines'].includes(id))} render={renderCard}/></>:view==='assign'?<AssignView {...props}/>:<CompanyView {...props} reports={reports}/>}</div>
+  {attendanceUnavailable&&availableVisible.some(id=>['leave','trips','absence','impact'].includes(id))&&<p className="home-source-note" role="status">出勤資料尚未提供。 <a href="#view=people">查看人員與出勤</a></p>}
+  <div className="home-sections">{view==='mine'?<>{missingMine&&<div className="home-view-notice" role="status">{assigned.error||confirmation.error||'個人工作來源尚未提供。'} <a href="#view=work">開啟我的工作</a></div>}<Sections view="mine" ids={contentIds.filter(id=>!missingMine||!['work','confirmation','deadlines'].includes(id))} render={renderCard}/></>:view==='assign'?<AssignView {...props}/>:<CompanyView {...props} reports={reports}/>}</div>
  </div></div>;
 }

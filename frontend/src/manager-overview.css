@@ -186,3 +186,8 @@
     padding-top: var(--sp-4, 1rem);
   }
 }
+
+@layer pages {
+.manager-overview-root .manager-overview-layout:not(.has-selection){grid-template-columns:minmax(0,1fr)}
+.manager-overview-root .p2-cases-table{min-width:0;width:100%}
+}

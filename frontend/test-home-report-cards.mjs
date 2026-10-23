@@ -26,8 +26,8 @@ let checks=0;const equal=(a,b)=>{assert.deepEqual(a,b);checks++};
 const cardIds=()=>[...document.querySelectorAll('[data-home-card]')].map(el=>el.dataset.homeCard);
 const reportIds=['attention','qualityTrend','qualityGroups','funnel','receivables','achievement','instruments','vehicles'];
 try{
- await render();equal(calls,1);equal(reportIds.every(id=>cardIds().includes(id)),true);
- equal([...document.querySelectorAll('[data-home-section]')].map(el=>el.dataset.homeSection),['todo','quality','business','progress','resources','people','shortcuts']);
+ await render();equal(document.querySelector('[data-home-section="people"]'),null);equal(calls,1);equal(reportIds.every(id=>cardIds().includes(id)),true);
+ equal([...document.querySelectorAll('[data-home-section]')].map(el=>el.dataset.homeSection),['todo','quality','business','progress','resources','shortcuts']);
  equal(document.querySelector('[data-home-card="qualityTrend"] .home-report-sentence').textContent,'報告週 11.5%，較前一週 +2.1pt。47 筆已退回中，測量二組 佔 38%');
  equal(document.querySelectorAll('.home-report-attention a').length,4);
  equal(document.querySelector('[data-home-card="qualityGroups"] .home-bar i').style.width,'100%');

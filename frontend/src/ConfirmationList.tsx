@@ -114,10 +114,6 @@ export function ConfirmationList(props: ConfirmationListProps) {
     }
   };
 
-  const bannerStateClass = view.pageState
-    ? view.pageState.states.join(' ')
-    : 'ready';
-
   const hasActiveFilters = Boolean(
     view.controls.filters.search ||
     view.controls.filters.source_version ||
@@ -134,33 +130,15 @@ export function ConfirmationList(props: ConfirmationListProps) {
         <div className="p2-header-title-row">
           <h2 className="p2-title">{view.header.title}</h2>
           <div className="p2-header-meta">
-            <span className="p2-meta-item">
-              資料日期：{view.header.asOf.label}
-              {view.header.asOf.reason && `（${view.header.asOf.reason}）`}
-            </span>
-            <span className="p2-meta-item">
-              快照時間：{view.header.snapshot.label}
-              {view.header.snapshot.reason && `（${view.header.snapshot.reason}）`}
-            </span>
+            {!view.header.asOf.reason && <span className="p2-meta-item">資料日期：{view.header.asOf.label}</span>}
+            {!view.header.snapshot.reason && <span className="p2-meta-item">保留資料：{view.header.snapshot.label}</span>}
           </div>
         </div>
       </header>
 
-      {/* Page State Banner */}
-      <section
-        className={`p2-banner state-${bannerStateClass}`}
-        role="status"
-        aria-live="polite"
-        aria-label="頁面資料狀態"
-      >
-        <div className="p2-banner-header">
-          <span className="p2-banner-title">頁面資料狀態</span>
-          <span className="p2-badge">
-            {view.pageStateLabel ?? ''}
-          </span>
-        </div>
-        {view.reason && <p className="p2-banner-reason">{view.reason}</p>}
-      </section>
+      {view.pageState && <p className="overview-table-note" role="status">
+        {view.pageState.states.some(state => state === 'forbidden') ? '沒有權限檢視工程確認單。' : view.pageState.states.some(state => state === 'loading') ? '確認單讀取中…' : view.pageState.states.some(state => state === 'complete_empty') ? '目前沒有工程確認單。' : view.pageState.states.some(state => state === 'filtered_empty') ? '沒有符合條件的確認單。' : view.pageState.states.some(state => state === 'stale') ? '資料待更新，目前顯示保留資料。' : view.pageState.states.some(state => state === 'read_failed') ? '更新失敗，目前顯示保留資料。' : '確認單資料尚未完整，僅顯示已載入內容。'}
+      </p>}
 
       {/* Controls & Toolbar with Progressive Disclosure */}
       <div className="p2-toolbar" role="region" aria-label="清單篩選與欄位控制">
@@ -338,7 +316,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
             {/* Deadline filter control (disabled with reason) */}
             <div
               className="p2-deadline-filter-group"
-              title={view.controls.deadline.reason}
+
             >
               <span className="p2-deadline-filter-label">有效期限（停用）</span>
               <input
@@ -363,7 +341,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                 aria-label="期限迄日（已停用）"
               />
               <span className="p2-deadline-reason" role="note">
-                {view.controls.deadline.reason}
+                期限來源尚未確認。
               </span>
             </div>
           </div>
@@ -441,7 +419,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                           ) : (
                             <span
                               className="p2-col-unsortable"
-                              title={col.sortDisabledReason ?? undefined}
+
                             >
                               {col.key === 'source_status'
                                 ? '來源讀取狀態'
@@ -461,7 +439,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                         colSpan={visibleColumns.length + 1}
                         className="p2-empty-cell"
                       >
-                        {view.pageStateLabel ?? view.reason ?? '—'}
+                        {view.pageStateLabel === '狀態未知' ? '確認單清單尚未提供。' : view.pageStateLabel ?? '確認單資料尚未提供。'}
                       </td>
                     </tr>
                   ) : (
@@ -516,31 +494,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                                   >
                                     <strong>{cell?.label ?? '—'}</strong>
                                   </button>
-                                  {cell?.reason && (
-                                    <span className="p2-sr-only">
-                                      （{cell.reason}）
-                                    </span>
-                                  )}
-                                  {/* Subdued, clean status tag for unresolved cases or retention */}
-                                  <div className="p2-scope-tags">
-                                    <span
-                                      className={`p2-badge ${
-                                        row.caseLink.state === 'unresolved'
-                                          ? 'p2-badge-unresolved'
-                                          : 'p2-badge-verification'
-                                      }`}
-                                    >
-                                      {row.caseLink.label}
-                                    </span>
-                                    {row.caseLink.reason && (
-                                      <span className="p2-link-reason">
-                                        （{row.caseLink.reason}）
-                                      </span>
-                                    )}
-                                    <span className="p2-badge p2-badge-retention">
-                                      {row.retentionLabel}
-                                    </span>
-                                  </div>
+
                                 </td>
                               );
                             }
@@ -551,11 +505,6 @@ export function ConfirmationList(props: ConfirmationListProps) {
                                   <strong className="p2-cell-text">
                                     {cell?.label ?? '—'}
                                   </strong>
-                                  {cell?.reason && (
-                                    <span className="p2-sr-only">
-                                      （{cell.reason}）
-                                    </span>
-                                  )}
                                 </td>
                               );
                             }
@@ -578,15 +527,10 @@ export function ConfirmationList(props: ConfirmationListProps) {
                                       ? 'p2-cell-unknown'
                                       : 'p2-cell-text'
                                   }
-                                  title={cell?.reason ?? undefined}
+
                                 >
                                   {cell?.label ?? '—'}
                                 </span>
-                                {cell?.reason && (
-                                  <span className="p2-sr-only">
-                                    （{cell.reason}）
-                                  </span>
-                                )}
                               </td>
                             );
                           })}
@@ -633,51 +577,9 @@ export function ConfirmationList(props: ConfirmationListProps) {
               aria-label="清單資料統計"
             >
               <div className="p2-footer-totals">
-                <div
-                  className="p2-footer-item"
-                  title={view.footer.matching.reason ?? undefined}
-                >
-                  <span className="p2-footer-label">符合條件版本筆數：</span>
-                  <strong className="p2-footer-val">
-                    {view.footer.matching.label}
-                  </strong>
-                  {view.footer.matching.reason && (
-                    <span className="p2-footer-reason p2-sr-only">
-                      （{view.footer.matching.reason}）
-                    </span>
-                  )}
-                </div>
-                <div
-                  className="p2-footer-item"
-                  title={view.footer.loaded.reason ?? undefined}
-                >
-                  <span className="p2-footer-label">已載入筆數：</span>
-                  <strong className="p2-footer-val">
-                    {view.footer.loaded.label}
-                  </strong>
-                  {view.footer.loaded.reason && (
-                    <span className="p2-footer-reason p2-sr-only">
-                      （{view.footer.loaded.reason}）
-                    </span>
-                  )}
-                </div>
-                <div
-                  className="p2-footer-item"
-                  title={view.footer.authorizedSource.reason ?? undefined}
-                >
-                  <span className="p2-footer-label">已授權來源版本筆數：</span>
-                  <strong className="p2-footer-val">
-                    {view.footer.authorizedSource.label}
-                  </strong>
-                  {view.footer.authorizedSource.reason && (
-                    <span className="p2-footer-reason p2-sr-only">
-                      （{view.footer.authorizedSource.reason}）
-                    </span>
-                  )}
-                </div>
-                <span className="p2-footer-basis">
-                  統計基準：{view.footer.basis}
-                </span>
+                {!view.footer.matching.reason && <span>符合條件 {view.footer.matching.label} 筆</span>}
+                {!view.footer.loaded.reason && <span>已載入筆數：{view.footer.loaded.label}</span>}
+                {!view.footer.authorizedSource.reason && <span>已授權來源 {view.footer.authorizedSource.label} 筆</span>}
               </div>
 
               {/* Server-cursor Next/Prev pagination */}
@@ -687,33 +589,22 @@ export function ConfirmationList(props: ConfirmationListProps) {
                   className="p2-page-btn"
                   disabled={!view.pagination.previous.enabled}
                   onClick={() => onPage?.(view.pagination.previous.cursor)}
-                  title={view.pagination.previous.reason ?? undefined}
+
                   aria-label="上一頁"
                 >
                   上一頁
                 </button>
-                {!view.pagination.previous.enabled &&
-                  view.pagination.previous.reason && (
-                    <span className="p2-page-reason p2-sr-only">
-                      {view.pagination.previous.reason}
-                    </span>
-                  )}
                 <button
                   type="button"
                   className="p2-page-btn"
                   disabled={!view.pagination.next.enabled}
                   onClick={() => onPage?.(view.pagination.next.cursor)}
-                  title={view.pagination.next.reason ?? undefined}
+
                   aria-label="下一頁"
                 >
                   下一頁
                 </button>
-                {!view.pagination.next.enabled &&
-                  view.pagination.next.reason && (
-                    <span className="p2-page-reason p2-sr-only">
-                      {view.pagination.next.reason}
-                    </span>
-                  )}
+
               </nav>
             </footer>
           </div>
@@ -759,13 +650,13 @@ export function ConfirmationList(props: ConfirmationListProps) {
                     </dd>
                   </div>
                   <div>
-                    <dt>Base Token</dt>
+                    <dt>來源資料庫代碼</dt>
                     <dd>
                       <code>{view.drawer.detail.sourceContext.baseToken}</code>
                     </dd>
                   </div>
                   <div>
-                    <dt>Table ID</dt>
+                    <dt>來源表格代碼</dt>
                     <dd>
                       <code>{view.drawer.detail.sourceContext.tableId}</code>
                     </dd>
@@ -799,7 +690,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                     <dt>未核准原因</dt>
                     <dd>
                       <span className="p2-amount-reason">
-                        {view.amounts.reason}
+                        合約金額尚未核准顯示。
                       </span>
                     </dd>
                   </div>
@@ -841,7 +732,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                         </span>
                         {view.drawer.row.caseLink.reason && (
                           <small className="p2-amount-reason">
-                            （{view.drawer.row.caseLink.reason}）
+                            （案件對應尚待核對。）
                           </small>
                         )}
                       </dd>

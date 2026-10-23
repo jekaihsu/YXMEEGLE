@@ -167,7 +167,7 @@ export function buildConfirmationListView(input: unknown, options: ConfirmationL
  const pageState: DataState | null = forbidden ? {states: ['forbidden']} : blocked ? shortState : b ? b.page_state : {states: ['unknown'], count: null};
  const reason = forbidden ? '沒有權限' : blocked ? describeDataState(pageState!) : b ? null : 'confirmation list body is malformed or unavailable';
  const f = rec(options.filters) && Object.entries(options.filters).every(([k, v]) => FILTERS.includes(k) && text(v)) ? {...options.filters} : {};
- const wantedColumns: readonly string[] = Array.isArray(options.columns) && Array.from(options.columns).every(c => [...DEFAULT, ...TECHNICAL].includes(c as typeof DEFAULT[number])) ? options.columns : DEFAULT;
+ const wantedColumns: readonly string[] = Array.isArray(options.columns) && Array.from(options.columns).every(c => [...DEFAULT, ...TECHNICAL].includes(c as typeof DEFAULT[number])) ? options.columns : ['case_number', 'project_name', 'confirmation_version', 'pm'];
  const columns = [...DEFAULT, ...TECHNICAL].map(key => ({key, label: LABELS[key], visible: wantedColumns.includes(key),
   default: (DEFAULT as readonly string[]).includes(key), technical: (TECHNICAL as readonly string[]).includes(key), sortable: SORTABLE.includes(key),
   sortDisabledReason: SORTABLE.includes(key) ? null : key === 'source_modified' ? MODIFIED : 'server contract does not support sorting this column',
