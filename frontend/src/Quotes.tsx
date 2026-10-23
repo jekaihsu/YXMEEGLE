@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
+import {Search} from 'lucide-react';
 import {getSessionEpoch} from './api';
 import {Badge,Button,Page,Row,Section,Sheet} from './design';
 import {amountLabel,quoteApi,quoteKey,QUOTE_STAGES,sortQuotes,type Quote,type QuoteDetail,type QuoteSort} from './quoteApi';
@@ -32,6 +33,21 @@ function QuoteSheet({c,detail,onClose,onReload}:{c:Ctx;detail:QuoteDetail;onClos
   {importing&&q.project_id&&<SopImportSheet projectId={q.project_id} startNode="sales" onApplied={onReload} onClose={()=>setImporting(false)} onOpenImported={openFlow}/>}
  </div></Sheet>,document.body);
 }
+
+const COLUMNS = [
+  ['quote_no', '報價編號', 'col-quote-no'],
+  ['engineering_no', '工程編號', 'col-eng-no'],
+  ['name', '案件名稱', 'col-name'],
+  ['client', '業主', 'col-client'],
+  ['quoted_on', '報價日期', 'col-date'],
+  ['quote_deadline', '報價期限', 'col-date'],
+  ['contract_amount', '合約金額', 'col-amount'],
+  ['quote_owners', '報價負責人', 'col-owner'],
+  ['pm_names', 'PM', 'col-pm'],
+  ['stage', '階段', 'col-stage'],
+  ['sop_counts', 'SOP 進度', 'col-sop'],
+] as const;
+
 export function Quotes({c}:{c:Ctx}) {
  const [items,setItems]=useState<Quote[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [q,setQ]=useState(''),[stage,setStage]=useState(''),[sort,setSort]=useState<QuoteSort>('quote_no'),[dir,setDir]=useState(-1),[page,setPage]=useState(0),[size,setSize]=useState(25);
@@ -54,8 +70,8 @@ export function Quotes({c}:{c:Ctx}) {
   {error&&<p className="quote-error" role="alert">{error}<Button onClick={reload}>重試</Button></p>}
   {localFlow?<><Badge>本地規劃</Badge><LocalFlow key={detail.quote.project_id} c={c} q={detail.quote}/></>:<div className="quote-register">
    <div className="quote-stages tabbar" role="group" aria-label="報價階段"><Button className={!stage?'active':''} aria-pressed={!stage} onClick={()=>{setStage('');setPage(0)}}>全部</Button>{Object.entries(QUOTE_STAGES).map(([key,label])=><Button key={key} className={stage===key?'active':''} aria-pressed={stage===key} onClick={()=>{setStage(key);setPage(0)}}>{label}</Button>)}</div>
-   <div className="table-toolbar"><label className="search-field"><input aria-label="搜尋報價" maxLength={240} placeholder="報價編號、案件名稱、客戶" value={q} onChange={e=>{setQ(e.target.value);setPage(0)}}/></label><span role="status">{loading?'正在載入報價…':`${rows.length} 筆`}</span></div>
-   {loading?<p className="quote-loading" role="status">正在載入報價…</p>:!error&&<><div className="table-scroll" tabIndex={0} aria-label="報價總表"><table className="data-table quote-table"><thead><tr>{([['quote_no','報價編號'],['engineering_no','工程編號'],['name','案件名稱'],['client','業主'],['quoted_on','報價日期'],['quote_deadline','報價期限'],['contract_amount','合約金額'],['quote_owners','報價負責人'],['pm_names','PM'],['stage','階段'],['sop_counts','SOP 進度']] as const).map(([key,label])=>{const sortable=['quote_no','name','quoted_on','quote_deadline','contract_amount'].includes(key);return <th key={key} aria-sort={key===sort?(dir===1?'ascending':'descending'):undefined}>{sortable?<button onClick={()=>changeSort(key as QuoteSort)}>{label}{key===sort?(dir===1?' ↑':' ↓'):''}</button>:label}</th>})}</tr></thead><tbody>{rows.slice(safePage*size,(safePage+1)*size).map(item=><tr key={quoteKey(item)} className="clickable" onClick={()=>void open(item)}><td><button className="text-button" onClick={e=>{e.stopPropagation();void open(item)}}>{item.quote_no}</button>{item.origin==='local'&&<Badge>本地規劃</Badge>}</td><td>{item.engineering_no||'未設定'}</td><td>{item.name}</td><td>{item.client||'未設定'}</td><td>{item.quoted_on||'未設定'}</td><td>{item.quote_deadline||'未設定'}</td><td>{amountLabel(item)}</td><td>{item.quote_owners.join('、')||'未指派'}</td><td>{item.pm_names.join('、')||c.w.users.find(u=>u.id===item.pm_id)?.name||'未指派'}</td><td><Badge>{QUOTE_STAGES[item.stage]}</Badge></td><td>{!item.project_id?'未納入案件':item.sop_counts?`${item.sop_counts.done}/${item.sop_counts.total}`:'無任務'}</td></tr>)}</tbody></table></div>{!rows.length&&<p className="pf-empty">{items.length?'沒有符合條件的報價':'目前沒有報價'}</p>}<div className="quote-pagination"><label>每頁<select value={size} onChange={e=>{setSize(Number(e.target.value));setPage(0)}}>{[10,25,50,100].map(n=><option key={n}>{n}</option>)}</select></label><Button disabled={!safePage} onClick={()=>setPage(safePage-1)}>上一頁</Button><span>{safePage+1} / {pages}</span><Button disabled={safePage+1>=pages} onClick={()=>setPage(safePage+1)}>下一頁</Button></div></>}
+   <div className="table-toolbar"><label className="search-field"><Search size={15} className="search-icon" aria-hidden="true"/><input aria-label="搜尋報價" maxLength={240} placeholder="報價編號、案件名稱、客戶" value={q} onChange={e=>{setQ(e.target.value);setPage(0)}}/>{q&&<button type="button" className="search-clear" aria-label="清除搜尋" onClick={()=>{setQ('');setPage(0)}}>&times;</button>}</label><span role="status">{loading?'正在載入報價…':`${rows.length} 筆`}</span></div>
+   {loading?<p className="quote-loading" role="status">正在載入報價…</p>:!error&&<div className="quote-table-card"><div className="table-scroll" tabIndex={0} aria-label="報價總表"><table className="data-table quote-table"><thead><tr>{COLUMNS.map(([key,label,colClass])=>{const sortable=['quote_no','name','quoted_on','quote_deadline','contract_amount'].includes(key);return <th key={key} className={colClass} aria-sort={key===sort?(dir===1?'ascending':'descending'):undefined}>{sortable?<button onClick={()=>changeSort(key as QuoteSort)}>{label}{key===sort?(dir===1?' ↑':' ↓'):''}</button>:label}</th>})}</tr></thead><tbody>{rows.slice(safePage*size,(safePage+1)*size).map(item=><tr key={quoteKey(item)} className="clickable" onClick={()=>void open(item)}><td className="col-quote-no"><button className="text-button" onClick={e=>{e.stopPropagation();void open(item)}}>{item.quote_no}</button>{item.origin==='local'&&<Badge>本地規劃</Badge>}</td><td className="col-eng-no">{item.engineering_no||'未設定'}</td><td className="col-name">{item.name}</td><td className="col-client">{item.client||'未設定'}</td><td className="col-date">{item.quoted_on||'未設定'}</td><td className="col-date">{item.quote_deadline||'未設定'}</td><td className="col-amount">{amountLabel(item)}</td><td className="col-owner">{item.quote_owners.join('、')||'未指派'}</td><td className="col-pm">{item.pm_names.join('、')||c.w.users.find(u=>u.id===item.pm_id)?.name||'未指派'}</td><td className="col-stage"><Badge>{QUOTE_STAGES[item.stage]}</Badge></td><td className="col-sop">{!item.project_id?'未納入案件':item.sop_counts?`${item.sop_counts.done}/${item.sop_counts.total}`:'無任務'}</td></tr>)}</tbody></table></div>{!rows.length&&<p className="pf-empty">{items.length?'沒有符合條件的報價':'目前沒有報價'}</p>}<div className="quote-pagination"><label>每頁<select value={size} onChange={e=>{setSize(Number(e.target.value));setPage(0)}}>{[10,25,50,100].map(n=><option key={n}>{n}</option>)}</select></label><Button disabled={!safePage} onClick={()=>setPage(safePage-1)}>上一頁</Button><span>{safePage+1} / {pages}</span><Button disabled={safePage+1>=pages} onClick={()=>setPage(safePage+1)}>下一頁</Button></div></div>}
   </div>}
   {detail&&!localFlow&&<QuoteSheet key={quoteKey(detail.quote)} c={c} detail={detail} onReload={async()=>{reload();await open(detail.quote)}} onClose={()=>{detailSeq.current++;setDetail(null);if(routeKey)c.go({view:'quotes'})}}/>}
   {creating&&<QuoteCreateSheet users={c.w.users} canImport={c.s.features?.sop_task_writes===true&&(c.s.user?.role==='manager'||c.s.user?.capabilities?.includes('sop_task_import')===true)} onClose={()=>setCreating(false)} onCreated={reload} onOpen={ref=>{setCreating(false);c.go({view:'quotes',project:ref,tab:'flow'})}}/>}
