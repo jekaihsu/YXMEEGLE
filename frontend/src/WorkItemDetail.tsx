@@ -818,7 +818,6 @@ export function WorkItemDetail({
             </div>
             <div className="p2-drawer-body">
               <div className="p2-drawer-section">
-                <h4 className="p2-drawer-section-title">原生識別（僅限抽屜）</h4>
                 <dl className="p2-drawer-def">
                   {view.drawer.model.fields.map((f, i) => (
                     <div key={`d-field-${i}-${f.label}`}>

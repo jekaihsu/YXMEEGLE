@@ -76,7 +76,6 @@ export function SopTaskInspector({task, project, users, sop, onClose}: {task: So
    {error && <p role="alert" className="pg-callout">{error}</p>}
    {notice && <p role="status" className="sop-muted">{notice}</p>}
    <Section>
-    <Row label="狀態" value={stateLabel(task)}/>
     <Row label="期限" value={dueLabel(task)}/>
     <Row label="節點" value={task.nodes.map(n => sopNodeLabel(n.node_key)).join('、') || '未連結節點'}/>
     {ROLES.map(r => <Row key={r} label={ROLE_LABEL[r]} value={task.participants[r] ? names.get(task.participants[r]!) || '人員待確認' : '未指派'}/>)}
@@ -84,6 +83,7 @@ export function SopTaskInspector({task, project, users, sop, onClose}: {task: So
    <div className="pf-actions sop-transitions" role="group" aria-label="狀態操作">{taskActions(task).map(a => a.reason
     ? <Reasoned key={a.action} label={a.label} busy={busy} onSubmit={reason => void transition(a.action, {reason})}/>
     : <FlowAction key={a.action} allowed={!busy} reason="處理中" onClick={() => void transition(a.action)}>{a.label}</FlowAction>)}</div>
+   <details className="sop-edit-details"><summary>編輯任務資料</summary>
    <form className="sop-form" onSubmit={e => {e.preventDefault(); if (contentChanged) void patch({title: title.trim(), ...(task.instructions !== null ? {instructions} : {})}, '已儲存內容')}}>
     <Field label="任務名稱"><input value={title} maxLength={500} disabled={!!editReason || busy} onChange={e => setTitle(e.target.value)}/></Field>
     {task.instructions !== null && <Field label="作法"><textarea rows={4} value={instructions} disabled={!!editReason || busy} onChange={e => setInstructions(e.target.value)}/></Field>}
@@ -107,6 +107,7 @@ export function SopTaskInspector({task, project, users, sop, onClose}: {task: So
     <Field label="適用原因"><input value={appReason} maxLength={1000} disabled={busy} onChange={e => setAppReason(e.target.value)}/></Field>
     <Button type="submit" disabled={busy || applicability === task.applicability || !appReason.trim()}>儲存適用</Button>
    </form>}
+   </details>
    <TaskSuggestion projectId={project.id} task={task} current={sop.current} reload={sop.reload} onAccept={()=>setReview(true)}/><Provenance task={task}/>{review && <SuggestionReview projectId={project.id} tasks={'data' in sop.state ? sop.state.data?.tasks||[] : []} initial={[task.id]} current={sop.current} reload={sop.reload} onClose={()=>setReview(false)}/>}
   </div>
  </Sheet>, document.body);
