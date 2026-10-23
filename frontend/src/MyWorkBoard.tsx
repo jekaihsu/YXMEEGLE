@@ -5,7 +5,7 @@ import {Avatar} from './AppShell';
 import './MyWorkBoard.css';
 
 type Lane='late'|'blocked'|'week'|'later';
-const LANES:[Lane,string][]=[['late','逾期'],['blocked','受阻'],['week','本週到期'],['later','之後']];
+const LANES:[Lane,string][]=[['late','逾期'],['blocked','受阻'],['week','未來 7 天到期'],['later','之後']];
 
 const day=(value:string,offset:number)=>{const d=new Date(value.slice(0,10)+'T12:00:00');d.setDate(d.getDate()+offset);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 
@@ -20,7 +20,7 @@ export function MyWorkBoard({c,rows,showOwner}:{c:Ctx;rows:TaskRow[];showOwner:b
  const[showDone,setShowDone]=useState(false);
  const asOf=c.w.as_of;
  const open=rows.filter(r=>active(r.t));
- const lanes=LANES.map(([key,label])=>({key,label,rows:open.filter(r=>laneOf(r,asOf)===key)}));
+ const lanes=LANES.map(([key,label])=>({key,label,rows:open.filter(r=>laneOf(r,asOf)===key)})).filter(l=>l.rows.length);
  const weekStart=day(asOf,-6);
  const done=rows.filter(r=>r.t.status==='completed'&&(r.t.completed_at||'').slice(0,10)>=weekStart).sort((a,b)=>(b.t.completed_at||'').localeCompare(a.t.completed_at||''));
  const card=(r:TaskRow,lane:Lane|'done')=>{
@@ -43,12 +43,13 @@ export function MyWorkBoard({c,rows,showOwner}:{c:Ctx;rows:TaskRow[];showOwner:b
   <div className="mwb-board">
    {lanes.map(l=><section key={l.key} className={`mwb-lane lane-${l.key}${l.rows.length?'':' is-empty'}`} aria-label={`${l.label} ${l.rows.length} 項`}>
     <header><i aria-hidden="true"/><h2>{l.label}</h2><span>{l.rows.length}</span></header>
-    <div className="mwb-cards">{l.rows.map(r=>card(r,l.key))}{!l.rows.length&&<p className="mwb-empty">沒有任務</p>}</div>
+    <div className="mwb-cards">{l.rows.map(r=>card(r,l.key))}</div>
    </section>)}
-   <section className={`mwb-lane lane-done ${showDone?'':'collapsed'}`} aria-label={`本週已完成 ${done.length} 項`}>
-    <header><button type="button" aria-expanded={showDone} onClick={()=>setShowDone(!showDone)}><i aria-hidden="true"/><h2>本週已完成</h2><span>{done.length}</span>{showDone?<ChevronDown size={15}/>:<ChevronRight size={15}/>}</button></header>
-    {showDone&&<div className="mwb-cards">{done.map(r=>card(r,'done'))}{!done.length&&<p className="mwb-empty">本週尚無完成</p>}</div>}
-   </section>
+   {!open.length&&!done.length&&<p className="mwb-empty">目前沒有待辦或近期完成的任務。</p>}
+   {!!done.length&&<section className={`mwb-lane lane-done ${showDone?'':'collapsed'}`} aria-label={`近 7 天已完成 ${done.length} 項`}>
+    <header><button type="button" aria-expanded={showDone} onClick={()=>setShowDone(!showDone)}><i aria-hidden="true"/><h2>近 7 天已完成</h2><span>{done.length}</span>{showDone?<ChevronDown size={15}/>:<ChevronRight size={15}/>}</button></header>
+    {showDone&&<div className="mwb-cards">{done.map(r=>card(r,'done'))}</div>}
+   </section>}
   </div>
  </div>;
 }
