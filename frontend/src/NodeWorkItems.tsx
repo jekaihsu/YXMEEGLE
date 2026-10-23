@@ -19,9 +19,7 @@ function ItemBar({item, empty = '尚無進度資料'}: {item: WorkItem; empty?: 
 function ItemSheet({item, node, projectId, onRetryEvidence, onClose}: {item: WorkItem; node: AssignmentNode; projectId: string; onRetryEvidence?:()=>void; onClose: () => void}) {
   const p = itemProgress(item);
   return createPortal(<Sheet title={`工項明細 · ${title(item)}`} onClose={onClose}><div className="na-wi-sheet">
-    <Section title="基本資料"><Row label="工項編號" value={item.code ?? '來源未提供'}/>
-      <Row label="工項名稱" value={item.name ?? '來源未提供'}/>
-      <Row label="所屬節點" value={node.label}/>
+    <Section title="基本資料"><Row label="所屬節點" value={node.label}/>
       <Row label="計畫數量" value={qty(item)}/></Section>
     <Section title="進度"><Row label="狀態" value={itemStatusLabel(item)}/>
       <Row label="完成度" value={<ItemBar item={item}/>}/>

@@ -871,7 +871,7 @@ export function CaseDetail({
               aria-label="選取項目原生詳情抽屜"
             >
               <div className="p2-drawer-header">
-                <h3 className="p2-drawer-title">原生識別與詳情</h3>
+                <h3 className="p2-drawer-title">{renderDisplayField(view.drawer.row.title)}</h3>
                 <button
                   type="button"
                   className="p2-btn p2-btn-sm p2-btn-close"
@@ -890,12 +890,7 @@ export function CaseDetail({
               <div className="p2-drawer-body">
                 {/* 選取項目摘要 */}
                 <div className="p2-drawer-section">
-                  <h4 className="p2-drawer-section-title">選取項目</h4>
                   <dl className="p2-drawer-def">
-                    <div>
-                      <dt>名稱</dt>
-                      <dd>{renderDisplayField(view.drawer.row.title)}</dd>
-                    </div>
                     <div>
                       <dt>種類</dt>
                       <dd>
