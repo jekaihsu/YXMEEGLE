@@ -27,17 +27,6 @@ const detail=async(url)=>{
  if(!project)return new Response(JSON.stringify({detail:'找不到這個案件'}),{status:404});
  return json({scope:'project',version:current.version,as_of:workspace.as_of,project,settings:{},delegations:[],handover_requests:[],sop_requests:[],sop_templates:[],approved_leave_delegations:[],approvals:[],events:[],policy_summary:[],financial_requests:[],source_quotes:[],source_confirmations:[],contract_items:[],node_skip_requests:[]});
 };
-const pct=p=>p.progress.total_nodes?p.progress.completed_nodes/p.progress.total_nodes:0;
-const overview=async(url)=>{
- const query=new URL(url,'http://x').searchParams;await overviewGate(query);
- const cards=current.projects,formal=p=>p.case_type!=='intake',tab=query.get('tab'),needle=(query.get('q')||'').toLowerCase(),sign=query.get('dir')==='desc'?-1:1;
- const keep={all:()=>true,formal,intake:p=>!formal(p),active:p=>p.execution_status!=='completed',overdue:p=>p.overdue_tasks>0,completed:p=>p.execution_status==='completed'}[tab];
- const key={due:p=>p.due_date||'9999',name:p=>p.name,progress:pct,created:p=>p.created_at||''}[query.get('sort')];
- const hit=cards.filter(p=>keep(p)&&(!needle||(p.code+' '+p.name+' '+p.client).toLowerCase().includes(needle))&&(!query.get('owner')||p.pm_id===query.get('owner')))
-  .sort((x,y)=>(key(x)<key(y)?-1:key(x)>key(y)?1:x.id<y.id?-1:1)*sign);
- const offset=Number(query.get('offset')),limit=Number(query.get('limit'));
- return json({total:hit.length,offset,limit,facets:{all:cards.length,formal:cards.filter(formal).length,intake:cards.filter(p=>!formal(p)).length},items:hit.slice(offset,offset+limit)});
-};
 let root;let features;let current=shell;let user=a;let etag='W/"shell-A:1"';let failMutation=false;let mutationResponse;const requests=[];
 globalThis.fetch=async(url,init)=>{
  requests.push({url,init});
@@ -45,7 +34,7 @@ globalThis.fetch=async(url,init)=>{
  if(url==='/api/my-work')return json({rows:[],readState:'ready',assignment:'unassigned',canSeeAwaitingConfirmation:false});
  if(url==='/api/source-health')return json({page_state:null,sources:[]});
  if(url==='/api/workspace'){await fullGate();return json({...workspace,version:current.version});}
- if(url.startsWith('/api/projects?view=overview'))return overview(url);
+ if(url==='/api/projects?view=portfolio'){await overviewGate(new URLSearchParams());return json({items:current.projects,total:current.projects.length,as_of:current.as_of,basis:'persisted_workspace'})}
  if(url.endsWith('/node-assignments'))return new Response(JSON.stringify({code:'disabled',detail:'disabled'}),{status:404});
  if(url.startsWith('/api/projects/'))return detail(url);
  if(url.startsWith('/api/daily-reports?'))return json({items:[],total:0,offset:0,limit:30,summary:{}});
@@ -55,8 +44,7 @@ globalThis.fetch=async(url,init)=>{
 };
 const mount=async(next)=>{if(root)await flush(()=>root.unmount());features=next;requests.length=0;root=createRoot(document.getElementById('root'));await flush(()=>root.render(React.createElement(App)))};
 const lastShell=()=>requests.findLast(r=>r.url==='/api/workspace?scope=shell');
-const rows=()=>[...document.querySelectorAll('.projects-table tbody tr')];
-const button=text=>[...document.querySelectorAll('.tabbar button')].find(b=>b.textContent.startsWith(text));
+const rows=()=>[...document.querySelectorAll('.pl-case')];
 try{
  for(const flag of [undefined,{}, {workspace_shell:false},{workspace_shell:'true'}]){
   await mount(flag);assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace']);
@@ -64,12 +52,12 @@ try{
   assert.equal(document.querySelector('.notification-button i'),null);
  }
  await mount({workspace_shell:true});
- assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects?view=overview&tab=formal&sort=due&dir=asc&limit=50&offset=0']);
+ assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects?view=portfolio']);
  assert.equal(window.shellContext.w.scope,'shell');assert.equal(rows().length,2);
  assert.ok(document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期 1'));
  assert.equal(document.querySelector('.notification-button'),null);assert.equal(window.shellContext.unmatchedDaily(window.shellContext.w),535);
- assert.equal(rows()[0].querySelector('.stage-chips').textContent,'—'); // 目前作業 no longer repeats the workflow badge shown in the status column
- assert.deepEqual([...document.querySelectorAll('.projects-table thead th')].map(th=>th.textContent),['案件名稱','來源 · 工作台 · 關注','執行歸屬 · 專案經理','目前作業','有效期限','']);
+ assert.equal(rows()[0].querySelector('.pl-current>span').textContent,'待核對'); // 目前作業 no longer repeats the workflow badge shown in the status column
+ assert.equal(rows()[0].querySelectorAll('.pl-stepper li').length,9);assert.equal(rows()[0].querySelector('.pl-status').textContent,'待核對');
  // P4-1: the dashboard renders from counts, the attention list and cards; no tree scan and no full workspace.
  await flush(()=>{location.hash='view=dashboard';window.dispatchEvent(new window.Event('hashchange'))});
  const todo=document.querySelector('.work-inbox');
@@ -81,19 +69,14 @@ try{
  assert.ok(document.querySelector('.project-preview-row').textContent.includes('PRIVATE_CASE_A'));
  assert.ok(!requests.some(r=>r.url==='/api/workspace'),'dashboard waiting groups render without a full workspace read');
  await flush(()=>{location.hash='view=projects';window.dispatchEvent(new window.Event('hashchange'))});
- await flush(()=>button('需要關注').click());assert.equal(rows().length,1);assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'));
- await flush(()=>button('執行中').click());assert.equal(rows().length,1);assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'));
- await flush(()=>button('交付已完成').click());assert.equal(rows().length,1);assert.ok(rows()[0].textContent.includes('CASE_B'));
- await flush(()=>button('全部紀錄').click());
- const sort=document.querySelector('[aria-label="案件排序"]');await flush(()=>{sort.value='created';sort.dispatchEvent(new Event('change',{bubbles:true}))});
- assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'),'shell created sort defaults to descending without nodes');
- assert.ok(requests.at(-1).url.includes('sort=created&dir=desc&limit=50&offset=0'));
+ const change=async(label,value)=>flush(()=>{const select=document.querySelector(`[aria-label="${label}"]`);select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}))});
+ const beforeFilters=requests.length;
+ const attention=document.querySelector('.pl-check input');await flush(()=>{attention.checked=true;attention.dispatchEvent(new Event('change',{bubbles:true}))});
+ await change('案件排序','created');assert.ok(rows()[0].textContent.includes('PRIVATE_CASE_A'));
  await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
- assert.ok(rows()[0].textContent.includes('CASE_B'),'explicit direction toggle sorts ascending');
- for(const value of ['due','name','created']){
-  await flush(()=>{sort.value=value;sort.dispatchEvent(new Event('change',{bubbles:true}))});
-  assert.ok(requests.at(-1).url.includes(`sort=${value}&dir=${value==='created'?'desc':'asc'}&limit=50&offset=0`),requests.at(-1).url);
- }
+ assert.ok(rows()[0].textContent.includes('CASE_B'));
+ assert.equal(requests.length,beforeFilters,'sorting complete portfolio does not request individual cases');
+ await flush(()=>document.querySelector('.pl-clear').click());
  const cached=window.shellContext.w;await flush(()=>window.shellContext.refresh());
  assert.equal(lastShell().init.headers.get('If-None-Match'),etag);assert.equal(window.shellContext.w,cached,'304 reuses cached data');
  assert.equal(window.shellContext.error,'');assert.equal(rows().length,2);
@@ -117,44 +100,20 @@ try{
  failMutation=true;await flush(()=>window.shellContext.run('case_execution_assign',{}, {project_id:'pA'}));
  assert.ok(requests.findLast(r=>r.url!==undefined&&!r.url.startsWith('/api/projects')).url==='/api/workspace?scope=shell','409 re-reads shell');assert.ok(window.shellContext.error.includes('conflict'));
 
- // Select ten rows so the small fixture still exercises a second page.
- const many=Array.from({length:25},(_,i)=>({...shell.projects[1],id:`c${i}`,code:`CODE_${String(i).padStart(2,'0')}`,name:`NAME_${i}`,created_at:String(25-i).padStart(2,'0'),case_type:i%5===0?'intake':'formal',due_date:`2026-11-${String(i+1).padStart(2,'0')}`}));
- current={...shell,projects:many};etag='W/"shell-big"';
- await mount({workspace_shell:true});
- const pages=()=>requests.filter(r=>r.url.startsWith('/api/projects?view=overview')).map(r=>new URL(r.url,'http://x').searchParams);
- assert.equal(pages().length,1);assert.equal(pages()[0].get('limit'),'50');assert.equal(pages()[0].get('offset'),'0');
- assert.equal(rows().length,20);
- await flush(()=>{const size=document.querySelector('[aria-label="每頁筆數"]');size.value='10';size.dispatchEvent(new Event('change',{bubbles:true}))});
- assert.equal(pages().at(-1).get('limit'),'10');assert.equal(pages().at(-1).get('offset'),'0');
- assert.equal(rows().length,10);assert.ok(rows()[0].textContent.includes('CODE_01'));assert.ok(document.querySelector('.table-footer').textContent.includes('符合條件 20 筆 · 本頁已載入 10 筆 · 部分資料，總數未知 · 第 1 頁'));
- assert.ok(!document.querySelector('.projects-table thead').textContent.includes('合約金額'),'contract amount is not in shell cards');
- // The formal-case count moved from the removed .portfolio-index block onto the 正式案件 filter tab.
- assert.equal([...document.querySelectorAll('.portfolio-surface .tabbar button')].find(b=>b.textContent.startsWith('正式案件'))?.querySelector('span')?.textContent,'20');
- const nextPage=[...document.querySelectorAll('.table-footer button')].find(b=>b.textContent==='下一頁');
- await flush(()=>nextPage.click());assert.equal(pages().at(-1).get('offset'),'10');assert.equal(rows().length,10);assert.ok(rows()[0].textContent.includes('CODE_13'));
- assert.ok([...document.querySelectorAll('.table-footer button')].find(b=>b.textContent==='下一頁').disabled);
- const size=document.querySelector('[aria-label="每頁筆數"]');
- await flush(()=>{size.value='25';size.dispatchEvent(new Event('change',{bubbles:true}))});
- assert.equal(pages().at(-1).get('limit'),'25');assert.equal(pages().at(-1).get('offset'),'0');assert.equal(rows().length,20,'size change returns to page 1');
- await flush(()=>{size.value='10';size.dispatchEvent(new Event('change',{bubbles:true}))});
- await flush(()=>[...document.querySelectorAll('.table-footer button')].find(b=>b.textContent==='下一頁').click());assert.equal(pages().at(-1).get('offset'),'10');
- await flush(()=>button('待確認接案').click());assert.equal(pages().at(-1).get('tab'),'intake');assert.equal(pages().at(-1).get('offset'),'0','tab change returns to page 1');assert.equal(rows().length,5);
- await flush(()=>button('正式案件').click());await flush(()=>[...document.querySelectorAll('.table-footer button')].find(b=>b.textContent==='下一頁').click());
- const ownerSelect=document.querySelector('[aria-label="篩選專案經理"]');
- await flush(()=>{ownerSelect.value='actor-A';ownerSelect.dispatchEvent(new Event('change',{bubbles:true}))});assert.equal(pages().at(-1).get('offset'),'0');assert.equal(pages().at(-1).get('owner'),'actor-A','owner filter reaches the server');
- await flush(()=>{ownerSelect.value='all';ownerSelect.dispatchEvent(new Event('change',{bubbles:true}))});
- const search=document.querySelector('[aria-label="搜尋案件"]');const before=pages().length
- await flush(()=>{search.value='CODE_2';Simulate.change(search)});
- assert.equal(pages().length,before,'typing is debounced');await flush(()=>new Promise(resolve=>setTimeout(resolve,320)));
-assert.equal(pages().at(-1).get('q'),'CODE_2');assert.equal(pages().length,before+1);assert.equal(rows().length,4);
- await flush(()=>search.parentElement.querySelector('button').click());await flush(()=>new Promise(resolve=>setTimeout(resolve,320)));assert.equal(pages().at(-1).get('q'),null);
- // A slow answer for an older query must never overwrite the newer one.
- let release;const slow=new Promise(resolve=>{release=resolve});overviewGate=async query=>{if(query.get('tab')==='intake')await slow};
- await flush(()=>button('待確認接案').click());await flush(()=>button('正式案件').click());
- assert.equal(pages().at(-1).get('offset'),'0','returning to an earlier filter starts at page 1');assert.equal(rows().length,10);assert.ok(rows()[0].textContent.includes('CODE_01'));
- await flush(async()=>{release();await slow});assert.equal(rows().length,10);assert.ok(rows()[0].textContent.includes('CODE_01'),'stale intake page did not overwrite formal page');
- overviewGate=async()=>{};
-
+ const many=Array.from({length:25},(_,i)=>({...shell.projects[1],id:`c${i}`,code:`CODE_${String(i).padStart(2,'0')}`,name:`NAME_${i}`,created_at:`2026-10-${String(25-i).padStart(2,'0')}`,case_type:i%5===0?'intake':'formal',due_date:`2026-11-${String(i+1).padStart(2,'0')}`}));
+ current={...shell,projects:many};etag='W/"shell-big"';await mount({workspace_shell:true});
+ const portfolioReads=()=>requests.filter(r=>r.url==='/api/projects?view=portfolio').length;
+ assert.equal(portfolioReads(),1);assert.equal(rows().length,3);
+ await change('每組顯示筆數','10');assert.equal(rows().length,10);
+ await flush(()=>document.querySelector('.pl-expand').click());assert.equal(rows().length,25);
+ assert.match(document.querySelector('.pl-footer').textContent,/已授權案件 25 筆/);
+ await change('案件分類','intake');assert.equal(rows().length,5);
+ await change('案件分類','formal');assert.equal(rows().length,10);
+ assert.equal(document.querySelector('.pl-group:has(.pl-case) h2 span').textContent,'20');
+ await change('篩選專案經理','actor-A');assert.equal(rows().length,10);await change('篩選專案經理','');
+ const search=document.querySelector('[aria-label="搜尋案件"]');await flush(()=>{search.value='CODE_2';Simulate.change(search)});assert.equal(rows().length,4);
+ await flush(()=>search.parentElement.querySelector('button').click());assert.equal(rows().length,10);
+ assert.equal(portfolioReads(),1,'combined filtering, expansion and sorting reuse the complete bulk projection');
  // P4-3: opening a case reads that one project; tabs are client-side; a mutation hands over to the full workspace.
  current=shell;etag='W/"shell-A:1"';failMutation=false;mutationResponse=undefined;location.hash='view=project&project=pA';
  await mount({workspace_shell:true});

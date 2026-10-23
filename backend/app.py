@@ -669,11 +669,14 @@ def create_app(overrides=None,*,dispatch_transport=None):
         from . import index_reads
         if view:
             from . import shell
-            require(view=='overview' and shell_enabled,'不支援的清單檢視',422)
+            require(view in ('overview','portfolio') and shell_enabled,'不支援的清單檢視',422)
             require(tab in shell.TABS and sort in shell.SORTS and dir in ('asc','desc') and len(q)<=240,'清單查詢參數錯誤',422)
             with phase(request,'load'),sessions() as db:
                 row=db.get(WorkspaceRow,data['wid'])
                 require(index_reads.ready(db,BusinessRow,row),'案件索引尚未就緒，請稍後重試',503)
+                if view=='portfolio':
+                    from .projects_portfolio import portfolio
+                    return portfolio(db,BusinessRow,row,load(db,row,collections=()),now()[:10])
                 return shell.overview_page(db,BusinessRow,row,load(db,row,collections=()),now()[:10],q=q,status=status,owner=owner,tab=tab,sort=sort,desc=dir=='desc',offset=offset,limit=limit)
         with phase(request,'load'),sessions() as db:
             row=db.get(WorkspaceRow,data['wid'])

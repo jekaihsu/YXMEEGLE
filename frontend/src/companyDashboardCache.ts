@@ -1,5 +1,6 @@
 import {parseInstant, taipeiDate} from './taipeiTime';
 import {api, ApiError, getSessionEpoch} from './api';
+import type {PortfolioPage} from './projectsListModel';
 import type {ProjectPage} from './appCommon';
 import type {CompanyDashboard} from './companyDashboardTypes';
 
@@ -61,6 +62,9 @@ function panelReader<T>(){
 const panels=panelReader<unknown>();
 export const cachedPanel=panels.cached;
 export const readPanel=panels.read;
+const portfolios=panelReader<PortfolioPage>();
+export const cachedPortfolio=portfolios.cached;
+export const readPortfolio=portfolios.read;
 const projects=panelReader<ProjectPage>();
 export const cachedProjects=projects.cached;
 export const readProjects=projects.read;

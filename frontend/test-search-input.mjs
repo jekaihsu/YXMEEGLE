@@ -34,14 +34,14 @@ try{
    await input.pressSequentially(character);
    assert.equal(await input.inputValue(),'YX-002'.slice(0,index+1),`${width}: each native keystroke survives React's onChange`);
   }
-  assert.equal(await page.locator('.projects-table tbody tr').count(),1,`${width}: search filters rows`);
-  assert.match(await page.locator('.projects-table tbody').innerText(),/YX-002/);
+  assert.equal(await page.locator('.pl-case').count(),1,`${width}: search filters rows`);
+  assert.match(await page.locator('.pl-groups').innerText(),/YX-002/);
   const reads=requests.length;
   await page.getByRole('button',{name:'重新整理資料',exact:true}).click();
   assert.equal(requests.length,reads,`${width}: blurred dirty input still blocks workspace reload`);
   await page.getByRole('button',{name:'清除搜尋',exact:true}).click();
   assert.equal(await input.inputValue(),'');
-  assert.equal(await page.locator('.projects-table tbody tr').count(),3);
+  assert.equal(await page.locator('.pl-case').count(),3);
   await Promise.all([
    page.waitForResponse(response=>new URL(response.url()).pathname==='/api/workspace'),
    page.getByRole('button',{name:'重新整理資料',exact:true}).click(),
@@ -49,8 +49,8 @@ try{
   assert.ok(requests.length>reads,`${width}: clearing to baseline releases reload guard`);
   await input.fill('YX-003');
   assert.equal(await input.inputValue(),'YX-003',`${width}: native replacement also survives`);
-  assert.equal(await page.locator('.projects-table tbody tr').count(),1);
-  assert.match(await page.locator('.projects-table tbody').innerText(),/YX-003/);
+  assert.equal(await page.locator('.pl-case').count(),1);
+  assert.match(await page.locator('.pl-groups').innerText(),/YX-003/);
   assert.deepEqual(errors,[],`${width}: no browser runtime errors`);
   console.log(`Search input: ${width}px native typing, replacement, clear, filtering and reload protection passed`);
   await page.close();

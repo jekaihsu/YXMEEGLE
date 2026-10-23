@@ -81,8 +81,8 @@
 .workspace .stage-button .stage-action-label{color:var(--accent)}
 .workspace .stage-button.completed .stage-action-label{color:var(--label-2)}
 @media(max-width:760px){
- .workspace .portfolio-page .tabbar,.workspace .project-detail .project-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;width:100%;border-radius:var(--radius-pill);scrollbar-width:none}
- .workspace .portfolio-page .tabbar button,.workspace .project-detail .project-tabs button{flex:0 0 auto;white-space:nowrap}
+ .workspace .project-detail .project-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;width:100%;border-radius:var(--radius-pill);scrollbar-width:none}
+ .workspace .project-detail .project-tabs button{flex:0 0 auto;white-space:nowrap}
 }
 /* Schedule: each day scrolls inside a fixed height instead of stretching the page. */
 .workspace .calendar-day{min-height:0}
