@@ -14,6 +14,7 @@ export interface SopCounts {done: number; total: number; unresolved: number; not
 export interface SopAssignee {id: string; name: string; case_roles: string[]; department: string|null}
 export interface SopSuggestion {taskId: string; ruleId: string; ruleRevision: number; tier: 'proof'|'indicator'; state: 'done'|'in_progress'; facts: Record<string, unknown>; hash: string}
 export interface SopTask {
+ result?:{note:string; actorId:string; actorName:string; at:number}|null; completionBlockedReason?:string|null;
  allowedActions: string[]; suggestion: SopSuggestion|null; shared: boolean; conditional: boolean;
  id: string; title: string; instructions: string|null; participants: Partial<Record<Role,string>>;
  applicability: Applicability; state: Lifecycle; revision: number; overdue: boolean; manual: boolean;
@@ -23,7 +24,7 @@ export interface SopTask {
  source: Record<string, unknown>|null; restricted: boolean;
 }
 export interface SopOverview {
- projectId: string; startNode: SopNodeKey; checklistRevision: number; caseCounts: SopCounts; nodeCounts: Record<SopNodeKey, SopCounts>;
+ caseHeader?:{id:string; code:string|null; name:string|null}; projectId: string; startNode: SopNodeKey; checklistRevision: number; caseCounts: SopCounts; nodeCounts: Record<SopNodeKey, SopCounts>;
  tasks: SopTask[]; allowed: {import: boolean; manage: boolean; work: boolean};
  nodeDone: Partial<Record<SopNodeKey, {rule: string; reason: string}>>;
 }
@@ -70,7 +71,9 @@ function task(v: unknown): SopTask {
  for (const [role, id] of Object.entries(people)) {if (!ROLES.includes(role as Role)) throw malformed(); participants[role as Role] = str(id)}
  const dueDate = optStr(local.due_date);
  if (dueDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) throw malformed();
- return {allowedActions: list(t.allowed_actions,str), suggestion: t.suggestion == null ? null : parseSuggestion(t.suggestion), shared: bool(t.is_shared), conditional: bool(t.is_conditional), id: str(t.id), title: str(t.title), instructions: optStr(t.instructions), participants, applicability: applicability(t.applicability),
+ const result=t.result==null?null:object(t.result);
+ return {result:result?{note:str(result.note),actorId:str(result.actor_id),actorName:str(result.actor_name),at:seconds(result.at)}:null,
+  completionBlockedReason:optStr(t.completion_blocked_reason),allowedActions: list(t.allowed_actions,str), suggestion: t.suggestion == null ? null : parseSuggestion(t.suggestion), shared: bool(t.is_shared), conditional: bool(t.is_conditional), id: str(t.id), title: str(t.title), instructions: optStr(t.instructions), participants, applicability: applicability(t.applicability),
   state: lifecycle(t.state), revision: int(t.revision), overdue: bool(t.overdue), manual: origin.template_family_id === 'manual',
   dueDate, dateStatus: str(local.date_status), completionRule: str(local.completion_rule_status),
   nodes: list(t.nodes, n => {const l = object(n); return {node_key: node(l.node_key), node_id: str(l.node_id), order: int(l.order)}}),
@@ -82,7 +85,8 @@ export function parseOverview(v: unknown): SopOverview {
  if (o.task_source !== 'sop_local') throw malformed();
  const tasks = list(o.tasks, task);
  if (new Set(tasks.map(t => t.id)).size !== tasks.length) throw malformed();
- return {projectId: str(o.project_id), startNode: node(o.start_node), checklistRevision: int(o.checklist_revision), caseCounts: counts(o.case_counts),
+ const header=o.case==null?null:object(o.case);
+ return {caseHeader:header?{id:str(header.id),code:optStr(header.code),name:optStr(header.name)}:undefined,projectId: str(o.project_id), startNode: node(o.start_node), checklistRevision: int(o.checklist_revision), caseCounts: counts(o.case_counts),
   nodeCounts: Object.fromEntries(SOP_NODE_KEYS.map(key => [key, counts(nodeCounts[key])])) as Record<SopNodeKey, SopCounts>,
   tasks, allowed: {import: bool(allowed.import), manage: bool(allowed.manage), work: bool(allowed.work)},
   nodeDone: Object.fromEntries(Object.entries(o.node_done == null ? {} : object(o.node_done)).filter(([key]) => isSopNode(key)).map(([key, v]) => {const d = object(v); return [key, {rule: str(d.rule), reason: str(d.reason)}]}))};
@@ -143,10 +147,10 @@ export const sopApi = {
 };
 
 export const SOP_ERROR_TEXT: Record<string, string> = {
- quote_number_taken: '報價編號已使用', quote_number_invalid: '報價編號格式不正確', local_case_creation_disabled: '本地建立暫停', quote_not_found: '找不到報價', suggestion_stale: '建議已更新', suggestion_confirmation_required: '需確認建議並填寫原因', identity_forbidden:'帳號或工作區尚未獲准存取，請聯絡管理員核對身分與名冊', session_expired: '登入已過期', sop_import_forbidden: '沒有 SOP 任務權限', case_not_found: '找不到此案件', task_not_found: '找不到此 SOP 任務',
+ result_note_required: '請填寫結果說明', quote_number_taken: '報價編號已使用', quote_number_invalid: '報價編號格式不正確', local_case_creation_disabled: '本地建立暫停', quote_not_found: '找不到報價', suggestion_stale: '建議已更新', suggestion_confirmation_required: '需確認建議並填寫原因', identity_forbidden:'帳號或工作區尚未獲准存取，請聯絡管理員核對身分與名冊', session_expired: '登入已過期', sop_import_forbidden: '沒有 SOP 任務權限', case_not_found: '找不到此案件', task_not_found: '找不到此 SOP 任務',
  preview_stale: '預覽已過期，已重新產生', preview_not_found: '預覽已失效，已重新產生', idempotency_mismatch: '匯入請求不一致，請重新預覽',
  task_revision_conflict: '任務已被更新，已重新載入', node_mapping_invalid: '節點對應有誤', row_not_importable: '此列不可匯入',
- applicability_unresolved: '需先確認適用', completion_evidence_missing: '完成條件待審核', import_unavailable: 'SOP 任務暫停寫入',
+ applicability_unresolved: '需先確認適用', completion_evidence_missing: '此任務需先完成佐證或審核', import_unavailable: 'SOP 任務暫停寫入',
  template_unavailable: '範本版本不可用', template_mapping_conflict: '範本節點對應衝突', participant_unresolved: '此人員已停用或不存在', node_not_done_by_data: '資料尚未判定此節點完成',
  task_reopen_required: '需先重新開啟', invalid_transition: '目前狀態不可執行', invalid_request: '內容格式不正確', run_not_found: '找不到匯入紀錄',
  network: '連線中斷', client_timeout: '連線逾時', malformed: '回應格式不正確',

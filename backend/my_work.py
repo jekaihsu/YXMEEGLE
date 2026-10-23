@@ -157,7 +157,7 @@ def _blocked(*states):
     return {'rows': [], 'readState': data_state(*states), 'assignment': 'unknown', 'canSeeAwaitingConfirmation': False}
 
 
-def build_my_work_input(ws, viewer, read=None):
+def build_my_work_input(ws, viewer, read=None, *, sop_items=()):
     """Return ``{'rows','readState','assignment','canSeeAwaitingConfirmation'}`` for ``viewer``.
 
     ``read`` reports how the caller obtained ``ws`` (this module reads nothing):
@@ -259,6 +259,24 @@ def build_my_work_input(ws, viewer, read=None):
         if item['id'] in unknown_outcome: row['operation_outcome'] = 'unknown'
         rows.append({k: v for k, v in row.items() if v is not None})
 
+    for item in sop_items:
+        if item['status'] in {'done', 'cancelled', 'skipped'}:
+            continue
+        target = item['target']
+        route = '/#' + '&'.join(f'{k}={quote(str(v), safe="")}' for k, v in target.items())
+        executor = 'executor' in item['assignment_roles']
+        row = {'id': item['id'], 'kind': 'sop_task', 'title': item['title'], 'workflow_state': item['status'],
+               'ended': False, 'parent': {'verified': True, 'case_title': item['case']['name']},
+               'case_code': item['case']['code'], 'node_keys': item['node_keys'],
+               'assignment_roles': item['assignment_roles'],
+               'effective_due': {'value': item['deadline'], 'verified_formal': True} if item['deadline'] else {'verified_formal': False},
+               'entry_points': [{'kind': 'task', 'exists': True, 'authorized': True, 'route': route}]}
+        if not executor:
+            row['queue'] = 'awaiting_my_confirmation'
+        rows.append(row)
+        ever_assigned = ever_assigned or executor
+    awaiting_sop = any(set(i['assignment_roles']) & {'checker', 'confirmer'} and i['status'] not in {'done', 'cancelled', 'skipped'} for i in sop_items)
+
     flags = [name for name, on in (('partial', partial), ('stale', read.get('stale') is True)) if on]
     if flags:
         read_state = data_state(*flags, count=None if partial else len(rows))
@@ -268,14 +286,19 @@ def build_my_work_input(ws, viewer, read=None):
            'assignment': 'assigned' if ever_assigned else 'unknown' if partial else 'unassigned',
             # Existing authorization: home_queues only lists a confirmation the viewer may cast (can_vote,
             # current reviewer seat or handover target). No such item proves nothing, so the toggle stays off.
-           'canSeeAwaitingConfirmation': bool(awaiting),
+           'canSeeAwaitingConfirmation': bool(awaiting) or awaiting_sop,
            'as_of': as_of}  # the workspace as_of this read used; not source freshness
     # Same default as backend/app.py public_ws: the explicit environment, else derived from the surviving
     # (filtered) projects only, so a hidden demo case can never grant the test/demo exemption.
     environment = visible.get('environment', 'demo' if any(isinstance(p, dict) and p.get('source_kind') == 'demo' for p in visible.get('projects', [])) else 'production')
     if environment not in ('test', 'demo'):
+        # Local planning headers are authorized by the task adapter and absent from the official-case redaction plan.
+        sop_rows = [r for r in out['rows'] if r.get('kind') == 'sop_task']
+        out['rows'] = [r for r in out['rows'] if r.get('kind') != 'sop_task']
         case_redaction.apply(out, case_redaction.make_plan(pre_filter, visible))
+        out['rows'] += sop_rows
         out['rows'] = [{k: v for k, v in r.items() if v is not None} for r in out['rows'] if r.get('id') is not None]
+    out['rows'].sort(key=lambda row: row['id'])
     for row in out['rows']:  # the consumer's table and search read the row level title; only a verified parent supplies it
         if row['parent'].get('verified') and row['parent'].get('case_title'): row['case_title'] = row['parent']['case_title']
     return out

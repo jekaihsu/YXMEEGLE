@@ -134,3 +134,6 @@ body:has(.project-detail-calm)>.ds-backdrop .pf-facts{grid-template-columns:repe
  .project-detail-calm .sop-quiet>header{flex-wrap:wrap;gap:4px 12px}.project-detail-calm .sop-quiet .pf-actions{gap:4px}
 }
 .project-detail-calm .pf-facts dd{min-height:32px;display:flex;align-items:center;margin-top:0}.project-detail-calm .pf-departments{width:100%}.project-detail-calm .pf-departments>summary{padding:0;min-height:32px;display:flex;align-items:center;gap:4px;position:relative;overflow:visible}.project-detail-calm .pf-departments>summary::after{content:'';position:absolute;inset:-6px 0}.project-detail-calm .pf-department-names{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#172033}.project-detail-calm .pf-departments>summary>span:last-child{flex-shrink:0}.project-detail-calm .pf-departments[open]>summary{margin:0}
+
+.work-page.project-detail-calm :is(.my-work-toolbar,.my-work-table-scroll){background:#fff;background-image:none;border:1px solid #e5e7eb;box-shadow:none;backdrop-filter:none}
+.app-shell .workspace:has(.work-page.project-detail-calm){min-height:calc(100vh - 64px)}

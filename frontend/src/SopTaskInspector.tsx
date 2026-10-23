@@ -2,7 +2,7 @@ import {TaskSuggestion,SuggestionReview} from './SopSuggestions';
 import {createPortal} from 'react-dom';
 import {useState, type ReactNode} from 'react';
 import {Badge, Button, Row, Section, Sheet} from './design';
-import {ROLES, SopError, sopApi, sopErrorText, sopNodeLabel, type Applicability, type MutationResult, type Role, type SopTask} from './sopTaskApi';
+import {ROLES, SopError, sopApi, sopErrorText, sopNodeLabel, type Applicability, type MutationResult, type Role, type SopTask, SOP_ERROR_TEXT} from './sopTaskApi';
 import {APPLICABILITY_LABEL, dueLabel, ROLE_LABEL, stateLabel, taskActions, type TaskAction} from './sopTaskModel';
 import {FlowAction} from './FlowActions';
 import type {useSopTasks} from './useSopTasks';
@@ -43,6 +43,7 @@ function Field({label, children}: {label: string; children: ReactNode}) {
 
 export function SopTaskInspector({task, project, users, sop, onClose}: {task: SopTask; project: {id:string}; users: User[]; sop: ReturnType<typeof useSopTasks>; onClose: () => void}) {
  const [review,setReview]=useState(false);
+ const [resultNote,setResultNote]=useState('');
  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
  const [title, setTitle] = useState(task.title), [instructions, setInstructions] = useState(task.instructions ?? '');
  const [people, setPeople] = useState(task.participants);
@@ -62,6 +63,7 @@ export function SopTaskInspector({task, project, users, sop, onClose}: {task: So
  };
  const patch = (body: Record<string, unknown>, done: string) => run(() => sopApi.patch(project.id, task.id, {expected_revision: task.revision, ...body}, sop.current), done);
  const transition = (action: TaskAction|'set_applicability', extra: Record<string, unknown> = {}) => run(() => sopApi.transition(project.id, task.id, {expected_revision: task.revision, action, ...extra}, sop.current), '已更新狀態');
+ const completionReason=busy?'處理中':task.completionBlockedReason?SOP_ERROR_TEXT[task.completionBlockedReason]||'完成條件待核對':!task.allowedActions.includes('complete')?'目前無法完成此任務':!resultNote.trim()?'請填寫結果說明':'';
  const contentChanged = title.trim() !== task.title || (task.instructions !== null && instructions !== task.instructions);
  const peopleChanged = ROLES.some(r => (people[r] || '') !== (task.participants[r] || ''));
  const options = (role: Role) => {
@@ -80,9 +82,15 @@ export function SopTaskInspector({task, project, users, sop, onClose}: {task: So
     <Row label="節點" value={task.nodes.map(n => sopNodeLabel(n.node_key)).join('、') || '未連結節點'}/>
     {ROLES.map(r => <Row key={r} label={ROLE_LABEL[r]} value={task.participants[r] ? names.get(task.participants[r]!) || '人員待確認' : '未指派'}/>)}
    </Section>
-   <div className="pf-actions sop-transitions" role="group" aria-label="狀態操作">{taskActions(task).map(a => a.reason
+   <div className="pf-actions sop-transitions" role="group" aria-label="狀態操作">{taskActions(task).filter(a=>a.action!=='complete').map(a => a.reason
     ? <Reasoned key={a.action} label={a.label} busy={busy} onSubmit={reason => void transition(a.action, {reason})}/>
     : <FlowAction key={a.action} allowed={!busy} reason="處理中" onClick={() => void transition(a.action)}>{a.label}</FlowAction>)}</div>
+   {task.result && <Section title="完成結果"><Row label="完成人員" value={task.result.actorName}/><Row label="完成時間" value={new Date(task.result.at*1000).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false})}/><Row label="結果說明" value={<span className="sop-raw">{task.result.note}</span>}/></Section>}
+   {task.state!=='done'&&task.state!=='archived'&&<form className="sop-form sop-result" onSubmit={e=>{e.preventDefault();if(!completionReason)void transition('complete',{result_note:resultNote.trim()})}}>
+    <Field label="結果說明"><textarea rows={4} maxLength={20000} value={resultNote} disabled={busy||!task.allowedActions.includes('complete')} onChange={e=>setResultNote(e.target.value)}/></Field>
+    {completionReason&&<p className="sop-muted" role="status">{completionReason}</p>}
+    <Button type="submit" variant="primary" disabled={!!completionReason} disabledReason={completionReason}>完成</Button>
+   </form>}
    <details className="sop-edit-details"><summary>編輯任務資料</summary>
    <form className="sop-form" onSubmit={e => {e.preventDefault(); if (contentChanged) void patch({title: title.trim(), ...(task.instructions !== null ? {instructions} : {})}, '已儲存內容')}}>
     <Field label="任務名稱"><input value={title} maxLength={500} disabled={!!editReason || busy} onChange={e => setTitle(e.target.value)}/></Field>

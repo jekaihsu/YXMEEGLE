@@ -31,20 +31,21 @@ class Context:
     state: dict
     project: dict
     refresh: object
-    # A person with no SOP grant who was assigned a task here: they see and work only the tasks assigned to them.
+    # Participants without broader case access read only their assigned tasks. Execution still requires the executor role.
     assigned_only: bool = False
 
 
 def explicitly_granted(user, capability):
-    return user.get('active', True) and (user.get('role') == 'manager' or capability in user.get('capabilities', []))
+    return user.get('active', True) and (user.get('role') in {'manager', 'admin'} or capability in user.get('capabilities', []))
 
 
 def can_manage(ctx):
-    return explicitly_granted(ctx.user, 'sop_task_import') and (
-        (ctx.project.get('case_type') == 'intake' and not ctx.project.get('pm_id'))
-        or ctx.user.get('role') == 'manager'
+    return ctx.user.get('active', True) and (
+        ctx.user.get('role') in {'manager', 'admin'}
         or ctx.user['id'] == ctx.project.get('pm_id')
-        or ctx.user['id'] in ctx.project.get('sop_task_delegate_ids', []))
+        or ctx.user['id'] in ctx.project.get('sop_task_delegate_ids', [])
+        or (ctx.project.get('case_type') == 'intake' and not ctx.project.get('pm_id')
+            and explicitly_granted(ctx.user, 'sop_task_import')))
 
 
 READER_GRANTS = ('sop_task_read', 'sop_task_import', 'sop_task_work')
@@ -60,16 +61,28 @@ def authorize_reader(user):
 
 
 def holds_task(task, user_id):
-    return task.participants.get('executor') == user_id
+    return user_id in task.participants.values()
 
 
 def authorize(ctx, write=False):
     if ctx.assigned_only:
         require(ctx.user.get('active', True), 'sop_import_forbidden', 403)
-    else:
+    elif not can_manage(ctx):
         authorize_reader(ctx.user)
     if write:
         require(can_manage(ctx), 'sop_import_forbidden', 403)
+
+
+def completion_policy(task):
+    proposal = task.snapshot.get('row', {}).get('proposed_import', {})
+    policy = proposal.get('completion_policy')
+    if policy is None and task.snapshot.get('row', {}).get('raw', {}).get('meegle_id') in {37,38,30,41,43,44,54,55,56,51,52}:
+        return 'proof_required'
+    if policy in {'delivery', 'financial', 'proof_required'} or proposal.get('proof_required') is True:
+        return 'proof_required'
+    if task.local.get('completion_rule_status') not in {None, 'unresolved', 'no_typed_obligations', 'result_note'}:
+        return 'proof_required'
+    return 'result_note'
 
 
 def text(value, maximum=20000, *, empty=True):
@@ -264,6 +277,21 @@ class Service:
         with self.sessions() as db:
             return any(holds_task(t, user_id) for t in db.scalars(
                 select(LocalTask).where(LocalTask.workspace_id == wid, LocalTask.project_id == project_id)))
+
+    def personal_items(self, state, wid, user):
+        from ..home_details import build_sop_home_task
+        from ..source_case_policy import visible_project, local_planning
+        if not user.get('active', True):
+            return []
+        projects = {p['id']: p for p in state.get('projects', [])
+                    if visible_project(state, p) or local_planning(p)}
+        with self.sessions() as db:
+            tasks = [t for t in db.scalars(select(LocalTask).where(LocalTask.workspace_id == wid))
+                     if t.project_id in projects and holds_task(t, user['id'])]
+            links = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == wid,
+                                   TaskNodeLink.task_id.in_([t.id for t in tasks])).order_by(TaskNodeLink.ordinal, TaskNodeLink.node_key)))
+            return [build_sop_home_task(projects[t.project_id], t, [l for l in links if l.task_id == t.id],
+                                       user, state.get('users', []), self.writes_enabled()) for t in tasks]
 
     def normalize(self, ctx, body, rows):
         fields(body, {'template_version_id', 'node_keys', 'row_keys', 'participant_bindings',
@@ -500,6 +528,8 @@ class Service:
                 'title': task.title, 'instructions': task.instructions if source or task.template_family_id == 'manual' else None,
                 'participants': task.participants, 'applicability': task.applicability.value, 'state': task.state.value,
                 'revision': task.revision, 'local': task.local,
+                'result': task.local.get('result'),
+                'completion_policy': completion_policy(task),
                 'overdue': bool(task.local.get('due_date') and task.local['due_date'] < today
                                 and task.applicability == Applicability.APPLICABLE
                                 and task.state not in {Lifecycle.DONE, Lifecycle.ARCHIVED}),
@@ -526,8 +556,18 @@ class Service:
             found = None if ctx.assigned_only else suggestions.current(task, facts)
             found = None if found and (task.id, found['facts_hash']) in dismissed else found
             views.append({**self.task_json(task, links[task.id], source), 'suggestion': found,
+                          'completion_blocked_reason': self.completion_blocker(ctx, task),
                           'allowed_actions': self.task_actions(ctx, task, found)})
         return views
+
+    def completion_blocker(self, ctx, task):
+        if not self.writes_enabled():
+            return 'import_unavailable'
+        if not (can_manage(ctx) or task.participants.get('executor') == ctx.user['id']):
+            return 'sop_import_forbidden'
+        if task.state not in TRANSITIONS['complete'][0]:
+            return 'invalid_transition'
+        return self.completion_failure(task)
 
     def task_actions(self, ctx, task, suggestion):
         if not self.writes_enabled():
@@ -566,7 +606,10 @@ class Service:
             by_task = {t.id: [l for l in links if l.task_id == t.id] for t in tasks}
             selected = [t for t in tasks if node_key is None or any(l.node_key == node_key for l in by_task[t.id])]
             selected.sort(key=lambda t: (t.template_family_id == 'manual', min((l.ordinal for l in by_task[t.id]), default=0), t.id))
-            return {'project_id': ctx.project['id'], 'task_source': 'sop_local', **self.position(db, ctx, self.facts(ctx)),
+            return {'project_id': ctx.project['id'], 'task_source': 'sop_local',
+                    'case': {k: ctx.project.get(k) for k in ('id', 'code', 'name')},
+                    **({'start_node': next((key for key in NODE_MAP.values() if any(l.node_key == key for t in tasks for l in by_task[t.id])), 'sales'),
+                        'stage': None} if ctx.assigned_only else self.position(db, ctx, self.facts(ctx))),
                     'checklist_revision': state.checklist_revision if state else 0,
                     'identity_revision': state.identity_revision if state else 0, 'scope': {'node_key': node_key},
                     'counts': self.counts(selected), 'case_counts': self.counts(tasks),
@@ -576,7 +619,7 @@ class Service:
                     'node_done': {} if ctx.assigned_only else {key: auto.public() for key, auto in self.node_done(ctx).items()},
                     'allowed_actions': {'import': can_manage(ctx) and self.writes_enabled(),
                                         'manage': can_manage(ctx) and self.writes_enabled(),
-                                        'work': (ctx.assigned_only or explicitly_granted(ctx.user, 'sop_task_work')) and self.writes_enabled(),
+                                        'work': (can_manage(ctx) or any(t.participants.get('executor') == ctx.user['id'] for t in tasks)) and self.writes_enabled(),
                                         'decide_suggestions': can_manage(ctx) and self.writes_enabled()}}
 
     def with_sop_counts(self, wid, items):
@@ -800,7 +843,7 @@ class Service:
 
     def mutate(self, ctx, task_id, body, *, transition=False):
         self.writable()
-        fields(body, {'expected_revision', 'action', 'reason', 'applicability'} if transition else
+        fields(body, {'expected_revision', 'action', 'reason', 'applicability', 'result_note'} if transition else
                {'expected_revision', 'title', 'instructions', 'participants', 'due_date', 'reason'})
         require(type(body.get('expected_revision')) is int, 'invalid_request')
         with self.sessions.begin() as db:
@@ -811,7 +854,19 @@ class Service:
                 require(manager or task.participants.get('executor') == ctx.user['id'], 'sop_import_forbidden', 403)
             require(task.revision == body['expected_revision'], 'task_revision_conflict', 409)
             if transition:
+                note = None
+                if body.get('action') == 'complete':
+                    self.completion(task)
+                if body.get('action') == 'complete' and completion_policy(task) == 'result_note' and (task.template_family_id != 'manual' or 'result_note' in body):
+                    note = body.get('result_note')
+                    require(isinstance(note, str) and bool(note.strip()), 'result_note_required')
+                    note = text(note.strip(), empty=False)
                 self.transition(task, body, manager)
+                if note is not None:
+                    task.local = {**task.local, 'result': {'note': note, 'actor_id': ctx.user['id'],
+                                  'actor_name': ctx.user.get('name') or ctx.user['id'], 'at': self.clock()}}
+                elif body.get('action') == 'reopen':
+                    task.local = {**task.local, 'result': None, 'attestations': {}}
             else:
                 require(task.state not in {Lifecycle.DONE, Lifecycle.ARCHIVED}, 'task_reopen_required', 409)
                 for key in ('title', 'instructions'):
@@ -819,7 +874,7 @@ class Service:
                         setattr(task, key, text(body[key], 500 if key == 'title' else 20000, empty=key != 'title'))
                 if 'participants' in body:
                     task.participants = self.participants(ctx, body['participants'])
-                    task.local = {**task.local, 'attestations': {}}
+                    task.local = {**task.local, 'attestations': {}, 'result': None, 'evidence_basis': None}
                 if 'due_date' in body:
                     value = body['due_date']
                     require(value is None or isinstance(value, str), 'invalid_request')
@@ -832,7 +887,8 @@ class Service:
                                   'date_reason': reason}
             task.revision += 1
             state.checklist_revision += 1
-            self.event(db, ctx, task, 'transition' if transition else 'edited', deepcopy(body))
+            self.event(db, ctx, task, 'transition' if transition else 'edited',
+                       {**deepcopy(body), **({'result': task.local['result']} if transition and body.get('action') == 'complete' and task.local.get('result') else {})})
             return {'task_id': task.id, 'revision': task.revision, 'checklist_revision': state.checklist_revision,
                     'state': task.state.value, 'applicability': task.applicability.value,
                     'task': self.task_views(db, ctx, [task])[0]}
@@ -841,7 +897,7 @@ class Service:
     def completion_failure(task, evidence=None):
         if task.applicability != Applicability.APPLICABLE:
             return 'applicability_unresolved'
-        if evidence is None and task.local.get('completion_rule_status') != 'no_typed_obligations':
+        if evidence is None and completion_policy(task) == 'proof_required':
             return 'completion_evidence_missing'
         return None
 

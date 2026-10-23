@@ -7,10 +7,13 @@ from starlette.concurrency import run_in_threadpool
 
 from ..production_access import hr_view_allowed
 from .domain import Failure, require
-from .service import Context, Service, authorize, has_reader_grant
+from .service import Context, Service, authorize, has_reader_grant, can_manage
 
 PREFIX = '/api/projects/{project_id}'
 MAX_BODY = 64 * 1024
+ERROR_TEXT = {'case_not_found': '找不到此案件或沒有讀取權限', 'result_note_required': '請填寫結果說明', 'task_revision_conflict': '任務已被更新，請重新載入後再試',
+              'sop_import_forbidden': '你沒有操作此 SOP 任務的權限', 'completion_evidence_missing': '此任務需先完成佐證或審核',
+              'applicability_unresolved': '需先確認任務適用', 'invalid_transition': '目前任務狀態不可執行此操作'}
 
 
 def register(app, *, identity, load_case, sessions, cfg, quote_view=None, workspace=None, persist_case=None, phase=None):
@@ -22,11 +25,14 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
         data, user = identity(request)
         require(user.get('active', True), 'sop_import_forbidden', 403)
         assigned_only = not has_reader_grant(user)
-        require(not assigned_only or service.participates(data['wid'], user['id'], project_id), 'sop_import_forbidden', 403)
         with (phase(request, 'load') if phase else nullcontext()):
             state, project = load_case(data, user, project_id)
         ctx = Context(data['wid'], user, state, project, lambda: context(request, project_id),
                       assigned_only=assigned_only)
+        ctx.assigned_only = assigned_only and not can_manage(ctx)
+        require(not ctx.assigned_only or service.participates(data['wid'], user['id'], project_id), 'sop_import_forbidden', 403)
+        if project.get('sop_assigned_only'):
+            ctx.assigned_only = True
         authorize(ctx)
         return ctx
 
@@ -34,11 +40,11 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
         try:
             body, status = run(), 200
         except Failure as exc:
-            body, status = {'code': exc.code, 'detail': exc.code, **exc.context}, exc.status
+            body, status = {'code': exc.code, 'detail': ERROR_TEXT.get(exc.code, exc.code), **exc.context}, exc.status
         except HTTPException as exc:
             code = {401: 'session_expired', 403: 'identity_forbidden', 404: 'case_not_found',
                     409: 'workspace_conflict'}.get(exc.status_code, 'invalid_request')
-            body, status = {'code': code, 'detail': code}, exc.status_code
+            body, status = {'code': code, 'detail': ERROR_TEXT.get(code, code)}, exc.status_code
         except (IntegrityError, OperationalError):
             body, status = {'code': 'import_unavailable', 'detail': 'import_unavailable'}, 503
         return JSONResponse(body, status_code=status, headers={'Cache-Control': 'no-store'})

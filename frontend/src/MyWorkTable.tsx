@@ -550,12 +550,12 @@ export function AssignmentTable({items,onNavigate,compact=false}:{items:import('
  if (!compact) return <div className="my-work-table-scroll" role="region" tabIndex={0} aria-label="工作表格，可左右捲動"><table className="my-work-table">
   <thead><tr><th scope="col">工作與案件</th><th scope="col">負責人</th><th scope="col">期限</th><th scope="col">狀態</th><th scope="col">下一步</th><th scope="col">操作</th></tr></thead>
   <tbody>{items.map(item=><tr key={item.id}>
-   <td><details><summary>{item.title}</summary><p>{item.detail || '來源未提供內容'}</p><AssignmentChildren item={item} onNavigate={onNavigate}/><p>指派人 {item.assigned_by?.name || '來源未提供'}{item.assignment_method ? ` · ${item.assignment_method}` : ''}</p><p>原始期限 {item.original_deadline || '未提供'}</p><p>{item.deadline_basis==='related_tasks_max' ? '節點期限取關聯任務的最晚截止日' : item.deadline_basis==='lark_task_deadline' ? '期限來自 Lark 任務截止日' : '期限來自本地工作流程'}</p></details><small>{item.kind==='node_assignment' ? '節點責任' : item.origin==='local_workflow' ? '本地 SOP' : 'Lark 任務'} · {item.case.code || '案號待核對'} · {item.case.name || '案件關聯待核對'}</small></td>
+   <td><details><summary>{item.title}</summary><p>{item.detail || '來源未提供內容'}</p><AssignmentChildren item={item} onNavigate={onNavigate}/><p>指派人 {item.assigned_by?.name || '來源未提供'}{item.assignment_method ? ` · ${item.assignment_method}` : ''}</p><p>原始期限 {item.original_deadline || '未提供'}</p><p>{item.deadline_basis==='related_tasks_max' ? '節點期限取關聯任務的最晚截止日' : item.deadline_basis==='lark_task_deadline' ? '期限來自 Lark 任務截止日' : '期限來自本地工作流程'}</p></details><small>{item.kind==='sop_task' ? 'SOP 任務' : item.kind==='node_assignment' ? '節點責任' : item.origin==='local_workflow' ? '本地 SOP' : 'Lark 任務'} · {item.case.code || '案號待核對'} · {item.case.name || '案件關聯待核對'}</small></td>
    <td>{item.assignees.map(person=><span key={person.id}><Avatar small user={{name:person.name,avatar_url:person.avatar_url ?? undefined}}/>{person.name || '姓名未提供'} </span>)}</td>
    <td>{item.deadline || '未排期限'}{item.next_due && item.next_due!==item.deadline && <small>下一任務期限 {item.next_due}</small>}</td>
    <td>{item.source_status || WORK_STATUS[item.status] || '來源未提供'}</td>
    <td>{item.overdue && <span>{item.can_execute ? '逾期' : '期限已過，等待條件'} · </span>}{item.blocked_reasons.join('、') || (item.can_execute ? '可前往作業' : item.status==='done' ? '已完成' : '請檢視作業條件')}</td>
-   <td>{item.target ? <button type="button" className="text-button" onClick={()=>{if(item.target)onNavigate(homeTarget(item.target))}}>開啟案件</button> : <a href="#view=projects">案件關聯待核對</a>}</td>
+   <td>{item.target ? <button type="button" className="text-button" onClick={()=>{if(item.target)onNavigate(homeTarget(item.target))}}>{item.kind==='sop_task'?'開啟任務':'開啟案件'}</button> : <a href="#view=projects">案件關聯待核對</a>}</td>
   </tr>)}</tbody>
  </table></div>;
  return <div className={compact ? 'ds-group glass--flat' : 'my-work-table-scroll'}>
@@ -563,13 +563,13 @@ export function AssignmentTable({items,onNavigate,compact=false}:{items:import('
    <div className="ds-row">
     <span className="ds-row-main">
      <button type="button" className="text-button" aria-expanded={expanded===item.id} onClick={()=>setExpanded(expanded===item.id ? null : item.id)}><strong>{item.title}</strong></button>
-     <small>{item.kind==='node_assignment' ? '節點責任' : item.origin==='local_workflow' ? '本地 SOP' : 'Lark 任務'} · {item.case.code || '案號待核對'} · {item.case.name || '案件關聯待核對'}</small>
+     <small>{item.kind==='sop_task' ? 'SOP 任務' : item.kind==='node_assignment' ? '節點責任' : item.origin==='local_workflow' ? '本地 SOP' : 'Lark 任務'} · {item.case.code || '案號待核對'} · {item.case.name || '案件關聯待核對'}</small>
      <span>{item.source_status || WORK_STATUS[item.status] || '來源未提供'} · {item.deadline || '未排期限'}{item.overdue ? item.can_execute ? ' · 逾期' : ' · 期限已過，等待條件' : item.due_today ? ' · 今日到期' : ''}</span>
      {item.next_due && item.next_due!==item.deadline && <small>下一任務期限 {item.next_due}</small>}
      <small>{item.blocked_reasons.join('、') || (item.can_execute ? '可前往作業' : item.status==='done' ? '已完成' : '請檢視作業條件')}</small>
      <span>{item.assignees.map(person=><span key={person.id}><Avatar small user={{name:person.name,avatar_url:person.avatar_url ?? undefined}}/>{person.name || '姓名未提供'} </span>)}</span>
     </span>
-    {item.target && <button type="button" className="text-button" onClick={()=>{if(item.target)onNavigate(homeTarget(item.target))}}>開啟案件</button>}
+    {item.target && <button type="button" className="text-button" onClick={()=>{if(item.target)onNavigate(homeTarget(item.target))}}>{item.kind==='sop_task'?'開啟任務':'開啟案件'}</button>}
    </div>
    {expanded===item.id && <div className="my-work-drawer-section">
     <p>{item.detail || '來源未提供內容'}</p>

@@ -45,8 +45,9 @@ def urgency(item, today):
 
 
 class HomePanels:
-    def __init__(self, nodes):
+    def __init__(self, nodes, sop=None):
         self.nodes = nodes
+        self.sop = sop
         self.config = nodes.config
         self.cache = StaleCache(self.config.read_ttl_seconds, self.config.stale_max_seconds, nodes.clock)
         self.roster_cache = StaleCache(self.config.roster_ttl_seconds, self.config.stale_max_seconds, nodes.clock)
@@ -272,7 +273,7 @@ class HomePanels:
         hidden_confirmations = {confirmation_record(p, self.config) for p in state.get('projects', []) if p['id'] not in visible_ids} - {None}
         if not user.get('active', True):
             raise HTTPException(403, '此帳號已停用')
-        if panel in ('proxy', 'local'):
+        if panel in ('proxy', 'local') or params.get('kinds') == 'sop_task':
             items, sources, manager, reason = [], {}, None, None
         else:
             items, sources, manager, reason = self.lark_items(visible, data, user, scope, scope_name == 'team', hidden_confirmations)
@@ -282,14 +283,21 @@ class HomePanels:
             raise HTTPException(403, '無法核實同組工作權限')
         if scope_name == 'mine':
             items += self.local_items(visible, user, panel)
-        selector = {'assigned': lambda i: i['origin'] == 'lark' and (i.get('_team') or i.get('_mine')),
+            sop_items = self.sop.personal_items(state, data['wid'], user) if self.sop else []
+            items += sop_items
+            if reason == 'disabled' and sop_items:
+                reason = 'partial'
+        if params.get('kinds') == 'sop_task' and scope_name == 'mine':
+            items = [i for i in items if i['kind'] == 'sop_task']
+            sources, reason = {}, None
+        selector = {'assigned': lambda i: i['origin'] in ('lark', 'sop_local') and (i.get('_team') or i.get('_mine')),
                     'proxy': lambda i: i.get('_proxy'), 'confirmation': lambda i: i.get('_review'),
                     'delegated': lambda i: i.get('_outgoing'), 'completed': lambda i: i.get('_mine'),
                     'local': lambda i: i['origin'] == 'local_workflow' and i.get('_mine') and not i.get('_proxy')}[panel]
         items = [i for i in items if selector(i) and ((i['status'] == 'done') if panel == 'completed' else i['status'] not in ('done', 'cancelled', 'skipped'))]
         kinds = set(params.get('kinds', '').split(',')) - {''}
         if kinds:
-            if not kinds <= {'node_assignment', 'task', 'local_workflow', 'local_confirmation', 'local_assignment'}:
+            if not kinds <= {'node_assignment', 'task', 'local_workflow', 'local_confirmation', 'local_assignment', 'sop_task'}:
                 raise HTTPException(422, '工作來源錯誤')
             items = [i for i in items if i['kind'] in kinds]
         if params.get('deadline') == 'unscheduled':
@@ -312,6 +320,7 @@ class HomePanels:
         complete = reason is None and all(s['readState'] in ('complete', 'stale') for s in states.values())
         counts = {name: sum(i['kind'] == kind for i in items) if reason is None and (name not in states or states[name]['readState'] != 'read_failed') else None
                   for name, kind in (('node_assignments', 'node_assignment'), ('tasks', 'task'), ('local_workflow', 'local_workflow'))}
+        counts['sop_tasks'] = sum(i['kind'] == 'sop_task' for i in items)
         counts.update(count_scope='viewer_visible', complete=complete)
         # Task visibility can depend on a node relation, so a failed N read cannot prove T counts.
         if states.get('node_assignments', {}).get('readState') == 'read_failed' and scope_name == 'team':
@@ -349,8 +358,8 @@ class HomePanels:
         return self.query(state, data, user, dict(request.query_params))
 
 
-def register(app, *, identity, load, sessions, workspace_model, nodes):
-    service = HomePanels(nodes)
+def register(app, *, identity, load, sessions, workspace_model, nodes, sop=None):
+    service = HomePanels(nodes, sop)
     service.sessions, service.load, service.workspace_model = sessions, load, workspace_model
     @app.get('/api/home-panels')
     def panels(request: Request):

@@ -176,3 +176,6 @@
 .unified-home .home-attendance .is-unknown{color:var(--label-3)}
 .unified-home .home-personal:not([open]){align-self:start}
 }
+
+.sop-home-filter {display:flex;align-items:center;gap:.75rem;margin-block:1rem;color:var(--text-secondary,#55605a)}
+.sop-home-filter select {min-height:44px;border:1px solid var(--border-color,#d9dedb);border-radius:6px;background:var(--surface,#fff);padding:.5rem}

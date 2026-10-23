@@ -68,9 +68,9 @@ def test_c_prefix_case_suggests_quote_tasks_done(case):
         key(15): ('done', 'indicator'), key(16): ('done', 'indicator')}
     assert task(h, url, 16)['suggestion']['facts'] == {'engineering_no': 'C115264', 'numbered': True, 'numbers_consistent': True}
     assert task(h, url, 15)['suggestion']['facts'] == {'returned_date': '2026-09-17', 'price_positive': True}
-    assert task(h, url, 12)['allowed_actions'] == ['start', 'block', 'archive', 'set_applicability', 'edit',
+    assert task(h, url, 12)['allowed_actions'] == ['start', 'block', 'complete', 'archive', 'set_applicability', 'edit',
                                                    'accept_suggestion', 'dismiss_suggestion']
-    assert task(h, url, 17)['allowed_actions'] == ['start', 'block', 'archive', 'set_applicability', 'edit']
+    assert task(h, url, 17)['allowed_actions'] == ['start', 'block', 'complete', 'archive', 'set_applicability', 'edit']
 
 
 def test_quote_stage_case_suggests_nothing_that_needs_a_won_quote(case):
@@ -108,7 +108,7 @@ def test_proof_tier_completes_an_imported_task_and_records_the_rule(case):
     set_quote(h, project, **C_ROW)
     target = task(h, url, 12)
     rejected = post(h, f"{url}/sop-tasks/{target['id']}/transition", {'expected_revision': 1, 'action': 'complete'}, 422)
-    assert rejected['code'] == 'completion_evidence_missing'
+    assert rejected['code'] == 'result_note_required'
     result = decide(h, url, 12)
     assert {k: result[k] for k in ('state', 'revision', 'replayed', 'checklist_revision')} == {
         'state': 'done', 'revision': 2, 'replayed': False, 'checklist_revision': 2}

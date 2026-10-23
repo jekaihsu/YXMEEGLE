@@ -1,7 +1,7 @@
 from .models import BusinessRow
 from .test_sop_import import URL, apply, change, h, overview, post  # noqa: F401  (fixture)
 
-IMPORTED = ['start', 'block', 'archive', 'set_applicability', 'edit']
+IMPORTED = ['start', 'block', 'complete', 'archive', 'set_applicability', 'edit']
 
 
 def by_row(h, n):
@@ -60,7 +60,7 @@ def test_edit_and_transition_return_the_updated_task(h):
         'Local title', 2, 2, before + 1)
     started = act(h, edited['task'], 'start')
     assert (started['task']['state'], started['task']['revision'], started['task']['allowed_actions'], started['checklist_revision']) == (
-        'in_progress', 3, ['block', 'archive', 'set_applicability', 'edit'], before + 2)
+        'in_progress', 3, ['block', 'complete', 'archive', 'set_applicability', 'edit'], before + 2)
     assert started['task'] == by_row(h, 19)
 
 
@@ -166,11 +166,12 @@ def test_a_system_manager_without_any_grant_can_do_everything(h):
     assert close(h, 'sales')['closed'] > 0
 
 
-def test_a_checker_only_person_and_the_assignee_list_stay_closed_to_assigned_only_users(h):
+def test_checker_reads_only_assigned_tasks_without_execution_and_assignees_stay_restricted(h):
     checker = grantless(h, 'checker')
     manual(h, {'checker': checker})
     h.who[0] = checker
-    assert h.client.get(URL + '/sop-tasks').status_code == 403
+    seen = overview(h)
+    assert len(seen['tasks']) == 1 and seen['tasks'][0]['allowed_actions'] == []
     staff = grantless(h, 'staff')
     h.who[0] = 'pm'
     manual(h, {'executor': staff})

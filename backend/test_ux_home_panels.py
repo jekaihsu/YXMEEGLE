@@ -46,7 +46,7 @@ def test_member_keeps_waiting_and_separate_grains(home):
     n = node(home)
     t = task(home, n, 截止日=int((T0 - 86400) * 1000))
     result = home.read()
-    assert result['counts'] == {'node_assignments': 1, 'tasks': 1, 'local_workflow': 0, 'count_scope': 'viewer_visible', 'complete': True}
+    assert result['counts'] == {'node_assignments': 1, 'tasks': 1, 'local_workflow': 0, 'sop_tasks': 0, 'count_scope': 'viewer_visible', 'complete': True}
     rows = {i['source']['record_id']: i for i in result['items']}
     assert rows[n]['deadline'] == '2026-09-20'
     assert rows[n]['next_due'] == '2026-09-20'

@@ -1225,7 +1225,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             read['loaded']=True
         except Exception:
             state={}; read['failed']=True
-        return build_my_work_input(state,user,read)
+        return build_my_work_input(state,user,read,sop_items=app.state.sop_import.personal_items(state,data['wid'],user) if read.get('loaded') else [])
 
     @app.post('/api/sources/cutover-baseline')
     async def source_case_baseline(request:Request):
@@ -1511,8 +1511,15 @@ def create_app(overrides=None,*,dispatch_transport=None):
         from .source_case_policy import visible_project,local_viewer
         require(len(project_id)<=200,'查詢參數過長',422)
         with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=storage.CASE_COLLECTIONS,project_ids=[project_id])
-        project=next((p for p in state['projects'] if p['id']==project_id and (visible_project(state,p) or local_viewer(user,p))),None)
+        project=next((p for p in state['projects'] if p['id']==project_id),None)
         require(project is not None,'找不到這個案件',404)
+        if not (visible_project(state,project) or local_viewer(user,project)):
+            from .source_case_policy import local_planning
+            require(local_planning(project) and (user['id'] in project.get('sop_task_delegate_ids',[]) or app.state.sop_import.participates(data['wid'],user['id'],project_id)),'找不到這個案件',404)
+            if user['id'] not in project.get('sop_task_delegate_ids',[]):
+                project={k:project.get(k) for k in ('id','code','name')}
+                project['sop_assigned_only']=True
+                state={'users':[user], 'projects':[project]}
         return state,project
     def quote_view(data,user):
         """The quote register's cases and rows as the viewer may see them, and the /progress amounts gate."""
@@ -1565,7 +1572,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         workspace=dispatch_workspace,allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'),
         transport=dispatch_transport)
     from .home_panels import register as register_home_panels
-    app.state.home_panels=register_home_panels(app,identity=identity,load=load,sessions=sessions,workspace_model=WorkspaceRow,nodes=app.state.node_assignment)
+    app.state.home_panels=register_home_panels(app,identity=identity,load=load,sessions=sessions,workspace_model=WorkspaceRow,nodes=app.state.node_assignment,sop=app.state.sop_import)
     from .native_poller import NativeApprovalPoller
     app.state.native_poller=NativeApprovalPoller(sessions,WorkspaceRow,BusinessRow,PersonRow,cfg)
     from .source_sync import SourceSyncService

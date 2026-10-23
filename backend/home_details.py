@@ -207,3 +207,33 @@ def build_home_task(ws,p,n,t,user,as_of):
                 delivery_links=_delivery_links(p,t))
     return dict(assigned=assigned,can_execute=can_execute,execution_blockers=execution,
                 activation_blockers=activation,detail=detail)
+
+
+def build_sop_home_task(project, task, links, user, users, writes_enabled):
+    from .sop_import.domain import Applicability, Lifecycle
+    roles = [role for role, ident in task.participants.items() if ident == user['id']]
+    executor = task.participants.get('executor')
+    person = next((u for u in users if u['id'] == executor), {})
+    blockers = []
+    if not writes_enabled:
+        blockers.append('SOP 任務暫停寫入')
+    if task.applicability != Applicability.APPLICABLE:
+        blockers.append('需先確認任務適用')
+    if task.state == Lifecycle.BLOCKED:
+        blockers.append('任務受阻，請先繼續或退回待處理')
+    status = {'pending': 'todo', 'archived': 'cancelled'}.get(task.state.value, task.state.value)
+    if task.applicability == Applicability.NOT_APPLICABLE and task.state != Lifecycle.ARCHIVED:
+        status = 'skipped'
+    return {'id': 'sop_task/' + task.id, 'kind': 'sop_task', 'origin': 'sop_local', 'source': None,
+            'case': {**{k: project.get(k) for k in ('id', 'code', 'name')}, 'relation_state': 'verified'},
+            'node_key': links[0].node_key if links else None, 'node_keys': [l.node_key for l in links],
+            'title': task.title, 'status': status, 'source_status': None, 'assignment_state': 'assigned',
+            'assignment_roles': roles, 'applicability': task.applicability.value,
+            'assignees': [{'id': executor, 'name': person.get('name') or executor, 'avatar_url': None}] if executor else [],
+            'assigned_by': None, 'deadline': task.local.get('due_date'), 'next_due': None,
+            'original_deadline': None, 'deadline_basis': 'sop_task',
+            'can_execute': 'executor' in roles and not blockers and task.state in {Lifecycle.PENDING, Lifecycle.IN_PROGRESS},
+            'blocked_reasons': blockers, 'detail': None, 'result': task.local.get('result'),
+            'target': {'view': 'project', 'project': project['id'], 'tab': 'flow',
+                       'task': task.id, 'task_source': 'sop_local', 'section': 'assigned-sop'},
+            '_mine': 'executor' in roles, '_review': bool(set(roles) & {'checker', 'confirmer'})}

@@ -12,6 +12,7 @@ import {Segmented} from './design';
 import {HOME_PANELS,useHomePanels,type HomePanel} from './useHomePanels';
 import {PanelStatus} from './DailyHome';
 import {Button} from './design';
+import './ProjectCalm.css';
 import type {Ctx} from './appCommon';
 export {DispatchWorkflowPage as DispatchPage} from './DispatchWorkflowPage';
 
@@ -87,7 +88,7 @@ function AssignmentWorkPage({c}:{c:Ctx}) {
  const panel=HOME_PANELS.find(p=>p===c.route.tab) ?? 'assigned';
  const params=new URLSearchParams(c.route.ctx);
  const scope=params.get('scope')==='team' ? 'team' : 'mine';
- const read=useHomePanels(c,{panel,scope,q:params.get('q')||'',deadline:params.get('deadline')||'all',cursor:params.get('cursor')||''},true,true);
+ const read=useHomePanels(c,{panel,scope,q:params.get('q')||'',deadline:params.get('deadline')||'all',cursor:params.get('cursor')||'',kinds:params.get('kinds')||undefined},true,true);
  const update=(changes:Record<string,string>,nextPanel:HomePanel=panel)=>{
   const next=new URLSearchParams(c.route.ctx);
   next.delete('cursor');
@@ -95,18 +96,19 @@ function AssignmentWorkPage({c}:{c:Ctx}) {
   for(const [key,value] of Object.entries(changes))value ? next.set(key,value) : next.delete(key);
   c.go({view:'work',tab:nextPanel,ctx:next.toString()},true);
  };
- return <main className="page work-page" aria-label="我的工作完整表格">
+ return <main className="page work-page project-detail-calm" aria-label="我的工作完整表格">
   <h1>我的工作</h1>
   <div className="my-work-toolbar">
    <label>工作清單<select value={panel} onChange={e=>{const next=HOME_PANELS.find(p=>p===e.target.value);if(next)update({},next)}}>
     <option value="assigned">指派給我</option><option value="confirmation">待我確認</option><option value="delegated">我交辦的</option><option value="proxy">代理給我</option><option value="local">本地 SOP</option><option value="completed">已完成</option>
    </select></label>
+   <label>工作類型<select value={params.get('kinds')||''} onChange={e=>update({kinds:e.target.value})}><option value="">全部類型</option><option value="sop_task">SOP 任務</option><option value="node_assignment">節點責任</option><option value="task">Lark 任務</option></select></label>
    <label>期限<select value={params.get('deadline')||'all'} onChange={e=>update({deadline:e.target.value})}><option value="all">全部期限</option><option value="unscheduled">未排期限</option></select></label>
    <label>搜尋<input placeholder="搜尋任務、案件或關鍵字" type="search" value={params.get('q')||''} onChange={e=>update({q:e.target.value})}/></label>
    {(read.body?.manager_view_available || scope==='team') && <label>範圍<select value={scope} onChange={e=>update({scope:e.target.value})}><option value="mine">我的工作</option><option value="team">同組</option></select></label>}
   </div>
   <PanelStatus read={read}/>
-  {read.body && <><p>節點責任 {read.body.counts.node_assignments ?? '未知'} 項 · 任務 {read.body.counts.tasks ?? '未知'} 項{read.body.counts.local_workflow ? ` · 本地 SOP ${read.body.counts.local_workflow} 項` : ''}</p>
+  {read.body && <><p>節點責任 {read.body.counts.node_assignments ?? '未知'} 項 · 任務 {read.body.counts.tasks ?? '未知'} 項 · SOP 任務 {read.body.counts.sop_tasks ?? 0} 項{read.body.counts.local_workflow ? ` · 本地 SOP ${read.body.counts.local_workflow} 項` : ''}</p>
   <Suspense fallback={<p className="my-work-loading" role="status">正在載入工作…</p>}><AssignmentTable items={read.body.items} onNavigate={c.go}/></Suspense>
    {!read.body.items.length && <p>{read.body.complete ? '目前沒有符合條件的工作' : '工作來源待核對'}</p>}
   </>}

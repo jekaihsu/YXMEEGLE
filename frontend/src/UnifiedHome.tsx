@@ -49,7 +49,8 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
  const [today,setToday]=useState(taipeiToday);
  const [refreshing,setRefreshing]=useState(false),[refreshTick,setRefreshTick]=useState(0),[refreshError,setRefreshError]=useState('');
  const homeContext={...c,reloadVersion:(c.reloadVersion||0)+refreshTick};
- const assigned=useHomePanels(homeContext,{panel:'assigned',scope:'mine',limit:100});
+ const [workKind,setWorkKind]=useState('');
+ const assigned=useHomePanels(homeContext,{panel:'assigned',scope:'mine',limit:100,kinds:workKind||undefined});
  const confirmation=useHomePanels(homeContext,{panel:'confirmation',scope:'mine',limit:100});
  const manager=assigned.body?.manager_view_available??null;
  const views:HomeViewId[]=preview?[...HOME_PREVIEWS[preview].views]:availableViews(c.s.user,manager);
@@ -106,6 +107,7 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
   {refreshError&&<Message>{refreshError}</Message>}
   {!saved&&<Message>瀏覽器無法儲存設定；目前配置在離開此頁後可能重設。</Message>}
   {!availableVisible.length&&<div className="home-empty glass--flat"><h2>挑選今天需要的內容</h2><p>尚未顯示任何卡片。開啟「自訂首頁」加入工作、案件或團隊動向。</p><Button onClick={()=>setEditing(true)}>選擇首頁卡片</Button></div>}
+  {view==='mine'&&<label className="sop-home-filter">工作類型 <select aria-label="首頁工作類型" value={workKind} onChange={e=>setWorkKind(e.target.value)}><option value="">全部類型</option><option value="sop_task">SOP 任務</option><option value="node_assignment">節點責任</option><option value="task">Lark 任務</option></select></label>}
   <div className="home-sections">{view==='mine'?<>{missingMine&&<div className="home-view-notice" role="status">{assigned.error||confirmation.error||'個人工作來源尚未提供。'} <a href="#view=work">開啟我的工作</a></div>}<Sections view="mine" ids={availableVisible.filter(id=>!missingMine||!['work','confirmation','deadlines'].includes(id))} render={renderCard}/></>:view==='assign'?<AssignView {...props}/>:<CompanyView {...props} reports={reports}/>}</div>
  </div></div>;
 }

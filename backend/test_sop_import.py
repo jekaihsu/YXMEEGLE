@@ -231,7 +231,7 @@ def test_at11_at12_applicability_and_exclusions(h):
     assert post(h, path, {'expected_revision': 1, 'action': 'complete'}, 422)['code'] == 'applicability_unresolved'
     post(h, path, {'expected_revision': 1, 'action': 'set_applicability', 'applicability': 'not_applicable', 'reason': 'No correction'})
     post(h, path, {'expected_revision': 2, 'action': 'set_applicability', 'applicability': 'applicable', 'reason': 'New scope'})
-    assert post(h, path, {'expected_revision': 3, 'action': 'complete'}, 422)['code'] == 'completion_evidence_missing'
+    assert post(h, path, {'expected_revision': 3, 'action': 'complete'}, 422)['code'] == 'result_note_required'
     assert overview(h)['counts']['done'] == 0
     selected = preview(h, row_keys=['meegle-v137:A:7'], applicability_decisions={
         'meegle-v137:A:7': {'value': 'applicable', 'reason': 'Confirmed subcontract'}})
@@ -265,7 +265,10 @@ def test_at20_permissions_workspace_hidden_revoked_replay_and_publish(h):
     assert apply(h, plan, status=404)['code'] == 'case_not_found'
     h.hidden.clear()
     h.users['pm']['capabilities'].remove('sop_task_import')
+    assert apply(h, plan)['replayed'] is True
+    h.users['pm']['active'] = False
     assert apply(h, plan, status=403)['code'] == 'sop_import_forbidden'
+    h.users['pm']['active'] = True
     h.wid[0] = 'other-w'
     assert h.client.get(URL + '/sop-tasks').status_code == 404
     h.wid[0] = 'w'
