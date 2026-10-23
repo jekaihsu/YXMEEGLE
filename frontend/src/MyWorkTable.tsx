@@ -12,7 +12,7 @@ import type {
   MyWorkDetail,
   MyWorkAction,
 } from './myWorkView.ts';
-import { MY_WORK_LABELS } from './myWorkView.ts';
+import { MY_WORK_LABELS, myWorkStatusText } from './myWorkView.ts';
 import './my-work-table.css';
 
 export interface MyWorkTableProps {
@@ -145,8 +145,8 @@ export function MyWorkTable({
           </div>
         </div>
 
-        {/* Page State Banner: every C-STATE value including view.pageState null */}
-        <div
+        {/* Empty reads explain their state below instead of repeating the banner. */}
+        {view.rows.length>0&&<div
           className={`my-work-page-state-banner state-${
             view.pageState ? view.pageState.states.join('-') : 'ready'
           }`}
@@ -155,13 +155,13 @@ export function MyWorkTable({
           data-state={bannerStateClass}
         >
           <span className="my-work-banner-state-text">{bannerText}</span>
-          <span className="my-work-banner-as-of"> · {view.dataAsOfLabel}</span>
+          {!view.dataAsOfLabel.endsWith(MY_WORK_LABELS.unknown)&&<span className="my-work-banner-as-of"> · {view.dataAsOfLabel}</span>}
           {view.selectionDropped && (
             <span className="my-work-selection-dropped-note">
               · 原選取項目已不再符合目前條件或已被移除
             </span>
           )}
-        </div>
+        </div>}
 
         {/* Main Table or Distinct Empty State */}
         {view.rows.length === 0 ? (
@@ -174,7 +174,7 @@ export function MyWorkTable({
             )}
             {!view.emptyReason && (
               <p className="my-work-empty-reason generic">
-                {view.pageStateLabel || '尚無資料'}
+                {view.pageState?.states.some(state=>state==='filtered_empty')?'沒有符合條件的工作。':view.pageState?.states.some(state=>state==='forbidden')?'沒有檢視工作資料的權限。':loading?'正在讀取工作…':`${view.pageStateLabel||'工作資料尚未完整'}，請重新讀取。`}
               </p>
             )}
           </div>
@@ -190,12 +190,9 @@ export function MyWorkTable({
                   <th scope="col">任務識別 / 名稱</th>
                   <th scope="col">案件 / 工作項</th>
                   <th scope="col">負責人</th>
-                  <th scope="col">流程狀態</th>
-                  <th scope="col">處理狀態</th>
+                  <th scope="col">狀態與原因</th>
                   <th scope="col">下一交付物</th>
                   <th scope="col">有效期限</th>
-                  <th scope="col">待處理原因</th>
-                  <th scope="col">交接／確認狀態</th>
                   <th scope="col">操作</th>
                 </tr>
               </thead>
@@ -235,7 +232,7 @@ export function MyWorkTable({
                               }
                             }}
                             aria-pressed={isSelected}
-                            aria-label={`選取任務：${row.title}`}
+                            aria-label={`選取任務：${row.title===MY_WORK_LABELS.unknown?'未命名工作':row.title}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               lastOpenedTaskIdRef.current = row.id;
@@ -247,9 +244,8 @@ export function MyWorkTable({
                               }
                             }}
                           >
-                            <strong>{row.title}</strong>
+                            <strong>{row.title===MY_WORK_LABELS.unknown?'未命名工作':row.title}</strong>
                           </button>
-                          <span className="my-work-task-id">{row.id}</span>
                           {/* Outcome note shown verbatim */}
                           {row.outcomeNote && (
                             <div className="my-work-outcome-note" role="note">
@@ -261,56 +257,24 @@ export function MyWorkTable({
 
                       <td>
                         <div className="my-work-cell-case">
-                          <span>{row.caseTitle}</span>
-                          <small>{row.workItemTitle}</small>
+                          <span>{row.caseTitle===MY_WORK_LABELS.unknown?'':row.caseTitle}</span>
+                          <small>{row.workItemTitle===MY_WORK_LABELS.unknown?'':row.workItemTitle}</small>
                         </div>
                       </td>
 
                       <td>
-                        <span>{row.assignee}</span>
+                        <span>{row.assignee===MY_WORK_LABELS.unknown?'':row.assignee}</span>
                       </td>
 
-                      <td>
-                        <span className="my-work-workflow-text">
-                          {row.workflowLabel}
-                        </span>
-                      </td>
-
-                      {/* Text status labels (not colour alone) */}
-                      <td>
-                        <span
-                          className={`my-work-status-text ${
-                            row.needsAttention
-                              ? 'status-attention'
-                              : row.statusLabel === '待處理'
-                              ? 'status-pending'
-                              : 'status-unknown'
-                          }`}
-                        >
-                          {row.statusLabel}
-                        </span>
-                      </td>
+                      <td><span className={`my-work-status-text ${row.needsAttention?'status-attention':''}`}>{myWorkStatusText(row)}</span></td>
 
                       <td>
-                        <span>{row.nextDeliverable}</span>
+                        <span>{row.nextDeliverable===MY_WORK_LABELS.unknown?'':row.nextDeliverable}</span>
                       </td>
 
                       {/* Effective due date: verified formal field only or unknown text, never 0 */}
                       <td>
-                        <span className="my-work-due-text">{row.dueLabel}</span>
-                      </td>
-
-                      <td>
-                        <span className="my-work-pending-reason">
-                          {row.pendingReason}
-                        </span>
-                      </td>
-
-                      {/* Handoff state: awaiting confirmation shown as not approved */}
-                      <td>
-                        <span className="my-work-handoff-text">
-                          {row.handoffLabel}
-                        </span>
+                        <span className="my-work-due-text">{row.dueLabel===MY_WORK_LABELS.unknown?'期限未提供':row.dueLabel}</span>
                       </td>
 
                       {/* Actions: navigation links/buttons calling onNavigate(route) only */}
@@ -355,10 +319,10 @@ export function MyWorkTable({
               aria-label="每週活動紀錄"
             >
               <header className="my-work-weekly-header">
-                <h3>每週活動紀錄（獨立資料集）</h3>
+                <h3>每週活動紀錄</h3>
                 <span className="my-work-weekly-period">
-                  區間：{view.weekly.period.start ?? 'unknown'} ~{' '}
-                  {view.weekly.period.end ?? 'unknown'}
+                  區間：{view.weekly.period.start ?? '未提供'} ~{' '}
+                  {view.weekly.period.end ?? '未提供'}
                 </span>
               </header>
               {view.weekly.items.length === 0 ? (
@@ -392,7 +356,7 @@ export function MyWorkTable({
         >
           <header className="my-work-drawer-header">
             <div className="my-work-drawer-title-group">
-              <h3 className="my-work-drawer-title">{view.drawer.task.title}</h3>
+              <h3 className="my-work-drawer-title">{view.drawer.task.title===MY_WORK_LABELS.unknown?'未命名工作':view.drawer.task.title}</h3>
               <span className="my-work-drawer-task-id">
                 {view.drawer.task.id}
               </span>
@@ -419,10 +383,10 @@ export function MyWorkTable({
             <section className="my-work-drawer-section">
               <h4>任務資訊</h4>
               <dl className="my-work-drawer-dl">
-                <div>
+                {view.drawer.task.assignee!==MY_WORK_LABELS.unknown&&<div>
                   <dt>負責人</dt>
                   <dd>{view.drawer.task.assignee}</dd>
-                </div>
+                </div>}
                 <div>
                   <dt>處理狀態</dt>
                   <dd>
@@ -435,64 +399,48 @@ export function MyWorkTable({
                           : 'status-unknown'
                       }`}
                     >
-                      {view.drawer.task.statusLabel}
+                      {myWorkStatusText(view.drawer.task)}
                     </span>
                   </dd>
                 </div>
-                <div>
-                  <dt>流程狀態</dt>
-                  <dd>{view.drawer.task.workflowLabel}</dd>
-                </div>
-                <div>
+                {view.drawer.task.dueLabel!==MY_WORK_LABELS.unknown&&<div>
                   <dt>有效期限</dt>
                   <dd>{view.drawer.task.dueLabel}</dd>
-                </div>
-                <div>
-                  <dt>待處理原因</dt>
-                  <dd>{view.drawer.task.pendingReason}</dd>
-                </div>
-                <div>
+                </div>}
+                {view.drawer.task.nextDeliverable!==MY_WORK_LABELS.unknown&&<div>
                   <dt>下一交付物</dt>
                   <dd>{view.drawer.task.nextDeliverable}</dd>
-                </div>
+                </div>}
               </dl>
             </section>
 
             {/* Input / Output */}
-            <section className="my-work-drawer-section">
+            {(view.drawer.task.requiredInput!==MY_WORK_LABELS.unknown||view.drawer.task.requiredOutput!==MY_WORK_LABELS.unknown)&&<section className="my-work-drawer-section">
               <h4>交付需求</h4>
               <dl className="my-work-drawer-dl">
-                <div>
+                {view.drawer.task.requiredInput!==MY_WORK_LABELS.unknown&&<div>
                   <dt>必要輸入</dt>
                   <dd>{view.drawer.task.requiredInput}</dd>
-                </div>
-                <div>
+                </div>}
+                {view.drawer.task.requiredOutput!==MY_WORK_LABELS.unknown&&<div>
                   <dt>必要輸出</dt>
                   <dd>{view.drawer.task.requiredOutput}</dd>
-                </div>
+                </div>}
               </dl>
-            </section>
-
-            {/* Handoff & Confirmation */}
-            <section className="my-work-drawer-section">
-              <h4>交接與確認狀態</h4>
-              <p className="my-work-drawer-handoff-status">
-                {view.drawer.task.handoffLabel}
-              </p>
-            </section>
+            </section>}
 
             {/* Attached Evidence */}
             <section className="my-work-drawer-section">
               <h4>附加佐證</h4>
               {view.drawer.task.evidence === null ? (
-                <p className="my-work-drawer-empty-text">{MY_WORK_LABELS.unknown}</p>
+                <p className="my-work-drawer-empty-text">佐證資料尚未提供</p>
               ) : view.drawer.task.evidence.length === 0 ? (
                 <p className="my-work-drawer-empty-text">無附加佐證</p>
               ) : (
                 <ul className="my-work-drawer-evidence-list">
                   {view.drawer.task.evidence.map((ev) => (
                     <li key={ev.id}>
-                      <span className="my-work-evidence-title">{ev.title}</span>
+                      <span className="my-work-evidence-title">{ev.title===MY_WORK_LABELS.unknown?'未命名佐證':ev.title}</span>
                       <span className="my-work-evidence-id">{ev.id}</span>
                     </li>
                   ))}
@@ -504,19 +452,19 @@ export function MyWorkTable({
             </section>
 
             {/* Parent Case / Work Item */}
-            <section className="my-work-drawer-section">
+            {(view.drawer.task.parent.caseTitle!==MY_WORK_LABELS.unknown||view.drawer.task.parent.workItemTitle!==MY_WORK_LABELS.unknown)&&<section className="my-work-drawer-section">
               <h4>母層關聯</h4>
               <dl className="my-work-drawer-dl">
-                <div>
+                {view.drawer.task.parent.caseTitle!==MY_WORK_LABELS.unknown&&<div>
                   <dt>母案件</dt>
                   <dd>{view.drawer.task.parent.caseTitle}</dd>
-                </div>
-                <div>
+                </div>}
+                {view.drawer.task.parent.workItemTitle!==MY_WORK_LABELS.unknown&&<div>
                   <dt>母工作項</dt>
                   <dd>{view.drawer.task.parent.workItemTitle}</dd>
-                </div>
+                </div>}
               </dl>
-            </section>
+            </section>}
 
             {/* Actions: Navigation only */}
             {view.drawer.task.actions.length > 0 && (
@@ -554,7 +502,7 @@ export function AssignmentTable({items,onNavigate,compact=false}:{items:import('
    <td>{item.assignees.map(person=><span key={person.id}><Avatar small user={{name:person.name,avatar_url:person.avatar_url ?? undefined}}/>{person.name || '姓名未提供'} </span>)}</td>
    <td>{item.deadline || '未排期限'}{item.next_due && item.next_due!==item.deadline && <small>下一任務期限 {item.next_due}</small>}</td>
    <td>{item.source_status || WORK_STATUS[item.status] || '來源未提供'}</td>
-   <td>{item.overdue && <span>{item.can_execute ? '逾期' : '期限已過，等待條件'} · </span>}{item.blocked_reasons.join('、') || (item.can_execute ? '可前往作業' : item.status==='done' ? '已完成' : '請檢視作業條件')}</td>
+   <td>{item.overdue && <span>{item.can_execute ? '逾期' : '期限已過，等待條件'} · </span>}{item.blocked_reasons.join('、') || (item.can_execute ? '可前往作業' : item.status==='done' ? '' : '請檢視作業條件')}</td>
    <td>{item.target ? <button type="button" className="text-button" onClick={()=>{if(item.target)onNavigate(homeTarget(item.target))}}>{item.kind==='sop_task'?'開啟任務':'開啟案件'}</button> : <a href="#view=projects">案件關聯待核對</a>}</td>
   </tr>)}</tbody>
  </table></div>;
@@ -566,7 +514,7 @@ export function AssignmentTable({items,onNavigate,compact=false}:{items:import('
      <small>{item.kind==='sop_task' ? 'SOP 任務' : item.kind==='node_assignment' ? '節點責任' : item.origin==='local_workflow' ? '本地 SOP' : 'Lark 任務'} · {item.case.code || '案號待核對'} · {item.case.name || '案件關聯待核對'}</small>
      <span>{item.source_status || WORK_STATUS[item.status] || '來源未提供'} · {item.deadline || '未排期限'}{item.overdue ? item.can_execute ? ' · 逾期' : ' · 期限已過，等待條件' : item.due_today ? ' · 今日到期' : ''}</span>
      {item.next_due && item.next_due!==item.deadline && <small>下一任務期限 {item.next_due}</small>}
-     <small>{item.blocked_reasons.join('、') || (item.can_execute ? '可前往作業' : item.status==='done' ? '已完成' : '請檢視作業條件')}</small>
+     <small>{item.blocked_reasons.join('、') || (item.can_execute ? '可前往作業' : item.status==='done' ? '' : '請檢視作業條件')}</small>
      <span>{item.assignees.map(person=><span key={person.id}><Avatar small user={{name:person.name,avatar_url:person.avatar_url ?? undefined}}/>{person.name || '姓名未提供'} </span>)}</span>
     </span>
     {item.target && <button type="button" className="text-button" onClick={()=>{if(item.target)onNavigate(homeTarget(item.target))}}>{item.kind==='sop_task'?'開啟任務':'開啟案件'}</button>}

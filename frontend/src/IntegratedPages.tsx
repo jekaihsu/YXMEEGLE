@@ -10,7 +10,6 @@ import {buildSourceHealthView} from './sourceHealthView.ts';
 import {filtersFromRoute, hashOfRoute, isLegacyTab, myWorkInput, sourceHealthInput, withFilters} from './integrationRoutes.ts';
 import {Segmented} from './design';
 import {HOME_PANELS,useHomePanels,type HomePanel} from './useHomePanels';
-import {PanelStatus} from './DailyHome';
 import {Button} from './design';
 import './ProjectCalm.css';
 import type {Ctx} from './appCommon';
@@ -97,7 +96,7 @@ function AssignmentWorkPage({c}:{c:Ctx}) {
   c.go({view:'work',tab:nextPanel,ctx:next.toString()},true);
  };
  return <main className="page work-page project-detail-calm" aria-label="我的工作完整表格">
-  <h1>我的工作</h1>
+  <header className="section-heading"><h1>我的工作</h1><Button disabled={read.pending} onClick={()=>void c.refresh()}>重新讀取</Button></header>
   <div className="my-work-toolbar">
    <label>工作清單<select value={panel} onChange={e=>{const next=HOME_PANELS.find(p=>p===e.target.value);if(next)update({},next)}}>
     <option value="assigned">指派給我</option><option value="confirmation">待我確認</option><option value="delegated">我交辦的</option><option value="proxy">代理給我</option><option value="local">本地 SOP</option><option value="completed">已完成</option>
@@ -107,11 +106,12 @@ function AssignmentWorkPage({c}:{c:Ctx}) {
    <label>搜尋<input placeholder="搜尋任務、案件或關鍵字" type="search" value={params.get('q')||''} onChange={e=>update({q:e.target.value})}/></label>
    {(read.body?.manager_view_available || scope==='team') && <label>範圍<select value={scope} onChange={e=>update({scope:e.target.value})}><option value="mine">我的工作</option><option value="team">同組</option></select></label>}
   </div>
-  <PanelStatus read={read}/>
-  {read.body && <><p>節點責任 {read.body.counts.node_assignments ?? '未知'} 項 · 任務 {read.body.counts.tasks ?? '未知'} 項 · SOP 任務 {read.body.counts.sop_tasks ?? 0} 項{read.body.counts.local_workflow ? ` · 本地 SOP ${read.body.counts.local_workflow} 項` : ''}</p>
-  <Suspense fallback={<p className="my-work-loading" role="status">正在載入工作…</p>}><AssignmentTable items={read.body.items} onNavigate={c.go}/></Suspense>
-   {!read.body.items.length && <p>{read.body.complete ? '目前沒有符合條件的工作' : '工作來源待核對'}</p>}
-  </>}
+  {read.pending&&<p className="my-work-loading" role="status">正在讀取工作…</p>}
+  {read.body && <>{read.body.items.length ? <>
+   <p className="my-work-banner-as-of">已讀取 {read.body.items.length} 項工作{read.body.as_of?` · 更新於 ${new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(read.body.as_of))}`:''}{!read.body.complete?' · 部分來源待讀取':''}{read.body.freshness.status==='stale'?' · 上次資料':''}</p>
+   <Suspense fallback={<p className="my-work-loading" role="status">正在載入工作…</p>}><AssignmentTable items={read.body.items} onNavigate={c.go}/></Suspense>
+  </> : !read.pending&&<p role="status">{read.body.complete ? '目前沒有符合條件的工作。' : '工作來源尚未完整，請重新讀取。'}</p>}</>}
+  {!read.body&&!read.pending&&!read.error&&<p role="status">工作暫時無法讀取，請重新讀取。</p>}
   <div className="my-work-actions">
    {params.has('cursor') && <Button onClick={()=>update({})}>回第一頁</Button>}
    {read.body?.next_cursor && <Button onClick={()=>update({cursor:read.body?.next_cursor||''})}>下一頁</Button>}

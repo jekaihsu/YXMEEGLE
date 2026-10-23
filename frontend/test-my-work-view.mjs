@@ -194,6 +194,13 @@ test('7. F1: absent evidence is unknown, only an explicit empty list is none; F2
  eq(view([row('a')]).dataAsOfLabel,'資料日期 '+MY_WORK_LABELS.unknown,'missing as_of is unknown');
  eq(view([row('a')],{asOf:42}).dataAsOfLabel,'資料日期 '+MY_WORK_LABELS.unknown,'malformed as_of is unknown');
 });
+test('status summary keeps distinct facts once and hides internal unknown sentinels',()=>{
+ const supplied=view([row('a',{workflow_state:'待處理',pending_reason:'待處理',handoff_state:'待處理'})]).rows[0];
+ eq(mod.myWorkStatusText(supplied),'待處理','same status appears once');
+ eq(mod.myWorkStatusText(view([row('a',{workflow_state:'',pending_reason:''})]).rows[0]),'狀態待提供','missing facts get one Chinese message');
+ const awaiting=view([row('a',{queue:'awaiting_my_confirmation',handoff_state:'已核准'})],{canSeeAwaitingConfirmation:true,filters:{mode:'awaiting_my_confirmation'}}).rows[0];
+ ok(mod.myWorkStatusText(awaiting).includes('尚未核准'),'unapproved confirmation remains explicit');
+});
 let failed=0;
 for(const [name,fn] of tests){try{await fn();console.log(`ok - ${name}`)}catch(e){failed++;console.log(`not ok - ${name}\n${e.message}`)}}
 if(failed){console.log(`${failed} failed`);process.exit(1)}

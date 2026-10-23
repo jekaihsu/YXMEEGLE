@@ -254,3 +254,7 @@ export function buildMyWorkView(input:MyWorkInput):MyWorkView{
  // A clean read with rows has no page-level state to show; partial/stale carry their own.
  return finish(flagStates.length?{states:flagStates,count:partial?null:rows.length}:null,rows,null,sel,visible);
 }
+
+export function myWorkStatusText(row:MyWorkRow):string {
+ return [...new Set([row.workflowLabel,row.statusLabel,row.pendingReason,row.handoffLabel].filter(label=>label&&label!==MY_WORK_LABELS.unknown))].join(' · ')||'狀態待提供';
+}

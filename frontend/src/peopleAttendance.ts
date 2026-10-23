@@ -45,4 +45,4 @@ export async function fetchPeopleAttendance({week,signal,current}:{week?:string;
  const query=week?'?'+new URLSearchParams({week}):'';
  return parsePeopleAttendance(await api<unknown>('/api/people/attendance'+query,{signal},current));
 }
-export const attendanceStatusLabel:Record<AttendanceStatus,string>={loading:'讀取中',ok:'已讀取',incomplete:'資料不完整',stale:'舊快照，更新中', 'needs-permission':'needs-permission：缺少唯讀權限','not-connected':'尚未連接 Lark','read-failed':'讀取失敗'};
+export const attendanceStatusLabel:Record<AttendanceStatus,string>={loading:'讀取中',ok:'已讀取',incomplete:'資料不完整',stale:'舊快照，更新中', 'needs-permission':'缺少唯讀權限','not-connected':'尚未連接 Lark','read-failed':'讀取失敗'};

@@ -25,7 +25,7 @@ doc=render({id:'impact'});
 assert.equal(doc.querySelector('.home-impact-row').textContent,'組員甲缺席 2 天（10/12、10/13） · 未完成 1 · 本週到期 1 · 逾期 0重新分配');
 assert.equal(doc.querySelector('.home-impact-row a').getAttribute('href'),'#view=work&tab=assigned&ctx=scope%3Dteam');
 doc=render({view:{...view,status:'needs-permission'}});
-assert.match(doc.body.textContent,/needs-permission：缺少唯讀權限/);
+assert.match(doc.body.textContent,/缺少唯讀權限/);
 assert.equal(doc.querySelector('table'),null);
 doc=render({scope:'company',view:{...view,incomplete:true,people:[]}});
 assert.match(doc.body.textContent,/人員出勤名單尚待核對/);
