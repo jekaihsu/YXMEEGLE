@@ -60,10 +60,10 @@ await check('round2 local flow list translates both pending and in-progress task
  await mount({enabled:false,node:'node_control',configure(base){base.project.nodes[4].tasks=[{id:'l1',title:'待開始工作',status:'pending',owner_id:'ou_anna'},{id:'l2',title:'進行工作',status:'in_progress',owner_id:'ou_anna'}]}});
  assert.deepEqual([...document.querySelectorAll('#flow-tasks .pf-task-open>span')].map(n=>n.textContent),['林安娜 · 尚未開始 · 未排期限','林安娜 · 進行中 · 未排期限']);
 });
-await check('round2 completed and skipped node mounted progress',async()=>{
+await check('round2 completed and skipped steps show state without progress bars',async()=>{
  await mount({node:'control',configure(base,f){Object.assign(f.list.nodes.find(n=>n.key==='control'),{derived_status:'已完成'});f.list.nodes.find(n=>n.key==='mapping').derived_status='略過';}});
  const completed=document.querySelector('.pf-node[aria-label^="控制節點"]'),skipped=document.querySelector('.pf-node[aria-label^="圖資節點"]');
- assert.equal(completed.querySelector('progress').value,100);assert.match(completed.textContent,/100%/);assert.equal(skipped.querySelector('progress'),null);assert.equal(skipped.querySelector('.pf-progress-unknown').textContent,'略過');
+ assert.equal(completed.querySelector('progress'),null);assert.equal(completed.querySelector('.pf-state').textContent,'已完成');assert.match(completed.getAttribute('aria-label'),/100%/);assert.equal(skipped.querySelector('progress'),null);assert.equal(skipped.querySelector('.pf-state').textContent,'略過');assert.equal(completed.querySelector('.pf-needs'),null);assert.equal(skipped.querySelector('.pf-needs'),null);
 });
 await check('round2 keyboard replaces history and never scrolls the selected panel',async()=>{
  let shellScroll=0;window.scrollTo=()=>shellScroll++;await mount({node:'control',shell:true});await act(tick);const before=history.length,scrollBefore=shellScroll;globalThis.lastScroll='untouched';

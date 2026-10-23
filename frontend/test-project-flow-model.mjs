@@ -75,3 +75,18 @@ test('round2 overall stays unknown when a counted node has unknown progress',()=
  const flow=m.buildFlowModel({project:projectFixture().project,assignments:list,today:'2026-10-21'});
  assert.deepEqual(flow.overall,{basis:'unknown',percent:null,label:'部分節點進度未知（略過不計）'});
 });
+
+test('node needs use source facts in priority order and finished nodes need nothing',()=>{
+ const {list}=assignmentFixture();const flow=m.buildFlowModel({project:projectFixture().project,assignments:list,progress,today:'2026-10-21'});
+ const base={...flow.nodes[0],state:'進行中',owners:[{open_id:'owner',name:'負責人'}],tasks:{done:1,total:3},overdue:false,assignment:undefined};
+ assert.equal(m.nodeNeeds({...base,state:'已完成',owners:[],overdue:true}),null);
+ assert.equal(m.nodeNeeds({...base,state:'略過',owners:[],overdue:true}),null);
+ assert.equal(m.nodeNeeds({...base,state:'待審核',owners:[],overdue:true}),'待主管審核');
+ assert.equal(m.nodeNeeds({...base,owners:[],overdue:true}),'待指派負責人');
+ assert.equal(m.nodeNeeds({...base,overdue:true,assignment:{can_submit_hint:true}}),'已逾期');
+ assert.equal(m.nodeNeeds({...base,assignment:{can_submit_hint:true}}),'可送審');
+ assert.equal(m.nodeNeeds(base),'尚餘 2 項任務');
+ assert.equal(m.nodeNeeds({...base,tasks:{done:3,total:3}}),null);
+ assert.equal(m.nodeNeeds({...base,tasks:{done:0,total:0}}),null);
+ for(const node of flow.nodes)assert.equal(node.needs,m.nodeNeeds(node));
+});
