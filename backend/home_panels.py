@@ -2,7 +2,6 @@
 import base64
 import hashlib
 import json
-from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -12,16 +11,15 @@ from fastapi.responses import JSONResponse
 
 from .home_details import build_home_task, local_work_instance
 from .home_queues import home_queues
+from .node_assignment.bulk import AssignmentChains
 from .node_assignment.cache import ReadScope, StaleCache
-from .node_assignment.domain import CHAIN, NODE_DEPARTMENTS, NODE_LABELS, NodeAction, NodeKey, NodeStatus, TaskFacts, TaskStatus, derive_chain, node_permissions, task_permissions
+from .node_assignment.domain import CHAIN, NODE_DEPARTMENTS, NODE_LABELS, NodeAction, NodeStatus, TaskFacts, TaskStatus, node_permissions, task_permissions
 from .node_assignment.errors import Failure
-from .node_assignment.lark_table import NODE_FIELDS, TASK_FIELDS, CaseSnapshot, Table, assignment_key, iso_time, parse_node, parse_task
-from .node_assignment.evidence import applicable, evidence_of
-from .node_assignment.operations import facts_of
+from .node_assignment.lark_table import NODE_FIELDS, TASK_FIELDS, Table, iso_time
 from .node_assignment.roster import fetch_roster
-from .node_assignment.service import Context, actor_for, confirmation_record
+from .node_assignment.service import actor_for, confirmation_record
 from .source_case_policy import filter_visible_cases
-from .sources import link_ids, normalized_case, text
+from .sources import link_ids, text
 from .workflow import now
 
 PANELS = ('assigned', 'proxy', 'confirmation', 'delegated', 'completed', 'local')
@@ -72,18 +70,21 @@ class HomePanels:
                 return fetch_roster(client, self.nodes._check_roster_schema)
         return self.roster_cache.get(scope.key([self.config.base, self.config.people_table]), load, allow_stale=False)
 
-    def lark_items(self, state, data, user, scope, team, hidden_confirmations):
+    def assignment_unavailable(self, state, data):
         org = self.nodes.cfg.get('LARK_WORKER_ORGANIZATION')
         if not self.config.enabled:
-            return [], {}, None, 'disabled'
+            return 'disabled'
         if state.get('environment') != 'production' or not org or data['wid'] != 'lark-' + org:
-            return [], {}, None, 'unavailable'
+            return 'unavailable'
         if not self.config.writable or self.nodes.cfg.get('LARK_WORKER_IDENTITY') != 'application':
-            return [], {}, None, 'unconfigured'
+            return 'unconfigured'
+        return None
+
+    def assignment_sources(self, scope, *, include_roster=False):
         with ThreadPoolExecutor(max_workers=3) as pool:
             reads = {name: pool.submit(self.read_table, scope, table, spec) for name, table, spec in
                      (('node_assignments', Table.NODES, NODE_FIELDS), ('tasks', Table.TASKS, TASK_FIELDS))}
-            roster_future = pool.submit(self.roster, scope)
+            roster_future = pool.submit(self.roster, scope) if include_roster else None
             sources = {}
             for name, future in reads.items():
                 try:
@@ -91,9 +92,27 @@ class HomePanels:
                 except Failure as exc:
                     sources[name] = exc
             try:
-                roster = roster_future.result().value
+                roster = roster_future.result().value if roster_future else None
             except Failure:
                 roster = None
+        return sources, roster
+
+    def portfolio_statuses(self, state, data, user):
+        if self.assignment_unavailable(state, data):
+            return {}
+        sources, _ = self.assignment_sources(self.scope(data, user))
+        if any(isinstance(source, Failure) or not source.complete for source in sources.values()):
+            return {}
+        try:
+            return AssignmentChains(self.nodes, state, data, user, sources['node_assignments'].value,
+                                    sources['tasks'].value).portfolio_statuses
+        except Failure:
+            return {}
+
+    def lark_items(self, state, data, user, scope, team, hidden_confirmations):
+        if reason := self.assignment_unavailable(state, data):
+            return [], {}, None, reason
+        sources, roster = self.assignment_sources(scope, include_roster=True)
         actor = actor_for(user, roster)
         manager = any(actor.manages(key) for key in CHAIN) if roster is not None or actor.override else None
         if team and not manager:
@@ -101,43 +120,11 @@ class HomePanels:
         nodes_read, tasks_read = sources['node_assignments'], sources['tasks']
         raw_nodes = [] if isinstance(nodes_read, Failure) else nodes_read.value
         raw_tasks = [] if isinstance(tasks_read, Failure) else tasks_read.value
-        nodes = {r['record_id']: parse_node(r) for r in raw_nodes}
-        tasks = {r['record_id']: parse_task(r) for r in raw_tasks}
-        raw_by_id = {r['record_id']: r['fields'] for r in raw_nodes}
-        task_fields = {r['record_id']: r['fields'] for r in raw_tasks}
-        projects = defaultdict(list)
-        for project in state.get('projects', []):
-            if project.get('source_kind') in ('demo', 'mock', 'simulation'):
-                continue
-            rid = confirmation_record(project, self.config)
-            if rid:
-                projects[rid].append(project)
-        labels = {value: key for key, value in NODE_LABELS.items()}
-        groups = defaultdict(lambda: defaultdict(list))
-        node_keys, node_groups = {}, {}
-        duplicate_keys = Counter(row.assignment_key for row in nodes.values())
-        for rid, row in nodes.items():
-            fields = raw_by_id[rid]
-            code = normalized_case(fields.get('確認單編號'))
-            key = labels.get(text(fields.get('節點')).strip())
-            if code and key and row.assignment_key == assignment_key(code, key):
-                node_keys[rid] = (code, key)
-                group = (code, tuple(sorted(link_ids(fields.get('工程確認單')))))
-                node_groups[rid] = group
-                groups[group][key].append(row)
-        linked = {rid: tuple(t for t in tasks.values() if t.node_ids == (rid,)) for rid in nodes}
-        chains = {}
-        reports = self.nodes.reports() if self.nodes.reports else None
-        for group, rows in groups.items():
-            code, relations = group
-            candidates = projects.get(relations[0], []) if len(relations) == 1 else []
-            project = candidates[0] if len(candidates) == 1 and normalized_case(candidates[0].get('code')) == code else None
-            skipped = frozenset(NodeKey(n['key']) for n in project.get('nodes', [])
-                                if n.get('key') in NODE_LABELS and self.nodes.skipped_nodes(state, project, n)) if project else frozenset()
-            snap = CaseSnapshot(code, {k: tuple(v) for k, v in rows.items()}, linked)
-            evidence = applicable(evidence_of(project, state, reports), skipped) if project else {}
-            legacy = self.nodes.legacy_completions(Context(data['wid'], user, state, project, lambda: user), snap) if project else {}
-            chains[group] = derive_chain(facts_of(snap, skipped, evidence, legacy))
+        bulk = AssignmentChains(self.nodes, state, data, user, raw_nodes, raw_tasks)
+        nodes, tasks = bulk.nodes, bulk.tasks
+        raw_by_id, task_fields = bulk.node_fields, bulk.task_fields
+        node_keys, node_groups = bulk.node_keys, bulk.node_groups
+        duplicate_keys, linked, chains = bulk.duplicate_keys, bulk.linked, bulk.chains
         items = []
         for kind, entries in (('node_assignment', nodes), ('task', tasks)):
             for rid, row in entries.items():
@@ -161,8 +148,7 @@ class HomePanels:
                 relations = link_ids(raw_by_id.get(parent_id, {}).get('工程確認單'))
                 if set(relations) & hidden_confirmations:
                     continue
-                matches = projects.get(relations[0], []) if len(relations) == 1 else []
-                project = matches[0] if len(matches) == 1 and normalized_case(matches[0].get('code')) == code else None
+                project = bulk.project_for(code, relations)
                 case = {'id': project['id'] if project else None, 'code': code, 'name': project.get('name') if project else None,
                         'relation_state': 'verified' if project else 'unverified'}
                 status = STATUS.get(derived if kind == 'node_assignment' and derived else source_status, 'unknown')

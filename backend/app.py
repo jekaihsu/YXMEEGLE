@@ -676,7 +676,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 require(index_reads.ready(db,BusinessRow,row),'案件索引尚未就緒，請稍後重試',503)
                 if view=='portfolio':
                     from .projects_portfolio import portfolio
-                    return portfolio(db,BusinessRow,row,load(db,row,collections=()),now()[:10])
+                    return portfolio(db,BusinessRow,row,load(db,row,collections=()),now()[:10],
+                        assignments=app.state.home_panels,data=data,user=user)
                 return shell.overview_page(db,BusinessRow,row,load(db,row,collections=()),now()[:10],q=q,status=status,owner=owner,tab=tab,sort=sort,desc=dir=='desc',offset=offset,limit=limit)
         with phase(request,'load'),sessions() as db:
             row=db.get(WorkspaceRow,data['wid'])
