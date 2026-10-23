@@ -5,7 +5,7 @@ import {JSDOM} from 'jsdom';
 import {response as dispatchExample} from './qa/dispatch-api-examples.mjs';
 import {projectFixture,embeddedAssignmentFixture} from './fixtures/node-assignments.mjs';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=project&project=p1',pretendToBeVisual:true});
-for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','HTMLDetailsElement','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.getComputedStyle=dom.window.getComputedStyle;
 HTMLElement.prototype.scrollIntoView=function(){globalThis.lastScroll=this.id};globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
@@ -31,7 +31,7 @@ async function mount({tab='flow',node,task,enabled=true,role='manager',dispatch=
    const key=url.split('/nodes/')[1].split('/')[0];const node=fixture.list.nodes.find(n=>n.key===key);if((init.method||'GET')==='GET'&&detailStatus!==200)return response({detail:'合成任務明細失敗'},detailStatus);
    if(init.method==='PATCH'){
     if(mutationStatus!==200)return response({detail:'沒有指派權限',code:'forbidden'},mutationStatus);
-    const t=fixture.list.node_details[key].tasks.find(t=>t.id===url.split('/').at(-1));const patch=JSON.parse(init.body);t.assignee={open_id:patch.assignee_open_id,name:'林安娜'};
+    const t=fixture.list.node_details[key].tasks.find(t=>t.id===url.split('/').at(-1));const patch=JSON.parse(init.body);if(patch.status)t.status=patch.status;else t.assignee={open_id:patch.assignee_open_id,name:'林安娜'};
    }
    return response({...fixture.list,node,can:fixture.list.can[key],...detailPayloads[key]});
   }
@@ -128,4 +128,45 @@ await check('round2 failed evidence retains node and offers retry in item sheet'
  assert.match(document.querySelector('[role=dialog]').textContent,/重試工程證據/);
 });
 evidenceStatus=200;
+const seedDetail='依計畫數量完成控制。\n計畫數量：999\n合約明細：9 筆；工項：9 項\n工項連結：原生 9、推導 0、待確認 0、未連結 0\n[SOP-START:v1:control]';
+const seedConfig=(base,f)=>{Object.assign(f.list.node_details.control.tasks[0],{title:'控制：依計畫數量完成',detail:seedDetail});};
+await check('production seed is one task with expanded evidence, unique item IDs and no raw marker',async()=>{
+ await mount({node:'control',configure:seedConfig});
+ const seed=document.querySelector('[data-assignment-task="recTask1"]');
+ assert.equal(seed.querySelector('strong').textContent,'依計畫數量完成');
+ assert.equal(seed.querySelector('#flow-evidence').open,true);
+ assert.equal(document.querySelectorAll('#flow-selected .pf-plan-facts').length,1);
+ assert.equal(seed.querySelector('.pf-plan-facts dd').textContent,progress.production.control.planned.qty);
+ assert.doesNotMatch(seed.textContent,/999|SOP-START/);
+ assert.deepEqual([...seed.querySelectorAll('[data-item-id]')].map(row=>row.dataset.itemId),progress.production.control.items.map(item=>item.item_id));
+ await click(seed.querySelector('.pf-task-open'));
+ assert.doesNotMatch(document.querySelector('[role=dialog]').textContent,/SOP-START|999/);
+ assert.ok(document.querySelector('select[aria-label="任務狀態"]'));
+ await value(document.querySelector('select[aria-label="任務狀態"]'),'已完成');await click(button('儲存狀態'));
+ assert.equal(calls.findLast(call=>call.method==='PATCH').body.status,'已完成');
+ await click(button('關閉'));
+ assert.match(document.querySelector('[data-assignment-task="recTask1"]').textContent,/已完成/);
+ await click([...seed.querySelectorAll('button')].find(b=>b.textContent==='改派'));
+ assert.ok(document.querySelector('select[aria-label="任務負責人"]'));
+ await value(document.querySelector('select[aria-label="任務負責人"]'),'ou_anna');await click(button('儲存指派'));
+ assert.match(document.querySelector('[data-assignment-task="recTask1"]').textContent,/林安娜/);
+ await act(async()=>{document.querySelector('#flow-evidence a').click();await tick()});
+ assert.equal(c.route.tab,'items');assert.equal(c.route.node,'control');
+});
+await check('production fallback uses task facts while evidence loads and keeps the plan visible when filtered',async()=>{
+ await mount({node:'control',configure:seedConfig,evidenceHold:true});
+ assert.match(document.querySelector('.pf-plan-facts').textContent,/999/);
+ assert.doesNotMatch(document.querySelector('#flow-selected').textContent,/SOP-START/);
+ await act(async()=>{globalThis.releaseEvidence();await tick()});
+ assert.doesNotMatch(document.querySelector('.pf-plan-facts').textContent,/999/);
+ await click(button('未指派'));
+ assert.equal(document.querySelectorAll('#flow-selected .pf-plan-facts').length,1);
+ assert.equal(document.querySelector('#flow-evidence').open,true);
+});
+await check('completed node reopen stays secondary and preserves the reason form',async()=>{
+ await mount({node:'control',configure(base,f){f.list.nodes.find(n=>n.key==='control').derived_status='已完成';f.list.can.control={claim:false,assign:false,complete:false,approve:false,reject:true,create_task:false}}});
+ assert.equal(button('取消完成').classList.contains('primary'),false);
+ assert.equal(document.querySelector('.pf-next-line'),null);
+ await click(button('取消完成'));assert.match(document.querySelector('.ne-form').textContent,/取消完成/);
+});
 await act(async()=>root.unmount());assert.deepEqual(failures,[]);
