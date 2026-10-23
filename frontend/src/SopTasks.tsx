@@ -100,10 +100,13 @@ const assign = async (t: SopTask, id: string) => {
    <h3>SOP 任務{counts && <span className="sop-progress" aria-label={`完成 ${progressLabel(counts)}`}>{progressLabel(counts)}</span>}{counts && checklistComplete(counts) && <Badge tone="positive">檢查清單已完成</Badge>}</h3>
    <div className="pf-actions">
     {allowed && <FlowAction allowed={allowed.import} reason="需 SOP 匯入權限" help="從預設 SOP 範本帶入整個案件的標準任務清單，匯入前可預覽與勾選。" onClick={() => setImporting('case')}>匯入預設任務</FlowAction>}
-    {allowed && <FlowAction allowed={allowed.manage} reason="需 SOP 任務管理權限" help="手動新增一項此節點的 SOP 任務。" onClick={() => setCreating(true)}>新增任務</FlowAction>}
-   {data && suggestionSelection(data.tasks).length>0 && <Button onClick={()=>setReview([])}>採用全部建議</Button>}</div>
+    {(allowed?.manage || data && suggestionSelection(data.tasks).length>0) && <details className="pf-action-more"><summary>其他操作</summary><div className="pf-actions">
+      {allowed?.manage && <FlowAction allowed={allowed.manage} reason="需 SOP 任務管理權限" help="手動新增一項此節點的 SOP 任務。" onClick={() => setCreating(true)}>新增任務</FlowAction>}
+      {data && suggestionSelection(data.tasks).length>0 && <Button onClick={()=>setReview([])}>採用全部建議</Button>}
+    </div></details>}
+   </div>
   </header>
-  {data && counts && !filtered && !history && rows.length===0 && allowed?.import && <div className="sop-empty-default"><div><strong>{node ? `${sopNodeLabel(node)}節點尚未匯入預設 SOP` : '尚未匯入預設 SOP'}</strong><span>匯入預設範本後，這個節點會帶入標準任務清單，可再指派與調整。</span></div><Button variant="primary" onClick={() => setImporting(node && !wholeCase ? node : 'case')}>{node && !wholeCase ? '匯入此節點預設任務' : '匯入預設任務'}</Button></div>}
+  {data && counts && !filtered && !history && rows.length===0 && allowed?.import && <div className="sop-empty-default"><div><strong>{node ? `${sopNodeLabel(node)}節點尚未匯入預設 SOP` : '尚未匯入預設 SOP'}</strong><span>匯入預設範本後，這個節點會帶入標準任務清單，可再指派與調整。</span></div></div>}
   {(!data || !counts || filtered || history || rows.length>0) && <div className="pf-filters sop-filters">
    <div className="pf-actions" role="group" aria-label="SOP 任務範圍">{node && <Button aria-pressed={!wholeCase} onClick={() => setWholeCase(false)}>此節點</Button>}<Button aria-pressed={wholeCase || !node} onClick={() => setWholeCase(true)}>全案</Button></div>
    <div className="pf-actions" role="group" aria-label="SOP 任務篩選">{FILTERS.map(([key, label]) => <Button key={key} aria-pressed={filters.includes(key)} onClick={() => toggle(key)}>{label}</Button>)}<Button aria-pressed={history} onClick={() => setHistory(h => !h)}>封存紀錄</Button></div>
