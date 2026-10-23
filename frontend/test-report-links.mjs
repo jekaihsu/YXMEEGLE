@@ -30,5 +30,5 @@ test('Overview field box and latest-valid-report KPI use the linked date',()=>{
  const field={work_orders:{latest_date:'2026-10-22'},items_total:0,actual:{known:false},items:[]};
  const cells=m.overviewKpis({field,nodes:[],issues:[],available:true});
  assert.equal(cells.find(c=>c.id==='latest_report').value,'2026-10-22');
- assert.match(cells.find(c=>c.id==='field').detail,/最近已連結回報 2026-10-22/);
+ assert.equal(cells.find(c=>c.id==='latest_report').label,'最近已連結回報');assert.equal(cells.some(c=>c.id==='field'),false);
 });

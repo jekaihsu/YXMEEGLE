@@ -13,16 +13,18 @@ export function overviewTasks(nodes:FlowNode[], available:boolean) {
 export type OverviewKpi={id:string;label:string;value:string;detail:string;compact:boolean;alert:boolean;target:OverviewTarget};
 export function overviewKpis({field,nodes,issues,available,stale=false,assignmentsStale=false}:{field?:ProductionStage;nodes:FlowNode[];issues:OverviewIssue[];available:boolean;stale?:boolean;assignmentsStale?:boolean}):OverviewKpi[] {
  const snapshot=fieldworkSnapshot(field,[],stale),tasks=overviewTasks(nodes,available && !assignmentsStale);
- return [
-  {id:'field',label:'外業進度',value:'尚無可信完成量',detail:`${snapshot.reason} 最近已連結回報 ${snapshot.latestDate || '未知'}`,compact:true,alert:false,target:{tab:'items',node:'field'}},
-  {id:'latest_report',label:'最近有效回報',value:snapshot.latestDate || '未知',detail:'已連結外業日報；完成量仍待核實',compact:true,alert:false,target:{tab:'items',node:'field',section:'reports'}},
-  {id:'items',label:'合約工項',value:snapshot.count===null || field?.planned===null ? '未知' : `${snapshot.count} 筆`,detail:'外業關聯工項',compact:false,alert:false,target:{tab:'items',node:'field'}},
-  {id:'planned',label:'計畫數量',value:'依各工項顯示',detail:'不同單位不加總',compact:true,alert:false,target:{tab:'items',node:'field'}},
-  {id:'actual',label:'實際完成數量',value:'未知',detail:'尚缺可核實的完成量',compact:false,alert:false,target:{tab:'items',node:'field'}},
-  {id:'tasks',label:'待處理任務',value:tasks.complete ? String(tasks.assigned) : '待核對',detail:tasks.complete ? `尚未指派 ${tasks.unassigned}` : '任務來源尚未完整核實',compact:false,alert:false,target:{tab:'flow',section:'all-tasks'}},
-  {id:'issues',label:'異常事項',value:available && !!field && !stale ? String(issues.length) : '待核對',detail:available && !!field && !stale ? issues.length ? '需要確認' : '目前無需立即處理' : '來源待更新核對',compact:false,alert:available && !!field && !stale && issues.length>0,target:issues[0]?.target || {tab:'data',section:'sources'}},
- ];
+ const cells:OverviewKpi[]=[];
+ if(snapshot.latestDate)cells.push({id:'latest_report',label:'最近已連結回報',value:snapshot.latestDate,detail:stale ? '上次成功資料，待更新' : '已連結外業日報',compact:true,alert:false,target:{tab:'items',node:'field',section:'reports'}});
+ if(snapshot.count!==null && field?.planned!==null)cells.push({id:'items',label:'外業關聯工項',value:`${snapshot.count} 筆`,detail:'外業關聯工項',compact:false,alert:false,target:{tab:'items',node:'field'}});
+ if(tasks.complete)cells.push({id:'tasks',label:'已指派待辦',value:String(tasks.assigned),detail:`尚未指派 ${tasks.unassigned}`,compact:false,alert:false,target:{tab:'flow',section:'all-tasks'}});
+ if(available && !!field && !stale && !assignmentsStale)cells.push({id:'issues',label:'待核對事項',value:String(issues.length),detail:'節點與外業資料檢查',compact:false,alert:issues.length>0,target:issues[0]?.target || {tab:'data',section:'sources'}});
+ return cells;
 }
+export function overviewMissingSummary(cells:OverviewKpi[]) {
+ const missing=['外業完成量',...[{id:'latest_report',label:'回報日期'},{id:'items',label:'工項筆數'},{id:'tasks',label:'任務統計'},{id:'issues',label:'異常統計'}].filter(metric=>!cells.some(cell=>cell.id===metric.id)).map(metric=>metric.label)];
+ return `待核實：${missing.join('、')}。`;
+}
+
 export type OverviewTodo={id:string;title:string;reason:string;owner:string;ownerId:string;deadline:string|null;target:OverviewTarget;primary:boolean};
 const targetKey=(target:OverviewTarget)=>JSON.stringify([target.tab,target.node || '',target.task || '',target.section || '']);
 export function overviewTodos(action:OverviewAction,issues:OverviewIssue[],nodes:FlowNode[]) {
