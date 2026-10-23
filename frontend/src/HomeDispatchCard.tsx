@@ -4,6 +4,7 @@ import {Card} from './homeCards';
 import {boardDisplay,dispatchWeek,snapshotAge} from './dispatchBoardModel';
 import {useDispatchBoardRead,type DispatchRead} from './DispatchBoard';
 import './HomeDispatchCard.css';
+
 export function HomeDispatchFrame({from,read}:{from:string;read:DispatchRead}) {
  const [now,setNow]=useState(Date.now);
  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(timer)},[]);
@@ -11,8 +12,9 @@ export function HomeDispatchFrame({from,read}:{from:string;read:DispatchRead}) {
  const board=display.kind==='forbidden'?undefined:read.data;
  const failed=display.kind==='failed'||display.kind==='retained';
  const stale=board?.source.quality.states.includes('stale')||display.kind==='retained';
+
  return <Card id="dispatch" subtitle={`本週 ${from.replaceAll('-','/')} 起 · 工作預排來源`} href="#view=dispatch" action="開啟派工看板">
-  <a href="#view=dispatch&tab=work">查看工作進度與需要我處理</a>
+  <a className="home-dispatch-link" href="#view=dispatch&tab=work">查看工作進度與需要我處理</a>
   <div className="home-dispatch-summary" data-dispatch-state={display.kind} aria-busy={loading}>
    <dl>{(['unassigned','unknown_overlap','conflict'] as const).map((key,index)=><div key={key}><dt>{['待派','同日重疊待確認','已核實時段衝突'][index]}</dt><dd>{loading?<Skeleton width="3rem" height="2rem"/>:<strong className="home-dispatch-count">{display.counts?display.counts[key]:'—'}</strong>}</dd></div>)}</dl>
    <div className="home-dispatch-source" role={failed?'alert':'status'}>{loading?<Skeleton lines={3}/>:<>
@@ -23,6 +25,7 @@ export function HomeDispatchFrame({from,read}:{from:string;read:DispatchRead}) {
   </div>
  </Card>;
 }
+
 export function HomeDispatchCard({today,reloadVersion}:{today:string;reloadVersion?:number}) {
  const from=dispatchWeek(today),read=useDispatchBoardRead(from,reloadVersion);
  return <HomeDispatchFrame from={from} read={read}/>;
