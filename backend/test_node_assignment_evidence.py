@@ -105,7 +105,7 @@ def test_actions_stay_illegal_on_an_auto_done_node(h):
     rev = node(overview, 'sales')['revision']
     can = overview['can']['sales']
     assert can == {'claim': False, 'assign': False, 'complete': False, 'approve': False, 'reject': False,
-                   'create_task': False}
+                   'create_task': False, 'legacy_complete': False}
     for who, path, body in (('ou_sales', '/nodes/sales/claim', {'expected_revision': rev}),
                             ('ou_sm', '/nodes/sales/complete', {'expected_revision': rev}),
                             ('ou_vp', '/nodes/sales/reject', {'expected_revision': rev, 'reason': '再確認'}),

@@ -249,9 +249,9 @@ def test_empty_case_overview_is_derived_without_creating_rows(h):
     assert [n['derived_status'] for n in body['nodes']] == ['待處理'] + ['未開始'] * 8
     assert node(body, 'field')['record_id'] is None and node(body, 'field')['status'] is None
     assert body['can']['field'] == {'claim': True, 'assign': False, 'complete': False, 'approve': False,
-                                    'reject': False, 'create_task': True}
+                                    'reject': False, 'create_task': True, 'legacy_complete': False}
     assert body['can']['sales'] == {'claim': False, 'assign': False, 'complete': False, 'approve': False,
-                                    'reject': False, 'create_task': False}
+                                    'reject': False, 'create_task': False, 'legacy_complete': False}
     assert (body['stale'], body['writes_enabled'], body['roster']) == (False, True, {'available': True, 'stale': False})
     assert h.fake.writes() == []
 

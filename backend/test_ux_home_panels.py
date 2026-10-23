@@ -21,6 +21,7 @@ def home():
     nodes = NodeAssignmentService(cfg, sessions=None, receipt_model=None, audit_model=None, skipped_nodes=lambda *_: False,
                                   transport=httpx.MockTransport(fake), clock=lambda: clock[0],
                                   client_options={'token_cache': TenantTokenCache(), 'bucket': NoBucket(), 'sleep': lambda _: None})
+    nodes.legacy_completions = lambda *_: {}
     service = HomePanels(nodes)
     p = dict(project(), name='真實格式測試案', source_kind='lark', case_visibility='source_reference')
     for node in p['nodes']:

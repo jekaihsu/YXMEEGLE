@@ -19,7 +19,7 @@ from .node_assignment.lark_table import NODE_FIELDS, TASK_FIELDS, CaseSnapshot, 
 from .node_assignment.evidence import applicable, evidence_of
 from .node_assignment.operations import facts_of
 from .node_assignment.roster import fetch_roster
-from .node_assignment.service import actor_for, confirmation_record
+from .node_assignment.service import Context, actor_for, confirmation_record
 from .source_case_policy import filter_visible_cases
 from .sources import link_ids, normalized_case, text
 from .workflow import now
@@ -136,7 +136,8 @@ class HomePanels:
                                 if n.get('key') in NODE_LABELS and self.nodes.skipped_nodes(state, project, n)) if project else frozenset()
             snap = CaseSnapshot(code, {k: tuple(v) for k, v in rows.items()}, linked)
             evidence = applicable(evidence_of(project, state, reports), skipped) if project else {}
-            chains[group] = derive_chain(facts_of(snap, skipped, evidence))
+            legacy = self.nodes.legacy_completions(Context(data['wid'], user, state, project, lambda: user), snap) if project else {}
+            chains[group] = derive_chain(facts_of(snap, skipped, evidence, legacy))
         items = []
         for kind, entries in (('node_assignment', nodes), ('task', tasks)):
             for rid, row in entries.items():

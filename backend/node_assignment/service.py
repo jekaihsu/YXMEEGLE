@@ -22,6 +22,7 @@ from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
 
 from .. import audit
 from ..business_policy import can_business_override, can_manage_roles
@@ -106,8 +107,9 @@ def confirmation_record(project, config: NodeAssignmentConfig):
     return next(iter(found)) if len(found) == 1 else None
 
 
-def actor_for(user, roster: Roster | None) -> Actor:
-    return Actor(roster.person(user['id']) if roster else None, user['id'], can_business_override(user) or can_manage_roles(user))
+def actor_for(user, roster: Roster | None, project=None) -> Actor:
+    return Actor(roster.person(user['id']) if roster else None, user['id'], can_business_override(user) or can_manage_roles(user),
+                 bool(user.get('active', True) and project and user['id'] == project.get('pm_id')))
 
 
 class KeyedLocks:
@@ -174,7 +176,7 @@ class Receipts:
             row = db.get(self.model, key)
             return None if row is None else deepcopy(row.result)
 
-    def save(self, key, fingerprint, result):
+    def save(self, key, fingerprint, result, *, audit_row=None):
         try:
             with self.sessions.begin() as db:
                 row = db.get(self.model, key)
@@ -184,6 +186,8 @@ class Receipts:
                     raise Failure('idempotency_conflict', 'request_id 已用於不同操作，請產生新的 request_id')
                 else:
                     row.result = deepcopy(result)
+                if audit_row is not None:
+                    db.add(audit_row)
         except IntegrityError:
             self.load(key, fingerprint)
             raise Failure('busy', '相同 request_id 正在處理中，請稍後再試') from None
@@ -215,24 +219,56 @@ class NodeAssignmentService:
 
     # Policy
 
-    def enrollment_block(self, ctx: Context, key=None):
+    def case_policy(self, ctx):
+        from ..sop_import.models import CasePolicy
+        with self.sessions() as db:
+            policy = db.get(CasePolicy, (ctx.wid, ctx.project['id']))
+            return policy.policy if policy else None
+
+    def legacy_completions(self, ctx, snapshot):
+        with self.sessions() as db:
+            events = db.scalars(select(self.Audit).where(
+                self.Audit.workspace_id == ctx.wid, self.Audit.action == 'node_assignment.legacy_complete',
+                self.Audit.data['project_id'].as_string() == ctx.project['id']).order_by(self.Audit.created_at, self.Audit.id))
+            found = {}
+            for event in events:
+                mark = event.data.get('legacy_completion')
+                if event.data.get('result') != 'success' or not mark:
+                    continue
+                key = NodeKey(event.data['node'])
+                rows = snapshot.rows.get(key, ())
+                row = rows[0] if len(rows) == 1 else None
+                if (row and row.approved and row.record_id == mark['record_id'] and row.approved_at == mark['approved_at']
+                        and row.approver.open_id == mark['actor']['open_id']):
+                    found[key] = mark
+            return found
+
+    def view_policy(self, ctx, snapshot):
+        policy = self.case_policy(ctx)
+        return {'case_policy': policy,
+                'legacy_writes_enabled': policy == 'legacy' and self.write_block(ctx, legacy=True) is None,
+                'legacy_completions': self.legacy_completions(ctx, snapshot)}
+
+    def enrollment_block(self, ctx: Context, key=None, action=None):
         from ..sop_import.models import CasePolicy
         from ..sop_import.enrollment_policy import timestamp
         active = str(self.cfg.get('SOP_AUTO_ENROLL_ENABLED', 'false')).lower() == 'true' and timestamp(self.cfg.get('SOP_AUTO_ENROLL_SINCE')) is not None
         with self.sessions() as db:
             policy = db.get(CasePolicy, (ctx.wid, ctx.project['id']))
+            if action == 'legacy_complete' or action == 'reject' and policy and policy.policy == 'legacy':
+                return None
             if policy is None and active or policy and (policy.policy != 'managed' or key is not None and key.value not in policy.node_keys):
                 return '舊案節點維持原流程，請先套用 SOP 到剩餘節點'
         return None
 
-    def write_block(self, ctx: Context):
-        if reason := self.enrollment_block(ctx):
+    def write_block(self, ctx: Context, *, legacy=False):
+        if not legacy and (reason := self.enrollment_block(ctx)):
             return reason
         if ctx.state.get('settings', {}).get('external_enabled') is not True:
             return '正式外部連線未啟用，節點指派暫不可修改'
         return None
 
-    def open(self, ctx: Context, *, write=False):
+    def open(self, ctx: Context, *, write=False, legacy=False):
         org = self.cfg.get('LARK_WORKER_ORGANIZATION', '')
         if not org or ctx.wid != 'lark-' + org or ctx.state.get('environment') != 'production':
             raise Failure('disabled', '節點指派僅限公司正式工作區')
@@ -241,7 +277,7 @@ class NodeAssignmentService:
         if self.cfg.get('LARK_WORKER_IDENTITY') != 'application' or not all(
                 self.cfg.get(k) for k in ('LARK_APP_ID', 'LARK_APP_SECRET')):
             raise Failure('lark_unconfigured', '公司應用身分尚未設定，無法讀寫節點指派')
-        if write and (reason := self.write_block(ctx)):
+        if write and (reason := self.write_block(ctx, legacy=legacy)):
             raise Failure('writes_disabled', reason)
         return case_code(ctx.project)
 
@@ -291,6 +327,8 @@ class NodeAssignmentService:
 
     def _envelope(self, ctx, cached, roster, body):
         block = self.write_block(ctx)
+        if self.case_policy(ctx) == 'legacy':
+            block = self.write_block(ctx, legacy=True)
         if not self.reports_visible(ctx.user):
             hide_report_figures(body)
         return {'project_id': ctx.project['id'], **body, 'stale': cached.stale, 'stale_reason': cached.stale_reason,
@@ -315,16 +353,17 @@ class NodeAssignmentService:
                 roster, cached = roster_future.result(), case_future.result()
             cache_status = 'stale' if cached.stale else ('miss' if calls else 'hit')
             people = roster.value if roster else None
-            actor = actor_for(ctx.user, people)
+            actor = actor_for(ctx.user, people, ctx.project)
             skipped, enabled, now = self.skipped(ctx), self.write_block(ctx) is None, self.now_ms()
             evidence = self.evidence(ctx)
+            policy = self.view_policy(ctx, cached.value)
             if key is not None:
-                body = node_detail(cached.value, skipped, actor, people, key, enabled, now, evidence)
+                body = node_detail(cached.value, skipped, actor, people, key, enabled, now, evidence, **policy)
             else:
-                _, body = case_view(cached.value, skipped, actor, enabled, now, evidence)
+                _, body = case_view(cached.value, skipped, actor, enabled, now, evidence, **policy)
                 body['node_details'] = {}
                 for node_key in NodeKey:
-                    detail = node_detail(cached.value, skipped, actor, people, node_key, enabled, now, evidence)
+                    detail = node_detail(cached.value, skipped, actor, people, node_key, enabled, now, evidence, **policy)
                     body['node_details'][node_key.value] = {k: detail[k] for k in ('tasks', 'assignable_people')}
             return self._envelope(ctx, cached, roster, body)
         finally:
@@ -346,18 +385,23 @@ class NodeAssignmentService:
         A call costs one rate charge, taken at its first authorized outbound write: replays, denials and
         no-ops cost nothing. Returns (http_status, body, replayed).
         """
-        if reason := self.enrollment_block(ctx, key):
+        if reason := self.enrollment_block(ctx, key, action):
             raise Failure('writes_disabled', reason)
-        code = self.open(ctx, write=True)
+        legacy = action == 'legacy_complete' or action == 'reject' and self.case_policy(ctx) == 'legacy'
+        code = self.open(ctx, write=True, legacy=legacy)
         receipt = self.receipts.key(ctx.wid, ctx.user['id'], request_id)
         fingerprint = fingerprint_of(action, ctx.project['id'], key, payload)
         akey = assignment_key(code, key)
 
-        def record(result, **details):
-            with self.sessions.begin() as db:
-                db.add(audit.record(self.Audit, ctx.wid, ctx.user['id'], 'node_assignment.' + action, result=result,
+        def record(result, *, persist=True, **details):
+            row = audit.record(self.Audit, ctx.wid, ctx.user['id'], 'node_assignment.' + action, result=result,
                                     request_id=request_id, details={'project_id': ctx.project['id'], 'node': key.value,
-                                                                    'assignment_key': akey, **details}))
+                                                                    'assignment_key': akey,
+                                                                    'reason': payload.get('body', {}).get('reason'), **details})
+            if persist:
+                with self.sessions.begin() as db:
+                    db.add(row)
+            return row
 
         with self.locks.hold((ctx.wid, akey), self.config.lock_timeout_seconds):
             ctx = replace(ctx, user=ctx.authorize())
@@ -372,7 +416,12 @@ class NodeAssignmentService:
             def authorize_write():
                 nonlocal ctx, write_attempts
                 try:
-                    if reason := self.enrollment_block(ctx, key):
+                    if legacy and ctx.refresh:
+                        ctx = ctx.refresh()
+                        if case_code(ctx.project) != code:
+                            raise Failure('revision_conflict', '案件編號已變更，請重新整理後再操作')
+                        self.open(ctx, write=True, legacy=True)
+                    if reason := self.enrollment_block(ctx, key, action):
                         raise Failure('writes_disabled', reason)
                     fresh_user = ctx.authorize()
                     if (actor_for(ctx.user, roster.value).override and not actor_for(fresh_user, roster.value).override
@@ -385,7 +434,7 @@ class NodeAssignmentService:
                                       writes_started=True) from None
                     raise
                 if situation is not None:
-                    fresh = replace(situation, actor=actor_for(ctx.user, roster.value))
+                    fresh = replace(situation, actor=actor_for(ctx.user, roster.value, ctx.project), case_policy=self.case_policy(ctx))
                     try:
                         checked = plan_fn(fresh, resumed)
                     except Denied as exc:
@@ -413,9 +462,12 @@ class NodeAssignmentService:
                         raise failure
                     resumed = previous
                 ctx = replace(ctx, user=ctx.authorize())
-                situation = Situation(key, code, actor_for(ctx.user, roster.value), roster.value, snapshot, self.skipped(ctx),
+                policy = self.view_policy(ctx, snapshot)
+                if action == 'reject' and self.enrollment_block(ctx, key) and key not in policy['legacy_completions']:
+                    raise Failure('writes_disabled', self.enrollment_block(ctx, key))
+                situation = Situation(key, code, actor_for(ctx.user, roster.value, ctx.project), roster.value, snapshot, self.skipped(ctx),
                                       self.now_ms(), confirmation_record(ctx.project, self.config),
-                                      self.evidence(ctx))
+                                      self.evidence(ctx), policy['case_policy'], policy['legacy_completions'])
                 try:
                     plan = plan_fn(situation, resumed)
                     if plan is None:
@@ -480,7 +532,7 @@ class NodeAssignmentService:
         found = self._rows_for(client, akey)
         if found:
             return found[0], False
-        status = derive_chain(facts_of(s.snapshot, s.skipped, s.evidence))[s.key]
+        status = derive_chain(facts_of(s.snapshot, s.skipped, s.evidence, s.legacy_completions))[s.key]
         initial = {'assignment_key': akey, 'code': s.code, 'node': NODE_LABELS[s.key], 'status': status.value}
         if s.confirmation_record:
             initial['confirmation'] = [s.confirmation_record]
@@ -568,7 +620,7 @@ class NodeAssignmentService:
         row = snapshot.row(key)
         if row is None:
             return 'unchanged'
-        facts = facts_of(snapshot, self.skipped(ctx), self.evidence(ctx))
+        facts = facts_of(snapshot, self.skipped(ctx), self.evidence(ctx), self.legacy_completions(ctx, snapshot))
         clear = plan.kind == 'task_update' and plan.changes.get('status') == '已完成' and row.rejected
         if clear:
             facts[key] = replace(facts[key], rejected=False)
@@ -611,11 +663,19 @@ class NodeAssignmentService:
     def _finish(self, ctx, client, code, key, plan: Plan, roster: Cached, receipt, fingerprint, record):
         snapshot, warnings = self._converge(ctx, client, code, key, plan)
         warnings = list(plan.warnings) + warnings
-        body = node_detail(snapshot, self.skipped(ctx), actor_for(ctx.user, roster.value), roster.value, key,
-                           self.write_block(ctx) is None, self.now_ms(), self.evidence(ctx))
+        event = record('success', persist=False, record_id=plan.record_id,
+                       changes=self._changes(ctx, assignment_key(code, key), plan), warnings=warnings)
+        policy = self.view_policy(ctx, snapshot)
+        if event.action == 'node_assignment.legacy_complete':
+            person = roster.value.person(ctx.user['id'])
+            mark = {'actor': {'open_id': ctx.user['id'], 'name': person.name if person else ctx.user.get('name') or ctx.user['id']},
+                    'at': datetime.fromtimestamp(plan.changes['approved_at'] / 1000, TAIPEI).isoformat(timespec='seconds'),
+                    'approved_at': plan.changes['approved_at'], 'reason': event.data['reason'], 'record_id': plan.record_id}
+            event.data = {**event.data, 'legacy_completion': mark}
+            policy['legacy_completions'][key] = mark
+        body = node_detail(snapshot, self.skipped(ctx), actor_for(ctx.user, roster.value, ctx.project), roster.value, key,
+                           self.write_block(ctx) is None, self.now_ms(), self.evidence(ctx), **policy)
         body['warnings'] += warnings
         body = {**self._envelope(ctx, Cached(snapshot, False, self.clock()), roster, body), 'record_id': plan.record_id}
-        self.receipts.save(receipt, fingerprint, {'state': 'done', 'status': 200, 'body': body})
-        record('success', record_id=plan.record_id, changes=self._changes(ctx, assignment_key(code, key), plan),
-               warnings=warnings)
+        self.receipts.save(receipt, fingerprint, {'state': 'done', 'status': 200, 'body': body}, audit_row=event)
         return 200, body, False

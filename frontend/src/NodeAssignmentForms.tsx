@@ -29,10 +29,24 @@ export function TaskCreator({detail, busy, error, onCancel, onSubmit}: {detail: 
     <label><span>期限 <small>僅日期</small></span><input type="date" value={draft.deadline} {...invalid('deadline')} onChange={e => update('deadline', e.target.value)}/>{fieldError('deadline')}</label>
   </div><div className="na-form-actions"><button type="button" className="button compact" onClick={onCancel}>取消</button><button type="submit" className="button primary compact">建立任務</button></div></fieldset></form>;
 }
-export function RejectForm({reopen, busy, error, onCancel, onSubmit}: {reopen?: boolean; busy: boolean; error: NodeAssignmentError | null; onCancel: () => void; onSubmit: (reason: string) => Promise<void>}) {
+type ReasonFormProps = {busy: boolean; error: NodeAssignmentError | null; onCancel: () => void; onSubmit: (reason: string) => Promise<void>};
+const REASON_COPY = {
+  reject: {title: '退回節點', label: '退回原因', submit: '確認退回'},
+  reopen: {title: '取消節點完成', label: '取消原因', submit: '確認取消完成'},
+  legacy_complete: {title: '直接標記完成', label: '原因', submit: '確認'},
+};
+function ReasonForm({mode, busy, error, onCancel, onSubmit}: ReasonFormProps & {mode: keyof typeof REASON_COPY}) {
   const [reason, setReason] = useState(''), [validation, setValidation] = useState('');
-  const id = useId(), message = validation || error?.fields.reason;
-  const submit = (event: FormEvent) => {event.preventDefault(); if (!reason.trim()) {setValidation(reopen ? '請填寫取消原因。' : '請填寫退回原因。'); return} setValidation(''); void onSubmit(reason.trim())};
-  return <form className="ne-form assignment-edit" noValidate onSubmit={submit}><fieldset disabled={busy}><legend>{reopen ? '取消節點完成' : '退回節點'}</legend><label><span>{reopen ? '取消原因' : '退回原因'} <small>必填</small></span><textarea placeholder="說明本次調整的原因" rows={3} value={reason} required aria-invalid={!!message} aria-describedby={message ? id : undefined} onChange={e => {setReason(e.target.value); setValidation('')}}/></label>{message && <p id={id} className="na-field-error" role="alert">{message}</p>}
-    <div className="na-form-actions"><button type="button" className="button compact" onClick={onCancel}>取消</button><button type="submit" className="button primary compact">{reopen ? '確認取消完成' : '確認退回'}</button></div></fieldset></form>;
+  const copy = REASON_COPY[mode], id = useId(), message = validation || error?.fields.reason || error?.message;
+  const submit = (event: FormEvent) => {event.preventDefault(); if (busy) return; if (!reason.trim()) {setValidation(`請填寫${copy.label}。`); return} if (reason.length > 500) {setValidation('原因不得超過 500 字。'); return} setValidation(''); void onSubmit(reason.trim())};
+  return <form className="ne-form assignment-edit" aria-label={copy.title} noValidate onSubmit={submit}><fieldset disabled={busy}><legend>{copy.title}</legend>
+    {mode === 'legacy_complete' && <p>僅記錄此舊案節點完成。任務、工程量、交付驗收及財務審批仍須各自核對。</p>}
+    <label><span>{copy.label} <small>必填</small></span><textarea placeholder="說明本次調整的原因" rows={3} value={reason} required maxLength={500} aria-invalid={!!message} aria-describedby={message ? id : undefined} onChange={e => {setReason(e.target.value); setValidation('')}}/></label>{message && <p id={id} className="na-field-error" role="alert">{message}</p>}
+    <div className="na-form-actions"><button type="button" className="button compact" onClick={onCancel}>取消</button><button type="submit" className="button primary compact">{copy.submit}</button></div></fieldset></form>;
+}
+export function RejectForm({reopen, ...props}: ReasonFormProps & {reopen?: boolean}) {
+  return <ReasonForm {...props} mode={reopen ? 'reopen' : 'reject'}/>;
+}
+export function LegacyCompleteForm(props: ReasonFormProps) {
+  return <ReasonForm {...props} mode="legacy_complete"/>;
 }

@@ -80,6 +80,7 @@ class NodeAction(StrEnum):
     CLAIM = 'claim'
     ASSIGN = 'assign'
     COMPLETE = 'complete'
+    LEGACY_COMPLETE = 'legacy_complete'
     APPROVE = 'approve'
     REJECT = 'reject'
     CREATE_TASK = 'create_task'
@@ -90,6 +91,7 @@ ACTION_FROM = {
     NodeAction.CLAIM: OPEN,
     NodeAction.ASSIGN: OPEN,
     NodeAction.COMPLETE: frozenset({NodeStatus.TODO, NodeStatus.IN_PROGRESS, NodeStatus.IN_REVIEW}),
+    NodeAction.LEGACY_COMPLETE: OPEN,
     NodeAction.APPROVE: frozenset({NodeStatus.IN_REVIEW}),
     NodeAction.REJECT: frozenset({NodeStatus.IN_REVIEW, NodeStatus.DONE}),
     NodeAction.CREATE_TASK: OPEN,
@@ -99,6 +101,7 @@ MANAGER_ACTIONS = frozenset({NodeAction.ASSIGN, NodeAction.COMPLETE, NodeAction.
 ACTION_LABELS = {
     NodeAction.CLAIM: '認領', NodeAction.ASSIGN: '指派', NodeAction.COMPLETE: '標記完成',
     NodeAction.APPROVE: '核准', NodeAction.REJECT: '退回', NodeAction.CREATE_TASK: '新增任務',
+    NodeAction.LEGACY_COMPLETE: '直接標記完成',
 }
 
 
@@ -118,6 +121,7 @@ class NodeFacts:
     tasks: tuple[TaskStatus, ...] = ()
     # The case's own source data shows this node's work has begun. It can only lift 待處理 to 進行中.
     evidence_started: bool = False
+    legacy_completed: bool = False
 
 
 @dataclass(frozen=True)
@@ -153,7 +157,8 @@ def derive_chain(facts: Mapping[NodeKey, NodeFacts]) -> dict[NodeKey, NodeStatus
     previous_done = True
     for key in CHAIN:
         statuses[key] = derive_status(facts.get(key, NodeFacts()), previous_done)
-        previous_done = statuses[key] in FINISHED
+        # An out-of-order legacy completion closes this node without releasing the earlier gap.
+        previous_done = statuses[key] in FINISHED and (previous_done or not facts.get(key, NodeFacts()).legacy_completed)
     return statuses
 
 
@@ -204,6 +209,7 @@ class Actor:
     open_id: str
     # The app's existing company-admin business grant (can_business_override).
     override: bool = False
+    case_pm: bool = False
 
     def member_of(self, key: NodeKey) -> bool:
         return self.person is not None and self.person.member_of(key)
@@ -215,11 +221,22 @@ class Actor:
         return person is not None and person.employed and (
             person.rank in EXECUTIVE_RANKS or (person.rank == MANAGER_RANK and person.member_of(key)))
 
+    def manages_legacy(self, key: NodeKey) -> bool:
+        return self.manages(key) or self.case_pm
+
 
 def check_node_action(actor: Actor, key: NodeKey, action: NodeAction, status: NodeStatus,
-                      owners: frozenset[str]) -> None:
+                      owners: frozenset[str], *, case_policy: str | None = None, legacy_completed=False) -> None:
     label = ACTION_LABELS[action]
-    if action in MANAGER_ACTIONS:
+    if action is NodeAction.LEGACY_COMPLETE:
+        if case_policy == 'managed':
+            raise Denied('此案件採用新案 SOP，請使用一般完成節點流程')
+        if case_policy != 'legacy':
+            raise Denied('此案件的舊案分類尚未確認，請先由管理員確認案件政策')
+    if action is NodeAction.LEGACY_COMPLETE or action is NodeAction.REJECT and legacy_completed and case_policy == 'legacy':
+        if not actor.manages_legacy(key):
+            raise Denied(f'只有本節點組別主管、應用管理員、案件 PM 或網站管理員可以{label}')
+    elif action in MANAGER_ACTIONS:
         if not actor.manages(key):
             raise Denied(f'只有本節點所屬組別的經理或副總、老闆可以{label}')
     elif not (actor.member_of(key) or (action is NodeAction.CREATE_TASK and actor.manages(key))):
@@ -231,11 +248,11 @@ def check_node_action(actor: Actor, key: NodeKey, action: NodeAction, status: No
 
 
 def node_permissions(actor: Actor, key: NodeKey, status: NodeStatus,
-                     owners: frozenset[str]) -> dict[NodeAction, bool]:
+                     owners: frozenset[str], *, case_policy=None, legacy_completed=False) -> dict[NodeAction, bool]:
     result = {}
     for action in NodeAction:
         try:
-            check_node_action(actor, key, action, status, owners)
+            check_node_action(actor, key, action, status, owners, case_policy=case_policy, legacy_completed=legacy_completed)
             result[action] = True
         except (Denied, IllegalTransition):
             result[action] = False

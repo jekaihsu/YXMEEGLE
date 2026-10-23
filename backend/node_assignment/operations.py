@@ -88,7 +88,7 @@ def parse_node_command(action: NodeAction, body) -> NodeCommand:
             raise Failure('invalid', '請指定 1 至 20 位負責人')
         owners = tuple(dict.fromkeys(_open_id(v, 'owner_open_ids') for v in owners))
         return NodeCommand(action, _revision(body), owners=owners)
-    if action is NodeAction.REJECT:
+    if action in (NodeAction.REJECT, NodeAction.LEGACY_COMPLETE):
         _keys(body, ('expected_revision', 'reason'))
         return NodeCommand(action, _revision(body), reason=_text(body, 'reason'))
     _keys(body, ('expected_revision',))
@@ -176,6 +176,8 @@ class Situation:
     now_ms: int
     confirmation_record: str | None = None
     evidence: Mapping[NodeKey, AutoDone | Signal] = field(default_factory=dict)
+    case_policy: str | None = None
+    legacy_completions: Mapping = field(default_factory=dict)
 
 
 class CreatePhase(StrEnum):
@@ -227,7 +229,7 @@ class Plan:
                    data.get('created_node', False), CreatePhase(data['phase']) if data.get('phase') else _inferred_phase(data))
 
 
-def facts_of(snapshot: CaseSnapshot, skipped, evidence=None) -> dict[NodeKey, NodeFacts]:
+def facts_of(snapshot: CaseSnapshot, skipped, evidence=None, legacy_completions=()) -> dict[NodeKey, NodeFacts]:
     """Lark facts per node. Auto-done nodes count as approved, whatever Lark says; a skipped node never is.
     A production signal that shows work has begun only marks the node `evidence_started`."""
     facts = {}
@@ -236,6 +238,7 @@ def facts_of(snapshot: CaseSnapshot, skipped, evidence=None) -> dict[NodeKey, No
         row = rows[0] if len(rows) == 1 else None
         facts[key] = NodeFacts(approved=bool(row and row.approved), skipped=key in skipped,
                                rejected=bool(row and row.rejected),
+                               legacy_completed=key in legacy_completions,
                                tasks=tuple(t.status for t in snapshot.node_tasks(key)))
     for key in auto_done(evidence or {}):
         if key not in skipped:
@@ -273,13 +276,14 @@ def _check_revision(current, expected):
 
 def plan_node(s: Situation, command: NodeCommand, expected_revision) -> Plan:
     row = s.snapshot.row(s.key)
-    facts = facts_of(s.snapshot, s.skipped, s.evidence)
+    facts = facts_of(s.snapshot, s.skipped, s.evidence, s.legacy_completions)
     statuses = derive_chain(facts)
     status = statuses[s.key]
     owners = frozenset(u.open_id for u in row.owners) if row else frozenset()
     illegal = None
     try:
-        check_node_action(s.actor, s.key, command.action, status, owners)
+        check_node_action(s.actor, s.key, command.action, status, owners, case_policy=s.case_policy,
+                          legacy_completed=s.key in s.legacy_completions)
     except IllegalTransition as exc:
         illegal = exc
     done_by_data = auto_done(s.evidence).get(s.key)
@@ -298,8 +302,10 @@ def plan_node(s: Situation, command: NodeCommand, expected_revision) -> Plan:
             if not eligible_assignee(s.roster.person(ident), s.key):
                 raise Failure('invalid', '負責人必須是本節點所屬組別的在職同仁')
         changes = {'owners': list(command.owners), 'method': AssignmentMethod.ASSIGNED.value, 'assigned_by': me}
-    elif command.action in (NodeAction.COMPLETE, NodeAction.APPROVE):
-        current = replace(current, approved=True, rejected=False)
+    elif command.action in (NodeAction.COMPLETE, NodeAction.APPROVE, NodeAction.LEGACY_COMPLETE):
+        if command.action is NodeAction.LEGACY_COMPLETE and (not command.reason or not command.reason.strip() or len(command.reason) > 500):
+            raise Failure('invalid', '原因必填，且不得超過 500 字')
+        current = replace(current, approved=True, rejected=False, legacy_completed=command.action is NodeAction.LEGACY_COMPLETE)
         changes = {'approver': me, 'approved_at': s.now_ms, 'finished_at': s.now_ms, 'reject_reason': None}
     else:
         if status is NodeStatus.DONE and later_nodes_started(statuses, s.key):
@@ -329,7 +335,7 @@ def _department(s: Situation, requested, assignee):
 
 def plan_create_task(s: Situation, command: CreateTask, client_token) -> Plan:
     row = s.snapshot.row(s.key)
-    status = derive_chain(facts_of(s.snapshot, s.skipped, s.evidence))[s.key]
+    status = derive_chain(facts_of(s.snapshot, s.skipped, s.evidence, s.legacy_completions))[s.key]
     check_node_action(s.actor, s.key, NodeAction.CREATE_TASK, status,
                       frozenset(u.open_id for u in row.owners) if row else frozenset())
     assignee = command.assignee
@@ -356,7 +362,7 @@ def find_task(s: Situation, task_id) -> TaskRow:
 
 
 def plan_patch_task(s: Situation, task: TaskRow, command: PatchTask) -> Plan:
-    status = derive_chain(facts_of(s.snapshot, s.skipped, s.evidence))[s.key]
+    status = derive_chain(facts_of(s.snapshot, s.skipped, s.evidence, s.legacy_completions))[s.key]
     if (s.actor.person is None or not s.actor.person.employed) and not s.actor.override:
         raise Denied('你不在人員名單或尚未在職，無法更新任務')
     _check_revision(task.revision, command.expected_revision)

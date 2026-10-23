@@ -1,7 +1,7 @@
 import {useEffect,useId,useRef,useState,type ReactNode} from 'react';
 import {CircleHelp} from 'lucide-react';
 import {Button,DisabledAction,DisabledActionReasons} from './design';
-import {AssignForm,TaskCreator,RejectForm} from './NodeAssignmentForms';
+import {AssignForm,TaskCreator,RejectForm,LegacyCompleteForm} from './NodeAssignmentForms';
 import type {AssignmentMutation,NodeAssignmentDetail,NodeAssignmentError} from './nodeAssignmentApi';
 export function HelpTip({label,text}:{label:string;text:string}){
  const [open,setOpen]=useState(false);const id=useId();const ref=useRef<HTMLSpanElement>(null);
@@ -24,21 +24,23 @@ const ORDER=Object.keys(ACTIONS) as ActionName[];
 const LEAD:ActionName[]=['approve','claim','complete','assign'];
 const REOPEN={label:'取消完成',help:'節點已完成但需要重做時使用，填寫原因後節點回到處理中；已完成的任務不會被改動。'};
 export function FlowNodeActions({detail,busy,error,reason,mutate,extra}:{detail:NodeAssignmentDetail;busy:boolean;error:NodeAssignmentError|null;reason:string;mutate:(m:AssignmentMutation)=>Promise<boolean>;extra?:ReactNode}){
- const [form,setForm]=useState<'assign'|'task'|'reject'|''>('');
+ const [form,setForm]=useState<'assign'|'task'|'reject'|'legacy_complete'|''>('');
  const [confirm,setConfirm]=useState<ActionName|''>('');
  const save=async(m:AssignmentMutation)=>{if(await mutate(m))setForm('')};
  const allowed=ORDER.filter(n=>detail.can[n]===true);
  const done=detail.node.derived_status==='已完成';
+ const legacyAllowed=detail.can.legacy_complete===true && !['已完成','略過'].includes(detail.node.derived_status);
  const label=(n:ActionName)=>n==='reject'&&done?REOPEN.label:ACTIONS[n].label,help=(n:ActionName)=>n==='reject'&&done?REOPEN.help:ACTIONS[n].help;
  const lead=LEAD.find(n=>allowed.includes(n))||(done&&allowed.includes('reject')?'reject':undefined);
  const shown=lead?[lead,...allowed.filter(n=>n!==lead)]:allowed;
  const run=(name:ActionName)=>name==='assign' ? setForm('assign') : name==='create_task' ? setForm('task') : name==='reject' ? setForm('reject') : ACTIONS[name].confirm ? setConfirm(name) : void save({action:name as 'claim',nodeKey:detail.node.key,expected_revision:detail.node.revision});
- return <DisabledActionReasons.Provider value={false}><div className="pf-node-actions"><div className="pf-actions">{lead && <FlowAction primary={lead!=='reject'} allowed={!busy} reason={reason} help={help(lead)} onClick={()=>run(lead)}>{label(lead)}</FlowAction>}{(shown.length>1 || extra) && <details className="pf-action-more"><summary>其他操作</summary><div className="pf-actions">{shown.filter(name=>name!==lead).map(name=><FlowAction key={name} allowed={!busy} reason={reason} help={help(name)} onClick={()=>run(name)}>{label(name)}</FlowAction>)}{extra}</div></details>}</div>
-  {!shown.length && <p className="pf-actions-hint">目前沒有你可執行的節點操作。</p>}
+ return <DisabledActionReasons.Provider value={false}><div className="pf-node-actions"><div className="pf-actions">{lead && <FlowAction primary={lead!=='reject'} allowed={!busy} reason={reason} help={help(lead)} onClick={()=>run(lead)}>{label(lead)}</FlowAction>}{legacyAllowed && <FlowAction allowed={!busy} reason={reason} onClick={()=>setForm('legacy_complete')}>直接標記完成</FlowAction>}{(shown.length>1 || extra) && <details className="pf-action-more"><summary>其他操作</summary><div className="pf-actions">{shown.filter(name=>name!==lead).map(name=><FlowAction key={name} allowed={!busy} reason={reason} help={help(name)} onClick={()=>run(name)}>{label(name)}</FlowAction>)}{extra}</div></details>}</div>
+  {!shown.length && !legacyAllowed && <p className="pf-actions-hint">目前沒有你可執行的節點操作。</p>}
   {confirm && <div className="pf-confirm" role="group" aria-label={`確認${ACTIONS[confirm].label}`}><p>{ACTIONS[confirm].confirm}</p><div className="pf-actions"><button type="button" className="button compact" onClick={()=>setConfirm('')}>取消</button><button type="button" className="button primary compact" disabled={busy} onClick={()=>{const action=confirm;setConfirm('');void save({action:action as 'complete',nodeKey:detail.node.key,expected_revision:detail.node.revision})}}>確認{ACTIONS[confirm].label}</button></div></div>}
   {form==='assign' && <AssignForm detail={detail} busy={busy} error={error} onCancel={()=>setForm('')} onSubmit={ids=>save({action:'assign',nodeKey:detail.node.key,owner_open_ids:ids,expected_revision:detail.node.revision})}/>}
   {form==='task' && <TaskCreator detail={detail} busy={busy} error={error} onCancel={()=>setForm('')} onSubmit={task=>save({action:'create_task',nodeKey:detail.node.key,task})}/>}
   {form==='reject' && <RejectForm reopen={done} busy={busy} error={error} onCancel={()=>setForm('')} onSubmit={reason=>save({action:'reject',nodeKey:detail.node.key,reason,expected_revision:detail.node.revision})}/>}
+  {form==='legacy_complete' && <LegacyCompleteForm busy={busy} error={error} onCancel={()=>setForm('')} onSubmit={reason=>save({action:'legacy_complete',nodeKey:detail.node.key,reason,expected_revision:detail.node.revision})}/>}
  </div></DisabledActionReasons.Provider>;
 }
 export function TaskPersonPicker({detail,taskId,busy,error,mutate,onClose}:{detail:NodeAssignmentDetail;taskId:string;busy:boolean;error:NodeAssignmentError|null;mutate:(m:AssignmentMutation)=>Promise<boolean>;onClose:()=>void}){

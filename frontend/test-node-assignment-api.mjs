@@ -73,7 +73,7 @@ test('parses the exact documented overview and detail JSON', async () => {
   assert.deepEqual(list.nodes[0], fixture.list.nodes[0]); assert.deepEqual(list.roster, {available: true, stale: false});
   response.body = fixture.detail;
   const detail = await api.fetchNodeAssignmentDetail('p1', 'field', signal, () => true);
-  assert.deepEqual(detail.can, fixture.list.can.field);
+  assert.deepEqual(detail.can, {...fixture.list.can.field, legacy_complete:false});
   assert.deepEqual(detail.tasks[0], {...fixture.detail.tasks[0], record_id: fixture.detail.tasks[0].id});
 });
 test('missing node rows preserve null revisions and send null expected_revision', async () => {

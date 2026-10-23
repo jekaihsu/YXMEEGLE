@@ -31,7 +31,7 @@ export type OverviewIssue={id:string;severity:number;title:string;reason:string;
 export function needsAttention(nodes:FlowNode[],field?:ProductionStage):OverviewIssue[]{
  const issues:OverviewIssue[]=[];
  for(const node of nodes){
-  if(node.state==='已完成' && node.tasks.done<node.tasks.total)issues.push({id:`reconcile:${node.key}`,severity:0,title:`${node.label}狀態待核對`,reason:`節點顯示已完成，但節點任務 ${node.tasks.done}/${node.tasks.total}。請核對兩者來源，不代表工程量未完成。`,owner:owner(node),target:{tab:'flow',node:node.key}});
+  if(node.state==='已完成' && (node.tasks.done===0 || node.tasks.done<node.tasks.total))issues.push({id:`reconcile:${node.key}`,severity:0,title:`${node.label}狀態待核對`,reason:`節點顯示已完成，但節點任務 ${node.tasks.done}/${node.tasks.total}。請核對兩者來源，不代表工程量未完成。`,owner:owner(node),target:{tab:'flow',node:node.key}});
   if((node.assignment || node.legacy) && node.state!=='略過' && !node.owners.length)issues.push({id:`owner:${node.key}`,severity:2,title:`${node.label}節點負責人尚未指派`,reason:'交接與任務窗口需要核對。',owner:owner(node),target:{tab:'flow',node:node.key}});
  }
  if(field && field.items_total>0 && (!field.actual.known || field.items.some(i=>['ambiguous','unlinked'].includes(i.link_basis))))issues.push({id:'field:unlinked',severity:1,title:'實際完成量尚未連結',reason:field.actual.reason || '工項與回報關聯待核對，無法判定可信的實際完成比例。',owner:owner(nodes.find(n=>n.key==='field') || nodes[0]),target:{tab:'items',node:'field'}});
