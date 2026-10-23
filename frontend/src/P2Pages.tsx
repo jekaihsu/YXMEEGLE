@@ -223,7 +223,7 @@ function ConfirmationsBody({context, body, loading, open, setNotice}: {context: 
  const pending = !sameFilters(draft, context.filters);
  const showBody = pending || loading ? {status: 200, page_state: {states: ['loading'], count: null},
   rows: [], next_cursor: null, totals: {matching: null, loaded: 0, authorized_source: null}} : body;
- const view = useMemo(() => buildConfirmationListView(showBody, {filters: draft, sort: context.sort, cursor: context.cursor, columns: context.columns??['case_number','project_name','confirmation_version','pm','admission_state','source_status'], selected: context.selected,
+ const view = useMemo(() => buildConfirmationListView(showBody, {filters: draft, sort: context.sort, cursor: context.cursor, columns: context.columns??['case_number','project_name','confirmation_version','pm'], selected: context.selected,
   cursorHistory: boundHistory(cursorStore, context.filters, context.sort, context.cursor)}), [showBody, draft, context]);
  // Any change to the query (sort) restarts at page one and drops the selection.
  const requery = (next: Partial<P2Context>) => open({...context, cursor: null, selected: null, ...next}, true);

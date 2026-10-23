@@ -57,7 +57,7 @@
 .unified-home .home-view-notice a{color:var(--accent);display:inline-flex;align-items:center;min-height:32px}
 .unified-home .home-card-compact{gap:var(--space-1);padding-block:var(--space-3)}
 .unified-home .home-card-compact .home-message{padding:0;font-size:var(--fs-footnote)}
-.unified-home .home-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-4)}
+.unified-home .home-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--space-4)}
 .unified-home .home-view-switcher{display:flex;width:fit-content;max-width:100%;flex-wrap:nowrap;border-bottom:1px solid var(--sep);gap:var(--space-2);margin:var(--space-2) 0 0}
 .unified-home .home-help-wrap{position:relative}
 .unified-home .home-help-wrap>button{min-width:44px;font-weight:700}
@@ -141,7 +141,7 @@
 
 @layer pages {
 .unified-home .home-attention-strip{margin-bottom:var(--space-4)}
-.unified-home .home-report-attention{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-4)}
+.unified-home .home-report-attention{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--space-4)}
 .unified-home .home-report-attention a{display:flex;flex-direction:column;gap:var(--space-2);color:inherit;min-width:0;overflow-wrap:anywhere;padding:var(--space-2);border-radius:var(--radius-control)}
 .unified-home .home-report-attention a:hover{background:var(--surface-2)}
 .unified-home .home-report-attention strong{font-size:var(--fs-title2);font-weight:600}

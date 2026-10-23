@@ -13,7 +13,7 @@ export function CompanyCard({id,c,today,confirmation,read}:{id:HomeCardId;c:Ctx;
  if(!data)return null;
  let content;
  if(id==='kpi')return <Kpis note="本週到期總數尚未提供。" values={[
-  {label:'進行中案件',href:'#view=projects',value:data.totals.execution_status_counts.in_progress??0},
+  {label:'進行中案件',href:'#view=projects',value:data.totals.execution_status_counts.in_progress??null},
   {label:'逾期任務',href:'#view=projects',value:data.totals.tasks_overdue},
   {label:'待確認',href:'#view=projects',value:data.totals.pending_local_reviews+data.totals.pending_native_reviews},
   {label:'本週到期',href:'#view=work',value:null},

@@ -21,14 +21,15 @@
 
 .confirmation-list-root .p2-header-title-row {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
+  flex-direction: column;
   justify-content: space-between;
   gap: var(--space-3, 12px);
   flex-wrap: wrap;
 }
 
 .confirmation-list-root .p2-title {
-  font-size: 1.25rem;
+  font-size: var(--fs-title1);
   font-weight: 650;
   letter-spacing: -0.01em;
   color: var(--label, #0f172a);
