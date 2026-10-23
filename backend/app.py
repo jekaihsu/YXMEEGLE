@@ -303,6 +303,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
             state['users']=[profiles.get(u['id'],u) for u in state['users']]+[p for ident,p in profiles.items() if ident not in known]
         state['native_approval_authority']={'app_id':cfg.get('LARK_APP_ID'),'tenant':cfg.get('LARK_WORKER_ORGANIZATION')}
         set_company_admin_authority(state,cfg)
+        from .report_bridge import load_bridges
+        state['report_case_bridges']=load_bridges(db,row.id)
         return state
 
     def load_for_write(db,row,footprint):
@@ -424,6 +426,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         """owned=True: caller passes a fresh load nobody else uses; it is projected in place (no deepcopy)."""
         file_categories=categories(data); verification=data.get('native_definition_verification')
         result=strip_migration_archive(data) if owned else public_copy(data)
+        result.pop('report_case_bridges',None);result.pop('report_bridge_available_codes',None)
         from .source_case_policy import filter_visible_cases
         from . import case_redaction
         pre=case_redaction.snapshot(result)
@@ -703,6 +706,45 @@ def create_app(overrides=None,*,dispatch_transport=None):
             from fastapi.encoders import jsonable_encoder
             return JSONResponse(jsonable_encoder(dict(records,scope='project',version=result['version'],as_of=result['as_of'],project=result['projects'][0])))
 
+    def report_link_state(data,user):
+        from .project_progress import ReportsView
+        from .report_bridge import reconcile_bridges,save_bridges
+        with sessions.begin() as db:
+            db.execute(update(WorkspaceRow).where(WorkspaceRow.id==data['wid']).values(version=WorkspaceRow.version))
+            row=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==data['wid']).with_for_update()).scalar_one()
+            state=load(db,row)
+            current=find(state['users'],user['id'])
+            reports=ReportsView(getattr(app.state,'reports',None),warm=False) if current.get('role') in ('manager','pm') else ReportsView(status='restricted')
+            reconcile_bridges(state,reports)
+            state['report_bridge_available_codes']=sorted(c for c in (reports.data or {}).get('cases',{}) if c and reports.case(c))
+            save_bridges(db,data['wid'],state)
+        return state,current
+
+    @app.get('/api/report-links')
+    def report_links(request:Request):
+        from .report_link_review import review_queue
+        data,user=identity(request)
+        state,current=report_link_state(data,user)
+        return review_queue(state,current)
+
+    @app.get('/api/report-links/summary')
+    def report_links_summary(request:Request,project_id:str=''):
+        from .report_links import can_review_links,link_summary
+        from .report_link_review import allowed_source
+        from .source_case_policy import visible_project
+        data,user=identity(request)
+        state,current=report_link_state(data,user)
+        projects=[p for p in state['projects'] if visible_project(state,p) or can_review_links(current,p)]
+        if project_id: require(any(p['id']==project_id for p in projects),'找不到這個案件',404)
+        state['projects']=projects
+        reviewer=can_review_links(current) or any(can_review_links(current,p) for p in projects)
+        state['daily_unmatched']=[d for d in state.get('daily_unmatched',[]) if allowed_source(state,d) and (reviewer or current['id'] in d.get('source_actor_ids',[]))]
+        result=link_summary(state,project_id or None)
+        bridges=[b for pid,b in state.get('report_case_bridges',{}).items() if any(p['id']==pid for p in projects)]
+        result['bridges']={status:sum(b['status']==status for b in bridges) for status in ('auto_exact','reviewed','rejected','pending')}
+        result['bridge_unknown']=len(projects)-len(bridges)
+        return result
+
     @app.get('/api/daily-reports')
     def daily_reports(request:Request,project_id:str='',department:str='',actor_id:str='',date_from:str='',date_to:str='',status:str='all',q:str='',offset:int=0,limit:int=50):
         from .source_projection import daily_index
@@ -872,6 +914,15 @@ def create_app(overrides=None,*,dispatch_transport=None):
             if body.action=='case_execution_assign':
                 assign_execution(ws,current,body.project_id,body.payload.get('execution_system'),body.payload.get('reason'))
                 return
+            from .report_link_review import LINK_ACTIONS
+            if body.action in LINK_ACTIONS:
+                from .report_bridge import reconcile_bridges
+                from .project_progress import ReportsView
+                reports=ReportsView(getattr(app.state,'reports',None),warm=False)
+                reconcile_bridges(ws,reports)
+                ws['report_bridge_available_codes']=sorted(c for c in (reports.data or {}).get('cases',{}) if c and reports.case(c))
+                apply_operation(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-'),cfg)
+                return
             affected_ids={i.get('project_id') for i in body.payload.get('items',[]) if isinstance(i,dict)} if body.action=='task_batch_complete' else ({body.project_id} if body.project_id else None)
             affected=[p for p in ws['projects'] if affected_ids is None or p['id'] in affected_ids]
             if affected_ids:
@@ -899,7 +950,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             require(not protected_node_changes(policies,protected_before,ws['projects'],protect_unclassified=app.state.sop_import.auto_active()),
                     '舊案節點維持原流程，請先由管理者套用 SOP 到剩餘節點',409)
         try:
-            with phase(request,'mutate'): return persist_mutation(data['wid'],None if body.action=='admin_person' and 'expected_authz_version' in body.payload else body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=(lambda lookup:resolve_footprint(raw,lookup)) if raw['action'] in FOOTPRINT_RULES else None)
+            with phase(request,'mutate'): return persist_mutation(data['wid'],None if body.action=='admin_person' and 'expected_authz_version' in body.payload else body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=(lambda lookup:resolve_footprint(raw,lookup)) if raw['action'] in FOOTPRINT_RULES and raw['action'] not in {'daily_propose','daily_approve'} else None)
         except HTTPException as exc:
             with sessions.begin() as db:
                 db.add(audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,
@@ -1181,6 +1232,14 @@ def create_app(overrides=None,*,dispatch_transport=None):
         if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true': reports=ReportsView(status='disabled')
         elif not privileged or data.get('mode')!='lark' or data['wid'].startswith(('test-','demo-')): reports=ReportsView(status='restricted')
         else: reports=ReportsView(getattr(app.state,'reports',None))
+        if reports.data is not None:
+            from .report_bridge import reconcile_bridges,save_bridges
+            with sessions.begin() as db:
+                db.execute(update(WorkspaceRow).where(WorkspaceRow.id==data['wid']).values(version=WorkspaceRow.version))
+                row=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==data['wid']).with_for_update()).scalar_one()
+                current=load(db,row,project_ids=[project_id])
+                reconcile_bridges(current,reports);save_bridges(db,data['wid'],current)
+                state['report_case_bridges']=current['report_case_bridges']
         return JSONResponse(build_project_progress(state,project_id,reports=reports,amounts=privileged,as_of=state['as_of']),headers={'Cache-Control':'no-store'})
 
     @app.get('/api/case-detail/{project_id}')
@@ -1643,7 +1702,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
     register_live(app,identity,app.state.live_read,authorize=authorize_live,audit=audit_live_refresh)
     from .reports.routes import register as register_reports
     register_reports(app,identity,cfg,authorize=authorize_live,live_enabled=live_enabled,
-                     allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+                     allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'),
+                     links=lambda data,user:report_link_state(data,user)[0].get('report_case_bridges',{}))
     from .lark_pilot.routes import register as register_pilot
     register_pilot(app, identity=identity, authorize=authorize_live, cfg=cfg)
     from .runtime_health import register as register_runtime_health

@@ -48,7 +48,7 @@ const status=()=>document.querySelector('[role=status]').textContent;
 const shown=()=>[...document.querySelectorAll('.daily-cards article p')].map(x=>x.textContent);
 const mk=(pid,ids)=>ids.map(id=>({id,date:'2026-10-01',department:'組',person:'人',description:id,project_id:pid,project_code:pid}));
 const calls=[];let handler;
-globalThis.fetch=async(url)=>{const q=new URL(String(url),'http://x').searchParams;calls.push({pid:q.get('project_id'),offset:q.get('offset')});return new Response(JSON.stringify(handler(q)),{status:200,headers:{'content-type':'application/json'}})};
+globalThis.fetch=async(url)=>{if(String(url).startsWith('/api/report-links/summary'))return new Response(JSON.stringify({linked:0,total:0,unlinked:0,departments:{},reasons:{},basis:{},latest_date:null}),{status:200,headers:{'content-type':'application/json'}});const q=new URL(String(url),'http://x').searchParams;calls.push({pid:q.get('project_id'),offset:q.get('offset')});return new Response(JSON.stringify(handler(q)),{status:200,headers:{'content-type':'application/json'}})};
 const render=async(proj)=>{await act(async()=>{root.render(React.createElement(DailyRecords,{w,p:proj,go:()=>{}}));await new Promise(r=>setTimeout(r,20))})};
 const resp=(items,total)=>({coverage:{scope:'visible_cases',project_only:true,unmatched_available:false},items,total,offset:0,limit:30,summary:{matched:total,unmatched:0,source_missing:0}});
 // Case 1: A at page 3 -> switch to one-row B resets to offset 0 and shows B's record.
@@ -74,7 +74,7 @@ assert.equal(document.querySelectorAll('button[disabled]').length,2);
 console.log('Daily records: project switch and shrink keep offset, label and items consistent');
 // Case 3: fetch ignores abort and completes out of order; A->B->A must restart at offset 0 and never render stale items.
 const pending=[];
-globalThis.fetch=async(url)=>{const q=new URL(String(url),'http://x').searchParams;calls.push({pid:q.get('project_id'),offset:q.get('offset')});return new Promise(res=>pending.push({pid:q.get('project_id'),offset:q.get('offset'),done:(items,tot)=>res(new Response(JSON.stringify(resp(items,tot)),{status:200,headers:{'content-type':'application/json'}}))}))};
+globalThis.fetch=async(url)=>{if(String(url).startsWith('/api/report-links/summary'))return new Response(JSON.stringify({linked:0,total:0,unlinked:0,departments:{},reasons:{},basis:{},latest_date:null}),{status:200,headers:{'content-type':'application/json'}});const q=new URL(String(url),'http://x').searchParams;calls.push({pid:q.get('project_id'),offset:q.get('offset')});return new Promise(res=>pending.push({pid:q.get('project_id'),offset:q.get('offset'),done:(items,tot)=>res(new Response(JSON.stringify(resp(items,tot)),{status:200,headers:{'content-type':'application/json'}}))}))};
 const tick=()=>act(async()=>{await new Promise(r=>setTimeout(r,20))});
 const rend=async(proj)=>{await act(async()=>{root.render(React.createElement(DailyRecords,{w,p:proj,go:()=>{}}));await new Promise(r=>setTimeout(r,10))})};
 const A={id:'A3',code:'A3',daily_reports:[]},B={id:'B3',code:'B3',daily_reports:[]};
@@ -114,7 +114,7 @@ const smallF={...F,daily_reports:mk('F',['f-only'])};
 await renderFallback(smallF,11);
 assert.deepEqual(shown(),['f-only']);assert.match(status(),/共 1 筆.*第 1／1 頁/);
 calls.length=0;
-globalThis.fetch=async(url)=>{const q=new URL(String(url),'http://x').searchParams;calls.push({pid:q.get('project_id'),offset:q.get('offset')});return new Response(JSON.stringify(resp(Number(q.get('offset'))===0?mk('F',['f-restored']):[],1)),{status:200,headers:{'content-type':'application/json'}})};
+globalThis.fetch=async(url)=>{if(String(url).startsWith('/api/report-links/summary'))return new Response(JSON.stringify({linked:0,total:0,unlinked:0,departments:{},reasons:{},basis:{},latest_date:null}),{status:200,headers:{'content-type':'application/json'}});const q=new URL(String(url),'http://x').searchParams;calls.push({pid:q.get('project_id'),offset:q.get('offset')});return new Response(JSON.stringify(resp(Number(q.get('offset'))===0?mk('F',['f-restored']):[],1)),{status:200,headers:{'content-type':'application/json'}})};
 await renderFallback(smallF,12);
 assert.equal(calls[0].offset,'0','restored API must use the page displayed by the fallback');
 assert.deepEqual(shown(),['f-restored']);

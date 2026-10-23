@@ -164,3 +164,16 @@ class DispatchReservationRow(Base):
     state=Column(String(20),nullable=False)
 
 BusinessRow,PersonRow=storage.models(Base)
+
+
+class ReportCaseBridge(Base):
+    __tablename__ = 'report_case_bridges'
+    workspace_id = Column(String(120), primary_key=True)
+    project_id = Column(String(160), primary_key=True)
+    status = Column(String(24), nullable=False)
+    codes = Column(JSON, nullable=False)
+    actor_id = Column(String(120), nullable=False)
+    reason = Column(String(2000), nullable=False)
+    decided_at = Column(String(64), nullable=False)
+    candidates = Column(JSON, nullable=False)
+    history = Column(JSON, nullable=False)

@@ -14,7 +14,7 @@ NO_DAILY = '尚無日報連結到此案件'
 
 
 def daily(h, key, *dates, points=2.5, pid_project=None):
-    rows = [{'id': f'{key}-{i}', 'date': d, 'department': DEPT[key], 'points': points} for i, d in enumerate(dates)]
+    rows = [{'id': f'{key}-{i}', 'date': d, 'department': DEPT[key], 'points': points,'case_mapping_status':'matched','match_basis':'source_case_or_link'} for i, d in enumerate(dates)]
     h.case['project'] = {**h.case['project'], 'daily_reports': [*h.case['project'].get('daily_reports', []), *rows]}
 
 
@@ -217,10 +217,10 @@ def test_the_reject_guard_still_only_protects_auto_done_nodes(h):
 
 def test_signal_is_pure_decimal_safe_and_does_not_read_a_missing_plan_as_zero():
     proj = {'id': 'p1', 'code': '115588', 'daily_reports': [
-        {'id': 'a', 'date': '2026-10-02', 'department': '外業組', 'points': 0.1},
-        {'id': 'b', 'date': '2026-10-09', 'department': '外業組', 'points': 0.2},
-        {'id': 'c', 'date': '2026-10-11', 'department': '外業組', 'source_missing': True, 'points': 99},
-        {'id': 'd', 'date': '2026-10-01', 'department': '控制組', 'points': None}]}
+        {'id': 'a', 'case_mapping_status':'matched','match_basis':'manual_review', 'date': '2026-10-02', 'department': '外業組', 'points': 0.1},
+        {'id': 'b', 'case_mapping_status':'matched','match_basis':'manual_review', 'date': '2026-10-09', 'department': '外業組', 'points': 0.2},
+        {'id': 'c', 'case_mapping_status':'matched','match_basis':'manual_review', 'date': '2026-10-11', 'department': '外業組', 'source_missing': True, 'points': 99},
+        {'id': 'd', 'case_mapping_status':'matched','match_basis':'manual_review', 'date': '2026-10-01', 'department': '控制組', 'points': None}]}
     found = production_signal(proj, {})
     assert list(found) == [NodeKey.FIELD, NodeKey.CONTROL, NodeKey.MAPPING, NodeKey.REPORT]
     field = found[NodeKey.FIELD]
@@ -237,6 +237,7 @@ def test_signal_is_pure_decimal_safe_and_does_not_read_a_missing_plan_as_zero():
 class StubReports:
     def __init__(self, cases, totals):
         self.cases, self.totals = cases, totals
+        self.data={"cases":{code:{} for code in cases}}
 
     def case(self, code):
         return {'case_key': 'rec' + code, 'case_code': code, 'status': '未填'} if code in self.cases else None

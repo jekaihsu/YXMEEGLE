@@ -125,7 +125,11 @@ def production_signal(project, state, reports=None) -> dict[NodeKey, Signal]:
     `reports` is an already-built ReportsView, or None; this never reads Lark and never waits for the register.
     """
     summary = plan_summary(state or {}, project['id'])
-    total = v3_field_total(project, reports) if reports is not None else None
+    from copy import deepcopy
+    from ..report_bridge import reconcile_bridges
+    bridge_state={'projects':[project],'report_case_bridges':deepcopy((state or {}).get('report_case_bridges',{}))}
+    if reports is not None and getattr(reports,'data',None) is not None: reconcile_bridges(bridge_state,reports)
+    total = v3_field_total(project,reports,bridge_state['report_case_bridges'].get(project['id'])) if reports is not None else None
     found = {}
     for node in PRODUCTION_NODES:
         key = node.value

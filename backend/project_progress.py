@@ -21,6 +21,8 @@ from .case_evidence import is_c_code, live_confirmation_fields, live_contract_li
 from .contract_links import CATEGORY_FIELDS, plan_summary
 from .item_progress import item_status, node_progress, parse_points
 from .sources import day, text
+from .report_bridge import reconcile_bridges,accepted_cases
+from .report_links import linked_daily,link_summary
 
 SCHEMA_VERSION = 1
 STAGES = (('sales', '業務'), ('pm', 'PM'), ('confirmation', '確認單'), ('field', '外業'), ('control', '控制'),
@@ -232,17 +234,23 @@ class ReportsView:
             return
         self.data, self.fetched_at, self.stale = snapshot['data'], snapshot['fetched_at'], store.meta(snapshot)['stale']
 
-    def case(self, code):
+    def case_candidates(self, code):
         from .reports.compute import cell
-        record = (self.data or {}).get('cases', {}).get(code) if code else None
-        if record is None:
-            return None
-        return {'case_key': record['id'], 'case_code': code, 'status': str(cell(record['f'].get('狀態'))) or '未填'}
+        from .sources import normalized_case
+        code=normalized_case(code)
+        if not code: return []
+        return [{'case_key':r['id'],'case_code':code,'status':str(cell(r['f'].get('狀態'))) or '未填'}
+                for r in (self.data or {}).get('tables',{}).get('case',[]) if normalized_case(r['f'].get('案件編號'))==code]
+
+    def case(self, code):
+        found=self.case_candidates(code)
+        return found[0] if len(found)==1 else None
 
     def field_total(self, code):
-        """The register's cumulative 外業 revenue points of one exact case, only when positive."""
+        """The register's cumulative 外業 revenue points of one unique full identity, only when positive."""
         from .reports.compute import number
-        record = (self.data or {}).get('cases', {}).get(code) if code else None
+        case=self.case(code)
+        record=next((r for r in (self.data or {}).get('tables',{}).get('case',[]) if case and r['id']==case['case_key']),None)
         total = number(record['f'].get('累計外業營業額點數')) if record else None
         return total if total and total > 0 else None
 
@@ -257,7 +265,9 @@ class ReportsView:
                 weeks[dept].add(week)
         for dept, reviews in data['reviews'].items():
             weeks[dept].update(monday(r['date']) for r in reviews if r['date'] and code in case_codes(r['case_code']))
-        key = data['cases'][code]['id']
+        case=self.case(code)
+        if case is None: return [],False
+        key=case['case_key']
         for dept, found in weeks.items():
             ordered = sorted(found, reverse=True)
             truncated = truncated or len(ordered) > MAX_WEEKS
@@ -304,20 +314,9 @@ def _stage(key, label, state, basis, *evidence):
     return {'key': key, 'label': label, 'state': state, 'basis': basis, 'evidence': list(evidence)}
 
 
-def _v3_matches(code, quotes, reports):
-    found = {}
-    for candidate, how in [(code, 'code')] + [(q['number'], 'quote_number') for q in quotes]:
-        case = reports.case(candidate)
-        if case and case['case_key'] not in found:
-            found[case['case_key']] = {**case, 'match': how}
-    return found
-
-
-def v3_field_total(project, reports):
-    """The register's cumulative 外業 points, only when exactly one v3 case matches the code or a quote number."""
-    quotes = [{'number': text(q.get('quote_code')) or None} for q in project.get('quotes', [])]
-    found = _v3_matches(text(project.get('code')) or None, quotes, reports)
-    return reports.field_total(next(iter(found.values()))['case_code']) if len(found) == 1 else None
+def v3_field_total(project, reports, bridge=None):
+    found=accepted_cases(project,reports,bridge)
+    return reports.field_total(found[0]['case_code']) if len(found)==1 else None
 
 
 def _identity(state, project, reports):
@@ -330,17 +329,19 @@ def _identity(state, project, reports):
     quotes = [{'number': text(q.get('quote_code')) or None, 'engineering_code': text(q.get('engineering_code')) or None,
                'status': text((q.get('fields') or {}).get('狀態')) or text((q.get('fields') or {}).get('案件狀態')) or None}
               for q in project.get('quotes', [])]
-    found = _v3_matches(code, quotes, reports)
+    bridge=state.get('report_case_bridges',{}).get(pid)
+    found=accepted_cases(project,reports,bridge)
+    if bridge and bridge['status']=='pending': found=[{**c,'bridge_status':'pending'} for c in bridge.get('candidates',[])]
     return {'code': code, 'is_c_prefix': is_c_code(code),
             'confirmation': {'present': bool(rows), 'line_count': len(lines),
                              'fill_item_count': len(fills) if imported else None,
                              'source_status': next(iter(statuses)) if len(statuses) == 1 else None},
-            'quotes': quotes, 'v3_cases': list(found.values()), 'v3_ambiguous': len(found) > 1}, rows, statuses
+            'quotes': quotes, 'v3_cases': found, 'v3_ambiguous': bool(bridge and bridge['status']=='pending' and len(bridge.get('candidates',[]))>1), 'v3_bridge_status': (bridge or {}).get('status','unknown')}, rows, statuses
 
 
 def _daily(project, key):
     group = PRODUCTION[key][1]
-    return [d for d in project.get('daily_reports', []) if d.get('department') == group and not d.get('source_missing')]
+    return [d for d in project.get('daily_reports', []) if d.get('department') == group and linked_daily(d)]
 
 
 def actual_of(project, key, v3_field_total):
@@ -402,7 +403,8 @@ def planned_items(state, project, summary, key):
                       'name': text(fields.get(CATEGORY_FIELDS[category][1])) or None,
                       'planned_qty': _fmt(_dec(fields.get(CATEGORY_FIELDS[category][0]))),
                       'planned_points': _fmt(planned), 'remaining_points': _fmt(remaining),
-                      'status': item_status(planned, remaining), 'link_basis': BASIS_LABEL[item['basis']]})
+                      'status': item_status(planned, remaining), 'link_basis': BASIS_LABEL[item['basis']],
+                      'linked_reports':[{k:d.get(k) for k in ('id','date','department','description','match_basis','source_url')} for d in project.get('daily_reports',[]) if linked_daily(d) and d.get('work_item_id')==item['id']]})
     progress = None if summary.get('truncated') else node_progress(points)
     return planned_of(summary, key), items, len(mine), len(mine) > MAX_ITEMS, progress
 
@@ -513,7 +515,7 @@ def _gaps(identity, production, summary, statuses, reports, finance, project, am
     numbers = [q['number'] for q in identity['quotes'] if q['number']]
     if len(numbers) != len(set(numbers)):
         add('quotes_duplicated', '同一報價編號有多筆報價紀錄，金額不可相加')
-    if not project.get('daily_reports'):
+    if not any(linked_daily(d) for d in project.get('daily_reports',[])):
         add('no_daily_linked', NO_DAILY + '，實際完成量未知（不代表尚未施工）')
     if identity['v3_ambiguous']:
         add('v3_ambiguous', '工編與報價編號對應到多個 v3 案件，未合併；請逐一確認')
@@ -538,14 +540,16 @@ def build_project_progress(state, project_id, *, reports=None, amounts=False, as
     if project is None:
         return None
     reports = reports or ReportsView(status='restricted')
+    reconcile_bridges(state,reports)
     identity, conf_rows, statuses = _identity(state, project, reports)
     summary = plan_summary(state, project_id)
     v3_rows, rows_truncated = [], False
-    for case in identity['v3_cases']:  # every candidate is listed with its own case_key; rows are never merged
+    for case in identity['v3_cases']:
+        if case.get('bridge_status')=='pending': continue
         found, cut = reports.rows(case['case_code'])
         v3_rows += found
         rows_truncated = rows_truncated or cut
-    field_total = v3_field_total(project, reports)
+    field_total = v3_field_total(project,reports,state.get('report_case_bridges',{}).get(project_id))
     production = {}
     for key in PRODUCTION:
         planned, items, total, truncated, progress = planned_items(state, project, summary, key)
@@ -558,5 +562,5 @@ def build_project_progress(state, project_id, *, reports=None, amounts=False, as
     return {'schema_version': SCHEMA_VERSION, 'project_id': project_id, 'as_of': as_of or state.get('as_of'),
             'sources': {'source_synced_at': status.get('last_sync'), 'source_status': status.get('status'),
                         'reports_status': reports.status, 'reports_fetched_at': reports.fetched_at, 'reports_stale': reports.stale},
-            'identity': identity, 'stages': _stages(identity, production, finance, project, amounts), 'production': production,
+            'daily_links':link_summary(state,project_id), 'identity': identity, 'stages': _stages(identity, production, finance, project, amounts), 'production': production,
             'finance': finance, 'gaps': _gaps(identity, production, summary, statuses, reports, finance, project, amounts)}

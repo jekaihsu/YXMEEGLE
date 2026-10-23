@@ -1,3 +1,4 @@
+import type {LinkSummary} from './reportLinksModel';
 import {PRODUCTION_NODE_KEYS} from './nodeAssignmentApi';
 import {api} from './api';
 import type {ItemsProgress, WorkItemStatus} from './nodeAssignmentApi';
@@ -8,7 +9,7 @@ export type LinkBasis = 'native'|'derived'|'ambiguous'|'unlinked';
 export interface ProgressStage {key: StageKey; label: string; state: 'done'|'active'|'waiting'|'unknown'; basis: 'rule'|'source'|'none'; evidence: {label: string; value: string; tone: 'ok'|'warn'|'muted'}[]}
 export interface ProductionStage {
  planned: {lines: number; items: number; qty: string; basis: Record<LinkBasis, number>; needs_review: number}|null;
- items: {item_id: string; code: string|null; name: string|null; planned_qty: string|null; planned_points?: string|null; remaining_points?: string|null; status?: WorkItemStatus; link_basis: LinkBasis; source_url?: string|null}[];
+ items: {item_id: string; code: string|null; name: string|null; planned_qty: string|null; planned_points?: string|null; remaining_points?: string|null; status?: WorkItemStatus; link_basis: LinkBasis; source_url?: string|null; linked_reports?: {id:string;date?:string;description?:string;match_basis?:string}[]}[];
  progress?: ItemsProgress|null;
  items_total: number; items_truncated: boolean;
  actual: {known: boolean; value: string|null; unit_note: string|null; reason: string|null; source: 'v4_daily'|'v3_reports'|null};
@@ -16,9 +17,9 @@ export interface ProductionStage {
 }
 export interface ProgressReportRow {case_key: string; case_code: string; dept: 'field'|'office'; week: string; basis: string; planned: number; actual: number; planned_days: number; actual_days: number; matched_days: number; achievement: number|null; expected_total: number|null; done_total: number|null; remaining: number|null; status: string; source_url?: string|null}
 export interface ProjectProgress {
- schema_version: 1; project_id: string; as_of: string|null;
+ daily_links?:LinkSummary; schema_version: 1; project_id: string; as_of: string|null;
  sources: {source_synced_at: string|null; source_status: string|null; reports_status: 'ok'|'cold'|'unavailable'|'restricted'|'disabled'; reports_fetched_at: string|null; reports_stale: boolean|null};
- identity: {code: string|null; is_c_prefix: boolean; confirmation: {present: boolean; line_count: number; fill_item_count: number|null; source_status: string|null}; quotes: {number: string|null; engineering_code: string|null; status: string|null}[]; v3_cases: {case_key: string; case_code: string; status: string; match: 'code'|'quote_number'}[]; v3_ambiguous: boolean};
+ identity: {code: string|null; is_c_prefix: boolean; confirmation: {present: boolean; line_count: number; fill_item_count: number|null; source_status: string|null}; quotes: {number: string|null; engineering_code: string|null; status: string|null}[]; v3_cases: {case_key: string; case_code: string; status: string; match: 'code'|'quote_number';bridge_status?:'auto_exact'|'reviewed'|'pending'}[]; v3_ambiguous: boolean};
  stages: ProgressStage[];
  production: Record<ProductionKey, ProductionStage> & {report_rows: ProgressReportRow[]; report_rows_truncated: boolean};
  finance: {restricted: boolean; quotes: {number: string|null; invoiced_total: string|null; billable_unrequested: string|null; billable_total: string|null; received_total: string|null; received_date: string|null; case_received: boolean|null}[]; case_received: boolean|null; received_date: string|null};

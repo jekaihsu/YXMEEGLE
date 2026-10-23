@@ -123,7 +123,7 @@ def _templates_changed(desired,existing):
 def save(db,model,wid,state):
     """Replace only changed entity rows; preserve one atomic workspace revision."""
     if '_partial' in state: raise ValueError('partial workspaces are read-only')
-    root={k:deepcopy(v) for k,v in state.items() if k not in COLLECTIONS and k!='migration_archive'}; desired={}
+    root={k:deepcopy(v) for k,v in state.items() if k not in COLLECTIONS and k not in ('migration_archive','report_bridge_available_codes')}; desired={}
     archive=state.get('migration_archive')
     if archive is not None: root['migration_archive_ref']='original'
     add=_adder(desired,'storage.save')
@@ -172,6 +172,9 @@ def save(db,model,wid,state):
         from . import index_tables  # lazy: storage must stay importable inside the isolated backup helper bundle
         index_tables.replace_projects(db,model,wid,state,dirty)
         index_tables.replace_counters(db,model,wid,state)
+    if 'report_case_bridges' in state:
+        from .report_bridge import save_bridges
+        save_bridges(db,wid,state)
     root['storage_schema']=2
     return root
 

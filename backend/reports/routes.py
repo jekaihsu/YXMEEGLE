@@ -81,7 +81,7 @@ def parameters(endpoint, query):
     return p
 
 
-def register(app, identity, cfg=None, *, reader=None, authorize=None, live_enabled=None, allow=None):
+def register(app, identity, cfg=None, *, reader=None, authorize=None, live_enabled=None, allow=None, links=None):
     cfg=os.environ if cfg is None else cfg
     store=SnapshotStore(reader or LarkReader(cfg),cfg)
     ensure_visible_logs()
@@ -114,6 +114,9 @@ def register(app, identity, cfg=None, *, reader=None, authorize=None, live_enabl
                     else: result=store.result(endpoint,params)
                 except UnknownStatus as exc: raise HTTPException(422,str(exc)) from None
                 except CaseNotFound: raise HTTPException(404,'case_not_found') from None
+                if endpoint=='progress' and links is not None:
+                    from .compute import attach_local_bridges
+                    result=attach_local_bridges(result,links(data,user))
                 if endpoint=='progress':
                     result['meta']['can_refresh']=False
                     if authorize is not None and live_enabled is not None and live_enabled(data['wid']):

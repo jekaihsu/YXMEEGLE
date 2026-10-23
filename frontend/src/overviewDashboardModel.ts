@@ -14,7 +14,8 @@ export type OverviewKpi={id:string;label:string;value:string;detail:string;compa
 export function overviewKpis({field,nodes,issues,available,stale=false,assignmentsStale=false}:{field?:ProductionStage;nodes:FlowNode[];issues:OverviewIssue[];available:boolean;stale?:boolean;assignmentsStale?:boolean}):OverviewKpi[] {
  const snapshot=fieldworkSnapshot(field,[],stale),tasks=overviewTasks(nodes,available && !assignmentsStale);
  return [
-  {id:'field',label:'外業進度',value:'尚無可信完成量',detail:snapshot.reason,compact:true,alert:false,target:{tab:'items',node:'field'}},
+  {id:'field',label:'外業進度',value:'尚無可信完成量',detail:`${snapshot.reason} 最近已連結回報 ${snapshot.latestDate || '未知'}`,compact:true,alert:false,target:{tab:'items',node:'field'}},
+  {id:'latest_report',label:'最近有效回報',value:snapshot.latestDate || '未知',detail:'已連結外業日報；完成量仍待核實',compact:true,alert:false,target:{tab:'items',node:'field',section:'reports'}},
   {id:'items',label:'合約工項',value:snapshot.count===null || field?.planned===null ? '未知' : `${snapshot.count} 筆`,detail:'外業關聯工項',compact:false,alert:false,target:{tab:'items',node:'field'}},
   {id:'planned',label:'計畫數量',value:'依各工項顯示',detail:'不同單位不加總',compact:true,alert:false,target:{tab:'items',node:'field'}},
   {id:'actual',label:'實際完成數量',value:'未知',detail:'尚缺可核實的完成量',compact:false,alert:false,target:{tab:'items',node:'field'}},

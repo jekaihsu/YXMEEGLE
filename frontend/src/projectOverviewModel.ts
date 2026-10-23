@@ -38,7 +38,7 @@ export function needsAttention(nodes:FlowNode[],field?:ProductionStage):Overview
  return issues.sort((a,b)=>a.severity-b.severity || a.id.localeCompare(b.id));
 }
 export function fieldworkSnapshot(field:ProductionStage|undefined,reports:Project['daily_reports']=[],stale=false){
- const valid=reports.filter(r=>r.department.includes('外業') && ['approved','accepted'].includes(r.review?.status || '') && ['native','source_case_or_link','manual_review'].includes(r.match_basis || '') && /^\d{4}-\d{2}-\d{2}$/.test(r.date) && Number.isFinite(Date.parse(r.date)) && new Date(r.date).toISOString().slice(0,10)===r.date).map(r=>r.date).sort().at(-1) || null;
+ const valid=reports.filter(r=>r.department.includes('外業') && ['source_case_or_link','provisional_case_code','manual_review'].includes(r.match_basis || '') && /^\d{4}-\d{2}-\d{2}$/.test(r.date) && Number.isFinite(Date.parse(r.date)) && new Date(r.date).toISOString().slice(0,10)===r.date).map(r=>r.date).sort().at(-1) || null;
  // The current API has no verified common unit/scope for the planned denominator. Points and work orders cannot establish a physical completion rate.
- return {percent:null,count:field?.items_total ?? null,latestDate:valid,reason:!field ? '工程證據尚未提供，暫時無法確認完成量。' : stale ? '來源為上次成功資料，待更新核對。' : !field.actual.known ? field.actual.reason || '日報尚未連結至工項，無法計算實際完成比例。' : field.items_truncated ? '工項資料尚未齊備，無法計算整體完成比例。' : field.items.some(i=>i.link_basis!=='native') ? '工項關聯仍需核對，無法計算可信完成比例。' : '已取得回報量，尚缺同單位與範圍的已驗證計畫分母。'};
+ return {percent:null,count:field?.items_total ?? null,latestDate:field?.work_orders?.latest_date || valid,reason:!field ? '工程證據尚未提供，暫時無法確認完成量。' : stale ? '來源為上次成功資料，待更新核對。' : !field.actual.known ? field.actual.reason || '日報尚未連結至工項，無法計算實際完成比例。' : field.items_truncated ? '工項資料尚未齊備，無法計算整體完成比例。' : field.items.some(i=>i.link_basis!=='native') ? '工項關聯仍需核對，無法計算可信完成比例。' : '已取得回報量，尚缺同單位與範圍的已驗證計畫分母。'};
 }

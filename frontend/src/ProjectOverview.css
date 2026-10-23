@@ -17,3 +17,6 @@
 @media(max-width:1000px){.po-lower-grid,.po-sidebar{grid-template-columns:minmax(0,1fr)}.po-sidebar dl>div{flex-wrap:nowrap}.po-sidebar dd{text-align:right}}
 
 @media(min-width:768px) and (max-width:1000px){.project-overview .po-items{overflow-x:auto}.po-items-table{min-width:650px}.po-items .po-card-heading{position:sticky;left:0}}
+
+.po-kpi.po-kpi-date strong,.po-items-table td[data-label="最近日報"]{white-space:nowrap}
+@media(min-width:1200px){.project-overview .po-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}.po-kpi:nth-child(n+5){border-top:1px solid #edf0f4;padding-top:16px;margin-top:16px}.po-kpi:nth-child(5){border-left:0}}

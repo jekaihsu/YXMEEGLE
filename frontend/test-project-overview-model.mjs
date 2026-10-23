@@ -42,7 +42,7 @@ test('C115264 has 3 linked items and unknown percent, never a sum of planned 5,1
  field.items[0].link_basis='ambiguous';assert.equal(m.fieldworkSnapshot(field).percent,null);assert.match(m.fieldworkSnapshot(field).reason,/關聯/);
  assert.equal(m.fieldworkSnapshot(undefined).count,null);assert.match(m.fieldworkSnapshot(field,[],true).reason,/上次成功/);
 });
-test('only approved explicitly matched field reports provide the latest valid report date',()=>{
- const report={department:'外業組',date:'2026-10-20',review:{status:'approved'},match_basis:'native'};
- const snapshot=m.fieldworkSnapshot(progress.production.field,[report,{...report,date:'2026-10-21',match_basis:'derived'},{...report,date:'2026-10-22',review:{status:'pending'}},{...report,date:'not-a-date'}]);assert.equal(snapshot.latestDate,'2026-10-20');assert.equal(m.fieldworkSnapshot(progress.production.field,[{...report,match_basis:'source_case_or_link'}]).latestDate,'2026-10-20');assert.equal(m.fieldworkSnapshot(progress.production.field,[{...report,date:'2026-02-31'}]).latestDate,null);
+test('only linked field reports provide the latest linked report date',()=>{
+ const report={department:'外業組',date:'2026-10-20',review:{status:'approved'},match_basis:'source_case_or_link'};
+ const snapshot=m.fieldworkSnapshot(progress.production.field,[report,{...report,date:'2026-10-21',match_basis:'derived'},{...report,date:'2026-10-22',review:{status:'pending'}},{...report,date:'not-a-date'}]);assert.equal(snapshot.latestDate,'2026-10-22');assert.equal(m.fieldworkSnapshot(progress.production.field,[{...report,match_basis:'source_case_or_link'}]).latestDate,'2026-10-20');assert.equal(m.fieldworkSnapshot(progress.production.field,[{...report,date:'2026-02-31'}]).latestDate,null);
 });

@@ -1,3 +1,4 @@
+import {ReportLinkSummary} from './ReportLinkSummary';
 import {useEffect,useState} from 'react';
 import {api,perfMark} from './api';
 import {taipeiTime} from './taipeiTime';
@@ -41,6 +42,7 @@ export function SettingsOverview({s,workspaceId}:{s:Session;workspaceId?:string}
    {read.kind==='loading'&&<p role="status" className="so-hint-note">正在讀取設定摘要…</p>}
    {read.kind==='error'&&<p role="alert" className="error-banner">設定摘要無法讀取，請重試。若持續失敗，請聯絡管理員確認連線與權限。</p>}
 
+   {s.user && ['manager','admin','pm'].includes(s.user.role) && <ReportLinkSummary admin/>}
    {s.user && ['manager','admin','pm'].includes(s.user.role) && <SopReadiness key={`${workspaceId}-${s.user.id}`}/>}
    {read.kind==='ready'&&<>
     <div className="so-grid">

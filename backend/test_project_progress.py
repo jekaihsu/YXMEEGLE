@@ -105,7 +105,7 @@ def stage(body, key):
 
 def daily(department='外業組', points=0.25, date='2026-10-13', ident='d1'):
     return dict(id=ident, date=date, department=department, points=points, person=SECRET_PERSON, source_fields={'姓名': SECRET_PERSON},
-                case_mapping_status='matched')
+                case_mapping_status='matched',match_basis='source_case_or_link')
 
 
 def test_c_prefixed_case_with_confirmation_and_lines(progress):
@@ -163,7 +163,7 @@ def test_v3_match_by_quote_number_and_report_rows(progress):
     run, _, _ = progress
     state, vis, _ = chain_state(code='C115238-01', quotes=(('115573', 'C115238-01', '報價中'),))
     body = run(state, vis, cases=[('recvsaz8kB86Jh', '115573', '未填', 0.25)], work_orders=[('115573', '2026-08-13', 0.25)]).json()
-    assert body['identity']['v3_cases'] == [{'case_key': 'recvsaz8kB86Jh', 'case_code': '115573', 'status': '未填', 'match': 'quote_number'}]
+    assert body['identity']['v3_cases'] == [{'case_key': 'recvsaz8kB86Jh', 'case_code': '115573', 'status': '未填', 'match': 'quote_number','bridge_status':'auto_exact'}]
     assert body['identity']['v3_ambiguous'] is False
     rows = body['production']['report_rows']
     assert len(rows) == 1 and rows[0]['case_key'] == 'recvsaz8kB86Jh' and rows[0]['dept'] == 'field' and rows[0]['week'] == '2026-08-10'
@@ -187,7 +187,7 @@ def test_ambiguous_v3_lists_both_and_never_borrows_actuals(progress):
                work_orders=[('115547', '2026-08-13', 0.5)]).json()
     assert body['identity']['v3_ambiguous'] is True
     assert [(c['case_key'], c['match']) for c in body['identity']['v3_cases']] == [('recB', 'code'), ('recA', 'quote_number')]
-    assert {r['case_key'] for r in body['production']['report_rows']} == {'recA'}
+    assert body['production']['report_rows'] == []
     assert body['production']['field']['actual']['known'] is False
     assert 'v3_ambiguous' in {g['id'] for g in body['gaps']}
 
@@ -391,13 +391,13 @@ def test_ambiguous_v3_never_borrows_a_cumulative_actual():
 
 @pytest.mark.parametrize('points', [True, False, float('nan'), float('inf'), float('-inf'), '1', None])
 def test_non_numeric_or_non_finite_points_are_not_known(points):
-    body = direct(bare(daily_reports=[{'department': '外業組', 'points': points, 'date': '2026-10-01'}]))
+    body = direct(bare(daily_reports=[{'department': '外業組', 'points': points, 'date': '2026-10-01','case_mapping_status':'matched','match_basis':'manual_review'}]))
     assert body['production']['field']['actual'] == {'known': False, 'value': None, 'unit_note': None, 'source': None,
                                                      'reason': '已有日報連結，但完成數量尚未投影'}
 
 
 def test_zero_points_daily_is_a_known_zero_report():
-    body = direct(bare(daily_reports=[{'department': '外業組', 'points': 0, 'date': '2026-10-01'}]))
+    body = direct(bare(daily_reports=[{'department': '外業組', 'points': 0, 'date': '2026-10-01','case_mapping_status':'matched','match_basis':'manual_review'}]))
     assert body['production']['field']['actual']['known'] is True and body['production']['field']['actual']['value'] == '0'
     assert stage(body, 'field')['state'] == 'active'
     assert stage(body, 'field')['evidence'][-1]['value'].startswith('0（')

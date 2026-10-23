@@ -374,6 +374,8 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
     validate_action(body)
     """Returns False for legacy task actions, True for handled actions."""
     upgrade(ws); action=body['action']; data=body.get('payload') or {}
+    from .report_link_review import LINK_ACTIONS,apply_review
+    if action in LINK_ACTIONS: return apply_review(ws,user,body)
     from .case_cutover import resolve_action_projects,require_execution
     for target in resolve_action_projects(ws,body):require_execution(ws,target)
     if action in ('input_mapping','input_draft','input_submit'):
@@ -846,22 +848,6 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         require(data.get('result') in ('accepted','returned') and data.get('evidence'),'需核准或退回及依據',422)
         entry.update(status=data['result'],reviewed_by=user['id'],reviewed_at=now(),review_evidence=data['evidence'])
         if data['result']=='accepted': r['due_date']=next_due(r['kind'],now()[:10],ws)
-    elif action=='daily_propose':
-        from .v4_sources import daily_source_version,daily_mapping_version
-        require(p is not None,'請指定案件',422); ident=data.get('daily_id')
-        entry=next((d for d in daily_entries(ws) if d['id']==ident),None); require(entry,'日報不存在',404)
-        require(lead(user,p) or user['id'] in entry.get('source_actor_ids',[]),'需由已核實日報填報人或案件主管補充關聯')
-        require(data.get('reason'),'需填核對依據',422)
-        require(not entry.get('source_missing'),'來源日報目前不存在，不能新增配對核准',409)
-        ws['daily_reviews'].append(dict(id=uid(),daily_id=ident,project_id=p['id'],source_fields=deepcopy(entry.get('source_fields',{})),source_version=daily_source_version(entry),mapping_version=daily_mapping_version(entry),entry=deepcopy(entry),reason=data['reason'],requested_by=user['id'],status='pending'))
-    elif action=='daily_approve':
-        from .v4_sources import daily_mapping_version,review_mapping_version
-        require(capable(user,'review_mapping')); r=find(ws['daily_reviews'],data.get('id')); require(r['status']=='pending','已核對',409); p=find(ws['projects'],r['project_id'])
-        current=[d for d in daily_entries(ws) if d['id']==r['daily_id']]
-        require(len(current)==1 and not current[0].get('source_missing') and daily_mapping_version(current[0])==review_mapping_version(r),'日報來源關聯已變更或不存在，請重新提出配對核對',409)
-        for project in loaded_projects(ws): project['daily_reports']=[d for d in project['daily_reports'] if d['id']!=r['daily_id']]
-        ws['daily_unmatched']=[d for d in ws['daily_unmatched'] if d['id']!=r['daily_id']]
-        entry=deepcopy(current[0]); entry.update(case_code=p['code'],match_basis='manual_review',case_mapping_status='matched'); p['daily_reports'].append(entry); r.update(status='approved',approved_by=user['id'],approved_at=now())
     elif action=='handover_request':
         require(p and lead(user,p)); active_user(ws,data.get('to_id')); active_user(ws,data.get('from_id')); require(data.get('reason'),'請填交接原因',422)
         ws['handover_requests'].append(dict(id=uid(),project_id=p['id'],from_id=data['from_id'],to_id=data['to_id'],reason=data['reason'],status='pending',requested_by=user['id']))

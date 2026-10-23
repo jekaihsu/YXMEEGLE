@@ -426,3 +426,11 @@ def report_gaps(data, endpoint, dept='field'):
         n=sum(number(r['f'].get('預估營業額點數')) is not None for r in data['tables'].get('plan',[]))
         gaps.append(gap('planned-coverage',f'工作預排預估營業額點數僅 {n}/{len(data["tables"].get("plan",[]))} 有值'))
     return gaps
+
+
+def attach_local_bridges(result, bridges):
+    result = dict(result)
+    result['items'] = [{**row, 'local_cases': [dict(project_id=pid, status=b['status']) for pid, b in bridges.items()
+                      if row.get('case_code') and b['status'] in ('auto_exact','reviewed') and row['case_code'] in b['codes']]}
+                      for row in result.get('items', [])]
+    return result
