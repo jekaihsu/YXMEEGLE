@@ -129,7 +129,7 @@ def staging():
              'scripts/run_service.py', 'scripts/run_worker.py', 'scripts/backup_schedule.py', 'scripts/backup_offsite.py', 'deployment/source-tables.json',
              'frontend/package.json', 'frontend/package-lock.json', 'frontend/index.html',
              'frontend/tsconfig.json', 'frontend/vite.config.ts']
-    exact += ['backend/sop_source_contracts.json', 'backend/sop_import/catalog.json']
+    exact += ['backend/sop_source_contracts.json', 'backend/sop_import/catalog.json', 'backend/report_link_vocabulary.json']
     exact += ['scripts/backup_publish.py','scripts/backup_reconcile.py',
               'scripts/backup_offsite_acceptance.py','backend/requirements.lock',
               'scripts/migrate_index_tables.py','scripts/backfill_index.py']
