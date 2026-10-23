@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import ts from 'typescript';
-const source=fs.readFileSync(new URL('./src/api.ts',import.meta.url),'utf8');
-const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+import {build} from 'esbuild';
+const bundle=await build({entryPoints:[new URL('./src/api.ts',import.meta.url).pathname],bundle:true,write:false,format:'esm',platform:'node',packages:'external'});
+const js=bundle.outputFiles[0].text;
 const {readRoute,normalizeRoute}=await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
 globalThis.location={hash:'#view=company'};
 assert.equal(readRoute().view,'projects','company deep link falls back to projects');

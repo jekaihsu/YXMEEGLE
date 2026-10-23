@@ -4,11 +4,7 @@ import type {ProductionKey, ProductionStage, ProjectProgress} from './projectPro
 import {joinProgressStages} from './projectProgressView';
 import type {Node, Project, User} from './types';
 
-export function projectFlowRoute(route: {tab?: string}) {
- const tab = route.tab || 'flow';
- return {tab: ['overview','progress','flow','tasks'].includes(tab) ? 'flow' : tab,
-  focus: tab === 'overview' ? 'top' : tab === 'progress' ? 'evidence' : tab === 'tasks' ? 'tasks' : 'node', allTasks: tab === 'tasks'};
-}
+export {projectFlowRoute} from './projectRoutes';
 export type FlowProgress = {basis: 'tasks'|'evidence'|'nodes'; percent: number; label: string}|{basis: 'unknown'|'skipped'; percent: null; label: string};
 export type FlowTask = {id:string;nodeKey:string;title:string;ownerId:string;owner:string;status:string;deadline:string|null;done:boolean;} & ({source:'Lark 任務';task:AssignmentTask}|{source:'本地流程';task:undefined});
 export type FlowNode = {

@@ -6,14 +6,19 @@ import {assignmentFixture, projectFixture} from './fixtures/node-assignments.mjs
 const bundled=await build({stdin:{contents:"export * from './src/flowModel'; export {parseRoute} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external'});
 const m=await import('data:text/javascript;base64,'+Buffer.from(bundled.outputFiles[0].text).toString('base64'));
 const progress=JSON.parse(await readFile(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));
-test('four old tabs keep node, task, completion and focus while selecting one workspace',()=>{
- for(const [tab,focus] of [['overview','top'],['progress','evidence'],['flow','node'],['tasks','tasks']]){
-  const route=m.parseRoute(`#view=project&project=p1&tab=${tab}&node=control&task=recTask1&focus=t1&completion=node_control`);
-  assert.deepEqual(m.projectFlowRoute(route),{tab:'flow',focus,allTasks:tab==='tasks'});
-  assert.equal(route.node,'control');assert.equal(route.task,'recTask1');assert.equal(route.focus,'t1');assert.equal(route.completion,'node_control');
+test('six tabs and every legacy tab preserve deep-link context',()=>{
+ for(const [tab,destination,section] of [['overview','overview'],['flow','flow'],['tasks','flow','all-tasks'],['progress','items'],['daily','items','reports'],['logs','data','activity'],['files','files'],['data','data'],['items','items'],['people','people']]){
+  const route=m.parseRoute(`#view=project&project=p1&tab=${tab}&node=control&task=recTask1&focus=t1&completion=node_control&approval=a1`);
+  assert.equal(route.tab,destination);assert.equal(route.section,section);
+  assert.equal(m.projectFlowRoute(route).tab,destination);assert.equal(m.projectFlowRoute(route).allTasks,tab==='tasks');
+  assert.equal(route.node,'control');assert.equal(route.task,'recTask1');assert.equal(route.focus,'t1');assert.equal(route.completion,'node_control');assert.equal(route.approval,'a1');
  }
- assert.deepEqual(m.projectFlowRoute({}),{tab:'flow',focus:'node',allTasks:false});
- assert.deepEqual(m.projectFlowRoute({tab:'daily'}),{tab:'daily',focus:'node',allTasks:false});
+ assert.equal(m.parseRoute('#view=project&project=p1').tab,'overview');
+ assert.equal(m.projectFlowRoute({}).tab,'overview');
+ for(const param of ['node=field','task=t1','focus=t1'])assert.equal(m.parseRoute(`#view=project&project=p1&${param}`).tab,'flow');
+ assert.equal(m.parseRoute('#view=project&project=p1&tab=data&section=files').tab,'files');
+ const explicit=m.parseRoute('#view=project&project=p1&tab=logs&section=custom&node=field');assert.equal(explicit.section,'custom');
+ const custom=m.parseRoute('#view=project&project=p1&tab=tasks&section=custom');assert.equal(custom.section,'custom');assert.equal(m.projectFlowRoute(custom).allTasks,true);assert.equal(m.projectFlowRoute(m.parseRoute('#'+new URLSearchParams(Object.entries(custom).filter(([,v])=>v)))).allTasks,true);
 });
 test('task basis excludes cancellation and superseded work and does not use opaque progress',()=>{
  const {list,detail}=assignmentFixture();const node=list.nodes.find(n=>n.key==='control');node.progress=.99;

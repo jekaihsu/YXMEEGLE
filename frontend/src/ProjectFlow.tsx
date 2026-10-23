@@ -55,7 +55,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  useEffect(()=>{
   if(loading)return;
   if(keyboardMove.current){keyboardMove.current=false;return;}
-  const id=route.focus==='top' ? 'project-page-top' : route.focus==='tasks' ? 'flow-tasks' : route.focus==='evidence' ? 'flow-evidence' : c.route.node ? 'flow-selected' : '';
+  const id=route.focus==='tasks' ? 'flow-tasks' : c.route.node ? 'flow-selected' : '';
   if(!id)return;const frame=requestAnimationFrame(()=>document.getElementById(id)?.scrollIntoView({block:'start',behavior:'auto'}));return()=>cancelAnimationFrame(frame);
  },[c.route.tab,c.route.node,loading]);
  const reports=(row?:ReportTarget)=>{location.hash=progressHash('#view=reports&tab=progress',{dept:row?.dept || 'field',week:row?.week || '',group:'',caseKey:'',q:row?.case_code || p.code})};

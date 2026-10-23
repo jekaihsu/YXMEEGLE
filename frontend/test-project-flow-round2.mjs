@@ -14,7 +14,7 @@ const temp=new URL('./.project-flow-ui.mjs',import.meta.url);await writeFile(tem
 const progress=JSON.parse(await readFile(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));progress.project_id='p1';
 let root,c,fixture,calls,hold,evidenceStatus=200,nodeStatus=200,detailStatus=200,mutationStatus=200;
 const tick=()=>new Promise(r=>setTimeout(r,15));
-async function mount({tab,node,task,enabled=true,role='manager',dispatch=false,assign=true,evidenceHold=false,embedded=true,parentProject='p1',shell=false,detailHold=false,configure=()=>{}}={}){
+async function mount({tab='flow',node,task,enabled=true,role='manager',dispatch=false,assign=true,evidenceHold=false,embedded=true,parentProject='p1',shell=false,detailHold=false,configure=()=>{}}={}){
  if(root)await act(async()=>root.unmount());ui.invalidateSessionEpoch();
  const base=projectFixture();fixture=embeddedAssignmentFixture();
  for(const n of fixture.list.nodes){n.departments=['控制'];fixture.list.node_details[n.key].assignable_people.forEach(p=>p.departments=['控制']);}
@@ -86,7 +86,15 @@ await check('round2 source timestamp and honest manager fallback',async()=>{
  assert.match(document.querySelector('.pf-source').textContent,/節點與任務.*2026\/10\/18 08:00:00 \(台北時間\)/);assert.doesNotMatch(document.querySelector('.pf-source').textContent,/節點 N/);
  const fact=[...document.querySelectorAll('.pf-facts>div')].find(d=>d.querySelector('dt').textContent==='組別主管');assert.equal(fact.querySelector('dd').textContent,'未能對應到本組主管');
 });
-await check('round2 overview goes to page header',async()=>{await mount({tab:'overview'});await act(tick);assert.equal(globalThis.lastScroll,'project-page-top')});
+await check('round2 overview is a real destination with one workflow strip',async()=>{await mount({tab:'overview'});await act(tick);assert.ok(document.querySelector('.project-overview'));assert.equal(document.querySelectorAll('.project-overview .pf-diagram').length,1);assert.equal(document.querySelector('.pf-overall'),null);assert.equal(document.querySelectorAll('.po-next button').length,1);assert.equal(document.querySelector('.project-overview table'),null);assert.equal(document.querySelector('#flow-selected'),null);assert.equal(document.querySelector('.pds-tabs [aria-current=page]').textContent,'總覽')});
+await check('overview keeps the workflow visible while evidence loads or fails',async()=>{
+ await mount({tab:'overview',evidenceHold:true});assert.match(document.querySelector('.po-grid').textContent,/工程證據載入中/);assert.equal(document.querySelectorAll('.project-overview .pf-node').length,9);await act(async()=>{globalThis.releaseEvidence();await tick()});
+ evidenceStatus=500;await mount({tab:'overview'});assert.match(document.querySelector('.po-grid').textContent,/工程證據暫不可用/);assert.equal(document.querySelectorAll('.po-next button').length,1);assert.equal(document.querySelectorAll('.project-overview .pf-node').length,9);evidenceStatus=200;
+});
+await check('overview labels stale assignments and denied sources without hiding other sections',async()=>{
+ await mount({tab:'overview',configure(base,f){f.list.stale=true;f.list.stale_reason='合成上次資料'}});assert.match(document.querySelector('.project-overview').textContent,/上次成功資料/);assert.equal(document.querySelector('.po-next button').textContent,'查看詳情');
+ nodeStatus=403;await mount({tab:'overview'});assert.match(document.querySelector('.po-source-state').textContent,/暫不可用/);assert.ok(document.querySelector('#po-field-title'));assert.equal(document.querySelectorAll('.po-next button').length,1);nodeStatus=200;
+});
 await check('round2 attention excludes manager-wide completion and unowned not-started nodes',async()=>{
  await mount({configure(base,f){f.list.node_details.control.tasks.forEach(t=>t.assignee={open_id:'other',name:'別人'});f.list.nodes.forEach(n=>n.owners=[{open_id:'other',name:'別人'}]);}});
  assert.equal(document.querySelector('.pf-attention').textContent,'');

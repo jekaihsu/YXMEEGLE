@@ -1,3 +1,4 @@
+import {projectFlowRoute} from './projectRoutes';
 // Opt-in load timing (?perf=1) lives here so api.ts stays self-contained; off means one boolean check.
 // Shared with App so every request captures the active session epoch.
 let sessionEpoch=0;
@@ -52,17 +53,17 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
   return data;
   }finally{if(timer!==undefined)clearTimeout(timer);request.signal?.removeEventListener('abort',cancel);if(mutating){const remaining=(pendingMutations.get(epoch)||1)-1;if(remaining)pendingMutations.set(epoch,remaining);else pendingMutations.delete(epoch);mutationChanged()}}
 }
-export function normalizeRoute<T extends {view:string;tab?:string;section?:string}>(route:T):T {
+export function normalizeRoute<T extends {view:string;tab?:string;section?:string;node?:string;task?:string;focus?:string;approval?:string;comment?:string}>(route:T):T {
  if(route.view==='company'||route.view==='schedule')return {...route,view:'projects'};
  if(route.view==='pm-glance')return {...route,view:'dashboard'};
  if(route.view==='learning')return {...route,view:'admin',tab:'people'};
  if(route.view!=='project')return route;
- if(['quotes','family','basic','participants','files'].includes(route.tab||''))return {...route,tab:'data',section:route.tab};
+ if(['quotes','family','basic','participants'].includes(route.tab||''))return {...route,tab:'data',section:route.tab};
  if(route.tab==='operations')return {...route,tab:'flow',section:route.section||'review'};
  if(route.tab==='approvals')return {...route,tab:'flow',section:'approvals'};
- return route;
+ const project=projectFlowRoute(route);return {...route,tab:project.tab,section:project.section,...(project.allTasks ? {all_tasks:'1'} : {})};
 }
-export function parseRoute(hash:string){const p=new URLSearchParams(hash.replace(/^#\/?/,''));return normalizeRoute({view:p.get('view')||'dashboard',project:p.get('project')||undefined,node:p.get('node')||undefined,task:p.get('task')||undefined,tab:p.get('tab')||undefined,section:p.get('section')||undefined,completion:p.get('completion')||undefined,focus:p.get('focus')||undefined,comment:p.get('comment')||undefined,approval:p.get('approval')||undefined,ctx:p.get('ctx')||undefined,task_source:p.get('task_source')||undefined})}
+export function parseRoute(hash:string){const p=new URLSearchParams(hash.replace(/^#\/?/,''));return normalizeRoute({view:p.get('view')||'dashboard',project:p.get('project')||undefined,node:p.get('node')||undefined,task:p.get('task')||undefined,tab:p.get('tab')||undefined,section:p.get('section')||undefined,completion:p.get('completion')||undefined,focus:p.get('focus')||undefined,comment:p.get('comment')||undefined,approval:p.get('approval')||undefined,ctx:p.get('ctx')||undefined,task_source:p.get('task_source')||undefined,all_tasks:p.get('all_tasks')||undefined})}
 export const readRoute=()=>parseRoute(location.hash);
 
 type LiveResult={freshness:import('./types').Freshness};
