@@ -215,7 +215,19 @@ class NodeAssignmentService:
 
     # Policy
 
+    def enrollment_block(self, ctx: Context, key=None):
+        from ..sop_import.models import CasePolicy
+        from ..sop_import.enrollment_policy import timestamp
+        active = str(self.cfg.get('SOP_AUTO_ENROLL_ENABLED', 'false')).lower() == 'true' and timestamp(self.cfg.get('SOP_AUTO_ENROLL_SINCE')) is not None
+        with self.sessions() as db:
+            policy = db.get(CasePolicy, (ctx.wid, ctx.project['id']))
+            if policy is None and active or policy and (policy.policy != 'managed' or key is not None and key.value not in policy.node_keys):
+                return '舊案節點維持原流程，請先套用 SOP 到剩餘節點'
+        return None
+
     def write_block(self, ctx: Context):
+        if reason := self.enrollment_block(ctx):
+            return reason
         if ctx.state.get('settings', {}).get('external_enabled') is not True:
             return '正式外部連線未啟用，節點指派暫不可修改'
         return None
@@ -334,6 +346,8 @@ class NodeAssignmentService:
         A call costs one rate charge, taken at its first authorized outbound write: replays, denials and
         no-ops cost nothing. Returns (http_status, body, replayed).
         """
+        if reason := self.enrollment_block(ctx, key):
+            raise Failure('writes_disabled', reason)
         code = self.open(ctx, write=True)
         receipt = self.receipts.key(ctx.wid, ctx.user['id'], request_id)
         fingerprint = fingerprint_of(action, ctx.project['id'], key, payload)
@@ -358,6 +372,8 @@ class NodeAssignmentService:
             def authorize_write():
                 nonlocal ctx, write_attempts
                 try:
+                    if reason := self.enrollment_block(ctx, key):
+                        raise Failure('writes_disabled', reason)
                     fresh_user = ctx.authorize()
                     if (actor_for(ctx.user, roster.value).override and not actor_for(fresh_user, roster.value).override
                             or fresh_user.get('department') != ctx.user.get('department')):

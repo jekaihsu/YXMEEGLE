@@ -11,7 +11,7 @@ from .service import Context, Service, authorize, has_reader_grant, can_manage
 
 PREFIX = '/api/projects/{project_id}'
 MAX_BODY = 64 * 1024
-ERROR_TEXT = {'case_not_found': '找不到此案件或沒有讀取權限', 'result_note_required': '請填寫結果說明', 'task_revision_conflict': '任務已被更新，請重新載入後再試',
+ERROR_TEXT = {'legacy_case_requires_opt_in': '舊案需先確認套用 SOP', 'node_not_enrolled': '此節點尚未套用 SOP', 'node_already_started_or_finished': '已開始或已完成的節點不能套用 SOP', 'case_identity_unresolved': '案件識別待核對', 'confirmation_required': '請確認套用的節點', 'case_not_found': '找不到此案件或沒有讀取權限', 'result_note_required': '請填寫結果說明', 'task_revision_conflict': '任務已被更新，請重新載入後再試',
               'sop_import_forbidden': '你沒有操作此 SOP 任務的權限', 'completion_evidence_missing': '此任務需先完成佐證或審核',
               'applicability_unresolved': '需先確認任務適用', 'invalid_transition': '目前任務狀態不可執行此操作'}
 
@@ -19,7 +19,8 @@ ERROR_TEXT = {'case_not_found': '找不到此案件或沒有讀取權限', 'resu
 def register(app, *, identity, load_case, sessions, cfg, quote_view=None, workspace=None, persist_case=None, phase=None):
     flag = lambda name: lambda: str(cfg.get(name, 'false')).lower() == 'true'
     service = Service(sessions, writes_enabled=flag('SOP_TASK_WRITES_ENABLED'),
-                      local_cases_enabled=flag('LOCAL_CASE_CREATION_ENABLED'))
+                      local_cases_enabled=flag('LOCAL_CASE_CREATION_ENABLED'),
+                      auto_enabled=flag('SOP_AUTO_ENROLL_ENABLED'), auto_since=lambda: cfg.get('SOP_AUTO_ENROLL_SINCE'))
 
     def context(request, project_id):
         data, user = identity(request)
@@ -98,6 +99,21 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
             data, user = identity(request)
             return service.publish_version(data['wid'], user, version_id)
         return respond(run)
+
+    @app.get('/api/sop-import/readiness')
+    def readiness(request: Request):
+        def run():
+            data, user = identity(request)
+            return service.readiness(data['wid'], user)
+        return respond(run)
+
+    @app.post(PREFIX + '/sop-import/opt-in')
+    async def opt_in(request: Request, project_id: str):
+        return await mutation(request, project_id, service.opt_in)
+
+    @app.post(PREFIX + '/sop-import/retry')
+    async def retry(request: Request, project_id: str):
+        return await mutation(request, project_id, service.retry_enrollment)
 
     @app.get(PREFIX + '/sop-tasks')
     def tasks(request: Request, project_id: str, node_key: str = None):

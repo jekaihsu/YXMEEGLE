@@ -137,3 +137,13 @@ body:has(.project-detail-calm)>.ds-backdrop .pf-facts{grid-template-columns:repe
 
 .work-page.project-detail-calm :is(.my-work-toolbar,.my-work-table-scroll){background:#fff;background-image:none;border:1px solid #e5e7eb;box-shadow:none;backdrop-filter:none}
 .app-shell .workspace:has(.work-page.project-detail-calm){min-height:calc(100vh - 64px)}
+
+.sop-enrollment { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:8px 0; font-size:13px; }
+.sop-readiness { margin:16px 0; }
+.sop-readiness-list { list-style:none; padding:0; margin:0; }
+.sop-readiness-list > li { padding:12px 0; border-bottom:1px solid var(--border, #e4e5e7); }
+.sop-readiness-list > li > div { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.sop-readiness .sop-muted { color:var(--text-secondary, #697078); font-size:13px; }
+.sop-enroll-form fieldset { display:grid; gap:4px; border:1px solid var(--border, #e4e5e7); padding:12px; }
+.sop-enroll-form label { display:grid; grid-template-columns:20px 1fr; gap:8px; align-items:start; padding:5px 0; line-height:1.6; }
+.sop-enroll-form input[type=checkbox] { width:16px; height:16px; margin:4px 0 0; }

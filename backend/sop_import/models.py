@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, JSON, Float, Boolean, UniqueConstraint, ForeignKeyConstraint, Enum
+from sqlalchemy import Column, String, Integer, JSON, Float, Boolean, UniqueConstraint, ForeignKeyConstraint, Enum, CheckConstraint
 from ..models import Base
 from .domain import Disposition, Applicability, Lifecycle
 
@@ -169,3 +169,47 @@ def protect_history(session, flush_context, instances):
                 raise Failure('immutable_task_origin', 409)
         if isinstance(obj, TaskEvent):
             raise Failure('immutable_task_event', 409)
+
+
+class CasePolicy(Base):
+    __tablename__ = 'sop_case_policies'
+    __table_args__ = (CheckConstraint("policy IN ('legacy','managed','needs_review')"),)
+    workspace_id = Column(String(120), primary_key=True)
+    project_id = Column(String(160), primary_key=True)
+    policy = Column(String(20), nullable=False)
+    revision = Column(Integer, nullable=False, default=1)
+    decided_by = Column(String(120), nullable=False)
+    decided_at = Column(Float, nullable=False)
+    reason = Column(String(2000), nullable=False)
+    facts = Column(JSON, nullable=False)
+    node_keys = Column(JSON, nullable=False)
+
+
+class SourceAdmission(Base):
+    __tablename__ = 'sop_source_admissions'
+    workspace_id = Column(String(120), primary_key=True)
+    identity_key = Column(String(500), primary_key=True)
+    project_id = Column(String(160), nullable=False)
+    first_seen_at = Column(String(80))
+    facts = Column(JSON, nullable=False)
+
+
+class Enrollment(Base):
+    __tablename__ = 'sop_case_enrollments'
+    __table_args__ = (CheckConstraint("status IN ('pending','failed','succeeded')"), CheckConstraint('attempts >= 0'))
+    workspace_id = Column(String(120), primary_key=True)
+    id = Column(String(64), primary_key=True)
+    project_id = Column(String(160), nullable=False, index=True)
+    identity_key = Column(String(500), nullable=False)
+    template_version_id = Column(String(120))
+    policy_revision = Column(Integer, nullable=False)
+    node_keys = Column(JSON, nullable=False)
+    actor_id = Column(String(120), nullable=False)
+    reason = Column(String(2000), nullable=False)
+    status = Column(String(20), nullable=False, default='pending')
+    attempts = Column(Integer, nullable=False, default=0)
+    last_error = Column(String(2000))
+    next_attempt_at = Column(Float)
+    created_at = Column(Float, nullable=False)
+    updated_at = Column(Float, nullable=False)
+    receipt = Column(JSON)

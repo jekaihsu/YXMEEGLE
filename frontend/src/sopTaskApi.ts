@@ -23,7 +23,17 @@ export interface SopTask {
  origin: {template_family_id: string; source_row_key: string; instance_scope: string; imported_version_id: string|null};
  source: Record<string, unknown>|null; restricted: boolean;
 }
+export type SopPolicy = 'legacy'|'managed'|'needs_review';
+export interface EnrollmentAttempt {
+ id:string; projectId:string; status:'pending'|'failed'|'succeeded'; lastError:string|null; attempts:number;
+ createdCount:number;
+}
+export interface SopEnrollment {
+ policy:SopPolicy; canOptIn:boolean; canRetry:boolean; attempt:EnrollmentAttempt|null;
+ nodes:{key:SopNodeKey; name:string; status:string; eligible:boolean}[];
+}
 export interface SopOverview {
+ enrollment?:SopEnrollment|null;
  caseHeader?:{id:string; code:string|null; name:string|null}; projectId: string; startNode: SopNodeKey; checklistRevision: number; caseCounts: SopCounts; nodeCounts: Record<SopNodeKey, SopCounts>;
  tasks: SopTask[]; allowed: {import: boolean; manage: boolean; work: boolean};
  nodeDone: Partial<Record<SopNodeKey, {rule: string; reason: string}>>;
@@ -80,13 +90,29 @@ function task(v: unknown): SopTask {
   origin: {template_family_id: str(origin.template_family_id), source_row_key: str(origin.source_row_key), instance_scope: str(origin.instance_scope), imported_version_id: optStr(origin.imported_version_id)},
   source: t.source_snapshot == null ? null : object(t.source_snapshot), restricted: t.source_restriction != null};
 }
+export function parseEnrollmentAttempt(v:unknown):EnrollmentAttempt {
+ const x=object(v), receipt=x.receipt==null?null:object(x.receipt);
+ return {id:str(x.id), projectId:str(x.project_id), status:oneOf(['pending','failed','succeeded'] as const)(x.status),
+  lastError:optStr(x.last_error), attempts:int(x.attempts), createdCount:receipt?list(receipt.created_task_ids,str).length+list(receipt.existing_task_ids,str).length:0};
+}
+export function parseEnrollment(v:unknown):SopEnrollment {
+ const x=object(v), policy=object(x.policy);
+ return {policy:oneOf<SopPolicy>(['legacy','managed','needs_review'])(policy.policy), canOptIn:bool(x.can_opt_in),canRetry:bool(x.can_retry),
+  attempt:x.enrollment==null?null:parseEnrollmentAttempt(x.enrollment),
+  nodes:list(x.nodes,v=>{const n=object(v);return {key:node(n.key),name:str(n.name),status:str(n.status),eligible:bool(n.eligible)}})};
+}
+export function parseReadiness(v:unknown) {
+ const x=object(v);
+ return list(x.items,v=>{const c=object(v),p=object(c.policy);return {projectId:str(c.project_id),code:optStr(c.code),name:optStr(c.name),
+  policy:oneOf<SopPolicy>(['legacy','managed','needs_review'])(p.policy),enrollments:list(c.enrollments,parseEnrollmentAttempt)}});
+}
 export function parseOverview(v: unknown): SopOverview {
  const o = object(v), allowed = object(o.allowed_actions), nodeCounts = object(o.node_counts);
  if (o.task_source !== 'sop_local') throw malformed();
  const tasks = list(o.tasks, task);
  if (new Set(tasks.map(t => t.id)).size !== tasks.length) throw malformed();
  const header=o.case==null?null:object(o.case);
- return {caseHeader:header?{id:str(header.id),code:optStr(header.code),name:optStr(header.name)}:undefined,projectId: str(o.project_id), startNode: node(o.start_node), checklistRevision: int(o.checklist_revision), caseCounts: counts(o.case_counts),
+ return {enrollment:o.sop_enrollment==null?null:parseEnrollment(o.sop_enrollment),caseHeader:header?{id:str(header.id),code:optStr(header.code),name:optStr(header.name)}:undefined,projectId: str(o.project_id), startNode: node(o.start_node), checklistRevision: int(o.checklist_revision), caseCounts: counts(o.case_counts),
   nodeCounts: Object.fromEntries(SOP_NODE_KEYS.map(key => [key, counts(nodeCounts[key])])) as Record<SopNodeKey, SopCounts>,
   tasks, allowed: {import: bool(allowed.import), manage: bool(allowed.manage), work: bool(allowed.work)},
   nodeDone: Object.fromEntries(Object.entries(o.node_done == null ? {} : object(o.node_done)).filter(([key]) => isSopNode(key)).map(([key, v]) => {const d = object(v); return [key, {rule: str(d.rule), reason: str(d.reason)}]}))};
@@ -131,6 +157,9 @@ async function request(url: string, init: RequestInit, current: () => boolean): 
 const base = (id: string) => `/api/projects/${encodeURIComponent(id)}`;
 const post = (body: unknown, method = 'POST'): RequestInit => ({method, body: JSON.stringify(body)});
 export const sopApi = {
+ readiness: (signal?:AbortSignal) => api<unknown>('/api/sop-import/readiness',{signal}).then(parseReadiness),
+ optIn: (id:string, nodeKeys:SopNodeKey[], current:()=>boolean) => request(`${base(id)}/sop-import/opt-in`,{method:'POST',body:JSON.stringify({node_keys:nodeKeys,confirmed:true})},current).then(parseEnrollmentAttempt),
+ retryEnrollment: (id:string, enrollmentId:string, current:()=>boolean) => request(`${base(id)}/sop-import/retry`,{method:'POST',body:JSON.stringify({enrollment_id:enrollmentId})},current).then(parseEnrollmentAttempt),
  assignees: (id: string, current: () => boolean) => request(`${base(id)}/sop-assignees`, {}, current).then(parseAssignees),
  suggestion: (id: string, taskId: string, body: Record<string, unknown>, current: () => boolean) => request(`${base(id)}/sop-tasks/${encodeURIComponent(taskId)}/suggestion`, post(body), current).then(parseMutation),
  acceptSuggestions: (id: string, body: Record<string, unknown>, current: () => boolean) => request(`${base(id)}/sop-tasks/suggestions/accept`, post(body), current),
@@ -152,7 +181,7 @@ export const SOP_ERROR_TEXT: Record<string, string> = {
  task_revision_conflict: '任務已被更新，已重新載入', node_mapping_invalid: '節點對應有誤', row_not_importable: '此列不可匯入',
  applicability_unresolved: '需先確認適用', completion_evidence_missing: '此任務需先完成佐證或審核', import_unavailable: 'SOP 任務暫停寫入',
  template_unavailable: '範本版本不可用', template_mapping_conflict: '範本節點對應衝突', participant_unresolved: '此人員已停用或不存在', node_not_done_by_data: '資料尚未判定此節點完成',
- task_reopen_required: '需先重新開啟', invalid_transition: '目前狀態不可執行', invalid_request: '內容格式不正確', run_not_found: '找不到匯入紀錄',
+ task_reopen_required: '需先重新開啟', invalid_transition: '目前狀態不可執行', legacy_case_requires_opt_in: '舊案需先確認套用 SOP', node_not_enrolled: '此節點尚未套用 SOP', node_already_started_or_finished: '已開始或已完成的節點維持原流程', case_identity_unresolved: '案件識別待核對', case_policy_changed: '案件納管範圍已變更，請重新讀取', confirmation_required: '請選擇節點並勾選確認', case_already_managed: '此案已套用 SOP，請重新讀取', invalid_request: '內容格式不正確', run_not_found: '找不到匯入紀錄',
  network: '連線中斷', client_timeout: '連線逾時', malformed: '回應格式不正確',
 };
 export const sopErrorText = (error: unknown) => error instanceof SopError ? SOP_ERROR_TEXT[error.code] || `操作未完成（${error.status}）` : '操作未完成';

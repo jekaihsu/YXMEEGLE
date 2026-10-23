@@ -876,6 +876,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             affected=[p for p in ws['projects'] if affected_ids is None or p['id'] in affected_ids]
             if affected_ids:
                 for project in affected:require_execution(ws,project)
+            protected_before=deepcopy(affected)
             hashes={n['id']:review_hash(p,n) for p in affected for n in p['nodes']}
             if not apply_learning(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-')) and not apply_operation(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-'),cfg):
                 apply_action(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-'))
@@ -891,6 +892,12 @@ def create_app(overrides=None,*,dispatch_transport=None):
                     for n in p['nodes']:
                         for t in n['tasks']:
                             if t['id']==body.task_id: t['manual_updated']=True
+            from .sop_import.models import CasePolicy
+            from .sop_import.enrollment_policy import protected_node_changes
+            with sessions() as policy_db:
+                policies={p.project_id:p for p in policy_db.scalars(select(CasePolicy).where(CasePolicy.workspace_id==data['wid']))}
+            require(not protected_node_changes(policies,protected_before,ws['projects'],protect_unclassified=app.state.sop_import.auto_active()),
+                    '舊案節點維持原流程，請先由管理者套用 SOP 到剩餘節點',409)
         try:
             with phase(request,'mutate'): return persist_mutation(data['wid'],None if body.action=='admin_person' and 'expected_authz_version' in body.payload else body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=(lambda lookup:resolve_footprint(raw,lookup)) if raw['action'] in FOOTPRINT_RULES else None)
         except HTTPException as exc:

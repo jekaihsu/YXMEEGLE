@@ -114,6 +114,9 @@ class StartSopRunner:
 
     def preview(self, ctx, seed_tasks=False) -> dict:
         svc = self.svc
+        for key in NodeKey:
+            if reason := svc.enrollment_block(ctx, key):
+                raise Failure('writes_disabled', reason)
         code = self._code(ctx)
         plan = plan_start(ctx.state, ctx.project, code)
         blockers = []

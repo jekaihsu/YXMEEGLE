@@ -222,3 +222,40 @@ Local intake creators with `sop_task_import` can manage the checklist while no P
 `GET /api/home-panels` and query-based `GET /api/my-work` accept `kinds=sop_task`. Items carry `kind=sop_task`, `origin=sop_local`, case ID/code/name, node keys, status, deadline, `assignment_roles`, and a route to the existing inspector. `counts.sop_tasks` counts the filtered list before pagination. Executor assignments are in `assigned` and `completed`; checker and confirmer assignments are in `confirmation`. These roles can inspect their assigned task but only the executor or a case manager may transition it. Team scope does not include personal SOP assignments. The no-query My Work contract also includes scoped SOP rows and confirmation flags.
 
 A local planning assignee outside the creator, PM, and collaborators receives only their assigned task rows and a minimal case header from the SOP routes. The normal case routes, official case lists, and other case records remain unavailable. The personal inspector route uses `task_source=sop_local&section=assigned-sop`. Disabled users have no access. Writes still require `SOP_TASK_WRITES_ENABLED` and `expected_revision`.
+
+## Automatic enrollment and legacy cases
+
+Automatic source enrollment defaults off. Configure both settings only after the owner agrees to a cutoff.
+
+```dotenv
+SOP_AUTO_ENROLL_ENABLED=false
+# SOP_AUTO_ENROLL_SINCE is unset by default.
+```
+
+To turn it on, set `SOP_AUTO_ENROLL_ENABLED=true` and `SOP_AUTO_ENROLL_SINCE` to the agreed ISO timestamp with a timezone, such as `2026-10-23T00:00:00+08:00`. Set `SOP_TASK_WRITES_ENABLED=true` and publish an active default SOP template. Restart the service with those settings. A missing or invalid cutoff never automatically classifies a source case as managed. The source projection revision includes the configured cutoff so that enabling enrollment also classifies an unchanged complete snapshot.
+
+`SOP_AUTO_ENROLL_ENABLED` does not grant import permissions to a user. Automatic task events record `system:auto-enroll`. The worker can process only durable enrollment requests for a managed policy revision. Every attempt checks the task-write switch and published template again. It has no Lark client and makes no external writes.
+
+The idempotent schema setup creates three tables through `Base.metadata.create_all`.
+
+- `sop_case_policies` stores `legacy`, `managed`, or `needs_review`, a decision revision, actor, epoch timestamp, reason, evidence facts, and the allowed node keys.
+- `sop_source_admissions` stores the complete source identity, original case ID, earliest observed admission time, and baseline facts. A source identity belongs to one original case.
+- `sop_case_enrollments` stores the deterministic enrollment ID, case and source identity, pinned template version, policy revision, chosen nodes, actor, reason, pending or failed or succeeded status, attempt count, last error, next retry time, and successful receipt.
+
+The pure policy function never reads node rows or statuses. A complete authorized source snapshot verifies the base, table, and record identity. A newly admitted identity after the configured cutoff becomes managed. Cases already present, identities in the historical source baseline, and source records demonstrably older than the cutoff remain legacy. Missing or ambiguous identities and merged cases require review. A source refresh cannot silently promote legacy policy. Locally created quotes are managed even when automatic source enrollment is off. Their existing optional task selection remains available.
+
+Source admission persists the policy and enrollment request inside the successful source transaction. Enrollment runs after commit. A task error leaves the source sync successful and the request inspectable. An unchanged source refresh also drains due retries. Each drain processes at most 20 requests. Automatic retries use exponential backoff from two minutes to one day and stop after eight attempts. Managers can request another single retry at any time. Restarting the service retains pending requests.
+
+Managed defaults use all nine nodes, preserve existing conditional-selection rules, and leave participants empty. Source admission uses empty canonical nodes for newly discovered cases so it does not create a second set of defaults in `project.nodes`. Task IDs derive from workspace, verified case identity, template family, source row, and instance scope. Existing origin uniqueness keeps task IDs and results across template revisions. Enrollment receipts identify the policy and template revision and replay exactly. A later template revision can add missing origins but cannot overwrite an existing result or task snapshot.
+
+A manager, system admin, case PM, or delegated SOP manager may explicitly opt a legacy case in. The node picker defaults to nodes that have never started and are not finished or skipped. Running, reviewing, completed, and finished nodes are refused. Enrollment checks the chosen scope again at retry time and never changes a node's status or owners. Unselected nodes retain legacy protection. Existing task and node mutations are refused for persisted legacy or review policies, including local workspace commands and native node writes. The future legacy direct-completion slice will provide its own explicit command.
+
+The existing `GET /api/projects/{project_id}/sop-tasks` response adds `sop_enrollment`, with policy, current enrollment status, eligible node choices, and server-authorized opt-in and retry flags. Assigned-only readers receive no policy evidence or node inventory.
+
+New routes are local only.
+
+- `POST /api/projects/{project_id}/sop-import/opt-in` accepts `confirmed=true`, optional `node_keys`, and an optional reason. It stores a managed policy decision and durable enrollment request before processing it.
+- `POST /api/projects/{project_id}/sop-import/retry` accepts `enrollment_id`. It requires current case management authority and permits exactly one attempt.
+- `GET /api/sop-import/readiness` is read-only. Managers and admins see case policies and queue status. PMs see cases they manage. A plain employee is denied. Unclassified pre-feature cases display legacy when a complete identity exists, and needs review when it does not. Source admission persists the decision.
+
+The SOP section shows `已自動帶入 N 項`, retryable failure, pending-template state, or `舊案 · 維持原流程`. Selective import remains under `其他操作` for managed cases. `管理設定` contains the policy and failed or pending enrollment filters with manager retry controls.
