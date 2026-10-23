@@ -111,6 +111,24 @@ def test_changed_definition_still_records_terminal_observation_but_never_busines
     assert remote_binding_resolved(item)
 
 
+def test_invalidated_poll_survives_workspace_sync_between_read_and_save(api):
+    assert operate(api,'prepare').status_code==200 and operate(api,'submit').status_code==200
+    def invalidate(state):
+        state['projects'][0]['revision']+=1
+        state['approvals'][0].update(status='invalidated',remote_resolution_required=True)
+    mutate(api,invalidate)
+    def sync():
+        with api.h.sessions.begin() as db:
+            row=db.get(api.h.W,api.h.wid);row.version+=1
+    api.before_persist.append(sync)
+    api.external[0]='APPROVED';before=len(api.calls)
+    response=operate(api,'poll')
+    assert response.status_code==200,response.text
+    item=response.json()['approvals'][0]
+    assert remote_binding_resolved(item) and not item['native_receipt']['applicable']
+    assert all(method=='GET' for method,_ in api.calls[before:])
+
+
 def test_api_definite_rejection_can_be_abandoned_with_audit_without_remote_cancel(api):
     assert operate(api,'prepare').status_code==200
     service=api.client.app.state.native_approval_service;factory=service.adapter_factory;writes=[]

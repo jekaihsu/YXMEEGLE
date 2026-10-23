@@ -1,0 +1,125 @@
+{
+  "samples": [
+    {
+      "bytes": 269102,
+      "ms": 735.5,
+      "path": "/api/workspace?scope=shell",
+      "projectMatched": false,
+      "round": 0,
+      "scope": "shell",
+      "status": 200,
+      "timing": "identity;dur=49.0, load;dur=69.6, project;dur=355.3, serialize;dur=150.6, total;dur=624.5"
+    },
+    {
+      "bytes": 86049,
+      "ms": 2563.5,
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "projectMatched": true,
+      "round": 0,
+      "scope": "project",
+      "status": 200,
+      "timing": "identity;dur=21.2, load;dur=1885.0, project;dur=528.9, encode;dur=27.0, serialize;dur=22.0, total;dur=2484.0"
+    },
+    {
+      "bytes": 269095,
+      "ms": 631.4000000357628,
+      "path": "/api/workspace?scope=shell",
+      "projectMatched": false,
+      "round": 1,
+      "scope": "shell",
+      "status": 200,
+      "timing": "identity;dur=46.3, load;dur=37.6, project;dur=355.3, serialize;dur=97.5, total;dur=536.7"
+    },
+    {
+      "bytes": 86049,
+      "ms": 3293.399999976158,
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "projectMatched": true,
+      "round": 1,
+      "scope": "project",
+      "status": 200,
+      "timing": "identity;dur=53.9, load;dur=2717.6, project;dur=425.4, encode;dur=11.1, serialize;dur=9.8, total;dur=3217.6"
+    },
+    {
+      "bytes": 269095,
+      "ms": 7945.100000023842,
+      "path": "/api/workspace?scope=shell",
+      "projectMatched": false,
+      "round": 2,
+      "scope": "shell",
+      "status": 200,
+      "timing": "identity;dur=26.3, load;dur=47.7, project;dur=320.9, serialize;dur=54.0, total;dur=449.0"
+    },
+    {
+      "bytes": 86049,
+      "ms": 5372.099999964237,
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "projectMatched": true,
+      "round": 2,
+      "scope": "project",
+      "status": 200,
+      "timing": "identity;dur=153.8, load;dur=3179.2, project;dur=1828.9, encode;dur=28.3, serialize;dur=30.9, total;dur=5221.1"
+    },
+    {
+      "bytes": 269102,
+      "ms": 8725.900000035763,
+      "path": "/api/workspace?scope=shell",
+      "projectMatched": false,
+      "round": 3,
+      "scope": "shell",
+      "status": 200,
+      "timing": "identity;dur=122.1, load;dur=663.8, project;dur=1193.2, serialize;dur=448.6, total;dur=2427.7"
+    },
+    {
+      "bytes": 86049,
+      "ms": 3946.5,
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "projectMatched": true,
+      "round": 3,
+      "scope": "project",
+      "status": 200,
+      "timing": "identity;dur=150.0, load;dur=2790.1, project;dur=649.3, encode;dur=28.3, serialize;dur=75.5, total;dur=3693.4"
+    },
+    {
+      "bytes": 269096,
+      "ms": 4464.5,
+      "path": "/api/workspace?scope=shell",
+      "projectMatched": false,
+      "round": 4,
+      "scope": "shell",
+      "status": 200,
+      "timing": "identity;dur=87.8, load;dur=85.5, project;dur=352.1, serialize;dur=157.5, total;dur=682.9"
+    },
+    {
+      "bytes": 86049,
+      "ms": 4710.5,
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "projectMatched": true,
+      "round": 4,
+      "scope": "project",
+      "status": 200,
+      "timing": "identity;dur=17.8, load;dur=3009.9, project;dur=1495.9, encode;dur=11.4, serialize;dur=16.0, total;dur=4551.0"
+    },
+    {
+      "bytes": 269096,
+      "ms": 6603.599999964237,
+      "path": "/api/workspace?scope=shell",
+      "projectMatched": false,
+      "round": 5,
+      "scope": "shell",
+      "status": 200,
+      "timing": "identity;dur=173.4, load;dur=525.1, project;dur=410.8, serialize;dur=506.1, total;dur=1615.4"
+    },
+    {
+      "bytes": 86049,
+      "ms": 3923,
+      "path": "/api/projects/src-604c50ce7422171b35dc",
+      "projectMatched": true,
+      "round": 5,
+      "scope": "project",
+      "status": 200,
+      "timing": "identity;dur=139.6, load;dur=2037.8, project;dur=1461.0, encode;dur=38.0, serialize;dur=38.8, total;dur=3715.1"
+    }
+  ],
+  "state": "done"
+}

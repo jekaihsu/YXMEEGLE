@@ -1,0 +1,44 @@
+import {useEffect,useState} from 'react';
+import {ApiError,getSessionEpoch} from './api';
+import {Avatar} from './Avatar';
+import {Badge,Button,Skeleton} from './design';
+import {useViewData} from './viewData';
+import {useDialogFocus} from './useDialogFocus';
+import {addDays,snapshotAge} from './dispatchBoardModel';
+import {actionLabels,commandLabels,dispatchPaths,dispatchRequest,needLabel,parseWork,planningLabels,rowProposal,taskFields,workSourceLabels,type Action,type Proposal,type WorkRow} from './dispatchPublishModel';
+export function useDispatchWork(from:string,scope:string,group:string,refreshVersion=0){
+ return useViewData(`dispatch-work:${from}:${scope}:${group}`,async(signal)=>{
+  try{
+   const result=parseWork(await dispatchRequest(dispatchPaths.work(new URLSearchParams({from,to:addDays(from,6),scope,group})),signal));
+   if(result.states.includes('forbidden')){return result}
+   if(result.states.includes('read_failed'))throw Error('工作來源讀取失敗。');
+   return result;
+  }catch(error){if(error instanceof ApiError&&error.status===403){return parseWork({rows:[],source:{quality:{states:['forbidden']}}})}throw error}
+ },[refreshVersion]);
+}
+export function WorkDetail({row,onClose,onAction,write}:{row:WorkRow;onClose:()=>void;onAction:(row:WorkRow,action:Action)=>void;write:boolean}) {
+ const ref=useDialogFocus(onClose);
+ const values=[row.project_id,[row.case.code,row.case.name].filter(Boolean).join(' · ')||'關聯待核實',row.phase==='unknown'?'待核實':row.phase,row.kind==='execution'?'執行':row.kind==='obligation'?'義務':'待核實',row.package_id,row.parent_task_ref,row.scope_version,row.rule_version,row.evidence_version,row.interval.start,row.interval.end,row.est_person_hours===null?'':String(row.est_person_hours),row.crew.map(p=>p.name||'姓名待確認').join('、'),row.instruments.map(p=>p.label).join('、'),row.vehicles.map(p=>p.label).join('、'),planningLabels[row.planning_status],row.revision===null?'':String(row.revision),row.command?.command_id,row.read_back_at,row.acceptance_status==='unknown'?'待核實':row.acceptance_status,row.acceptance_summary];
+ return <div className="db-scrim"><section className="db-drawer glass--card dp-detail" role="dialog" aria-modal="true" aria-labelledby="work-detail-title" ref={ref} tabIndex={-1}><header><h2 id="work-detail-title">{row.title||'工作詳情'}</h2><Button onClick={onClose}>關閉</Button></header><p>{row.content||'尚無工作內容'}</p><dl className="dp-fields"><div><dt>負責人</dt><dd>{row.owner.name||'尚未指派'}</dd></div><div><dt>部門</dt><dd>{row.department||'未提供'}</dd></div><div><dt>截止日</dt><dd>{row.deadline||'未提供'}</dd></div><div><dt>狀態</dt><dd>{row.status==='unknown'?'待核實':row.status}</dd></div><div><dt>九節點位置</dt><dd>{row.node_position||'來源未提供'}</dd></div>{taskFields.map((name,i)=><div key={name}><dt>{name}{[6,7,8,15,16,17,18,19,20].includes(i)&&'（系統唯讀）'}</dt><dd>{values[i]||'未提供'}</dd></div>)}</dl><footer className="dp-actions">{[...row.allowed_actions,...(write&&row.preview_id?['review_preview' as const]:[])].filter(a=>write||a==='approve'||a==='return').map(action=><Button key={action} onClick={()=>onAction(row,action)}>{actionLabels[action]}</Button>)}</footer></section></div>;
+}
+export function DispatchWork({from,write,onProposal,onAction,refreshVersion=0}:{from:string;write:boolean;refreshVersion?:number;onProposal:(proposal:Proposal,row:WorkRow,action:Action)=>void;onAction:(row:WorkRow,action:Action)=>void}){
+ const [scope,setScope]=useState(write?'all':'mine'),[group,setGroup]=useState(''),[query,setQuery]=useState(''),[status,setStatus]=useState(''),[planning,setPlanning]=useState(''),[selected,setSelected]=useState<WorkRow>();
+ const read=useDispatchWork(from,scope,group,refreshVersion),[now,setNow]=useState(Date.now);
+ useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(timer)},[]);
+ const epoch=getSessionEpoch();
+ useEffect(()=>{setSelected(undefined)},[epoch]);
+ const forbidden=read.data?.states.includes('forbidden');
+ useEffect(()=>{if(forbidden)setSelected(undefined)},[forbidden]);
+ const rows=forbidden?[]:read.data?.rows??[];
+ const filtered=rows.filter(r=>(!status||r.status===status)&&(!planning||r.planning_status===planning)&&(!query||[r.title,r.content,r.case.code,r.case.name,r.owner.name,...r.crew.map(p=>p.name),...r.instruments.map(p=>p.label),...r.vehicles.map(p=>p.label)].join(' ').includes(query)));
+ const counts=(key:'status'|'planning_status')=>filtered.reduce<Record<string,number>>((a,r)=>{a[r[key]]=(a[r[key]]??0)+1;return a},{});
+ const action=(row:WorkRow,a:Action)=>{setSelected(undefined);if(['assign','reassign','edit_detail'].includes(a))onProposal(rowProposal(row),row,a);else onAction(row,a)};
+ const card=(row:WorkRow)=><article className="dp-work-row glass--flat" key={row.row_id}><button className="dp-work-open" onClick={()=>setSelected(row)}><div><strong>{row.title||'標題待確認'}</strong><Badge>{workSourceLabels[row.source]}</Badge><Badge>{row.status==='unknown'?'狀態待核實':row.status}</Badge><Badge>{planningLabels[row.planning_status]}</Badge></div><span>負責人 · {row.owner.name||'尚未指派'}</span><span className="dp-people">{row.crew.map((p,i)=><span key={i}><Avatar user={p} small/>{p.name||'姓名待確認'}</span>)}</span><span>{row.interval.start||'開始待確認'} ～ {row.interval.end||'結束待確認'}{row.interval.precision==='date'?'（僅日期）':'（結束時間不含在內）'}</span><span>案件 · {[row.case.code,row.case.name].filter(Boolean).join(' ')||'關聯待核實'}</span><span>儀器 · {row.instruments.map(r=>r.label||'名稱待確認').join('、')||'未提供'}　車輛 · {row.vehicles.map(r=>r.label||'名稱待確認').join('、')||'未提供'}</span><span>截止 · {row.deadline||'未排期限'}　九節點 · {row.node_position||'待核實'}</span><span>命令 · {row.command?commandLabels[row.command.state]:'尚無命令'}</span>{row.needs_me.length>0&&<strong>{row.needs_me.map(needLabel).join(' · ')}</strong>}</button><div className="dp-actions">{[...row.allowed_actions,...(write&&row.preview_id?['review_preview' as const]:[])].filter(a=>write||a==='approve'||a==='return').map(a=><Button key={a} onClick={()=>action(row,a)}>{actionLabels[a]}</Button>)}</div></article>;
+ const cold=!read.data&&read.loading;
+ return <section className="dp-work"><header className="dp-section-head"><div><h1>工作進度</h1><p>從同一份工作清單核對進度，再處理需要你的決定。</p></div><Button disabled={read.loading} onClick={read.reload}>{read.loading?'讀取中…':'更新工作進度'}</Button></header><div className="dp-filters"><label>範圍<select value={scope} onChange={e=>setScope(e.target.value)}><option value="mine">我的工作</option><option value="group">組內工作</option><option value="all">全部可見工作</option></select></label><label>組別<input value={group} onChange={e=>setGroup(e.target.value)}/></label><label>搜尋工作、人員或資源<input value={query} onChange={e=>setQuery(e.target.value)}/></label><label>狀態<select value={status} onChange={e=>setStatus(e.target.value)}><option value="">全部</option>{['待處理','進行中','已完成','取消','unknown'].map(s=><option key={s} value={s}>{s==='unknown'?'待核實':s}</option>)}</select></label><label>排程狀態<select value={planning} onChange={e=>setPlanning(e.target.value)}><option value="">全部</option>{Object.entries(planningLabels).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label></div>
+ <div className="dp-source"><span role="status">{forbidden?'沒有工作進度的檢視權限。':read.error?`讀取失敗。${read.data?'保留上次成功快照。':'目前無法核實，未以零代替。'}`:read.loading?'正在讀取工作清單。':read.data?.states.includes('stale')?'上次成功快照，資料待更新。':read.data?.states.some(s=>s==='partial'||s==='unknown')?'來源尚未完整，僅顯示已載入工作。':'已載入工作清單。'}</span>{read.data&&!forbidden&&` 資料時間 ${read.data.fetched_at||'來源未提供'} · ${snapshotAge(read.data.fetched_at,now)}`}</div>
+ {read.data?.gaps.length? <p className="dp-warning">{read.data.gaps.length} 份草稿格式不正確，未列入工作進度。請從草稿清單載入並修正。</p>:null}
+ <div className="dp-progress glass--flat" aria-busy={cold}>{cold?<Skeleton lines={3}/>:!read.data||forbidden?<p>進度 · —</p>:<>{read.error||read.data.states.includes('stale')?<p>以下為上次快照筆數。</p>:null}<p>依目前篩選清單 · {filtered.length} 件</p><p>狀態 · {Object.entries(counts('status')).map(([k,n])=>`${k==='unknown'?'待核實':k} ${n}`).join(' ／ ')||'清單為空'}</p><p>排程狀態 · {Object.entries(counts('planning_status')).map(([k,n])=>`${planningLabels[k as keyof typeof planningLabels]} ${n}`).join(' ／ ')||'清單為空'}</p></>}</div>
+ <section className="dp-needs glass--card"><h2>需要我處理</h2><div className="dp-work-list">{cold?Array.from({length:4},(_,i)=><div className="dp-work-row" key={i}><Skeleton lines={7}/></div>):filtered.filter(r=>r.needs_me.length).map(card)}</div>{!cold&&!filtered.some(r=>r.needs_me.length)&&<p>{forbidden||!read.data?'待核實處理事項。':'目前篩選清單沒有需要你處理的事項。'}</p>}</section>
+ <section><h2>工作清單</h2><div className="dp-work-list">{cold?Array.from({length:4},(_,i)=><div className="dp-work-row" key={i}><Skeleton lines={7}/></div>):filtered.map(card)}</div>{!cold&&!filtered.length&&<p>{!read.data||forbidden?'尚無可核實的工作清單。':'目前篩選清單沒有工作。'}</p>}</section>{selected&&!forbidden&&<WorkDetail row={selected} onClose={()=>setSelected(undefined)} onAction={action} write={write}/>}</section>;
+}

@@ -10,7 +10,7 @@ def roster_identity_verified(person,app_id):
         and source.get('app_id')==app_id and source.get('record_id'))
 
 
-def schedule_subject_verified(ws,user_id,*,clock=None):
+def schedule_subject_verified(ws,user_id,*,clock=None,cfg=None):
     """Historical schedules cannot establish a current formal employee identity."""
     if ws.get('environment') in ('demo','test'):return True
     app_id=(ws.get('native_approval_authority') or {}).get('app_id') or (ws.get('people_directory_status') or {}).get('app_id') or (ws.get('attendance_schedule_status') or {}).get('app_id')
@@ -18,7 +18,7 @@ def schedule_subject_verified(ws,user_id,*,clock=None):
     person=next((u for u in ws.get('users',[]) if u.get('id')==user_id),None)
     if not person or not roster_identity_verified(person,app_id):return False
     from .production_access import access_mode
-    return access_mode(person,app_id,now=clock)=='normal'
+    return access_mode(person,app_id,now=clock,cfg=cfg)=='normal'
 
 
 def valid_identity(person,app_id,tenant):

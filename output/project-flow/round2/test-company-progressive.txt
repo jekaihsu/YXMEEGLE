@@ -1,0 +1,1 @@
+Company progressive load: 12 checks passed

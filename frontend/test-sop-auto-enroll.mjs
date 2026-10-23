@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {build} from 'esbuild';
+import {JSDOM} from 'jsdom';
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/',pretendToBeVisual:true});
+for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','Element','HTMLElement','HTMLInputElement','navigator','DOMException'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
+const bundle=await build({stdin:{contents:"export {enrollmentLabel,SopEnrollmentStatus,SopReadiness} from './src/SopEnrollment';export {parseEnrollment,parseReadiness} from './src/sopTaskApi';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const file=new URL('./.sop-auto-enroll-test.mjs',import.meta.url);await fs.writeFile(file,bundle.outputFiles[0].text);
+let ui;try{ui=await import(file.href)}finally{await fs.unlink(file)}
+const raw={policy:{policy:'legacy'},can_opt_in:true,can_retry:true,enrollment:null,nodes:[{key:'sales',name:'報價',status:'completed',eligible:false},{key:'pm',name:'PM 派工',status:'in_progress',eligible:false},{key:'field',name:'外業',status:'pending',eligible:true}]};
+const attempt={id:'job',project_id:'p1',status:'failed',last_error:'RuntimeError',attempts:1,receipt:null};
+let enrollment=ui.parseEnrollment(raw);
+assert.equal(ui.enrollmentLabel(enrollment),'舊案 · 維持原流程');
+assert.equal(ui.enrollmentLabel(ui.parseEnrollment({...raw,policy:{policy:'needs_review'}})),'案件待核對');
+assert.equal(ui.enrollmentLabel(ui.parseEnrollment({...raw,policy:{policy:'managed'},enrollment:{...attempt,status:'pending',last_error:'template_unavailable'}})),'範本尚未發布');
+assert.equal(ui.enrollmentLabel(ui.parseEnrollment({...raw,policy:{policy:'managed'},enrollment:{...attempt,status:'succeeded',receipt:{created_task_ids:['t1','t2'],existing_task_ids:[]}}})),'已自動帶入 2 項');
+assert.throws(()=>ui.parseEnrollment({...raw,policy:{policy:'unknown'}}));
+const calls=[];
+globalThis.fetch=async(url,init)=>{
+ if(init?.method==='POST'){calls.push({url,body:JSON.parse(init.body)});return new Response(JSON.stringify({...attempt,status:'succeeded',receipt:{created_task_ids:['t1'],existing_task_ids:[]}}),{status:200})}
+ return new Response(JSON.stringify({items:[{project_id:'p1',code:'C1',name:'新案',policy:{policy:'managed'},enrollments:[attempt]}]}),{status:200});
+};
+const root=createRoot(document.getElementById('root'));const tick=()=>new Promise(resolve=>setTimeout(resolve,20));
+const button=text=>[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===text);
+const render=()=>root.render(React.createElement(ui.SopEnrollmentStatus,{projectId:'p1',enrollment,current:()=>true,reload:async()=>{}}));
+await act(async()=>{render();await tick()});assert.match(document.body.textContent,/舊案 · 維持原流程/);
+await act(async()=>{button('套用 SOP 到剩餘節點').click();await tick()});
+let checks=[...document.querySelectorAll('input[type="checkbox"]')];
+assert.deepEqual(checks.map(c=>[c.disabled,c.checked]),[[true,false],[true,false],[false,true],[false,false]]);
+assert.ok(button('確認套用').disabled);
+await act(async()=>{checks.at(-1).click();await tick()});assert.equal(button('確認套用').disabled,false);
+await act(async()=>{button('確認套用').click();await tick()});assert.deepEqual(calls[0].body,{node_keys:['field'],confirmed:true});
+enrollment=ui.parseEnrollment({...raw,policy:{policy:'managed'},can_opt_in:false,enrollment:attempt});
+await act(async()=>{render();await tick()});assert.match(document.body.textContent,/帶入失敗/);assert.ok(!button('套用 SOP 到剩餘節點'));
+await act(async()=>{button('重試').click();await tick()});assert.deepEqual(calls[1].body,{enrollment_id:'job'});
+enrollment={...enrollment,canRetry:false};await act(async()=>{render();await tick()});assert.ok(!button('重試'));
+await act(async()=>{root.render(React.createElement(ui.SopReadiness));await tick()});assert.match(document.body.textContent,/SOP 帶入狀態.*已納管.*帶入失敗.*已嘗試 1 次/s);
+await act(async()=>root.unmount());console.log('PASS managed/legacy/review/pending/template status, protected node picker, confirmation, authority UI, readiness and retry');

@@ -1,0 +1,2 @@
+people attendance view contracts passed
+People page: search, filters, empty/reset, keyboard table, explicit refresh, re-entry, idle and permission safety passed

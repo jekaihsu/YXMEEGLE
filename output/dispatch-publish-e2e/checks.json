@@ -1,0 +1,32 @@
+[
+  {
+    "command": "npm run build",
+    "exit_code": 0,
+    "log": "build.log"
+  },
+  {
+    "command": "npx tsc --noEmit -p tsconfig.json",
+    "exit_code": 0,
+    "log": "typescript.log"
+  },
+  {
+    "command": "node test-dispatch-board.mjs",
+    "exit_code": 0,
+    "log": "dispatch-board.log"
+  },
+  {
+    "command": "node test-contrast.mjs",
+    "exit_code": 0,
+    "log": "contrast.log"
+  },
+  {
+    "command": "npm run test:dispatch-publish",
+    "exit_code": 0,
+    "log": "dispatch-publish.log"
+  },
+  {
+    "command": "node test-api-response.mjs",
+    "exit_code": 0,
+    "log": "api-response.log"
+  }
+]

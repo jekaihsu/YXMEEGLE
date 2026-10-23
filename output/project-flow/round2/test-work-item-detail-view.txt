@@ -1,0 +1,25 @@
+ok 1. breadcrumb runs Confirmation → Contract Line → Work Item and tabs are the five named ones
+ok 2. unknown-not-zero: quantity, unit, plan/actual and dates render an em dash plus reason, never 0
+ok 3. amount withheld: 未核准顯示 + G-AMT reason, no value even when the body carries one
+ok 4. work orders are unlocated with an explicit row and Source Health link; body rows never render
+ok 5. rework instances are distinct rows with round history; duplicate identity fails closed
+ok 6. receipt_missing renders 對應未驗證 and body claims of verified are never upgraded
+ok 7. missing confirmation edge renders an explicit unresolved path, not a blank
+ok 8. evidence rows are evidence-only, never completion; evidence cannot set execution state
+ok 9. deliverables sort by date (default desc) then stable id; undated last
+ok 10. case_daily_reports is a link-only entry with no count, no rows, no state count
+ok 11. hand-built {states:[unlocated]} envelope without count normalizes safely
+ok 12. side dates are four distinct unknown cells with distinct reasons
+ok 13. forbidden-absent: forbidden page renders only the state; forbidden section shows no rows or hints
+ok 14. missing selection (body is only unknown) shows state only, no key, count or label
+ok 15. malformed body fails closed to unknown with a reason, never partially trusted
+ok 16. IDs live only in the drawer model; default rows carry none
+ok 17. drawer is selection-only: stale selection dropped, never resurrected
+ok 18. forbidden actions absent: no Complete/Approve/SOP write control or key anywhere
+ok 19. unknown body reason strings are not echoed (no ID smuggling through reasons)
+ok 20. history tab: completed history collapsed until expanded; round history always listed
+ok 21. 132-R1 forbidden side section: loaded owner, warnings and dates are not displayed
+ok 22. 132-R2 incomplete body: header-only partial body is an unknown page with reason
+ok 23. 132-R2 conflicting instance identity fails the whole node section closed (and drawer cannot open)
+ok 24. 132-P1 missing parent: explicit unresolved path keeps Work Item endpoint, no navigation or ID
+24/24 tests, 142 checks

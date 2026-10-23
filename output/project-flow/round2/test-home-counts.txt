@@ -1,0 +1,1 @@
+Home KPI literal counts passed for complete, partial, missing, demo fallback, assign and dashboard totals.

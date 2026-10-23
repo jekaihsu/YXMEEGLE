@@ -5,6 +5,8 @@ from pathlib import Path
 import secrets
 import re
 from copy import deepcopy
+from contextlib import asynccontextmanager, contextmanager
+from time import perf_counter
 from datetime import datetime, timezone
 from urllib.parse import urlencode, urlsplit
 import httpx
@@ -14,53 +16,101 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 from itsdangerous import URLSafeTimedSerializer, BadSignature
 from pydantic import BaseModel, Field
-from sqlalchemy import create_engine, Column, String, Integer, JSON, select, update
+from sqlalchemy import create_engine, Column, String, Integer, JSON, select, update, cast, or_, and_, func
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.engine import make_url
 from .seed import seed, USERS
-from .workflow import apply_action, require, find, event, now, uid, is_pm, is_owner
-from .sources import API, configuration, fetch_sources, import_sources
+from .workflow import apply_action, require, find, event, now, uid, is_pm, is_owner, valid_date
+from .sources import API, configuration, import_sources
 from .policy import upgrade, CAPABILITIES, MANAGER_CAPABILITIES
 from .operations import apply_operation, project_summary, capable, review_hash, invalidate
 from . import storage
+from .write_footprint import WorkspaceView, Lookup, resolve as resolve_footprint, RULES as FOOTPRINT_RULES
 from .learning import apply_learning
 from .approval_capabilities import approval_connection
-from .workspace_projection import public_copy, filter_private_workspace, public_person
+from .avatar import avatar_url
+from .workspace_projection import public_copy, strip_migration_archive, filter_private_workspace, public_person
 from .production_access import require_admission, require_access, test_profile,company_admin_grant,set_company_admin_authority
 from . import audit
+from .input_validation import json_object
 from .file_categories import categories, validate_category, save_category
 
-Base=declarative_base()
-class WorkspaceRow(Base):
-    __tablename__='workspaces'
-    id=Column(String(120),primary_key=True); version=Column(Integer,nullable=False); data=Column(JSON,nullable=False)
-class Receipt(Base):
-    __tablename__='receipts'
-    id=Column(String(300),primary_key=True); fingerprint=Column(String(64)); result=Column(JSON)
-class AuthRow(Base):
-    __tablename__='auth_sessions'
-    id=Column(String(100),primary_key=True); data=Column(JSON)
-class CacheRow(Base):
-    __tablename__='source_caches'
-    id=Column(String(120),primary_key=True); data=Column(JSON)
-class AuditRow(Base):
-    __tablename__='action_audit'
-    id=Column(String(64),primary_key=True)
-    workspace_id=Column(String(120),nullable=False,index=True)
-    actor_id=Column(String(120),nullable=False)
-    action=Column(String(120),nullable=False)
-    created_at=Column(String(64),nullable=False,index=True)
-    data=Column(JSON,nullable=False)
+from .models import Base, WorkspaceRow, Receipt, AuthRow, CacheRow, AuditRow, BusinessRow, PersonRow
+
+NO_ROSTER_REFRESH_PATHS = frozenset({'/api/live/status', '/api/lark-pilot/shadow'})
+
 class Action(BaseModel):
     action:str; version:int; request_id:str=Field(min_length=1,max_length=120)
     project_id:str|None=None; node_id:str|None=None; task_id:str|None=None; payload:dict=Field(default_factory=dict)
     project_versions:dict[str,int]=Field(default_factory=dict)
 
-BusinessRow,PersonRow=storage.models(Base)
 
-def create_app(overrides=None):
+def _copy_local_pilot_attachments(upload_dir,source_wid,target_wid,project,id_map):
+    """Copy verified local bytes into the test namespace; never mutate source files."""
+    source_root=Path(upload_dir).resolve()/hashlib.sha256(source_wid.encode()).hexdigest()
+    target_root=Path(upload_dir).resolve()/hashlib.sha256(target_wid.encode()).hexdigest()
+    created=[]; copied={}
+    try:
+        for item in project.get('files',[]):
+            if item.get('storage')!='local': continue
+            ident=item.get('id')
+            source_ident=next((old for old,new in id_map.items() if new==ident),ident)
+            require(isinstance(ident,str) and ident and Path(ident).name==ident and ident not in ('.','..'),'附件識別碼錯誤',409)
+            source=(source_root/source_ident).resolve(); destination=target_root/ident
+            require(source.is_relative_to(source_root) and source.is_file(),'正式附件檔案不存在',409)
+            payload=source.read_bytes(); digest=hashlib.sha256(payload).hexdigest()
+            require(isinstance(item.get('size'),int) and len(payload)==item['size'],'正式附件大小不符',409)
+            require(isinstance(item.get('sha256'),str) and digest==item['sha256'],'正式附件校驗失敗',409)
+            if ident in copied:
+                require(copied[ident]==(len(payload),digest),'附件索引衝突',409)
+                continue
+            target_root.mkdir(parents=True,exist_ok=True)
+            with destination.open('xb') as handle: handle.write(payload)
+            created.append(destination); copied[ident]=(len(payload),digest)
+        return created
+    except Exception:
+        for path in created: path.unlink(missing_ok=True)
+        raise
+
+def _reidentify_pilot_project(project,occupied_ids=()):
+    """Give an isolated project copy new entity IDs while preserving internal links."""
+    from .workflow import uid
+    copied=deepcopy(project)
+    id_map={};used=set(occupied_ids)
+    def collect(value):
+        if isinstance(value,dict):
+            ident=value.get('id')
+            if isinstance(ident,str) and ident:
+                if ident in used: id_map.setdefault(ident,'pilot-'+uid())
+                used.add(ident)
+            for child in value.values(): collect(child)
+        elif isinstance(value,list):
+            for child in value: collect(child)
+    collect(copied)
+    file_urls={f'/api/files/{item["id"]}/download':f'/api/files/{id_map[item["id"]]}/download'
+               for item in copied.get('files',[]) if item.get('id') in id_map}
+    source_id=copied['id']
+    def rewrite(value):
+        if isinstance(value,dict):
+            for key,child in list(value.items()):
+                if key=='id' and isinstance(child,str): value[key]=id_map.get(child,child)
+                elif key=='url' and isinstance(child,str): value[key]=file_urls.get(child,child)
+                elif isinstance(child,str): value[key]=id_map.get(child,child)
+                else: rewrite(child)
+        elif isinstance(value,list):
+            for index,child in enumerate(value):
+                if isinstance(child,str): value[index]=id_map.get(child,child)
+                else: rewrite(child)
+    rewrite(copied)
+    copied['pilot_source_id']=source_id
+    return copied,id_map
+
+def create_app(overrides=None,*,dispatch_transport=None):
+    """dispatch_transport replaces the Lark HTTP transport of the dispatch board and publish routes only
+    (scripts/dev_dispatch_fake_server.py passes an in-memory Bitable); None keeps the real one."""
     cfg=dict(os.environ); cfg.update(overrides or {})
+    from .features import resolve_features, guard_action
     production=cfg.get('APP_ENV','development')=='production'
     demo=str(cfg.get('DEMO_MODE','false' if production else 'true')).lower()=='true'
     db_url=cfg.get('DATABASE_URL','sqlite:///./backend/workspace.db')
@@ -76,36 +126,58 @@ def create_app(overrides=None):
         database_path=make_url(db_url).database
         if database_path and database_path!=':memory:': Path(database_path).resolve().parent.mkdir(parents=True,exist_ok=True)
     engine=create_engine(db_url,connect_args={'check_same_thread':False,'timeout':20} if db_url.startswith('sqlite') else {},pool_pre_ping=True)
-    Base.metadata.create_all(engine); sessions=sessionmaker(engine,expire_on_commit=False)
+    from .sop_import import models as sop_import_models
+    Base.metadata.create_all(engine); sessions=sessionmaker(engine,expire_on_commit=False,info={'index_tables':str(cfg.get('INDEX_TABLES_ENABLED','false')).lower()=='true'})
     # Migration is reversible: preserve the original JSON before normalizing.
-    with sessions.begin() as db:
-        for row in db.scalars(select(WorkspaceRow)):
-            if row.data.get('storage_schema')!=2:
-                state=upgrade(deepcopy(row.data))
-                state.setdefault('migration_archive',deepcopy(row.data))
-                row.data=storage.save(db,BusinessRow,row.id,state)
-            elif 'migration_archive' in row.data:
-                state=upgrade(storage.load(db,BusinessRow,row))
-                row.data=storage.save(db,BusinessRow,row.id,state)
-    signer=URLSafeTimedSerializer(secret,salt='meegle-session-v1')
+    from .workspace_migration import migrate_workspaces
+    migrate_workspaces(sessions,WorkspaceRow,BusinessRow,upgrade,storage)
+    signer=URLSafeTimedSerializer(secret,salt='meegle-session-v1',signer_kwargs={'digest_method':hashlib.sha256})
     upload_dir=Path(cfg.get('UPLOAD_DIR','./backend/uploads')).resolve(); upload_dir.mkdir(parents=True,exist_ok=True)
-    app=FastAPI(title='詠翔專案工作台',docs_url=None if production else '/api/docs'); app.state.engine=engine; app.state.sessions=sessions; app.state.signer=signer
+    @asynccontextmanager
+    async def lifespan(app):
+        try:
+            tenant=cfg.get('LARK_WORKER_ORGANIZATION')
+            if tenant and tenant in allowed_tenants:
+                wid='lark-'+tenant
+                ensure_workspace(wid,True)
+                for dataset in ('roster','attendance','sources'):
+                    app.state.live_read.ensure(wid,dataset,wait=False)
+                app.state.people_attendance.view(wid)
+            yield
+        finally:
+            app.state.people_attendance.close()
+            app.state.live_read.close()
+
+    app=FastAPI(title='詠翔專案工作台',docs_url=None if production else '/api/docs',lifespan=lifespan); app.state.engine=engine; app.state.sessions=sessions; app.state.signer=signer
     app.state.cfg=cfg; app.state.upload_dir=upload_dir
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+    @app.exception_handler(StarletteHTTPException)
     @app.exception_handler(HTTPException)
     async def safe_auth_error(request,exc):
         from fastapi.responses import JSONResponse
         if request.url.path=='/api/auth/lark/callback' and 'text/html' in request.headers.get('accept',''):
             detail=str(exc.detail)
-            code='provider_unavailable' if exc.status_code>=500 else ('tenant_denied' if '租戶' in detail else 'unverified_directory' if '名冊' in detail else 'inactive' if '停權' in detail else 'expired')
+            code=('provider_unavailable' if exc.status_code>=500 else
+                  'tenant_denied' if '租戶' in detail else
+                  'unverified_directory' if '名冊' in detail else
+                  'inactive' if '停權' in detail else
+                  'app_configuration' if '應用權限' in detail or 'OAuth 應用' in detail else
+                  'authorization_denied' if '使用者拒絕授權' in detail else 'expired')
             response=RedirectResponse('/?auth_error='+code,status_code=303)
             response.delete_cookie('lark_oauth_state'); return response
-        return JSONResponse({'detail':exc.detail},status_code=exc.status_code,headers=exc.headers)
+        body = {'detail': exc.detail}
+        if isinstance(exc.detail,dict) and exc.detail.get('code')=='feature_disabled': body=exc.detail
+        if getattr(exc,'code',None)=='user_token_expired': body['code']=exc.code
+        if request.url.path == '/api/lark-pilot/shadow':
+            body['code'] = getattr(exc, 'code', 'pilot_method_not_allowed' if exc.status_code == 405 else 'pilot_read_failed')
+        response=JSONResponse(body,status_code=exc.status_code,headers=exc.headers)
+        if request.url.path=='/api/auth/lark/callback': response.delete_cookie('lark_oauth_state')
+        return response
     app.add_middleware(GZipMiddleware,minimum_size=1000,compresslevel=5)
     from .request_limits import JsonRequestLimit
     app.add_middleware(JsonRequestLimit)
     oauth_configured=all(cfg.get(k) for k in ('LARK_APP_ID','LARK_APP_SECRET','LARK_REDIRECT_URI','LARK_ALLOWED_TENANTS'))
-    oauth_scopes=' '.join(dict.fromkeys(x for x in re.split(r'[\s,]+',cfg.get('LARK_OAUTH_SCOPES','bitable:app:readonly').strip()) if x))
-    if not oauth_scopes: oauth_scopes='bitable:app:readonly'
+    oauth_scopes=''  # Login uses identity only; feature reads use application permissions.
     try: role_map=json.loads(cfg.get('LARK_ROLE_MAP_JSON','{}'))
     except (ValueError,TypeError): raise RuntimeError('LARK_ROLE_MAP_JSON must be a JSON object of open_id to role')
     if not isinstance(role_map,dict) or any(not isinstance(k,str) or v not in ('member','pm','manager') for k,v in role_map.items()):
@@ -117,8 +189,33 @@ def create_app(overrides=None):
     def initial_capabilities(ident,role):
         return (MANAGER_CAPABILITIES[:] if role=='manager' else [])+(['approve_capability'] if ident in capability_approvers else [])
 
+    shell_enabled=str(cfg.get('WORKSPACE_SHELL_ENABLED','false')).lower()=='true'
+    TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('GET','/api/settings/overview'),('POST','/api/actions')}
+    @contextmanager
+    def phase(request,name):
+        started=perf_counter()
+        try: yield
+        finally:
+            phases=request.scope.setdefault('phases',{}); phases[name]=phases.get(name,0)+perf_counter()-started
+
+    @app.middleware('http')
+    async def callback_state_cleanup(request,call_next):
+        if request.url.path!='/api/auth/lark/callback': return await call_next(request)
+        try:
+            response=await call_next(request)
+        except Exception as exc:
+            import logging
+            from fastapi.responses import JSONResponse
+            logging.getLogger(__name__).warning('oauth_callback_failed error_class=%s',type(exc).__name__)
+            response=(RedirectResponse('/?auth_error=provider_unavailable',status_code=303)
+                      if 'text/html' in request.headers.get('accept','') else
+                      JSONResponse({'code':'provider_unavailable','detail':'Lark 登入暫時無法完成，請稍後重新登入'},status_code=503))
+        response.delete_cookie('lark_oauth_state')
+        return response
+
     @app.middleware('http')
     async def origin_guard(request,call_next):
+        started=perf_counter()
         if request.method in ('POST','PUT','PATCH','DELETE'):
             origin=request.headers.get('origin'); expected=cfg.get('PUBLIC_ORIGIN')
             actual=f"{request.url.scheme}://{request.url.netloc}"
@@ -130,17 +227,39 @@ def create_app(overrides=None):
         response.headers['X-Content-Type-Options']='nosniff'
         response.headers['Referrer-Policy']='same-origin'
         if request.url.path.startswith('/api'): response.headers['Cache-Control']='no-store'
+        if (request.method,request.url.path) in TIMED_ROUTES or (request.method=='GET' and re.fullmatch(r'/api/projects/[^/]+(?:/(?:node-assignments|start-sop|sop-tasks|sop-assignees))?',request.url.path)):
+            # Durations only. 'serialize' is the unmeasured remainder (response encoding and framework time).
+            phases=dict(request.scope.get('phases',{})); total=perf_counter()-started
+            phases['serialize']=max(total-sum(phases.values()),0)
+            response.headers['Server-Timing']=', '.join([f'{k};dur={v*1000:.1f}' for k,v in phases.items()]+[f'total;dur={total*1000:.1f}'])
         return response
+
+    SESSION_MAX_AGE=7*24*3600
+
+    def public_origin(request):
+        origin=(cfg.get('APP_URL') or '').strip() or (cfg.get('PUBLIC_ORIGIN') or '').strip()
+        if origin: return origin.rstrip('/')
+        require(not production,'Production Lark login requires APP_URL or PUBLIC_ORIGIN',503)
+        host=(request.headers.get('x-forwarded-host') or request.headers.get('host') or '').split(',')[0].strip()
+        proto=request.headers.get('x-forwarded-proto',request.url.scheme).split(',')[0].strip()
+        return f'{proto}://{host}' if host else str(request.base_url).rstrip('/')
+
+    def safe_next(value):
+        return (isinstance(value,str) and value.startswith('/') and not value.startswith('//')
+                and '\\' not in value and not any(ord(c)<32 for c in value))
+
+    def secure_cookie(request):
+        return production or public_origin(request).startswith('https://')
 
     def read_cookie(request):
         cookie=request.cookies.get('meegle_session')
         if not cookie: return None
-        try: data=signer.loads(cookie,max_age=8*3600)
+        try: data=signer.loads(cookie,max_age=SESSION_MAX_AGE)
         except BadSignature: return None
         if data.get('mode')=='demo' and not demo: return None
         return data
-    def set_cookie(response,data):
-        response.set_cookie('meegle_session',signer.dumps(data),httponly=True,secure=production,samesite='lax',max_age=8*3600,path='/')
+    def set_cookie(response,data,request):
+        response.set_cookie('meegle_session',signer.dumps(data),httponly=True,secure=secure_cookie(request),samesite='lax',max_age=SESSION_MAX_AGE,path='/')
     def ensure_workspace(wid,empty=False):
         with sessions.begin() as db:
             if not db.get(WorkspaceRow,wid):
@@ -151,11 +270,27 @@ def create_app(overrides=None):
                 row=WorkspaceRow(id=wid,version=1,data=data); db.add(row); db.flush()
                 row.data=storage.save(db,BusinessRow,wid,data)
 
-    def load(db,row):
-        state=upgrade(storage.load(db,BusinessRow,row))
+    def load(db,row,*,collections=None,project_ids=None):
+        if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections if collections is not None else storage.DETAIL_COLLECTIONS,project_ids=project_ids,project_children=storage.PROJECT_CHILDREN,filter_project_rows=True)
+        else: state=storage.load(db,BusinessRow,row) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections)
+        state=upgrade(state,generate_sop_candidate=collections is None or 'sop_templates' in collections)
+        return seal(db,row,state)
+
+    def seal(db,row,state,*,scoped=False):
+        """What every load adds to a stored state. A scoped load holds only part of the projects, so it checks the rest in SQL."""
         from .workspace_environment import normalize_environment
-        from .case_cutover import initialize_execution_system
+        from .case_cutover import initialize_execution_system,SYSTEMS,isolated
         normalize_environment(state,row.id,cfg)
+        state['features']=resolve_features(cfg)
+        if state.get('environment')=='production':
+            if scoped: demo_rows=db.scalar(select(func.count()).select_from(BusinessRow).where(BusinessRow.workspace_id==row.id,BusinessRow.kind=='projects',BusinessRow.data['source_kind'].as_string().in_(('demo','mock','simulation'))))
+            else: demo_rows=sum(p.get('source_kind') in ('demo','mock','simulation') for p in state.get('projects',[]))
+            require(not demo_rows,'正式工作區包含隔離示範資料，請由管理員核對',409)
+        if scoped and not isolated(state):
+            # The full load would classify these cases (and record an event); only the full path may.
+            unclassified=BusinessRow.data['execution_system'].as_string()
+            if db.scalar(select(func.count()).select_from(BusinessRow).where(BusinessRow.workspace_id==row.id,BusinessRow.kind=='projects',or_(unclassified.is_(None),unclassified.notin_(SYSTEMS)))):
+                raise storage.PartialUnavailable('cases without an execution system')
         initialize_execution_system(state)
         if row.id.startswith(('lark-','test-lark-')):
             org=row.id.removeprefix('test-')
@@ -168,7 +303,17 @@ def create_app(overrides=None):
             state['users']=[profiles.get(u['id'],u) for u in state['users']]+[p for ident,p in profiles.items() if ident not in known]
         state['native_approval_authority']={'app_id':cfg.get('LARK_APP_ID'),'tenant':cfg.get('LARK_WORKER_ORGANIZATION')}
         set_company_admin_authority(state,cfg)
+        from .report_bridge import load_bridges
+        state['report_case_bridges']=load_bridges(db,row.id)
         return state
+
+    def load_for_write(db,row,footprint):
+        """load() over just a footprint, with the project order; PartialUnavailable when the stored state needs the full path."""
+        state,order=storage.load_scoped(db,BusinessRow,row,collections=sorted(footprint.collections),project_ids=footprint.project_ids)
+        templates=deepcopy(state['sop_templates']) if 'sop_templates' in footprint.collections else None
+        upgrade(state,generate_sop_candidate='sop_templates' in footprint.collections)
+        if state['events'] or (templates is not None and state['sop_templates']!=templates): raise storage.PartialUnavailable('an upgrade would change shared records')
+        return seal(db,row,state,scoped=True),order
 
     def organization(data):
         return data.get('organization') or data['wid'].removeprefix('test-')
@@ -184,7 +329,7 @@ def create_app(overrides=None):
                      'source':'server_allowlist_and_verified_oauth','salary_base_modified':False}))
         return True
 
-    def person_identity(db,data,user):
+    def person_identity(db,data,user,*,tenant_read=False):
         if data.get('mode')!='lark': return user
         org=organization(data); row=db.get(PersonRow,(org,user['id']))
         if row:
@@ -199,7 +344,7 @@ def create_app(overrides=None):
                 result['capabilities']=list(dict.fromkeys(result.get('capabilities',[])+['approve_capability']))
                 result.update(capability_config_applied=True,capability_config_applied_at=now(),authz_version=result.get('authz_version',0)+1)
                 row.data=result; db.commit()
-            if admission_required: require_admission(result,cfg.get('LARK_APP_ID'))
+            if admission_required and not tenant_read: require_admission(result,cfg.get('LARK_APP_ID'))
             if data['wid'].startswith('test-'):
                 overlay=db.get(PersonRow,(data['wid'],user['id']))
                 result=test_profile(result,overlay.data if overlay else None)
@@ -210,13 +355,15 @@ def create_app(overrides=None):
         result=deepcopy(user); result['role']=role_map.get(user['id'],user.get('role','member'))
         if admission_required:
             if role_map.get(user['id'])=='manager': result['bootstrap_admin']=True
-            require_admission(result,cfg.get('LARK_APP_ID'))
+            if not tenant_read: require_admission(result,cfg.get('LARK_APP_ID'))
         result['capabilities']=initial_capabilities(user['id'],result['role'])
         result.setdefault('default_workspace','test' if result['role']=='manager' else 'production')
         result.setdefault('active',True)
         db.add(PersonRow(organization_id=org,person_id=user['id'],data=result)); db.commit()
         return result
     def identity(request):
+        with phase(request,'identity'): return _identity(request)
+    def _identity(request):
         data=read_cookie(request); require(data is not None,'請先登入',401)
         with sessions() as db:
             if data.get('mode')=='lark':
@@ -225,73 +372,190 @@ def create_app(overrides=None):
             row=db.get(WorkspaceRow,data['wid']); require(row is not None,'工作區不存在',401)
             if data.get('mode')=='lark':
                 profile=db.get(PersonRow,(organization(data),data['uid']))
-                user=deepcopy(profile.data) if profile else find(load(db,row)['users'],data['uid'],'登入人員')
-            else: user=find(load(db,row)['users'],data['uid'],'登入人員')
-            user=person_identity(db,data,user)
+                user=deepcopy(profile.data) if profile else find(load(db,row,collections=('users',))['users'],data['uid'],'登入人員')
+            else: user=find(load(db,row,collections=('users',))['users'],data['uid'],'登入人員')
+            if (data.get('mode')=='lark' and not data['wid'].startswith('test-')
+                    and request.url.path not in NO_ROSTER_REFRESH_PATHS):
+                from .live_read.admission import ensure_roster_for_admission
+                # Release the transaction before scheduling the background roster refresh.
+                db.rollback()
+                ensure_roster_for_admission(app.state.live_read,organization(data),user)
+                db.expire_all()
+                profile=db.get(PersonRow,(organization(data),data['uid']))
+                if profile: user=deepcopy(profile.data)
+            from .production_access import tenant_read_allowed
+            tenant_read=(data.get('mode')=='lark' and data['wid']==organization(data)
+                         and tenant_read_allowed(user,cfg,organization(data),request.method,request.url.path))
+            user=person_identity(db,data,user,tenant_read=tenant_read)
             require(user.get('active',True),'帳號已停權',403)
             if data.get('mode')=='lark' and admission_required:
                 from .production_access import require_access
                 recovery_routes={('GET','/api/session'),('POST','/api/logout'),
                     ('POST','/api/people/sync'),('GET','/api/admin/runtime-health')}
-                access=require_access(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'),allow_recovery=(request.method,request.url.path) in recovery_routes)
+                if tenant_read:
+                    from .production_access import access_mode
+                    access=access_mode(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'))
+                    if access=='denied': access='tenant-read'
+                else:
+                    access=require_access(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'),allow_recovery=(request.method,request.url.path) in recovery_routes)
                 data={**data,'access_mode':access}
         return data,user
-    def public_ws(data,wid,user,mode=None):
-        result=public_copy(data)
+
+    def user_access_token(db,data):
+        auth=db.get(AuthRow,data['sid'])
+        expiry=auth.data.get('token_expires') if auth else None
+        if type(expiry) not in (int,float) or not expiry>datetime.now(timezone.utc).timestamp():
+            exc=HTTPException(401,'Lark 授權已過期，請重新登入')
+            exc.code='user_token_expired'
+            raise exc
+        return auth.data['access_token']
+
+    def hr_visible(user):
+        from .production_access import hr_view_allowed
+        return hr_view_allowed(user,cfg)
+
+    def restrict_hr(out,user):
+        out['hr_view_allowed']=hr_visible(user)
+        if not hr_visible(user):
+            out['users']=[p for p in out.get('users',[]) if p['id']==user['id']]
+            out['work_schedules']=[]
+            out['people_directory_status']={'status':'restricted','message':'不在人事資料查看名單（HR_VIEWERS）'}
+            out['attendance_schedule_status']={'status':'restricted','message':'不在人事資料查看名單（HR_VIEWERS）'}
+
+    def public_ws(data,wid,user,mode=None,owned=False,task_details=True):
+        """owned=True: caller passes a fresh load nobody else uses; it is projected in place (no deepcopy)."""
+        file_categories=categories(data); verification=data.get('native_definition_verification')
+        result=strip_migration_archive(data) if owned else public_copy(data)
+        result.pop('report_case_bridges',None);result.pop('report_bridge_available_codes',None)
         from .source_case_policy import filter_visible_cases
+        from . import case_redaction
+        pre=case_redaction.snapshot(result)
         filter_visible_cases(result)
         result['workspace_id']=wid
-        result['file_categories']=categories(data)
+        result['file_categories']=file_categories
         if not result['projects'] or any(p.get('source_kind')=='lark' for p in result['projects']): result['as_of']=now()[:10]
         upgrade(result)
         result['environment']=result.get('environment','demo' if any(p.get('source_kind')=='demo' for p in result['projects']) else 'production')
-        result['policy_summary']=[project_summary(result,p) for p in result['projects']]
+        if result['environment']=='production':
+            for collection in ('approvals','node_skip_requests','financial_requests'):
+                result[collection]=[item for item in result.get(collection,[]) if not item.get('simulated')]
+        if task_details:
+            result['policy_summary']=[project_summary(result,p) for p in result['projects']]
+        else:
+            from .operations import refresh_project_state
+            for project in result['projects']: refresh_project_state(project,result)
         # Workspace namespaces are assigned by the server. Match /api/actions:
         # signed demo sessions and test namespaces may simulate, never submit.
-        result['approval_connection']=approval_connection(cfg,simulation_available=(mode=='demo' if mode is not None else wid.startswith('demo-')) or wid.startswith('test-'),definition_verification=data.get('native_definition_verification'))
+        result['approval_connection']=approval_connection(cfg,simulation_available=(mode=='demo' if mode is not None else wid.startswith('demo-')) or wid.startswith('test-'),definition_verification=verification)
         result.pop('native_definition_verification',None)
         from .case_cutover import project_execution_view
+        from .attachment_coverage import source_attachment_coverage
         for project in result['projects']:
             project.update(project_execution_view(result,project))
-        return filter_private_workspace(result,user)
-    def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None):
+            if task_details: project['source_attachment_coverage']=source_attachment_coverage(project)
+        result.pop('source_work_items',None)
+        result.pop('source_work_items_status',None)
+        result.pop('derived_plan',None)
+        result.pop('derived_plan_status',None)
+        result.pop('source_work_items_enabled',None)
+        out=filter_private_workspace(result,user,task_details=task_details)
+        restrict_hr(out,user)
+        if out.get('environment') not in ('test','demo'):
+            app.state.case_redaction_stats=case_redaction.apply(out,case_redaction.make_plan(pre,out))
+        return out
+    partial_writes=str(cfg.get('PARTIAL_WRITES_ENABLED','true')).lower()=='true'
+    partial_strict=str(cfg.get('PARTIAL_WRITES_STRICT','false')).lower()=='true'
+    app.state.partial_writes={'committed':0,'declined':0}
+    app.state.last_write={}  # diagnostics: which path the last write took and how long it held the workspace row lock
+
+    def persist_mutation(wid,expected,callback,receipt_key=None,fingerprint=None,actor_id=None,action_name='mutation',project_versions=None,footprint=None):
+        """Run callback on the workspace and commit it as the next version.
+
+        footprint, when given, is a function from a Lookup to the Footprint of this request
+        (or None). Only that part is then loaded, checked and saved, so the lock covers a
+        few rows instead of the workspace. Anything the footprint cannot serve (a mutation
+        that reaches outside it, an unknown record, legacy rows) runs again on the full path
+        from a rolled back transaction, and strict mode raises instead.
+        """
         require(bool(actor_id),'缺少操作人員身分',403)
+        if footprint is not None and partial_writes:
+            try: return persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,footprint)
+            except (storage.FootprintViolation,storage.PartialUnavailable) as stop:
+                if partial_strict and isinstance(stop,storage.FootprintViolation): raise
+                declined(action_name,stop)
+            except HTTPException as exc:
+                if exc.status_code!=404: raise
+                declined(action_name,exc)  # a case outside the footprint looks missing; the full path decides
+        return persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,None)
+
+    def declined(action_name,reason):
+        import logging
+        app.state.partial_writes['declined']+=1
+        logging.getLogger(__name__).warning('partial_write_declined action=%s reason=%s',action_name,str(getattr(reason,'detail',reason))[:200])
+
+    def persist_locked(wid,expected,callback,receipt_key,fingerprint,actor_id,action_name,project_versions,resolver):
+        replay=False
         with sessions.begin() as db:
             row=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one()
+            locked_at=perf_counter()
             if receipt_key:
                 receipt=db.get(Receipt,receipt_key)
                 if receipt:
                     require(receipt.fingerprint==fingerprint,'request_id 已用於不同操作',409)
-                    state=load(db,row)
-                    return public_ws(state,wid,find(state['users'],actor_id,'登入人員'))
-            state=load(db,row)
-            if project_versions:
-                require(all(find(state['projects'],pid).get('concurrency_version',0)==version for pid,version in project_versions.items()),'此案件已被更新，請核對最新內容後重試',409)
-            else: require(row.version==expected,'資料已被其他操作更新，請重新整理後重試',409)
-            expected=row.version
-            if actor_id: require(find(state['users'],actor_id).get('active',True),'帳號已停權',403)
-            if admission_required and wid.startswith(('lark-','test-lark-')):
-                person=db.get(PersonRow,(wid.removeprefix('test-'),actor_id))
-                from .production_access import require_access
-                require_access(person.data if person else None,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=wid.removeprefix('test-').removeprefix('lark-'))
-            if wid.startswith('lark-'): state['as_of']=now()[:10]
-            before=audit.entities(state)
-            callback(state); state['version']=row.version+1
-            if wid.startswith(('lark-','test-lark-')):
-                org=wid
-                for person in state['users']:
-                    profile=db.get(PersonRow,(org,person['id']))
-                    if profile:
-                        if profile.data!=person: profile.data=deepcopy(person)
-                    else: db.add(PersonRow(organization_id=org,person_id=person['id'],data=deepcopy(person)))
-            root=storage.save(db,BusinessRow,wid,state)
-            updated=db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==expected).values(version=expected+1,data=root))
-            require(updated.rowcount==1,'資料版本衝突，請重新整理',409)
-            if receipt_key: db.add(Receipt(id=receipt_key,fingerprint=fingerprint,result={'version':state['version']}))
-            db.add(audit.record(AuditRow,wid,actor_id,action_name,request_id=receipt_key,
-                               details={'version':state['version'],'changes':audit.changes(before,state),
-                                        'business_authority':{k:v for k,v in find(state['users'],actor_id).get('_business_authority',{}).items()
-                                                              if k in ('grant_id','decision_ref','scopes')}}))
+                    if resolver is None:
+                        state=load(db,row)
+                        return public_ws(state,wid,find(state['users'],actor_id,'登入人員'))
+                    replay=True
+            if not replay:
+                footprint=resolver(Lookup(db,BusinessRow,wid)) if resolver is not None else None
+                if resolver is not None and (footprint is None or not set(project_versions or ())<=set(footprint.project_ids)):
+                    raise storage.PartialUnavailable('this request has no footprint')
+                if footprint is None: state=view=load(db,row)
+                else:
+                    state,order=load_for_write(db,row,footprint)
+                    view=WorkspaceView(state,footprint.collections,order)
+                if project_versions:
+                    require(all(find(view['projects'],pid).get('concurrency_version',0)==version for pid,version in project_versions.items()),'此案件已被更新，請核對最新內容後重試',409)
+                elif expected is not None: require(row.version==expected,'資料已被其他操作更新，請重新整理後重試',409)
+                expected=row.version
+                if actor_id: require(find(state['users'],actor_id).get('active',True),'帳號已停權',403)
+                if admission_required and wid.startswith(('lark-','test-lark-')):
+                    person=db.get(PersonRow,(wid.removeprefix('test-'),actor_id))
+                    from .production_access import require_access
+                    require_access(person.data if person else None,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=wid.removeprefix('test-').removeprefix('lark-'))
+                if wid.startswith('lark-'): state['as_of']=now()[:10]
+                before=audit.entities(state)
+                callback(view); state['version']=row.version+1
+                if wid.startswith(('lark-','test-lark-')):
+                    org=wid
+                    for person in state['users']:
+                        profile=db.get(PersonRow,(org,person['id']))
+                        if profile:
+                            if profile.data!=person: profile.data=deepcopy(person)
+                        else: db.add(PersonRow(organization_id=org,person_id=person['id'],data=deepcopy(person)))
+                if footprint is None: root=storage.save(db,BusinessRow,wid,state)
+                else: root=storage.save_partial(db,BusinessRow,wid,state,sorted(footprint.collections|{'events'}),footprint.project_ids,order,view=view)
+                updated=db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==expected).values(version=expected+1,data=root))
+                require(updated.rowcount==1,'資料版本衝突，請重新整理',409)
+                if receipt_key: db.add(Receipt(id=receipt_key,fingerprint=fingerprint,result={'version':state['version']}))
+                db.add(audit.record(AuditRow,wid,actor_id,action_name,request_id=receipt_key,
+                                   details={'version':state['version'],'changes':audit.changes(before,state),
+                                            'business_authority':{k:v for k,v in find(state['users'],actor_id).get('_business_authority',{}).items()
+                                                                  if k in ('grant_id','decision_ref','scopes')}}))
+                if footprint is None:
+                    response=public_ws(state,wid,find(state['users'],actor_id,'登入人員'))
+                    app.state.last_write={'path':'full','held_seconds':perf_counter()-locked_at}
+                    return response
+            if not replay: app.state.last_write={'path':'partial','held_seconds':perf_counter()-locked_at}
+        # Committed. The lock is gone, so the full response is read like GET /api/workspace.
+        if not replay: app.state.partial_writes['committed']+=1
+        with sessions() as db:
+            if engine.dialect.name=='postgresql':
+                db.connection(execution_options={'isolation_level':'REPEATABLE READ'})
+            else:
+                # SQLite's legacy driver does not begin a snapshot for SELECT alone.
+                db.connection().exec_driver_sql('BEGIN')
+            state=load(db,db.get(WorkspaceRow,wid))
             return public_ws(state,wid,find(state['users'],actor_id,'登入人員'))
 
     @app.get('/api/health')
@@ -299,30 +563,48 @@ def create_app(overrides=None):
         with engine.connect() as connection: connection.execute(select(1))
         return {'status':'ok','mode':'demo' if demo else 'lark','database':'postgresql' if engine.dialect.name=='postgresql' else 'sqlite'}
 
+    def features(environment=None):
+        from .node_assignment.config import NodeAssignmentConfig
+        node_config = NodeAssignmentConfig.from_env(cfg)
+        flags = resolve_features(cfg)
+        flags['local_case_creation'] = str(cfg.get('LOCAL_CASE_CREATION_ENABLED', 'false')).lower() == 'true'
+        flags['sop_task_writes'] = str(cfg.get('SOP_TASK_WRITES_ENABLED', 'false')).lower() == 'true'
+        flags['mock_ui']=environment in ('demo','test') and str(cfg.get('FEATURE_LARK_AUTHORITATIVE_OPS','false')).lower()=='true'
+        if shell_enabled: flags['workspace_shell']=True
+        if (node_config.enabled and node_config.writable and cfg.get('LARK_WORKER_ORGANIZATION')
+                and cfg.get('LARK_WORKER_IDENTITY') == 'application'
+                and cfg.get('LARK_APP_ID') and cfg.get('LARK_APP_SECRET')):
+            flags['node_assignment'] = True
+        from .dispatch_board.config import DispatchBoardConfig
+        if DispatchBoardConfig.from_env(cfg).enabled: flags['dispatch_board'] = True
+        from .dispatch_publish.config import DispatchPublishConfig
+        if DispatchPublishConfig.from_env(cfg).enabled: flags['dispatch_write'] = True
+        return {'features': flags} if flags else {}
+
     @app.get('/api/session')
     def get_session(request:Request):
         from fastapi.responses import JSONResponse
         data=read_cookie(request)
         if not data and demo:
             data={'mode':'demo','uid':'u-pm','wid':'demo-'+uid()}; ensure_workspace(data['wid'])
-            response=JSONResponse({'user':USERS[0],'users':USERS,'mode':'demo','auth_configured':oauth_configured}); set_cookie(response,data); return response
-        if not data: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured}
+            response=JSONResponse({'user':USERS[0],'users':USERS,'mode':'demo','auth_configured':oauth_configured,'environment':'demo',**features('demo')}); set_cookie(response,data,request); return response
+        if not data: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured,**features()}
         try: data,user=identity(request)
-        except HTTPException: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured}
+        except HTTPException: return {'user':None,'users':[],'mode':'lark','auth_configured':oauth_configured,**features()}
         if data.get('access_mode')=='recovery':
             return {'user':public_person(user,include_authority=True),'users':[],'mode':data['mode'],'workspace_id':data['wid'],
-                    'environment':'test' if data['wid'].startswith('test-') else 'production','auth_configured':oauth_configured,'access_mode':'recovery'}
-        with sessions() as db: users=load(db,db.get(WorkspaceRow,data['wid']))['users']
-        return {'user':public_person(user,include_authority=True),'users':[public_person(person) for person in users],'mode':data['mode'],'workspace_id':data['wid'],'environment':'test' if data['wid'].startswith('test-') else data['mode'],'auth_configured':oauth_configured,'access_mode':data.get('access_mode','normal')}
+                    'environment':'test' if data['wid'].startswith('test-') else 'production','auth_configured':oauth_configured,'access_mode':'recovery',**features()}
+        with phase(request,'load'),sessions() as db: users=load(db,db.get(WorkspaceRow,data['wid']),collections=('users',))['users']
+        return {'user':public_person(user,include_authority=True),'users':[public_person(person) for person in users if hr_visible(user) or person['id']==user['id']],'mode':data['mode'],'workspace_id':data['wid'],'environment':'test' if data['wid'].startswith('test-') else ('demo' if data['mode']=='demo' else 'production'),'auth_configured':oauth_configured,'access_mode':data.get('access_mode','normal'),**features('test' if data['wid'].startswith('test-') else 'demo' if data['mode']=='demo' else 'production')}
 
     @app.post('/api/demo/session')
     async def demo_session(request:Request):
         from fastapi.responses import JSONResponse
         require(demo,'未啟用示範角色切換',403); data,user=identity(request); require(data['mode']=='demo','正式身分不可切換為示範角色',403)
-        body=await request.json()
+        body=await json_object(request)
         with sessions() as db: users=load(db,db.get(WorkspaceRow,data['wid']))['users']
         user=find(users,body.get('user_id'),'角色'); require(user.get('active',True),'帳號已停權'); data['uid']=user['id']
-        response=JSONResponse({'user':user,'users':users,'mode':'demo','auth_configured':oauth_configured}); set_cookie(response,data); return response
+        response=JSONResponse({'user':user,'users':users,'mode':'demo','auth_configured':oauth_configured}); set_cookie(response,data,request); return response
 
     @app.post('/api/logout')
     def logout(request:Request):
@@ -334,28 +616,138 @@ def create_app(overrides=None):
                 if row: db.delete(row)
         response=JSONResponse({'ok':True}); response.delete_cookie('meegle_session'); return response
 
+    def shell_response(request,data,user,coordinator):
+        """Slim index-backed workspace; None means the index cannot vouch for it, so the caller serves the full workspace."""
+        from fastapi.responses import JSONResponse, Response
+        from . import shell, index_reads
+        wid=data['wid']
+        if not hr_visible(user): return None
+        with sessions() as db:
+            row=db.get(WorkspaceRow,wid)
+            with phase(request,'load'):
+                if not index_reads.ready(db,BusinessRow,row): return None
+                state=load(db,row,collections=('users','delegations','approved_leave_delegations'))
+            today=now()[:10]; facts=shell.prepare(state,user,today)
+            tag=shell.etag(wid,user,row.version,today,state['users'])
+            if tag in [v.strip() for v in request.headers.get('if-none-match','').split(',')]: return Response(status_code=304,headers={'ETag':tag})
+            with phase(request,'project'):
+                result=shell.build(db,BusinessRow,row,state,user,facts,today,approval_connection(cfg,simulation_available=(data['mode']=='demo') or wid.startswith('test-'),definition_verification=state.get('native_definition_verification')))
+        restrict_hr(result,user)
+        result['freshness']=coordinator.status(wid)
+        as_of=result['freshness']['datasets']['sources']['as_of']
+        return JSONResponse(result,headers={'ETag':tag,**({'X-Data-As-Of':as_of} if as_of else {})})
+
     @app.get('/api/workspace')
-    def workspace(request:Request):
+    def workspace(request:Request,scope:str=''):
         data,user=identity(request)
-        with sessions() as db: return public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'])
+        coordinator=app.state.live_read
+        coordinator.ensure(data['wid'],'sources')
+        coordinator.ensure(data['wid'],'attendance')
+        if scope=='shell' and shell_enabled:
+            shell_result=shell_response(request,data,user,coordinator)
+            if shell_result is not None: return shell_result
+        with sessions() as db:
+            with phase(request,'load'): state=load(db,db.get(WorkspaceRow,data['wid']))
+            with phase(request,'project'): result=public_ws(state,data['wid'],user,data['mode'],owned=True)
+        result['freshness']=coordinator.status(data['wid'])
+        as_of=result['freshness']['datasets']['sources']['as_of']
+        from fastapi.responses import JSONResponse
+        return JSONResponse(result,headers={'X-Data-As-Of':as_of} if as_of else {})
 
     @app.get('/api/company-dashboard')
-    def company_dashboard(request:Request,offset:int=0,limit:int=100,q:str='',group:str='',source_status:str='',attention:str=''):
+    def company_dashboard(request:Request,offset:int=0,limit:int=100,q:str='',group:str='',source_status:str='',attention:str='',lifecycle:str=''):
         data,user=identity(request)
         require(offset>=0 and 1<=limit<=250 and attention in ('','overdue','review'),'駕駛艙查詢參數錯誤',422)
-        require(len(q)<=240 and len(group)<=120 and len(source_status)<=120,'查詢文字過長',422)
-        with sessions() as db: safe=public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'])
+        require(len(q)<=240 and len(group)<=120 and len(source_status)<=120 and len(lifecycle)<=120,'查詢文字過長',422)
+        with sessions() as db: safe=public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'],owned=True,task_details=False)
         from .company_dashboard import overview
-        return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention)
+        return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle)
 
     @app.get('/api/projects')
-    def projects(request:Request,q:str='',status:str='',owner:str='',offset:int=0,limit:int=30):
+    def projects(request:Request,q:str='',status:str='',owner:str='',offset:int=0,limit:int=30,view:str='',tab:str='formal',sort:str='due',dir:str='asc'):
         data,user=identity(request); require(0<=offset and 1<=limit<=100,'分頁參數錯誤',422)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
+        from . import index_reads
+        if view:
+            from . import shell
+            require(view in ('overview','portfolio') and shell_enabled,'不支援的清單檢視',422)
+            require(tab in shell.TABS and sort in shell.SORTS and dir in ('asc','desc') and len(q)<=240,'清單查詢參數錯誤',422)
+            with phase(request,'load'),sessions() as db:
+                row=db.get(WorkspaceRow,data['wid'])
+                require(index_reads.ready(db,BusinessRow,row),'案件索引尚未就緒，請稍後重試',503)
+                if view=='portfolio':
+                    from .projects_portfolio import portfolio
+                    return portfolio(db,BusinessRow,row,load(db,row,collections=()),now()[:10],
+                        assignments=app.state.home_panels,data=data,user=user)
+                return shell.overview_page(db,BusinessRow,row,load(db,row,collections=()),now()[:10],q=q,status=status,owner=owner,tab=tab,sort=sort,desc=dir=='desc',offset=offset,limit=limit)
+        with phase(request,'load'),sessions() as db:
+            row=db.get(WorkspaceRow,data['wid'])
+            if index_reads.ready(db,BusinessRow,row) and index_reads.casefold_safe(q):
+                return index_reads.project_page(db,BusinessRow,data['wid'],load(db,row,collections=()).get('environment'),q=q,status=status,owner=owner,offset=offset,limit=limit)
+            state=load(db,row,collections=('projects',))
         from .source_case_policy import visible_project
-        items=[p for p in state['projects'] if visible_project(state,p) and (not q or q.casefold() in ' '.join(str(p.get(k,'')) for k in ('code','name','client')).casefold()) and (not status or p['status']==status) and (not owner or p['pm_id']==owner)]
+        with phase(request,'project'): items=[p for p in state['projects'] if visible_project(state,p) and (not q or q.casefold() in ' '.join(str(p.get(k,'')) for k in ('code','name','client')).casefold()) and (not status or p['status']==status) and (not owner or p['pm_id']==owner)]
         items.sort(key=lambda p:(p.get('due_date') or '9999',p['id']))
         return {'total':len(items),'offset':offset,'limit':limit,'items':[dict(id=p['id'],code=p['code'],name=p['name'],status=p['status'],source_status=p.get('source_status'),pm_id=p['pm_id'],due_date=p.get('due_date')) for p in items[offset:offset+limit]]}
+
+    # Already in the shell, or large and unrelated to one case (the full-workspace screens read them on demand).
+    DETAIL_SKIP=('_partial','projects','users','calendar','source_status','file_categories','approval_connection','freshness','environment','workspace_id','as_of','version','work_schedules','daily_unmatched')
+
+    @app.get('/api/projects/{project_id}')
+    def project_detail(request:Request,project_id:str):
+        """One project tree and the records of that case, projected exactly like /api/workspace (same visibility and privacy filters).
+
+        Lists keep this case's rows plus global rows without a project_id (templates, catalogues); the rest of the workspace is not sent.
+        """
+        data,user=identity(request); require(shell_enabled,'尚未啟用單一案件讀取',404)
+        with sessions() as db:
+            with phase(request,'load'): state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
+            with phase(request,'project'): result=public_ws(state,data['wid'],user,data['mode'],owned=True)
+        require(len(result['projects'])==1,'找不到這個案件',404)
+        mine=lambda item:not isinstance(item,dict) or item.get('project_id',project_id)==project_id
+        records={k:[i for i in v if mine(i)] if isinstance(v,list) else v for k,v in result.items() if k not in DETAIL_SKIP}
+        with phase(request,'encode'):
+            from fastapi.responses import JSONResponse
+            from fastapi.encoders import jsonable_encoder
+            return JSONResponse(jsonable_encoder(dict(records,scope='project',version=result['version'],as_of=result['as_of'],project=result['projects'][0])))
+
+    def report_link_state(data,user):
+        from .project_progress import ReportsView
+        from .report_bridge import reconcile_bridges,save_bridges
+        with sessions.begin() as db:
+            db.execute(update(WorkspaceRow).where(WorkspaceRow.id==data['wid']).values(version=WorkspaceRow.version))
+            row=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==data['wid']).with_for_update()).scalar_one()
+            state=load(db,row)
+            current=find(state['users'],user['id'])
+            reports=ReportsView(getattr(app.state,'reports',None),warm=False) if current.get('role') in ('manager','pm') else ReportsView(status='restricted')
+            reconcile_bridges(state,reports)
+            state['report_bridge_available_codes']=sorted(c for c in (reports.data or {}).get('cases',{}) if c and reports.case(c))
+            save_bridges(db,data['wid'],state)
+        return state,current
+
+    @app.get('/api/report-links')
+    def report_links(request:Request):
+        from .report_link_review import review_queue
+        data,user=identity(request)
+        state,current=report_link_state(data,user)
+        return review_queue(state,current)
+
+    @app.get('/api/report-links/summary')
+    def report_links_summary(request:Request,project_id:str=''):
+        from .report_links import can_review_links,link_summary
+        from .report_link_review import allowed_source
+        from .source_case_policy import visible_project
+        data,user=identity(request)
+        state,current=report_link_state(data,user)
+        projects=[p for p in state['projects'] if visible_project(state,p) or can_review_links(current,p)]
+        if project_id: require(any(p['id']==project_id for p in projects),'找不到這個案件',404)
+        state['projects']=projects
+        reviewer=can_review_links(current) or any(can_review_links(current,p) for p in projects)
+        state['daily_unmatched']=[d for d in state.get('daily_unmatched',[]) if allowed_source(state,d) and (reviewer or current['id'] in d.get('source_actor_ids',[]))]
+        result=link_summary(state,project_id or None)
+        bridges=[b for pid,b in state.get('report_case_bridges',{}).items() if any(p['id']==pid for p in projects)]
+        result['bridges']={status:sum(b['status']==status for b in bridges) for status in ('auto_exact','reviewed','rejected','pending')}
+        result['bridge_unknown']=len(projects)-len(bridges)
+        return result
 
     @app.get('/api/daily-reports')
     def daily_reports(request:Request,project_id:str='',department:str='',actor_id:str='',date_from:str='',date_to:str='',status:str='all',q:str='',offset:int=0,limit:int=50):
@@ -363,33 +755,115 @@ def create_app(overrides=None):
         data,user=identity(request)
         require(offset>=0 and 1<=limit<=100,'分頁參數錯誤',422)
         require(status in ('all','matched','unmatched','source_missing'),'日報狀態錯誤',422)
+        for value in (date_from,date_to):
+            if value:
+                try: valid_date(value)
+                except HTTPException: raise HTTPException(422,'日期需為 YYYY-MM-DD')
+        require(not (date_from and date_to) or date_from<=date_to,'結束日期不能早於開始日期',422)
         with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
         from .source_case_policy import filter_visible_cases
+        coverage_scope='workspace' if state.get('environment') in ('demo','test') else 'visible_cases'
         filter_visible_cases(state);filter_private_workspace(state,user)
-        return daily_index(state,project_id=project_id,department=department,actor_id=actor_id,date_from=date_from,date_to=date_to,status=status,q=q,offset=offset,limit=limit)
+        return daily_index(state,project_id=project_id,department=department,actor_id=actor_id,date_from=date_from,date_to=date_to,status=status,q=q,offset=offset,limit=limit,coverage_scope=coverage_scope)
+
+    @app.get('/api/projects/{project_id}/navigation')
+    def project_navigation(request:Request,project_id:str):
+        from .case_navigation import case_navigation
+        from .source_case_policy import visible_project
+        data,user=identity(request)
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
+        require(any(p['id']==project_id and visible_project(state,p) for p in state.get('projects',[])),'找不到這個案件',404)
+        filter_private_workspace(state,user)
+        return case_navigation(state,project_id)
+
+    AUDIT_BATCH=100
+
+    def audit_page(db,wid,offset,limit,project_id,accept,prefilter=()):
+        """Keyset-scan action_audit newest-first in bounded batches.
+
+        Visibility is decided per row by ``accept`` (never after an unsafe LIMIT): every
+        batch is fully filtered before the next keyset page is read, and the scan stops
+        once the requested page plus one lookahead row is known. Memory is bounded
+        by the page and batch sizes; reads stop after offset+limit+1 accepted
+        rows or exhaustion (sparse visibility can still
+        require scanning the history). ``total`` is exact when history is
+        exhausted, otherwise a lower bound (``has_more`` is true).
+        """
+        base=select(AuditRow).where(AuditRow.workspace_id==wid,*prefilter)
+        if project_id:  # conservative superset; exact check stays in ``accept``
+            # SQLite JSON can escape Unicode; PostgreSQL JSON casts can retain it.
+            encodings={json.dumps(project_id,ensure_ascii=ascii_only) for ascii_only in (True,False)}
+            patterns=[value.replace('\\','\\\\').replace('%','\\%').replace('_','\\_') for value in encodings]
+            base=base.where(or_(*[cast(AuditRow.data,String).like('%'+pattern+'%',escape='\\') for pattern in patterns]))
+        need=offset+limit+1; items=[]; accepted=0; last=None; exhausted=False
+        while accepted<need:
+            query=base
+            if last: query=query.where(or_(AuditRow.created_at<last[0],and_(AuditRow.created_at==last[0],AuditRow.id<last[1])))
+            rows=list(db.scalars(query.order_by(AuditRow.created_at.desc(),AuditRow.id.desc()).limit(AUDIT_BATCH)))
+            for row in rows:
+                item=accept(row)
+                if item is not None:
+                    accepted+=1
+                    if offset<accepted<=need: items.append(item)
+            if len(rows)<AUDIT_BATCH: exhausted=True; break
+            last=(rows[-1].created_at,rows[-1].id)
+        has_more=accepted>offset+limit
+        total=accepted if exhausted else need
+        return {'items':items[:limit],'total':total,'offset':offset,'limit':limit,'has_more':has_more}
 
     @app.get('/api/audit')
     def action_audit(request:Request,project_id:str='',offset:int=0,limit:int=50):
         data,user=identity(request); require(offset>=0 and 1<=limit<=100,'分頁參數錯誤',422)
         with sessions() as db:
-            state=load(db,db.get(WorkspaceRow,data['wid']))
+            state=load(db,db.get(WorkspaceRow,data['wid']),collections=('projects',))
             from .source_case_policy import visible_project
             visible={p['id'] for p in state.get('projects',[]) if visible_project(state,p)}
-            rows=list(db.scalars(select(AuditRow).where(AuditRow.workspace_id==data['wid']).order_by(AuditRow.created_at.desc(),AuditRow.id.desc())))
-            items=[]
-            for row in rows:
+            manager=user.get('role')=='manager'
+            def accept(row):
                 details=deepcopy(row.data)
                 refs={details['project_id']} if details.get('project_id') else set()
                 for change in details.get('changes',[]):
                     if change.get('project_id'):refs.add(change['project_id'])
                     elif change.get('kind')=='project':refs.add(change.get('id'))
-                if refs-visible:continue
-                if user.get('role')!='manager':
-                    if row.action.startswith(('admin_','company_admin_','person','delegation','people_')) and row.actor_id!=user['id']: continue
+                if refs-visible:return None
+                if not manager:
+                    if row.action.startswith(('admin_','company_admin_','person','delegation','people_')) and row.actor_id!=user['id']: return None
                     details['changes']=[c for c in details.get('changes',[]) if c['kind'] not in ('users','delegations') or c['id']==user['id']]
-                if project_id and details.get('project_id')!=project_id and not any(c.get('project_id')==project_id or (c['kind']=='project' and c['id']==project_id) for c in details.get('changes',[])): continue
-                items.append(dict(id=row.id,actor_id=row.actor_id,action=row.action,created_at=row.created_at,**details))
-        return {'items':items[offset:offset+limit],'total':len(items),'offset':offset,'limit':limit}
+                if project_id and details.get('project_id')!=project_id and not any(c.get('project_id')==project_id or (c['kind']=='project' and c['id']==project_id) for c in details.get('changes',[])): return None
+                return dict(id=row.id,actor_id=row.actor_id,action=row.action,created_at=row.created_at,**details)
+            prefilter=()
+            if not manager:  # same rule as ``accept``, pushed into SQL to skip rows early
+                prefilter=(or_(AuditRow.actor_id==user['id'],
+                    and_(*[func.substr(AuditRow.action,1,len(x))!=x for x in ('admin_','company_admin_','person','delegation','people_')])),)
+            return audit_page(db,data['wid'],offset,limit,project_id,accept,prefilter)
+
+    @app.get('/api/admin/index-health')
+    def index_health(request:Request):
+        return index_health_run(request,False)
+
+    @app.post('/api/admin/index-health/repair')
+    def index_health_repair(request:Request):
+        return index_health_run(request,True)
+
+    def index_health_run(request,fix):
+        from . import index_tables
+        data,user=identity(request)
+        require(user.get('active',True) and user.get('role')=='manager','索引健康檢查僅限公司管理員',403)
+        wid=data['wid']
+        with sessions.begin() as db:
+            row=db.get(WorkspaceRow,wid)
+            require(not fix or db.info.get('index_tables'),'索引表未啟用，無法修復',409)
+            if fix:  # serialize with writers while the index is rewritten
+                require(db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==row.version).values(version=row.version)).rowcount==1,'資料版本衝突，請重新操作',409)
+            state=upgrade(storage.load(db,BusinessRow,row)); state['version']=row.version
+            report=index_tables.reconcile(db,BusinessRow,wid,state)
+            report['enabled']=bool(db.info.get('index_tables')); report['repaired']=False
+            if fix and not report['healthy']:
+                index_tables.repair(db,BusinessRow,wid,state,report)
+                db.add(audit.record(AuditRow,wid,user['id'],'admin_index_repair',details={'projects':report['dirty_projects'][:50],'project_count':len(report['dirty_projects']),
+                       'counter_drift':len(report['counters']['drift']),'tasks':{k:len(report['tasks'][k]) for k in ('missing','extra','stale')}}))
+                report['repaired']=True
+        return report
 
     @app.get('/api/admin/audit/history')
     def historical_action_audit(request:Request,project_id:str='',offset:int=0,limit:int=50):
@@ -398,25 +872,29 @@ def create_app(overrides=None):
         require(offset>=0 and 1<=limit<=100,'分頁參數錯誤',422)
         # This deliberate administrative endpoint exposes metadata, not archived
         # source snapshots, employee fields, comments or approval evidence.
-        items=[]
-        with sessions() as db:
-            rows=db.scalars(select(AuditRow).where(AuditRow.workspace_id==data['wid']).order_by(AuditRow.created_at.desc(),AuditRow.id.desc()))
-            for row in rows:
-                details=row.data or {}; refs={details['project_id']} if details.get('project_id') else set()
-                for change in details.get('changes',[]):
-                    if change.get('project_id'):refs.add(change['project_id'])
-                    elif change.get('kind')=='project':refs.add(change.get('id'))
-                if project_id and project_id not in refs:continue
-                items.append({'id':row.id,'actor_id':row.actor_id,'action':row.action,'created_at':row.created_at,
-                    'result':details.get('result'),'request_id':details.get('request_id'),
-                    'project_ids':sorted(r for r in refs if r),'change_count':len(details.get('changes',[]))})
-        return {'items':items[offset:offset+limit],'total':len(items),'offset':offset,'limit':limit}
+        def accept(row):
+            details=row.data or {}; refs={details['project_id']} if details.get('project_id') else set()
+            for change in details.get('changes',[]):
+                if change.get('project_id'):refs.add(change['project_id'])
+                elif change.get('kind')=='project':refs.add(change.get('id'))
+            if project_id and project_id not in refs:return None
+            return {'id':row.id,'actor_id':row.actor_id,'action':row.action,'created_at':row.created_at,
+                'result':details.get('result'),'request_id':details.get('request_id'),
+                'project_ids':sorted(r for r in refs if r),'change_count':len(details.get('changes',[]))}
+        with sessions() as db: return audit_page(db,data['wid'],offset,limit,project_id,accept)
 
     @app.post('/api/actions')
     def actions(body:Action,request:Request):
         data,user=identity(request); raw=body.model_dump()
         from .input_validation import validate_action
-        validate_action(raw)
+        try:
+            guard_action({'features':resolve_features(cfg)},raw)
+            validate_action(raw)
+        except HTTPException as exc:
+            with sessions.begin() as db:
+                db.add(audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,
+                                   details={'status':exc.status_code,'reason':'validation'}))
+            raise
         fingerprint=hashlib.sha256(json.dumps({k:v for k,v in raw.items() if k not in ('version','request_id','project_versions')},sort_keys=True).encode()).hexdigest()
         versions=None
         if body.project_versions:
@@ -440,12 +918,22 @@ def create_app(overrides=None):
             if body.action=='case_execution_assign':
                 assign_execution(ws,current,body.project_id,body.payload.get('execution_system'),body.payload.get('reason'))
                 return
+            from .report_link_review import LINK_ACTIONS
+            if body.action in LINK_ACTIONS:
+                from .report_bridge import reconcile_bridges
+                from .project_progress import ReportsView
+                reports=ReportsView(getattr(app.state,'reports',None),warm=False)
+                reconcile_bridges(ws,reports)
+                ws['report_bridge_available_codes']=sorted(c for c in (reports.data or {}).get('cases',{}) if c and reports.case(c))
+                apply_operation(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-'),cfg)
+                return
             affected_ids={i.get('project_id') for i in body.payload.get('items',[]) if isinstance(i,dict)} if body.action=='task_batch_complete' else ({body.project_id} if body.project_id else None)
             affected=[p for p in ws['projects'] if affected_ids is None or p['id'] in affected_ids]
             if affected_ids:
                 for project in affected:require_execution(ws,project)
+            protected_before=deepcopy(affected)
             hashes={n['id']:review_hash(p,n) for p in affected for n in p['nodes']}
-            if not apply_learning(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-')) and not apply_operation(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-')):
+            if not apply_learning(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-')) and not apply_operation(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-'),cfg):
                 apply_action(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-'))
                 for p in affected:
                     for n in p['nodes']:
@@ -455,12 +943,18 @@ def create_app(overrides=None):
                 if body.action=='task_start':
                     p=find(ws['projects'],body.project_id); p['execution_status']='in_progress'
             if body.action=='task_update':
-                for p in ws['projects']:
+                for p in affected:
                     for n in p['nodes']:
                         for t in n['tasks']:
                             if t['id']==body.task_id: t['manual_updated']=True
+            from .sop_import.models import CasePolicy
+            from .sop_import.enrollment_policy import protected_node_changes
+            with sessions() as policy_db:
+                policies={p.project_id:p for p in policy_db.scalars(select(CasePolicy).where(CasePolicy.workspace_id==data['wid']))}
+            require(not protected_node_changes(policies,protected_before,ws['projects'],protect_unclassified=app.state.sop_import.auto_active()),
+                    '舊案節點維持原流程，請先由管理者套用 SOP 到剩餘節點',409)
         try:
-            return persist_mutation(data['wid'],body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions)
+            with phase(request,'mutate'): return persist_mutation(data['wid'],None if body.action=='admin_person' and 'expected_authz_version' in body.payload else body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=(lambda lookup:resolve_footprint(raw,lookup)) if raw['action'] in FOOTPRINT_RULES and raw['action'] not in {'daily_propose','daily_approve'} else None)
         except HTTPException as exc:
             with sessions.begin() as db:
                 db.add(audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,
@@ -471,14 +965,14 @@ def create_app(overrides=None):
     async def upload(request:Request,file:UploadFile=File(...),project_id:str=Form(...),node_id:str=Form(''),direction:str=Form(...),version:int=Form(...),category_id:str=Form('other'),file_key:str=Form(''),project_version:int|None=Form(None)):
         data,user=identity(request); require(direction in ('input','output','evidence'),'文件用途錯誤',400)
         from .case_cutover import require_execution
-        def authorize_upload(ws):
+        def authorize_upload(ws,actor):
             p=find(ws['projects'],project_id,'案件'); n=find(p['nodes'],node_id,'節點') if node_id else None
             require_execution(ws,p)
-            require(is_pm(user,p) or (n and (n['owner_id']==user['id'] or any(is_owner(user,t,ws) for t in n['tasks']))))
+            require(is_pm(actor,p) or (n and (n['owner_id']==actor['id'] or any(is_owner(actor,t,ws,p) for t in n['tasks']))))
             validate_category(ws,category_id)
             return p,n
         # Check before writing any uploaded bytes, then repeat under the mutation lock.
-        with sessions() as db:authorize_upload(load(db,db.get(WorkspaceRow,data['wid'])))
+        with sessions() as db:authorize_upload(load(db,db.get(WorkspaceRow,data['wid'])),user)
         from .upload_policy import attachment_name
         safe_name=attachment_name(file.filename)
         ident=uid(); folder=upload_dir/hashlib.sha256(data['wid'].encode()).hexdigest(); folder.mkdir(exist_ok=True); target=folder/ident
@@ -488,18 +982,26 @@ def create_app(overrides=None):
                 while chunk:=await file.read(1024*1024):
                     size+=len(chunk); require(size<=20*1024*1024,'附件不得超過 20 MB（Lark 保存上限）',413); handle.write(chunk);content_digest.update(chunk)
             def mutate(ws):
-                p,n=authorize_upload(ws)
+                # The uploader's role/capabilities may have changed while the
+                # request body was being read. Authorize and attribute the
+                # durable mutation using the profile reloaded under the lock.
+                actor=find(ws['users'],data['uid'],'登入人員')
+                require(actor.get('active',True),'帳號已停權',403)
+                if data.get('mode')=='lark' and admission_required:
+                    require_access(actor,cfg.get('LARK_APP_ID'),cfg=cfg,
+                                   tenant=data['wid'].removeprefix('test-').removeprefix('lark-'))
+                p,n=authorize_upload(ws,actor)
                 related=[x for x in p['files'] if x.get('file_key',x['id'])==file_key] if file_key else []
                 if file_key:
                     require(bool(related),'原文件不存在，不能新增版本',404)
                     require(all(x.get('node_id')==(node_id or None) and x.get('category_id','other')==category_id and x['direction']==direction for x in related),'新版本須維持原文件節點、分類及用途',409)
                 key=file_key or ident
                 number=1+max((int(x.get('version',1)) for x in related),default=0)
-                p['files'].append(dict(id=ident,file_key=key,category_id=category_id,name=safe_name,node_id=node_id or None,direction=direction,version=str(number),uploaded_by=user['id'],created_at=now(),size=size,sha256=content_digest.hexdigest(),url=f'/api/files/{ident}/download',storage='local'))
+                p['files'].append(dict(id=ident,file_key=key,category_id=category_id,name=safe_name,node_id=node_id or None,direction=direction,version=str(number),uploaded_by=actor['id'],created_at=now(),size=size,sha256=content_digest.hexdigest(),url=f'/api/files/{ident}/download',storage='local'))
                 from .operations import queue
-                queue(ws,'file',user,{'project_id':project_id,'file_id':ident},'file:'+ident)
+                queue(ws,'file',actor,{'project_id':project_id,'file_id':ident},'file:'+ident)
                 p['files'][-1].update(remote_status='queued',auto_store_requested=True)
-                event(ws,user,'file_upload',project_id,node_id,message=f'上傳 {safe_name}')
+                event(ws,actor,'file_upload',project_id,node_id,message=f'上傳 {safe_name}')
             return persist_mutation(data['wid'],version,mutate,actor_id=user['id'],action_name='file_upload',project_versions={project_id:project_version} if project_version is not None else None)
         except Exception:
             target.unlink(missing_ok=True); raise
@@ -515,15 +1017,285 @@ def create_app(overrides=None):
         require(path.resolve().is_relative_to(upload_dir) and path.is_file(),'附件檔案不存在',404)
         return FileResponse(path,filename=match['name'],media_type='application/octet-stream',headers={'Content-Disposition':"attachment; filename*=UTF-8''"+__import__('urllib.parse',fromlist=['quote']).quote(match['name'])})
 
+    def public_source_response(state,snapshot,user):
+        # Shared by GET and POST sync: the raw snapshot stays in the internal cache.
+        from .workspace_projection import public_source_cache
+        from .source_case_policy import visible_source_snapshot
+        out=public_source_cache(visible_source_snapshot(state,snapshot),user)
+        if state.get('environment') not in ('test','demo'):
+            from . import case_redaction
+            from .source_case_policy import filter_visible_cases
+            visible=filter_visible_cases(dict(state))
+            app.state.case_redaction_stats=case_redaction.apply(out,case_redaction.make_plan(case_redaction.snapshot(state),visible))
+        return out
+
     @app.get('/api/sources')
     def sources(request:Request):
         data,user=identity(request)
-        if data['mode']!='lark' or data['wid'].startswith('test-'): return {'configured':False,'last_sync':None,'status':'requires_login','message':'測試區使用隔離試行案；請切換正式工作區讀取 V4','tables':[],'records':[]}
-        with sessions() as db:
-            cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']))
-        from .workspace_projection import public_source_cache
-        from .source_case_policy import visible_source_snapshot
-        return public_source_cache(visible_source_snapshot(state,cache.data),user) if cache else {'configured':bool(configuration(cfg)),'last_sync':None,'status':'not_synced','message':'尚未同步來源','tables':[],'records':[]}
+        app.state.live_read.ensure(data['wid'],'sources')
+        freshness=app.state.live_read.status(data['wid'])
+        if data['mode']!='lark' or data['wid'].startswith('test-'):
+            result={'configured':False,'last_sync':None,'status':'requires_login','message':'測試區使用隔離試行案；請切換正式工作區讀取 V4','tables':[],'records':[]}
+        else:
+            with sessions() as db:
+                cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']))
+            result=public_source_response(state,cache.data,user) if cache else {'configured':bool(configuration(cfg)),'last_sync':None,'status':'never','message':'尚未同步來源','tables':[],'records':[]}
+        return {**result,'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
+
+    def source_health_from(data,user,freshness,cache_data,state):
+        """The GET /api/source-health computation over an already captured read (cache snapshot data and loaded workspace state)."""
+        from .source_health import build_source_health
+        if data['mode']!='lark' or data['wid'].startswith('test-'):
+            snapshot={'status':'requires_login','tables':[],'records':[]}
+        else:
+            if cache_data is not None:
+                from .source_case_policy import visible_source_snapshot
+                snapshot=visible_source_snapshot(state,cache_data)
+                if state.get('environment') not in ('test','demo'):
+                    from . import case_redaction
+                    from .source_case_policy import filter_visible_cases
+                    visible=filter_visible_cases(dict(state))
+                    case_redaction.apply(snapshot,case_redaction.make_plan(case_redaction.snapshot(state),visible))
+            else: snapshot={'status':'never','tables':[],'records':[]}
+        # Exactly the POST /api/sources/sync predicate. viewer_filtered stays None: visible_source_snapshot narrows
+        # records to the admitted ids, so a zero count cannot be proven unfiltered.
+        read_authorized=data['mode']=='lark' and not data['wid'].startswith('test-') and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+        return build_source_health(snapshot,freshness['datasets']['sources'],diagnostic=False,read_authorized=read_authorized,viewer_filtered=None)
+
+    def source_health_page(data,user):
+        """The GET /api/source-health computation, shared so the manager overview binds the identical page state."""
+        app.state.live_read.ensure(data['wid'],'sources')
+        freshness=app.state.live_read.status(data['wid'])
+        cache_data=state=None
+        if data['mode']=='lark' and not data['wid'].startswith('test-'):
+            with sessions() as db:
+                cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']))
+                cache_data=cache.data if cache else None
+        return source_health_from(data,user,freshness,cache_data,state)
+
+    @app.get('/api/source-health')
+    def source_health(request:Request):
+        """Page state only (G-DIAG open: diagnostic=False). Same branches and visibility as GET /api/sources; no record values."""
+        data,user=identity(request)
+        return source_health_page(data,user)
+
+    # ---- P2 read routes (VCC-128..132). Read-only; every handler works on one visibility-narrowed state. ----
+    P2_NOT_FOUND='找不到這個項目'
+    from .project_progress import PLANNING_FIELDS
+    P2_LIST_PARAMS=frozenset({'q','source_version','pm','admission_state','deadline_from','deadline_to','sort','direction','cursor','limit'})
+    P2_CASE_PARAMS=frozenset({'pm_id','execution_status'})
+    P2_FILTER_PARAMS=('source_version','pm','admission_state','deadline_from','deadline_to')
+    P2_SOURCE_STATUS={'forbidden':'forbidden','read_failed':'error','loading':'loading','unlocated':'unlocated','partial':'partial','stale':'stale'}
+
+    def p2_narrowed_state(state,user,page,freshness,keep_lines=False):
+        """filter_visible_cases -> filter_private_workspace -> case_redaction (non test/demo) over a captured workspace state.
+
+        Unlike public_ws this keeps source_work_items/status, but only as narrowed by filter_visible_cases.
+        ``source_status`` translates the Source Health page state of the same capture and keeps its trusted
+        last_sync/sync_revision; ``as_of`` is that capture's source snapshot time, never fetch or request time.
+        ``keep_lines`` re-attaches only the planning fields of the already visibility-narrowed contract lines after the
+        payload strip (which empties them) and before case_redaction, so the same redaction still sweeps them.
+        """
+        from .source_case_policy import filter_visible_cases
+        from . import case_redaction
+        stored=state.get('source_status') if isinstance(state.get('source_status'),dict) else {}
+        pre=case_redaction.snapshot(state)
+        filter_visible_cases(state)
+        kept={c['id']:{k:deepcopy(v) for k,v in (c.get('fields') or {}).items() if k in PLANNING_FIELDS} for c in state.get('contract_items',[])} if keep_lines else {}
+        filter_private_workspace(state,user)
+        restrict_hr(state,user)
+        for c in state.get('contract_items',[]):
+            if c['id'] in kept: c['fields']=kept[c['id']]
+        if state.get('environment') not in ('test','demo'):
+            case_redaction.apply(state,case_redaction.make_plan(pre,state))
+        states=(page or {}).get('states') if isinstance(page,dict) else None
+        if page is None: status='fresh'
+        elif states and 'partial' in states: status='partial'
+        else: status=P2_SOURCE_STATUS.get(states[0]) if states else None
+        translated={'status':status or 'unknown'}
+        if states and 'partial' in states and 'stale' in states: translated['stale']=True
+        for key in ('last_sync','sync_revision'):
+            if key in stored: translated[key]=stored[key]
+        try:
+            stamp=stored.get('last_sync')
+            if isinstance(stamp,str) and datetime.fromisoformat(stamp).tzinfo is not None: translated['last_success_at']=stamp
+        except ValueError: pass
+        state['source_status']=translated
+        state['as_of']=(freshness.get('datasets',{}).get('sources',{}).get('as_of') or stored.get('as_of')) or None
+        return state
+
+    def p2_generation(db,wid):
+        version=db.scalar(select(WorkspaceRow.version).where(WorkspaceRow.id==wid))
+        # The generation fence needs four scalars, not the large source snapshot.
+        keys=('status','last_attempt_at','last_sync','as_of')
+        cache=db.execute(select(*(CacheRow.data[key] for key in keys)).where(CacheRow.id==wid)).first()
+        return (version,*(tuple(cache) if cache else (None,)*len(keys)))
+
+    def p2_read(data,user,keep_lines=False,*,project_id=None):
+        """Health and module input come from ONE capture fenced by a generation read BEFORE the first input read
+        (freshness, cache, workspace) and re-checked after the last. A capture is returned only after its fence
+        passed; when the bounded retries are exhausted nothing from any rejected capture is returned: the input is an
+        empty state under a read_failed page state (rows/counts/ids/labels absent, never current).
+        Single-project progress retains shared policy/redaction facts but loads only that project's tree."""
+        wid=data['wid']
+        app.state.live_read.ensure(wid,'sources')
+        for _ in range(3):
+            with sessions() as db: generation=p2_generation(db,wid)
+            freshness=app.state.live_read.status(wid)
+            with sessions() as db:
+                # This session owns the freshly decoded JSON; health projection
+                # makes its own response copy before redacting formal sources.
+                cache=db.get(CacheRow,wid);cache_data=cache.data if cache else None
+                state=load(db,db.get(WorkspaceRow,wid),project_ids=[project_id] if project_id is not None else None)
+            health=source_health_from(data,user,freshness,cache_data,deepcopy(state))
+            with sessions() as db: unchanged=p2_generation(db,wid)==generation
+            if unchanged: return data,user,health,p2_narrowed_state(state,user,health.get('page_state'),freshness,keep_lines)
+        failed={'page_state':{'states':['read_failed'],'count':None}}
+        empty={'environment':state.get('environment'),'projects':[],'source_confirmations':[],'contract_items':[],'source_work_items':[],'source_visible_record_ids':[]}
+        return data,user,failed,p2_narrowed_state(empty,user,failed['page_state'],{})
+
+    def p2_list_args(request,allowed=P2_LIST_PARAMS):
+        query=request.query_params
+        require(set(query.keys())<=allowed,'查詢參數錯誤',422)
+        for key in query.keys():
+            values=query.getlist(key)
+            require(len(values)<=(20 if key in ('source_version','pm','admission_state') else 1) and all(len(v)<=(240 if key=='q' else 512 if key=='cursor' else 120) for v in values),'查詢參數過長',422)
+        filters={k:(query.getlist(k) if k in ('source_version','pm','admission_state') else query.get(k)) for k in P2_FILTER_PARAMS if k in query}
+        limit=query.get('limit')
+        if limit is not None:
+            require(limit.isascii() and limit.isdigit() and len(limit)<=4,'limit 錯誤',422)
+        require(query.get('direction') in (None,'asc','desc'),'排序方向錯誤',422)
+        return {'q':query.get('q',''),'filters':filters,'cursor':query.get('cursor') or None,
+                'sort':{'column':query.get('sort'),'direction':query.get('direction') or 'asc'} if query.get('sort') else None,
+                'limit':int(limit) if limit is not None else 50}
+
+    def p2_one(request,name,limit):
+        """The single bounded value of a scalar query parameter; repeated or oversize values are 422."""
+        values=request.query_params.getlist(name)
+        require(len(values)<=1 and all(len(v)<=limit for v in values),'查詢參數過長',422)
+        return values[0] if values else None
+
+    def p2_cursor_context(data,user):
+        return [data.get('wid'),user.get('identity_app_id'),user.get('id'),user.get('role'),user.get('authz_version',0)]
+
+    def p2_list_page(state,args,as_of,cursor_context=None):
+        from .confirmation_list import build_confirmation_list
+        result=build_confirmation_list(state,as_of=as_of,cursor_context=cursor_context,**args)
+        if result.get('status')==403: raise HTTPException(403,'沒有權限')
+        if result.get('status')!=200: raise HTTPException(result.get('status',422),result.get('detail') or '查詢參數錯誤')
+        return result
+
+    @app.get('/api/confirmations')
+    def confirmations(request:Request):
+        data,user=identity(request)
+        args=p2_list_args(request)
+        _,_,_,state=p2_read(data,user)
+        return p2_list_page(state,args,state['as_of'],p2_cursor_context(data,user))
+
+    @app.get('/api/manager-overview')
+    def manager_overview(request:Request):
+        from .manager_overview import build_manager_overview
+        from .confirmation_list import confirmation_population
+        data,user=identity(request)
+        args=p2_list_args(request,frozenset(P2_FILTER_PARAMS)|P2_CASE_PARAMS)
+        # Case-level filters (project fields) go only to build_manager_overview; the list/population vocabulary stays separate.
+        case_filters={k:p2_one(request,k,120) for k in sorted(P2_CASE_PARAMS) if k in request.query_params}
+        _,_,health,state=p2_read(data,user)
+        # The same read that feeds the population supplies its C-STATE; this also validates the filters (422).
+        page=p2_list_page(state,{'q':'','filters':args['filters'],'cursor':None,'sort':None,'limit':1},state['as_of'],p2_cursor_context(data,user))
+        envelope=page['page_state']
+        # C-STATE has no complete-nonempty value (data_state.py STATES), so a healthy read (page_state None) stays None
+        # (manager_overview then reports partial: completeness not asserted); any other state is passed through exactly.
+        def population(st,flt):
+            return confirmation_population(st,{k:v for k,v in flt.items() if k not in P2_CASE_PARAMS})
+        result=build_manager_overview(state,population=population,filters={**args['filters'],**case_filters},
+            population_state={'states':envelope['states'],'count':envelope.get('count')} if envelope else None,
+            source_health=health,as_of=state['as_of'])
+        # A KPI drilldown carries population filters only.
+        for card in (result.get('snapshot') or {}).get('cards',[]):
+            card['drilldown']['filters']={k:v for k,v in card['drilldown']['filters'].items() if k not in P2_CASE_PARAMS}
+        return result
+
+    def p2_visible_case_state(data,user,project_id,keep_lines=False,*,scoped=False):
+        """The narrowed P2 state, or 404 (identical for absent and not visible) unless the case is visible to the viewer."""
+        _,_,_,state=p2_read(data,user,keep_lines,project_id=project_id if scoped else None)
+        from .source_case_policy import visible_project
+        require(any(p['id']==project_id and visible_project(state,p) for p in state.get('projects',[])),P2_NOT_FOUND,404)
+        return state
+
+    @app.get('/api/projects/{project_id}/progress')
+    def project_progress(request:Request,project_id:str):
+        """One case's engineering progress. Same gates as case-detail; amounts and v3 reports only for PM/manager in normal access."""
+        from fastapi.responses import JSONResponse
+        from .project_progress import build_project_progress,ReportsView
+        data,user=identity(request)
+        require(len(project_id)<=200,'查詢參數過長',422)
+        require(not request.query_params,'查詢參數錯誤',422)
+        state=p2_visible_case_state(data,user,project_id,keep_lines=True,scoped=True)
+        privileged=data.get('access_mode','normal')=='normal' and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+        if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true': reports=ReportsView(status='disabled')
+        elif not privileged or data.get('mode')!='lark' or data['wid'].startswith(('test-','demo-')): reports=ReportsView(status='restricted')
+        else: reports=ReportsView(getattr(app.state,'reports',None))
+        if reports.data is not None:
+            from .report_bridge import reconcile_bridges,save_bridges
+            with sessions.begin() as db:
+                db.execute(update(WorkspaceRow).where(WorkspaceRow.id==data['wid']).values(version=WorkspaceRow.version))
+                row=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==data['wid']).with_for_update()).scalar_one()
+                current=load(db,row,project_ids=[project_id])
+                reconcile_bridges(current,reports);save_bridges(db,data['wid'],current)
+                state['report_case_bridges']=current['report_case_bridges']
+        return JSONResponse(build_project_progress(state,project_id,reports=reports,amounts=privileged,as_of=state['as_of']),headers={'Cache-Control':'no-store'})
+
+    @app.get('/api/case-detail/{project_id}')
+    def case_detail(request:Request,project_id:str):
+        from .case_detail import build_case_detail
+        data,user=identity(request)
+        require(len(project_id)<=200,'查詢參數過長',422)
+        require(set(request.query_params.keys())<={'confirmation_key'},'查詢參數錯誤',422)
+        confirmation_key=p2_one(request,'confirmation_key',300)
+        state=p2_visible_case_state(data,user,project_id)
+        result=build_case_detail(state,project_id,confirmation_key=confirmation_key,as_of=state['as_of'])
+        require(result.get('header') is not None,P2_NOT_FOUND,404)
+        return result
+
+    @app.get('/api/contract-detail')
+    def contract_detail(request:Request):
+        from .contract_detail import build_contract_detail
+        data,user=identity(request)
+        require(set(request.query_params.keys())<={'key'},'查詢參數錯誤',422)
+        key=p2_one(request,'key',300) or ''
+        require(0<len(key),'查詢參數錯誤',422)
+        _,_,_,state=p2_read(data,user)
+        result=build_contract_detail(state,key,as_of=state['as_of'])
+        require(result.get('page_state',{}).get('states')!=['unlocated'],P2_NOT_FOUND,404)
+        return result
+
+    @app.get('/api/work-item-detail')
+    def work_item_detail(request:Request):
+        from .work_item_detail import build_work_item_detail
+        data,user=identity(request)
+        require(set(request.query_params.keys())<={'key'},'查詢參數錯誤',422)
+        key=p2_one(request,'key',300) or ''
+        require(0<len(key),'查詢參數錯誤',422)
+        _,_,_,state=p2_read(data,user)
+        result=build_work_item_detail(state,key,as_of=state['as_of'])
+        require('header' in result,P2_NOT_FOUND,404)
+        return result
+
+    @app.get('/api/my-work')
+    def my_work(request:Request):
+        """Read model for the viewer; same full-workspace load as GET /api/workspace. my_work applies case_redaction itself."""
+        from .my_work import build_my_work_input
+        data,user=identity(request)
+        if request.query_params: return app.state.home_panels.read_workspace(request,data,user)
+        app.state.live_read.ensure(data['wid'],'sources')
+        read={'admitted':data.get('access_mode','normal') in ('normal','tenant-read')}
+        try:
+            with phase(request,'load'),sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
+            read['loaded']=True
+        except Exception:
+            state={}; read['failed']=True
+        return build_my_work_input(state,user,read,sop_items=app.state.sop_import.personal_items(state,data['wid'],user) if read.get('loaded') else [])
 
     @app.post('/api/sources/cutover-baseline')
     async def source_case_baseline(request:Request):
@@ -536,30 +1308,54 @@ def create_app(overrides=None):
     def sync(request:Request):
         data,user=identity(request); require(data['mode']=='lark','請使用公司 Lark 登入後同步正式來源',403); require(user['role'] in ('pm','manager') or capable(user,'manage_sources'),'需要來源同步權限',403)
         require(not data['wid'].startswith('test-'),'測試工作區不可直接同步正式 V4；請使用隔離試行複本',403)
-        with sessions() as db: auth=db.get(AuthRow,data['sid']); token=auth.data['access_token']
-        return app.state.source_sync.sync(data['wid'],user['id'],token)
+        if live_enabled(data['wid']):
+            authorize_live(data['wid'],'sources',user)
+            response=manual_live(data['wid'],'sources',user)
+            if response: return response
+            with sessions() as db:
+                cache=db.get(CacheRow,data['wid']); state=load(db,db.get(WorkspaceRow,data['wid']))
+            freshness=app.state.live_read.status(data['wid'])
+            return {**public_source_response(state,cache.data,user),'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
+        with sessions() as db: token=user_access_token(db,data)
+        snapshot=app.state.source_sync.sync(data['wid'],user['id'],token)
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
+        freshness=app.state.live_read.status(data['wid'])
+        return {**public_source_response(state,snapshot,user),'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
 
     @app.post('/api/approvals/{approval_id}/refresh')
     async def refresh_approval(approval_id:str,request:Request):
-        data,user=identity(request); require(data['mode']=='lark','原生審批查詢需公司 Lark 登入',403)
-        body=await request.json(); instance_code=str(body.get('instance_code','')); require(bool(re.fullmatch(r'[A-Za-z0-9_-]{6,128}',instance_code)),'請提供有效 Lark 審批實例 ID',400)
+        data,user=identity(request)
+        from .features import require_feature
+        require_feature(resolve_features(cfg),'change_extension')
+        require(data['mode']=='lark','原生審批查詢需公司 Lark 登入',403)
+        body=await json_object(request)
+        require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
+        instance_code=str(body.get('instance_code','')); require(bool(re.fullmatch(r'[A-Za-z0-9_-]{6,128}',instance_code)),'請提供有效 Lark 審批實例 ID',400)
         with sessions() as db:
             ws=load(db,db.get(WorkspaceRow,data['wid'])); approval=find(ws['approvals'],approval_id,'申請'); p=find(ws['projects'],approval['project_id'],'案件'); require(is_pm(user,p))
-            token=db.get(AuthRow,data['sid']).data['access_token']
+            token=user_access_token(db,data)
         try:
             with httpx.Client(timeout=25) as client:
                 response=client.get(API+'/approval/v4/instances/detail',headers={'Authorization':'Bearer '+token},params={'instance_code':instance_code,'locale':'zh-TW','user_id_type':'open_id'})
-                require(response.status_code==200,'Lark 審批讀取失敗',502); result=response.json(); require(result.get('code',0)==0,'目前身份無法讀取該 Lark 審批實例',403)
+                require(response.status_code==200,'Lark 審批讀取失敗',502)
+                try: result=response.json()
+                except ValueError: raise HTTPException(502,'Lark 審批回應無法核實')
+                require(isinstance(result,dict) and type(result.get('code',0)) is int,'Lark 審批回應格式不完整',502)
+                require(result.get('code',0)==0,'目前身份無法讀取該 Lark 審批實例',403)
         except httpx.HTTPError: raise HTTPException(502,'Lark 審批服務暫時無法連線')
         remote=result.get('data',{}); expected=cfg.get('LARK_CHANGE_APPROVAL_CODE' if approval['type']=='change' else 'LARK_EXTENSION_APPROVAL_CODE')
+        require(isinstance(remote,dict),'Lark 審批回應內容無法核實',502)
+        status=remote.get('status','UNKNOWN')
+        require(isinstance(status,str) and re.fullmatch(r'[A-Z_]{1,40}',status),'Lark 審批狀態無法核實',502)
         if expected: require((remote.get('definition_code') or remote.get('approval_code'))==expected,'此審批實例不屬於設定的審批定義',409)
         def mutate(state):
             target=find(state['approvals'],approval_id,'申請')
+            actor=find(state['users'],user['id'],'操作者')
+            require(is_pm(actor,find(state['projects'],target['project_id'],'案件')))
             # Do not turn an arbitrary reference into authorization to change project scope.
             target.update(lark_instance_code=instance_code,lark_external_status=remote.get('status','UNKNOWN'),lark_checked_at=now(),lark_binding_verified=False)
             target['history'].append({'action':'lark_refresh','actor_id':user['id'],'created_at':now(),'message':'唯讀取得原生審批狀態；尚未驗證此實例與案件範圍一致，不自動核准'})
             event(state,user,'approval_refresh',target['project_id'],message='查詢既有 Lark 審批狀態')
-        require(isinstance(body.get('version'),int),'請提供工作區 version',400)
         return persist_mutation(data['wid'],body['version'],mutate,actor_id=user['id'])
 
     @app.post('/api/learning/sync')
@@ -570,8 +1366,9 @@ def create_app(overrides=None):
         from .lark_adapter import LarkAdapter, RemoteFailure
         data,user=identity(request); require(data['mode']=='lark' and not data['wid'].startswith('test-'),'能力地圖唯讀同步需公司正式工作區',403)
         require(capable(user,'manage_training') or capable(user,'manage_sources'),'需要訓練或來源管理權限',403)
-        body=await request.json()
-        with sessions() as db: token=db.get(AuthRow,data['sid']).data['access_token']
+        body=await json_object(request)
+        require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
+        with sessions() as db: token=user_access_token(db,data)
         adapter=LarkAdapter(token)
         try: catalog,bindings=read_capabilities(adapter)
         except RemoteFailure as exc: raise HTTPException(502,str(exc))
@@ -588,7 +1385,13 @@ def create_app(overrides=None):
         require(data['mode']=='lark','公司名冊同步需使用公司 Lark 身分',403)
         target=organization(data) if data.get('access_mode')=='recovery' else data['wid']
         if data.get('access_mode')=='recovery':ensure_workspace(target,True)
-        return app.state.people_directory.sync(target,user['id'])
+        if live_enabled(target):
+            authorize_live(target,'roster',user)
+            response=manual_live(target,'roster',user)
+            if response: return response
+            with sessions() as db: state=load(db,db.get(WorkspaceRow,target))
+            return {**state['people_directory_status'],'freshness':app.state.live_read.status(target)}
+        return {**app.state.people_directory.sync(target,user['id']),'freshness':app.state.live_read.status(target)}
 
     @app.post('/api/delegations/verify-approval')
     async def verify_delegation(request:Request):
@@ -596,9 +1399,11 @@ def create_app(overrides=None):
         from .lark_adapter import LarkAdapter, RemoteFailure
         data,user=identity(request); require(data['mode']=='lark' and not data['wid'].startswith('test-'),'請假來源核實需正式公司身分',403)
         require(capable(user,'manage_handover'),'需要交接管理權限',403)
-        body=await request.json(); code=str(body.get('instance_code',''))
+        body=await json_object(request)
+        require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
+        code=str(body.get('instance_code',''))
         require(bool(re.fullmatch(r'[A-Za-z0-9_-]{6,128}',code)),'審批實例編號格式錯誤',422)
-        with sessions() as db: token=db.get(AuthRow,data['sid']).data['access_token']
+        with sessions() as db: token=user_access_token(db,data)
         adapter=LarkAdapter(token)
         try:
             remote=adapter.request('GET','/approval/v4/instances/detail',params={'instance_code':code,'user_id_type':'open_id','locale':'zh-TW'})
@@ -606,6 +1411,8 @@ def create_app(overrides=None):
         except RemoteFailure as exc: raise HTTPException(502,str(exc))
         finally: adapter.client.close()
         def mutate(state):
+            actor=find(state['users'],user['id'],'操作者')
+            require(capable(actor,'manage_handover'),'需要交接管理權限',403)
             known={u['id'] for u in state['users']}
             require(result['principal_id'] in known and result['delegate_id'] in known,'請先核實兩人的公司身分',409)
             state['approved_leave_delegations']=[a for a in state['approved_leave_delegations'] if a['id']!=code]+[result]
@@ -613,16 +1420,17 @@ def create_app(overrides=None):
         return persist_mutation(data['wid'],body['version'],mutate,actor_id=user['id'])
 
     @app.get('/api/auth/lark/login')
-    def lark_login(next:str='/'):
+    def lark_login(request:Request,next:str='/'):
         require(oauth_configured,'尚未設定 Lark 登入應用、回呼網址或租戶白名單',503)
-        require(next.startswith('/') and not next.startswith('//') and '\\' not in next and not any(ord(c)<32 for c in next),'返回路徑不合法',422)
+        require(safe_next(next),'返回路徑不合法',422)
+        public_origin(request)  # Validate production configuration before creating a nonce.
         state=secrets.token_urlsafe(32)
         with sessions.begin() as db: db.add(AuthRow(id='oauth-'+state,data={'expires':datetime.now(timezone.utc).timestamp()+600,'next':next}))
-        response=RedirectResponse('https://accounts.larksuite.com/open-apis/authen/v1/authorize?'+urlencode({'app_id':cfg['LARK_APP_ID'],'redirect_uri':cfg['LARK_REDIRECT_URI'],'state':state,'response_type':'code','scope':oauth_scopes}))
-        response.set_cookie('lark_oauth_state',signer.dumps(state),httponly=True,secure=production,samesite='lax',max_age=600); return response
+        response=RedirectResponse('https://accounts.larksuite.com/open-apis/authen/v1/authorize?'+urlencode({'app_id':cfg['LARK_APP_ID'],'redirect_uri':cfg['LARK_REDIRECT_URI'],'state':state,'response_type':'code'}))
+        response.set_cookie('lark_oauth_state',signer.dumps(state),httponly=True,secure=secure_cookie(request),samesite='lax',max_age=600,path='/'); return response
 
     @app.get('/api/auth/lark/callback')
-    def lark_callback(request:Request,code:str='',state:str=''):
+    def lark_callback(request:Request,code:str='',state:str='',error:str='',error_description:str=''):
         require(oauth_configured,'Lark 登入未設定',503)
         try: cookie=signer.loads(request.cookies.get('lark_oauth_state',''),max_age=600)
         except BadSignature: raise HTTPException(400,'OAuth state 驗證失敗')
@@ -631,9 +1439,34 @@ def create_app(overrides=None):
             nonce=db.execute(select(AuthRow).where(AuthRow.id=='oauth-'+state).with_for_update()).scalar_one_or_none()
             require(nonce is not None and nonce.data['expires']>datetime.now(timezone.utc).timestamp(),'OAuth state 已失效或已使用',400)
             return_to=nonce.data.get('next','/'); db.delete(nonce)
+        return_to=return_to if safe_next(return_to) else '/'
+        # Authorization servers return OAuth errors on the callback instead of
+        # an authorization code when consent is denied or a scope is invalid.
+        # Never forward provider-supplied descriptions into our URL or UI.
+        if error:
+            provider_errors={
+                'access_denied':'authorization_denied',
+                'invalid_scope':'app_configuration',
+                'unauthorized_client':'app_configuration',
+                'invalid_client':'app_configuration',
+                'temporarily_unavailable':'provider_unavailable',
+                'server_error':'provider_unavailable',
+            }
+            safe_code=provider_errors.get(error,'authorization_failed')
+            response=RedirectResponse('/?auth_error='+safe_code,status_code=303)
+            response.delete_cookie('lark_oauth_state'); return response
+        require(bool(code),'Lark 沒有回傳授權碼',400)
         try:
             with httpx.Client(timeout=25) as client:
-                response=client.post(API+'/authen/v2/oauth/token',json={'grant_type':'authorization_code','client_id':cfg['LARK_APP_ID'],'client_secret':cfg['LARK_APP_SECRET'],'code':code,'redirect_uri':cfg['LARK_REDIRECT_URI']}); response.raise_for_status(); token=response.json()
+                response=client.post(API+'/authen/v2/oauth/token',json={'grant_type':'authorization_code','client_id':cfg['LARK_APP_ID'],'client_secret':cfg['LARK_APP_SECRET'],'code':code,'redirect_uri':cfg['LARK_REDIRECT_URI']})
+                if response.status_code>=400:
+                    try: provider_error=response.json().get('error')
+                    except (ValueError,TypeError,AttributeError): provider_error=None
+                    detail=('使用者拒絕授權' if provider_error=='access_denied' else
+                            'OAuth 應用權限設定需管理員檢查' if provider_error in ('invalid_scope','unauthorized_client','invalid_client') else
+                            'Lark 登入服務暫時無法連線')
+                    raise HTTPException(400 if provider_error in ('access_denied','invalid_scope','unauthorized_client','invalid_client') else 502,detail)
+                token=response.json()
                 require(bool(token.get('access_token')),'Lark 授權碼交換失敗',401)
                 response=client.get(API+'/authen/v1/user_info',headers={'Authorization':'Bearer '+token['access_token']}); response.raise_for_status(); info=response.json().get('data',{})
         except httpx.HTTPError: raise HTTPException(502,'Lark 登入服務暫時無法連線')
@@ -651,18 +1484,23 @@ def create_app(overrides=None):
                 if role=='manager' and user.get('role')=='manager': user['bootstrap_admin']=True
                 elif role=='manager' and not user.get('authz_version'):
                     user.update(role='manager',bootstrap_admin=True,capabilities=initial_capabilities(oid,'manager'))
-                require_access(user,cfg['LARK_APP_ID'],allow_recovery=True,cfg=cfg,tenant=tenant)
                 reconcile_company_admin(db,org,user)
                 if isinstance(info.get('user_id'),str) and info['user_id']:
                     user['attendance_identity']={'employee_type':'employee_id','employee_id':info['user_id'],'open_id':oid,'app_id':cfg['LARK_APP_ID'],'tenant':tenant,'verified_at':now(),'source':'oauth_user_info'}
+                photo = avatar_url(info.get('avatar_url')) or avatar_url(info.get('avatar_thumb')) or avatar_url(user.get('avatar_url'))
+                user.pop('avatar_url', None)
+                if photo:
+                    user['avatar_url'] = photo
                 profile.data=deepcopy(user)
             else:
                 user['oauth_identity']={'source':'oauth_user_info','app_id':cfg['LARK_APP_ID'],'tenant':tenant,'open_id':oid,'verified_at':now()}
                 if role=='manager': user['bootstrap_admin']=True
-                require_access(user,cfg['LARK_APP_ID'],allow_recovery=True,cfg=cfg,tenant=tenant)
                 reconcile_company_admin(db,org,user)
                 if isinstance(info.get('user_id'),str) and info['user_id']:
                     user['attendance_identity']={'employee_type':'employee_id','employee_id':info['user_id'],'open_id':oid,'app_id':cfg['LARK_APP_ID'],'tenant':tenant,'verified_at':now(),'source':'oauth_user_info'}
+                photo = avatar_url(info.get('avatar_url')) or avatar_url(info.get('avatar_thumb'))
+                if photo:
+                    user['avatar_url'] = photo
                 db.add(PersonRow(organization_id=org,person_id=oid,data=user))
         # Company OAuth always enters the real company workspace. Historical
         # manager preferences must not silently turn a fresh login into a test.
@@ -670,65 +1508,230 @@ def create_app(overrides=None):
         wid=org
         ensure_workspace(wid,True); ensure_workspace(org,True); sid=uid()
         with sessions.begin() as db:
-            db.add(AuthRow(id=sid,data={'wid':wid,'organization':org,'uid':oid,'access_token':token['access_token'],'granted_scope':token.get('scope',''),'requested_scope':oauth_scopes,'expires':datetime.now(timezone.utc).timestamp()+min(int(token.get('expires_in',7200)),8*3600)}))
+            db.add(AuthRow(id=sid,data={'wid':wid,'organization':org,'uid':oid,'access_token':token['access_token'],'granted_scope':token.get('scope',''),'requested_scope':oauth_scopes,'expires':datetime.now(timezone.utc).timestamp()+SESSION_MAX_AGE,'token_expires':datetime.now(timezone.utc).timestamp()+int(token.get('expires_in',7200))}))
             db.add(audit.record(AuditRow,wid,oid,'login',details={'environment':'test' if wid.startswith('test-') else 'production'}))
-        response=RedirectResponse(return_to); set_cookie(response,{'mode':'lark','uid':oid,'wid':wid,'organization':org,'sid':sid}); response.delete_cookie('lark_oauth_state'); return response
+        response=RedirectResponse(public_origin(request)+return_to); set_cookie(response,{'mode':'lark','uid':oid,'wid':wid,'organization':org,'sid':sid},request); response.delete_cookie('lark_oauth_state'); return response
 
     @app.post('/api/workspace/switch')
     async def switch_workspace(request:Request):
         from fastapi.responses import JSONResponse
         data,user=identity(request); require(data['mode']=='lark','需公司登入',403)
-        body=await request.json(); target=body.get('environment'); require(target in ('test','production'),'工作區錯誤',422)
+        body=await json_object(request); target=body.get('environment'); require(isinstance(target,str) and target in ('test','production'),'工作區錯誤',422)
         wid=('test-' if target=='test' else '')+organization(data); ensure_workspace(wid,True)
         with sessions.begin() as db:
             auth=db.execute(select(AuthRow).where(AuthRow.id==data['sid']).with_for_update()).scalar_one()
             require(auth.data.get('wid')==data['wid'],'工作區已在另一視窗切換，請重新載入',409)
             auth.data={**auth.data,'wid':wid}
             db.add(audit.record(AuditRow,wid,user['id'],'workspace_switch',details={'from':data['wid'],'to':wid}))
-        data['wid']=wid; response=JSONResponse({'ok':True,'environment':target}); set_cookie(response,data); return response
+        data['wid']=wid; response=JSONResponse({'ok':True,'environment':target}); set_cookie(response,data,request); return response
 
     @app.post('/api/pilot/copy')
     async def copy_pilot(request:Request):
         data,user=identity(request); require(data['mode']=='lark' and user['role']=='manager','需公司管理員',403)
-        body=await request.json(); org=organization(data); wid='test-'+org; ensure_workspace(wid,True)
-        with sessions.begin() as db:
-            source=db.get(WorkspaceRow,org); require(source is not None,'正式工作區尚未建立',409); source_state=load(db,source)
-            p=find(source_state['projects'],body.get('project_id'),'V4案件'); target=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one(); state=load(db,target); expected=target.version
-            require(not any(x.get('pilot_source_id')==p['id'] for x in state['projects']),'此試行案已複製',409)
-            copy=deepcopy(p); copy['pilot_source_id']=p['id']; copy['pilot']=True
-            # Preserve stable IDs in the isolated namespace, not production identities/recipients.
-            copy['pm_id']=user['id']; copy['admin_id']=''; copy['supervisor_id']=''; copy['issuer_ids']=[user['id']]; copy['confirmation_issues']=[]
-            for node in copy['nodes']:
-                node['owner_id']=user['id']; node['supervisor_id']=''; node['reviewers']=[]; node['collaborator_ids']=[]; node['review_cycles']=[]
-                for task in node['tasks']: task['owner_id']=user['id']; task.pop('proxy',None)
-            state['projects'].append(copy); state['environment']='test'; state['version']=expected+1
-            root=storage.save(db,BusinessRow,wid,state)
-            updated=db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==expected).values(version=expected+1,data=root))
-            require(updated.rowcount==1,'工作區已變更，請重新操作',409)
-            db.add(audit.record(AuditRow,wid,user['id'],'pilot_copy',details={'project_id':copy['id'],'source_workspace':org}))
+        body=await json_object(request); require(isinstance(body.get('project_id'),str),'請提供案件編號',422); org=organization(data); wid='test-'+org; ensure_workspace(wid,True)
+        copied_files=[]
+        try:
+            with sessions.begin() as db:
+                source=db.get(WorkspaceRow,org); require(source is not None,'正式工作區尚未建立',409)
+                target=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one()
+                source_state=load(db,source)
+                actor=find(source_state['users'],user['id'],'操作者')
+                require(actor.get('active',True) and actor.get('role')=='manager','需公司管理員',403)
+                p=find(source_state['projects'],body.get('project_id'),'V4案件'); state=load(db,target); expected=target.version
+                require(not any(x.get('pilot_source_id')==p['id'] for x in state['projects']),'此試行案已複製',409)
+                occupied_ids=set()
+                def collect_ids(value):
+                    if isinstance(value,dict):
+                        if isinstance(value.get('id'),str): occupied_ids.add(value['id'])
+                        for child in value.values(): collect_ids(child)
+                    elif isinstance(value,list):
+                        for child in value: collect_ids(child)
+                collect_ids(state['projects'])
+                copy,id_map=_reidentify_pilot_project(p,occupied_ids); copy['pilot']=True
+                # Preserve stable IDs in the isolated namespace, not production identities/recipients.
+                copy['pm_id']=user['id']; copy['admin_id']=''; copy['supervisor_id']=''; copy['issuer_ids']=[user['id']]; copy['confirmation_issues']=[]
+                for node in copy['nodes']:
+                    node['owner_id']=user['id']; node['supervisor_id']=''; node['reviewers']=[]; node['collaborator_ids']=[]; node['review_cycles']=[]
+                    for task in node['tasks']: task['owner_id']=user['id']; task.pop('proxy',None)
+                copied_files=_copy_local_pilot_attachments(upload_dir,org,wid,copy,id_map)
+                state['projects'].append(copy); state['environment']='test'; state['version']=expected+1
+                root=storage.save(db,BusinessRow,wid,state)
+                updated=db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==expected).values(version=expected+1,data=root))
+                require(updated.rowcount==1,'工作區已變更，請重新操作',409)
+                db.add(audit.record(AuditRow,wid,user['id'],'pilot_copy',details={'project_id':copy['id'],'source_workspace':org}))
+        except Exception:
+            for path in copied_files: path.unlink(missing_ok=True)
+            raise
         return {'ok':True,'workspace':'test','project_id':copy['id']}
 
     from .integration_routes import register
     register(app,identity,load,persist_mutation,sessions,WorkspaceRow,BusinessRow,PersonRow,cfg,upload_dir)
     from .native_routes import register as register_native
     register_native(app,identity,load,persist_mutation,sessions,WorkspaceRow,cfg)
+
+    def node_assignment_case(data,user,project_id):
+        from .source_case_policy import visible_project
+        require(len(project_id)<=200,'查詢參數過長',422)
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=storage.CASE_COLLECTIONS,project_ids=[project_id])
+        project=next((p for p in state['projects'] if p['id']==project_id and visible_project(state,p)),None)
+        require(project is not None,'找不到這個案件',404)
+        return state,project
+    def sop_case(data,user,project_id):
+        """node_assignment_case plus the local planning cases this viewer may see; node assignment never gets those."""
+        from .source_case_policy import visible_project,local_viewer
+        require(len(project_id)<=200,'查詢參數過長',422)
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=storage.CASE_COLLECTIONS,project_ids=[project_id])
+        project=next((p for p in state['projects'] if p['id']==project_id),None)
+        require(project is not None,'找不到這個案件',404)
+        if not (visible_project(state,project) or local_viewer(user,project)):
+            from .source_case_policy import local_planning
+            require(local_planning(project) and (user['id'] in project.get('sop_task_delegate_ids',[]) or app.state.sop_import.participates(data['wid'],user['id'],project_id)),'找不到這個案件',404)
+            if user['id'] not in project.get('sop_task_delegate_ids',[]):
+                project={k:project.get(k) for k in ('id','code','name')}
+                project['sop_assigned_only']=True
+                state={'users':[user], 'projects':[project]}
+        return state,project
+    def quote_view(data,user):
+        """The quote register's cases and rows as the viewer may see them, and the /progress amounts gate."""
+        from .source_case_policy import filter_visible_cases,local_viewer
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=('projects','source_quotes'))
+        local=[p for p in state['projects'] if local_viewer(user,p)]
+        filter_visible_cases(state)
+        state['local_cases']=local
+        return state,data.get('access_mode','normal')=='normal' and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+    def quote_workspace(wid):
+        with sessions() as db: return load(db,db.get(WorkspaceRow,wid),collections=('users','projects','source_quotes','sop_templates'))
+    def persist_local_case(db,wid,actor_id,build):
+        """Append one case inside the caller's transaction through the full save, so index rows and versions stay exact."""
+        row=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==wid).with_for_update()).scalar_one()
+        state=load(db,row)
+        before=audit.entities(state)
+        project=build(state)
+        state['projects'].append(project); state['version']=row.version+1
+        root=storage.save(db,BusinessRow,wid,state)
+        updated=db.execute(update(WorkspaceRow).where(WorkspaceRow.id==wid,WorkspaceRow.version==row.version).values(version=row.version+1,data=root))
+        require(updated.rowcount==1,'資料版本衝突，請重新整理',409)
+        db.add(audit.record(AuditRow,wid,actor_id,'create_local_case',details={'version':state['version'],'project_id':project['id'],
+                                                                               'changes':audit.changes(before,state)}))
+    from .sop_import.routes import register as register_sop_import
+    app.state.sop_import = register_sop_import(app, identity=identity, load_case=sop_case, phase=phase,
+        sessions=sessions, cfg=cfg, quote_view=quote_view, workspace=quote_workspace, persist_case=persist_local_case)
+    from .node_assignment.routes import register as register_node_assignment
+    from .node_skip import valid_waiver
+    def node_reports():
+        # Cached snapshot only: never starts a read, so a cold or disabled register simply means no v3 evidence.
+        from .project_progress import ReportsView
+        if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true' or getattr(app.state,'reports',None) is None: return None
+        return ReportsView(app.state.reports,warm=False)
+    app.state.node_assignment=register_node_assignment(app,identity=identity,load_case=node_assignment_case,sessions=sessions,
+        receipt_model=Receipt,audit_model=AuditRow,cfg=cfg,skipped_nodes=valid_waiver,reports=node_reports,
+        phase=phase,reports_visible=lambda user: user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+    from .dispatch_board.routes import register as register_dispatch_board
+    from .dispatch_board.service import DispatchBoardService
+    from .dispatch_board.lark_table import DispatchReader
+    app.state.dispatch_board=register_dispatch_board(app,identity=identity,cfg=cfg,
+        allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'),
+        service=DispatchBoardService(cfg,reader=DispatchReader(cfg,transport=dispatch_transport)) if dispatch_transport else None)
+    from .dispatch_publish.routes import register as register_dispatch_publish
+    def dispatch_workspace(wid):
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,wid),collections=('users',))
+        # Session people feed the pm_final seat (role pm); only the fields the seat needs leave here.
+        users=[{k:u.get(k) for k in ('id','name','role','active')} for u in state.get('users',[])]
+        return {'settings':state.get('settings',{}),'environment':state.get('environment'),'users':users}
+    app.state.dispatch_publish=register_dispatch_publish(app,identity=identity,cfg=cfg,sessions=sessions,audit_model=AuditRow,
+        workspace=dispatch_workspace,allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'),
+        transport=dispatch_transport)
+    from .home_panels import register as register_home_panels
+    app.state.home_panels=register_home_panels(app,identity=identity,load=load,sessions=sessions,workspace_model=WorkspaceRow,nodes=app.state.node_assignment,sop=app.state.sop_import)
     from .native_poller import NativeApprovalPoller
     app.state.native_poller=NativeApprovalPoller(sessions,WorkspaceRow,BusinessRow,PersonRow,cfg)
     from .source_sync import SourceSyncService
-    app.state.source_sync=SourceSyncService(sessions,WorkspaceRow,BusinessRow,PersonRow,AuthRow,CacheRow,cfg,fetcher=lambda token:fetch_sources(token,cfg=cfg))
+    app.state.source_sync=SourceSyncService(sessions,WorkspaceRow,BusinessRow,PersonRow,AuthRow,CacheRow,cfg)
     from .people_directory import PeopleDirectoryService
     app.state.people_directory=PeopleDirectoryService(sessions,WorkspaceRow,BusinessRow,PersonRow,cfg)
     from .attendance_service import AttendanceScheduleService
     app.state.attendance_schedule=AttendanceScheduleService(sessions,WorkspaceRow,BusinessRow,PersonRow,cfg)
+    # Default OFF and not imported unless on (ops_sync is not in the deploy package yet). When on, the local feature
+    # path gets the version-CAS WorkspaceRow store, never the file mock.
+    app.state.ops_store_for=None
+    if str(cfg.get('FEATURE_LARK_AUTHORITATIVE_OPS','false')).lower()=='true':
+        from .ops_sync.flags import resolve_flags as resolve_ops_flags
+        from .ops_sync.workspace_store import ops_store_factory
+        app.state.ops_store_for=ops_store_factory(resolve_ops_flags({'FEATURE_LARK_AUTHORITATIVE_OPS':True}),sessions)
+        from .ops_sync.routes import register as register_ops_routes
+        register_ops_routes(app,identity,load,sessions,WorkspaceRow)
+    from .live_read.coordinator import RefreshCoordinator
+    from .live_read.datasets import build_refreshers
+    from .live_read.routes import register as register_live, refresh as live_refresh
+    app.state.live_read=RefreshCoordinator(sessions,CacheRow,build_refreshers(
+        app.state.source_sync,app.state.people_directory,app.state.attendance_schedule),cfg)
+
+    from .live_read.people_attendance import PeopleAttendance
+    app.state.people_attendance=PeopleAttendance(sessions,CacheRow,app.state.live_read,cfg)
+
+    @app.get('/api/people/attendance')
+    def people_attendance(request:Request,week:str|None=None):
+        data,user=identity(request)
+        require(hr_visible(user),'不在人事資料查看名單（HR_VIEWERS）',403)
+        from fastapi.responses import JSONResponse
+        return JSONResponse(app.state.people_attendance.view(data['wid'],week),
+                            headers={'Cache-Control':'no-store'})
+
+    def live_enabled(wid):
+        return app.state.live_read.status(wid)['enabled']
+
+    def authorize_live(wid,dataset,user):
+        if dataset=='sources':
+            app.state.source_sync._authorize(wid,user['id'])
+        else:
+            service=app.state.people_directory if dataset=='roster' else app.state.attendance_schedule
+            with sessions() as db:
+                row=db.get(WorkspaceRow,wid)
+                require(row is not None,'工作區不存在',404)
+                service._actor(service._state(db,row),user['id'])
+
+    def manual_live(wid,dataset,user):
+        response=live_refresh(app.state.live_read,wid,[dataset],wait=True,force=True)
+        if response.status_code!=200: return response
+        action={'sources':'source_sync','roster':'people_directory_sync','attendance':'attendance_schedule_sync'}[dataset]
+        with sessions.begin() as db:
+            db.add(audit.record(AuditRow,wid,user['id'],action,details={'live_read':True}))
+        return None
+
+    def audit_live_refresh(wid,user,datasets):
+        with sessions.begin() as db:
+            db.add(audit.record(AuditRow,wid,user['id'],'live_refresh',
+                                details={'live_read':True,'force':True,'datasets':datasets}))
+
+    register_live(app,identity,app.state.live_read,authorize=authorize_live,audit=audit_live_refresh)
+    from .reports.routes import register as register_reports
+    register_reports(app,identity,cfg,authorize=authorize_live,live_enabled=live_enabled,
+                     allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'),
+                     links=lambda data,user:report_link_state(data,user)[0].get('report_case_bridges',{}))
+    from .lark_pilot.routes import register as register_pilot
+    register_pilot(app, identity=identity, authorize=authorize_live, cfg=cfg)
     from .runtime_health import register as register_runtime_health
-    register_runtime_health(app,identity,sessions,CacheRow,cfg,workspace_model=WorkspaceRow)
+    register_runtime_health(app,identity,sessions,CacheRow,cfg,workspace_model=WorkspaceRow,coordinator=app.state.live_read)
+    from .settings_overview import register as register_settings_overview
+    register_settings_overview(app,identity,load,sessions,WorkspaceRow,CacheRow,cfg,phase=phase)
 
     @app.post('/api/attendance/sync')
     async def sync_attendance(request:Request):
         data,user=identity(request)
-        body=await request.json()
-        require(isinstance(body,dict),'請提供班表日期設定',422)
-        return app.state.attendance_schedule.sync(data['wid'],user['id'],body.get('date_from'),body.get('date_to'))
+        body=await json_object(request)
+        if live_enabled(data['wid']):
+            from datetime import timedelta
+            from zoneinfo import ZoneInfo
+            start=datetime.now(ZoneInfo('Asia/Taipei')).date()
+            require(body.get('date_from') in (None,'',start.isoformat())
+                    and body.get('date_to') in (None,'',(start+timedelta(days=13)).isoformat()),
+                    '即時讀取使用今天起14天班表，請使用預設日期區間',422)
+            authorize_live(data['wid'],'attendance',user)
+            response=manual_live(data['wid'],'attendance',user)
+            if response: return response
+            with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
+            return {**state['attendance_schedule_status'],'freshness':app.state.live_read.status(data['wid'])}
+        return {**app.state.attendance_schedule.sync(data['wid'],user['id'],body.get('date_from'),body.get('date_to')),'freshness':app.state.live_read.status(data['wid'])}
 
     frontend=Path(cfg.get('FRONTEND_DIST',str(Path(__file__).resolve().parents[1]/'frontend'/'dist')))
     if frontend.is_dir():

@@ -1,0 +1,11 @@
+file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-reports-interactions.mjs:29
+await act(async()=>root.unmount());console.log(`${test} passed.`);
+                        ^
+
+TypeError: Cannot read properties of undefined (reading 'unmount')
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-reports-interactions.mjs:29:25
+    at act (/Users/vc/Local/YXMEEGLE/frontend/node_modules/react/cjs/react.development.js:2512:16)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-reports-interactions.mjs:29:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v26.9.0

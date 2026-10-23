@@ -1,0 +1,6 @@
+Warning: Each child in a list should have a unique "key" prop.
+
+Check the render method of `CaseNavigation`. See https://reactjs.org/link/warning-keys for more information.
+    at div
+    at CaseNavigation (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/.case-navigation-test.mjs:165:27)
+Case navigation: 35 assertions passed

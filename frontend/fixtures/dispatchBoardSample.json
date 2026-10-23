@@ -1,0 +1,1590 @@
+{
+  "label": "合成測試資料，非真實派工與人員。",
+  "variants": {
+    "loaded": {
+      "schema_version": 1,
+      "window": {
+        "from": "2026-07-27",
+        "to": "2026-08-02",
+        "tz": "Asia/Taipei"
+      },
+      "source": {
+        "dataset_key": "operational_schedule",
+        "registry_key": "v4",
+        "table_id": "tblZz6Mkhv9gHrB2",
+        "fetched_at": "2026-10-18T02:00:00Z",
+        "latest_booking_date": "2026-08-19",
+        "quality": {
+          "states": [
+            "complete"
+          ],
+          "reason": null
+        },
+        "joins": {
+          "people": "ok",
+          "instruments": "ok",
+          "vehicles": "ok",
+          "cases": "ok"
+        }
+      },
+      "kpi": {
+        "slots": 6,
+        "unassigned": 1,
+        "unknown_overlap": 2,
+        "conflict": 2
+      },
+      "unassigned_queue": [
+        "v4:tblZz6Mkhv9gHrB2:recSynthetic1"
+      ],
+      "slots": [
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic1",
+          "record_id": "recSynthetic1",
+          "kind": "work",
+          "planning_status": "unassigned",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-27",
+            "end": "2026-07-27",
+            "precision": "date"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase1",
+            "code": "示例 C001",
+            "name": "合成測量案件"
+          },
+          "work_content": "河道斷面測量",
+          "crew": [],
+          "resources": [
+            {
+              "kind": "vehicle",
+              "ref": "recSyntheticV1",
+              "label": "示例工程車",
+              "feasibility": "feasible",
+              "reasons": []
+            }
+          ],
+          "gaps": [
+            "no_crew"
+          ],
+          "issues": []
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic2",
+          "record_id": "recSynthetic2",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-28T08:00:00+08:00",
+            "end": "2026-07-28T12:00:00+08:00",
+            "precision": "datetime"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase2",
+            "code": "示例 C002",
+            "name": "合成測量案件"
+          },
+          "work_content": "控制點複測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP1",
+              "name": "示例 林安娜",
+              "active": true,
+              "feasibility": "conflict",
+              "reasons": [
+                "timed_overlap",
+                "no_capability_source"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic3"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic3",
+          "record_id": "recSynthetic3",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-28T10:00:00+08:00",
+            "end": "2026-07-28T14:00:00+08:00",
+            "precision": "datetime"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase3",
+            "code": "示例 C003",
+            "name": "合成測量案件"
+          },
+          "work_content": "碼頭水深測量",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP1",
+              "name": "示例 林安娜",
+              "active": true,
+              "feasibility": "conflict",
+              "reasons": [
+                "timed_overlap"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic2"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic4",
+          "record_id": "recSynthetic4",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-29",
+            "end": "2026-07-29",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase4",
+            "code": "示例 C004",
+            "name": "合成測量案件"
+          },
+          "work_content": "成果補測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP2",
+              "name": "示例 陳威廷",
+              "active": true,
+              "feasibility": "unknown",
+              "reasons": [
+                "same_day_other_slot",
+                "no_leave_source"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic5"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic5",
+          "record_id": "recSynthetic5",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-29",
+            "end": "2026-07-29",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase5",
+            "code": "示例 C005",
+            "name": "合成測量案件"
+          },
+          "work_content": "地形現況測量",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP2",
+              "name": null,
+              "active": true,
+              "feasibility": "unknown",
+              "reasons": [
+                "same_day_other_slot"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic4"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic6",
+          "record_id": "recSynthetic6",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-30",
+            "end": "2026-07-30",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase6",
+            "code": "示例 C006",
+            "name": "合成測量案件"
+          },
+          "work_content": "儀器檢測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP3",
+              "name": "示例 王小文",
+              "active": false,
+              "feasibility": "unavailable",
+              "reasons": [
+                "inactive"
+              ]
+            }
+          ],
+          "resources": [
+            {
+              "kind": "instrument",
+              "ref": "recSyntheticI1",
+              "label": "示例 多音束測深儀",
+              "feasibility": "unavailable",
+              "reasons": [
+                "repair"
+              ]
+            }
+          ],
+          "gaps": [],
+          "issues": []
+        }
+      ],
+      "capacity": {
+        "people": [
+          {
+            "person_ref": "recSyntheticP1",
+            "name": "示例 林安娜",
+            "days": {
+              "2026-07-28": {
+                "booked_slots": 2,
+                "state": "booked"
+              }
+            }
+          },
+          {
+            "person_ref": "recSyntheticP2",
+            "name": null,
+            "days": {
+              "2026-07-29": {
+                "booked_slots": 2,
+                "state": "overbooked_unknown"
+              }
+            }
+          }
+        ]
+      },
+      "gaps": [
+        {
+          "code": "no_capability_source",
+          "message": "尚無能力與資格來源，所有資格檢核均待確認。",
+          "count": 0
+        },
+        {
+          "code": "no_leave_source",
+          "message": "尚無完整請假來源，無法保證人員可出勤。",
+          "count": 0
+        }
+      ]
+    },
+    "stale": {
+      "schema_version": 1,
+      "window": {
+        "from": "2026-07-27",
+        "to": "2026-08-02",
+        "tz": "Asia/Taipei"
+      },
+      "source": {
+        "dataset_key": "operational_schedule",
+        "registry_key": "v4",
+        "table_id": "tblZz6Mkhv9gHrB2",
+        "fetched_at": "2026-10-17T02:00:00Z",
+        "latest_booking_date": "2026-08-19",
+        "quality": {
+          "states": [
+            "stale"
+          ],
+          "reason": null
+        },
+        "joins": {
+          "people": "ok",
+          "instruments": "ok",
+          "vehicles": "ok",
+          "cases": "ok"
+        }
+      },
+      "kpi": {
+        "slots": 6,
+        "unassigned": 1,
+        "unknown_overlap": 2,
+        "conflict": 2
+      },
+      "unassigned_queue": [
+        "v4:tblZz6Mkhv9gHrB2:recSynthetic1"
+      ],
+      "slots": [
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic1",
+          "record_id": "recSynthetic1",
+          "kind": "work",
+          "planning_status": "unassigned",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-27",
+            "end": "2026-07-27",
+            "precision": "date"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase1",
+            "code": "示例 C001",
+            "name": "合成測量案件"
+          },
+          "work_content": "河道斷面測量",
+          "crew": [],
+          "resources": [
+            {
+              "kind": "vehicle",
+              "ref": "recSyntheticV1",
+              "label": "示例工程車",
+              "feasibility": "feasible",
+              "reasons": []
+            }
+          ],
+          "gaps": [
+            "no_crew"
+          ],
+          "issues": []
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic2",
+          "record_id": "recSynthetic2",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-28T08:00:00+08:00",
+            "end": "2026-07-28T12:00:00+08:00",
+            "precision": "datetime"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase2",
+            "code": "示例 C002",
+            "name": "合成測量案件"
+          },
+          "work_content": "控制點複測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP1",
+              "name": "示例 林安娜",
+              "active": true,
+              "feasibility": "conflict",
+              "reasons": [
+                "timed_overlap",
+                "no_capability_source"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic3"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic3",
+          "record_id": "recSynthetic3",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-28T10:00:00+08:00",
+            "end": "2026-07-28T14:00:00+08:00",
+            "precision": "datetime"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase3",
+            "code": "示例 C003",
+            "name": "合成測量案件"
+          },
+          "work_content": "碼頭水深測量",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP1",
+              "name": "示例 林安娜",
+              "active": true,
+              "feasibility": "conflict",
+              "reasons": [
+                "timed_overlap"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic2"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic4",
+          "record_id": "recSynthetic4",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-29",
+            "end": "2026-07-29",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase4",
+            "code": "示例 C004",
+            "name": "合成測量案件"
+          },
+          "work_content": "成果補測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP2",
+              "name": "示例 陳威廷",
+              "active": true,
+              "feasibility": "unknown",
+              "reasons": [
+                "same_day_other_slot",
+                "no_leave_source"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic5"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic5",
+          "record_id": "recSynthetic5",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-29",
+            "end": "2026-07-29",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase5",
+            "code": "示例 C005",
+            "name": "合成測量案件"
+          },
+          "work_content": "地形現況測量",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP2",
+              "name": null,
+              "active": true,
+              "feasibility": "unknown",
+              "reasons": [
+                "same_day_other_slot"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic4"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic6",
+          "record_id": "recSynthetic6",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-30",
+            "end": "2026-07-30",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase6",
+            "code": "示例 C006",
+            "name": "合成測量案件"
+          },
+          "work_content": "儀器檢測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP3",
+              "name": "示例 王小文",
+              "active": false,
+              "feasibility": "unavailable",
+              "reasons": [
+                "inactive"
+              ]
+            }
+          ],
+          "resources": [
+            {
+              "kind": "instrument",
+              "ref": "recSyntheticI1",
+              "label": "示例 多音束測深儀",
+              "feasibility": "unavailable",
+              "reasons": [
+                "repair"
+              ]
+            }
+          ],
+          "gaps": [],
+          "issues": []
+        }
+      ],
+      "capacity": {
+        "people": [
+          {
+            "person_ref": "recSyntheticP1",
+            "name": "示例 林安娜",
+            "days": {
+              "2026-07-28": {
+                "booked_slots": 2,
+                "state": "booked"
+              }
+            }
+          },
+          {
+            "person_ref": "recSyntheticP2",
+            "name": null,
+            "days": {
+              "2026-07-29": {
+                "booked_slots": 2,
+                "state": "overbooked_unknown"
+              }
+            }
+          }
+        ]
+      },
+      "gaps": [
+        {
+          "code": "no_capability_source",
+          "message": "尚無能力與資格來源，所有資格檢核均待確認。",
+          "count": 0
+        },
+        {
+          "code": "no_leave_source",
+          "message": "尚無完整請假來源，無法保證人員可出勤。",
+          "count": 0
+        }
+      ]
+    },
+    "read_failed": {
+      "schema_version": 1,
+      "window": {
+        "from": "2026-07-27",
+        "to": "2026-08-02",
+        "tz": "Asia/Taipei"
+      },
+      "source": {
+        "dataset_key": "operational_schedule",
+        "registry_key": "v4",
+        "table_id": "tblZz6Mkhv9gHrB2",
+        "fetched_at": "2026-10-18T02:00:00Z",
+        "latest_booking_date": "2026-08-19",
+        "quality": {
+          "states": [
+            "read_failed"
+          ],
+          "reason": null
+        },
+        "joins": {
+          "people": "ok",
+          "instruments": "ok",
+          "vehicles": "ok",
+          "cases": "ok"
+        }
+      },
+      "kpi": {
+        "slots": 6,
+        "unassigned": 1,
+        "unknown_overlap": 2,
+        "conflict": 2
+      },
+      "unassigned_queue": [
+        "v4:tblZz6Mkhv9gHrB2:recSynthetic1"
+      ],
+      "slots": [
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic1",
+          "record_id": "recSynthetic1",
+          "kind": "work",
+          "planning_status": "unassigned",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-27",
+            "end": "2026-07-27",
+            "precision": "date"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase1",
+            "code": "示例 C001",
+            "name": "合成測量案件"
+          },
+          "work_content": "河道斷面測量",
+          "crew": [],
+          "resources": [
+            {
+              "kind": "vehicle",
+              "ref": "recSyntheticV1",
+              "label": "示例工程車",
+              "feasibility": "feasible",
+              "reasons": []
+            }
+          ],
+          "gaps": [
+            "no_crew"
+          ],
+          "issues": []
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic2",
+          "record_id": "recSynthetic2",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-28T08:00:00+08:00",
+            "end": "2026-07-28T12:00:00+08:00",
+            "precision": "datetime"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase2",
+            "code": "示例 C002",
+            "name": "合成測量案件"
+          },
+          "work_content": "控制點複測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP1",
+              "name": "示例 林安娜",
+              "active": true,
+              "feasibility": "conflict",
+              "reasons": [
+                "timed_overlap",
+                "no_capability_source"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic3"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic3",
+          "record_id": "recSynthetic3",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-28T10:00:00+08:00",
+            "end": "2026-07-28T14:00:00+08:00",
+            "precision": "datetime"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase3",
+            "code": "示例 C003",
+            "name": "合成測量案件"
+          },
+          "work_content": "碼頭水深測量",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP1",
+              "name": "示例 林安娜",
+              "active": true,
+              "feasibility": "conflict",
+              "reasons": [
+                "timed_overlap"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic2"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic4",
+          "record_id": "recSynthetic4",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-29",
+            "end": "2026-07-29",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase4",
+            "code": "示例 C004",
+            "name": "合成測量案件"
+          },
+          "work_content": "成果補測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP2",
+              "name": "示例 陳威廷",
+              "active": true,
+              "feasibility": "unknown",
+              "reasons": [
+                "same_day_other_slot",
+                "no_leave_source"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic5"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic5",
+          "record_id": "recSynthetic5",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-29",
+            "end": "2026-07-29",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase5",
+            "code": "示例 C005",
+            "name": "合成測量案件"
+          },
+          "work_content": "地形現況測量",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP2",
+              "name": null,
+              "active": true,
+              "feasibility": "unknown",
+              "reasons": [
+                "same_day_other_slot"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic4"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic6",
+          "record_id": "recSynthetic6",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-30",
+            "end": "2026-07-30",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase6",
+            "code": "示例 C006",
+            "name": "合成測量案件"
+          },
+          "work_content": "儀器檢測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP3",
+              "name": "示例 王小文",
+              "active": false,
+              "feasibility": "unavailable",
+              "reasons": [
+                "inactive"
+              ]
+            }
+          ],
+          "resources": [
+            {
+              "kind": "instrument",
+              "ref": "recSyntheticI1",
+              "label": "示例 多音束測深儀",
+              "feasibility": "unavailable",
+              "reasons": [
+                "repair"
+              ]
+            }
+          ],
+          "gaps": [],
+          "issues": []
+        }
+      ],
+      "capacity": {
+        "people": [
+          {
+            "person_ref": "recSyntheticP1",
+            "name": "示例 林安娜",
+            "days": {
+              "2026-07-28": {
+                "booked_slots": 2,
+                "state": "booked"
+              }
+            }
+          },
+          {
+            "person_ref": "recSyntheticP2",
+            "name": null,
+            "days": {
+              "2026-07-29": {
+                "booked_slots": 2,
+                "state": "overbooked_unknown"
+              }
+            }
+          }
+        ]
+      },
+      "gaps": [
+        {
+          "code": "no_capability_source",
+          "message": "尚無能力與資格來源，所有資格檢核均待確認。",
+          "count": 0
+        },
+        {
+          "code": "no_leave_source",
+          "message": "尚無完整請假來源，無法保證人員可出勤。",
+          "count": 0
+        }
+      ]
+    },
+    "forbidden": {
+      "schema_version": 1,
+      "window": {
+        "from": "2026-07-27",
+        "to": "2026-08-02",
+        "tz": "Asia/Taipei"
+      },
+      "source": {
+        "dataset_key": "operational_schedule",
+        "registry_key": "v4",
+        "table_id": "tblZz6Mkhv9gHrB2",
+        "fetched_at": "2026-10-18T02:00:00Z",
+        "latest_booking_date": "2026-08-19",
+        "quality": {
+          "states": [
+            "forbidden"
+          ],
+          "reason": null
+        },
+        "joins": {
+          "people": "ok",
+          "instruments": "ok",
+          "vehicles": "ok",
+          "cases": "ok"
+        }
+      },
+      "kpi": {
+        "slots": 6,
+        "unassigned": 1,
+        "unknown_overlap": 2,
+        "conflict": 2
+      },
+      "unassigned_queue": [
+        "v4:tblZz6Mkhv9gHrB2:recSynthetic1"
+      ],
+      "slots": [
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic1",
+          "record_id": "recSynthetic1",
+          "kind": "work",
+          "planning_status": "unassigned",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-27",
+            "end": "2026-07-27",
+            "precision": "date"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase1",
+            "code": "示例 C001",
+            "name": "合成測量案件"
+          },
+          "work_content": "河道斷面測量",
+          "crew": [],
+          "resources": [
+            {
+              "kind": "vehicle",
+              "ref": "recSyntheticV1",
+              "label": "示例工程車",
+              "feasibility": "feasible",
+              "reasons": []
+            }
+          ],
+          "gaps": [
+            "no_crew"
+          ],
+          "issues": []
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic2",
+          "record_id": "recSynthetic2",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-28T08:00:00+08:00",
+            "end": "2026-07-28T12:00:00+08:00",
+            "precision": "datetime"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase2",
+            "code": "示例 C002",
+            "name": "合成測量案件"
+          },
+          "work_content": "控制點複測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP1",
+              "name": "示例 林安娜",
+              "active": true,
+              "feasibility": "conflict",
+              "reasons": [
+                "timed_overlap",
+                "no_capability_source"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic3"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic3",
+          "record_id": "recSynthetic3",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-28T10:00:00+08:00",
+            "end": "2026-07-28T14:00:00+08:00",
+            "precision": "datetime"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase3",
+            "code": "示例 C003",
+            "name": "合成測量案件"
+          },
+          "work_content": "碼頭水深測量",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP1",
+              "name": "示例 林安娜",
+              "active": true,
+              "feasibility": "conflict",
+              "reasons": [
+                "timed_overlap"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic2"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic4",
+          "record_id": "recSynthetic4",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-29",
+            "end": "2026-07-29",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase4",
+            "code": "示例 C004",
+            "name": "合成測量案件"
+          },
+          "work_content": "成果補測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP2",
+              "name": "示例 陳威廷",
+              "active": true,
+              "feasibility": "unknown",
+              "reasons": [
+                "same_day_other_slot",
+                "no_leave_source"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic5"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic5",
+          "record_id": "recSynthetic5",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-29",
+            "end": "2026-07-29",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase5",
+            "code": "示例 C005",
+            "name": "合成測量案件"
+          },
+          "work_content": "地形現況測量",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP2",
+              "name": null,
+              "active": true,
+              "feasibility": "unknown",
+              "reasons": [
+                "same_day_other_slot"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic4"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic6",
+          "record_id": "recSynthetic6",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-30",
+            "end": "2026-07-30",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase6",
+            "code": "示例 C006",
+            "name": "合成測量案件"
+          },
+          "work_content": "儀器檢測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP3",
+              "name": "示例 王小文",
+              "active": false,
+              "feasibility": "unavailable",
+              "reasons": [
+                "inactive"
+              ]
+            }
+          ],
+          "resources": [
+            {
+              "kind": "instrument",
+              "ref": "recSyntheticI1",
+              "label": "示例 多音束測深儀",
+              "feasibility": "unavailable",
+              "reasons": [
+                "repair"
+              ]
+            }
+          ],
+          "gaps": [],
+          "issues": []
+        }
+      ],
+      "capacity": {
+        "people": [
+          {
+            "person_ref": "recSyntheticP1",
+            "name": "示例 林安娜",
+            "days": {
+              "2026-07-28": {
+                "booked_slots": 2,
+                "state": "booked"
+              }
+            }
+          },
+          {
+            "person_ref": "recSyntheticP2",
+            "name": null,
+            "days": {
+              "2026-07-29": {
+                "booked_slots": 2,
+                "state": "overbooked_unknown"
+              }
+            }
+          }
+        ]
+      },
+      "gaps": [
+        {
+          "code": "no_capability_source",
+          "message": "尚無能力與資格來源，所有資格檢核均待確認。",
+          "count": 0
+        },
+        {
+          "code": "no_leave_source",
+          "message": "尚無完整請假來源，無法保證人員可出勤。",
+          "count": 0
+        }
+      ]
+    },
+    "empty_future_window": {
+      "schema_version": 1,
+      "window": {
+        "from": "2026-10-12",
+        "to": "2026-10-18",
+        "tz": "Asia/Taipei"
+      },
+      "source": {
+        "dataset_key": "operational_schedule",
+        "registry_key": "v4",
+        "table_id": "tblZz6Mkhv9gHrB2",
+        "fetched_at": "2026-10-18T02:00:00Z",
+        "latest_booking_date": "2026-08-19",
+        "quality": {
+          "states": [
+            "complete"
+          ],
+          "reason": null
+        },
+        "joins": {
+          "people": "ok",
+          "instruments": "ok",
+          "vehicles": "ok",
+          "cases": "ok"
+        }
+      },
+      "kpi": {
+        "slots": 0,
+        "unassigned": 0,
+        "unknown_overlap": 0,
+        "conflict": 0
+      },
+      "unassigned_queue": [],
+      "slots": [],
+      "capacity": {
+        "people": []
+      },
+      "gaps": [
+        {
+          "code": "no_capability_source",
+          "message": "尚無能力與資格來源，所有資格檢核均待確認。",
+          "count": 0
+        },
+        {
+          "code": "no_leave_source",
+          "message": "尚無完整請假來源，無法保證人員可出勤。",
+          "count": 0
+        },
+        {
+          "code": "no_bookings_after_2026-08-19",
+          "message": "來源在 2026-08-19 之後沒有預排紀錄。",
+          "count": 0
+        }
+      ]
+    },
+    "partial_joins": {
+      "schema_version": 1,
+      "window": {
+        "from": "2026-07-27",
+        "to": "2026-08-02",
+        "tz": "Asia/Taipei"
+      },
+      "source": {
+        "dataset_key": "operational_schedule",
+        "registry_key": "v4",
+        "table_id": "tblZz6Mkhv9gHrB2",
+        "fetched_at": "2026-10-18T02:00:00Z",
+        "latest_booking_date": "2026-08-19",
+        "quality": {
+          "states": [
+            "complete"
+          ],
+          "reason": null
+        },
+        "joins": {
+          "people": "partial",
+          "instruments": "ok",
+          "vehicles": "ok",
+          "cases": "ok"
+        }
+      },
+      "kpi": {
+        "slots": 6,
+        "unassigned": 1,
+        "unknown_overlap": 2,
+        "conflict": 2
+      },
+      "unassigned_queue": [
+        "v4:tblZz6Mkhv9gHrB2:recSynthetic1"
+      ],
+      "slots": [
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic1",
+          "record_id": "recSynthetic1",
+          "kind": "work",
+          "planning_status": "unassigned",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-27",
+            "end": "2026-07-27",
+            "precision": "date"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase1",
+            "code": "示例 C001",
+            "name": "合成測量案件"
+          },
+          "work_content": "河道斷面測量",
+          "crew": [],
+          "resources": [
+            {
+              "kind": "vehicle",
+              "ref": "recSyntheticV1",
+              "label": "示例工程車",
+              "feasibility": "feasible",
+              "reasons": []
+            }
+          ],
+          "gaps": [
+            "no_crew"
+          ],
+          "issues": []
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic2",
+          "record_id": "recSynthetic2",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-28T08:00:00+08:00",
+            "end": "2026-07-28T12:00:00+08:00",
+            "precision": "datetime"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase2",
+            "code": "示例 C002",
+            "name": "合成測量案件"
+          },
+          "work_content": "控制點複測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP1",
+              "name": null,
+              "active": true,
+              "feasibility": "conflict",
+              "reasons": [
+                "timed_overlap",
+                "no_capability_source"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic3"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic3",
+          "record_id": "recSynthetic3",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-28T10:00:00+08:00",
+            "end": "2026-07-28T14:00:00+08:00",
+            "precision": "datetime"
+          },
+          "group": "水深A組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase3",
+            "code": "示例 C003",
+            "name": "合成測量案件"
+          },
+          "work_content": "碼頭水深測量",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP1",
+              "name": "示例 林安娜",
+              "active": true,
+              "feasibility": "conflict",
+              "reasons": [
+                "timed_overlap"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic2"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic4",
+          "record_id": "recSynthetic4",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-29",
+            "end": "2026-07-29",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase4",
+            "code": "示例 C004",
+            "name": "合成測量案件"
+          },
+          "work_content": "成果補測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP2",
+              "name": "示例 陳威廷",
+              "active": true,
+              "feasibility": "unknown",
+              "reasons": [
+                "same_day_other_slot",
+                "no_leave_source"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic5"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic5",
+          "record_id": "recSynthetic5",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-29",
+            "end": "2026-07-29",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase5",
+            "code": "示例 C005",
+            "name": "合成測量案件"
+          },
+          "work_content": "地形現況測量",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP2",
+              "name": null,
+              "active": true,
+              "feasibility": "unknown",
+              "reasons": [
+                "same_day_other_slot"
+              ]
+            }
+          ],
+          "resources": [],
+          "gaps": [
+            "no_instrument_for_field_work"
+          ],
+          "issues": [
+            "v4:tblZz6Mkhv9gHrB2:recSynthetic4"
+          ]
+        },
+        {
+          "slot_id": "v4:tblZz6Mkhv9gHrB2:recSynthetic6",
+          "record_id": "recSynthetic6",
+          "kind": "work",
+          "planning_status": "confirmed",
+          "provenance": "v4_row",
+          "interval": {
+            "start": "2026-07-30",
+            "end": "2026-07-30",
+            "precision": "date"
+          },
+          "group": "測量二組",
+          "discipline": "外業",
+          "case": {
+            "ref": "recSyntheticCase6",
+            "code": "示例 C006",
+            "name": "合成測量案件"
+          },
+          "work_content": "儀器檢測",
+          "crew": [
+            {
+              "person_ref": "recSyntheticP3",
+              "name": "示例 王小文",
+              "active": false,
+              "feasibility": "unavailable",
+              "reasons": [
+                "inactive"
+              ]
+            }
+          ],
+          "resources": [
+            {
+              "kind": "instrument",
+              "ref": "recSyntheticI1",
+              "label": "示例 多音束測深儀",
+              "feasibility": "unavailable",
+              "reasons": [
+                "repair"
+              ]
+            }
+          ],
+          "gaps": [],
+          "issues": []
+        }
+      ],
+      "capacity": {
+        "people": [
+          {
+            "person_ref": "recSyntheticP1",
+            "name": "示例 林安娜",
+            "days": {
+              "2026-07-28": {
+                "booked_slots": 2,
+                "state": "booked"
+              }
+            }
+          },
+          {
+            "person_ref": "recSyntheticP2",
+            "name": null,
+            "days": {
+              "2026-07-29": {
+                "booked_slots": 2,
+                "state": "overbooked_unknown"
+              }
+            }
+          }
+        ]
+      },
+      "gaps": [
+        {
+          "code": "no_capability_source",
+          "message": "尚無能力與資格來源，所有資格檢核均待確認。",
+          "count": 0
+        },
+        {
+          "code": "no_leave_source",
+          "message": "尚無完整請假來源，無法保證人員可出勤。",
+          "count": 0
+        }
+      ]
+    }
+  }
+}

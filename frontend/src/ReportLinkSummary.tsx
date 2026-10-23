@@ -1,0 +1,10 @@
+import {useEffect,useState} from 'react';
+import {api} from './api';
+import {basisLabel,summaryLine,type LinkSummary,type LinkCounts} from './reportLinksModel';
+import './ReportLinks.css';
+export function DepartmentLinkCounts({label,counts}:{label:string;counts:LinkCounts}){return <div className="rl-counts"><strong>{label}</strong><span>已連結 {counts.linked} · 待配對 {counts.unlinked}</span>{Object.entries(counts.basis).map(([basis,n])=>n>0&&<span className="rl-chip" key={basis}>{basisLabel(basis)} {n}</span>)}<span>最近已連結回報 {counts.latest_date || '未知'}</span></div>}
+export function ReportLinkSummary({projectId,version,initial,admin=false}:{projectId?:string;version?:number;initial?:LinkSummary;admin?:boolean}){
+ const[data,setData]=useState(initial);const[error,setError]=useState('');
+ useEffect(()=>{const controller=new AbortController();void api<LinkSummary>('/api/report-links/summary'+(projectId?'?project_id='+encodeURIComponent(projectId):''),{signal:controller.signal}).then(v=>{if(typeof v.linked!=='number'||typeof v.total!=='number'||!v.departments)throw Error('日報連結摘要格式不完整');if(!controller.signal.aborted){setData(v);setError('')}}).catch(e=>{if(!controller.signal.aborted)setError(e.message)});return()=>controller.abort()},[projectId,version]);
+ return <section className="rl-summary" aria-label="日報連結摘要"><h3>{admin?'日報與週報連結概況':'日報連結'}</h3>{data?<><p>{summaryLine(data)} <a href="#view=admin&tab=daily">{admin?'前往審核':'前往待配對佇列'}</a></p>{projectId&&<p className="rl-note">已連結為本案筆數；待配對為可見佇列，尚未歸屬本案。未知來源依據的舊資料另待核對。</p>}{Object.entries(data.departments).map(([dept,counts])=><DepartmentLinkCounts key={dept} label={dept} counts={counts}/>)}{admin&&<><ul>{Object.entries(data.reasons).map(([r,n])=><li key={r}>{{missing_reference:'缺少關聯',unresolved_reference:'暫填案號無對應',ambiguous_reference:'多個候選'}[r] || r} {n} 筆</li>)}</ul><p>v3 橋接 · 暫定精確 {data.bridges?.auto_exact??'未知'} · 人工核對 {data.bridges?.reviewed??'未知'} · 已拒絕 {data.bridges?.rejected??'未知'} · 待核對 {data.bridges?.pending??'未知'} · 未讀取 {data.bridge_unknown??'未知'}</p></>}</>:<p>{error || '正在讀取日報連結摘要…'}</p>}{data&&error&&<p role="alert">摘要更新失敗 · {error}</p>}</section>
+}

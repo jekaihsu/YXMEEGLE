@@ -1,0 +1,2 @@
+Home reports: 52 literal parser, insight and summary checks passed.
+Home reports final total: 57 literal assertions passed.

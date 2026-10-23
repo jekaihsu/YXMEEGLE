@@ -1,0 +1,6 @@
+{
+  "SOURCE": {"value": "source_case_or_link", "label": "原生"},
+  "CODE": {"value": "provisional_case_code", "label": "完整案號"},
+  "MANUAL": {"value": "manual_review", "label": "人工核對"},
+  "UNLINKED": {"value": "unlinked", "label": "待配對"}
+}

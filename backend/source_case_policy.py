@@ -209,12 +209,27 @@ def mark_imported_new(ws,new_ids):
             project.setdefault('execution_assignment',{'basis':'verified_post_cutover_source','recorded_by':'system:cutover','recorded_at':now()})
 
 
+def local_planning(project):
+    return project.get('planning_origin')=='local'
+
+
+def local_viewer(user,project):
+    """A local planning case is visible only to its creator, PM, collaborators and managers, in every environment."""
+    people={project.get('created_by'),project.get('pm_id'),*project.get('collaborator_ids',[])}-{'',None}
+    return (local_planning(project) and bool(user) and user.get('active',True)
+            and (user.get('role') in {'manager','admin'} or user.get('id') in people))
+
+
 def visible_project(ws,project):
+    # Official views never list local planning cases, so they stay out of every case total.
+    if local_planning(project):return False
     return ws.get('environment') in ('test','demo') or project.get('case_visibility') in ('new_case','source_reference')
 
 
 def filter_visible_cases(state):
-    if state.get('environment') in ('test','demo'):return state
+    if state.get('environment') in ('test','demo'):
+        state['projects']=[p for p in state.get('projects',[]) if not local_planning(p)]
+        return state
     visible={p['id'] for p in state.get('projects',[]) if visible_project(state,p)}
     allowed_sources=set(state.get('source_visible_record_ids',[]))
     state['projects']=[p for p in state.get('projects',[]) if p['id'] in visible]
@@ -242,6 +257,19 @@ def filter_visible_cases(state):
             if not related&visible:continue
             rows.append(row)
         state[key]=rows
+    confirmations={r['id'] for r in state.get('source_confirmations',[])}
+    contracts={r['id'] for r in state.get('contract_items',[]) if r.get('confirmation_ids')
+               and set(r['confirmation_ids'])<=confirmations and not r.get('unresolved_confirmation_ids')}
+    if 'source_work_items' in state:
+        state['source_work_items']=[r for r in state['source_work_items'] if r.get('project_id') in visible
+            and r.get('contract_ids') and set(r['contract_ids'])<=contracts
+            and r['id'].replace('/','|') in allowed_sources]
+        state['source_work_items_status']={pid:s for pid,s in state.get('source_work_items_status',{}).items() if pid in visible}
+    if 'derived_plan' in state:
+        state['derived_plan']={pid:summary for pid,summary in (state.get('derived_plan') or {}).items()
+            if pid in visible and summary.get('_source_ids')
+            and all(ident.replace('/','|') in allowed_sources for ident in summary['_source_ids'])}
+    state.pop('derived_plan_status',None)
     if 'jobs' in state:
         state['jobs']=[job for job in state['jobs']
             if ((job.get('payload') or {}).get('project_id') in visible

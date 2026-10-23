@@ -1,0 +1,6 @@
+{
+  "checks": [
+    "R2 real update command times out before landing. Manager opens command recovery and reconciliation returns 502 failed. 修改後重新預覽 restores people/case pickers and the original proposal, task_id recLegacy and parent obligation recObligationQA. The next real preview preserves both references."
+  ],
+  "errors": []
+}

@@ -1,5 +1,7 @@
 import errno
 import json
+import os
+import sys
 from datetime import datetime,timedelta,timezone
 from pathlib import Path
 import pytest
@@ -9,6 +11,8 @@ from .test_backup_safety import source as fixture_source
 
 
 def test_no_hardlinks_uses_atomic_publication_and_never_overwrites(tmp_path,monkeypatch):
+    if os.name!='nt' and not sys.platform.startswith('linux'):
+        pytest.skip('atomic exclusive fallback is implemented for Linux and Windows')
     temporary=tmp_path/'complete.tmp';temporary.write_bytes(b'complete')
     target=tmp_path/'published'
     def unsupported(*args):raise OSError(errno.ENOTSUP,'unsupported')

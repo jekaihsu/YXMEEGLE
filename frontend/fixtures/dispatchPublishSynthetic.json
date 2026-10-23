@@ -1,0 +1,1151 @@
+{
+  "label": "合成資料（synthetic），不連線、不寫入 Lark",
+  "work": {
+    "source": {
+      "fetched_at": "2026-10-18T11:01:09.706Z",
+      "quality": {
+        "states": [
+          "complete"
+        ]
+      }
+    },
+    "progress": {
+      "status": {
+        "進行中": 3,
+        "待處理": 1
+      },
+      "planning_status": {
+        "pending_approval": 1,
+        "unassigned": 1,
+        "publishing": 1,
+        "draft": 1
+      }
+    },
+    "needs_me": [
+      {
+        "task_id": "synthetic-task-1",
+        "title": "合成 港區水深測量",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "進行中",
+        "planning_status": "pending_approval",
+        "acceptance_status": "審核中",
+        "acceptance_summary": "尚待成果核對",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [
+          {
+            "person_ref": "synthetic-dispatcher",
+            "name": "合成 林派工"
+          },
+          {
+            "person_ref": "synthetic-leader",
+            "name": "合成 陳組長"
+          }
+        ],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": null,
+        "source": "v4_task",
+        "needs_me": [
+          "approve_seat:manager_review"
+        ],
+        "allowed_actions": [
+          "reassign",
+          "edit_detail",
+          "approve",
+          "return"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "外業（4 / 9）",
+        "preview_id": ""
+      },
+      {
+        "task_id": "synthetic-task-2",
+        "title": "合成 待指派控制工作",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "待處理",
+        "planning_status": "unassigned",
+        "acceptance_status": "審核中",
+        "acceptance_summary": "尚待成果核對",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": null,
+        "source": "v4_task",
+        "needs_me": [
+          "confirm_assignment"
+        ],
+        "allowed_actions": [
+          "assign",
+          "edit_detail"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "控制（5 / 9）",
+        "preview_id": ""
+      },
+      {
+        "task_id": "synthetic-task-3",
+        "title": "合成 回應不明待對帳",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "進行中",
+        "planning_status": "publishing",
+        "acceptance_status": "審核中",
+        "acceptance_summary": "尚待成果核對",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [
+          {
+            "person_ref": "synthetic-dispatcher",
+            "name": "合成 林派工"
+          },
+          {
+            "person_ref": "synthetic-leader",
+            "name": "合成 陳組長"
+          }
+        ],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": {
+          "command_id": "synthetic-command-unknown",
+          "state": "outcome_unknown",
+          "revision": 2,
+          "next_action": "reconcile"
+        },
+        "source": "v4_task",
+        "needs_me": [
+          "reconcile_command"
+        ],
+        "allowed_actions": [
+          "reconcile"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "外業（4 / 9）",
+        "preview_id": ""
+      },
+      {
+        "task_id": "synthetic-task-4",
+        "title": "合成 成果退回待核實",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "進行中",
+        "planning_status": "draft",
+        "acceptance_status": "已退回",
+        "acceptance_summary": "請補充量測紀錄",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [
+          {
+            "person_ref": "synthetic-dispatcher",
+            "name": "合成 林派工"
+          },
+          {
+            "person_ref": "synthetic-leader",
+            "name": "合成 陳組長"
+          }
+        ],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": null,
+        "source": "v4_task",
+        "needs_me": [
+          "review_returned",
+          "verify_unknown:synthetic-leader"
+        ],
+        "allowed_actions": [
+          "edit_detail",
+          "cancel_draft"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "外業（4 / 9）",
+        "preview_id": ""
+      }
+    ],
+    "rows": [
+      {
+        "task_id": "synthetic-task-1",
+        "title": "合成 港區水深測量",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "進行中",
+        "planning_status": "pending_approval",
+        "acceptance_status": "審核中",
+        "acceptance_summary": "尚待成果核對",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [
+          {
+            "person_ref": "synthetic-dispatcher",
+            "name": "合成 林派工"
+          },
+          {
+            "person_ref": "synthetic-leader",
+            "name": "合成 陳組長"
+          }
+        ],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": null,
+        "source": "v4_task",
+        "needs_me": [
+          "approve_seat:manager_review"
+        ],
+        "allowed_actions": [
+          "reassign",
+          "edit_detail",
+          "approve",
+          "return"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "外業（4 / 9）",
+        "preview_id": ""
+      },
+      {
+        "task_id": "synthetic-task-2",
+        "title": "合成 待指派控制工作",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "待處理",
+        "planning_status": "unassigned",
+        "acceptance_status": "審核中",
+        "acceptance_summary": "尚待成果核對",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": null,
+        "source": "v4_task",
+        "needs_me": [
+          "confirm_assignment"
+        ],
+        "allowed_actions": [
+          "assign",
+          "edit_detail"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "控制（5 / 9）",
+        "preview_id": ""
+      },
+      {
+        "task_id": "synthetic-task-3",
+        "title": "合成 回應不明待對帳",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "進行中",
+        "planning_status": "publishing",
+        "acceptance_status": "審核中",
+        "acceptance_summary": "尚待成果核對",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [
+          {
+            "person_ref": "synthetic-dispatcher",
+            "name": "合成 林派工"
+          },
+          {
+            "person_ref": "synthetic-leader",
+            "name": "合成 陳組長"
+          }
+        ],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": {
+          "command_id": "synthetic-command-unknown",
+          "state": "outcome_unknown",
+          "revision": 2,
+          "next_action": "reconcile"
+        },
+        "source": "v4_task",
+        "needs_me": [
+          "reconcile_command"
+        ],
+        "allowed_actions": [
+          "reconcile"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "外業（4 / 9）",
+        "preview_id": ""
+      },
+      {
+        "task_id": "synthetic-task-4",
+        "title": "合成 成果退回待核實",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "進行中",
+        "planning_status": "draft",
+        "acceptance_status": "已退回",
+        "acceptance_summary": "請補充量測紀錄",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [
+          {
+            "person_ref": "synthetic-dispatcher",
+            "name": "合成 林派工"
+          },
+          {
+            "person_ref": "synthetic-leader",
+            "name": "合成 陳組長"
+          }
+        ],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": null,
+        "source": "v4_task",
+        "needs_me": [
+          "review_returned",
+          "verify_unknown:synthetic-leader"
+        ],
+        "allowed_actions": [
+          "edit_detail",
+          "cancel_draft"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "外業（4 / 9）",
+        "preview_id": ""
+      }
+    ]
+  },
+  "stale": {
+    "source": {
+      "fetched_at": "2026-10-18T01:00:00Z",
+      "quality": {
+        "states": [
+          "stale"
+        ]
+      }
+    },
+    "progress": {
+      "status": {
+        "進行中": 3,
+        "待處理": 1
+      },
+      "planning_status": {
+        "pending_approval": 1,
+        "unassigned": 1,
+        "publishing": 1,
+        "draft": 1
+      }
+    },
+    "needs_me": [
+      {
+        "task_id": "synthetic-task-1",
+        "title": "合成 港區水深測量",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "進行中",
+        "planning_status": "pending_approval",
+        "acceptance_status": "審核中",
+        "acceptance_summary": "尚待成果核對",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [
+          {
+            "person_ref": "synthetic-dispatcher",
+            "name": "合成 林派工"
+          },
+          {
+            "person_ref": "synthetic-leader",
+            "name": "合成 陳組長"
+          }
+        ],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": null,
+        "source": "v4_task",
+        "needs_me": [
+          "approve_seat:manager_review"
+        ],
+        "allowed_actions": [
+          "reassign",
+          "edit_detail",
+          "approve",
+          "return"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "外業（4 / 9）",
+        "preview_id": ""
+      },
+      {
+        "task_id": "synthetic-task-2",
+        "title": "合成 待指派控制工作",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "待處理",
+        "planning_status": "unassigned",
+        "acceptance_status": "審核中",
+        "acceptance_summary": "尚待成果核對",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": null,
+        "source": "v4_task",
+        "needs_me": [
+          "confirm_assignment"
+        ],
+        "allowed_actions": [
+          "assign",
+          "edit_detail"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "控制（5 / 9）",
+        "preview_id": ""
+      },
+      {
+        "task_id": "synthetic-task-3",
+        "title": "合成 回應不明待對帳",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "進行中",
+        "planning_status": "publishing",
+        "acceptance_status": "審核中",
+        "acceptance_summary": "尚待成果核對",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [
+          {
+            "person_ref": "synthetic-dispatcher",
+            "name": "合成 林派工"
+          },
+          {
+            "person_ref": "synthetic-leader",
+            "name": "合成 陳組長"
+          }
+        ],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": {
+          "command_id": "synthetic-command-unknown",
+          "state": "outcome_unknown",
+          "revision": 2,
+          "next_action": "reconcile"
+        },
+        "source": "v4_task",
+        "needs_me": [
+          "reconcile_command"
+        ],
+        "allowed_actions": [
+          "reconcile"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "外業（4 / 9）",
+        "preview_id": ""
+      },
+      {
+        "task_id": "synthetic-task-4",
+        "title": "合成 成果退回待核實",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "進行中",
+        "planning_status": "draft",
+        "acceptance_status": "已退回",
+        "acceptance_summary": "請補充量測紀錄",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [
+          {
+            "person_ref": "synthetic-dispatcher",
+            "name": "合成 林派工"
+          },
+          {
+            "person_ref": "synthetic-leader",
+            "name": "合成 陳組長"
+          }
+        ],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": null,
+        "source": "v4_task",
+        "needs_me": [
+          "review_returned",
+          "verify_unknown:synthetic-leader"
+        ],
+        "allowed_actions": [
+          "edit_detail",
+          "cancel_draft"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "外業（4 / 9）",
+        "preview_id": ""
+      }
+    ],
+    "rows": [
+      {
+        "task_id": "synthetic-task-1",
+        "title": "合成 港區水深測量",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "進行中",
+        "planning_status": "pending_approval",
+        "acceptance_status": "審核中",
+        "acceptance_summary": "尚待成果核對",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [
+          {
+            "person_ref": "synthetic-dispatcher",
+            "name": "合成 林派工"
+          },
+          {
+            "person_ref": "synthetic-leader",
+            "name": "合成 陳組長"
+          }
+        ],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": null,
+        "source": "v4_task",
+        "needs_me": [
+          "approve_seat:manager_review"
+        ],
+        "allowed_actions": [
+          "reassign",
+          "edit_detail",
+          "approve",
+          "return"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "外業（4 / 9）",
+        "preview_id": ""
+      },
+      {
+        "task_id": "synthetic-task-2",
+        "title": "合成 待指派控制工作",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "待處理",
+        "planning_status": "unassigned",
+        "acceptance_status": "審核中",
+        "acceptance_summary": "尚待成果核對",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": null,
+        "source": "v4_task",
+        "needs_me": [
+          "confirm_assignment"
+        ],
+        "allowed_actions": [
+          "assign",
+          "edit_detail"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "控制（5 / 9）",
+        "preview_id": ""
+      },
+      {
+        "task_id": "synthetic-task-3",
+        "title": "合成 回應不明待對帳",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "進行中",
+        "planning_status": "publishing",
+        "acceptance_status": "審核中",
+        "acceptance_summary": "尚待成果核對",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [
+          {
+            "person_ref": "synthetic-dispatcher",
+            "name": "合成 林派工"
+          },
+          {
+            "person_ref": "synthetic-leader",
+            "name": "合成 陳組長"
+          }
+        ],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": {
+          "command_id": "synthetic-command-unknown",
+          "state": "outcome_unknown",
+          "revision": 2,
+          "next_action": "reconcile"
+        },
+        "source": "v4_task",
+        "needs_me": [
+          "reconcile_command"
+        ],
+        "allowed_actions": [
+          "reconcile"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "外業（4 / 9）",
+        "preview_id": ""
+      },
+      {
+        "task_id": "synthetic-task-4",
+        "title": "合成 成果退回待核實",
+        "content": "完成測區量測並核對儀器紀錄。",
+        "case": {
+          "ref": "synthetic-case",
+          "code": "合成 C001",
+          "name": "港區測量"
+        },
+        "project_id": "synthetic-project",
+        "package_id": "PKG-SYNTHETIC",
+        "kind": "execution",
+        "phase": "正式",
+        "status": "進行中",
+        "planning_status": "draft",
+        "acceptance_status": "已退回",
+        "acceptance_summary": "請補充量測紀錄",
+        "owner": {
+          "person_ref": "synthetic-dispatcher",
+          "name": "合成 林派工"
+        },
+        "crew": [
+          {
+            "person_ref": "synthetic-dispatcher",
+            "name": "合成 林派工"
+          },
+          {
+            "person_ref": "synthetic-leader",
+            "name": "合成 陳組長"
+          }
+        ],
+        "interval": {
+          "start": "2026-10-19T08:00:00+08:00",
+          "end": "2026-10-19T12:00:00+08:00",
+          "precision": "datetime"
+        },
+        "instruments": [
+          {
+            "ref": "synthetic-instrument",
+            "label": "合成 測深儀"
+          }
+        ],
+        "vehicles": [
+          {
+            "ref": "synthetic-vehicle",
+            "label": "合成 工務車"
+          }
+        ],
+        "deadline": "2026-10-23",
+        "est_person_hours": 8,
+        "revision": 2,
+        "command": null,
+        "source": "v4_task",
+        "needs_me": [
+          "review_returned",
+          "verify_unknown:synthetic-leader"
+        ],
+        "allowed_actions": [
+          "edit_detail",
+          "cancel_draft"
+        ],
+        "parent_task_ref": "synthetic-obligation",
+        "department": "外業組",
+        "scope_version": "1",
+        "rule_version": "R1",
+        "evidence_version": "E1",
+        "read_back_at": "2026-10-18T02:00:00Z",
+        "node_position": "外業（4 / 9）",
+        "preview_id": ""
+      }
+    ]
+  }
+}

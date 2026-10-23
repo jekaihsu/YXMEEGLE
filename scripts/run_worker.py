@@ -6,8 +6,16 @@ import json
 from datetime import datetime,timezone
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from fastapi import HTTPException
 from sqlalchemy import select
+from backend.live_read.config import LiveReadConfig
 from backend.app import app, WorkspaceRow, CacheRow
+
+
+def report(component,exc):
+    # HTTPException carries a numeric status only; its detail may name people or resources.
+    code=exc.status_code if isinstance(exc,HTTPException) else None
+    print(json.dumps({'component':component,'error_type':type(exc).__name__,**({'status_code':code} if code else {})}),flush=True)
 
 
 def heartbeat(status,stage='idle',error_type=None):
@@ -36,23 +44,24 @@ def main():
             try:
                 app.state.native_poller.run_due(wid)
             except Exception as exc:
-                failed=True; print(json.dumps({'component':'approval_poll','error_type':type(exc).__name__}),flush=True)
-            try:
-                app.state.people_directory.run_due(wid)
-            except Exception as exc:
-                failed=True; print(json.dumps({'component':'people','error_type':type(exc).__name__}),flush=True)
-            try:
-                app.state.attendance_schedule.run_due(wid)
-            except Exception as exc:
-                failed=True; print(json.dumps({'component':'attendance','error_type':type(exc).__name__}),flush=True)
-            try:
-                app.state.source_sync.run_due(wid)
-            except Exception as exc:
-                failed=True; print(json.dumps({'component':'source','error_type':type(exc).__name__}),flush=True)
+                failed=True; report('approval_poll',exc)
+            if not LiveReadConfig.from_env(app.state.cfg).enabled:
+                try:
+                    app.state.people_directory.run_due(wid)
+                except Exception as exc:
+                    failed=True; report('people',exc)
+                try:
+                    app.state.attendance_schedule.run_due(wid)
+                except Exception as exc:
+                    failed=True; report('attendance',exc)
+                try:
+                    app.state.source_sync.run_due(wid)
+                except Exception as exc:
+                    failed=True; report('source',exc)
             try:
                 app.state.worker.run_one(wid)
             except Exception as exc:
-                failed=True; print(json.dumps({'component':'jobs','error_type':type(exc).__name__}),flush=True)
+                failed=True; report('jobs',exc)
         heartbeat('degraded' if failed else 'ok','cycle_complete')
         if args.once: return
         time.sleep(30)

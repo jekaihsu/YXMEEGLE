@@ -1,0 +1,507 @@
+[
+  {
+    "command": "npm run build",
+    "exit_code": 0,
+    "log": "build.txt"
+  },
+  {
+    "command": "npx tsc --noEmit -p tsconfig.json",
+    "exit_code": 0,
+    "log": "typecheck.txt"
+  },
+  {
+    "command": "node test-api-response.mjs",
+    "exit_code": 0,
+    "log": "test-api-response.txt"
+  },
+  {
+    "command": "node test-approval-detail-a11y.mjs",
+    "exit_code": 0,
+    "log": "test-approval-detail-a11y.txt"
+  },
+  {
+    "command": "node test-audit-pagination.mjs",
+    "exit_code": 0,
+    "log": "test-audit-pagination.txt"
+  },
+  {
+    "command": "node test-audit-project-switch.mjs",
+    "exit_code": 0,
+    "log": "test-audit-project-switch.txt"
+  },
+  {
+    "command": "node test-avatar.mjs",
+    "exit_code": 0,
+    "log": "test-avatar.txt"
+  },
+  {
+    "command": "node test-browser-floor.mjs",
+    "exit_code": 0,
+    "log": "test-browser-floor.txt"
+  },
+  {
+    "command": "node test-case-amount-label.mjs",
+    "exit_code": 0,
+    "log": "test-case-amount-label.txt"
+  },
+  {
+    "command": "node test-case-detail-view.mjs",
+    "exit_code": 0,
+    "log": "test-case-detail-view.txt"
+  },
+  {
+    "command": "node test-case-navigation.mjs",
+    "exit_code": 0,
+    "log": "test-case-navigation.txt"
+  },
+  {
+    "command": "node test-comment-draft-scope.mjs",
+    "exit_code": 0,
+    "log": "test-comment-draft-scope.txt"
+  },
+  {
+    "command": "node test-company-cockpit.mjs",
+    "exit_code": 0,
+    "log": "test-company-cockpit.txt"
+  },
+  {
+    "command": "node test-company-progressive.mjs",
+    "exit_code": 0,
+    "log": "test-company-progressive.txt"
+  },
+  {
+    "command": "node test-company-route.mjs",
+    "exit_code": 0,
+    "log": "test-company-route.txt"
+  },
+  {
+    "command": "node test-confirmation-list-view.mjs",
+    "exit_code": 0,
+    "log": "test-confirmation-list-view.txt"
+  },
+  {
+    "command": "node test-confirmations-loading.mjs",
+    "exit_code": 0,
+    "log": "test-confirmations-loading.txt"
+  },
+  {
+    "command": "node test-contract-detail-view.mjs",
+    "exit_code": 0,
+    "log": "test-contract-detail-view.txt"
+  },
+  {
+    "command": "node test-contrast.mjs",
+    "exit_code": 0,
+    "log": "test-contrast.txt"
+  },
+  {
+    "command": "node test-daily-records.mjs",
+    "exit_code": 0,
+    "log": "test-daily-records.txt"
+  },
+  {
+    "command": "node test-data-freshness.mjs",
+    "exit_code": 0,
+    "log": "test-data-freshness.txt"
+  },
+  {
+    "command": "node test-data-state.mjs",
+    "exit_code": 0,
+    "log": "test-data-state.txt"
+  },
+  {
+    "command": "node test-dev-tooling.mjs",
+    "exit_code": 1,
+    "log": "test-dev-tooling.txt"
+  },
+  {
+    "command": "node test-dispatch-board.mjs",
+    "exit_code": 0,
+    "log": "test-dispatch-board.txt"
+  },
+  {
+    "command": "node test-dispatch-fixes.mjs",
+    "exit_code": 0,
+    "log": "test-dispatch-fixes.txt"
+  },
+  {
+    "command": "node test-dispatch-publish-ui.mjs",
+    "exit_code": 0,
+    "log": "test-dispatch-publish-ui.txt"
+  },
+  {
+    "command": "node test-dispatch-publish.mjs",
+    "exit_code": 0,
+    "log": "test-dispatch-publish.txt"
+  },
+  {
+    "command": "node test-dispatch-round2.mjs",
+    "exit_code": 0,
+    "log": "test-dispatch-round2.txt"
+  },
+  {
+    "command": "node test-draft-callsites.mjs",
+    "exit_code": 0,
+    "log": "test-draft-callsites.txt"
+  },
+  {
+    "command": "node test-drilldown-context.mjs",
+    "exit_code": 0,
+    "log": "test-drilldown-context.txt"
+  },
+  {
+    "command": "node test-execution-admission.mjs",
+    "exit_code": 0,
+    "log": "test-execution-admission.txt"
+  },
+  {
+    "command": "node test-financial-draft-scope.mjs",
+    "exit_code": 0,
+    "log": "test-financial-draft-scope.txt"
+  },
+  {
+    "command": "node test-form-draft-identity.mjs",
+    "exit_code": 0,
+    "log": "test-form-draft-identity.txt"
+  },
+  {
+    "command": "node test-freshness-wiring.mjs",
+    "exit_code": 0,
+    "log": "test-freshness-wiring.txt"
+  },
+  {
+    "command": "node test-home-attendance-unknown.mjs",
+    "exit_code": 0,
+    "log": "test-home-attendance-unknown.txt"
+  },
+  {
+    "command": "node test-home-counts.mjs",
+    "exit_code": 0,
+    "log": "test-home-counts.txt"
+  },
+  {
+    "command": "node test-home-dispatch.mjs",
+    "exit_code": 0,
+    "log": "test-home-dispatch.txt"
+  },
+  {
+    "command": "node test-home-executable.mjs",
+    "exit_code": 0,
+    "log": "test-home-executable.txt"
+  },
+  {
+    "command": "node test-home-layout.mjs",
+    "exit_code": 0,
+    "log": "test-home-layout.txt"
+  },
+  {
+    "command": "node test-home-panels.mjs",
+    "exit_code": 1,
+    "log": "test-home-panels.txt"
+  },
+  {
+    "command": "node test-home-people-cards.mjs",
+    "exit_code": 0,
+    "log": "test-home-people-cards.txt"
+  },
+  {
+    "command": "node test-home-people.mjs",
+    "exit_code": 0,
+    "log": "test-home-people.txt"
+  },
+  {
+    "command": "node test-home-query-refresh.mjs",
+    "exit_code": 0,
+    "log": "test-home-query-refresh.txt"
+  },
+  {
+    "command": "node test-home-report-cards.mjs",
+    "exit_code": 0,
+    "log": "test-home-report-cards.txt"
+  },
+  {
+    "command": "node test-home-reports-retry.mjs",
+    "exit_code": 0,
+    "log": "test-home-reports-retry.txt"
+  },
+  {
+    "command": "node test-home-reports.mjs",
+    "exit_code": 0,
+    "log": "test-home-reports.txt"
+  },
+  {
+    "command": "node test-home-review-regressions.mjs",
+    "exit_code": 0,
+    "log": "test-home-review-regressions.txt"
+  },
+  {
+    "command": "node test-home-target-navigation.mjs",
+    "exit_code": 1,
+    "log": "test-home-target-navigation.txt"
+  },
+  {
+    "command": "node test-input-recovery.mjs",
+    "exit_code": 0,
+    "log": "test-input-recovery.txt"
+  },
+  {
+    "command": "node test-integration-routes.mjs",
+    "exit_code": 0,
+    "log": "test-integration-routes.txt"
+  },
+  {
+    "command": "node test-lark-pilot-contract.mjs",
+    "exit_code": 0,
+    "log": "test-lark-pilot-contract.txt"
+  },
+  {
+    "command": "node test-lark-pilot.mjs",
+    "exit_code": 0,
+    "log": "test-lark-pilot.txt"
+  },
+  {
+    "command": "node test-live-read-regressions.mjs",
+    "exit_code": 0,
+    "log": "test-live-read-regressions.txt"
+  },
+  {
+    "command": "node test-manager-overview-view.mjs",
+    "exit_code": 0,
+    "log": "test-manager-overview-view.txt"
+  },
+  {
+    "command": "node test-my-work-integrated.mjs",
+    "exit_code": 0,
+    "log": "test-my-work-integrated.txt"
+  },
+  {
+    "command": "node test-my-work-return-focus.mjs",
+    "exit_code": 0,
+    "log": "test-my-work-return-focus.txt"
+  },
+  {
+    "command": "node test-my-work-view.mjs",
+    "exit_code": 0,
+    "log": "test-my-work-view.txt"
+  },
+  {
+    "command": "node test-native-approval-a11y.mjs",
+    "exit_code": 0,
+    "log": "test-native-approval-a11y.txt"
+  },
+  {
+    "command": "node test-native-approval-version.mjs",
+    "exit_code": 0,
+    "log": "test-native-approval-version.txt"
+  },
+  {
+    "command": "node test-node-assignment-api.mjs",
+    "exit_code": 0,
+    "log": "test-node-assignment-api.txt"
+  },
+  {
+    "command": "node test-node-assignments.mjs",
+    "exit_code": 0,
+    "log": "test-node-assignments.txt"
+  },
+  {
+    "command": "node test-node-evidence.mjs",
+    "exit_code": 0,
+    "log": "test-node-evidence.txt"
+  },
+  {
+    "command": "node test-ops-flow-view.mjs",
+    "exit_code": 0,
+    "log": "test-ops-flow-view.txt"
+  },
+  {
+    "command": "node test-ops-sync-panel.mjs",
+    "exit_code": 1,
+    "log": "test-ops-sync-panel.txt"
+  },
+  {
+    "command": "node test-overview-design.mjs",
+    "exit_code": 0,
+    "log": "test-overview-design.txt"
+  },
+  {
+    "command": "node test-p2-routes.mjs",
+    "exit_code": 0,
+    "log": "test-p2-routes.txt"
+  },
+  {
+    "command": "node test-people-attendance.mjs",
+    "exit_code": 0,
+    "log": "test-people-attendance.txt"
+  },
+  {
+    "command": "node test-perf.mjs",
+    "exit_code": 0,
+    "log": "test-perf.txt"
+  },
+  {
+    "command": "node test-plan-panel.mjs",
+    "exit_code": 1,
+    "log": "test-plan-panel.txt"
+  },
+  {
+    "command": "node test-pm-glance.mjs",
+    "exit_code": 0,
+    "log": "test-pm-glance.txt"
+  },
+  {
+    "command": "node test-project-disabled-reasons.mjs",
+    "exit_code": 0,
+    "log": "test-project-disabled-reasons.txt"
+  },
+  {
+    "command": "node test-project-flow-model.mjs",
+    "exit_code": 0,
+    "log": "test-project-flow-model.txt"
+  },
+  {
+    "command": "node test-project-flow-round2.mjs",
+    "exit_code": 0,
+    "log": "test-project-flow-round2.txt"
+  },
+  {
+    "command": "node test-project-flow-ui.mjs",
+    "exit_code": 0,
+    "log": "test-project-flow-ui.txt"
+  },
+  {
+    "command": "node test-project-progress.mjs",
+    "exit_code": 0,
+    "log": "test-project-progress.txt"
+  },
+  {
+    "command": "node test-recurring-draft-period.mjs",
+    "exit_code": 0,
+    "log": "test-recurring-draft-period.txt"
+  },
+  {
+    "command": "node test-reload-generation.mjs",
+    "exit_code": 0,
+    "log": "test-reload-generation.txt"
+  },
+  {
+    "command": "node test-reports-build.mjs",
+    "exit_code": 0,
+    "log": "test-reports-build.txt"
+  },
+  {
+    "command": "node test-reports-interactions.mjs",
+    "exit_code": 1,
+    "log": "test-reports-interactions.txt"
+  },
+  {
+    "command": "node test-reports-mock.mjs",
+    "exit_code": 0,
+    "log": "test-reports-mock.txt"
+  },
+  {
+    "command": "node test-reports-progress-fixes.mjs",
+    "exit_code": 0,
+    "log": "test-reports-progress-fixes.txt"
+  },
+  {
+    "command": "node test-reports-progress.mjs",
+    "exit_code": 0,
+    "log": "test-reports-progress.txt"
+  },
+  {
+    "command": "node test-reports-requests.mjs",
+    "exit_code": 0,
+    "log": "test-reports-requests.txt"
+  },
+  {
+    "command": "node test-reports-view.mjs",
+    "exit_code": 0,
+    "log": "test-reports-view.txt"
+  },
+  {
+    "command": "node test-search-input.mjs",
+    "exit_code": 1,
+    "log": "test-search-input.txt"
+  },
+  {
+    "command": "node test-session-epoch.mjs",
+    "exit_code": 0,
+    "log": "test-session-epoch.txt"
+  },
+  {
+    "command": "node test-settings-overview.mjs",
+    "exit_code": 0,
+    "log": "test-settings-overview.txt"
+  },
+  {
+    "command": "node test-shell-mode.mjs",
+    "exit_code": 1,
+    "log": "test-shell-mode.txt"
+  },
+  {
+    "command": "node test-source-coverage-views.mjs",
+    "exit_code": 0,
+    "log": "test-source-coverage-views.txt"
+  },
+  {
+    "command": "node test-source-health-view.mjs",
+    "exit_code": 0,
+    "log": "test-source-health-view.txt"
+  },
+  {
+    "command": "node test-source-lifecycle.mjs",
+    "exit_code": 0,
+    "log": "test-source-lifecycle.txt"
+  },
+  {
+    "command": "node test-start-sop.mjs",
+    "exit_code": 0,
+    "log": "test-start-sop.txt"
+  },
+  {
+    "command": "node test-taipei-time.mjs",
+    "exit_code": 0,
+    "log": "test-taipei-time.txt"
+  },
+  {
+    "command": "node test-task-table.mjs",
+    "exit_code": 0,
+    "log": "test-task-table.txt"
+  },
+  {
+    "command": "node test-unified-home.mjs",
+    "exit_code": 0,
+    "log": "test-unified-home.txt"
+  },
+  {
+    "command": "node test-ux-case-detail.mjs",
+    "exit_code": 1,
+    "log": "test-ux-case-detail.txt"
+  },
+  {
+    "command": "node test-ux-disabled.mjs",
+    "exit_code": 0,
+    "log": "test-ux-disabled.txt"
+  },
+  {
+    "command": "node test-ux-table-sort.mjs",
+    "exit_code": 0,
+    "log": "test-ux-table-sort.txt"
+  },
+  {
+    "command": "node test-view-data.mjs",
+    "exit_code": 0,
+    "log": "test-view-data.txt"
+  },
+  {
+    "command": "node test-work-assigned-visibility.mjs",
+    "exit_code": 0,
+    "log": "test-work-assigned-visibility.txt"
+  },
+  {
+    "command": "node test-work-item-detail-view.mjs",
+    "exit_code": 0,
+    "log": "test-work-item-detail-view.txt"
+  }
+]

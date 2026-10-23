@@ -86,6 +86,28 @@ def test_quote_review_still_requires_actual_two_distinct_seats():
     assert project['quote_reviews'][0]['status']=='approved'
     assert len(project['quote_reviews'][0]['votes'])==2 and not state['jobs']
 
+
+def test_quote_reassignment_invalidates_old_pending_vote_and_requires_new_pm():
+    state=upgrade(seed()); state['users']=deepcopy(USERS)
+    project=state['projects'][0]; project.update(pm_id='u-pm',sales_id='u-field',quotes=[{'id':'quote1','amount':100}])
+
+    def vote(actor,seat):
+        return apply_operation(state,next(u for u in state['users'] if u['id']==actor),
+            {'action':'quote_review','project_id':project['id'],'payload':{'quote_id':'quote1','classification':'effective','seat':seat}},True)
+
+    vote('u-pm','pm')
+    old=project['quote_reviews'][0]
+    apply_operation(state,next(u for u in state['users'] if u['id']=='u-manager'),
+        {'action':'project_roles','project_id':project['id'],'payload':{'pm_id':'u-control'}},True)
+    assert old['status']=='invalidated' and old['votes'][0]['actor_id']=='u-pm'
+    vote('u-control','pm')
+    current=project['quote_reviews'][-1]
+    assert current['status']=='pending'
+    vote('u-field','sales')
+    assert current['status']=='approved'
+    assert current['principal_ids']=={'pm':'u-control','sales':'u-field'}
+    assert {entry['actor_id'] for entry in current['votes']}=={'u-control','u-field'}
+
 @pytest.mark.parametrize('kind',['capability','training_record'])
 @pytest.mark.parametrize('environment',['demo','test','production'])
 def test_remote_policy_cannot_simulate_or_enable_stopped_jobs(kind,environment):

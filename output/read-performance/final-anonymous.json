@@ -1,0 +1,8 @@
+{
+  "/api/health": 200,
+  "/api/session": 200,
+  "/api/workspace?scope=shell": 401,
+  "/api/projects/missing": 401,
+  "/api/settings/overview": 401,
+  "/api/projects/missing/sop-tasks": 401
+}

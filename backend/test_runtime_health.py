@@ -111,3 +111,13 @@ def test_bootstrap_recovery_can_read_health_from_own_test_context_only():
 def test_local_backup_never_claims_verified_offsite(tmp_path):
     result=snapshot(sessions(),object,backup(tmp_path,offsite={}),now=NOW)
     assert result['backup']['status']=='local_only'
+
+
+@pytest.mark.parametrize('age,status', [(30, 'degraded'), (700, 'degraded'), (901, 'stale')])
+def test_live_roster_needs_permission_is_blocking_even_with_last_good_data(age, status):
+    from .runtime_health import directory_status
+    live = {'enabled': True, 'datasets': {'roster': {
+        'status': 'needs-permission', 'as_of': (NOW-timedelta(seconds=age)).isoformat()}}}
+    result = directory_status(sessions(), object, {}, NOW, live_read=live)
+    assert result['status'] == status and result['blocking'] is True
+    assert result['success_age_seconds'] == age

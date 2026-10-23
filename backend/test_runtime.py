@@ -95,8 +95,9 @@ def test_deployment_staging_includes_runtime_and_omits_credentials(tmp_path,monk
     paths=['Dockerfile','.dockerignore','backend/requirements.txt','backend/app.py','scripts/backup_restore.py','scripts/backup_live_legacy.py','scripts/run_service.py','scripts/run_worker.py','scripts/backup_schedule.py','frontend/package.json','frontend/package-lock.json','frontend/index.html','frontend/tsconfig.json','frontend/vite.config.ts','frontend/src/app.ts','frontend/public/logo.svg']
     paths.append('scripts/backup_offsite.py')
     paths.append('scripts/restore_drill.py')
-    paths += ['backend/sop_source_contracts.json','scripts/backup_publish.py',
-              'scripts/backup_reconcile.py','scripts/backup_offsite_acceptance.py','backend/requirements.lock']
+    paths += ['backend/sop_source_contracts.json','backend/sop_import/catalog.json','scripts/backup_publish.py',
+              'scripts/backup_reconcile.py','scripts/backup_offsite_acceptance.py','backend/requirements.lock',
+              'scripts/migrate_index_tables.py','scripts/backfill_index.py']
     for name in paths:
         path=root/name; path.parent.mkdir(parents=True,exist_ok=True); path.write_text('source',encoding='utf-8')
     config=root/'deployment/source-tables.json'; config.parent.mkdir()
@@ -122,3 +123,69 @@ def test_source_table_config_rejects_credential_keys_without_echoing_value(tmp_p
     path.write_text(json.dumps([dict(base_token='resource',table_id='table',kind='daily',access_token=secret)]))
     with pytest.raises(SystemExit) as exc: deploy_prepare.validate_source_tables(path)
     assert secret not in str(exc.value)
+
+
+@pytest.mark.parametrize('enabled',[True,False])
+def test_worker_once_gates_dataset_timers_but_keeps_jobs_and_heartbeat(tmp_path,monkeypatch,enabled):
+    from types import SimpleNamespace
+    from backend.app import create_app, WorkspaceRow, CacheRow
+    from backend.seed import seed
+    from scripts import run_worker
+    app=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/worker.db','UPLOAD_DIR':str(tmp_path/'uploads'),
+                    'DEMO_MODE':'true','LARK_LIVE_READ_ENABLED':str(enabled).lower()})
+    with app.state.sessions.begin() as db: db.add(WorkspaceRow(id='demo-worker',version=1,data=seed()))
+    calls=[]
+    def service(name,method): return SimpleNamespace(**{method:lambda wid:calls.append((name,wid))})
+    app.state.native_poller=service('native','run_due')
+    app.state.worker=service('jobs','run_one')
+    app.state.people_directory=service('roster','run_due')
+    app.state.attendance_schedule=service('attendance','run_due')
+    app.state.source_sync=service('sources','run_due')
+    monkeypatch.setattr(run_worker,'app',app)
+    monkeypatch.setattr(sys,'argv',['run_worker.py','--once'])
+    run_worker.main()
+    names=[name for name,wid in calls]
+    assert names==(['native','jobs'] if enabled else ['native','roster','attendance','sources','jobs'])
+    with app.state.sessions() as db:
+        heartbeat=db.get(CacheRow,'runtime:worker').data
+    assert heartbeat['status']=='ok' and heartbeat['stage']=='cycle_complete'
+    assert heartbeat['last_success_at']==heartbeat['at']
+
+
+@pytest.mark.parametrize('age,status,blocking',[(30,'ok',False),(650,'warning',False),(900,'warning',False),(901,'stale',True)])
+def test_runtime_health_uses_live_roster_and_preserves_hard_limit(age,status,blocking):
+    from contextlib import contextmanager
+    from datetime import datetime,timedelta,timezone
+    from types import SimpleNamespace
+    from backend.runtime_health import snapshot
+    now=datetime(2026,10,7,tzinfo=timezone.utc)
+    @contextmanager
+    def sessions(): yield SimpleNamespace(get=lambda model,key:None)
+    live={'enabled':True,'datasets':{'roster':{'as_of':(now-timedelta(seconds=age)).isoformat(),'status':'fresh'}}}
+    coordinator=SimpleNamespace(status=lambda wid:live,queue_depth=2)
+    result=snapshot(sessions,object,{'LARK_WORKER_ORGANIZATION':'company'},now=now,coordinator=coordinator)
+    assert result['directory']['status']==status
+    assert result['directory']['blocking'] is blocking
+    assert result['directory']['max_age_seconds']==900
+    assert result['live_read']['queue_depth']==2
+    assert result['external_integrations_verified'] is False
+
+
+def test_worker_log_carries_http_status_without_detail(tmp_path,monkeypatch,capsys):
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from backend.app import create_app, WorkspaceRow
+    from backend.seed import seed
+    from scripts import run_worker
+    app=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/worker.db','UPLOAD_DIR':str(tmp_path/'uploads'),
+                    'DEMO_MODE':'true','LARK_LIVE_READ_ENABLED':'false'})
+    with app.state.sessions.begin() as db: db.add(WorkspaceRow(id='demo-worker',version=1,data=seed()))
+    def boom(wid): raise HTTPException(409,'secret-detail-ou_123')
+    noop=SimpleNamespace(run_due=lambda wid:None,run_one=lambda wid:None)
+    app.state.native_poller=app.state.people_directory=app.state.attendance_schedule=noop
+    app.state.worker=noop; app.state.source_sync=SimpleNamespace(run_due=boom)
+    monkeypatch.setattr(run_worker,'app',app); monkeypatch.setattr(sys,'argv',['run_worker.py','--once'])
+    run_worker.main()
+    out=capsys.readouterr().out
+    assert json.loads(out.strip().splitlines()[0])=={'component':'source','error_type':'HTTPException','status_code':409}
+    assert 'secret-detail' not in out

@@ -1,0 +1,108 @@
+[
+  {
+    "file": "test-dispatch-board.mjs",
+    "status": 0,
+    "summary": "Dispatch board: 64 literal parser, selector, rendered state, route, request and retention checks passed."
+  },
+  {
+    "file": "test-data-state.mjs",
+    "status": 0,
+    "summary": "data state: 180 checks passed"
+  },
+  {
+    "file": "test-contrast.mjs",
+    "status": 0,
+    "summary": "dark secondary boundary 10.85:1; text 10.85:1"
+  },
+  {
+    "file": "test-node-assignment-api.mjs",
+    "status": 0,
+    "summary": "ℹ duration_ms 12.434291"
+  },
+  {
+    "file": "test-node-assignments.mjs",
+    "status": 0,
+    "summary": "(Use `node --trace-warnings ...` to show where the warning was created)"
+  },
+  {
+    "file": "test-node-evidence.mjs",
+    "status": 0,
+    "summary": "ℹ duration_ms 174.497166"
+  },
+  {
+    "file": "test-project-progress.mjs",
+    "status": 0,
+    "summary": "ℹ duration_ms 3.713416"
+  },
+  {
+    "file": "test-shell-mode.mjs",
+    "status": 1,
+    "summary": "Existing table-header assertion fails identically on clean HEAD",
+    "baseline_reproduced": true
+  },
+  {
+    "file": "test-ux-disabled.mjs",
+    "status": 0,
+    "summary": "UX disabled routes, aliases, navigation and topbar checks passed"
+  },
+  {
+    "file": "test-integration-routes.mjs",
+    "status": 0,
+    "summary": "integration routes: all passed"
+  },
+  {
+    "file": "test-home-layout.mjs",
+    "status": 0,
+    "summary": "PASS 5 available-neighbour and section-edge assertions"
+  },
+  {
+    "file": "test-home-counts.mjs",
+    "status": 0,
+    "summary": "Home KPI literal counts passed for complete, partial, missing, demo fallback, assign and dashboard totals."
+  },
+  {
+    "file": "test-unified-home.mjs",
+    "status": 0,
+    "summary": "Unified home: role defaults, route alias, task/case anchors, named daily leave/trips, unavailable state, hide/reorder persistence, all-hidden recovery and blocked storage passed."
+  },
+  {
+    "file": "test-home-reports.mjs",
+    "status": 0,
+    "summary": "Home reports final total: 57 literal assertions passed."
+  },
+  {
+    "file": "test-home-report-cards.mjs",
+    "status": 0,
+    "summary": "Home report cards: 37 rendered access, request, stale, cancellation, trend-gap and clipboard checks passed."
+  },
+  {
+    "file": "test-home-reports-retry.mjs",
+    "status": 0,
+    "summary": "PASS 8 report week, warming success, capped attempts, manual retry, unmount, token change and ordinary errors scenarios"
+  },
+  {
+    "file": "test-home-review-regressions.mjs",
+    "status": 0,
+    "summary": "Home review regressions R1-R5 rendered API checks passed"
+  },
+  {
+    "file": "test-p2-routes.mjs",
+    "status": 0,
+    "summary": "p2 routes: 18 mutants killed"
+  },
+  {
+    "file": "test-company-route.mjs",
+    "status": 0,
+    "summary": "Company route: 4 checks passed"
+  },
+  {
+    "file": "test-api-response.mjs",
+    "status": 0,
+    "summary": "api response tests passed"
+  },
+  {
+    "file": "test-session-epoch.mjs",
+    "status": 0,
+    "summary": "    at commitRoot (/Users/vc/.t3/worktrees/YXMEEGLE/t3-f824e8ff/frontend/node_modules/react-dom/cjs/react-dom.development.js:26721:5) undefined"
+  }
+]

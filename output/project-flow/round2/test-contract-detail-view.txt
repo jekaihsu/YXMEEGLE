@@ -1,0 +1,25 @@
+ok - 1 unknown quantity/unit/reason/children render em dash plus reason, never 0
+ok - 2 both amounts withheld with G-AMT reason; no value, sum or difference; altered amounts fail closed
+ok - 3 no Complete/Approve/SOP write action; links are read-only navigation
+ok - 4 malformed bodies fail closed to unknown (whole page, no partial trust)
+ok - 5 breadcrumb Confirmation -> Contract Line; missing parent is explicit, not auto-assigned
+ok - 6 sibling directory keeps equal names as separate entries, current selected, stable key order
+ok - 7 main line block: number/name/version; quantity+unit unknown; revision reason unknown
+ok - 8 child table: stable id order with disclosure; sort by category falls back to stable id; unsortable column ignored
+ok - 9 child states: partial counted rows; complete-empty only when body says so; technical ids only in nav/drawer
+ok - 10 version history: observed snapshots labelled; formal revisions unlocated; effective version unknown
+ok - 11 drawer is selection-only: null by default, contract line or listed child when selected, else null
+ok - 12 receipt_missing always surfaces as 對應未驗證 even if the warnings list omits it
+ok - 13 page states: forbidden exposes nothing; unlocated/loading/read_failed/unknown are text states; stale is a retained-snapshot note
+ok - 14 duplicate case/line numbers and names across contracts stay separate; same key listed twice is malformed
+ok - 15 input is not mutated and the view is JSON-safe
+ok - mutation M1 unknown rendered as 0 -> unknown-not-zero guard fails the guard
+ok - mutation M2 withheld amount rendered as a number -> amount guard fails the guard
+ok - mutation M2b amount strictness removed (extra keys trusted) -> amount guard fails the guard
+ok - mutation M3 write action added -> forbidden-absent guard fails the guard
+ok - mutation M3b approve label leaks into warnings -> forbidden-absent guard fails the guard
+ok - mutation M4 malformed body partially trusted -> fail-closed guard fails the guard
+ok - mutation M4b extra keys tolerated -> fail-closed guard fails the guard
+ok - mutation M4d positive count with zero rows trusted -> fail-closed guard (131-R1) fails the guard
+ok - mutation M4c mapping claim trusted -> fail-closed guard fails the guard
+24 tests passed

@@ -1,0 +1,2 @@
+export const STATUS:Record<string,string>={approved_skipped:'核准跳過',engineering_complete:'工程完成、財務待結',internal:'內部案',source_conflict:'來源待核對',pending:'尚未開始',in_progress:'進行中',completed:'已完成',paused:'暫停中',superseded:'舊版留存',rework:'退回修正',draft:'草稿',approved:'已核准',executed:'已套用',rejected:'已駁回',withdrawn:'已撤回',active:'進行中',ongoing:'進行中'};
+export const NODE_NAMES:Record<string,string>={sales:'業務',pm:'PM',confirmation:'確認單',field:'外業',control:'控制',mapping:'圖資',report:'報告',pricing:'計價',settlement:'結算'};
