@@ -48,7 +48,7 @@ w.projects=Array.from({length:300},(_,i)=>({...structuredClone(p),id:`p${i}`,cod
 await flush(()=>root.render(React.createElement(Projects,{c:{...c,route:{view:'projects'}}})));
 const size=document.querySelector('[aria-label="每組顯示筆數"]');
 await flush(()=>{size.value='50';size.dispatchEvent(new Event('change',{bubbles:true}))});
-assert.equal(document.querySelectorAll('.pl-case').length,50);assert.ok(document.querySelector('.pl-footer').textContent.includes('已授權案件 300 筆'));
+assert.equal(document.querySelectorAll('.pl-case').length,50);assert.ok(document.querySelector('.pl-footer').textContent.includes('符合條件 300 筆'));
 const row=document.querySelector('.pl-case');await flush(()=>row.querySelector('.pl-more>button').click());await flush(()=>[...document.querySelectorAll('[role="menuitem"]')].find(b=>b.textContent.includes('查看案件詳情')).click());
 assert.equal(row.querySelector('.verification-cell').getAttribute('aria-label'),'已驗證');assert.ok(row.textContent.includes('受阻'));assert.ok(row.textContent.includes('即將到期'));assert.ok(row.querySelector('.deadline').classList.contains('is-upcoming'));assert.equal(row.querySelector('.numeric'),null,'contract amount is absent from overview rows');
 await flush(()=>document.querySelector('.pl-expand').click());assert.equal(document.querySelectorAll('.pl-case').length,300);assert.ok(document.querySelector('.pl-groups').textContent.includes('CASE-300'));

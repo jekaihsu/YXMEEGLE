@@ -54,7 +54,7 @@ try {
  const menu=document.querySelector('.pl-more>button');await act(async()=>menu.click());
  await act(async()=>[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent.includes('查看案件詳情')).click());
  assert.match(document.querySelector('.pl-details').textContent,/來源 執行中/);
- assert.match(document.querySelector('.pl-footer').textContent,/已授權案件 51 筆/);
+ assert.match(document.querySelector('.pl-footer').textContent,/符合條件 51 筆/);
  assert.equal(document.querySelector('.pl-group:has(.pl-case) h2 span').textContent,'51');
  await act(async()=>document.querySelector('.pl-expand').click());assert.equal(document.querySelectorAll('.pl-case').length,51);
  assert.ok(!document.querySelector('.pl-groups').textContent.includes('合約金額'));
