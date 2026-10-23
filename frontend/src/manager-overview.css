@@ -1,0 +1,188 @@
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
+@layer pages {
+  /* Manager Overview Refinements - Impeccable Distill */
+  .manager-overview-root {
+    gap: var(--sp-4, 1rem);
+  }
+
+  /* Compact, restrained status bar */
+  .manager-overview-root .p2-banner {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--sp-2, 0.5rem);
+    padding: var(--sp-2, 0.5rem) var(--sp-3, 0.75rem);
+    border-radius: var(--radius-s, 6px);
+    border: 1px solid var(--separator, #e2e8f0);
+    background: var(--surface-2, #f8fafc);
+  }
+
+  .manager-overview-root .p2-banner-header {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2, 0.5rem);
+    margin: 0;
+  }
+
+  .manager-overview-root .p2-banner-title {
+    font-size: var(--fs-caption, 0.75rem);
+    font-weight: 600;
+    color: var(--label-2);
+    text-transform: uppercase;
+  }
+
+  .manager-overview-root .p2-banner-reason {
+    margin: 0;
+    font-size: var(--fs-caption, 0.75rem);
+    color: var(--label-2);
+  }
+
+  /* Cases Section - Clear hierarchy and focus */
+  .manager-overview-root .p2-cases-section .p2-section-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-3, 0.75rem);
+    margin-bottom: var(--sp-2, 0.5rem);
+  }
+
+  .manager-overview-root .overview-table-note {
+    font-size: var(--fs-caption, 0.75rem);
+    color: var(--label-2);
+    margin: 0;
+  }
+
+  /* Button Hierarchy in Cases Table: Entry is Primary, Select/Details is Secondary */
+  .manager-overview-root .p2-cases-table .p2-toolbar-left {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2, 0.5rem);
+    white-space: nowrap;
+  }
+
+  .manager-overview-root .p2-btn-entry {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill, 9999px);
+    background: var(--accent);
+    color: #ffffff;
+    border: none;
+    font-size: var(--fs-caption, 0.75rem);
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity 0.15s ease;
+  }
+
+  .manager-overview-root .p2-btn-entry:hover {
+    opacity: 0.88;
+  }
+
+  .manager-overview-root .p2-btn-select {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: var(--radius-s, 4px);
+    background: transparent;
+    color: var(--label-2);
+    border: 1px solid var(--separator, #cbd5e1);
+    font-size: var(--fs-caption, 0.75rem);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .manager-overview-root .p2-btn-select:hover {
+    background: var(--surface-2, #f1f5f9);
+    color: var(--label);
+    border-color: var(--label-2);
+  }
+
+  .manager-overview-root .p2-btn-select[aria-expanded="true"] {
+    background: var(--accent-fill, rgba(0, 113, 227, 0.1));
+    color: var(--accent, #0071e3);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* Unknown cell indicators - calm, understated */
+  .manager-overview-root .p2-cell-unknown .p2-dash {
+    color: var(--label-3, #94a3b8);
+  }
+
+  /* KPI Cards - Distilled and scannable */
+  .manager-overview-root .p2-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--sp-3, 0.75rem);
+  }
+
+  .manager-overview-root .p2-card {
+    border-radius: var(--radius-m, 8px);
+    border: 1px solid var(--separator, #e2e8f0);
+    background: var(--surface, #ffffff);
+    padding: var(--sp-3, 0.75rem) var(--sp-4, 1rem);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+  }
+
+  .manager-overview-root .p2-card:hover {
+    border-color: var(--accent, #0071e3);
+  }
+
+  .manager-overview-root .p2-card.is-unavailable {
+    opacity: 0.72;
+    background: var(--surface-2, #f8fafc);
+  }
+
+  .manager-overview-root .p2-card-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  /* Weekly activity - Demoted to quiet footnote card */
+  .manager-overview-root .p2-weekly-section {
+    background: var(--surface-2, #f8fafc);
+    border: 1px solid var(--separator, #e2e8f0);
+    border-radius: var(--radius-m, 8px);
+    padding: var(--sp-3, 0.75rem) var(--sp-4, 1rem);
+  }
+
+  .manager-overview-root .p2-weekly-section .p2-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--sp-2, 0.5rem);
+  }
+
+  .manager-overview-root .p2-weekly-section h3 {
+    margin: 0;
+    font-size: var(--fs-subhead, 0.875rem);
+    color: var(--label-2);
+  }
+
+  .manager-overview-root .p2-weekly-body {
+    font-size: var(--fs-caption, 0.75rem);
+    color: var(--label-2);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .manager-overview-root .p2-weekly-reason {
+    margin: 0;
+  }
+
+  .manager-overview-root .p2-weekly-period {
+    margin: 0;
+  }
+
+  /* Unresolved data section - quiet when 0 */
+  .manager-overview-root .p2-unresolved-section {
+    border-top: 1px solid var(--separator, #e2e8f0);
+    padding-top: var(--sp-4, 1rem);
+  }
+}
