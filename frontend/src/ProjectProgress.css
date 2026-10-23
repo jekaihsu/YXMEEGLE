@@ -30,5 +30,6 @@
 }
 @layer pages {
 .pg-table summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--accent)}
+.pg-details{border-top:1px solid var(--sep);padding-top:4px}.pg-details>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--accent);font-weight:600}.pg-details[open]>summary{margin-bottom:8px}
 
 }
