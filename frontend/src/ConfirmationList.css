@@ -1,0 +1,717 @@
+/* ==========================================================================
+   ConfirmationList.css - Impeccable Distill for 工程確認單
+   Mode: Operate (Restrained, Precise, Scannable, High-Density Task Surface)
+   ========================================================================== */
+
+.confirmation-list-root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 16px);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Header refinement */
+.confirmation-list-root .p2-header {
+  padding-bottom: var(--space-2, 8px);
+  border-bottom: 1px solid var(--sep, #e2e8f0);
+}
+
+.confirmation-list-root .p2-header-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+  flex-wrap: wrap;
+}
+
+.confirmation-list-root .p2-title {
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--label, #0f172a);
+}
+
+.confirmation-list-root .p2-header-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+  font-size: 0.8125rem;
+  color: var(--label-2, #64748b);
+}
+
+.confirmation-list-root .p2-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Page State Banner - Clean & Compact, Refuse thick left border */
+.confirmation-list-root .p2-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+  padding: 8px var(--space-3, 12px);
+  border-radius: var(--radius-control, 6px);
+  border: 1px solid var(--sep, #e2e8f0);
+  background: var(--surface-2, #f8fafc);
+  box-shadow: none;
+}
+
+.confirmation-list-root .p2-banner-header {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+.confirmation-list-root .p2-banner-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--label-2, #64748b);
+  letter-spacing: 0.02em;
+}
+
+.confirmation-list-root .p2-banner.state-ready {
+  border-color: var(--sep, #e2e8f0);
+}
+
+.confirmation-list-root .p2-banner.state-loading {
+  background: color-mix(in srgb, var(--accent, #0070f3) 6%, var(--surface, #ffffff));
+  border-color: color-mix(in srgb, var(--accent, #0070f3) 24%, var(--sep, #e2e8f0));
+}
+
+.confirmation-list-root .p2-banner.state-partial,
+.confirmation-list-root .p2-banner.state-stale,
+.confirmation-list-root .p2-banner.state-unlocated {
+  background: color-mix(in srgb, var(--warning, #f59e0b) 6%, var(--surface, #ffffff));
+  border-color: color-mix(in srgb, var(--warning, #f59e0b) 24%, var(--sep, #e2e8f0));
+}
+
+.confirmation-list-root .p2-banner.state-forbidden,
+.confirmation-list-root .p2-banner.state-read_failed {
+  background: color-mix(in srgb, var(--critical, #ef4444) 6%, var(--surface, #ffffff));
+  border-color: color-mix(in srgb, var(--critical, #ef4444) 24%, var(--sep, #e2e8f0));
+}
+
+.confirmation-list-root .p2-banner.state-unknown {
+  background: var(--surface-2, #f8fafc);
+  border-color: var(--sep, #e2e8f0);
+}
+
+/* Toolbar: Streamlined Single Goal (Search & Filter) */
+.confirmation-list-root .p2-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+  padding: var(--space-3, 12px);
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--sep, #e2e8f0);
+  border-radius: var(--radius-card, 8px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.confirmation-list-root .p2-toolbar-row-primary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.confirmation-list-root .p2-toolbar-primary-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  flex-wrap: wrap;
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+.confirmation-list-root .p2-toolbar-primary-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  flex-shrink: 0;
+}
+
+/* Compact Search Box */
+.confirmation-list-root .p2-search-box {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 13rem;
+  min-width: 140px;
+}
+
+.confirmation-list-root .p2-search-input {
+  width: 100%;
+  height: 34px;
+  min-height: 34px;
+  padding: 6px 28px 6px 10px;
+  font-size: 0.8125rem;
+  border: 1px solid var(--sep, #cbd5e1);
+  border-radius: var(--radius-control, 6px);
+  background: var(--surface, #ffffff);
+  color: var(--label, #0f172a);
+}
+
+.confirmation-list-root .p2-search-input:focus {
+  border-color: var(--accent, #0070f3);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #0070f3) 20%, transparent);
+}
+
+.confirmation-list-root .p2-search-clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--label-2, #64748b);
+  font-size: 0.875rem;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.confirmation-list-root .p2-search-clear:hover {
+  background: var(--surface-2, #f1f5f9);
+  color: var(--label, #0f172a);
+}
+
+/* Compact Filter Fields in Primary Row */
+.confirmation-list-root .p2-filter-field-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2, #f8fafc);
+  border: 1px solid var(--sep, #cbd5e1);
+  border-radius: var(--radius-control, 6px);
+  padding: 0 6px;
+  height: 34px;
+  box-sizing: border-box;
+}
+
+.confirmation-list-root .p2-filter-field-inline .p2-filter-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--label-2, #64748b);
+  white-space: nowrap;
+}
+
+.confirmation-list-root .p2-filter-field-inline .p2-filter-input {
+  border: none;
+  background: transparent;
+  padding: 4px 6px;
+  min-height: auto;
+  height: 28px;
+  width: 100px;
+  font-size: 0.8125rem;
+  color: var(--label, #0f172a);
+}
+
+.confirmation-list-root .p2-filter-field-inline .p2-filter-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.confirmation-list-root .p2-filter-field-inline:focus-within {
+  border-color: var(--accent, #0070f3);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #0070f3) 20%, transparent);
+  background: var(--surface, #ffffff);
+}
+
+/* Progressive Disclosure Button: 進階篩選 */
+.confirmation-list-root .p2-btn-advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 var(--space-2, 10px);
+  font-size: 0.75rem;
+  font-weight: 550;
+  border: 1px solid var(--sep, #cbd5e1);
+  border-radius: var(--radius-control, 6px);
+  background: var(--surface-2, #f8fafc);
+  color: var(--label-2, #475569);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.confirmation-list-root .p2-btn-advanced-toggle:hover {
+  background: var(--surface, #ffffff);
+  color: var(--label, #0f172a);
+  border-color: var(--accent, #0070f3);
+}
+
+.confirmation-list-root .p2-btn-advanced-toggle.is-active {
+  background: color-mix(in srgb, var(--accent, #0070f3) 10%, var(--surface, #ffffff));
+  border-color: var(--accent, #0070f3);
+  color: var(--accent, #0070f3);
+}
+
+.confirmation-list-root .p2-filter-active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent, #0070f3);
+}
+
+/* Action Buttons (Reset, Column Chooser) */
+.confirmation-list-root .p2-btn-reset-filters,
+.confirmation-list-root .p2-btn-chooser {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 var(--space-3, 12px);
+  font-size: 0.75rem;
+  font-weight: 550;
+  border: 1px solid var(--sep, #cbd5e1);
+  border-radius: var(--radius-control, 6px);
+  background: var(--surface, #ffffff);
+  color: var(--label-2, #475569);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.confirmation-list-root .p2-btn-reset-filters:hover,
+.confirmation-list-root .p2-btn-chooser:hover {
+  background: var(--surface-2, #f8fafc);
+  color: var(--label, #0f172a);
+  border-color: var(--accent, #0070f3);
+}
+
+/* Secondary Advanced Filters Row */
+.confirmation-list-root .p2-toolbar-row-advanced {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+  flex-wrap: wrap;
+  padding-top: var(--space-2, 8px);
+  margin-top: 4px;
+  border-top: 1px dashed var(--sep, #e2e8f0);
+}
+
+/* Clean Deadline Filter Notice in Advanced Row */
+.confirmation-list-root .p2-deadline-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: 4px 10px;
+  border-radius: var(--radius-control, 6px);
+  border: 1px dashed var(--sep, #cbd5e1);
+  background: var(--surface-2, #f8fafc);
+  font-size: 0.75rem;
+  color: var(--label-2, #64748b);
+}
+
+.confirmation-list-root .p2-deadline-filter-group .p2-deadline-filter-label {
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.confirmation-list-root .p2-deadline-input {
+  width: 5.5rem;
+  height: 26px;
+  min-height: 26px;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  border: 1px solid var(--sep, #e2e8f0);
+  border-radius: 4px;
+  background: var(--surface, #ffffff);
+  opacity: 0.75;
+}
+
+.confirmation-list-root .p2-deadline-reason {
+  font-size: 0.6875rem;
+  color: var(--muted, #94a3b8);
+}
+
+/* Column Chooser Dropdown Panel */
+.confirmation-list-root .p2-column-chooser-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 40;
+  margin-top: 4px;
+  width: 240px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--sep, #cbd5e1);
+  border-radius: var(--radius-card, 8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: var(--space-2, 8px);
+}
+
+/* Table container */
+.confirmation-list-root .p2-table-container {
+  border: 1px solid var(--sep, #e2e8f0);
+  border-radius: var(--radius-card, 8px);
+  background: var(--surface, #ffffff);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.confirmation-list-root .p2-table-scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+/* Table styling: High Density Operate Mode */
+.confirmation-list-root .confirmation-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.confirmation-list-root .confirmation-list-table th {
+  padding: 10px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--label-2, #64748b);
+  background: var(--surface-2, #f8fafc);
+  border-bottom: 1px solid var(--sep, #e2e8f0);
+  white-space: nowrap;
+}
+
+.confirmation-list-root .confirmation-list-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--sep, #e2e8f0);
+  color: var(--label, #1e293b);
+  vertical-align: middle;
+}
+
+.confirmation-list-root .p2-row {
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.confirmation-list-root .p2-row:hover {
+  background-color: color-mix(in srgb, var(--accent, #0070f3) 4%, var(--surface, #ffffff));
+}
+
+.confirmation-list-root .p2-row.is-selected {
+  background-color: color-mix(in srgb, var(--accent, #0070f3) 8%, var(--surface, #ffffff));
+}
+
+.confirmation-list-root .p2-row-title-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  font-size: 0.8125rem;
+  color: var(--label, #0f172a);
+  cursor: pointer;
+  display: block;
+}
+
+.confirmation-list-root .p2-row-title-btn strong {
+  font-weight: 600;
+  transition: color 0.15s ease;
+}
+
+.confirmation-list-root .p2-row-title-btn:hover strong {
+  color: var(--accent, #0070f3);
+}
+
+/* Subdued project scope tags */
+.confirmation-list-root .p2-scope-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+
+.confirmation-list-root .p2-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.confirmation-list-root .p2-badge-unresolved {
+  background: color-mix(in srgb, var(--warning, #f59e0b) 12%, transparent);
+  color: var(--warning, #b45309);
+  border: 1px solid color-mix(in srgb, var(--warning, #f59e0b) 25%, transparent);
+}
+
+.confirmation-list-root .p2-badge-verification {
+  background: var(--surface-2, #f1f5f9);
+  color: var(--label-2, #64748b);
+  border: 1px solid var(--sep, #e2e8f0);
+}
+
+.confirmation-list-root .p2-badge-retention {
+  background: transparent;
+  color: var(--muted, #94a3b8);
+  font-size: 0.6875rem;
+}
+
+.confirmation-list-root .p2-badge-status {
+  background: var(--surface-2, #f1f5f9);
+  color: var(--label, #334155);
+}
+
+/* Action select button */
+.confirmation-list-root .p2-btn-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  font-weight: 550;
+  border: 1px solid var(--sep, #cbd5e1);
+  border-radius: var(--radius-control, 4px);
+  background: var(--surface, #ffffff);
+  color: var(--label-2, #475569);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.confirmation-list-root .p2-btn-select:hover {
+  background: var(--surface-2, #f8fafc);
+  color: var(--label, #0f172a);
+  border-color: var(--accent, #0070f3);
+}
+
+.confirmation-list-root .p2-row.is-selected .p2-btn-select {
+  background: var(--surface-2, #f1f5f9);
+  color: var(--label, #0f172a);
+  border-color: var(--sep, #cbd5e1);
+}
+
+/* Table Footer */
+.confirmation-list-root .p2-table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 12px);
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--surface-2, #f8fafc);
+  border-top: 1px solid var(--sep, #e2e8f0);
+  font-size: 0.75rem;
+  color: var(--label-2, #64748b);
+}
+
+.confirmation-list-root .p2-footer-totals {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4, 16px);
+  flex-wrap: wrap;
+}
+
+.confirmation-list-root .p2-footer-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.confirmation-list-root .p2-footer-val {
+  font-weight: 650;
+  color: var(--label, #0f172a);
+  font-variant-numeric: tabular-nums;
+}
+
+.confirmation-list-root .p2-footer-basis {
+  color: var(--muted, #94a3b8);
+  font-size: 0.6875rem;
+}
+
+.confirmation-list-root .p2-pagination {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+}
+
+.confirmation-list-root .p2-page-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 0.75rem;
+  font-weight: 550;
+  border: 1px solid var(--sep, #cbd5e1);
+  border-radius: var(--radius-control, 4px);
+  background: var(--surface, #ffffff);
+  color: var(--label, #1e293b);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.confirmation-list-root .p2-page-btn:hover:not(:disabled) {
+  background: var(--surface-2, #f8fafc);
+  border-color: var(--accent, #0070f3);
+}
+
+.confirmation-list-root .p2-page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: var(--sep, #e2e8f0);
+}
+
+/* Drawer: Clean, Structured, Unnested */
+.confirmation-list-root .confirmation-source-drawer {
+  width: 320px;
+  flex: 0 0 320px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--sep, #e2e8f0);
+  border-radius: var(--radius-card, 8px);
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.confirmation-list-root .p2-drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+  padding: 12px 14px;
+  background: var(--surface-2, #f8fafc);
+  border-bottom: 1px solid var(--sep, #e2e8f0);
+}
+
+.confirmation-list-root .p2-drawer-title {
+  font-size: 0.875rem;
+  font-weight: 650;
+  color: var(--label, #0f172a);
+  margin: 0;
+}
+
+.confirmation-list-root .p2-drawer-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  border: 1px solid var(--sep, #cbd5e1);
+  border-radius: 4px;
+  background: var(--surface, #ffffff);
+  color: var(--label-2, #64748b);
+  cursor: pointer;
+}
+
+.confirmation-list-root .p2-drawer-close-btn:hover {
+  background: var(--surface-2, #f1f5f9);
+  color: var(--label, #0f172a);
+}
+
+.confirmation-list-root .p2-drawer-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 16px);
+  max-height: calc(100vh - 280px);
+  overflow-y: auto;
+}
+
+.confirmation-list-root .p2-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.confirmation-list-root .p2-drawer-section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--label-2, #64748b);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin: 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--sep, #f1f5f9);
+}
+
+.confirmation-list-root .p2-dl {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.confirmation-list-root .p2-dl > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+}
+
+.confirmation-list-root .p2-dl dt {
+  color: var(--label-2, #64748b);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.confirmation-list-root .p2-dl dd {
+  margin: 0;
+  color: var(--label, #0f172a);
+  text-align: right;
+  word-break: break-all;
+}
+
+.confirmation-list-root .p2-dl code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.75rem;
+  background: var(--surface-2, #f1f5f9);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.confirmation-list-root .p2-amount-withheld {
+  color: var(--muted, #94a3b8);
+  font-style: italic;
+  font-size: 0.75rem;
+}
+
+.confirmation-list-root .p2-amount-reason {
+  color: var(--muted, #94a3b8);
+  font-size: 0.6875rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .confirmation-list-root .confirmation-list-layout {
+    flex-direction: column;
+  }
+
+  .confirmation-list-root .confirmation-source-drawer {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .confirmation-list-root .p2-toolbar-row-primary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .confirmation-list-root .p2-toolbar-primary-left {
+    width: 100%;
+  }
+
+  .confirmation-list-root .p2-toolbar-primary-right {
+    justify-content: flex-end;
+  }
+}
