@@ -166,7 +166,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                       <tr>
                         <th scope="col">案件名稱</th>
                         <th scope="col">未完成狀態</th>
-                        <th scope="col">可行動作</th>
+                        <th scope="col">可行動</th>
                         <th scope="col">負責人</th>
                         <th scope="col">目前階段</th>
                         <th scope="col">有效期限</th>

@@ -61,7 +61,7 @@ export function PeopleAttendancePanel({c}:{c:Context&{reloadVersion?:number}}){
    </details>
   </section>
   <section className="people-surface" aria-labelledby="people-week-title">
-   <div className="people-section-heading"><div><h2 id="people-week-title">每週出勤</h2><p>{view?.week_start??week} 至 {view?.week_end??'—'}{view&&` · 顯示 ${people.length} / ${view.people.length} 筆已讀取名冊紀錄`}</p></div></div>
+   <div className="people-section-heading"><div><h2 id="people-week-title">每週出勤</h2><p>{view?.week_start??week} 至 {view?.week_end??'—'}{view&&` · 顯示 ${people.length} / ${view.people.length} 筆已讀取名冊紀錄，非全公司在職人數`}</p></div></div>
    <div className="people-legend" aria-label="出勤狀態說明"><span className="attendance-status attendance-ok">到班／免打卡</span><span className="attendance-status attendance-away">請假／出差／外出</span><span className="attendance-status attendance-attention">遲到／早退／缺卡</span><span className="attendance-status attendance-unknown">— 待核對</span></div>
    {view?.incomplete&&<p className="people-notice">部分識別、組別或打卡證據待核對。請假 {attendanceValue(state.error?null:view.summary.on_leave)} 人、出差 {attendanceValue(state.error?null:view.summary.on_trip)} 人；不推算應到人日或出勤率。</p>}
    {state.loading&&!view&&<ViewSkeleton/>}

@@ -89,7 +89,7 @@ function DispatchWorkspace({session,projects,from,setFrom,tab,setTab,write}:{ses
    </div>
   </details>}
 
-  {message&&<p className="dp-live" role="status">{message}</p>}
+  <p className="dp-live" role="status">{message}</p>
 
   {tab==='board'?<DispatchBoardFrame from={from} read={read} onWeek={setFrom} projects={projects} onAssign={write?create:undefined}/>:<><div className="dp-week"><Button onClick={()=>setFrom(addDays(from,-7))}>上一週</Button><span>{from} ～ {addDays(from,6)}</span><Button onClick={()=>setFrom(addDays(from,7))}>下一週</Button></div><DispatchWork refreshVersion={version} from={from} write={write} onProposal={(proposal,row,action)=>{if(row.draft_id)void run(async signal=>{const draft=parseDraft(await dispatchRequest(dispatchPaths.draft(row.draft_id),signal));setFlow({proposal:draft.proposal,row,action,draft})});else setFlow({proposal,row,action})}} onAction={rowAction}/></>}
   {flow&&<DispatchPublishDialog flow={flow} session={session} onSaved={save} onClose={()=>setFlow(undefined)} onPublished={()=>{read.reload();setVersion(v=>v+1)}}/>}
