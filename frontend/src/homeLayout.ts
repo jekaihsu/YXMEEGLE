@@ -32,7 +32,7 @@ export type HomeCardId=keyof typeof HOME_CARDS;
 export type HomeLayout={order:HomeCardId[];hidden:HomeCardId[]};
 export type HomeSettings={version:2;view:HomeViewId|null;layouts:Record<HomeViewId,HomeLayout>};
 export const DEFAULT_LAYOUT:Record<HomeViewId,HomeLayout>={
- mine:{order:['kpi','work','mycases'],hidden:[]},
+ mine:{order:['mycases','work'],hidden:[]},
  assign:{order:['kpi','allocation','workload','delegated','absence','impact','work','dispatch'],hidden:[]},
  company:{order:['kpi','attention','confirmation','cases','qualityTrend','qualityGroups','funnel','receivables','achievement','statuses','groups','instruments','vehicles','leave','trips','absence','links','dispatch'],hidden:[]},
 };

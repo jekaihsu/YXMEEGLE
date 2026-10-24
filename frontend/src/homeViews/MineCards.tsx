@@ -8,7 +8,7 @@ import {DeadlineStrip} from '../homeCharts';
 import {dayOffset,Kpis} from './shared';
 const myCases=(c:Ctx)=>{
  const me=c.s.user?.id||'';
- return c.w.projects.filter(p=>p.case_type!=='intake'&&p.status!=='completed'&&(p.pm_id===me||p.sales_id===me||p.nodes.some(n=>n.owner_id===me||n.collaborator_ids?.includes(me)||n.tasks.some(t=>t.owner_id===me))));
+ return c.w.projects.filter(p=>p.case_type!=='intake'&&p.status!=='completed'&&(p.pm_id===me||p.sales_id===me||p.nodes.some(n=>n.tasks.some(t=>t.owner_id===me))));
 };
 export function MineCard({id,c,today,assigned,confirmation}:{id:HomeCardId;c:Ctx;today:string;assigned:PanelRead;confirmation:PanelRead}){
  if(id==='work'||id==='confirmation')return <WorkCard c={c} id={id} panel={id==='work'?'assigned':'confirmation'} today={today} read={id==='work'?assigned:confirmation}/>;

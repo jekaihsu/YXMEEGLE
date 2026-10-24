@@ -98,8 +98,6 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
  </div><div className="ds-actions">
   {view==='company'&&reports.data&&!reports.unavailable&&<CopyReportSummary report={reports.data}/>}
   <Button disabled={refreshing||c.busy} onClick={()=>void refresh()}><RefreshCw size={16}/>{refreshing?'讀取中…':'重新讀取'}</Button>
-  <Button variant="plain" aria-expanded={editing} aria-controls="home-customize" onClick={()=>setEditing(value=>!value)}>{editing?<Check size={16}/>:<Settings2 size={16}/>} {editing?'完成設定':'自訂首頁'}</Button>
-  <HomeHelp view={view}/>
  </div></header>
   {editing&&<section className="home-customize glass--flat" id="home-customize" aria-label="自訂首頁卡片">
    <header><div><h2>安排你的首頁 · {HOME_VIEWS[view].label}</h2><p>顯示、隱藏與排序目前視圖的卡片。設定依登入身分與視圖儲存在此瀏覽器。</p></div><Button onClick={()=>update(defaultHomeLayout(view),'已還原目前視圖的建議配置')}><RotateCcw size={15}/>還原建議配置</Button></header>
@@ -109,11 +107,9 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
    </li>})}</ol></section>)}
   </section>}
   <span className="sr-only" role="status">{notice}</span>
-  {asOf&&<p className={`home-freshness${stale?' is-stale':''}`} role="status">資料截至 {date(asOf)}{stale?' · 可能已過期':''}</p>}
   {refreshError&&<Message>{refreshError}</Message>}
   {!saved&&<Message>瀏覽器無法儲存設定；目前配置在離開此頁後可能重設。</Message>}
   {!availableVisible.length&&<div className="home-empty glass--flat"><h2>挑選今天需要的內容</h2><p>尚未顯示任何卡片。開啟「自訂首頁」加入工作、案件或團隊動向。</p><Button onClick={()=>setEditing(true)}>選擇首頁卡片</Button></div>}
-  {view==='mine'&&<label className="sop-home-filter">工作類型 <select aria-label="首頁工作類型" value={workKind} onChange={e=>setWorkKind(e.target.value)}><option value="">全部類型</option><option value="sop_task">SOP 任務</option><option value="node_assignment">節點責任</option><option value="task">Lark 任務</option></select></label>}
   {attendanceUnavailable&&availableVisible.some(id=>['leave','trips','absence','impact'].includes(id))&&<p className="home-source-note" role="status">出勤資料尚未提供。 <a href="#view=people">查看人員與出勤</a></p>}
   <div className="home-sections">{view==='mine'?<>{missingMine&&<div className="home-view-notice" role="status">{assigned.error||confirmation.error||'個人工作來源尚未提供。'} <a href="#view=work">開啟我的工作</a></div>}<Sections view="mine" ids={contentIds.filter(id=>!missingMine||!['work','confirmation','deadlines'].includes(id))} render={renderCard}/></>:view==='assign'?<AssignView {...props}/>:<CompanyView {...props} reports={reports}/>}</div>
  </div></div>;

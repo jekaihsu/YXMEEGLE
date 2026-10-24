@@ -16,9 +16,9 @@ for(const manager of [false,null]){
  assert.deepEqual(m.availableViews({role:'member'},manager),['mine']);
 }
 assert.equal(m.resolvePersona(null,null),'mine');
-const defaults={version:2,view:null,layouts:{mine:{order:['kpi','work','mycases'],hidden:[]},assign:{order:['kpi','allocation','workload','delegated','absence','impact','work','dispatch'],hidden:[]},company:{order:['kpi','attention','confirmation','cases','qualityTrend','qualityGroups','funnel','receivables','achievement','statuses','groups','instruments','vehicles','leave','trips','absence','links','dispatch'],hidden:[]}}};
+const defaults={version:2,view:null,layouts:{mine:{order:['mycases','work'],hidden:[]},assign:{order:['kpi','allocation','workload','delegated','absence','impact','work','dispatch'],hidden:[]},company:{order:['kpi','attention','confirmation','cases','qualityTrend','qualityGroups','funnel','receivables','achievement','statuses','groups','instruments','vehicles','leave','trips','absence','links','dispatch'],hidden:[]}}};
 for(const raw of [null,'bad','[]','{"version":1,"order":["work"]}','{"version":3}'])assert.deepEqual(m.parseHomeLayout(raw),defaults);
-assert.deepEqual(m.parseHomeLayout(JSON.stringify({version:2,view:'alien',layouts:{mine:{order:['mycases','mycases','groups',null],hidden:['work','work','cases']},assign:{order:null,hidden:[]}}})),{...defaults,layouts:{...defaults.layouts,mine:{order:['mycases','kpi','work'],hidden:['work']}}});
+assert.deepEqual(m.parseHomeLayout(JSON.stringify({version:2,view:'alien',layouts:{mine:{order:['mycases','mycases','groups',null],hidden:['work','work','cases']},assign:{order:null,hidden:[]}}})),{...defaults,layouts:{...defaults.layouts,mine:{order:['mycases','work'],hidden:['work']}}});
 assert.equal(m.parseHomeLayout('{"version":2,"view":"assign"}').view,'assign');
 assert.deepEqual(m.moveHomeCard({order:['work','confirmation'],hidden:[]},'work',1),{order:['confirmation','work'],hidden:[]});
 assert.equal(m.homeLayoutKey('w','u','pm','demo'),'yx.home.v2:["w","u","pm","demo"]');
