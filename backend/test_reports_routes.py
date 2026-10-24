@@ -84,6 +84,15 @@ def test_lark_reader_projection_and_pagination():
     assert seen[-1].method=='GET'
 
 
+def test_lark_reader_treats_null_items_of_an_empty_table_as_empty():
+    def respond(request):
+        if '/auth/' in request.url.path:
+            return httpx.Response(200,json={'code':0,'tenant_access_token':'token','expire':7200})
+        return httpx.Response(200,json={'code':0,'data':{'has_more':False,'items':None,'total':0}})
+    reader=LarkReader({'LARK_APP_ID':'test','LARK_APP_SECRET':'test'},transport=httpx.MockTransport(respond),tables=(BY_KIND['vehicle'],))
+    assert reader.read()['vehicle']['records']==[]
+
+
 def test_reports_disabled_and_demo_isolation():
     for cfg,mode,expected in (({'REPORTS_ENABLED':'false'},'lark',404),({},'demo',403)):
         app=FastAPI();store=register(app,lambda _:({'wid':'company','mode':mode},{}),cfg,reader=FixtureReader(FIXTURES))
