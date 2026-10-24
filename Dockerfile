@@ -3,6 +3,7 @@ WORKDIR /build/frontend
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
+COPY backend/report_link_vocabulary.json /build/backend/report_link_vocabulary.json
 RUN npm run build
 
 FROM python:3.12-slim AS runtime
