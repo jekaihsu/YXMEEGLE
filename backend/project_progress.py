@@ -217,6 +217,8 @@ class ReportsView:
 
     def __init__(self, store=None, status='ok', *, warm=True):
         self.store, self.status, self.data, self.fetched_at, self.stale = store, status, None, None, None
+        self.snapshot = None
+        self._case_records = None
         if status != 'ok':
             return
         if store is None:
@@ -232,7 +234,17 @@ class ReportsView:
             except Exception:
                 self.status = 'unavailable'
             return
+        self.snapshot = snapshot
         self.data, self.fetched_at, self.stale = snapshot['data'], snapshot['fetched_at'], store.meta(snapshot)['stale']
+
+    def _records_by_code(self):
+        from .sources import normalized_case
+        if self._case_records is None:
+            self._case_records = {}
+            for row in (self.data or {}).get('tables',{}).get('case',[]):
+                code = normalized_case(row['f'].get('案件編號'))
+                if code: self._case_records.setdefault(code, []).append(row)
+        return self._case_records
 
     def case_candidates(self, code):
         from .reports.compute import cell
@@ -240,7 +252,7 @@ class ReportsView:
         code=normalized_case(code)
         if not code: return []
         return [{'case_key':r['id'],'case_code':code,'status':str(cell(r['f'].get('狀態'))) or '未填'}
-                for r in (self.data or {}).get('tables',{}).get('case',[]) if normalized_case(r['f'].get('案件編號'))==code]
+                for r in self._records_by_code().get(code, [])]
 
     def case(self, code):
         found=self.case_candidates(code)
@@ -249,8 +261,9 @@ class ReportsView:
     def field_total(self, code):
         """The register's cumulative 外業 revenue points of one unique full identity, only when positive."""
         from .reports.compute import number
-        case=self.case(code)
-        record=next((r for r in (self.data or {}).get('tables',{}).get('case',[]) if case and r['id']==case['case_key']),None)
+        from .sources import normalized_case
+        records=self._records_by_code().get(normalized_case(code), [])
+        record=records[0] if len(records)==1 else None
         total = number(record['f'].get('累計外業營業額點數')) if record else None
         return total if total and total > 0 else None
 
@@ -273,7 +286,7 @@ class ReportsView:
             truncated = truncated or len(ordered) > MAX_WEEKS
             for week in ordered[:MAX_WEEKS]:
                 try:
-                    result = self.store.result('progress', {'dept': dept, 'week': week, 'scope': 'open', 'q': code, 'limit': 200})
+                    result = self.store.result('progress', {'dept': dept, 'week': week, 'scope': 'open', 'q': code, 'limit': 200}, snapshot=self.snapshot)
                 except HTTPException:
                     continue
                 for item in result['items']:

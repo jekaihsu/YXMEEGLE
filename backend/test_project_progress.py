@@ -511,3 +511,46 @@ def test_progress_generation_fences_do_not_materialize_source_snapshots(progress
     finally:
         event.remove(CacheRow, 'load', capture)
     assert loaded == [WID], 'only the actual health capture decodes source records; generation fences read scalars'
+
+
+def test_warm_progress_never_waits_for_reports_or_takes_a_workspace_write_lock(progress, monkeypatch):
+    from sqlalchemy import event
+    run, client, app = progress
+    state, vis, _ = chain_state()
+    first = run(state, vis, cases=[('recX', 'C115264', '未填', None)],
+                work_orders=[('C115264', '2026-10-13', 0.25)])
+    assert first.status_code == 200
+    assert first.json()['production']['report_rows']
+
+    def forbidden_get():
+        raise AssertionError('case progress must use its captured snapshot, never a blocking cold read')
+
+    monkeypatch.setattr(app.state.reports, 'get', forbidden_get)
+    statements = []
+    def capture(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement.lower())
+    event.listen(app.state.engine, 'before_cursor_execute', capture)
+    try:
+        again = client.get(f'/api/projects/{vis}/progress')
+    finally:
+        event.remove(app.state.engine, 'before_cursor_execute', capture)
+    assert again.status_code == 200
+    assert again.json() == first.json()
+    assert not any('for update' in sql or sql.lstrip().startswith(('update ', 'insert ', 'delete '))
+                   for sql in statements)
+
+
+def test_reports_view_keeps_the_captured_generation_when_store_changes():
+    with_snapshot = SnapshotStore(RawReader([('recX', 'C115264', '未填', 3)],
+                                           [('C115264', '2026-10-13', 0.25)]))
+    try:
+        snapshot = with_snapshot.get()
+        view = ReportsView(with_snapshot)
+        # A different publication must not change rows halfway through a detail read.
+        with_snapshot._snapshot = None
+        rows, truncated = view.rows('C115264')
+        assert rows and rows[0]['done_total'] == 3 and not truncated
+        assert view.field_total('C115264') == 3
+        assert view.snapshot is snapshot
+    finally:
+        with_snapshot.close()

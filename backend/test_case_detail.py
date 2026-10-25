@@ -2,6 +2,7 @@ import json
 from copy import deepcopy
 from .case_detail import SECTIONS, build_case_detail, parent_context
 from .case_navigation import case_navigation
+from .test_p2_int_routes import http  # noqa: F401
 
 
 def task(tid, ident, category='外業'):
@@ -39,6 +40,35 @@ def fixture(env='production'):
 
 def walk(detail):
     return detail['header']['details']['edges']
+
+
+def test_scoped_case_detail_matches_full_capture_without_loading_other_trees(http, monkeypatch):
+    from .test_p2_int_routes import build_state
+    from . import storage
+    app, client, seat, signin = http
+    state, pid, _ = build_state()
+    seat(state)
+    signin()
+    real = storage.load_partial
+    captures = []
+
+    def scoped(db, model, row, **kwargs):
+        result = real(db, model, row, **kwargs)
+        if kwargs.get('project_ids') is not None:
+            captures.append([p['id'] for p in result['projects']])
+        return result
+
+    monkeypatch.setattr(storage, 'load_partial', scoped)
+    response = client.get(f'/api/case-detail/{pid}')
+    assert response.status_code == 200 and captures == [[pid]]
+
+    def full(db, model, row, **kwargs):
+        return storage.load(db, model, row) if kwargs.get('project_ids') is not None else real(db, model, row, **kwargs)
+
+    monkeypatch.setattr(storage, 'load_partial', full)
+    legacy = client.get(f'/api/case-detail/{pid}')
+    assert legacy.status_code == 200
+    assert response.json() == legacy.json()
 
 
 def test_round_trip_parent_child_agree_for_every_visible_node():

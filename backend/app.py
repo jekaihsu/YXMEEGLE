@@ -227,7 +227,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         response.headers['X-Content-Type-Options']='nosniff'
         response.headers['Referrer-Policy']='same-origin'
         if request.url.path.startswith('/api'): response.headers['Cache-Control']='no-store'
-        if (request.method,request.url.path) in TIMED_ROUTES or (request.method=='GET' and re.fullmatch(r'/api/projects/[^/]+(?:/(?:node-assignments|start-sop|sop-tasks|sop-assignees))?',request.url.path)):
+        if (request.method,request.url.path) in TIMED_ROUTES or (request.method=='GET' and response.status_code<400 and re.fullmatch(r'/api/(?:projects/[^/]+(?:/(?:navigation|progress|node-assignments|start-sop|sop-tasks|sop-assignees))?|case-detail/[^/]+)',request.url.path)):
             # Durations only. 'serialize' is the unmeasured remainder (response encoding and framework time).
             phases=dict(request.scope.get('phases',{})); total=perf_counter()-started
             phases['serialize']=max(total-sum(phases.values()),0)
@@ -712,8 +712,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         records={k:[i for i in v if mine(i)] if isinstance(v,list) else v for k,v in result.items() if k not in DETAIL_SKIP}
         with phase(request,'encode'):
             from fastapi.responses import JSONResponse
-            from fastapi.encoders import jsonable_encoder
-            return JSONResponse(jsonable_encoder(dict(records,scope='project',version=result['version'],as_of=result['as_of'],project=result['projects'][0])))
+            return JSONResponse(dict(records,scope='project',version=result['version'],as_of=result['as_of'],project=result['projects'][0]))
 
     def report_link_state(data,user):
         from .project_progress import ReportsView
@@ -776,10 +775,11 @@ def create_app(overrides=None,*,dispatch_transport=None):
         from .case_navigation import case_navigation
         from .source_case_policy import visible_project
         data,user=identity(request)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
+        with phase(request,'load'),sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
         require(any(p['id']==project_id and visible_project(state,p) for p in state.get('projects',[])),'找不到這個案件',404)
-        filter_private_workspace(state,user)
-        return case_navigation(state,project_id)
+        with phase(request,'project'):
+            filter_private_workspace(state,user)
+            return case_navigation(state,project_id)
 
     AUDIT_BATCH=100
 
@@ -1047,7 +1047,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             result=public_source_response(state,cache.data,user) if cache else {'configured':bool(configuration(cfg)),'last_sync':None,'status':'never','message':'尚未同步來源','tables':[],'records':[]}
         return {**result,'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
 
-    def source_health_from(data,user,freshness,cache_data,state):
+    def source_health_from(data,user,freshness,cache_data,state,*,metadata_only=False):
         """The GET /api/source-health computation over an already captured read (cache snapshot data and loaded workspace state)."""
         from .source_health import build_source_health
         if data['mode']!='lark' or data['wid'].startswith('test-'):
@@ -1055,7 +1055,16 @@ def create_app(overrides=None,*,dispatch_transport=None):
         else:
             if cache_data is not None:
                 from .source_case_policy import visible_source_snapshot
-                snapshot=visible_source_snapshot(state,cache_data)
+                if metadata_only and state.get('environment') not in ('test','demo'):
+                    # Case reads need health, not source values. Count the same
+                    # admitted identities without copying/redacting every field.
+                    from collections import Counter
+                    from .source_case_policy import identity
+                    allowed=set(state.get('source_visible_record_ids',[]))
+                    counts=Counter((r.get('base_token'),r.get('table_id')) for r in cache_data.get('records',[]) if identity(r) in allowed)
+                    snapshot={k:deepcopy(v) for k,v in cache_data.items() if k not in ('records','case_filter','tables')}
+                    snapshot['tables']=[dict(deepcopy(t),count=counts[(t.get('base_token'),t.get('table_id'))]) for t in cache_data.get('tables',[])]
+                else: snapshot=visible_source_snapshot(state,cache_data)
                 if state.get('environment') not in ('test','demo'):
                     from . import case_redaction
                     from .source_case_policy import filter_visible_cases
@@ -1152,7 +1161,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 # makes its own response copy before redacting formal sources.
                 cache=db.get(CacheRow,wid);cache_data=cache.data if cache else None
                 state=load(db,db.get(WorkspaceRow,wid),project_ids=[project_id] if project_id is not None else None)
-            health=source_health_from(data,user,freshness,cache_data,deepcopy(state))
+            health=source_health_from(data,user,freshness,cache_data,state,metadata_only=project_id is not None)
             with sessions() as db: unchanged=p2_generation(db,wid)==generation
             if unchanged: return data,user,health,p2_narrowed_state(state,user,health.get('page_state'),freshness,keep_lines)
         failed={'page_state':{'states':['read_failed'],'count':None}}
@@ -1236,32 +1245,29 @@ def create_app(overrides=None,*,dispatch_transport=None):
         data,user=identity(request)
         require(len(project_id)<=200,'查詢參數過長',422)
         require(not request.query_params,'查詢參數錯誤',422)
-        state=p2_visible_case_state(data,user,project_id,keep_lines=True,scoped=True)
+        with phase(request,'capture'): state=p2_visible_case_state(data,user,project_id,keep_lines=True,scoped=True)
         privileged=data.get('access_mode','normal')=='normal' and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
         if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true': reports=ReportsView(status='disabled')
         elif not privileged or data.get('mode')!='lark' or data['wid'].startswith(('test-','demo-')): reports=ReportsView(status='restricted')
         else: reports=ReportsView(getattr(app.state,'reports',None))
-        if reports.data is not None:
-            from .report_bridge import reconcile_bridges,save_bridges
-            with sessions.begin() as db:
-                db.execute(update(WorkspaceRow).where(WorkspaceRow.id==data['wid']).values(version=WorkspaceRow.version))
-                row=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==data['wid']).with_for_update()).scalar_one()
-                current=load(db,row,project_ids=[project_id])
-                reconcile_bridges(current,reports);save_bridges(db,data['wid'],current)
-                state['report_case_bridges']=current['report_case_bridges']
-        return JSONResponse(build_project_progress(state,project_id,reports=reports,amounts=privileged,as_of=state['as_of']),headers={'Cache-Control':'no-store'})
+        # Automatic candidates are a read-time projection. Persisted owner
+        # decisions were loaded above; GET must not queue behind a source sync's
+        # workspace write lock. The link-review workflow persists its own rows.
+        with phase(request,'project'): result=build_project_progress(state,project_id,reports=reports,amounts=privileged,as_of=state['as_of'])
+        with phase(request,'encode'): return JSONResponse(result,headers={'Cache-Control':'no-store'})
 
     @app.get('/api/case-detail/{project_id}')
     def case_detail(request:Request,project_id:str):
+        from fastapi.responses import JSONResponse
         from .case_detail import build_case_detail
         data,user=identity(request)
         require(len(project_id)<=200,'查詢參數過長',422)
         require(set(request.query_params.keys())<={'confirmation_key'},'查詢參數錯誤',422)
         confirmation_key=p2_one(request,'confirmation_key',300)
-        state=p2_visible_case_state(data,user,project_id)
-        result=build_case_detail(state,project_id,confirmation_key=confirmation_key,as_of=state['as_of'])
+        with phase(request,'capture'): state=p2_visible_case_state(data,user,project_id,scoped=True)
+        with phase(request,'project'): result=build_case_detail(state,project_id,confirmation_key=confirmation_key,as_of=state['as_of'])
         require(result.get('header') is not None,P2_NOT_FOUND,404)
-        return result
+        with phase(request,'encode'): return JSONResponse(result)
 
     @app.get('/api/contract-detail')
     def contract_detail(request:Request):
