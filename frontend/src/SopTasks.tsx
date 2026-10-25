@@ -101,10 +101,8 @@ const assign = async (t: SopTask, id: string) => {
   <header>
    <h3>SOP 任務{counts && <span className="sop-progress" aria-label={`完成 ${progressLabel(counts)}`}>{progressLabel(counts)}</span>}{counts && checklistComplete(counts) && <Badge tone="positive">檢查清單已完成</Badge>}</h3>
    <div className="pf-actions">
-    {!data?.enrollment && empty && allowed && <Button variant="plain" disabled={!allowed.import} disabledReason="需 SOP 匯入權限" onClick={() => setImporting('case')}>匯入預設任務</Button>}
-    {!data?.enrollment && allowed && !empty && <FlowAction allowed={allowed.import} reason="需 SOP 匯入權限" help="從預設 SOP 範本帶入整個案件的標準任務清單，匯入前可預覽與勾選。" onClick={() => setImporting('case')}>匯入預設任務</FlowAction>}
+    {allowed && <FlowAction allowed={allowed.import} reason="任務寫入尚未開放或需 SOP 匯入權限" onClick={()=>setImporting('case')}>匯入預設任務</FlowAction>}
     {allowed && <Button id="sop-add-task" disabled={!allowed.manage} disabledReason="任務寫入尚未開放或需管理權限" onClick={()=>setCreating(true)}>新增任務</Button>}
-    {allowed && data?.enrollment?.policy==='managed' && <Button disabled={!allowed.import} disabledReason="需 SOP 匯入權限" onClick={()=>setImporting('case')}>匯入預設任務</Button>}
     {data && suggestionSelection(data.tasks).length>0 && <Button onClick={()=>setReview([])}>採用全部建議</Button>}
    </div>
   </header>

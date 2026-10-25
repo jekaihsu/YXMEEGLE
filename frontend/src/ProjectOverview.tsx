@@ -1,7 +1,9 @@
+import {useStartSop} from './useStartSop';
+import {SopControls} from './StartSopControls';
 import type {ReactNode} from 'react';
 import type {useSopTasks} from './useSopTasks';
 import {CaseSopStart} from './CaseSopStart';
-import {withLocalChecklist} from './nodeWorkbenchModel';
+import {localCase,withLocalChecklist} from './nodeWorkbenchModel';
 import {CalendarDays, Clock3, FileText, Flag} from 'lucide-react';
 import {FlowDiagram} from './FlowDiagram';
 import {buildFlowModel} from './flowModel';
@@ -21,6 +23,8 @@ import './ProjectOverview.css';
 const text=(value:unknown,fallback:string)=>typeof value==='string' && value.trim() ? value : fallback;
 const shortDate=(value:unknown)=>typeof value==='string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0,10) : '未設定';
 export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}:{c:Ctx;p:Project;assignments:ReturnType<typeof useNodeAssignments>;selectedKey:string;sopTasks:ReturnType<typeof useSopTasks>;workbench:ReactNode}){
+ const remoteStart=!localCase(p)&&c.s.features?.node_assignment===true;
+ const start=useStartSop(p.id,remoteStart&&!workbench,assignments.reload);
  const read=useProjectProgress(p.id),list='data' in assignments.state ? assignments.state.data : undefined;
  const data=read.state.kind==='ready' && read.state.data.project_id===p.id ? read.state.data : undefined;
  const flow=buildFlowModel({project:assignments.state.kind==='disabled' ? p : {...p,nodes:[]},assignments:list,progress:data,today:c.w.as_of,users:c.w.users});
@@ -45,7 +49,7 @@ export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}
  const status=text(p.source_status,'來源狀態待核對');
  return <div className="project-overview">
   <div className="po-main">
-   {!workbench && <CaseSopStart projectId={p.id} sop={sopTasks}/>}
+   {!workbench && (remoteStart?<div className="nw-start"><SopControls sop={start}/></div>:<CaseSopStart projectId={p.id} sop={sopTasks}/>)}
    <FlowDiagram compact nodes={model.nodes} overall={model.overall} selected={c.route.node?selectedKey:current} loading={assignments.state.kind==='loading'} onSelect={node=>go({tab:'overview',node})}/>
    {workbench}
     <section className="po-card po-todos" aria-labelledby="po-todo-title"><header className="po-card-heading"><h2 id="po-todo-title">待辦事項</h2><Button variant="plain" onClick={()=>go({tab:'flow',section:'all-tasks'})}>查看全部任務{tasks.complete ? ` (${tasks.rows.length})` : ''} →</Button></header>
