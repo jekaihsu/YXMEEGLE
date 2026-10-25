@@ -136,6 +136,7 @@ def parse_start_sop(body) -> StartSopCommand:
 @dataclass(frozen=True)
 class PatchTask:
     expected_revision: str
+    title: object = UNSET
     status: object = UNSET
     assignee: object = UNSET
     deadline: object = UNSET
@@ -143,7 +144,7 @@ class PatchTask:
 
 
 def parse_patch_task(body) -> PatchTask:
-    _keys(body, ('expected_revision', 'status', 'assignee_open_id', 'deadline', 'detail'))
+    _keys(body, ('expected_revision', 'status', 'assignee_open_id', 'deadline', 'detail', 'title'))
     revision = _revision(body)
     if revision is None:
         raise Failure('invalid', '請提供任務目前的 expected_revision')
@@ -158,6 +159,8 @@ def parse_patch_task(body) -> PatchTask:
         changes['assignee'] = None if value is None else _open_id(value, 'assignee_open_id')
     if 'deadline' in body:
         changes['deadline'] = _deadline(body['deadline'])
+    if 'title' in body:
+        changes['title'] = _text(body, 'title')
     if 'detail' in body:
         changes['detail'] = _text(body, 'detail', blank=True)
     if not changes:
@@ -386,7 +389,7 @@ def plan_patch_task(s: Situation, task: TaskRow, command: PatchTask) -> Plan:
         changes['assigned_by'] = [s.actor.open_id]
         before.update(assignee=task.assignee and task.assignee.open_id,
                       assigned_by=task.assigned_by and task.assigned_by.open_id)
-    for key, current in (('deadline', task.deadline), ('detail', task.detail)):
+    for key, current in (('deadline', task.deadline), ('detail', task.detail), ('title', task.title)):
         value = getattr(command, key)
         if value is UNSET or value == current:
             continue

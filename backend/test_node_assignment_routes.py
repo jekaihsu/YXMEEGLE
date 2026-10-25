@@ -871,3 +871,19 @@ def test_replays_and_denied_attempts_cost_no_rate_budget(h):
     created = act(h, 'ou_sales', '/nodes/sales/tasks', {'request_id': 'task-1', 'title': 'x'})
     assert created.status_code == 200, created.text
     assert len(h.fake.writes()) == writes + 1
+
+
+def test_inline_task_title_patch_preserves_manager_permission_and_revision(h):
+    created = act(h, 'ou_fm', '/nodes/field/tasks', {'request_id': 'editor-create', 'title': '原任務',
+        'assignee_open_id': 'ou_depth'})
+    assert created.status_code == 200, created.text
+    task = created.json()['tasks'][0]
+    path = f'/nodes/field/tasks/{task["id"]}'
+    denied = act(h, 'ou_member', path, {'request_id':'editor-denied', 'expected_revision':task['revision'], 'title':'不可改'}, method='patch')
+    assert denied.status_code == 403
+    edited = act(h, 'ou_fm', path, {'request_id':'editor-save', 'expected_revision':task['revision'], 'title':'核對測量成果', 'detail':'更新備註'}, method='patch')
+    assert edited.status_code == 200, edited.text
+    assert edited.json()['tasks'][0]['title'] == '核對測量成果'
+    assert edited.json()['tasks'][0]['detail'] == '更新備註'
+    stale = act(h, 'ou_fm', path, {'request_id':'editor-stale', 'expected_revision':task['revision'], 'title':'舊版本'}, method='patch')
+    assert stale.status_code == 409

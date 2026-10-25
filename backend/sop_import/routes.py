@@ -11,7 +11,7 @@ from .service import Context, Service, authorize, has_reader_grant, can_manage
 
 PREFIX = '/api/projects/{project_id}'
 MAX_BODY = 64 * 1024
-ERROR_TEXT = {'legacy_case_requires_opt_in': '舊案需先確認套用 SOP', 'node_not_enrolled': '此節點尚未套用 SOP', 'node_already_started_or_finished': '已開始或已完成的節點不能套用 SOP', 'case_identity_unresolved': '案件識別待核對', 'confirmation_required': '請確認套用的節點', 'case_not_found': '找不到此案件或沒有讀取權限', 'result_note_required': '請填寫結果說明', 'task_revision_conflict': '任務已被更新，請重新載入後再試',
+ERROR_TEXT = {'local_node_only': '請使用此案件的正式節點流程', 'local_node_blocked': '節點目前無法操作', 'node_revision_conflict': '節點已更新，請重新載入後再試', 'legacy_case_requires_opt_in': '舊案需先確認套用 SOP', 'node_not_enrolled': '此節點尚未套用 SOP', 'node_already_started_or_finished': '已開始或已完成的節點不能套用 SOP', 'case_identity_unresolved': '案件識別待核對', 'confirmation_required': '請確認套用的節點', 'case_not_found': '找不到此案件或沒有讀取權限', 'result_note_required': '請填寫結果說明', 'task_revision_conflict': '任務已被更新，請重新載入後再試',
               'sop_import_forbidden': '你沒有操作此 SOP 任務的權限', 'completion_evidence_missing': '此任務需先完成佐證或審核',
               'applicability_unresolved': '需先確認任務適用', 'invalid_transition': '目前任務狀態不可執行此操作'}
 
@@ -146,6 +146,11 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
     @app.post(PREFIX + '/sop-tasks/{task_id}/transition')
     async def transition(request: Request, project_id: str, task_id: str):
         return await mutation(request, project_id, lambda ctx, body: service.mutate(ctx, task_id, body, transition=True))
+
+    @app.post(PREFIX + '/sop-nodes/{node_key}')
+    async def local_node(request: Request, project_id: str, node_key: str):
+        from .local_nodes import mutate
+        return await mutation(request, project_id, lambda ctx, body: mutate(service, ctx, node_key, body))
 
     @app.post(PREFIX + '/sop-tasks/close-node')
     async def close_node(request: Request, project_id: str):

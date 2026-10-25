@@ -14,7 +14,7 @@ from ..sources import normalized_case
 from ..workflow import now
 from .catalog import digest, publish
 from .case_stage import stage, start_node
-from . import local_case, quotes, suggestions
+from . import local_case, quotes, suggestions, local_nodes
 from .enrollment import EnrollmentService
 from .enrollment_policy import identity_key
 from .domain import (Applicability, Lifecycle, Disposition, TRANSITIONS, NODE_MAP, SUBCONTRACT,
@@ -617,7 +617,7 @@ class Service(EnrollmentService):
             selected.sort(key=lambda t: (t.template_family_id == 'manual', min((l.ordinal for l in by_task[t.id]), default=0), t.id))
             enrollment = self.enrollment_status(db, ctx) if not ctx.assigned_only else None
             policy_write = not enrollment or enrollment['policy']['policy'] == 'managed' or enrollment['policy']['revision'] == 0 and not self.auto_active()
-            return {'sop_enrollment': enrollment, 'project_id': ctx.project['id'], 'task_source': 'sop_local',
+            return {'local_nodes': local_nodes.projection(self, db, ctx), 'sop_enrollment': enrollment, 'project_id': ctx.project['id'], 'task_source': 'sop_local',
                     'case': {k: ctx.project.get(k) for k in ('id', 'code', 'name')},
                     **({'start_node': next((key for key in NODE_MAP.values() if any(l.node_key == key for t in tasks for l in by_task[t.id])), 'sales'),
                         'stage': None} if ctx.assigned_only else self.position(db, ctx, self.facts(ctx))),
