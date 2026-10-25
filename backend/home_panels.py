@@ -202,7 +202,7 @@ class HomePanels:
 
     def local_items(self, state, user, panel):
         items = []
-        for project in state.get('projects', []):
+        for project in state.get('projects', []) if panel in ('proxy', 'local', 'completed') else []:
             for node in project.get('nodes', []):
                 for task in node.get('tasks', []):
                     if not local_work_instance(project, task) or (task.get('owner_id') != user['id'] and panel != 'proxy'):
@@ -269,7 +269,8 @@ class HomePanels:
         if scope_name == 'team' and manager is not True:
             raise HTTPException(403, '無法核實同組工作權限')
         if scope_name == 'mine':
-            items += self.local_items(visible, user, panel)
+            if panel != 'assigned' and params.get('kinds') != 'sop_task':
+                items += self.local_items(visible, user, panel)
             sop_items = self.sop.personal_items(state, data['wid'], user) if self.sop else []
             items += sop_items
             if reason == 'disabled' and sop_items:
@@ -338,7 +339,21 @@ class HomePanels:
 
     def read_workspace(self, request, data, user):
         with self.sessions() as db:
-            state = self.load(db, db.get(self.workspace_model, data['wid']))
+            row = db.get(self.workspace_model, data['wid'])
+            state = self.load(db, row, collections=('users', 'projects'))
+            params = request.query_params
+            panel = 'completed' if params.get('status') == 'done' else params.get('panel', 'assigned')
+            sop_only = params.get('kinds') == 'sop_task'
+            if not sop_only and not (panel == 'assigned' and self.assignment_unavailable(state, data)):
+                omitted = ('project_comments', 'work_schedules', 'recurring', 'daily_unmatched', 'daily_reviews')
+                # Assigned shows Lark work and separate LocalTask rows only. Native
+                # task trees are needed here solely for verifying an applied skip.
+                if panel == 'assigned' and not state.get('node_skip_requests'):
+                    omitted += ('tasks', 'review_cycles', 'events', 'project_files', 'project_evidence',
+                                'project_finance_versions', 'project_payment_batches', 'project_delivery_batches')
+                if self.assignment_unavailable(state, data):
+                    omitted += ('project_daily_reports',)
+                state = self.load(db, row, omit_kinds=omitted)
         return self.read(request, data, user, state)
 
     def read(self, request, data, user, state):

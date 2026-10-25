@@ -275,9 +275,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 row=WorkspaceRow(id=wid,version=1,data=data); db.add(row); db.flush()
                 row.data=storage.save(db,BusinessRow,wid,data)
 
-    def load(db,row,*,collections=None,project_ids=None):
+    def load(db,row,*,collections=None,project_ids=None,omit_kinds=()):
         if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections if collections is not None else storage.DETAIL_COLLECTIONS,project_ids=project_ids,project_children=storage.PROJECT_CHILDREN,filter_project_rows=True)
-        else: state=storage.load(db,BusinessRow,row) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections)
+        else: state=storage.load(db,BusinessRow,row,omit_kinds=omit_kinds) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections)
         state=upgrade(state,generate_sop_candidate=collections is None or 'sop_templates' in collections)
         return seal(db,row,state)
 
