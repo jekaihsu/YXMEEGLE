@@ -14,7 +14,7 @@ from .source_lifecycle import summarize
 from .seed import STAGES
 from .policy import upgrade, template, TECHNICAL, VERSION
 from .workflow import now, uid
-from .report_links import resolve_daily, LinkBasis
+from .report_links import daily_code, resolve_daily, LinkBasis
 
 STATUS = {'報價中':'pending','執行中':'in_progress','已完工':'engineering_complete','已結案':'completed','中止':'paused','內部':'internal'}
 
@@ -158,20 +158,22 @@ RELATIONS = {'daily': {'所屬案件': {'confirmation','quote_confirmation'},
              'contract': {'所屬成案確認單（日報關聯）': {'confirmation','quote_confirmation'}}}
 
 
-def daily_native_parent(record, index, projects, cases):
+def daily_native_parent(record, index, projects, cases, *, resolver=None):
+    if resolver is None:
+        def resolver(row, **kwargs): return resolve_daily(row, projects, **kwargs)
     key=tuple(record[k] for k in ('base_token','table_id','record_id'))
     if record['kind'] in ('confirmation','quote_confirmation'):
         parent=cases.get(key)
-        return resolve_daily({'fields':{}},projects,native_targets=[dict(identity={k:record[k] for k in ('base_token','table_id','record_id')},project_id=parent['id'])] if parent else [],unresolved_native=parent is None)
+        return resolver({'fields':{}},native_targets=[dict(identity={k:record[k] for k in ('base_token','table_id','record_id')},project_id=parent['id'])] if parent else [],unresolved_native=parent is None)
     field,kinds=('來源合約明細（日報關聯）',{'contract'}) if record['kind']=='reporting' else ('所屬成案確認單（日報關聯）',{'confirmation','quote_confirmation'})
     parents,missing=native_records(record,field,index,kinds)
     targets=[];unresolved=bool(missing)
     for parent in parents:
-        decision=daily_native_parent(parent,index,projects,cases)
+        decision=daily_native_parent(parent,index,projects,cases,resolver=resolver)
         unresolved=unresolved or decision.reason in ('missing_reference','unresolved_reference')
         for candidate in decision.candidates:
             targets.append(dict(identity={k:parent[k] for k in ('base_token','table_id','record_id')},project_id=candidate['project_id']))
-    return resolve_daily({'fields':{'案件編號':record['fields'].get('所屬案件')}},projects,native_targets=targets,unresolved_native=unresolved)
+    return resolver({'fields':{'案件編號':record['fields'].get('所屬案件')}},native_targets=targets,unresolved_native=unresolved)
 
 
 def source_provenance(record, index):
@@ -486,26 +488,47 @@ def import_v4(ws, records, complete_tables=None):
     costs=defaultdict(list)
     for r in records:
         if r.get('kind')=='cost': costs[(r['base_token'],r['record_id'])].append(r)
-    for r in records:
-        if r.get('kind')!='daily': continue
+    # Case identities are stable during daily reconciliation. Keep every exact
+    # code/approved alias match and native target; resolve_daily still decides
+    # ambiguity and provenance on those original records.
+    by_daily_code=defaultdict(dict); by_project_id=defaultdict(dict)
+    for ordinal,p in enumerate(ws['projects']):
+        by_project_id[p['id']][ordinal]=p
+        codes={normalized_case(p.get('code'))}
+        codes.update(normalized_case(a.get('code')) for a in p.get('report_link_aliases',[]) if a.get('status')=='reviewed')
+        for code in codes-{''}: by_daily_code[code][ordinal]=p
+    def resolve_indexed(row,*,native_targets,unresolved_native=False):
+        selected=dict(by_daily_code.get(daily_code(row),{}))
+        for target in native_targets: selected.update(by_project_id.get(target.get('project_id'),{}))
+        return resolve_daily(row,[selected[i] for i in sorted(selected)],native_targets=native_targets,unresolved_native=unresolved_native)
+    daily_records=[r for r in records if r.get('kind')=='daily']
+    daily_ids={source_id(r) for r in daily_records}
+    for p in ws['projects']: p['daily_reports']=[d for d in p['daily_reports'] if d['id'] not in daily_ids]
+    ws['daily_unmatched']=[d for d in ws['daily_unmatched'] if d['id'] not in daily_ids]
+    seen_daily=set()
+    reviews_by_daily=defaultdict(list)
+    for review in ws['daily_reviews']: reviews_by_daily[review['daily_id']].append(review)
+    for r in daily_records:
         f=r['fields']; ident=source_id(r)
         is_provisional=not normalized_case(f.get('案件編號') or f.get('工程編號') or f.get('案號')) and not any(link_ids(f.get(k)) for k in ('所屬案件','內業工項','合約工項')) and bool(normalized_case(f.get(PROVISIONAL_CASE_FIELD) or f.get('可能確認單工作編號')))
-        for p in ws['projects']: p['daily_reports']=[d for d in p['daily_reports'] if d['id']!=ident]
-        ws['daily_unmatched']=[d for d in ws['daily_unmatched'] if d['id']!=ident]
+        if ident in seen_daily:
+            for p in ws['projects']: p['daily_reports']=[d for d in p['daily_reports'] if d['id']!=ident]
+            ws['daily_unmatched']=[d for d in ws['daily_unmatched'] if d['id']!=ident]
+        seen_daily.add(ident)
         code=normalized_case(f.get('案件編號') or f.get('工程編號') or f.get('案號'))
         linked=[]; targets_for_link=[]; unresolved_case=False
         for field in ('所屬案件','內業工項','合約工項'):
             targets,unresolved=native_records(r,field,record_index,RELATIONS['daily'][field])
             unresolved_case=unresolved_case or bool(unresolved)
             for target in targets:
-                parent=daily_native_parent(target,record_index,ws['projects'],by_ref)
+                parent=daily_native_parent(target,record_index,ws['projects'],by_ref,resolver=resolve_indexed)
                 unresolved_case=unresolved_case or parent.reason in ('missing_reference','unresolved_reference')
                 for candidate in parent.candidates:
                     targets_for_link.append(dict(identity={k:target[k] for k in ('base_token','table_id','record_id')},project_id=candidate['project_id'],work_item_id='/'.join(target[k] for k in ('base_token','table_id','record_id')) if field!='所屬案件' else None))
                 if field!='所屬案件': linked.append(target['fields'])
-        decision=resolve_daily(r,ws['projects'],native_targets=targets_for_link,unresolved_native=unresolved_case)
+        decision=resolve_indexed(r,native_targets=targets_for_link,unresolved_native=unresolved_case)
         code=code or normalized_case(f.get(PROVISIONAL_CASE_FIELD) or f.get('可能確認單工作編號'))
-        candidates={p['id']:p for p in ws['projects'] if p['id']==decision.project_id}
+        candidates={p['id']:p for p in by_project_id.get(decision.project_id,{}).values()}
         basis=decision.basis or ('provisional_case_code' if code else 'source_case_or_link')
         costrecords,_=native_records(r,'所屬成本單',record_index,{'cost'})
         costfields=[c['fields'] for c in costrecords]
@@ -529,7 +552,7 @@ def import_v4(ws, records, complete_tables=None):
         entry['source_provenance']=source_provenance(r,record_index)
         entry['source_version']=daily_source_version(entry)
         entry['mapping_version']=daily_mapping_version(entry)
-        for review in ws['daily_reviews']:
+        for review in reviews_by_daily[ident]:
             if (review['daily_id']==ident and review['status']=='approved'
                     and review_mapping_version(review)!=entry['mapping_version']
                     and any(review_mapping_version(review)==daily_mapping_version(entry,excluded_daily_fields=fields)
@@ -540,9 +563,9 @@ def import_v4(ws, records, complete_tables=None):
                 review['mapping_version']=entry['mapping_version']
             if review['daily_id']==ident and review['status'] in ('pending','approved') and review_mapping_version(review)!=entry['mapping_version']:
                 review.update(status='invalidated',invalidated_at=now(),invalidated_reason='日報或上游關聯來源已改版，須重新核對')
-        approved=next((m for m in reversed(ws['daily_reviews']) if m['daily_id']==ident and m['status']=='approved' and review_mapping_version(m)==entry['mapping_version']),None)
+        approved=next((m for m in reversed(reviews_by_daily[ident]) if m['status']=='approved' and review_mapping_version(m)==entry['mapping_version']),None)
         if approved:
-            candidates={p['id']:p for p in ws['projects'] if p['id']==approved.get('project_id')}; entry['match_basis']=LinkBasis.MANUAL.value; unresolved_case=False
+            candidates={p['id']:p for p in by_project_id.get(approved.get('project_id'),{}).values()}; entry['match_basis']=LinkBasis.MANUAL.value; unresolved_case=False
             entry.pop('work_item_id',None)
             if approved.get('work_item_id'):
                 from .report_links import reviewed_item
