@@ -16,18 +16,23 @@ from .test_perf_budget import scaled_client
 
 
 @pytest.mark.parametrize('panel', ['assigned', 'confirmation', 'delegated', 'proxy', 'local', 'completed'])
-def test_projected_home_matches_full_workspace(tmp_path, panel):
+@pytest.mark.parametrize('environment', ['demo', 'production'])
+def test_projected_home_matches_full_workspace(tmp_path, monkeypatch, panel, environment):
     def prepare(state):
         fixture(state)
         task = state['projects'][0]['nodes'][0]['tasks'][0]
         task.update(owner_id='ou_015', owner_inherited=False, status='rework')
     with scaled_client(tmp_path, 5, upgraded=True, mutate=prepare) as (app, client):
+        from . import workspace_environment
+        monkeypatch.setattr(workspace_environment, 'normalize_environment',
+                            lambda state, *_: state.update(environment=environment) or state)
         client.post('/api/demo/session', json={'user_id': 'ou_015'})
         user = client.get('/api/session').json()['user']
         wid = app.state.signer.loads(client.cookies.get('meegle_session'))['wid']
         with app.state.sessions() as db:
             state = upgrade(storage.load(db, BusinessRow, db.get(WorkspaceRow, wid)))
         state['features'] = {'routines': False, 'change_extension': False}
+        state['environment'] = environment
         params = {'panel': panel, 'limit': '100'}
         expected = app.state.home_panels.query(state, {'wid': wid, 'mode': 'demo'}, user, params)
         response = client.get('/api/home-panels', params=params)

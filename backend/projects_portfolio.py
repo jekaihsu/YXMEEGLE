@@ -43,7 +43,8 @@ def portfolio(db, model, row, state, today, *, assignments, data, user):
     headers, nodes, daily = {}, {}, {}
     if row.data.get('storage_schema') == 2:
         records = db.execute(select(model.kind, model.entity_id, model.parent_id, model.data)
-            .where(model.workspace_id == row.id, or_(
+            .where(model.workspace_id == row.id, model.kind.in_(('projects', 'nodes', 'project_daily_reports')
+                if overlay_enabled else ('projects', 'nodes')), or_(
                 and_(model.kind == 'projects', True if overlay_enabled else model.entity_id.in_(ids)),
                 and_(model.kind.in_(('nodes', 'project_daily_reports') if overlay_enabled else ('nodes',)),
                      model.parent_id.in_(ids)))).order_by(model.ordinal))
