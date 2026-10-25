@@ -645,7 +645,7 @@ class Service(EnrollmentService):
 
     def quote_list(self, wid, state, amounts, *, stage='', q='', offset=0, limit=30):
         require(not stage or stage in quotes.STAGES, 'invalid_request')
-        require(offset >= 0 and 1 <= limit <= 100 and len(q) <= 240, 'invalid_request')
+        require(offset >= 0 and 1 <= limit <= quotes.MAX_PAGE_SIZE and len(q) <= 240, 'invalid_request')
         items = [item for item in quotes.register(state, today=self.today(), amounts=amounts)
                  if (not stage or item['stage'] == stage) and (not q or quotes.matches(item, q))]
         return {'total': len(items), 'offset': offset, 'limit': limit, 'amount_restricted': not amounts,

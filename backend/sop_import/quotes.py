@@ -10,6 +10,9 @@ from ..sources import normalized_case, number, text
 from .case_stage import Stage, stage
 from .quote_facts import case_facts, collect, live
 
+# Bound register transfers while avoiding repeated full-register work for small pages.
+MAX_PAGE_SIZE = 2000
+
 STAGES = frozenset(s.value for s in Stage)
 
 

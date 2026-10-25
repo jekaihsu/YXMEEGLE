@@ -24,7 +24,7 @@ function fixture(path) {
   if (path.pathname === '/api/reports/home') return homeReportFixture();
   if (path.pathname === '/api/quotes') {
     const offset = Number(path.searchParams.get('offset'));
-    return {total: quotes.length, items: quotes.slice(offset, offset + 100)};
+    return {total: quotes.length, items: quotes.slice(offset, offset + Number(path.searchParams.get('limit') || 30))};
   }
   if (path.pathname.startsWith('/api/quotes/')) {
     const key = decodeURIComponent(path.pathname.split('/').at(-1));
@@ -91,6 +91,8 @@ try {
       })),
       paints: performance.getEntriesByType('paint').map(paint => ({name: paint.name, start: paint.startTime})),
     }));
+    const quoteRequests=[];
+    page.on('request', request=>{if(new URL(request.url()).pathname==='/api/quotes')quoteRequests.push(request.url())});
     const quoteStarted = performance.now();
     await page.goto(origin + '/?perf=1#view=quotes');
     await page.waitForSelector('tbody tr', {timeout: 30000});
@@ -102,7 +104,7 @@ try {
       await page.waitForTimeout(0);
       pagination.push(performance.now() - started);
     }
-    results.push({run, ...data, quoteReadyMs, pagination, errors});
+    results.push({run, ...data, quoteReadyMs, quoteRequests:quoteRequests.length, pagination, errors});
     await context.close();
   }
   writeFileSync(output, JSON.stringify(results, null, 2));
@@ -113,6 +115,7 @@ try {
     fcp: median(results.map(result => result.paints.find(paint => paint.name === 'first-contentful-paint').start)),
     js: first.filter(resource => resource.name.endsWith('.js')).reduce((total, resource) => total + resource.bytes, 0),
     css: first.filter(resource => resource.name.endsWith('.css')).reduce((total, resource) => total + resource.decoded, 0),
+    quoteRequests: results.map(result=>result.quoteRequests),
     quoteReady: median(results.map(result => result.quoteReadyMs)),
     pagination: median(results.flatMap(result => result.pagination)),
     errors: results.flatMap(result => result.errors),

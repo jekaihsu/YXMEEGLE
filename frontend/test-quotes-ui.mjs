@@ -131,3 +131,26 @@ test('reload and unmount abort quote reads instead of continuing obsolete page r
  await act(async()=>{pending[0].resolve(reply({total:1000,items:[x.quotes.items[0]]}));pending[2].resolve(reply({total:201,items:[x.quotes.items[0]]}));await tick()});
  assert.equal(pending.length,3,'late obsolete responses cannot start another page');
 });
+
+test('bulk quote pages load 2000 rows in one request and 2001 in two before global search/sort',async()=>{
+ for(const count of [2000,2001]){
+  const calls=[];
+  const rows=Array.from({length:count},(_,i)=>({...x.quotes.items[0],quote_no:String(115000+i),name:`案件${i}`,engineering_no:`ENG-${i}`,contract_amount:i}));
+  globalThis.fetch=async url=>{
+   const params=new URL(url,'http://localhost').searchParams;
+   const offset=Number(params.get('offset')),limit=Number(params.get('limit'));
+   calls.push({offset,limit});return reply({total:rows.length,items:rows.slice(offset,offset+limit)});
+  };
+  root=createRoot(document.getElementById('root'));
+  await act(async()=>{root.render(React.createElement(m.Quotes,{c:{s:{user:{}},w:{users:[]},route:{view:'quotes'},go(){}}}));await tick()});
+  assert.deepEqual(calls,count===2000?[{offset:0,limit:2000}]:[{offset:0,limit:2000},{offset:2000,limit:2000}]);
+  assert.match(document.querySelector('tbody tr').textContent,new RegExp(String(115000+count-1)));
+  await click(button('下一頁'));
+  await type(document.querySelector('[aria-label="搜尋報價"]'),`eng-${count-1}`);
+  assert.equal(document.querySelectorAll('tbody tr').length,1);
+  assert.match(document.querySelector('tbody tr').textContent,new RegExp(`案件${count-1}`));
+  assert.equal(button('上一頁').disabled,true);
+  assert.equal(calls.length,count===2000?1:2,'local interactions do not refetch');
+  await act(async()=>root.unmount());root=null;
+ }
+});

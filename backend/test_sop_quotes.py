@@ -131,9 +131,10 @@ def test_filter_search_and_pagination(quotes_http):
     assert [i['quote_no'] for i in get(client, '/api/quotes?q=桃園軌道')['items']] == ['115236']
     assert [i['quote_no'] for i in get(client, '/api/quotes?q=布袋戲')['items']] == ['115600']
     assert [i['quote_no'] for i in get(client, '/api/quotes?q=115236')['items']] == ['115236']
+    assert [i['quote_no'] for i in get(client, '/api/quotes?q=c115236')['items']] == ['115236']
     page = get(client, '/api/quotes?offset=1&limit=1')
     assert (page['total'], [i['quote_no'] for i in page['items']]) == (2, ['115236'])
-    assert get(client, '/api/quotes?limit=101', 422)['code'] == 'invalid_request'
+    assert get(client, '/api/quotes?limit=2001', 422)['code'] == 'invalid_request'
 
 
 def test_detail_carries_merged_facts_records_and_sop_counts(quotes_http):
@@ -211,3 +212,28 @@ def test_demo_orphan_quote_has_no_case_or_tasks(tmp_path):
         orphan = get(client, '/api/quotes/115700')
         assert (orphan['project_id'], orphan['project_ids'], orphan['sop_counts']) == (None, [], None)
     app.state.engine.dispose()
+
+
+def test_large_pages_preserve_scope_redaction_counts_and_order(quotes_http):
+    app, client, signin, ids = quotes_http
+    with app.state.sessions.begin() as db:
+        row = db.get(WorkspaceRow, WID)
+        state = storage.load(db, BusinessRow, row)
+        extra = [quote_row(f'bulk{i}', f'B{i:04}', ids['formal'], 工程編號=f'ENG-{i}',
+                           **{'契約價格(未稅)': i}) for i in range(2001)]
+        state['source_quotes'].extend(extra)
+        state['source_visible_record_ids'].extend('|'.join(r['source_identity'].values()) for r in extra)
+        row.data = storage.save(db, BusinessRow, WID, state)
+    first = get(client, '/api/quotes?limit=2000')
+    second = get(client, '/api/quotes?limit=2000&offset=2000')
+    assert (first['total'], len(first['items']), len(second['items'])) == (2003, 2000, 3)
+    items = first['items'] + second['items']
+    assert [i['quote_no'] for i in items] == sorted([i['quote_no'] for i in items], reverse=True)
+    assert len({i['quote_no'] for i in items}) == 2003
+    assert all('sop_counts' in i for i in items)
+    assert not any('HIDDEN' in (i['name'] or '') for i in items)
+    assert get(client, '/api/quotes?limit=2000&q=eng-2000')['items'] == [first['items'][0]]
+    signin('u-field')
+    restricted = get(client, '/api/quotes?limit=2000')
+    assert len(restricted['items']) == 2000
+    assert all(i['contract_amount'] is None and i['amount_restricted'] for i in restricted['items'])
