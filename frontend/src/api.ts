@@ -14,18 +14,19 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
   const epoch=getSessionEpoch();
   const mutating=!!init?.method&&!['GET','HEAD'].includes(init.method.toUpperCase());
   if(mutating){pendingMutations.set(epoch,(pendingMutations.get(epoch)||0)+1);mutationChanged()}
-  const {etag,timeoutMs,...request}=init||{};
-  const controller=timeoutMs?new AbortController():undefined;
+  const {etag,timeoutMs=mutating?0:30000,...request}=init||{};
+  // Race the whole read (headers and body), even when a transport ignores abort.
+  const controller=timeoutMs||request.signal?new AbortController():undefined;
   let timer:ReturnType<typeof setTimeout>|undefined;
   let cancel:()=>void=()=>{};
+  try{
+  if(request.signal?.aborted)throw new DOMException('aborted','AbortError');
   const deadline=controller?new Promise<never>((_resolve,reject)=>{
    cancel=()=>{reject(new DOMException('aborted','AbortError'));controller.abort()};
    request.signal?.addEventListener('abort',cancel,{once:true});
-   timer=setTimeout(()=>{reject(new ApiError(408,'讀取逾時，請重試。','client_timeout'));controller.abort()},timeoutMs);
-   if(request.signal?.aborted)cancel();
+   if(timeoutMs)timer=setTimeout(()=>{reject(new ApiError(408,'讀取逾時，請重試。','client_timeout'));controller.abort()},timeoutMs);
   }):undefined;
   const bounded=<V>(work:Promise<V>):Promise<V>=>deadline?Promise.race([work,deadline]):work;
-  try{
   const cacheable=etag===true&&!mutating&&(!init?.method||init.method.toUpperCase()==='GET');
   const cached=cacheable&&init?.cache!=='reload'&&init?.cache!=='no-store'?etagCache.get(url):undefined;
   const headers=new Headers(init?.headers);
@@ -51,7 +52,7 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
    }else etagCache.delete(url);
   }
   return data;
-  }finally{if(timer!==undefined)clearTimeout(timer);request.signal?.removeEventListener('abort',cancel);if(mutating){const remaining=(pendingMutations.get(epoch)||1)-1;if(remaining)pendingMutations.set(epoch,remaining);else pendingMutations.delete(epoch);mutationChanged()}}
+  }finally{if(timer!==undefined)clearTimeout(timer);request.signal?.removeEventListener('abort',cancel);controller?.abort();if(mutating){const remaining=(pendingMutations.get(epoch)||1)-1;if(remaining)pendingMutations.set(epoch,remaining);else pendingMutations.delete(epoch);mutationChanged()}}
 }
 export function normalizeRoute<T extends {view:string;tab?:string;section?:string;node?:string;task?:string;focus?:string;approval?:string;comment?:string}>(route:T):T {
  if(route.view==='company'||route.view==='schedule')return {...route,view:'projects'};

@@ -1,8 +1,8 @@
 // Verify api() turns unusable HTTP 200 bodies into typed ApiError without leaking the body.
 import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
-import {transform} from 'esbuild';
-const {code}=await transform(await fs.readFile('src/api.ts','utf8'),{loader:'ts',format:'esm'});
+import {build} from 'esbuild';
+const {outputFiles:[out]}=await build({entryPoints:['src/api.ts'],bundle:true,write:false,format:'esm'});
+const code=out.text;
 const {api,ApiError,invalidateSessionEpoch,getPendingMutations}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
 let expired=0,mutationEvents=0;
 globalThis.window={dispatchEvent(event){if(event.type==='yx:mutation-state'){mutationEvents++;return}assert.equal(event.type,'yx:session-expired');expired++}};
