@@ -65,6 +65,6 @@ export function withLocalChecklist(nodes:FlowNode[],sop?:SopOverview,people:{id:
 export function checklistProject(sop:SopOverview):Project|undefined {
  const header=sop.caseHeader;
  if(!header || !sop.localNodes?.length)return undefined;
- return {id:header.id,code:header.code||'',name:header.name||'案件名稱待核對',client:'',pm_id:'',status:'pending',priority:'',due_date:'',original_due_date:'',created_at:'',started_at:'',description:'',contract_amount:null,estimated_points:null,source_url:'',source_kind:'local',revision:0,case_type:'intake',sop_only:true,
+ return {id:header.id,code:header.code||'',name:header.name||'案件名稱待核對',client:'',pm_id:'',status:'unknown',priority:'',due_date:'',original_due_date:'',created_at:'',started_at:'',description:'',contract_amount:null,estimated_points:null,source_url:'',source_kind:'local',revision:0,case_type:'intake',sop_only:true,
   nodes:sop.localNodes.map(n=>({id:n.id,key:n.key,name:n.key,owner_id:n.ownerId||'',collaborator_ids:[],status:n.status,start_date:null,due_date:null,original_due_date:null,started_at:null,completed_at:n.completedAt,tasks:[]})),files:[],comments:[],daily_reports:[]};
 }
