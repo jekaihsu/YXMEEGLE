@@ -28,3 +28,16 @@ test('denied fields have a visible reason and cannot save an unchanged task',asy
  assert.equal(document.querySelector('input').disabled,true);assert.match(document.body.textContent,/需管理權限/);
  await act(async()=>document.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));assert.equal(writes,0);await act(async()=>root.unmount());
 });
+test('legacy start date and points are editable and reach the save callback',async()=>{
+ const root=createRoot(document.getElementById('root'));let saved;
+ const model={draft:{...draft,start_date:'',points:''},legacy:{start_date:true,points:true},fields:ui.editorFields({title:true,assignee:true,due:true,notes:true,status:false}),people:[],statuses:[{id:'pending',label:'待處理'}],maxTitle:500,maxNotes:20000,dueReason:false};
+ await act(async()=>root.render(React.createElement(ui.InlineTaskEditor,{model,onSave:async d=>{saved=d;return true}})));
+ await change('任務開始日期','2026-10-26');await change('任務營業額點數','12.5');
+ await act(async()=>document.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ assert.equal(saved.start_date,'2026-10-26');assert.equal(saved.points,'12.5');await act(async()=>root.unmount());
+});
+test('archived tasks show one short reason and keep every field disabled',async()=>{
+ const root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.InlineTaskEditor,{model:{draft,fields:ui.editorFields({title:false,assignee:false,due:false,notes:false,status:false},'已封存'),readOnlyReason:'已封存',people:[],statuses:[{id:'pending',label:'待處理'}],maxTitle:500,maxNotes:20000,dueReason:false},onSave:async()=>false})));
+ assert.equal(document.querySelectorAll('#task-editor-readonly').length,1);assert.equal(document.querySelectorAll('small').length,0);assert.ok([...document.querySelectorAll('input,select,textarea')].every(el=>el.disabled));await act(async()=>root.unmount());
+});
