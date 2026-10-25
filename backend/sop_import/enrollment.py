@@ -151,11 +151,18 @@ class EnrollmentService:
     def node_enrollable(node):
         return node.get('status', 'pending') not in {'done','completed','finished','approved','skipped','in_progress','in_review','running'} and not node.get('completed_at') and not node.get('started_at') and not node.get('source_declared_completed')
 
-    def check_policy_write(self, db, ctx, nodes=None):
+    def policy_write_reason(self, db, ctx, nodes=None):
         policy = db.get(CasePolicy, (ctx.wid, ctx.project['id']))
-        require((policy is not None and policy.policy == 'managed') or (policy is None and not self.auto_active()), 'legacy_case_requires_opt_in', 409)
-        if policy and nodes:
-            require(set(nodes) <= set(policy.node_keys), 'node_not_enrolled', 409)
+        if not ((policy is not None and policy.policy == 'managed') or (policy is None and not self.auto_active())):
+            return 'legacy_case_requires_opt_in', '案件尚未啟用 SOP 管理'
+        if policy and nodes and not set(nodes) <= set(policy.node_keys):
+            return 'node_not_enrolled', '此節點尚未納入 SOP 管理'
+        return None
+
+    def check_policy_write(self, db, ctx, nodes=None):
+        blocked = self.policy_write_reason(db, ctx, nodes)
+        if blocked:
+            require(False, blocked[0], 409, reason=blocked[1])
 
     def task_policy_writable(self, db, ctx, task_id):
         policy = db.get(CasePolicy, (ctx.wid, ctx.project['id']))
