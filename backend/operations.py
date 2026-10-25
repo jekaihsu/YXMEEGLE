@@ -287,6 +287,13 @@ def seats(p,n):
     if n['key'] in TECHNICAL: result['supervisor']=n.get('supervisor_id') or p.get('supervisor_id','')
     return result
 
+def require_review_seats(ws,p,n):
+    targets=seats(p,n); require(targets and all(targets.values()),'確認人尚未完整分派',409)
+    for ident in targets.values(): active_user(ws,ident)
+    if n['key'] in FINANCIAL: require(len(set(targets.values()))==2,'PM 與行政必須是兩位不同的人',409)
+    else: require(len(set(targets.values()))==len(targets),'不同確認職責須由不同人擔任；負責人不可兼主管確認',409)
+    return targets
+
 def can_vote(ws,user,p,seat,representative):
     active_user(ws,representative)
     if user['id']==representative: return True
@@ -324,10 +331,7 @@ def submit_review(ws,user,p,n):
     current=next((c for c in reversed(n['review_cycles']) if c['status']=='pending'),None)
     fingerprint=review_hash(p,n)
     if current and current['content_hash']==fingerprint: return current
-    targets=seats(p,n); require(targets and all(targets.values()),'確認人尚未完整分派',409)
-    for ident in targets.values(): active_user(ws,ident)
-    if n['key'] in FINANCIAL: require(len(set(targets.values()))==2,'PM 與行政必須是兩位不同的人',409)
-    else: require(len(set(targets.values()))==len(targets),'不同確認職責須由不同人擔任；負責人不可兼主管確認',409)
+    targets=require_review_seats(ws,p,n)
     invalidate(n,'重新送審')
     cycle=dict(id=uid(),status='pending',content_hash=fingerprint,mode='all' if n['key'] in FINANCIAL else n['review_mode'],seats=targets,votes=[],created_at=now(),submitted_by=user['id'],rule_version=p['sop_version'])
     n['review_cycles'].append(cycle); return cycle

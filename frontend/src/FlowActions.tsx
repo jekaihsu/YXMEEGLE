@@ -27,15 +27,17 @@ export function FlowNodeActions({detail,busy,error,reason,mutate,extra,registry}
  const [form,setForm]=useState<'assign'|'task'|'reject'|'legacy_complete'|''>('');
  const [confirm,setConfirm]=useState<ActionName|''>('');
  const save=async(m:AssignmentMutation)=>{if(await mutate(m)){setForm('');requestAnimationFrame(()=>document.getElementById('flow-selected')?.scrollIntoView({block:'start',behavior:'auto'}))}};
- const actions=registry || actionRegistry({can:detail.can,busy,reason:busy?reason:''});
+ const actions=registry || actionRegistry({can:detail.can,busy,reason:reason || detail.writes_disabled_reason || ''});
  const done=detail.node.derived_status==='已完成';
  const unfinished=detail.tasks.filter(t=>!['已完成','取消'].includes(t.status)).length;
- const viewOnly=!Object.values(detail.can).some(Boolean);
- if(viewOnly)return <p className="nw-action-reason">{detail.writes_disabled_reason || reason || detail.node.auto_done?.reason || (['已完成','略過'].includes(detail.node.derived_status)?detail.node.derived_status:'僅供檢視')}</p>;
+ const visibleActions=ORDER.filter(name=>actions[name].visible && !(name==='complete'&&(done||detail.node.derived_status==='略過')));
+ const legacyVisible=detail.can.legacy_complete===true && actions.legacy_complete.visible && !done && detail.node.derived_status!=='略過';
+ const viewOnly=!visibleActions.length && !legacyVisible;
+ if(viewOnly)return <p className="nw-action-reason">{detail.writes_disabled_reason || reason || detail.node.auto_done?.reason || detail.node.derived_status || '僅供檢視'}</p>;
  const label=(n:ActionName)=>n==='reject'&&done?REOPEN.label:ACTIONS[n].label;
  const run=(name:ActionName)=>name==='assign' ? setForm('assign') : name==='create_task' ? setForm('task') : name==='reject' ? setForm('reject') : ACTIONS[name].confirm ? setConfirm(name) : void save({action:name as 'claim',nodeKey:detail.node.key,expected_revision:detail.node.revision});
- return <DisabledActionReasons.Provider value={true}><div className="pf-node-actions"><div className="nw-actions">{ORDER.filter(name=>actions[name].visible && !(name==='complete'&&(done||detail.node.derived_status==='略過'))).map(name=><FlowAction key={name} primary={name==='complete'||name==='approve'} allowed={actions[name].enabled} reason={actions[name].disabledReason} onClick={()=>run(name)}>{label(name)}</FlowAction>)}
- {detail.can.legacy_complete && !done && detail.node.derived_status!=='略過' && <FlowAction allowed={!busy} reason={reason} onClick={()=>setForm('legacy_complete')}>直接標記完成</FlowAction>}{extra}</div>{!detail.writes_enabled&&detail.writes_disabled_reason&&<p className="nw-action-reason">{detail.writes_disabled_reason}</p>}
+ return <DisabledActionReasons.Provider value={true}><div className="pf-node-actions"><div className="nw-actions">{visibleActions.map(name=><FlowAction key={name} primary={name==='complete'||name==='approve'} allowed={actions[name].enabled} reason={actions[name].disabledReason} onClick={()=>run(name)}>{label(name)}</FlowAction>)}
+ {legacyVisible && <FlowAction allowed={actions.legacy_complete.enabled} reason={actions.legacy_complete.disabledReason} onClick={()=>setForm('legacy_complete')}>直接標記完成</FlowAction>}{extra}</div>{!detail.writes_enabled&&detail.writes_disabled_reason&&<p className="nw-action-reason">{detail.writes_disabled_reason}</p>}
   {confirm && <div className="pf-confirm" role="group" aria-label={`確認${ACTIONS[confirm].label}`}><p>{ACTIONS[confirm].confirm}</p>{confirm==='complete'&&unfinished>0&&<p role="status">尚有 {unfinished} 項任務未完成</p>}<div className="pf-actions"><button type="button" className="button compact" onClick={()=>setConfirm('')}>取消</button><button type="button" className="button primary compact" disabled={busy} onClick={()=>{const action=confirm;setConfirm('');void save({action:action as 'complete',nodeKey:detail.node.key,expected_revision:detail.node.revision})}}>確認{ACTIONS[confirm].label}</button></div></div>}
   {form==='assign' && <AssignForm detail={detail} busy={busy} error={error} onCancel={()=>setForm('')} onSubmit={ids=>save({action:'assign',nodeKey:detail.node.key,owner_open_ids:ids,expected_revision:detail.node.revision})}/>}
   {form==='task' && <TaskCreator detail={detail} busy={busy} error={error} onCancel={()=>setForm('')} onSubmit={task=>save({action:'create_task',nodeKey:detail.node.key,task})}/>}

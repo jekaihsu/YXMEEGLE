@@ -18,21 +18,21 @@ export type ActionRegistry = Record<WorkbenchAction, ActionState>;
 export type LocalNode = {key:string; id:string; revision:number; status:string; ownerId:string|null; completedAt:string|null; reason:string|null; can:NodePermissions; disabledReason:string|null;completeDisabledReason?:string|null};
 export type NodeWorkbench = {node:FlowNode; source:'lark'|'local-sop'|'legacy'; tasks:WorkbenchTask[]; actions:ActionRegistry;facts:{label:string;value:string}[]; local?:LocalNode};
 
-export function actionRegistry({can,busy=false,reason='',local=false,legacy=false,reasons={}}:{reasons?:Partial<Record<WorkbenchAction,string>>;can:NodePermissions;busy?:boolean;reason?:string;local?:boolean;legacy?:boolean}):ActionRegistry {
+export function actionRegistry({can,busy=false,reason='',local=false,legacy=false}:{can:NodePermissions;busy?:boolean;reason?:string;local?:boolean;legacy?:boolean}):ActionRegistry {
  const entries=NODE_ACTIONS.map(([id])=>{
   const visible = id==='legacy_complete' ? legacy || can[id]===true : local ? ['assign','complete','reject','create_task'].includes(id) : can[id]===true;
   const enabled=can[id]===true && !busy && !reason;
-  return [id,{visible,enabled,disabledReason:enabled ? '' : reason || reasons[id] || (busy ? '正在儲存，請稍候' : '目前狀態或權限不允許此操作')}];
+  return [id,{visible,enabled,disabledReason:enabled ? '' : reason || (busy ? '正在儲存，請稍候' : '目前狀態或權限不允許此操作')}];
  });
  return Object.fromEntries(entries) as ActionRegistry;
 }
 export function localCase(project:{case_type?:string;code?:string}) {return project.case_type==='intake' || !project.code?.trim()}
-export function buildNodeWorkbench({node,sop,local,busy=false,reason='',can={},users=[],reasons={}}:{node:FlowNode;sop?:SopOverview;local?:LocalNode;busy?:boolean;reason?:string;can?:NodePermissions;reasons?:Partial<Record<WorkbenchAction,string>>;users?:Pick<User,'name'|'role'|'active'|'department'>[]}):NodeWorkbench {
+export function buildNodeWorkbench({node,sop,local,busy=false,reason='',can={},users=[]}:{node:FlowNode;sop?:SopOverview;local?:LocalNode;busy?:boolean;reason?:string;can?:NodePermissions;users?:Pick<User,'name'|'role'|'active'|'department'>[]}):NodeWorkbench {
  const source=node.assignment ? 'lark' : local || sop?.tasks.some(t=>t.nodes.some(n=>n.node_key===node.key)) ? 'local-sop' : 'legacy';
  const remote:WorkbenchTask[]=node.taskRows.flatMap(row=>row.task ? [{id:row.id,nodeKey:node.key,source:'lark' as const,task:row.task}] : []);
  const legacy:WorkbenchTask[]=node.legacy?.tasks.filter(t=>t.status!=='superseded').map(task=>({id:task.id,nodeKey:node.key,source:'legacy',task})) || [];
  const checklist:WorkbenchTask[]=(sop?.tasks || []).filter(t=>t.nodes.some(n=>n.node_key===node.key)).map(task=>({id:task.id,nodeKey:node.key,source:'local-sop',task}));
- const actions=actionRegistry({can:local?.can || can,busy,reason:reason || local?.disabledReason || '',reasons,local:!!local,legacy:sop?.enrollment?.policy==='legacy'});
+ const actions=actionRegistry({can:local?.can || can,busy,reason:reason || local?.disabledReason || '',local:!!local,legacy:sop?.enrollment?.policy==='legacy'});
  if(can.legacy_complete===true&&!busy){actions.legacy_complete.enabled=true;actions.legacy_complete.disabledReason=''}
  if(['已完成','略過','completed','approved_skipped'].includes(local?.status||node.state))actions.complete.visible=false;
  if(local){actions.reject.visible=local.status==='completed';actions.assign.disabledReason=local.disabledReason||'節點已完成'}
@@ -70,16 +70,4 @@ export function checklistProject(sop:SopOverview):Project|undefined {
  if(!header || !sop.localNodes?.length)return undefined;
  return {id:header.id,code:header.code||'',name:header.name||'案件名稱待核對',client:'',pm_id:'',status:'unknown',priority:'',due_date:'',original_due_date:'',created_at:'',started_at:'',description:'',contract_amount:null,estimated_points:null,source_url:'',source_kind:'local',revision:0,case_type:'intake',sop_only:true,
   nodes:sop.localNodes.map(n=>({id:n.id,key:n.key,name:n.key,owner_id:n.ownerId||'',collaborator_ids:[],status:n.status,start_date:null,due_date:null,original_due_date:null,started_at:null,completed_at:n.completedAt,tasks:[]})),files:[],comments:[],daily_reports:[]};
-}
-
-export function nodeActionReasons(node:FlowNode):Partial<Record<WorkbenchAction,string>> {
- const state=node.state;
- return {
-  assign:['已完成','略過'].includes(state)?'節點已完成或略過':'需由此組主管指派',
-  complete:state==='未開始'?'前置節點尚未完成':'需由此組主管完成節點',
-  approve:state==='待審核'?'需由此組主管核准':'節點尚未送審',
-  reject:['已完成','待審核'].includes(state)?'需由此組主管退回':'節點尚未送審',
-  claim:node.owners.length?'節點已有負責人':'僅限此組在職人員認領',
-  create_task:['已完成','略過'].includes(state)?'節點已完成或略過':'需有此節點新增任務權限',
- };
 }

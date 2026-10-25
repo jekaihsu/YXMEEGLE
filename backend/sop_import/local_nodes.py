@@ -1,12 +1,13 @@
 from copy import deepcopy
 
+from fastapi import HTTPException
 from sqlalchemy import select
 
 from .. import audit, storage
 from ..models import AuditRow, BusinessRow, WorkspaceRow
 from ..workflow import now
 from ..workflow_rules import assignable, assign_node, audit_change
-from ..operations import missing, seats, TECHNICAL
+from ..operations import missing, require_review_seats, FINANCIAL
 from .domain import Applicability, Lifecycle, NODE_MAP, require
 from .models import TaskNodeLink
 
@@ -46,15 +47,12 @@ def projection(service, db, ctx):
                   else policy[1] if policy else None)
         node = next(n for n in project['nodes'] if n['key'] == key)
         issues = missing(project, node, workspace)
-        if key in TECHNICAL:
-            targets = seats(project, node)
-            if not targets or not all(targets.values()):
-                issues.append('確認人尚未完整分派')
-            elif any(not any(u['id'] == ident and u.get('active', True) for u in workspace['users']) for ident in targets.values()):
-                issues.append('確認人須為在職人員')
-            elif len(set(targets.values())) != len(targets):
-                issues.append('不同確認職責須由不同人擔任；負責人不可兼主管確認')
-        financial = key in {'pricing', 'settlement'}
+        financial = key in FINANCIAL
+        if not financial:
+            try:
+                require_review_seats(workspace, project, node)
+            except HTTPException as exc:
+                issues.append(exc.detail)
         done = n.get('status') in {'completed', 'approved_skipped'}
         complete_reason = reason or ('此節點須依財務核准流程完成' if financial else '節點已完成' if done else '尚未完成：' + '、'.join(issues) if issues else '請先完成任務並確認適用條件' if unfinished else None)
         result.append({'key': key, 'id': row.entity_id, 'revision': n.get('workbench_revision', 0),

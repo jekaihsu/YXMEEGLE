@@ -1,3 +1,5 @@
+import pytest
+
 from sqlalchemy import select
 
 from .models import AuditRow
@@ -16,9 +18,10 @@ def test_assign_complete_reopen_is_local_revision_checked_and_audited(local):
     app, client, signin, pid, url = setup(local)
     change_workspace(app, prepare_completion)
     nodes = call(client, 'GET', url + '/sop-tasks')['local_nodes']
-    assert len(nodes) == 9 and nodes[0]['can']['complete']
+    assert len(nodes) == 9 and not nodes[0]['can']['complete']
     path = url + '/sop-nodes/sales'
     call(client, 'POST', path, {'action': 'assign', 'expected_revision': 0, 'owner_id': 'u-field'})
+    assert call(client, 'GET', url + '/sop-tasks')['local_nodes'][0]['can']['complete']
     call(client, 'POST', path, {'action': 'complete', 'expected_revision': 0, 'reason': '核對完成'}, 409)
     call(client, 'POST', path, {'action': 'complete', 'expected_revision': 1, 'reason': '核對完成'})
     [case], _, _ = persisted(app)
@@ -154,3 +157,29 @@ def test_manual_task_creation_saves_owner_notes_and_initial_due_date(local):
     task = receipt['task']
     assert (task['instructions'], task['participants']['executor'], task['local']['due_date']) == ('核對成果', 'u-field', '2026-10-28')
     call(client, 'POST', url + '/sop-tasks', {'title': '無效期限', 'node_keys': ['sales'], 'due_date': '2026-02-30'}, 422)
+
+
+@pytest.mark.parametrize(('key', 'invalid_seat', 'reason'), [
+    ('sales', 'inactive-reviewer', '人員已停權'),
+    ('field', 'duplicate-person', '不同確認職責須由不同人擔任；負責人不可兼主管確認'),
+    ('sales', 'empty-owner', '確認人尚未完整分派'),
+])
+def test_completion_enforces_legacy_review_seats(local, monkeypatch, key, invalid_seat, reason):
+    app, client, signin, pid, url = setup(local)
+    monkeypatch.setattr('backend.sop_import.local_nodes.missing', lambda p, n, ws: [])
+    def invalidate_seat(state):
+        case = next(p for p in state['projects'] if p['id'] == pid)
+        node = next(n for n in case['nodes'] if n['key'] == key)
+        node.update(owner_id='u-field', reviewers=[], supervisor_id='u-field')
+        if invalid_seat == 'inactive-reviewer':
+            node['reviewers'] = ['u-field']
+            next(u for u in state['users'] if u['id'] == 'u-field')['active'] = False
+        elif invalid_seat == 'empty-owner':
+            node['owner_id'] = ''
+    change_workspace(app, invalidate_seat)
+    node = next(n for n in call(client, 'GET', url + '/sop-tasks')['local_nodes'] if n['key'] == key)
+    assert node['can']['complete'] is False
+    assert reason in node['complete_disabled_reason']
+    failed = call(client, 'POST', url + '/sop-nodes/' + key,
+                  {'action': 'complete', 'expected_revision': 0, 'reason': '核對'}, 409)
+    assert failed['reason'] == node['complete_disabled_reason']

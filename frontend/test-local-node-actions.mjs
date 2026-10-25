@@ -43,11 +43,34 @@ test('completion confirmation reports all unfinished tasks and hides completed-n
  const props={detail,busy:false,error:null,reason:'',mutate:async()=>true};
  await act(async()=>root.render(React.createElement(ui.FlowNodeActions,props)));await click(button('完成節點'));
  assert.match(document.querySelector('.pf-confirm').textContent,/尚有 2 項任務未完成/);
- await act(async()=>root.render(React.createElement(ui.FlowNodeActions,{...props,detail:{...detail,node:{...detail.node,derived_status:'已完成'},can:{reject:true}}})));
+ await act(async()=>root.render(React.createElement(ui.FlowNodeActions,{...props,detail:{...detail,node:{...detail.node,derived_status:'已完成'},can:{complete:true,reject:true}}})));
  assert.equal(button('完成節點'),undefined);await act(async()=>root.unmount());
 });
 test('remote policy-blocked reason replaces a row of disabled actions',async()=>{
  const root=createRoot(document.getElementById('root'));
  await act(async()=>root.render(React.createElement(ui.FlowNodeActions,{detail:{can:{},node:{derived_status:'待處理'},tasks:[],writes_disabled_reason:'案件尚未啟用 SOP 管理'},busy:false,error:null,reason:'',mutate:async()=>false})));
  assert.equal(document.querySelectorAll('button').length,0);assert.equal(document.body.textContent,'案件尚未啟用 SOP 管理');await act(async()=>root.unmount());
+});
+
+test('state-hidden remote actions show one specific reason line',async()=>{
+ const root=createRoot(document.getElementById('root'));
+ for(const [detail,expected] of [
+  [{can:{complete:true},node:{derived_status:'已完成',auto_done:{reason:'來源成果已核實'}},tasks:[]},'來源成果已核實'],
+  [{can:{complete:true},node:{derived_status:'略過'},tasks:[]},'略過'],
+ ]){
+  await act(async()=>root.render(React.createElement(ui.FlowNodeActions,{detail,busy:false,error:null,reason:'',mutate:async()=>false})));
+  assert.equal(document.querySelectorAll('button').length,0);
+  assert.equal(document.querySelectorAll('.nw-action-reason').length,1);
+  assert.equal(document.body.textContent,expected);
+ }
+ await act(async()=>root.unmount());
+});
+test('visible remote actions retain specific busy and writes-off reasons',async()=>{
+ const root=createRoot(document.getElementById('root'));
+ for(const props of [{busy:true,reason:'正在更新節點資料，請稍候。'}, {busy:false,reason:'',writes_disabled_reason:'節點修改尚未開放。'}]){
+  await act(async()=>root.render(React.createElement(ui.FlowNodeActions,{detail:{can:{assign:true},node:{derived_status:'進行中'},tasks:[],writes_disabled_reason:props.writes_disabled_reason},...props,error:null,mutate:async()=>false})));
+  assert.equal(button('指派負責人').disabled,true);
+  assert.equal(button('指派負責人').title,props.reason || props.writes_disabled_reason);
+ }
+ await act(async()=>root.unmount());
 });

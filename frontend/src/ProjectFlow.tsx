@@ -1,5 +1,5 @@
 import {ReportLinkReview} from './ReportLinkReview';
-import {withLocalChecklist,buildNodeWorkbench,localCase,nodeActionReasons} from './nodeWorkbenchModel';
+import {withLocalChecklist,buildNodeWorkbench,localCase} from './nodeWorkbenchModel';
 import {LocalNodeActions} from './LocalNodeActions';
 import {CaseSopStart} from './CaseSopStart';
 import {ReportLinkSummary} from './ReportLinkSummary';
@@ -57,7 +57,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  const nodeBusy=!!list?.stale || assignments.refreshing || !!assignments.pending || assignments.state.kind!=='ready';
  const busy=nodeBusy || !list?.writes_enabled;
  const reason=!list?.writes_enabled ? list?.writes_disabled_reason || '節點修改尚未開放。' : assignments.state.kind==='error' ? '節點來源更新失敗，請重試。' : '正在更新節點資料，請稍候。';
- const workbench=buildNodeWorkbench({node:selected,sop:sopData,local:sopData?.localNodes?.find(n=>n.key===selected.key),can:detail?.can,users:c.w.users,busy:localCase(p)?sopTasks.state.kind!=='ready'||sopTasks.state.refreshing:nodeBusy,reason:localCase(p)?'':nodeBusy||!list?.writes_enabled?reason:'',reasons:Object.fromEntries(Object.entries(nodeActionReasons(selected)).map(([key,value])=>[key,sopData?.enrollment?.policy==='legacy'?'此節點維持原流程':value]))});
+ const workbench=buildNodeWorkbench({node:selected,sop:sopData,local:sopData?.localNodes?.find(n=>n.key===selected.key),can:detail?.can,users:c.w.users,busy:localCase(p)?sopTasks.state.kind!=='ready'||sopTasks.state.refreshing:nodeBusy,reason:localCase(p)?'':nodeBusy||!list?.writes_enabled?reason:''});
  const [reviewLinks,setReviewLinks]=useState(false);
  const [report,setReport]=useState<ProgressReportRow|null>(null);
  const keyboardMove=useRef(false);
