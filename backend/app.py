@@ -227,6 +227,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
         response.headers['X-Content-Type-Options']='nosniff'
         response.headers['Referrer-Policy']='same-origin'
         if request.url.path.startswith('/api'): response.headers['Cache-Control']='no-store'
+        elif response.status_code in (200,206,304) and re.fullmatch(r'/assets/(?:[^/]+/)*[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+',request.url.path):
+            response.headers['Cache-Control']='public, max-age=31536000, immutable'
         if (request.method,request.url.path) in TIMED_ROUTES or (request.method=='GET' and response.status_code<400 and re.fullmatch(r'/api/(?:projects/[^/]+(?:/(?:navigation|progress|node-assignments|start-sop|sop-tasks|sop-assignees))?|case-detail/[^/]+)',request.url.path)):
             # Durations only. 'serialize' is the unmeasured remainder (response encoding and framework time).
             phases=dict(request.scope.get('phases',{})); total=perf_counter()-started

@@ -1,21 +1,17 @@
-import {PeopleAttendancePanel} from './PeopleDirectoryPanel';
 import './polish.css';
 import './Sources.css';
 import './Approvals.css';
 import {useReloadGuard} from './reloadGuard';
 import {ageFreshness, datasetNotice, failedFreshness} from './freshness';
-import {LarkPilotPanel} from './LarkPilotPanel';
 import {RecoveryPage} from './RecoveryPage';
 import {executionAllowed, executionReason} from './ProjectExecution';
 import {lazy, Suspense, useCallback, useEffect, useState, useRef, type FormEvent} from 'react';
 import {ArrowRight, ArrowUpRight, CalendarDays, Check, ChevronLeft, ChevronRight, CircleCheck, Clock3, ExternalLink, Files, GitBranch, Loader2, Network, Play, RefreshCw, Search, Send, Settings2, ShieldCheck, Sparkles, TriangleAlert, Users} from 'lucide-react';
 import {api, perfFirstRender, perfMark, ApiError, readRoute, normalizeRoute, getSessionEpoch, invalidateSessionEpoch, liveRefresh, disabledRouteFeature} from './api';
-import {AdministrationEntry, Routines} from './Operations';
 import {MentionInbox} from './MentionInbox';
 import {Picker,Segmented} from './design';
 import {AppearanceControl} from './design/AppearanceControl';
 import {AppShell, Avatar, ROLE} from './AppShell';
-import {DispatchPage, LegacyTabs, SourceHealthPage, WorkPage} from './IntegratedPages';
 import {isLegacyTab} from './integrationRoutes.ts';
 import {isP2View, p2ActiveNav} from './p2RouteNames.ts';
 import {useDraftNavigationGuard, type DraftScope} from './useDraftNavigationGuard';
@@ -30,9 +26,17 @@ import {type Approval, type Project, type Route, type Session, type SourceData, 
 import {homeOverdueCount,isHomeAssigned,isHomeProxy} from './executableTasks';
 import {ActionScope, Ctx, TaskRow, STATUS, NODE_NAMES, SOURCE_KINDS, eventMessage, date, shortDate, stamp, num, active, allTasks, isLate, nameOf, isLead, isProjectLead, isTaskActor, taskReadiness, safeUrl, Badge, Empty, Modal, Field, Primary, PageHead, openTask, TaskTable, FullWorkspaceGate, DisabledFeature} from './appCommon';
 import {UnifiedHome} from './UnifiedHome';
-import {Projects} from './ProjectsList';
 
-// Case pages are the largest screen and never the first one painted, so they load on demand like the cockpit.
+// Keep secondary screens (including their CSS) out of the default dashboard's static graph.
+const Projects=lazy(()=>import('./ProjectsList').then(m=>({default:m.Projects})));
+const AdministrationEntry=lazy(()=>import('./Operations').then(m=>({default:m.AdministrationEntry})));
+const Routines=lazy(()=>import('./Operations').then(m=>({default:m.Routines})));
+const DispatchPage=lazy(()=>import('./DispatchWorkflowPage').then(m=>({default:m.DispatchWorkflowPage})));
+const LegacyTabs=lazy(()=>import('./IntegratedPages').then(m=>({default:m.LegacyTabs})));
+const SourceHealthPage=lazy(()=>import('./IntegratedPages').then(m=>({default:m.SourceHealthPage})));
+const WorkPage=lazy(()=>import('./IntegratedPages').then(m=>({default:m.WorkPage})));
+const PeopleAttendancePanel=lazy(()=>import('./PeopleDirectoryPanel').then(m=>({default:m.PeopleAttendancePanel})));
+const LarkPilotPanel=lazy(()=>import('./LarkPilotPanel').then(m=>({default:m.LarkPilotPanel})));
 const Quotes=lazy(()=>import('./Quotes').then(m=>({default:m.Quotes})));
 const AssignedSopTaskPage = lazy(() => import('./AssignedSopTaskPage'));
 const ProjectDetailGate = lazy(() => import('./ProjectDetail').then(module => ({default: module.ProjectDetailGate})));
@@ -116,8 +120,8 @@ export default function App(){
   {toast&&<div className="toast glass" role="status" aria-live="polite"><CircleCheck size={18}/>{toast}</div>}
   {sessionOpen&&s&&<Modal title={s.mode==='demo'?'切換示範角色':'目前登入身份'} subtitle="角色會影響可操作的案件、節點及子任務。" onClose={()=>setSessionOpen(false)}><div className="modal-body"><AppearanceControl/></div>{s.mode==='demo'?<div className="role-list">{s.users.map(u=><button key={u.id} disabled={busy} className={`role-option ${u.id===s.user?.id?'selected':''}`} onClick={()=>void switchUser(u.id)}><Avatar user={u}/><span><strong>{u.name}</strong><small>{u.department} · {ROLE[u.role]||u.role}</small></span>{u.id===s.user?.id?<Check size={18}/>:<ChevronRight size={16}/>}</button>)}</div>:<div className="modal-body"><p>目前為 Lark 登入，使用者身份由登入帳號決定。</p><p>{s.environment==='test'?'目前在獨立測試區，來源與正式案件分開。':'目前在公司正式工作區。'}</p><button className="button" onClick={()=>{setSessionOpen(false);go({view:'admin',tab:'settings'})}}>切換工作區</button><button className="button" disabled={busy} onClick={()=>void logout()}>登出</button></div>}</Modal>}
   </>}>
-   {disabledFeature?<DisabledFeature feature={disabledFeature} onHome={()=>go({view:'dashboard'})}/>:<>{route.view==='dispatch'&&<DispatchPage key={getSessionEpoch()} session={s} projects={w?.projects??[]}/>}{route.view==='reports'&&<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在準備 PM 週報…</p></div>}><ReportsPage key={getSessionEpoch()} tab={route.tab} onTab={tab=>go({view:'reports',tab})}/></Suspense>}{c&&<>{route.view==='dashboard'&&<UnifiedHome c={c}/>}{route.view==='projects'&&<Projects c={c}/>}{route.view==='quotes'&&<Suspense fallback={null}><Quotes key={getSessionEpoch()} c={c}/></Suspense>}{route.view==='work'&&(isLegacyTab(route,'work')?<><LegacyTabs c={c} view="work"/><FullWorkspaceGate c={c}>{fc=><MyWork c={fc}/>}</FullWorkspaceGate></>:<WorkPage c={c}/>)}{route.view==='people'&&<PeopleAttendancePanel c={c}/>}{route.view==='project'&&<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在開啟案件…</p></div>}>{route.section==='assigned-sop'&&route.task_source==='sop_local'?<AssignedSopTaskPage key={`${getSessionEpoch()}:${route.project}`} c={c}/>:<ProjectDetailGate c={c}/>}</Suspense>}{route.view==='approvals'&&<FullWorkspaceGate c={c}>{fc=><Approvals c={fc}/>}</FullWorkspaceGate>}{route.view==='sources'&&(isLegacyTab(route,'sources')?<><LegacyTabs c={c} view="sources"/><Sources c={c}/></>:<SourceHealthPage c={c}/>)}<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在載入頁面…</p></div>}>{isP2View(route.view)&&<P2Page c={c}/>}</Suspense>{route.view==='admin'&&<AdministrationEntry key={getSessionEpoch()} s={s} c={c} tab={route.tab} go={tab=>go({view:'admin',tab})} refresh={refresh}/>} {route.view==='routines'&&<FullWorkspaceGate c={c}>{fc=><Routines c={fc}/>}</FullWorkspaceGate>}</>}</>}
- </AppShell></DraftNamespace.Provider>
+   <Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在載入頁面…</p></div>}>{disabledFeature?<DisabledFeature feature={disabledFeature} onHome={()=>go({view:'dashboard'})}/>:<>{route.view==='dispatch'&&<DispatchPage key={getSessionEpoch()} session={s} projects={w?.projects??[]}/>}{route.view==='reports'&&<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在準備 PM 週報…</p></div>}><ReportsPage key={getSessionEpoch()} tab={route.tab} onTab={tab=>go({view:'reports',tab})}/></Suspense>}{c&&<>{route.view==='dashboard'&&<UnifiedHome c={c}/>}{route.view==='projects'&&<Projects c={c}/>}{route.view==='quotes'&&<Suspense fallback={null}><Quotes key={getSessionEpoch()} c={c}/></Suspense>}{route.view==='work'&&(isLegacyTab(route,'work')?<><LegacyTabs c={c} view="work"/><FullWorkspaceGate c={c}>{fc=><MyWork c={fc}/>}</FullWorkspaceGate></>:<WorkPage c={c}/>)}{route.view==='people'&&<PeopleAttendancePanel c={c}/>}{route.view==='project'&&<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在開啟案件…</p></div>}>{route.section==='assigned-sop'&&route.task_source==='sop_local'?<AssignedSopTaskPage key={`${getSessionEpoch()}:${route.project}`} c={c}/>:<ProjectDetailGate c={c}/>}</Suspense>}{route.view==='approvals'&&<FullWorkspaceGate c={c}>{fc=><Approvals c={fc}/>}</FullWorkspaceGate>}{route.view==='sources'&&(isLegacyTab(route,'sources')?<><LegacyTabs c={c} view="sources"/><Sources c={c}/></>:<SourceHealthPage c={c}/>)}<Suspense fallback={<div className="loading-page" role="status"><Loader2 className="spin"/><p>正在載入頁面…</p></div>}>{isP2View(route.view)&&<P2Page c={c}/>}</Suspense>{route.view==='admin'&&<AdministrationEntry key={getSessionEpoch()} s={s} c={c} tab={route.tab} go={tab=>go({view:'admin',tab})} refresh={refresh}/>} {route.view==='routines'&&<FullWorkspaceGate c={c}>{fc=><Routines c={fc}/>}</FullWorkspaceGate>}</>}</>}
+ </Suspense></AppShell></DraftNamespace.Provider>
 }
 
 

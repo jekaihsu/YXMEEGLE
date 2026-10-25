@@ -88,3 +88,46 @@ test('stage dropdown filters rows and can restore all stages',async()=>{
  await change('quoted');assert.equal(document.querySelectorAll('tbody tr').length,1);assert.match(document.querySelector('tbody').textContent,/115802/);
  await change('');assert.equal(document.querySelectorAll('tbody tr').length,2);
 });
+
+test('pagination and parent updates reuse filtered/sorted rows; filters and sorting still recompute',async()=>{
+ const compare=Object.getOwnPropertyDescriptor(Intl.Collator.prototype,'compare');
+ let comparisons=0;
+ Object.defineProperty(Intl.Collator.prototype,'compare',{...compare,get(){const fn=compare.get.call(this);return (...args)=>{comparisons++;return fn(...args)}}});
+ try{
+  const rows=Array.from({length:101},(_,i)=>({...x.quotes.items[0],quote_no:String(115000+i),name:`案件${i}`,stage:i%2?'quoted':'inquiry'}));
+  globalThis.fetch=async url=>{const offset=Number(new URL(url,'http://localhost').searchParams.get('offset'));return reply({total:rows.length,items:rows.slice(offset,offset+100)})};
+  root=createRoot(document.getElementById('root'));
+  const c={s:{user:{}},w:{users:[]},route:{view:'quotes'},go(){}};
+  await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});
+  assert.ok(comparisons>0);
+  const initial=comparisons;
+  await click(button('下一頁'));assert.equal(comparisons,initial,'page changes only slice the existing rows');
+  await act(async()=>{root.render(React.createElement(m.Quotes,{c:{...c,busy:true}}));await tick()});
+  assert.equal(comparisons,initial,'unrelated parent updates do not sort');
+  await click([...document.querySelectorAll('thead button')].find(b=>b.textContent.includes('案件名稱')));
+  assert.ok(comparisons>initial,'sort changes recompute');
+  const sorted=comparisons;
+  await type(document.querySelector('[aria-label="搜尋報價"]'),'案件1');
+  assert.ok(comparisons>sorted,'search changes recompute');
+  assert.equal(document.querySelectorAll('tbody tr').length,12);
+  assert.equal(button('上一頁').disabled,true);
+ }finally{Object.defineProperty(Intl.Collator.prototype,'compare',compare)}
+});
+
+test('reload and unmount abort quote reads instead of continuing obsolete page requests',async()=>{
+ const pending=[];
+ globalThis.fetch=(url,init)=>new Promise(resolve=>pending.push({url,init,resolve}));
+ root=createRoot(document.getElementById('root'));
+ const c={s:{user:{}},w:{users:[]},route:{view:'quotes'},go(){}};
+ await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});
+ assert.equal(pending.length,1);
+ await click(button('重新整理'));
+ assert.equal(pending.length,2);assert.ok(pending[0].init.signal.aborted);
+ await act(async()=>{pending[1].resolve(reply({total:201,items:Array.from({length:100},(_,i)=>({...x.quotes.items[0],quote_no:String(i)}))}));await tick()});
+ assert.equal(pending.length,3);
+ assert.match(pending[2].url,/offset=100/);
+ await act(async()=>root.unmount());root=null;
+ assert.ok(pending[2].init.signal.aborted);
+ await act(async()=>{pending[0].resolve(reply({total:1000,items:[x.quotes.items[0]]}));pending[2].resolve(reply({total:201,items:[x.quotes.items[0]]}));await tick()});
+ assert.equal(pending.length,3,'late obsolete responses cannot start another page');
+});
