@@ -54,8 +54,8 @@ class SourceSyncService:
                 '公司來源僅限已核定的 V4 與報價總表',403)
         return tuple(self.cfg.get(k) for k in ('LARK_APP_ID','LARK_WORKER_ORGANIZATION','LARK_SOURCE_TABLES_JSON','LARK_V4_BASE_TOKEN','LARK_QUOTE_BASE_TOKEN'))
 
-    def _state(self,db,row):
-        return upgrade(storage.load(db,self.B,row))
+    def _state(self,db,row,*,row_snapshot=None):
+        return upgrade(storage.load(db,self.B,row,**({'row_snapshot':row_snapshot} if row_snapshot is not None else {})))
 
     def _light(self,db,row):
         """Root fields, users and templates, upgraded, for a write that only changes the root.
@@ -100,8 +100,15 @@ class SourceSyncService:
             if state is not None and all(state.get(key)==row.data.get(key)
                                          for key in PROJECTION_FIELDS if key not in storage.COLLECTIONS):
                 return {'version':version,'state':state,'matches':True,'plan':None,'prior_projects':[]}
-            state=self._state(db,row)
-            prior_projects=deepcopy(state.get('projects', []))
+            root_before=deepcopy(row.data)
+            can_plan=(row.data.get('storage_schema')==2
+                      and status.get('projection_workspace_version')==version
+                      and not self.sop_enrollment.auto_active()
+                      and 'report_case_bridges' not in row.data
+                      and db.get_bind().dialect.name in ('sqlite','postgresql'))
+            existing={} if can_plan else None
+            state=self._state(db,row,row_snapshot=existing)
+            prior_projects=deepcopy(state.get('projects', [])) if self.sop_enrollment.auto_active() else []
             if skip_unchanged:
                 status=state.get('source_status',{})
                 matches=(status.get('projection_fingerprint')==digest and status.get('projection_version')==self.projection_version
@@ -115,7 +122,10 @@ class SourceSyncService:
                     plan=candidate
                 except Exception: return None
             if db.scalar(select(self.W.version).where(self.W.id==wid))!=version: return None
-            return {'version':version,'state':state,'matches':matches,'plan':plan,'prior_projects':prior_projects}
+            write_plan=(storage.prepare_save(self.B,wid,state,existing,root_before,indexed=db.info.get('index_tables'))
+                        if can_plan and plan is not None and 'report_case_bridges' not in state else None)
+            return {'version':version,'state':state,'matches':matches,'plan':plan,'prior_projects':prior_projects,
+                    'root_before':root_before,'write_plan':write_plan}
 
     def _import(self,state,snapshot,actor):
         """The heavy half of an apply: fold the records into the state and count what is visible."""
@@ -203,7 +213,8 @@ class SourceSyncService:
         prepared=self._prepare(wid,snapshot,digest,skip_unchanged,actor_id) if self.partial else None
         with self.sessions.begin() as db:
             row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update()); require(row is not None,'工作區不存在',404)
-            fresh=prepared is not None and prepared['version']==row.version
+            fresh=(prepared is not None and prepared['version']==row.version
+                   and ('root_before' not in prepared or prepared['root_before']==row.data))
             if fresh and '_partial' in prepared['state']:
                 fresh=row.data.get('source_status',{}).get('projection_workspace_version')==row.version
             state=prepared['state'] if fresh else self._state(db,row)
@@ -250,7 +261,7 @@ class SourceSyncService:
                 # A cache change can invalidate an early root-only plan even
                 # when the workspace version has not moved.
                 state=self._state(db,row)
-                prior_projects=deepcopy(state.get('projects', []))
+                prior_projects=deepcopy(state.get('projects', [])) if self.sop_enrollment.auto_active() else []
             if planned is not None:
                 snapshot.clear(); snapshot.update(planned)
             else:
@@ -280,7 +291,9 @@ class SourceSyncService:
             authorized_by=actor_id or prior_connection.get('authorized_by') or prior_connection.get('actor_id')
             state['source_connection']=readonly_sync_connection(self.cfg,authorized_by)
             state['version']=row.version+1; event(state,actor,'source_sync',message=snapshot['message'])
-            root=storage.save(db,self.B,wid,state)
+            write_plan=prepared.get('write_plan') if fresh else None
+            root=(storage.save_prepared(db,self.B,wid,state,write_plan) if write_plan is not None
+                  else storage.save(db,self.B,wid,state))
             # storage.save assigns entity concurrency versions; stamp that final
             # representation so a subsequent unchanged read can safely skip.
             state['source_status'].update(projection_fingerprint=digest,

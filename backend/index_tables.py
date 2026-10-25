@@ -66,7 +66,7 @@ def _chunks(items):
     for i in range(0,len(items),CHUNK): yield items[i:i+CHUNK]
 
 
-def replace_projects(db,model,wid,state,project_ids):
+def replace_projects(db,model,wid,state,project_ids,*,rows=None):
     """Drop and rewrite index rows of the given projects (absent ones are just removed)."""
     ids=list(project_ids)
     if not ids: return
@@ -74,23 +74,31 @@ def replace_projects(db,model,wid,state,project_ids):
     for part in _chunks(ids):
         db.execute(delete(ti).where(ti.c.workspace_id==wid,ti.c.project_id.in_(part)))
         db.execute(delete(pi).where(pi.c.workspace_id==wid,pi.c.project_id.in_(part)))
-    projects,tasks=project_rows(wid,state,ids)
+    projects,tasks=rows if rows is not None else project_rows(wid,state,ids)
     if projects: db.execute(insert(pi),projects)
     if tasks: db.execute(insert(ti),tasks)
 
 
-def replace_counters(db,model,wid,state):
+def replace_counters(db,model,wid,state,*,desired=None):
     """Write only counters whose value or version differs; delete vanished ones."""
     *_,ci=tables(model)
-    desired=counter_values(state); version=state.get('version',0)
+    desired=counter_values(state) if desired is None else desired; version=state.get('version',0)
     existing={(r.key,r.subject_id):r for r in db.execute(select(ci).where(ci.c.workspace_id==wid))}
-    for key,row in existing.items():
-        if key not in desired:
-            db.execute(delete(ci).where(ci.c.workspace_id==wid,ci.c.key==key[0],ci.c.subject_id==key[1]))
-        elif row.value!=desired[key] or row.source_version!=version:
-            db.execute(ci.update().where(ci.c.workspace_id==wid,ci.c.key==key[0],ci.c.subject_id==key[1]).values(value=desired[key],source_version=version))
-    fresh=[dict(workspace_id=wid,key=k,subject_id=s,value=v,source_version=version) for (k,s),v in desired.items() if (k,s) not in existing]
-    if fresh: db.execute(insert(ci),fresh)
+    remove=[key for key in existing if key not in desired]
+    for key in remove:
+        db.execute(delete(ci).where(ci.c.workspace_id==wid,ci.c.key==key[0],ci.c.subject_id==key[1]))
+    updates=[dict(workspace_id=wid,key=k,subject_id=s,value=v,source_version=version)
+             for (k,s),v in desired.items() if (k,s) not in existing
+             or existing[(k,s)].value!=v or existing[(k,s)].source_version!=version]
+    if updates:
+        if db.get_bind().dialect.name=='postgresql':
+            from sqlalchemy.dialects.postgresql import insert as upsert
+        else:
+            from sqlalchemy.dialects.sqlite import insert as upsert
+        for part in _chunks(updates):
+            statement=upsert(ci).values(part)
+            db.execute(statement.on_conflict_do_update(index_elements=['workspace_id','key','subject_id'],
+                set_={'value':statement.excluded.value,'source_version':statement.excluded.source_version}))
 
 
 def advance_counters(db,model,wid,previous,version):
