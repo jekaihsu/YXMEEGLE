@@ -253,6 +253,30 @@ class RefreshCoordinator:
                         dataset, int((monotonic() - began) * 1000), metrics['pages'],
                         metrics['calls'], metrics['records'], outcome)
 
+    def _claim_and_refresh(self, wid, dataset, key, force):
+        # Lease writes can wait on another transaction or a busy database. Keep
+        # them in the same bounded background lane as the remote read/apply.
+        now = self._now()
+        try:
+            claimed = self._claim(key, now, dataset, force)
+        except Exception as exc:
+            logger.warning('Live-read claim failed: dataset=%s %s', dataset, type(exc).__name__)
+            raise
+        if claimed:
+            self._refresh(wid, dataset, key, claimed, now)
+
+    def _submission_failed(self, key, row):
+        data = dict(row, revision=str(uuid4()), last_error='Lark refresh failed',
+                    error_at=self._now().isoformat())
+        if row:
+            self._replace(key, row.get('revision'), data)
+        else:
+            try:
+                with self.Session.begin() as db:
+                    db.add(self.CacheRow(id=key, data=data))
+            except IntegrityError:
+                pass  # Another process already owns this dataset.
+
     def close(self):
         self.executor.shutdown(wait=True)
         if self.roster_executor is not self.executor:
@@ -314,27 +338,15 @@ class RefreshCoordinator:
                 if not slots.acquire(blocking=False):
                     return dict(current, status='busy')
                 try:
-                    now = self._now()
-                    claimed = self._claim(key, now, dataset, force)
+                    future = executor.submit(self._claim_and_refresh, wid, dataset, key, force)
+                    future.add_done_callback(lambda _: slots.release())
+                    with self._lock:
+                        self._futures[key] = future
                 except Exception:
                     slots.release()
+                    self._submission_failed(key, row)
                     if wait:
                         raise
-                    return dict(current, status='error', last_error='Lark refresh failed')
-                if claimed:
-                    try:
-                        future = executor.submit(self._refresh, wid, dataset, key, claimed, now)
-                        future.add_done_callback(lambda _: slots.release())
-                        with self._lock:
-                            self._futures[key] = future
-                    except Exception:
-                        slots.release()
-                        self._replace(key, claimed['revision'], dict(row, revision=str(uuid4()),
-                                      last_error='Lark refresh failed', error_at=now.isoformat()))
-                        if wait:
-                            raise
-                else:
-                    slots.release()
             finally:
                 with self._lock:
                     self._pending.discard(key)
@@ -357,7 +369,13 @@ class RefreshCoordinator:
                 raise ReadBlocked('Lark authorization or resource access denied')
             if final['status'] == 'error':
                 raise RuntimeError('Lark refresh failed')
-        return self._dataset_status(dataset, self._read(key))
+        if not wait and future is not None and not future.done():
+            return dict(current, status='refreshing')
+        final = self._dataset_status(dataset, self._read(key))
+        if (not wait and future is not None and future.exception() is not None
+                and final['status'] in ('never', 'stale')):
+            return dict(final, status='error', last_error='Lark refresh failed')
+        return final
 
     def _dataset_status(self, dataset, row):
         status = freshness({dataset: row}, self.config, self._now(), True)['datasets'][dataset]
