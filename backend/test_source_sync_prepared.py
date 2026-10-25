@@ -78,3 +78,30 @@ def test_changed_plan_is_discarded_when_a_local_writer_commits(harness,monkeypat
     assert project['case_policy']=={'local_decision':'retain me'}
     assert project['nodes'][0]['tasks'][0]['comments']==[{'id':'task-note','body':'retain me'}]
     assert any(a['id']=='local-approval' for a in state['approvals'])
+
+
+def test_prepared_refresh_retains_local_business_state(harness,monkeypatch):
+    h=harness
+    sync(h)
+    with h.sessions.begin() as db:
+        row=db.get(h.W,h.wid); state=storage.load(db,h.B,row)
+        project=state['projects'][0]
+        project['comments'].append({'id':'local-comment','body':'keep me'})
+        project['case_policy']={'local_decision':'keep me'}
+        project['nodes'][0]['tasks'][0]['comments'].append({'id':'local-note','body':'keep me'})
+        state['approvals'].append({'id':'local-approval','project_id':project['id'],'type':'extension','status':'draft','history':[]})
+        row.data=storage.save(db,h.B,h.wid,state)
+    # Revalidate after the local write, then change source content with a valid proof.
+    sync(h)
+    before,_=h.read()
+    changed(h)
+    def forbidden(*args,**kwargs): raise AssertionError('expected the prepared delta')
+    with monkeypatch.context() as patch:
+        patch.setattr(storage,'save',forbidden)
+        sync(h)
+    after,_=h.read()
+    assert after['projects'][0]['source_status']=='已結案'
+    assert after['projects'][0]['comments']==before['projects'][0]['comments']
+    assert after['projects'][0]['case_policy']==before['projects'][0]['case_policy']
+    assert after['projects'][0]['nodes'][0]['tasks']==before['projects'][0]['nodes'][0]['tasks']
+    assert after['approvals']==before['approvals']

@@ -1,0 +1,85 @@
+{
+ "label": "before",
+ "database": "postgresql",
+ "projects": 420,
+ "business_rows": 21849,
+ "runs": 5,
+ "scenarios": {
+  "failure": {
+   "load_partial_ms": {
+    "median": 0.8,
+    "min": 0.7,
+    "max": 0.9
+   },
+   "lock_held_ms": {
+    "median": 25.2,
+    "min": 24.8,
+    "max": 25.7
+   },
+   "save_collections_ms": {
+    "median": 0.6,
+    "min": 0.6,
+    "max": 0.7
+   },
+   "total_ms": {
+    "median": 25.5,
+    "min": 25.1,
+    "max": 26.1
+   }
+  },
+  "apply_unchanged": {
+   "load_ms": {
+    "median": 0,
+    "min": 0,
+    "max": 191.3
+   },
+   "load_partial_ms": {
+    "median": 3.5,
+    "min": 2.5,
+    "max": 3.6
+   },
+   "lock_held_ms": {
+    "median": 43.1,
+    "min": 42.8,
+    "max": 847.4
+   },
+   "save_ms": {
+    "median": 0,
+    "min": 0,
+    "max": 742.5
+   },
+   "total_ms": {
+    "median": 105.3,
+    "min": 104.6,
+    "max": 1841.7
+   }
+  },
+  "apply_changed": {
+   "load_ms": {
+    "median": 231.2,
+    "min": 218.5,
+    "max": 270.2
+   },
+   "load_partial_ms": {
+    "median": 2.7,
+    "min": 2.5,
+    "max": 3.6
+   },
+   "lock_held_ms": {
+    "median": 716.4,
+    "min": 711.7,
+    "max": 742.9
+   },
+   "save_ms": {
+    "median": 608.6,
+    "min": 603.8,
+    "max": 637.8
+   },
+   "total_ms": {
+    "median": 1713.9,
+    "min": 1666.6,
+    "max": 1768.7
+   }
+  }
+ }
+}
