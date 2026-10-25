@@ -798,19 +798,25 @@ class Service(EnrollmentService):
             return run.receipt
 
     def manual(self, ctx, body):
-        fields(body, {'title', 'instructions', 'node_keys', 'participants'})
+        fields(body, {'title', 'instructions', 'node_keys', 'participants', 'due_date'})
         self.writable()
         with self.sessions.begin() as db:
             ctx, state = self.lock(db, ctx)
             keys = row_keys(body.get('node_keys', []))
             self.check_policy_write(db, ctx, keys)
             nodes = self.nodes(db, ctx, keys)
+            due = body.get('due_date')
+            require(due is None or isinstance(due, str), 'invalid_request')
+            try:
+                require(due is None or date.fromisoformat(due).isoformat() == due, 'invalid_request')
+            except ValueError:
+                require(False, 'invalid_request')
             task = LocalTask(workspace_id=ctx.wid, id=str(uuid4()), project_id=ctx.project['id'],
                              template_family_id='manual', source_row_key=str(uuid4()), instance_scope='case', snapshot={},
                              title=text(body.get('title'), 500, empty=False), instructions=text(body.get('instructions', '')),
                              participants=self.participants(ctx, body.get('participants', {})),
                              applicability=Applicability.APPLICABLE, state=Lifecycle.PENDING, revision=1,
-                             local={'due_date': None, 'timezone': 'Asia/Taipei', 'date_status': 'unresolved',
+                             local={'due_date': due, 'timezone': 'Asia/Taipei', 'date_status': 'manual' if due else 'unresolved',
                                     'completion_rule_status': 'no_typed_obligations', 'attestations': {}})
             db.add(task)
             db.flush()

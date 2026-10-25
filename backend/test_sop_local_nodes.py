@@ -145,3 +145,12 @@ def test_technical_completion_requires_distinct_active_review_seats(local, monke
     assert not node['can']['complete']
     assert '確認人尚未完整分派' in node['complete_disabled_reason']
     call(client, 'POST', url + '/sop-nodes/field', {'action': 'complete', 'expected_revision': 0, 'reason': '核對'}, 409)
+
+
+def test_manual_task_creation_saves_owner_notes_and_initial_due_date(local):
+    app, client, signin, pid, url = setup(local)
+    receipt = call(client, 'POST', url + '/sop-tasks', {'title': '成果核對', 'instructions': '核對成果',
+        'node_keys': ['sales'], 'participants': {'executor': 'u-field'}, 'due_date': '2026-10-28'})
+    task = receipt['task']
+    assert (task['instructions'], task['participants']['executor'], task['local']['due_date']) == ('核對成果', 'u-field', '2026-10-28')
+    call(client, 'POST', url + '/sop-tasks', {'title': '無效期限', 'node_keys': ['sales'], 'due_date': '2026-02-30'}, 422)
