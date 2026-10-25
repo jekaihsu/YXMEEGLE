@@ -97,7 +97,8 @@ class SourceSyncService:
             # Every storage save invalidates this stamp. A matching version also
             # excludes root-only writers, which advance the workspace revision.
             state=self._light(db,row) if unchanged else None
-            if state is not None:
+            if state is not None and all(state.get(key)==row.data.get(key)
+                                         for key in PROJECTION_FIELDS if key not in storage.COLLECTIONS):
                 return {'version':version,'state':state,'matches':True,'plan':None,'prior_projects':[]}
             state=self._state(db,row)
             prior_projects=deepcopy(state.get('projects', []))

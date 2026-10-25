@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.schema import CreateSchema, DropSchema
 
-from . import storage
+from . import source_sync, storage
 from .source_sync import SourceSyncService
 from .sources import normalized_case
 from .test_source_sync import harness as sqlite_harness  # noqa: F401
@@ -160,6 +160,25 @@ def test_cache_change_after_preparation_falls_back_to_complete_state(harness, mo
     after, _ = h.read()
     assert after['projects'] == before['projects']
     assert after['source_status']['sync_revision'] == before['source_status']['sync_revision'] + 1
+
+
+def test_new_root_policy_inputs_are_applied_even_when_source_content_is_equal(harness, monkeypatch):
+    h = harness
+    sync(h)
+    before, _ = h.read()
+    upgrade = source_sync.upgrade
+
+    def upgraded(state):
+        state = upgrade(state)
+        state['settings']['new_source_input'] = 'new-default'
+        return state
+
+    monkeypatch.setattr(source_sync, 'upgrade', upgraded)
+    h.clock[0] = '2026-09-27T10:01:00+08:00'
+    sync(h)
+    state, _ = h.read()
+    assert state['settings']['new_source_input'] == 'new-default'
+    assert state['source_status']['sync_revision'] == before['source_status']['sync_revision'] + 1
 
 
 @pytest.mark.parametrize('bump_version', [False, True])
