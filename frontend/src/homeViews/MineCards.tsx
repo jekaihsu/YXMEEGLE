@@ -13,7 +13,7 @@ const pinnedIds=(c:Ctx)=>{
 const myCases=(c:Ctx)=>{
  const me=c.s.user?.id||'',pins=pinnedIds(c);
  const rank=(p:{id:string})=>pins.has(p.id)?0:1;
- return c.w.projects.filter(p=>p.case_type!=='intake'&&p.status!=='completed'&&(pins.has(p.id)||p.pm_id===me||p.sales_id===me||p.owner_id===me||p.nodes.some(n=>n.tasks.some(t=>t.owner_id===me)))).map((p,i)=>({p,i,pinned:pins.has(p.id)})).sort((a,b)=>rank(a.p)-rank(b.p)||a.i-b.i).map(({p,pinned})=>({...p,pinned}));
+ return c.w.projects.filter(p=>p.case_type!=='intake'&&p.status!=='completed'&&(pins.has(p.id)||p.pm_id===me||p.sales_id===me||p.owner_id===me||(p.nodes??[]).some(n=>(n.tasks??[]).some(t=>t.owner_id===me)))).map((p,i)=>({p,i,pinned:pins.has(p.id)})).sort((a,b)=>rank(a.p)-rank(b.p)||a.i-b.i).map(({p,pinned})=>({...p,pinned}));
 };
 export function MineCard({id,c,today,assigned,confirmation}:{id:HomeCardId;c:Ctx;today:string;assigned:PanelRead;confirmation:PanelRead}){
  if(id==='work'||id==='confirmation')return <WorkCard c={c} id={id} panel={id==='work'?'assigned':'confirmation'} today={today} read={id==='work'?assigned:confirmation}/>;

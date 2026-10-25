@@ -19,7 +19,7 @@ localStorage.setItem('yx.home.preview','company');
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const today=m.taipeiToday(),stamp=today+'T01:00:00Z';
 const project={id:'p1',name:'可點擊測量案件',code:'C-TEST',pm_id:'u1',case_type:'formal',due_date:'2026-12-10',status:'in_progress',nodes:[]};
-const c={go:()=>{},refresh:async()=>{},reloadVersion:1,s:{mode:'lark',workspace_id:'test-workspace',user:{id:'u1',name:'合成使用者',role:'member'},features:{node_assignment:true}},w:{version:1,as_of:stamp,scope:'shell',environment:'test',projects:[project],users:[{id:'u1',name:'合成使用者'}]}};
+const c={go:()=>{},refresh:async()=>{},reloadVersion:1,s:{mode:'lark',workspace_id:'test-workspace',user:{id:'u1',name:'合成使用者',role:'member'},features:{node_assignment:true}},w:{version:1,as_of:stamp,scope:'shell',environment:'test',projects:[project,{id:'p2',name:'無節點案件',code:'C-NONODES',pm_id:'u9',case_type:'formal',status:'in_progress'}],users:[{id:'u1',name:'合成使用者'}]}};
 let attendanceStatus='ok',panelDisabled=false,managerAvailable=false,dashboardDenied=false,holdAssigned=false,teamDenied=false;
 const pendingAssigned=[];
 const calls=[];
