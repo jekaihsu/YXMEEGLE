@@ -1149,6 +1149,22 @@ def create_app(overrides=None,*,dispatch_transport=None):
         cache=db.execute(select(*(CacheRow.data[key] for key in keys)).where(CacheRow.id==wid)).first()
         return (version,*(tuple(cache) if cache else (None,)*len(keys)))
 
+    def p2_related_project_ids(state,project_id):
+        """Other projects whose visibility a scoped case read still needs.
+
+        filter_visible_cases drops a source row related to a project outside its visible set, so a scoped load that
+        holds only this project would drop rows a full load keeps when the related project is visible too."""
+        rows={r['id']:r for key in ('source_confirmations','contract_items','source_work_items') for r in state.get(key,[]) if r.get('id')}
+        frontier=[r for r in rows.values() if r.get('project_id')==project_id]; seen={r['id'] for r in frontier}; related=set()
+        while frontier:
+            row=frontier.pop()
+            related.update(row.get('project_ids',[]));related.update(row.get('review_project_ids',[]))
+            related.update(ref.get('project_id') for ref in row.get('task_refs',[]))
+            related.update((row.get('project_id'),row.get('linked_project_id')))
+            for ident in (*row.get('confirmation_ids',[]),*row.get('contract_ids',[])):
+                if ident in rows and ident not in seen: seen.add(ident);frontier.append(rows[ident])
+        return sorted(p for p in related-{None,project_id} if isinstance(p,str))
+
     def p2_read(data,user,keep_lines=False,*,project_id=None):
         """Health and module input come from ONE capture fenced by a generation read BEFORE the first input read
         (freshness, cache, workspace) and re-checked after the last. A capture is returned only after its fence
@@ -1164,7 +1180,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 # This session owns the freshly decoded JSON; health projection
                 # makes its own response copy before redacting formal sources.
                 cache=db.get(CacheRow,wid);cache_data=cache.data if cache else None
-                state=load(db,db.get(WorkspaceRow,wid),project_ids=[project_id] if project_id is not None else None)
+                row=db.get(WorkspaceRow,wid)
+                state=load(db,row,project_ids=[project_id] if project_id is not None else None)
+                extra=p2_related_project_ids(state,project_id) if project_id is not None else []
+                if extra: state=load(db,row,project_ids=[project_id,*extra])
             health=source_health_from(data,user,freshness,cache_data,state,metadata_only=project_id is not None)
             with sessions() as db: unchanged=p2_generation(db,wid)==generation
             if unchanged: return data,user,health,p2_narrowed_state(state,user,health.get('page_state'),freshness,keep_lines)
