@@ -68,10 +68,14 @@ def portfolio(db, model, row, state, today, *, assignments, data, user):
                                         for pid, p in headers.items()]
         statuses = {pid: chain for pid, chain in assignments.portfolio_statuses(assignment_state, data, user).items() if pid in ids}
     items = []
+    hidden_removed = 0
     for r in rows:
         p = headers.get(r['project_id'], {})
+        if p.get('source_removed_at') and r['case_type'] == 'intake':
+            hidden_removed += 1
+            continue
         item = card(r, state, counts)
-        item.update({key: p.get(key) for key in ('created_at', 'source_lifecycle', 'parent_code', 'owner_id', 'collaborator_ids')})
+        item.update({key: p.get(key) for key in ('created_at', 'source_lifecycle', 'parent_code', 'owner_id', 'collaborator_ids', 'source_removed_at')})
         derived = {n['id']: n for n in (r['summary'] or {}).get('nodes', [])}
         chain = statuses.get(r['project_id'], {})
         item['portfolio_nodes'] = [dict(key=n.get('key'), status=chain.get(n.get('key'), derived.get(n.get('id'), n).get('status')),
@@ -80,5 +84,6 @@ def portfolio(db, model, row, state, today, *, assignments, data, user):
         item['sop_summary'] = dict(policy=policies.get(r['project_id']), imported_tasks=r['project_id'] in imported)
         items.append(item)
     items, duplicates = collapse_same_code(items)
-    return dict(items=items, total=len(items), hidden_duplicates=duplicates, as_of=today,
+    return dict(items=items, total=len(items), hidden_duplicates=duplicates, hidden_removed=hidden_removed,
+                source_synced_at=state.get('source_status', {}).get('last_sync'), as_of=today,
                 basis='persisted_workspace+lark_derived' if statuses else 'persisted_workspace')

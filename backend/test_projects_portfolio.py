@@ -33,6 +33,24 @@ def test_portfolio_is_complete_compact_and_policy_aware(tmp_path):
         assert all(n['status_source']=='persisted' for p in body['items'] for n in p['portfolio_nodes'])
 
 
+def test_portfolio_hides_removed_intakes_but_keeps_formal_history(tmp_path):
+    def prepare(state):
+        state['source_status']['last_sync'] = '2026-10-25T08:30:00+00:00'
+        state['projects'][0].update(case_type='intake', source_model='v4', source_removed_at='2026-10-25T16:00:00+08:00')
+        state['projects'][1].update(case_type='formal', source_model='v4', source_removed_at='2026-10-25T16:01:00+08:00')
+        state['projects'][2].update(case_type='intake', source_model='v4')
+    with scaled_client(tmp_path, 3, upgraded=True, mutate=prepare,
+                       INDEX_TABLES_ENABLED='true', WORKSPACE_SHELL_ENABLED='true') as (_, client):
+        response = client.get('/api/projects?view=portfolio')
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body['hidden_removed'] == 1
+        assert body['total'] == len(body['items']) == 2
+        assert body['source_synced_at'] == '2026-10-25T08:30:00+00:00'
+        assert all(p['source_removed_at'] is None for p in body['items'] if p['case_type'] == 'intake')
+        assert next(p for p in body['items'] if p['case_type'] == 'formal')['source_removed_at'] == '2026-10-25T16:01:00+08:00'
+
+
 def test_portfolio_applies_visibility_and_does_not_load_task_trees(tmp_path,monkeypatch):
     from . import storage as store,index_reads
     from . import workspace_environment

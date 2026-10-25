@@ -1,9 +1,10 @@
 import {useEffect, useRef, useState, type ReactNode} from 'react';
 import {ArrowDown, ArrowRight, Check, CircleCheck, Clock3, Copy, FileText, LayoutGrid, List, MoreVertical, Pin, PlayCircle, Plus, Search, Settings2, Star, UserRound, X} from 'lucide-react';
 import {useViewData} from './viewData';
+import {api} from './api';
 import {readPortfolio, cachedPortfolio, tableCalendarDay} from './companyDashboardCache';
 import {STATUS} from './workflowLabels';
-import {taipeiDate} from './taipeiTime';
+import {taipeiDate, taipeiTime} from './taipeiTime';
 import {AdmissionCell, ExecutionAdmissionQueue} from './ExecutionAdmission';
 import {Ctx, Empty} from './appCommon';
 import {Skeleton} from './design';
@@ -38,7 +39,7 @@ function CaseCard({row,c,pinned,onPin,today}:{row:CaseRow;c:Ctx;pinned:boolean;o
  return <article className="pl-case" data-project={p.id}>
   <div className="pl-row" onClick={e=>{if(e.target instanceof window.Element&&!e.target.closest('a,button,summary,select,input,[role="menu"]'))c.go({view:'project',project:p.id})}}>
    <button className="pl-pin" aria-label={`${pinned?'取消釘選':'釘選'} ${p.code}`} aria-pressed={pinned} onClick={onPin}><Star size={15} fill={pinned?'currentColor':'none'}/></button>
-   <div className="pl-identity"><span className="pl-code">#{p.code}{!!p.duplicate_count&&<small className="pl-dup" title="Lark 來源有相同編號的重複紀錄，已合併顯示"> · Lark 重複 {p.duplicate_count+1} 筆</small>}</span><span className="pl-client">{p.client||'客戶未提供'}</span></div>
+   <div className="pl-identity"><span className="pl-code">#{p.code}{!!p.duplicate_count&&<small className="pl-dup" title="Lark 來源有相同編號的重複紀錄，已合併顯示"> · Lark 重複 {p.duplicate_count+1} 筆</small>}{p.source_removed_at&&<small className="pl-removed"> · Lark 已移除</small>}</span><span className="pl-client">{p.client||'客戶未提供'}</span></div>
    <a className="pl-title case-link" href={href}><FileText size={12} aria-hidden="true"/><strong>{p.name}</strong></a>
    <div className="pl-field pl-pm"><small>負責 PM</small><Person name={person(p.pm_id)}/></div>
    <div className="pl-field pl-owner"><small>目前節點負責人</small><Person name={row.current?.owners.map(o=>o.name).join('、')||'未指派'}/></div>
@@ -59,7 +60,7 @@ function CaseCard({row,c,pinned,onPin,today}:{row:CaseRow;c:Ctx;pinned:boolean;o
 }
 export function Projects({c}:{c:Ctx}) {
  const [filters,setFilters]=useState<CaseFilters>({...DEFAULT_FILTERS,kind:c.route.tab==='intake'?'intake':''});
- const [view,setView]=useState('list'),[expanded,setExpanded]=useState<string[]>([]),[limit,setLimit]=useState(readLimit),[creating,setCreating]=useState(false),[notice,setNotice]=useState('');
+ const [view,setView]=useState('list'),[expanded,setExpanded]=useState<string[]>([]),[limit,setLimit]=useState(readLimit),[creating,setCreating]=useState(false),[notice,setNotice]=useState(''),[syncing,setSyncing]=useState(false),[syncStatus,setSyncStatus]=useState('');
  const shell=c.w.scope==='shell',scope=JSON.stringify([c.s.user?.id,c.s.user?.role,c.s.workspace_id,c.w.workspace_id]);
  const read=useViewData<PortfolioPage|undefined>(shell?`projects-portfolio:${scope}`:'projects-local',async signal=>shell?readPortfolio(PROJECT_URL,signal,scope,{reloadVersion:c.reloadVersion}):undefined,[c.reloadVersion]);
  const cached=shell?cachedPortfolio(PROJECT_URL,scope):undefined;
@@ -78,10 +79,13 @@ export function Projects({c}:{c:Ctx}) {
  const clients=[...new Set(projects.map(p=>p.client).filter(Boolean))].sort();
  const pmIds=[...new Set(projects.map(p=>p.pm_id).filter(Boolean))];
  const canCreate=c.s.features?.local_case_creation===true&&c.s.user?.capabilities?.includes('create_local_case')===true;
+ const canSync=c.s.mode==='lark'&&(c.s.access_mode||'normal')==='normal'&&c.s.user?.active!==false&&!String(c.s.workspace_id||c.w.workspace_id||'').startsWith('test-')&&(['pm','manager'].includes(c.s.user?.role||'')||c.s.user?.capabilities?.includes('manage_sources')===true);
+ const sync=async()=>{if(syncing)return;setSyncing(true);setSyncStatus('');try{await api('/api/sources/sync',{method:'POST',body:'{}'});await c.refresh();read.reload();setSyncStatus('Lark 同步完成，案件清單已更新。')}catch(error){setSyncStatus(`Lark 同步失敗：${error instanceof Error?error.message:String(error)}`)}finally{setSyncing(false)}};
  const hasFilters=Object.entries(filters).some(([k,v])=>v!==Object.entries(DEFAULT_FILTERS).find(([key])=>key===k)?.[1]);
  const kpis=[{label:'全部案件',value:counts.all,icon:FileText},{label:'進行中',value:counts.active,icon:PlayCircle},{label:'SOP 進行中',value:counts.sop,icon:Settings2},{label:'已完成',value:counts.done,icon:CircleCheck}];
  return <div className="pl-page">
-  <header className="pl-header"><div><h1>案件總覽</h1></div><div className="pl-header-actions"><label className="pl-search"><Search size={16}/><input aria-label="搜尋案件" placeholder="搜尋案件、客戶或案號…" maxLength={240} value={filters.q} onChange={e=>update('q',e.target.value)}/>{filters.q&&<button aria-label="清除搜尋" onClick={()=>update('q','')}><X size={15}/></button>}</label><div className="pl-view" role="group" aria-label="案件顯示方式"><button aria-label="清單檢視" aria-pressed={view==='list'} onClick={()=>setView('list')}><List size={17}/></button><button aria-label="卡片檢視" aria-pressed={view==='grid'} onClick={()=>setView('grid')}><LayoutGrid size={17}/></button></div>{canCreate&&<button className="pl-create" onClick={()=>setCreating(true)}><Plus size={17}/>新增案件</button>}</div></header>
+  <header className="pl-header"><div><h1>案件總覽</h1></div><div className="pl-header-actions"><label className="pl-search"><Search size={16}/><input aria-label="搜尋案件" placeholder="搜尋案件、客戶或案號…" maxLength={240} value={filters.q} onChange={e=>update('q',e.target.value)}/>{filters.q&&<button aria-label="清除搜尋" onClick={()=>update('q','')}><X size={15}/></button>}</label><div className="pl-view" role="group" aria-label="案件顯示方式"><button aria-label="清單檢視" aria-pressed={view==='list'} onClick={()=>setView('list')}><List size={17}/></button><button aria-label="卡片檢視" aria-pressed={view==='grid'} onClick={()=>setView('grid')}><LayoutGrid size={17}/></button></div>{canSync&&<button className="pl-sync" aria-label="重新同步 Lark" disabled={syncing} onClick={()=>void sync()}>{syncing?'同步中…':'重新同步 Lark'}</button>}{canCreate&&<button className="pl-create" onClick={()=>setCreating(true)}><Plus size={17}/>新增案件</button>}</div></header>
+  <p className="pl-sync-status sr-only" role="status" aria-live="polite">{syncStatus}</p>
   <section className="pl-kpis" aria-label="案件統計">{kpis.filter(k=>ready && k.value!==null).map(k=><div className="pl-kpi" key={k.label}><span className="pl-kpi-icon"><k.icon size={21}/></span><div><span>{k.label}</span><strong>{k.value}</strong></div></div>)}</section>
   <div className="pl-filters" role="group" aria-label="案件篩選">
    <Select label="客戶" value={filters.client} onChange={v=>update('client',v)}><option value="">客戶</option>{clients.map(client=><option key={client}>{client}</option>)}</Select>
@@ -95,7 +99,7 @@ export function Projects({c}:{c:Ctx}) {
   {shell&&read.error&&<div className="pl-state" role="alert"><h2>案件讀取失敗</h2><p>{read.error}</p><button onClick={read.reload}>重新載入案件</button>{data&&<p>下方保留上次成功讀取的資料。</p>}</div>}
   {shell&&read.loading&&!data?<div className="pl-state" role="status" aria-busy="true"><p>正在載入案件…</p><Skeleton lines={5}/></div>:ready?<div className={`pl-groups ${view==='grid'?'pl-grid':''}`}>{groups.filter(g=>g.rows.length>0).map(group=>{const Icon=GROUP_ICONS[group.key];const open=expanded.includes(group.key);return <section className="pl-group" key={group.key} aria-label={group.label}><header><h2><Icon size={19}/>{group.label}<span>{group.rows.length}</span></h2>{group.rows.length>limit&&<button className="pl-expand" aria-expanded={open} onClick={()=>setExpanded(open?expanded.filter(key=>key!==group.key):[...expanded,group.key])}>{open?'收合':'顯示更多'}<ArrowRight size={15}/></button>}</header><div className="pl-group-rows">{(open?group.rows:group.rows.slice(0,limit)).map(row=><CaseCard key={row.project.id} row={row} c={c} today={asOf} pinned={pins.includes(row.project.id)} onPin={()=>togglePin(row.project.id)}/>)}</div></section>})}</div>:null}
   {ready&&!rows.length&&<Empty title="沒有符合條件的案件" detail="試試其他關鍵字或清除篩選條件。"/>}
-  <footer className="pl-footer">{ready?`符合條件 ${rows.length} 筆 · 統計依目前篩選，釘選不重複計算${data?.hidden_duplicates?` · 已合併 Lark 重複編號 ${data.hidden_duplicates} 筆`:''}`:'案件統計載入中'}{taipeiDate(asOf,'')&&` · 資料日期 ${taipeiDate(asOf,'')}`}{ready&&kpis.some(k=>k.value===null)?' · 部分統計待核實':''}{shell&&read.loading&&data?' · 更新中':''}</footer>
+  <footer className="pl-footer">{ready?`符合條件 ${rows.length} 筆 · 統計依目前篩選，釘選不重複計算${data?.hidden_duplicates?` · 已合併 Lark 重複編號 ${data.hidden_duplicates} 筆`:''}`:'案件統計載入中'}{taipeiDate(asOf,'')&&` · 資料日期 ${taipeiDate(asOf,'')}`}{ready&&kpis.some(k=>k.value===null)?' · 部分統計待核實':''}{shell&&read.loading&&data?' · 更新中':''}{data?.source_synced_at&&taipeiTime(data.source_synced_at,'')&&` · 上次同步 Lark：${taipeiTime(data.source_synced_at,'').slice(11,16)}`}{!!data?.hidden_removed&&` · 已隱藏 ${data.hidden_removed} 筆已從 Lark 移除的報價`}</footer>
   <details className="pl-admission"><summary>執行歸屬核定與案件生命週期</summary><p>工程確認單成案，報價資料先保留為待確認接案。來源商務狀態與工作台節點狀態分開顯示，詳見各案件的更多操作。</p><ExecutionAdmissionQueue w={c.w} s={c.s} run={(action,payload,scope)=>c.run(action,payload,scope)} busy={c.busy}/></details>
   {creating&&<QuoteCreateSheet users={c.w.users} canImport={c.s.features?.sop_task_writes===true&&(c.s.user?.role==='manager'||c.s.user?.capabilities?.includes('sop_task_import')===true)} onClose={()=>setCreating(false)} onCreated={read.reload} onOpen={ref=>{setCreating(false);c.go({view:'quotes',project:ref,tab:'flow'})}}/>}
  </div>;

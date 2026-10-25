@@ -278,6 +278,34 @@ def mark_missing_dailies(ws, records, complete_tables):
     for entry in moved:
         ws['daily_unmatched'] = [d for d in ws['daily_unmatched'] if d['id'] != entry['id']] + [entry]
 
+def mark_removed_projects(ws, records, complete_tables):
+    kinds = {'quote', 'quote_confirmation', 'confirmation'}
+    present = {source_id(r) for r in records if r.get('kind') in kinds}
+    covered = set()
+    for table in complete_tables or []:
+        key = (table.get('base_token'), table.get('table_id'))
+        rows = [r for r in records if (r['base_token'], r['table_id']) == key]
+        if (all(key) and table.get('kind') in kinds and table.get('status') == 'ready'
+                and isinstance(table.get('count'), int) and table['count'] == len(rows)
+                and all(r.get('kind') == table['kind'] for r in rows)):
+            covered.add(key)
+    for p in ws['projects']:
+        if p.get('source_model') != 'v4': continue
+        sources = [r for r in p.get('source_records', []) if r.get('kind') in kinds]
+        ids = {r['id'] for r in sources}
+        known = ids | set(p.get('source_record_ids', [])) | {q['id'] for q in p.get('quotes', [])}
+        if known & present:
+            p.pop('source_removed_at', None)
+            continue
+        if not ids or ids != known: continue
+        tables = set()
+        for source in sources:
+            parsed = urlparse(source.get('url', ''))
+            query = parse_qs(parsed.query)
+            tables.add((parsed.path.rstrip('/').split('/')[-1], query.get('table', [''])[0]))
+        if tables <= covered:
+            p.setdefault('source_removed_at', now())
+
 def import_v4(ws, records, complete_tables=None):
     upgrade(ws)
     record_index=defaultdict(list)
@@ -592,4 +620,5 @@ def import_v4(ws, records, complete_tables=None):
     for p in ws['projects']:
         refresh_project_state(p,ws)
         p['status']=p['execution_status']
+    mark_removed_projects(ws,records,complete_tables)
     return stats
