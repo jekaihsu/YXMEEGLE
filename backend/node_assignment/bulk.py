@@ -42,6 +42,7 @@ class AssignmentChains:
         self.linked = {rid: tuple(linked[rid]) for rid in self.nodes}
         self.chains, self.portfolio_statuses = {}, {}
         reports = service.reports() if service.reports else None
+        legacy_records = service.legacy_completion_records(data['wid']) if groups else None
         for group, rows in groups.items():
             code, relations = group
             project = self.project_for(code, relations)
@@ -49,7 +50,10 @@ class AssignmentChains:
                                 if n.get('key') in NODE_LABELS and service.skipped_nodes(state, project, n)) if project else frozenset()
             snap = CaseSnapshot(code, {k: tuple(v) for k, v in rows.items()}, self.linked)
             evidence = applicable(evidence_of(project, state, reports), skipped) if project else {}
-            legacy = service.legacy_completions(Context(data['wid'], user, state, project, lambda: user), snap) if project else {}
+            legacy = {}
+            if project:
+                ctx = Context(data['wid'], user, state, project, lambda: user)
+                legacy = service.legacy_completions(ctx, snap, records=legacy_records.get(project['id'], [])) if legacy_records is not None else service.legacy_completions(ctx, snap)
             chain = derive_chain(facts_of(snap, skipped, evidence, legacy))
             self.chains[group] = chain
             if project and all(self.duplicate_keys[row.assignment_key] == 1 for entries in rows.values() for row in entries):

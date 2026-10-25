@@ -405,11 +405,26 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
     result['_partial']={'collections':list(collections),'project_ids':None if project_ids is None else list(project_ids),'project_children':list(project_children)}
     return result
 
-def load(db,model,row):
-    if row.data.get('storage_schema')!=2: return deepcopy(row.data)
+def load(db,model,row,*,omit_kinds=()):
+    """Materialize a workspace, optionally omitting read-only presentation inputs."""
+    omit_kinds=tuple(omit_kinds)
+    allowed=set(COLLECTIONS)|{'project_'+child for child in PROJECT_CHILDREN}|{'tasks','review_cycles'}
+    if 'projects' in omit_kinds: raise ValueError('project headers cannot be omitted')
+    if set(omit_kinds)-allowed: raise ValueError('unknown workspace kind')
+    if row.data.get('storage_schema')!=2:
+        result=deepcopy(row.data)
+        for kind in omit_kinds:
+            if kind in COLLECTIONS: result[kind]=[]
+            elif kind in ('tasks','review_cycles'):
+                for p in result.get('projects',[]):
+                    for n in p.get('nodes',[]): n[kind]=[]
+            else:
+                for p in result.get('projects',[]): p[kind.removeprefix('project_')]=[]
+        if omit_kinds: result['_partial']={'omitted_kinds':list(omit_kinds)}
+        return result
     result=deepcopy(row.data); records={}
     # Column selection decodes fresh JSON without aliasing identity-map objects.
-    for kind,parent,data in db.execute(select(model.kind,model.parent_id,model.data).where(model.workspace_id==row.id,model.kind!='migration_archive').order_by(model.ordinal)):
+    for kind,parent,data in db.execute(select(model.kind,model.parent_id,model.data).where(model.workspace_id==row.id,model.kind.notin_(('migration_archive',)+omit_kinds)).order_by(model.ordinal)):
         records.setdefault((kind,parent),[]).append(data)
     for collection in COLLECTIONS: result[collection]=records.get((collection,''),result.get(collection,[]))
     for p in result['projects']:
@@ -417,4 +432,5 @@ def load(db,model,row):
         for n in p['nodes']:
             n['tasks']=records.get(('tasks',n['id']),[]); n['review_cycles']=records.get(('review_cycles',n['id']),[])
         for child in PROJECT_CHILDREN: p[child]=records.get(('project_'+child,p['id']),[])
+    if omit_kinds: result['_partial']={'omitted_kinds':list(omit_kinds)}
     return result

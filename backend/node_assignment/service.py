@@ -225,23 +225,36 @@ class NodeAssignmentService:
             policy = db.get(CasePolicy, (ctx.wid, ctx.project['id']))
             return policy.policy if policy else None
 
-    def legacy_completions(self, ctx, snapshot):
+    def legacy_completion_records(self, wid):
+        """One ordered audit read for all cases in a home/portfolio projection."""
+        if self.sessions is None or self.Audit is None:
+            return None
         with self.sessions() as db:
-            events = db.scalars(select(self.Audit).where(
-                self.Audit.workspace_id == ctx.wid, self.Audit.action == 'node_assignment.legacy_complete',
-                self.Audit.data['project_id'].as_string() == ctx.project['id']).order_by(self.Audit.created_at, self.Audit.id))
-            found = {}
-            for event in events:
-                mark = event.data.get('legacy_completion')
-                if event.data.get('result') != 'success' or not mark:
-                    continue
-                key = NodeKey(event.data['node'])
-                rows = snapshot.rows.get(key, ())
-                row = rows[0] if len(rows) == 1 else None
-                if (row and row.approved and row.record_id == mark['record_id'] and row.approved_at == mark['approved_at']
-                        and row.approver.open_id == mark['actor']['open_id']):
-                    found[key] = mark
-            return found
+            records = {}
+            for event in db.scalars(select(self.Audit).where(
+                    self.Audit.workspace_id == wid, self.Audit.action == 'node_assignment.legacy_complete')
+                    .order_by(self.Audit.created_at, self.Audit.id)):
+                records.setdefault(event.data.get('project_id'), []).append(event.data)
+            return records
+
+    def legacy_completions(self, ctx, snapshot, *, records=None):
+        if records is None:
+            with self.sessions() as db:
+                records = [event.data for event in db.scalars(select(self.Audit).where(
+                    self.Audit.workspace_id == ctx.wid, self.Audit.action == 'node_assignment.legacy_complete',
+                    self.Audit.data['project_id'].as_string() == ctx.project['id']).order_by(self.Audit.created_at, self.Audit.id))]
+        found = {}
+        for data in records:
+            mark = data.get('legacy_completion')
+            if data.get('result') != 'success' or not mark:
+                continue
+            key = NodeKey(data['node'])
+            rows = snapshot.rows.get(key, ())
+            row = rows[0] if len(rows) == 1 else None
+            if (row and row.approved and row.record_id == mark['record_id'] and row.approved_at == mark['approved_at']
+                    and row.approver.open_id == mark['actor']['open_id']):
+                found[key] = mark
+        return found
 
     def view_policy(self, ctx, snapshot):
         policy = self.case_policy(ctx)

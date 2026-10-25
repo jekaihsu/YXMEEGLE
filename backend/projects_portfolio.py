@@ -1,5 +1,5 @@
 """Compact portfolio with read-only, cached node-assignment status overlays."""
-from sqlalchemy import select
+from sqlalchemy import select, and_, or_
 from . import index_tables, storage
 from .index_reads import visibility
 from .shell import card, project_counts
@@ -34,7 +34,7 @@ def portfolio(db, model, row, state, today, *, assignments, data, user):
     rows = db.execute(select(pi).where(pi.c.workspace_id == row.id,
         *visibility(pi, state.get('environment', 'production'))).order_by(pi.c.ordinal)).mappings().all()
     ids = {r['project_id'] for r in rows}
-    counts = project_counts(db, ti, row.id, today)
+    counts = project_counts(db, ti, row.id, today, list(ids))
     policies = dict(db.execute(select(CasePolicy.project_id, CasePolicy.policy)
         .where(CasePolicy.workspace_id == row.id)).all())
     imported = set(db.scalars(select(LocalTask.project_id).where(LocalTask.workspace_id == row.id,
@@ -44,7 +44,10 @@ def portfolio(db, model, row, state, today, *, assignments, data, user):
     if row.data.get('storage_schema') == 2:
         records = db.execute(select(model.kind, model.entity_id, model.parent_id, model.data)
             .where(model.workspace_id == row.id, model.kind.in_(('projects', 'nodes', 'project_daily_reports')
-                if overlay_enabled else ('projects', 'nodes'))).order_by(model.ordinal))
+                if overlay_enabled else ('projects', 'nodes')), or_(
+                and_(model.kind == 'projects', True if overlay_enabled else model.entity_id.in_(ids)),
+                and_(model.kind.in_(('nodes', 'project_daily_reports') if overlay_enabled else ('nodes',)),
+                     model.parent_id.in_(ids)))).order_by(model.ordinal))
         for kind, ident, parent, stored in records:
             if kind == 'projects':
                 headers[ident] = stored

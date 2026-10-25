@@ -1,6 +1,6 @@
 import type {Project, User} from './types';
 import {buildFlowModel, type FlowNode} from './flowModel';
-import {compareTableValues, tableCalendarDay} from './companyDashboardCache';
+import {compareTableValues, tableCalendarDay, tableDate} from './companyDashboardCache';
 
 export type PortfolioNode = {key:string;status:string;owner_id:string|null;collaborator_ids:string[]};
 export type PortfolioProject = Project & {duplicate_count?:number;source_removed_at?:string;portfolio_nodes?:PortfolioNode[];sop_summary?:{policy:string|null;imported_tasks:boolean}};
@@ -60,15 +60,18 @@ export function caseAttention(p:Project,today:string) {
   soon:!closed&&days>=0&&days<=7,blocked:['paused','blocked'].includes(p.execution_status||p.status)||tasks.some(t=>['paused','blocked'].includes(t.status))};
 }
 export function filterRows(rows:CaseRow[],f:CaseFilters,today:string) {
- const filtered=rows.filter(r=>{const p=r.project;return `${p.code} ${p.name} ${p.client}`.toLocaleLowerCase().includes(f.q.trim().toLocaleLowerCase()) &&
+ const query=f.q.trim().toLocaleLowerCase();
+ const attention=new Map(rows.filter(()=>f.attention||f.sort==='due').map(row=>[row,caseAttention(row.project,today)]));
+ const filtered=rows.filter(r=>{const p=r.project;return `${p.code} ${p.name} ${p.client}`.toLocaleLowerCase().includes(query) &&
   (!f.client||p.client===f.client)&&(!f.owner||p.pm_id===f.owner)&&(!f.node||(f.node==='unknown'?r.state==='待核對':r.current?.key===f.node))&&
   (!f.state||r.state===f.state)&&(!f.kind||(f.kind==='formal'?p.case_type!=='intake':p.case_type==='intake'))&&
-  (!f.attention||Object.values(caseAttention(p,today)).some(Boolean));});
+  (!f.attention||Object.values(attention.get(r)??{}).some(Boolean));});
+ const dir=f.direction===1?'asc':'desc';
+ const field=f.sort==='name'?'name':f.sort==='created'?'created_at':'due_date';
+ const values=new Map(filtered.map(row=>[row,f.sort==='name'?row.project.name:tableDate(row.project[field])]));
  return filtered.sort((a,b)=>{
-  const dir=f.direction===1?'asc':'desc';
-  const urgency=f.sort==='due'?Number(caseAttention(b.project,today).late)-Number(caseAttention(a.project,today).late):0;
-  const field=f.sort==='name'?'name':f.sort==='created'?'created_at':'due_date';
-  return urgency||compareTableValues(a.project[field],b.project[field],f.sort==='name'?'text':'date',dir)||compareTableValues(a.project.code,b.project.code,'text')||a.project.id.localeCompare(b.project.id);
+  const urgency=f.sort==='due'?Number(attention.get(b)?.late)-Number(attention.get(a)?.late):0;
+  return urgency||compareTableValues(values.get(a),values.get(b),f.sort==='name'?'text':'number',dir)||compareTableValues(a.project.code,b.project.code,'text')||a.project.id.localeCompare(b.project.id);
  });
 }
 export const pinStorageKey=(workspace:string,viewer:string)=>`yx.projects.pins.v1:${encodeURIComponent(workspace)}:${encodeURIComponent(viewer)}`;

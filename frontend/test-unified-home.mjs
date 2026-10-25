@@ -38,6 +38,11 @@ const settle=()=>act(async()=>{await new Promise(resolve=>setTimeout(resolve,35)
 const render=async(context)=>{await act(async()=>root.render(React.createElement(m.UnifiedHome,{c:context})));await settle()};
 const button=(text)=>[...document.querySelectorAll('button')].find(el=>el.textContent.includes(text));
 await render(c);
+assert.equal(calls.length,1,'default home needs one assignment read');
+assert.match(calls[0],/panel=assigned/);
+assert.ok(!calls.some(url=>url.includes('people/attendance')||url.includes('panel=confirmation')),'hidden cards do not fetch attendance or confirmations');
+await render({...c,w:{...c.w,version:2}});
+assert.equal(calls.length,1,'workspace updates with the same read generation do not repeat panel requests');
 assert.match(document.body.textContent,/今日工作台/);
 assert.equal(document.querySelector('[aria-label="首頁視圖"]'),null,'member has no switcher');
 assert.ok(!calls.some(url=>url.includes('scope=team')||url.includes('company-dashboard')),'personal view never fetches privileged sources');
@@ -51,6 +56,15 @@ for(const gone of ['confirmation','deadlines','leave','trips','dispatch'])assert
 assert.equal(document.querySelector('[data-home-card="kpi"]'),null,'no KPI row');
 assert.deepEqual([...document.querySelectorAll('[data-home-card]')].map(el=>el.dataset.homeCard),['mycases','work']);
 assert.ok(!button('自訂首頁'),'no customize control');
+let finishRefresh;
+const refreshContext={...c,refresh:()=>new Promise(resolve=>{finishRefresh=resolve})};
+await render(refreshContext);
+const beforeWorkspaceRefresh=calls.length;
+await act(async()=>button('重新讀取').click());
+await render({...refreshContext,reloadVersion:2,w:{...c.w,version:2}});
+assert.equal(calls.length,beforeWorkspaceRefresh,'home waits for workspace refresh before reading panels');
+await act(async()=>finishRefresh());await settle();
+assert.equal(calls.length,beforeWorkspaceRefresh+1,'one completed refresh starts one panel read');
 attendanceStatus='not-connected';
 await render({...c,s:{...c.s,user:{id:'u2',name:'另一人',role:'pm'}}});
 assert.equal(document.querySelector('.unified-home').dataset.homeView,'mine','every role lands on personal work');

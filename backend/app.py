@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode, urlsplit
 import httpx
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 from itsdangerous import URLSafeTimedSerializer, BadSignature
@@ -277,9 +277,11 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 row=WorkspaceRow(id=wid,version=1,data=data); db.add(row); db.flush()
                 row.data=storage.save(db,BusinessRow,wid,data)
 
-    def load(db,row,*,collections=None,project_ids=None):
+    def load(db,row,*,collections=None,project_ids=None,omit_kinds=()):
         if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections if collections is not None else storage.DETAIL_COLLECTIONS,project_ids=project_ids,project_children=storage.PROJECT_CHILDREN,filter_project_rows=True)
-        else: state=storage.load(db,BusinessRow,row) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections)
+        elif collections is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections)
+        elif omit_kinds: state=storage.load(db,BusinessRow,row,omit_kinds=omit_kinds)
+        else: state=storage.load(db,BusinessRow,row)
         state=upgrade(state,generate_sop_candidate=collections is None or 'sop_templates' in collections)
         return seal(db,row,state)
 
@@ -683,8 +685,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 require(index_reads.ready(db,BusinessRow,row),'案件索引尚未就緒，請稍後重試',503)
                 if view=='portfolio':
                     from .projects_portfolio import portfolio
-                    return portfolio(db,BusinessRow,row,load(db,row,collections=()),now()[:10],
-                        assignments=app.state.home_panels,data=data,user=user)
+                    return JSONResponse(portfolio(db,BusinessRow,row,load(db,row,collections=()),now()[:10],
+                        assignments=app.state.home_panels,data=data,user=user))
                 return shell.overview_page(db,BusinessRow,row,load(db,row,collections=()),now()[:10],q=q,status=status,owner=owner,tab=tab,sort=sort,desc=dir=='desc',offset=offset,limit=limit)
         with phase(request,'load'),sessions() as db:
             row=db.get(WorkspaceRow,data['wid'])

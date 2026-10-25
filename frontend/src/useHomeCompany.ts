@@ -13,6 +13,6 @@ export function useHomeCompany(c:Ctx){
    .then(data=>{if(!controller.signal.aborted)setState({data,error:'',pending:false})})
    .catch(error=>{if(!controller.signal.aborted)setState({error:error instanceof ApiError&&error.status===403?'目前沒有公司資料權限，請切換至我的工作。':'公司資料讀取失敗，請重新讀取。',pending:false})});
   return()=>controller.abort();
- },[identity,c.reloadVersion,c.w.version]);
+ },[identity,c.reloadVersion??c.w.version]);
  return state;
 }
