@@ -8,6 +8,11 @@ from zoneinfo import ZoneInfo
 from .source_lifecycle import declared
 from .case_cutover import admission_fields
 
+# Keep files/evidence, finance, review cycles and authority collections: public_ws
+# recomputes their validity before overview reads the resulting counters.
+READ_OMIT_KINDS=('events','project_comments','project_daily_reports','work_schedules',
+                 'recurring','daily_unmatched','daily_reviews','source_work_items')
+
 GROUPS={'field':'外業組','control':'控制組','mapping':'圖資組','report':'報告組'}
 
 def verified_native_pending(item):
@@ -72,7 +77,9 @@ def source_overdue(project,today):
     return count
 
 
-def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',attention='',lifecycle='',clock=None,sort='urgency',direction='asc',owner=''):
+def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',attention='',lifecycle='',clock=None,sort='urgency',direction='asc',owner='',complete_read=False):
+    # complete_read is the route's complete READ_OMIT_KINDS projection; source
+    # truncation and source partial flags still determine business completeness.
     if sort not in ('urgency','code','name','due') or direction not in ('asc','desc'): raise ValueError('unsupported company sort')
     clock=clock or datetime.now(timezone.utc);today=clock.astimezone(ZoneInfo('Asia/Taipei')).date()
     totals=Counter(cases=0,confirmed_cases=0,intake_records=0,workbench_cases=0,tasks_total=0,tasks_completed=0,tasks_overdue=0,
@@ -165,7 +172,7 @@ def overview(workspace,*,offset=0,limit=100,q='',group='',source_status='',atten
     else:
         filtered.sort(key=lambda r:r[sort].casefold(),reverse=direction=='desc')
     source=workspace.get('source_status') or {}
-    complete=source.get('status')=='ready' and not source.get('partial') and not source.get('truncated') and not workspace.get('_partial')
+    complete=source.get('status')=='ready' and not source.get('partial') and not source.get('truncated') and (not workspace.get('_partial') or complete_read)
     snapshot_version=hashlib.sha256(json.dumps([workspace.get('version'),source.get('last_sync'),rows],sort_keys=True,default=str).encode()).hexdigest()[:24]
     return {'as_of':today.isoformat(),'checked_at':clock.isoformat(),'date_basis':'Asia/Taipei; actual task due_date only',
         'source':{'status':source.get('status','missing'),'last_success_at':source.get('last_sync'),
