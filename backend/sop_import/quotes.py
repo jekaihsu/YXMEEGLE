@@ -87,4 +87,4 @@ def find(state, quote_no, *, today, amounts):
 
 
 def matches(item, q):
-    return q.casefold() in ' '.join(item.get(k) or '' for k in ('quote_no', 'local_reference', 'name', 'client')).casefold()
+    return q.casefold() in ' '.join(item.get(k) or '' for k in ('quote_no', 'engineering_no', 'local_reference', 'name', 'client')).casefold()

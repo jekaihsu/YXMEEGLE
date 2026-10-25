@@ -56,7 +56,7 @@ export function Quotes({c}:{c:Ctx}) {
  const routeKey=c.route.project;
  useEffect(()=>{if(!routeKey)return;let active=true;void quoteApi.detail(routeKey,()=>active&&current()).then(d=>{if(active&&current())setDetail(d)}).catch(e=>{if(active&&current())setError(sopErrorText(e))});return()=>{active=false}},[routeKey,version,current]);
  const open=async(item:Quote)=>{const seq=++detailSeq.current;const valid=()=>current()&&seq===detailSeq.current;setError('');try{const d=await quoteApi.detail(quoteKey(item),valid);if(valid())setDetail(d)}catch(e){if(valid())setError(sopErrorText(e))}};
- const rows=sortQuotes(items.filter(item=>(!stage||item.stage===stage)&&`${item.quote_no} ${item.name} ${item.client}`.toLocaleLowerCase().includes(q.toLocaleLowerCase())),sort,dir);
+ const rows=sortQuotes(items.filter(item=>(!stage||item.stage===stage)&&`${item.quote_no} ${item.engineering_no||""} ${item.name} ${item.client}`.toLocaleLowerCase().includes(q.toLocaleLowerCase())),sort,dir);
  const pages=Math.max(1,Math.ceil(rows.length/size)),safePage=Math.min(page,pages-1);
  const changeSort=(key:QuoteSort)=>{if(sort===key)setDir(v=>-v);else{setSort(key);setDir(1)}setPage(0)};
  const canCreate=c.s.features?.local_case_creation===true&&c.s.user?.capabilities?.includes('create_local_case')===true;

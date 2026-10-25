@@ -4,7 +4,7 @@ from enum import Enum
 import json
 from pathlib import Path
 
-VOCABULARY=json.loads(Path(__file__).with_name("report_link_vocabulary.json").read_text())
+VOCABULARY=json.loads(Path(__file__).with_name("report_link_vocabulary.json").read_text(encoding="utf-8"))
 from .sources import normalized_case, PROVISIONAL_CASE_FIELD
 
 
