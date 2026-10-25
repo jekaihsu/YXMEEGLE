@@ -1740,8 +1740,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
         def frontend_page(path:str):
             if path.startswith('api/'): raise HTTPException(404,'API 不存在')
             candidate=(frontend/path).resolve()
-            if candidate.is_relative_to(frontend.resolve()) and candidate.is_file(): return FileResponse(candidate)
-            return FileResponse(frontend/'index.html')
+            page={'Cache-Control':'no-cache'}
+            if candidate.is_relative_to(frontend.resolve()) and candidate.is_file(): return FileResponse(candidate,headers=None if candidate.suffix!='.html' else page)
+            return FileResponse(frontend/'index.html',headers=page)
     return app
 
 app=create_app()
