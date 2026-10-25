@@ -1,0 +1,11 @@
+{
+  "database": "postgresql",
+  "runs": 5,
+  "lease_lock_ms": 250,
+  "request_ms": {
+    "median": 253.6,
+    "min": 252.5,
+    "max": 261.2
+  },
+  "refresh_calls": 5
+}
