@@ -232,6 +232,11 @@ def create_app(overrides=None,*,dispatch_transport=None):
             phases=dict(request.scope.get('phases',{})); total=perf_counter()-started
             phases['serialize']=max(total-sum(phases.values()),0)
             response.headers['Server-Timing']=', '.join([f'{k};dur={v*1000:.1f}' for k,v in phases.items()]+[f'total;dur={total*1000:.1f}'])
+        if request.url.path.startswith('/api'):
+            elapsed=perf_counter()-started
+            if elapsed>3:
+                import logging
+                logging.getLogger('backend.slow').warning('slow_request method=%s path=%s status=%s total_ms=%.0f phases=%s',request.method,request.url.path,response.status_code,elapsed*1000,{k:round(v*1000) for k,v in request.scope.get('phases',{}).items()})
         return response
 
     SESSION_MAX_AGE=7*24*3600
