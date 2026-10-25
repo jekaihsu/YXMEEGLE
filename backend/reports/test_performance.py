@@ -146,3 +146,22 @@ def test_group_normalization_preserves_filtered_review_results():
     with ThreadPoolExecutor(max_workers=4) as pool:
         results=list(pool.map(lambda g:compute.review(data,group=g,week='2026-10-12'),['水深A','水深A組']*2))
     assert all(result==results[0] for result in results)
+
+
+def test_spawn_normalization_experiment_roundtrips_snapshot_data_and_gaps():
+    from concurrent.futures import ProcessPoolExecutor
+    import multiprocessing
+    from backend.reports.benchmark_normalization import normalize
+
+    reader = FixtureReader(FIXTURES)
+    store = SnapshotStore(reader)
+    try:
+        expected = store.get()
+        with ProcessPoolExecutor(max_workers=1, mp_context=multiprocessing.get_context('spawn')) as pool:
+            data, gaps, measured = pool.submit(normalize, reader.read()).result(timeout=10)
+        assert data == expected['data']
+        assert gaps == expected['gaps']
+        assert measured['ended'] >= measured['started']
+        assert measured['peak_rss_mib'] > 0
+    finally:
+        store.close()

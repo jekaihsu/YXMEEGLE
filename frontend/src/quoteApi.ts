@@ -40,6 +40,7 @@ export const amountLabel = (q:Quote) => q.amount_restricted?'受限':q.contract_
 export type QuoteSort='quote_no'|'name'|'quoted_on'|'quote_deadline'|'contract_amount';
 const quoteCollator=new Intl.Collator('zh-TW',{numeric:true});
 export function sortQuotes(items:Quote[],key:QuoteSort,dir:number) {return [...items].sort((a,b)=>{const x=a[key],y=b[key];if(x==null)return y==null?0:1;if(y==null)return -1;return dir*(typeof x==='number'&&typeof y==='number'?x-y:quoteCollator.compare(String(x),String(y)))||a.quote_no.localeCompare(b.quote_no)})}
+export const QUOTE_PAGE_SIZE = 2000;
 export const quoteApi={
  list:async(query:string,current:()=>boolean,signal?:AbortSignal)=>parseQuotePage(await quoteRequest(`/api/quotes?${query}`,undefined,current,signal)),
  detail:async(key:string,current:()=>boolean,signal?:AbortSignal):Promise<QuoteDetail>=>{const d=record(await quoteRequest(`/api/quotes/${encodeURIComponent(key)}`,undefined,current,signal));return {quote:parseQuote(d),facts:record(d.facts),records:Array.isArray(d.records)?d.records:[]}},

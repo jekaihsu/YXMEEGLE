@@ -59,3 +59,34 @@ node qa/loading-performance.mjs dist /tmp/yx-after.json
 The benchmark defaults to the provided `/private/tmp/yxr/pwi/node_modules/playwright-core/index.mjs`; set `PLAYWRIGHT_MODULE` to another Playwright core module path when needed. Chrome must be installed. The harness serves fixture APIs itself, binds only to loopback, and blocks every external browser request.
 
 Remaining opportunities: quote acquisition still fetches every 100-row page before sorting, and the main CSS bundle is still substantial. Changing server-side sorting/paging or dividing shared global CSS warrants separate coordination with the owning agents. The default dashboard's model/data logic and all explicitly excluded files were left untouched.
+
+## Follow-up: bounded bulk quote pages — 2026-10-25
+
+Measured again from merged `t3/ui-clean-redesign` HEAD using the same fictional
+2,000-row Chrome workload and throttling above. Seven fresh contexts per build:
+quote-table readiness median **1,296.6 → 294.9 ms** (−77.3%); sequential
+requests **20 → 1**. All seven after runs issued exactly one request; neither
+build had browser errors. These fixture responses exclude backend/Lark latency.
+Samples and conditions: `frontend/qa/quote-bulk-results.json`.
+
+The existing `/api/quotes` route now accepts a bounded limit of **2,000**
+(previously 100); its default remains 30. The register requests 2,000 rows per
+page, following the actual returned row count until all pages arrive. This
+keeps global client sorting, filtering, page resets, cancellation and explicit
+reload behavior. Larger registers still paginate (2,001 rows need two reads).
+There is no unbounded bulk endpoint or source refresh. The same visibility
+projection, search including 工程編號, amount redaction and SOP counts apply.
+The backend already constructs the entire visible register before slicing;
+larger pages also avoid repeating that work twenty times.
+
+Reproduce with `npm run build` and the existing
+`node qa/loading-performance.mjs dist /tmp/quotes.json`. Its fictional server
+now honors the requested `limit` and records quote request counts. The UI tests
+cover 2,000/2,001 rows, cross-page global ordering and engineering-number search;
+existing sort-key/direction/null/tie and obsolete-request tests remain intact.
+The real-app backend test covers 2,003 visible entries in two pages, hidden
+source exclusion, redaction, counts and engineering-number search.
+
+Follow-up targeted verification: both quote scripts pass (contracts/sorts and
+13 UI cases), TypeScript/Vite production build passes, and the combined
+reports/quotes/transport backend run passes **185 tests, 1 skipped**.

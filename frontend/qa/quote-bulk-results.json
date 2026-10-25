@@ -1,0 +1,48 @@
+{
+  "fixture_rows": 2000,
+  "conditions": {
+    "browser": "headless installed Chrome",
+    "fresh_contexts": 7,
+    "cpu_slowdown": 4,
+    "network_latency_ms": 40,
+    "throughput_bytes_per_second": 1250000,
+    "responses": "gzip, local fictional API fixtures, external requests blocked"
+  },
+  "before": {
+    "quote_ready_ms": [
+      1296.5906670000002,
+      1292.6688329999997,
+      1295.4956249999996,
+      1296.5093339999994,
+      1300.2790000000005,
+      1303.3559999999998,
+      1303.2582920000004
+    ],
+    "requests": 20,
+    "request_count_basis": "100-row sequential loop over 2000 fixture rows"
+  },
+  "after": {
+    "quote_ready_ms": [
+      296.88870799999995,
+      293.13004200000023,
+      295.9377080000004,
+      297.3159590000005,
+      294.8775830000004,
+      292.38945799999965,
+      291.5786250000001
+    ],
+    "requests": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "browser_errors": {
+    "before": [],
+    "after": []
+  }
+}
