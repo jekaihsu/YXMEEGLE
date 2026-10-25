@@ -3,6 +3,26 @@ import {ApiError,getSessionEpoch} from '../api';
 import {query} from './reportsView';
 import type {Query} from './types';
 const cache=new Map<string,{at:number;data:unknown}>();
+type PendingReport={controller:AbortController;promise:Promise<unknown>;readers:Set<()=>boolean>};
+const pendingReports=new Map<string,PendingReport>();
+function shareReport(key:string,load:(signal:AbortSignal,current:()=>boolean)=>Promise<unknown>,current:()=>boolean){
+ let pending=pendingReports.get(key);
+ if(!pending){
+  const controller=new AbortController();const readers=new Set([current]);
+  const promise=load(controller.signal,()=>[...readers].some(reader=>reader()));
+  const created={controller,readers,promise};pending=created;pendingReports.set(key,created);
+  const settled=()=>{if(pendingReports.get(key)===created)pendingReports.delete(key)};
+  void promise.then(settled,settled);
+ }else pending.readers.add(current);
+ const shared=pending;
+ return {promise:shared.promise,release:()=>{
+  shared.readers.delete(current);
+  if(shared.readers.size===0){
+   if(pendingReports.get(key)===shared)pendingReports.delete(key);
+   shared.controller.abort();
+  }
+ }};
+}
 export function useDebounce(value:string,onApply?:()=>void){const apply=useRef(onApply);apply.current=onApply;const [result,set]=useState(value);useEffect(()=>{if(value===result)return;const timer=setTimeout(()=>{set(value);apply.current?.()},250);return()=>clearTimeout(timer)},[value,result]);return result}
 class ReportError extends ApiError {
  constructor(status:number,message:string,public warming:boolean,public retryAfter:number){super(status,message)}
@@ -20,13 +40,14 @@ export function useReport<T>(endpoint:string,params:Query){
  const key=query(Object.fromEntries(Object.entries(params).sort(([a],[b])=>a.localeCompare(b))));const sequence=useRef(0);const [reload,setReload]=useState(0);
  const [state,setState]=useState<{key:string; data?:T; error?:string; warming?:boolean; loading:boolean}>({key:'',loading:true});
  useEffect(()=>{const controller=new AbortController();const seq=++sequence.current;const epoch=getSessionEpoch();const cacheKey=`${epoch}:${location.search}:${endpoint}?${key}`;const cached=cache.get(cacheKey);if(cached&&Date.now()-cached.at<60000&&reload===0){setState({key,data:cached.data as T,loading:false});return()=>controller.abort()} const current=()=>!controller.signal.aborted&&seq===sequence.current&&epoch===getSessionEpoch();setState({key,loading:true});
- const load=async()=>{if(new URLSearchParams(location.search).get('mock')==='1'){const {mockReport}=await import('./mock');return mockReport(endpoint,new URLSearchParams(key)) as T}return readReport<T>(`/api/reports/${endpoint}?${key}`,controller.signal,current)};
- let timer:ReturnType<typeof setTimeout>|undefined;let attempts=0;
+ const load=async(signal:AbortSignal,active:()=>boolean)=>{if(new URLSearchParams(location.search).get('mock')==='1'){const {mockReport}=await import('./mock');return mockReport(endpoint,new URLSearchParams(key))}return readReport<T>(`/api/reports/${endpoint}?${key}`,signal,active)};
+ let timer:ReturnType<typeof setTimeout>|undefined;let attempts=0;let release:(()=>void)|undefined;
  const attempt=async()=>{
   if(!current())return;
   attempts++;
   try{
-   const data=await load();
+   const shared=shareReport(cacheKey,load,current);release=shared.release;
+   const data=await shared.promise as T;
    if(current()){if(cache.size>=256)cache.clear();cache.set(cacheKey,{at:Date.now(),data});setState({key,data,loading:false})}
   }catch(e){
    if(!current())return;
@@ -34,10 +55,10 @@ export function useReport<T>(endpoint:string,params:Query){
     setState({key,loading:true,warming:true});
     timer=setTimeout(()=>{timer=undefined;void attempt()},e.retryAfter*1000);
    }else setState({key,error:e instanceof Error?e.message:'暫時無法讀取報表',loading:false});
-  }
+  }finally{release?.();release=undefined}
  };
  void attempt();
- return()=>{controller.abort();if(timer!==undefined)clearTimeout(timer)};
+ return()=>{controller.abort();release?.();if(timer!==undefined)clearTimeout(timer)};
 
  },[endpoint,key,reload]);
  return {...(state.key===key?state:{key,loading:true}),retry:()=>setReload(v=>v+1)};

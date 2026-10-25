@@ -1,5 +1,6 @@
 """Single-flight snapshots with bounded cold waits and stale reads."""
 from concurrent.futures import ThreadPoolExecutor, Future
+import asyncio
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -81,6 +82,28 @@ class SnapshotStore:
                     raise HTTPException(503,dict(detail='報表來源暫時無法讀取',warming=False)) from None
                 except Exception: raise HTTPException(503,dict(detail='報表來源暫時無法讀取',warming=False)) from None
         return current
+
+    async def aget(self):
+        # Cold HTTP readers must not occupy Starlette's shared worker pool while
+        # the reports executor reads Lark. One slow build can otherwise starve
+        # unrelated synchronous routes (including case details).
+        with self._lock: current=self._snapshot
+        if current is None:
+            future=self.start()
+            try:
+                waiting=asyncio.wrap_future(future)
+                # A timed-out/disconnected reader leaves the shared build
+                # running; consume a later failure even if nobody awaits it.
+                waiting.add_done_callback(lambda done:done.exception() if not done.cancelled() else None)
+                await asyncio.wait_for(asyncio.shield(waiting),self.budget)
+            except TimeoutError:
+                if not future.done():
+                    raise HTTPException(503,dict(detail='報表資料正在首次讀取，請稍候',warming=True,retry_after=5),headers={'Retry-After':'5'}) from None
+                raise HTTPException(503,dict(detail='報表來源暫時無法讀取',warming=False)) from None
+            except Exception: raise HTTPException(503,dict(detail='報表來源暫時無法讀取',warming=False)) from None
+        # Read through the regular accessor once ready; stale reads trigger its
+        # nonblocking revalidation and share the same snapshot selection.
+        return self.get()
 
     def meta(self, snapshot=None, endpoint='sources'):
         if snapshot is None:
