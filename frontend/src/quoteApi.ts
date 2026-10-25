@@ -31,17 +31,18 @@ export function parseQuotePage(v:unknown) {const p=record(v); if(!Array.isArray(
 function parseCase(v:unknown):QuoteCase {const c=record(v);return {project_id:str(c.project_id),local_reference:str(c.local_reference),official_quote_no:ns(c.official_quote_no),name:str(c.name),client:str(c.client),description:str(c.description),pm_id:ns(c.pm_id)}}
 export function parseQuoteDraft(v:unknown):QuoteDraft {const d=record(v);return {draft_id:str(d.draft_id),expires_at:num(d.expires_at),case:parseCase(d.case),taskCount:d.import==null?0:num(record(record(d.import).counts).new_tasks)}}
 export function parseQuoteReceipt(v:unknown):QuoteReceipt {const r=record(v);return {...parseCase(r),request_id:str(r.request_id),imported:r.import==null?null:parseReceipt(r.import)}}
-export async function quoteRequest(url:string, body?:unknown, current:()=>boolean=()=>true):Promise<unknown> {
- try{return await api<unknown>(url,{cache:'no-store',timeoutMs:20000,...(body===undefined?{}:{method:'POST',body:JSON.stringify(body)})},current)}
+export async function quoteRequest(url:string, body?:unknown, current:()=>boolean=()=>true,signal?:AbortSignal):Promise<unknown> {
+ try{return await api<unknown>(url,{cache:'no-store',timeoutMs:20000,signal,...(body===undefined?{}:{method:'POST',body:JSON.stringify(body)})},current)}
  catch(e){if(e instanceof ApiError) throw new SopError(e.status,e.code||'request_failed');if(e instanceof DOMException && e.name==='AbortError')throw e;throw new SopError(0,'network')}
 }
 export const quoteKey = (q:Quote) => q.local_reference || q.quote_no;
 export const amountLabel = (q:Quote) => q.amount_restricted?'受限':q.contract_amount==null?'未設定':q.contract_amount.toLocaleString('zh-TW');
 export type QuoteSort='quote_no'|'name'|'quoted_on'|'quote_deadline'|'contract_amount';
-export function sortQuotes(items:Quote[],key:QuoteSort,dir:number) {return [...items].sort((a,b)=>{const x=a[key],y=b[key];if(x==null)return y==null?0:1;if(y==null)return -1;return dir*(typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y),'zh-TW',{numeric:true}))||a.quote_no.localeCompare(b.quote_no)})}
+const quoteCollator=new Intl.Collator('zh-TW',{numeric:true});
+export function sortQuotes(items:Quote[],key:QuoteSort,dir:number) {return [...items].sort((a,b)=>{const x=a[key],y=b[key];if(x==null)return y==null?0:1;if(y==null)return -1;return dir*(typeof x==='number'&&typeof y==='number'?x-y:quoteCollator.compare(String(x),String(y)))||a.quote_no.localeCompare(b.quote_no)})}
 export const quoteApi={
- list:async(query:string,current:()=>boolean)=>parseQuotePage(await quoteRequest(`/api/quotes?${query}`,undefined,current)),
- detail:async(key:string,current:()=>boolean):Promise<QuoteDetail>=>{const d=record(await quoteRequest(`/api/quotes/${encodeURIComponent(key)}`,undefined,current));return {quote:parseQuote(d),facts:record(d.facts),records:Array.isArray(d.records)?d.records:[]}},
+ list:async(query:string,current:()=>boolean,signal?:AbortSignal)=>parseQuotePage(await quoteRequest(`/api/quotes?${query}`,undefined,current,signal)),
+ detail:async(key:string,current:()=>boolean,signal?:AbortSignal):Promise<QuoteDetail>=>{const d=record(await quoteRequest(`/api/quotes/${encodeURIComponent(key)}`,undefined,current,signal));return {quote:parseQuote(d),facts:record(d.facts),records:Array.isArray(d.records)?d.records:[]}},
  preview:async(form:QuoteForm,current:()=>boolean)=>parseQuoteDraft(await quoteRequest('/api/quotes/preview',form,current)),
  create:async(draft_id:string,request_id:string,current:()=>boolean)=>parseQuoteReceipt(await quoteRequest('/api/quotes',{draft_id,request_id},current)),
  recover:async(id:string,current:()=>boolean)=>parseQuoteReceipt(await quoteRequest(`/api/quotes/requests/${encodeURIComponent(id)}`,undefined,current)),

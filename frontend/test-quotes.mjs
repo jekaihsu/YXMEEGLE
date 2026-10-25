@@ -18,3 +18,14 @@ test('counts deduplicate the supplied task list and exclude conditional non-appl
 
 test('indicator confirmation names each task explicitly',()=>{const t=m.parseOverview(x.sop_tasks_with_suggestions).tasks.find(t=>t.suggestion?.tier==='indicator');assert.deepEqual(m.suggestionBody([t],true,'checked',[t.id]).confirmed_task_ids,[t.id]);assert.deepEqual(m.suggestionBody([t],true,'checked').confirmed_task_ids,[])});
 test('nullable register fields preserve local references and renderable names',()=>{for(const page of [x.quotes,x.quotes_with_local]){const q=m.parseQuote({...page.items[0],quote_no:null,name:null,client:null,origin:'local',local_reference:'LOCAL-ABC12345'});assert.equal(m.quoteKey(q),'LOCAL-ABC12345');assert.equal(q.quote_no,'LOCAL-ABC12345');assert.equal(q.name,'未設定');assert.equal(q.client,'')}});
+
+test('collator preserves legacy order, numeric strings, Chinese names, nulls and tie breaks without mutating input',()=>{
+ const base=m.parseQuote(x.quotes.items[0]);
+ const rows=Array.from({length:120},(_,i)=>({...base,quote_no:`Q${(i*71)%120}`,name:['案2','案10','台北','臺北','甲案',''][i%6],quoted_on:i%4?`2026-01-${String(i%28+1).padStart(2,'0')}`:null,quote_deadline:i%3?'2026-12-01':null,contract_amount:i%5?i%13:null}));
+ const original=[...rows];
+ for(const key of ['quote_no','name','quoted_on','quote_deadline','contract_amount'])for(const dir of [-1,1]){
+  const expected=[...rows].sort((a,b)=>{const x=a[key],y=b[key];if(x==null)return y==null?0:1;if(y==null)return -1;return dir*(typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y),'zh-TW',{numeric:true}))||a.quote_no.localeCompare(b.quote_no)});
+  assert.deepEqual(m.sortQuotes(rows,key,dir),expected,`${key} ${dir}`);
+ }
+ assert.deepEqual(rows,original);
+});

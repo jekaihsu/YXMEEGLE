@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Search} from 'lucide-react';
 import {getSessionEpoch} from './api';
@@ -49,14 +49,16 @@ export function Quotes({c}:{c:Ctx}) {
  const [detail,setDetail]=useState<QuoteDetail|null>(null),[creating,setCreating]=useState(false),[version,setVersion]=useState(0);
  const life=useRef({active:true,epoch:getSessionEpoch(),seq:0});
  const detailSeq=useRef(0);
- useEffect(()=>{life.current.active=true;return()=>{life.current.active=false}},[]);
+ const detailRequest=useRef<AbortController>();
+ useEffect(()=>{life.current.active=true;return()=>{life.current.active=false;detailRequest.current?.abort()}},[]);
  const current=useCallback(()=>life.current.active&&life.current.epoch===getSessionEpoch(),[]);
  const reload=()=>setVersion(v=>v+1);
- useEffect(()=>{const seq=++life.current.seq;const valid=()=>current()&&seq===life.current.seq;setLoading(true);setError('');void(async()=>{try{let rows:Quote[]=[];let offset=0;let total=1;while(offset<total){const p=await quoteApi.list(new URLSearchParams({limit:'100',offset:String(offset)}).toString(),valid);if(!valid())return;rows=rows.concat(p.items);total=p.total;if(!p.items.length)break;offset+=p.items.length}if(valid())setItems(rows)}catch(e){if(valid())setError(sopErrorText(e))}finally{if(valid())setLoading(false)}})();return()=>{life.current.seq++}},[version,current]);
+ useEffect(()=>{const controller=new AbortController();const seq=++life.current.seq;const valid=()=>!controller.signal.aborted&&current()&&seq===life.current.seq;setLoading(true);setError('');void(async()=>{try{let rows:Quote[]=[];let offset=0;let total=1;while(offset<total){const p=await quoteApi.list(new URLSearchParams({limit:'100',offset:String(offset)}).toString(),valid,controller.signal);if(!valid())return;rows=rows.concat(p.items);total=p.total;if(!p.items.length)break;offset+=p.items.length}if(valid())setItems(rows)}catch(e){if(valid())setError(sopErrorText(e))}finally{if(valid())setLoading(false)}})();return()=>{life.current.seq++;controller.abort()}},[version,current]);
  const routeKey=c.route.project;
- useEffect(()=>{if(!routeKey)return;let active=true;void quoteApi.detail(routeKey,()=>active&&current()).then(d=>{if(active&&current())setDetail(d)}).catch(e=>{if(active&&current())setError(sopErrorText(e))});return()=>{active=false}},[routeKey,version,current]);
- const open=async(item:Quote)=>{const seq=++detailSeq.current;const valid=()=>current()&&seq===detailSeq.current;setError('');try{const d=await quoteApi.detail(quoteKey(item),valid);if(valid())setDetail(d)}catch(e){if(valid())setError(sopErrorText(e))}};
- const rows=sortQuotes(items.filter(item=>(!stage||item.stage===stage)&&`${item.quote_no} ${item.engineering_no||""} ${item.name} ${item.client}`.toLocaleLowerCase().includes(q.toLocaleLowerCase())),sort,dir);
+ useEffect(()=>{if(!routeKey)return;const controller=new AbortController();const valid=()=>!controller.signal.aborted&&current();void quoteApi.detail(routeKey,valid,controller.signal).then(d=>{if(valid())setDetail(d)}).catch(e=>{if(valid())setError(sopErrorText(e))});return()=>controller.abort()},[routeKey,version,current]);
+ const open=async(item:Quote)=>{detailRequest.current?.abort();const controller=new AbortController();detailRequest.current=controller;const seq=++detailSeq.current;const valid=()=>!controller.signal.aborted&&current()&&seq===detailSeq.current;setError('');try{const d=await quoteApi.detail(quoteKey(item),valid,controller.signal);if(valid())setDetail(d)}catch(e){if(valid())setError(sopErrorText(e))}};
+ const searchable=useMemo(()=>items.map(item=>({item,text:`${item.quote_no} ${item.engineering_no||""} ${item.name} ${item.client}`.toLocaleLowerCase()})),[items]);
+ const rows=useMemo(()=>{const query=q.toLocaleLowerCase();return sortQuotes(searchable.filter(({item,text})=>(!stage||item.stage===stage)&&text.includes(query)).map(({item})=>item),sort,dir)},[searchable,q,stage,sort,dir]);
  const pages=Math.max(1,Math.ceil(rows.length/size)),safePage=Math.min(page,pages-1);
  const changeSort=(key:QuoteSort)=>{if(sort===key)setDir(v=>-v);else{setSort(key);setDir(1)}setPage(0)};
  const canCreate=c.s.features?.local_case_creation===true&&c.s.user?.capabilities?.includes('create_local_case')===true;
