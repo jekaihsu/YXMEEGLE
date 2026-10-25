@@ -119,3 +119,71 @@ continue. Python normalization remains in a thread and shares the GIL; this
 fixture's CPU build is under 0.1 seconds, not 30 seconds. Much longer plan
 spans or much larger datasets may warrant a separate process or persistent
 snapshot. Warm-up and stale-while-revalidate already existed and are retained.
+
+## Follow-up: normalization process experiment — 2026-10-25
+
+**Decision: retain the existing thread executor in `snapshot.py`.** No runtime
+process pool or configuration switch was added. Single-flight, stale reads,
+fingerprint reuse, retries and shutdown behavior remain unchanged.
+
+The new offline experiment compares the actual `compute.normalize` plus all
+21 snapshot gap calculations in one thread against one **spawned** process.
+Both return identical data/gaps. Source reads, canonical JSON hashing, source
+network latency and final snapshot publication are excluded; serialization of
+raw input and normalized output is included in process wall time. A real
+FastAPI synchronous detail route is sampled concurrently via ASGITransport;
+only requests overlapping normalization count toward latency. Five thread
+runs, one cold process run and five subsequent warm process runs use the same
+8,565-row fictional export. Worker duration uses a monotonic wall clock around normalization/gaps; it is
+not a CPU-time counter. No CPU or memory limits were imposed locally.
+
+- Thread: normalization/gaps worker duration median **37.6 ms**, wall median **39.1 ms**;
+  competing detail p50/p95 **37.80 / 59.54 ms** (only five overlapping samples,
+  because the GIL delays the sampler itself).
+- Spawn, cold: worker duration **47.2 ms**, wall **210.1 ms**;
+  detail p50/p95 **0.194 / 0.272 ms** (32 overlapping samples).
+- Spawn, warm: worker duration **41.7 ms**, wall median **88.1 ms**;
+  detail p50/p95 **0.204 / 0.319 ms** (139 overlapping samples).
+- Raw input pickle: **1,414,167 bytes**; result pickle: **3,483,024 bytes**.
+  The child high-water RSS reaches **99.7 MiB** after repeated jobs (cold
+  83.4 MiB); the parent also retains its application, raw input and snapshot.
+  RSS is a process high-water measurement, not incremental container memory.
+
+The process clearly isolates GIL contention, but makes this representative
+normalization workload **2.25× slower warm / 5.37× slower cold** in wall time.
+A safe server would use spawn rather than fork its active threads/connections,
+keep at most one worker, and handle child failure/shutdown. During refresh the
+parent retains the old snapshot while serialized input, new data and child
+memory coexist. The repository does not establish the container's memory
+headroom, and this was not run under Zeabur's memory/CPU limits. Consequently
+we cannot establish that the extra process is safe for the memory-limited
+single container. The small CPU workload and unchanged-fingerprint reuse do
+not justify adding that operational cost here. Much larger live workloads or
+measured service latency objectives could warrant revisiting the decision
+under the actual container quota. Chunked yielding was not introduced: it
+would change normalization throughout compute code without eliminating CPU
+cost or providing process isolation.
+
+Reproduce without network or credentials:
+
+```sh
+/Users/vc/Local/YXMEEGLE/.venv/bin/python -B -m backend.reports.benchmark_normalization --output /tmp/report-cpu.json
+```
+
+Raw samples: `backend/reports/normalization-process-results.json`. The new
+spawn roundtrip test checks normalization and every gap result against a real
+`SnapshotStore` build. Existing cold-wait, cancellation, stale refresh, failure
+and single-flight tests continue to validate the retained implementation.
+
+Follow-up verification: reports/quotes/transport targeted checks pass **185
+with 1 skipped**; a second run including the spawned-worker roundtrip and
+quote creation/publish/reassignment checks passes **51 tests**. The complete
+frontend run passes **101/115 scripts**; the 14 failures are in the previously
+recorded baseline set (including dependency-layout/tooling failures).
+
+Complete follow-up backend run: **5,112 passed, 32 skipped, 1 xfailed,
+9 failed** (397.37 seconds). The nine failures exactly match the supplied
+baseline: `test_home_executable_tasks`, `test_node_assignment_start_sop`,
+`test_node_item_progress`, three cases in `test_partial_writes`,
+`test_read_scopes`, `test_runtime` deployment staging, and
+`test_ux_home_panels`. No new failures. `git diff --check` passes.
