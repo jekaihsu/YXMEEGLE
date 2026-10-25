@@ -15,6 +15,7 @@ assert.notEqual(m.homeLayoutKey('a','u','pm','lark'),m.homeLayoutKey('a','v','pm
 assert.notEqual(m.homeLayoutKey('a','u','pm','lark'),m.homeLayoutKey('a','u','member','lark'));
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=dashboard',pretendToBeVisual:true});
 for(const key of ['window','document','location','history','Event','HTMLElement','localStorage'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+localStorage.setItem('yx.home.preview','company');
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const today=m.taipeiToday(),stamp=today+'T01:00:00Z';
 const project={id:'p1',name:'可點擊測量案件',code:'C-TEST',pm_id:'u1',case_type:'formal',due_date:'2026-12-10',status:'in_progress',nodes:[]};
@@ -73,3 +74,4 @@ await act(async()=>pendingAssigned.splice(0).forEach(resolve=>resolve()));await 
 assert.equal(document.querySelector('.unified-home').dataset.homeView,'mine');
 await act(async()=>root.unmount());
 console.log('Unified home: personal work and cases only, task/case anchors, hide/reorder persistence, all-hidden recovery and blocked storage passed.');
+assert.equal(localStorage.getItem('yx.home.preview'),null,'a saved role preview is dropped');assert.ok(!/預覽角色/.test(document.body.textContent),'no preview banner');

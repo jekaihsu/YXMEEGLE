@@ -17,7 +17,7 @@ import {MineCard} from './homeViews/MineCards';
 import {AssignCard,useAssignData} from './homeViews/AssignCards';
 import {CompanyCard} from './homeViews/CompanyCards';
 import {useHomeCompany} from './useHomeCompany';
-import {HOME_PREVIEWS,useHomePreview} from './homeRolePreview';
+import {HOME_PREVIEWS} from './homeRolePreview';
 import {useHomeReports,type HomeReportsRead} from './useHomeReports';
 import {isReportCard} from './homeReportCards';
 import {ReportCard,CopyReportSummary} from './homeViews/ReportCard';
@@ -43,8 +43,8 @@ function CompanyView(props:ViewProps&{reports:HomeReportsRead}){
 }
 export function UnifiedHome({c}:{c:Ctx}){
  const key=homeLayoutKey(c.s.workspace_id||c.w.workspace_id||'default',c.s.user?.id||'anonymous',c.s.user?.role||'',c.s.mode);
- const preview=useHomePreview();
- return <HomeWorkspace key={key+'|'+(preview||'')} c={c} storageKey={key} preview={preview}/>;
+ useEffect(()=>{try{localStorage.removeItem('yx.home.preview')}catch{}},[]);
+ return <HomeWorkspace key={key} c={c} storageKey={key} preview={null}/>;
 }
 function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:keyof typeof HOME_PREVIEWS|null}){
  const [previewView,setPreviewView]=useState<HomeViewId|null>(null);
