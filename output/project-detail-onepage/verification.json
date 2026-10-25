@@ -1,8 +1,13 @@
 {
-  "base_commit": "173fa7e89c21d4cdc1ef55b5c0f2228483614380",
+  "base_commit": "1f284bae6de8dae4dc4f73a030f4da7836e3b89b",
+  "tested_code_commit": "176957cce86f7bdf8508d379308bc7a9c103dd86",
   "frontend": {
-    "total_files": 117,
-    "passing_files": 104,
+    "typecheck": "pass",
+    "vite_build": "pass",
+    "scratch_out_dir": "tmp/onepage/fix-dist",
+    "total_files": 118,
+    "passing_files": 105,
+    "base_passing_files": 104,
     "failed_files": [
       "test-build-loading.mjs",
       "test-dev-tooling.mjs",
@@ -18,94 +23,87 @@
       "test-search-input.mjs",
       "test-shell-mode.mjs"
     ],
+    "base_failed_files": [
+      "test-build-loading.mjs",
+      "test-dev-tooling.mjs",
+      "test-dispatch-board.mjs",
+      "test-dispatch-fixes.mjs",
+      "test-home-panels.mjs",
+      "test-home-target-navigation.mjs",
+      "test-ops-sync-panel.mjs",
+      "test-p2-routes.mjs",
+      "test-plan-panel.mjs",
+      "test-read-loading.mjs",
+      "test-reports-interactions.mjs",
+      "test-search-input.mjs",
+      "test-shell-mode.mjs"
+    ],
     "new_failures": [],
-    "fixed_baseline_files": [
-      "test-sop-tasks.mjs",
-      "test-ux-case-detail.mjs"
-    ],
-    "required_files": [
-      "test-project-flow-model.mjs",
-      "test-project-flow-round2.mjs",
-      "test-project-flow-ui.mjs",
-      "test-project-overview-model.mjs",
-      "test-node-assignments.mjs",
-      "test-node-assignment-api.mjs",
-      "test-sop-tasks.mjs",
-      "test-start-sop.mjs",
-      "test-sop-assignment-loop.mjs",
-      "test-legacy-complete.mjs",
-      "test-report-links.mjs",
-      "test-node-workbench-model.mjs",
-      "test-inline-task-editor.mjs"
-    ],
-    "required_all_passed": true,
-    "typecheck": "npx tsc --noEmit passed",
-    "build": "npx vite build --outDir ../tmp/onepage/final-dist passed"
+    "required_files": {
+      "test-node-workbench-model.mjs": "pass",
+      "test-inline-task-editor.mjs": "pass",
+      "test-project-flow-model.mjs": "pass",
+      "test-project-flow-round2.mjs": "pass",
+      "test-project-flow-ui.mjs": "pass",
+      "test-project-overview-model.mjs": "pass",
+      "test-node-assignments.mjs": "pass",
+      "test-node-assignment-api.mjs": "pass",
+      "test-sop-tasks.mjs": "pass",
+      "test-start-sop.mjs": "pass",
+      "test-sop-assignment-loop.mjs": "pass",
+      "test-legacy-complete.mjs": "pass",
+      "test-report-links.mjs": "pass",
+      "test-ux-case-detail.mjs": "pass",
+      "test-project-detail-loading.mjs": "pass",
+      "test-local-node-actions.mjs": "pass"
+    }
   },
   "backend": {
-    "passed": 411,
+    "passed": 417,
     "failed": 1,
     "skipped": 1,
-    "baseline_passed": 406,
-    "baseline_failed": 1,
-    "baseline_skipped": 1,
-    "unchanged_failure": "backend/test_node_assignment_start_sop.py::test_start_agrees_with_the_evidence_overlay_and_mirrors_it_only_onto_rows_it_creates",
-    "failure_detail": "Expected field node 進行中, received 待處理. Identical at the base commit.",
-    "new_backend_tests_passed": 5
+    "base_passed": 411,
+    "base_failed": 1,
+    "base_skipped": 1,
+    "unchanged_failure": "test_node_assignment_start_sop.py::test_start_agrees_with_the_evidence_overlay_and_mirrors_it_only_onto_rows_it_creates"
   },
   "browser": {
-    "transport": "real Vite and demo API, isolated SQLite; node_assignment HTTP uses httpx.MockTransport(FakeBitable), all other Lark reads denied",
-    "viewports": [
+    "result": "pass",
+    "checks": 22,
+    "could_not_run": [
       {
-        "width": 1440,
-        "height": 1000,
-        "scroll_width": 1440
-      },
-      {
-        "width": 390,
-        "height": 844,
-        "scroll_width": 390
+        "label": "formal SOP start apply",
+        "result": "could not run",
+        "evidence": "啟動 SOP 預覽\n✕\n建立內容\n取消\n確認啟動\n目前無法操作\n\n此案件沒有大於 0 的計畫數量，無法啟動 SOP"
       }
     ],
-    "pass": [
-      "Overview stepper opens selected workbench without tab navigation",
-      "Local node owner assignment and readback",
-      "Local SOP manual task title, assignee, date with reason, notes and completion",
-      "Local canonical node completion with reason",
-      "SOP preview and apply imported 38 defaults",
-      "Per-case default title, executor, date, applicability and archive",
-      "Report link summary opens review inline",
-      "Authorized private local-planning case opens through SOP projection",
-      "Lark node assignment, task creation and all editor fields",
-      "Lark node complete, approve, reject with reason",
-      "Explicit legacy policy direct completion with audit marker",
-      "Legacy task edits, initial date and notes persisted after workspace-conflict reload retained the draft",
-      "Keyboard Escape closes the sheet and preserves overview route"
-    ],
-    "could_not_run": [
-      "Remote Lark SOP start had no planned quantities in the synthetic formal case. Local SOP preview and apply passed.",
-      "Genuine work-item and external source link destinations were absent from the synthetic case. Existing route and report-link tests passed."
-    ],
-    "real_lark_writes": false
-  },
-  "screenshots": [
-    {
-      "file": "local-overview-1440.png",
-      "css_width": 1440
-    },
-    {
-      "file": "remote-overview-1440.png",
-      "css_width": 1440
-    },
-    {
-      "file": "local-editor-390.png",
-      "css_width": 390
-    },
-    {
-      "file": "local-start-390.png",
-      "css_width": 390
+    "transport": "httpx.MockTransport(FakeBitable), other Lark live reads denied",
+    "screenshots": {
+      "local-overview-1440.png": [
+        1440,
+        2951
+      ],
+      "remote-overview-1440.png": [
+        1440,
+        2557
+      ],
+      "local-editor-390.png": [
+        390,
+        844
+      ],
+      "local-start-390.png": [
+        390,
+        844
+      ],
+      "local-overview-390.png": [
+        390,
+        3756
+      ],
+      "remote-overview-390.png": [
+        390,
+        3158
+      ]
     }
-  ],
-  "screenshot_note": "Native preview snapshots may downsample large captures. CSS viewport sizes and scroll widths were measured in the page.",
-  "implementation_head": "3c3c548a3e869b06740696023ed551ef55ed9c6f"
+  },
+  "declined_findings": []
 }

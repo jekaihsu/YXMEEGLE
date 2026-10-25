@@ -306,3 +306,9 @@ test('without manager authority or open tasks there is no close action', async (
  assert.ok(document.querySelector('.sop-node-done'));
  assert.equal(button('依節點完成，全部標為已完成（1）'), undefined);
 });
+
+test('an unenrolled node hides creation and import even when case management is allowed',async()=>{
+ await mount({tasks:[],extra:{local_nodes:[{key:'sales',id:'sales-id',revision:0,status:'pending',owner_id:null,completed_at:null,reason:null,disabled_reason:'此節點尚未納入 SOP 管理',complete_disabled_reason:'此節點尚未納入 SOP 管理',can:{assign:false,complete:false,reject:false,create_task:false}}]}});
+ assert.equal(button('新增任務'),undefined);
+ assert.equal(button('匯入預設任務'),undefined);
+});
