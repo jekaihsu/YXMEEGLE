@@ -5,6 +5,7 @@ business collections are rows with indexed workspace, kind, parent and ordering.
 All materialization happens within the caller's version-checked transaction.
 """
 from copy import deepcopy
+from types import SimpleNamespace
 from sqlalchemy import Column, String, Integer, JSON, ForeignKey, UniqueConstraint, select, delete, func
 
 COLLECTIONS=('users','projects','approvals','events','sop_templates','delegations','jobs','recurring','input_mappings','input_revisions','cost_allocations','daily_unmatched','daily_reviews','handover_requests','sop_requests','training_plans','capability_catalog','capability_awards','learning_standards','work_schedules','approved_leave_delegations','capability_bindings','learning_mappings','financial_requests','source_quotes','source_confirmations','contract_items','source_work_items')
@@ -184,6 +185,85 @@ def save(db,model,wid,state):
     root['storage_schema']=2
     _invalidate_projection(root)
     return root
+
+def prepare_save(model,wid,state,existing,previous_root,*,indexed=False):
+    """Prepare a normalized source-import delta before acquiring the workspace lock.
+
+    The caller must recheck both the workspace revision and original root under
+    the lock. The revision proof must still be present: every storage writer
+    invalidates it, including writers that do not advance the revision.
+    """
+    desired={}; add=_adder(desired,'storage.prepare_save')
+    for collection in COLLECTIONS:
+        if collection=='events': continue  # append-only events are finalized at commit
+        for i,record in enumerate(state.get(collection,[])):
+            if collection=='projects': _flatten_project(add,record,i)
+            else: add(collection,record,ordinal=i)
+    existing={key:value for key,value in existing.items() if key[0]!='events'}
+    project_of=_project_resolver(desired,existing)
+    changed=_changed_projects(desired,existing,project_of)
+    if previous_root.get('node_skip_requests',[])!=state.get('node_skip_requests',[]):
+        changed.update(item['project_id'] for root in (previous_root,state)
+                       for item in root.get('node_skip_requests',[]) if item.get('project_id'))
+    if _templates_changed(desired,existing): changed.update(p['id'] for p in state['projects'])
+    dirty=set(changed)
+    for key,value in desired.items():
+        old=existing.get(key)
+        if old and key[0] in ('projects','nodes','tasks') and (old.parent_id!=value['parent_id'] or old.ordinal!=value['ordinal']):
+            pid=project_of(key,value)
+            if pid: dirty.add(pid)
+    for project in state['projects']:
+        old=existing.get(('projects',project['id']))
+        revision=(old.data.get('concurrency_version',0) if old else 0)+(project['id'] in changed)
+        project['concurrency_version']=revision
+        desired[('projects',project['id'])]['data']['concurrency_version']=revision
+    writes=[dict(workspace_id=wid,kind=kind,entity_id=ident,**value)
+            for (kind,ident),value in desired.items()
+            if (kind,ident) not in existing or any(getattr(existing[(kind,ident)],field)!=value[field]
+                                                  for field in ('parent_id','ordinal','data'))]
+    plan={'writes':writes,'deletes':existing.keys()-desired.keys(),'dirty':dirty}
+    if indexed:
+        from . import index_tables
+        view=dict(state,version=state['version']+1)
+        plan['indexes']=index_tables.project_rows(wid,view,dirty)
+        plan['counters']=index_tables.counter_values(view)
+    return plan
+
+
+def save_prepared(db,model,wid,state,plan):
+    """Apply only the prepared changed rows, inside the caller's fenced transaction."""
+    if '_partial' in state: raise ValueError('partial workspaces are read-only')
+    table=model.__table__
+    dialect=db.get_bind().dialect.name
+    if dialect=='postgresql':
+        from sqlalchemy.dialects.postgresql import insert
+    elif dialect=='sqlite':
+        from sqlalchemy.dialects.sqlite import insert
+    else: raise PartialUnavailable('prepared saves require SQLite or PostgreSQL')
+    for part in _row_chunks(plan['writes']):
+        statement=insert(table).values(part)
+        db.execute(statement.on_conflict_do_update(
+            index_elements=['workspace_id','kind','entity_id'],
+            set_={key:getattr(statement.excluded,key) for key in ('parent_id','ordinal','data')}))
+    by_kind={}
+    for kind,ident in plan['deletes']: by_kind.setdefault(kind,[]).append(ident)
+    for kind,ids in by_kind.items():
+        for part in _in_chunks(model.entity_id,ids):
+            db.execute(delete(table).where(table.c.workspace_id==wid,table.c.kind==kind,part))
+    # Events may have been appended after preparation (the sync receipt itself).
+    event_state=dict(state,_partial={'collections':['events']})
+    root=save_collections(db,model,wid,event_state,('events',))
+    if db.info.get('index_tables'):
+        from . import index_tables
+        index_tables.replace_projects(db,model,wid,state,plan['dirty'],rows=plan['indexes'])
+        index_tables.replace_counters(db,model,wid,state,desired=plan['counters'])
+    return root
+
+
+def _row_chunks(rows,size=100):
+    # Bound SQL parameters for SQLite as well as PostgreSQL.
+    for start in range(0,len(rows),size): yield rows[start:start+size]
+
 
 def save_collections(db,model,wid,state,collections):
     """Write only the named non-project collections of a load_partial state.
@@ -405,7 +485,7 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
     result['_partial']={'collections':list(collections),'project_ids':None if project_ids is None else list(project_ids),'project_children':list(project_children)}
     return result
 
-def load(db,model,row,*,omit_kinds=()):
+def load(db,model,row,*,omit_kinds=(),row_snapshot=None):
     """Materialize a workspace, optionally omitting read-only presentation inputs."""
     omit_kinds=tuple(omit_kinds)
     allowed=set(COLLECTIONS)|{'project_'+child for child in PROJECT_CHILDREN}|{'tasks','review_cycles'}
@@ -424,7 +504,9 @@ def load(db,model,row,*,omit_kinds=()):
         return result
     result=deepcopy(row.data); records={}
     # Column selection decodes fresh JSON without aliasing identity-map objects.
-    for kind,parent,data in db.execute(select(model.kind,model.parent_id,model.data).where(model.workspace_id==row.id,model.kind.notin_(('migration_archive',)+omit_kinds)).order_by(model.ordinal)):
+    for kind,ident,parent,ordinal,data in db.execute(select(model.kind,model.entity_id,model.parent_id,model.ordinal,model.data).where(model.workspace_id==row.id,model.kind.notin_(('migration_archive',)+omit_kinds)).order_by(model.ordinal)):
+        if row_snapshot is not None and kind!='events':
+            row_snapshot[(kind,ident)]=SimpleNamespace(kind=kind,entity_id=ident,parent_id=parent,ordinal=ordinal,data=deepcopy(data))
         records.setdefault((kind,parent),[]).append(data)
     for collection in COLLECTIONS: result[collection]=records.get((collection,''),result.get(collection,[]))
     for p in result['projects']:

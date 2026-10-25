@@ -668,9 +668,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
         data,user=identity(request)
         require(offset>=0 and 1<=limit<=250 and attention in ('','overdue','review'),'駕駛艙查詢參數錯誤',422)
         require(len(q)<=240 and len(group)<=120 and len(source_status)<=120 and len(lifecycle)<=120,'查詢文字過長',422)
-        with sessions() as db: safe=public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'],owned=True,task_details=False)
-        from .company_dashboard import overview
-        return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle)
+        from .company_dashboard import overview, READ_OMIT_KINDS
+        with sessions() as db: safe=public_ws(load(db,db.get(WorkspaceRow,data['wid']),omit_kinds=READ_OMIT_KINDS),data['wid'],user,data['mode'],owned=True,task_details=False)
+        return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle,complete_read=True)
 
     @app.get('/api/projects')
     def projects(request:Request,q:str='',status:str='',owner:str='',offset:int=0,limit:int=30,view:str='',tab:str='formal',sort:str='due',dir:str='asc'):
@@ -1318,18 +1318,18 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     @app.get('/api/my-work')
     def my_work(request:Request):
-        """Read model for the viewer; same full-workspace load as GET /api/workspace. my_work applies case_redaction itself."""
-        from .my_work import build_my_work_input
+        """Complete legacy My Work inputs; my_work applies case_redaction itself."""
+        from .my_work import build_my_work_input, READ_OMIT_KINDS
         data,user=identity(request)
         if request.query_params: return app.state.home_panels.read_workspace(request,data,user)
         app.state.live_read.ensure(data['wid'],'sources')
         read={'admitted':data.get('access_mode','normal') in ('normal','tenant-read')}
         try:
-            with phase(request,'load'),sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
+            with phase(request,'load'),sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),omit_kinds=READ_OMIT_KINDS)
             read['loaded']=True
         except Exception:
             state={}; read['failed']=True
-        return build_my_work_input(state,user,read,sop_items=app.state.sop_import.personal_items(state,data['wid'],user) if read.get('loaded') else [])
+        return build_my_work_input(state,user,read,sop_items=app.state.sop_import.personal_items(state,data['wid'],user) if read.get('loaded') else [],complete_read=True)
 
     @app.post('/api/sources/cutover-baseline')
     async def source_case_baseline(request:Request):

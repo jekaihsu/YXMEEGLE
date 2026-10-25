@@ -38,6 +38,11 @@ from .source_case_policy import filter_visible_cases
 from .workflow import now
 
 # Statuses that are still open work. A status outside both sets stays unknown.
+# Whole task/review trees and event history remain authority inputs. Daily rows,
+# project comments and staffing schedules do not feed this legacy read model.
+READ_OMIT_KINDS=('project_comments','project_daily_reports','work_schedules','recurring',
+                 'daily_unmatched','daily_reviews','source_work_items')
+
 OPEN_TASKS = frozenset(('pending', 'in_progress', 'rework', 'paused'))
 # Task fields proven to hold a verified formal due date. VCC-123 (deadline
 # provenance) is unresolved, so none is proven: every due date stays unknown.
@@ -157,9 +162,11 @@ def _blocked(*states):
     return {'rows': [], 'readState': data_state(*states), 'assignment': 'unknown', 'canSeeAwaitingConfirmation': False}
 
 
-def build_my_work_input(ws, viewer, read=None, *, sop_items=()):
+def build_my_work_input(ws, viewer, read=None, *, sop_items=(), complete_read=False):
     """Return ``{'rows','readState','assignment','canSeeAwaitingConfirmation'}`` for ``viewer``.
 
+    ``complete_read`` is set by the route only for READ_OMIT_KINDS: the
+    storage view remains read-only, but contains every input this model needs.
     ``read`` reports how the caller obtained ``ws`` (this module reads nothing):
     ``loaded``, ``admitted`` (the existing production_access verdict), ``failed``,
     ``unlocated`` and ``stale``. Missing information is never treated as success.
@@ -174,7 +181,7 @@ def build_my_work_input(ws, viewer, read=None, *, sop_items=()):
     if not uid or not any(u.get('id') == uid and u.get('active', True) for u in ws.get('users', [])):
         return _blocked('unknown')
 
-    partial = '_partial' in ws
+    partial = '_partial' in ws and not complete_read
     pre_filter = case_redaction.snapshot(ws)  # the redaction plan needs the original, unfiltered cases
     visible = filter_visible_cases(dict(ws))  # hidden cases vanish here, never as forbidden rows
     state = visible  # original records: authority and review hashes are only ever computed from these
