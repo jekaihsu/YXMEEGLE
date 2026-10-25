@@ -1,0 +1,111 @@
+{
+  "base_commit": "173fa7e89c21d4cdc1ef55b5c0f2228483614380",
+  "frontend": {
+    "total_files": 117,
+    "passing_files": 104,
+    "failed_files": [
+      "test-build-loading.mjs",
+      "test-dev-tooling.mjs",
+      "test-dispatch-board.mjs",
+      "test-dispatch-fixes.mjs",
+      "test-home-panels.mjs",
+      "test-home-target-navigation.mjs",
+      "test-ops-sync-panel.mjs",
+      "test-p2-routes.mjs",
+      "test-plan-panel.mjs",
+      "test-read-loading.mjs",
+      "test-reports-interactions.mjs",
+      "test-search-input.mjs",
+      "test-shell-mode.mjs"
+    ],
+    "new_failures": [],
+    "fixed_baseline_files": [
+      "test-sop-tasks.mjs",
+      "test-ux-case-detail.mjs"
+    ],
+    "required_files": [
+      "test-project-flow-model.mjs",
+      "test-project-flow-round2.mjs",
+      "test-project-flow-ui.mjs",
+      "test-project-overview-model.mjs",
+      "test-node-assignments.mjs",
+      "test-node-assignment-api.mjs",
+      "test-sop-tasks.mjs",
+      "test-start-sop.mjs",
+      "test-sop-assignment-loop.mjs",
+      "test-legacy-complete.mjs",
+      "test-report-links.mjs",
+      "test-node-workbench-model.mjs",
+      "test-inline-task-editor.mjs"
+    ],
+    "required_all_passed": true,
+    "typecheck": "npx tsc --noEmit passed",
+    "build": "npx vite build --outDir ../tmp/onepage/final-dist passed"
+  },
+  "backend": {
+    "passed": 411,
+    "failed": 1,
+    "skipped": 1,
+    "baseline_passed": 406,
+    "baseline_failed": 1,
+    "baseline_skipped": 1,
+    "unchanged_failure": "backend/test_node_assignment_start_sop.py::test_start_agrees_with_the_evidence_overlay_and_mirrors_it_only_onto_rows_it_creates",
+    "failure_detail": "Expected field node 進行中, received 待處理. Identical at the base commit.",
+    "new_backend_tests_passed": 5
+  },
+  "browser": {
+    "transport": "real Vite and demo API, isolated SQLite; node_assignment HTTP uses httpx.MockTransport(FakeBitable), all other Lark reads denied",
+    "viewports": [
+      {
+        "width": 1440,
+        "height": 1000,
+        "scroll_width": 1440
+      },
+      {
+        "width": 390,
+        "height": 844,
+        "scroll_width": 390
+      }
+    ],
+    "pass": [
+      "Overview stepper opens selected workbench without tab navigation",
+      "Local node owner assignment and readback",
+      "Local SOP manual task title, assignee, date with reason, notes and completion",
+      "Local canonical node completion with reason",
+      "SOP preview and apply imported 38 defaults",
+      "Per-case default title, executor, date, applicability and archive",
+      "Report link summary opens review inline",
+      "Authorized private local-planning case opens through SOP projection",
+      "Lark node assignment, task creation and all editor fields",
+      "Lark node complete, approve, reject with reason",
+      "Explicit legacy policy direct completion with audit marker",
+      "Legacy task edits, initial date and notes persisted after workspace-conflict reload retained the draft",
+      "Keyboard Escape closes the sheet and preserves overview route"
+    ],
+    "could_not_run": [
+      "Remote Lark SOP start had no planned quantities in the synthetic formal case. Local SOP preview and apply passed.",
+      "Genuine work-item and external source link destinations were absent from the synthetic case. Existing route and report-link tests passed."
+    ],
+    "real_lark_writes": false
+  },
+  "screenshots": [
+    {
+      "file": "local-overview-1440.png",
+      "css_width": 1440
+    },
+    {
+      "file": "remote-overview-1440.png",
+      "css_width": 1440
+    },
+    {
+      "file": "local-editor-390.png",
+      "css_width": 390
+    },
+    {
+      "file": "local-start-390.png",
+      "css_width": 390
+    }
+  ],
+  "screenshot_note": "Native preview snapshots may downsample large captures. CSS viewport sizes and scroll widths were measured in the page.",
+  "implementation_head": "3c3c548a3e869b06740696023ed551ef55ed9c6f"
+}
