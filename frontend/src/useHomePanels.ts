@@ -119,7 +119,8 @@ export function useHomePanels(c:Ctx, query:HomeQuery, enabled=true, full=false):
   const visible = () => {if(document.visibilityState==='visible')load()};
   document.addEventListener('visibilitychange',visible);
   return () => {disposed=true;controller?.abort();window.clearInterval(timer);document.removeEventListener('visibilitychange',visible)};
- }, [key,url,scope,enabled,c.reloadVersion,c.w.version]);
+ }, [key,url,scope,enabled,c.reloadVersion??c.w.version]);
+ if(!enabled)return {body:null,pending:false,error:null};
  const read=state.key===key?state.read:{body:cachedSnapshot(key) ?? (state.scope===scope?state.read.body:null),pending:true,error:null};
  return query.q===search?read:{...read,pending:true};
 }

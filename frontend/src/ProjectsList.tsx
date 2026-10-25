@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState, type ReactNode} from 'react';
+import {useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import {ArrowDown, ArrowRight, Check, CircleCheck, Clock3, Copy, FileText, LayoutGrid, List, MoreVertical, Pin, PlayCircle, Plus, Search, Settings2, Star, UserRound, X} from 'lucide-react';
 import {useViewData} from './viewData';
 import {api} from './api';
@@ -65,7 +65,7 @@ export function Projects({c}:{c:Ctx}) {
  const read=useViewData<PortfolioPage|undefined>(shell?`projects-portfolio:${scope}`:'projects-local',async signal=>shell?readPortfolio(PROJECT_URL,signal,scope,{reloadVersion:c.reloadVersion}):undefined,[c.reloadVersion]);
  const cached=shell?cachedPortfolio(PROJECT_URL,scope):undefined;
  const data=read.data||cached;
- const projects=shell?(data?.items||[]):c.w.projects;
+ const projects=shell?data?.items:c.w.projects;
  const asOf=data?.as_of||c.w.as_of;
  const pinKey=pinStorageKey(c.w.workspace_id||c.s.workspace_id||'default',c.s.user?.id||'anonymous');
  const [pinState,setPinState]=useState(()=>({key:pinKey,ids:readPins(window.localStorage,pinKey)}));
@@ -74,10 +74,11 @@ export function Projects({c}:{c:Ctx}) {
  useEffect(()=>{const sync=(e:StorageEvent)=>{if(e.key===pinKey)setPinState({key:pinKey,ids:readPins(window.localStorage,pinKey)})};window.addEventListener('storage',sync);return()=>window.removeEventListener('storage',sync)},[pinKey]);
  const togglePin=(id:string)=>{const next=pins.includes(id)?pins.filter(p=>p!==id):[...pins,id];setPinState({key:pinKey,ids:next});if(!writePins(window.localStorage,pinKey,next))setNotice('瀏覽器無法儲存釘選，本次瀏覽仍可使用。')};
  const update=(key:keyof CaseFilters,value:string|number|boolean)=>{setFilters(f=>({...f,[key]:value}));setExpanded([])};
- const rows=filterRows(projects.map(p=>caseRow(p,c.w.users,c.s.user?.id||'',asOf)),filters,asOf);
+ const modeled=useMemo(()=>(projects??[]).map(p=>caseRow(p,c.w.users,c.s.user?.id||'',asOf)),[projects,c.w.users,c.s.user?.id,asOf]);
+ const rows=useMemo(()=>filterRows(modeled,filters,asOf),[modeled,filters,asOf]);
  const groups=groupRows(rows,new Set(pins)),counts=portfolioCounts(rows),ready=!shell||!!data;
- const clients=[...new Set(projects.map(p=>p.client).filter(Boolean))].sort();
- const pmIds=[...new Set(projects.map(p=>p.pm_id).filter(Boolean))];
+ const clients=useMemo(()=>[...new Set((projects??[]).map(p=>p.client).filter(Boolean))].sort(),[projects]);
+ const pmIds=useMemo(()=>[...new Set((projects??[]).map(p=>p.pm_id).filter(Boolean))],[projects]);
  const canCreate=c.s.features?.local_case_creation===true&&c.s.user?.capabilities?.includes('create_local_case')===true;
  const canSync=c.s.mode==='lark'&&(c.s.access_mode||'normal')==='normal'&&c.s.user?.active!==false&&!String(c.s.workspace_id||c.w.workspace_id||'').startsWith('test-')&&(['pm','manager'].includes(c.s.user?.role||'')||c.s.user?.capabilities?.includes('manage_sources')===true);
  const sync=async()=>{if(syncing)return;setSyncing(true);setSyncStatus('');try{await api('/api/sources/sync',{method:'POST',body:'{}'});await c.refresh();read.reload();setSyncStatus('Lark 同步完成，案件清單已更新。')}catch(error){setSyncStatus(`Lark 同步失敗：${error instanceof Error?error.message:String(error)}`)}finally{setSyncing(false)}};

@@ -1,5 +1,5 @@
 import {HomeDispatchCard} from './HomeDispatchCard';
-import {useEffect,useState,type ReactNode} from 'react';
+import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {ArrowDown,ArrowUp,Check,Settings2,RotateCcw,RefreshCw} from 'lucide-react';
 import {Button,Eyebrow} from './design';
 import {type Ctx,date} from './appCommon';
@@ -52,28 +52,33 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
  const [editing,setEditing]=useState(false),[saved,setSaved]=useState(true),[notice,setNotice]=useState('');
  const [today,setToday]=useState(taipeiToday);
  const [refreshing,setRefreshing]=useState(false),[refreshTick,setRefreshTick]=useState(0),[refreshError,setRefreshError]=useState('');
- const homeContext={...c,reloadVersion:(c.reloadVersion||0)+refreshTick};
+ const readGeneration=useRef((c.reloadVersion??c.w.version)+refreshTick);
+ if(!refreshing)readGeneration.current=(c.reloadVersion??c.w.version)+refreshTick;
+ const homeContext={...c,reloadVersion:readGeneration.current};
  const [workKind,setWorkKind]=useState('');
  const assigned=useHomePanels(homeContext,{panel:'assigned',scope:'mine',limit:100,kinds:workKind||undefined});
- const confirmation=useHomePanels(homeContext,{panel:'confirmation',scope:'mine',limit:100});
  const manager=assigned.body?.manager_view_available??null;
  const views:HomeViewId[]=preview?[...HOME_PREVIEWS[preview].views]:availableViews(c.s.user,manager);
  const chosen=preview?previewView:settings.view;
  const view=chosen&&views.includes(chosen)?chosen:preview?views[0]:assigned.pending&&!assigned.body?'mine':resolvePersona(c.s.user,manager);
  const layout=settings.layouts[view];
+ const visible=layout.order.filter(id=>!layout.hidden.includes(id));
+ const needsConfirmation=visible.includes('confirmation');
+ const needsAttendance=visible.some(id=>['leave','trips','absence','impact'].includes(id));
+ const confirmation=useHomePanels(homeContext,{panel:'confirmation',scope:'mine',limit:100},needsConfirmation);
  const refresh=async()=>{setRefreshing(true);setRefreshError('');try{await c.refresh()}catch{setRefreshError('工作區重新讀取失敗；已保留上次資料，請稍後再試。')}finally{setRefreshTick(value=>value+1);setRefreshing(false)}};
  useEffect(()=>{const timer=window.setInterval(()=>setToday(taipeiToday()),60000);return()=>window.clearInterval(timer)},[]);
- const attendance=useViewData(`home-attendance:${storageKey}:${taipeiWeek(today)}`,async(signal,current)=>{
+ const attendance=useViewData(`home-attendance:${storageKey}:${taipeiWeek(today)}:${needsAttendance}`,async(signal,current)=>{
+  if(!needsAttendance)return undefined;
   try{return await fetchPeopleAttendance({week:taipeiWeek(today),signal,current})}
   catch(error){if(error instanceof ApiError&&error.status===403)return parsePeopleAttendance({status:'needs-permission'});throw error}
- },[c.reloadVersion,c.w.version,today,refreshTick]);
+ },[homeContext.reloadVersion,today]);
  const persist=(next:HomeSettings,message:string)=>{
   setSettings(next);setNotice(message);
   try{localStorage.setItem(storageKey,JSON.stringify(next));setSaved(true)}catch{setSaved(false)}
  };
  const update=(next:HomeLayout,message:string)=>persist({...settings,layouts:{...settings.layouts,[view]:next}},message);
  const choose=(next:HomeViewId)=>preview?(setPreviewView(next),setNotice(`已切換至${HOME_VIEWS[next].label}`)):persist({...settings,view:next},`已切換至${HOME_VIEWS[next].label}`);
- const visible=layout.order.filter(id=>!layout.hidden.includes(id));
  const reports=useHomeReports(homeContext,view,visible,today);
  const available=availableCardIds(view,c.s.user,reports,c.s);
  const availableOrder=layout.order.filter(id=>available.includes(id));
