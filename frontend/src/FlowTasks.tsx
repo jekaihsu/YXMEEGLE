@@ -11,7 +11,7 @@ import {ProductionPlanFacts} from './FlowEvidence';
 export function FlowTasks({c,p,nodes,selected,details,all,onScope,busy,reason,error,mutate,loading,incomplete,evidence}:{c:Ctx;p:Project;nodes:FlowNode[];selected:string;details:Record<string,NodeAssignmentDetail>;all:boolean;onScope:(all:boolean)=>void;busy:boolean;reason:string;error:NodeAssignmentError|null;mutate:(m:AssignmentMutation)=>Promise<boolean>;loading:boolean;incomplete:boolean;evidence:ReactNode}){
  const [filters,setFilters]=useState({mine:false,unassigned:false,overdue:false});
  const [assigning,setAssigning]=useState('');
- const rows=nodes.flatMap(n=>n.taskRows);
+ const rows=nodes.flatMap(n=>n.taskRows).filter(row=>row.source!=='SOP 任務');
  const filtered=filterFlowTasks(rows,{...filters,node:all ? undefined : selected,userId:c.s.user?.id || '',today:c.w.as_of});
  const sopTask=c.route.task_source==='sop_local';
  const localTask=sopTask || p.nodes.some(n=>n.tasks.some(t=>t.id===c.route.task));

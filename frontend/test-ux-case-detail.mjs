@@ -14,7 +14,7 @@ HTMLElement.prototype.scrollIntoView = function () {};
 const React = await import('react');
 const {act} = React;
 const {createRoot} = await import('react-dom/client');
-const bundle = await build({stdin: {contents: "export {ProjectDetail, ApprovalForm, contractItemOrder, sourceFieldValue} from './src/ProjectDetail'; export {NodeAssignments} from './src/NodeAssignments'; export {DailyRecords, dailyRecordOrder} from './src/DailyRecords'; export {auditRecordOrder} from './src/AuditTrail'; export {assignmentTarget, sortAssignmentTasks} from './src/nodeAssignmentApi'; export {invalidateSessionEpoch} from './src/api';", resolveDir: new URL('.', import.meta.url).pathname}, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
+const bundle = await build({stdin: {contents: "export {ProjectDetail, ApprovalForm, contractItemOrder, sourceFieldValue} from './src/ProjectDetail'; export {DailyRecords, dailyRecordOrder} from './src/DailyRecords'; export {auditRecordOrder} from './src/AuditTrail'; export {assignmentTarget, sortAssignmentTasks} from './src/nodeAssignmentApi'; export {invalidateSessionEpoch} from './src/api';", resolveDir: new URL('.', import.meta.url).pathname}, bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', packages: 'external', loader: {'.css': 'empty'}});
 const artifact = new URL('./.ux-case-detail-test.mjs', import.meta.url);
 await fs.writeFile(artifact, bundle.outputFiles[0].text);
 let ui;
@@ -47,19 +47,19 @@ test('home deep link expands the real node and focuses the task without a legacy
   ui.invalidateSessionEpoch(); const fixture = sourceFixture();
   globalThis.fetch = async () => reply(fixture.list);
   await mount(React.createElement(ui.ProjectDetail, {c: context({tab: 'flow', node: 'control', task: 'recTask1'})}));
-  assert.equal(document.querySelector('[data-assignment-node="control"]').getAttribute('aria-expanded'), 'true');
-  assert.equal(document.activeElement.getAttribute('data-assignment-task'), 'recTask1');
-  assert.equal(document.querySelector('[data-assignment-task="recTask1"] details').open, true);
+  assert.equal(document.querySelector('#flow-selected').getAttribute('aria-label'),'控制節點明細');
+  assert.ok(document.querySelector('[data-assignment-task="recTask1"]'));
+  assert.equal(document.querySelector('[aria-label="任務名稱"]').value,'控制點成果核對');
   assert.equal(document.querySelector('.task-inspector'), null);
   assert.ok(!document.body.textContent.includes('找不到此任務'));
-  assert.ok(document.body.textContent.includes('Lark 節點指派 N · Lark 任務 T'));
+  assert.match(document.querySelector('.pf-source').textContent,/Lark 節點與任務/);
 });
 test('a task-only link discovers its node from authorized embedded tasks', async () => {
   ui.invalidateSessionEpoch(); const fixture = sourceFixture();
   globalThis.fetch = async () => reply(fixture.list);
   await mount(React.createElement(ui.ProjectDetail, {c: context({tab: 'tasks', task: 'recTask1'})}));
-  assert.equal(document.activeElement.getAttribute('data-assignment-task'), 'recTask1');
-  assert.equal(document.querySelector('[data-assignment-node="control"]').getAttribute('aria-expanded'), 'true');
+  assert.equal(document.querySelector('#flow-selected').getAttribute('aria-label'),'控制節點明細');
+  assert.equal(document.querySelector('[aria-label="任務名稱"]').value,'控制點成果核對');
 });
 test('unknown remote tasks have a readable scoped error', async () => {
   ui.invalidateSessionEpoch(); const fixture = sourceFixture();
@@ -70,19 +70,19 @@ test('unknown remote tasks have a readable scoped error', async () => {
 });
 test('zero Lark tasks remain separate from expandable local templates', async () => {
   ui.invalidateSessionEpoch(); const fixture = sourceFixture();
-  fixture.list.node_details = {};
+  fixture.list.node_details = Object.fromEntries(fixture.list.nodes.map(n=>[n.key,{tasks:[],assignable_people:[]}]));
   fixture.list.nodes = fixture.list.nodes.map(n => ({...n, tasks: {done: 0, total: 0}, progress: 0, derived_status: '未開始'}));
   fixture.list.summary = {done: 0, total: 9, current_node: 'sales'};
   globalThis.fetch = async () => reply(fixture.list);
-  await mount(React.createElement(ui.NodeAssignments, {projectId: 'p1', enabled: true, legacy: React.createElement('div', {id: 'template'}, '21 項本地範本')}));
-  assert.equal(document.querySelector('.na-summary-count').textContent, '0/9');
-  assert.equal(document.querySelector('.na-summary strong').textContent, '尚未開始');
-  assert.equal(document.getElementById('template'), null);
-  assert.deepEqual([...document.querySelectorAll('.na-progress-cell strong')].map(e => e.textContent), ['0/0', '0/0', '0/0', '0/0', '0/0', '0/0', '0/0', '0/0', '0/0']);
+  await mount(React.createElement(ui.ProjectDetail, {c:context({tab:'flow',node:'sales'})}));
+  assert.equal(document.querySelectorAll('#flow-tasks .pf-task-open').length,0);
+  assert.equal(document.querySelector('.pf-legacy').open,false);
+  assert.match(document.querySelector('#flow-tasks').textContent,/尚無可見任務/);
 });
 test('an unavailable remote link does not pretend to focus local workflow', async () => {
   ui.invalidateSessionEpoch();
-  await mount(React.createElement(ui.NodeAssignments, {projectId: 'p1', enabled: false, target: {nodeKey: 'control', taskId: 'recTask1'}, legacy: React.createElement('div', null, '本地流程')}));
+  const c=context({tab:'flow',node:'control',task:'recTask1'});c.s.features.node_assignment=false;
+  await mount(React.createElement(ui.ProjectDetail,{c}));
   assert.ok(document.body.textContent.includes('節點指派尚未開放，無法定位此 Lark 節點或任務。'));
   assert.equal(document.querySelector('[data-assignment-task]'), null);
 });
@@ -91,9 +91,9 @@ test('opening logs does not read assignments before the flow tab is selected', a
   globalThis.fetch = async url => {requests.push(url); return reply(url.endsWith('/node-assignments') ? fixture.list : {items: [], total: 0})};
   const c = context({tab: 'logs'});
   await mount(React.createElement(ui.ProjectDetail, {c}));
-  assert.equal(requests.filter(url => url.includes('/node-assignments')).length, 0);
+  assert.equal(requests.filter(url => url.endsWith('/node-assignments')).length, 0);
   await act(async () => root.render(React.createElement(ui.ProjectDetail, {c: {...c, route: {...c.route, tab: 'flow'}}})));
-  assert.equal(requests.filter(url => url.includes('/node-assignments')).length, 1);
+  assert.equal(requests.filter(url => url.endsWith('/node-assignments')).length, 1);
 });
 test('disabled approval form has no creation controls or mutations', async () => {
   ui.invalidateSessionEpoch(); const c = context(); let writes = 0;

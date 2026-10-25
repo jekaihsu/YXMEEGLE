@@ -1,7 +1,7 @@
 import type {AssignmentTask, NodePermissions} from './nodeAssignmentApi';
-import type {FlowNode} from './flowModel';
+import type {FlowNode,FlowTask} from './flowModel';
 import type {SopOverview, SopTask} from './sopTaskApi';
-import type {Project,Task} from './types';
+import type {Project,Task,User} from './types';
 
 export type WorkbenchTask = {id:string; nodeKey:string} & (
  | {source:'lark'; task:AssignmentTask}
@@ -16,7 +16,7 @@ export const NODE_ACTIONS = [
 export type WorkbenchAction = typeof NODE_ACTIONS[number][0];
 export type ActionRegistry = Record<WorkbenchAction, ActionState>;
 export type LocalNode = {key:string; id:string; revision:number; status:string; ownerId:string|null; completedAt:string|null; reason:string|null; can:NodePermissions; disabledReason:string|null;completeDisabledReason?:string|null};
-export type NodeWorkbench = {node:FlowNode; source:'lark'|'local-sop'|'legacy'; tasks:WorkbenchTask[]; actions:ActionRegistry; local?:LocalNode};
+export type NodeWorkbench = {node:FlowNode; source:'lark'|'local-sop'|'legacy'; tasks:WorkbenchTask[]; actions:ActionRegistry;facts:{label:string;value:string}[]; local?:LocalNode};
 
 export function actionRegistry({can,busy=false,reason='',local=false,legacy=false}:{can:NodePermissions;busy?:boolean;reason?:string;local?:boolean;legacy?:boolean}):ActionRegistry {
  const entries=NODE_ACTIONS.map(([id])=>{
@@ -27,14 +27,19 @@ export function actionRegistry({can,busy=false,reason='',local=false,legacy=fals
  return Object.fromEntries(entries) as ActionRegistry;
 }
 export function localCase(project:{case_type?:string;code?:string}) {return project.case_type==='intake' || !project.code?.trim()}
-export function buildNodeWorkbench({node,sop,local,busy=false,reason='',can={}}:{node:FlowNode;sop?:SopOverview;local?:LocalNode;busy?:boolean;reason?:string;can?:NodePermissions}):NodeWorkbench {
+export function buildNodeWorkbench({node,sop,local,busy=false,reason='',can={},users=[]}:{node:FlowNode;sop?:SopOverview;local?:LocalNode;busy?:boolean;reason?:string;can?:NodePermissions;users?:Pick<User,'name'|'role'|'active'|'department'>[]}):NodeWorkbench {
  const source=node.assignment ? 'lark' : local || sop?.tasks.some(t=>t.nodes.some(n=>n.node_key===node.key)) ? 'local-sop' : 'legacy';
  const remote:WorkbenchTask[]=node.taskRows.flatMap(row=>row.task ? [{id:row.id,nodeKey:node.key,source:'lark' as const,task:row.task}] : []);
  const legacy:WorkbenchTask[]=node.legacy?.tasks.filter(t=>t.status!=='superseded').map(task=>({id:task.id,nodeKey:node.key,source:'legacy',task})) || [];
  const checklist:WorkbenchTask[]=(sop?.tasks || []).filter(t=>t.nodes.some(n=>n.node_key===node.key)).map(task=>({id:task.id,nodeKey:node.key,source:'local-sop',task}));
  const actions=actionRegistry({can:local?.can || can,busy,reason:reason || local?.disabledReason || '',local:!!local,legacy:sop?.enrollment?.policy==='legacy'});
  if(local && !actions.complete.enabled && local.completeDisabledReason)actions.complete.disabledReason=local.completeDisabledReason;
- return {node,source,tasks:[...remote,...legacy,...checklist],local,actions};
+ const managers=users.filter(u=>u.active!==false&&u.role==='manager'&&node.departments.includes(u.department));
+ const facts=[{label:'負責人',value:node.owners.map(p=>p.name).join('、')||'尚未指派'},...(node.assignment?[
+  {label:'負責組別',value:node.departments.join('、')||'來源未提供'},
+  {label:'組別主管',value:managers.map(u=>u.name).join('、')||(node.departments.length?'未能對應到本組主管':'來源未提供負責組別，未能對應到本組主管')},
+  {label:'指派主管',value:node.assignment.assigned_by?.name||'來源未提供'}]:[]),{label:'節點最後期限',value:node.finalDeadline?.slice(0,10)||'未排定'}];
+ return {node,source,facts,tasks:[...remote,...legacy,...checklist],local,actions};
 }
 export type TaskDraft = {title:string;assignee:string;due:string;notes:string;status:string;reason:string};
 export type EditorField = 'title'|'assignee'|'due'|'notes'|'status';
@@ -52,7 +57,8 @@ export function withLocalChecklist(nodes:FlowNode[],sop?:SopOverview,people:{id:
   if(!local)return node;
   const tasks=counts ? {done:counts.done,total:counts.total} : node.tasks;
   const state=local.status==='completed'?'已完成':local.status==='in_progress'?'進行中':node.state;
-  return {...node,state,tasks,owners:local.ownerId ? [{open_id:local.ownerId,name:people.find(p=>p.id===local.ownerId)?.name || node.owners.find(p=>p.open_id===local.ownerId)?.name || '姓名待核對'}] : [],progress:state==='已完成'?{basis:'nodes',percent:100,label:'節點已完成'}:counts&&counts.total?{basis:'tasks',percent:Math.round(counts.done/counts.total*100),label:'SOP 任務完成度'}:{basis:'unknown',percent:null,label:'進度未知'}};
+  const checklist:FlowTask[]=sop.tasks.filter(t=>t.nodes.some(n=>n.node_key===node.key)&&t.state!=='archived'&&t.applicability==='applicable').map(t=>({id:t.id,nodeKey:node.key,title:t.title,ownerId:t.participants.executor||'',owner:people.find(p=>p.id===t.participants.executor)?.name|| (t.participants.executor?'姓名待核對':'尚未指派'),status:t.state==='done'?'已完成':t.state==='in_progress'?'進行中':t.state==='blocked'?'暫停':'待處理',deadline:t.dueDate,done:t.state==='done',source:'SOP 任務',task:undefined,sopTask:t}));
+  return {...node,state,tasks,taskRows:[...node.taskRows,...checklist],owners:local.ownerId ? [{open_id:local.ownerId,name:people.find(p=>p.id===local.ownerId)?.name || node.owners.find(p=>p.open_id===local.ownerId)?.name || '姓名待核對'}] : [],progress:state==='已完成'?{basis:'nodes',percent:100,label:'節點已完成'}:counts&&counts.total?{basis:'tasks',percent:Math.round(counts.done/counts.total*100),label:'SOP 任務完成度'}:{basis:'unknown',percent:null,label:'進度未知'}};
  });
 }
 

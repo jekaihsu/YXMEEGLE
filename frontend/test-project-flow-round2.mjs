@@ -174,4 +174,11 @@ await check('completed node reopen stays secondary and preserves the reason form
  assert.equal(document.querySelector('.pf-next-line'),null);
  await click(button('取消完成'));assert.match(document.querySelector('.ne-form').textContent,/取消完成/);
 });
+await check('legacy direct completion stays enabled when ordinary SOP writes are policy-blocked',async()=>{
+ await mount({tab:'overview',node:'control',configure(base,f){f.list.writes_enabled=false;f.list.writes_disabled_reason='舊案維持原流程';f.list.can.control={legacy_complete:true};}});
+ assert.equal(button('直接標記完成').disabled,false);
+ assert.equal(document.querySelector('.pf-node-actions button.primary').disabled,true);
+ await click(button('直接標記完成'));
+ assert.ok(document.querySelector('.assignment-edit textarea'));
+});
 await act(async()=>root.unmount());assert.deepEqual(failures,[]);

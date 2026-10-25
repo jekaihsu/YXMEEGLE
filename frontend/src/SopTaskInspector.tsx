@@ -4,8 +4,8 @@ import {TaskSuggestion,SuggestionReview} from './SopSuggestions';
 import {createPortal} from 'react-dom';
 import {useState, type ReactNode} from 'react';
 import {Badge, Button, Row, Section, Sheet} from './design';
-import {ROLES, SopError, sopApi, sopErrorText, sopNodeLabel, type Applicability, type MutationResult, type SopTask, SOP_ERROR_TEXT} from './sopTaskApi';
-import {APPLICABILITY_LABEL, dueLabel, ROLE_LABEL, stateLabel, taskActions, type TaskAction} from './sopTaskModel';
+import {SopError, sopApi, sopErrorText, sopNodeLabel, type Applicability, type MutationResult, type SopTask, SOP_ERROR_TEXT} from './sopTaskApi';
+import {APPLICABILITY_LABEL, ROLE_LABEL, stateLabel, taskActions, type TaskAction} from './sopTaskModel';
 import {FlowAction} from './FlowActions';
 import type {useSopTasks} from './useSopTasks';
 import type {User} from './types';
@@ -44,7 +44,6 @@ export function SopTaskInspector({task, project, users, sop, onClose}: {task: So
  const [review,setReview]=useState(false);
  const [resultNote,setResultNote]=useState('');
  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
- const names = new Map([...users,...sop.assignees].map(u => [u.id, u.name]));
  const run = async (call: () => Promise<MutationResult>, done: string) => {
   setBusy(true); setError(''); setNotice('');
   try {await call(); await sop.reload(); if (sop.current()) setNotice(done); return true}
@@ -74,11 +73,6 @@ export function SopTaskInspector({task, project, users, sop, onClose}: {task: So
    <div className="sop-badges"><Badge tone="accent">SOP 任務</Badge><Badge>{stateLabel(task)}</Badge>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.applicability !== 'applicable' && <Badge tone="warning">{APPLICABILITY_LABEL[task.applicability]}</Badge>}</div>
    {error && <p role="alert" className="pg-callout">{error}</p>}
    {notice && <p role="status" className="sop-muted">{notice}</p>}
-   <Section>
-    <Row label="期限" value={dueLabel(task)}/>
-    <Row label="節點" value={task.nodes.map(n => sopNodeLabel(n.node_key)).join('、') || '未連結節點'}/>
-    {ROLES.map(r => <Row key={r} label={ROLE_LABEL[r]} value={task.participants[r] ? names.get(task.participants[r]!) || '人員待確認' : '未指派'}/>)}
-   </Section>
    <InlineTaskEditor busy={busy || sop.state.kind!=='ready' || sop.state.refreshing} model={{draft,fields:editorFields({title:editable,assignee:editable,due:editable,notes:editable && task.instructions!==null,status:false},'目前狀態或權限不允許編輯'),people:sop.assignees,statuses:[{id:task.state,label:stateLabel(task)}],maxTitle:500,maxNotes:20000,dueReason:true}} onSave={save}/>
    {editable && <ParticipantRoles task={task} people={sop.assignees} busy={busy} save={participants=>patch({participants},'已更新人員')}/>}
    {task.allowedActions.includes('set_applicability') && <ApplicabilityEditor task={task} busy={busy} save={(applicability,reason)=>transition('set_applicability',{applicability,reason})}/>}

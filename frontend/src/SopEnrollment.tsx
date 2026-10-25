@@ -30,7 +30,7 @@ export function SopEnrollmentStatus({projectId,enrollment,current,reload,startLa
  return <div className="sop-enrollment">
   <span role="status" className="sop-muted">{enrollmentLabel(enrollment)}</span>
   {enrollment.canRetry && enrollment.attempt && enrollment.attempt.status!=='succeeded' && <Button variant="plain" disabled={busy} onClick={()=>void run(false)}>重試</Button>}
-  {enrollment.canOptIn && <Button variant="plain" onClick={()=>{setKeys(enrollment.nodes.filter(n=>n.eligible).map(n=>n.key));setConfirm(false);setOpen(true)}}>{startLabel||'套用 SOP 到剩餘節點'}</Button>}
+  {enrollment.canOptIn && <Button variant={startLabel?'primary':'plain'} onClick={()=>{setKeys(enrollment.nodes.filter(n=>n.eligible).map(n=>n.key));setConfirm(false);setOpen(true)}}>{startLabel||'套用 SOP 到剩餘節點'}</Button>}
   {error && <p role="alert">{error}</p>}
   {open && createPortal(<Sheet title="套用 SOP 到剩餘節點" onClose={()=>{if(!busy)setOpen(false)}}>
    <div className="sop-form sop-enroll-form">

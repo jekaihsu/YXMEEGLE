@@ -1,20 +1,20 @@
-import {overdueTask,type FlowNode,type FlowTask} from './flowModel';
+import {flowTaskTarget,overdueTask,type FlowNode,type FlowTask} from './flowModel';
 import type {NodeAssignmentList} from './nodeAssignmentApi';
 import type {ProductionStage} from './projectProgressApi';
 import type {Project,User} from './types';
 export type OverviewTarget={tab:'overview'|'flow'|'items'|'data'|'files'|'people';node?:string;task?:string;section?:string;approval?:string;task_source?:string};
 export type OverviewAction={kind:'blocking'|'overdue'|'review'|'soon'|'work';title:string;reason:string;owner:string;allowed:boolean;button:string;target:OverviewTarget};
-type ActionInput={nodes:FlowNode[];list?:NodeAssignmentList;user?:User|null;today:string;execution:{allowed:boolean;reason:string};localLead:boolean;assignmentsUnavailable:boolean;blockingApproval?:{id:string;title:string;node:string;owner:string}};
+type ActionInput={nodes:FlowNode[];list?:NodeAssignmentList;user?:User|null;today:string;execution:{allowed:boolean;reason:string};localLead:boolean;localChecklist?:boolean;assignmentsUnavailable:boolean;blockingApproval?:{id:string;title:string;node:string;owner:string}};
 const finished=(node:FlowNode)=>['已完成','略過'].includes(node.state);
 const owner=(node:FlowNode|undefined)=>node?.owners.map(p=>p.name).join('、') || node?.assignment?.assigned_by?.name || '尚未指派';
 function taskAction(node:FlowNode,task:FlowTask,input:ActionInput,kind:OverviewAction['kind']):OverviewAction{
  const local=node.legacy?.tasks.find(t=>t.id===task.id);
- const allowed=input.execution.allowed && !input.assignmentsUnavailable && (task.task ? input.list?.writes_enabled===true && !input.list.stale && task.task.can.edit_status : local?.can_execute===true && (input.user?.id===task.ownerId || local.assigned_to_viewer===true));
- return {kind,title:kind==='overdue' ? `處理逾期任務「${task.title}」` : kind==='soon' ? `準備到期任務「${task.title}」` : `接續「${task.title}」`,reason:`${node.label} · ${task.deadline ? `期限 ${task.deadline.slice(0,10)}` : '期限未排定'}`,owner:task.owner,allowed,button:allowed ? '開啟任務' : '查看詳情',target:{tab:'flow',node:node.key,task:task.id}};
+ const allowed=task.source==='SOP 任務'?task.sopTask.allowedActions.some(a=>['start','complete','resume','edit'].includes(a)):input.execution.allowed && !input.assignmentsUnavailable && (task.task ? input.list?.writes_enabled===true && !input.list.stale && task.task.can.edit_status : local?.can_execute===true && (input.user?.id===task.ownerId || local.assigned_to_viewer===true));
+ return {kind,title:kind==='overdue' ? `處理逾期任務「${task.title}」` : kind==='soon' ? `準備到期任務「${task.title}」` : `接續「${task.title}」`,reason:`${node.label} · ${task.deadline ? `期限 ${task.deadline.slice(0,10)}` : '期限未排定'}`,owner:task.owner,allowed,button:allowed ? '開啟任務' : '查看詳情',target:flowTaskTarget(task)};
 }
 export function selectNextAction(input:ActionInput):OverviewAction{
  const {nodes,list,today}=input,writable=list?.writes_enabled===true && !list.stale && !input.assignmentsUnavailable;
- if(!input.execution.allowed)return {kind:'blocking',title:'先確認案件執行歸屬',reason:input.execution.reason,owner:'案件主管',allowed:false,button:'查看詳情',target:{tab:'data',section:'basic'}};
+ if(!input.execution.allowed&&!input.localChecklist)return {kind:'blocking',title:'先確認案件執行歸屬',reason:input.execution.reason,owner:'案件主管',allowed:false,button:'查看詳情',target:{tab:'data',section:'basic'}};
  if(input.blockingApproval){const approval=input.blockingApproval;return {kind:'blocking',title:'先確認阻擋中的審批',reason:`${approval.title} · 關聯節點暫停中，需核對審批結果。`,owner:approval.owner,allowed:false,button:'查看詳情',target:{tab:'data',section:'approvals',node:approval.node,approval:approval.id}}}
  const active=nodes.filter(n=>(n.assignment || n.legacy) && !finished(n)),current=list?.summary.current_node || active.find(n=>['進行中','待審核','暫停'].includes(n.state))?.key || active[0]?.key;
  const unowned=active.find(n=>!n.owners.length && (n.key===current || ['進行中','待審核','暫停'].includes(n.state)));

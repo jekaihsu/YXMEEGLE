@@ -1,3 +1,4 @@
+import type {SopTask} from './sopTaskApi';
 import {NODE_NAMES, STATUS} from './workflowLabels';
 import {FINISHED_NODE_STATES, isProductionNode, NODE_ASSIGNMENT_ORDER, nodeStatusLabel, type AssignmentNode, type AssignmentPerson, type AssignmentTask, type NodeAssignmentList} from './nodeAssignmentApi';
 import type {ProductionKey, ProductionStage, ProjectProgress} from './projectProgressApi';
@@ -6,7 +7,7 @@ import type {Node, Project, User} from './types';
 
 export {projectFlowRoute} from './projectRoutes';
 export type FlowProgress = {basis: 'tasks'|'evidence'|'nodes'; percent: number; label: string}|{basis: 'unknown'|'skipped'; percent: null; label: string};
-export type FlowTask = {id:string;nodeKey:string;title:string;ownerId:string;owner:string;status:string;deadline:string|null;done:boolean;} & ({source:'Lark 任務';task:AssignmentTask}|{source:'本地流程';task:undefined});
+export type FlowTask = {id:string;nodeKey:string;title:string;ownerId:string;owner:string;status:string;deadline:string|null;done:boolean;} & ({source:'Lark 任務';task:AssignmentTask}|{source:'本地流程';task:undefined}|{source:'SOP 任務';task:undefined;sopTask:SopTask});
 export type FlowNode = {
  key: string; label: string; state: string; owners: AssignmentPerson[]; departments: string[];
  tasks: {done: number; total: number}; progress: FlowProgress; deadline: string|null; finalDeadline:string|null; overdue: boolean; needs: string|null;
@@ -115,3 +116,5 @@ export function nodeDispatchProposal({project,node,parentTaskId}: {project: Proj
  return {project_ref: typeof project.project_ref === 'string' ? project.project_ref : project.id,
   case_ref: typeof project.confirmation_id === 'string' ? project.confirmation_id : '',title:`${project.name} · ${node.label}`,content:'',phase:project.case_type === 'intake' ? '接案前' : '正式',kind:'execution',department:node.departments[0] || '',parent_task_ref:parentTaskId,deadline:node.deadline || ''};
 }
+
+export const flowTaskTarget=(task:FlowTask)=>({tab:'flow' as const,node:task.nodeKey,task:task.id,...(task.source==='SOP 任務'?{task_source:'sop_local'}:{})});

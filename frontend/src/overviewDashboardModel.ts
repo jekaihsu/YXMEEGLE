@@ -1,4 +1,4 @@
-import {cancelledTask, type FlowNode} from './flowModel';
+import {flowTaskTarget,cancelledTask, type FlowNode} from './flowModel';
 import {fieldworkSnapshot, type OverviewAction, type OverviewIssue, type OverviewTarget} from './projectOverviewModel';
 import type {ProductionStage} from './projectProgressApi';
 import type {ProjectFile} from './types';
@@ -34,7 +34,7 @@ export function overviewTodos(action:OverviewAction,issues:OverviewIssue[],nodes
  const candidates:OverviewTodo[]=[
   {id:'next-action',title:action.title,reason:action.reason,owner:action.owner,ownerId:selected?.ownerId || '',deadline:selected?.deadline || null,target:action.target,primary:true},
   ...issues.map(issue=>({...issue,ownerId:'',deadline:null,primary:false})),
-  ...tasks.map(task=>({id:`task:${task.nodeKey}:${task.id}`,title:task.title,reason:task.source,owner:task.owner,ownerId:task.ownerId,deadline:task.deadline,target:{tab:'flow',node:task.nodeKey,task:task.id} satisfies OverviewTarget,primary:false})),
+  ...tasks.map(task=>({id:`task:${task.nodeKey}:${task.id}`,title:task.title,reason:task.source,owner:task.owner,ownerId:task.ownerId,deadline:task.deadline,target:flowTaskTarget(task) satisfies OverviewTarget,primary:false})),
  ];
  const seen=new Set<string>();
  return candidates.filter(row=>{const key=targetKey(row.target);if(seen.has(key))return false;seen.add(key);return true});
