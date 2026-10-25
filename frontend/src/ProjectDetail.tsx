@@ -50,13 +50,16 @@ function fetchProjectSnapshot(id:string,reloadVersion:number|undefined){
 
 export function ProjectDetailGate({c}:{c:Ctx}){
  // Shell mode reads only this project (tree plus its own approvals, events and records); a full workspace, after any mutation, takes the legacy path unchanged.
- const shell=c.w.scope==='shell';const id=c.route.project;const sopRead=canReadSop(c.s.user);
+ const shell=c.w.scope==='shell';const id=c.route.project;const sopRead=canReadSop(c.s.user);const {tab}=projectFlowRoute(c.route);
  useEffect(()=>{
   if(!shell||!id)return;
-  if(c.s.features?.node_assignment){void prefetchNodeAssignments(id).catch(()=>{});void prefetchStartSop(id).catch(()=>{})}
-  void prefetchProjectProgress(id).catch(()=>{});
-  if(sopRead){void prefetchSopTasks(id,c.s.workspace_id||'',!!c.reloadVersion).catch(()=>{});void prefetchSopAssignees(id,c.s.workspace_id||'').catch(()=>{})}
- },[shell,id,c.s.workspace_id,sopRead,c.s.features?.node_assignment,c.reloadVersion]);
+  if(c.s.features?.node_assignment&&['overview','flow','items','people'].includes(tab))void prefetchNodeAssignments(id).catch(()=>{});
+  if(['overview','flow','items'].includes(tab))void prefetchProjectProgress(id).catch(()=>{});
+  if(tab==='flow'){
+   if(c.s.features?.node_assignment)void prefetchStartSop(id).catch(()=>{});
+   if(sopRead){void prefetchSopTasks(id,c.s.workspace_id||'',!!c.reloadVersion).catch(()=>{});void prefetchSopAssignees(id,c.s.workspace_id||'').catch(()=>{})}
+  }
+ },[shell,id,tab,c.s.workspace_id,sopRead,c.s.features?.node_assignment,c.reloadVersion]);
  const detail=useViewData<ProjectSlice|undefined>(shell?`project:${id}`:'project-legacy',()=>shell&&id?fetchProjectSnapshot(id,c.reloadVersion):Promise.resolve(undefined),[c.reloadVersion]);
  useEffect(()=>{if(shell&&detail.data)perfMark('project-detail-render')},[shell,detail.data]);
  if(!shell)return <ProjectDetail key={id} c={c}/>;
@@ -71,7 +74,7 @@ export function ProjectDetail({c}:{c:Ctx}){
  const prefetchFlow=(id:string)=>{clearTimeout(tabPrefetch.current);if(!c.s.features?.node_assignment)return;const connection=navigator as Navigator&{connection?:{saveData?:boolean;effectiveType?:string}};if(connection.connection?.saveData||['slow-2g','2g'].includes(connection.connection?.effectiveType||''))return;tabPrefetch.current=setTimeout(()=>{void prefetchNodeAssignments(id).catch(()=>{});void prefetchStartSop(id).catch(()=>{})},150)};
  const p=c.w.projects.find(p=>p.id===c.route.project);const[modal,setModal]=useState(c.route.focus&&!assignmentTarget(c.route,p?.nodes)?'complete-node':'');useEffect(()=>{if(c.route.focus&&!assignmentTarget(c.route,p?.nodes))setModal('complete-node')},[c.route.focus,c.route.node]);const[approvalType,setApprovalType]=useState<'change'|'extension'>('change');
 
- const assignments=useNodeAssignments(p?.id || '',!!p && c.s.features?.node_assignment===true);
+ const assignments=useNodeAssignments(p?.id || '',!!p && c.s.features?.node_assignment===true && ['overview','flow','items','people'].includes(projectFlowRoute(c.route).tab));
  if(!p)return <Empty title="找不到這個案件" detail="案件連結可能已失效，請回到案件總覽重新開啟。"/>;
  const selectedKey=selectedFlowNode(p,c.route.node,'data' in assignments.state ? assignments.state.data : undefined);
  const selected=p.nodes.find(n=>n.key===selectedKey);
