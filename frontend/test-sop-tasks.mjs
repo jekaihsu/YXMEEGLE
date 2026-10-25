@@ -157,7 +157,7 @@ test('task actions use the per-task server actions', () => {
 test('the section lists the node tasks with executor, state, due and badges', async () => {
  await mount({tasks: [task('t1'), task('shared', {title: '共用檢核', participants: {executor: 'member'}, nodes: [link('sales', 9), link('pm', 9)], applicability: 'unresolved'})]});
  const section = document.querySelector('#sop-tasks');
- assert.equal(section.querySelector('h3').firstChild.textContent, 'SOP 任務');
+ assert.equal(section.querySelector('h3').firstChild.textContent, '任務');
  assert.deepEqual([...section.querySelectorAll('.pf-task-open strong')].map(s => s.textContent), ['業主提出報價需求', '共用檢核']);
  assert.equal(section.querySelector('[data-sop-task=t1] span').textContent, '未指派 · 待處理 · 期限待確認');
  assert.equal(section.querySelector('[data-sop-task=shared] span').textContent, '林組員 · 待處理 · 期限待確認共用條件');
@@ -182,9 +182,9 @@ test('quote-stage import starts from 報價, needs a reason for subcontract rows
  await click(button('匯入預設任務'));
  assert.match(dialog().textContent, /從 報價 開始/);
  assert.equal(dialog().querySelector('input[type=radio]').checked, true);
- assert.deepEqual([...dialog().querySelectorAll('.sop-nodes button')].filter(b => b.getAttribute('aria-pressed') === 'true').length, 9);
+ assert.equal(dialog().querySelector('.sop-nodes'), null);
  await click(button('下一步'));
- assert.deepEqual(calls.filter(r => r.url.endsWith('/preview')).map(r => r.body), [{template_version_id: examples.preview.template.version_id, node_keys: NODES}]);
+ assert.deepEqual(calls.filter(r => r.url.endsWith('/preview')).map(r => r.body), [{template_version_id: examples.preview.template.version_id, node_keys: ['sales']}]);
  assert.deepEqual([...dialog().querySelectorAll('.sop-group legend')].map(l => l.textContent), ['新增 1', '待確認 2', '已排除 1', '需範本審核 1']);
  const sub = dialog().querySelector('[data-row="meegle-v137:A:7"] input[type=checkbox]');
  await act(async () => {sub.click(); await tick()});

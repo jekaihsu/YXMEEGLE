@@ -1,5 +1,5 @@
 import {ReportLinkReview} from './ReportLinkReview';
-import {withLocalChecklist,buildNodeWorkbench,localCase} from './nodeWorkbenchModel';
+import {withLocalChecklist,buildNodeWorkbench,localCase,nodeActionReasons} from './nodeWorkbenchModel';
 import {LocalNodeActions} from './LocalNodeActions';
 import {CaseSopStart} from './CaseSopStart';
 import {ReportLinkSummary} from './ReportLinkSummary';
@@ -20,7 +20,6 @@ import {FlowAction,FlowNodeActions} from './FlowActions';
 import {FlowTasks} from './FlowTasks';
 import {SopTasks,type SopImportTarget} from './SopTasks';
 import {useSopTasks,canReadSop} from './useSopTasks';
-import {isSopNode} from './sopTaskApi';
 import {FlowSchedule} from './FlowSchedule';
 import {ProductionCard,ProductionPlanFacts} from './FlowEvidence';
 import {isProductionSeedTask,productionPlanFacts,productionPlanGaps} from './productionPlan';
@@ -58,7 +57,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  const nodeBusy=!!list?.stale || assignments.refreshing || !!assignments.pending || assignments.state.kind!=='ready';
  const busy=nodeBusy || !list?.writes_enabled;
  const reason=!list?.writes_enabled ? list?.writes_disabled_reason || '節點修改尚未開放。' : assignments.state.kind==='error' ? '節點來源更新失敗，請重試。' : '正在更新節點資料，請稍候。';
- const workbench=buildNodeWorkbench({node:selected,sop:sopData,local:sopData?.localNodes?.find(n=>n.key===selected.key),can:detail?.can,users:c.w.users,busy:localCase(p)?sopTasks.state.kind!=='ready'||sopTasks.state.refreshing:nodeBusy,reason:localCase(p)?'':nodeBusy?reason:''});
+ const workbench=buildNodeWorkbench({node:selected,sop:sopData,local:sopData?.localNodes?.find(n=>n.key===selected.key),can:detail?.can,users:c.w.users,busy:localCase(p)?sopTasks.state.kind!=='ready'||sopTasks.state.refreshing:nodeBusy,reason:localCase(p)?'':nodeBusy||!list?.writes_enabled?reason:'',reasons:Object.fromEntries(Object.entries(nodeActionReasons(selected)).map(([key,value])=>[key,sopData?.enrollment?.policy==='legacy'?'此節點維持原流程':value]))});
  const [reviewLinks,setReviewLinks]=useState(false);
  const [report,setReport]=useState<ProgressReportRow|null>(null);
  const keyboardMove=useRef(false);
@@ -72,9 +71,6 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  },[c.route.tab,c.route.node,c.route.section,loading]);
  const reports=(row?:ReportTarget)=>{location.hash=progressHash('#view=reports&tab=progress',{dept:row?.dept || 'field',week:row?.week || '',group:'',caseKey:'',q:row?.case_code || p.code})};
  const select=(node:string,keyboard=false)=>{keyboardMove.current=keyboard;c.go({...c.route,tab:inline ? 'overview' : keyboard ? c.route.tab : 'flow',node,task:undefined,task_source:undefined,focus:undefined},keyboard)};
- const sopAllowed=sopTasks.state.kind==='ready' ? sopTasks.state.data.allowed : undefined;
- const sopNode=isSopNode(selected.key) ? selected.key : undefined;
- const sopNodeAction=sopAllowed && sopNode ? <FlowAction allowed={sopAllowed.import} reason="需 SOP 匯入權限" help="從預設 SOP 範本帶入本節點的標準任務清單，匯入前可預覽與勾選。" onClick={()=>setSopImport(sopNode)}>匯入此節點任務</FlowAction> : null;
  const localNode=p.nodes.find(n=>n.key===selected.key);
  const taskIncomplete=(!isLegacy && assignments.state.kind==='error' && !list) || (all ? Object.keys(details.errors).length>0 : !!details.errors[selected.key]);
  const seed=selected.taskRows.find(row=>row.task && isProductionSeedTask(row.task,selected.key));
@@ -104,12 +100,12 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
    <dl className="pf-facts">{workbench.facts.map(fact=><div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}{selected.assignment?.legacy_completion && <div><dt>舊案直接完成</dt><dd>{selected.assignment.legacy_completion.actor.name} · {taipeiTime(selected.assignment.legacy_completion.at)}<small>{selected.assignment.legacy_completion.reason}</small></dd></div>}</dl>
    {selected.assignment?.auto_done && <p className="pg-callout">自動判定 · {selected.assignment.auto_done.reason}</p>}
    {inline&&isLegacy&&!localCase(p)&&!workbench.local&&legacyActions}
-   {workbench.local ? <LocalNodeActions workbench={workbench} sop={sopTasks} projectId={p.id} onCreate={()=>document.getElementById('sop-add-task')?.click()}/> : detail ? <FlowNodeActions key={selected.key} detail={detail} busy={nodeBusy} reason={reason} error={assignments.error} mutate={assignments.mutate} registry={workbench.actions} extra={sopNodeAction}/> : !isLegacy && !!selected.assignment && assignments.state.kind==='ready' && !details.errors[selected.key] ? <Skeleton height="3rem"/> : sopNodeAction && <div className="pf-node-actions"><div className="pf-actions">{sopNodeAction}</div></div>}
+   {workbench.local ? <LocalNodeActions workbench={workbench} sop={sopTasks} projectId={p.id}/> : detail ? <FlowNodeActions key={selected.key} detail={detail} busy={nodeBusy} reason={nodeBusy||!list?.writes_enabled?reason:''} error={assignments.error} mutate={assignments.mutate} registry={workbench.actions} /> : !isLegacy && !!selected.assignment && assignments.state.kind==='ready' && !details.errors[selected.key] ? <Skeleton height="3rem"/> : null}
    {!workbench.local && !isLegacy && !selected.assignment && <p className="pf-empty">尚無節點指派</p>}
 
    {Object.entries(details.errors).map(([key,error])=><p role="alert" key={key}>{model.nodes.find(n=>n.key===key)?.label}任務明細讀取失敗。{error}<Button onClick={details.retry}>重試任務明細</Button></p>)}
-   {(!workbench.local || selected.taskRows.some(row=>row.source!=='SOP 任務')) && <FlowTasks c={c} p={p} nodes={model.nodes} selected={selected.key} details={details.details} all={all} onScope={value=>c.go({...c.route,tab:inline?'overview':'flow',section:value ? 'all-tasks' : undefined})} busy={busy} reason={reason} error={assignments.error} mutate={assignments.mutate} loading={taskLoading} incomplete={taskIncomplete} evidence={evidence}/>}
-   <SopTasks c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>
+   {(!workbench.local || selected.taskRows.some(row=>row.source!=='SOP 任務')) && <FlowTasks c={c} p={p} nodes={model.nodes} selected={selected.key} details={details.details} all={all} onScope={value=>c.go({...c.route,tab:inline?'overview':'flow',section:value ? 'all-tasks' : undefined})} busy={busy} reason={reason} error={assignments.error} mutate={assignments.mutate} loading={taskLoading} incomplete={taskIncomplete} evidence={evidence}>{selected.assignment&&<SopTasks remote c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>}</FlowTasks>}
+   {!selected.assignment&&<SopTasks c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>}
   </section>
   {!inline && p.nodes.length>0 && legacyActions && <details className="pf-secondary pf-legacy"><summary>範本與本地流程</summary>
    <label>本地節點<select aria-label="本地節點" value={selectedKey} onChange={e=>select(e.target.value)}>{p.nodes.map(n=><option key={n.id} value={n.key}>{NODE_NAMES[n.key] || n.name}</option>)}</select></label>{legacyActions}

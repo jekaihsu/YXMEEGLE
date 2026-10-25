@@ -8,11 +8,14 @@ export function AssignForm({detail, busy, error, onCancel, onSubmit}: {detail: N
     {!detail.assignable_people.length && <p className="na-empty">目前沒有可指派人員，請聯絡管理員。</p>}{(validation || error?.fields.owner_open_ids) && <p className="na-field-error" role="alert">{validation || error?.fields.owner_open_ids}</p>}
     <div className="na-form-actions"><button type="button" className="button compact" onClick={onCancel}>取消</button><button className="button primary compact" type="submit" disabled={!detail.assignable_people.length}>儲存指派</button></div></fieldset></form>;
 }
-export function TaskCreator({detail, busy, error, onCancel, onSubmit}: {detail: NodeAssignmentDetail; busy: boolean; error: NodeAssignmentError | null; onCancel: () => void; onSubmit: (task: NewAssignmentTask) => Promise<void>}) {
+export function TaskCreator({detail,...props}: {detail:NodeAssignmentDetail;busy:boolean;error:NodeAssignmentError|null;onCancel:()=>void;onSubmit:(task:NewAssignmentTask)=>Promise<void>}) {
+ return <TaskCreateForm {...props} people={detail.assignable_people} departments={detail.node.departments}/>;
+}
+export function TaskCreateForm({people,departments:nodeDepartments,busy,error,onCancel,onSubmit}:{people:NodeAssignmentDetail['assignable_people'];departments?:string[];busy:boolean;error:{fields:Record<string,string>;message:string}|null;onCancel:()=>void;onSubmit:(task:NewAssignmentTask)=>Promise<void>}) {
   const [draft, setDraft] = useState<NewAssignmentTask>({title: '', detail: '', assignee_open_id: '', department: '', deadline: ''});
   const [validation, setValidation] = useState<Record<string, string>>({});
   const id = useId(), fields = {...error?.fields, ...validation};
-  const departments = [...new Set(draft.assignee_open_id ? detail.assignable_people.find(p => p.open_id === draft.assignee_open_id)?.departments || [] : detail.node.departments)];
+  const departments = [...new Set(draft.assignee_open_id ? people.find(p => p.open_id === draft.assignee_open_id)?.departments || [] : nodeDepartments || [])];
   const update = (field: keyof NewAssignmentTask, value: string) => {setDraft(d => ({...d, [field]: value, ...(field === 'assignee_open_id' ? {department: ''} : {})})); setValidation(v => {const next = {...v}; delete next[field]; return next})};
   const submit = (event: FormEvent) => {
     event.preventDefault(); const errors: Record<string, string> = {};
@@ -22,12 +25,12 @@ export function TaskCreator({detail, busy, error, onCancel, onSubmit}: {detail: 
   const invalid = (field: string) => ({'aria-invalid': !!fields[field], 'aria-describedby': fields[field] ? `${id}-${field}` : undefined});
   const fieldError = (field: string) => fields[field] && <small className="na-field-error" id={`${id}-${field}`} role="alert">{fields[field]}</small>;
   return <form className="ne-form assignment-edit" noValidate onSubmit={submit}><fieldset disabled={busy}><legend>新增節點任務</legend><div className="na-form-grid">
-    <label className="na-wide"><span>任務名稱 <small>必填</small></span><input value={draft.title} required {...invalid('title')} onChange={e => update('title', e.target.value)} placeholder="例如 控制點成果核對"/>{fieldError('title')}</label>
-    <label className="na-wide"><span>任務說明</span><textarea value={draft.detail} {...invalid('detail')} onChange={e => update('detail', e.target.value)} rows={3} placeholder="補充作業範圍與交付內容"/>{fieldError('detail')}</label>
-    {detail.assignable_people.length > 0 && <label><span>負責人 <small>{detail.can.assign ? '未選擇則建立未指派任務' : '未選擇則由自己負責'}</small></span><select value={draft.assignee_open_id} {...invalid('assignee_open_id')} onChange={e => update('assignee_open_id', e.target.value)}><option value="">選擇負責人</option>{detail.assignable_people.map(p => <option key={p.open_id} value={p.open_id}>{p.name}</option>)}</select>{fieldError('assignee_open_id')}</label>}
-    <label><span>部門</span><select value={draft.department} {...invalid('department')} onChange={e => update('department', e.target.value)}><option value="">選擇部門</option>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select>{fieldError('department')}</label>
-    <label><span>期限 <small>僅日期</small></span><input type="date" value={draft.deadline} {...invalid('deadline')} onChange={e => update('deadline', e.target.value)}/>{fieldError('deadline')}</label>
-  </div><div className="na-form-actions"><button type="button" className="button compact" onClick={onCancel}>取消</button><button type="submit" className="button primary compact">建立任務</button></div></fieldset></form>;
+    <label className="na-wide"><span>任務名稱</span><input value={draft.title} required {...invalid('title')} onChange={e => update('title', e.target.value)}/>{fieldError('title')}</label>
+    <label className="na-wide"><span>任務說明</span><textarea value={draft.detail} {...invalid('detail')} onChange={e => update('detail', e.target.value)} rows={3}/>{fieldError('detail')}</label>
+    {people.length > 0 && <label><span>負責人</span><select value={draft.assignee_open_id} {...invalid('assignee_open_id')} onChange={e => update('assignee_open_id', e.target.value)}><option value="">選擇負責人</option>{people.map(p => <option key={p.open_id} value={p.open_id}>{p.name}</option>)}</select>{fieldError('assignee_open_id')}</label>}
+    {nodeDepartments && <label><span>部門</span><select value={draft.department} {...invalid('department')} onChange={e => update('department', e.target.value)}><option value="">選擇部門</option>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select>{fieldError('department')}</label>}
+    <label><span>期限</span><input type="date" value={draft.deadline} {...invalid('deadline')} onChange={e => update('deadline', e.target.value)}/>{fieldError('deadline')}</label>
+  </div>{error?.message&&<p role="alert">{error.message}</p>}<div className="na-form-actions"><button type="button" className="button compact" onClick={onCancel}>取消</button><button type="submit" className="button primary compact">建立任務</button></div></fieldset></form>;
 }
 type ReasonFormProps = {busy: boolean; error: NodeAssignmentError | null; onCancel: () => void; onSubmit: (reason: string) => Promise<void>};
 const REASON_COPY = {

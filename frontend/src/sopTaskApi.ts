@@ -54,7 +54,7 @@ export interface ImportReceipt {requestId: string; created: string[]; existing: 
 export interface MutationResult {task_id: string; revision: number; checklist_revision: number}
 
 export class SopError extends Error {
- constructor(public status: number, public code: string) {super(code)}
+ constructor(public status: number, public code: string,public reason?:string) {super(code)}
  // No status means the request may have reached the server, so its outcome is unknown.
  get ambiguous() {return this.status === 0 || this.status === 408 || this.status >= 500}
 }
@@ -155,7 +155,7 @@ export function parseMutation(v: unknown): MutationResult {
 async function request(url: string, init: RequestInit, current: () => boolean): Promise<unknown> {
  try {return await api<unknown>(url, {cache: 'no-store', ...init, timeoutMs: 20000}, current)}
  catch (error) {
-  if (error instanceof ApiError) throw new SopError(error.status, error.code || (error.status === 408 ? 'client_timeout' : 'request_failed'));
+  if (error instanceof ApiError) throw new SopError(error.status, error.code || (error.status === 408 ? 'client_timeout' : 'request_failed'),error.payload&&typeof error.payload==='object'&&'reason' in error.payload&&typeof error.payload.reason==='string'?error.payload.reason:undefined);
   if (error instanceof DOMException && error.name === 'AbortError') throw error;
   throw new SopError(0, 'network');
  }
@@ -176,7 +176,7 @@ export const sopApi = {
   request(`${base(id)}/sop-import/preview`, post(body), current).then(parsePreview),
  apply: (id: string, body: {preview_id: string; request_id: string}, current: () => boolean) => request(`${base(id)}/sop-import/apply`, post(body), current).then(parseReceipt),
  run: (id: string, requestId: string, current: () => boolean) => request(`${base(id)}/sop-import/runs/${encodeURIComponent(requestId)}`, {}, current).then(parseReceipt),
- create: (id: string, body: {title: string; node_keys: SopNodeKey[]}, current: () => boolean) => request(`${base(id)}/sop-tasks`, post(body), current).then(r => ({task_id: str(object(r).task_id), checklist_revision: int(object(r).checklist_revision)})),
+ create: (id: string, body: {title: string; node_keys: SopNodeKey[];instructions?:string;participants?:{executor?:string};due_date?:string|null}, current: () => boolean) => request(`${base(id)}/sop-tasks`, post(body), current).then(r => ({task_id: str(object(r).task_id), checklist_revision: int(object(r).checklist_revision)})),
  patch: (id: string, taskId: string, body: Record<string, unknown>, current: () => boolean) => request(`${base(id)}/sop-tasks/${encodeURIComponent(taskId)}`, post(body, 'PATCH'), current).then(parseMutation),
  closeNode: (id: string, nodeKey: SopNodeKey, current: () => boolean): Promise<CloseNodeResult> => request(`${base(id)}/sop-tasks/close-node`, post({node_key: nodeKey}), current).then(r => {const o = object(r), left = object(o.left_open); return {closed: int(o.closed), leftOpen: {shared: int(left.shared), unresolved: int(left.unresolved)}}}),
  transition: (id: string, taskId: string, body: Record<string, unknown>, current: () => boolean) => request(`${base(id)}/sop-tasks/${encodeURIComponent(taskId)}/transition`, post(body), current).then(parseMutation),
@@ -192,4 +192,4 @@ export const SOP_ERROR_TEXT: Record<string, string> = {
  task_reopen_required: '需先重新開啟', invalid_transition: '目前狀態不可執行', legacy_case_requires_opt_in: '舊案需先確認套用 SOP', node_not_enrolled: '此節點尚未套用 SOP', node_already_started_or_finished: '已開始或已完成的節點維持原流程', case_identity_unresolved: '案件識別待核對', case_policy_changed: '案件納管範圍已變更，請重新讀取', confirmation_required: '請選擇節點並勾選確認', case_already_managed: '此案已套用 SOP，請重新讀取', invalid_request: '內容格式不正確', run_not_found: '找不到匯入紀錄',
  network: '連線中斷', client_timeout: '連線逾時', malformed: '回應格式不正確',
 };
-export const sopErrorText = (error: unknown) => error instanceof SopError ? SOP_ERROR_TEXT[error.code] || `操作未完成（${error.status}）` : '操作未完成';
+export const sopErrorText = (error: unknown) => error instanceof SopError ? error.reason || SOP_ERROR_TEXT[error.code] || `操作未完成（${error.status}）` : '操作未完成';

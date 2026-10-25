@@ -40,9 +40,11 @@
 
 .sop-form>label{display:grid;gap:6px;font-size:13px}.sop-form>label:has(input[type=checkbox]){display:flex;align-items:center;gap:8px}.sop-form input[type=checkbox]{width:18px;height:18px;flex:none}.sop-task-select input[type=checkbox]{width:18px;height:18px;flex:none;margin:0}.sop-batch-list label{flex-wrap:wrap}
 .sop-task-select{flex-wrap:wrap}
-.sop-quick-assign{min-height:36px;max-width:11rem;border:1px solid var(--sep);background:var(--surface);color:var(--label);border-radius:10px;padding:4px 8px;font:inherit;font-size:13px}
+.sop-quick-assign{min-height:44px;max-width:11rem;border:1px solid var(--sep);background:var(--surface);color:var(--label);border-radius:10px;padding:4px 8px;font:inherit;font-size:13px}
 .sop-node-done{display:flex;gap:8px 12px;align-items:center;flex-wrap:wrap}
 .sop-more-roles{display:grid;gap:12px}.sop-more-roles>summary{cursor:pointer;font-size:13px;color:var(--label-2)}
 .sop-empty-default{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px 20px;margin:12px 0;border:1px dashed var(--sep);border-radius:12px;background:var(--surface-2)}.sop-empty-default>div{display:grid;gap:4px}.sop-empty-default span{font-size:13px;color:var(--label-2)}
 
 .sop-result {padding-block:1rem;border-block:1px solid var(--border-color,#d9dedb)}
+
+.pf-tasks .sop-tasks{border-top:0;padding-top:0}
