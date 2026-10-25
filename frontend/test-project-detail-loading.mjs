@@ -22,7 +22,7 @@ const settle=()=>{for(const request of requests)request.resolve(new Response('{"
 try{
  root=createRoot(document.getElementById('root'));
  await render('overview');
- assert.deepEqual(requests.map(r=>r.url).sort(),['/api/projects/p1','/api/projects/p1/node-assignments','/api/projects/p1/progress'],'overview data starts together while project detail is unresolved');
+ assert.deepEqual(requests.map(r=>r.url).sort(),['/api/projects/p1','/api/projects/p1/node-assignments','/api/projects/p1/node-assignments/start-sop','/api/projects/p1/progress','/api/projects/p1/sop-assignees','/api/projects/p1/sop-tasks'],'overview data starts together while project detail is unresolved');
  await render('flow');
  assert.equal(requests.filter(r=>r.url==='/api/projects/p1').length,1,'changing tabs shares the pending detail read');
  for(const suffix of ['start-sop','sop-tasks','sop-assignees'])assert.equal(requests.filter(r=>r.url.endsWith('/'+suffix)).length,1,'flow starts '+suffix+' without waiting for detail');

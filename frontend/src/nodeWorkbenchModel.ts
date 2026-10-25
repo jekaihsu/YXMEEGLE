@@ -1,7 +1,7 @@
 import type {AssignmentTask, NodePermissions} from './nodeAssignmentApi';
 import type {FlowNode} from './flowModel';
 import type {SopOverview, SopTask} from './sopTaskApi';
-import type {Task} from './types';
+import type {Project,Task} from './types';
 
 export type WorkbenchTask = {id:string; nodeKey:string} & (
  | {source:'lark'; task:AssignmentTask}
@@ -15,7 +15,7 @@ export const NODE_ACTIONS = [
 ] as const;
 export type WorkbenchAction = typeof NODE_ACTIONS[number][0];
 export type ActionRegistry = Record<WorkbenchAction, ActionState>;
-export type LocalNode = {key:string; id:string; revision:number; status:string; ownerId:string|null; completedAt:string|null; reason:string|null; can:NodePermissions; disabledReason:string|null};
+export type LocalNode = {key:string; id:string; revision:number; status:string; ownerId:string|null; completedAt:string|null; reason:string|null; can:NodePermissions; disabledReason:string|null;completeDisabledReason?:string|null};
 export type NodeWorkbench = {node:FlowNode; source:'lark'|'local-sop'|'legacy'; tasks:WorkbenchTask[]; actions:ActionRegistry; local?:LocalNode};
 
 export function actionRegistry({can,busy=false,reason='',local=false,legacy=false}:{can:NodePermissions;busy?:boolean;reason?:string;local?:boolean;legacy?:boolean}):ActionRegistry {
@@ -32,7 +32,9 @@ export function buildNodeWorkbench({node,sop,local,busy=false,reason='',can={}}:
  const remote:WorkbenchTask[]=node.taskRows.flatMap(row=>row.task ? [{id:row.id,nodeKey:node.key,source:'lark' as const,task:row.task}] : []);
  const legacy:WorkbenchTask[]=node.legacy?.tasks.filter(t=>t.status!=='superseded').map(task=>({id:task.id,nodeKey:node.key,source:'legacy',task})) || [];
  const checklist:WorkbenchTask[]=(sop?.tasks || []).filter(t=>t.nodes.some(n=>n.node_key===node.key)).map(task=>({id:task.id,nodeKey:node.key,source:'local-sop',task}));
- return {node,source,tasks:[...remote,...legacy,...checklist],local,actions:actionRegistry({can:local?.can || can,busy,reason:reason || local?.disabledReason || '',local:!!local,legacy:sop?.enrollment?.policy==='legacy'})};
+ const actions=actionRegistry({can:local?.can || can,busy,reason:reason || local?.disabledReason || '',local:!!local,legacy:sop?.enrollment?.policy==='legacy'});
+ if(local && !actions.complete.enabled && local.completeDisabledReason)actions.complete.disabledReason=local.completeDisabledReason;
+ return {node,source,tasks:[...remote,...legacy,...checklist],local,actions};
 }
 export type TaskDraft = {title:string;assignee:string;due:string;notes:string;status:string;reason:string};
 export type EditorField = 'title'|'assignee'|'due'|'notes'|'status';
@@ -41,3 +43,22 @@ export function editorFields(permissions:Record<EditorField,boolean>,reason='需
  return Object.fromEntries(Object.entries(permissions).map(([key,enabled])=>[key,{enabled,reason:enabled?'':reason}])) as TaskEditorModel['fields'];
 }
 export function draftChanged(a:TaskDraft,b:TaskDraft) {return (['title','assignee','due','notes','status'] as const).some(key=>a[key]!==b[key])}
+
+export function withLocalChecklist(nodes:FlowNode[],sop?:SopOverview,people:{id:string;name:string}[]=[]) :FlowNode[] {
+ if(!sop)return nodes;
+ return nodes.map(node=>{
+  if(node.assignment)return node;
+  const local=sop.localNodes?.find(n=>n.key===node.key),counts=Object.entries(sop.nodeCounts).find(([key])=>key===node.key)?.[1];
+  if(!local)return node;
+  const tasks=counts ? {done:counts.done,total:counts.total} : node.tasks;
+  const state=local.status==='completed'?'已完成':local.status==='in_progress'?'進行中':node.state;
+  return {...node,state,tasks,owners:local.ownerId ? [{open_id:local.ownerId,name:people.find(p=>p.id===local.ownerId)?.name || node.owners.find(p=>p.open_id===local.ownerId)?.name || '姓名待核對'}] : [],progress:state==='已完成'?{basis:'nodes',percent:100,label:'節點已完成'}:counts&&counts.total?{basis:'tasks',percent:Math.round(counts.done/counts.total*100),label:'SOP 任務完成度'}:{basis:'unknown',percent:null,label:'進度未知'}};
+ });
+}
+
+export function checklistProject(sop:SopOverview):Project|undefined {
+ const header=sop.caseHeader;
+ if(!header || !sop.localNodes?.length)return undefined;
+ return {id:header.id,code:header.code||'',name:header.name||'案件名稱待核對',client:'',pm_id:'',status:'pending',priority:'',due_date:'',original_due_date:'',created_at:'',started_at:'',description:'',contract_amount:null,estimated_points:null,source_url:'',source_kind:'local',revision:0,case_type:'intake',sop_only:true,
+  nodes:sop.localNodes.map(n=>({id:n.id,key:n.key,name:n.key,owner_id:n.ownerId||'',collaborator_ids:[],status:n.status,start_date:null,due_date:null,original_due_date:null,started_at:null,completed_at:n.completedAt,tasks:[]})),files:[],comments:[],daily_reports:[]};
+}

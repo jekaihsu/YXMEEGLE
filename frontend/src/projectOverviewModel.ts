@@ -2,7 +2,7 @@ import {overdueTask,type FlowNode,type FlowTask} from './flowModel';
 import type {NodeAssignmentList} from './nodeAssignmentApi';
 import type {ProductionStage} from './projectProgressApi';
 import type {Project,User} from './types';
-export type OverviewTarget={tab:'flow'|'items'|'data'|'files'|'people';node?:string;task?:string;section?:string;approval?:string;task_source?:string};
+export type OverviewTarget={tab:'overview'|'flow'|'items'|'data'|'files'|'people';node?:string;task?:string;section?:string;approval?:string;task_source?:string};
 export type OverviewAction={kind:'blocking'|'overdue'|'review'|'soon'|'work';title:string;reason:string;owner:string;allowed:boolean;button:string;target:OverviewTarget};
 type ActionInput={nodes:FlowNode[];list?:NodeAssignmentList;user?:User|null;today:string;execution:{allowed:boolean;reason:string};localLead:boolean;assignmentsUnavailable:boolean;blockingApproval?:{id:string;title:string;node:string;owner:string}};
 const finished=(node:FlowNode)=>['已完成','略過'].includes(node.state);

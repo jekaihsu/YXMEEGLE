@@ -1,3 +1,7 @@
+import type {ReactNode} from 'react';
+import type {useSopTasks} from './useSopTasks';
+import {CaseSopStart} from './CaseSopStart';
+import {withLocalChecklist} from './nodeWorkbenchModel';
 import {CalendarDays, Clock3, FileText, Flag} from 'lucide-react';
 import {FlowDiagram} from './FlowDiagram';
 import {buildFlowModel} from './flowModel';
@@ -16,10 +20,11 @@ import './ProjectOverview.css';
 
 const text=(value:unknown,fallback:string)=>typeof value==='string' && value.trim() ? value : fallback;
 const shortDate=(value:unknown)=>typeof value==='string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0,10) : '未設定';
-export function ProjectOverview({c,p,assignments}:{c:Ctx;p:Project;assignments:ReturnType<typeof useNodeAssignments>}){
+export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}:{c:Ctx;p:Project;assignments:ReturnType<typeof useNodeAssignments>;selectedKey:string;sopTasks:ReturnType<typeof useSopTasks>;workbench:ReactNode}){
  const read=useProjectProgress(p.id),list='data' in assignments.state ? assignments.state.data : undefined;
  const data=read.state.kind==='ready' && read.state.data.project_id===p.id ? read.state.data : undefined;
- const model=buildFlowModel({project:assignments.state.kind==='disabled' ? p : {...p,nodes:[]},assignments:list,progress:data,today:c.w.as_of,users:c.w.users});
+ const flow=buildFlowModel({project:assignments.state.kind==='disabled' ? p : {...p,nodes:[]},assignments:list,progress:data,today:c.w.as_of,users:c.w.users});
+ const model={...flow,nodes:withLocalChecklist(flow.nodes,'data' in sopTasks.state?sopTasks.state.data:undefined,sopTasks.assignees)};
  const unavailable=assignments.state.kind==='loading' || assignments.state.kind==='error';
  const approval=c.s.features?.change_extension ? c.w.approvals.filter(a=>a.project_id===p.id && a.status==='pending' && p.nodes.some(n=>n.id===a.node_id && n.status==='paused')).sort((a,b)=>a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))[0] : undefined;
  const action=selectNextAction({nodes:model.nodes,list,user:c.s.user,today:c.w.as_of,execution:{allowed:executionAllowed(p,c.w),reason:executionReason(p)},localLead:isProjectLead(c.s,p),assignmentsUnavailable:unavailable,blockingApproval:approval ? {id:approval.id,title:approval.title,node:approval.node_id,owner:p.supervisor_id ? nameOf(c.w,p.supervisor_id) : '案件主管'} : undefined});
@@ -30,8 +35,9 @@ export function ProjectOverview({c,p,assignments}:{c:Ctx;p:Project;assignments:R
  const rows=field ? workItemRows(field,stale || data?.sources.reports_status!=='ok').slice(0,5) : [];
  const events=c.w.events.filter(e=>e.project_id===p.id).slice().sort((a,b)=>b.created_at.localeCompare(a.created_at)).slice(0,4);
  const documents=Array.isArray(p.files) ? overviewDocuments(p.files,c.w.file_categories) : null;
- const go=(target:OverviewTarget)=>c.go({view:'project',project:p.id,...target});
- const href=(target:OverviewTarget)=>`#${new URLSearchParams({view:'project',project:p.id,...target})}`;
+ const destination=(target:OverviewTarget)=>({...target,...(target.tab==='flow'?{tab:'overview'}:{})});
+ const go=(target:OverviewTarget)=>c.go({view:'project',project:p.id,...destination(target)});
+ const href=(target:OverviewTarget)=>`#${new URLSearchParams({view:'project',project:p.id,...destination(target)})}`;
  const current=list?.summary.current_node || model.nodes.find(n=>n.state==='進行中' || n.state==='待審核')?.key || model.nodes[0].key;
  const fieldNode=model.nodes.find(node=>node.key==='field'),localField=p.nodes.find(node=>node.key==='field');
  const pm=c.w.users.find(user=>user.id===p.pm_id),supervisor=c.w.users.find(user=>user.id===localField?.supervisor_id);
@@ -39,11 +45,13 @@ export function ProjectOverview({c,p,assignments}:{c:Ctx;p:Project;assignments:R
  const status=text(p.source_status,'來源狀態待核對');
  return <div className="project-overview">
   <div className="po-main">
-   <FlowDiagram compact nodes={model.nodes} overall={model.overall} selected={current} loading={assignments.state.kind==='loading'} onSelect={node=>go({tab:'flow',node})}/>
+   {!workbench && <CaseSopStart projectId={p.id} sop={sopTasks}/>}
+   <FlowDiagram compact nodes={model.nodes} overall={model.overall} selected={c.route.node?selectedKey:current} loading={assignments.state.kind==='loading'} onSelect={node=>go({tab:'overview',node})}/>
+   {workbench}
     <section className="po-card po-todos" aria-labelledby="po-todo-title"><header className="po-card-heading"><h2 id="po-todo-title">待辦事項</h2><Button variant="plain" onClick={()=>go({tab:'flow',section:'all-tasks'})}>查看全部任務{tasks.complete ? ` (${tasks.rows.length})` : ''} →</Button></header>
      <ul>{todos.slice(0,3).map(row=><li key={row.id} className={row.primary ? 'po-todo-primary' : undefined}><span className="po-todo-circle" aria-hidden="true"/><div className="po-todo-content"><a href={href(row.target)} onClick={event=>{event.preventDefault();go(row.target)}}>{row.title}</a>{row.primary && <p title={row.reason}>{action.kind==='blocking' && action.title.includes('節點的負責人') ? '執行與交接窗口需要核對。' : row.reason}</p>}<div className="po-todo-meta"><span className="po-person"><Avatar small user={c.w.users.find(user=>user.id===row.ownerId || user.name===row.owner)}/>{row.owner}</span><time>{row.deadline ? shortDate(row.deadline).slice(5).replace('-','/') : '未排定'}</time></div></div>{row.primary && <Button variant="primary" onClick={()=>go(row.target)}>{action.button}</Button>}</li>)}</ul>
     </section>
-   {unavailable && <p className="po-source-state" role={assignments.state.kind==='error' ? 'alert' : 'status'}>{assignments.state.kind==='error' ? `節點來源暫不可用 · ${assignments.state.message}` : '節點指派載入中，其他案件資訊仍可查看。'}{assignments.state.kind==='error' && <Button variant="plain" onClick={()=>void assignments.reload()}>重試節點來源</Button>}</p>}
+   {assignments.state.kind==='error' && <p className="po-source-state" role="alert">節點暫不可用<Button onClick={()=>void assignments.reload()}>重試</Button></p>}
    {sourceStale && !list?.stale && <p className="po-source-state">工程來源為上次成功資料，待更新核對。</p>}
    {list?.stale && <p className="po-source-state">節點來源為上次成功資料，待更新核對。</p>}
    {!!kpis.length && <section className="po-kpis po-card" aria-label="案件重點指標">{kpis.map(cell=><a key={cell.id} className={`po-kpi${cell.compact ? ' po-kpi-text' : ''}${cell.id==='latest_report' ? ' po-kpi-date' : ''}${cell.alert ? ' po-kpi-alert' : ''}`} href={href(cell.target)} onClick={event=>{event.preventDefault();go(cell.target)}}><span>{cell.label}</span><strong>{cell.value}</strong><small>{cell.detail}</small></a>)}</section>}
@@ -62,7 +70,7 @@ export function ProjectOverview({c,p,assignments}:{c:Ctx;p:Project;assignments:R
   <aside className="po-sidebar" aria-label="案件摘要資料">
    <section className="po-card"><h2>案件資訊</h2><dl><div><dt>案件狀態</dt><dd><span className={`po-pill${status.includes('待核對') ? ' po-pill-amber' : ''}`}>{status}</span></dd></div>{text(p.project_type,'') && <div><dt>案件類型</dt><dd>{p.project_type}</dd></div>}{['demo','lark','local'].includes(p.source_kind) && <div><dt>來源</dt><dd>{p.source_kind==='demo' ? '獨立示範資料' : p.source_kind==='lark' ? '飛書' : '工作台'}</dd></div>}{p.created_at && <div><dt>建立時間</dt><dd>{shortDate(p.created_at)}</dd></div>}{sync && <div><dt>最後同步</dt><dd><time dateTime={sync} title={stamp(sync)}>{stamp(sync).replaceAll('/','-').slice(0,16)}</time></dd></div>}</dl></section>
    {(p.planned_start_date || p.planned_end_date || p.original_due_date) && <section className="po-card po-dates"><h2>關鍵日期</h2><dl>{p.planned_start_date && <div><dt><Flag size={17}/>預計開工</dt><dd>{shortDate(p.planned_start_date)}</dd></div>}{p.planned_end_date && <div><dt><CalendarDays size={17}/>預計完工</dt><dd>{shortDate(p.planned_end_date)}</dd></div>}{p.original_due_date && <div><dt><Clock3 size={17}/>合約期限</dt><dd>{shortDate(p.original_due_date)}</dd></div>}</dl></section>}
-   <section className="po-card po-team"><h2>負責人與團隊</h2><dl><div><dt>PM</dt><dd className="po-person"><Avatar small user={pm}/>{p.pm_id ? nameOf(c.w,p.pm_id) : '未指派'}</dd></div><div><dt>組別主管</dt><dd className="po-person"><Avatar small user={supervisor}/>{supervisor?.name || '未指派'}</dd></div>{!!fieldNode?.departments.length && <div><dt>外業組別</dt><dd>{fieldNode.departments.join('、')}</dd></div>}{fieldNode?.assignment?.assigned_by?.name && <div><dt>指派主管</dt><dd>{fieldNode.assignment.assigned_by.name}</dd></div>}</dl></section>
+   <section className="po-card po-team"><h2>負責人與團隊</h2><dl><div><dt>PM</dt><dd className="po-person"><Avatar small user={pm}/>{p.pm_id ? nameOf(c.w,p.pm_id) : p.sop_only?'未提供':'未指派'}</dd></div><div><dt>組別主管</dt><dd className="po-person"><Avatar small user={supervisor}/>{supervisor?.name || '未指派'}</dd></div>{!!fieldNode?.departments.length && <div><dt>外業組別</dt><dd>{fieldNode.departments.join('、')}</dd></div>}{fieldNode?.assignment?.assigned_by?.name && <div><dt>指派主管</dt><dd>{fieldNode.assignment.assigned_by.name}</dd></div>}</dl></section>
   </aside>
  </div>;
 }

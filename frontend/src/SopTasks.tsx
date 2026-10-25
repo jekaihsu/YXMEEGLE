@@ -71,7 +71,7 @@ export function SopTasks({c, p, nodeKey, sop, importing, setImporting}: {c: Ctx;
  const people = new Map([...c.w.users,...sop.assignees].map(u => [u.id, u.name]));
  const routeTask = c.route.task_source === SOP_TASK_SOURCE ? c.route.task : undefined;
  const openTask = data?.tasks.find(t => t.id === routeTask);
- const openRoute = (task?: string) => c.go({...c.route, tab: 'flow', task, task_source: task ? SOP_TASK_SOURCE : undefined});
+ const openRoute = (task?: string) => c.go({...c.route, tab: c.route.tab==='overview'?'overview':'flow', task, task_source: task ? SOP_TASK_SOURCE : undefined});
  const toggle = (f: SopFilter) => setFilters(list => list.includes(f) ? list.filter(x => x !== f) : [...list, f]);
  const rows = data ? visibleTasks(data.tasks, {scope, filters, history}, me) : [];
  const counts = data ? (scope ? data.nodeCounts[scope] : data.caseCounts) : undefined;
@@ -103,11 +103,9 @@ const assign = async (t: SopTask, id: string) => {
    <div className="pf-actions">
     {!data?.enrollment && empty && allowed && <Button variant="plain" disabled={!allowed.import} disabledReason="需 SOP 匯入權限" onClick={() => setImporting('case')}>匯入預設任務</Button>}
     {!data?.enrollment && allowed && !empty && <FlowAction allowed={allowed.import} reason="需 SOP 匯入權限" help="從預設 SOP 範本帶入整個案件的標準任務清單，匯入前可預覽與勾選。" onClick={() => setImporting('case')}>匯入預設任務</FlowAction>}
-    {(allowed?.manage || data && suggestionSelection(data.tasks).length>0) && <details className="pf-action-more"><summary>其他操作</summary><div className="pf-actions">
-      {allowed?.import && data?.enrollment?.policy === 'managed' && <Button variant="plain" onClick={() => setImporting('case')}>選擇性匯入任務</Button>}
-      {allowed?.manage && <FlowAction allowed={allowed.manage} reason="需 SOP 任務管理權限" help="手動新增一項此節點的 SOP 任務。" onClick={() => setCreating(true)}>新增任務</FlowAction>}
-      {data && suggestionSelection(data.tasks).length>0 && <Button onClick={()=>setReview([])}>採用全部建議</Button>}
-    </div></details>}
+    {allowed && <Button id="sop-add-task" disabled={!allowed.manage} disabledReason="任務寫入尚未開放或需管理權限" onClick={()=>setCreating(true)}>新增任務</Button>}
+    {allowed && data?.enrollment?.policy==='managed' && <Button disabled={!allowed.import} disabledReason="需 SOP 匯入權限" onClick={()=>setImporting('case')}>匯入預設任務</Button>}
+    {data && suggestionSelection(data.tasks).length>0 && <Button onClick={()=>setReview([])}>採用全部建議</Button>}
    </div>
   </header>
 

@@ -1,3 +1,4 @@
+import type {LocalNode} from './nodeWorkbenchModel';
 import {api, ApiError} from './api';
 
 export const SOP_NODES = [['sales','報價'],['pm','PM 派工'],['confirmation','確認單'],['field','外業'],['control','控制'],['mapping','圖資'],['report','報告'],['pricing','計價請款'],['settlement','入帳結算']] as const;
@@ -33,6 +34,7 @@ export interface SopEnrollment {
  nodes:{key:SopNodeKey; name:string; status:string; eligible:boolean}[];
 }
 export interface SopOverview {
+ localNodes?:LocalNode[];
  enrollment?:SopEnrollment|null;
  caseHeader?:{id:string; code:string|null; name:string|null}; projectId: string; startNode: SopNodeKey; checklistRevision: number; caseCounts: SopCounts; nodeCounts: Record<SopNodeKey, SopCounts>;
  tasks: SopTask[]; allowed: {import: boolean; manage: boolean; work: boolean};
@@ -106,13 +108,17 @@ export function parseReadiness(v:unknown) {
  return list(x.items,v=>{const c=object(v),p=object(c.policy);return {projectId:str(c.project_id),code:optStr(c.code),name:optStr(c.name),
   policy:oneOf<SopPolicy>(['legacy','managed','needs_review'])(p.policy),enrollments:list(c.enrollments,parseEnrollmentAttempt)}});
 }
+function parseLocalNode(v:unknown):LocalNode {
+ const n=object(v),can=object(n.can);
+ return {key:node(n.key),id:str(n.id),revision:int(n.revision),status:str(n.status),ownerId:optStr(n.owner_id),completedAt:optStr(n.completed_at),reason:optStr(n.reason),disabledReason:optStr(n.disabled_reason),completeDisabledReason:optStr(n.complete_disabled_reason),can:{assign:bool(can.assign),complete:bool(can.complete),reject:bool(can.reject),create_task:bool(can.create_task)}};
+}
 export function parseOverview(v: unknown): SopOverview {
  const o = object(v), allowed = object(o.allowed_actions), nodeCounts = object(o.node_counts);
  if (o.task_source !== 'sop_local') throw malformed();
  const tasks = list(o.tasks, task);
  if (new Set(tasks.map(t => t.id)).size !== tasks.length) throw malformed();
  const header=o.case==null?null:object(o.case);
- return {enrollment:o.sop_enrollment==null?null:parseEnrollment(o.sop_enrollment),caseHeader:header?{id:str(header.id),code:optStr(header.code),name:optStr(header.name)}:undefined,projectId: str(o.project_id), startNode: node(o.start_node), checklistRevision: int(o.checklist_revision), caseCounts: counts(o.case_counts),
+ return {localNodes:o.local_nodes==null?[]:list(o.local_nodes,parseLocalNode),enrollment:o.sop_enrollment==null?null:parseEnrollment(o.sop_enrollment),caseHeader:header?{id:str(header.id),code:optStr(header.code),name:optStr(header.name)}:undefined,projectId: str(o.project_id), startNode: node(o.start_node), checklistRevision: int(o.checklist_revision), caseCounts: counts(o.case_counts),
   nodeCounts: Object.fromEntries(SOP_NODE_KEYS.map(key => [key, counts(nodeCounts[key])])) as Record<SopNodeKey, SopCounts>,
   tasks, allowed: {import: bool(allowed.import), manage: bool(allowed.manage), work: bool(allowed.work)},
   nodeDone: Object.fromEntries(Object.entries(o.node_done == null ? {} : object(o.node_done)).filter(([key]) => isSopNode(key)).map(([key, v]) => {const d = object(v); return [key, {rule: str(d.rule), reason: str(d.reason)}]}))};
@@ -157,6 +163,7 @@ async function request(url: string, init: RequestInit, current: () => boolean): 
 const base = (id: string) => `/api/projects/${encodeURIComponent(id)}`;
 const post = (body: unknown, method = 'POST'): RequestInit => ({method, body: JSON.stringify(body)});
 export const sopApi = {
+ localNode:(id:string,key:string,body:{action:'assign'|'complete'|'reject';expected_revision:number;owner_id?:string;reason?:string},current:()=>boolean)=>request(`${base(id)}/sop-nodes/${encodeURIComponent(key)}`,post(body),current),
  readiness: (signal?:AbortSignal) => api<unknown>('/api/sop-import/readiness',{signal}).then(parseReadiness),
  optIn: (id:string, nodeKeys:SopNodeKey[], current:()=>boolean) => request(`${base(id)}/sop-import/opt-in`,{method:'POST',body:JSON.stringify({node_keys:nodeKeys,confirmed:true})},current).then(parseEnrollmentAttempt),
  retryEnrollment: (id:string, enrollmentId:string, current:()=>boolean) => request(`${base(id)}/sop-import/retry`,{method:'POST',body:JSON.stringify({enrollment_id:enrollmentId})},current).then(parseEnrollmentAttempt),

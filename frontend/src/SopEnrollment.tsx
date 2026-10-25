@@ -14,7 +14,7 @@ export function enrollmentLabel(enrollment:SopEnrollment) {
  return '等待自動帶入';
 }
 
-export function SopEnrollmentStatus({projectId,enrollment,current,reload}:{projectId:string;enrollment:SopEnrollment;current:()=>boolean;reload:()=>Promise<void>}) {
+export function SopEnrollmentStatus({projectId,enrollment,current,reload,startLabel}:{projectId:string;enrollment:SopEnrollment;current:()=>boolean;reload:()=>Promise<void>;startLabel?:string}) {
  const [open,setOpen]=useState(false),[confirm,setConfirm]=useState(false),[keys,setKeys]=useState<SopNodeKey[]>([]);
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
  const run=async(optIn:boolean)=>{
@@ -30,7 +30,7 @@ export function SopEnrollmentStatus({projectId,enrollment,current,reload}:{proje
  return <div className="sop-enrollment">
   <span role="status" className="sop-muted">{enrollmentLabel(enrollment)}</span>
   {enrollment.canRetry && enrollment.attempt && enrollment.attempt.status!=='succeeded' && <Button variant="plain" disabled={busy} onClick={()=>void run(false)}>重試</Button>}
-  {enrollment.canOptIn && <Button variant="plain" onClick={()=>{setKeys(enrollment.nodes.filter(n=>n.eligible).map(n=>n.key));setConfirm(false);setOpen(true)}}>套用 SOP 到剩餘節點</Button>}
+  {enrollment.canOptIn && <Button variant="plain" onClick={()=>{setKeys(enrollment.nodes.filter(n=>n.eligible).map(n=>n.key));setConfirm(false);setOpen(true)}}>{startLabel||'套用 SOP 到剩餘節點'}</Button>}
   {error && <p role="alert">{error}</p>}
   {open && createPortal(<Sheet title="套用 SOP 到剩餘節點" onClose={()=>{if(!busy)setOpen(false)}}>
    <div className="sop-form sop-enroll-form">

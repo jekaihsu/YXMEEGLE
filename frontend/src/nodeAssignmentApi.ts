@@ -53,7 +53,7 @@ export type AssignmentMutation =
   | {action: 'assign'; nodeKey: string; owner_open_ids: string[]; expected_revision: string | null}
   | {action: 'reject' | 'legacy_complete'; nodeKey: string; reason: string; expected_revision: string | null}
   | {action: 'create_task'; nodeKey: string; task: NewAssignmentTask}
-  | {action: 'update_task'; nodeKey: string; taskId: string; expected_revision: string; patch: Partial<Pick<NewAssignmentTask, 'assignee_open_id' | 'deadline' | 'detail'>> & {status?: string}};
+  | {action: 'update_task'; nodeKey: string; taskId: string; expected_revision: string; patch: Partial<Pick<NewAssignmentTask, 'title' | 'detail'>> & {status?: string; assignee_open_id?:string|null; deadline?:string|null}};
 
 const NODE_LABELS: Record<string, string> = {
   not_started: '未開始', pending: '待處理', in_progress: '進行中', pending_review: '待審核', completed: '已完成', skipped: '略過',

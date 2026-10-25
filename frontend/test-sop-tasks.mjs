@@ -171,7 +171,7 @@ test('the section lists the node tasks with executor, state, due and badges', as
 test('an empty case shows plain labels and a denied read shows the denial', async () => {
  await mount({tasks: []});
  assert.equal(document.querySelector('.sop-progress').textContent, '無適用任務');
- assert.equal(document.querySelector('#sop-tasks .pf-empty').textContent, '無 SOP 任務');
+ assert.equal(document.querySelector('#sop-tasks .pf-empty'), null);assert.ok(button('新增任務'));
  await act(async () => root.unmount()); root = null;
  await mount({overviewStatus: 403});
  assert.match(document.querySelector('#sop-tasks').textContent, /sop_task_read.*sop_task_read_source/);
@@ -206,7 +206,7 @@ test('quote-stage import starts from 報價, needs a reason for subcontract rows
  assert.ok(before >= 2, 'overview refreshed after apply');
  await click(button('開啟匯入任務'));
  assert.equal(dialog(), null);
- assert.equal(button('全案').getAttribute('aria-pressed'), 'true');
+ assert.equal(c.route.tab,'flow');
 });
 
 test('an apply the server never recorded is retried with the same preview and request ids', async () => {
@@ -247,20 +247,20 @@ test('a deep link opens the SOP drawer, Escape clears the discriminator and retu
 
 test('a revision conflict reloads the task and keeps the draft for the next save', async () => {
  await mount({route: {task: 't1', task_source: 'sop_local'}});
- const input = dialog().querySelector('.sop-field input');
+ const input = dialog().querySelector('[aria-label="任務名稱"]');
  await type(input, '業主需求確認');
  server.patchReply = () => {server.overview = overview([task('t1', {revision: 2})]); return response({code: 'task_revision_conflict'}, 409)};
- await click(button('儲存內容'));
+ await click(button('儲存任務'));
  assert.equal(dialog().querySelector('[role=alert]').textContent, '任務已被更新，已重新載入');
- assert.equal(dialog().querySelector('.sop-field input').value, '業主需求確認');
+ assert.equal(dialog().querySelector('[aria-label="任務名稱"]').value, '業主需求確認');
  server.patchReply = null;
- await click(button('儲存內容'));
+ await click(button('儲存任務'));
  assert.deepEqual(server.patch.map(b => [b.expected_revision, b.title]), [[1, '業主需求確認'], [2, '業主需求確認']]);
 });
 
 test('participant choices come only from eligible case people', async () => {
  await mount({route: {task: 't1', task_source: 'sop_local'}});
- const executor = [...dialog().querySelectorAll('.sop-field')].find(f => f.textContent.startsWith('執行人員')).querySelector('select');
+ const executor = dialog().querySelector('[aria-label="任務負責人"]');
  assert.deepEqual([...executor.options].map(o => o.textContent), ['未指派', '王經理', '林組員']);
 });
 

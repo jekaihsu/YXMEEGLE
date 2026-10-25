@@ -22,3 +22,9 @@ test('task variants retain their source and revisions without title matching',()
 test('draft changes ignore a reason alone and preserve cleared assignees and dates',()=>{
  const a={title:'核對',assignee:'u1',due:'2026-10-25',notes:'',status:'pending',reason:''};assert.equal(m.draftChanged(a,{...a,reason:'原因'}),false);assert.equal(m.draftChanged(a,{...a,assignee:''}),true);assert.equal(m.draftChanged(a,{...a,due:''}),true);
 });
+
+test('a checklist-only case uses authorized node projections and preserves unknown case facts',()=>{
+ assert.equal(m.checklistProject({caseHeader:{id:'local',name:'規劃案'},localNodes:[]}),undefined);
+ const p=m.checklistProject({caseHeader:{id:'local',name:'規劃案',code:null},localNodes:[{id:'sales-id',key:'sales',status:'completed',ownerId:'u1',completedAt:'2026-10-25'}]});
+ assert.equal(p.id,'local');assert.equal(p.contract_amount,null);assert.equal(p.pm_id,'');assert.equal(p.nodes[0].status,'completed');assert.equal(p.nodes[0].owner_id,'u1');assert.equal(p.sop_only,true);
+});

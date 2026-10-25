@@ -147,7 +147,7 @@ await check('production seed is one task with expanded evidence, unique item IDs
  await click(seed.querySelector('.pf-task-open'));
  assert.doesNotMatch(document.querySelector('[role=dialog]').textContent,/SOP-START|999/);
  assert.ok(document.querySelector('select[aria-label="任務狀態"]'));
- await value(document.querySelector('select[aria-label="任務狀態"]'),'已完成');await click(button('儲存狀態'));
+ await value(document.querySelector('select[aria-label="任務狀態"]'),'已完成');await click(button('儲存任務'));
  assert.equal(calls.findLast(call=>call.method==='PATCH').body.status,'已完成');
  await click(button('關閉'));
  assert.match(document.querySelector('[data-assignment-task="recTask1"]').textContent,/已完成/);
