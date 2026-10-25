@@ -13,7 +13,7 @@ const raw={policy:{policy:'legacy'},can_opt_in:true,can_retry:true,enrollment:nu
 const attempt={id:'job',project_id:'p1',status:'failed',last_error:'RuntimeError',attempts:1,receipt:null};
 let enrollment=ui.parseEnrollment(raw);
 assert.equal(ui.enrollmentLabel(enrollment),'舊案 · 維持原流程');
-assert.equal(ui.enrollmentLabel(ui.parseEnrollment({...raw,policy:{policy:'needs_review'}})),'案件待核對');
+assert.equal(ui.enrollmentLabel(ui.parseEnrollment({...raw,policy:{policy:'needs_review'}})),'SOP 狀態待核對');
 assert.equal(ui.enrollmentLabel(ui.parseEnrollment({...raw,policy:{policy:'managed'},enrollment:{...attempt,status:'pending',last_error:'template_unavailable'}})),'範本尚未發布');
 assert.equal(ui.enrollmentLabel(ui.parseEnrollment({...raw,policy:{policy:'managed'},enrollment:{...attempt,status:'succeeded',receipt:{created_task_ids:['t1','t2'],existing_task_ids:[]}}})),'已自動帶入 2 項');
 assert.throws(()=>ui.parseEnrollment({...raw,policy:{policy:'unknown'}}));

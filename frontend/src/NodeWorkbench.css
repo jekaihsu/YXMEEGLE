@@ -16,3 +16,7 @@
 }
 
 .project-overview .nw-start .ds-button[data-variant="primary"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+
+.project-flow .pf-actions button,.project-flow .pf-filters button,.project-flow .pf-node-actions button,.project-overview .button,.project-overview .ds-button{min-height:44px}
+.project-overview a{display:inline-flex;align-items:center;min-height:44px}
+.project-overview .po-kpi,.project-overview .po-documents a{display:flex}

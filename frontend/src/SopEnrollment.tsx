@@ -5,7 +5,7 @@ import {sopApi, sopErrorText, type SopEnrollment, type SopNodeKey} from './sopTa
 
 export function enrollmentLabel(enrollment:SopEnrollment) {
  if(enrollment.policy==='legacy') return '舊案 · 維持原流程';
- if(enrollment.policy==='needs_review') return '案件待核對';
+ if(enrollment.policy==='needs_review') return 'SOP 狀態待核對';
  const attempt=enrollment.attempt;
  if(attempt?.status==='succeeded') return `已自動帶入 ${attempt.createdCount} 項`;
  if(attempt?.lastError==='template_unavailable') return '範本尚未發布';
