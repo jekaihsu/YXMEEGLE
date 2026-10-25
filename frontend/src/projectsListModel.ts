@@ -3,8 +3,8 @@ import {buildFlowModel, type FlowNode} from './flowModel';
 import {compareTableValues, tableCalendarDay} from './companyDashboardCache';
 
 export type PortfolioNode = {key:string;status:string;owner_id:string|null;collaborator_ids:string[]};
-export type PortfolioProject = Project & {portfolio_nodes?:PortfolioNode[];sop_summary?:{policy:string|null;imported_tasks:boolean}};
-export type PortfolioPage = {items:PortfolioProject[];total:number;as_of:string;basis:string};
+export type PortfolioProject = Project & {duplicate_count?:number;portfolio_nodes?:PortfolioNode[];sop_summary?:{policy:string|null;imported_tasks:boolean}};
+export type PortfolioPage = {items:PortfolioProject[];total:number;hidden_duplicates?:number;as_of:string;basis:string};
 export type CaseState = '進行中'|'待審核'|'尚未開始'|'已完成'|'待核對'|'暫停';
 export type CaseRow = {project:PortfolioProject;nodes:FlowNode[];current:FlowNode|undefined;state:CaseState;mine:boolean;sop:boolean|null};
 export type GroupKey = 'pinned'|'mine'|'sop'|'notStarted'|'done'|'other';

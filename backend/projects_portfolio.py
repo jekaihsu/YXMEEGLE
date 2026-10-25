@@ -6,6 +6,29 @@ from .shell import card, project_counts
 from .sop_import.models import CasePolicy, LocalTask
 
 
+def collapse_same_code(items):
+    """One card per case code. Lark can hold the same quote twice; a confirmed case wins over an intake."""
+    kept, duplicates = {}, 0
+    result = []
+    for item in items:
+        code = (item.get('code') or '').strip()
+        if not code:
+            result.append(item)
+            continue
+        current = kept.get(code)
+        if current is None:
+            kept[code] = item
+            result.append(item)
+            continue
+        duplicates += 1
+        if current.get('case_type') == 'intake' and item.get('case_type') != 'intake':
+            item['duplicate_count'] = current.get('duplicate_count', 0) + 1
+            result[result.index(current)] = kept[code] = item
+        else:
+            current['duplicate_count'] = current.get('duplicate_count', 0) + 1
+    return result, duplicates
+
+
 def portfolio(db, model, row, state, today, *, assignments, data, user):
     pi, ti, _ = index_tables.tables(model)
     rows = db.execute(select(pi).where(pi.c.workspace_id == row.id,
@@ -56,5 +79,6 @@ def portfolio(db, model, row, state, today, *, assignments, data, user):
             owner_id=n.get('owner_id'), collaborator_ids=n.get('collaborator_ids', [])) for n in nodes.get(r['project_id'], [])]
         item['sop_summary'] = dict(policy=policies.get(r['project_id']), imported_tasks=r['project_id'] in imported)
         items.append(item)
-    return dict(items=items, total=len(items), as_of=today,
+    items, duplicates = collapse_same_code(items)
+    return dict(items=items, total=len(items), hidden_duplicates=duplicates, as_of=today,
                 basis='persisted_workspace+lark_derived' if statuses else 'persisted_workspace')

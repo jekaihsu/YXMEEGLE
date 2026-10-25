@@ -208,3 +208,14 @@ def test_portfolio_falls_back_on_unparseable_source_records(portfolio_case, monk
         return Cached([{'record_id': 'recBroken', 'fields': None}] if table is Table.NODES else [], False, T0)
     monkeypatch.setattr(h.home.service, 'read_table', read_table)
     assert h.read() == h.persisted
+
+
+def test_same_case_code_collapses_to_one_card_and_a_confirmed_case_wins():
+    from .projects_portfolio import collapse_same_code
+    items=[dict(id='a',code='C115211-01A',case_type='intake'),dict(id='b',code='C115211-01A',case_type='intake'),
+           dict(id='c',code='C115264',case_type='intake'),dict(id='d',code='C115264',case_type='formal'),
+           dict(id='e',code=''),dict(id='f',code='')]
+    kept,hidden=collapse_same_code(items)
+    assert [i['id'] for i in kept]==['a','d','e','f']
+    assert hidden==2
+    assert kept[0]['duplicate_count']==1 and kept[1]['duplicate_count']==1
