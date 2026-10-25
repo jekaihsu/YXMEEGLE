@@ -84,14 +84,28 @@ class SourceSyncService:
         with self.sessions() as db:
             row=db.get(self.W,wid)
             if row is None: return None
-            version=row.version; state=self._state(db,row); matches=None; plan=None
+            version=row.version; matches=None; plan=None
+            cache=db.get(self.C,wid)
+            status=row.data.get('source_status',{})
+            from .live_read.fingerprint import fingerprint
+            unchanged=(skip_unchanged and status.get('projection_workspace_version')==version
+                       and status.get('projection_fingerprint')==digest
+                       and status.get('projection_version')==self.projection_version
+                       and cache and (cache.data or {}).get('status')=='ready'
+                       and cache.data.get('source_message')==snapshot['message']
+                       and fingerprint(cache.data)==digest)
+            # Every storage save invalidates this stamp. A matching version also
+            # excludes root-only writers, which advance the workspace revision.
+            state=self._light(db,row) if unchanged else None
+            if state is not None and all(state.get(key)==row.data.get(key)
+                                         for key in PROJECTION_FIELDS if key not in storage.COLLECTIONS):
+                return {'version':version,'state':state,'matches':True,'plan':None,'prior_projects':[]}
+            state=self._state(db,row)
             prior_projects=deepcopy(state.get('projects', []))
             if skip_unchanged:
                 status=state.get('source_status',{})
                 matches=(status.get('projection_fingerprint')==digest and status.get('projection_version')==self.projection_version
                          and status.get('projection_state_fingerprint')==projection_fingerprint(state))
-            cache=db.get(self.C,wid)
-            from .live_read.fingerprint import fingerprint
             skippable=bool(matches and cache and (cache.data or {}).get('status')=='ready'
                            and cache.data.get('source_message')==snapshot['message'] and fingerprint(cache.data)==digest)
             if not skippable:
@@ -190,6 +204,8 @@ class SourceSyncService:
         with self.sessions.begin() as db:
             row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update()); require(row is not None,'工作區不存在',404)
             fresh=prepared is not None and prepared['version']==row.version
+            if fresh and '_partial' in prepared['state']:
+                fresh=row.data.get('source_status',{}).get('projection_workspace_version')==row.version
             state=prepared['state'] if fresh else self._state(db,row)
             prior_projects=prepared['prior_projects'] if fresh else deepcopy(state.get('projects', []))
             require(self._policy(wid)==policy,'來源同步設定已變更，保留原資料',409)
@@ -219,7 +235,7 @@ class SourceSyncService:
                 # Advance the workspace read metadata without re-importing entities
                 # or incrementing the source generation/event history.
                 status.update(last_sync=value['last_sync'],as_of=value['as_of'],
-                              last_attempt_at=value['last_attempt_at'])
+                              last_attempt_at=value['last_attempt_at'],projection_workspace_version=row.version+1)
                 previous=row.version
                 root=deepcopy(row.data)
                 root.update(source_status=status,version=row.version+1)
@@ -230,6 +246,11 @@ class SourceSyncService:
                     from . import index_tables
                     index_tables.advance_counters(db,self.B,wid,previous,previous+1)
                 return value
+            if '_partial' in state:
+                # A cache change can invalidate an early root-only plan even
+                # when the workspace version has not moved.
+                state=self._state(db,row)
+                prior_projects=deepcopy(state.get('projects', []))
             if planned is not None:
                 snapshot.clear(); snapshot.update(planned)
             else:
@@ -263,7 +284,7 @@ class SourceSyncService:
             # storage.save assigns entity concurrency versions; stamp that final
             # representation so a subsequent unchanged read can safely skip.
             state['source_status'].update(projection_fingerprint=digest,
-                projection_version=self.projection_version,
+                projection_version=self.projection_version,projection_workspace_version=state['version'],
                 projection_state_fingerprint=projection_fingerprint(state))
             root['source_status']=deepcopy(state['source_status'])
             changed=db.execute(update(self.W).where(self.W.id==wid,self.W.version==row.version)

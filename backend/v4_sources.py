@@ -14,7 +14,7 @@ from .source_lifecycle import summarize
 from .seed import STAGES
 from .policy import upgrade, template, TECHNICAL, VERSION
 from .workflow import now, uid
-from .report_links import resolve_daily, LinkBasis
+from .report_links import daily_code, resolve_daily, LinkBasis
 
 STATUS = {'報價中':'pending','執行中':'in_progress','已完工':'engineering_complete','已結案':'completed','中止':'paused','內部':'internal'}
 
@@ -486,12 +486,28 @@ def import_v4(ws, records, complete_tables=None):
     costs=defaultdict(list)
     for r in records:
         if r.get('kind')=='cost': costs[(r['base_token'],r['record_id'])].append(r)
+    # Remove fetched evidence once before remapping it. Doing this per daily
+    # row repeatedly walked every project's accumulated history.
+    daily_ids={source_id(r) for r in records if r.get('kind')=='daily'}
+    for p in ws['projects']: p['daily_reports']=[d for d in p['daily_reports'] if d['id'] not in daily_ids]
+    ws['daily_unmatched']=[d for d in ws['daily_unmatched'] if d['id'] not in daily_ids]
+    projects_by_id={p['id']:p for p in ws['projects']}
+    projects_by_code=defaultdict(dict)
+    for p in ws['projects']:
+        codes=[p.get('code')]+[a.get('code') for a in p.get('report_link_aliases',[]) if a.get('status')=='reviewed']
+        for value in codes:
+            code=normalized_case(value)
+            if code: projects_by_code[code][p['id']]=p
+    seen_dailies=set()
     for r in records:
         if r.get('kind')!='daily': continue
         f=r['fields']; ident=source_id(r)
+        # Import callers can supply duplicates; preserve last-record-wins order.
+        if ident in seen_dailies:
+            for p in ws['projects']: p['daily_reports']=[d for d in p['daily_reports'] if d['id']!=ident]
+            ws['daily_unmatched']=[d for d in ws['daily_unmatched'] if d['id']!=ident]
+        seen_dailies.add(ident)
         is_provisional=not normalized_case(f.get('案件編號') or f.get('工程編號') or f.get('案號')) and not any(link_ids(f.get(k)) for k in ('所屬案件','內業工項','合約工項')) and bool(normalized_case(f.get(PROVISIONAL_CASE_FIELD) or f.get('可能確認單工作編號')))
-        for p in ws['projects']: p['daily_reports']=[d for d in p['daily_reports'] if d['id']!=ident]
-        ws['daily_unmatched']=[d for d in ws['daily_unmatched'] if d['id']!=ident]
         code=normalized_case(f.get('案件編號') or f.get('工程編號') or f.get('案號'))
         linked=[]; targets_for_link=[]; unresolved_case=False
         for field in ('所屬案件','內業工項','合約工項'):
@@ -503,9 +519,15 @@ def import_v4(ws, records, complete_tables=None):
                 for candidate in parent.candidates:
                     targets_for_link.append(dict(identity={k:target[k] for k in ('base_token','table_id','record_id')},project_id=candidate['project_id'],work_item_id='/'.join(target[k] for k in ('base_token','table_id','record_id')) if field!='所屬案件' else None))
                 if field!='所屬案件': linked.append(target['fields'])
-        decision=resolve_daily(r,ws['projects'],native_targets=targets_for_link,unresolved_native=unresolved_case)
+        # Retain every exact/alias match and native target, including conflicts;
+        # the resolver still makes the attribution decision using the same rules.
+        related=dict(projects_by_code.get(daily_code(r),{}))
+        for target in targets_for_link:
+            pid=target.get('project_id')
+            if pid in projects_by_id: related[pid]=projects_by_id[pid]
+        decision=resolve_daily(r,list(related.values()),native_targets=targets_for_link,unresolved_native=unresolved_case)
         code=code or normalized_case(f.get(PROVISIONAL_CASE_FIELD) or f.get('可能確認單工作編號'))
-        candidates={p['id']:p for p in ws['projects'] if p['id']==decision.project_id}
+        candidates={decision.project_id:projects_by_id[decision.project_id]} if decision.project_id in projects_by_id else {}
         basis=decision.basis or ('provisional_case_code' if code else 'source_case_or_link')
         costrecords,_=native_records(r,'所屬成本單',record_index,{'cost'})
         costfields=[c['fields'] for c in costrecords]
@@ -542,7 +564,8 @@ def import_v4(ws, records, complete_tables=None):
                 review.update(status='invalidated',invalidated_at=now(),invalidated_reason='日報或上游關聯來源已改版，須重新核對')
         approved=next((m for m in reversed(ws['daily_reviews']) if m['daily_id']==ident and m['status']=='approved' and review_mapping_version(m)==entry['mapping_version']),None)
         if approved:
-            candidates={p['id']:p for p in ws['projects'] if p['id']==approved.get('project_id')}; entry['match_basis']=LinkBasis.MANUAL.value; unresolved_case=False
+            pid=approved.get('project_id')
+            candidates={pid:projects_by_id[pid]} if pid in projects_by_id else {}; entry['match_basis']=LinkBasis.MANUAL.value; unresolved_case=False
             entry.pop('work_item_id',None)
             if approved.get('work_item_id'):
                 from .report_links import reviewed_item

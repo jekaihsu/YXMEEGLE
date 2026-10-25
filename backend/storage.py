@@ -120,6 +120,12 @@ def _templates_changed(desired,existing):
     return (any(key[0]=='sop_templates' and (key not in existing or existing[key].data!=value['data']) for key,value in desired.items())
             or any(key[0]=='sop_templates' and key not in desired for key in existing))
 
+def _invalidate_projection(root):
+    # A source refresh may trust its workspace revision only until another save.
+    # Invalidate even when a caller stores content without bumping that revision.
+    if isinstance(root.get('source_status'),dict):
+        root['source_status'].pop('projection_workspace_version',None)
+
 def save(db,model,wid,state):
     """Replace only changed entity rows; preserve one atomic workspace revision."""
     if '_partial' in state: raise ValueError('partial workspaces are read-only')
@@ -176,6 +182,7 @@ def save(db,model,wid,state):
         from .report_bridge import save_bridges
         save_bridges(db,wid,state)
     root['storage_schema']=2
+    _invalidate_projection(root)
     return root
 
 def save_collections(db,model,wid,state,collections):
@@ -221,6 +228,7 @@ def save_collections(db,model,wid,state,collections):
         from . import index_tables
         index_tables.advance_counters(db,model,wid,state['version']-1,state['version'])
     root['storage_schema']=2
+    _invalidate_projection(root)
     return root
 
 def load_scoped(db,model,row,*,collections,project_ids):
@@ -321,6 +329,7 @@ def save_partial(db,model,wid,state,collections,project_ids,project_order,*,view
         index_tables.replace_projects(db,model,wid,view,dirty)
         index_tables.apply_counter_deltas(db,model,wid,state['version']-1,state['version'],before,after)
     root['storage_schema']=2
+    _invalidate_projection(root)
     return root
 
 def load_partial(db,model,row,*,collections=(),project_ids=None,project_children=(),filter_project_rows=False):
