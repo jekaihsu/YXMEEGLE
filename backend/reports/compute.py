@@ -125,14 +125,16 @@ def normalize(raw, base=BASE_TOKEN):
         dept={'外業':'field','內業':'office'}.get(cell(f.get('業別')))
         if not dt or not dept or cell(f.get('條類型'))=='休假': continue
         if end<dt: negative+=1;end=dt
+        group=normalize_group(f.get('組別'))
         current=date.fromisoformat(dt); last=date.fromisoformat(end)
         while current<=last:
-            plan_indices[(dept,monday(current.isoformat()))].append(dict(r,date=current.isoformat(),group=normalize_group(f.get('組別'))))
+            plan_indices[(dept,monday(current.isoformat()))].append(dict(r,date=current.isoformat(),group=group))
             current+=timedelta(days=1)
     if negative: gaps.append(gap('plan-negative-span',f'{negative} 筆預排結束早於開始，按開始當日計算'))
     cases={str(cell(r['f'].get('案件編號'))):r for r in tables.get('case',[])}
     plan_basis='points' if any(number(r['f'].get('預估營業額點數')) is not None for r in tables.get('plan',[])) else 'days'
-    return dict(plan_basis=plan_basis,plan_indices=plan_indices,cases=cases,tables=tables, reviews=reviews, indices=indices, gaps=gaps, raw=raw, base=base)
+    cost_dates={ident:day(f.get('工作日期')) for ident,f in cost.items()}
+    return dict(cost_dates=cost_dates,plan_basis=plan_basis,plan_indices=plan_indices,cases=cases,tables=tables, reviews=reviews, indices=indices, gaps=gaps, raw=raw, base=base)
 
 
 def record_link(base, kind, ident):
@@ -150,7 +152,8 @@ def kpi(rows):
 def review_rows(data, dept, week=None, group='', person='', **_):
     source = 'office' if dept == 'control' else dept
     rows = data['indices'][source].get(week, []) if week else data['reviews'][source]
-    return [r for r in rows if (dept != 'control' or r['group'] == '控制') and (not group or normalize_group(group) == r['group']) and (not person or person == '__blank__' and not r['person'] or person in r['person'].split(','))]
+    group=normalize_group(group) if group else ''
+    return [r for r in rows if (dept != 'control' or r['group'] == '控制') and (not group or group == r['group']) and (not person or person == '__blank__' and not r['person'] or person in r['person'].split(','))]
 
 
 def review(data, dept='field', week=None, weeks=12, group='', person='', **_):
@@ -220,7 +223,7 @@ def assets(data, **p):
         for slot,column in enumerate(columns,1):
             for cost_id in set(links(asset['f'].get(column))):
                 f=costs.get(cost_id,{})
-                dt=day(f.get('工作日期'))
+                dt=data['cost_dates'].get(cost_id)
                 if not dt or dt>end: continue
                 ident=asset['id']; use[ident].append(dt)
                 if dt>=start and kind=='vehicle':
@@ -246,7 +249,7 @@ def assets(data, **p):
     cats=defaultdict(list)
     for r in rows: cats[r['category']].append(r)
     repair=lambda r: '送修' in r['status'] or '損壞' in r['status'] or '出險' in r['status']
-    window={ident for ident,f in costs.items() if (day(f.get('工作日期')) or '')>=start and (day(f.get('工作日期')) or '')<=end}
+    window={ident for ident,dt in data['cost_dates'].items() if start<=(dt or '')<=end}
     coverage={k:ratio(len(ids & window),len(window)) for k,ids in linked_costs.items()}
     gaps=[gap('asset-'+k+'-coverage',f'{len(ids & window)} / {len(window)} 張成本單有'+('車輛' if k=='vehicle' else '儀器')+'紀錄') for k,ids in linked_costs.items()]
     if excluded: gaps.append(gap('mileage-excluded',f'{excluded} 組里程因缺值或倒退排除，僅計部分里程'))
