@@ -34,14 +34,15 @@ def projection(service, db, ctx):
             t.applicability == Applicability.APPLICABLE and t.state != Lifecycle.DONE) for t in linked)
         unfinished = unfinished or any(t.data.get('required') and t.data.get('status') not in {'completed', 'superseded'} for t in legacy)
         reason = ('任務寫入尚未開放' if not service.writes_enabled() else '需由案件 PM 或管理者操作' if not can_manage(ctx)
-                  else '此節點須依財務核准流程完成' if key in {'pricing', 'settlement'} else None)
+                  else None)
+        financial = key in {'pricing', 'settlement'}
         done = n.get('status') in {'completed', 'approved_skipped'}
         result.append({'key': key, 'id': row.entity_id, 'revision': n.get('workbench_revision', 0),
             'status': n.get('status', 'pending'), 'owner_id': n.get('owner_id'), 'completed_at': n.get('completed_at'),
             'reason': n.get('workbench_reason'), 'disabled_reason': reason,
-            'complete_disabled_reason': '請先完成任務並確認適用條件' if unfinished else '節點已完成' if done else reason,
-            'can': {'assign': not reason and not done, 'complete': not reason and not done and not unfinished,
-                    'reject': not reason and n.get('status') == 'completed', 'create_task': not reason and not done}})
+            'complete_disabled_reason': reason or ('此節點須依財務核准流程完成' if financial else '節點已完成' if done else '請先完成任務並確認適用條件' if unfinished else None),
+            'can': {'assign': not reason and not done, 'complete': not reason and not financial and not done and not unfinished,
+                    'reject': not reason and not financial and n.get('status') == 'completed', 'create_task': not reason}})
     return result
 
 
