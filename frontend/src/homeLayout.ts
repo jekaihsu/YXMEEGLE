@@ -11,7 +11,7 @@ const reportCards=Object.fromEntries(Object.entries(REPORT_CARDS).map(([id,card]
 export const HOME_CARDS={
  ...reportCards,
  dispatch:{section:'todo',title:'派工看板',description:'本週待派與重疊預排，保留來源缺口',views:['mine','assign','company'],kind:'table'},
- mycases:{section:'todo',title:'我的案件',description:'你負責或參與的案件',views:['mine'],kind:'table'},
+ mycases:{section:'todo',title:'我的案件',description:'你負責、釘選或有你任務的案件',views:['mine'],kind:'table'},
  kpi:{section:null,title:'工作摘要',description:'目前視圖的重點數字',views:['mine', 'assign', 'company'],kind:'kpi'},
  work:{section:'todo',title:'我的工作',description:'依急迫程度排序的工作與期限',views:['mine', 'assign'],kind:'table'},
  confirmation:{section:'todo',title:'待我確認',description:'需要你覆核或確認的事項',views:['mine', 'company'],kind:'table'},

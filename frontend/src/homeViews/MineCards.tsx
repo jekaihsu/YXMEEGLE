@@ -4,19 +4,24 @@ import type {PanelRead} from '../useHomePanels';
 import {workSource,sourceCount} from '../homeWorkSource';
 import {Card,WorkCard} from '../homeCards';
 import {Row} from '../design';
+import {pinStorageKey,readPins} from '../projectsListModel';
 import {DeadlineStrip} from '../homeCharts';
 import {dayOffset,Kpis} from './shared';
+const pinnedIds=(c:Ctx)=>{
+ try{return new Set(readPins(window.localStorage,pinStorageKey(c.w.workspace_id||c.s.workspace_id||'default',c.s.user?.id||'anonymous')))}catch{return new Set<string>()}
+};
 const myCases=(c:Ctx)=>{
- const me=c.s.user?.id||'';
- return c.w.projects.filter(p=>p.case_type!=='intake'&&p.status!=='completed'&&(p.pm_id===me||p.sales_id===me||p.nodes.some(n=>n.tasks.some(t=>t.owner_id===me))));
+ const me=c.s.user?.id||'',pins=pinnedIds(c);
+ const rank=(p:{id:string})=>pins.has(p.id)?0:1;
+ return c.w.projects.filter(p=>p.case_type!=='intake'&&p.status!=='completed'&&(pins.has(p.id)||p.pm_id===me||p.sales_id===me||p.owner_id===me||p.nodes.some(n=>n.tasks.some(t=>t.owner_id===me)))).map((p,i)=>({p,i,pinned:pins.has(p.id)})).sort((a,b)=>rank(a.p)-rank(b.p)||a.i-b.i).map(({p,pinned})=>({...p,pinned}));
 };
 export function MineCard({id,c,today,assigned,confirmation}:{id:HomeCardId;c:Ctx;today:string;assigned:PanelRead;confirmation:PanelRead}){
  if(id==='work'||id==='confirmation')return <WorkCard c={c} id={id} panel={id==='work'?'assigned':'confirmation'} today={today} read={id==='work'?assigned:confirmation}/>;
  if(id==='mycases'){
   const rows=myCases(c);
-  return <Card id={id} subtitle="你負責或參與的案件" href="#view=projects" action="開啟案件總覽">
-   {rows.slice(0,8).map(p=><Row key={p.id} label={`${p.code} ${p.name}`} detail={p.client} value={p.due_date?`期限 ${p.due_date.slice(0,10).replaceAll('-','/')}`:''} href={`#view=project&project=${p.id}`}/>)}
-   {!rows.length&&<p className="home-source-note">目前沒有你負責或參與的案件。</p>}
+  return <Card id={id} subtitle="你負責、釘選或有你任務的案件" href="#view=projects" action="開啟案件總覽">
+   {rows.slice(0,8).map(p=><Row key={p.id} label={`${p.code} ${p.name}`} detail={p.pinned?`已釘選 · ${p.client}`:p.client} value={p.due_date?`期限 ${p.due_date.slice(0,10).replaceAll('-','/')}`:''} href={`#view=project&project=${p.id}`}/>)}
+   {!rows.length&&<p className="home-source-note">目前沒有你負責、釘選或有你任務的案件。可在案件總覽釘選案件。</p>}
   </Card>;
  }
  if(id==='kpi'){
