@@ -120,3 +120,12 @@ test('project change aborts the old poller before another project refresh',async
  await act(async()=>read.retry());assert.equal(statuses,2);assert.equal(signals.length,2);
  t.mock.timers.reset();
 });
+test('engineering deadline includes progress readback and keeps last good time',async t=>{
+ const data=structuredClone(fixture);Object.assign(data.sources,{can_refresh_sources:true,source_synced_at:'2026-10-26T09:00:00Z'});
+ globalThis.fetch=async()=>reply(data);await mount(React.createElement(Probe));
+ t.mock.timers.enable({apis:['setTimeout','Date']});
+ globalThis.fetch=async url=>url==='/api/live/refresh'?new Promise(resolve=>setTimeout(()=>resolve(reply({freshness:freshness('fresh')})),80000)):new Promise(()=>{});
+ await act(async()=>read.retry());await act(async()=>t.mock.timers.tick(80000));assert.equal(read.state.kind,'loading');
+ await act(async()=>t.mock.timers.tick(10000));assert.equal(read.state.kind,'error');assert.equal(read.state.lastGoodAt,'2026-10-26T09:00:00Z');
+ assert.match(read.state.message,/資料仍在更新/);t.mock.timers.reset();
+});
