@@ -36,12 +36,14 @@ try{
  await flush(()=>window.dispatchEvent(new Event('hashchange')));await flush();
  assert.match(document.querySelector('.pf-node[aria-current=step]').getAttribute('aria-label'),/^外業節點/);
  assert.equal(document.querySelector('[aria-label="任務名稱"]').value,'控制點成果核對');
+ assert.equal(document.activeElement?.closest('[role="dialog"]')?.getAttribute('aria-label'),'控制點成果核對','home navigation focuses the target task inspector');
  await flush(()=>{location.hash='view=work&tab=assigned';window.dispatchEvent(new Event('hashchange'))});await flush();
  await flush(()=>document.querySelector('tbody summary').click());
  await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='開啟任務').click());await flush();
  assert.equal(ui.parseRoute(location.hash).node,'field','child target retains its node');
  assert.equal(ui.parseRoute(location.hash).task,'recTask2','child target overrides the parent task');
  assert.equal(document.querySelector('[aria-label="任務名稱"]').value,'子任務核對');
+ assert.equal(document.activeElement?.closest('[role="dialog"]')?.getAttribute('aria-label'),'子任務核對','child navigation focuses the target task inspector');
  assert.deepEqual([...document.querySelectorAll('[aria-label="案件頁面"] button')].map(button=>button.textContent),['總覽','流程與任務','工項與進度','排程與人員','文件與交付','案件資料']);
  await flush(()=>root.render(React.createElement(ui.AssignmentTable,{items:[],onNavigate(){}})));
  assert.equal(document.querySelector('[aria-label="工作表格，可左右捲動"]').getAttribute('role'),'region');
