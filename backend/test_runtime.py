@@ -95,7 +95,7 @@ def test_deployment_staging_includes_runtime_and_omits_credentials(tmp_path,monk
     paths=['Dockerfile','.dockerignore','backend/requirements.txt','backend/app.py','scripts/backup_restore.py','scripts/backup_live_legacy.py','scripts/run_service.py','scripts/run_worker.py','scripts/backup_schedule.py','frontend/package.json','frontend/package-lock.json','frontend/index.html','frontend/tsconfig.json','frontend/vite.config.ts','frontend/src/app.ts','frontend/public/logo.svg']
     paths.append('scripts/backup_offsite.py')
     paths.append('scripts/restore_drill.py')
-    paths += ['backend/sop_source_contracts.json','backend/sop_import/catalog.json','scripts/backup_publish.py',
+    paths += ['backend/sop_source_contracts.json','backend/sop_import/catalog.json','backend/report_link_vocabulary.json','scripts/backup_publish.py',
               'scripts/backup_reconcile.py','scripts/backup_offsite_acceptance.py','backend/requirements.lock',
               'scripts/migrate_index_tables.py','scripts/backfill_index.py']
     for name in paths:
@@ -106,6 +106,7 @@ def test_deployment_staging_includes_runtime_and_omits_credentials(tmp_path,monk
     for name in ('.env','.runtime/credentials.json','scripts/private_credentials.py','backend/test_private.py'):
         (root/name).write_text(secret,encoding='utf-8')
     monkeypatch.setattr(deploy_prepare,'ROOT',root); monkeypatch.setattr(deploy_prepare,'RUNTIME',runtime)
+    monkeypatch.setattr(deploy_prepare,'build_identity',lambda _root:{'git_sha':'0'*40,'dirty':False,'built_at':'2026-10-26T00:00:00+00:00','branch':'test'})
     # This tests manifest boundaries using placeholder files. The independent
     # package smoke has its own real-package and missing-resource tests.
     from scripts import verify_stage_package
@@ -115,7 +116,7 @@ def test_deployment_staging_includes_runtime_and_omits_credentials(tmp_path,monk
         assert (folder/name).is_file()
     assert all(secret not in p.read_text(encoding='utf-8') for p in folder.rglob('*') if p.is_file())
     manifest=json.loads((runtime/'zeabur-stage-manifest.json').read_text())
-    assert {f['path'] for f in manifest['files']}==set(paths)|{'deployment/source-tables.json'}
+    assert {f['path'] for f in manifest['files']}==set(paths)|{'deployment/source-tables.json','backend/build-manifest.json'}
 
 
 def test_source_table_config_rejects_credential_keys_without_echoing_value(tmp_path):
