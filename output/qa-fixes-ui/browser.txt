@@ -1,0 +1,7 @@
+work assigned and direct reload passed
+work delegated and direct reload passed
+work local and direct reload passed
+source details, Taipei times, missing timestamps, safe errors, forced retry and build identity passed at 1440/390
+real 30-second timeout followed by stale failure then independent fresh retry passed
+dev build null and staged health metadata matched manifest
+no browser page errors

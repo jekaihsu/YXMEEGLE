@@ -1,0 +1,15 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: home panel row is mounted by App
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/test-home-target-navigation.mjs:32:93 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: undefined,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

@@ -89,21 +89,20 @@ def test_unadmitted_production_identity_is_forbidden(tmp_path, path):
 
 
 # ---- source health ---------------------------------------------------------
-def test_source_health_exposes_page_state_only_and_no_source_or_hidden_value(http, monkeypatch):
+def test_source_health_exposes_safe_source_reads_without_record_values(http, monkeypatch):
     app, client, seat, signin, _ = http
     make_fresh(app, monkeypatch)
     seat(cache=fresh_cache()); signin('u-manager')
     response = client.get('/api/source-health')
     assert response.status_code == 200, response.text
     body = response.json()
-    assert set(body) <= {'page_state', 'sources', 'error'} and body['sources'] == []
-    for sentinel in (BASE, TABLE, 'NAME_SENTINEL', 'OLD_CASE_SENTINEL', 'Current case', 'recOld', 'recNew', 'diagnostic'):
+    row = body['sources'][0]
+    assert row['name'] == 'NAME_SENTINEL'
+    assert row['last_success'] and row['read_authorized'] is True
+    assert row['retry_handle'] == {'dataset': 'sources'}
+    for sentinel in (BASE, TABLE, 'OLD_CASE_SENTINEL', 'Current case', 'recOld', 'recNew'):
         assert sentinel not in response.text
-    # None is derived from the cached snapshot, not from proof of a complete read of THIS request; the route adds no
-    # healthy/clean/complete field, so the client must treat it as unknown.
-    assert body['page_state'] is None
-    assert not {'healthy', 'health', 'complete', 'clean', 'status', 'label'} & set(body)
-    assert '資料正常' not in response.text
+    assert 'diagnostic' not in body
 
 
 def test_source_health_unknown_is_not_zero_or_empty(http, monkeypatch):
@@ -146,7 +145,7 @@ def test_source_health_passes_the_sync_predicate_and_closed_arguments(http, monk
         return {'page_state': None, 'sources': []}
     monkeypatch.setattr(source_health, 'build_source_health', spy)
     assert client.get('/api/source-health').status_code == 200
-    assert (seen['diagnostic'], seen['viewer_filtered'], seen['read_authorized']) == (False, None, expected)
+    assert (seen['diagnostic'], seen['viewer_filtered'], seen['read_authorized']) == (True, None, expected)
     if not expected: assert client.post('/api/sources/sync').status_code == 403  # same refusal as the predicate's False
     assert [r['record_id'] for r in seen['snapshot']['records']] == ['recNew']  # hidden case rows narrowed before projection
 

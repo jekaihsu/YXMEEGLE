@@ -86,7 +86,9 @@ def test_scoped_health_matches_full_source_health_without_copying_record_values(
     assert reference.status_code == 200
     assert client.get(f'/api/case-detail/{pid}').status_code == 200
     assert len(captures) == 2
-    assert captures[0][1] == captures[1][1]
+    assert captures[0][1]['page_state'] == captures[1][1]['page_state']
+    assert captures[1][1]['sources'] == []
+    assert reference.json()['sources'] == captures[0][1]['sources']
     assert captures[0][0]['tables'] == captures[1][0]['tables']
     assert captures[0][0]['records'] and 'records' not in captures[1][0]
     with app.state.sessions() as db:

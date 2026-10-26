@@ -1,0 +1,12 @@
+file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/test-read-loading.mjs:27
+ await flush(()=>resolveSummary(json({user:{name:'SUMMARY_READY',role:'manager',permissions:[]},environment:'demo',identity_mode:'unknown',features:{},sources:[],sources_access:'restricted',directory:{status:'restricted',last_success_at:null},datasets:[],node_connection:[],manager_details_available:false})));
+                 ^
+
+TypeError: resolveSummary is not a function
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/test-read-loading.mjs:27:18
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/test-read-loading.mjs:11:51
+    at act (/Users/vc/Local/YXMEEGLE/frontend/node_modules/.pnpm/react@18.3.1/node_modules/react/cjs/react.development.js:2512:16)
+    at flush (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/test-read-loading.mjs:11:31)
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/test-read-loading.mjs:27:8
+
+Node.js v24.19.0
