@@ -85,13 +85,13 @@ export function SourceHealthPage({c}: {c: Ctx}) {
   if(retrying.current || busy || !handle || typeof handle!=='object' || !('dataset' in handle) || handle.dataset!=='sources')return;
   const epoch=getSessionEpoch();retrying.current=true;setBusy(true);setError('');
   try{await refreshSources()}
-  catch(error){if(epoch===getSessionEpoch())setError(error instanceof Error?error.message:'Lark 讀取失敗，請重試')}
+  catch(error){if(epoch===getSessionEpoch())setError(error instanceof ApiError && (error.status===401 || error.status===403)?'權限不足':'Lark 讀取失敗，請重試')}
   finally{retrying.current=false;if(epoch===getSessionEpoch()){setBusy(false);setAttempt(n=>n+1)}}
  };
  return <main className="page sources-page" aria-label="資料來源">
   <LegacyTabs c={c} view="sources"/>
   {error&&<p role="alert">{error}</p>}
-  {reason && <p>{reason}</p>}
+  {reason && <span role="status">權限不足</span>}
   <Suspense fallback={<p role="status">正在載入來源健康…</p>}><SourceHealth view={view} onRetry={retry} busy={busy}/></Suspense>
   {c.s.user?.role==='manager'&&<small className="source-build-id" aria-label="部署版本">{buildLabel(health.status==='ok'?health.body:null)}</small>}
  </main>;

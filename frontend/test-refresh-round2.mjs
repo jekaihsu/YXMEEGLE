@@ -45,7 +45,7 @@ const sourceBody=allowed=>({can_refresh:allowed,refresh_reason:allowed?null:'需
 const sourceContext=role=>({s:{user:{id:role,role}},w:{version:1},route:{view:'sources'},go(){}});
 test('limited source page shows permission reason and no retry',async()=>{
  globalThis.fetch=async url=>reply(url==='/api/health'?{}:sourceBody(false));await mount(React.createElement(ui.SourceHealthPage,{c:sourceContext('member')}));await flush();
- assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent==='重試'),false);assert.equal(document.body.textContent.includes('需由有權限的 PM 或主管更新'),true);assert.equal(document.body.textContent.includes('2026/10/26 17:00:00'),true);
+ assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent==='重試'),false);assert.equal(document.body.textContent.includes('權限不足'),true);assert.equal(document.body.textContent.includes('2026/10/26 17:00:00'),true);
 });
 test('privileged source page polls accepted work then reloads health',async()=>{
  const calls=[];globalThis.fetch=async(url,init)=>{calls.push(url);if(url==='/api/live/refresh')return reply({freshness:freshness('refreshing')},202);if(url==='/api/live/status')return reply({freshness:freshness('fresh')});return reply(url==='/api/health'?{}:sourceBody(true))};
@@ -55,7 +55,7 @@ test('privileged source page polls accepted work then reloads health',async()=>{
 test('source page displays server rejection and retains last success',async()=>{
  globalThis.fetch=async url=>url==='/api/live/refresh'?reply({detail:'來源同步操作者已無權限'},403):reply(url==='/api/health'?{}:sourceBody(true));
  await mount(React.createElement(ui.SourceHealthPage,{c:sourceContext('manager')}));await flush();await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重試').click());await flush();
- assert.equal(document.querySelector('[role="alert"]').textContent,'來源同步操作者已無權限');assert.equal(document.body.textContent.includes('2026/10/26 17:00:00'),true);
+ assert.equal(document.querySelector('[role="alert"]').textContent,'權限不足');assert.equal(document.body.textContent.includes('2026/10/26 17:00:00'),true);
 });
 test('a refresh is bounded at ninety seconds and reports pending explicitly',async()=>{
  const real=globalThis.setTimeout;const delays=[];

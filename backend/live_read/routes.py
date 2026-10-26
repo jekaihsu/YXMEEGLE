@@ -1,4 +1,5 @@
 """Authenticated freshness reads and permission-preserving refresh triggers."""
+import logging
 from typing import Literal
 
 from fastapi import HTTPException, Request
@@ -26,9 +27,8 @@ def refresh(coordinator, wid, datasets, *, wait=False, force=False):
             except TimeoutError:
                 timed_out = True
     except Exception as exc:
-        import logging
         logging.getLogger('backend.live').warning('refresh failed datasets=%s class=%s', ','.join(datasets), type(exc).__name__)
-        return JSONResponse({'detail': 'Lark 資料暫時無法讀取',
+        return JSONResponse({'detail': 'Lark 讀取失敗，請重試',
                              'freshness': coordinator.status(wid)}, status_code=502)
     if timed_out:
         freshness = coordinator.status(wid)
@@ -40,7 +40,7 @@ def refresh(coordinator, wid, datasets, *, wait=False, force=False):
         return JSONResponse({'detail': '資料正在重新讀取，請稍後再試',
                              'freshness': freshness}, status_code=409)
     if wait and any(r['status'] != 'fresh' for r in results):
-        return JSONResponse({'detail': 'Lark 資料暫時無法讀取',
+        return JSONResponse({'detail': 'Lark 讀取失敗，請重試',
                              'freshness': freshness}, status_code=502)
     pending = (any(r['status'] != 'fresh' for r in results)
                or (not wait and (force or any(previous[d]['status'] != 'fresh' for d in datasets))))
