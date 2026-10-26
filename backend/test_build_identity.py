@@ -16,6 +16,9 @@ def test_stage_identity_tracks_commit_branch_dirty_and_utc(tmp_path):
     assert manifest['git_sha']==sha and manifest['branch']=='qa-build'
     assert manifest['dirty'] is False
     assert datetime.fromisoformat(manifest['built_at']).utcoffset().total_seconds()==0
+    (tmp_path/'output').mkdir()
+    (tmp_path/'output'/'untracked.txt').write_text('generated build output')
+    assert deploy_prepare.build_identity(tmp_path)['dirty'] is False
     source.write_text('changed')
     assert deploy_prepare.build_identity(tmp_path)['dirty'] is True
 

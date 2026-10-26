@@ -127,7 +127,7 @@ def build_identity(root):
     def git(*args):
         return subprocess.check_output(['git', *args],cwd=root,text=True).strip()
     return {'git_sha':git('rev-parse','HEAD'),
-            'dirty':bool(git('status','--porcelain')),
+            'dirty':bool(git('status','--porcelain','--untracked-files=no')),
             'built_at':datetime.now(timezone.utc).isoformat(timespec='seconds'),
             'branch':git('rev-parse','--abbrev-ref','HEAD')}
 
