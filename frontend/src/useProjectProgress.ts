@@ -22,14 +22,15 @@ export function useProjectProgress(id: string, enabled = true) {
  const [version, setVersion] = useState(0);
  const reading = useRef(false);
  const synchronize=useRef<string|null>(null);
- const canRefresh=state.kind==='ready'?state.data.sources.can_refresh_sources===true:cache.has(id)?cache.get(id)?.data.sources.can_refresh_sources===true:state.kind==='error' || version>0;
+ const canRefresh=state.kind==='ready'?state.data.sources.can_refresh_sources===true:cache.has(id)?cache.get(id)?.data.sources.can_refresh_sources===true:false;
+ const canRetryRead=state.kind==='error' && state.status!==401 && state.status!==403;
  const retry = useCallback(() => {
-  if (!enabled || !canRefresh || reading.current) return;
+  if (!enabled || (!canRefresh && !canRetryRead) || reading.current) return;
   reading.current = true;
-  synchronize.current=id;
+  synchronize.current=canRefresh?id:null;
   setState({kind: 'loading'});
   setVersion(v => v + 1);
- }, [id,enabled,canRefresh]);
+ }, [id,enabled,canRefresh,canRetryRead]);
  const reload=useCallback(()=>{
   if(!enabled || reading.current)return;
   reading.current=true;
@@ -51,5 +52,5 @@ export function useProjectProgress(id: string, enabled = true) {
   }).catch(error => {if (active && currentEpoch === getSessionEpoch()) setState({kind: 'error', message: error instanceof Error ? error.message : '工程進度暫不可用。',lastGoodAt:lastGoodAt,...(error instanceof ApiError ? {status:error.status} : {})})}).finally(() => {if (active) reading.current = false});
   return () => {active = false; reading.current = false};
  }, [id, enabled, version]);
- return {state, retry, reload, canRefresh};
+ return {state, retry, reload, canRefresh, canRetryRead};
 }

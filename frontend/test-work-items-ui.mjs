@@ -42,13 +42,15 @@ for(const initialStatus of [200,500]){
  const button=[...document.querySelectorAll('button')].find(b=>b.textContent===(initialStatus===500?'重試工程證據':'更新工程證據'));
  const before=calls.filter(url=>url.endsWith('/progress')).length;
  await act(async()=>{for(let i=0;i<5;i++)button.click();await tick()});
- const refresh=[...document.querySelectorAll('button')].find(b=>b.textContent==='更新工程證據');
+ const refresh=initialStatus===500?button:[...document.querySelectorAll('button')].find(b=>b.textContent==='更新工程證據');
+ if(initialStatus===500)assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent==='更新工程證據'),false,'unknown permission never exposes source refresh');
  for(let i=0;i<5;i++)await click(refresh);
  assert.equal(calls.filter(url=>url.endsWith('/progress')).length-before,1,'rapid retry/refresh clicks start exactly one progress request');
- assert.equal(refresh.disabled,true,'progress control is disabled while the read is pending');
- assert.equal(refresh.getAttribute('aria-busy'),'true');
+ if(initialStatus===200){assert.equal(refresh.disabled,true,'progress control is disabled while the read is pending');assert.equal(refresh.getAttribute('aria-busy'),'true')}
+ else assert.match(document.querySelector('[role="status"]').textContent,/載入中/);
  await act(async()=>{finish();await tick()});hold=null;
- assert.equal(refresh.disabled,false,'progress control is enabled after settlement');
- assert.equal(refresh.getAttribute('aria-busy'),'false');
+ const settled=[...document.querySelectorAll('button')].find(b=>b.textContent==='更新工程證據');
+ assert.equal(settled.disabled,false,'progress control is enabled after settlement');
+ assert.equal(settled.getAttribute('aria-busy'),'false');
 }
 assert.deepEqual(keyWarnings,[],'duplicate work codes produce no React key warnings');console.error=originalError;await act(async()=>root.unmount());console.log('Work items DOM checks passed, including duplicate identities, exact task joins, focus return, routes and source states.');
