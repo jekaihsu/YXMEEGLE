@@ -1,13 +1,10 @@
-import type {SourceHealthView, SortColumn} from './sourceHealthView';
+import type {SourceHealthView} from './sourceHealthView';
 import {taipeiTime} from './taipeiTime';
 import './source-health.css';
 
 export interface SourceHealthProps {
  view?:SourceHealthView|null;
- onSelect?:(key:string|null)=>void;
- onSort?:(column:SortColumn)=>void;
  onRetry?:(handle:unknown)=>void;
- currentSort?:{column:SortColumn;direction:'asc'|'desc'|'clear'}|null;
  busy?:boolean;
 }
 export function successfulRead(value:string|null,now=Date.now()):string {
@@ -29,7 +26,7 @@ export function SourceHealth({view,onRetry,busy=false}:SourceHealthProps) {
     <div><h2>{row.name??'未命名來源'}</h2><span className="source-health-tag">{row.dataState===null?'已讀取':row.statusLabel}</span></div>
     <p>最近成功 · {successfulRead(row.last_success.value)}</p>
     {row.lastErrorSummary&&<p className="source-read-error">{row.lastErrorSummary}</p>}
-    {row.retry&&onRetry?<button type="button" className="source-health-btn-retry" disabled={busy} onClick={()=>onRetry(row.retry!.handle)}>{busy?'更新中…':'重試'}</button>:row.needsAttention&&<span>請聯絡管理員</span>}
+    {row.retry&&onRetry?<button type="button" className="source-health-btn-retry" disabled={busy} onClick={()=>onRetry(row.retry!.handle)}>{busy?'更新中…':'重試'}</button>:row.needsAttention&&<span>待處理</span>}
    </article>)}</div>:<p>{view?.page.states.includes('loading')?'讀取中…':'尚無可見來源'}</p>}
   </section>
  </div>;
