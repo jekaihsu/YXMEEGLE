@@ -1,8 +1,9 @@
+import {useSourceRefresh} from './useSourceRefresh';
 // P1-INT pages: #work -> MyWorkTable(buildMyWorkView(...)), #sources -> SourceHealth(buildSourceHealthView(...)).
 // The legacy MyWork / Sources screens stay reachable through tab=legacy. Transport only; all state text comes
 // from the view models. New GETs: /api/my-work and /api/source-health.
-import {lazy, Suspense, useCallback, useEffect, useMemo, useState} from 'react';
-import {api, liveRefresh, ApiError, getSessionEpoch, parseRoute} from './api';
+import {lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {api, ApiError, getSessionEpoch, parseRoute} from './api';
 const MyWorkTable=lazy(()=>import('./MyWorkTable'));
 const AssignmentTable=lazy(()=>import('./MyWorkTable').then(module=>({default:module.AssignmentTable})));
 import {buildLabel} from './buildIdentity';
@@ -72,20 +73,25 @@ function LegacyWorkPage({c}: {c: Ctx}) {
 }
 
 export function SourceHealthPage({c}: {c: Ctx}) {
+ const refreshSources=useSourceRefresh(c.s.workspace_id);
  const health=useFetched('/api/health',0,c.s?.user?.id);
  const [attempt,setAttempt]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const fetched = useFetched('/api/source-health', `${c.reloadVersion ?? c.w.version}:${attempt}`, c.s?.user?.id);
  const view = useMemo(() => buildSourceHealthView(sourceHealthInput(fetched), {diagnosticCapability: true}), [fetched]);
+ const retrying=useRef(false);
+ const body=fetched.status==='ok' && fetched.body && typeof fetched.body==='object'?fetched.body:null;
+ const reason=body && 'can_refresh' in body && body.can_refresh===false && 'refresh_reason' in body && typeof body.refresh_reason==='string'?body.refresh_reason:null;
  const retry=async(handle:unknown)=>{
-  if(busy || !handle || typeof handle!=='object' || !('dataset' in handle) || handle.dataset!=='sources')return;
-  const epoch=getSessionEpoch();setBusy(true);setError('');
-  try{await liveRefresh(['sources'],true,undefined,true)}
-  catch{if(epoch===getSessionEpoch())setError('更新失敗，請重試')}
-  finally{if(epoch===getSessionEpoch()){setBusy(false);setAttempt(n=>n+1)}}
+  if(retrying.current || busy || !handle || typeof handle!=='object' || !('dataset' in handle) || handle.dataset!=='sources')return;
+  const epoch=getSessionEpoch();retrying.current=true;setBusy(true);setError('');
+  try{await refreshSources()}
+  catch(error){if(epoch===getSessionEpoch())setError(error instanceof ApiError && (error.status===401 || error.status===403)?'權限不足':'Lark 讀取失敗，請重試')}
+  finally{retrying.current=false;if(epoch===getSessionEpoch()){setBusy(false);setAttempt(n=>n+1)}}
  };
  return <main className="page sources-page" aria-label="資料來源">
   <LegacyTabs c={c} view="sources"/>
   {error&&<p role="alert">{error}</p>}
+  {reason && <span role="status">權限不足</span>}
   <Suspense fallback={<p role="status">正在載入來源健康…</p>}><SourceHealth view={view} onRetry={retry} busy={busy}/></Suspense>
   {c.s.user?.role==='manager'&&<small className="source-build-id" aria-label="部署版本">{buildLabel(health.status==='ok'?health.body:null)}</small>}
  </main>;

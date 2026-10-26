@@ -197,7 +197,8 @@ def test_reports_snapshot_cold_returns_the_rest_with_a_gap(progress):
     state, vis, _ = chain_state()
     body = run(state, vis, cases=[('recX', 'C115264', '未填', None)], warm=False).json()
     assert body['sources'] == {'source_synced_at': body['sources']['source_synced_at'], 'source_status': body['sources']['source_status'],
-                               'reports_status': 'cold', 'reports_fetched_at': None, 'reports_stale': None}
+                               'reports_status': 'cold', 'reports_fetched_at': None, 'reports_stale': None,
+                               'can_refresh_sources':False,'refresh_reason':'即時讀取僅限已啟用的公司正式工作區'}
     assert body['identity']['confirmation']['present'] is True and stage(body, 'sales')['state'] == 'done'
     assert body['identity']['v3_cases'] == [] and 'reports_cold' in {g['id'] for g in body['gaps']}
 
@@ -554,3 +555,62 @@ def test_reports_view_keeps_the_captured_generation_when_store_changes():
         assert view.snapshot is snapshot
     finally:
         with_snapshot.close()
+
+
+@pytest.mark.parametrize('uid,expected', [('u-manager', True), ('u-pm', True), ('u-field', False)])
+def test_source_refresh_permission_matches_live_authorization(http, monkeypatch, uid, expected):
+    app, client, seat, signin = http
+    state, vis, _ = build_state()
+    from dataclasses import replace
+    monkeypatch.undo()
+    app.state.cfg.update(LARK_APP_ID='synthetic-app',LARK_WORKER_IDENTITY='application',LARK_LIVE_READ_ENABLED='true')
+    app.state.live_read.config=replace(app.state.live_read.config,enabled=True)
+    app.state.live_read.refreshers={d:lambda wid:{'fingerprint':'synthetic'} for d in ('sources','roster','attendance')}
+    for user in state['users']:
+        user.update(directory_status='employed', directory_source={'app_id':app.state.cfg.get('LARK_APP_ID'), 'record_id':'synthetic'})
+    seat(state)
+    signin(uid)
+    health = client.get('/api/source-health').json()
+    assert health['can_refresh'] is expected
+    progress = client.get(f'/api/projects/{vis}/progress')
+    assert progress.status_code == 200
+    assert progress.json()['sources']['can_refresh_sources'] is expected
+    if expected:
+        response=client.post('/api/live/refresh',json={'datasets':['sources'],'force':True,'wait':True})
+        assert response.status_code==200
+        assert response.json()['freshness']['datasets']['sources']['status']=='fresh'
+    if not expected:
+        assert health['refresh_reason'] == '需由有權限的 PM 或主管更新'
+        assert all('retry_handle' not in row for row in health['sources'])
+        response = client.post('/api/live/refresh', json={'datasets':['sources'], 'force':True, 'wait':True})
+        assert response.status_code == 403
+
+
+@pytest.mark.parametrize('failure', ['disabled', 'database'])
+def test_refresh_permission_failures_preserve_read_routes(http, monkeypatch, failure):
+    from dataclasses import replace
+    app, client, seat, signin = http
+    state, vis, _ = build_state()
+    seat(state)
+    signin('u-manager')
+    calls = []
+    def authorize(*args):
+        calls.append(args)
+        if failure == 'database':
+            raise OSError('private database details')
+    monkeypatch.setattr(app.state.source_sync, '_authorize', authorize)
+    app.state.cfg.update(LARK_WORKER_IDENTITY='application', LARK_LIVE_READ_TRANSPORT='deny')
+    monkeypatch.setattr(app.state.live_read, 'ensure', lambda *args, **kwargs: None)
+    app.state.live_read.config = replace(app.state.live_read.config, enabled=failure != 'disabled')
+    for path in ['/api/source-health', f'/api/projects/{vis}/progress', '/api/manager-overview']:
+        calls.clear()
+        response = client.get(path)
+        assert response.status_code == 200, response.text
+        assert len(calls) == (1 if failure == 'database' else 0)
+        assert 'private database details' not in response.text
+        if path == '/api/source-health':
+            assert response.json()['can_refresh'] is False
+        if path.endswith('/progress'):
+            assert response.json()['sources']['can_refresh_sources'] is False
+    if failure == 'disabled':
+        assert client.post('/api/live/refresh', json={'datasets':['sources'], 'force':True}).status_code == 403

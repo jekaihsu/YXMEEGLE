@@ -400,7 +400,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             if data.get('mode')=='lark' and admission_required:
                 from .production_access import require_access
                 recovery_routes={('GET','/api/session'),('POST','/api/logout'),
-                    ('POST','/api/people/sync'),('GET','/api/admin/runtime-health')}
+                    ('POST','/api/people/sync'),('GET','/api/live/status'),('GET','/api/admin/runtime-health')}
                 if tenant_read:
                     from .production_access import access_mode
                     access=access_mode(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'))
@@ -1052,6 +1052,20 @@ def create_app(overrides=None,*,dispatch_transport=None):
             result=public_source_response(state,cache.data,user) if cache else {'configured':bool(configuration(cfg)),'last_sync':None,'status':'never','message':'尚未同步來源','tables':[],'records':[]}
         return {**result,'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
 
+    def source_refresh_permission(data,user,freshness=None):
+        if '_source_refresh_permission' not in data:
+            try:
+                require_refresh(app.state.live_read,data,user,'sources',authorize=authorize_live,enabled=freshness['enabled'] if freshness is not None else None)
+                permission=(True,None)
+            except Exception as exc:
+                reason='權限不足'
+                if user.get('role') not in ('pm','manager') and not capable(user,'manage_sources'):
+                    reason='需由有權限的 PM 或主管更新'
+                elif isinstance(exc,HTTPException): reason=exc.detail
+                permission=(False,reason)
+            data['_source_refresh_permission']=permission
+        return data['_source_refresh_permission']
+
     def source_health_from(data,user,freshness,cache_data,state,*,metadata_only=False,diagnostic=False):
         """The GET /api/source-health computation over an already captured read (cache snapshot data and loaded workspace state)."""
         from .source_health import build_source_health
@@ -1078,8 +1092,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
             else: snapshot={'status':'never','tables':[],'records':[]}
         # Exactly the POST /api/sources/sync predicate. viewer_filtered stays None: visible_source_snapshot narrows
         # records to the admitted ids, so a zero count cannot be proven unfiltered.
-        read_authorized=data['mode']=='lark' and not data['wid'].startswith('test-') and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+        read_authorized,refresh_reason=source_refresh_permission(data,user,freshness)
         result=build_source_health(snapshot,freshness['datasets']['sources'],diagnostic=diagnostic,read_authorized=read_authorized,viewer_filtered=None)
+        result.update(can_refresh=read_authorized,refresh_reason=refresh_reason)
         result.pop('diagnostic',None)
         return result
 
@@ -1280,6 +1295,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         # decisions were loaded above; GET must not queue behind a source sync's
         # workspace write lock. The link-review workflow persists its own rows.
         with phase(request,'project'): result=build_project_progress(state,project_id,reports=reports,amounts=privileged,as_of=state['as_of'])
+        result['sources']['can_refresh_sources'],result['sources']['refresh_reason']=source_refresh_permission(data,user)
         with phase(request,'encode'): return JSONResponse(result,headers={'Cache-Control':'no-store'})
 
     @app.get('/api/case-detail/{project_id}')
@@ -1699,7 +1715,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         register_ops_routes(app,identity,load,sessions,WorkspaceRow)
     from .live_read.coordinator import RefreshCoordinator
     from .live_read.datasets import build_refreshers
-    from .live_read.routes import register as register_live, refresh as live_refresh
+    from .live_read.routes import register as register_live, refresh as live_refresh, require_refresh
     app.state.live_read=RefreshCoordinator(sessions,CacheRow,build_refreshers(
         app.state.source_sync,app.state.people_directory,app.state.attendance_schedule),cfg)
 

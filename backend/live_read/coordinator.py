@@ -97,6 +97,13 @@ class RefreshCoordinator:
                 result['datasets'][dataset].pop(field, None)
             if dataset not in self.refreshers:
                 result['datasets'][dataset]['status'] = 'unconfigured'
+            elif result['enabled']:
+                key = self._key(wid, dataset)
+                with self._lock:
+                    future = self._futures.get(key)
+                    running = key in self._pending or future is not None and not future.done()
+                if running:
+                    result['datasets'][dataset]['status'] = 'refreshing'
         return result
 
     @property
@@ -231,9 +238,8 @@ class RefreshCoordinator:
             permission=cause if isinstance(cause,ReadNeedsPermission) else None
             blocked = isinstance(cause, ReadBlocked) or (isinstance(exc, HTTPException) and exc.status_code == 403)
             error_code = 'ReadNeedsPermission' if permission else 'ReadBlocked' if blocked else type(exc).__name__
-            detail = exc.detail if isinstance(exc, HTTPException) and isinstance(exc.detail, str) else ''
-            logger.warning('Live-read refresh failed: dataset=%s %s status=%s detail=%s duration_ms=%d',
-                           dataset, error_code, getattr(exc, 'status_code', None), detail[:160],
+            logging.getLogger('backend.live').warning('Live-read refresh failed: dataset=%s %s status=%s duration_ms=%d',
+                           dataset, error_code, getattr(exc, 'status_code', None),
                            int((monotonic()-began)*1000))
             if not isinstance(exc, LeaseLost):
                 retained = dict(claimed)

@@ -24,8 +24,10 @@ def fresh_cache(**table):
 def http(tmp_path):
     app = create_app({'DATABASE_URL': f'sqlite:///{tmp_path}/p1int.db', 'UPLOAD_DIR': str(tmp_path / 'files'),
                       'DEMO_MODE': 'false', 'APP_ENV': 'development', 'SESSION_SECRET': 'p1-int-only' * 4,
-                      'LARK_WORKER_ORGANIZATION': 'boundary', 'LARK_ALLOWED_TENANTS': 'boundary'})
+                      'LARK_APP_ID':'synthetic-app','LARK_WORKER_ORGANIZATION': 'boundary', 'LARK_ALLOWED_TENANTS': 'boundary'})
     state = upgrade(seed()); state['environment'] = 'production'
+    for user in state['users']:
+        user.update(directory_status='employed',directory_source={'app_id':'synthetic-app','record_id':'synthetic'})
     for project in state.get('projects', []): project['source_kind']='lark'
     for p in state['projects']: p.update(case_visibility='excluded_history', execution_system='meegle')
     old, new = state['projects'][:2]
@@ -53,7 +55,7 @@ def http(tmp_path):
 def make_fresh(app, monkeypatch):
     real = app.state.live_read.status
     def status(wid):
-        out = real(wid); out['datasets']['sources'].update(status='fresh', age_seconds=1, ttl_seconds=900, last_error=None)
+        out = real(wid); out['enabled'] = True; out['datasets']['sources'].update(status='fresh', age_seconds=1, ttl_seconds=900, last_error=None)
         return out
     monkeypatch.setattr(app.state.live_read, 'status', status)
 
@@ -135,7 +137,8 @@ def test_source_health_forbidden_source_and_failed_read_leak_nothing(http):
 
 @pytest.mark.parametrize('uid,expected', [('u-manager', True), ('u-pm', True), ('u-field', False)])
 def test_source_health_passes_the_sync_predicate_and_closed_arguments(http, monkeypatch, uid, expected):
-    _, client, seat, signin, _ = http
+    app, client, seat, signin, _ = http
+    make_fresh(app, monkeypatch)
     seat(cache=fresh_cache()); signin(uid)
     seen = {}
     from . import source_health
