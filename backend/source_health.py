@@ -140,6 +140,8 @@ def build_source_health(snapshot, freshness=None, *, diagnostic=False, read_auth
         else:
             row['health'] = 'healthy'
         if diagnostic is True:
+            if state and 'read_failed' in state['states']:
+                row['last_error_summary'] = '權限不足' if freshness.get('status') == 'blocked' else '來源讀取失敗'
             if isinstance(table.get('name'), str) and table['name'].strip():
                 row['name'] = table['name']
             loaded = _count(table.get('count')) if read and (state is None or state['states'] != ['unknown']) else None

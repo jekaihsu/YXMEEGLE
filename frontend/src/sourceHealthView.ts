@@ -51,6 +51,7 @@ export interface Timestamp {value: string | null; label: string}
 export interface SourceRow {
  key: string;
  name: string | null;
+ lastErrorSummary: string | null;
  version: string | null;
  dataState: DataState | null;
  statusLabel: string;
@@ -145,7 +146,7 @@ function sourceRow(raw: Record<string, unknown>, key: string): SourceRow {
  const hasKnownCounts = !states.some(s => ['unknown', 'loading', 'unlocated', 'read_failed'].includes(s)) &&
   !states.some(s => ['complete_empty', 'filtered_empty'].includes(s));
  return {
-  key, name: text(raw.name), version: text(raw.version), dataState: state === null ? null : parseDataState({states, count: null}),
+  key, name: text(raw.name), lastErrorSummary: text(raw.last_error_summary), version: text(raw.version), dataState: state === null ? null : parseDataState({states, count: null}),
   statusLabel: state === null ? '資料正常' : states.map(s => DATA_STATE_LABELS[s]).join('・'),
   needsAttention: states.some(s => ['read_failed', 'unlocated', 'partial', 'stale', 'unknown'].includes(s)),
   partial: states.includes('partial'), stale: states.includes('stale'),

@@ -1051,7 +1051,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             result=public_source_response(state,cache.data,user) if cache else {'configured':bool(configuration(cfg)),'last_sync':None,'status':'never','message':'尚未同步來源','tables':[],'records':[]}
         return {**result,'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
 
-    def source_health_from(data,user,freshness,cache_data,state,*,metadata_only=False):
+    def source_health_from(data,user,freshness,cache_data,state,*,metadata_only=False,diagnostic=False):
         """The GET /api/source-health computation over an already captured read (cache snapshot data and loaded workspace state)."""
         from .source_health import build_source_health
         if data['mode']!='lark' or data['wid'].startswith('test-'):
@@ -1078,7 +1078,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
         # Exactly the POST /api/sources/sync predicate. viewer_filtered stays None: visible_source_snapshot narrows
         # records to the admitted ids, so a zero count cannot be proven unfiltered.
         read_authorized=data['mode']=='lark' and not data['wid'].startswith('test-') and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
-        return build_source_health(snapshot,freshness['datasets']['sources'],diagnostic=False,read_authorized=read_authorized,viewer_filtered=None)
+        result=build_source_health(snapshot,freshness['datasets']['sources'],diagnostic=diagnostic,read_authorized=read_authorized,viewer_filtered=None)
+        result.pop('diagnostic',None)
+        return result
 
     def source_health_page(data,user):
         """The GET /api/source-health computation, shared so the manager overview binds the identical page state."""
@@ -1089,11 +1091,11 @@ def create_app(overrides=None,*,dispatch_transport=None):
             with sessions() as db:
                 cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']))
                 cache_data=cache.data if cache else None
-        return source_health_from(data,user,freshness,cache_data,state)
+        return source_health_from(data,user,freshness,cache_data,state,diagnostic=True)
 
     @app.get('/api/source-health')
     def source_health(request:Request):
-        """Page state only (G-DIAG open: diagnostic=False). Same branches and visibility as GET /api/sources; no record values."""
+        """Visibility-filtered source read summaries without identifiers or record values."""
         data,user=identity(request)
         return source_health_page(data,user)
 

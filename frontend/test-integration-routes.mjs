@@ -57,6 +57,6 @@ assert.match(app, /route\.view==='sources'&&\(isLegacyTab\(route,'sources'\)\?[^
 assert.match(app, /async function sync|const sync=async/, 'legacy sync function is not deleted');
 const pages = await fs.readFile(new URL('./src/IntegratedPages.tsx', import.meta.url), 'utf8');
 assert.deepEqual([...pages.matchAll(/useFetched\('([^']+)'/g)].map(x => x[1]).sort(), ['/api/my-work', '/api/source-health']);
-assert.match(pages, /diagnosticCapability: false/);
+assert.match(pages, /diagnosticCapability: true/);
 assert.doesNotMatch(pages, /\/api\/(audit|projects|actions|workspace)\b|method:\s*'(POST|PUT|PATCH|DELETE)'/, 'VCC-125: no reuse of audit/action/project payloads and no writes');
 console.log('integration routes: all passed');

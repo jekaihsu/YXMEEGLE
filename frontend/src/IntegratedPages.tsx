@@ -2,7 +2,7 @@
 // The legacy MyWork / Sources screens stay reachable through tab=legacy. Transport only; all state text comes
 // from the view models. New GETs: /api/my-work and /api/source-health.
 import {lazy, Suspense, useCallback, useEffect, useMemo, useState} from 'react';
-import {api, ApiError, getSessionEpoch, parseRoute} from './api';
+import {api, liveRefresh, ApiError, getSessionEpoch, parseRoute} from './api';
 const MyWorkTable=lazy(()=>import('./MyWorkTable'));
 const AssignmentTable=lazy(()=>import('./MyWorkTable').then(module=>({default:module.AssignmentTable})));
 import {buildMyWorkView} from './myWorkView.ts';
@@ -71,12 +71,20 @@ function LegacyWorkPage({c}: {c: Ctx}) {
 }
 
 export function SourceHealthPage({c}: {c: Ctx}) {
- const fetched = useFetched('/api/source-health', c.reloadVersion ?? c.w.version, c.s?.user?.id);
- // G-DIAG is open: no diagnostic capability exists, so the page shows the page state only.
- const view = useMemo(() => buildSourceHealthView(sourceHealthInput(fetched), {diagnosticCapability: false}), [fetched]);
+ const [attempt,setAttempt]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const fetched = useFetched('/api/source-health', `${c.reloadVersion ?? c.w.version}:${attempt}`, c.s?.user?.id);
+ const view = useMemo(() => buildSourceHealthView(sourceHealthInput(fetched), {diagnosticCapability: true}), [fetched]);
+ const retry=async(handle:unknown)=>{
+  if(busy || !handle || typeof handle!=='object' || !('dataset' in handle) || handle.dataset!=='sources')return;
+  const epoch=getSessionEpoch();setBusy(true);setError('');
+  try{await liveRefresh(['sources'],true,undefined,true)}
+  catch{if(epoch===getSessionEpoch())setError('更新失敗，請重試')}
+  finally{if(epoch===getSessionEpoch()){setBusy(false);setAttempt(n=>n+1)}}
+ };
  return <main className="page sources-page" aria-label="資料來源">
   <LegacyTabs c={c} view="sources"/>
-  <Suspense fallback={<p role="status">正在載入來源健康…</p>}><SourceHealth view={view}/></Suspense>
+  {error&&<p role="alert">{error}</p>}
+  <Suspense fallback={<p role="status">正在載入來源健康…</p>}><SourceHealth view={view} onRetry={retry} busy={busy}/></Suspense>
  </main>;
 }
 
