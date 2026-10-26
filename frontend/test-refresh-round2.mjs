@@ -129,3 +129,15 @@ test('engineering deadline includes progress readback and keeps last good time',
  await act(async()=>t.mock.timers.tick(10000));assert.equal(read.state.kind,'error');assert.equal(read.state.lastGoodAt,'2026-10-26T09:00:00Z');
  assert.match(read.state.message,/資料仍在更新/);t.mock.timers.reset();
 });
+test('reload during an active read coalesces into one subsequent read',async()=>{
+ let release,calls=0;globalThis.fetch=async()=>{calls++;if(calls===1)await new Promise(resolve=>release=resolve);return reply(fixture)};
+ await mount(React.createElement(Probe));assert.equal(calls,1);
+ await act(async()=>{read.reload();read.reload();read.reload()});assert.equal(calls,1);
+ await act(async()=>release());assert.equal(calls,2);assert.equal(read.state.kind,'ready');
+});
+test('source permission hint is one short label without raw authorization details',async()=>{
+ globalThis.fetch=async url=>reply(url==='/api/health'?{}:{...sourceBody(false),refresh_reason:'來源同步操作者尚未核實在職身分'});
+ await mount(React.createElement(ui.SourceHealthPage,{c:sourceContext('member')}));await flush();
+ assert.equal(document.body.textContent.includes('來源同步操作者尚未核實在職身分'),false);
+ assert.equal(document.body.textContent.includes('權限不足'),true);
+});
