@@ -51,7 +51,11 @@ def test_converted_action_stores_what_the_full_path_stores(pair, action):
     a, b = both(full, partial, user, action, **fields)
     assert a.status_code == 200, a.text
     same(full, partial, action)
-    assert partial.app.state.partial_writes == {'committed': 1, 'declined': 0}, 'the action did not take the partial path'
+    expected_commits = 0 if action == 'daily_propose' else 1
+    assert partial.app.state.partial_writes == {'committed': expected_commits, 'declined': 0}
+    if action == 'daily_propose':
+        review = b.json()['daily_reviews'][-1]
+        assert (review['status'], review['reason']) == ('pending', '依案號核對')
     assert partial.version() == 2
 
 
@@ -256,7 +260,9 @@ def test_a_daily_mapping_is_proposed_and_approved_identically(pair, daily):
     a, b = both(full, partial, 'u-manager', 'daily_approve', project_id=fields['project_id'], payload={'id': review})
     assert a.status_code == 200, a.text
     same(full, partial, 'daily_approve')
-    assert partial.app.state.partial_writes == {'committed': 2, 'declined': 0}
+    assert partial.app.state.partial_writes == {'committed': 0, 'declined': 0}
+    review = b.json()['daily_reviews'][-1]
+    assert (review['status'], review['reason']) == ('approved', '依案號核對' if daily == 'unmatched' else '改掛正確案件')
 
 
 @pytest.fixture
