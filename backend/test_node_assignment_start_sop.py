@@ -1313,3 +1313,22 @@ def test_start_agrees_with_the_evidence_overlay_and_mirrors_it_only_onto_rows_it
     overview = {n['key']: n for n in body['overview']['nodes']}
     assert (overview['field']['derived_status'], overview['field']['evidence']['drives_status']) == ('進行中', True)
     assert overview['field']['warnings'] == [] and len(s.fake.rows(TASKS)) == 0
+
+
+def test_positive_preview_submit_reload_and_replay_preserve_seed_rows(s):
+    plan = preview(s)
+    assert [n['planned_qty'] for n in plan['nodes']] == ['123.45', '10', '8.5', '3']
+    assert (plan['eligible'], plan['can_start'], plan['blockers']) == (True, True, [])
+    assert s.fake.writes() == []
+    response = start(s, rid='qa-positive', digest=plan['preview_hash'])
+    assert (response.json()['started'], response.json()['complete']) == (True, True)
+    assert (len(s.fake.rows(NODES)), len(s.fake.rows(TASKS))) == (4, 4)
+    fresh = s.build().get(URL).json()
+    assert [(n['key'], n['tasks']['total']) for n in fresh['nodes'] if n['key'] in ('field', 'control', 'mapping', 'report')] == [
+        ('field', 1), ('control', 1), ('mapping', 1), ('report', 1)]
+    writes = len(s.fake.writes())
+    replay = start(s, rid='qa-positive', digest=plan['preview_hash'])
+    assert replay.json() == response.json()
+    assert replay.headers['idempotent-replayed'] == 'true'
+    assert len(s.fake.writes()) == writes
+    assert (len(s.fake.rows(NODES)), len(s.fake.rows(TASKS))) == (4, 4)
