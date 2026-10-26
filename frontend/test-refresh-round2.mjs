@@ -72,3 +72,19 @@ test('polling failure uses a short Chinese reason',async()=>{
  globalThis.fetch=async url=>{const data=freshness(url.endsWith('/refresh')?'refreshing':'error');data.datasets.sources.last_error='Lark refresh failed';return reply({freshness:data},url.endsWith('/refresh')?202:200)};
  await assert.rejects(ui.refreshSources(),{message:'Lark 讀取失敗，請重試'});
 });
+test('initial permission denial never grants refresh or retry',async()=>{
+ let calls=0;globalThis.fetch=async()=>{calls++;return reply({detail:'denied'},403)};
+ await mount(React.createElement(Probe));assert.equal(read.canRefresh,false);assert.equal(read.canRetryRead,false);
+ await act(async()=>read.retry());assert.equal(calls,1);
+});
+test('initial network failure offers only a progress reread',async()=>{
+ const calls=[];globalThis.fetch=async url=>{calls.push(url);if(calls.length===1)throw new TypeError('network');return reply(fixture)};
+ await mount(React.createElement(Probe));assert.equal(read.canRefresh,false);assert.equal(read.canRetryRead,true);
+ await act(async()=>read.retry());assert.equal(read.state.kind,'ready');assert.equal(calls.some(url=>url==='/api/live/refresh'),false);
+});
+test('cached privilege is preserved after a failed progress read',async()=>{
+ const data=structuredClone(fixture);data.sources.can_refresh_sources=true;
+ globalThis.fetch=async()=>reply(data);await mount(React.createElement(Probe));
+ globalThis.fetch=async()=>{throw new TypeError('network')};await act(async()=>read.reload());
+ assert.equal(read.state.kind,'error');assert.equal(read.canRefresh,true);
+});
