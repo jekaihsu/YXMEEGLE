@@ -15,6 +15,7 @@ from sqlalchemy.pool import StaticPool
 from .live_read.token_cache import TenantTokenCache
 from .models import AuditRow, Base, Receipt
 from .node_assignment.routes import register
+from .sop_import.models import CasePolicy
 
 BASE = 'H7W6b0PFWaVF1BsgqXJj3pQ9pXb'
 NODES, TASKS, PEOPLE = 'tblcPZPmezkyeVb7', 'tblsoyGcC6K5AipF', 'tblfaCO2xPUNptQH'
