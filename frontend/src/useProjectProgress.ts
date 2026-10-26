@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useState} from 'react';
 import {ApiError,getSessionEpoch} from './api';
 import {fetchProjectProgress, type ProjectProgress} from './projectProgressApi';
-const fresh=(data:ProjectProgress)=>['ready','fresh'].includes(data.sources.source_status??'') && !!data.sources.source_synced_at && data.sources.reports_status==='ok' && data.sources.reports_stale===false;
+const fresh=(data:ProjectProgress)=>['ready','fresh','partial'].includes(data.sources.source_status??'') && !!data.sources.source_synced_at;
 type State = {kind: 'loading'}|{kind: 'ready'; data: ProjectProgress}|{kind: 'error'; message: string; status?:number; lastGoodAt?:string|null};
 let epoch = getSessionEpoch();
 const cache = new Map<string, {data: ProjectProgress; at: number}>();
