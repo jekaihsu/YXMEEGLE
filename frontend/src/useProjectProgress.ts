@@ -47,14 +47,15 @@ export function useProjectProgress(id: string, enabled = true) {
   reading.current = true;
   const currentEpoch = getSessionEpoch();
   const sync=version>0 && synchronize.current===id;
+  const timer=sync?setTimeout(()=>controller.abort(),90000):undefined;
   const lastGoodAt=cache.get(id)?.data.sources.source_synced_at;
   setState({kind: 'loading'});
   void (async()=>{if(sync && cache.get(id)?.data.sources.can_refresh_sources===true)await refreshSources('sources',undefined,controller.signal);if(!active || currentEpoch!==getSessionEpoch())return null;return prefetchProjectProgress(id,version>0,controller.signal)})().then(data => {
    if(!data || !active || currentEpoch!==getSessionEpoch())return;
    if(sync && !fresh(data))setState({kind:'error',message:'來源仍待更新，請重試',lastGoodAt:data.sources.source_synced_at || lastGoodAt});
    else setState({kind:'ready',data});
-  }).catch(error => {if (active && currentEpoch === getSessionEpoch()) setState({kind: 'error', message: error instanceof Error ? error.message : '工程進度暫不可用。',lastGoodAt:lastGoodAt,...(error instanceof ApiError ? {status:error.status} : {})})}).finally(() => {if (active) reading.current = false});
-  return () => {active = false; controller.abort();unsubscribe()};
+  }).catch(error => {if (active && currentEpoch === getSessionEpoch()) setState({kind: 'error', message: controller.signal.aborted ? '資料仍在更新，請稍後重試' : error instanceof Error ? error.message : '工程進度暫不可用。',lastGoodAt:lastGoodAt,...(error instanceof ApiError ? {status:error.status} : {})})}).finally(() => {clearTimeout(timer);if (active) reading.current = false});
+  return () => {active = false; clearTimeout(timer);controller.abort();unsubscribe()};
  }, [id, enabled, version]);
  return {state, retry, reload, canRefresh, canRetryRead};
 }
