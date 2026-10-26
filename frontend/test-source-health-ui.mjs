@@ -9,3 +9,8 @@ const view=ui.buildSourceHealthView({page_state:{states:['stale']},sources:[{key
 const html=renderToStaticMarkup(React.createElement(ui.SourceHealth,{view,onRetry:()=>{}}));
 assert.match(html,/部分來源時間未知/);assert.match(html,/2026\/10\/26 08:00:00/);assert.match(html,/前/);assert.match(html,/尚無成功紀錄/);assert.match(html,/讀取失敗/);assert.match(html,/重試/);assert.doesNotMatch(html,/PRIVATE_|來源代碼|對應未驗證/);
 console.log('Source health shows Taipei time, age, unknown state and retry without identifiers.');
+
+const unknownPage=ui.buildSourceHealthView({page_state:{states:['unknown']},sources:[{key:'healthy',authorized:true,health:'healthy',name:'工程來源'}]},{diagnosticCapability:true});
+const unknownHtml=renderToStaticMarkup(React.createElement(ui.SourceHealth,{view:unknownPage}));
+assert.match(unknownHtml,/<span class="source-health-status-badge">狀態未知<\/span>/);
+assert.match(unknownHtml,/<span class="source-health-tag">已讀取<\/span>/);
