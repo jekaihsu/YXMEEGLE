@@ -15,7 +15,7 @@ export function successfulRead(value:string|null,now=Date.now()):string {
 }
 export function SourceHealth({view,onRetry,busy=false}:SourceHealthProps) {
  const diagnostic=view?.diagnostic,rows=diagnostic?.rows??[];
- const state=view?.page?.statusLabel??(rows.length&&rows.every(row=>row.dataState===null)?'已讀取':'狀態未知');
+ const state=view?.page?.reported?view.page.statusLabel:rows.length&&rows.every(row=>row.dataState===null)?'已讀取':'狀態未知';
  return <div className="source-health-root">
   <section className="source-health-banner" role="status" aria-label="頁面資料狀態">
    <h1>來源與資料健康</h1><span className="source-health-status-badge">{state}</span>

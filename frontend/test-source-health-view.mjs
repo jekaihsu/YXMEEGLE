@@ -69,7 +69,7 @@ test('4 partial and stale independent and coexisting', () => {
 test('5 viewer split; forbidden omitted from every output; search cannot alter summary', () => {
  const forbidden = problem('SECRET_KEY', ['forbidden'], {name: 'SECRET_NAME', base_id: 'SECRET_BASE', loaded_count: 991, last_success: iso(1), fields: [{field_id: 'SECRET_FIELD'}], retry_handle: 'SECRET_HANDLE', read_authorized: true});
  const sources = [healthy('a', {last_success: iso(5), loaded_count: 7, base_id: 'base'}), forbidden];
- assert.deepEqual(build(input(sources), {diagnosticCapability: false}), {page: {states: ['partial', 'stale'], statusLabel: '部分資料・資料待更新', explanation: '目前只顯示部分資料，請確認既有來源的讀取狀態。 目前資料待更新，請確認最近成功讀取時間。'}, diagnostic: null});
+ assert.deepEqual(build(input(sources), {diagnosticCapability: false}), {page: {reported: true, states: ['partial', 'stale'], statusLabel: '部分資料・資料待更新', explanation: '目前只顯示部分資料，請確認既有來源的讀取狀態。 目前資料待更新，請確認最近成功讀取時間。'}, diagnostic: null});
  assert.equal(build(input(sources), {diagnosticCapability: 'true'}).diagnostic, null);
  const diagnostic = view(sources, {selectedKey: 'SECRET_KEY'});
  assert.deepEqual(keys(diagnostic), ['a']);
@@ -221,7 +221,7 @@ test('F7 malformed and forbidden-looking states expose no metadata anywhere', ()
 
 test('F8 ordinary read_failed guidance offers an available administrator action', () => {
  const result = build({page_state: {states: ['read_failed']}, sources: []}, {diagnosticCapability: false});
- assert.deepEqual(result, {page: {states: ['read_failed'], statusLabel: '讀取失敗', explanation: '請聯絡管理員確認既有授權讀取的失敗原因。'}, diagnostic: null});
+ assert.deepEqual(result, {page: {reported: true, states: ['read_failed'], statusLabel: '讀取失敗', explanation: '請聯絡管理員確認既有授權讀取的失敗原因。'}, diagnostic: null});
 });
 
 let passed = 0;

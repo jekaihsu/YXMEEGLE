@@ -75,6 +75,7 @@ export interface SourceRow {
  retry: {handle: unknown} | null;
 }
 export interface PageHealth {
+ reported: boolean;
  states: DataStateName[];
  statusLabel: string;
  explanation: string;
@@ -174,7 +175,7 @@ function sourceRow(raw: Record<string, unknown>, key: string): SourceRow {
 export function buildSourceHealthView(input: unknown, options: SourceHealthOptions): SourceHealthView {
  const raw = record(input);
  const pageState = parseDataState(raw.page_state);
- const page: PageHealth = {states: [...pageState.states], statusLabel: pageState.states.map(s => DATA_STATE_LABELS[s]).join('・'),
+ const page: PageHealth = {reported: raw.page_state != null, states: [...pageState.states], statusLabel: pageState.states.map(s => DATA_STATE_LABELS[s]).join('・'),
   explanation: pageState.states.map(s => guidance[s]).join(' ')};
  if (options.diagnosticCapability !== true) return {page, diagnostic: null};
  const candidates = Array.isArray(raw.sources) ? Array.from(raw.sources, record) : [];
