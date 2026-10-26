@@ -48,8 +48,8 @@ def test_one_partial_item_starts_the_node_by_evidence_and_shows_the_percent(full
     assert evidence['progress'] == {'percent': '30', 'earned_points': '60', 'planned_points': '200', 'items_done': 0, 'items_total': 2, 'known_items': 1, 'unknown_items': 1}
     assert evidence['items_total'] == 2 and evidence['items_truncated'] is False
     assert evidence['work_items'] == [
-        {'code': 'C1-1', 'name': '導線測量', 'planned_qty': '50', 'planned_points': '100', 'remaining_points': '40', 'status': 'partial', 'link_basis': 'native'},
-        {'code': 'C1-2', 'name': '水準測量', 'planned_qty': '5', 'planned_points': '100', 'remaining_points': '100', 'status': 'no_signal', 'link_basis': 'native'}]
+        {'code': 'C1-1', 'name': '導線測量', 'planned_qty': '50', 'planned_points': '100', 'remaining_points': '40', 'status': 'partial', 'link_basis': 'native', 'linked_reports': []},
+        {'code': 'C1-2', 'name': '水準測量', 'planned_qty': '5', 'planned_points': '100', 'remaining_points': '100', 'status': 'no_signal', 'link_basis': 'native', 'linked_reports': []}]
     assert field['can_submit_hint'] is False
     assert h.fake.writes() == []
 
