@@ -1,9 +1,9 @@
-import {homeTarget} from './projectRoutes';
 // My Work Presentational UI (VCC-126).
 // Pure presentational component: renders ONLY the output of buildMyWorkView from myWorkView.ts.
 // Does NOT recompute any state, label, sort, or count.
 // No fetch and no writes.
 
+import {homeTarget} from './projectRoutes';
 import { useRef, useEffect, useState } from 'react';
 import {Avatar} from './Avatar';
 import type {
