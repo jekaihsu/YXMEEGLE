@@ -6,7 +6,7 @@ import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost'});
-for(const k of ['window','document','location','HTMLElement'])globalThis[k]=dom.window[k];
+for(const k of ['window','document','location','HTMLElement','Event'])globalThis[k]=dom.window[k];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const bundle=await build({stdin:{contents:"export {refreshSources} from './src/refreshSources';export {useProjectProgress} from './src/useProjectProgress';export {SourceHealthPage} from './src/IntegratedPages';export {invalidateSessionEpoch} from './src/api';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const path=new URL('./.refresh-round2.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);let ui;try{ui=await import(path.href)}finally{await fs.unlink(path)}
@@ -40,4 +40,35 @@ test('engineering refresh that stays stale fails with last good time',async()=>{
  const data=structuredClone(fixture);Object.assign(data.sources,{can_refresh_sources:true,source_status:'stale',source_synced_at:'2026-10-26T09:00:00Z'});
  globalThis.fetch=async url=>reply(url.endsWith('/refresh')?{freshness:freshness('fresh')}:data);
  await mount(React.createElement(Probe));await act(async()=>read.retry());await flush();assert.equal(read.state.kind,'error');assert.equal(read.state.message,'來源仍待更新，請重試');assert.equal(read.state.lastGoodAt,'2026-10-26T09:00:00Z');
+});
+const sourceBody=allowed=>({can_refresh:allowed,refresh_reason:allowed?null:'需由有權限的 PM 或主管更新',page_state:{states:['stale'],count:null},sources:[{key:'source-one',name:'測試來源',authorized:true,read_authorized:allowed,retry_handle:allowed?{dataset:'sources'}:null,data_state:{states:['stale'],count:null},last_success:'2026-10-26T09:00:00Z'}]});
+const sourceContext=role=>({s:{user:{id:role,role}},w:{version:1},route:{view:'sources'},go(){}});
+test('limited source page shows permission reason and no retry',async()=>{
+ globalThis.fetch=async url=>reply(url==='/api/health'?{}:sourceBody(false));await mount(React.createElement(ui.SourceHealthPage,{c:sourceContext('member')}));await flush();
+ assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent==='重試'),false);assert.equal(document.body.textContent.includes('需由有權限的 PM 或主管更新'),true);assert.equal(document.body.textContent.includes('2026/10/26 17:00:00'),true);
+});
+test('privileged source page polls accepted work then reloads health',async()=>{
+ const calls=[];globalThis.fetch=async(url,init)=>{calls.push(url);if(url==='/api/live/refresh')return reply({freshness:freshness('refreshing')},202);if(url==='/api/live/status')return reply({freshness:freshness('fresh')});return reply(url==='/api/health'?{}:sourceBody(true))};
+ await mount(React.createElement(ui.SourceHealthPage,{c:sourceContext('manager')}));await flush();await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重試').click());await flush();
+ assert.deepEqual(calls.filter(x=>x!=='/api/health'),['/api/source-health','/api/live/refresh','/api/live/status','/api/source-health']);assert.equal(document.querySelector('[role="alert"]'),null);
+});
+test('source page displays server rejection and retains last success',async()=>{
+ globalThis.fetch=async url=>url==='/api/live/refresh'?reply({detail:'來源同步操作者已無權限'},403):reply(url==='/api/health'?{}:sourceBody(true));
+ await mount(React.createElement(ui.SourceHealthPage,{c:sourceContext('manager')}));await flush();await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重試').click());await flush();
+ assert.equal(document.querySelector('[role="alert"]').textContent,'來源同步操作者已無權限');assert.equal(document.body.textContent.includes('2026/10/26 17:00:00'),true);
+});
+test('a refresh is bounded at ninety seconds and reports pending explicitly',async()=>{
+ const real=globalThis.setTimeout;const delays=[];
+ globalThis.setTimeout=(fn,ms,...args)=>{delays.push(ms);return real(fn,ms===90000?0:ms,...args)};
+ globalThis.fetch=async(url,init)=>new Promise((resolve,reject)=>init.signal.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError')),{once:true}));
+ try{await assert.rejects(ui.refreshSources(),{message:'資料仍在更新，請稍後重試'});assert.equal(delays.includes(90000),true)}finally{globalThis.setTimeout=real}
+});
+test('stale readback without a timestamp retains the previous success time',async()=>{
+ const data=structuredClone(fixture);Object.assign(data.sources,{can_refresh_sources:true,source_status:'stale',source_synced_at:'2026-10-26T09:00:00Z'});
+ globalThis.fetch=async url=>{if(url.endsWith('/refresh')){data.sources.source_synced_at=null;return reply({freshness:freshness('fresh')})}return reply(data)};
+ await mount(React.createElement(Probe));await act(async()=>read.retry());await flush();assert.equal(read.state.kind,'error');assert.equal(read.state.lastGoodAt,'2026-10-26T09:00:00Z');
+});
+test('polling failure uses a short Chinese reason',async()=>{
+ globalThis.fetch=async url=>{const data=freshness(url.endsWith('/refresh')?'refreshing':'error');data.datasets.sources.last_error='Lark refresh failed';return reply({freshness:data},url.endsWith('/refresh')?202:200)};
+ await assert.rejects(ui.refreshSources(),{message:'Lark 讀取失敗，請重試'});
 });
