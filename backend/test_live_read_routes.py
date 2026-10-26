@@ -439,3 +439,24 @@ def test_wait_timeout_starts_every_requested_dataset(harness):
             assert statuses['attendance']['status'] != 'never'
         finally:
             release.set()
+
+
+def test_recovery_session_can_poll_sync_status_without_reading_lark(tmp_path):
+    app, client = production_client(tmp_path)
+    with app.state.sessions.begin() as db:
+        person = db.get(PersonRow, ('lark-company', 'u-manager'))
+        person.data = {**person.data, 'bootstrap_admin': True,
+                       'directory_last_seen_at': (datetime.now(timezone.utc)-timedelta(hours=25)).isoformat()}
+    calls = []
+    def forbidden(wid):
+        calls.append(wid)
+        raise AssertionError('status must not read Lark')
+    app.state.live_read.refreshers = {d: forbidden for d in ('sources', 'roster', 'attendance')}
+    assert client.get('/api/session').json()['access_mode'] == 'recovery'
+    calls.clear()
+    before = app.state.live_read.status('lark-company')
+    response = client.get('/api/live/status')
+    assert response.status_code == 200, response.text
+    assert response.json()['freshness']['datasets']['roster']['status'] == before['datasets']['roster']['status']
+    assert calls == []
+    assert client.get('/api/workspace').status_code == 403
