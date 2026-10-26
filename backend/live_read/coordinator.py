@@ -97,6 +97,13 @@ class RefreshCoordinator:
                 result['datasets'][dataset].pop(field, None)
             if dataset not in self.refreshers:
                 result['datasets'][dataset]['status'] = 'unconfigured'
+            elif result['enabled']:
+                key = self._key(wid, dataset)
+                with self._lock:
+                    future = self._futures.get(key)
+                    running = key in self._pending or future is not None and not future.done()
+                if running:
+                    result['datasets'][dataset]['status'] = 'refreshing'
         return result
 
     @property
