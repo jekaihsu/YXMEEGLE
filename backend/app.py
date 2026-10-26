@@ -570,7 +570,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
     @app.get('/api/health')
     def health():
         with engine.connect() as connection: connection.execute(select(1))
-        return {'status':'ok','mode':'demo' if demo else 'lark','database':'postgresql' if engine.dialect.name=='postgresql' else 'sqlite'}
+        from .build_identity import read_build_identity
+        return {'build':read_build_identity(),'status':'ok','mode':'demo' if demo else 'lark','database':'postgresql' if engine.dialect.name=='postgresql' else 'sqlite'}
 
     def features(environment=None):
         from .node_assignment.config import NodeAssignmentConfig

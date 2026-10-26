@@ -570,3 +570,5 @@
 }
 
 .source-read-list{display:grid;gap:12px}.source-read-row{padding:20px;border:1px solid var(--separator,#ddd);border-radius:12px;overflow-wrap:anywhere}.source-read-row>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.source-read-row h2{font-size:16px;margin:0}.source-read-row p{font-size:14px;line-height:1.7}.source-read-row button{min-height:44px;padding:8px 20px}.source-read-error{color:var(--critical,#b42318)}
+
+.source-build-id{display:block;margin-top:20px;color:var(--label-2);font-size:12px}

@@ -5,6 +5,7 @@ import {lazy, Suspense, useCallback, useEffect, useMemo, useState} from 'react';
 import {api, liveRefresh, ApiError, getSessionEpoch, parseRoute} from './api';
 const MyWorkTable=lazy(()=>import('./MyWorkTable'));
 const AssignmentTable=lazy(()=>import('./MyWorkTable').then(module=>({default:module.AssignmentTable})));
+import {buildLabel} from './buildIdentity';
 import {buildMyWorkView} from './myWorkView.ts';
 import {buildSourceHealthView} from './sourceHealthView.ts';
 import {filtersFromRoute, hashOfRoute, isLegacyTab, myWorkInput, sourceHealthInput, withFilters} from './integrationRoutes.ts';
@@ -71,6 +72,7 @@ function LegacyWorkPage({c}: {c: Ctx}) {
 }
 
 export function SourceHealthPage({c}: {c: Ctx}) {
+ const health=useFetched('/api/health',0,c.s?.user?.id);
  const [attempt,setAttempt]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const fetched = useFetched('/api/source-health', `${c.reloadVersion ?? c.w.version}:${attempt}`, c.s?.user?.id);
  const view = useMemo(() => buildSourceHealthView(sourceHealthInput(fetched), {diagnosticCapability: true}), [fetched]);
@@ -85,6 +87,7 @@ export function SourceHealthPage({c}: {c: Ctx}) {
   <LegacyTabs c={c} view="sources"/>
   {error&&<p role="alert">{error}</p>}
   <Suspense fallback={<p role="status">正在載入來源健康…</p>}><SourceHealth view={view} onRetry={retry} busy={busy}/></Suspense>
+  <small className="source-build-id" aria-label="部署版本">{buildLabel(health.status==='ok'?health.body:null)}</small>
  </main>;
 }
 
