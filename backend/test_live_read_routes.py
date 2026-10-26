@@ -374,3 +374,43 @@ def test_display_cache_read_failure_returns_cached_content(tmp_path, path):
     assert response.status_code == 200, response.text
     assert response.json()['freshness']['datasets']['sources']['status'] == 'error'
     assert 'private database details' not in response.text
+
+
+def test_slow_wait_and_forced_join_return_pending_then_fresh(harness):
+    from dataclasses import replace
+    client, coordinator, _, _, _ = harness
+    coordinator.config = replace(coordinator.config, blocking_timeout_seconds=.03)
+    started, release = Event(), Event()
+    calls = []
+    def slow(wid):
+        calls.append(wid)
+        started.set()
+        assert release.wait(5)
+        return {'fingerprint': 'completed'}
+    coordinator.refreshers['sources'] = slow
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        coordinator.executor = executor
+        try:
+            response = client.post('/api/live/refresh', json={'datasets':['sources'], 'wait':True, 'force':True})
+            assert started.is_set()
+            assert response.status_code == 202
+            assert response.json()['freshness']['datasets']['sources']['status'] == 'refreshing'
+            joined = client.post('/api/live/refresh', json={'datasets':['sources'], 'wait':True, 'force':True})
+            assert joined.status_code == 202
+        finally:
+            release.set()
+    assert calls == ['lark-company']
+    assert client.get('/api/live/status').json()['freshness']['datasets']['sources']['status'] == 'fresh'
+
+
+def test_refresh_failure_logs_class_and_dataset_without_secret(harness, caplog):
+    client, coordinator, _, _, _ = harness
+    def fail(wid):
+        raise ValueError('private-token')
+    coordinator.refreshers['sources'] = fail
+    with caplog.at_level('WARNING', logger='backend.live'):
+        response = client.post('/api/live/refresh', json={'datasets':['sources'], 'wait':True, 'force':True})
+    assert response.status_code == 502
+    messages = [record.getMessage() for record in caplog.records if record.name == 'backend.live']
+    assert any('ValueError' in message and 'sources' in message for message in messages)
+    assert 'private-token' not in ' '.join(messages)
