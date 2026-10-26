@@ -1,4 +1,4 @@
-import {refreshSources} from './refreshSources';
+import {useSourceRefresh} from './useSourceRefresh';
 // P1-INT pages: #work -> MyWorkTable(buildMyWorkView(...)), #sources -> SourceHealth(buildSourceHealthView(...)).
 // The legacy MyWork / Sources screens stay reachable through tab=legacy. Transport only; all state text comes
 // from the view models. New GETs: /api/my-work and /api/source-health.
@@ -73,6 +73,7 @@ function LegacyWorkPage({c}: {c: Ctx}) {
 }
 
 export function SourceHealthPage({c}: {c: Ctx}) {
+ const refreshSources=useSourceRefresh(c.s.workspace_id);
  const health=useFetched('/api/health',0,c.s?.user?.id);
  const [attempt,setAttempt]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const fetched = useFetched('/api/source-health', `${c.reloadVersion ?? c.w.version}:${attempt}`, c.s?.user?.id);

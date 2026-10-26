@@ -57,8 +57,8 @@ export function parseProjectProgress(value: unknown): ProjectProgress {
  }
  return data;
 }
-export async function fetchProjectProgress(id: string, current: () => boolean) {
- const data = parseProjectProgress(await api<unknown>(`/api/projects/${encodeURIComponent(id)}/progress`, {cache: 'no-store'}, current));
+export async function fetchProjectProgress(id: string, current: () => boolean, signal?:AbortSignal) {
+ const data = parseProjectProgress(await api<unknown>(`/api/projects/${encodeURIComponent(id)}/progress`, {cache: 'no-store',signal}, current));
  if (data.project_id !== id) throw new Error('工程進度案件不符，請重新讀取。');
  return data;
 }

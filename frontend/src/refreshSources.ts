@@ -1,12 +1,16 @@
-import {api, ApiError, getSessionEpoch, liveRefresh, liveStatus} from './api';
+import {api, ApiError, getSessionEpoch, liveRefresh, liveStatus, onSessionEpochChange} from './api';
 
 import type {Freshness, LiveDataset} from './types';
 
 type SyncResult={freshness?:Freshness;status?:string};
-export async function refreshSources(dataset:LiveDataset='sources', legacy?:{url:string;body?:string}) {
+export async function refreshSources(dataset:LiveDataset='sources', legacy?:{url:string;body?:string}, signal?:AbortSignal) {
  const epoch=getSessionEpoch(), controller=new AbortController();
+ const abort=()=>controller.abort();
+ signal?.addEventListener('abort',abort,{once:true});
+ if(signal?.aborted)abort();
+ const unsubscribe=onSessionEpochChange(abort);
  const timer=setTimeout(()=>controller.abort(),90000);
- const current=()=>{if(epoch!==getSessionEpoch())throw new Error('登入狀態已變更，請重新讀取')};
+ const current=()=>{if(controller.signal.aborted)throw new DOMException('Aborted','AbortError');if(epoch!==getSessionEpoch())throw new Error('登入狀態已變更，請重新讀取')};
  try {
   let status=200;
   let result:SyncResult=legacy?await api<SyncResult>(legacy.url,{method:'POST',body:legacy.body,signal:controller.signal},()=>true,value=>{status=value}):await liveRefresh([dataset],true,controller.signal,dataset==='sources');
@@ -29,5 +33,5 @@ export async function refreshSources(dataset:LiveDataset='sources', legacy?:{url
   if(controller.signal.aborted)throw new Error('資料仍在更新，請稍後重試');
   if(error instanceof TypeError)throw new Error('Lark 讀取失敗，請重試');
   throw error;
- }finally{clearTimeout(timer)}
+ }finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);unsubscribe()}
 }

@@ -8,7 +8,9 @@ const pendingMutations=new Map<number,number>();
 export const getPendingMutations=()=>pendingMutations.get(sessionEpoch)||0;
 const mutationChanged=()=>{if(typeof window!=='undefined')window.dispatchEvent(new Event('yx:mutation-state'))};
 export const getSessionEpoch=()=>sessionEpoch;
-export const invalidateSessionEpoch=()=>{sessionEpoch++;etagCache.clear()};
+const epochListeners=new Set<()=>void>();
+export const onSessionEpochChange=(listener:()=>void)=>{epochListeners.add(listener);return ()=>{epochListeners.delete(listener)}};
+export const invalidateSessionEpoch=()=>{sessionEpoch++;etagCache.clear();for(const listener of epochListeners)listener()};
 export class ApiError extends Error {constructor(public status:number,message:string,public code?:string,public ceiling_seconds?:number,public warming?:boolean,public retry_after?:number,public payload?:unknown){super(message)}}
 export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boolean=()=>true,onResponse?:(status:number)=>void):Promise<T>{
   const epoch=getSessionEpoch();

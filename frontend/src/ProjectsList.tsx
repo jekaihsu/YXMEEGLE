@@ -1,4 +1,4 @@
-import {refreshSources} from './refreshSources';
+import {useSourceRefresh} from './useSourceRefresh';
 import {useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import {ArrowDown, ArrowRight, Check, CircleCheck, Clock3, Copy, FileText, LayoutGrid, List, MoreVertical, Pin, PlayCircle, Plus, Search, Settings2, Star, UserRound, X} from 'lucide-react';
 import {useViewData} from './viewData';
@@ -60,6 +60,7 @@ function CaseCard({row,c,pinned,onPin,today}:{row:CaseRow;c:Ctx;pinned:boolean;o
  </article>;
 }
 export function Projects({c}:{c:Ctx}) {
+ const refreshSources=useSourceRefresh(c.s.workspace_id);
  const [filters,setFilters]=useState<CaseFilters>({...DEFAULT_FILTERS,kind:c.route.tab==='intake'?'intake':''});
  const [view,setView]=useState('list'),[expanded,setExpanded]=useState<string[]>([]),[limit,setLimit]=useState(readLimit),[creating,setCreating]=useState(false),[notice,setNotice]=useState(''),[syncing,setSyncing]=useState(false),[syncStatus,setSyncStatus]=useState('');
  const shell=c.w.scope==='shell',scope=JSON.stringify([c.s.user?.id,c.s.user?.role,c.s.workspace_id,c.w.workspace_id]);

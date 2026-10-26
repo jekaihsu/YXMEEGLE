@@ -5,11 +5,12 @@ import './owned-screens.css';
 import {ageFreshness,datasetNotice} from './freshness';
 import {useState} from 'react';
 import {ApiError,getSessionEpoch} from './api';
-import {refreshSources} from './refreshSources';
+import {useSourceRefresh} from './useSourceRefresh';
 import {DraftForm} from './FormDraft';
 import type {Context} from './Operations';
 
 export function AttendanceWorkSchedules({c}:{c:Context}){
+ const refreshSources=useSourceRefresh(c.s.workspace_id);
  const params=new URLSearchParams(location.hash.slice(1));const today=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Taipei'});
  const[from,setFrom]=useState(today),[to,setTo]=useState(today),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
  const freshness=c.w.freshness?.datasets.attendance;
