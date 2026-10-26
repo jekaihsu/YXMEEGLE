@@ -121,3 +121,17 @@ def test_manual_pairing_is_not_reported_as_provisional_pairing():
     paired = project['daily_reports'][0]
     assert paired['match_basis'] == 'manual_review'
     assert paired['mapping_status'] == 'ready'
+
+
+def test_date_formula_serial_agrees_with_payroll_date():
+    _, work = outdoor_rows(**{'工作日期-薪資': 46245, '日期': 46245})
+    entry, stats = only_daily([work])
+    assert entry['date'] == '2026-08-11'
+    assert entry['mapping_status'] != 'conflicting_dates'
+    assert stats['daily_conflicting_dates'] == 0
+
+
+def test_date_formula_serial_alone_is_not_unix_epoch():
+    _, work = outdoor_rows(**{'工作日期-薪資': None, '日期': 46245})
+    entry, _ = only_daily([work])
+    assert entry['date'] == '2026-08-11'
