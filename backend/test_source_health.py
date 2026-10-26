@@ -465,3 +465,10 @@ def test_revalidation_keeps_successful_source_snapshot_available_to_p2():
     assert page['page_state']['states'] == ['stale']
     assert [row['case_number'] for row in page['rows']] == ['C100']
     assert page['amounts']['state'] == 'withheld'
+
+
+def test_per_source_failure_has_safe_summary_and_retained_time():
+    result = row(snapshot(status='error'), freshness={'status': 'error', 'last_error': 'SECRET_TOKEN'})
+    assert result['last_error_summary'] == '來源讀取失敗'
+    assert result['last_success']
+    assert 'SECRET_TOKEN' not in json.dumps(result)
