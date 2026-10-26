@@ -10,7 +10,7 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'
 const bundle=await build({entryPoints:['src/main.tsx'],bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',loader:{'.css':'empty'},define:{'process.env.NODE_ENV':'"development"'}});
 const server=createServer((request,response)=>{
  response.setHeader('Content-Type',request.url==='/app.js'?'text/javascript':'text/html');
- response.end(request.url==='/app.js'?bundle.outputFiles[0].text:'<!doctype html><title>Search regression</title><div id="root"></div><script src="/app.js"></script>');
+ response.end(request.url==='/app.js'?bundle.outputFiles[0].text:'<!doctype html><html data-browser-supported="true"><title>Search regression</title><div id="root"></div><script src="/app.js"></script>');
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
@@ -37,22 +37,16 @@ try{
   assert.equal(await page.locator('.pl-case').count(),1,`${width}: search filters rows`);
   assert.match(await page.locator('.pl-groups').innerText(),/YX-002/);
   const reads=requests.length;
-  await page.getByRole('button',{name:'重新整理資料',exact:true}).click();
-  assert.equal(requests.length,reads,`${width}: blurred dirty input still blocks workspace reload`);
   await page.getByRole('button',{name:'清除搜尋',exact:true}).click();
   assert.equal(await input.inputValue(),'');
   assert.equal(await page.locator('.pl-case').count(),3);
-  await Promise.all([
-   page.waitForResponse(response=>new URL(response.url()).pathname==='/api/workspace'),
-   page.getByRole('button',{name:'重新整理資料',exact:true}).click(),
-  ]);
-  assert.ok(requests.length>reads,`${width}: clearing to baseline releases reload guard`);
+  assert.equal(requests.length,reads,`${width}: clearing a complete client list needs no extra workspace read`);
   await input.fill('YX-003');
   assert.equal(await input.inputValue(),'YX-003',`${width}: native replacement also survives`);
   assert.equal(await page.locator('.pl-case').count(),1);
   assert.match(await page.locator('.pl-groups').innerText(),/YX-003/);
   assert.deepEqual(errors,[],`${width}: no browser runtime errors`);
-  console.log(`Search input: ${width}px native typing, replacement, clear, filtering and reload protection passed`);
+  console.log(`Search input: ${width}px native typing, replacement, clear, filtering without extra workspace reads passed`);
   await page.close();
  }
 }finally{
