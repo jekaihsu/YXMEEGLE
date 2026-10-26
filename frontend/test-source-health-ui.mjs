@@ -15,3 +15,9 @@ const unknownPage=ui.buildSourceHealthView({page_state:{states:['unknown']},sour
 const unknownHtml=renderToStaticMarkup(React.createElement(ui.SourceHealth,{view:unknownPage}));
 assert.match(unknownHtml,/<span class="source-health-status-badge">狀態未知<\/span>/);
 assert.match(unknownHtml,/<span class="source-health-tag">已讀取<\/span>/);
+
+const healthyPage=ui.buildSourceHealthView({page_state:null,sources:[{key:'healthy',authorized:true,health:'healthy',name:'工程來源'}]},{diagnosticCapability:true});
+const healthyHtml=renderToStaticMarkup(React.createElement(ui.SourceHealth,{view:healthyPage}));
+assert.match(healthyHtml,/<span class="source-health-status-badge">已讀取<\/span>/,'a healthy page reported as null shows 已讀取');
+const unrowedHtml=renderToStaticMarkup(React.createElement(ui.SourceHealth,{view:ui.buildSourceHealthView({page_state:null,sources:[]},{diagnosticCapability:true})}));
+assert.match(unrowedHtml,/<span class="source-health-status-badge">狀態未知<\/span>/,'no rows and no reported state stays unknown');
