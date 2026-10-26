@@ -554,3 +554,21 @@ def test_reports_view_keeps_the_captured_generation_when_store_changes():
         assert view.snapshot is snapshot
     finally:
         with_snapshot.close()
+
+
+@pytest.mark.parametrize('uid,expected', [('u-manager', True), ('u-pm', True), ('u-field', False)])
+def test_source_refresh_permission_matches_live_authorization(http, uid, expected):
+    app, client, seat, signin = http
+    state, vis, _ = build_state()
+    seat(state)
+    signin(uid)
+    health = client.get('/api/source-health').json()
+    assert health['can_refresh'] is expected
+    progress = client.get(f'/api/projects/{vis}/progress')
+    assert progress.status_code == 200
+    assert progress.json()['sources']['can_refresh_sources'] is expected
+    if not expected:
+        assert health['refresh_reason'] == '需由有權限的 PM 或主管更新'
+        assert all('retry_handle' not in row for row in health['sources'])
+        response = client.post('/api/live/refresh', json={'datasets':['sources'], 'force':True, 'wait':True})
+        assert response.status_code == 403
