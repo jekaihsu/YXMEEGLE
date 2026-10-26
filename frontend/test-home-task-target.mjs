@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {createRequire} from 'node:module';
+import {JSDOM} from 'jsdom';
+const bundle=await build({stdin:{contents:"import React from 'react';import {renderToStaticMarkup} from 'react-dom/server';import {WorkPreview} from './src/homeCards';export const render=item=>renderToStaticMarkup(<WorkPreview item={item} today='2026-10-26'/>);export {parseRoute} from './src/api';",resolveDir:import.meta.dirname,loader:'tsx'},bundle:true,write:false,format:'cjs',platform:'node',packages:'external',loader:{'.css':'empty'}});
+const mod={exports:{}};new Function('require','module','exports',bundle.outputFiles[0].text)(createRequire(import.meta.url),mod,mod.exports);
+const item={id:'task/field/task1',kind:'task',title:'核對成果',status:'todo',source_status:null,case:{name:'QA 案件'},blocked_reasons:[],deadline:null,next_due:null,target:{view:'project',project:'case1',tab:'flow',assignment_node:'field',assignment_task:'task1'}};
+const link=new JSDOM(mod.exports.render(item)).window.document.querySelector('a');
+assert.equal(link.textContent.includes('核對成果'),true);
+const route=mod.exports.parseRoute(link.getAttribute('href'));
+assert.equal(route.project,'case1');assert.equal(route.node,'field');assert.equal(route.task,'task1');assert.equal(route.tab,'flow');
