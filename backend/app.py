@@ -1052,6 +1052,17 @@ def create_app(overrides=None,*,dispatch_transport=None):
             result=public_source_response(state,cache.data,user) if cache else {'configured':bool(configuration(cfg)),'last_sync':None,'status':'never','message':'尚未同步來源','tables':[],'records':[]}
         return {**result,'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
 
+    def source_refresh_permission(data,user):
+        try:
+            if data['mode']!='lark' or data['wid'].startswith(('test-','demo-')):
+                return False, '隔離工作區不可同步正式來源'
+            app.state.source_sync._authorize(data['wid'],user['id'])
+            return True, None
+        except HTTPException as exc:
+            if user.get('role') not in ('pm','manager') and not capable(user,'manage_sources'):
+                return False, '需由有權限的 PM 或主管更新'
+            return False, exc.detail
+
     def source_health_from(data,user,freshness,cache_data,state,*,metadata_only=False,diagnostic=False):
         """The GET /api/source-health computation over an already captured read (cache snapshot data and loaded workspace state)."""
         from .source_health import build_source_health
@@ -1078,8 +1089,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
             else: snapshot={'status':'never','tables':[],'records':[]}
         # Exactly the POST /api/sources/sync predicate. viewer_filtered stays None: visible_source_snapshot narrows
         # records to the admitted ids, so a zero count cannot be proven unfiltered.
-        read_authorized=data['mode']=='lark' and not data['wid'].startswith('test-') and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+        read_authorized,refresh_reason=source_refresh_permission(data,user)
         result=build_source_health(snapshot,freshness['datasets']['sources'],diagnostic=diagnostic,read_authorized=read_authorized,viewer_filtered=None)
+        result.update(can_refresh=read_authorized,refresh_reason=refresh_reason)
         result.pop('diagnostic',None)
         return result
 
@@ -1280,6 +1292,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         # decisions were loaded above; GET must not queue behind a source sync's
         # workspace write lock. The link-review workflow persists its own rows.
         with phase(request,'project'): result=build_project_progress(state,project_id,reports=reports,amounts=privileged,as_of=state['as_of'])
+        result['sources']['can_refresh_sources'],result['sources']['refresh_reason']=source_refresh_permission(data,user)
         with phase(request,'encode'): return JSONResponse(result,headers={'Cache-Control':'no-store'})
 
     @app.get('/api/case-detail/{project_id}')

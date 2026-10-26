@@ -24,8 +24,10 @@ def fresh_cache(**table):
 def http(tmp_path):
     app = create_app({'DATABASE_URL': f'sqlite:///{tmp_path}/p1int.db', 'UPLOAD_DIR': str(tmp_path / 'files'),
                       'DEMO_MODE': 'false', 'APP_ENV': 'development', 'SESSION_SECRET': 'p1-int-only' * 4,
-                      'LARK_WORKER_ORGANIZATION': 'boundary', 'LARK_ALLOWED_TENANTS': 'boundary'})
+                      'LARK_APP_ID':'synthetic-app','LARK_WORKER_ORGANIZATION': 'boundary', 'LARK_ALLOWED_TENANTS': 'boundary'})
     state = upgrade(seed()); state['environment'] = 'production'
+    for user in state['users']:
+        user.update(directory_status='employed',directory_source={'app_id':'synthetic-app','record_id':'synthetic'})
     for project in state.get('projects', []): project['source_kind']='lark'
     for p in state['projects']: p.update(case_visibility='excluded_history', execution_system='meegle')
     old, new = state['projects'][:2]

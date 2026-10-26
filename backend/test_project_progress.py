@@ -197,7 +197,8 @@ def test_reports_snapshot_cold_returns_the_rest_with_a_gap(progress):
     state, vis, _ = chain_state()
     body = run(state, vis, cases=[('recX', 'C115264', '未填', None)], warm=False).json()
     assert body['sources'] == {'source_synced_at': body['sources']['source_synced_at'], 'source_status': body['sources']['source_status'],
-                               'reports_status': 'cold', 'reports_fetched_at': None, 'reports_stale': None}
+                               'reports_status': 'cold', 'reports_fetched_at': None, 'reports_stale': None,
+                               'can_refresh_sources':False,'refresh_reason':'來源同步操作者尚未核實在職身分'}
     assert body['identity']['confirmation']['present'] is True and stage(body, 'sales')['state'] == 'done'
     assert body['identity']['v3_cases'] == [] and 'reports_cold' in {g['id'] for g in body['gaps']}
 
@@ -557,9 +558,16 @@ def test_reports_view_keeps_the_captured_generation_when_store_changes():
 
 
 @pytest.mark.parametrize('uid,expected', [('u-manager', True), ('u-pm', True), ('u-field', False)])
-def test_source_refresh_permission_matches_live_authorization(http, uid, expected):
+def test_source_refresh_permission_matches_live_authorization(http, monkeypatch, uid, expected):
     app, client, seat, signin = http
     state, vis, _ = build_state()
+    from dataclasses import replace
+    monkeypatch.undo()
+    app.state.cfg.update(LARK_APP_ID='synthetic-app',LARK_WORKER_IDENTITY='application',LARK_LIVE_READ_ENABLED='true')
+    app.state.live_read.config=replace(app.state.live_read.config,enabled=True)
+    app.state.live_read.refreshers={d:lambda wid:{'fingerprint':'synthetic'} for d in ('sources','roster','attendance')}
+    for user in state['users']:
+        user.update(directory_status='employed', directory_source={'app_id':app.state.cfg.get('LARK_APP_ID'), 'record_id':'synthetic'})
     seat(state)
     signin(uid)
     health = client.get('/api/source-health').json()
@@ -567,6 +575,10 @@ def test_source_refresh_permission_matches_live_authorization(http, uid, expecte
     progress = client.get(f'/api/projects/{vis}/progress')
     assert progress.status_code == 200
     assert progress.json()['sources']['can_refresh_sources'] is expected
+    if expected:
+        response=client.post('/api/live/refresh',json={'datasets':['sources'],'force':True,'wait':True})
+        assert response.status_code==200
+        assert response.json()['freshness']['datasets']['sources']['status']=='fresh'
     if not expected:
         assert health['refresh_reason'] == '需由有權限的 PM 或主管更新'
         assert all('retry_handle' not in row for row in health['sources'])
