@@ -532,7 +532,7 @@ def import_v4(ws, records, complete_tables=None):
         basis=decision.basis or ('provisional_case_code' if code else 'source_case_or_link')
         costrecords,_=native_records(r,'所屬成本單',record_index,{'cost'})
         costfields=[c['fields'] for c in costrecords]
-        dates={day(f.get(k),formula_serial=k in ('工作日期-薪資','工作日期-營業額明細')) for k in ('工作日期-薪資','工作日期-營業額明細','日期')}|{day(c.get(k)) for c in costfields for k in ('工作日期','出工日期','日期')}; dates.discard('')
+        dates={day(f.get(k),formula_serial=k in ('工作日期-薪資','工作日期-營業額明細','日期')) for k in ('工作日期-薪資','工作日期-營業額明細','日期')}|{day(c.get(k)) for c in costfields for k in ('工作日期','出工日期','日期')}; dates.discard('')
         rawgroup=unique_value([text(f.get('組別'))]+[text(c.get('內業組別') or c.get('組別') or c.get('所屬組別')) for c in costfields])
         department=canonical_department(text(f.get('營業額組別-明細') or r.get('department')) or unique_value(text(x.get('工項類別')) for x in linked) or rawgroup)
         # 出工人 (組長＋組員) and 姓名 name who worked. The account fields are only the fallback: 填報帳號 is
