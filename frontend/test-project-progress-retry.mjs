@@ -30,5 +30,20 @@ try{
   if(expected==='ready')assert.deepEqual(read.state,{kind:'ready',data:payload});
   else assert.deepEqual(read.state,{kind:'error',message:'無法更新工程證據，請重試。',lastGoodAt:'2026-10-26T00:00:00Z'});
  }
+ await act(async()=>root.render(null));ui.invalidateSessionEpoch();calls=0;
+ payload=structuredClone(fixture);Object.assign(payload.sources,{source_status:'fresh',source_synced_at:'2026-10-26T00:00:00Z'});
+ await act(async()=>root.render(React.createElement(Probe)));
+ let release;
+ globalThis.fetch=async()=>{calls++;await new Promise(resolve=>release=resolve);return new Response(JSON.stringify(payload),{headers:{'content-type':'application/json'}})};
+ calls=0;
+ const retry=read.retry;
+ await act(async()=>{for(let i=0;i<5;i++)retry()});
+ for(let i=0;i<5;i++)await act(async()=>retry());
+ assert.equal(calls,1,'re-entrant retries start exactly one request until it settles');
+ await act(async()=>release());
+ assert.equal(read.state.kind,'ready');
+ await act(async()=>retry());
+ assert.equal(calls,2,'retry becomes available again after settlement');
+ await act(async()=>release());
  console.log('PASS progress retry states keep source freshness independent from report availability');
 }finally{await act(async()=>root.unmount())}
