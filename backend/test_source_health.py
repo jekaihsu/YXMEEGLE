@@ -472,3 +472,16 @@ def test_per_source_failure_has_safe_summary_and_retained_time():
     assert result['last_error_summary'] == '來源讀取失敗'
     assert result['last_success']
     assert 'SECRET_TOKEN' not in json.dumps(result)
+
+
+@pytest.mark.parametrize(('status', 'label'), [
+    ('blocked', '設定未完成'),
+    ('needs-permission', '權限不足'),
+    ('error', '來源讀取失敗'),
+])
+def test_diagnostic_failure_labels_distinguish_setup_permission_and_read_errors(status, label):
+    for details in ({}, {'last_error': 'PRIVATE_CONFIGURATION_OR_UPSTREAM_MESSAGE'}):
+        result = build(snapshot(), {'status': status, **details}, diagnostic=True)
+        assert result['page_state'] == {'states': ['read_failed'], 'count': None}
+        assert result['sources'][0]['last_error_summary'] == label
+        assert 'PRIVATE_' not in json.dumps(result)
