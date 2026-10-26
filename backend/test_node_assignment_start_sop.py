@@ -1306,7 +1306,8 @@ def test_seed_tasks_must_be_a_boolean(s, value):
 
 def test_start_agrees_with_the_evidence_overlay_and_mirrors_it_only_onto_rows_it_creates(s):
     s.state['contract_items'] = [{'id': 'ct1', 'project_id': 'p1'}]
-    s.case['project']['daily_reports'] = [{'id': 'd1', 'date': '2026-10-08', 'department': '外業組', 'points': 1}]
+    s.case['project']['daily_reports'] = [{'id': 'd1', 'date': '2026-10-08', 'department': '外業組', 'points': 1,
+        'case_mapping_status': 'matched', 'match_basis': 'source_case_or_link'}]
     body = start(s, seed=False).json()
     states = {f['節點']: f['狀態'] for f in s.fake.rows(NODES).values()}
     assert states == {'外業': '進行中', '控制': '未開始', '圖資': '未開始', '報告': '未開始'}

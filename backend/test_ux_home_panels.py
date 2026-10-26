@@ -273,7 +273,8 @@ def test_production_evidence_moves_a_node_to_in_progress_on_the_home_panels_too(
         node(home, label, owner='ou_sales', 狀態='已完成', 核准人=[{'id': 'ou_vp'}], 核准時間=int(T0 * 1000))
     rid = node(home, '外業')
     before = next(r for r in home.read()['items'] if r['source']['record_id'] == rid)
-    p['daily_reports'] = [{'id': 'd1', 'date': '2026-10-08', 'department': '外業組', 'points': 1}]
+    p['daily_reports'] = [{'id': 'd1', 'date': '2026-10-08', 'department': '外業組', 'points': 1,
+        'case_mapping_status': 'matched', 'match_basis': 'source_case_or_link'}]
     home.clock[0] += 1000
     after = next(r for r in home.read()['items'] if r['source']['record_id'] == rid)
     assert (before['derived_status'], after['derived_status']) == ('todo', 'in_progress')
