@@ -8,3 +8,7 @@ export function projectFlowRoute(route:ProjectRoute){
  const allTasks=original==='tasks' || section==='all-tasks' || route.all_tasks==='1';
  return {tab,focus:allTasks ? 'tasks' : 'node',allTasks,...(section ? {section} : {})};
 }
+
+export function homeTarget({assignment_node,assignment_task,...target}:import('./useHomePanels').HomeTarget){
+ return {...target,node:assignment_node ?? target.node,task:assignment_task ?? target.task};
+}
