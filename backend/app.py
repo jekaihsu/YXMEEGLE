@@ -400,7 +400,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             if data.get('mode')=='lark' and admission_required:
                 from .production_access import require_access
                 recovery_routes={('GET','/api/session'),('POST','/api/logout'),
-                    ('POST','/api/people/sync'),('GET','/api/admin/runtime-health')}
+                    ('POST','/api/people/sync'),('GET','/api/live/status'),('GET','/api/admin/runtime-health')}
                 if tenant_read:
                     from .production_access import access_mode
                     access=access_mode(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'))

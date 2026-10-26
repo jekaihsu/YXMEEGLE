@@ -1,3 +1,4 @@
+import {refreshSources} from './refreshSources';
 import {useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import {ArrowDown, ArrowRight, Check, CircleCheck, Clock3, Copy, FileText, LayoutGrid, List, MoreVertical, Pin, PlayCircle, Plus, Search, Settings2, Star, UserRound, X} from 'lucide-react';
 import {useViewData} from './viewData';
@@ -81,7 +82,7 @@ export function Projects({c}:{c:Ctx}) {
  const pmIds=useMemo(()=>[...new Set((projects??[]).map(p=>p.pm_id).filter(Boolean))],[projects]);
  const canCreate=c.s.features?.local_case_creation===true&&c.s.user?.capabilities?.includes('create_local_case')===true;
  const canSync=c.s.mode==='lark'&&(c.s.access_mode||'normal')==='normal'&&c.s.user?.active!==false&&!String(c.s.workspace_id||c.w.workspace_id||'').startsWith('test-')&&(['pm','manager'].includes(c.s.user?.role||'')||c.s.user?.capabilities?.includes('manage_sources')===true);
- const sync=async()=>{if(syncing)return;setSyncing(true);setSyncStatus('');try{await api('/api/sources/sync',{method:'POST',body:'{}'});await c.refresh();read.reload();setSyncStatus('Lark 同步完成，案件清單已更新。')}catch(error){setSyncStatus(`Lark 同步失敗：${error instanceof Error?error.message:String(error)}`)}finally{setSyncing(false)}};
+ const sync=async()=>{if(syncing)return;setSyncing(true);setSyncStatus('');try{await refreshSources('sources',{url:'/api/sources/sync',body:'{}'});await c.refresh();read.reload();setSyncStatus('Lark 同步完成，案件清單已更新。')}catch(error){setSyncStatus(`Lark 同步失敗：${error instanceof Error?error.message:String(error)}`)}finally{setSyncing(false)}};
  const hasFilters=Object.entries(filters).some(([k,v])=>v!==Object.entries(DEFAULT_FILTERS).find(([key])=>key===k)?.[1]);
  const kpis=[{label:'全部案件',value:counts.all,icon:FileText},{label:'進行中',value:counts.active,icon:PlayCircle},{label:'SOP 進行中',value:counts.sop,icon:Settings2},{label:'已完成',value:counts.done,icon:CircleCheck}];
  return <div className="pl-page">
