@@ -1052,16 +1052,19 @@ def create_app(overrides=None,*,dispatch_transport=None):
             result=public_source_response(state,cache.data,user) if cache else {'configured':bool(configuration(cfg)),'last_sync':None,'status':'never','message':'尚未同步來源','tables':[],'records':[]}
         return {**result,'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
 
-    def source_refresh_permission(data,user):
-        try:
-            if data['mode']!='lark' or data['wid'].startswith(('test-','demo-')):
-                return False, '隔離工作區不可同步正式來源'
-            app.state.source_sync._authorize(data['wid'],user['id'])
-            return True, None
-        except HTTPException as exc:
-            if user.get('role') not in ('pm','manager') and not capable(user,'manage_sources'):
-                return False, '需由有權限的 PM 或主管更新'
-            return False, exc.detail
+    def source_refresh_permission(data,user,freshness=None):
+        if '_source_refresh_permission' not in data:
+            try:
+                require_refresh(app.state.live_read,data,user,'sources',authorize=authorize_live,enabled=freshness['enabled'] if freshness is not None else None)
+                permission=(True,None)
+            except Exception as exc:
+                reason='權限不足'
+                if user.get('role') not in ('pm','manager') and not capable(user,'manage_sources'):
+                    reason='需由有權限的 PM 或主管更新'
+                elif isinstance(exc,HTTPException): reason=exc.detail
+                permission=(False,reason)
+            data['_source_refresh_permission']=permission
+        return data['_source_refresh_permission']
 
     def source_health_from(data,user,freshness,cache_data,state,*,metadata_only=False,diagnostic=False):
         """The GET /api/source-health computation over an already captured read (cache snapshot data and loaded workspace state)."""
@@ -1089,7 +1092,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             else: snapshot={'status':'never','tables':[],'records':[]}
         # Exactly the POST /api/sources/sync predicate. viewer_filtered stays None: visible_source_snapshot narrows
         # records to the admitted ids, so a zero count cannot be proven unfiltered.
-        read_authorized,refresh_reason=source_refresh_permission(data,user)
+        read_authorized,refresh_reason=source_refresh_permission(data,user,freshness)
         result=build_source_health(snapshot,freshness['datasets']['sources'],diagnostic=diagnostic,read_authorized=read_authorized,viewer_filtered=None)
         result.update(can_refresh=read_authorized,refresh_reason=refresh_reason)
         result.pop('diagnostic',None)
@@ -1712,7 +1715,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         register_ops_routes(app,identity,load,sessions,WorkspaceRow)
     from .live_read.coordinator import RefreshCoordinator
     from .live_read.datasets import build_refreshers
-    from .live_read.routes import register as register_live, refresh as live_refresh
+    from .live_read.routes import register as register_live, refresh as live_refresh, require_refresh
     app.state.live_read=RefreshCoordinator(sessions,CacheRow,build_refreshers(
         app.state.source_sync,app.state.people_directory,app.state.attendance_schedule),cfg)
 

@@ -55,7 +55,7 @@ def http(tmp_path):
 def make_fresh(app, monkeypatch):
     real = app.state.live_read.status
     def status(wid):
-        out = real(wid); out['datasets']['sources'].update(status='fresh', age_seconds=1, ttl_seconds=900, last_error=None)
+        out = real(wid); out['enabled'] = True; out['datasets']['sources'].update(status='fresh', age_seconds=1, ttl_seconds=900, last_error=None)
         return out
     monkeypatch.setattr(app.state.live_read, 'status', status)
 
@@ -137,7 +137,8 @@ def test_source_health_forbidden_source_and_failed_read_leak_nothing(http):
 
 @pytest.mark.parametrize('uid,expected', [('u-manager', True), ('u-pm', True), ('u-field', False)])
 def test_source_health_passes_the_sync_predicate_and_closed_arguments(http, monkeypatch, uid, expected):
-    _, client, seat, signin, _ = http
+    app, client, seat, signin, _ = http
+    make_fresh(app, monkeypatch)
     seat(cache=fresh_cache()); signin(uid)
     seen = {}
     from . import source_health

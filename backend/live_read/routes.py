@@ -47,6 +47,18 @@ def refresh(coordinator, wid, datasets, *, wait=False, force=False):
     return JSONResponse({'freshness': freshness}, status_code=202 if pending else 200)
 
 
+def require_refresh(coordinator, data, user, dataset, *, authorize=None, force=True, enabled=None):
+    if enabled is None:
+        enabled = coordinator.status(data['wid'])['enabled']
+    if (data.get('mode') != 'lark' or data['wid'].startswith(('demo-', 'test-'))
+            or not enabled):
+        raise HTTPException(403, '即時讀取僅限已啟用的公司正式工作區')
+    if force or dataset == 'roster':
+        if authorize is None:
+            raise HTTPException(403, '需要資料同步權限')
+        authorize(data['wid'], dataset, user)
+
+
 def register(app, identity, coordinator, *, authorize=None, audit=None):
     @app.get('/api/live/status')
     def status(request: Request):
@@ -58,15 +70,9 @@ def register(app, identity, coordinator, *, authorize=None, audit=None):
     def trigger(body: RefreshRequest, request: Request):
         data, user = identity(request)
         wid = data['wid']
-        if (data.get('mode') != 'lark' or wid.startswith(('demo-', 'test-'))
-                or not coordinator.status(wid)['enabled']):
-            raise HTTPException(403, '即時讀取僅限已啟用的公司正式工作區')
         datasets = list(dict.fromkeys(body.datasets))
         for dataset in datasets:
-            if body.force or dataset == 'roster':
-                if authorize is None:
-                    raise HTTPException(403, '需要資料同步權限')
-                authorize(wid, dataset, user)
+            require_refresh(coordinator, data, user, dataset, authorize=authorize, force=body.force)
         if body.force and audit is not None:
             audit(wid, user, datasets)
         return refresh(coordinator, wid, datasets, wait=body.wait, force=body.force)

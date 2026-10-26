@@ -198,7 +198,7 @@ def test_reports_snapshot_cold_returns_the_rest_with_a_gap(progress):
     body = run(state, vis, cases=[('recX', 'C115264', '未填', None)], warm=False).json()
     assert body['sources'] == {'source_synced_at': body['sources']['source_synced_at'], 'source_status': body['sources']['source_status'],
                                'reports_status': 'cold', 'reports_fetched_at': None, 'reports_stale': None,
-                               'can_refresh_sources':False,'refresh_reason':'來源同步操作者尚未核實在職身分'}
+                               'can_refresh_sources':False,'refresh_reason':'即時讀取僅限已啟用的公司正式工作區'}
     assert body['identity']['confirmation']['present'] is True and stage(body, 'sales')['state'] == 'done'
     assert body['identity']['v3_cases'] == [] and 'reports_cold' in {g['id'] for g in body['gaps']}
 
