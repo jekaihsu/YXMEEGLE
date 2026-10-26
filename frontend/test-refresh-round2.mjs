@@ -88,3 +88,35 @@ test('cached privilege is preserved after a failed progress read',async()=>{
  globalThis.fetch=async()=>{throw new TypeError('network')};await act(async()=>read.reload());
  assert.equal(read.state.kind,'error');assert.equal(read.canRefresh,true);
 });
+test('unmount cancels a pending engineering poll before another status read',async t=>{
+ const data=structuredClone(fixture);data.sources.can_refresh_sources=true;let statuses=0;
+ globalThis.fetch=async url=>{if(url==='/api/live/refresh')return reply({freshness:freshness('refreshing')},202);if(url==='/api/live/status'){statuses++;return reply({freshness:freshness('refreshing')})}return reply(data)};
+ await mount(React.createElement(Probe));t.mock.timers.enable({apis:['setTimeout']});
+ await act(async()=>read.retry());assert.equal(statuses,1);
+ await act(()=>root.unmount());root=null;
+ await act(async()=>t.mock.timers.tick(2000));assert.equal(statuses,1);
+ t.mock.timers.reset();
+});
+test('session epoch change cancels pending engineering polling',async t=>{
+ const data=structuredClone(fixture);data.sources.can_refresh_sources=true;let statuses=0;
+ globalThis.fetch=async url=>{if(url==='/api/live/refresh')return reply({freshness:freshness('refreshing')},202);if(url==='/api/live/status'){statuses++;return reply({freshness:freshness('refreshing')})}return reply(data)};
+ await mount(React.createElement(Probe));t.mock.timers.enable({apis:['setTimeout']});
+ await act(async()=>read.retry());assert.equal(statuses,1);
+ await act(async()=>ui.invalidateSessionEpoch());await act(async()=>t.mock.timers.tick(2000));assert.equal(statuses,1);
+ t.mock.timers.reset();
+});
+test('strict effect remount does not join an aborted progress request',async()=>{
+ globalThis.fetch=async()=>reply(fixture);
+ await mount(React.createElement(React.StrictMode,null,React.createElement(Probe)));
+ assert.equal(read.state.kind,'ready');
+});
+test('project change aborts the old poller before another project refresh',async t=>{
+ let statuses=0;const signals=[];
+ globalThis.fetch=async(url,init)=>{if(url==='/api/live/refresh'){signals.push(init.signal);return reply({freshness:freshness('refreshing')},202)}if(url==='/api/live/status'){statuses++;return reply({freshness:freshness('refreshing')})}const data=structuredClone(fixture);data.project_id=url.split('/')[3];data.sources.can_refresh_sources=true;return reply(data)};
+ function Switch({id}){read=ui.useProjectProgress(id);return React.createElement('p',null,read.state.kind)}
+ await mount(React.createElement(Switch,{id:'old'}));t.mock.timers.enable({apis:['setTimeout']});await act(async()=>read.retry());assert.equal(statuses,1);
+ await act(async()=>root.render(React.createElement(Switch,{id:'new'})));assert.equal(signals[0].aborted,true);
+ await act(async()=>t.mock.timers.tick(2000));assert.equal(statuses,1);
+ await act(async()=>read.retry());assert.equal(statuses,2);assert.equal(signals.length,2);
+ t.mock.timers.reset();
+});
