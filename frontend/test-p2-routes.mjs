@@ -278,10 +278,10 @@ test('wiring: five hash views stay reachable through compact navigation and dril
  assert.match(app, /isP2View\(route\.view\)&&<P2Page c=\{c\}\/>/);
  assert.match(app, /p2ActiveNav\(route\.view\)/);
  for (const legacy of ["route.view==='projects'&&<Projects", "route.view==='work'&&(isLegacyTab(route,'work')", "route.view==='sources'&&(isLegacyTab(route,'sources')", "route.view==='project'&&<Suspense"]) assert.ok(app.includes(legacy), legacy);
- assert.match(shell, /\{view:'overview',label:'管理總覽'/); assert.match(shell, /confirmation:'案件與確認單詳情'/);
+ assert.match(shell, /overview:'管理總覽'/); assert.match(shell, /\{view:'overview',label:ROUTE_LABELS\['overview'\]/); assert.match(shell, /confirmation:'案件與確認單詳情'/);
  assert.doesNotMatch(shell, /\{view:'confirmations',label:/);
  assert.doesNotMatch(shell, /\{view:'(confirmation|contract|workitem)',label/);
- assert.match(shell, /\{view:'projects',label:'案件總覽'/); assert.match(read('src/IntegratedPages.tsx'), /<h1>我的工作<\/h1>/);
+ assert.match(shell, /projects:'案件總覽'/); assert.match(shell, /\{view:'projects',label:ROUTE_LABELS\['projects'\]/); assert.match(read('src/IntegratedPages.tsx'), /<h1>我的工作<\/h1>/);
  assert.doesNotMatch(shell, /\{view:'work',label:/);
  const ci = fs.readFileSync(path.join(root, '..', 'scripts', 'local_ci.sh'), 'utf8');
  for (const t of ['drilldown-context', 'confirmation-list-view', 'case-detail-view', 'contract-detail-view', 'work-item-detail-view', 'manager-overview-view', 'p2-routes']) assert.ok(ci.includes(`test-${t}.mjs`), `local_ci runs test-${t}`);
