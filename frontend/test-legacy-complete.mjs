@@ -17,7 +17,7 @@ const button=text=>[...document.querySelectorAll('button')].find(b=>b.textConten
 async function mount({allowed=true,status='未開始',error=null,busy=false}={}){
  const detail=assignmentFixture().detail;detail.node.derived_status=status;detail.can={legacy_complete:allowed};mutations=[];
  root=createRoot(document.getElementById('root'));
- await act(async()=>root.render(React.createElement(ui.FlowNodeActions,{detail,busy,error,reason:'儲存中',mutate:async m=>{mutations.push(m);return false}})));
+ await act(async()=>root.render(React.createElement(ui.FlowNodeActions,{detail,busy,error,reason:busy?'儲存中':'',mutate:async m=>{mutations.push(m);return false}})));
  return detail;
 }
 const click=async element=>act(async()=>element.click());
