@@ -584,3 +584,33 @@ def test_source_refresh_permission_matches_live_authorization(http, monkeypatch,
         assert all('retry_handle' not in row for row in health['sources'])
         response = client.post('/api/live/refresh', json={'datasets':['sources'], 'force':True, 'wait':True})
         assert response.status_code == 403
+
+
+@pytest.mark.parametrize('failure', ['disabled', 'database'])
+def test_refresh_permission_failures_preserve_read_routes(http, monkeypatch, failure):
+    from dataclasses import replace
+    app, client, seat, signin = http
+    state, vis, _ = build_state()
+    seat(state)
+    signin('u-manager')
+    calls = []
+    def authorize(*args):
+        calls.append(args)
+        if failure == 'database':
+            raise OSError('private database details')
+    monkeypatch.setattr(app.state.source_sync, '_authorize', authorize)
+    app.state.cfg.update(LARK_WORKER_IDENTITY='application', LARK_LIVE_READ_TRANSPORT='deny')
+    monkeypatch.setattr(app.state.live_read, 'ensure', lambda *args, **kwargs: None)
+    app.state.live_read.config = replace(app.state.live_read.config, enabled=failure != 'disabled')
+    for path in ['/api/source-health', f'/api/projects/{vis}/progress', '/api/manager-overview']:
+        calls.clear()
+        response = client.get(path)
+        assert response.status_code == 200, response.text
+        assert len(calls) == (1 if failure == 'database' else 0)
+        assert 'private database details' not in response.text
+        if path == '/api/source-health':
+            assert response.json()['can_refresh'] is False
+        if path.endswith('/progress'):
+            assert response.json()['sources']['can_refresh_sources'] is False
+    if failure == 'disabled':
+        assert client.post('/api/live/refresh', json={'datasets':['sources'], 'force':True}).status_code == 403
