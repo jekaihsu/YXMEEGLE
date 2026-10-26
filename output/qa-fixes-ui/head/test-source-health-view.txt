@@ -1,0 +1,31 @@
+PASS 1 attention-first; asc/desc/clear and stable source key; no retrieval fallback
+PASS 2 three independent timestamps; summary oldest relevant success or unknown
+PASS 3 distinct stages; caller receipts never authoritative; definitions never success counts
+PASS 4 partial and stale independent and coexisting
+PASS 5 viewer split; forbidden omitted from every output; search cannot alter summary
+PASS 6 drawer selection only; revocation and disappearance drop selection
+PASS 7 retry preserves opaque authorized handle; no scope expansion or unauthorized retry
+PASS 8 C-STATE text labels; unknown never zero; malformed payloads fail closed
+PASS G2 loading and unlocated suppress every scoped count
+PASS G4 timestamp sorting compares instants across mixed offsets
+PASS G5 present non-boolean stage flags are unknown and need attention
+PASS G6 source and field mappings use unverified mapping copy without authority
+PASS F1 timestamp sorting never substitutes retrieval and keeps unknown last
+PASS F2 healthy text requires absence of every negative stage flag
+PASS F3 read_failed suppresses every count rather than inventing an empty read
+PASS F4 accepted is always false even with matched caller receipts and stage flags
+PASS F5 empty states never present contradictory nonzero scope counts
+PASS F7 malformed and forbidden-looking states expose no metadata anywhere
+PASS F8 ordinary read_failed guidance offers an available administrator action
+PASS H1 null page_state stays unknown and never yields a healthy/clean label; absent or malformed too
+PASS mutation rejected: unknown source update falls back to retrieval (F1 )
+PASS mutation rejected: unknown timestamp sorts first (F1 )
+PASS mutation rejected: healthy label erased (F2 )
+PASS mutation rejected: failed read retains counts (F3 )
+PASS mutation rejected: caller receipt reference echoed (3 distinct)
+PASS mutation rejected: retrieval substituted for source update (1 attention-first)
+PASS mutation rejected: caller string re-enables mapping authority (3 distinct)
+PASS mutation rejected: caller string re-enables acceptance (F4 )
+PASS mutation rejected: field caller string re-enables YX binding (3 distinct)
+PASS mutation rejected: forbidden metadata leaked (5 viewer split)
+source health: 20 named tests passed
