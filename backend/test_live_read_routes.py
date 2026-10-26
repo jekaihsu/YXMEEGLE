@@ -414,3 +414,28 @@ def test_refresh_failure_logs_class_and_dataset_without_secret(harness, caplog):
     messages = [record.getMessage() for record in caplog.records if record.name == 'backend.live']
     assert any('ValueError' in message and 'sources' in message for message in messages)
     assert 'private-token' not in ' '.join(messages)
+
+
+def test_wait_timeout_starts_every_requested_dataset(harness):
+    from dataclasses import replace
+    client, coordinator, _, _, _ = harness
+    coordinator.config = replace(coordinator.config, blocking_timeout_seconds=.03)
+    release, attendance = Event(), Event()
+    def slow(wid):
+        assert release.wait(5)
+        return {'fingerprint': 'sources'}
+    def scheduled(wid):
+        attendance.set()
+        return {'fingerprint': 'attendance'}
+    coordinator.refreshers.update(sources=slow, attendance=scheduled)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        coordinator.executor = executor
+        try:
+            response = client.post('/api/live/refresh', json={'datasets':['sources','attendance'], 'wait':True, 'force':True})
+            assert response.status_code == 202
+            assert attendance.wait(1)
+            statuses = response.json()['freshness']['datasets']
+            assert statuses['sources']['status'] == 'refreshing'
+            assert statuses['attendance']['status'] != 'never'
+        finally:
+            release.set()
