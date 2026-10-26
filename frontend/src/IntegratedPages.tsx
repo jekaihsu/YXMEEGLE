@@ -87,7 +87,7 @@ export function SourceHealthPage({c}: {c: Ctx}) {
   <LegacyTabs c={c} view="sources"/>
   {error&&<p role="alert">{error}</p>}
   <Suspense fallback={<p role="status">正在載入來源健康…</p>}><SourceHealth view={view} onRetry={retry} busy={busy}/></Suspense>
-  <small className="source-build-id" aria-label="部署版本">{buildLabel(health.status==='ok'?health.body:null)}</small>
+  {c.s.user?.role==='manager'&&<small className="source-build-id" aria-label="部署版本">{buildLabel(health.status==='ok'?health.body:null)}</small>}
  </main>;
 }
 
