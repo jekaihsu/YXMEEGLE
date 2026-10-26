@@ -25,4 +25,30 @@ await mount({patch:d=>{d.production.field.items_truncated=true;d.production.fiel
 await mount({patch:d=>{d.sources.source_status='stale'}});assert.match(document.body.textContent,/上次成功來源資料/);
 status=403;await mount();assert.match(document.querySelector('[role="alert"]').textContent,/權限不足/);status=500;await mount();assert.match(document.querySelector('[role="alert"]').textContent,/工程證據暫不可用/);status=200;
 let release;hold=new Promise(resolve=>release=resolve);await mount();assert.match(document.querySelector('[role="status"]').textContent,/載入中/);await act(async()=>{release();await tick()});hold=null;
+await mount({patch:d=>{d.sources.source_status='stale';d.sources.reports_stale=true}});
+await click([...document.querySelectorAll('button')].find(b=>b.textContent==='更新工程證據'));
+assert.match(document.querySelector('[role="alert"]')?.textContent??'',/無法更新工程證據/);
+assert.match(document.querySelector('[role="alert"]').textContent,/2026\/10\/17/);
+assert.equal(document.querySelectorAll('[data-item-id]').length,0,'stale retry never presents items as success');
+data.sources.source_status='ready';data.sources.reports_status='ok';data.sources.reports_stale=false;
+await click([...document.querySelectorAll('button')].find(b=>b.textContent==='重試工程證據'));
+assert.equal(document.querySelector('[role="alert"]'),null);assert.equal(document.querySelectorAll('[data-item-id]').length,3);
+status=500;await click([...document.querySelectorAll('button')].find(b=>b.textContent==='更新工程證據'));
+assert.match(document.querySelector('[role="alert"]').textContent,/2026\/10\/17/,'failed refresh retains last good source time');
+status=200;
+for(const initialStatus of [200,500]){
+ status=initialStatus;await mount();status=200;
+ let finish;hold=new Promise(resolve=>finish=resolve);
+ const button=[...document.querySelectorAll('button')].find(b=>b.textContent===(initialStatus===500?'重試工程證據':'更新工程證據'));
+ const before=calls.filter(url=>url.endsWith('/progress')).length;
+ await act(async()=>{for(let i=0;i<5;i++)button.click();await tick()});
+ const refresh=[...document.querySelectorAll('button')].find(b=>b.textContent==='更新工程證據');
+ for(let i=0;i<5;i++)await click(refresh);
+ assert.equal(calls.filter(url=>url.endsWith('/progress')).length-before,1,'rapid retry/refresh clicks start exactly one progress request');
+ assert.equal(refresh.disabled,true,'progress control is disabled while the read is pending');
+ assert.equal(refresh.getAttribute('aria-busy'),'true');
+ await act(async()=>{finish();await tick()});hold=null;
+ assert.equal(refresh.disabled,false,'progress control is enabled after settlement');
+ assert.equal(refresh.getAttribute('aria-busy'),'false');
+}
 assert.deepEqual(keyWarnings,[],'duplicate work codes produce no React key warnings');console.error=originalError;await act(async()=>root.unmount());console.log('Work items DOM checks passed, including duplicate identities, exact task joins, focus return, routes and source states.');

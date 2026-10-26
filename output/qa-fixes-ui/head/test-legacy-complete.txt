@@ -1,0 +1,37 @@
+✔ permitted legacy 未開始 shows secondary direct completion (9.207541ms)
+✔ permitted legacy 待處理 shows secondary direct completion (1.098875ms)
+✔ permitted legacy 進行中 shows secondary direct completion (1.260042ms)
+✔ permitted legacy 待審核 shows secondary direct completion (0.855375ms)
+✔ managed has no direct completion control (0.604709ms)
+✔ denied employee has no direct completion control (0.323834ms)
+✔ done has no direct completion control (0.255292ms)
+✔ skipped has no direct completion control (0.239292ms)
+✖ form validates whitespace and length then submits the reason and revision (0.745209ms)
+✖ server reason is retained in the form (1.035458ms)
+✔ busy direct completion cannot be submitted (0.539792ms)
+✔ API sends the reason through the dedicated revision checked operation and parses the audit marker (7.359208ms)
+✔ completed node with zero tasks asks for reconciliation and leaves engineering quantity unknown (4.606875ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 11
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 30.683584
+
+✖ failing tests:
+
+test at test-legacy-complete.mjs:33:1
+✖ form validates whitespace and length then submits the reason and revision (0.745209ms)
+  TypeError: Cannot read properties of null (reading 'required')
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/test-legacy-complete.mjs:34:106)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)
+
+test at test-legacy-complete.mjs:39:1
+✖ server reason is retained in the form (1.035458ms)
+  TypeError: Cannot read properties of null (reading 'textContent')
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/frontend/test-legacy-complete.mjs:40:163)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)

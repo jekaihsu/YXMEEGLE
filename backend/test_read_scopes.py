@@ -51,30 +51,35 @@ def test_project_scopes_filter_sql_and_keep_shared_policy_inputs(tmp_path):
 
 
 def test_denied_sop_read_does_not_materialize_case_and_read_grants_work_without_writes(tmp_path):
+    from .test_shell import switch
     with scaled_client(tmp_path, 8, **ON, SOP_TASK_WRITES_ENABLED='false') as (app, client):
         wid = app.state.signer.loads(client.cookies.get('meegle_session'))['wid']
-        statements = []
+        with app.state.sessions.begin() as db:
+            user = db.get(BusinessRow, (wid, 'users', 'ou_040'))
+            user.data = {**user.data, 'capabilities': []}
+        switch(client, 'ou_040')
+        writes = []
         def capture(conn, cursor, sql, parameters, context, many):
-            if 'FROM business_records' in sql:
-                statements.append(parameters)
+            if sql.lstrip().upper().startswith(('INSERT ', 'UPDATE ', 'DELETE ')):
+                writes.append(sql)
         event.listen(app.state.engine, 'before_cursor_execute', capture)
         try:
             for endpoint in ('sop-tasks', 'sop-assignees'):
                 response = client.get('/api/projects/p001/' + endpoint)
-                assert response.status_code == 403
-                assert response.json()['code'] == 'sop_import_forbidden'
+                assert (response.status_code, response.json()['code']) == (403, 'sop_import_forbidden')
+            assert writes == []
         finally:
             event.remove(app.state.engine, 'before_cursor_execute', capture)
-        assert len(statements) == 2  # identity only, one users query per request
-        assert all(p[-2:] == ('users', '') for p in statements)
         with app.state.sessions.begin() as db:
-            user = db.get(BusinessRow, (wid, 'users', 'u-manager'))
-            user.data = {**user.data, 'capabilities': [*user.data['capabilities'], 'sop_task_read']}
+            user = db.get(BusinessRow, (wid, 'users', 'ou_040'))
+            user.data = {**user.data, 'capabilities': ['sop_task_read']}
         for endpoint in ('sop-tasks', 'sop-assignees'):
             assert client.get('/api/projects/p001/' + endpoint).status_code == 200
             assert client.get('/api/projects/missing/' + endpoint).status_code == 404
         result = client.get('/api/projects/p001/sop-tasks').json()
-        assert result['allowed_actions']['import'] is False
+        assert result['allowed_actions'] == {'import': False, 'manage': False, 'work': False, 'decide_suggestions': False}
+        switch(client, 'u-manager')
+        assert client.get('/api/projects/p001/sop-tasks').status_code == 200
 
 
 def test_formal_settings_reads_snapshot_summary_without_source_records(tmp_path):

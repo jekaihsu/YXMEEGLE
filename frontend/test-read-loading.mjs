@@ -85,7 +85,7 @@ for(const shell of [false,true]){
 }
 {
  const dom=environment('');ui.invalidateSessionEpoch();const pending=[];
- globalThis.fetch=(url)=>new Promise(resolve=>pending.push({url,resolve}));
+ globalThis.fetch=(url)=>url.endsWith('/sop-tasks')?Promise.resolve(new Response(JSON.stringify({code:'sop_import_forbidden'}),{status:403})):new Promise(resolve=>pending.push({url,resolve}));
  const c={w:{...workspace,scope:'shell'},s:{user:a,users:[a],mode:'lark',workspace_id:'A',features:{}},route:{view:'project',project:'pA'},go:()=>{},notify:()=>{},busy:false};
  const root=createRoot(document.getElementById('root'));
  await flush(()=>root.render(React.createElement(ui.ProjectDetailGate,{c})));
@@ -95,6 +95,7 @@ for(const shell of [false,true]){
  assert.equal(document.querySelector('h1').textContent,'CASE_B','route switches show only the selected summary');
  await flush(()=>pending.find(p=>p.url==='/api/projects/pB').resolve(new Response(JSON.stringify({error:'not_found'}),{status:404})));
  assert.equal(document.querySelector('h1'),null,'denied or unavailable detail removes the summary preview');
+ await flush(()=>{for(const request of pending)request.resolve(new Response(JSON.stringify({code:'not_found'}),{status:404}))});
  await flush(()=>root.unmount());dom.window.close();
 }
 console.log('Settings bootstrap, deferred edits, cancellation, and explicit SOP read gating passed');

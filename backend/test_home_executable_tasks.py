@@ -154,8 +154,9 @@ def test_demo_future_start_uses_data_date_in_full_and_shell(tmp_path, monkeypatc
 
 
 def test_valid_current_proxy_stays_visible_on_historical_data_date(tmp_path, monkeypatch):
-    from . import workflow
+    from . import workflow, home_details
     monkeypatch.setattr(workflow, 'now', lambda: '2026-10-13T09:00:00+08:00')
+    monkeypatch.setattr(home_details, 'now', lambda: '2026-10-13T09:00:00+08:00')
     def mutate(state):
         shape(state)
         for project in state['projects']:

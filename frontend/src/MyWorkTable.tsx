@@ -3,6 +3,7 @@
 // Does NOT recompute any state, label, sort, or count.
 // No fetch and no writes.
 
+import {homeTarget} from './projectRoutes';
 import { useRef, useEffect, useState } from 'react';
 import {Avatar} from './Avatar';
 import type {
@@ -530,9 +531,6 @@ export function AssignmentTable({items,onNavigate,compact=false}:{items:import('
    </div>}
   </section>)}
  </div>;
-}
-function homeTarget({assignment_node,assignment_task,...target}:import('./useHomePanels').HomeTarget){
- return {...target,node:assignment_node ?? target.node,task:assignment_task ?? target.task};
 }
 const WORK_STATUS:Record<string,string> = {not_started:'未開始',todo:'待處理',in_progress:'進行中',in_review:'待審核',rework:'退回修正',done:'已完成',pending:'待處理',paused:'暫停中'};
 

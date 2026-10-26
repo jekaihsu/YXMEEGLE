@@ -1,0 +1,20 @@
+✔ parser accepts real backend synthetic fixture and preserves exact decimal quantities (0.5705ms)
+✔ parser rejects malformed nested values and missing stages with friendly error (0.765959ms)
+✔ stage join keeps source state and evidence independent of SOP completion (0.399292ms)
+✔ billing joins pricing node and missing SOP remains absent (0.106333ms)
+✔ null numbers never become zero and decimal text stays exact (0.067208ms)
+✔ gap hints give practical repair instructions for every known id (0.126584ms)
+✔ progress deep link survives serialization and preserves existing route normalization (0.30425ms)
+✔ SOP label offers the start only before the node rows exist; a started case has none (0.05625ms)
+✔ starting needs eligibility; seeds are a separate opt-in and a started case confirms neither (0.073917ms)
+✔ ambiguous report links list every candidate without choosing one (0.264291ms)
+✔ the parser keeps the item progress and statuses and an older payload without them still parses (0.177667ms)
+✔ forced progress reads bypass pending requests and older completions cannot replace fresh data (10.513083ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16.311542
