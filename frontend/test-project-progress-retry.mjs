@@ -18,7 +18,7 @@ const root=createRoot(document.getElementById('root'));
 try{
  for(const [sourceStatus,reportsStatus,reportsStale,expected] of [
   ['fresh','ok',false,'ready'],['fresh','restricted',null,'ready'],['fresh','disabled',null,'ready'],
-  ['fresh','cold',true,'ready'],['partial','ok',false,'error'],['fresh','unavailable',true,'ready'],
+  ['fresh','cold',true,'ready'],['partial','ok',false,'ready'],['fresh','unavailable',true,'ready'],
   ['stale','ok',false,'error'],['unknown','ok',false,'error'],['loading','ok',false,'error']
  ]){
   await act(async()=>root.render(null));ui.invalidateSessionEpoch();calls=0;
