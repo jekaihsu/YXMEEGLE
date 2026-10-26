@@ -15,11 +15,18 @@ class RefreshRequest(BaseModel):
 def refresh(coordinator, wid, datasets, *, wait=False, force=False):
     """Share response semantics between the live and legacy manual endpoints."""
     previous = coordinator.status(wid)['datasets']
-    if force and any(previous[d]['status'] == 'refreshing' for d in datasets):
+    if force and not wait and any(previous[d]['status'] == 'refreshing' for d in datasets):
         raise HTTPException(409, '資料正在重新讀取，請稍後再試')
     try:
         results = [coordinator.ensure(wid, d, wait=wait, force=force) for d in datasets]
-    except Exception:
+    except TimeoutError:
+        freshness = coordinator.status(wid)
+        if any(freshness['datasets'][d]['status'] == 'refreshing' for d in datasets):
+            return JSONResponse({'freshness': freshness}, status_code=202)
+        return JSONResponse({'detail': 'Lark 讀取失敗，請重試', 'freshness': freshness}, status_code=502)
+    except Exception as exc:
+        import logging
+        logging.getLogger('backend.live').warning('refresh failed datasets=%s class=%s', ','.join(datasets), type(exc).__name__)
         return JSONResponse({'detail': 'Lark 資料暫時無法讀取',
                              'freshness': coordinator.status(wid)}, status_code=502)
     freshness = coordinator.status(wid)

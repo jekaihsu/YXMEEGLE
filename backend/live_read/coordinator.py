@@ -231,9 +231,8 @@ class RefreshCoordinator:
             permission=cause if isinstance(cause,ReadNeedsPermission) else None
             blocked = isinstance(cause, ReadBlocked) or (isinstance(exc, HTTPException) and exc.status_code == 403)
             error_code = 'ReadNeedsPermission' if permission else 'ReadBlocked' if blocked else type(exc).__name__
-            detail = exc.detail if isinstance(exc, HTTPException) and isinstance(exc.detail, str) else ''
-            logger.warning('Live-read refresh failed: dataset=%s %s status=%s detail=%s duration_ms=%d',
-                           dataset, error_code, getattr(exc, 'status_code', None), detail[:160],
+            logging.getLogger('backend.live').warning('Live-read refresh failed: dataset=%s %s status=%s duration_ms=%d',
+                           dataset, error_code, getattr(exc, 'status_code', None),
                            int((monotonic()-began)*1000))
             if not isinstance(exc, LeaseLost):
                 retained = dict(claimed)
