@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 import {createRequire} from 'node:module';
+import {spawnSync} from 'node:child_process';
+if(!process.env.REPORT_CASE){
+ for(const scenario of ['assets-blank','asset-owner','progress-week','progress-label','points','progress-sentinel','progress-options']){
+  const result=spawnSync(process.execPath,[new URL(import.meta.url).pathname],{env:{...process.env,REPORT_CASE:scenario},encoding:'utf8'});
+  assert.equal(result.status,0,result.stdout+result.stderr);process.stdout.write(result.stdout);
+ }
+ process.exit(0);
+}
 import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
