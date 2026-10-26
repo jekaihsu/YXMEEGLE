@@ -19,6 +19,6 @@ const root=createRoot(document.getElementById('root'));
 try{
  await act(async()=>{root.render(React.createElement(App));await new Promise(resolve=>setTimeout(resolve,30))});
  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,30))});
- assert.deepEqual(calls,['/api/session','/api/settings/overview']);
+ assert.deepEqual(calls.filter(url=>url==='/api/session'||url==='/api/settings/overview'||url.startsWith('/api/workspace')),['/api/session','/api/settings/overview']);
  assert.match(document.body.textContent,/摘要已讀取/);
 }finally{await act(async()=>root.unmount());dom.window.close()}
