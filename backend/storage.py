@@ -6,9 +6,6 @@ All materialization happens within the caller's version-checked transaction.
 """
 import functools
 import json
-import threading
-import time
-from collections import OrderedDict
 from copy import deepcopy
 from types import SimpleNamespace
 from sqlalchemy import Column, String, Integer, JSON, Text, ForeignKey, UniqueConstraint, cast, select, delete, func
@@ -131,6 +128,10 @@ def _invalidate_projection(root):
     # Invalidate even when a caller stores content without bumping that revision.
     if isinstance(root.get('source_status'),dict):
         root['source_status'].pop('projection_workspace_version',None)
+
+def invalidate_shared_reads(wid):
+    from . import shared_reads
+    shared_reads.invalidate(wid)
 
 def _drops_shared_reads(write):
     """A storage write forgets the workspace's shared rows before and after it runs."""
@@ -431,48 +432,6 @@ def save_partial(db,model,wid,state,collections,project_ids,project_order,*,view
     _invalidate_projection(root)
     return root
 
-# Case-scoped reads of one workspace version repeat the same large global-collection fetch. Concurrent and
-# back-to-back readers share one fetch of the raw JSON text; each reader still decodes its own copy.
-# Only large, data-only kinds are shared. Anything that carries authority (users and their capabilities, approvals,
-# delegations) is always read fresh.
-SHARED_READ_KINDS=frozenset({'source_quotes','source_confirmations','contract_items'})
-SHARED_READ_TTL=30.0
-SHARED_READ_MAX_BYTES=160_000_000
-_shared_guard=threading.Lock()
-_shared_entries=OrderedDict()
-_shared_flights={}
-_shared_generation=0
-
-def invalidate_shared_reads(wid):
-    """Forget cached rows of one workspace (every workspace when wid is None); an in-flight fetch will not be stored."""
-    global _shared_generation
-    with _shared_guard:
-        _shared_generation+=1
-        for key in [k for k in _shared_entries if wid is None or k[0]==wid]: del _shared_entries[key]
-
-def _shared_rows(key,fetch):
-    if key[1] is None: return fetch()
-    with _shared_guard:
-        hit=_shared_entries.get(key)
-        if hit and time.monotonic()-hit[0]<SHARED_READ_TTL:
-            _shared_entries.move_to_end(key)
-            return hit[2]
-        flight=_shared_flights.setdefault(key,threading.Lock())
-    with flight:
-        with _shared_guard:
-            hit=_shared_entries.get(key)
-            if hit and time.monotonic()-hit[0]<SHARED_READ_TTL: return hit[2]
-            generation=_shared_generation
-        rows=fetch()
-        size=sum(len(text) for _,text in rows)
-        with _shared_guard:
-            if generation==_shared_generation:
-                _shared_entries[key]=(time.monotonic(),size,rows)
-                _shared_entries.move_to_end(key)
-                while len(_shared_entries)>1 and sum(entry[1] for entry in _shared_entries.values())>SHARED_READ_MAX_BYTES: _shared_entries.popitem(last=False)
-            if _shared_flights.get(key) is flight: del _shared_flights[key]
-        return rows
-
 
 def load_partial(db,model,row,*,collections=(),project_ids=None,project_children=(),filter_project_rows=False):
     """Read selected collections and project trees; never pass this to save.
@@ -513,12 +472,13 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
                 query=query.where((~model.kind.in_(READ_PROJECT_LINKED)) | linked.is_(None) | linked.in_(project_ids))
             return db.execute(query.order_by(model.ordinal))
         top=kinds-{'projects','source_work_items'}
-        shared=top&SHARED_READ_KINDS
+        from . import shared_reads
+        shared=top&shared_reads.KINDS
         if top-shared:
             for kind,parent,data in fetch(top-shared,parent_id=('',)): result[kind].append(data)
         if shared:
             scope=tuple(project_ids) if filter_project_rows and project_ids is not None else None
-            rows=_shared_rows((row.id,getattr(row,'version',None),tuple(sorted(shared)),scope),lambda:[(kind,text) for kind,parent,text in fetch(shared,as_text=True,parent_id=('',))])
+            rows=shared_reads.rows((row.id,getattr(row,'version',None),tuple(sorted(shared)),scope),lambda:[(kind,text) for kind,parent,text in fetch(shared,as_text=True,parent_id=('',))])
             for kind,text in rows: result[kind].append(json.loads(text))
         if 'source_work_items' in kinds:
             query=select(model.data).where(model.workspace_id==row.id,model.kind=='source_work_items')
