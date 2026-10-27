@@ -22,11 +22,11 @@ let root,c;
 const render=()=>root.render(React.createElement(ui.ProjectDetail,{c}));
 const go=(next,replace=false)=>{const r=ui.normalizeRoute(next);const q=new URLSearchParams();Object.entries(r).forEach(([k,v])=>{if(v)q.set(k,v)});if(replace)history.replaceState(null,'',location.pathname+location.search+'#'+q.toString());else location.hash=q.toString();c={...c,route:r};render()};
 window.addEventListener('hashchange',()=>{if(!root)return;c={...c,route:ui.parseRoute(location.hash)};render()});
-async function mount(hash){
+async function mount(hash,{actor}={}){
  if(root){await act(async()=>root.unmount());root=null}ui.invalidateSessionEpoch();
  location.hash=hash;await tick();
  const base=localProject();
- c={w:base.workspace,s:{user:base.user,mode:'demo',workspace_id:'local-company',features:{node_assignment:false}},route:ui.parseRoute(location.hash),busy:false,error:'',run:async()=>undefined,notify(){},registerDrafts(){},refresh:async()=>{},go};
+ c={w:base.workspace,s:{user:actor||base.user,mode:'demo',workspace_id:'local-company',features:{node_assignment:false}},route:ui.parseRoute(location.hash),busy:false,error:'',run:async()=>undefined,notify(){},registerDrafts(){},refresh:async()=>{},go};
  globalThis.fetch=async()=>new Response(JSON.stringify({detail:'disabled'}),{status:404,headers:{'Content-Type':'application/json'}});
  root=createRoot(document.getElementById('root'));await act(async()=>{render();await tick()});
 }
@@ -71,5 +71,12 @@ const stage=()=>[...document.querySelectorAll('.daily-filters label')].find(l=>l
 assert.ok(c.route.node);assert.equal(stage().value,c.route.node,'Files preselects the task node stage');
 await mount('view=project&project=p1&tab=files');
 assert.equal(stage().value,'all','bare Files keeps every stage');
+
+
+await mount('view=project&project=p1&tab=flow&node=node_sales&task=sales-0',{actor:{id:'ou_guest',name:'訪客',role:'member',department:'',avatar:'',capabilities:[]}});
+assert.equal(document.getElementById('task-editor-readonly').textContent,'需由案件 PM 或節點負責人編輯','read-only actor sees the permission reason');
+await mount('view=project&project=p1&tab=flow&node=node_sales&task=sales-0');
+assert.equal(document.querySelector('[aria-label="任務名稱"]').disabled,false);
+assert.equal(document.getElementById('task-editor-due-reason').textContent,'已排定期限須申請展延');
 
 await act(async()=>root.unmount());console.log('Task list context checks passed');
