@@ -62,6 +62,8 @@ async function mount({tasks = [task('t1')], route = {}, role = 'pm', overviewSta
  globalThis.fetch = async (url, init = {}) => {
   const method = init.method || 'GET', body = init.body ? JSON.parse(init.body) : null;
   calls.push({url, method, body});
+  if (url === '/api/projects/p1/sop-tasks' && method === 'GET' && server.overviewHold) await server.overviewHold;
+  if (url === '/api/projects/p1/sop-tasks' && method === 'GET' && server.overviewFail) return response({code: 'upstream'}, 502);
   if (url === '/api/projects/p1/sop-tasks' && method === 'GET') return overviewStatus === 200 ? response(server.overview) : response({code: 'sop_import_forbidden'}, overviewStatus);
   if (url.endsWith('/sop-assignees')) return response({people:[{id:'pm',name:'王經理',case_roles:['pm']},{id:'member',name:'林組員',case_roles:['collaborator']}]});
   if (url === '/api/sop-templates') return response({templates: [{...examples.preview.template, name: 'Plumb 案件 SOP', is_default: true}]});
@@ -281,6 +283,55 @@ test('a failed Start keeps the task as it was and shows the error beside the act
  assert.match(dialog().querySelector('.task-drawer-footer [role=alert]').textContent, /目前狀態不可執行/);
  assert.match(dialog().querySelector('.sop-badges').textContent, /待處理/);
  assert.ok([...dialog().querySelectorAll('.task-drawer-footer button')].some(b => b.textContent === '開始' && !b.disabled), 'Start can be retried');
+});
+
+const footerButtons = () => [...dialog().querySelectorAll('.task-drawer-footer button')];
+const startButton = () => footerButtons().find(b => b.textContent === '開始');
+
+test('after a timeout on Start, actions stay blocked until the read-back answers, then follow the fresh task', async () => {
+ await mount({route: {task: 't1', task_source: 'sop_local'}});
+ let release; server.overviewHold = new Promise(r => {release = r});
+ server.transitionReply = () => response({code: 'upstream'}, 504);
+ await click(startButton());
+ assert.match(dialog().querySelector('.task-drawer-footer').textContent, /正在確認剛才的操作結果/);
+ assert.ok(footerButtons().every(b => b.disabled), 'every action is disabled while the outcome is unknown');
+ await act(async () => {startButton().click(); await tick()});
+ assert.equal(server.transitions.length, 1, 'no second write while verifying');
+ server.overview = overview([task('t1', {state: 'in_progress', revision: 4, allowed_actions: ['block', 'complete']})]);
+ await act(async () => {release(); await tick(); await tick()});
+ assert.match(dialog().querySelector('.sop-badges').textContent, /進行中/, 'the read-back result is shown');
+ assert.equal(startButton(), undefined);
+ assert.equal(server.transitions.length, 1);
+});
+
+test('a 5xx on Start whose read-back also fails offers a read-only retry and never a second write', async () => {
+ await mount({route: {task: 't1', task_source: 'sop_local'}});
+ server.transitionReply = () => response({code: 'boom'}, 500);
+ server.overviewFail = true;
+ await click(startButton());
+ const footer = () => dialog().querySelector('.task-drawer-footer');
+ assert.match(footer().textContent, /無法確認剛才的操作是否已完成/);
+ assert.ok(footerButtons().filter(b => b.textContent !== '重新讀取').every(b => b.disabled), 'mutating actions stay disabled');
+ const getsBefore = calls.filter(x => x.method === 'GET' && x.url === '/api/projects/p1/sop-tasks').length;
+ await act(async () => {startButton().click(); await tick()});
+ assert.equal(server.transitions.length, 1);
+ await click(footerButtons().find(b => b.textContent === '重新讀取'));
+ assert.equal(server.transitions.length, 1, 'retry is a read, not a write');
+ assert.ok(calls.filter(x => x.method === 'GET' && x.url === '/api/projects/p1/sop-tasks').length > getsBefore);
+ assert.match(footer().textContent, /無法確認剛才的操作是否已完成/, 'still blocked while reads keep failing');
+ server.overviewFail = false;
+ await click(footerButtons().find(b => b.textContent === '重新讀取'));
+ assert.doesNotMatch(footer().textContent, /無法確認/);
+ assert.ok(startButton() && !startButton().disabled, 'unblocked once a read-back succeeds');
+ assert.equal(server.transitions.length, 1);
+});
+
+test('an ordinary 409 conflict is not treated as unknown: the error shows and Start can be retried at once', async () => {
+ await mount({route: {task: 't1', task_source: 'sop_local'}});
+ server.transitionReply = () => response({code: 'task_revision_conflict', detail: '任務已更新'}, 409);
+ await click(startButton());
+ assert.doesNotMatch(dialog().querySelector('.task-drawer-footer').textContent, /正在確認|無法確認/);
+ assert.ok(startButton() && !startButton().disabled);
 });
 
 test('a revision conflict reloads the task and keeps the draft for the next save', async () => {

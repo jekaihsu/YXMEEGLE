@@ -57,13 +57,23 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
   } finally {if(sop.current())setBusy(false)}
  };
  const [resultNote,setResultNote]=useState('');
- const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
+ const [writeBusy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
+ const [verify, setVerify] = useState<'idle'|'checking'|'failed'>('idle');
+ const busy = writeBusy || verify !== 'idle';
  const [pending, setPending] = useState('');
  const writing = useRef(false);
+ const confirmOutcome = async () => {
+  writing.current = true; setVerify('checking'); setError(''); setNotice('');
+  const confirmed = await sop.readback();
+  if (!sop.current()) return;
+  if (confirmed) {writing.current = false; setVerify('idle'); setNotice('已重新讀取，任務狀態以最新資料為準')}
+  else setVerify('failed');
+ };
  const run = async (call: () => Promise<MutationResult>, done: string, label = '儲存中…') => {
   if (busy || writing.current) return false;
   writing.current = true;
   setBusy(true); setPending(label); setError(''); setNotice('');
+  let verifying = false;
   try {
    const receipt = await call();
    if (!sop.current()) return true;
@@ -73,10 +83,11 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
    return true;
   } catch (e) {
    if (!sop.current()) return false;
+   if (e instanceof SopError && e.ambiguous) {verifying = true; void confirmOutcome(); return false}
    setError(sopErrorText(e));
-   if (e instanceof SopError && (e.code === 'task_revision_conflict' || e.ambiguous)) void sop.reload();
+   if (e instanceof SopError && e.code === 'task_revision_conflict') void sop.reload();
    return false;
-  } finally {writing.current = false; if (sop.current()) {setBusy(false); setPending('')}}
+  } finally {if (!verifying) writing.current = false; if (sop.current()) {setBusy(false); setPending('')}}
  };
  const patch = (body: Record<string, unknown>, done: string) => run(() => sopApi.patch(project.id, task.id, {expected_revision: task.revision, ...body}, sop.current), done);
  const transition = (action: TaskAction|'set_applicability', extra: Record<string, unknown> = {}, label?: string) => run(() => sopApi.transition(project.id, task.id, {expected_revision: task.revision, action, ...extra}, sop.current), '已更新狀態', label ? `${label}中…` : undefined);
@@ -92,7 +103,7 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
   return patch(body,'已儲存任務');
  };
 
- const footer=<>{error && !cleanupOpen && <p role="alert" className="pg-callout">{error}</p>}{busy && <p role="status" className="sop-muted">{pending}</p>}<div className="pf-actions sop-transitions" role="group" aria-label="狀態操作" aria-busy={busy}>{taskActions(task).filter(a=>a.action!=='complete').reverse().map(a => a.reason
+ const footer=<>{error && !cleanupOpen && <p role="alert" className="pg-callout">{error}</p>}{writeBusy && <p role="status" className="sop-muted">{pending}</p>}{verify==='checking' && <p role="status" className="sop-muted">正在確認剛才的操作結果，確認前不能再修改…</p>}{verify==='failed' && <div role="alert" className="pg-callout">無法確認剛才的操作是否已完成，請先重新讀取，不要重複送出。<Button onClick={() => void confirmOutcome()}>重新讀取</Button></div>}<div className="pf-actions sop-transitions" role="group" aria-label="狀態操作" aria-busy={busy}>{taskActions(task).filter(a=>a.action!=='complete').reverse().map(a => a.reason
     ? <Reasoned key={a.action} label={a.label} busy={busy} onSubmit={reason => void transition(a.action, {reason}, a.label)}/>
     : <FlowAction key={a.action} allowed={!busy} reason="處理中" onClick={() => void transition(a.action, {}, a.label)}>{busy && pending===`${a.label}中…` ? pending : a.label}</FlowAction>)}</div></>;
  return <TaskDrawer footer={taskActions(task).length||busy||(error&&!cleanupOpen) ? footer : undefined} kind="sop" label={`SOP 任務 · ${task.title}`} trail={['SOP 任務',task.nodes.map(n=>sopNodeLabel(n.node_key)).join('、')]} title={task.title} status={<SopLarkSync task={task} link/>} onClose={() => {if (!busy) onClose()}}>
