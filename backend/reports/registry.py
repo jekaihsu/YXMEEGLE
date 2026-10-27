@@ -4,6 +4,7 @@ Case detail contract/billing amounts and progress ratios are allowed because 案
 from dataclasses import dataclass
 
 BASE_TOKEN = 'Sdw1bG1djaHsVGsRPvmjyVWipgg'
+CRM_BASE_TOKEN = 'Yda8bPhWFaAuFisOJt9jsy2QpDf'
 FLAGS = ('⚠案件不符', '⚠組別權重=0', '⚠工項不符', '⚠負值', '⚠已結案新列')
 
 @dataclass(frozen=True)
@@ -13,6 +14,7 @@ class Table:
     kind: str
     fields: tuple[str, ...]
     used_by: tuple[str, ...]
+    base_token: str = BASE_TOKEN
 
 TABLES = (
     Table('外業工作單', 'tbl97f1uXqi7Qz0k', 'field', ('工作單號','所屬成本單','所屬案件','案件編號','組別','出工日期','工作日期-薪資','營業額人員-明細','此單出工人','工項','最終營業額點數','檢核狀態','控制組檢核','是否有檢核程序','違反檢核程序 緣由','備註'), ('review','progress')),
@@ -27,5 +29,7 @@ TABLES = (
     Table('人員名單', 'tblmlpA6nG5Ou7NQ', 'people', ('姓名','所屬組別'), ('review','progress')),
     Table('外業組別營業額統計', 'tblCys3XcRulzlQ4', 'monthly', ('組別月份','月份日期','組別','營業額點數'), ('progress',)),
     Table('回報問題', 'tblwKTWB3AIM786y', 'issue', ('文字','文字 2','單選','日期'), ('sources',)),
+    Table('跟進／拜訪紀錄','tblReHxTlKydHguQ','crm_contact',tuple('活動ID,客戶,客戶(同步),同步業主,活動類型,活動時間,原建立時間,建立時間,執行人,原建立者,建立人,工程編號,報編（尚未成案可填）,同步報價編號,工程名稱,業主窗口,聯繫方式,聯繫主題,活動主旨,內容摘要,結果,下一步,下一跟進日,處理結果,已完成,有效日期,是否本週（有效日期）,彙整週(週一),原記錄ID'.split(',')),('contacts',),CRM_BASE_TOKEN),
+    Table('聯絡業主記錄','tblJW1agkDHqZJ9k','v3_contact',tuple('摘要,工程編號,工程名稱,報編（尚未成案可填）,聯繫日期,建立時間,有效日期,聯繫人員,業主窗口,聯繫方式,聯繫主題,聯繫內容/業主回覆,下次追蹤日,待辦事項,處理結果,是否本週,是否本週（有效日期）,彙整週(週一)'.split(',')),('contacts',),BASE_TOKEN),
 )
 BY_KIND = {t.kind: t for t in TABLES}

@@ -85,7 +85,7 @@ def contract(f):
 
 
 def normalize(raw, base=BASE_TOKEN):
-    tables = {k: [dict(id=r['record_id'], f=r['fields']) for r in v['records']] for k, v in raw.items()}
+    tables = {k: [dict(id=r['record_id'], f=r['fields'], created_time=r.get('created_time')) for r in v['records']] for k, v in raw.items()}
     cost = {r['id']: r['f'] for r in tables.get('field_cost', [])}
     reviews = {'field': [], 'office': []}
     for dept in reviews:
@@ -389,7 +389,7 @@ def report_gaps(data, endpoint, dept='field'):
         'review/rows': {department+'-date',department+'-group'} | ({'office-review-coverage','PM檢核','內業組長檢核'} if department=='office' else set()),
         'progress': {department+'-date',department+'-group','plan-negative-span'},
     }
-    source_kinds={'review': {department,department+'_cost'}, 'review/rows': {department,department+'_cost'}, 'sales': {'case'}, 'assets': {'vehicle','instrument','field_cost','plan'}, 'progress': {'case','plan','contract','people',department}}
+    source_kinds={'contacts': {'crm_contact','v3_contact','case','people'}, 'review': {department,department+'_cost'}, 'review/rows': {department,department+'_cost'}, 'sales': {'case'}, 'assets': {'vehicle','instrument','field_cost','plan'}, 'progress': {'case','plan','contract','people',department}}
     allowed=relevant.get(endpoint,set()) | {'source-'+k for k in source_kinds.get(endpoint,set())}
     gaps=[g for g in data['gaps'] if endpoint=='sources' or g['id'] in allowed]
     if endpoint=='sales':
@@ -437,3 +437,74 @@ def attach_local_bridges(result, bridges):
                       if row.get('case_code') and b['status'] in ('auto_exact','reviewed') and row['case_code'] in b['codes']]}
                       for row in result.get('items', [])]
     return result
+
+
+def contacts(data, **p):
+    """Combine CRM and legacy contact records for the weekly report."""
+    import re
+    import unicodedata
+    tables=data['tables']
+    people=tables.get('people', [])
+    person_ids={r['id']:str(cell(r['f'].get('姓名'))) for r in people}
+    groups={str(cell(r['f'].get('姓名'))):str(cell(r['f'].get('所屬組別') or r['f'].get('組別') or r['f'].get('部門'))) for r in people}
+    fallback={'朱雅琪':'工務助理','郭倢瑛':'工務助理','林瑩瑄':'工務助理','鍾智偉':'PM','吳重樺':'PM','吳科翰':'PM'}
+    def unique(value):
+        return list(dict.fromkeys(x.strip() for x in re.split(r'[,，、/]',str(cell(value))) if x.strip()))
+    def first(f,*keys):
+        return next((f[k] for k in keys if cell(f.get(k)) != ''), '')
+    def timestamp(value):
+        value=cell(value)
+        try:
+            n=float(value)
+            return n if abs(n)>10000000 else n*86400000
+        except (ValueError,TypeError):
+            try:
+                d=datetime.fromisoformat(str(value).replace('Z','+00:00'))
+                return (d if d.tzinfo else d.replace(tzinfo=TZ)).timestamp()*1000
+            except (ValueError,TypeError,OverflowError): return 0
+    def build(r,kind):
+        f=r['f']; rawdate=first(f,'活動時間','聯繫日期','有效日期','原建立時間','建立時間') or r.get('created_time'); dt=day(rawdate) or ''
+        code=', '.join(unique(first(f,'工程編號','報編（尚未成案可填）','同步報價編號','報價編號')))
+        name=', '.join(unique(f.get('工程名稱')))
+        person=str(cell(first(f,'執行人','聯繫人員','建立者','原建立者','建立人'))); person=person_ids.get(person,person)
+        methods=[{'line':'LINE','mail':'MAIL'}.get(x.lower(),x) for x in unique(f.get('聯繫方式'))]; methods=list(dict.fromkeys(methods))
+        topics=unique(f.get('聯繫主題'))
+        result=str(cell(first(f,'處理結果','結果')))
+        if result.upper()=='OK' or result=='已完成' or f.get('已完成') is True: result='已完成'
+        nextdate=day(first(f,'下一跟進日','下次追蹤日')) or ''
+        table=BY_KIND[kind]
+        return dict(id=r['id'],orig_id=str(cell(f.get('原記錄ID'))),contact_date=dt,contact_date_slash=dt.replace('-','/'),sort_ts=timestamp(rawdate),case_code=code,case_name=name,person=person,group=groups.get(person) or fallback.get(person,''),client_contact=str(cell(first(f,'業主窗口','客戶(同步)','同步業主','客戶'))),method=' / '.join(methods),methods=methods,topic='、'.join(topics),topics=topics,content=str(cell(first(f,'內容摘要','聯繫內容/業主回覆','聯繫內容'))),next_date=nextdate,next_date_slash=nextdate.replace('-','/'),special_note=str(cell(first(f,'下一步','待辦事項','特別事項','摘要'))),result=result,result_status='completed' if result=='已完成' else 'pending',link=f'https://yong-xiang-survey.jp.larksuite.com/base/{table.base_token}?table={table.table_id}&record={r["id"]}')
+    crm=[build(r,'crm_contact') for r in tables.get('crm_contact',[])]; legacy={r['id']:build(r,'v3_contact') for r in tables.get('v3_contact',[])}
+    used=set()
+    for r in crm:
+        v=legacy.get(r['orig_id'])
+        if v:
+            used.add(v['id'])
+            for key in ('contact_date','contact_date_slash','sort_ts','case_code','case_name','person','group','client_contact','method','methods','topic','topics','content','next_date','next_date_slash','special_note','result'):
+                if not r[key]: r[key]=v[key]
+            r['result_status']='completed' if r['result']=='已完成' else 'pending'
+    rows=crm+[v for ident,v in legacy.items() if ident not in used]
+    for r in rows:
+        if not r['case_name']:
+            case=data['cases'].get(r['case_code']) or data['cases'].get(r['case_code'].split(',')[0].strip())
+            r['case_name']=str(cell(first(case['f'],'案件名稱','工程名稱'))) if case else ('115年度第二辦公室安全觀測' if r['case_code'].split(',')[0].strip()=='C115180-3' else '')
+    start=p.get('week') or p.get('from') or ''; end=(date.fromisoformat(p['week'])+timedelta(days=6)).isoformat() if p.get('week') else p.get('to') or ''
+    rows=[r for r in rows if r['contact_date'] and (not start or r['contact_date']>=start) and (not end or r['contact_date']<=end) and any(r[k] for k in ('case_code','case_name','person','client_contact','content','special_note','method','topic','result'))]
+    raw_total=len(rows)
+    options={k:sorted({v for r in rows for v in (r['topics'] if k=='topic' else r['methods'] if k=='method' else [r[k]]) if v}) for k in ('group','person','topic','method','result_status')}
+    q=unicodedata.normalize('NFKC',p.get('q','')).casefold()
+    rows=[r for r in rows if all(not p.get(k) or p[k]=='all' or (p[k] in r[k+'s'] if k in ('topic','method') else p[k]==r[k]) for k in ('group','person','topic','method','result_status')) and (not q or q in unicodedata.normalize('NFKC',' '.join(r[k] for k in ('case_code','case_name','client_contact','content','person','special_note'))).casefold())]
+    mode=p.get('dedup_mode','latest_per_day')
+    if mode=='latest_per_day':
+        buckets=defaultdict(list)
+        for r in rows: buckets[(r['case_code'] or r['client_contact'] or r['id'],r['contact_date'])].append(r)
+        rows=[]
+        for bucket in buckets.values():
+            r=max(bucket,key=lambda x:(x['sort_ts'],x['id'])).copy();r['same_day_count']=len(bucket);rows.append(r)
+    else:
+        rows=[dict(r,same_day_count=1) for r in rows]
+    sort=p.get('sort','contact_date'); order=p.get('order','desc' if sort=='contact_date' else 'asc')
+    rows.sort(key=lambda r: (r.get(sort,'') or '',r['sort_ts'],r['id']),reverse=order=='desc')
+    total=len(rows); kpi=dict(total=total,raw_total=raw_total,cases_count=len({r['case_code'] for r in rows if r['case_code']}),completed_count=sum(r['result_status']=='completed' for r in rows),pending_count=sum(r['result_status']=='pending' for r in rows))
+    offset=int(p.get('offset',0));limit=int(p.get('limit',200))
+    return dict(items=rows[offset:offset+limit],total=total,raw_total=raw_total,kpi=kpi,options=options,date_range={'from':start,'to':end},dedup_mode=mode,gaps=report_gaps(data,'contacts'),offset=offset,limit=limit)

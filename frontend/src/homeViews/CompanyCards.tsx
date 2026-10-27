@@ -8,7 +8,7 @@ import {StatusChart,WorkloadChart} from '../homeCharts';
 import {Kpis} from './shared';
 export function CompanyCard({id,c,today,confirmation,read}:{id:HomeCardId;c:Ctx;today:string;confirmation:PanelRead;read:ReturnType<typeof useHomeCompany>}){
  if(id==='confirmation')return <WorkCard id={id} panel="confirmation" c={c} today={today} read={confirmation}/>;
- if(id==='links')return <Card id={id} subtitle="前往完整管理工具" href="#view=projects"><nav className="home-quick-links" aria-label="管理捷徑">{[['reports','PM 週報'],['overview','管理總覽'],['projects','案件總覽']].filter(([view])=>view!=='reports'||c.s.user?.role==='pm'||c.s.user?.role==='manager').map(([view,label])=><a key={view} href={homeHref({view})}>{label}</a>)}</nav></Card>;
+ if(id==='links')return <Card id={id} subtitle="前往完整管理工具" href="#view=projects"><nav className="home-quick-links" aria-label="管理捷徑">{[['reports','PM 週報'],['overview','管理總覽'],['projects','案件總覽']].filter(([view])=>view!=='reports'||c.s.user?.role==='pm'||c.s.user?.role==='manager'||c.s.user?.role==='工務助理'||c.s.user?.department==='工務助理'||['郭倢瑛','朱雅琪','林瑩瑄'].includes(c.s.user?.name||'')||c.s.user?.capabilities?.includes('manage_sources')).map(([view,label])=><a key={view} href={homeHref({view})}>{label}</a>)}</nav></Card>;
  const data=read.data;
  if(!data)return null;
  let content;

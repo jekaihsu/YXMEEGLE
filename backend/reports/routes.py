@@ -13,6 +13,7 @@ from .reader import LarkReader
 from .snapshot import SnapshotStore, ensure_visible_logs
 
 SORTS={
+    'contacts':('contact_date','case_code','case_name','person','client_contact','method','topic','next_date','result'),
     'review/rows':('date','group','person','case','points','status'),
     'sales':('code','name','client','pm','status','contract','progress_revenue','progress_cost','progress_billing','billable_unbilled','receivable'),
     'assets':('name','category','status','owner','uses','km','last_used','idle_days','daily_rent'),
@@ -22,6 +23,7 @@ SORTS={
 
 PAGE_KEYS={'sort','order','offset','limit'}
 ALLOWED={
+    'contacts': PAGE_KEYS | {'week','from','to','group','person','topic','method','result_status','dedup_mode','q'},
     'review':{'dept','week','weeks','group','person'},
     'review/rows':PAGE_KEYS|{'dept','week','weeks','group','person','status','flag','q'},
     'progress':PAGE_KEYS|{'dept','week','group','scope','status','q'},
@@ -40,7 +42,7 @@ def parameters(endpoint, query):
     if unknown: raise HTTPException(422,'不支援的查詢欄位：'+', '.join(sorted(unknown)))
     p={k:v.strip() if isinstance(v,str) and k!='key' else v for k,v in p.items()}
     p={k:v for k,v in p.items() if v!=''}
-    if p.get('group'):
+    if p.get('group') and endpoint != 'contacts':
         from .compute import normalize_group
         p['group']=normalize_group(p['group'])
     def integer(key, default, minimum, maximum):
@@ -69,14 +71,20 @@ def parameters(endpoint, query):
     if endpoint=='progress': choice('scope','week',('week','open'))
     if endpoint.startswith('review'): integer('weeks',12,1,104)
     if endpoint=='review/rows': choice('status','',('','passed','returned','pending','unset'))
+    if endpoint=='contacts':
+        choice('dedup_mode','latest_per_day',('latest_per_day','all'))
+        choice('result_status','all',('all','completed','pending',''))
+        for key in ('week','from','to'):
+            if key in p: calendar(key,p[key])
+        if p.get('from') and p.get('to') and p['from'] > p['to']: raise HTTPException(422,'from 不可晚於 to')
     if endpoint=='assets':
         choice('kind','vehicle',('vehicle','instrument'))
         calendar('from',(today-timedelta(days=29)).isoformat());calendar('to',today.isoformat())
         if p['from']>p['to']: raise HTTPException(422,'from 不可晚於 to')
         if 'idle_days' in p: integer('idle_days',0,0,36500)
     if endpoint in SORTS:
-        choice('sort',SORTS[endpoint][0],SORTS[endpoint]);choice('order','asc',('asc','desc'))
-        integer('offset',0,0,10000000);integer('limit',50,1,200)
+        choice('sort',SORTS[endpoint][0],SORTS[endpoint]);choice('order','desc' if endpoint=='contacts' and p['sort']=='contact_date' else 'asc',('asc','desc'))
+        integer('offset',0,0,10000000);integer('limit',200 if endpoint=='contacts' else 50,1,200)
     for value in p.values():
         if isinstance(value,str) and len(value)>240: raise HTTPException(422,'查詢文字過長')
     return p
@@ -133,7 +141,7 @@ def register(app, identity, cfg=None, *, reader=None, authorize=None, live_enabl
                 return JSONResponse(exc.detail if isinstance(exc.detail,dict) else {'detail':str(exc.detail)},status_code=exc.status_code,headers={'Cache-Control':'no-store',**(exc.headers or {})})
         read.__name__='reports_'+endpoint.replace('/','_')
         return read
-    for endpoint in ('review','review/rows','sales','assets','progress','progress/case','sources','home'):
+    for endpoint in ('review','review/rows','sales','assets','progress','progress/case','sources','home','contacts'):
         app.add_api_route('/api/reports/'+endpoint,handler(endpoint),methods=['GET'])
     @app.post('/api/reports/refresh')
     def refresh(request: Request):

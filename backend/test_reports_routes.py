@@ -373,3 +373,16 @@ def test_progress_normalized_search_and_detail_key_rejected_before_scan():
             assert response.status_code==404
             assert response.json()=={'detail':'case_not_found'}
     store.close()
+
+
+def test_contacts_route_and_validation():
+    app,store=app_for()
+    with TestClient(app) as client:
+        response=client.get('/api/reports/contacts',params={'week':'2026-10-19','dedup_mode':'all'})
+        assert response.status_code==200
+        body=response.json()
+        assert body['date_range']=={'from':'2026-10-19','to':'2026-10-25'}
+        assert body['total']>0 and body['items'][0]['link'].startswith('https://yong-xiang-survey.jp.larksuite.com/base/')
+        for params in ({'dedup_mode':'wrong'},{'result_status':'wrong'},{'from':'bad'},{'sort':'wrong'}):
+            assert client.get('/api/reports/contacts',params=params).status_code==422
+    store.close()

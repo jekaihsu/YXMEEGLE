@@ -365,3 +365,18 @@ def test_plan_people_items_and_detail_exact_contract():
     assert set(detail['week']['work_rows'][0]['checks'])=={'status','control_checked'}
     assert detail['week']['plan_rows'][0]['people']=='王小明,未填'
     assert detail['week']['plan_rows'][0]['items']=='測量 · 水深'
+
+
+def test_contacts_merge_filter_and_same_day():
+    raw={'crm_contact':{'name':'CRM','status':'ok','records':[
+        {'record_id':'c1','fields':{'活動時間':'2026-10-19T09:00:00+08:00','工程編號':'C1,C1','原記錄ID':'v1','執行人':[{'name':'郭倢瑛'}],'聯繫方式':['line'],'處理結果':'OK'}},
+        {'record_id':'c2','fields':{'活動時間':'2026-10-19T11:00:00+08:00','工程編號':'C1','聯繫主題':['成果'],'內容摘要':'進度'}}]},
+        'v3_contact':{'name':'V3','status':'ok','records':[{'record_id':'v1','fields':{'聯繫日期':'2026-10-19','工程名稱':'工程甲'}}]}}
+    d=c.normalize(raw); result=c.contacts(d,week='2026-10-19')
+    assert result['raw_total']==2 and result['total']==1
+    assert result['items'][0]['id']=='c2' and result['items'][0]['same_day_count']==2
+    all_rows=c.contacts(d,week='2026-10-19',dedup_mode='all')
+    row=next(r for r in all_rows['items'] if r['id']=='c1')
+    assert (row['case_code'],row['case_name'],row['group'],row['method'],row['result'])==('C1','工程甲','工務助理','LINE','已完成')
+    filtered=c.contacts(d,week='2026-10-19',person='不存在')
+    assert filtered['total']==0 and '郭倢瑛' in filtered['options']['person']

@@ -33,7 +33,7 @@ export function AppShell({s,w,route,error,setError,callbackError,mobile,setMobil
  },[route.view,route.project,route.tab,pageSection,ready]);
  const navigationRef=useDialogFocus(()=>setMobile(false),mobile);
  const dispatchVisible=canReadDispatch(s);
- const visibleNav=NAV.filter(n=>(n.view!=='approvals'||s.features?.change_extension===true)&&(n.view!=='routines'||s.features?.routines===true)&&(n.view!=='reports'||s.user?.role==='pm'||s.user?.role==='manager'));
+ const visibleNav=NAV.filter(n=>(n.view!=='approvals'||s.features?.change_extension===true)&&(n.view!=='routines'||s.features?.routines===true)&&(n.view!=='reports'||s.user?.role==='pm'||s.user?.role==='manager'||s.user?.role==='工務助理'||s.user?.department==='工務助理'||['郭倢瑛','朱雅琪','林瑩瑄'].includes(s.user?.name||'')||s.user?.capabilities?.includes('manage_sources')));
  const tabs=visibleNav.filter(n=>['dashboard','projects','work','approvals'].includes(n.view));
  return <div className={`app-shell ${compact?'sidebar-compact':''}`}>
   <div className="compact-brand glass--bar"><a href="#view=dashboard" aria-label="詠翔工作台首頁"><span className="brand-mark"><i/><i/><i/><i/></span><strong>詠翔工作台</strong></a><button ref={openSidebarRef} className="sidebar-toggle" aria-label="展開側邊導覽" aria-expanded={!compact} aria-controls="workspace-navigation" onClick={()=>toggleSidebar(false)}><Menu size={20}/></button></div>
