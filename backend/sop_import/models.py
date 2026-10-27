@@ -130,8 +130,7 @@ class LocalCaseRun(Base):
 
 class TaskEvent(Base):
     __tablename__ = 'sop_task_events'
-    __table_args__ = (ForeignKeyConstraint(['workspace_id', 'project_id', 'task_id'],
-                                         ['sop_local_tasks.workspace_id', 'sop_local_tasks.project_id', 'sop_local_tasks.id']),)
+    # Audit identities outlive explicitly tagged test tasks removed by cleanup.
     workspace_id = Column(String(120), primary_key=True)
     id = Column(String(64), primary_key=True)
     project_id = Column(String(160), nullable=False, index=True)
