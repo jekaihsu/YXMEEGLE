@@ -1,5 +1,6 @@
 import time
 from copy import deepcopy
+from types import SimpleNamespace
 from dataclasses import dataclass
 from datetime import date, datetime
 from uuid import uuid4, uuid5, NAMESPACE_URL
@@ -311,7 +312,7 @@ class Service(EnrollmentService):
 
     def personal_items(self, state, wid, user):
         from ..home_details import build_sop_home_task
-        from ..source_case_policy import visible_project, local_planning, local_viewer
+        from ..source_case_policy import visible_project, local_planning
         if not user.get('active', True):
             return []
         projects = {p['id']: p for p in state.get('projects', [])
@@ -322,8 +323,9 @@ class Service(EnrollmentService):
             links = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == wid,
                                    TaskNodeLink.task_id.in_([t.id for t in tasks])).order_by(TaskNodeLink.ordinal, TaskNodeLink.node_key)))
             def full_case(project):
-                return (visible_project(state, project) or local_viewer(user, project)
-                        or user['id'] in project.get('sop_task_delegate_ids', []))
+                case_access = (visible_project(state, project) or local_viewer(user, project)
+                               or user['id'] in project.get('sop_task_delegate_ids', []))
+                return case_access and (has_reader_grant(user) or can_manage(SimpleNamespace(user=user, project=project)))
             return [build_sop_home_task(projects[t.project_id], t, [l for l in links if l.task_id == t.id],
                                        user, state.get('users', []), self.writes_enabled(),
                                        full_case(projects[t.project_id])) for t in tasks]
