@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from sqlalchemy import create_engine, delete, inspect, select
 
+from .models import BusinessRow
 from .sop_import.cleanup_migration import migrate
 from .sop_import.domain import Failure
 from .sop_import.models import LocalTask, TaskNodeLink, TaskEvent
@@ -59,6 +60,17 @@ def set_local(h, task_id, **values):
 def imported_shared_task(h):
     apply(h)
     return next(t for t in overview(h)['tasks'] if len(t['node_keys']) == 3)
+
+
+def grant(h, **data):
+    """Reshape the case row so the next request resolves a different case authority."""
+    with h.sessions.begin() as db:
+        row = db.get(BusinessRow, ('w', 'projects', 'p1'))
+        row.data = {**row.data, **data}
+
+
+CASE_AUTHORITY = {'pm': ('pm', {}), 'delegate': ('member', {'sop_task_delegate_ids': ['member']}),
+                  'intake': ('other', {'case_type': 'intake', 'pm_id': None})}
 
 
 def test_explicit_test_creation_records_immutable_provenance(m):
@@ -142,17 +154,43 @@ def test_cleanup_removes_task_links_counts_and_preserves_audit_idempotently(m):
     assert events(m) == history
 
 
-@pytest.mark.parametrize('actor', ['member', 'other', 'expired'])
-def test_tag_and_cleanup_require_existing_manager_authority(m, actor):
+@pytest.mark.parametrize('actor', ['pm', 'delegate', 'intake', 'member', 'other', 'expired'])
+def test_only_managers_create_tag_or_remove_test_fixtures(m, actor):
     task = fixture(m)
-    m.who[0] = actor
+    user, case = CASE_AUTHORITY.get(actor, (actor, {}))
+    grant(m, **case)
+    m.who[0] = user
     status = 401 if actor == 'expired' else 403
+    if actor in CASE_AUTHORITY:
+        assert 'is_test' not in manual(m)['local']  # Case authority still creates ordinary tasks.
+    before = events(m)
+    assert post(m, URL + '/sop-tasks', {'title': 'x', 'node_keys': ['pm'], 'is_test': True}, status)
     assert tag(m, task, status)
     assert clean(m, task, status)
+    assert stored(m, task['id']) is not None and events(m) == before
     m.who[0] = 'manager'
     clean(m, task)
-    m.who[0] = actor
+    m.who[0] = user
     assert clean(m, task, status)  # Replay does not bypass authorization.
+
+
+def test_manager_demoted_during_lock_is_refused_but_keeps_case_authority(m):
+    task = fixture(m)
+    grant(m, pm_id='manager')
+    original = m.service.lock_workspace_row
+
+    def demote_during_lock(db, wid):
+        original(db, wid)
+        m.users['manager']['role'] = 'pm'
+
+    m.service.lock_workspace_row = demote_during_lock
+    before = events(m)
+    assert clean(m, task, 403)['code'] == 'sop_import_forbidden'
+    assert tag(m, task, 403, is_test=False)['code'] == 'sop_import_forbidden'
+    assert post(m, URL + '/sop-tasks', {'title': 'x', 'node_keys': ['pm'], 'is_test': True}, 403)['code'] == 'sop_import_forbidden'
+    assert stored(m, task['id']) is not None and events(m) == before
+    m.service.lock_workspace_row = original
+    assert 'is_test' not in manual(m)['local']
 
 
 def test_reimport_never_reuses_an_identity_cleaned_before_provenance_existed(m):

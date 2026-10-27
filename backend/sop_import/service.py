@@ -37,14 +37,17 @@ class Context:
     assigned_only: bool = False
 
 
+def administrator(user):
+    return user.get('active', True) and user.get('role') in {'manager', 'admin'}
+
+
 def explicitly_granted(user, capability):
-    return user.get('active', True) and (user.get('role') in {'manager', 'admin'} or capability in user.get('capabilities', []))
+    return administrator(user) or (user.get('active', True) and capability in user.get('capabilities', []))
 
 
 def can_manage(ctx):
-    return ctx.user.get('active', True) and (
-        ctx.user.get('role') in {'manager', 'admin'}
-        or ctx.user['id'] == ctx.project.get('pm_id')
+    return administrator(ctx.user) or ctx.user.get('active', True) and (
+        ctx.user['id'] == ctx.project.get('pm_id')
         or ctx.user['id'] in ctx.project.get('sop_task_delegate_ids', [])
         or (ctx.project.get('case_type') == 'intake' and not ctx.project.get('pm_id')
             and explicitly_granted(ctx.user, 'sop_task_import')))
@@ -79,6 +82,11 @@ def completed_with_proof(task):
 def disposable(task):
     require(created_as_test(task), 'test_task_required', 409)
     require(not completed_with_proof(task), 'task_reopen_required', 409)
+
+
+def authorize_test_operator(ctx):
+    """Test fixtures are created, tagged and removed by workspace managers only, never by a case's PM or delegates."""
+    require(administrator(ctx.user), 'sop_import_forbidden', 403)
 
 
 def authorize(ctx, write=False):
@@ -825,6 +833,8 @@ class Service(EnrollmentService):
         self.writable()
         with self.sessions.begin() as db:
             ctx, state = self.lock(db, ctx)
+            if is_test:
+                authorize_test_operator(ctx)
             keys = row_keys(body.get('node_keys', []))
             self.check_policy_write(db, ctx, keys)
             nodes = self.nodes(db, ctx, keys)
@@ -860,6 +870,7 @@ class Service(EnrollmentService):
         self.writable()
         with self.sessions.begin() as db:
             ctx, state = self.lock(db, ctx)
+            authorize_test_operator(ctx)
             task = self.task(db, ctx, task_id)
             disposable(task)
             require(task.revision == body['expected_revision'], 'task_revision_conflict', 409)
@@ -878,6 +889,7 @@ class Service(EnrollmentService):
         self.writable()
         with self.sessions.begin() as db:
             ctx, state = self.lock(db, ctx)
+            authorize_test_operator(ctx)
             task = db.get(LocalTask, (ctx.wid, task_id))
             if task is None:
                 cleaned = db.scalar(select(TaskEvent.id).where(TaskEvent.workspace_id == ctx.wid,
