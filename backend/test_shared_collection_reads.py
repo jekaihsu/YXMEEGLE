@@ -124,3 +124,66 @@ def test_authority_bearing_rows_are_never_served_from_the_shared_read(world):
         edited = user.entity_id
     users = {u['id']: u for u in read(app, project=ids['intake'])['users']}
     assert users[edited]['capabilities'] == ['edited-without-a-version-bump']
+
+
+def test_a_reader_refill_inside_a_writers_open_transaction_never_survives_the_commit(world):
+    app, client, signin, ids = world
+    read(app, project=ids['intake'])
+    saved, commit = threading.Event(), threading.Event()
+    failure = []
+
+    def writer():
+        try:
+            with app.state.sessions.begin() as db:
+                state = storage.load(db, BusinessRow, db.get(WorkspaceRow, WID))
+                state['source_quotes'][0]['marker'] = 'committed'
+                storage.save(db, BusinessRow, WID, state)
+                saved.set()
+                assert commit.wait(10)
+        except BaseException as error:
+            failure.append(error)
+            saved.set()
+    thread = threading.Thread(target=writer)
+    thread.start()
+    assert saved.wait(10)
+    during = read(app, project=ids['intake'])
+    assert not any('marker' in q for q in during['source_quotes']), 'an open transaction is not visible to readers'
+    commit.set()
+    thread.join(10)
+    assert not failure, failure
+    assert any(q.get('marker') == 'committed' for q in read(app, project=ids['intake'])['source_quotes'])
+
+
+def test_a_fetch_that_straddles_an_invalidation_is_not_stored():
+    from . import shared_reads
+    shared_reads.invalidate(None)
+    key = ('w', 1, ('k',), None)
+    started, release = threading.Event(), threading.Event()
+
+    def slow():
+        started.set()
+        release.wait(10)
+        return [('k', '"old"')]
+    thread = threading.Thread(target=lambda: shared_reads.rows(key, slow))
+    thread.start()
+    assert started.wait(10)
+    shared_reads.invalidate('w')
+    release.set()
+    thread.join(10)
+    fetched = []
+    assert shared_reads.rows(key, lambda: fetched.append(1) or [('k', '"new"')]) == [('k', '"new"')]
+    assert fetched == [1]
+    shared_reads.invalidate(None)
+
+
+def test_a_writer_reading_back_inside_its_own_transaction_sees_its_write_not_the_cache(world):
+    app, client, signin, ids = world
+    read(app, project=ids['intake'])
+    with app.state.sessions.begin() as db:
+        row = db.get(WorkspaceRow, WID)
+        state = storage.load(db, BusinessRow, row)
+        state['source_quotes'][0]['marker'] = 'mine'
+        storage.save(db, BusinessRow, WID, state)
+        inside = storage.load_partial(db, BusinessRow, row, collections=storage.CASE_COLLECTIONS,
+                                      project_ids=[ids['intake']], filter_project_rows=True)
+        assert any(q.get('marker') == 'mine' for q in inside['source_quotes'])

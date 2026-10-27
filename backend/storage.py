@@ -134,14 +134,13 @@ def invalidate_shared_reads(wid):
     shared_reads.invalidate(wid)
 
 def _drops_shared_reads(write):
-    """A storage write forgets the workspace's shared rows before and after it runs."""
     @functools.wraps(write)
     def wrapper(db,model,wid,*args,**kwargs):
-        invalidate_shared_reads(wid)
         try: return write(db,model,wid,*args,**kwargs)
-        finally: invalidate_shared_reads(wid)
+        finally:
+            from . import shared_reads
+            shared_reads.drop_after_commit(db,wid)
     return wrapper
-
 
 @_drops_shared_reads
 def save(db,model,wid,state):
@@ -473,7 +472,7 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
             return db.execute(query.order_by(model.ordinal))
         top=kinds-{'projects','source_work_items'}
         from . import shared_reads
-        shared=top&shared_reads.KINDS
+        shared=top&shared_reads.KINDS if not db.info.get('shared_reads_wids') else frozenset()
         if top-shared:
             for kind,parent,data in fetch(top-shared,parent_id=('',)): result[kind].append(data)
         if shared:

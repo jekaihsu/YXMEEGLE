@@ -48,3 +48,17 @@ def rows(key,fetch):
                 while len(_entries)>1 and sum(entry[1] for entry in _entries.values())>MAX_BYTES: _entries.popitem(last=False)
             if _flights.get(key) is flight: del _flights[key]
         return fetched
+
+
+def drop_after_commit(db,wid):
+    """Only the commit makes written rows true, so shared rows are dropped then; a reader may refill old rows while the transaction is open."""
+    from sqlalchemy import event
+    pending=db.info.setdefault('shared_reads_wids',set())
+    if not pending:
+        def committed(session):
+            for item in session.info.pop('shared_reads_wids',()): invalidate(item)
+        try: event.listen(db,'after_commit',committed,once=True)
+        except Exception:
+            invalidate(wid)
+            return
+    pending.add(wid)
