@@ -2,7 +2,7 @@ import {SopLarkSync} from './SopLarkSync';
 import {InlineTaskEditor} from './InlineTaskEditor';
 import {editorFields,type TaskDraft} from './nodeWorkbenchModel';
 import {TaskSuggestion,SuggestionReview} from './SopSuggestions';
-import {useState, type ReactNode} from 'react';
+import {useRef, useState, type ReactNode} from 'react';
 import {Badge, Button, Row, Section} from './design';
 import {SopError, sopApi, sopErrorText, sopNodeLabel, type Applicability, type MutationResult, type SopTask, SOP_ERROR_TEXT} from './sopTaskApi';
 import {APPLICABILITY_LABEL, ROLE_LABEL, stateLabel, taskActions, type TaskAction} from './sopTaskModel';
@@ -59,8 +59,10 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
  const [resultNote,setResultNote]=useState('');
  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
  const [pending, setPending] = useState('');
+ const writing = useRef(false);
  const run = async (call: () => Promise<MutationResult>, done: string, label = '儲存中…') => {
-  if (busy) return false;
+  if (busy || writing.current) return false;
+  writing.current = true;
   setBusy(true); setPending(label); setError(''); setNotice('');
   try {
    const receipt = await call();
@@ -74,7 +76,7 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
    setError(sopErrorText(e));
    if (e instanceof SopError && (e.code === 'task_revision_conflict' || e.ambiguous)) void sop.reload();
    return false;
-  } finally {if (sop.current()) {setBusy(false); setPending('')}}
+  } finally {writing.current = false; if (sop.current()) {setBusy(false); setPending('')}}
  };
  const patch = (body: Record<string, unknown>, done: string) => run(() => sopApi.patch(project.id, task.id, {expected_revision: task.revision, ...body}, sop.current), done);
  const transition = (action: TaskAction|'set_applicability', extra: Record<string, unknown> = {}, label?: string) => run(() => sopApi.transition(project.id, task.id, {expected_revision: task.revision, action, ...extra}, sop.current), '已更新狀態', label ? `${label}中…` : undefined);

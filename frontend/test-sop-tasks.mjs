@@ -71,6 +71,7 @@ async function mount({tasks = [task('t1')], route = {}, role = 'pm', overviewSta
   if (url.endsWith('/sop-tasks/close-node')) {server.close = [...(server.close || []), body]; return response({closed: 1, left_open: {shared: 0, unresolved: 0}, checklist_revision: 5})}
   if (url.endsWith('/cleanup-test')) {server.cleanup = [...(server.cleanup || []), body]; if(server.cleanupReply)return server.cleanupReply(body);server.overview = overview([]);return response({task_id:'t1',removed:true,replayed:false,checklist_revision:10})}
   if (url === '/api/projects/p1/sop-tasks' && method === 'POST') {server.created=body;return response({task_id:'created',checklist_revision:10})}
+  if (url.endsWith('/transition')) {server.transitions = [...(server.transitions || []), body]; if (server.hold) await server.hold; return server.transitionReply ? server.transitionReply(body) : response({task_id: 't1', revision: body.expected_revision + 1, checklist_revision: 9, state: 'in_progress', applicability: 'applicable', task: task('t1', {state: 'in_progress', revision: body.expected_revision + 1, allowed_actions: ['block', 'complete']})})}
   if (method === 'PATCH') {server.patch.push(body); return server.patchReply ? server.patchReply(body) : response({task_id: 't1', revision: body.expected_revision + 1, checklist_revision: 9, state: 'pending', applicability: 'applicable'})}
   return response({code: 'not_found'}, 404);
  };
@@ -256,6 +257,30 @@ test('a task row leads with its state marker and ends with the bulk checkbox; th
  assert.deepEqual([...dialog().querySelectorAll('.task-drawer-trail>span')].map(s => s.textContent), ['SOP 任務', '報價']);
  const actions = [...dialog().querySelectorAll('.task-drawer-footer [aria-label=狀態操作] button')].map(b => b.textContent);
  assert.equal(actions.at(-1), '開始');
+});
+
+test('Start shows a labelled pending state, applies the receipt before any refresh, and sends one write', async () => {
+ await mount({route: {task: 't1', task_source: 'sop_local'}});
+ let release; server.hold = new Promise(r => {release = r});
+ const start = [...dialog().querySelectorAll('.task-drawer-footer button')].find(b => b.textContent === '開始');
+ await act(async () => {start.click(); start.click(); await tick()});
+ const footer = dialog().querySelector('.task-drawer-footer');
+ assert.match(footer.textContent, /開始中…/);
+ assert.ok([...footer.querySelectorAll('button')].every(b => b.disabled), 'every action is disabled while the write is pending');
+ server.overview = overview([task('t1', {state: 'pending'})]);
+ await act(async () => {release(); await tick()});
+ assert.equal(server.transitions.length, 1, 'no duplicate write');
+ assert.match(dialog().querySelector('.sop-badges').textContent, /進行中/);
+ assert.equal([...dialog().querySelectorAll('.task-drawer-footer button')].some(b => b.textContent === '開始'), false);
+});
+
+test('a failed Start keeps the task as it was and shows the error beside the actions', async () => {
+ await mount({route: {task: 't1', task_source: 'sop_local'}});
+ server.transitionReply = () => response({code: 'invalid_transition', detail: '目前狀態不可執行'}, 409);
+ await click([...dialog().querySelectorAll('.task-drawer-footer button')].find(b => b.textContent === '開始'));
+ assert.match(dialog().querySelector('.task-drawer-footer [role=alert]').textContent, /目前狀態不可執行/);
+ assert.match(dialog().querySelector('.sop-badges').textContent, /待處理/);
+ assert.ok([...dialog().querySelectorAll('.task-drawer-footer button')].some(b => b.textContent === '開始' && !b.disabled), 'Start can be retried');
 });
 
 test('a revision conflict reloads the task and keeps the draft for the next save', async () => {
