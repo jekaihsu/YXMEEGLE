@@ -189,7 +189,7 @@ class Projection:
     def status(self, db, ctx, task, *, rows=None):
         row = latest(db, ctx.wid, task.project_id, task.id) if rows is None else rows.get(task.id)
         enabled = gates(self.cfg, ctx.wid, ctx.state) and not excluded(ctx.state, ctx.project)
-        if not enabled:
+        if not enabled or task.snapshot.get('test_fixture') is True:
             return {'state': '未啟用', 'synced_at': None, 'record_id': None, 'error': None}
         state = ('未啟用' if not enabled else '同步失敗' if row and row.last_error else
                  'Lark 已變更' if row and row.drift else '已同步' if row and row.state == 'done' else '同步中')
@@ -329,6 +329,10 @@ class Projection:
     def project_task(self, client, wid, pid, tid, project, state, roster):
         with self.sessions.begin() as db:
             row = latest(db, wid, pid, tid)
+            task = db.get(LocalTask, (wid, tid))
+            if task.snapshot.get('test_fixture') is True:
+                row.state, row.last_error = 'paused', 'test_task_projection_forbidden'
+                return
             values = self.values(db, wid, pid, tid, project, state, roster, row.generation)
             row.target_revision = values['本地版本']
             generation, rid = row.generation, row.record_id
@@ -447,6 +451,12 @@ class Projection:
                     if key in known and not readonly:
                         known[key].state, known[key].last_error = 'paused', 'duplicate_sync_key'
             for key, row in known.items():
+                task = db.get(LocalTask, (wid, row.task_id))
+                if task is not None and task.snapshot.get('test_fixture') is True:
+                    issues.append({'kind': 'test_task_projection_forbidden', 'task_id': row.task_id})
+                    if not readonly:
+                        row.state, row.last_error = 'paused', 'test_task_projection_forbidden'
+                    continue
                 found = grouped.get(key, [])
                 if not found and row.record_id in by_id:
                     found = [by_id[row.record_id]]
