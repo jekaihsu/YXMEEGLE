@@ -7,7 +7,7 @@ import {NODE_NAMES} from './workflowLabels';
 import {taipeiTime} from './taipeiTime';
 import {elapsed,nameOf,safeUrl} from './appCommon';
 import {createPortal} from 'react-dom';
-import {useEffect,useRef,useState,type ReactNode} from 'react';
+import {useEffect,useRef,useState,type MutableRefObject,type ReactNode} from 'react';
 import {Button,Skeleton} from './design';
 import {useNodeAssignments} from './useNodeAssignments';
 import {useProjectProgress} from './useProjectProgress';
@@ -37,7 +37,7 @@ import type {Project} from './types';
 import './NodeAssignments.css';
 import './StartSop.css';
 import './ProjectFlow.css';
-export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions,sopTasks:providedSop,inline=false}:{c:Ctx;p:Project;assignments:ReturnType<typeof useNodeAssignments>;selectedKey:string;secondary:ReactNode;legacyActions:ReactNode;sopTasks?:ReturnType<typeof useSopTasks>;inline?:boolean}){
+export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions,sopTasks:providedSop,reopened,inline=false}:{c:Ctx;p:Project;assignments:ReturnType<typeof useNodeAssignments>;selectedKey:string;secondary:ReactNode;legacyActions:ReactNode;sopTasks?:ReturnType<typeof useSopTasks>;reopened?:MutableRefObject<string>;inline?:boolean}){
  const route=projectFlowRoute(c.route),enabled=!localCase(p)&&c.s.features?.node_assignment===true;
  const read=useProjectProgress(p.id);
  const ownSop=useSopTasks(p.id,c.s.workspace_id || '',!providedSop&&canReadSop(c.s.user));
@@ -105,7 +105,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
    {!workbench.local && !isLegacy && !selected.assignment && <p className="pf-empty">尚無節點指派</p>}
 
    {Object.entries(details.errors).map(([key,error])=><p role="alert" key={key}>{model.nodes.find(n=>n.key===key)?.label}任務明細讀取失敗。{error}<Button onClick={details.retry}>重試任務明細</Button></p>)}
-   {(!workbench.local || selected.taskRows.some(row=>row.source!=='SOP 任務')) && <FlowTasks c={c} p={p} nodes={model.nodes} selected={selected.key} details={details.details} all={all} onScope={value=>c.go(withTaskScope({...c.route,tab:inline?'overview':'flow'},value))} busy={busy} reason={reason} error={assignments.error} mutate={assignments.mutate} loading={taskLoading} incomplete={taskIncomplete} evidence={evidence}>{selected.assignment&&<SopTasks remote c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>}</FlowTasks>}
+   {(!workbench.local || selected.taskRows.some(row=>row.source!=='SOP 任務')) && <FlowTasks c={c} p={p} nodes={model.nodes} selected={selected.key} details={details.details} all={all} onScope={value=>c.go(withTaskScope({...c.route,tab:inline?'overview':'flow'},value))} busy={busy} reason={reason} error={assignments.error} mutate={assignments.mutate} loading={taskLoading} incomplete={taskIncomplete} evidence={evidence} reopened={reopened}>{selected.assignment&&<SopTasks remote c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>}</FlowTasks>}
    {!selected.assignment&&<SopTasks c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>}
   </section>
   {!inline && p.nodes.length>0 && legacyActions && <details className="pf-secondary pf-legacy"><summary>範本與本地流程</summary>

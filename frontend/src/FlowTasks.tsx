@@ -1,15 +1,16 @@
-import {useState,type ReactNode} from 'react';
+import {useEffect,useState,type MutableRefObject,type ReactNode} from 'react';
 import {Badge,Button,Skeleton} from './design';
 import type {Ctx} from './appCommon';
 import type {Project} from './types';
 import type {AssignmentMutation,NodeAssignmentDetail,NodeAssignmentError} from './nodeAssignmentApi';
 import {filterFlowTasks,overdueTask,type FlowNode} from './flowModel';
+import {taskFilters,withTaskFilter} from './projectRoutes';
 import {FlowAction,TaskPersonPicker} from './FlowActions';
 import {AssignmentTaskInspector} from './AssignmentTaskInspector';
 import {isProductionSeedTask,productionPlanFacts} from './productionPlan';
 import {ProductionPlanFacts} from './FlowEvidence';
-export function FlowTasks({c,p,nodes,selected,details,all,onScope,busy,reason,error,mutate,loading,incomplete,evidence,children}:{c:Ctx;p:Project;nodes:FlowNode[];selected:string;details:Record<string,NodeAssignmentDetail>;all:boolean;onScope:(all:boolean)=>void;busy:boolean;reason:string;error:NodeAssignmentError|null;mutate:(m:AssignmentMutation)=>Promise<boolean>;loading:boolean;incomplete:boolean;evidence:ReactNode;children?:ReactNode}){
- const [filters,setFilters]=useState({mine:false,unassigned:false,overdue:false});
+export function FlowTasks({c,p,nodes,selected,details,all,onScope,busy,reason,error,mutate,loading,incomplete,evidence,reopened,children}:{c:Ctx;p:Project;nodes:FlowNode[];selected:string;details:Record<string,NodeAssignmentDetail>;all:boolean;onScope:(all:boolean)=>void;busy:boolean;reason:string;error:NodeAssignmentError|null;mutate:(m:AssignmentMutation)=>Promise<boolean>;loading:boolean;incomplete:boolean;evidence:ReactNode;reopened?:MutableRefObject<string>;children?:ReactNode}){
+ const filters=taskFilters(c.route);
  const [assigning,setAssigning]=useState('');
  const rows=nodes.flatMap(n=>n.taskRows).filter(row=>row.source!=='SOP 任務');
  const filtered=filterFlowTasks(rows,{...filters,node:all ? undefined : selected,userId:c.s.user?.id || '',today:c.w.as_of});
@@ -18,9 +19,16 @@ export function FlowTasks({c,p,nodes,selected,details,all,onScope,busy,reason,er
  const selectedRow=sopTask ? undefined : rows.find(r=>r.id===c.route.task && r.task);
  const seed=filtered.find(row=>row.nodeKey===selected && row.task && isProductionSeedTask(row.task,selected));
  const taskPlan=selectedRow?.task ? productionPlanFacts(selectedRow.task,selectedRow.nodeKey,nodes.find(n=>n.key===selectedRow.nodeKey)?.production) : null;
+ useEffect(()=>{
+  if(c.route.task || loading || !reopened?.current)return;
+  const row=[...document.querySelectorAll<HTMLElement>('[data-assignment-task]')].find(li=>li.dataset.assignmentTask===reopened.current)?.querySelector<HTMLElement>('.pf-task-open');
+  if(!row)return;
+  if(!document.activeElement || document.activeElement===document.body)row.focus();
+  reopened.current='';
+ },[c.route.task,loading,filtered.length]);
  return <section id="flow-tasks" className="pf-tasks" aria-label="流程任務列表" tabIndex={-1}>
   <header><h3>任務</h3><div className="pf-actions" aria-label="任務範圍">{[false,true].map(value=><Button key={String(value)} aria-pressed={all===value} onClick={()=>onScope(value)}>{value ? '全部任務' : '此節點'}</Button>)}</div></header>
-  <div className="pf-filters" aria-label="任務篩選">{([['mine','我的'],['unassigned','未指派'],['overdue','逾期']] as const).map(([key,label])=><Button key={key} aria-pressed={filters[key]} onClick={()=>setFilters(f=>({...f,[key]:!f[key]}))}>{label}</Button>)}<span role="status">{incomplete ? `${filtered.length} 項已載入，來源未完整` : `${filtered.length} 項符合`}</span></div>
+  <div className="pf-filters" aria-label="任務篩選">{([['mine','我的'],['unassigned','未指派'],['overdue','逾期']] as const).map(([key,label])=><Button key={key} aria-pressed={filters[key]} onClick={()=>c.go(withTaskFilter(c.route,key,!filters[key]),true)}>{label}</Button>)}<span role="status">{incomplete ? `${filtered.length} 項已載入，來源未完整` : `${filtered.length} 項符合`}</span></div>
   {incomplete && <p role="status">任務來源暫不可用，請重試明細後再確認完整清單。</p>}
   {loading && <div aria-label="任務載入中" aria-busy="true"><Skeleton lines={3} height="3.5rem"/></div>}
   <ul className="pf-task-list">{filtered.map(row=>{const plan=row.task ? productionPlanFacts(row.task,row.nodeKey,nodes.find(n=>n.key===row.nodeKey)?.production) : null;return <li key={row.id} data-assignment-task={row.id}>

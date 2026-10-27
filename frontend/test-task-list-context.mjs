@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
 import {projectFixture} from './fixtures/node-assignments.mjs';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=project&project=p1&tab=tasks&node=node_sales',pretendToBeVisual:true});
-for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','Element','Node','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.getComputedStyle=dom.window.getComputedStyle;
 HTMLElement.prototype.scrollIntoView=function(){};globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
@@ -21,9 +21,9 @@ function localProject(){
 let root,c;
 const render=()=>root.render(React.createElement(ui.ProjectDetail,{c}));
 const go=(next,replace=false)=>{const r=ui.normalizeRoute(next);const q=new URLSearchParams();Object.entries(r).forEach(([k,v])=>{if(v)q.set(k,v)});if(replace)history.replaceState(null,'',location.pathname+location.search+'#'+q.toString());else location.hash=q.toString();c={...c,route:r};render()};
-window.addEventListener('hashchange',()=>{c={...c,route:ui.parseRoute(location.hash)};render()});
+window.addEventListener('hashchange',()=>{if(!root)return;c={...c,route:ui.parseRoute(location.hash)};render()});
 async function mount(hash){
- if(root)await act(async()=>root.unmount());ui.invalidateSessionEpoch();
+ if(root){await act(async()=>root.unmount());root=null}ui.invalidateSessionEpoch();
  location.hash=hash;await tick();
  const base=localProject();
  c={w:base.workspace,s:{user:base.user,mode:'demo',workspace_id:'local-company',features:{node_assignment:false}},route:ui.parseRoute(location.hash),busy:false,error:'',run:async()=>undefined,notify(){},registerDrafts(){},refresh:async()=>{},go};
@@ -48,5 +48,19 @@ assert.equal(pressed('全部任務'),'true');assert.equal(pressed('逾期'),'tru
 await click(button('逾期'));assert.equal(rows(),21);
 await click(button('此節點'));assert.equal(rows(),2,'scope toggle returns to the node');assert.equal(pressed('此節點'),'true');assert.equal(c.route.all_tasks,undefined);
 await click(button('全部任務'));assert.equal(rows(),21);
+
+
+await mount('view=project&project=p1&tab=tasks&node=node_sales');
+await click(button('逾期'));assert.equal(rows(),5);assert.match(location.hash,/task_filters=overdue/);
+await click(document.querySelector('.pf-task-open'));const opened=c.route.task;
+await click([...document.querySelectorAll('.task-inspector button')].find(b=>b.textContent.trim()==='查看節點檔案'));
+assert.equal(c.route.tab,'files');assert.equal(document.querySelector('.task-inspector'),null);assert.equal(rows(),0);
+await back();
+assert.equal(c.route.task,opened);assert.ok(document.querySelector('.task-inspector'),'history restores the drawer');
+assert.equal(rows(),5,'overdue filter survives Files and Back');assert.equal(pressed('逾期'),'true');assert.equal(pressed('全部任務'),'true');
+await act(async()=>{document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});
+assert.equal(document.querySelector('.task-inspector'),null);assert.equal(rows(),5);
+const row=[...document.querySelectorAll('[data-assignment-task]')].find(li=>li.dataset.assignmentTask===opened).querySelector('.pf-task-open');
+assert.equal(document.activeElement,row,'focus returns to the reopened row');
 
 await act(async()=>root.unmount());console.log('Task list context checks passed');

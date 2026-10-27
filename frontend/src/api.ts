@@ -66,7 +66,7 @@ export function normalizeRoute<T extends {view:string;tab?:string;section?:strin
  if(route.tab==='approvals')return {...route,tab:'flow',section:'approvals'};
  const project=projectFlowRoute(route);return {...route,tab:project.tab,section:project.section,...(project.allTasks ? {all_tasks:'1'} : {})};
 }
-export function parseRoute(hash:string){const p=new URLSearchParams(hash.replace(/^#\/?/,''));return normalizeRoute({view:p.get('view')||'dashboard',project:p.get('project')||undefined,node:p.get('node')||undefined,task:p.get('task')||undefined,tab:p.get('tab')||undefined,section:p.get('section')||undefined,completion:p.get('completion')||undefined,focus:p.get('focus')||undefined,comment:p.get('comment')||undefined,approval:p.get('approval')||undefined,ctx:p.get('ctx')||undefined,task_source:p.get('task_source')||undefined,all_tasks:p.get('all_tasks')||undefined})}
+export function parseRoute(hash:string){const p=new URLSearchParams(hash.replace(/^#\/?/,''));return normalizeRoute({view:p.get('view')||'dashboard',project:p.get('project')||undefined,node:p.get('node')||undefined,task:p.get('task')||undefined,tab:p.get('tab')||undefined,section:p.get('section')||undefined,completion:p.get('completion')||undefined,focus:p.get('focus')||undefined,comment:p.get('comment')||undefined,approval:p.get('approval')||undefined,ctx:p.get('ctx')||undefined,task_source:p.get('task_source')||undefined,task_filters:p.get('task_filters')||undefined,all_tasks:p.get('all_tasks')||undefined})}
 export const readRoute=()=>parseRoute(location.hash);
 
 type LiveResult={freshness:import('./types').Freshness};
