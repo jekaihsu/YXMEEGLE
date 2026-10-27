@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {build} from 'esbuild';
 import {assignmentFixture,projectFixture} from './fixtures/node-assignments.mjs';
-const result=await build({stdin:{contents:"export * from './src/nodeWorkbenchModel';export {buildFlowModel,flowTaskTarget} from './src/flowModel'",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external'});
+const result=await build({stdin:{contents:"export * from './src/nodeWorkbenchModel';export {buildFlowModel,flowTaskTarget,taskListHeading} from './src/flowModel'",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external'});
 const m=await import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].text).toString('base64'));
 test('registry never enables an action absent from the server permissions',()=>{
  const r=m.actionRegistry({can:{assign:true,complete:false}});assert.equal(r.assign.enabled,true);assert.equal(r.complete.enabled,false);assert.ok(r.complete.disabledReason);
@@ -45,4 +45,10 @@ test('assign reason follows the verified node status, never a blanket completed 
  assert.notEqual(idle.actions.assign.disabledReason,'節點已完成');
  const done=m.buildNodeWorkbench({node,local:local('completed'),sop:{tasks:[]}});
  assert.equal(done.actions.assign.disabledReason,'節點已完成');
+});
+test('task list heading matches the row sources',()=>{
+ const f=m.buildFlowModel({project:projectFixture().project,today:'2026-10-25'});
+ assert.equal(m.taskListHeading([{source:'Lark 任務'}]),'Lark 任務');
+ assert.equal(m.taskListHeading([{source:'本地流程'}]),'本地流程');
+ assert.equal(m.taskListHeading([{source:'Lark 任務'},{source:'本地流程'}]),'流程任務');
 });

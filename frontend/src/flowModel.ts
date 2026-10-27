@@ -118,3 +118,8 @@ export function nodeDispatchProposal({project,node,parentTaskId}: {project: Proj
 }
 
 export const flowTaskTarget=(task:FlowTask)=>({tab:'flow' as const,node:task.nodeKey,task:task.id,...(task.source==='SOP 任務'?{task_source:'sop_local'}:{})});
+
+export function taskListHeading(rows:{source:FlowTask['source']}[]) {
+ const sources=[...new Set(rows.map(r=>r.source))];
+ return sources.length===1 ? `${sources[0]}` : '流程任務';
+}
