@@ -38,6 +38,7 @@ const back=async()=>{await act(async()=>{history.back();await tick();await tick(
 
 await mount('view=project&project=p1&tab=tasks&node=node_sales');
 assert.equal(pressed('全部任務'),'true');assert.equal(rows(),21);
+assert.match(document.querySelector('.pf-task-open small').textContent,/本地流程/,'local rows name their source');
 await click(button('逾期'));assert.equal(rows(),5);
 await click(document.querySelector('.pf-task-open'));
 assert.ok(document.querySelector('.task-inspector'),'local drawer opens');assert.equal(rows(),5);

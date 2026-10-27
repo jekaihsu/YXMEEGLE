@@ -18,7 +18,7 @@ export function AssignmentTaskInspector({assignment:task,people=[],plan,nodeLabe
   if(value.status!==draft.status)patch.status=value.status;
   return mutate({action:'update_task',nodeKey,taskId:task.id,expected_revision:task.revision,patch});
  };
- return createPortal(<Sheet title={plan?'依計畫數量完成':task.title} onClose={onClose}><div className="pf-inspector assignment-edit"><p>{nodeLabel}</p>
+ return createPortal(<Sheet title={plan?'依計畫數量完成':task.title} onClose={onClose}><div className="pf-inspector assignment-edit"><p>Lark 任務 · {nodeLabel}</p>
   <InlineTaskEditor busy={busy} model={{draft,fields:editorFields({title:task.can.edit_details,assignee:task.can.assign,due:task.can.edit_details,notes:task.can.edit_details,status:task.can.edit_status || task.can.cancel},reason || '需有此任務的編輯權限'),people:people.map(p=>({id:p.open_id,name:p.name})),statuses:TASK_STATUS_OPTIONS.filter(([value])=>value===task.status || (value==='取消' ? task.can.cancel : task.can.edit_status)).map(([id,label])=>({id,label})),maxTitle:200,maxNotes:2000,dueReason:false}} onSave={save}/>
   {plan && <ProductionPlanFacts plan={plan}/>}<Button onClick={onClose}>關閉</Button></div></Sheet>,document.body);
 }

@@ -93,4 +93,6 @@ await mount({node:'control',embedded:false});assert.equal(document.querySelector
  await act(async()=>{releaseDetail();await tick()});assert.equal(document.querySelectorAll('.pf-task-open').length,2);
  Date.now=realNow;
 }
+await mount({node:'control'});assert.match(document.querySelector('.pf-task-open small').textContent,/Lark 任務/,'rows name their source');
+await click(document.querySelector('.pf-task-open'));assert.match(document.querySelector('[role=dialog] .pf-inspector p').textContent,/^Lark 任務 · /,'drawer names its source');await click(button('關閉'));
 await act(async()=>root.unmount());console.log('Unified project flow rendered checks passed');
