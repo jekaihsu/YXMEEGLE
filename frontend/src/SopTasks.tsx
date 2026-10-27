@@ -123,7 +123,9 @@ const assign = async (t: SopTask, id: string) => {
   {proven && <div className="pg-callout sop-node-done" role="status"><strong>{sopNodeLabel(node!)}節點已完成</strong> · {proven.reason}
    {allowed?.manage && closable.length > 0 && <FlowAction allowed={!closing} reason="處理中" onClick={() => void closeNode()}>{closing ? '處理中…' : `依節點完成，全部標為已完成（${closable.length}）`}</FlowAction>}</div>}
   {actionError && <p role="alert" className="pg-callout">{actionError}</p>}
-  {state.kind === 'error' && <div role="alert" className="pg-callout">SOP 任務讀取失敗 · {state.message}<Button onClick={() => void sop.reload()}>重試 SOP 任務</Button></div>}
+  {state.kind === 'error' && (state.retrying
+   ? <div role="status" aria-busy="true" className="pg-callout">正在重新讀取 SOP 任務，不會變更任何資料…{routeTask && '（保留目前選取的任務）'}<Button disabled>重新讀取中…</Button></div>
+   : <div role="alert" className="pg-callout">SOP 任務讀取失敗 · {state.message}<Button onClick={() => void sop.reload(true, true)}>重試 SOP 任務</Button></div>)}
   {state.kind === 'loading' ? <div aria-label="SOP 任務載入中" aria-busy="true"><Skeleton lines={3} height="3.5rem"/></div>
    : data && (rows.length ? <ul className="pf-task-list">{rows.map(t => <TaskLine key={t.id} task={t} assignees={sop.assignees} assigning={assigning===t.id} onAssign={id=>void assign(t,id)} selected={selected.has(t.id)} onSelect={()=>selectTask(t.id)} projectId={p.id} sop={sop} onAccept={()=>setReview([t.id])} people={people} scoped={!!scope} onOpen={() => openRoute(t.id)}/>)}</ul>
     : (history || filtered) && <p className="pf-empty">{history ? '無封存任務' : filtered ? '沒有符合的任務' : '無 SOP 任務'}</p>)}
