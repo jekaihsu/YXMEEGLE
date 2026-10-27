@@ -159,8 +159,8 @@ test('the section lists the node tasks with executor, state, due and badges', as
  const section = document.querySelector('#sop-tasks');
  assert.equal(section.querySelector('h3').firstChild.textContent, '任務');
  assert.deepEqual([...section.querySelectorAll('.pf-task-open strong')].map(s => s.textContent), ['業主提出報價需求', '共用檢核']);
- assert.equal(section.querySelector('[data-sop-task=t1] span').textContent, '未指派 · 待處理 · 期限待確認');
- assert.equal(section.querySelector('[data-sop-task=shared] span').textContent, '林組員 · 待處理 · 期限待確認共用條件');
+ assert.equal(section.querySelector('[data-sop-task=t1] .pf-task-open>span').textContent, '未指派 · 待處理 · 期限待確認未啟用');
+ assert.equal(section.querySelector('[data-sop-task=shared] .pf-task-open>span').textContent, '林組員 · 待處理 · 期限待確認未啟用共用條件');
  assert.equal(section.querySelector('.sop-progress').textContent, '0/1');
  await click(button('全案'));
  assert.equal(section.querySelector('[data-sop-task=shared] small').textContent, '報價、PM 派工');
@@ -245,6 +245,17 @@ test('a deep link opens the SOP drawer, Escape clears the discriminator and retu
  assert.equal(document.activeElement, document.querySelector('[data-sop-task=t1] button'));
 });
 
+test('a task row leads with its state marker and ends with the bulk checkbox; the drawer footer ends with the primary action', async () => {
+ await mount({route: {task: 't1', task_source: 'sop_local'}});
+ const row = document.querySelector('[data-sop-task=t1] .sop-task-select');
+ assert.deepEqual([...row.children].map(e => e.className || e.type), ['sop-state', 'pf-task-open', 'sop-quick-assign', 'checkbox']);
+ assert.equal(row.firstElementChild.dataset.state, 'pending');
+ assert.equal(dialog().dataset.kind, 'sop');
+ assert.deepEqual([...dialog().querySelectorAll('.task-drawer-trail>span')].map(s => s.textContent), ['SOP 任務', '報價']);
+ const actions = [...dialog().querySelectorAll('.task-drawer-footer [aria-label=狀態操作] button')].map(b => b.textContent);
+ assert.equal(actions.at(-1), '開始');
+});
+
 test('a revision conflict reloads the task and keeps the draft for the next save', async () => {
  await mount({route: {task: 't1', task_source: 'sop_local'}});
  const input = dialog().querySelector('[aria-label="任務名稱"]');
@@ -275,6 +286,92 @@ test('link confirmation shows completion actor, time, state and evidence before 
  await click(button('匯入預設任務'));await click(button('下一步'));await click(button('下一步'));
  for(const value of ['完成人員','王經理','完成時間','已完成','reviewed','abc123','evidence-123'])assert.ok(dialog().textContent.includes(value),value);
  assert.equal(server.apply.length,0);
+});
+
+
+test('sync badge and Lark row link follow the task receipt', async () => {
+ const sync = {state: 'Lark 已變更', synced_at: 1000, record_id: 'recKnown', base_id: 'baseKnown', table_id: 'tblKnown'};
+ await mount({tasks: [task('t1', {lark_sync: sync})], route: {task: 't1', task_source: 'sop_local'}});
+ assert.match(document.querySelector('[data-sop-task=t1]').textContent, /Lark 已變更/);
+ const link = [...document.querySelectorAll('a')].find(a => a.textContent === '開啟 Lark 列');
+ assert.ok(link);
+ assert.equal(link.href, 'https://yong-xiang-survey.jp.larksuite.com/base/baseKnown?table=tblKnown&record=recKnown');
+});
+
+test('unsynced task has a plain badge without a Lark row link', async () => {
+ await mount({tasks: [task('t1', {lark_sync: {state: '同步中', synced_at: null, record_id: null}})], route: {task: 't1', task_source: 'sop_local'}});
+ assert.match(document.querySelector('[data-sop-task=t1]').textContent, /同步中/);
+ assert.ok(![...document.querySelectorAll('a')].some(a => a.textContent === '開啟 Lark 列'));
+ const invalid = overview([task('t1', {lark_sync: {state: 'unknown'}})]);
+ assert.throws(() => ui.parseOverview(invalid), e => e.code === 'malformed');
+});
+
+
+test('disabled projection hides stale receipt links', async () => {
+ await mount({tasks: [task('t1', {lark_sync: {state: '未啟用', record_id: 'recOld', base_id: 'baseOld', table_id: 'tblOld'}})], route: {task: 't1', task_source: 'sop_local'}});
+ assert.ok(![...document.querySelectorAll('a')].some(a => a.textContent === '開啟 Lark 列'));
+});
+
+
+test('background projection completion refreshes badge and receipt link', async () => {
+ const originalSet = globalThis.setInterval, originalClear = globalThis.clearInterval;
+ const timers = new Map(); let next = 0;
+ globalThis.setInterval = (fn, delay) => {assert.equal(delay, 10000); timers.set(++next, fn); return next};
+ globalThis.clearInterval = id => timers.delete(id);
+ try {
+  await mount({tasks: [task('t1', {lark_sync: {state: '同步中'}})], route: {task: 't1', task_source: 'sop_local'}});
+  assert.equal(timers.size, 1);
+  server.overview = overview([task('t1', {lark_sync: {state: '已同步', record_id: 'recNew', base_id: 'baseNew', table_id: 'tblNew'}})]);
+  await act(async () => {await [...timers.values()][0](); await tick()});
+  assert.match(document.querySelector('[data-sop-task=t1]').textContent, /已同步/);
+  assert.ok([...document.querySelectorAll('a')].some(a => a.href.includes('record=recNew')));
+  assert.equal(timers.size, 0);
+  assert.ok(button('重新整理'));
+  await click(button('重新整理'));
+ } finally {globalThis.setInterval = originalSet; globalThis.clearInterval = originalClear}
+});
+
+test('projection polling stops after five minutes and on session change or unmount', async () => {
+ const originalSet = globalThis.setInterval, originalClear = globalThis.clearInterval;
+ const timers = new Map(); let next = 0;
+ globalThis.setInterval = (fn, delay) => {assert.equal(delay, 10000); timers.set(++next, fn); return next};
+ globalThis.clearInterval = id => timers.delete(id);
+ try {
+  await mount({tasks: [task('t1', {lark_sync: {state: '同步中'}})]});
+  const poll = [...timers.values()][0]; assert.equal(typeof poll, 'function');
+  for (let i = 0; i < 31; i++) await act(async () => {await poll(); await tick()});
+  assert.equal(calls.filter(c => c.url.endsWith('/sop-tasks')).length, 31);
+  assert.equal(timers.size, 0);
+  await act(async () => root.unmount()); root = null;
+  assert.equal(timers.size, 0);
+  document.body.innerHTML = '<div id="root"></div>';
+  await mount({tasks: [task('t1', {lark_sync: {state: '同步中'}})]});
+  const stale = [...timers.values()][0], before = calls.length;
+  ui.invalidateSessionEpoch();
+  await act(async () => {await stale(); await tick()});
+  assert.equal(calls.length, before);
+  await act(async () => root.unmount()); root = null;
+  assert.equal(timers.size, 0);
+ } finally {globalThis.setInterval = originalSet; globalThis.clearInterval = originalClear}
+});
+
+
+test('slow overview requests do not extend the projection polling window', async () => {
+ const originalSet = globalThis.setInterval, originalClear = globalThis.clearInterval;
+ const timers = new Map(); let next = 0, release;
+ globalThis.setInterval = fn => {timers.set(++next, fn); return next};
+ globalThis.clearInterval = id => timers.delete(id);
+ try {
+  await mount({tasks: [task('t1', {lark_sync: {state: '同步中'}})]});
+  const originalFetch = globalThis.fetch;
+  const held = new Promise(resolve => {release = resolve});
+  globalThis.fetch = async (...args) => {await held; return originalFetch(...args)};
+  const poll = [...timers.values()][0]; let pending;
+  await act(async () => {pending = poll(); await tick()});
+  for (let i = 1; i < 31; i++) await poll();
+  assert.equal(timers.size, 0);
+  await act(async () => {release(); await pending; await tick()});
+ } finally {release?.(); globalThis.setInterval = originalSet; globalThis.clearInterval = originalClear}
 });
 
 test('a manager assigns the executor from the list row without opening the task', async () => {

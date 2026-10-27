@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from . import storage
 from .app import BusinessRow, WorkspaceRow
 from .case_cutover import execution_allowed
-from .sop_import.models import CaseState, Family, LocalCaseRun, LocalTask, Preview
+from .sop_import.models import CaseState, Family, LocalCaseRun, LocalTask, Preview, LarkOutbox
 from .sop_import.quote_facts import ENGINEERING_NO
 from .sop_import.local_case import OFFICIAL_NUMBER
 from .test_sop_quotes import WID, harness, quote_row
@@ -69,6 +69,10 @@ def test_create_with_default_sop_is_one_atomic_case_with_nine_empty_nodes(local)
         'project_id': pid, 'official_quote_no': None, 'name': '新竹科學園區地形測量', 'client': '竹科管理局', 'pm_id': 'u-pm',
         'planning_origin': 'local', 'case_type': 'intake', 'replayed': False}
     assert len(receipt['import']['created_task_ids']) == 38
+    with app.state.sessions() as db:
+        outbox = list(db.scalars(select(LarkOutbox).where(LarkOutbox.project_id == receipt['project_id'])))
+        assert len(outbox) == 38
+        assert {r.task_id for r in outbox} == set(receipt['import']['created_task_ids'])
     [case], _, counts = persisted(app)
     assert (case['id'], case['created_by'], case['case_visibility'], case['execution_system']) == (
         pid, 'u-field', 'local_planning', 'pending')
@@ -113,6 +117,8 @@ def test_any_failure_rolls_back_case_tasks_and_receipt(local):
     failed = call(client, 'POST', '/api/quotes', {'draft_id': draft['draft_id'], 'request_id': 'r1'}, 409)
     assert failed['code'] == 'template_unavailable'
     assert persisted(app) == before
+    with app.state.sessions() as db:
+        assert list(db.scalars(select(LarkOutbox))) == []
     numbered = call(client, 'POST', '/api/quotes/preview', {**FORM, 'import_tasks': False, 'official_quote_no': '115950'})
     with app.state.sessions.begin() as db:
         workspace = db.get(WorkspaceRow, WID)

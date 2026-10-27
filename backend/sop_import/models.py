@@ -171,6 +171,53 @@ def protect_history(session, flush_context, instances):
             raise Failure('immutable_task_event', 409)
 
 
+class LarkOutbox(Base):
+    __tablename__ = 'sop_lark_outbox'
+    workspace_id = Column(String(120), primary_key=True)
+    project_id = Column(String(160), primary_key=True)
+    task_id = Column(String(64), primary_key=True)
+    generation = Column(Integer, primary_key=True, default=1)
+    target_revision = Column(Integer, nullable=False)
+    state = Column(String(20), nullable=False, default='none')
+    record_id = Column(String(120))
+    first_sent_at = Column(Float)
+    synced_at = Column(Float)
+    last_error = Column(String(300))
+    last_fingerprint = Column(String(64))
+    retry_at = Column(Float, nullable=False, default=0)
+    attempts = Column(Integer, nullable=False, default=0)
+    drift = Column(Boolean, nullable=False, default=False)
+
+
+class LarkReconcile(Base):
+    __tablename__ = 'sop_lark_reconcile'
+    workspace_id = Column(String(120), primary_key=True)
+    project_id = Column(String(160), primary_key=True)
+    checked_at = Column(Float, nullable=False, default=0)
+    issues = Column(JSON, nullable=False, default=list)
+
+
+@event.listens_for(Session, 'before_flush')
+def collect_projection_intents(session, flush_context, instances):
+    changed = session.info.setdefault('sop_projection_intents', set())
+    for obj in session.new | session.dirty:
+        if isinstance(obj, LocalTask) and (obj in session.new or session.is_modified(obj)):
+            changed.add((obj.workspace_id, obj.project_id, obj.id))
+        elif isinstance(obj, TaskNodeLink) and (obj in session.new or session.is_modified(obj)):
+            changed.add((obj.workspace_id, obj.project_id, obj.task_id))
+
+
+@event.listens_for(Session, 'after_flush_postexec')
+def persist_projection_intents(session, flush_context):
+    from .outbox import enqueue
+    for wid, pid, tid in session.info.pop('sop_projection_intents', set()):
+        enqueue(session, wid, pid, tid)
+
+
+@event.listens_for(Session, 'after_soft_rollback')
+def discard_projection_intents(session, previous_transaction):
+    session.info.pop('sop_projection_intents', None)
+
 class CasePolicy(Base):
     __tablename__ = 'sop_case_policies'
     __table_args__ = (CheckConstraint("policy IN ('legacy','managed','needs_review')"),)

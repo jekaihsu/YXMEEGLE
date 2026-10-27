@@ -118,6 +118,9 @@ def test_proof_tier_completes_an_imported_task_and_records_the_rule(case):
         'pm', 'quote-evidence:A:12', 1, target['suggestion']['facts_hash'], 'complete', 'pending')
     assert task(h, url, 12)['local']['evidence_basis']['tier'] == 'proof'
     assert task(h, url, 12)['suggestion'] is None
+    from .sop_import.outbox import latest
+    with h.sessions() as db:
+        assert latest(db, h.wid[0], project['id'], target['id']).target_revision == 2
 
 
 def test_indicator_tier_needs_explicit_confirmation_and_reason(case):

@@ -147,3 +147,14 @@ export function disabledRouteFeature(route:import('./types').Route,features:impo
  if((normalized.view==='routines'||(normalized.view==='project'&&normalized.tab==='flow'&&normalized.section==='routines'))&&features?.routines!==true)return 'routines';
  return undefined;
 }
+
+export async function submitAction<T>(body:Record<string,unknown>,isCurrent:()=>boolean):Promise<T>{
+ const post=()=>api<T>('/api/actions',{method:'POST',body:JSON.stringify(body)},isCurrent);
+ try{return await post()}catch(error){
+  if(!(error instanceof ApiError)||error.code!=='workspace_cas_conflict'||!body.entity_versions||!isCurrent())throw error;
+  const fresh=await api<{version:number}>('/api/workspace',{cache:'no-store'},isCurrent);
+  if(!isCurrent())throw new DOMException('stale','AbortError');
+  body.version=fresh.version;
+  return post();
+ }
+}

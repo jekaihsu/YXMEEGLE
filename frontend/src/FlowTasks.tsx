@@ -8,7 +8,7 @@ import {FlowAction,TaskPersonPicker} from './FlowActions';
 import {AssignmentTaskInspector} from './AssignmentTaskInspector';
 import {isProductionSeedTask,productionPlanFacts} from './productionPlan';
 import {ProductionPlanFacts} from './FlowEvidence';
-export function FlowTasks({c,p,nodes,selected,details,all,onScope,busy,reason,error,mutate,loading,incomplete,evidence,children}:{c:Ctx;p:Project;nodes:FlowNode[];selected:string;details:Record<string,NodeAssignmentDetail>;all:boolean;onScope:(all:boolean)=>void;busy:boolean;reason:string;error:NodeAssignmentError|null;mutate:(m:AssignmentMutation)=>Promise<boolean>;loading:boolean;incomplete:boolean;evidence:ReactNode;children?:ReactNode}){
+export function FlowTasks({c,p,title='Lark 任務',nodes,selected,details,all,onScope,busy,reason,error,mutate,loading,incomplete,evidence,children}:{c:Ctx;p:Project;title?:string;nodes:FlowNode[];selected:string;details:Record<string,NodeAssignmentDetail>;all:boolean;onScope:(all:boolean)=>void;busy:boolean;reason:string;error:NodeAssignmentError|null;mutate:(m:AssignmentMutation)=>Promise<boolean>;loading:boolean;incomplete:boolean;evidence:ReactNode;children?:ReactNode}){
  const [filters,setFilters]=useState({mine:false,unassigned:false,overdue:false});
  const [assigning,setAssigning]=useState('');
  const rows=nodes.flatMap(n=>n.taskRows).filter(row=>row.source!=='SOP 任務');
@@ -19,9 +19,9 @@ export function FlowTasks({c,p,nodes,selected,details,all,onScope,busy,reason,er
  const seed=filtered.find(row=>row.nodeKey===selected && row.task && isProductionSeedTask(row.task,selected));
  const taskPlan=selectedRow?.task ? productionPlanFacts(selectedRow.task,selectedRow.nodeKey,nodes.find(n=>n.key===selectedRow.nodeKey)?.production) : null;
  return <section id="flow-tasks" className="pf-tasks" aria-label="流程任務列表" tabIndex={-1}>
-  <header><h3>任務</h3><div className="pf-actions" aria-label="任務範圍">{[false,true].map(value=><Button key={String(value)} aria-pressed={all===value} onClick={()=>onScope(value)}>{value ? '全部任務' : '此節點'}</Button>)}</div></header>
+  <header><h3>{title}</h3><div className="pf-actions" aria-label="任務範圍">{[false,true].map(value=><Button key={String(value)} aria-pressed={all===value} onClick={()=>onScope(value)}>{value ? '全部任務' : '此節點'}</Button>)}</div></header>
   <div className="pf-filters" aria-label="任務篩選">{([['mine','我的'],['unassigned','未指派'],['overdue','逾期']] as const).map(([key,label])=><Button key={key} aria-pressed={filters[key]} onClick={()=>setFilters(f=>({...f,[key]:!f[key]}))}>{label}</Button>)}<span role="status">{incomplete ? `${filtered.length} 項已載入，來源未完整` : `${filtered.length} 項符合`}</span></div>
-  {incomplete && <p role="status">任務來源暫不可用，請重試明細後再確認完整清單。</p>}
+  {incomplete && <p role="status">任務來源暫不可用</p>}
   {loading && <div aria-label="任務載入中" aria-busy="true"><Skeleton lines={3} height="3.5rem"/></div>}
   <ul className="pf-task-list">{filtered.map(row=>{const plan=row.task ? productionPlanFacts(row.task,row.nodeKey,nodes.find(n=>n.key===row.nodeKey)?.production) : null;return <li key={row.id} data-assignment-task={row.id}>
    <div className="pf-task-line"><button className="pf-task-open" onClick={()=>c.go({...c.route,tab:c.route.tab==='overview' ? 'overview' : 'flow',section:all ? 'all-tasks' : undefined,node:row.task ? row.nodeKey : nodes.find(n=>n.key===row.nodeKey)?.legacy?.id,task:row.id,task_source:undefined})}><strong>{plan ? '依計畫數量完成' : row.title}</strong><span>{row.owner} · {row.status} · {row.deadline?.slice(0,10) || '未排期限'}{overdueTask(row.deadline,row.done,c.w.as_of) && <Badge tone="critical">逾期</Badge>}</span><small>{plan && '生產計畫 · '}{nodes.find(n=>n.key===row.nodeKey)?.label}</small></button>

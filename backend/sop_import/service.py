@@ -146,6 +146,7 @@ class Service(EnrollmentService):
     def __init__(self, sessions, *, writes_enabled=lambda: False, local_cases_enabled=lambda: False, clock=time.time,
                  auto_enabled=lambda: False, auto_since=lambda: None):
         self.auto_enabled, self.auto_since = auto_enabled, auto_since
+        self.projection = None
         self.sessions, self.writes_enabled, self.local_cases_enabled, self.clock = (
             sessions, writes_enabled, local_cases_enabled, clock)
 
@@ -559,12 +560,14 @@ class Service(EnrollmentService):
         dismissed = self.decided(db, ctx, 'suggestion_dismissed')
         source = explicitly_granted(ctx.user, 'sop_task_read_source')
         views = []
+        sync = self.projection.statuses(db, ctx, tasks) if self.projection else {}
         from .models import CasePolicy
         policy = db.get(CasePolicy, (ctx.wid, ctx.project['id']))
         for task in tasks:
             found = None if ctx.assigned_only else suggestions.current(task, facts)
             found = None if found and (task.id, found['facts_hash']) in dismissed else found
             views.append({**self.task_json(task, links[task.id], source), 'suggestion': found,
+                          'lark_sync': sync[task.id] if self.projection else {'state': '未啟用', 'synced_at': None, 'record_id': None},
                           'completion_blocked_reason': self.completion_blocker(ctx, task),
                           'allowed_actions': self.task_actions(ctx, task, found) if (not policy or policy.policy == 'managed' and {l.node_key for l in links[task.id]} <= set(policy.node_keys)) else []})
         return views
@@ -604,6 +607,8 @@ class Service(EnrollmentService):
     def overview(self, ctx, node_key=None):
         authorize(ctx)
         require(node_key is None or node_key in NODE_MAP.values(), 'node_mapping_invalid')
+        if self.projection:
+            self.projection.request_reconcile(ctx.wid, ctx.project['id'], ctx.state)
         with self.sessions() as db:
             state = db.get(CaseState, (ctx.wid, ctx.project['id']))
             tasks = self.tasks(db, ctx)
