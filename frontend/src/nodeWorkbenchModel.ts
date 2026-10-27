@@ -35,7 +35,7 @@ export function buildNodeWorkbench({node,sop,local,busy=false,reason='',can={},u
  const actions=actionRegistry({can:local?.can || can,busy,reason:reason || local?.disabledReason || '',local:!!local,legacy:sop?.enrollment?.policy==='legacy'});
  if(can.legacy_complete===true&&!busy){actions.legacy_complete.enabled=true;actions.legacy_complete.disabledReason=''}
  if(['已完成','略過','completed','approved_skipped'].includes(local?.status||node.state))actions.complete.visible=false;
- if(local){actions.reject.visible=local.status==='completed';actions.assign.disabledReason=local.disabledReason||'節點已完成'}
+ if(local){actions.reject.visible=local.status==='completed';actions.assign.disabledReason=actions.assign.enabled?'':local.disabledReason||(local.status==='completed'?'節點已完成':busy?'讀取中，稍後再試':actions.assign.disabledReason)}
  if(local && !actions.complete.enabled && local.completeDisabledReason)actions.complete.disabledReason=local.completeDisabledReason;
  const managers=users.filter(u=>u.active!==false&&u.role==='manager'&&node.departments.includes(u.department));
  const facts=[{label:'負責人',value:node.owners.map(p=>p.name).join('、')||'尚未指派'},...(node.assignment?[
