@@ -35,6 +35,15 @@ text=await render({body:null,pending:true,error:null});
 assert.doesNotMatch(text,new RegExp(EMPTY));assert.match(text,/讀取中/);
 text=await render({body:body([],{readState:'disabled'}),pending:false,error:null});
 assert.doesNotMatch(text,new RegExp(EMPTY),'a disabled source is not an empty one');
+const known=(id,over={})=>({id,code:`LOCAL-${id}`,name:`案件${id.slice(-1)}`,client:'',pm_id:'other',status:'in_progress',case_type:'formal',due_date:null,nodes:[],...over});
+const withProjects=async(projects,read)=>{const saved=c.w.projects;c.w.projects=projects;try{return await render(read)}finally{c.w.projects=saved}};
+for(const [label,project] of [['an intake (接洽) case',known('case1',{case_type:'intake'})],['a completed case',known('case1',{status:'completed'})],['an intake case that is also completed',known('case1',{case_type:'intake',status:'completed'})]]){
+ text=await withProjects([project],{body:body([item(1)]),pending:false,error:null});
+ assert.match(text,/案件1/,`${label} that holds your assigned task still lists`);
+ assert.match(text,/有你的任務/);
+}
+text=await withProjects([known('case9',{case_type:'intake',pm_id:'u1'})],{body:body([]),pending:false,error:null});
+assert.doesNotMatch(text,/案件9/,'an intake case you merely manage stays out of 我的案件');
 const all=body([item(1),item(2)]);
 const asNames=t=>[...t.matchAll(/案件\d/g)].map(x=>x[0]).join(',');
 const unfiltered=await render({body:all,pending:false,error:null});
