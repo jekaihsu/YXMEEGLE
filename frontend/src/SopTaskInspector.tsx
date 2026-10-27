@@ -41,8 +41,21 @@ function Field({label, children}: {label: string; children: ReactNode}) {
  return <label className="sop-field">{label}{children}</label>;
 }
 
-export function SopTaskInspector({task, project, users, sop, onClose}: {task: SopTask; project: {id:string}; users: User[]; sop: ReturnType<typeof useSopTasks>; onClose: () => void}) {
+export function SopTaskInspector({task, project, users, sop, onClose, testOperator=false, onCleaned}: {testOperator?:boolean; onCleaned?:()=>void; task: SopTask; project: {id:string}; users: User[]; sop: ReturnType<typeof useSopTasks>; onClose: () => void}) {
  const [review,setReview]=useState(false);
+ const [cleanupOpen,setCleanupOpen]=useState(false), [cleanupReason,setCleanupReason]=useState('');
+ const cleanup = async () => {
+  if (busy || !cleanupReason.trim()) return;
+  setBusy(true);setError('');
+  try {
+   await sopApi.cleanupTest(project.id,task.id,{expected_revision:task.revision,reason:cleanupReason.trim()},sop.current);
+   if (!sop.current()) return;
+   await sop.reload();
+   if(sop.current()) (onCleaned || onClose)();
+  } catch(e) {
+   if(sop.current()){setError(sopErrorText(e));if(e instanceof SopError && (e.status===409 || e.ambiguous))await sop.reload()}
+  } finally {if(sop.current())setBusy(false)}
+ };
  const [resultNote,setResultNote]=useState('');
  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
  const run = async (call: () => Promise<MutationResult>, done: string) => {
@@ -74,8 +87,8 @@ export function SopTaskInspector({task, project, users, sop, onClose}: {task: So
     : <FlowAction key={a.action} allowed={!busy} reason="處理中" onClick={() => void transition(a.action)}>{a.label}</FlowAction>)}</div>;
  return <TaskDrawer footer={taskActions(task).length ? footer : undefined} kind="sop" label={`SOP 任務 · ${task.title}`} trail={['SOP 任務',task.nodes.map(n=>sopNodeLabel(n.node_key)).join('、')]} title={task.title} status={<SopLarkSync task={task} link/>} onClose={() => {if (!busy) onClose()}}>
   <div className="sop-inspector">
-   <div className="sop-badges"><Badge tone="accent">SOP 任務</Badge><Badge>{stateLabel(task)}</Badge>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.applicability !== 'applicable' && <Badge tone="warning">{APPLICABILITY_LABEL[task.applicability]}</Badge>}</div>
-   {error && <p role="alert" className="pg-callout">{error}</p>}
+   <div className="sop-badges"><Badge tone="accent">SOP 任務</Badge>{task.isTest && <Badge tone="warning">測試</Badge>}<Badge>{stateLabel(task)}</Badge>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.applicability !== 'applicable' && <Badge tone="warning">{APPLICABILITY_LABEL[task.applicability]}</Badge>}</div>
+   {error && !cleanupOpen && <p role="alert" className="pg-callout">{error}</p>}
    {notice && <p role="status" className="sop-muted">{notice}</p>}
    <InlineTaskEditor busy={busy || sop.state.kind!=='ready' || sop.state.refreshing} model={{draft,fields:editorFields({title:editable,assignee:editable,due:editable,notes:editable && task.instructions!==null,status:false},task.state==='archived'?'已封存':task.state==='done'?'已完成':'需管理權限'),people:sop.assignees,statuses:[{id:task.state,label:stateLabel(task)}],maxTitle:500,maxNotes:20000,dueReason:true,readOnlyReason:task.state==='archived'?'已封存':task.state==='done'?'已完成':undefined}} onSave={save}/>
    {editable && <ParticipantRoles task={task} people={sop.assignees} busy={busy} save={participants=>patch({participants},'已更新人員')}/>}
@@ -87,6 +100,16 @@ export function SopTaskInspector({task, project, users, sop, onClose}: {task: So
     {completionReason&&<p className="sop-muted" role="status">{completionReason}</p>}
     <Button type="submit" variant="primary" disabled={!!completionReason} disabledReason={completionReason}>完成</Button>
    </form>}
+   {testOperator && task.isTest && <Button disabled={busy} onClick={()=>{setError('');setCleanupOpen(true)}}>清除測試任務</Button>}
+   {cleanupOpen && <TaskDrawer kind="sop" label="清除測試任務" trail={['測試任務']} title="清除測試任務" onClose={()=>{if(!busy)setCleanupOpen(false)}}>
+    <form className="sop-form" onSubmit={e=>{e.preventDefault();void cleanup()}}>
+     <p>確認清除「{task.title}」及其本地節點連結？此操作無法復原，稽核紀錄會保留。已有 Lark 投影紀錄的任務無法清除。</p>
+     <Field label="清除原因"><textarea required maxLength={1000} value={cleanupReason} disabled={busy} onChange={e=>setCleanupReason(e.target.value)}/></Field>
+     {error && <p role="alert">{error}</p>}
+     <Button disabled={busy} onClick={()=>setCleanupOpen(false)}>取消</Button>
+     <Button type="submit" variant="primary" disabled={busy||!cleanupReason.trim()} disabledReason="請填寫清除原因">確認清除</Button>
+    </form>
+   </TaskDrawer>}
    <TaskSuggestion projectId={project.id} task={task} current={sop.current} reload={sop.reload} onAccept={()=>setReview(true)}/><Provenance task={task}/>{review && <SuggestionReview projectId={project.id} tasks={'data' in sop.state ? sop.state.data?.tasks||[] : []} initial={[task.id]} current={sop.current} reload={sop.reload} onClose={()=>setReview(false)}/>}
   </div>
  </TaskDrawer>;

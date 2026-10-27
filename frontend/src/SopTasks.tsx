@@ -4,11 +4,11 @@ import {SopEnrollmentStatus} from './SopEnrollment';
 import {TaskSuggestion,SuggestionReview} from './SopSuggestions';
 import {bulkEligible,SopBulkActions,type BulkAction} from './SopBulkActions';
 import {createPortal} from 'react-dom';
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import {Badge, Button, Skeleton} from './design';
 import {FlowAction} from './FlowActions';
 import {isSopNode, sopApi, sopErrorText, sopNodeLabel, type SopAssignee, type SopNodeKey, type SopTask} from './sopTaskApi';
-import {checklistComplete, closableTasks, countTasks, dueLabel, FILTERS, progressLabel, stateLabel, visibleTasks, suggestionSelection, type SopFilter} from './sopTaskModel';
+import {canOperateTestTasks, checklistComplete, closableTasks, countTasks, dueLabel, FILTERS, progressLabel, stateLabel, visibleTasks, suggestionSelection, type SopFilter} from './sopTaskModel';
 import {SopImportSheet} from './SopImportSheet';
 import {SopTaskInspector} from './SopTaskInspector';
 import type {useSopTasks} from './useSopTasks';
@@ -27,7 +27,7 @@ function TaskLine({task, people, assignees, assigning, onAssign, scoped, onOpen,
  return <li data-sop-task={task.id}><div className="sop-task-select"><span className="sop-state" data-state={task.applicability === 'not_applicable' ? 'not_applicable' : task.state} aria-hidden="true"/><button className="pf-task-open" onClick={onOpen} aria-label={`開啟 SOP 任務 ${task.title}`}>
   <strong>{task.title}</strong>
   <span>{executor ? people.get(executor) || '人員待確認' : '未指派'} · {stateLabel(task)} · {dueLabel(task)}
-   <SopLarkSync task={task}/>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.conditional && <Badge tone="warning">條件</Badge>}{task.manual && <Badge>手動</Badge>}</span>
+   <SopLarkSync task={task}/>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.conditional && <Badge tone="warning">條件</Badge>}{task.manual && <Badge>手動</Badge>}{task.isTest && <Badge tone="warning">測試</Badge>}</span>
   {!scoped && <small>{task.nodes.map(n => sopNodeLabel(n.node_key)).join('、') || '未連結節點'}</small>}
  </button>{editable && <select className="sop-quick-assign" aria-label={`指派 ${task.title}`} value={executor || ''} disabled={assigning} onChange={e => onAssign(e.target.value)}>
   <option value="">未指派</option>
@@ -36,14 +36,15 @@ function TaskLine({task, people, assignees, assigning, onAssign, scoped, onOpen,
  </select>}<input type="checkbox" aria-label={`選取 ${task.title}`} checked={selected} onChange={onSelect}/></div><TaskSuggestion projectId={projectId} task={task} current={sop.current} reload={sop.reload} onAccept={onAccept}/></li>;
 }
 
-function CreateTask({projectId,node,sop,onClose}:{projectId:string;node:SopNodeKey;sop:Sop;onClose:()=>void}) {
+function CreateTask({projectId,node,sop,onClose,testOperator}:{projectId:string;node:SopNodeKey;sop:Sop;onClose:()=>void;testOperator:boolean}) {
+ const [isTest,setIsTest]=useState(false);
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
  return <TaskCreateForm busy={busy} error={error?{fields:{},message:error}:null} people={sop.assignees.map(p=>({open_id:p.id,name:p.name,departments:[]}))} onCancel={onClose} onSubmit={async draft=>{
   if(busy)return;setBusy(true);setError('');
-  try{await sopApi.create(projectId,{title:draft.title,node_keys:[node],instructions:draft.detail,participants:draft.assignee_open_id?{executor:draft.assignee_open_id}:{},due_date:draft.deadline||null},sop.current);if(sop.current()){await sop.reload();onClose();requestAnimationFrame(()=>document.getElementById('flow-selected')?.scrollIntoView({block:'start',behavior:'auto'}))}}
+  try{await sopApi.create(projectId,{title:draft.title,node_keys:[node],instructions:draft.detail,participants:draft.assignee_open_id?{executor:draft.assignee_open_id}:{},due_date:draft.deadline||null,...(testOperator?{is_test:isTest}:{})},sop.current);if(sop.current()){await sop.reload();onClose();requestAnimationFrame(()=>document.getElementById('flow-selected')?.scrollIntoView({block:'start',behavior:'auto'}))}}
   catch(e){if(sop.current()){setError(sopErrorText(e));await sop.reload()}}
   finally{if(sop.current())setBusy(false)}
- }}/>;
+ }}>{testOperator && <label className="na-wide"><input type="checkbox" role="switch" checked={isTest} onChange={e=>setIsTest(e.target.checked)}/>測試任務<small>僅供驗收，不會同步至 Lark。建立後可填寫原因清除。</small></label>}</TaskCreateForm>;
 }
 
 export function SopTasks({c, p, nodeKey, sop, importing, setImporting,remote=false}: {remote?:boolean;c: Ctx; p: Pick<Project,'id'>; nodeKey: string; sop: Sop; importing: SopImportTarget; setImporting: (target: SopImportTarget) => void}) {
@@ -51,6 +52,7 @@ export function SopTasks({c, p, nodeKey, sop, importing, setImporting,remote=fal
  const [filters, setFilters] = useState<SopFilter[]>([]);
  const [history, setHistory] = useState(false);
  const [creating, setCreating] = useState(false);
+ const [cleanupFocus,setCleanupFocus]=useState(false);
  const [selected,setSelected]=useState<Set<string>>(new Set());
  const [review,setReview]=useState<string[]|null>(null);
  const [bulk,setBulk]=useState<BulkAction|null>(null);
@@ -64,6 +66,7 @@ export function SopTasks({c, p, nodeKey, sop, importing, setImporting,remote=fal
  const me = c.s.user?.id || '';
  const people = new Map([...c.w.users,...sop.assignees].map(u => [u.id, u.name]));
  const routeTask = c.route.task_source === SOP_TASK_SOURCE ? c.route.task : undefined;
+ useEffect(()=>{if(cleanupFocus && !routeTask){document.getElementById('sop-tasks')?.focus();setCleanupFocus(false)}},[cleanupFocus,routeTask]);
  const openTask = data?.tasks.find(t => t.id === routeTask);
  const openRoute = (task?: string) => c.go({...c.route, tab: c.route.tab==='overview'?'overview':'flow', task, task_source: task ? SOP_TASK_SOURCE : undefined});
  const toggle = (f: SopFilter) => setFilters(list => list.includes(f) ? list.filter(x => x !== f) : [...list, f]);
@@ -103,7 +106,7 @@ const assign = async (t: SopTask, id: string) => {
     <Button variant="plain" onClick={() => {void sop.reload()}} disabled={state.kind === 'loading' || state.kind === 'ready' && state.refreshing}>重新整理</Button></div>
   </header>
 
-  {creating && <CreateTask projectId={p.id} node={node||'sales'} sop={sop} onClose={() => setCreating(false)}/>}
+  {creating && <CreateTask testOperator={canOperateTestTasks(c.s.user)} projectId={p.id} node={node||'sales'} sop={sop} onClose={() => setCreating(false)}/>}
   {!remote && data?.enrollment && <SopEnrollmentStatus projectId={p.id} enrollment={data.enrollment} current={sop.current} reload={sop.reload}/>}
   {(!remote || rows.length>0) && (!data || !counts || filtered || history || rows.length>0) && <div className="pf-filters sop-filters">
    <div className="pf-actions" role="group" aria-label="SOP 任務範圍">{node && <Button aria-pressed={!wholeCase} onClick={() => setWholeCase(false)}>此節點</Button>}<Button aria-pressed={wholeCase || !node} onClick={() => setWholeCase(true)}>全案</Button></div>
@@ -125,7 +128,7 @@ const assign = async (t: SopTask, id: string) => {
    : data && (rows.length ? <ul className="pf-task-list">{rows.map(t => <TaskLine key={t.id} task={t} assignees={sop.assignees} assigning={assigning===t.id} onAssign={id=>void assign(t,id)} selected={selected.has(t.id)} onSelect={()=>selectTask(t.id)} projectId={p.id} sop={sop} onAccept={()=>setReview([t.id])} people={people} scoped={!!scope} onOpen={() => openRoute(t.id)}/>)}</ul>
     : (history || filtered) && <p className="pf-empty">{history ? '無封存任務' : filtered ? '沒有符合的任務' : '無 SOP 任務'}</p>)}
   {routeTask && data && !openTask && state.kind === 'ready' && !state.refreshing && <p role="alert">找不到此 SOP 任務 <Button onClick={() => openRoute()}>關閉</Button></p>}
-  {openTask && data && <SopTaskInspector key={openTask.id} task={openTask} project={p} users={c.w.users} sop={sop} onClose={() => openRoute()}/>}
+  {openTask && data && <SopTaskInspector key={openTask.id} task={openTask} project={p} users={c.w.users} sop={sop} testOperator={canOperateTestTasks(c.s.user)} onCleaned={() => {setCleanupFocus(true);openRoute()}} onClose={() => openRoute()}/>}
   {importing && data && <SopImportSheet projectId={p.id} startNode={data.startNode} only={importing === 'case' ? undefined : importing} onApplied={sop.reload} onClose={() => setImporting(null)} onOpenImported={() => {setImporting(null); setWholeCase(true); setFilters([]); setHistory(false); requestAnimationFrame(() => document.getElementById('sop-tasks')?.focus())}}/>}
  {review && data && <SuggestionReview projectId={p.id} tasks={data.tasks} initial={review} current={sop.current} reload={sop.reload} onClose={()=>setReview(null)}/>}
  {bulk && <SopBulkActions projectId={p.id} tasks={selectedTasks} action={bulk} assignees={sop.assignees} current={sop.current} reload={sop.reload} onClose={()=>{setBulk(null);setSelected(new Set())}}/>}

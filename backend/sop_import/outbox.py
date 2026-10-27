@@ -13,9 +13,11 @@ def enqueue(db, wid, pid, tid, *, resume=False):
     connection = db.connection()
     table = LarkOutbox.__table__
     where = (table.c.workspace_id == wid, table.c.project_id == pid, table.c.task_id == tid)
+    revision, snapshot = connection.execute(select(LocalTask.revision, LocalTask.snapshot).where(
+        LocalTask.workspace_id == wid, LocalTask.project_id == pid, LocalTask.id == tid)).one()
+    if snapshot.get('test_fixture') is True:
+        return False
     current = connection.execute(select(table).where(*where).order_by(table.c.generation.desc()).limit(1)).mappings().first()
-    revision = connection.execute(select(LocalTask.revision).where(LocalTask.workspace_id == wid,
-                                                                  LocalTask.id == tid)).scalar_one()
     if current:
         resume = resume and current['last_error'] != 'canary_cleanup'
         # A sent create must retain its identity until recovery has established its outcome.
@@ -28,10 +30,10 @@ def enqueue(db, wid, pid, tid, *, resume=False):
                                                 target_revision=revision, state='none', retry_at=0, attempts=0, drift=False)
                            .on_conflict_do_nothing())
 
+    return True
+
 
 def enqueue_all(sessions):
     with sessions.begin() as db:
         tasks = list(db.scalars(select(LocalTask)))
-        for task in tasks:
-            enqueue(db, task.workspace_id, task.project_id, task.id, resume=True)
-        return len(tasks)
+        return sum(enqueue(db, task.workspace_id, task.project_id, task.id, resume=True) for task in tasks)

@@ -53,11 +53,11 @@ const tick = () => new Promise(r => setTimeout(r, 10));
 const response = (b, s = 200) => new Response(JSON.stringify(b), {status: s, headers: {'Content-Type': 'application/json'}});
 function Harness() {const sop = ui.useSopTasks('p1', 'w1'); const [importing, setImporting] = React.useState(null); return React.createElement(ui.SopTasks, {c, p: {id: 'p1', pm_id: 'pm', collaborator_ids: ['member'], nodes: []}, nodeKey: c.route.node, sop, importing, setImporting})}
 const render = () => root.render(React.createElement(Harness));
-async function mount({tasks = [task('t1')], route = {}, overviewStatus = 200, extra = {}} = {}) {
+async function mount({tasks = [task('t1')], route = {}, role = 'pm', overviewStatus = 200, extra = {}} = {}) {
  ui.invalidateSessionEpoch();
  server = {overview: {...overview(tasks), ...extra}, apply: [], run: [], patch: []};
  calls = [];
- c = {s: {user: {id: 'pm', capabilities: ['sop_task_read']}, workspace_id: 'w1'}, w: {users: [{id: 'pm', name: '王經理', role: 'pm', capabilities: ['sop_task_work']}, {id: 'member', name: '林組員', role: 'member', capabilities: ['sop_task_work']}, {id: 'outsider', name: '外部', role: 'member', capabilities: ['sop_task_work']}]},
+ c = {s: {user: {id: 'pm', role, capabilities: ['sop_task_read']}, workspace_id: 'w1'}, w: {users: [{id: 'pm', name: '王經理', role: 'pm', capabilities: ['sop_task_work']}, {id: 'member', name: '林組員', role: 'member', capabilities: ['sop_task_work']}, {id: 'outsider', name: '外部', role: 'member', capabilities: ['sop_task_work']}]},
   route: {view: 'project', project: 'p1', tab: 'flow', node: 'sales', ...route}, go(next) {c = {...c, route: next}; render()}};
  globalThis.fetch = async (url, init = {}) => {
   const method = init.method || 'GET', body = init.body ? JSON.parse(init.body) : null;
@@ -69,6 +69,8 @@ async function mount({tasks = [task('t1')], route = {}, overviewStatus = 200, ex
   if (url.endsWith('/sop-import/apply')) {server.apply.push(body); return server.applyReply ? server.applyReply(body) : response({...examples.apply, request_id: body.request_id})}
   if (url.includes('/sop-import/runs/')) {server.run.push(url); if (server.hold) await server.hold; return server.runReply ? server.runReply(url) : response({...examples.apply, request_id: decodeURIComponent(url.split('/').at(-1))})}
   if (url.endsWith('/sop-tasks/close-node')) {server.close = [...(server.close || []), body]; return response({closed: 1, left_open: {shared: 0, unresolved: 0}, checklist_revision: 5})}
+  if (url.endsWith('/cleanup-test')) {server.cleanup = [...(server.cleanup || []), body]; if(server.cleanupReply)return server.cleanupReply(body);server.overview = overview([]);return response({task_id:'t1',removed:true,replayed:false,checklist_revision:10})}
+  if (url === '/api/projects/p1/sop-tasks' && method === 'POST') {server.created=body;return response({task_id:'created',checklist_revision:10})}
   if (method === 'PATCH') {server.patch.push(body); return server.patchReply ? server.patchReply(body) : response({task_id: 't1', revision: body.expected_revision + 1, checklist_revision: 9, state: 'pending', applicability: 'applicable'})}
   return response({code: 'not_found'}, 404);
  };
@@ -408,4 +410,69 @@ test('an unenrolled node hides creation and import even when case management is 
  await mount({tasks:[],extra:{local_nodes:[{key:'sales',id:'sales-id',revision:0,status:'pending',owner_id:null,completed_at:null,reason:null,disabled_reason:'此節點尚未納入 SOP 管理',complete_disabled_reason:'此節點尚未納入 SOP 管理',can:{assign:false,complete:false,reject:false,create_task:false}}]}});
  assert.equal(button('新增任務'),undefined);
  assert.equal(button('匯入預設任務'),undefined);
+});
+
+
+for (const role of ['manager','admin','pm','member']) test(`test task toggle is limited to workspace managers, role ${role}`, async()=>{
+ await mount({role,extra:{allowed_actions:{import:true,manage:true,work:true}}});
+ await click(button('新增任務'));
+ const toggle=document.querySelector('[role=switch]');
+ assert.equal(!!toggle,['manager','admin'].includes(role));
+ if(toggle)await click(toggle);
+ await type(document.querySelector('input[required]'),'Acceptance task');
+ await click(button('建立任務'));
+ assert.equal(server.created.is_test,['manager','admin'].includes(role)?true:undefined);
+});
+
+test('test badge appears in the list and drawer, cleanup requires a reason and preserves filters and focus',async()=>{
+ await mount({role:'manager',tasks:[task('t1',{local:{is_test:true},allowed_actions:['edit']})]});
+ await click(button('未指派'));
+ assert.equal(button('未指派').getAttribute('aria-pressed'),'true');
+ assert.match(document.querySelector('[data-sop-task=t1]').textContent,/測試/);
+ await click(document.querySelector('.pf-task-open'));
+ assert.match(dialog().querySelector('.sop-badges').textContent,/測試/);
+ await click(button('清除測試任務'));
+ assert.equal(button('確認清除').disabled,true);
+ await type(document.querySelector('[aria-label="清除測試任務"] textarea'),'   ');
+ assert.equal(button('確認清除').disabled,true);
+ await type(document.querySelector('[aria-label="清除測試任務"] textarea'),' Browser acceptance complete ');
+ await click(button('確認清除'));
+ assert.deepEqual(server.cleanup,[{expected_revision:1,reason:'Browser acceptance complete'}]);
+ assert.equal(dialog(),null);
+ assert.equal(document.querySelector('[data-sop-task=t1]'),null);
+ assert.equal(c.route.task,undefined);
+ assert.equal(button('未指派').getAttribute('aria-pressed'),'true');
+ assert.equal(document.activeElement.id,'sop-tasks');
+});
+
+for(const role of ['pm','member'])test(`non-manager ${role} never sees cleanup even with case management`,async()=>{
+ await mount({role,tasks:[task('t1',{local:{is_test:true}})]});
+ await click(document.querySelector('.pf-task-open'));
+ assert.equal(button('清除測試任務'),undefined);
+});
+
+test('manager cannot clean an ordinary task and cancelling cleanup sends no request',async()=>{
+ await mount({role:'manager',tasks:[task('t1')]});
+ await click(document.querySelector('.pf-task-open'));
+ assert.equal(button('清除測試任務'),undefined);
+ await act(async()=>{server.overview=overview([task('t1',{local:{is_test:true}})]);c.go({...c.route,task:undefined});await tick()});
+ await click(button('重新整理'));
+ await click(document.querySelector('.pf-task-open'));
+ await click(button('清除測試任務'));
+ await click([...document.querySelector('[aria-label="清除測試任務"]').querySelectorAll('button')].find(b=>b.textContent==='取消'));
+ assert.equal(server.cleanup,undefined);
+ assert.equal(document.querySelectorAll('[role=dialog]').length,1);
+});
+
+for(const [status,code,copy] of [[503,'cleanup_migration_required','稽核遷移'],[409,'test_task_projection_exists','Lark 投影紀錄'],[409,'test_task_required','建立時標記'],[409,'task_reopen_required','重新開啟'],[409,'task_revision_conflict','任務已被更新']])test(`cleanup ${code} keeps the task and reason and shows its distinct recovery message`,async()=>{
+ await mount({role:'manager',tasks:[task('t1',{local:{is_test:true}})]});
+ server.cleanupReply=()=>response({code},status);
+ await click(document.querySelector('.pf-task-open'));
+ await click(button('清除測試任務'));
+ await type(document.querySelector('[aria-label="清除測試任務"] textarea'),'QA reason');
+ await click(button('確認清除'));
+ const panel=document.querySelector('[aria-label="清除測試任務"]');
+ assert.match(panel.querySelector('[role=alert]').textContent,new RegExp(copy));
+ assert.equal(panel.querySelector('textarea').value,'QA reason');
+ assert.ok(document.querySelector('[data-sop-task=t1]'));
 });

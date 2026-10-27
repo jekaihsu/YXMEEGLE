@@ -21,7 +21,7 @@ from .enrollment_policy import identity_key
 from .domain import (Applicability, Lifecycle, Disposition, TRANSITIONS, NODE_MAP, SUBCONTRACT,
                      CONDITIONAL, PARTICIPANT_ROLES, Failure, require)
 from .models import (Family, Version, TemplateRow, CaseState, LocalTask, TaskNodeLink, Preview, ImportRun, TaskEvent,
-                     LocalCaseRun)
+                     LocalCaseRun, LarkOutbox)
 from .quote_facts import case_facts
 from ..node_assignment.evidence import evidence_for
 from ..node_skip import valid_waiver
@@ -908,6 +908,9 @@ class Service(EnrollmentService):
             disposable(task)
             require(task.local.get('is_test') is True, 'test_task_required', 409)
             require(task.revision == body['expected_revision'], 'task_revision_conflict', 409)
+            require(db.scalar(select(LarkOutbox.task_id).where(LarkOutbox.workspace_id == ctx.wid,
+                    LarkOutbox.project_id == ctx.project['id'], LarkOutbox.task_id == task_id).limit(1)) is None,
+                    'test_task_projection_exists', 409)
             require(audit_history_detached(db.connection()), 'cleanup_migration_required', 503)
             links = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == ctx.wid,
                                    TaskNodeLink.project_id == ctx.project['id'], TaskNodeLink.task_id == task_id)))

@@ -344,3 +344,25 @@ def test_backfill_preserves_canary_cleanup_pause(p):
     p.worker.drain()
     assert row(p).state == 'paused'
     assert not p.fake.records
+
+
+@pytest.mark.parametrize('tagged', [True, False])
+def test_legacy_queued_test_origin_is_never_written_to_lark(p, tagged):
+    with p.sessions.begin() as db:
+        db.add(LocalTask(workspace_id='lark-org', id='test-task', project_id='SRC-test',
+                         template_family_id='manual', source_row_key='test-origin', instance_scope='case',
+                         snapshot={'test_fixture': True}, title='Acceptance task', instructions='', participants={},
+                         applicability=Applicability.APPLICABLE, state=Lifecycle.PENDING, revision=1,
+                         local={'is_test': tagged}))
+    with p.sessions.begin() as db:
+        assert latest(db, 'lark-org', 'SRC-test', 'test-task') is None
+        db.add(LarkOutbox(workspace_id='lark-org', project_id='SRC-test', task_id='test-task', generation=1,
+                         target_revision=1, state='none'))
+    p.worker.drain()
+    with p.sessions() as db:
+        queued = latest(db, 'lark-org', 'SRC-test', 'test-task')
+        assert (queued.state, queued.last_error, queued.record_id) == ('paused', 'test_task_projection_forbidden', None)
+    assert len(p.fake.records) == 1
+    assert all(r['fields']['標題'] != 'Acceptance task' for r in p.fake.records.values())
+    assert 'test-task' not in json.dumps(p.fake.calls)
+    assert enqueue_all(p.sessions) == 1

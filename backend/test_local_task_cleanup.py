@@ -351,3 +351,35 @@ def test_prior_audit_is_still_immutable_after_cleanup(m):
     with pytest.raises(Failure, match='immutable_task_event'):
         with m.sessions.begin() as db:
             db.delete(db.scalar(select(TaskEvent)))
+
+
+def test_test_origin_never_enqueues_on_create_edit_assign_or_backfill(m):
+    from .sop_import.models import LarkOutbox
+    from .sop_import.outbox import enqueue_all
+    from .test_sop_import import change
+    task = fixture(m)
+    edited = change(m, task, {'title': 'Edited test', 'participants': {'executor': 'member'}})['task']
+    tag(m, edited, is_test=False)
+    assert enqueue_all(m.sessions) == 0
+    with m.sessions() as db:
+        assert list(db.scalars(select(LarkOutbox))) == []
+    ordinary = manual(m)
+    assert enqueue_all(m.sessions) == 1
+    with m.sessions() as db:
+        assert [r.task_id for r in db.scalars(select(LarkOutbox))] == [ordinary['id']]
+
+
+@pytest.mark.parametrize('state,record_id', [('none', None), ('sent', None), ('done', 'rec-existing'), ('paused', 'rec-existing')])
+def test_cleanup_refuses_any_projection_row_without_removing_local_data(m, state, record_id):
+    from .sop_import.models import LarkOutbox
+    task = fixture(m)
+    before = events(m)
+    with m.sessions.begin() as db:
+        db.add(LarkOutbox(workspace_id='w', project_id='p1', task_id=task['id'], generation=2,
+                         target_revision=1, state=state, record_id=record_id))
+    assert clean(m, task, 409)['code'] == 'test_task_projection_exists'
+    assert stored(m, task['id']) is not None
+    assert events(m) == before
+    with m.sessions() as db:
+        assert db.scalar(select(TaskNodeLink).where(TaskNodeLink.task_id == task['id'])) is not None
+        assert db.scalar(select(LarkOutbox).where(LarkOutbox.task_id == task['id'])).record_id == record_id
