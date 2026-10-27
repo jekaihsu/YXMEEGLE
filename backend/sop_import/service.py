@@ -311,7 +311,7 @@ class Service(EnrollmentService):
 
     def personal_items(self, state, wid, user):
         from ..home_details import build_sop_home_task
-        from ..source_case_policy import visible_project, local_planning
+        from ..source_case_policy import visible_project, local_planning, local_viewer
         if not user.get('active', True):
             return []
         projects = {p['id']: p for p in state.get('projects', [])
@@ -321,8 +321,12 @@ class Service(EnrollmentService):
                      if t.project_id in projects and holds_task(t, user['id'])]
             links = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == wid,
                                    TaskNodeLink.task_id.in_([t.id for t in tasks])).order_by(TaskNodeLink.ordinal, TaskNodeLink.node_key)))
+            def full_case(project):
+                return (visible_project(state, project) or local_viewer(user, project)
+                        or user['id'] in project.get('sop_task_delegate_ids', []))
             return [build_sop_home_task(projects[t.project_id], t, [l for l in links if l.task_id == t.id],
-                                       user, state.get('users', []), self.writes_enabled()) for t in tasks]
+                                       user, state.get('users', []), self.writes_enabled(),
+                                       full_case(projects[t.project_id])) for t in tasks]
 
     def normalize(self, ctx, body, rows):
         fields(body, {'template_version_id', 'node_keys', 'row_keys', 'participant_bindings',

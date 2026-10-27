@@ -122,6 +122,19 @@ def test_home_my_work_shape_filter_counts_pagination_and_checker_flags(local):
     transition(client, path, mine, 'complete', 403, result_note='檢核不可執行')
 
 
+def test_home_item_for_a_case_reader_opens_the_full_case_at_the_task(local):
+    app, client, signin, path, mine, other = imported(local)
+    signin('u-manager')
+    tasks = call(client, 'GET', path)['tasks']
+    spare = next(t for t in tasks if t['id'] not in {mine['id'], other['id']})
+    call(client, 'PATCH', path + '/' + spare['id'],
+         {'expected_revision': spare['revision'], 'participants': {'executor': 'u-manager'}})
+    items = call(client, 'GET', '/api/home-panels?panel=assigned&kinds=sop_task')['items']
+    target = next(i for i in items if i['id'] == 'sop_task/' + spare['id'])['target']
+    assert 'section' not in target
+    assert target['task'] == spare['id'] and target['task_source'] == 'sop_local' and target['node']
+
+
 def test_personal_query_cursor_expires_after_transition_and_writes_flag(local):
     app, client, signin, path, mine, other = imported(local)
     call(client, 'PATCH', path + '/' + other['id'], {'expected_revision': other['revision'] + 1, 'participants': {'executor': 'u-map'}})
