@@ -127,3 +127,7 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
   };
   return {state, refreshing, revision, pending, notice, error, reload, mutate, retryMutation: () => retryAttempt.current ? mutate(retryAttempt.current.mutation) : Promise.resolve(false), clearFeedback: () => {retryAttempt.current = null; setError(null); setNotice('')}};
 }
+export function cachedNodeAssignmentDetail(projectId: string, nodeKey: string): NodeAssignmentDetail | undefined {
+  syncEpoch();
+  return details.get(`${projectId}/${nodeKey}`)?.data;
+}
