@@ -152,7 +152,13 @@ class EnrollmentService:
         return node.get('status', 'pending') not in {'done','completed','finished','approved','skipped','in_progress','in_review','running'} and not node.get('completed_at') and not node.get('started_at') and not node.get('source_declared_completed')
 
     def policy_write_reason(self, db, ctx, nodes=None):
+        return self.policy_reason(db.get(CasePolicy, (ctx.wid, ctx.project['id'])), nodes)
+
+    def policy_write_reasons(self, db, ctx, keys):
         policy = db.get(CasePolicy, (ctx.wid, ctx.project['id']))
+        return {key: self.policy_reason(policy, [key]) for key in keys}
+
+    def policy_reason(self, policy, nodes):
         if not ((policy is not None and policy.policy == 'managed') or (policy is None and not self.auto_active())):
             return 'legacy_case_requires_opt_in', '案件尚未啟用 SOP 管理'
         if policy and nodes and not set(nodes) <= set(policy.node_keys):
