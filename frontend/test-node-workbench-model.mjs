@@ -36,3 +36,13 @@ test('local SOP tasks enter overview rows with their source-specific deep link',
  assert.equal(node.taskRows[0].source,'SOP 任務');assert.equal(node.taskRows[0].owner,'執行人');assert.equal(node.tasks.total,1);
  assert.deepEqual(m.flowTaskTarget(node.taskRows[0]),{tab:'flow',node:'sales',task:'sop-task',task_source:'sop_local'});
 });
+test('assign reason follows the verified node status, never a blanket completed claim',()=>{
+ const node=m.buildFlowModel({project:projectFixture().project,today:'2026-10-25'}).nodes[0];
+ const local=status=>({key:'sales',id:'n',revision:1,status,can:{assign:false,complete:false},disabledReason:null});
+ const pending=m.buildNodeWorkbench({node,local:local('pending'),sop:{tasks:[]},busy:true});
+ assert.equal(pending.actions.assign.disabledReason,'讀取中，稍後再試');
+ const idle=m.buildNodeWorkbench({node,local:local('pending'),sop:{tasks:[]}});
+ assert.notEqual(idle.actions.assign.disabledReason,'節點已完成');
+ const done=m.buildNodeWorkbench({node,local:local('completed'),sop:{tasks:[]}});
+ assert.equal(done.actions.assign.disabledReason,'節點已完成');
+});
