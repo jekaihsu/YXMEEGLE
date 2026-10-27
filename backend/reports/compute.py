@@ -491,7 +491,7 @@ def contacts(data, **p):
         if not r['case_name']:
             c0=r['case_code'].split(',')[0].strip()
             case=data['cases'].get(r['case_code']) or data['cases'].get(c0)
-            r['case_name']=str(cell(first(case['f'],'案件名稱','工程名稱'))) if case else known_cases.get(c0,'')
+            r['case_name']=(str(cell(first(case['f'],'案件名稱','工程名稱'))).strip() if case else '') or known_cases.get(c0,'')
     start=p.get('week') or p.get('from') or ''; end=(date.fromisoformat(p['week'])+timedelta(days=6)).isoformat() if p.get('week') else p.get('to') or ''
     rows=[r for r in rows if r['contact_date'] and (not start or r['contact_date']>=start) and (not end or r['contact_date']<=end) and any(r[k] for k in ('case_code','case_name','person','client_contact','content','special_note','method','topic','result'))]
     raw_total=len(rows)

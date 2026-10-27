@@ -380,3 +380,12 @@ def test_contacts_merge_filter_and_same_day():
     assert (row['case_code'],row['case_name'],row['group'],row['method'],row['result'])==('C1','工程甲','工務助理','LINE','已完成')
     filtered=c.contacts(d,week='2026-10-19',person='不存在')
     assert filtered['total']==0 and '郭倢瑛' in filtered['options']['person']
+
+
+def test_contacts_case_name_fallback_when_v3_case_has_blank_title():
+    raw = FixtureReader(FIXTURES).read()
+    raw['case']['records'].append({'record_id': 'recBlankCase', 'fields': {'案件編號': 'C115259-01', '案件名稱': '', '工程名稱': ''}})
+    d = c.normalize(raw)
+    res = c.contacts(d, **{'from': '2026-10-19', 'to': '2026-10-25'})
+    row = next(r for r in res['items'] if r['case_code'] == 'C115259-01')
+    assert row['case_name'] == '鋼構垂直度測量'
