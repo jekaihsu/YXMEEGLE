@@ -1,5 +1,5 @@
-import {createPortal} from 'react-dom';
-import {Button,Sheet} from './design';
+import {Badge} from './design';
+import {TaskDrawer,DrawerFacts} from './TaskDrawer';
 import {TASK_STATUS_OPTIONS,type AssignmentTask,type AssignmentMutation,type AssignablePerson} from './nodeAssignmentApi';
 import {InlineTaskEditor} from './InlineTaskEditor';
 import {editorFields,type TaskDraft} from './nodeWorkbenchModel';
@@ -18,7 +18,7 @@ export function AssignmentTaskInspector({assignment:task,people=[],plan,nodeLabe
   if(value.status!==draft.status)patch.status=value.status;
   return mutate({action:'update_task',nodeKey,taskId:task.id,expected_revision:task.revision,patch});
  };
- return createPortal(<Sheet title={plan?'依計畫數量完成':task.title} onClose={onClose}><div className="pf-inspector assignment-edit"><p>Lark 任務 · {nodeLabel}</p>
+ return <TaskDrawer kind="lark" label={task.title} trail={[nodeLabel,'Lark 任務']} title={plan?'依計畫數量完成':task.title} status={<Badge>{task.status}</Badge>} onClose={onClose}><div className="assignment-edit"><DrawerFacts facts={[{label:'負責人',value:task.assignee?.name || '尚未指派'},{label:'期限',value:task.deadline || '未排期限'},{label:'指派人',value:task.assigned_by?.name || '來源未提供'},{label:'完成時間',value:task.done_at || '未完成'}]}/>
   <InlineTaskEditor busy={busy} model={{draft,fields:editorFields({title:task.can.edit_details,assignee:task.can.assign,due:task.can.edit_details,notes:task.can.edit_details,status:task.can.edit_status || task.can.cancel},reason || '需有此任務的編輯權限'),people:people.map(p=>({id:p.open_id,name:p.name})),statuses:TASK_STATUS_OPTIONS.filter(([value])=>value===task.status || (value==='取消' ? task.can.cancel : task.can.edit_status)).map(([id,label])=>({id,label})),maxTitle:200,maxNotes:2000,dueReason:false}} onSave={save}/>
-  {plan && <ProductionPlanFacts plan={plan}/>}<Button onClick={onClose}>關閉</Button></div></Sheet>,document.body);
+  {plan && <ProductionPlanFacts plan={plan}/>}<details className="sop-source"><summary>來源</summary><p>record {task.record_id}</p><p>建立 {task.created_at || '來源未提供'}</p></details></div></TaskDrawer>;
 }

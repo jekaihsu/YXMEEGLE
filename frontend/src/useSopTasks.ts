@@ -78,6 +78,21 @@ export function useSopTasks(projectId: string, workspace: string, enabled=true) 
   void prefetchSopAssignees(projectId,workspace).then(people=>{if(valid())setAssignees(people)}).catch(e=>{if(valid())setAssigneeError(sopErrorText(e))});
   return () => {life.current.active = false};
  }, [key, reload]);
+ const syncing = 'data' in state && !!state.data?.tasks.some(task => task.larkSync.state === '同步中');
+ useEffect(() => {
+  if (!syncing) return;
+  const scope = life.current;
+  let attempts = 0, pending = false;
+  const timer = setInterval(async () => {
+   if (!scope.active || scope !== life.current || scope.epoch !== getSessionEpoch() || attempts >= 30) {clearInterval(timer); return}
+   attempts += 1;
+   if (attempts >= 30) clearInterval(timer);
+   if (pending) return;
+   pending = true;
+   try {await reload()} finally {pending = false}
+  }, 10000);
+  return () => clearInterval(timer);
+ }, [key, reload, syncing]);
  const current = useCallback(() => life.current.active && life.current.epoch === getSessionEpoch(), []);
  const sameScope=life.current.key===key&&life.current.epoch===getSessionEpoch();
  return {state:!enabled?{kind:'forbidden'} satisfies SopListState:!sameScope?{kind:'loading'} satisfies SopListState:state, reload, current, assignees:enabled&&sameScope?assignees:[], assigneeError};

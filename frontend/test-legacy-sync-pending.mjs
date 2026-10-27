@@ -7,7 +7,7 @@ import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {workspace,a} from './session-epoch-fixture.mjs';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost'});
-for(const k of ['window','document','location','HTMLElement','Event','StorageEvent'])globalThis[k]=dom.window[k];
+for(const k of ['window','document','location','HTMLElement','HTMLInputElement','HTMLTextAreaElement','HTMLSelectElement','Event','StorageEvent'])globalThis[k]=dom.window[k];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const bundle=await build({stdin:{contents:"export {Projects} from './src/ProjectsList';export {RecoveryPage} from './src/RecoveryPage';export {AttendanceWorkSchedules} from './src/AttendanceWorkSchedules';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const path=new URL('./.legacy-sync-test.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);let ui;try{ui=await import(path.href)}finally{await fs.unlink(path)}

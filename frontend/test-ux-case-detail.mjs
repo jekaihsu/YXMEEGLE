@@ -66,7 +66,7 @@ test('unknown remote tasks have a readable scoped error', async () => {
   globalThis.fetch = async () => reply(fixture.list);
   await mount(React.createElement(ui.ProjectDetail, {c: context({tab: 'flow', node: 'control', task: 'recMissing'})}));
   assert.ok(document.body.textContent.includes('找不到此 Lark 任務'));
-  assert.equal(document.querySelector('.task-inspector'), null);
+  assert.equal(document.querySelector('.task-drawer[data-kind=legacy]'), null);
 });
 test('zero Lark tasks remain separate from expandable local templates', async () => {
   ui.invalidateSessionEpoch(); const fixture = sourceFixture();

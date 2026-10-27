@@ -812,7 +812,12 @@
           "archive",
           "set_applicability",
           "edit"
-        ]
+        ],
+        "lark_sync": {
+          "state": "未啟用",
+          "synced_at": null,
+          "record_id": null
+        }
       }
     ],
     "allowed_actions": {
@@ -823,7 +828,7 @@
     }
   },
   "sop_tasks_with_suggestions": {
-    "project_id": "626bfbcb48a14a2b97f673c0ac6800d1",
+    "project_id": "ec4c40f648864124bd7732a2a253c5c4",
     "task_source": "sop_local",
     "start_node": "pm",
     "stage": "numbered",
@@ -913,14 +918,14 @@
     },
     "tasks": [
       {
-        "id": "cd7a8ee6-346e-4848-a623-daeeb1f3a05b",
+        "id": "cef47bc3-c8e6-45f2-bace-f9c60e7e2908",
         "task_source": "sop_local",
-        "project_id": "626bfbcb48a14a2b97f673c0ac6800d1",
+        "project_id": "ec4c40f648864124bd7732a2a253c5c4",
         "origin": {
           "template_family_id": "plumb-case-sop",
           "source_row_key": "meegle-v137:A:12",
           "instance_scope": "case",
-          "imported_version_id": "158f9714-a29b-4d19-b343-ea864728e67e"
+          "imported_version_id": "f5fa8311-1739-43d5-ad70-34a533255485"
         },
         "title": "報價單是否回傳",
         "instructions": "每日查回傳單日期；收到含回簽附件的信 → 寫回傳單日期、附件存 Drive → 自動判「是」；到期仍無 → 判「無」",
@@ -940,7 +945,7 @@
         "nodes": [
           {
             "node_key": "sales",
-            "node_id": "626bfbcb48a14a2b97f673c0ac6800d1-sales",
+            "node_id": "ec4c40f648864124bd7732a2a253c5c4-sales",
             "order": 12
           }
         ],
@@ -992,7 +997,7 @@
             }
           },
           "template": {
-            "version_id": "158f9714-a29b-4d19-b343-ea864728e67e",
+            "version_id": "f5fa8311-1739-43d5-ad70-34a533255485",
             "template_family_id": "plumb-case-sop",
             "revision": "plumb-v0.2-1",
             "mapping_revision": "yx-company-node-mapping-1",
@@ -1003,7 +1008,7 @@
         },
         "source_restriction": null,
         "suggestion": {
-          "task_id": "cd7a8ee6-346e-4848-a623-daeeb1f3a05b",
+          "task_id": "cef47bc3-c8e6-45f2-bace-f9c60e7e2908",
           "rule_id": "quote-evidence:A:12",
           "rule_revision": 1,
           "tier": "proof",
@@ -1023,17 +1028,23 @@
           "edit",
           "accept_suggestion",
           "dismiss_suggestion"
-        ]
+        ],
+        "lark_sync": {
+          "state": "未啟用",
+          "synced_at": null,
+          "record_id": null,
+          "error": null
+        }
       },
       {
-        "id": "9c5006be-76ee-4261-9058-a3f771a5c1b6",
+        "id": "f2917175-0fa7-4db4-b33f-8c3751f83e9b",
         "task_source": "sop_local",
-        "project_id": "626bfbcb48a14a2b97f673c0ac6800d1",
+        "project_id": "ec4c40f648864124bd7732a2a253c5c4",
         "origin": {
           "template_family_id": "plumb-case-sop",
           "source_row_key": "meegle-v137:A:15",
           "instance_scope": "case",
-          "imported_version_id": "158f9714-a29b-4d19-b343-ea864728e67e"
+          "imported_version_id": "f5fa8311-1739-43d5-ad70-34a533255485"
         },
         "title": "收到回傳單，合約成立",
         "instructions": "回簽附件存 Meegle 必填欄；寫契約價格(未稅／含稅)、付款條件、合約開始日期；狀態＝成案；通知 PM 派工段啟動",
@@ -1053,7 +1064,7 @@
         "nodes": [
           {
             "node_key": "sales",
-            "node_id": "626bfbcb48a14a2b97f673c0ac6800d1-sales",
+            "node_id": "ec4c40f648864124bd7732a2a253c5c4-sales",
             "order": 15
           }
         ],
@@ -1105,7 +1116,7 @@
             }
           },
           "template": {
-            "version_id": "158f9714-a29b-4d19-b343-ea864728e67e",
+            "version_id": "f5fa8311-1739-43d5-ad70-34a533255485",
             "template_family_id": "plumb-case-sop",
             "revision": "plumb-v0.2-1",
             "mapping_revision": "yx-company-node-mapping-1",
@@ -1116,7 +1127,7 @@
         },
         "source_restriction": null,
         "suggestion": {
-          "task_id": "9c5006be-76ee-4261-9058-a3f771a5c1b6",
+          "task_id": "f2917175-0fa7-4db4-b33f-8c3751f83e9b",
           "rule_id": "quote-evidence:A:15",
           "rule_revision": 1,
           "tier": "indicator",
@@ -1135,7 +1146,13 @@
           "edit",
           "accept_suggestion",
           "dismiss_suggestion"
-        ]
+        ],
+        "lark_sync": {
+          "state": "未啟用",
+          "synced_at": null,
+          "record_id": null,
+          "error": null
+        }
       }
     ],
     "allowed_actions": {
@@ -1146,7 +1163,7 @@
     }
   },
   "accept_suggestion": {
-    "task_id": "cd7a8ee6-346e-4848-a623-daeeb1f3a05b",
+    "task_id": "cef47bc3-c8e6-45f2-bace-f9c60e7e2908",
     "revision": 2,
     "state": "done",
     "applicability": "applicable",
@@ -1159,14 +1176,14 @@
       "facts_hash": "0d6b2beab559aca1b2bfd48bc30b7eb5456748a4146dac99c7e763df24c2cf3b"
     },
     "task": {
-      "id": "cd7a8ee6-346e-4848-a623-daeeb1f3a05b",
+      "id": "cef47bc3-c8e6-45f2-bace-f9c60e7e2908",
       "task_source": "sop_local",
-      "project_id": "626bfbcb48a14a2b97f673c0ac6800d1",
+      "project_id": "ec4c40f648864124bd7732a2a253c5c4",
       "origin": {
         "template_family_id": "plumb-case-sop",
         "source_row_key": "meegle-v137:A:12",
         "instance_scope": "case",
-        "imported_version_id": "158f9714-a29b-4d19-b343-ea864728e67e"
+        "imported_version_id": "f5fa8311-1739-43d5-ad70-34a533255485"
       },
       "title": "報價單是否回傳",
       "instructions": "每日查回傳單日期；收到含回簽附件的信 → 寫回傳單日期、附件存 Drive → 自動判「是」；到期仍無 → 判「無」",
@@ -1187,7 +1204,7 @@
           "tier": "proof",
           "facts_hash": "0d6b2beab559aca1b2bfd48bc30b7eb5456748a4146dac99c7e763df24c2cf3b",
           "actor_id": "u-pm",
-          "at": 1792498526.6605241,
+          "at": 1792508176.1430132,
           "confirmed": false
         }
       },
@@ -1195,7 +1212,7 @@
       "nodes": [
         {
           "node_key": "sales",
-          "node_id": "626bfbcb48a14a2b97f673c0ac6800d1-sales",
+          "node_id": "ec4c40f648864124bd7732a2a253c5c4-sales",
           "order": 12
         }
       ],
@@ -1247,7 +1264,7 @@
           }
         },
         "template": {
-          "version_id": "158f9714-a29b-4d19-b343-ea864728e67e",
+          "version_id": "f5fa8311-1739-43d5-ad70-34a533255485",
           "template_family_id": "plumb-case-sop",
           "revision": "plumb-v0.2-1",
           "mapping_revision": "yx-company-node-mapping-1",
@@ -1261,17 +1278,23 @@
       "allowed_actions": [
         "reopen",
         "archive"
-      ]
+      ],
+      "lark_sync": {
+        "state": "未啟用",
+        "synced_at": null,
+        "record_id": null,
+        "error": null
+      }
     },
     "checklist_revision": 2
   },
   "accept_suggestion_stale": {
     "code": "suggestion_stale",
     "detail": "suggestion_stale",
-    "task_id": "9c5006be-76ee-4261-9058-a3f771a5c1b6"
+    "task_id": "f2917175-0fa7-4db4-b33f-8c3751f83e9b"
   },
   "dismiss_suggestion": {
-    "task_id": "ec7af724-6d0f-42f0-af2b-d0bd0c68d270",
+    "task_id": "6672202f-c792-4fd0-9506-8cd869bd7c79",
     "revision": 1,
     "state": "pending",
     "applicability": "applicable",
@@ -1285,14 +1308,14 @@
     },
     "dismissed": true,
     "task": {
-      "id": "ec7af724-6d0f-42f0-af2b-d0bd0c68d270",
+      "id": "6672202f-c792-4fd0-9506-8cd869bd7c79",
       "task_source": "sop_local",
-      "project_id": "626bfbcb48a14a2b97f673c0ac6800d1",
+      "project_id": "ec4c40f648864124bd7732a2a253c5c4",
       "origin": {
         "template_family_id": "plumb-case-sop",
         "source_row_key": "meegle-v137:A:1",
         "instance_scope": "case",
-        "imported_version_id": "158f9714-a29b-4d19-b343-ea864728e67e"
+        "imported_version_id": "f5fa8311-1739-43d5-ad70-34a533255485"
       },
       "title": "業主提出報價需求",
       "instructions": "結構化需求：工項類型、數量（面積／點數／公里）、行政區、時程、特殊進場條件 → 需求卡；抽不出的欄位反問業務，不猜；需求佐證文件存案件資料夾",
@@ -1312,7 +1335,7 @@
       "nodes": [
         {
           "node_key": "sales",
-          "node_id": "626bfbcb48a14a2b97f673c0ac6800d1-sales",
+          "node_id": "ec4c40f648864124bd7732a2a253c5c4-sales",
           "order": 1
         }
       ],
@@ -1364,7 +1387,7 @@
           }
         },
         "template": {
-          "version_id": "158f9714-a29b-4d19-b343-ea864728e67e",
+          "version_id": "f5fa8311-1739-43d5-ad70-34a533255485",
           "template_family_id": "plumb-case-sop",
           "revision": "plumb-v0.2-1",
           "mapping_revision": "yx-company-node-mapping-1",
@@ -1381,15 +1404,21 @@
         "archive",
         "set_applicability",
         "edit"
-      ]
+      ],
+      "lark_sync": {
+        "state": "未啟用",
+        "synced_at": null,
+        "record_id": null,
+        "error": null
+      }
     }
   },
   "accept_suggestions": {
-    "project_id": "626bfbcb48a14a2b97f673c0ac6800d1",
+    "project_id": "ec4c40f648864124bd7732a2a253c5c4",
     "checklist_revision": 3,
     "results": [
       {
-        "task_id": "9c5006be-76ee-4261-9058-a3f771a5c1b6",
+        "task_id": "f2917175-0fa7-4db4-b33f-8c3751f83e9b",
         "revision": 2,
         "state": "done",
         "applicability": "applicable",
@@ -1402,14 +1431,14 @@
           "facts_hash": "1d94c2b9488eb151d802939fc8fdf047f4ac7d5a8d69f161bbc2f5dc33c3ab40"
         },
         "task": {
-          "id": "9c5006be-76ee-4261-9058-a3f771a5c1b6",
+          "id": "f2917175-0fa7-4db4-b33f-8c3751f83e9b",
           "task_source": "sop_local",
-          "project_id": "626bfbcb48a14a2b97f673c0ac6800d1",
+          "project_id": "ec4c40f648864124bd7732a2a253c5c4",
           "origin": {
             "template_family_id": "plumb-case-sop",
             "source_row_key": "meegle-v137:A:15",
             "instance_scope": "case",
-            "imported_version_id": "158f9714-a29b-4d19-b343-ea864728e67e"
+            "imported_version_id": "f5fa8311-1739-43d5-ad70-34a533255485"
           },
           "title": "收到回傳單，合約成立",
           "instructions": "回簽附件存 Meegle 必填欄；寫契約價格(未稅／含稅)、付款條件、合約開始日期；狀態＝成案；通知 PM 派工段啟動",
@@ -1430,7 +1459,7 @@
               "tier": "indicator",
               "facts_hash": "1d94c2b9488eb151d802939fc8fdf047f4ac7d5a8d69f161bbc2f5dc33c3ab40",
               "actor_id": "u-pm",
-              "at": 1792498526.6761138,
+              "at": 1792508176.159483,
               "confirmed": true
             }
           },
@@ -1438,7 +1467,7 @@
           "nodes": [
             {
               "node_key": "sales",
-              "node_id": "626bfbcb48a14a2b97f673c0ac6800d1-sales",
+              "node_id": "ec4c40f648864124bd7732a2a253c5c4-sales",
               "order": 15
             }
           ],
@@ -1490,7 +1519,7 @@
               }
             },
             "template": {
-              "version_id": "158f9714-a29b-4d19-b343-ea864728e67e",
+              "version_id": "f5fa8311-1739-43d5-ad70-34a533255485",
               "template_family_id": "plumb-case-sop",
               "revision": "plumb-v0.2-1",
               "mapping_revision": "yx-company-node-mapping-1",
@@ -1504,7 +1533,13 @@
           "allowed_actions": [
             "reopen",
             "archive"
-          ]
+          ],
+          "lark_sync": {
+            "state": "未啟用",
+            "synced_at": null,
+            "record_id": null,
+            "error": null
+          }
         }
       }
     ]
@@ -1536,9 +1571,9 @@
         "status": "成案",
         "stage_label": null,
         "stage": "numbered",
-        "project_id": "626bfbcb48a14a2b97f673c0ac6800d1",
+        "project_id": "ec4c40f648864124bd7732a2a253c5c4",
         "project_ids": [
-          "626bfbcb48a14a2b97f673c0ac6800d1"
+          "ec4c40f648864124bd7732a2a253c5c4"
         ],
         "source_rows": 1,
         "duplicated": false,
@@ -1573,9 +1608,9 @@
     "status": "成案",
     "stage_label": null,
     "stage": "numbered",
-    "project_id": "626bfbcb48a14a2b97f673c0ac6800d1",
+    "project_id": "ec4c40f648864124bd7732a2a253c5c4",
     "project_ids": [
-      "626bfbcb48a14a2b97f673c0ac6800d1"
+      "ec4c40f648864124bd7732a2a253c5c4"
     ],
     "source_rows": 1,
     "duplicated": false,
@@ -1632,11 +1667,11 @@
     }
   },
   "quote_preview": {
-    "draft_id": "4b39f901-7fb1-4993-9322-b0e9047d3934",
-    "expires_at": 1792499426.7236428,
+    "draft_id": "d39507a6-73ee-41f4-9fc8-c0db8f102c73",
+    "expires_at": 1792509076.212547,
     "case": {
-      "project_id": "20dd43fd0d0b40d3b43c37554a708740",
-      "local_reference": "LOCAL-20DD43FD",
+      "project_id": "4cc71d56e4dd4c55b7d25d0b668b46d1",
+      "local_reference": "LOCAL-4CC71D56",
       "official_quote_no": "115950",
       "name": "新竹科學園區地形測量",
       "client": "竹科管理局",
@@ -1647,39 +1682,39 @@
       "nodes": [
         {
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
           "node_key": "pm",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-pm"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-pm"
         },
         {
           "node_key": "confirmation",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-confirmation"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-confirmation"
         },
         {
           "node_key": "field",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-field"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-field"
         },
         {
           "node_key": "control",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-control"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-control"
         },
         {
           "node_key": "mapping",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-mapping"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-mapping"
         },
         {
           "node_key": "report",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-report"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-report"
         },
         {
           "node_key": "pricing",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-pricing"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-pricing"
         },
         {
           "node_key": "settlement",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-settlement"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-settlement"
         }
       ]
     },
@@ -1690,11 +1725,11 @@
       "nodes": [
         {
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         }
       ],
       "template": {
-        "version_id": "158f9714-a29b-4d19-b343-ea864728e67e",
+        "version_id": "f5fa8311-1739-43d5-ad70-34a533255485",
         "template_family_id": "plumb-case-sop",
         "revision": "plumb-v0.2-1",
         "mapping_revision": "yx-company-node-mapping-1",
@@ -1713,6 +1748,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -1730,12 +1766,13 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [
             {
               "task_id": null,
               "node_key": "sales",
-              "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+              "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
             }
           ],
           "reason_code": "new",
@@ -1753,12 +1790,13 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [
             {
               "task_id": null,
               "node_key": "sales",
-              "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+              "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
             }
           ],
           "reason_code": "new",
@@ -1776,12 +1814,13 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [
             {
               "task_id": null,
               "node_key": "sales",
-              "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+              "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
             }
           ],
           "reason_code": "new",
@@ -1799,12 +1838,13 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [
             {
               "task_id": null,
               "node_key": "sales",
-              "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+              "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
             }
           ],
           "reason_code": "new",
@@ -1822,6 +1862,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -1839,6 +1880,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -1856,6 +1898,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "unresolved",
           "links_to_add": [],
           "reason_code": "excluded",
@@ -1873,12 +1916,13 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [
             {
               "task_id": null,
               "node_key": "sales",
-              "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+              "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
             }
           ],
           "reason_code": "new",
@@ -1896,12 +1940,13 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [
             {
               "task_id": null,
               "node_key": "sales",
-              "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+              "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
             }
           ],
           "reason_code": "new",
@@ -1919,12 +1964,13 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [
             {
               "task_id": null,
               "node_key": "sales",
-              "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+              "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
             }
           ],
           "reason_code": "new",
@@ -1942,6 +1988,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -1959,12 +2006,13 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [
             {
               "task_id": null,
               "node_key": "sales",
-              "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+              "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
             }
           ],
           "reason_code": "new",
@@ -1982,6 +2030,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -1999,6 +2048,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2016,19 +2066,20 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [
             {
               "task_id": null,
               "node_key": "sales",
-              "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+              "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
             }
           ],
           "reason_code": "new",
           "exclusion_reason": null
         }
       ],
-      "context_hash": "12eef096ce4133ddbd67ba023afe4e429641b4f084a91f49af2a9b7e12317a52",
+      "context_hash": "f7acbb019b053857bc66f02ec26ad241780070894e660cdd244d242a588fc4fe",
       "stage": "inquiry",
       "unresolved_items": [
         {
@@ -2106,7 +2157,7 @@
         "added_links": 9
       },
       "selection": {
-        "template_version_id": "158f9714-a29b-4d19-b343-ea864728e67e",
+        "template_version_id": "f5fa8311-1739-43d5-ad70-34a533255485",
         "node_keys": [
           "sales"
         ],
@@ -2129,8 +2180,8 @@
   },
   "quote_create": {
     "request_id": "examples-local-case",
-    "project_id": "20dd43fd0d0b40d3b43c37554a708740",
-    "local_reference": "LOCAL-20DD43FD",
+    "project_id": "4cc71d56e4dd4c55b7d25d0b668b46d1",
+    "local_reference": "LOCAL-4CC71D56",
     "official_quote_no": "115950",
     "name": "新竹科學園區地形測量",
     "client": "竹科管理局",
@@ -2140,70 +2191,70 @@
     "case_type": "intake",
     "replayed": false,
     "import": {
-      "run_id": "f052802f-05b9-48dd-83c6-de417e6c0566",
+      "run_id": "1eec5992-97d6-4f76-b487-780b98bfb297",
       "request_id": "examples-local-case",
-      "project_id": "20dd43fd0d0b40d3b43c37554a708740",
-      "template_version_id": "158f9714-a29b-4d19-b343-ea864728e67e",
+      "project_id": "4cc71d56e4dd4c55b7d25d0b668b46d1",
+      "template_version_id": "f5fa8311-1739-43d5-ad70-34a533255485",
       "start_node": "sales",
       "stage": "inquiry",
       "replayed": false,
       "created_task_ids": [
-        "d2afad39-f416-4941-8ba6-22908d903ab8",
-        "ca347af0-4de9-45e2-8ea2-8c8986d6f79c",
-        "6326e195-ce2d-44bc-b257-4d8d21daa966",
-        "05bc0486-c000-460f-b24e-b9fca2d8b99d",
-        "21038bf9-0f0e-420b-b131-c143b9d33436",
-        "992e2fe2-70d7-4b1b-a7a4-e734bfbea8d3",
-        "4e6e1471-2b77-405e-ba88-f4da7e9e6143",
-        "8b2ce7d9-3e74-4c16-b0c1-85847fd9d18f",
-        "e8952fdd-467e-49b0-8eb5-a1cf7895e75e"
+        "1de65a84-b8b0-4019-8403-c5edc6cc1369",
+        "da8802f8-569f-4298-af93-ed9ceda50787",
+        "5f9ec8e2-74b2-4d2d-803a-c806f778a37a",
+        "222d416c-d31b-4068-8ab8-dae54212b9c8",
+        "2e6cf986-dd0d-44a5-8ff7-9903c3b6e389",
+        "35b96a97-1fdd-4a33-806f-b458f174dead",
+        "ef52ca85-0aa5-45e8-a8df-1a550a7f5758",
+        "d91648f7-2f6b-45e7-800f-698853087a4a",
+        "5e6aec7c-e6fd-4dcb-b7ba-fda865c16d1c"
       ],
       "existing_task_ids": [],
       "added_links": [
         {
-          "task_id": "d2afad39-f416-4941-8ba6-22908d903ab8",
+          "task_id": "1de65a84-b8b0-4019-8403-c5edc6cc1369",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "ca347af0-4de9-45e2-8ea2-8c8986d6f79c",
+          "task_id": "da8802f8-569f-4298-af93-ed9ceda50787",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "6326e195-ce2d-44bc-b257-4d8d21daa966",
+          "task_id": "5f9ec8e2-74b2-4d2d-803a-c806f778a37a",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "05bc0486-c000-460f-b24e-b9fca2d8b99d",
+          "task_id": "222d416c-d31b-4068-8ab8-dae54212b9c8",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "21038bf9-0f0e-420b-b131-c143b9d33436",
+          "task_id": "2e6cf986-dd0d-44a5-8ff7-9903c3b6e389",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "992e2fe2-70d7-4b1b-a7a4-e734bfbea8d3",
+          "task_id": "35b96a97-1fdd-4a33-806f-b458f174dead",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "4e6e1471-2b77-405e-ba88-f4da7e9e6143",
+          "task_id": "ef52ca85-0aa5-45e8-a8df-1a550a7f5758",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "8b2ce7d9-3e74-4c16-b0c1-85847fd9d18f",
+          "task_id": "d91648f7-2f6b-45e7-800f-698853087a4a",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "e8952fdd-467e-49b0-8eb5-a1cf7895e75e",
+          "task_id": "5e6aec7c-e6fd-4dcb-b7ba-fda865c16d1c",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         }
       ],
       "exclusions": [
@@ -2219,6 +2270,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2236,6 +2288,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2253,6 +2306,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2270,6 +2324,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "unresolved",
           "links_to_add": [],
           "reason_code": "excluded",
@@ -2287,6 +2342,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2304,6 +2360,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2321,6 +2378,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2402,8 +2460,8 @@
   },
   "quote_create_replay": {
     "request_id": "examples-local-case",
-    "project_id": "20dd43fd0d0b40d3b43c37554a708740",
-    "local_reference": "LOCAL-20DD43FD",
+    "project_id": "4cc71d56e4dd4c55b7d25d0b668b46d1",
+    "local_reference": "LOCAL-4CC71D56",
     "official_quote_no": "115950",
     "name": "新竹科學園區地形測量",
     "client": "竹科管理局",
@@ -2413,70 +2471,70 @@
     "case_type": "intake",
     "replayed": true,
     "import": {
-      "run_id": "f052802f-05b9-48dd-83c6-de417e6c0566",
+      "run_id": "1eec5992-97d6-4f76-b487-780b98bfb297",
       "request_id": "examples-local-case",
-      "project_id": "20dd43fd0d0b40d3b43c37554a708740",
-      "template_version_id": "158f9714-a29b-4d19-b343-ea864728e67e",
+      "project_id": "4cc71d56e4dd4c55b7d25d0b668b46d1",
+      "template_version_id": "f5fa8311-1739-43d5-ad70-34a533255485",
       "start_node": "sales",
       "stage": "inquiry",
       "replayed": false,
       "created_task_ids": [
-        "d2afad39-f416-4941-8ba6-22908d903ab8",
-        "ca347af0-4de9-45e2-8ea2-8c8986d6f79c",
-        "6326e195-ce2d-44bc-b257-4d8d21daa966",
-        "05bc0486-c000-460f-b24e-b9fca2d8b99d",
-        "21038bf9-0f0e-420b-b131-c143b9d33436",
-        "992e2fe2-70d7-4b1b-a7a4-e734bfbea8d3",
-        "4e6e1471-2b77-405e-ba88-f4da7e9e6143",
-        "8b2ce7d9-3e74-4c16-b0c1-85847fd9d18f",
-        "e8952fdd-467e-49b0-8eb5-a1cf7895e75e"
+        "1de65a84-b8b0-4019-8403-c5edc6cc1369",
+        "da8802f8-569f-4298-af93-ed9ceda50787",
+        "5f9ec8e2-74b2-4d2d-803a-c806f778a37a",
+        "222d416c-d31b-4068-8ab8-dae54212b9c8",
+        "2e6cf986-dd0d-44a5-8ff7-9903c3b6e389",
+        "35b96a97-1fdd-4a33-806f-b458f174dead",
+        "ef52ca85-0aa5-45e8-a8df-1a550a7f5758",
+        "d91648f7-2f6b-45e7-800f-698853087a4a",
+        "5e6aec7c-e6fd-4dcb-b7ba-fda865c16d1c"
       ],
       "existing_task_ids": [],
       "added_links": [
         {
-          "task_id": "d2afad39-f416-4941-8ba6-22908d903ab8",
+          "task_id": "1de65a84-b8b0-4019-8403-c5edc6cc1369",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "ca347af0-4de9-45e2-8ea2-8c8986d6f79c",
+          "task_id": "da8802f8-569f-4298-af93-ed9ceda50787",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "6326e195-ce2d-44bc-b257-4d8d21daa966",
+          "task_id": "5f9ec8e2-74b2-4d2d-803a-c806f778a37a",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "05bc0486-c000-460f-b24e-b9fca2d8b99d",
+          "task_id": "222d416c-d31b-4068-8ab8-dae54212b9c8",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "21038bf9-0f0e-420b-b131-c143b9d33436",
+          "task_id": "2e6cf986-dd0d-44a5-8ff7-9903c3b6e389",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "992e2fe2-70d7-4b1b-a7a4-e734bfbea8d3",
+          "task_id": "35b96a97-1fdd-4a33-806f-b458f174dead",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "4e6e1471-2b77-405e-ba88-f4da7e9e6143",
+          "task_id": "ef52ca85-0aa5-45e8-a8df-1a550a7f5758",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "8b2ce7d9-3e74-4c16-b0c1-85847fd9d18f",
+          "task_id": "d91648f7-2f6b-45e7-800f-698853087a4a",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "e8952fdd-467e-49b0-8eb5-a1cf7895e75e",
+          "task_id": "5e6aec7c-e6fd-4dcb-b7ba-fda865c16d1c",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         }
       ],
       "exclusions": [
@@ -2492,6 +2550,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2509,6 +2568,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2526,6 +2586,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2543,6 +2604,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "unresolved",
           "links_to_add": [],
           "reason_code": "excluded",
@@ -2560,6 +2622,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2577,6 +2640,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2594,6 +2658,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2675,8 +2740,8 @@
   },
   "quote_request": {
     "request_id": "examples-local-case",
-    "project_id": "20dd43fd0d0b40d3b43c37554a708740",
-    "local_reference": "LOCAL-20DD43FD",
+    "project_id": "4cc71d56e4dd4c55b7d25d0b668b46d1",
+    "local_reference": "LOCAL-4CC71D56",
     "official_quote_no": "115950",
     "name": "新竹科學園區地形測量",
     "client": "竹科管理局",
@@ -2686,70 +2751,70 @@
     "case_type": "intake",
     "replayed": false,
     "import": {
-      "run_id": "f052802f-05b9-48dd-83c6-de417e6c0566",
+      "run_id": "1eec5992-97d6-4f76-b487-780b98bfb297",
       "request_id": "examples-local-case",
-      "project_id": "20dd43fd0d0b40d3b43c37554a708740",
-      "template_version_id": "158f9714-a29b-4d19-b343-ea864728e67e",
+      "project_id": "4cc71d56e4dd4c55b7d25d0b668b46d1",
+      "template_version_id": "f5fa8311-1739-43d5-ad70-34a533255485",
       "start_node": "sales",
       "stage": "inquiry",
       "replayed": false,
       "created_task_ids": [
-        "d2afad39-f416-4941-8ba6-22908d903ab8",
-        "ca347af0-4de9-45e2-8ea2-8c8986d6f79c",
-        "6326e195-ce2d-44bc-b257-4d8d21daa966",
-        "05bc0486-c000-460f-b24e-b9fca2d8b99d",
-        "21038bf9-0f0e-420b-b131-c143b9d33436",
-        "992e2fe2-70d7-4b1b-a7a4-e734bfbea8d3",
-        "4e6e1471-2b77-405e-ba88-f4da7e9e6143",
-        "8b2ce7d9-3e74-4c16-b0c1-85847fd9d18f",
-        "e8952fdd-467e-49b0-8eb5-a1cf7895e75e"
+        "1de65a84-b8b0-4019-8403-c5edc6cc1369",
+        "da8802f8-569f-4298-af93-ed9ceda50787",
+        "5f9ec8e2-74b2-4d2d-803a-c806f778a37a",
+        "222d416c-d31b-4068-8ab8-dae54212b9c8",
+        "2e6cf986-dd0d-44a5-8ff7-9903c3b6e389",
+        "35b96a97-1fdd-4a33-806f-b458f174dead",
+        "ef52ca85-0aa5-45e8-a8df-1a550a7f5758",
+        "d91648f7-2f6b-45e7-800f-698853087a4a",
+        "5e6aec7c-e6fd-4dcb-b7ba-fda865c16d1c"
       ],
       "existing_task_ids": [],
       "added_links": [
         {
-          "task_id": "d2afad39-f416-4941-8ba6-22908d903ab8",
+          "task_id": "1de65a84-b8b0-4019-8403-c5edc6cc1369",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "ca347af0-4de9-45e2-8ea2-8c8986d6f79c",
+          "task_id": "da8802f8-569f-4298-af93-ed9ceda50787",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "6326e195-ce2d-44bc-b257-4d8d21daa966",
+          "task_id": "5f9ec8e2-74b2-4d2d-803a-c806f778a37a",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "05bc0486-c000-460f-b24e-b9fca2d8b99d",
+          "task_id": "222d416c-d31b-4068-8ab8-dae54212b9c8",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "21038bf9-0f0e-420b-b131-c143b9d33436",
+          "task_id": "2e6cf986-dd0d-44a5-8ff7-9903c3b6e389",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "992e2fe2-70d7-4b1b-a7a4-e734bfbea8d3",
+          "task_id": "35b96a97-1fdd-4a33-806f-b458f174dead",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "4e6e1471-2b77-405e-ba88-f4da7e9e6143",
+          "task_id": "ef52ca85-0aa5-45e8-a8df-1a550a7f5758",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "8b2ce7d9-3e74-4c16-b0c1-85847fd9d18f",
+          "task_id": "d91648f7-2f6b-45e7-800f-698853087a4a",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         },
         {
-          "task_id": "e8952fdd-467e-49b0-8eb5-a1cf7895e75e",
+          "task_id": "5e6aec7c-e6fd-4dcb-b7ba-fda865c16d1c",
           "node_key": "sales",
-          "node_id": "20dd43fd0d0b40d3b43c37554a708740-sales"
+          "node_id": "4cc71d56e4dd4c55b7d25d0b668b46d1-sales"
         }
       ],
       "exclusions": [
@@ -2765,6 +2830,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2782,6 +2848,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2799,6 +2866,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2816,6 +2884,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "unresolved",
           "links_to_add": [],
           "reason_code": "excluded",
@@ -2833,6 +2902,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2850,6 +2920,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2867,6 +2938,7 @@
           "existing_task_id": null,
           "existing_state": null,
           "existing_revision": null,
+          "completion": null,
           "applicability": "applicable",
           "links_to_add": [],
           "reason_code": "routing_reference",
@@ -2959,7 +3031,7 @@
       {
         "origin": "local",
         "quote_no": "115950",
-        "local_reference": "LOCAL-20DD43FD",
+        "local_reference": "LOCAL-4CC71D56",
         "engineering_no": null,
         "name": "新竹科學園區地形測量",
         "client": "竹科管理局",
@@ -2973,9 +3045,9 @@
         "status": null,
         "stage_label": null,
         "stage": "inquiry",
-        "project_id": "20dd43fd0d0b40d3b43c37554a708740",
+        "project_id": "4cc71d56e4dd4c55b7d25d0b668b46d1",
         "project_ids": [
-          "20dd43fd0d0b40d3b43c37554a708740"
+          "4cc71d56e4dd4c55b7d25d0b668b46d1"
         ],
         "source_rows": 0,
         "duplicated": false,
@@ -2990,7 +3062,7 @@
     ]
   },
   "sop_assignees": {
-    "project_id": "626bfbcb48a14a2b97f673c0ac6800d1",
+    "project_id": "ec4c40f648864124bd7732a2a253c5c4",
     "restricted": false,
     "people": [
       {
@@ -3003,20 +3075,20 @@
     ]
   },
   "task_edit": {
-    "task_id": "9f52988f-0a72-49ef-9d01-dce736474968",
+    "task_id": "59a2ca53-723f-4c38-85f1-2fd603811869",
     "revision": 2,
     "checklist_revision": 4,
     "state": "pending",
     "applicability": "applicable",
     "task": {
-      "id": "9f52988f-0a72-49ef-9d01-dce736474968",
+      "id": "59a2ca53-723f-4c38-85f1-2fd603811869",
       "task_source": "sop_local",
-      "project_id": "626bfbcb48a14a2b97f673c0ac6800d1",
+      "project_id": "ec4c40f648864124bd7732a2a253c5c4",
       "origin": {
         "template_family_id": "plumb-case-sop",
         "source_row_key": "meegle-v137:A:3",
         "instance_scope": "case",
-        "imported_version_id": "158f9714-a29b-4d19-b343-ea864728e67e"
+        "imported_version_id": "f5fa8311-1739-43d5-ad70-34a533255485"
       },
       "title": "通知業主報價成立（本案）",
       "instructions": "草擬通知（SOP 四項：告知報價聯絡人、了解案件需求與期程、確認報價時程、特殊進場條件）→ 卡片給專案經理 → 按「寄出」才寄；寫回第一次聯繫日期；聯絡證明存業主往來紀錄表",
@@ -3036,7 +3108,7 @@
       "nodes": [
         {
           "node_key": "sales",
-          "node_id": "626bfbcb48a14a2b97f673c0ac6800d1-sales",
+          "node_id": "ec4c40f648864124bd7732a2a253c5c4-sales",
           "order": 3
         }
       ],
@@ -3088,7 +3160,7 @@
           }
         },
         "template": {
-          "version_id": "158f9714-a29b-4d19-b343-ea864728e67e",
+          "version_id": "f5fa8311-1739-43d5-ad70-34a533255485",
           "template_family_id": "plumb-case-sop",
           "revision": "plumb-v0.2-1",
           "mapping_revision": "yx-company-node-mapping-1",
@@ -3099,7 +3171,7 @@
       },
       "source_restriction": null,
       "suggestion": {
-        "task_id": "9f52988f-0a72-49ef-9d01-dce736474968",
+        "task_id": "59a2ca53-723f-4c38-85f1-2fd603811869",
         "rule_id": "quote-evidence:A:3",
         "rule_revision": 1,
         "tier": "indicator",
@@ -3117,24 +3189,30 @@
         "edit",
         "accept_suggestion",
         "dismiss_suggestion"
-      ]
+      ],
+      "lark_sync": {
+        "state": "未啟用",
+        "synced_at": null,
+        "record_id": null,
+        "error": null
+      }
     }
   },
   "task_transition": {
-    "task_id": "9f52988f-0a72-49ef-9d01-dce736474968",
+    "task_id": "59a2ca53-723f-4c38-85f1-2fd603811869",
     "revision": 3,
     "checklist_revision": 5,
     "state": "in_progress",
     "applicability": "applicable",
     "task": {
-      "id": "9f52988f-0a72-49ef-9d01-dce736474968",
+      "id": "59a2ca53-723f-4c38-85f1-2fd603811869",
       "task_source": "sop_local",
-      "project_id": "626bfbcb48a14a2b97f673c0ac6800d1",
+      "project_id": "ec4c40f648864124bd7732a2a253c5c4",
       "origin": {
         "template_family_id": "plumb-case-sop",
         "source_row_key": "meegle-v137:A:3",
         "instance_scope": "case",
-        "imported_version_id": "158f9714-a29b-4d19-b343-ea864728e67e"
+        "imported_version_id": "f5fa8311-1739-43d5-ad70-34a533255485"
       },
       "title": "通知業主報價成立（本案）",
       "instructions": "草擬通知（SOP 四項：告知報價聯絡人、了解案件需求與期程、確認報價時程、特殊進場條件）→ 卡片給專案經理 → 按「寄出」才寄；寫回第一次聯繫日期；聯絡證明存業主往來紀錄表",
@@ -3154,7 +3232,7 @@
       "nodes": [
         {
           "node_key": "sales",
-          "node_id": "626bfbcb48a14a2b97f673c0ac6800d1-sales",
+          "node_id": "ec4c40f648864124bd7732a2a253c5c4-sales",
           "order": 3
         }
       ],
@@ -3206,7 +3284,7 @@
           }
         },
         "template": {
-          "version_id": "158f9714-a29b-4d19-b343-ea864728e67e",
+          "version_id": "f5fa8311-1739-43d5-ad70-34a533255485",
           "template_family_id": "plumb-case-sop",
           "revision": "plumb-v0.2-1",
           "mapping_revision": "yx-company-node-mapping-1",
@@ -3217,7 +3295,7 @@
       },
       "source_restriction": null,
       "suggestion": {
-        "task_id": "9f52988f-0a72-49ef-9d01-dce736474968",
+        "task_id": "59a2ca53-723f-4c38-85f1-2fd603811869",
         "rule_id": "quote-evidence:A:3",
         "rule_revision": 1,
         "tier": "indicator",
@@ -3234,20 +3312,26 @@
         "edit",
         "accept_suggestion",
         "dismiss_suggestion"
-      ]
+      ],
+      "lark_sync": {
+        "state": "未啟用",
+        "synced_at": null,
+        "record_id": null,
+        "error": null
+      }
     }
   },
   "manual_task": {
-    "task_id": "2e8dfea6-0f92-4635-9e54-ee2217c53b97",
+    "task_id": "b33b384c-a8e4-40a6-8bcc-f040f7c613d7",
     "revision": 1,
     "checklist_revision": 6,
     "task": {
-      "id": "2e8dfea6-0f92-4635-9e54-ee2217c53b97",
+      "id": "b33b384c-a8e4-40a6-8bcc-f040f7c613d7",
       "task_source": "sop_local",
-      "project_id": "626bfbcb48a14a2b97f673c0ac6800d1",
+      "project_id": "ec4c40f648864124bd7732a2a253c5c4",
       "origin": {
         "template_family_id": "manual",
-        "source_row_key": "edbacfd5-3cb0-4ecf-832e-12a6bc49cfb4",
+        "source_row_key": "3c2264f7-5108-41b5-93df-8ab877101036",
         "instance_scope": "case",
         "imported_version_id": null
       },
@@ -3268,7 +3352,7 @@
       "nodes": [
         {
           "node_key": "sales",
-          "node_id": "626bfbcb48a14a2b97f673c0ac6800d1-sales",
+          "node_id": "ec4c40f648864124bd7732a2a253c5c4-sales",
           "order": 10000
         }
       ],
@@ -3288,7 +3372,13 @@
         "archive",
         "set_applicability",
         "edit"
-      ]
+      ],
+      "lark_sync": {
+        "state": "未啟用",
+        "synced_at": null,
+        "record_id": null,
+        "error": null
+      }
     }
   },
   "preview_error_node_mapping_invalid": {
@@ -3309,7 +3399,7 @@
   "templates": {
     "templates": [
       {
-        "version_id": "158f9714-a29b-4d19-b343-ea864728e67e",
+        "version_id": "f5fa8311-1739-43d5-ad70-34a533255485",
         "template_family_id": "plumb-case-sop",
         "revision": "plumb-v0.2-1",
         "mapping_revision": "yx-company-node-mapping-1",

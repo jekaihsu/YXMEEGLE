@@ -1,3 +1,4 @@
+import {SopLarkSync} from './SopLarkSync';
 import {TaskCreateForm} from './NodeAssignmentForms';
 import {SopEnrollmentStatus} from './SopEnrollment';
 import {TaskSuggestion,SuggestionReview} from './SopSuggestions';
@@ -23,16 +24,16 @@ type Sop = ReturnType<typeof useSopTasks>;
 function TaskLine({task, people, assignees, assigning, onAssign, scoped, onOpen, selected, onSelect, projectId, sop, onAccept}: {task: SopTask; people: Map<string, string>; assignees: SopAssignee[]; assigning: boolean; onAssign: (id: string) => void; scoped: boolean; onOpen: () => void; selected:boolean; onSelect:()=>void; projectId:string; sop:Sop; onAccept:()=>void}) {
  const executor = task.participants.executor;
  const editable = task.allowedActions.includes('edit') && assignees.length > 0;
- return <li data-sop-task={task.id}><div className="sop-task-select"><input type="checkbox" aria-label={`選取 ${task.title}`} checked={selected} onChange={onSelect}/><button className="pf-task-open" onClick={onOpen} aria-label={`開啟 SOP 任務 ${task.title}`}>
+ return <li data-sop-task={task.id}><div className="sop-task-select"><span className="sop-state" data-state={task.applicability === 'not_applicable' ? 'not_applicable' : task.state} aria-hidden="true"/><button className="pf-task-open" onClick={onOpen} aria-label={`開啟 SOP 任務 ${task.title}`}>
   <strong>{task.title}</strong>
   <span>{executor ? people.get(executor) || '人員待確認' : '未指派'} · {stateLabel(task)} · {dueLabel(task)}
-   {task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.conditional && <Badge tone="warning">條件</Badge>}{task.manual && <Badge>手動</Badge>}</span>
+   <SopLarkSync task={task}/>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.conditional && <Badge tone="warning">條件</Badge>}{task.manual && <Badge>手動</Badge>}</span>
   {!scoped && <small>{task.nodes.map(n => sopNodeLabel(n.node_key)).join('、') || '未連結節點'}</small>}
  </button>{editable && <select className="sop-quick-assign" aria-label={`指派 ${task.title}`} value={executor || ''} disabled={assigning} onChange={e => onAssign(e.target.value)}>
   <option value="">未指派</option>
   {executor && !assignees.some(u => u.id === executor) && <option value={executor}>{people.get(executor) || '人員待確認'}</option>}
   {assignees.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
- </select>}</div><TaskSuggestion projectId={projectId} task={task} current={sop.current} reload={sop.reload} onAccept={onAccept}/></li>;
+ </select>}<input type="checkbox" aria-label={`選取 ${task.title}`} checked={selected} onChange={onSelect}/></div><TaskSuggestion projectId={projectId} task={task} current={sop.current} reload={sop.reload} onAccept={onAccept}/></li>;
 }
 
 function CreateTask({projectId,node,sop,onClose}:{projectId:string;node:SopNodeKey;sop:Sop;onClose:()=>void}) {
@@ -99,7 +100,7 @@ const assign = async (t: SopTask, id: string) => {
     {allowed?.import && !localNode?.disabledReason && <FlowAction allowed={allowed.import} reason={data?.localNodes?.find(n=>n.key===node)?.disabledReason||'需 SOP 匯入權限'} onClick={()=>setImporting(node||'case')}>匯入預設任務</FlowAction>}
     {!remote && allowed?.manage && (!localNode || localNode.can.create_task) && <Button id="sop-add-task" disabled={!allowed.manage} disabledReason="任務寫入尚未開放或需管理權限" onClick={()=>setCreating(true)}>新增任務</Button>}
     {data && suggestionSelection(data.tasks).length>0 && <Button onClick={()=>setReview([])}>採用全部建議</Button>}
-   </div>
+    <Button variant="plain" onClick={() => {void sop.reload()}} disabled={state.kind === 'loading' || state.kind === 'ready' && state.refreshing}>重新整理</Button></div>
   </header>
 
   {creating && <CreateTask projectId={p.id} node={node||'sales'} sop={sop} onClose={() => setCreating(false)}/>}

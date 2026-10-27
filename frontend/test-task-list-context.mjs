@@ -41,9 +41,9 @@ assert.equal(pressed('全部任務'),'true');assert.equal(rows(),21);
 assert.match(document.querySelector('.pf-task-open small').textContent,/本地流程/,'local rows name their source');
 await click(button('逾期'));assert.equal(rows(),5);
 await click(document.querySelector('.pf-task-open'));
-assert.ok(document.querySelector('.task-inspector'),'local drawer opens');assert.equal(rows(),5);
-await click(document.querySelector('[aria-label="關閉任務"]'));
-assert.equal(document.querySelector('.task-inspector'),null);
+assert.ok(document.querySelector('.task-drawer[data-kind="legacy"]'),'local drawer opens');assert.equal(rows(),5);
+await click(document.querySelector('[aria-label="關閉"]'));
+assert.equal(document.querySelector('.task-drawer[data-kind="legacy"]'),null);
 assert.equal(rows(),5,'closing the drawer keeps the five overdue results');
 assert.equal(pressed('全部任務'),'true');assert.equal(pressed('逾期'),'true');assert.equal(c.route.section,'all-tasks');
 await click(button('逾期'));assert.equal(rows(),21);
@@ -54,20 +54,20 @@ await click(button('全部任務'));assert.equal(rows(),21);
 await mount('view=project&project=p1&tab=tasks&node=node_sales');
 await click(button('逾期'));assert.equal(rows(),5);assert.match(location.hash,/task_filters=overdue/);
 await click(document.querySelector('.pf-task-open'));const opened=c.route.task;
-await click([...document.querySelectorAll('.task-inspector button')].find(b=>b.textContent.trim()==='查看節點檔案'));
-assert.equal(c.route.tab,'files');assert.equal(document.querySelector('.task-inspector'),null);assert.equal(rows(),0);
+await click([...document.querySelectorAll('.task-drawer[data-kind="legacy"] button')].find(b=>b.textContent.trim()==='查看節點檔案'));
+assert.equal(c.route.tab,'files');assert.equal(document.querySelector('.task-drawer[data-kind="legacy"]'),null);assert.equal(rows(),0);
 await back();
-assert.equal(c.route.task,opened);assert.ok(document.querySelector('.task-inspector'),'history restores the drawer');
+assert.equal(c.route.task,opened);assert.ok(document.querySelector('.task-drawer[data-kind="legacy"]'),'history restores the drawer');
 assert.equal(rows(),5,'overdue filter survives Files and Back');assert.equal(pressed('逾期'),'true');assert.equal(pressed('全部任務'),'true');
 await act(async()=>{document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});
-assert.equal(document.querySelector('.task-inspector'),null);assert.equal(rows(),5);
+assert.equal(document.querySelector('.task-drawer[data-kind="legacy"]'),null);assert.equal(rows(),5);
 const row=[...document.querySelectorAll('[data-assignment-task]')].find(li=>li.dataset.assignmentTask===opened).querySelector('.pf-task-open');
 assert.equal(document.activeElement,row,'focus returns to the reopened row');
 
 
 await mount('view=project&project=p1&tab=tasks&node=node_sales');
 await click(document.querySelector('.pf-task-open'));
-await click([...document.querySelectorAll('.task-inspector button')].find(b=>b.textContent.trim()==='查看節點檔案'));
+await click([...document.querySelectorAll('.task-drawer[data-kind="legacy"] button')].find(b=>b.textContent.trim()==='查看節點檔案'));
 const stage=()=>[...document.querySelectorAll('.daily-filters label')].find(l=>l.textContent.startsWith('所屬階段')).querySelector('select');
 assert.ok(c.route.node);assert.equal(stage().value,c.route.node,'Files preselects the task node stage');
 await mount('view=project&project=p1&tab=files');
@@ -81,7 +81,7 @@ assert.equal(document.querySelector('[aria-label="任務名稱"]').disabled,fals
 assert.equal(document.getElementById('task-editor-due-reason').textContent,'已排定期限須申請展延');
 
 await mount('view=project&project=p1&tab=flow&section=all-tasks&task_filters=overdue&node=node_sales&task=sales-0');
-await click(document.querySelector('[aria-label="關閉任務"]'));
+await click(document.querySelector('[aria-label="關閉"]'));
 assert.equal(document.activeElement.id,'flow-tasks','a filtered-out task returns focus to the list');
 document.activeElement.blur();
 await click(button('逾期'));

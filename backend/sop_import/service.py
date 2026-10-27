@@ -14,6 +14,7 @@ from ..sources import normalized_case
 from ..workflow import now
 from .catalog import digest, publish
 from .case_stage import stage, start_node
+from .cleanup_migration import audit_history_detached
 from . import local_case, quotes, suggestions, local_nodes
 from .enrollment import EnrollmentService
 from .enrollment_policy import identity_key
@@ -37,14 +38,17 @@ class Context:
     assigned_only: bool = False
 
 
+def administrator(user):
+    return user.get('active', True) and user.get('role') in {'manager', 'admin'}
+
+
 def explicitly_granted(user, capability):
-    return user.get('active', True) and (user.get('role') in {'manager', 'admin'} or capability in user.get('capabilities', []))
+    return administrator(user) or (user.get('active', True) and capability in user.get('capabilities', []))
 
 
 def can_manage(ctx):
-    return ctx.user.get('active', True) and (
-        ctx.user.get('role') in {'manager', 'admin'}
-        or ctx.user['id'] == ctx.project.get('pm_id')
+    return administrator(ctx.user) or ctx.user.get('active', True) and (
+        ctx.user['id'] == ctx.project.get('pm_id')
         or ctx.user['id'] in ctx.project.get('sop_task_delegate_ids', [])
         or (ctx.project.get('case_type') == 'intake' and not ctx.project.get('pm_id')
             and explicitly_granted(ctx.user, 'sop_task_import')))
@@ -64,6 +68,26 @@ def authorize_reader(user):
 
 def holds_task(task, user_id):
     return user_id in task.participants.values()
+
+
+def created_as_test(task):
+    """Only a manual task created as a test fixture may be tagged or removed; the marker lives in the immutable origin."""
+    return task.template_family_id == 'manual' and task.snapshot.get('test_fixture') is True
+
+
+def completed_with_proof(task):
+    return (Lifecycle.DONE in {task.state, task.previous_state}
+            and any(task.local.get(key) for key in ('result', 'evidence_basis', 'attestations')))
+
+
+def disposable(task):
+    require(created_as_test(task), 'test_task_required', 409)
+    require(not completed_with_proof(task), 'task_reopen_required', 409)
+
+
+def authorize_test_operator(ctx):
+    """Test fixtures are created, tagged and removed by workspace managers only, never by a case's PM or delegates."""
+    require(administrator(ctx.user), 'sop_import_forbidden', 403)
 
 
 def authorize(ctx, write=False):
@@ -146,6 +170,7 @@ class Service(EnrollmentService):
     def __init__(self, sessions, *, writes_enabled=lambda: False, local_cases_enabled=lambda: False, clock=time.time,
                  auto_enabled=lambda: False, auto_since=lambda: None):
         self.auto_enabled, self.auto_since = auto_enabled, auto_since
+        self.projection = None
         self.sessions, self.writes_enabled, self.local_cases_enabled, self.clock = (
             sessions, writes_enabled, local_cases_enabled, clock)
 
@@ -473,7 +498,13 @@ class Service(EnrollmentService):
             else:
                 related = {30: [31], 41: [31, 47], 46: [47]}.get(row.snapshot['raw']['meegle_id'], [])
                 references = [r.snapshot for r in rows.values() if r.snapshot['raw']['meegle_id'] in related]
-                task = LocalTask(workspace_id=ctx.wid, id=str(uuid5(NAMESPACE_URL, digest([ctx.wid, identity_key(ctx.project) or ctx.project['id'], version.family_id, key, row.snapshot['proposed_import']['instance_scope']]))), project_id=ctx.project['id'],
+                task_id = str(uuid5(NAMESPACE_URL, digest([ctx.wid, identity_key(ctx.project) or ctx.project['id'], version.family_id, key, row.snapshot['proposed_import']['instance_scope']])))
+                # Never reuse a cleaned identity: its audit and stale requests survive.
+                if db.scalar(select(TaskEvent.id).where(TaskEvent.workspace_id == ctx.wid,
+                                                       TaskEvent.task_id == task_id,
+                                                       TaskEvent.kind == 'test_cleaned').limit(1)):
+                    task_id = str(uuid4())
+                task = LocalTask(workspace_id=ctx.wid, id=task_id, project_id=ctx.project['id'],
                                  template_family_id=version.family_id, source_row_key=key,
                                  instance_scope=row.snapshot['proposed_import']['instance_scope'], imported_version_id=version.id,
                                  snapshot={'row': deepcopy(row.snapshot), 'template': self.version_json(version),
@@ -559,12 +590,14 @@ class Service(EnrollmentService):
         dismissed = self.decided(db, ctx, 'suggestion_dismissed')
         source = explicitly_granted(ctx.user, 'sop_task_read_source')
         views = []
+        sync = self.projection.statuses(db, ctx, tasks) if self.projection else {}
         from .models import CasePolicy
         policy = db.get(CasePolicy, (ctx.wid, ctx.project['id']))
         for task in tasks:
             found = None if ctx.assigned_only else suggestions.current(task, facts)
             found = None if found and (task.id, found['facts_hash']) in dismissed else found
             views.append({**self.task_json(task, links[task.id], source), 'suggestion': found,
+                          'lark_sync': sync[task.id] if self.projection else {'state': '未啟用', 'synced_at': None, 'record_id': None},
                           'completion_blocked_reason': self.completion_blocker(ctx, task),
                           'allowed_actions': self.task_actions(ctx, task, found) if (not policy or policy.policy == 'managed' and {l.node_key for l in links[task.id]} <= set(policy.node_keys)) else []})
         return views
@@ -604,6 +637,8 @@ class Service(EnrollmentService):
     def overview(self, ctx, node_key=None):
         authorize(ctx)
         require(node_key is None or node_key in NODE_MAP.values(), 'node_mapping_invalid')
+        if self.projection:
+            self.projection.request_reconcile(ctx.wid, ctx.project['id'], ctx.state)
         with self.sessions() as db:
             state = db.get(CaseState, (ctx.wid, ctx.project['id']))
             tasks = self.tasks(db, ctx)
@@ -798,10 +833,14 @@ class Service(EnrollmentService):
             return run.receipt
 
     def manual(self, ctx, body):
-        fields(body, {'title', 'instructions', 'node_keys', 'participants', 'due_date'})
+        fields(body, {'title', 'instructions', 'node_keys', 'participants', 'due_date', 'is_test'})
+        is_test = body.get('is_test', False)
+        require(type(is_test) is bool, 'invalid_request')
         self.writable()
         with self.sessions.begin() as db:
             ctx, state = self.lock(db, ctx)
+            if is_test:
+                authorize_test_operator(ctx)
             keys = row_keys(body.get('node_keys', []))
             self.check_policy_write(db, ctx, keys)
             nodes = self.nodes(db, ctx, keys)
@@ -812,21 +851,79 @@ class Service(EnrollmentService):
             except ValueError:
                 require(False, 'invalid_request')
             task = LocalTask(workspace_id=ctx.wid, id=str(uuid4()), project_id=ctx.project['id'],
-                             template_family_id='manual', source_row_key=str(uuid4()), instance_scope='case', snapshot={},
+                             template_family_id='manual', source_row_key=str(uuid4()), instance_scope='case',
+                             snapshot={'test_fixture': True} if is_test else {},
                              title=text(body.get('title'), 500, empty=False), instructions=text(body.get('instructions', '')),
                              participants=self.participants(ctx, body.get('participants', {})),
                              applicability=Applicability.APPLICABLE, state=Lifecycle.PENDING, revision=1,
                              local={'due_date': due, 'timezone': 'Asia/Taipei', 'date_status': 'manual' if due else 'unresolved',
-                                    'completion_rule_status': 'no_typed_obligations', 'attestations': {}})
+                                    'completion_rule_status': 'no_typed_obligations', 'attestations': {},
+                                    **({'is_test': True} if is_test else {})})
             db.add(task)
             db.flush()
             for n in nodes:
                 db.add(TaskNodeLink(workspace_id=ctx.wid, task_id=task.id, project_id=ctx.project['id'],
                                     node_id=n['node_id'], node_key=n['node_key'], ordinal=10000))
-            self.event(db, ctx, task, 'created', {})
+            self.event(db, ctx, task, 'created', {'is_test': True} if is_test else {})
             state.checklist_revision += 1
             return {'task_id': task.id, 'revision': task.revision, 'checklist_revision': state.checklist_revision,
                     'task': self.task_views(db, ctx, [task])[0]}
+
+    def tag_test(self, ctx, task_id, body):
+        fields(body, {'expected_revision', 'is_test', 'reason'})
+        require(type(body.get('expected_revision')) is int and type(body.get('is_test')) is bool, 'invalid_request')
+        reason = text(body.get('reason'), 1000, empty=False)
+        self.writable()
+        with self.sessions.begin() as db:
+            ctx, state = self.lock(db, ctx)
+            authorize_test_operator(ctx)
+            task = self.task(db, ctx, task_id)
+            disposable(task)
+            require(task.revision == body['expected_revision'], 'task_revision_conflict', 409)
+            before = task.local.get('is_test') is True
+            task.local = {**task.local, 'is_test': body['is_test']}
+            task.revision += 1
+            state.checklist_revision += 1
+            self.event(db, ctx, task, 'test_tagged', {'before': before, 'is_test': body['is_test'], 'reason': reason})
+            return {'task': self.task_views(db, ctx, [task])[0], 'checklist_revision': state.checklist_revision}
+
+    def cleanup_test(self, ctx, task_id, body):
+        fields(body, {'expected_revision', 'reason'})
+        require(type(body.get('expected_revision')) is int, 'invalid_request')
+        reason = text(body.get('reason'), 1000, empty=False)
+        task_id = identifier(task_id)
+        self.writable()
+        with self.sessions.begin() as db:
+            ctx, state = self.lock(db, ctx)
+            authorize_test_operator(ctx)
+            task = db.get(LocalTask, (ctx.wid, task_id))
+            if task is None:
+                cleaned = db.scalar(select(TaskEvent.id).where(TaskEvent.workspace_id == ctx.wid,
+                                    TaskEvent.project_id == ctx.project['id'], TaskEvent.task_id == task_id,
+                                    TaskEvent.kind == 'test_cleaned').limit(1))
+                require(cleaned is not None, 'task_not_found', 404)
+                return {'task_id': task_id, 'removed': False, 'replayed': True,
+                        'checklist_revision': state.checklist_revision}
+            task = self.task(db, ctx, task_id)
+            disposable(task)
+            require(task.local.get('is_test') is True, 'test_task_required', 409)
+            require(task.revision == body['expected_revision'], 'task_revision_conflict', 409)
+            require(audit_history_detached(db.connection()), 'cleanup_migration_required', 503)
+            links = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == ctx.wid,
+                                   TaskNodeLink.project_id == ctx.project['id'], TaskNodeLink.task_id == task_id)))
+            self.event(db, ctx, task, 'test_cleaned', {'reason': reason, 'is_test': True,
+                       'origin': {'template_family_id': task.template_family_id, 'source_row_key': task.source_row_key,
+                                  'instance_scope': task.instance_scope, 'imported_version_id': task.imported_version_id},
+                       'node_links': [{'node_id': link.node_id, 'node_key': link.node_key} for link in links]})
+            db.flush()
+            db.execute(delete(TaskNodeLink).where(TaskNodeLink.workspace_id == ctx.wid,
+                       TaskNodeLink.project_id == ctx.project['id'], TaskNodeLink.task_id == task_id))
+            # The sole physical removal path; ORM origin/history guards stay intact.
+            db.execute(delete(LocalTask).where(LocalTask.workspace_id == ctx.wid,
+                       LocalTask.project_id == ctx.project['id'], LocalTask.id == task_id))
+            state.checklist_revision += 1
+            return {'task_id': task_id, 'removed': True, 'replayed': False,
+                    'checklist_revision': state.checklist_revision}
 
     @staticmethod
     def node_done(ctx):

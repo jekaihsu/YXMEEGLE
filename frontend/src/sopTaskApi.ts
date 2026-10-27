@@ -14,7 +14,10 @@ export const ROLES: readonly Role[] = ['executor','checker','confirmer'];
 export interface SopCounts {done: number; total: number; unresolved: number; not_applicable: number; archived: number}
 export interface SopAssignee {id: string; name: string; case_roles: string[]; department: string|null}
 export interface SopSuggestion {taskId: string; ruleId: string; ruleRevision: number; tier: 'proof'|'indicator'; state: 'done'|'in_progress'; facts: Record<string, unknown>; hash: string}
+export const SYNC_STATES = ['同步中','已同步','Lark 已變更','同步失敗','未啟用'] as const;
+export interface SopLarkSync {state: typeof SYNC_STATES[number]; syncedAt: number|null; recordId: string|null; baseId: string|null; tableId: string|null}
 export interface SopTask {
+ larkSync: SopLarkSync;
  result?:{note:string; actorId:string; actorName:string; at:number}|null; completionBlockedReason?:string|null;
  allowedActions: string[]; suggestion: SopSuggestion|null; shared: boolean; conditional: boolean;
  id: string; title: string; instructions: string|null; participants: Partial<Record<Role,string>>;
@@ -77,6 +80,11 @@ export function parseSuggestion(v: unknown): SopSuggestion {
  const s = object(v); return {taskId: str(s.task_id), ruleId: str(s.rule_id), ruleRevision: int(s.rule_revision), tier: oneOf(['proof','indicator'] as const)(s.tier), state: oneOf(['done','in_progress'] as const)(s.suggested_state), facts: object(s.facts), hash: str(s.facts_hash)};
 }
 export function parseAssignees(v: unknown): SopAssignee[] {return list(object(v).people, p => {const x=object(p);return {id:str(x.id),name:str(x.name),case_roles:list(x.case_roles,str),department:optStr(x.department)}})}
+function parseLarkSync(v: unknown): SopLarkSync {
+ if (v == null) return {state: '未啟用', syncedAt: null, recordId: null, baseId: null, tableId: null};
+ const s = object(v);
+ return {state: oneOf(SYNC_STATES)(s.state), syncedAt: s.synced_at == null ? null : seconds(s.synced_at), recordId: optStr(s.record_id), baseId: optStr(s.base_id), tableId: optStr(s.table_id)};
+}
 function task(v: unknown): SopTask {
  const t = object(v), local = object(t.local), origin = object(t.origin), people = object(t.participants);
  const participants: SopTask['participants'] = {};
@@ -84,7 +92,7 @@ function task(v: unknown): SopTask {
  const dueDate = optStr(local.due_date);
  if (dueDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) throw malformed();
  const result=t.result==null?null:object(t.result);
- return {result:result?{note:str(result.note),actorId:str(result.actor_id),actorName:str(result.actor_name),at:seconds(result.at)}:null,
+ return {larkSync: parseLarkSync(t.lark_sync), result:result?{note:str(result.note),actorId:str(result.actor_id),actorName:str(result.actor_name),at:seconds(result.at)}:null,
   completionBlockedReason:optStr(t.completion_blocked_reason),allowedActions: list(t.allowed_actions,str), suggestion: t.suggestion == null ? null : parseSuggestion(t.suggestion), shared: bool(t.is_shared), conditional: bool(t.is_conditional), id: str(t.id), title: str(t.title), instructions: optStr(t.instructions), participants, applicability: applicability(t.applicability),
   state: lifecycle(t.state), revision: int(t.revision), overdue: bool(t.overdue), manual: origin.template_family_id === 'manual',
   dueDate, dateStatus: str(local.date_status), completionRule: str(local.completion_rule_status),
