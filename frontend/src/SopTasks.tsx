@@ -68,7 +68,7 @@ export function SopTasks({c, p, nodeKey, sop, importing, setImporting,remote=fal
  const routeTask = c.route.task_source === SOP_TASK_SOURCE ? c.route.task : undefined;
  useEffect(()=>{if(cleanupFocus && !routeTask){document.getElementById('sop-tasks')?.focus();setCleanupFocus(false)}},[cleanupFocus,routeTask]);
  const openTask = data?.tasks.find(t => t.id === routeTask);
- const openRoute = (task?: string) => c.go({...c.route, tab: c.route.tab==='overview'?'overview':'flow', task, task_source: task ? SOP_TASK_SOURCE : undefined});
+ const openRoute = (task?: string) => c.go({...c.route, tab: c.route.tab==='overview'?'overview':'flow', task, task_source: task ? SOP_TASK_SOURCE : undefined}, !task);
  const toggle = (f: SopFilter) => setFilters(list => list.includes(f) ? list.filter(x => x !== f) : [...list, f]);
  const rows = data ? visibleTasks(data.tasks, {scope, filters, history}, me) : [];
  const counts = data ? (scope ? data.nodeCounts[scope] : data.caseCounts) : undefined;

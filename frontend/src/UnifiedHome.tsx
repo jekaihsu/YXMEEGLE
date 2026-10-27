@@ -29,7 +29,7 @@ function Sections({view,ids,render,reportStale=false}:{view:HomeViewId;ids:HomeC
  return <>{sections.filter(section=>section.id==='todo').map(renderSection)}{ids.includes('kpi')&&render('kpi')}{sections.filter(section=>section.id!=='todo').map(renderSection)}</>;
 }
 
-type ViewProps={attendanceRead:{view?:PeopleAttendance;loading:boolean;error:string};ids:HomeCardId[];c:Ctx;today:string;assigned:PanelRead;confirmation:PanelRead;dispatch:()=>ReactNode;attendance:(id:'leave'|'trips')=>ReactNode};
+type ViewProps={cases:PanelRead;attendanceRead:{view?:PeopleAttendance;loading:boolean;error:string};ids:HomeCardId[];c:Ctx;today:string;assigned:PanelRead;confirmation:PanelRead;dispatch:()=>ReactNode;attendance:(id:'leave'|'trips')=>ReactNode};
 function AssignView(props:ViewProps){
  const data=useAssignData(props.c);
  const unavailable=!data.team.pending&&!data.review.pending&&!panelSource(data.team)&&!panelSource(data.review);
@@ -57,6 +57,8 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
  const homeContext={...c,reloadVersion:readGeneration.current};
  const [workKind,setWorkKind]=useState('');
  const assigned=useHomePanels(homeContext,{panel:'assigned',scope:'mine',limit:100,kinds:workKind||undefined});
+ const unfilteredAssigned=useHomePanels(homeContext,{panel:'assigned',scope:'mine',limit:100},!!workKind);
+ const cases=workKind?unfilteredAssigned:assigned;
  const manager=assigned.body?.manager_view_available??null;
  const views:HomeViewId[]=preview?[...HOME_PREVIEWS[preview].views]:availableViews(c.s.user,manager);
  const chosen=preview?previewView:settings.view;
@@ -94,7 +96,7 @@ function HomeWorkspace({c,storageKey,preview}:{c:Ctx;storageKey:string;preview:k
  const dispatchCard=()=><HomeDispatchCard key="dispatch" today={today} reloadVersion={homeContext.reloadVersion}/>;
  const attendanceUnavailable=!attendance.loading&&(!attendance.data||!['ok','incomplete','stale'].includes(attendance.data.status));
  const contentIds=availableVisible.filter(id=>!attendanceUnavailable||!['leave','trips','absence','impact'].includes(id));
- const props:ViewProps={dispatch:dispatchCard,attendanceRead:{view:attendance.data,loading:attendance.loading,error:attendance.error},ids:contentIds,c:homeContext,today,assigned,confirmation,attendance:attendanceCard};
+ const props:ViewProps={cases,dispatch:dispatchCard,attendanceRead:{view:attendance.data,loading:attendance.loading,error:attendance.error},ids:contentIds,c:homeContext,today,assigned,confirmation,attendance:attendanceCard};
  const missingMine=!assigned.pending&&!confirmation.pending&&!workSource(homeContext,'assigned',today,assigned)&&!workSource(homeContext,'confirmation',today,confirmation);
  const renderCard=(id:HomeCardId)=>id==='dispatch'?dispatchCard():id==='leave'||id==='trips'?attendanceCard(id):<MineCard key={id} id={id} {...props}/>;
  return <div className="unified-home" data-home-view={view}><div className="ds-page"><header className="ds-page-head"><div>

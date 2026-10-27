@@ -2,7 +2,7 @@ import {SopLarkSync} from './SopLarkSync';
 import {InlineTaskEditor} from './InlineTaskEditor';
 import {editorFields,type TaskDraft} from './nodeWorkbenchModel';
 import {TaskSuggestion,SuggestionReview} from './SopSuggestions';
-import {useState, type ReactNode} from 'react';
+import {useRef, useState, type ReactNode} from 'react';
 import {Badge, Button, Row, Section} from './design';
 import {SopError, sopApi, sopErrorText, sopNodeLabel, type Applicability, type MutationResult, type SopTask, SOP_ERROR_TEXT} from './sopTaskApi';
 import {APPLICABILITY_LABEL, ROLE_LABEL, stateLabel, taskActions, type TaskAction} from './sopTaskModel';
@@ -57,19 +57,40 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
   } finally {if(sop.current())setBusy(false)}
  };
  const [resultNote,setResultNote]=useState('');
- const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
- const run = async (call: () => Promise<MutationResult>, done: string) => {
-  setBusy(true); setError(''); setNotice('');
-  try {await call(); await sop.reload(); if (sop.current()) setNotice(done); return true}
-  catch (e) {
+ const [writeBusy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
+ const [verify, setVerify] = useState<'idle'|'checking'|'failed'>('idle');
+ const busy = writeBusy || verify !== 'idle';
+ const [pending, setPending] = useState('');
+ const writing = useRef(false);
+ const confirmOutcome = async () => {
+  writing.current = true; setVerify('checking'); setError(''); setNotice('');
+  const confirmed = await sop.readback();
+  if (!sop.current()) return;
+  if (confirmed) {writing.current = false; setVerify('idle'); setNotice('已重新讀取，任務狀態以最新資料為準')}
+  else setVerify('failed');
+ };
+ const run = async (call: () => Promise<MutationResult>, done: string, label = '儲存中…') => {
+  if (busy || writing.current) return false;
+  writing.current = true;
+  setBusy(true); setPending(label); setError(''); setNotice('');
+  let verifying = false;
+  try {
+   const receipt = await call();
+   if (!sop.current()) return true;
+   if (receipt.task) sop.applyTask(receipt.task, receipt.checklist_revision);
+   setNotice(done);
+   void sop.reload();
+   return true;
+  } catch (e) {
    if (!sop.current()) return false;
+   if (e instanceof SopError && e.ambiguous) {verifying = true; void confirmOutcome(); return false}
    setError(sopErrorText(e));
-   if (e instanceof SopError && (e.code === 'task_revision_conflict' || e.ambiguous)) await sop.reload();
-  return false;
-  } finally {if (sop.current()) setBusy(false)}
+   if (e instanceof SopError && e.code === 'task_revision_conflict') void sop.reload();
+   return false;
+  } finally {if (!verifying) writing.current = false; if (sop.current()) {setBusy(false); setPending('')}}
  };
  const patch = (body: Record<string, unknown>, done: string) => run(() => sopApi.patch(project.id, task.id, {expected_revision: task.revision, ...body}, sop.current), done);
- const transition = (action: TaskAction|'set_applicability', extra: Record<string, unknown> = {}) => run(() => sopApi.transition(project.id, task.id, {expected_revision: task.revision, action, ...extra}, sop.current), '已更新狀態');
+ const transition = (action: TaskAction|'set_applicability', extra: Record<string, unknown> = {}, label?: string) => run(() => sopApi.transition(project.id, task.id, {expected_revision: task.revision, action, ...extra}, sop.current), '已更新狀態', label ? `${label}中…` : undefined);
  const completionReason=busy?'處理中':task.completionBlockedReason?SOP_ERROR_TEXT[task.completionBlockedReason]||'完成條件待核對':!task.allowedActions.includes('complete')?'目前無法完成此任務':!resultNote.trim()?'請填寫結果說明':'';
  const draft={title:task.title,assignee:task.participants.executor || '',due:task.dueDate || '',notes:task.instructions || '',status:task.state,reason:''};
  const editable=task.allowedActions.includes('edit');
@@ -82,20 +103,19 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
   return patch(body,'已儲存任務');
  };
 
- const footer=<div className="pf-actions sop-transitions" role="group" aria-label="狀態操作">{taskActions(task).filter(a=>a.action!=='complete').reverse().map(a => a.reason
-    ? <Reasoned key={a.action} label={a.label} busy={busy} onSubmit={reason => void transition(a.action, {reason})}/>
-    : <FlowAction key={a.action} allowed={!busy} reason="處理中" onClick={() => void transition(a.action)}>{a.label}</FlowAction>)}</div>;
- return <TaskDrawer footer={taskActions(task).length ? footer : undefined} kind="sop" label={`SOP 任務 · ${task.title}`} trail={['SOP 任務',task.nodes.map(n=>sopNodeLabel(n.node_key)).join('、')]} title={task.title} status={<SopLarkSync task={task} link/>} onClose={() => {if (!busy) onClose()}}>
+ const footer=<>{error && !cleanupOpen && <p role="alert" className="pg-callout">{error}</p>}{writeBusy && <p role="status" className="sop-muted">{pending}</p>}{verify==='checking' && <p role="status" className="sop-muted">正在確認剛才的操作結果，確認前不能再修改…</p>}{verify==='failed' && <div role="alert" className="pg-callout">無法確認剛才的操作是否已完成，請先重新讀取，不要重複送出。<Button onClick={() => void confirmOutcome()}>重新讀取</Button></div>}<div className="pf-actions sop-transitions" role="group" aria-label="狀態操作" aria-busy={busy}>{taskActions(task).filter(a=>a.action!=='complete').reverse().map(a => a.reason
+    ? <Reasoned key={a.action} label={a.label} busy={busy} onSubmit={reason => void transition(a.action, {reason}, a.label)}/>
+    : <FlowAction key={a.action} allowed={!busy} reason="處理中" onClick={() => void transition(a.action, {}, a.label)}>{busy && pending===`${a.label}中…` ? pending : a.label}</FlowAction>)}</div></>;
+ return <TaskDrawer footer={taskActions(task).length||busy||(error&&!cleanupOpen) ? footer : undefined} kind="sop" label={`SOP 任務 · ${task.title}`} trail={['SOP 任務',task.nodes.map(n=>sopNodeLabel(n.node_key)).join('、')]} title={task.title} status={<SopLarkSync task={task} link/>} onClose={() => {if (!busy) onClose()}}>
   <div className="sop-inspector">
    <div className="sop-badges"><Badge tone="accent">SOP 任務</Badge>{task.isTest && <Badge tone="warning">測試</Badge>}<Badge>{stateLabel(task)}</Badge>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.applicability !== 'applicable' && <Badge tone="warning">{APPLICABILITY_LABEL[task.applicability]}</Badge>}</div>
-   {error && !cleanupOpen && <p role="alert" className="pg-callout">{error}</p>}
    {notice && <p role="status" className="sop-muted">{notice}</p>}
    <InlineTaskEditor busy={busy || sop.state.kind!=='ready' || sop.state.refreshing} model={{draft,fields:editorFields({title:editable,assignee:editable,due:editable,notes:editable && task.instructions!==null,status:false},task.state==='archived'?'已封存':task.state==='done'?'已完成':'需管理權限'),people:sop.assignees,statuses:[{id:task.state,label:stateLabel(task)}],maxTitle:500,maxNotes:20000,dueReason:true,readOnlyReason:task.state==='archived'?'已封存':task.state==='done'?'已完成':undefined}} onSave={save}/>
    {editable && <ParticipantRoles task={task} people={sop.assignees} busy={busy} save={participants=>patch({participants},'已更新人員')}/>}
    {task.allowedActions.includes('set_applicability') && <ApplicabilityEditor task={task} busy={busy} save={(applicability,reason)=>transition('set_applicability',{applicability,reason})}/>}
 
    {task.result && <Section title="完成結果"><Row label="完成人員" value={task.result.actorName}/><Row label="完成時間" value={new Date(task.result.at*1000).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false})}/><Row label="結果說明" value={<span className="sop-raw">{task.result.note}</span>}/></Section>}
-   {task.state!=='done'&&task.state!=='archived'&&<form className="sop-form sop-result" onSubmit={e=>{e.preventDefault();if(!completionReason)void transition('complete',{result_note:resultNote.trim()})}}>
+   {task.state!=='done'&&task.state!=='archived'&&<form className="sop-form sop-result" onSubmit={e=>{e.preventDefault();if(!completionReason)void transition('complete',{result_note:resultNote.trim()},'完成')}}>
     <Field label="結果說明"><textarea rows={4} maxLength={20000} value={resultNote} disabled={busy||!task.allowedActions.includes('complete')} onChange={e=>setResultNote(e.target.value)}/></Field>
     {completionReason&&<p className="sop-muted" role="status">{completionReason}</p>}
     <Button type="submit" variant="primary" disabled={!!completionReason} disabledReason={completionReason}>完成</Button>

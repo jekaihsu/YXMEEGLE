@@ -209,7 +209,18 @@ def build_home_task(ws,p,n,t,user,as_of):
                 activation_blockers=activation,detail=detail)
 
 
-def build_sop_home_task(project, task, links, user, users, writes_enabled):
+def _sop_target(project, task, links, full_case):
+    """Readers of the case land in its flow with the task drawer open; assignment-only holders get the restricted page."""
+    target = {'view': 'project', 'project': project['id'], 'tab': 'flow', 'task': task.id, 'task_source': 'sop_local'}
+    if full_case:
+        if links:
+            target['node'] = links[0].node_key
+    else:
+        target['section'] = 'assigned-sop'
+    return target
+
+
+def build_sop_home_task(project, task, links, user, users, writes_enabled, full_case=False):
     from .sop_import.domain import Applicability, Lifecycle
     roles = [role for role, ident in task.participants.items() if ident == user['id']]
     executor = task.participants.get('executor')
@@ -234,6 +245,5 @@ def build_sop_home_task(project, task, links, user, users, writes_enabled):
             'original_deadline': None, 'deadline_basis': 'sop_task',
             'can_execute': 'executor' in roles and not blockers and task.state in {Lifecycle.PENDING, Lifecycle.IN_PROGRESS},
             'blocked_reasons': blockers, 'detail': None, 'result': task.local.get('result'),
-            'target': {'view': 'project', 'project': project['id'], 'tab': 'flow',
-                       'task': task.id, 'task_source': 'sop_local', 'section': 'assigned-sop'},
+            'target': _sop_target(project, task, links, full_case),
             '_mine': 'executor' in roles, '_review': bool(set(roles) & {'checker', 'confirmer'})}

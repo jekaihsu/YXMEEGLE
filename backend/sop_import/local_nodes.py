@@ -32,17 +32,21 @@ def projection(service, db, ctx):
     tasks = service.tasks(db, ctx)
     links = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == ctx.wid,
         TaskNodeLink.project_id == ctx.project['id'])))
+    legacy_by_node = {}
+    for task in db.scalars(select(BusinessRow).where(BusinessRow.workspace_id == ctx.wid, BusinessRow.kind == 'tasks',
+                                                     BusinessRow.parent_id.in_([row.entity_id for row in nodes]))):
+        legacy_by_node.setdefault(task.parent_id, []).append(task)
+    policies = service.policy_write_reasons(db, ctx, [row.data.get('key') for row in nodes])
     result = []
     for row in nodes:
         n = row.data
         key = n.get('key')
         linked = [t for t in tasks if any(l.task_id == t.id and l.node_key == key for l in links)]
-        legacy = list(db.scalars(select(BusinessRow).where(BusinessRow.workspace_id == ctx.wid,
-            BusinessRow.kind == 'tasks', BusinessRow.parent_id == row.entity_id)))
+        legacy = legacy_by_node.get(row.entity_id, [])
         unfinished = any(t.state != Lifecycle.ARCHIVED and (t.applicability == Applicability.UNRESOLVED or
             t.applicability == Applicability.APPLICABLE and t.state != Lifecycle.DONE) for t in linked)
         unfinished = unfinished or any(t.data.get('required') and t.data.get('status') not in {'completed', 'superseded'} for t in legacy)
-        policy = service.policy_write_reason(db, ctx, [key])
+        policy = policies[key]
         reason = ('任務寫入尚未開放' if not service.writes_enabled() else '需由案件 PM 或管理者操作' if not can_manage(ctx)
                   else policy[1] if policy else None)
         node = next(n for n in project['nodes'] if n['key'] == key)
