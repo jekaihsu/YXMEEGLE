@@ -34,10 +34,10 @@ const myCases=(c:Ctx,assigned:PanelRead):CaseRow[]=>{
  const external:CaseRow[]=[...fromWork].filter(([id])=>!known.has(id)).map(([id,info])=>({id,code:info.code,name:info.name,client:'',pinned:pins.has(id),assigned:true,href:info.href}));
  return [...owned,...external].map((row,i)=>({row,i})).sort((a,b)=>rank(a.row)-rank(b.row)||a.i-b.i).map(({row})=>row);
 };
-export function MineCard({id,c,today,assigned,confirmation}:{id:HomeCardId;c:Ctx;today:string;assigned:PanelRead;confirmation:PanelRead}){
+export function MineCard({id,c,today,assigned,cases,confirmation}:{id:HomeCardId;c:Ctx;today:string;assigned:PanelRead;cases:PanelRead;confirmation:PanelRead}){
  if(id==='work'||id==='confirmation')return <WorkCard c={c} id={id} panel={id==='work'?'assigned':'confirmation'} today={today} read={id==='work'?assigned:confirmation}/>;
  if(id==='mycases'){
-  const rows=myCases(c,assigned),coverage=caseCoverage(assigned);
+  const rows=myCases(c,cases),coverage=caseCoverage(cases);
   return <Card id={id} subtitle="你負責、釘選或有你任務的案件" href="#view=projects" action="開啟案件總覽">
    {rows.slice(0,8).map(p=><Row key={p.id} label={`${p.code} ${p.name}`} detail={[p.pinned?'已釘選':p.assigned?'有你的任務':'',p.client].filter(Boolean).join(' · ')} value={p.due_date?`期限 ${p.due_date.slice(0,10).replaceAll('-','/')}`:''} href={p.href||`#view=project&project=${p.id}`}/>)}
    {coverage!=='complete'&&<p className="home-source-note" role="status">{COVERAGE_NOTE[coverage]}{coverage!=='loading'&&<> <a href="#view=work">開啟我的工作</a></>}</p>}

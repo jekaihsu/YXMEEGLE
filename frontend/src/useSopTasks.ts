@@ -52,24 +52,27 @@ export function useSopTasks(projectId: string, workspace: string, enabled=true) 
  const [assigneeError,setAssigneeError]=useState('');
  const [state, setState] = useState<SopListState>(() => {const data = cached(key); return data ? {kind: 'ready', data, refreshing: true} : {kind: 'loading'}});
  const life = useRef({key, epoch: getSessionEpoch(), active: true, seq: 0});
- const reload = useCallback(async (force=true) => {
-  if(!enabled){setState({kind:'forbidden'});return}
+ const readback = useCallback(async (force=true): Promise<boolean> => {
+  if(!enabled){setState({kind:'forbidden'});return false}
   if(force)denied.delete(key);
   const scope = life.current, seq = ++scope.seq;
   const current = () => scope.active && scope === life.current && seq === scope.seq && scope.epoch === getSessionEpoch();
   setState(s => s.kind === 'ready' ? {...s, refreshing: true} : s);
   try {
    const data = await prefetchSopTasks(projectId,workspace,force);
-   if (!current()) return;
+   if (!current()) return false;
    const previous = cache.get(key);
    if (!previous || previous.checklistRevision <= data.checklistRevision) cache.set(key, data);
    setState({kind: 'ready', data: cache.get(key)!, refreshing: false});
+   return true;
   } catch (error) {
-   if (!current()) return;
-   if (error instanceof SopError && [401, 403, 404].includes(error.status)) {cache.delete(key); if(error.status===403&&error.code==='sop_import_forbidden')setState({kind:'forbidden'});else setState({kind:'error',message:sopErrorText(error)});return}
+   if (!current()) return false;
+   if (error instanceof SopError && [401, 403, 404].includes(error.status)) {cache.delete(key); if(error.status===403&&error.code==='sop_import_forbidden')setState({kind:'forbidden'});else setState({kind:'error',message:sopErrorText(error)});return false}
    setState(s => ({kind: 'error', message: sopErrorText(error), data: 'data' in s ? s.data : undefined}));
+   return false;
   }
  }, [projectId, key, workspace, enabled]);
+ const reload = useCallback(async (force=true) => {await readback(force)}, [readback]);
  useEffect(() => {
   life.current = {key, epoch: getSessionEpoch(), active: true, seq: 0};
   if(!enabled){setState({kind:'forbidden'});setAssignees([]);setAssigneeError('');return()=>{life.current.active=false}}
@@ -105,7 +108,7 @@ export function useSopTasks(projectId: string, workspace: string, enabled=true) 
  }, [key, reload, syncing]);
  const current = useCallback(() => life.current.active && life.current.epoch === getSessionEpoch(), []);
  const sameScope=life.current.key===key&&life.current.epoch===getSessionEpoch();
- return {state:!enabled?{kind:'forbidden'} satisfies SopListState:!sameScope?{kind:'loading'} satisfies SopListState:state, reload, applyTask, current, assignees:enabled&&sameScope?assignees:[], assigneeError};
+ return {state:!enabled?{kind:'forbidden'} satisfies SopListState:!sameScope?{kind:'loading'} satisfies SopListState:state, reload, readback, applyTask, current, assignees:enabled&&sameScope?assignees:[], assigneeError};
 }
 
 export type ImportStep = 'version'|'select'|'confirm'|'receipt';
