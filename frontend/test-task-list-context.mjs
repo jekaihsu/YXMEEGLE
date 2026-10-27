@@ -63,4 +63,13 @@ assert.equal(document.querySelector('.task-inspector'),null);assert.equal(rows()
 const row=[...document.querySelectorAll('[data-assignment-task]')].find(li=>li.dataset.assignmentTask===opened).querySelector('.pf-task-open');
 assert.equal(document.activeElement,row,'focus returns to the reopened row');
 
+
+await mount('view=project&project=p1&tab=tasks&node=node_sales');
+await click(document.querySelector('.pf-task-open'));
+await click([...document.querySelectorAll('.task-inspector button')].find(b=>b.textContent.trim()==='查看節點檔案'));
+const stage=()=>[...document.querySelectorAll('.daily-filters label')].find(l=>l.textContent.startsWith('所屬階段')).querySelector('select');
+assert.ok(c.route.node);assert.equal(stage().value,c.route.node,'Files preselects the task node stage');
+await mount('view=project&project=p1&tab=files');
+assert.equal(stage().value,'all','bare Files keeps every stage');
+
 await act(async()=>root.unmount());console.log('Task list context checks passed');
