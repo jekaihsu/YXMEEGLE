@@ -66,6 +66,21 @@ def holds_task(task, user_id):
     return user_id in task.participants.values()
 
 
+def created_as_test(task):
+    """Only a manual task created as a test fixture may be tagged or removed; the marker lives in the immutable origin."""
+    return task.template_family_id == 'manual' and task.snapshot.get('test_fixture') is True
+
+
+def completed_with_proof(task):
+    return (Lifecycle.DONE in {task.state, task.previous_state}
+            and any(task.local.get(key) for key in ('result', 'evidence_basis', 'attestations')))
+
+
+def disposable(task):
+    require(created_as_test(task), 'test_task_required', 409)
+    require(not completed_with_proof(task), 'task_reopen_required', 409)
+
+
 def authorize(ctx, write=False):
     if ctx.assigned_only:
         require(ctx.user.get('active', True), 'sop_import_forbidden', 403)
@@ -804,7 +819,9 @@ class Service(EnrollmentService):
             return run.receipt
 
     def manual(self, ctx, body):
-        fields(body, {'title', 'instructions', 'node_keys', 'participants', 'due_date'})
+        fields(body, {'title', 'instructions', 'node_keys', 'participants', 'due_date', 'is_test'})
+        is_test = body.get('is_test', False)
+        require(type(is_test) is bool, 'invalid_request')
         self.writable()
         with self.sessions.begin() as db:
             ctx, state = self.lock(db, ctx)
@@ -818,18 +835,20 @@ class Service(EnrollmentService):
             except ValueError:
                 require(False, 'invalid_request')
             task = LocalTask(workspace_id=ctx.wid, id=str(uuid4()), project_id=ctx.project['id'],
-                             template_family_id='manual', source_row_key=str(uuid4()), instance_scope='case', snapshot={},
+                             template_family_id='manual', source_row_key=str(uuid4()), instance_scope='case',
+                             snapshot={'test_fixture': True} if is_test else {},
                              title=text(body.get('title'), 500, empty=False), instructions=text(body.get('instructions', '')),
                              participants=self.participants(ctx, body.get('participants', {})),
                              applicability=Applicability.APPLICABLE, state=Lifecycle.PENDING, revision=1,
                              local={'due_date': due, 'timezone': 'Asia/Taipei', 'date_status': 'manual' if due else 'unresolved',
-                                    'completion_rule_status': 'no_typed_obligations', 'attestations': {}})
+                                    'completion_rule_status': 'no_typed_obligations', 'attestations': {},
+                                    **({'is_test': True} if is_test else {})})
             db.add(task)
             db.flush()
             for n in nodes:
                 db.add(TaskNodeLink(workspace_id=ctx.wid, task_id=task.id, project_id=ctx.project['id'],
                                     node_id=n['node_id'], node_key=n['node_key'], ordinal=10000))
-            self.event(db, ctx, task, 'created', {})
+            self.event(db, ctx, task, 'created', {'is_test': True} if is_test else {})
             state.checklist_revision += 1
             return {'task_id': task.id, 'revision': task.revision, 'checklist_revision': state.checklist_revision,
                     'task': self.task_views(db, ctx, [task])[0]}
@@ -842,6 +861,7 @@ class Service(EnrollmentService):
         with self.sessions.begin() as db:
             ctx, state = self.lock(db, ctx)
             task = self.task(db, ctx, task_id)
+            disposable(task)
             require(task.revision == body['expected_revision'], 'task_revision_conflict', 409)
             before = task.local.get('is_test') is True
             task.local = {**task.local, 'is_test': body['is_test']}
@@ -867,6 +887,7 @@ class Service(EnrollmentService):
                 return {'task_id': task_id, 'removed': False, 'replayed': True,
                         'checklist_revision': state.checklist_revision}
             task = self.task(db, ctx, task_id)
+            disposable(task)
             require(task.local.get('is_test') is True, 'test_task_required', 409)
             require(task.revision == body['expected_revision'], 'task_revision_conflict', 409)
             links = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == ctx.wid,
