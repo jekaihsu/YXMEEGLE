@@ -12,3 +12,7 @@ export function projectFlowRoute(route:ProjectRoute){
 export function homeTarget({assignment_node,assignment_task,...target}:import('./useHomePanels').HomeTarget){
  return {...target,node:assignment_node ?? target.node,task:assignment_task ?? target.task};
 }
+
+export function withTaskScope<T extends ProjectRoute>(route:T,all:boolean):T {
+ return {...route,section:all ? 'all-tasks' : undefined,all_tasks:undefined};
+}
