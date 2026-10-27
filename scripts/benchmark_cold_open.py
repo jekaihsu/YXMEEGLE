@@ -1,10 +1,13 @@
 """Time the case-open reads against a workspace at roughly staging scale (local sqlite, synthetic filler).
 
-Run from the repository root: PYTHONPATH=. python scripts/benchmark_cold_open.py
-Prints each read serially (first and warm), then the five reads of a cold case open fired at once, then the
-server-side phase timings of each case read. Absolute times are this machine's; compare runs on the same machine.
+Run from a repository root (base or branch): PYTHONPATH=. python scripts/benchmark_cold_open.py [iterations]
+COLD runs clear every in-process cache that exists in that checkout (the shared collection reads and any
+functools caches under backend.*) before each measurement. WARM runs follow a priming pass and clear nothing.
+The same script runs on a base checkout that has no shared cache, where cold and warm coincide.
+Not reset: SQLite's page cache and the OS file cache, so "cold" is a cold process cache over a hot database.
+Absolute times are this machine's; compare base against branch on the same machine, never against staging.
 """
-import json, sys, time, threading, pathlib, shutil, tempfile
+import json, sys, time, threading, pathlib, shutil, tempfile, statistics
 from copy import deepcopy
 from sqlalchemy import select, text
 from backend.test_sop_local_case import CAPS
@@ -47,26 +50,56 @@ with app.state.sessions.begin() as db:
         db.add(BusinessRow(workspace_id=WID, kind='projects', entity_id=data['id'], parent_id='', ordinal=20000 + i, data=data))
 ws = None
 signin('u-manager')
-from sqlalchemy import event
-rowsread = {'n': 0}
-@event.listens_for(app.state.engine, 'before_cursor_execute')
-def _c(conn, cur, st, params, ctx, many):
-    if 'business_records' in st: rowsread['n'] += 1
-with app.state.sessions() as db:
-    print('DBROWS', {k: db.execute(text("select count(*), sum(length(data)) from business_records where kind=:k"), {'k': k}).fetchone() for k in ('source_quotes','contract_items','source_confirmations','projects')}, 'schema', db.get(WorkspaceRow, WID).data.get('storage_schema'), file=sys.stderr)
-r0 = client.get(f'/api/projects/{PID}/sop-tasks'); print('SOP', r0.status_code, len(r0.content), 'br_queries', rowsread['n'], file=sys.stderr)
-def timed(path):
-    t = time.perf_counter(); r = client.get(path); return round((time.perf_counter() - t) * 1000), r.status_code
-flow = [f'/api/projects/{PID}', f'/api/projects/{PID}/progress', f'/api/projects/{PID}/sop-tasks', f'/api/projects/{PID}/sop-assignees', '/api/home-panels?panel=assigned&scope=mine&limit=25']
-res = {'serial_first': {p.split(PID)[-1] or '/project': timed(p) for p in flow}}
-res['serial_warm'] = {p.split(PID)[-1] or '/project': timed(p) for p in flow}
-out = {}
-def run(p): out[p] = timed(p)
-t0 = time.perf_counter(); th = [threading.Thread(target=run, args=(p,)) for p in flow]
-[t.start() for t in th]; [t.join() for t in th]
-res['cold_burst'] = {'wall_ms': round((time.perf_counter() - t0) * 1000), 'per': {p.split(PID)[-1] or '/project': v for p, v in out.items()}}
-print('COLD_OPEN', json.dumps(res, ensure_ascii=False))
+ITERATIONS = int(sys.argv[1]) if len(sys.argv) > 1 else 7
+FLOW = [f'/api/projects/{PID}', f'/api/projects/{PID}/progress', f'/api/projects/{PID}/sop-tasks', f'/api/projects/{PID}/sop-assignees', '/api/home-panels?panel=assigned&scope=mine&limit=25']
+NAME = {FLOW[0]: 'project', FLOW[1]: 'progress', FLOW[2]: 'sop-tasks', FLOW[3]: 'sop-assignees', FLOW[4]: 'home-panels'}
 
-for path in flow[:4]:
-    client.get(path); r = client.get(path)
-    print('PHASES', path.split(PID)[-1] or '/project', r.headers.get('server-timing'))
+
+def reset_caches():
+    from backend import storage
+    if hasattr(storage, 'invalidate_shared_reads'): storage.invalidate_shared_reads(None)
+    cleared = 0
+    for name, module in list(sys.modules.items()):
+        if name.startswith('backend.') and module is not None:
+            for value in list(vars(module).values()):
+                if callable(getattr(value, 'cache_clear', None)):
+                    value.cache_clear(); cleared += 1
+    return cleared
+
+
+def timed(path):
+    t = time.perf_counter(); r = client.get(path); assert r.status_code == 200, (path, r.status_code)
+    return round((time.perf_counter() - t) * 1000)
+
+
+def burst():
+    out = {}
+    def run(p): out[p] = timed(p)
+    t0 = time.perf_counter(); threads = [threading.Thread(target=run, args=(p,)) for p in FLOW]
+    [t.start() for t in threads]; [t.join() for t in threads]
+    return round((time.perf_counter() - t0) * 1000), out
+
+
+def spread(values):
+    return {'min': min(values), 'median': statistics.median(values), 'max': max(values), 'n': len(values)}
+
+
+cleared = reset_caches()
+for path in FLOW: timed(path)
+res = {'iterations': ITERATIONS, 'caches_cleared_per_cold_run': cleared}
+res['cold_serial_ms'] = {NAME[p]: spread([(reset_caches(), timed(p))[1] for _ in range(ITERATIONS)]) for p in FLOW}
+for path in FLOW: timed(path)
+res['warm_serial_ms'] = {NAME[p]: spread([timed(p) for _ in range(ITERATIONS)]) for p in FLOW}
+cold = []
+for _ in range(ITERATIONS):
+    reset_caches(); cold.append(burst())
+res['cold_burst_wall_ms'] = spread([w for w, _ in cold])
+res['cold_burst_slowest_read_ms'] = spread([max(per.values()) for _, per in cold])
+burst()
+warm = [burst() for _ in range(ITERATIONS)]
+res['warm_burst_wall_ms'] = spread([w for w, _ in warm])
+res['warm_burst_slowest_read_ms'] = spread([max(per.values()) for _, per in warm])
+print('COLD_OPEN', json.dumps(res, ensure_ascii=False))
+for path in FLOW[:4]:
+    reset_caches(); r = client.get(path)
+    print('COLD_PHASES', NAME[path], r.headers.get('server-timing'))
