@@ -16,6 +16,18 @@ def eligible(project):
     return project.get('case_type') == 'intake' or not str(project.get('code') or '').strip()
 
 
+# Node completion rules read the case, its people, approvals and settings; none of them reads the source tables.
+SOURCE_KINDS = ('source_quotes', 'source_confirmations', 'contract_items', 'source_work_items')
+
+
+def case_workspace(db, root, ctx):
+    """The workspace as completion rules read it, narrowed to the viewed case instead of every case."""
+    workspace = storage.load_partial(db, BusinessRow, root, collections=tuple(k for k in storage.DETAIL_COLLECTIONS if k not in SOURCE_KINDS),
+                                     project_ids=[ctx.project['id']], project_children=storage.PROJECT_CHILDREN,
+                                     filter_project_rows=True)
+    return workspace, next(p for p in workspace['projects'] if p['id'] == ctx.project['id'])
+
+
 def projection(service, db, ctx):
     from .service import can_manage
     if not eligible(ctx.project) or ctx.assigned_only:
@@ -27,8 +39,7 @@ def projection(service, db, ctx):
     root = db.get(WorkspaceRow, ctx.wid)
     if root.data.get('storage_schema') != 2:
         return []
-    workspace = storage.load(db, BusinessRow, root)
-    project = next(p for p in workspace['projects'] if p['id'] == ctx.project['id'])
+    workspace, project = case_workspace(db, root, ctx)
     tasks = service.tasks(db, ctx)
     links = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == ctx.wid,
         TaskNodeLink.project_id == ctx.project['id'])))

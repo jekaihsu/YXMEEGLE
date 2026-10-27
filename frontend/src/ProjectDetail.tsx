@@ -56,10 +56,11 @@ export function ProjectDetailGate({c}:{c:Ctx}){
  useEffect(()=>{
   if(!shell||!id)return;
   if(c.s.features?.node_assignment&&!localCase(c.w.projects.find(p=>p.id===id)||{})&&['overview','flow','items','people'].includes(tab))void prefetchNodeAssignments(id).catch(()=>{});
-  if(['overview','flow','items'].includes(tab))void prefetchProjectProgress(id).catch(()=>{});
+  const warmProgress=()=>{if(['overview','flow','items'].includes(tab))void prefetchProjectProgress(id).catch(()=>{})};
+  if(!sopRead||!['overview','flow'].includes(tab))warmProgress();
   if(['overview','flow'].includes(tab)){
    if(c.s.features?.node_assignment&&!localCase(c.w.projects.find(p=>p.id===id)||{}))void prefetchStartSop(id).catch(()=>{});
-   if(sopRead){void prefetchSopTasks(id,c.s.workspace_id||'',!!c.reloadVersion,true).catch(()=>{});void prefetchSopAssignees(id,c.s.workspace_id||'').catch(()=>{})}
+   if(sopRead)void prefetchSopTasks(id,c.s.workspace_id||'',!!c.reloadVersion,true).catch(()=>{}).then(()=>{warmProgress();void prefetchSopAssignees(id,c.s.workspace_id||'').catch(()=>{})})
   }
  },[shell,id,tab,c.s.workspace_id,sopRead,c.s.features?.node_assignment,c.reloadVersion]);
  const detail=useViewData<ProjectSlice|undefined>(shell?`project:${id}`:'project-legacy',()=>shell&&id?fetchProjectSnapshot(id,c.reloadVersion).catch(async error=>{if(!(error instanceof ApiError)||error.status!==404)throw error;const sop=await prefetchSopTasks(id,c.s.workspace_id||'');const project=checklistProject(sop);if(!project)throw error;deniedProjects.delete(id);return {scope:'project' as const,version:c.w.version,project}}):Promise.resolve(undefined),[c.reloadVersion]);

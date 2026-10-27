@@ -4,16 +4,14 @@ import {requestId} from './nodeAssignmentApi';
 import {SOP_NODE_KEYS, SopError, type SopTask, sopApi, sopErrorText, type ImportPreview, type ImportReceipt, type SopNodeKey, type SopOverview, type SopTemplate, type SopAssignee} from './sopTaskApi';
 import {previewBody, sameSelection, selectionBlockers, type Decisions} from './sopTaskModel';
 
-export type SopListState = {kind: 'loading'} | {kind: 'forbidden'} | {kind: 'error'; message: string; data?: SopOverview} | {kind: 'ready'; data: SopOverview; refreshing: boolean};
+export type SopListState = {kind: 'loading'} | {kind: 'forbidden'} | {kind: 'error'; message: string; data?: SopOverview; retrying?: boolean} | {kind: 'ready'; data: SopOverview; refreshing: boolean};
 let cacheEpoch = getSessionEpoch();
 const cache = new Map<string, SopOverview>();
 const requests = new Map<string, Promise<SopOverview>>();
 const assigneeRequests = new Map<string, Promise<SopAssignee[]>>();
 const assigneeCache = new Map<string, SopAssignee[]>();
 const readAt = new Map<string, number>();
-const startedAt = new Map<string, number>();
-// Only a prefetch may share a read that just started; a reload after a write must not, since that read can predate the write.
-const JOIN_WINDOW_MS = 1000;
+
 const denied = new Map<string, SopError>();
 const deniedAt = new Map<string, number>();
 // A denial lapses so a person newly assigned a task is not locked out of it until the session resets.
@@ -30,12 +28,13 @@ export function canReadSop(user: {active?:boolean} | null | undefined){
 export function prefetchSopTasks(projectId:string,workspace:string,force=false,join=false){
  const key=`${workspace}:${projectId}`, stored=cached(key), epoch=getSessionEpoch();
  const failure=deniedFor(key);if(failure)return Promise.reject(failure);
- const pending=requests.get(key);if(pending&&(!force||join&&Date.now()-(startedAt.get(key)||0)<JOIN_WINDOW_MS))return pending;
+ // A passive caller (prefetch, poll, retry) shares any read already in flight; only a reload after a write must not, since that read can predate the write.
+ const pending=requests.get(key);if(pending&&(!force||join))return pending;
  if(!force&&stored&&Date.now()-(readAt.get(key)||0)<60000)return Promise.resolve(stored);
  const request=sopApi.overview(projectId,()=>epoch===getSessionEpoch()).then(data=>{
   if(epoch===getSessionEpoch()&&requests.get(key)===request){const prior=cache.get(key);if(!prior||prior.checklistRevision<=data.checklistRevision)cache.set(key,data);readAt.set(key,Date.now())}return data;
  }).catch(error=>{if(epoch===getSessionEpoch()&&requests.get(key)===request){cache.delete(key);readAt.delete(key);if(error instanceof SopError&&[401,403,404].includes(error.status))deny(key,error)}throw error}).finally(()=>{if(requests.get(key)===request)requests.delete(key)});
- requests.set(key,request);startedAt.set(key,Date.now());return request;
+ requests.set(key,request);return request;
 }
 export function prefetchSopAssignees(projectId:string,workspace:string){
  const key=`${workspace}:${projectId}`;cached(key);const epoch=getSessionEpoch();
@@ -52,14 +51,14 @@ export function useSopTasks(projectId: string, workspace: string, enabled=true) 
  const [assigneeError,setAssigneeError]=useState('');
  const [state, setState] = useState<SopListState>(() => {const data = cached(key); return data ? {kind: 'ready', data, refreshing: true} : {kind: 'loading'}});
  const life = useRef({key, epoch: getSessionEpoch(), active: true, seq: 0});
- const readback = useCallback(async (force=true): Promise<boolean> => {
+ const readback = useCallback(async (force=true, join=false): Promise<boolean> => {
   if(!enabled){setState({kind:'forbidden'});return false}
   if(force)denied.delete(key);
   const scope = life.current, seq = ++scope.seq;
   const current = () => scope.active && scope === life.current && seq === scope.seq && scope.epoch === getSessionEpoch();
-  setState(s => s.kind === 'ready' ? {...s, refreshing: true} : s);
+  setState(s => s.kind === 'ready' ? {...s, refreshing: true} : s.kind === 'error' ? {...s, retrying: true} : s);
   try {
-   const data = await prefetchSopTasks(projectId,workspace,force);
+   const data = await prefetchSopTasks(projectId,workspace,force,join);
    if (!current()) return false;
    const previous = cache.get(key);
    if (!previous || previous.checklistRevision <= data.checklistRevision) cache.set(key, data);
@@ -72,18 +71,20 @@ export function useSopTasks(projectId: string, workspace: string, enabled=true) 
    return false;
   }
  }, [projectId, key, workspace, enabled]);
- const reload = useCallback(async (force=true) => {await readback(force)}, [readback]);
+ const reload = useCallback(async (force=true, join=false) => {await readback(force, join)}, [readback]);
  useEffect(() => {
   life.current = {key, epoch: getSessionEpoch(), active: true, seq: 0};
   if(!enabled){setState({kind:'forbidden'});setAssignees([]);setAssigneeError('');return()=>{life.current.active=false}}
   const data = cached(key);
   setState(data ? {kind: 'ready', data, refreshing: true} : {kind: 'loading'});
-  void reload(false);
   setAssignees([]); setAssigneeError('');
   const scope=life.current; const valid=()=>scope===life.current&&scope.active&&scope.epoch===getSessionEpoch();
-  void prefetchSopAssignees(projectId,workspace).then(people=>{if(valid())setAssignees(people)}).catch(e=>{if(valid())setAssigneeError(sopErrorText(e))});
+  void readback(false,true).then(()=>{
+   if(!valid())return;
+   void prefetchSopAssignees(projectId,workspace).then(people=>{if(valid())setAssignees(people)}).catch(e=>{if(valid())setAssigneeError(sopErrorText(e))});
+  });
   return () => {life.current.active = false};
- }, [key, reload]);
+ }, [key, readback]);
  const applyTask = useCallback((task: SopTask, checklistRevision: number) => {
   const previous = cache.get(key);
   if (!previous || !life.current.active || life.current.epoch !== getSessionEpoch()) return;
@@ -102,7 +103,7 @@ export function useSopTasks(projectId: string, workspace: string, enabled=true) 
    if (attempts >= 30) clearInterval(timer);
    if (pending) return;
    pending = true;
-   try {await reload()} finally {pending = false}
+   try {await reload(true, true)} finally {pending = false}
   }, 10000);
   return () => clearInterval(timer);
  }, [key, reload, syncing]);

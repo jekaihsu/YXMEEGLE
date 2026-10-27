@@ -63,6 +63,7 @@ async function mount({tasks = [task('t1')], route = {}, role = 'pm', overviewSta
   const method = init.method || 'GET', body = init.body ? JSON.parse(init.body) : null;
   calls.push({url, method, body});
   if (url === '/api/projects/p1/sop-tasks' && method === 'GET' && server.overviewHold) await server.overviewHold;
+  if (url === '/api/projects/p1/sop-tasks' && method === 'GET' && server.overviewOk) return response(server.overview);
   if (url === '/api/projects/p1/sop-tasks' && method === 'GET' && server.overviewFail) return response({code: 'upstream'}, 502);
   if (url === '/api/projects/p1/sop-tasks' && method === 'GET') return overviewStatus === 200 ? response(server.overview) : response({code: 'sop_import_forbidden'}, overviewStatus);
   if (url.endsWith('/sop-assignees')) return response({people:[{id:'pm',name:'王經理',case_roles:['pm']},{id:'member',name:'林組員',case_roles:['collaborator']}]});
@@ -332,6 +333,34 @@ test('an ordinary 409 conflict is not treated as unknown: the error shows and St
  await click(startButton());
  assert.doesNotMatch(dialog().querySelector('.task-drawer-footer').textContent, /正在確認|無法確認/);
  assert.ok(startButton() && !startButton().disabled);
+});
+
+test('retrying a failed overview read replaces the stale error at once, keeps the task, blocks duplicates and never writes', async () => {
+ await mount({route: {task: 't1', task_source: 'sop_local'}, overviewStatus: 502});
+ assert.match(document.body.textContent, /SOP 任務讀取失敗/);
+ const retry = button('重試 SOP 任務');
+ assert.ok(retry, 'the failed read offers a retry');
+ let release; server.overviewHold = new Promise(r => {release = r}); server.overviewOk = true;
+ const readsBefore = calls.filter(x => x.method === 'GET' && x.url === '/api/projects/p1/sop-tasks').length;
+ await act(async () => {retry.click(); await tick()});
+ assert.doesNotMatch(document.body.textContent, /SOP 任務讀取失敗/, 'the stale error is gone the moment retry is clicked');
+ const status = document.querySelector('#sop-tasks [role=status][aria-busy=true]');
+ assert.match(status.textContent, /正在重新讀取 SOP 任務/);
+ assert.match(status.textContent, /保留目前選取的任務/);
+ assert.equal(button('重新讀取中…').disabled, true, 'a second retry is not possible');
+ assert.equal(c.route.task, 't1', 'the selected task stays in the route');
+ await act(async () => {button('重新讀取中…').click(); await tick()});
+ assert.equal(calls.filter(x => x.method === 'GET' && x.url === '/api/projects/p1/sop-tasks').length, readsBefore + 1, 'one read in flight');
+ await act(async () => {release(); await tick(); await tick()});
+ assert.equal(dialog().getAttribute('aria-label'), 'SOP 任務 · 業主提出報價需求', 'the exact task opens');
+ assert.deepEqual(calls.filter(x => x.method !== 'GET'), [], 'retry is read-only');
+});
+
+test('a retry that fails again shows the new failure with the retry available', async () => {
+ await mount({route: {task: 't1', task_source: 'sop_local'}, overviewStatus: 502});
+ await click(button('重試 SOP 任務'));
+ assert.match(document.body.textContent, /SOP 任務讀取失敗/);
+ assert.ok(button('重試 SOP 任務') && !button('重試 SOP 任務').disabled);
 });
 
 test('a revision conflict reloads the task and keeps the draft for the next save', async () => {

@@ -4,9 +4,11 @@ Workspace metadata and append-only migration archives stay in workspaces.data;
 business collections are rows with indexed workspace, kind, parent and ordering.
 All materialization happens within the caller's version-checked transaction.
 """
+import functools
+import json
 from copy import deepcopy
 from types import SimpleNamespace
-from sqlalchemy import Column, String, Integer, JSON, ForeignKey, UniqueConstraint, select, delete, func
+from sqlalchemy import Column, String, Integer, JSON, Text, ForeignKey, UniqueConstraint, cast, select, delete, func
 
 COLLECTIONS=('users','projects','approvals','events','sop_templates','delegations','jobs','recurring','input_mappings','input_revisions','cost_allocations','daily_unmatched','daily_reviews','handover_requests','sop_requests','training_plans','capability_catalog','capability_awards','learning_standards','work_schedules','approved_leave_delegations','capability_bindings','learning_mappings','financial_requests','source_quotes','source_confirmations','contract_items','source_work_items')
 PROJECT_CHILDREN=('files','comments','daily_reports','evidence','finance_versions','payment_batches','confirmation_issues','delivery_batches','quote_reviews')
@@ -127,6 +129,20 @@ def _invalidate_projection(root):
     if isinstance(root.get('source_status'),dict):
         root['source_status'].pop('projection_workspace_version',None)
 
+def invalidate_shared_reads(wid):
+    from . import shared_reads
+    shared_reads.invalidate(wid)
+
+def _drops_shared_reads(write):
+    @functools.wraps(write)
+    def wrapper(db,model,wid,*args,**kwargs):
+        try: return write(db,model,wid,*args,**kwargs)
+        finally:
+            from . import shared_reads
+            shared_reads.drop_after_commit(db,wid)
+    return wrapper
+
+@_drops_shared_reads
 def save(db,model,wid,state):
     """Replace only changed entity rows; preserve one atomic workspace revision."""
     if '_partial' in state: raise ValueError('partial workspaces are read-only')
@@ -230,6 +246,7 @@ def prepare_save(model,wid,state,existing,previous_root,*,indexed=False):
     return plan
 
 
+@_drops_shared_reads
 def save_prepared(db,model,wid,state,plan):
     """Apply only the prepared changed rows, inside the caller's fenced transaction."""
     if '_partial' in state: raise ValueError('partial workspaces are read-only')
@@ -265,6 +282,7 @@ def _row_chunks(rows,size=100):
     for start in range(0,len(rows),size): yield rows[start:start+size]
 
 
+@_drops_shared_reads
 def save_collections(db,model,wid,state,collections):
     """Write only the named non-project collections of a load_partial state.
 
@@ -330,6 +348,7 @@ def _in_chunks(column,values,size=400):
     values=list(values)
     for i in range(0,len(values),size): yield column.in_(values[i:i+size])
 
+@_drops_shared_reads
 def save_partial(db,model,wid,state,collections,project_ids,project_order,*,view=None):
     """Write the named collections and project trees of a load_scoped state.
 
@@ -412,6 +431,7 @@ def save_partial(db,model,wid,state,collections,project_ids,project_order,*,view
     _invalidate_projection(root)
     return root
 
+
 def load_partial(db,model,row,*,collections=(),project_ids=None,project_children=(),filter_project_rows=False):
     """Read selected collections and project trees; never pass this to save.
 
@@ -442,8 +462,8 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
             for child in PROJECT_CHILDREN:
                 if project_ids is None or child not in project_children: p[child]=[]
     else:
-        def fetch(selected,**filters):
-            query=select(model.kind,model.parent_id,model.data).where(model.workspace_id==row.id,model.kind.in_(selected))
+        def fetch(selected,as_text=False,**filters):
+            query=select(model.kind,model.parent_id,cast(model.data,Text) if as_text else model.data).where(model.workspace_id==row.id,model.kind.in_(selected))
             for column,values in filters.items(): query=query.where(getattr(model,column).in_(values))
             if filter_project_rows and project_ids is not None and set(selected) & READ_PROJECT_LINKED:
                 # Mixed top-level kinds: retain shared policy rows and legacy globals.
@@ -451,8 +471,14 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
                 query=query.where((~model.kind.in_(READ_PROJECT_LINKED)) | linked.is_(None) | linked.in_(project_ids))
             return db.execute(query.order_by(model.ordinal))
         top=kinds-{'projects','source_work_items'}
-        if top:
-            for kind,parent,data in fetch(top,parent_id=('',)): result[kind].append(data)
+        from . import shared_reads
+        shared=top&shared_reads.KINDS if not db.info.get('shared_reads_wids') else frozenset()
+        if top-shared:
+            for kind,parent,data in fetch(top-shared,parent_id=('',)): result[kind].append(data)
+        if shared:
+            scope=tuple(project_ids) if filter_project_rows and project_ids is not None else None
+            rows=shared_reads.rows((row.id,getattr(row,'version',None),tuple(sorted(shared)),scope),lambda:[(kind,text) for kind,parent,text in fetch(shared,as_text=True,parent_id=('',))])
+            for kind,text in rows: result[kind].append(json.loads(text))
         if 'source_work_items' in kinds:
             query=select(model.data).where(model.workspace_id==row.id,model.kind=='source_work_items')
             if project_ids is not None:
