@@ -55,7 +55,7 @@ export interface ImportPreview {
  counts: {new_tasks: number; existing_tasks: number; added_links: number}; rowKeys: string[];
 }
 export interface ImportReceipt {requestId: string; created: string[]; existing: string[]; links: number; unresolved: {applicability: number; participants: number; dates: number}; checklistRevision: number}
-export interface MutationResult {task_id: string; revision: number; checklist_revision: number}
+export interface MutationResult {task_id: string; revision: number; checklist_revision: number; task?: SopTask}
 
 export class SopError extends Error {
  constructor(public status: number, public code: string,public reason?:string) {super(code)}
@@ -158,7 +158,7 @@ export function parseReceipt(v: unknown): ImportReceipt {
 }
 export function parseMutation(v: unknown): MutationResult {
  const r = object(v);
- return {task_id: str(r.task_id), revision: int(r.revision), checklist_revision: int(r.checklist_revision)};
+ return {task_id: str(r.task_id), revision: int(r.revision), checklist_revision: int(r.checklist_revision), ...(r.task == null ? {} : {task: task(r.task)})};
 }
 
 async function request(url: string, init: RequestInit, current: () => boolean): Promise<unknown> {

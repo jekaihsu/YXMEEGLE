@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {getSessionEpoch} from './api';
 import {requestId} from './nodeAssignmentApi';
-import {SOP_NODE_KEYS, SopError, sopApi, sopErrorText, type ImportPreview, type ImportReceipt, type SopNodeKey, type SopOverview, type SopTemplate, type SopAssignee} from './sopTaskApi';
+import {SOP_NODE_KEYS, SopError, type SopTask, sopApi, sopErrorText, type ImportPreview, type ImportReceipt, type SopNodeKey, type SopOverview, type SopTemplate, type SopAssignee} from './sopTaskApi';
 import {previewBody, sameSelection, selectionBlockers, type Decisions} from './sopTaskModel';
 
 export type SopListState = {kind: 'loading'} | {kind: 'forbidden'} | {kind: 'error'; message: string; data?: SopOverview} | {kind: 'ready'; data: SopOverview; refreshing: boolean};
@@ -78,6 +78,13 @@ export function useSopTasks(projectId: string, workspace: string, enabled=true) 
   void prefetchSopAssignees(projectId,workspace).then(people=>{if(valid())setAssignees(people)}).catch(e=>{if(valid())setAssigneeError(sopErrorText(e))});
   return () => {life.current.active = false};
  }, [key, reload]);
+ const applyTask = useCallback((task: SopTask, checklistRevision: number) => {
+  const previous = cache.get(key);
+  if (!previous || !life.current.active || life.current.epoch !== getSessionEpoch()) return;
+  const next = {...previous, tasks: previous.tasks.map(t => t.id === task.id && t.revision <= task.revision ? task : t), checklistRevision: Math.max(previous.checklistRevision, checklistRevision)};
+  cache.set(key, next);
+  setState(s => ({kind: 'ready', data: next, refreshing: s.kind === 'ready' && s.refreshing}));
+ }, [key]);
  const syncing = 'data' in state && !!state.data?.tasks.some(task => task.larkSync.state === '同步中');
  useEffect(() => {
   if (!syncing) return;
@@ -95,7 +102,7 @@ export function useSopTasks(projectId: string, workspace: string, enabled=true) 
  }, [key, reload, syncing]);
  const current = useCallback(() => life.current.active && life.current.epoch === getSessionEpoch(), []);
  const sameScope=life.current.key===key&&life.current.epoch===getSessionEpoch();
- return {state:!enabled?{kind:'forbidden'} satisfies SopListState:!sameScope?{kind:'loading'} satisfies SopListState:state, reload, current, assignees:enabled&&sameScope?assignees:[], assigneeError};
+ return {state:!enabled?{kind:'forbidden'} satisfies SopListState:!sameScope?{kind:'loading'} satisfies SopListState:state, reload, applyTask, current, assignees:enabled&&sameScope?assignees:[], assigneeError};
 }
 
 export type ImportStep = 'version'|'select'|'confirm'|'receipt';
