@@ -161,16 +161,14 @@ export function parseMutation(v: unknown): MutationResult {
  return {task_id: str(r.task_id), revision: int(r.revision), checklist_revision: int(r.checklist_revision), ...(r.task == null ? {} : {task: task(r.task)})};
 }
 
-async function request(url: string, init: RequestInit, current: () => boolean, timeoutMs = 20000): Promise<unknown> {
- try {return await api<unknown>(url, {cache: 'no-store', ...init, timeoutMs}, current)}
+async function request(url: string, init: RequestInit, current: () => boolean): Promise<unknown> {
+ try {return await api<unknown>(url, {cache: 'no-store', ...init, timeoutMs: 20000}, current)}
  catch (error) {
   if (error instanceof ApiError) throw new SopError(error.status, error.code || (error.status === 408 ? 'client_timeout' : 'request_failed'),error.payload&&typeof error.payload==='object'&&'reason' in error.payload&&typeof error.payload.reason==='string'?error.payload.reason:undefined);
   if (error instanceof DOMException && error.name === 'AbortError') throw error;
   throw new SopError(0, 'network');
  }
 }
-// The case overview is a heavy read; abandoning it at the write timeout only repeats the work.
-const OVERVIEW_TIMEOUT_MS = 45000;
 const base = (id: string) => `/api/projects/${encodeURIComponent(id)}`;
 const post = (body: unknown, method = 'POST'): RequestInit => ({method, body: JSON.stringify(body)});
 export const sopApi = {
@@ -181,7 +179,7 @@ export const sopApi = {
  assignees: (id: string, current: () => boolean) => request(`${base(id)}/sop-assignees`, {}, current).then(parseAssignees),
  suggestion: (id: string, taskId: string, body: Record<string, unknown>, current: () => boolean) => request(`${base(id)}/sop-tasks/${encodeURIComponent(taskId)}/suggestion`, post(body), current).then(parseMutation),
  acceptSuggestions: (id: string, body: Record<string, unknown>, current: () => boolean) => request(`${base(id)}/sop-tasks/suggestions/accept`, post(body), current),
- overview: (id: string, current: () => boolean) => request(`${base(id)}/sop-tasks`, {}, current, OVERVIEW_TIMEOUT_MS).then(parseOverview),
+ overview: (id: string, current: () => boolean) => request(`${base(id)}/sop-tasks`, {}, current).then(parseOverview),
  templates: (current: () => boolean) => request('/api/sop-templates', {}, current).then(parseTemplates),
  preview: (id: string, body: {template_version_id: string; node_keys: SopNodeKey[]; row_keys?: string[]; applicability_decisions?: Record<string, {value: Applicability; reason: string}>}, current: () => boolean) =>
   request(`${base(id)}/sop-import/preview`, post(body), current).then(parsePreview),
