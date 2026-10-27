@@ -27,12 +27,21 @@ const COVERAGE_NOTE:Record<Exclude<CaseCoverage,'complete'>,string>={
 const myCases=(c:Ctx,assigned:PanelRead):CaseRow[]=>{
  const me=c.s.user?.id||'',pins=pinnedIds(c);
  const fromWork=new Map<string,{code:string;name:string;href?:string}>();
- for(const item of assigned.body?.items??[])if(item.case.id&&!fromWork.has(item.case.id))fromWork.set(item.case.id,{code:item.case.code||'',name:item.case.name||'',href:item.target?homeHref(homeTarget(item.target)):undefined});
+ for(const item of assigned.body?.items??[]){
+  const id=item.case.id||item.target?.project;
+  if(id&&!fromWork.has(id))fromWork.set(id,{code:item.case.code||'',name:item.case.name||'',href:item.target?homeHref(homeTarget(item.target)):undefined});
+ }
  const rank=(p:{id:string})=>pins.has(p.id)?0:1;
- const known=new Set(c.w.projects.map(p=>p.id));
- const owned:CaseRow[]=c.w.projects.filter(p=>p.case_type!=='intake'&&p.status!=='completed'&&(pins.has(p.id)||fromWork.has(p.id)||p.pm_id===me||p.sales_id===me||p.owner_id===me||(p.nodes??[]).some(n=>(n.tasks??[]).some(t=>t.owner_id===me)))).map(p=>({id:p.id,code:p.code,name:p.name,client:p.client,due_date:p.due_date,pinned:pins.has(p.id),assigned:fromWork.has(p.id)}));
- const external:CaseRow[]=[...fromWork].filter(([id])=>!known.has(id)).map(([id,info])=>({id,code:info.code,name:info.name,client:'',pinned:pins.has(id),assigned:true,href:info.href}));
- return [...owned,...external].map((row,i)=>({row,i})).sort((a,b)=>rank(a.row)-rank(b.row)||a.i-b.i).map(({row})=>row);
+ const known=new Map(c.w.projects.map(p=>[p.id,p]));
+ const rows:CaseRow[]=[];
+ // Assigned work is authorization enough: a case category or status never hides a case that holds your active task.
+ for(const [id,info] of fromWork){
+  const p=known.get(id);
+  rows.push(p?{id,code:p.code||info.code,name:p.name||info.name,client:p.client,due_date:p.due_date,pinned:pins.has(id),assigned:true}:{id,...info,client:'',pinned:pins.has(id),assigned:true});
+ }
+ for(const p of c.w.projects)if(!fromWork.has(p.id)&&p.case_type!=='intake'&&p.status!=='completed'&&(pins.has(p.id)||p.pm_id===me||p.sales_id===me||p.owner_id===me||(p.nodes??[]).some(n=>(n.tasks??[]).some(t=>t.owner_id===me))))
+  rows.push({id:p.id,code:p.code,name:p.name,client:p.client,due_date:p.due_date,pinned:pins.has(p.id),assigned:false});
+ return rows.map((row,i)=>({row,i})).sort((a,b)=>rank(a.row)-rank(b.row)||a.i-b.i).map(({row})=>row);
 };
 export function MineCard({id,c,today,assigned,cases,confirmation}:{id:HomeCardId;c:Ctx;today:string;assigned:PanelRead;cases:PanelRead;confirmation:PanelRead}){
  if(id==='work'||id==='confirmation')return <WorkCard c={c} id={id} panel={id==='work'?'assigned':'confirmation'} today={today} read={id==='work'?assigned:confirmation}/>;
