@@ -7,7 +7,7 @@ import {NODE_NAMES} from './workflowLabels';
 import {taipeiTime} from './taipeiTime';
 import {elapsed,nameOf,safeUrl} from './appCommon';
 import {createPortal} from 'react-dom';
-import {useEffect,useRef,useState,type ReactNode} from 'react';
+import {useEffect,useRef,useState,type MutableRefObject,type ReactNode} from 'react';
 import {Button,Skeleton} from './design';
 import {useNodeAssignments} from './useNodeAssignments';
 import {useProjectProgress} from './useProjectProgress';
@@ -15,7 +15,8 @@ import {useStartSop} from './useStartSop';
 import {SopControls} from './StartSopControls';
 import {useFlowDetails} from './useFlowDetails';
 import {buildFlowModel,needsViewerAction,productionKey,projectFlowRoute} from './flowModel';
-import {FlowDiagram,FlowPanelSkeleton} from './FlowDiagram';
+import {withTaskScope} from './projectRoutes';
+import {FlowDiagram} from './FlowDiagram';
 import {FlowAction,FlowNodeActions} from './FlowActions';
 import {FlowTasks} from './FlowTasks';
 import {SopTasks,type SopImportTarget} from './SopTasks';
@@ -36,7 +37,7 @@ import type {Project} from './types';
 import './NodeAssignments.css';
 import './StartSop.css';
 import './ProjectFlow.css';
-export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions,sopTasks:providedSop,inline=false}:{c:Ctx;p:Project;assignments:ReturnType<typeof useNodeAssignments>;selectedKey:string;secondary:ReactNode;legacyActions:ReactNode;sopTasks?:ReturnType<typeof useSopTasks>;inline?:boolean}){
+export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions,sopTasks:providedSop,reopened,inline=false}:{c:Ctx;p:Project;assignments:ReturnType<typeof useNodeAssignments>;selectedKey:string;secondary:ReactNode;legacyActions:ReactNode;sopTasks?:ReturnType<typeof useSopTasks>;reopened?:MutableRefObject<string>;inline?:boolean}){
  const route=projectFlowRoute(c.route),enabled=!localCase(p)&&c.s.features?.node_assignment===true;
  const read=useProjectProgress(p.id);
  const ownSop=useSopTasks(p.id,c.s.workspace_id || '',!providedSop&&canReadSop(c.s.user));
@@ -58,6 +59,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  const busy=nodeBusy || !list?.writes_enabled;
  const reason=!list?.writes_enabled ? list?.writes_disabled_reason || '節點修改尚未開放。' : assignments.state.kind==='error' ? '節點來源更新失敗，請重試。' : '正在更新節點資料，請稍候。';
  const workbench=buildNodeWorkbench({node:selected,sop:sopData,local:sopData?.localNodes?.find(n=>n.key===selected.key),can:detail?.can,users:c.w.users,busy:localCase(p)?sopTasks.state.kind!=='ready'||sopTasks.state.refreshing:nodeBusy,reason:localCase(p)?'':nodeBusy||!list?.writes_enabled?reason:''});
+ const nodeLoading=loading&&!workbench.local;
  const [reviewLinks,setReviewLinks]=useState(false);
  const [report,setReport]=useState<ProgressReportRow|null>(null);
  const keyboardMove=useRef(false);
@@ -95,16 +97,16 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
   {assignments.pending && <p role="status">儲存中…</p>}
   {assignments.error && <div role="alert" className="pg-callout">{assignments.error.message}{['outcome_unknown','readback_mismatch','busy'].includes(assignments.error.code || '') && <Button onClick={()=>void assignments.retryMutation()}>重試同一操作</Button>}</div>}
   {!inline && <FlowDiagram compact selectionFollowsFocus nodes={model.nodes} overall={model.overall} selected={selected.key} loading={loading} onSelect={select}/>}
-  {loading && <FlowPanelSkeleton/>}<section id="flow-selected" className="pf-panel glass--card nw-selected" aria-label={`${selected.label}節點明細`} tabIndex={-1}>
-   <header><div className="pf-selected-heading"><h2>{selected.label}</h2><span className="pf-selected-state" role="status">{selected.state}</span></div><div className="pf-panel-tools">{safeUrl(p.source_url)&&<a className="button" href={p.source_url} target="_blank" rel="noreferrer">開啟案件來源</a>}{inline&&enabled&&<SopControls sop={sop}/>} {!enabled&&<CaseSopStart projectId={p.id} sop={sopTasks}/>}<FlowSchedule key={selected.key} project={p} node={selected} session={c.s} onPublished={()=>{void assignments.reload();read.reload()}}/>{list && <details className="pf-attention-menu"><summary>需要我處理</summary><div className="pf-attention" aria-label="需要我處理">{model.nodes.filter(n=>needsViewerAction(n,list,c.s.user?.id || '')).map(n=><Button key={n.key} onClick={()=>select(n.key)}>{n.label} · {n.state==='待審核' ? '待審核' : !n.owners.length ? '待認領' : '待處理'}</Button>)}</div></details>}</div></header>
-   <dl className="pf-facts">{workbench.facts.map(fact=><div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}{selected.assignment?.legacy_completion && <div><dt>舊案直接完成</dt><dd>{selected.assignment.legacy_completion.actor.name} · {taipeiTime(selected.assignment.legacy_completion.at)}<small>{selected.assignment.legacy_completion.reason}</small></dd></div>}</dl>
+  <section id="flow-selected" className="pf-panel glass--card nw-selected" aria-label={`${selected.label}節點明細`} aria-busy={loading} tabIndex={-1}>
+   <header><div className="pf-selected-heading"><h2>{selected.label}</h2><span className="pf-selected-state" role="status">{nodeLoading?'正在載入節點資料…':selected.state}</span></div><div className="pf-panel-tools">{safeUrl(p.source_url)&&<a className="button" href={p.source_url} target="_blank" rel="noreferrer">開啟案件來源</a>}{inline&&enabled&&<SopControls sop={sop}/>} {!enabled&&<CaseSopStart projectId={p.id} sop={sopTasks}/>}{!nodeLoading&&<FlowSchedule key={selected.key} project={p} node={selected} session={c.s} onPublished={()=>{void assignments.reload();read.reload()}}/>}{list && <details className="pf-attention-menu"><summary>需要我處理</summary><div className="pf-attention" aria-label="需要我處理">{model.nodes.filter(n=>needsViewerAction(n,list,c.s.user?.id || '')).map(n=><Button key={n.key} onClick={()=>select(n.key)}>{n.label} · {n.state==='待審核' ? '待審核' : !n.owners.length ? '待認領' : '待處理'}</Button>)}</div></details>}</div></header>
+   {nodeLoading ? <Skeleton height="5rem"/> : <dl className="pf-facts">{workbench.facts.map(fact=><div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}{selected.assignment?.legacy_completion && <div><dt>舊案直接完成</dt><dd>{selected.assignment.legacy_completion.actor.name} · {taipeiTime(selected.assignment.legacy_completion.at)}<small>{selected.assignment.legacy_completion.reason}</small></dd></div>}</dl>}
    {selected.assignment?.auto_done && <p className="pg-callout">自動判定 · {selected.assignment.auto_done.reason}</p>}
    {inline&&isLegacy&&!localCase(p)&&!workbench.local&&legacyActions}
    {workbench.local ? <LocalNodeActions workbench={workbench} sop={sopTasks} projectId={p.id}/> : detail ? <FlowNodeActions key={selected.key} detail={detail} busy={nodeBusy} reason={nodeBusy||!list?.writes_enabled?reason:''} error={assignments.error} mutate={assignments.mutate} registry={workbench.actions} /> : !isLegacy && !!selected.assignment && assignments.state.kind==='ready' && !details.errors[selected.key] ? <Skeleton height="3rem"/> : null}
-   {!workbench.local && !isLegacy && !selected.assignment && <p className="pf-empty">尚無節點指派</p>}
+   {!loading && !workbench.local && !isLegacy && !selected.assignment && <p className="pf-empty">尚無節點指派</p>}
 
    {Object.entries(details.errors).map(([key,error])=><p role="alert" key={key}>{model.nodes.find(n=>n.key===key)?.label}任務明細讀取失敗。{error}<Button onClick={details.retry}>重試任務明細</Button></p>)}
-   {(!workbench.local || selected.taskRows.some(row=>row.source!=='SOP 任務')) && <FlowTasks c={c} p={p} nodes={model.nodes} selected={selected.key} details={details.details} all={all} onScope={value=>c.go({...c.route,tab:inline?'overview':'flow',section:value ? 'all-tasks' : undefined})} busy={busy} reason={reason} error={assignments.error} mutate={assignments.mutate} loading={taskLoading} incomplete={taskIncomplete} evidence={evidence}>{selected.assignment&&<SopTasks remote c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>}</FlowTasks>}
+   {(!workbench.local || selected.taskRows.some(row=>row.source!=='SOP 任務')) && <FlowTasks c={c} p={p} nodes={model.nodes} selected={selected.key} details={details.details} all={all} onScope={value=>c.go(withTaskScope({...c.route,tab:inline?'overview':'flow'},value))} busy={busy} reason={reason} error={assignments.error} mutate={assignments.mutate} loading={taskLoading} incomplete={taskIncomplete} evidence={evidence} reopened={reopened}>{selected.assignment&&<SopTasks remote c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>}</FlowTasks>}
    {!selected.assignment&&<SopTasks c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>}
   </section>
   {!inline && p.nodes.length>0 && legacyActions && <details className="pf-secondary pf-legacy"><summary>範本與本地流程</summary>

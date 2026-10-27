@@ -83,4 +83,20 @@ detailStatus=500;await mount({node:'control',embedded:false});assert.match(docum
 await mount({enabled:false,node:'node_control'});assert.equal(calls.some(r=>r.url.includes('/node-assignments')),false);assert.equal(document.querySelectorAll('.pf-node').length,9);assert.match(document.querySelector('.pf-legacy').textContent,/本地/);
 globalThis.sopOverview=JSON.parse(await readFile(new URL('../backend/sop_import/api-examples.json',import.meta.url),'utf8')).sop_tasks;
 await mount({node:'sales'});assert.equal(document.querySelector('#flow-selected #sop-tasks .pf-task-open strong').textContent,'業主提出報價需求');assert.ok([...document.querySelectorAll('#sop-tasks button')].some(b=>b.textContent==='匯入預設任務'));globalThis.sopOverview=undefined;
+await mount({node:'control',embedded:false});assert.equal(document.querySelectorAll('.pf-task-open').length,2);
+{
+ const realNow=Date.now;Date.now=()=>realNow()+61000;
+ const fetchNow=globalThis.fetch;let releaseDetail;const detailHold=new Promise(r=>releaseDetail=r);
+ globalThis.fetch=async(url,init)=>{if(url.includes('/node-assignments/nodes/'))await detailHold;return fetchNow(url,init)};
+ await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(ui.ProjectDetail,{c}));await tick()});
+ assert.equal(document.querySelectorAll('.pf-task-open').length,2,'revisit shows last-good task rows while revalidating');assert.equal(document.querySelector('[aria-label="任務載入中"]'),null);
+ await act(async()=>{releaseDetail();await tick()});assert.equal(document.querySelectorAll('.pf-task-open').length,2);
+ detailStatus=403;Date.now=()=>realNow()+122000;
+ await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(ui.ProjectDetail,{c}));await tick()});
+ assert.equal(document.querySelectorAll('.pf-task-open').length,0,'forbidden revalidation removes cached task rows');
+ assert.match(document.querySelector('#flow-tasks').textContent,/來源未完整/);
+ detailStatus=200;Date.now=realNow;
+}
+await mount({node:'control'});assert.match(document.querySelector('.pf-task-open small').textContent,/Lark 任務/,'rows name their source');
+await click(document.querySelector('.pf-task-open'));assert.match(document.querySelector('[role=dialog] [aria-label="任務位置"]').textContent,/Lark 任務/,'drawer names its source');await click(document.querySelector('[role=dialog] [aria-label="關閉"]'));
 await act(async()=>root.unmount());console.log('Unified project flow rendered checks passed');

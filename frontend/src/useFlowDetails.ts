@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {getSessionEpoch} from './api';
 import {assignmentErrorMessage,overviewDetail,type NodeAssignmentDetail,type NodeAssignmentList} from './nodeAssignmentApi';
-import {prefetchNodeAssignmentDetail} from './useNodeAssignments';
+import {cachedNodeAssignmentDetail,prefetchNodeAssignmentDetail} from './useNodeAssignments';
 export function useFlowDetails(projectId:string,list:NodeAssignmentList|undefined,selected:string,all:boolean,version:number){
  const [loaded,setLoaded]=useState<Record<string,NodeAssignmentDetail>>({});
  const [errors,setErrors]=useState<Record<string,string>>({});
@@ -19,7 +19,7 @@ export function useFlowDetails(projectId:string,list:NodeAssignmentList|undefine
   }
   return()=>{active=false};
  },[projectId,list,selected,all,version,retry]);
- const details=Object.fromEntries((list?.nodes || []).flatMap(node=>{const embedded=list && overviewDetail(list,node);const stored=loaded[node.key];const detail=embedded || (stored?.node.revision===node.revision ? stored : undefined);return detail ? [[node.key,detail]] : []}));
+ const details=Object.fromEntries((list?.nodes || []).flatMap(node=>{const embedded=list && overviewDetail(list,node);const stored=loaded[node.key] ?? cachedNodeAssignmentDetail(projectId,node.key);const detail=embedded || (stored?.node.revision===node.revision ? stored : undefined);return detail ? [[node.key,detail]] : []}));
  const visibleErrors=Object.fromEntries(Object.entries(errors).filter(([key])=>!list?.node_details?.[key]));
  return {details,errors:visibleErrors,retry:()=>setRetry(v=>v+1)};
 }

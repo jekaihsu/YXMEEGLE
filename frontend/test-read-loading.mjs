@@ -50,6 +50,9 @@ for(const shell of [false,true]){
  const assignments={state:{kind:'loading'},refreshing:false,pending:'',notice:'',error:null,revision:0,reload:async()=>{},mutate:async()=>{}};
  const root=createRoot(document.getElementById('root'));await flush(()=>root.render(React.createElement(ui.ProjectFlow,{c,p:workspace.projects[0],assignments,selectedKey:'sales',secondary:null,legacyActions:null})));
  assert.ok(document.querySelector('#sop-tasks'),'SOP section is mounted while assignments remain loading');
+ assert.equal(document.querySelectorAll('.pf-panel').length,1,'cold loading has one mounted node panel');
+ assert.equal(document.querySelector('#flow-selected .pf-facts'),null,'unknown assignment facts stay placeholders');
+ assert.match(document.querySelector('.pf-selected-state').textContent,/正在載入節點資料/);
  assert.match(document.querySelector('#sop-tasks').textContent,/業主提出報價需求/);
  assert.ok(calls.some(url=>url.endsWith('/progress')),'progress starts independently');
  await flush(()=>root.unmount());dom.window.close();

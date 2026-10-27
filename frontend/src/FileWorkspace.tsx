@@ -15,7 +15,7 @@ const driveStatus:Record<string,string>={queued:'Drive 等待上傳',running:'Dr
 const directions:Record<string,string>={input:'作業資料',output:'作業成果',evidence:'交付佐證'};
 
 export function FilePanel({c,p,node}:{c:Context;p:Project;node?:Node}){
- const[category,setCategory]=useState('all');const[direction,setDirection]=useState('all');const[scope,setScope]=useState('all');const[modal,setModal]=useState('');
+ const[category,setCategory]=useState('all');const[direction,setDirection]=useState('all');const[scope,setScope]=useState(node?.id ?? 'all');const[modal,setModal]=useState('');
  const coverage=p.source_attachment_coverage as {scope?:string;metadata_records?:number;metadata_status_counts?:Record<string,number>;workspace_versions?:number;unmatched_metadata_access?:string;source_field_coverage?:string;file_content_access?:string}|undefined;
  const catalog=categories(c.w);const categoryName=(id:string)=>catalog.find(x=>x.id===id)?.name||catalog.find(x=>x.id===id)?.label||'其他';
  const filtered=p.files.filter(f=>(category==='all'||(f.category_id||'other')===category)&&(direction==='all'||f.direction===direction)&&(scope==='all'||f.node_id===scope));

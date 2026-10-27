@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
 import {assignmentFixture, projectFixture} from './fixtures/node-assignments.mjs';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=dashboard',pretendToBeVisual:true});
-for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','HTMLElement','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','HTMLElement','HTMLInputElement','HTMLTextAreaElement','HTMLSelectElement','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;
 HTMLElement.prototype.scrollIntoView=function(){};
