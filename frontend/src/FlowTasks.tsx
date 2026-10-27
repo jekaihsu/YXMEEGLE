@@ -22,8 +22,7 @@ export function FlowTasks({c,p,nodes,selected,details,all,onScope,busy,reason,er
  useEffect(()=>{
   if(c.route.task || loading || !reopened?.current)return;
   const row=[...document.querySelectorAll<HTMLElement>('[data-assignment-task]')].find(li=>li.dataset.assignmentTask===reopened.current)?.querySelector<HTMLElement>('.pf-task-open');
-  if(!row)return;
-  if(!document.activeElement || document.activeElement===document.body)row.focus();
+  if(!document.activeElement || document.activeElement===document.body)(row || document.getElementById('flow-tasks'))?.focus();
   reopened.current='';
  },[c.route.task,loading,filtered.length]);
  return <section id="flow-tasks" className="pf-tasks" aria-label="流程任務列表" tabIndex={-1}>

@@ -80,4 +80,10 @@ await mount('view=project&project=p1&tab=flow&node=node_sales&task=sales-0');
 assert.equal(document.querySelector('[aria-label="任務名稱"]').disabled,false);
 assert.equal(document.getElementById('task-editor-due-reason').textContent,'已排定期限須申請展延');
 
+await mount('view=project&project=p1&tab=flow&section=all-tasks&task_filters=overdue&node=node_sales&task=sales-0');
+await click(document.querySelector('[aria-label="關閉任務"]'));
+assert.equal(document.activeElement.id,'flow-tasks','a filtered-out task returns focus to the list');
+await click(button('逾期'));
+assert.notEqual(document.activeElement.closest('[data-assignment-task]')?.dataset.assignmentTask,'sales-0','changing filters does not restore a stale opener');
+
 await act(async()=>root.unmount());console.log('Task list context checks passed');
