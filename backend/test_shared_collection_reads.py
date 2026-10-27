@@ -111,3 +111,16 @@ def test_a_warm_cache_does_not_widen_what_another_user_may_see(world):
     assert client.get(f"/api/projects/{ids['intake']}/sop-tasks").status_code in (403, 404)
     signin('u-manager')
     assert client.get(f"/api/projects/{ids['intake']}/sop-tasks").status_code == 200
+
+
+def test_authority_bearing_rows_are_never_served_from_the_shared_read(world):
+    app, client, signin, ids = world
+    read(app, project=ids['intake'])
+    with app.state.sessions.begin() as db:
+        user = db.scalars(select(BusinessRow).where(BusinessRow.workspace_id == WID, BusinessRow.kind == 'users')).first()
+        data = deepcopy(user.data)
+        data['capabilities'] = ['edited-without-a-version-bump']
+        user.data = data
+        edited = user.entity_id
+    users = {u['id']: u for u in read(app, project=ids['intake'])['users']}
+    assert users[edited]['capabilities'] == ['edited-without-a-version-bump']

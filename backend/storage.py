@@ -433,6 +433,9 @@ def save_partial(db,model,wid,state,collections,project_ids,project_order,*,view
 
 # Case-scoped reads of one workspace version repeat the same large global-collection fetch. Concurrent and
 # back-to-back readers share one fetch of the raw JSON text; each reader still decodes its own copy.
+# Only large, data-only kinds are shared. Anything that carries authority (users and their capabilities, approvals,
+# delegations) is always read fresh.
+SHARED_READ_KINDS=frozenset({'source_quotes','source_confirmations','contract_items'})
 SHARED_READ_TTL=30.0
 SHARED_READ_MAX_BYTES=160_000_000
 _shared_guard=threading.Lock()
@@ -510,9 +513,12 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
                 query=query.where((~model.kind.in_(READ_PROJECT_LINKED)) | linked.is_(None) | linked.in_(project_ids))
             return db.execute(query.order_by(model.ordinal))
         top=kinds-{'projects','source_work_items'}
-        if top:
+        shared=top&SHARED_READ_KINDS
+        if top-shared:
+            for kind,parent,data in fetch(top-shared,parent_id=('',)): result[kind].append(data)
+        if shared:
             scope=tuple(project_ids) if filter_project_rows and project_ids is not None else None
-            rows=_shared_rows((row.id,getattr(row,'version',None),tuple(sorted(top)),scope),lambda:[(kind,text) for kind,parent,text in fetch(top,as_text=True,parent_id=('',))])
+            rows=_shared_rows((row.id,getattr(row,'version',None),tuple(sorted(shared)),scope),lambda:[(kind,text) for kind,parent,text in fetch(shared,as_text=True,parent_id=('',))])
             for kind,text in rows: result[kind].append(json.loads(text))
         if 'source_work_items' in kinds:
             query=select(model.data).where(model.workspace_id==row.id,model.kind=='source_work_items')
