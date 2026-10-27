@@ -143,6 +143,14 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
     async def patch(request: Request, project_id: str, task_id: str):
         return await mutation(request, project_id, lambda ctx, body: service.mutate(ctx, task_id, body))
 
+    @app.post(PREFIX + '/sop-tasks/{task_id}/test-tag')
+    async def test_tag(request: Request, project_id: str, task_id: str):
+        return await mutation(request, project_id, lambda ctx, body: service.tag_test(ctx, task_id, body))
+
+    @app.post(PREFIX + '/sop-tasks/{task_id}/cleanup-test')
+    async def cleanup_test(request: Request, project_id: str, task_id: str):
+        return await mutation(request, project_id, lambda ctx, body: service.cleanup_test(ctx, task_id, body))
+
     @app.post(PREFIX + '/sop-tasks/{task_id}/transition')
     async def transition(request: Request, project_id: str, task_id: str):
         return await mutation(request, project_id, lambda ctx, body: service.mutate(ctx, task_id, body, transition=True))

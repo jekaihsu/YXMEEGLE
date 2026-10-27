@@ -473,7 +473,13 @@ class Service(EnrollmentService):
             else:
                 related = {30: [31], 41: [31, 47], 46: [47]}.get(row.snapshot['raw']['meegle_id'], [])
                 references = [r.snapshot for r in rows.values() if r.snapshot['raw']['meegle_id'] in related]
-                task = LocalTask(workspace_id=ctx.wid, id=str(uuid5(NAMESPACE_URL, digest([ctx.wid, identity_key(ctx.project) or ctx.project['id'], version.family_id, key, row.snapshot['proposed_import']['instance_scope']]))), project_id=ctx.project['id'],
+                task_id = str(uuid5(NAMESPACE_URL, digest([ctx.wid, identity_key(ctx.project) or ctx.project['id'], version.family_id, key, row.snapshot['proposed_import']['instance_scope']])))
+                # Never reuse a cleaned identity: its audit and stale requests survive.
+                if db.scalar(select(TaskEvent.id).where(TaskEvent.workspace_id == ctx.wid,
+                                                       TaskEvent.task_id == task_id,
+                                                       TaskEvent.kind == 'test_cleaned').limit(1)):
+                    task_id = str(uuid4())
+                task = LocalTask(workspace_id=ctx.wid, id=task_id, project_id=ctx.project['id'],
                                  template_family_id=version.family_id, source_row_key=key,
                                  instance_scope=row.snapshot['proposed_import']['instance_scope'], imported_version_id=version.id,
                                  snapshot={'row': deepcopy(row.snapshot), 'template': self.version_json(version),
@@ -827,6 +833,57 @@ class Service(EnrollmentService):
             state.checklist_revision += 1
             return {'task_id': task.id, 'revision': task.revision, 'checklist_revision': state.checklist_revision,
                     'task': self.task_views(db, ctx, [task])[0]}
+
+    def tag_test(self, ctx, task_id, body):
+        fields(body, {'expected_revision', 'is_test', 'reason'})
+        require(type(body.get('expected_revision')) is int and type(body.get('is_test')) is bool, 'invalid_request')
+        reason = text(body.get('reason'), 1000, empty=False)
+        self.writable()
+        with self.sessions.begin() as db:
+            ctx, state = self.lock(db, ctx)
+            task = self.task(db, ctx, task_id)
+            require(task.revision == body['expected_revision'], 'task_revision_conflict', 409)
+            before = task.local.get('is_test') is True
+            task.local = {**task.local, 'is_test': body['is_test']}
+            task.revision += 1
+            state.checklist_revision += 1
+            self.event(db, ctx, task, 'test_tagged', {'before': before, 'is_test': body['is_test'], 'reason': reason})
+            return {'task': self.task_views(db, ctx, [task])[0], 'checklist_revision': state.checklist_revision}
+
+    def cleanup_test(self, ctx, task_id, body):
+        fields(body, {'expected_revision', 'reason'})
+        require(type(body.get('expected_revision')) is int, 'invalid_request')
+        reason = text(body.get('reason'), 1000, empty=False)
+        task_id = identifier(task_id)
+        self.writable()
+        with self.sessions.begin() as db:
+            ctx, state = self.lock(db, ctx)
+            task = db.get(LocalTask, (ctx.wid, task_id))
+            if task is None:
+                cleaned = db.scalar(select(TaskEvent.id).where(TaskEvent.workspace_id == ctx.wid,
+                                    TaskEvent.project_id == ctx.project['id'], TaskEvent.task_id == task_id,
+                                    TaskEvent.kind == 'test_cleaned').limit(1))
+                require(cleaned is not None, 'task_not_found', 404)
+                return {'task_id': task_id, 'removed': False, 'replayed': True,
+                        'checklist_revision': state.checklist_revision}
+            task = self.task(db, ctx, task_id)
+            require(task.local.get('is_test') is True, 'test_task_required', 409)
+            require(task.revision == body['expected_revision'], 'task_revision_conflict', 409)
+            links = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == ctx.wid,
+                                   TaskNodeLink.project_id == ctx.project['id'], TaskNodeLink.task_id == task_id)))
+            self.event(db, ctx, task, 'test_cleaned', {'reason': reason, 'is_test': True,
+                       'origin': {'template_family_id': task.template_family_id, 'source_row_key': task.source_row_key,
+                                  'instance_scope': task.instance_scope, 'imported_version_id': task.imported_version_id},
+                       'node_links': [{'node_id': link.node_id, 'node_key': link.node_key} for link in links]})
+            db.flush()
+            db.execute(delete(TaskNodeLink).where(TaskNodeLink.workspace_id == ctx.wid,
+                       TaskNodeLink.project_id == ctx.project['id'], TaskNodeLink.task_id == task_id))
+            # The sole physical removal path; ORM origin/history guards stay intact.
+            db.execute(delete(LocalTask).where(LocalTask.workspace_id == ctx.wid,
+                       LocalTask.project_id == ctx.project['id'], LocalTask.id == task_id))
+            state.checklist_revision += 1
+            return {'task_id': task_id, 'removed': True, 'replayed': False,
+                    'checklist_revision': state.checklist_revision}
 
     @staticmethod
     def node_done(ctx):
