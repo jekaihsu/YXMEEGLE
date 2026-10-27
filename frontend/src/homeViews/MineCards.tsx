@@ -13,6 +13,17 @@ const pinnedIds=(c:Ctx)=>{
  try{return new Set(readPins(window.localStorage,pinStorageKey(c.w.workspace_id||c.s.workspace_id||'default',c.s.user?.id||'anonymous')))}catch{return new Set<string>()}
 };
 type CaseRow={id:string;code:string;name:string;client:string;due_date?:string|null;pinned:boolean;assigned:boolean;href?:string};
+export type CaseCoverage='loading'|'error'|'partial'|'complete';
+export const caseCoverage=(read:PanelRead):CaseCoverage=>{
+ if(read.error)return 'error';
+ if(!read.body)return read.pending?'loading':'error';
+ return read.body.readState==='disabled'||!read.body.complete||read.body.has_more||read.body.freshness.status==='stale'?'partial':'complete';
+};
+const COVERAGE_NOTE:Record<Exclude<CaseCoverage,'complete'>,string>={
+ loading:'案件讀取中…',
+ error:'工作來源讀取失敗，案件清單可能不完整。請重新讀取或開啟我的工作。',
+ partial:'僅涵蓋已載入的工作，可能還有其他有你任務的案件。請開啟我的工作查看完整清單。',
+};
 const myCases=(c:Ctx,assigned:PanelRead):CaseRow[]=>{
  const me=c.s.user?.id||'',pins=pinnedIds(c);
  const fromWork=new Map<string,{code:string;name:string;href?:string}>();
@@ -26,10 +37,11 @@ const myCases=(c:Ctx,assigned:PanelRead):CaseRow[]=>{
 export function MineCard({id,c,today,assigned,confirmation}:{id:HomeCardId;c:Ctx;today:string;assigned:PanelRead;confirmation:PanelRead}){
  if(id==='work'||id==='confirmation')return <WorkCard c={c} id={id} panel={id==='work'?'assigned':'confirmation'} today={today} read={id==='work'?assigned:confirmation}/>;
  if(id==='mycases'){
-  const rows=myCases(c,assigned);
+  const rows=myCases(c,assigned),coverage=caseCoverage(assigned);
   return <Card id={id} subtitle="你負責、釘選或有你任務的案件" href="#view=projects" action="開啟案件總覽">
    {rows.slice(0,8).map(p=><Row key={p.id} label={`${p.code} ${p.name}`} detail={[p.pinned?'已釘選':p.assigned?'有你的任務':'',p.client].filter(Boolean).join(' · ')} value={p.due_date?`期限 ${p.due_date.slice(0,10).replaceAll('-','/')}`:''} href={p.href||`#view=project&project=${p.id}`}/>)}
-   {!rows.length&&<p className="home-source-note">{assigned.pending&&!assigned.body?'案件讀取中…':'目前沒有你負責、釘選或有你任務的案件。可在案件總覽釘選案件。'}</p>}
+   {coverage!=='complete'&&<p className="home-source-note" role="status">{COVERAGE_NOTE[coverage]}{coverage!=='loading'&&<> <a href="#view=work">開啟我的工作</a></>}</p>}
+   {!rows.length&&coverage==='complete'&&<p className="home-source-note">目前沒有你負責、釘選或有你任務的案件。可在案件總覽釘選案件。</p>}
   </Card>;
  }
  if(id==='kpi'){
