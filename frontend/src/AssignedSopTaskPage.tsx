@@ -1,3 +1,4 @@
+import {canOperateTestTasks} from './sopTaskModel';
 import {Button} from './design';
 import {SopTaskInspector} from './SopTaskInspector';
 import {useSopTasks} from './useSopTasks';
@@ -14,6 +15,6 @@ export default function AssignedSopTaskPage({c}:{c:Ctx}){
   {sop.state.kind==='loading'&&<p role="status">正在載入 SOP 任務…</p>}
   {sop.state.kind==='error'&&<p role="alert">{sop.state.message}</p>}
   {(sop.state.kind==='forbidden'||data&&!task)&&<p role="alert">找不到此 SOP 任務或沒有讀取權限</p>}
-  {task&&data&&<SopTaskInspector key={task.id} task={task} project={{id:data.projectId}} users={[]} sop={sop} onClose={()=>c.go({view:'work'})}/>}
+  {task&&data&&<SopTaskInspector key={task.id} task={task} project={{id:data.projectId}} users={[]} sop={sop} testOperator={canOperateTestTasks(c.s.user)} onClose={()=>c.go({view:'work'})}/>}
  </div>;
 }

@@ -97,3 +97,5 @@ export function suggestionBody(tasks: SopTask[], confirm: boolean, reason: strin
  return {tasks: tasks.flatMap(t => t.suggestion ? [{task_id:t.id,facts_hash:t.suggestion.hash,expected_revision:t.revision}] : []),confirm,reason:reason.trim(),confirmed_task_ids:confirmedTaskIds};
 }
 export const requiresSuggestionConfirmation = (tasks: SopTask[]) => tasks.some(t => t.suggestion?.tier === 'indicator');
+
+export const canOperateTestTasks = (user: {role?:string;active?:boolean}|null|undefined) => !!user && user.active !== false && ['manager','admin'].includes(user.role || '');

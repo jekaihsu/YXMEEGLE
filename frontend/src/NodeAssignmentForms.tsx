@@ -1,4 +1,4 @@
-import {useId,useState,type FormEvent} from 'react';
+import {useId,useState,type FormEvent,type ReactNode} from 'react';
 import type {NodeAssignmentDetail,NodeAssignmentError,NewAssignmentTask} from './nodeAssignmentApi';
 export function AssignForm({detail, busy, error, onCancel, onSubmit}: {detail: NodeAssignmentDetail; busy: boolean; error: NodeAssignmentError | null; onCancel: () => void; onSubmit: (ids: string[]) => Promise<void>}) {
   const [selected, setSelected] = useState(detail.node.owners.filter(p => detail.assignable_people.some(candidate => candidate.open_id === p.open_id)).map(p => p.open_id));
@@ -11,7 +11,7 @@ export function AssignForm({detail, busy, error, onCancel, onSubmit}: {detail: N
 export function TaskCreator({detail,...props}: {detail:NodeAssignmentDetail;busy:boolean;error:NodeAssignmentError|null;onCancel:()=>void;onSubmit:(task:NewAssignmentTask)=>Promise<void>}) {
  return <TaskCreateForm {...props} people={detail.assignable_people} departments={detail.node.departments}/>;
 }
-export function TaskCreateForm({people,departments:nodeDepartments,busy,error,onCancel,onSubmit}:{people:NodeAssignmentDetail['assignable_people'];departments?:string[];busy:boolean;error:{fields:Record<string,string>;message:string}|null;onCancel:()=>void;onSubmit:(task:NewAssignmentTask)=>Promise<void>}) {
+export function TaskCreateForm({people,departments:nodeDepartments,busy,error,onCancel,onSubmit,children}:{people:NodeAssignmentDetail['assignable_people'];departments?:string[];children?:ReactNode;busy:boolean;error:{fields:Record<string,string>;message:string}|null;onCancel:()=>void;onSubmit:(task:NewAssignmentTask)=>Promise<void>}) {
   const [draft, setDraft] = useState<NewAssignmentTask>({title: '', detail: '', assignee_open_id: '', department: '', deadline: ''});
   const [validation, setValidation] = useState<Record<string, string>>({});
   const id = useId(), fields = {...error?.fields, ...validation};
@@ -30,7 +30,7 @@ export function TaskCreateForm({people,departments:nodeDepartments,busy,error,on
     {people.length > 0 && <label><span>負責人</span><select value={draft.assignee_open_id} {...invalid('assignee_open_id')} onChange={e => update('assignee_open_id', e.target.value)}><option value="">選擇負責人</option>{people.map(p => <option key={p.open_id} value={p.open_id}>{p.name}</option>)}</select>{fieldError('assignee_open_id')}</label>}
     {nodeDepartments && <label><span>部門</span><select value={draft.department} {...invalid('department')} onChange={e => update('department', e.target.value)}><option value="">選擇部門</option>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select>{fieldError('department')}</label>}
     <label><span>期限</span><input type="date" value={draft.deadline} {...invalid('deadline')} onChange={e => update('deadline', e.target.value)}/>{fieldError('deadline')}</label>
-  </div>{error?.message&&<p role="alert">{error.message}</p>}<div className="na-form-actions"><button type="button" className="button compact" onClick={onCancel}>取消</button><button type="submit" className="button primary compact">建立任務</button></div></fieldset></form>;
+  </div>{children}{error?.message&&<p role="alert">{error.message}</p>}<div className="na-form-actions"><button type="button" className="button compact" onClick={onCancel}>取消</button><button type="submit" className="button primary compact">建立任務</button></div></fieldset></form>;
 }
 type ReasonFormProps = {busy: boolean; error: NodeAssignmentError | null; onCancel: () => void; onSubmit: (reason: string) => Promise<void>};
 const REASON_COPY = {

@@ -17,6 +17,7 @@ export interface SopSuggestion {taskId: string; ruleId: string; ruleRevision: nu
 export const SYNC_STATES = ['同步中','已同步','Lark 已變更','同步失敗','未啟用'] as const;
 export interface SopLarkSync {state: typeof SYNC_STATES[number]; syncedAt: number|null; recordId: string|null; baseId: string|null; tableId: string|null}
 export interface SopTask {
+ isTest: boolean;
  larkSync: SopLarkSync;
  result?:{note:string; actorId:string; actorName:string; at:number}|null; completionBlockedReason?:string|null;
  allowedActions: string[]; suggestion: SopSuggestion|null; shared: boolean; conditional: boolean;
@@ -92,7 +93,7 @@ function task(v: unknown): SopTask {
  const dueDate = optStr(local.due_date);
  if (dueDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) throw malformed();
  const result=t.result==null?null:object(t.result);
- return {larkSync: parseLarkSync(t.lark_sync), result:result?{note:str(result.note),actorId:str(result.actor_id),actorName:str(result.actor_name),at:seconds(result.at)}:null,
+ return {isTest: local.is_test == null ? false : bool(local.is_test), larkSync: parseLarkSync(t.lark_sync), result:result?{note:str(result.note),actorId:str(result.actor_id),actorName:str(result.actor_name),at:seconds(result.at)}:null,
   completionBlockedReason:optStr(t.completion_blocked_reason),allowedActions: list(t.allowed_actions,str), suggestion: t.suggestion == null ? null : parseSuggestion(t.suggestion), shared: bool(t.is_shared), conditional: bool(t.is_conditional), id: str(t.id), title: str(t.title), instructions: optStr(t.instructions), participants, applicability: applicability(t.applicability),
   state: lifecycle(t.state), revision: int(t.revision), overdue: bool(t.overdue), manual: origin.template_family_id === 'manual',
   dueDate, dateStatus: str(local.date_status), completionRule: str(local.completion_rule_status),
@@ -184,13 +185,17 @@ export const sopApi = {
   request(`${base(id)}/sop-import/preview`, post(body), current).then(parsePreview),
  apply: (id: string, body: {preview_id: string; request_id: string}, current: () => boolean) => request(`${base(id)}/sop-import/apply`, post(body), current).then(parseReceipt),
  run: (id: string, requestId: string, current: () => boolean) => request(`${base(id)}/sop-import/runs/${encodeURIComponent(requestId)}`, {}, current).then(parseReceipt),
- create: (id: string, body: {title: string; node_keys: SopNodeKey[];instructions?:string;participants?:{executor?:string};due_date?:string|null}, current: () => boolean) => request(`${base(id)}/sop-tasks`, post(body), current).then(r => ({task_id: str(object(r).task_id), checklist_revision: int(object(r).checklist_revision)})),
+ create: (id: string, body: {title: string; node_keys: SopNodeKey[];instructions?:string;participants?:{executor?:string};due_date?:string|null;is_test?:boolean}, current: () => boolean) => request(`${base(id)}/sop-tasks`, post(body), current).then(r => ({task_id: str(object(r).task_id), checklist_revision: int(object(r).checklist_revision)})),
+ cleanupTest: (id: string, taskId: string, body: {expected_revision: number; reason: string}, current: () => boolean) => request(`${base(id)}/sop-tasks/${encodeURIComponent(taskId)}/cleanup-test`, post(body), current).then(r => {const o = object(r); return {taskId: str(o.task_id), removed: bool(o.removed), replayed: bool(o.replayed), checklistRevision: int(o.checklist_revision)}}),
  patch: (id: string, taskId: string, body: Record<string, unknown>, current: () => boolean) => request(`${base(id)}/sop-tasks/${encodeURIComponent(taskId)}`, post(body, 'PATCH'), current).then(parseMutation),
  closeNode: (id: string, nodeKey: SopNodeKey, current: () => boolean): Promise<CloseNodeResult> => request(`${base(id)}/sop-tasks/close-node`, post({node_key: nodeKey}), current).then(r => {const o = object(r), left = object(o.left_open); return {closed: int(o.closed), leftOpen: {shared: int(left.shared), unresolved: int(left.unresolved)}}}),
  transition: (id: string, taskId: string, body: Record<string, unknown>, current: () => boolean) => request(`${base(id)}/sop-tasks/${encodeURIComponent(taskId)}/transition`, post(body), current).then(parseMutation),
 };
 
 export const SOP_ERROR_TEXT: Record<string, string> = {
+ cleanup_migration_required: '測試任務清除尚未開放，請聯絡管理員套用清除稽核遷移（503）',
+ test_task_projection_exists: '此測試任務已有 Lark 投影紀錄，無法清除，請聯絡管理員核對，避免留下孤立資料（409）',
+ test_task_required: '僅能清除建立時標記為測試且仍有測試標記的任務（409）',
  node_revision_conflict:'節點已更新，請重新載入後再試',local_node_blocked:'節點目前無法操作，請核對任務與狀態',local_node_only:'請使用此案件的正式節點流程',
  result_note_required: '請填寫結果說明', quote_number_taken: '報價編號已使用', quote_number_invalid: '報價編號格式不正確', local_case_creation_disabled: '本地建立暫停', quote_not_found: '找不到報價', suggestion_stale: '建議已更新', suggestion_confirmation_required: '需確認建議並填寫原因', identity_forbidden:'帳號或工作區尚未獲准存取，請聯絡管理員核對身分與名冊', session_expired: '登入已過期', sop_import_forbidden: '沒有 SOP 任務權限', case_not_found: '找不到此案件', task_not_found: '找不到此 SOP 任務',
  preview_stale: '預覽已過期，已重新產生', preview_not_found: '預覽已失效，已重新產生', idempotency_mismatch: '匯入請求不一致，請重新預覽',
