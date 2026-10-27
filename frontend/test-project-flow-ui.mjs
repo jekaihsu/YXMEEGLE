@@ -91,7 +91,11 @@ await mount({node:'control',embedded:false});assert.equal(document.querySelector
  await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(ui.ProjectDetail,{c}));await tick()});
  assert.equal(document.querySelectorAll('.pf-task-open').length,2,'revisit shows last-good task rows while revalidating');assert.equal(document.querySelector('[aria-label="任務載入中"]'),null);
  await act(async()=>{releaseDetail();await tick()});assert.equal(document.querySelectorAll('.pf-task-open').length,2);
- Date.now=realNow;
+ detailStatus=403;Date.now=()=>realNow()+122000;
+ await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(ui.ProjectDetail,{c}));await tick()});
+ assert.equal(document.querySelectorAll('.pf-task-open').length,0,'forbidden revalidation removes cached task rows');
+ assert.match(document.querySelector('#flow-tasks').textContent,/來源未完整/);
+ detailStatus=200;Date.now=realNow;
 }
 await mount({node:'control'});assert.match(document.querySelector('.pf-task-open small').textContent,/Lark 任務/,'rows name their source');
 await click(document.querySelector('.pf-task-open'));assert.match(document.querySelector('[role=dialog] .pf-inspector p').textContent,/^Lark 任務 · /,'drawer names its source');await click(button('關閉'));
