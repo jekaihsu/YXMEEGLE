@@ -105,7 +105,7 @@ def stage(body, key):
 
 def daily(department='外業組', points=0.25, date='2026-10-13', ident='d1'):
     return dict(id=ident, date=date, department=department, points=points, person=SECRET_PERSON, source_fields={'姓名': SECRET_PERSON},
-                case_mapping_status='matched')
+                case_mapping_status='matched',match_basis='source_case_or_link')
 
 
 def test_c_prefixed_case_with_confirmation_and_lines(progress):
@@ -163,7 +163,7 @@ def test_v3_match_by_quote_number_and_report_rows(progress):
     run, _, _ = progress
     state, vis, _ = chain_state(code='C115238-01', quotes=(('115573', 'C115238-01', '報價中'),))
     body = run(state, vis, cases=[('recvsaz8kB86Jh', '115573', '未填', 0.25)], work_orders=[('115573', '2026-08-13', 0.25)]).json()
-    assert body['identity']['v3_cases'] == [{'case_key': 'recvsaz8kB86Jh', 'case_code': '115573', 'status': '未填', 'match': 'quote_number'}]
+    assert body['identity']['v3_cases'] == [{'case_key': 'recvsaz8kB86Jh', 'case_code': '115573', 'status': '未填', 'match': 'quote_number','bridge_status':'auto_exact'}]
     assert body['identity']['v3_ambiguous'] is False
     rows = body['production']['report_rows']
     assert len(rows) == 1 and rows[0]['case_key'] == 'recvsaz8kB86Jh' and rows[0]['dept'] == 'field' and rows[0]['week'] == '2026-08-10'
@@ -187,7 +187,7 @@ def test_ambiguous_v3_lists_both_and_never_borrows_actuals(progress):
                work_orders=[('115547', '2026-08-13', 0.5)]).json()
     assert body['identity']['v3_ambiguous'] is True
     assert [(c['case_key'], c['match']) for c in body['identity']['v3_cases']] == [('recB', 'code'), ('recA', 'quote_number')]
-    assert {r['case_key'] for r in body['production']['report_rows']} == {'recA'}
+    assert body['production']['report_rows'] == []
     assert body['production']['field']['actual']['known'] is False
     assert 'v3_ambiguous' in {g['id'] for g in body['gaps']}
 
@@ -197,7 +197,8 @@ def test_reports_snapshot_cold_returns_the_rest_with_a_gap(progress):
     state, vis, _ = chain_state()
     body = run(state, vis, cases=[('recX', 'C115264', '未填', None)], warm=False).json()
     assert body['sources'] == {'source_synced_at': body['sources']['source_synced_at'], 'source_status': body['sources']['source_status'],
-                               'reports_status': 'cold', 'reports_fetched_at': None, 'reports_stale': None}
+                               'reports_status': 'cold', 'reports_fetched_at': None, 'reports_stale': None,
+                               'can_refresh_sources':False,'refresh_reason':'即時讀取僅限已啟用的公司正式工作區'}
     assert body['identity']['confirmation']['present'] is True and stage(body, 'sales')['state'] == 'done'
     assert body['identity']['v3_cases'] == [] and 'reports_cold' in {g['id'] for g in body['gaps']}
 
@@ -391,13 +392,13 @@ def test_ambiguous_v3_never_borrows_a_cumulative_actual():
 
 @pytest.mark.parametrize('points', [True, False, float('nan'), float('inf'), float('-inf'), '1', None])
 def test_non_numeric_or_non_finite_points_are_not_known(points):
-    body = direct(bare(daily_reports=[{'department': '外業組', 'points': points, 'date': '2026-10-01'}]))
+    body = direct(bare(daily_reports=[{'department': '外業組', 'points': points, 'date': '2026-10-01','case_mapping_status':'matched','match_basis':'manual_review'}]))
     assert body['production']['field']['actual'] == {'known': False, 'value': None, 'unit_note': None, 'source': None,
                                                      'reason': '已有日報連結，但完成數量尚未投影'}
 
 
 def test_zero_points_daily_is_a_known_zero_report():
-    body = direct(bare(daily_reports=[{'department': '外業組', 'points': 0, 'date': '2026-10-01'}]))
+    body = direct(bare(daily_reports=[{'department': '外業組', 'points': 0, 'date': '2026-10-01','case_mapping_status':'matched','match_basis':'manual_review'}]))
     assert body['production']['field']['actual']['known'] is True and body['production']['field']['actual']['value'] == '0'
     assert stage(body, 'field')['state'] == 'active'
     assert stage(body, 'field')['evidence'][-1]['value'].startswith('0（')
@@ -466,3 +467,150 @@ def test_progress_tab_and_node_evidence_agree(progress):
         assert [{k: v for k, v in i.items() if k != 'item_id'} for i in part['items']] == signal.public()['work_items'], key
         assert (signal.items_total, signal.items_truncated) == (part['items_total'], part['items_truncated'])
     assert found[NodeKey.CONTROL].items_all_done is True and found[NodeKey.FIELD].items_all_done is False
+
+@pytest.mark.parametrize('uid', ['u-manager', 'u-field'])
+def test_scoped_progress_matches_full_capture_without_other_project_trees(progress, monkeypatch, uid):
+    from . import storage
+    run, client, _ = progress
+    state, vis, _ = chain_state(daily=[daily()])
+    real = storage.load_partial
+    captures = []
+
+    def scoped(db, model, row, **kwargs):
+        result = real(db, model, row, **kwargs)
+        if kwargs.get('project_ids') is not None:
+            captures.append(result)
+        return result
+
+    monkeypatch.setattr(storage, 'load_partial', scoped)
+    response = run(state, vis, uid=uid)
+    assert response.status_code == 200
+    assert captures and all([p['id'] for p in capture['projects']] == [vis] for capture in captures)
+
+    def full(db, model, row, **kwargs):
+        return storage.load(db, model, row) if kwargs.get('project_ids') is not None else real(db, model, row, **kwargs)
+
+    monkeypatch.setattr(storage, 'load_partial', full)
+    legacy = client.get(f'/api/projects/{vis}/progress')
+    assert legacy.status_code == 200
+    assert response.json() == legacy.json()
+
+
+def test_progress_generation_fences_do_not_materialize_source_snapshots(progress):
+    from sqlalchemy import event
+    from .models import CacheRow
+    run, _, _ = progress
+    state, vis, _ = chain_state()
+    loaded = []
+
+    def capture(row, context):
+        loaded.append(row.id)
+
+    event.listen(CacheRow, 'load', capture)
+    try:
+        assert run(state, vis).status_code == 200
+    finally:
+        event.remove(CacheRow, 'load', capture)
+    assert loaded == [WID], 'only the actual health capture decodes source records; generation fences read scalars'
+
+
+def test_warm_progress_never_waits_for_reports_or_takes_a_workspace_write_lock(progress, monkeypatch):
+    from sqlalchemy import event
+    run, client, app = progress
+    state, vis, _ = chain_state()
+    first = run(state, vis, cases=[('recX', 'C115264', '未填', None)],
+                work_orders=[('C115264', '2026-10-13', 0.25)])
+    assert first.status_code == 200
+    assert first.json()['production']['report_rows']
+
+    def forbidden_get():
+        raise AssertionError('case progress must use its captured snapshot, never a blocking cold read')
+
+    monkeypatch.setattr(app.state.reports, 'get', forbidden_get)
+    statements = []
+    def capture(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement.lower())
+    event.listen(app.state.engine, 'before_cursor_execute', capture)
+    try:
+        again = client.get(f'/api/projects/{vis}/progress')
+    finally:
+        event.remove(app.state.engine, 'before_cursor_execute', capture)
+    assert again.status_code == 200
+    assert again.json() == first.json()
+    assert not any('for update' in sql or sql.lstrip().startswith(('update ', 'insert ', 'delete '))
+                   for sql in statements)
+
+
+def test_reports_view_keeps_the_captured_generation_when_store_changes():
+    with_snapshot = SnapshotStore(RawReader([('recX', 'C115264', '未填', 3)],
+                                           [('C115264', '2026-10-13', 0.25)]))
+    try:
+        snapshot = with_snapshot.get()
+        view = ReportsView(with_snapshot)
+        # A different publication must not change rows halfway through a detail read.
+        with_snapshot._snapshot = None
+        rows, truncated = view.rows('C115264')
+        assert rows and rows[0]['done_total'] == 3 and not truncated
+        assert view.field_total('C115264') == 3
+        assert view.snapshot is snapshot
+    finally:
+        with_snapshot.close()
+
+
+@pytest.mark.parametrize('uid,expected', [('u-manager', True), ('u-pm', True), ('u-field', False)])
+def test_source_refresh_permission_matches_live_authorization(http, monkeypatch, uid, expected):
+    app, client, seat, signin = http
+    state, vis, _ = build_state()
+    from dataclasses import replace
+    monkeypatch.undo()
+    app.state.cfg.update(LARK_APP_ID='synthetic-app',LARK_WORKER_IDENTITY='application',LARK_LIVE_READ_ENABLED='true')
+    app.state.live_read.config=replace(app.state.live_read.config,enabled=True)
+    app.state.live_read.refreshers={d:lambda wid:{'fingerprint':'synthetic'} for d in ('sources','roster','attendance')}
+    for user in state['users']:
+        user.update(directory_status='employed', directory_source={'app_id':app.state.cfg.get('LARK_APP_ID'), 'record_id':'synthetic'})
+    seat(state)
+    signin(uid)
+    health = client.get('/api/source-health').json()
+    assert health['can_refresh'] is expected
+    progress = client.get(f'/api/projects/{vis}/progress')
+    assert progress.status_code == 200
+    assert progress.json()['sources']['can_refresh_sources'] is expected
+    if expected:
+        response=client.post('/api/live/refresh',json={'datasets':['sources'],'force':True,'wait':True})
+        assert response.status_code==200
+        assert response.json()['freshness']['datasets']['sources']['status']=='fresh'
+    if not expected:
+        assert health['refresh_reason'] == '需由有權限的 PM 或主管更新'
+        assert all('retry_handle' not in row for row in health['sources'])
+        response = client.post('/api/live/refresh', json={'datasets':['sources'], 'force':True, 'wait':True})
+        assert response.status_code == 403
+
+
+@pytest.mark.parametrize('failure', ['disabled', 'database'])
+def test_refresh_permission_failures_preserve_read_routes(http, monkeypatch, failure):
+    from dataclasses import replace
+    app, client, seat, signin = http
+    state, vis, _ = build_state()
+    seat(state)
+    signin('u-manager')
+    calls = []
+    def authorize(*args):
+        calls.append(args)
+        if failure == 'database':
+            raise OSError('private database details')
+    monkeypatch.setattr(app.state.source_sync, '_authorize', authorize)
+    app.state.cfg.update(LARK_WORKER_IDENTITY='application', LARK_LIVE_READ_TRANSPORT='deny')
+    monkeypatch.setattr(app.state.live_read, 'ensure', lambda *args, **kwargs: None)
+    app.state.live_read.config = replace(app.state.live_read.config, enabled=failure != 'disabled')
+    for path in ['/api/source-health', f'/api/projects/{vis}/progress', '/api/manager-overview']:
+        calls.clear()
+        response = client.get(path)
+        assert response.status_code == 200, response.text
+        assert len(calls) == (1 if failure == 'database' else 0)
+        assert 'private database details' not in response.text
+        if path == '/api/source-health':
+            assert response.json()['can_refresh'] is False
+        if path.endswith('/progress'):
+            assert response.json()['sources']['can_refresh_sources'] is False
+    if failure == 'disabled':
+        assert client.post('/api/live/refresh', json={'datasets':['sources'], 'force':True}).status_code == 403

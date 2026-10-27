@@ -51,6 +51,7 @@ export interface Timestamp {value: string | null; label: string}
 export interface SourceRow {
  key: string;
  name: string | null;
+ lastErrorSummary: string | null;
  version: string | null;
  dataState: DataState | null;
  statusLabel: string;
@@ -74,6 +75,7 @@ export interface SourceRow {
  retry: {handle: unknown} | null;
 }
 export interface PageHealth {
+ reported: boolean;
  states: DataStateName[];
  statusLabel: string;
  explanation: string;
@@ -145,7 +147,7 @@ function sourceRow(raw: Record<string, unknown>, key: string): SourceRow {
  const hasKnownCounts = !states.some(s => ['unknown', 'loading', 'unlocated', 'read_failed'].includes(s)) &&
   !states.some(s => ['complete_empty', 'filtered_empty'].includes(s));
  return {
-  key, name: text(raw.name), version: text(raw.version), dataState: state === null ? null : parseDataState({states, count: null}),
+  key, name: text(raw.name), lastErrorSummary: text(raw.last_error_summary), version: text(raw.version), dataState: state === null ? null : parseDataState({states, count: null}),
   statusLabel: state === null ? '資料正常' : states.map(s => DATA_STATE_LABELS[s]).join('・'),
   needsAttention: states.some(s => ['read_failed', 'unlocated', 'partial', 'stale', 'unknown'].includes(s)),
   partial: states.includes('partial'), stale: states.includes('stale'),
@@ -173,7 +175,7 @@ function sourceRow(raw: Record<string, unknown>, key: string): SourceRow {
 export function buildSourceHealthView(input: unknown, options: SourceHealthOptions): SourceHealthView {
  const raw = record(input);
  const pageState = parseDataState(raw.page_state);
- const page: PageHealth = {states: [...pageState.states], statusLabel: pageState.states.map(s => DATA_STATE_LABELS[s]).join('・'),
+ const page: PageHealth = {reported: raw.page_state != null, states: [...pageState.states], statusLabel: pageState.states.map(s => DATA_STATE_LABELS[s]).join('・'),
   explanation: pageState.states.map(s => guidance[s]).join(' ')};
  if (options.diagnosticCapability !== true) return {page, diagnostic: null};
  const candidates = Array.isArray(raw.sources) ? Array.from(raw.sources, record) : [];

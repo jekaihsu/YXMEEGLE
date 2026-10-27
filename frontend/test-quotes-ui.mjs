@@ -30,7 +30,10 @@ async function registerDetail(quote,allowed=true) {
  const destinations=[];
  const c={s:{workspace_id:`quote-${quote.quote_no}-${allowed}`,features:{sop_task_writes:true},user:{capabilities:['sop_task_import']}},w:{users:[]},route:{view:'quotes'},go:route=>destinations.push(route)};
  await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});
+ assert.deepEqual([...document.querySelectorAll('thead th')].map(th=>th.textContent.replace(/ [↑↓]/,'')),['報價編號','案件名稱','業主','合約金額','階段','負責人']);
+ assert.equal(document.querySelectorAll('.quote-stage-filter option').length,12,'all stage choices remain available');
  await click(button(quote.quote_no));
+ for(const label of ['工程編號','報價日期','報價期限','PM','SOP 進度'])assert.ok(document.querySelector('[role=dialog]').textContent.includes(label),`${label} retained in detail`);
  return {calls,destinations};
 }
 test('source quote starts SOP at 報價 with all nodes and opens its canonical case',async()=>{
@@ -46,7 +49,7 @@ test('source quote starts SOP at 報價 with all nodes and opens its canonical c
 });
 test('no-case quote has plain admission label and makes no case or import request',async()=>{
  const {calls}=await registerDetail(x.quote_without_case);
- assert.match(document.querySelector('tbody tr').textContent,/未納入案件/);
+ assert.equal(document.querySelector('tbody .col-sop'),null,'SOP admission belongs in detail');
  assert.match(document.querySelector('[role=dialog]').textContent,/未納入案件/);
  assert.equal(Boolean(button('開始 SOP')),false);
  assert.equal(button('開啟流程'),undefined);
@@ -72,4 +75,82 @@ test('completed import refreshes the open detail and removes the start action',a
  await click(button('關閉'));
  assert.equal(Boolean(button('開始 SOP')),false);
  assert.match(document.querySelector('[role=dialog]').textContent,/0\/1/);
+});
+
+test('stage dropdown filters rows and can restore all stages',async()=>{
+ const base=x.quotes.items[0];
+ globalThis.fetch=async()=>reply({total:2,items:[{...base,quote_no:'115801',stage:'inquiry'},{...base,quote_no:'115802',stage:'quoted'}]});
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>{root.render(React.createElement(m.Quotes,{c:{s:{user:{}},w:{users:[]},route:{view:'quotes'},go(){}}}));await tick()});
+ const select=document.querySelector('.quote-stage-filter select');
+ const change=async value=>act(async()=>{Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(select,value);select.dispatchEvent(new Event('change',{bubbles:true}));await tick()});
+ assert.equal(document.querySelectorAll('tbody tr').length,2);
+ await change('quoted');assert.equal(document.querySelectorAll('tbody tr').length,1);assert.match(document.querySelector('tbody').textContent,/115802/);
+ await change('');assert.equal(document.querySelectorAll('tbody tr').length,2);
+});
+
+test('pagination and parent updates reuse filtered/sorted rows; filters and sorting still recompute',async()=>{
+ const compare=Object.getOwnPropertyDescriptor(Intl.Collator.prototype,'compare');
+ let comparisons=0;
+ Object.defineProperty(Intl.Collator.prototype,'compare',{...compare,get(){const fn=compare.get.call(this);return (...args)=>{comparisons++;return fn(...args)}}});
+ try{
+  const rows=Array.from({length:101},(_,i)=>({...x.quotes.items[0],quote_no:String(115000+i),name:`案件${i}`,stage:i%2?'quoted':'inquiry'}));
+  globalThis.fetch=async url=>{const offset=Number(new URL(url,'http://localhost').searchParams.get('offset'));return reply({total:rows.length,items:rows.slice(offset,offset+100)})};
+  root=createRoot(document.getElementById('root'));
+  const c={s:{user:{}},w:{users:[]},route:{view:'quotes'},go(){}};
+  await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});
+  assert.ok(comparisons>0);
+  const initial=comparisons;
+  await click(button('下一頁'));assert.equal(comparisons,initial,'page changes only slice the existing rows');
+  await act(async()=>{root.render(React.createElement(m.Quotes,{c:{...c,busy:true}}));await tick()});
+  assert.equal(comparisons,initial,'unrelated parent updates do not sort');
+  await click([...document.querySelectorAll('thead button')].find(b=>b.textContent.includes('案件名稱')));
+  assert.ok(comparisons>initial,'sort changes recompute');
+  const sorted=comparisons;
+  await type(document.querySelector('[aria-label="搜尋報價"]'),'案件1');
+  assert.ok(comparisons>sorted,'search changes recompute');
+  assert.equal(document.querySelectorAll('tbody tr').length,12);
+  assert.equal(button('上一頁').disabled,true);
+ }finally{Object.defineProperty(Intl.Collator.prototype,'compare',compare)}
+});
+
+test('reload and unmount abort quote reads instead of continuing obsolete page requests',async()=>{
+ const pending=[];
+ globalThis.fetch=(url,init)=>new Promise(resolve=>pending.push({url,init,resolve}));
+ root=createRoot(document.getElementById('root'));
+ const c={s:{user:{}},w:{users:[]},route:{view:'quotes'},go(){}};
+ await act(async()=>{root.render(React.createElement(m.Quotes,{c}));await tick()});
+ assert.equal(pending.length,1);
+ await click(button('重新整理'));
+ assert.equal(pending.length,2);assert.ok(pending[0].init.signal.aborted);
+ await act(async()=>{pending[1].resolve(reply({total:201,items:Array.from({length:100},(_,i)=>({...x.quotes.items[0],quote_no:String(i)}))}));await tick()});
+ assert.equal(pending.length,3);
+ assert.match(pending[2].url,/offset=100/);
+ await act(async()=>root.unmount());root=null;
+ assert.ok(pending[2].init.signal.aborted);
+ await act(async()=>{pending[0].resolve(reply({total:1000,items:[x.quotes.items[0]]}));pending[2].resolve(reply({total:201,items:[x.quotes.items[0]]}));await tick()});
+ assert.equal(pending.length,3,'late obsolete responses cannot start another page');
+});
+
+test('bulk quote pages load 2000 rows in one request and 2001 in two before global search/sort',async()=>{
+ for(const count of [2000,2001]){
+  const calls=[];
+  const rows=Array.from({length:count},(_,i)=>({...x.quotes.items[0],quote_no:String(115000+i),name:`案件${i}`,engineering_no:`ENG-${i}`,contract_amount:i}));
+  globalThis.fetch=async url=>{
+   const params=new URL(url,'http://localhost').searchParams;
+   const offset=Number(params.get('offset')),limit=Number(params.get('limit'));
+   calls.push({offset,limit});return reply({total:rows.length,items:rows.slice(offset,offset+limit)});
+  };
+  root=createRoot(document.getElementById('root'));
+  await act(async()=>{root.render(React.createElement(m.Quotes,{c:{s:{user:{}},w:{users:[]},route:{view:'quotes'},go(){}}}));await tick()});
+  assert.deepEqual(calls,count===2000?[{offset:0,limit:2000}]:[{offset:0,limit:2000},{offset:2000,limit:2000}]);
+  assert.match(document.querySelector('tbody tr').textContent,new RegExp(String(115000+count-1)));
+  await click(button('下一頁'));
+  await type(document.querySelector('[aria-label="搜尋報價"]'),`eng-${count-1}`);
+  assert.equal(document.querySelectorAll('tbody tr').length,1);
+  assert.match(document.querySelector('tbody tr').textContent,new RegExp(`案件${count-1}`));
+  assert.equal(button('上一頁').disabled,true);
+  assert.equal(calls.length,count===2000?1:2,'local interactions do not refetch');
+  await act(async()=>root.unmount());root=null;
+ }
 });

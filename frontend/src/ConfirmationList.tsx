@@ -6,6 +6,7 @@ import type {
   ConfirmationListRow,
 } from './confirmationListView.ts';
 import './p2-lists.css';
+import './ConfirmationList.css';
 
 export interface ConfirmationListCallbacks {
   onSelect?: (key: string | null) => void;
@@ -47,6 +48,19 @@ export function ConfirmationList(props: ConfirmationListProps) {
   const prevSelectedKeyRef = useRef<string | null>(
     view?.drawer?.open && view.drawer.row ? view.drawer.row.key : null
   );
+
+  const hasActiveAdvanced = Boolean(
+    view?.controls?.filters?.admission ||
+    view?.controls?.filters?.deadline_from ||
+    view?.controls?.filters?.deadline_to
+  );
+  const [advancedOpen, setAdvancedOpen] = useState(hasActiveAdvanced);
+
+  useEffect(() => {
+    if (hasActiveAdvanced) {
+      setAdvancedOpen(true);
+    }
+  }, [hasActiveAdvanced]);
 
   useEffect(() => {
     const currentKey =
@@ -100,9 +114,14 @@ export function ConfirmationList(props: ConfirmationListProps) {
     }
   };
 
-  const bannerStateClass = view.pageState
-    ? view.pageState.states.join(' ')
-    : 'ready';
+  const hasActiveFilters = Boolean(
+    view.controls.filters.search ||
+    view.controls.filters.source_version ||
+    view.controls.filters.pm ||
+    view.controls.filters.admission ||
+    view.controls.filters.deadline_from ||
+    view.controls.filters.deadline_to
+  );
 
   return (
     <div className="confirmation-list-root">
@@ -111,210 +130,222 @@ export function ConfirmationList(props: ConfirmationListProps) {
         <div className="p2-header-title-row">
           <h2 className="p2-title">{view.header.title}</h2>
           <div className="p2-header-meta">
-            <span className="p2-meta-item">
-              資料日期：{view.header.asOf.label}
-              {view.header.asOf.reason && `（${view.header.asOf.reason}）`}
-            </span>
-            <span className="p2-meta-item">
-              快照時間：{view.header.snapshot.label}
-              {view.header.snapshot.reason && `（${view.header.snapshot.reason}）`}
-            </span>
+            {!view.header.asOf.reason && <span className="p2-meta-item">資料日期：{view.header.asOf.label}</span>}
+            {!view.header.snapshot.reason && <span className="p2-meta-item">保留資料：{view.header.snapshot.label}</span>}
           </div>
         </div>
       </header>
 
-      {/* Page State Banner */}
-      <section
-        className={`p2-banner state-${bannerStateClass}`}
-        role="status"
-        aria-live="polite"
-        aria-label="頁面資料狀態"
-      >
-        <div className="p2-banner-header">
-          <span className="p2-banner-title">頁面資料狀態</span>
-          <span className="p2-badge">
-            {view.pageStateLabel ?? ''}
-          </span>
-        </div>
-        {view.reason && <p className="p2-banner-reason">{view.reason}</p>}
-      </section>
+      {view.pageState && <p className="overview-table-note" role="status">
+        {view.pageState.states.some(state => state === 'forbidden') ? '沒有權限檢視工程確認單。' : view.pageState.states.some(state => state === 'loading') ? '確認單讀取中…' : view.pageState.states.some(state => state === 'complete_empty') ? '目前沒有工程確認單。' : view.pageState.states.some(state => state === 'filtered_empty') ? '沒有符合條件的確認單。' : view.pageState.states.some(state => state === 'stale') ? '資料待更新，目前顯示保留資料。' : view.pageState.states.some(state => state === 'read_failed') ? '更新失敗，目前顯示保留資料。' : '確認單資料尚未完整，僅顯示已載入內容。'}
+      </p>}
 
-      {/* Controls & Toolbar */}
+      {/* Controls & Toolbar with Progressive Disclosure */}
       <div className="p2-toolbar" role="region" aria-label="清單篩選與欄位控制">
-        <div className="p2-toolbar-left">
-          {/* Search box */}
-          <div className="p2-search-box">
-            <input
-              id={`${baseId}-search`}
-              type="search"
-              className="p2-search-input"
-              value={view.controls.filters.search ?? ''}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="搜尋確認單…"
-              aria-label="搜尋工程確認單"
-            />
-            {view.controls.filters.search ? (
-              <button
-                type="button"
-                className="p2-search-clear"
-                onClick={() => handleSearchChange('')}
-                aria-label="清除搜尋"
+        {/* Primary Filter & Action Bar */}
+        <div className="p2-toolbar-row-primary">
+          <div className="p2-toolbar-primary-left">
+            {/* Search box (Primary action anchor) */}
+            <div className="p2-search-box">
+              <input
+                id={`${baseId}-search`}
+                type="search"
+                className="p2-search-input"
+                value={view.controls.filters.search ?? ''}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="搜尋確認單…"
+                aria-label="搜尋工程確認單"
+              />
+              {view.controls.filters.search ? (
+                <button
+                  type="button"
+                  className="p2-search-clear"
+                  onClick={() => handleSearchChange('')}
+                  aria-label="清除搜尋"
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
+
+            {/* Quick Filter: Source Version */}
+            <div className="p2-filter-field-inline">
+              <label
+                htmlFor={`${baseId}-filter-source-version`}
+                className="p2-filter-label"
               >
-                ×
-              </button>
-            ) : null}
-          </div>
+                版本
+              </label>
+              <input
+                id={`${baseId}-filter-source-version`}
+                name="source_version"
+                type="text"
+                className="p2-filter-input"
+                value={view.controls.filters.source_version ?? ''}
+                onChange={(e) =>
+                  handleFilterChange('source_version', e.target.value)
+                }
+                placeholder="確認單版本"
+                aria-label="篩選確認單版本"
+              />
+            </div>
 
-          {/* Source Version filter */}
-          <div className="p2-filter-field">
-            <label
-              htmlFor={`${baseId}-filter-source-version`}
-              className="p2-filter-label"
-            >
-              版本
-            </label>
-            <input
-              id={`${baseId}-filter-source-version`}
-              name="source_version"
-              type="text"
-              className="p2-filter-input"
-              value={view.controls.filters.source_version ?? ''}
-              onChange={(e) =>
-                handleFilterChange('source_version', e.target.value)
-              }
-              placeholder="確認單版本"
-              aria-label="篩選確認單版本"
-            />
-          </div>
+            {/* Quick Filter: PM */}
+            <div className="p2-filter-field-inline">
+              <label htmlFor={`${baseId}-filter-pm`} className="p2-filter-label">
+                負責人
+              </label>
+              <input
+                id={`${baseId}-filter-pm`}
+                name="pm"
+                type="text"
+                className="p2-filter-input"
+                value={view.controls.filters.pm ?? ''}
+                onChange={(e) => handleFilterChange('pm', e.target.value)}
+                placeholder="案件負責人"
+                aria-label="篩選案件負責人"
+              />
+            </div>
 
-          {/* PM filter */}
-          <div className="p2-filter-field">
-            <label htmlFor={`${baseId}-filter-pm`} className="p2-filter-label">
-              負責人
-            </label>
-            <input
-              id={`${baseId}-filter-pm`}
-              name="pm"
-              type="text"
-              className="p2-filter-input"
-              value={view.controls.filters.pm ?? ''}
-              onChange={(e) => handleFilterChange('pm', e.target.value)}
-              placeholder="案件負責人"
-              aria-label="篩選案件負責人"
-            />
-          </div>
-
-          {/* Admission filter */}
-          <div className="p2-filter-field">
-            <label
-              htmlFor={`${baseId}-filter-admission`}
-              className="p2-filter-label"
-            >
-              准入狀態
-            </label>
-            <input
-              id={`${baseId}-filter-admission`}
-              name="admission"
-              type="text"
-              className="p2-filter-input"
-              value={view.controls.filters.admission ?? ''}
-              onChange={(e) => handleFilterChange('admission', e.target.value)}
-              placeholder="准入狀態"
-              aria-label="篩選准入狀態"
-            />
-          </div>
-
-          {/* Deadline filter control (disabled with reason) */}
-          <div
-            className="p2-deadline-filter-group"
-            title={view.controls.deadline.reason}
-          >
-            <span className="p2-deadline-filter-label">有效期限（停用）</span>
-            <input
-              id={`${baseId}-deadline-from`}
-              type="text"
-              className="p2-deadline-input"
-              disabled
-              aria-disabled="true"
-              value={view.controls.filters.deadline_from ?? ''}
-              placeholder="起日"
-              aria-label="期限起日（已停用）"
-            />
-            <span aria-hidden="true">~</span>
-            <input
-              id={`${baseId}-deadline-to`}
-              type="text"
-              className="p2-deadline-input"
-              disabled
-              aria-disabled="true"
-              value={view.controls.filters.deadline_to ?? ''}
-              placeholder="迄日"
-              aria-label="期限迄日（已停用）"
-            />
-            <span className="p2-deadline-reason" role="note">
-              {view.controls.deadline.reason}
-            </span>
-          </div>
-        </div>
-
-        <div className="p2-toolbar-right">
-          {/* Reset Filters button */}
-          <button
-            type="button"
-            className="p2-btn-reset-filters"
-            onClick={() => {
-              if (onFilterChange) {
-                onFilterChange(view.controls.resetFilters.filters);
-              } else if (onResetFilters) {
-                onResetFilters();
-              }
-            }}
-            aria-label="重設篩選條件"
-          >
-            重設篩選
-          </button>
-
-          {/* Column Chooser */}
-          <div className="p2-column-chooser-wrapper">
+            {/* Progressive Disclosure Toggle: 進階篩選 */}
             <button
-              id={`${baseId}-chooser-btn`}
               type="button"
-              className="p2-btn-chooser"
-              aria-expanded={chooserOpen}
-              aria-controls={`${baseId}-chooser-panel`}
-              onClick={() => setChooserOpen(!chooserOpen)}
+              className={`p2-btn-advanced-toggle ${advancedOpen ? 'is-active' : ''}`}
+              onClick={() => setAdvancedOpen(!advancedOpen)}
+              aria-expanded={advancedOpen}
+              aria-controls={`${baseId}-advanced-panel`}
             >
-              欄位設定
+              <span>進階篩選</span>
+              {hasActiveAdvanced && <span className="p2-filter-active-dot" aria-hidden="true" />}
             </button>
-            {chooserOpen && (
-              <div
-                id={`${baseId}-chooser-panel`}
-                className="p2-column-chooser-panel"
-                role="region"
-                aria-label="欄位顯示設定"
+          </div>
+
+          <div className="p2-toolbar-primary-right">
+            {/* Reset Filters button */}
+            <button
+              type="button"
+              className="p2-btn-reset-filters"
+              onClick={() => {
+                if (onFilterChange) {
+                  onFilterChange(view.controls.resetFilters.filters);
+                } else if (onResetFilters) {
+                  onResetFilters();
+                }
+              }}
+              disabled={!hasActiveFilters}
+              aria-label="重設篩選條件"
+            >
+              重設篩選
+            </button>
+
+            {/* Column Chooser */}
+            <div className="p2-column-chooser-wrapper">
+              <button
+                id={`${baseId}-chooser-btn`}
+                type="button"
+                className="p2-btn-chooser"
+                aria-expanded={chooserOpen}
+                aria-controls={`${baseId}-chooser-panel`}
+                onClick={() => setChooserOpen(!chooserOpen)}
               >
-                <div className="p2-chooser-title">顯示欄位</div>
-                <div className="p2-chooser-list">
-                  {view.columns.map((col) => (
-                    <label className="p2-chooser-item" key={col.key}>
-                      <input
-                        type="checkbox"
-                        checked={col.visible}
-                        onChange={() => onColumnToggle?.(col.key)}
-                      />
-                      <span>{col.key==='source_status'?'來源讀取狀態':col.label}</span>
-                      {col.technical ? (
-                        <span className="p2-badge-tech">技術欄位（非預設）</span>
-                      ) : !col.default ? (
-                        <span className="p2-badge-tech">非預設</span>
-                      ) : null}
-                    </label>
-                  ))}
+                欄位設定
+              </button>
+              {chooserOpen && (
+                <div
+                  id={`${baseId}-chooser-panel`}
+                  className="p2-column-chooser-panel"
+                  role="region"
+                  aria-label="欄位顯示設定"
+                >
+                  <div className="p2-chooser-title">顯示欄位</div>
+                  <div className="p2-chooser-list">
+                    {view.columns.map((col) => (
+                      <label className="p2-chooser-item" key={col.key}>
+                        <input
+                          type="checkbox"
+                          checked={col.visible}
+                          onChange={() => onColumnToggle?.(col.key)}
+                        />
+                        <span>
+                          {col.key === 'source_status'
+                            ? '來源讀取狀態'
+                            : col.label}
+                        </span>
+                        {col.technical ? (
+                          <span className="p2-badge-tech">
+                            技術欄位（非預設）
+                          </span>
+                        ) : !col.default ? (
+                          <span className="p2-badge-tech">非預設</span>
+                        ) : null}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Secondary / Advanced Filters (Disclosed progressively) */}
+        {advancedOpen && (
+          <div
+            id={`${baseId}-advanced-panel`}
+            className="p2-toolbar-row-advanced"
+          >
+            {/* Admission filter */}
+            <div className="p2-filter-field-inline">
+              <label
+                htmlFor={`${baseId}-filter-admission`}
+                className="p2-filter-label"
+              >
+                准入狀態
+              </label>
+              <input
+                id={`${baseId}-filter-admission`}
+                name="admission"
+                type="text"
+                className="p2-filter-input"
+                value={view.controls.filters.admission ?? ''}
+                onChange={(e) => handleFilterChange('admission', e.target.value)}
+                placeholder="准入狀態"
+                aria-label="篩選准入狀態"
+              />
+            </div>
+
+            {/* Deadline filter control (disabled with reason) */}
+            <div
+              className="p2-deadline-filter-group"
+
+            >
+              <span className="p2-deadline-filter-label">有效期限（停用）</span>
+              <input
+                id={`${baseId}-deadline-from`}
+                type="text"
+                className="p2-deadline-input"
+                disabled
+                aria-disabled="true"
+                value={view.controls.filters.deadline_from ?? ''}
+                placeholder="起日"
+                aria-label="期限起日（已停用）"
+              />
+              <span aria-hidden="true">~</span>
+              <input
+                id={`${baseId}-deadline-to`}
+                type="text"
+                className="p2-deadline-input"
+                disabled
+                aria-disabled="true"
+                value={view.controls.filters.deadline_to ?? ''}
+                placeholder="迄日"
+                aria-label="期限迄日（已停用）"
+              />
+              <span className="p2-deadline-reason" role="note">
+                期限來源尚未確認。
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Table and Drawer Layout */}
@@ -333,7 +364,9 @@ export function ConfirmationList(props: ConfirmationListProps) {
                   <tr>
                     {visibleColumns.map((col) => {
                       const isSorted = view.controls.sort?.key === col.key;
-                      const currentDir = isSorted ? view.controls.sort?.dir ?? null : null;
+                      const currentDir = isSorted
+                        ? view.controls.sort?.dir ?? null
+                        : null;
                       const ariaSort: 'ascending' | 'descending' | 'none' =
                         currentDir === 'asc'
                           ? 'ascending'
@@ -361,10 +394,21 @@ export function ConfirmationList(props: ConfirmationListProps) {
                               type="button"
                               className="p2-sort-btn"
                               onClick={() => handleSortClick(col.key, currentDir)}
-                              aria-label={`依${col.key==='source_status'?'來源讀取狀態':col.label}排序`}
+                              aria-label={`依${
+                                col.key === 'source_status'
+                                  ? '來源讀取狀態'
+                                  : col.label
+                              }排序`}
                             >
-                              <span>{col.key==='source_status'?'來源讀取狀態':col.label}</span>
-                              <span className="p2-sort-icon" aria-hidden="true">
+                              <span>
+                                {col.key === 'source_status'
+                                  ? '來源讀取狀態'
+                                  : col.label}
+                              </span>
+                              <span
+                                className="p2-sort-icon"
+                                aria-hidden="true"
+                              >
                                 {currentDir === 'asc'
                                   ? ' ↑'
                                   : currentDir === 'desc'
@@ -375,9 +419,11 @@ export function ConfirmationList(props: ConfirmationListProps) {
                           ) : (
                             <span
                               className="p2-col-unsortable"
-                              title={col.sortDisabledReason ?? undefined}
+
                             >
-                              {col.key==='source_status'?'來源讀取狀態':col.label}
+                              {col.key === 'source_status'
+                                ? '來源讀取狀態'
+                                : col.label}
                             </span>
                           )}
                         </th>
@@ -393,7 +439,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                         colSpan={visibleColumns.length + 1}
                         className="p2-empty-cell"
                       >
-                        {view.pageStateLabel ?? view.reason ?? '—'}
+                        {view.pageStateLabel === '狀態未知' ? '確認單清單尚未提供。' : view.pageStateLabel ?? '確認單資料尚未提供。'}
                       </td>
                     </tr>
                   ) : (
@@ -429,7 +475,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
 
                             const cell = row.cells[col.key];
 
-                            // Row title column: activates onNavigate (case detail); no Show-More
+                            // Row title column: activates onNavigate (case detail)
                             if (col.key === 'project_name') {
                               return (
                                 <td key={col.key} className={stickyClass}>
@@ -448,31 +494,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                                   >
                                     <strong>{cell?.label ?? '—'}</strong>
                                   </button>
-                                  {cell?.reason && (
-                                    <span className="p2-sr-only">
-                                      （{cell.reason}）
-                                    </span>
-                                  )}
-                                  {/* Explicit per-row caseLink and retention label */}
-                                  <div className="p2-scope-tags">
-                                    <span
-                                      className={`p2-badge ${
-                                        row.caseLink.state === 'unresolved'
-                                          ? 'p2-badge-unresolved'
-                                          : 'p2-badge-verification'
-                                      }`}
-                                    >
-                                      {row.caseLink.label}
-                                    </span>
-                                    {row.caseLink.reason && (
-                                      <span className="p2-link-reason">
-                                        （{row.caseLink.reason}）
-                                      </span>
-                                    )}
-                                    <span className="p2-badge p2-badge-retention">
-                                      {row.retentionLabel}
-                                    </span>
-                                  </div>
+
                                 </td>
                               );
                             }
@@ -483,11 +505,6 @@ export function ConfirmationList(props: ConfirmationListProps) {
                                   <strong className="p2-cell-text">
                                     {cell?.label ?? '—'}
                                   </strong>
-                                  {cell?.reason && (
-                                    <span className="p2-sr-only">
-                                      （{cell.reason}）
-                                    </span>
-                                  )}
                                 </td>
                               );
                             }
@@ -510,15 +527,10 @@ export function ConfirmationList(props: ConfirmationListProps) {
                                       ? 'p2-cell-unknown'
                                       : 'p2-cell-text'
                                   }
-                                  title={cell?.reason ?? undefined}
+
                                 >
                                   {cell?.label ?? '—'}
                                 </span>
-                                {cell?.reason && (
-                                  <span className="p2-sr-only">
-                                    （{cell.reason}）
-                                  </span>
-                                )}
                               </td>
                             );
                           })}
@@ -565,51 +577,9 @@ export function ConfirmationList(props: ConfirmationListProps) {
               aria-label="清單資料統計"
             >
               <div className="p2-footer-totals">
-                <div className="p2-footer-item">
-                  <span className="p2-footer-label">符合條件版本筆數：</span>
-                  <strong className="p2-footer-val">
-                    {view.footer.matching.label}
-                  </strong>
-                  {view.footer.matching.reason && (
-                    <span
-                      className="p2-footer-reason"
-                      title={view.footer.matching.reason}
-                    >
-                      （{view.footer.matching.reason}）
-                    </span>
-                  )}
-                </div>
-                <div className="p2-footer-item">
-                  <span className="p2-footer-label">已載入筆數：</span>
-                  <strong className="p2-footer-val">
-                    {view.footer.loaded.label}
-                  </strong>
-                  {view.footer.loaded.reason && (
-                    <span
-                      className="p2-footer-reason"
-                      title={view.footer.loaded.reason}
-                    >
-                      （{view.footer.loaded.reason}）
-                    </span>
-                  )}
-                </div>
-                <div className="p2-footer-item">
-                  <span className="p2-footer-label">已授權來源版本筆數：</span>
-                  <strong className="p2-footer-val">
-                    {view.footer.authorizedSource.label}
-                  </strong>
-                  {view.footer.authorizedSource.reason && (
-                    <span
-                      className="p2-footer-reason"
-                      title={view.footer.authorizedSource.reason}
-                    >
-                      （{view.footer.authorizedSource.reason}）
-                    </span>
-                  )}
-                </div>
-                <span className="p2-footer-basis">
-                  統計基準：{view.footer.basis}
-                </span>
+                {!view.footer.matching.reason && <span>符合條件 {view.footer.matching.label} 筆</span>}
+                {!view.footer.loaded.reason && <span>已載入筆數：{view.footer.loaded.label}</span>}
+                {!view.footer.authorizedSource.reason && <span>已授權來源 {view.footer.authorizedSource.label} 筆</span>}
               </div>
 
               {/* Server-cursor Next/Prev pagination */}
@@ -619,33 +589,22 @@ export function ConfirmationList(props: ConfirmationListProps) {
                   className="p2-page-btn"
                   disabled={!view.pagination.previous.enabled}
                   onClick={() => onPage?.(view.pagination.previous.cursor)}
-                  title={view.pagination.previous.reason ?? undefined}
+
                   aria-label="上一頁"
                 >
                   上一頁
                 </button>
-                {!view.pagination.previous.enabled &&
-                  view.pagination.previous.reason && (
-                    <span className="p2-page-reason p2-sr-only">
-                      {view.pagination.previous.reason}
-                    </span>
-                  )}
                 <button
                   type="button"
                   className="p2-page-btn"
                   disabled={!view.pagination.next.enabled}
                   onClick={() => onPage?.(view.pagination.next.cursor)}
-                  title={view.pagination.next.reason ?? undefined}
+
                   aria-label="下一頁"
                 >
                   下一頁
                 </button>
-                {!view.pagination.next.enabled &&
-                  view.pagination.next.reason && (
-                    <span className="p2-page-reason p2-sr-only">
-                      {view.pagination.next.reason}
-                    </span>
-                  )}
+
               </nav>
             </footer>
           </div>
@@ -656,7 +615,10 @@ export function ConfirmationList(props: ConfirmationListProps) {
           <aside
             className="p2-drawer confirmation-source-drawer"
             role="region"
-            aria-label={`來源詳情：${view.drawer.row?.cells.case_number?.label ?? view.drawer.detail.recordId}`}
+            aria-label={`來源詳情：${
+              view.drawer.row?.cells.case_number?.label ??
+              view.drawer.detail.recordId
+            }`}
           >
             <div className="p2-drawer-header">
               <div>
@@ -688,13 +650,13 @@ export function ConfirmationList(props: ConfirmationListProps) {
                     </dd>
                   </div>
                   <div>
-                    <dt>Base Token</dt>
+                    <dt>來源資料庫代碼</dt>
                     <dd>
                       <code>{view.drawer.detail.sourceContext.baseToken}</code>
                     </dd>
                   </div>
                   <div>
-                    <dt>Table ID</dt>
+                    <dt>來源表格代碼</dt>
                     <dd>
                       <code>{view.drawer.detail.sourceContext.tableId}</code>
                     </dd>
@@ -728,7 +690,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                     <dt>未核准原因</dt>
                     <dd>
                       <span className="p2-amount-reason">
-                        {view.amounts.reason}
+                        合約金額尚未核准顯示。
                       </span>
                     </dd>
                   </div>
@@ -770,7 +732,7 @@ export function ConfirmationList(props: ConfirmationListProps) {
                         </span>
                         {view.drawer.row.caseLink.reason && (
                           <small className="p2-amount-reason">
-                            （{view.drawer.row.caseLink.reason}）
+                            （案件對應尚待核對。）
                           </small>
                         )}
                       </dd>

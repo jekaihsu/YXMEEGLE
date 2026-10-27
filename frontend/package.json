@@ -6,6 +6,7 @@
   "scripts": {
     "test:admin-concurrency": "node test-admin-concurrency.mjs",
     "test:admin-capabilities": "node test-admin-capabilities.mjs",
+    "test:read-loading": "node test-read-loading.mjs",
     "test:dispatch-board": "node test-dispatch-board.mjs",
     "test:start-sop": "node test-start-sop.mjs",
     "test:plan-panel": "node test-plan-panel.mjs",
@@ -29,7 +30,6 @@
     "test:form-draft": "node test-form-draft-identity.mjs && node test-recurring-draft-period.mjs && node test-draft-callsites.mjs",
     "test:freshness-wiring": "node test-freshness-wiring.mjs",
     "test:data-freshness": "node test-data-freshness.mjs",
-    "test:company-cockpit": "node test-company-cockpit.mjs",
     "test:source-lifecycle": "node test-source-lifecycle.mjs",
     "test:execution-admission": "node test-execution-admission.mjs",
     "test:api-response": "node test-api-response.mjs",
@@ -74,6 +74,7 @@
     "@vitejs/plugin-react": "4.3.4",
     "esbuild": "0.28.2",
     "jsdom": "26.1.0",
+    "playwright-core": "1.64.1",
     "typescript": "5.7.3",
     "vite": "6.4.3"
   }

@@ -116,7 +116,7 @@ test('partial, stale and read failure snapshots have per-row text and distinct r
  assert.equal(v.footer.matching.label, '—'); assert.equal(v.footer.loaded.label, '—');
 });
 test('technical IDs only appear in selected source drawer and chooser stays non-default', () => {
- const v = view(body()); assert.equal(v.table.rows[0].cells.record_id, undefined);
+ const v = view(body()); assert.deepEqual(v.columns.filter(c => c.visible).map(c => c.key), ['case_number', 'project_name', 'confirmation_version', 'pm']); assert.equal(v.table.rows[0].cells.record_id, undefined);
  assert.equal(v.columns.find(c => c.key === 'record_id').visible, false); assert.equal(v.columns.find(c => c.key === 'source_context').default, false);
  const selected = view(body(), {selected: 'base/table/record@i3', columns: ['project_name', 'record_id']});
  assert.equal(selected.drawer.selectionOnly, true); assert.equal(selected.drawer.detail.sourceContext.tableId, 'table');
@@ -125,7 +125,7 @@ test('technical IDs only appear in selected source drawer and chooser stays non-
 });
 test('deadline disabled with backend reason; sorting offers asc desc clear only on supported columns', () => {
  const v = view(body(), {filters: {deadline_from: '2026-01-01'}, sort: {key: 'confirmation_version', dir: 'desc'}});
- assert.deepEqual(v.controls.deadline, {disabled: true, reason: 'VCC-123 provenance unresolved'});
+ assert.deepEqual(v.controls.deadline, {disabled: true, reason: '尚無法判定期限：期限來源待確認'});
  assert.deepEqual(v.controls.sort, {key: 'confirmation_version', dir: 'desc'});
  assert.deepEqual(v.columns.find(c => c.key === 'pm').sortChoices, ['asc', 'desc', 'clear']);
  assert.equal(v.columns.find(c => c.key === 'source_modified').sortable, false);

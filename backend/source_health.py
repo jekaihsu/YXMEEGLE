@@ -47,7 +47,7 @@ def _state(snapshot, freshness, table=None, *, viewer_filtered=None):
         if status in ('ready', 'partial') and _time((table or {}).get('last_sync', snapshot.get('last_sync'))):
             return data_state(*(['partial'] if status == 'partial' else []), 'stale')
         return data_state('loading')
-    if freshness.get('last_error') or freshness.get('status') in ('error', 'blocked'):
+    if freshness.get('last_error') or freshness.get('status') in ('error', 'blocked', 'needs-permission'):
         return data_state('read_failed')
     if status == 'loading':
         return data_state('loading')
@@ -140,6 +140,8 @@ def build_source_health(snapshot, freshness=None, *, diagnostic=False, read_auth
         else:
             row['health'] = 'healthy'
         if diagnostic is True:
+            if state and 'read_failed' in state['states']:
+                row['last_error_summary'] = {'blocked': '設定未完成', 'needs-permission': '權限不足'}.get(freshness.get('status'), '來源讀取失敗')
             if isinstance(table.get('name'), str) and table['name'].strip():
                 row['name'] = table['name']
             loaded = _count(table.get('count')) if read and (state is None or state['states'] != ['unknown']) else None

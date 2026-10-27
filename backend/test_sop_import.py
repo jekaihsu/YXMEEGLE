@@ -231,7 +231,7 @@ def test_at11_at12_applicability_and_exclusions(h):
     assert post(h, path, {'expected_revision': 1, 'action': 'complete'}, 422)['code'] == 'applicability_unresolved'
     post(h, path, {'expected_revision': 1, 'action': 'set_applicability', 'applicability': 'not_applicable', 'reason': 'No correction'})
     post(h, path, {'expected_revision': 2, 'action': 'set_applicability', 'applicability': 'applicable', 'reason': 'New scope'})
-    assert post(h, path, {'expected_revision': 3, 'action': 'complete'}, 422)['code'] == 'completion_evidence_missing'
+    assert post(h, path, {'expected_revision': 3, 'action': 'complete'}, 422)['code'] == 'result_note_required'
     assert overview(h)['counts']['done'] == 0
     selected = preview(h, row_keys=['meegle-v137:A:7'], applicability_decisions={
         'meegle-v137:A:7': {'value': 'applicable', 'reason': 'Confirmed subcontract'}})
@@ -242,7 +242,7 @@ def test_at13_participants_are_explicit_active_and_authorized(h):
     apply(h, preview(h, node_keys=['confirmation']))
     assert all(t['participants'] == {} for t in overview(h)['tasks'])
     request = {'template_version_id': h.vid, 'row_keys': ['meegle-v137:A:1'],
-               'participant_bindings': {'meegle-v137:A:1': {'executor': 'other'}}}
+               'participant_bindings': {'meegle-v137:A:1': {'executor': 'ghost'}}}
     assert post(h, URL + '/sop-import/preview', request, 422)['code'] == 'participant_unresolved'
     request['participant_bindings']['meegle-v137:A:1']['executor'] = 'member'
     plan = post(h, URL + '/sop-import/preview', request)
@@ -256,7 +256,7 @@ def test_at20_permissions_workspace_hidden_revoked_replay_and_publish(h):
     plan = preview(h)
     apply(h, plan)
     h.who[0] = 'manager'
-    assert h.client.get(URL + '/sop-tasks').status_code == 403
+    assert h.client.get(URL + '/sop-tasks').status_code == 200
     h.who[0] = 'other'
     post(h, URL + '/sop-import/preview', {'template_version_id': h.vid}, 403)
     h.who[0] = 'pm'
@@ -265,7 +265,10 @@ def test_at20_permissions_workspace_hidden_revoked_replay_and_publish(h):
     assert apply(h, plan, status=404)['code'] == 'case_not_found'
     h.hidden.clear()
     h.users['pm']['capabilities'].remove('sop_task_import')
+    assert apply(h, plan)['replayed'] is True
+    h.users['pm']['active'] = False
     assert apply(h, plan, status=403)['code'] == 'sop_import_forbidden'
+    h.users['pm']['active'] = True
     h.wid[0] = 'other-w'
     assert h.client.get(URL + '/sop-tasks').status_code == 404
     h.wid[0] = 'w'
@@ -392,7 +395,7 @@ def test_real_app_registration_restart_and_storage_save_preserve_checklist(tmp_p
     with TestClient(app) as client:
         client.get('/api/session')
         assert client.post('/api/demo/session', json={'user_id': 'u-manager'}).status_code == 200
-        assert client.get(URL + '/sop-tasks').status_code == 403
+        assert client.get(URL + '/sop-tasks').status_code == 200
         with app.state.sessions.begin() as db:
             workspace = db.scalar(select(WorkspaceRow))
             wid = workspace.id

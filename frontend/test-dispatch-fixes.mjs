@@ -8,7 +8,7 @@ import {createRoot} from 'react-dom/client';
 import {JSDOM} from 'jsdom';
 import * as model from './src/dispatchBoardModel.ts';
 const {variants}=JSON.parse(await fs.readFile(new URL('./fixtures/dispatchBoardSample.json',import.meta.url),'utf8'));
-const bundle=await build({stdin:{contents:"export {DispatchBoard,DispatchBoardFrame} from './src/DispatchBoard';export {AppShell} from './src/AppShell';export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {DispatchBoard,DispatchBoardFrame} from './src/DispatchBoard';export {AppShell} from './src/AppShell';export {canReadDispatch} from './src/dispatchAccess';export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
 const temp=new URL('./.dispatch-fixes-test.mjs',import.meta.url);
 await fs.writeFile(temp,bundle.outputFiles[0].text);
 let ui;
@@ -54,10 +54,12 @@ test('F11 snapshot age stays outside status live region',()=>{
  assert.equal(dom.window.document.querySelector('.db-source').textContent.includes('分鐘前'),true);
  dom.window.close();
 });
-test('F10 member navigation hides dispatch while PM company navigation shows it',()=>{
+test('F10 dispatch access stays role scoped while the compact navigation omits it',()=>{
  for(const [role,workspace,mode,expected] of [['member','company','lark',false],['pm','company','lark',true],['manager','lark-org','lark',true],['pm','test-one','lark',false],['manager','demo-one','demo',false]]){
   const html=renderToStaticMarkup(React.createElement(ui.AppShell,{s:{features:{dispatch_board:true},user:{name:'測試',role},mode,workspace_id:workspace},route:{view:'dashboard'},error:'',ready:true,go(){},children:null}));
-  assert.equal(html.includes('派工看板'),expected);
+  assert.equal(ui.canReadDispatch({features:{dispatch_board:true},user:{role},mode,workspace_id:workspace}),expected);
+  assert.equal(html.includes('派工看板'),false);
+  assert.equal(html.includes('案件總覽'),true);
  }
 });
 test('F4 cold HTTP 200 read_failed board is displayed',async()=>{

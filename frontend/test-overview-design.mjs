@@ -46,24 +46,23 @@ assert.ok(document.querySelector('.dh-hero').textContent.includes('2 項待處�
 
 w.projects=Array.from({length:300},(_,i)=>({...structuredClone(p),id:`p${i}`,code:`CASE-${String(i+1).padStart(3,'0')}`,name:`Road survey ${i+1}`,created_at:new Date(Date.UTC(2026,0,1)+ (300-i)*86400000).toISOString()}));
 await flush(()=>root.render(React.createElement(Projects,{c:{...c,route:{view:'projects'}}})));
-assert.equal(document.querySelectorAll('tbody tr').length,50);assert.ok(document.querySelector('.table-footer').textContent.includes('符合條件 300 筆 · 本頁已載入 50 筆'));
-const row=document.querySelector('tbody tr');assert.equal(row.querySelector('.verification-cell').getAttribute('aria-label'),'已驗證');assert.ok(row.textContent.includes('受阻'));assert.ok(row.textContent.includes('即將到期'));assert.ok(row.querySelector('.deadline').classList.contains('is-upcoming'));assert.equal(row.querySelector('.numeric'),null,'contract amount is absent from overview rows');
-await flush(()=>[...document.querySelectorAll('.pager button')].find(b=>b.textContent==='下一頁').click());assert.ok(document.querySelector('tbody').textContent.includes('CASE-051'));assert.ok(!document.querySelector('tbody').textContent.includes('CASE-001'));
+const size=document.querySelector('[aria-label="每組顯示筆數"]');
+await flush(()=>{size.value='50';size.dispatchEvent(new Event('change',{bubbles:true}))});
+assert.equal(document.querySelectorAll('.pl-case').length,50);assert.ok(document.querySelector('.pl-footer').textContent.includes('符合條件 300 筆'));
+const row=document.querySelector('.pl-case');await flush(()=>row.querySelector('.pl-more>button').click());await flush(()=>[...document.querySelectorAll('[role="menuitem"]')].find(b=>b.textContent.includes('查看案件詳情')).click());
+assert.equal(row.querySelector('.verification-cell').getAttribute('aria-label'),'已驗證');assert.ok(row.textContent.includes('受阻'));assert.ok(row.textContent.includes('即將到期'));assert.ok(row.querySelector('.deadline').classList.contains('is-upcoming'));assert.equal(row.querySelector('.numeric'),null,'contract amount is absent from overview rows');
+await flush(()=>document.querySelector('.pl-expand').click());assert.equal(document.querySelectorAll('.pl-case').length,300);assert.ok(document.querySelector('.pl-groups').textContent.includes('CASE-300'));
 // App add-time ordering is shared by shell requests and legacy rows.
 w.projects=[['old','2026-10-01'],['new','2026-10-13'],['tied','2026-10-13'],['empty','']].map(([id,created_at])=>({...structuredClone(p),id,code:id,created_at}));
 await flush(()=>root.render(React.createElement(Projects,{key:'created',c:{...c,route:{view:'projects'}}})));
-const sortPicker=()=>document.querySelector('button[aria-label^="案件排序："]');
-assert.equal(sortPicker().getAttribute('aria-label'),'案件排序：依工作台期限');
-const sortLabels={created:'最近加入',due:'依工作台期限',name:'依案件名稱'};
+const sortPicker=()=>document.querySelector('select[aria-label="案件排序"]');
+assert.equal(sortPicker().value,'due');
 const selectSort=async value=>{
- await flush(()=>sortPicker().click());
- const option=[...document.querySelectorAll('[role="listbox"][aria-label="案件排序"] [role="option"]')].find(item=>item.textContent===sortLabels[value]);
- assert.ok(option,`sort picker offers ${value}`);
- await flush(()=>option.click());
- assert.equal(sortPicker().getAttribute('aria-expanded'),'false');
+ await flush(()=>{const select=sortPicker();select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}))});
+ assert.equal(sortPicker().value,value);
 };
 await selectSort('created');
-const codes=()=>[...document.querySelectorAll('tbody .case-code')].map(e=>e.childNodes[0].textContent);
+const codes=()=>[...document.querySelectorAll('.pl-code')].map(e=>e.textContent.slice(1));
 assert.deepEqual(codes(),['new','tied','old','empty']);
 await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
 assert.deepEqual(codes(),['old','new','tied','empty']);
@@ -74,7 +73,7 @@ await selectSort('created');
 assert.deepEqual(codes(),['later','equal','utc','early','empty','invalid']);
 await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
 assert.deepEqual(codes(),['early','equal','utc','later','empty','invalid']);
-assert.equal(sortPicker().getAttribute('aria-label'),'案件排序：最近加入');
+assert.equal(sortPicker().value,'created');
 // Switching a sort discards the previous direction and uses its natural default.
 w.projects=[['z','2026-10-01','2026-10-01',0],['a','2026-10-13','2026-10-13',1],['b','2026-10-12','2026-10-12',1]].map(([id,created_at,due_date,completed])=>({...structuredClone(p),id,code:id,name:id,created_at,due_date,nodes:[{...p.nodes[0],tasks:[{...base,status:completed?'completed':'in_progress'}]}]}));
 await flush(()=>root.render(React.createElement(Projects,{key:'switch-defaults',c:{...c,route:{view:'projects'}}})));
@@ -84,7 +83,7 @@ for(const [sort,expected,reversed] of [['due',['z','b','a'],['z','a','b']],['nam
  await flush(()=>document.querySelector('[aria-label="切換排序方向"]').click());
  assert.deepEqual(codes(),reversed,`${sort} explicit reverse`);
 }
-const requests=[];globalThis.fetch=async url=>{requests.push(String(url));return new Response(JSON.stringify({items:[],total:0,facets:{all:0,formal:0,intake:0}}),{status:200})};
+const requests=[];globalThis.fetch=async url=>{requests.push(String(url));return new Response(JSON.stringify({items:[],total:0,as_of:'2026-10-23',basis:'persisted_workspace'}),{status:200})};
 await flush(()=>root.render(React.createElement(Projects,{key:'shell-default',c:{...c,w:{...w,scope:'shell'},route:{view:'projects'}}})));
-assert.ok(requests.some(url=>url==='/api/projects?view=overview&tab=formal&sort=due&dir=asc&limit=50&offset=0'),requests.join(' | '));
+assert.ok(requests.some(url=>url==='/api/projects?view=portfolio'),requests.join(' | '));
 await flush(()=>root.unmount());dom.window.close();console.log('Overview design: ready action, separate assigned waiting parity, preserved original deadline, verification/deadline states and 300-case paging passed');

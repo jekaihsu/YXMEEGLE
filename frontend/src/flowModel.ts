@@ -1,19 +1,16 @@
+import type {SopTask} from './sopTaskApi';
 import {NODE_NAMES, STATUS} from './workflowLabels';
 import {FINISHED_NODE_STATES, isProductionNode, NODE_ASSIGNMENT_ORDER, nodeStatusLabel, type AssignmentNode, type AssignmentPerson, type AssignmentTask, type NodeAssignmentList} from './nodeAssignmentApi';
 import type {ProductionKey, ProductionStage, ProjectProgress} from './projectProgressApi';
 import {joinProgressStages} from './projectProgressView';
 import type {Node, Project, User} from './types';
 
-export function projectFlowRoute(route: {tab?: string}) {
- const tab = route.tab || 'flow';
- return {tab: ['overview','progress','flow','tasks'].includes(tab) ? 'flow' : tab,
-  focus: tab === 'overview' ? 'top' : tab === 'progress' ? 'evidence' : tab === 'tasks' ? 'tasks' : 'node', allTasks: tab === 'tasks'};
-}
+export {projectFlowRoute} from './projectRoutes';
 export type FlowProgress = {basis: 'tasks'|'evidence'|'nodes'; percent: number; label: string}|{basis: 'unknown'|'skipped'; percent: null; label: string};
-export type FlowTask = {id:string;nodeKey:string;title:string;ownerId:string;owner:string;status:string;deadline:string|null;done:boolean;} & ({source:'Lark 任務';task:AssignmentTask}|{source:'本地流程';task:undefined});
+export type FlowTask = {id:string;nodeKey:string;title:string;ownerId:string;owner:string;status:string;deadline:string|null;done:boolean;} & ({source:'Lark 任務';task:AssignmentTask}|{source:'本地流程';task:undefined}|{source:'SOP 任務';task:undefined;sopTask:SopTask});
 export type FlowNode = {
  key: string; label: string; state: string; owners: AssignmentPerson[]; departments: string[];
- tasks: {done: number; total: number}; progress: FlowProgress; deadline: string|null; finalDeadline:string|null; overdue: boolean;
+ tasks: {done: number; total: number}; progress: FlowProgress; deadline: string|null; finalDeadline:string|null; overdue: boolean; needs: string|null;
  quantity: {planned: string|null; actual: string|null; unit: string|null; reason: string};
  gaps: string[]; taskRows:FlowTask[]; production?: ProductionStage; assignment?: AssignmentNode; legacy?: Node;
 };
@@ -69,6 +66,14 @@ function overallProgress(nodes:FlowNode[]):FlowProgress {
  const percent=Math.round(counted.reduce((sum,n)=>sum+(n.progress.percent || 0),0)/counted.length);
  return {basis:'nodes',percent,label:'節點完成度（略過不計）'};
 }
+export function nodeNeeds(node:Pick<FlowNode,'state'|'owners'|'tasks'|'overdue'|'assignment'>):string|null {
+ if(FINISHED_NODE_STATES.includes(node.state))return null;
+ if(node.state==='待審核')return '待主管審核';
+ if(!node.owners.length)return '待指派負責人';
+ if(node.overdue)return '已逾期';
+ if(node.assignment?.can_submit_hint)return '可送審';
+ return node.tasks.total>0 && node.tasks.done<node.tasks.total ? `尚餘 ${node.tasks.total-node.tasks.done} 項任務` : null;
+}
 export function needsViewerAction(node:FlowNode,list:NodeAssignmentList,userId:string) {
  if(FINISHED_NODE_STATES.includes(node.state))return false;
  const owns=node.owners.some(p=>p.open_id===userId), ownTask=node.taskRows.some(t=>t.ownerId===userId && !t.done);
@@ -90,11 +95,12 @@ export function buildFlowModel({project,assignments,progress,today,users=[]}:Flo
   const deadline=assignment ? assignment.next_due===undefined ? assignment.deadline : assignment.next_due : legacy?.due_date || null;
   const owner=legacy?.owner_id;
   const quantity=nodeQuantity(production,assignment);
+  const owners=assignment?.owners || (owner ? [{open_id:owner,name:users.find(u=>u.id===owner)?.name || '姓名待核對'}] : []);
+  const overdue=overdueTask(deadline,FINISHED_NODE_STATES.includes(state),today);
   return {
-   key,label:NODE_NAMES[key],state,
-   owners:assignment?.owners || (owner ? [{open_id:owner,name:users.find(u=>u.id===owner)?.name || '姓名待核對'}] : []),
+   key,label:NODE_NAMES[key],state,owners,needs:nodeNeeds({state,owners,tasks,overdue,assignment}),
    departments:assignment?.departments || [],tasks,progress:nodeFlowProgress(state,tasks,!assignments),deadline,
-   finalDeadline:assignment?.deadline || legacy?.due_date || null,overdue:overdueTask(deadline,FINISHED_NODE_STATES.includes(state),today),quantity,
+   finalDeadline:assignment?.deadline || legacy?.due_date || null,overdue,quantity,
    gaps:[...(assignment?.warnings.map(w=>nodeWarnings[w] || '來源有待核對的節點警示，請主管核對指派資料。') || []),
     ...(category && production && !production.actual.known ? [quantity.reason] : [])],taskRows,production,assignment,legacy
   } satisfies FlowNode;
@@ -110,3 +116,5 @@ export function nodeDispatchProposal({project,node,parentTaskId}: {project: Proj
  return {project_ref: typeof project.project_ref === 'string' ? project.project_ref : project.id,
   case_ref: typeof project.confirmation_id === 'string' ? project.confirmation_id : '',title:`${project.name} · ${node.label}`,content:'',phase:project.case_type === 'intake' ? '接案前' : '正式',kind:'execution',department:node.departments[0] || '',parent_task_ref:parentTaskId,deadline:node.deadline || ''};
 }
+
+export const flowTaskTarget=(task:FlowTask)=>({tab:'flow' as const,node:task.nodeKey,task:task.id,...(task.source==='SOP 任務'?{task_source:'sop_local'}:{})});

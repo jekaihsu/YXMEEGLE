@@ -14,7 +14,21 @@ def test_staged_app_and_catalog_work_without_repository_fallback(tmp_path, monke
     monkeypatch.setattr(deploy_prepare, 'RUNTIME', tmp_path)
     stage = deploy_prepare.staging()
     assert (stage / 'backend' / 'sop_source_contracts.json').is_file()
+    identity=json.loads((stage/'backend/build-manifest.json').read_text())
+    assert len(identity['git_sha'])==40 and isinstance(identity['dirty'],bool)
+    assert identity['branch'] and identity['built_at']
+    from fastapi.testclient import TestClient
+    from backend import build_identity
+    from backend.app import create_app
+    monkeypatch.setattr(build_identity,'MANIFEST_PATH',stage/'backend/build-manifest.json')
+    app=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/identity.db','UPLOAD_DIR':str(tmp_path/'uploads'),'APP_ENV':'development','DEMO_MODE':'true'})
+    assert TestClient(app).get('/api/health').json()['build']==identity
     assert (stage / 'backend' / 'sop_import' / 'catalog.json').is_file()
+    for script in ('migrate_index_tables.py', 'backfill_index.py'):
+        import subprocess, sys
+        result = subprocess.run([sys.executable, '-B', str(stage / 'scripts' / script), '--help'],
+                                cwd=tmp_path, capture_output=True, text=True)
+        assert result.returncode == 0 and 'usage' in result.stdout
     manifest = json.loads((tmp_path / 'zeabur-stage-manifest.json').read_text())
     assert any(f['path'] == 'backend/sop_source_contracts.json' for f in manifest['files'])
     receipt = json.loads((tmp_path / (stage.name + '-smoke.json')).read_text())

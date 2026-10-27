@@ -125,7 +125,7 @@ function Aside({c,formal,intakes,daily,activity}:{c:Ctx;formal:number;intakes:nu
 // Zero counts are noise in a caption; an all-clear reads better as nothing at all.
 const countLine=(parts:[string,number][])=>parts.filter(([,n])=>n>0).map(([l,n])=>`${l} ${n}`).join(' · ');
 
-const Head=({c,children}:{c:Ctx;children:ReactNode})=><Page eyebrow={`${date(c.w.as_of)} · 資料日期`} title="工作總覽" subtitle="先掌握待處理工作，再查看案件進度。" actions={<><Button onClick={()=>c.go({view:'schedule'})}><CalendarDays size={16}/>查看排程</Button></>}>{children}</Page>;
+const Head=({c,children}:{c:Ctx;children:ReactNode})=><Page eyebrow={`${date(c.w.as_of)} · 資料日期`} title="工作總覽" subtitle="先掌握待處理工作，再查看案件進度。" actions={<><Button onClick={()=>c.go({view:'projects'})}><CalendarDays size={16}/>查看案件</Button></>}>{children}</Page>;
 
 function LegacyDashboard({c}:{c:Ctx}){
  // Home counts only the viewer's executable work on cases that are not paused (executableTasks.ts); source deadlines elsewhere stay visible on the Company view.
@@ -169,7 +169,7 @@ function ShellActivity({c}:{c:Ctx}){
 
 export function PanelStatus({read}:{read:PanelRead}) {
  const body=read.body;
- if (!body) return read.pending ? <Skeleton lines={3}/> : <p role="status">工作來源暫時無法讀取</p>;
+ if (!body) return read.pending ? <p className="my-work-loading" role="status">正在載入工作…</p> : <p role="status">工作來源暫時無法讀取</p>;
  const time=body.as_of ? new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(body.as_of)) : null;
  if(!time && !read.pending && !read.error && body.complete && body.readState!=='partial' && body.freshness.status!=='stale')return null;
  return <small className="my-work-banner-as-of">{time ? `更新於 ${time}` : '尚無成功讀取時間'}{read.pending ? ' · 正在更新清單' : read.error ? ' · 上次資料，更新失敗' : body.freshness.status==='stale' ? ' · 上次資料' : ''}{!body.complete ? ' · 來源尚未完整' : ''}</small>;

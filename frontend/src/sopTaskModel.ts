@@ -41,6 +41,10 @@ export function countTasks(tasks: SopTask[]): SopCounts {
   unresolved: active.filter(t => t.applicability === 'unresolved').length,
   not_applicable: active.filter(t => t.applicability === 'not_applicable').length, archived: tasks.length - active.length};
 }
+const OPEN_STATES: Lifecycle[] = ['pending','in_progress','blocked'];
+// Tasks the server will close for a node the data proves done: open, applicable and linked only to proven nodes.
+export const closableTasks = (tasks: SopTask[], node: SopNodeKey, proven: Partial<Record<SopNodeKey, unknown>>) =>
+ tasks.filter(t => OPEN_STATES.includes(t.state) && t.applicability === 'applicable' && t.nodes.some(n => n.node_key === node) && t.nodes.every(n => proven[n.node_key]));
 export const progressLabel = (c: SopCounts) => c.total ? `${c.done}/${c.total}` : '無適用任務';
 export const checklistComplete = (c: SopCounts) => c.total > 0 && c.done === c.total && c.unresolved === 0;
 

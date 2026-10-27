@@ -23,32 +23,17 @@
  background:transparent;border:0;border-radius:0;box-shadow:none;
  -webkit-backdrop-filter:none;backdrop-filter:none;
 }
-.workspace :is(.glass--flat,.pm-glance-tile,.ds-group,.table-scroll,.portfolio-index,.my-work-table-scroll,.tl-sheet,.approval-list,.na-summary,.na-list,.node-section,.project-discussion,.p2-banner,.p2-side-panel,.p2-card,.people-surface,.people-summary>div,.project-readiness,.source-contract-index,.daily-cards>article,.source-connection,.ds-section.dh-personal-queue,.my-work-toolbar,.owned-view:not(.owned-state),section.empty,.p2-drawer,.source-health-drawer,.my-work-drawer,.cockpit-table-scroll,.inbox-row,.inbox-clear,.empty>span){
- background:var(--glass-fill-strong);border:1px solid var(--glass-border);border-radius:var(--radius-card);box-shadow:var(--glass-highlight),var(--glass-shadow-flat);
- -webkit-backdrop-filter:none;backdrop-filter:none;
-}
 .workspace :is(.dh-hero,.p2-header,.cockpit-overview-grid>section,.cockpit-delivery,.cockpit-source,.major-approval-summary) :is(.glass--flat,.ds-group,.table-scroll,.p2-card){
  background:transparent;border-color:var(--sep);box-shadow:none;
 }
 .workspace :is(.ds-section.dh-personal-queue,.owned-view:not(.owned-state)) .ds-group{background:transparent;border:0;box-shadow:none;border-radius:0}
 /* Rows inside a glass card let the card show through; only hover and selection add fill. */
-.workspace :is(.ds-group,.glass--flat,.my-work-table-scroll,.portfolio-index,.ds-section.dh-personal-queue,.file-screen,.audit-screen) :is(.ds-row,.file-version,.audit-entry,.source-attachment-index,.source-attachment-index article){background:transparent}
 .workspace :is(.ds-group,.glass--flat) :is(button.ds-row,a.ds-row):hover{background:color-mix(in srgb,var(--accent) 7%,transparent)}
 .workspace :is(.ds-group,.glass--flat,.cockpit-overview-grid>section,.cockpit-delivery,.cockpit-source) .ds-group{border:0;border-radius:0}
 /* Read-status cards retain their semantic left border while sharing the flat glass material. */
 .workspace .people-status{background:var(--glass-fill-strong);border-radius:var(--radius-card);box-shadow:var(--glass-highlight),var(--glass-shadow-flat);-webkit-backdrop-filter:none;backdrop-filter:none}
 /* One frosted boundary for each primary panel. The pastel canvas remains visible through the material. */
-.workspace :is(.ds-group,.table-scroll,.portfolio-index,.my-work-table-scroll,.tl-sheet,.approval-list,.na-summary,.na-list,.node-section,.project-discussion,.p2-side-panel,.p2-card,.people-surface,.people-summary>div,.people-status,.project-readiness,.source-contract-index,.source-connection,.ds-section.dh-personal-queue,.my-work-toolbar,.owned-view:not(.owned-state),section.empty,.cockpit-table-scroll){
- background:var(--glass-fill);box-shadow:var(--glass-highlight),var(--glass-shadow);
- -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
-}
 /* Nested surfaces inherit their parent's material instead of stacking blur layers. */
-.workspace :is(.glass,.glass--card,.dh-hero,.p2-header,.cockpit-overview-grid>section,.cockpit-delivery,.cockpit-source,.major-approval-summary,.ds-group,.table-scroll,.portfolio-index,.my-work-table-scroll,.tl-sheet,.approval-list,.na-summary,.na-list,.node-section,.project-discussion,.p2-side-panel,.p2-card,.people-surface,.people-summary>div,.people-status,.project-readiness,.source-contract-index,.source-connection,.ds-section.dh-personal-queue,.my-work-toolbar,.owned-view:not(.owned-state),section.empty,.cockpit-table-scroll) :is(.ds-group,.table-scroll,.portfolio-index,.my-work-table-scroll,.tl-sheet,.approval-list,.na-summary,.na-list,.node-section,.project-discussion,.p2-side-panel,.p2-card,.people-surface,.people-summary>div,.people-status,.project-readiness,.source-contract-index,.source-connection,.ds-section.dh-personal-queue,.my-work-toolbar,.owned-view:not(.owned-state),section.empty,.cockpit-table-scroll){
- background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
-}
-@media(max-width:600px){
- .workspace .portfolio-page .table-scroll{background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
-}
 /* Status badges use the opaque foreground and background pairs from tokens.css, in both themes. */
 .ds-badge{background:var(--status-unknown-bg);color:var(--status-unknown-fg)}
 .ds-badge[data-tone=positive]{background:var(--status-ok-bg);color:var(--status-ok-fg)}

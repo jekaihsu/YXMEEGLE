@@ -12,7 +12,6 @@ const {createRoot}=await import('react-dom/client');
 const load=async(entry,name)=>{const b=await build({entryPoints:[entry],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
  const path=new URL(`./.${name}-bundle.mjs`,import.meta.url);await fs.writeFile(path,b.outputFiles[0].text);try{return await import(path.href)}finally{await fs.unlink(path)}};
 const {AdmissionCell,ExecutionAdmissionQueue}=await load('src/ExecutionAdmission.tsx','adm');
-const {CompanyCockpit}=await load('src/CompanyCockpit.tsx','cockpit');
 const rules=await load('src/admissionRules.ts','rules');
 let checks=0;const ok=(c,m)=>{assert.ok(c,m);checks++};
 const proj=(id,over={})=>({id,code:id,name:'合成 '+id,case_visibility:'source_reference',execution_system:'pending',execution_system_label:'待確認歸屬',execution_allowed:false,execution_readonly_reason:'等待管理員核定案件歸屬',...over});
@@ -45,12 +44,4 @@ await flush(()=>set(li.querySelector('select'),'workbench',dom.window.HTMLSelect
 await flush(()=>set(li.querySelector('input'),'合成核定依據',dom.window.HTMLInputElement.prototype));
 await flush(()=>li.querySelector('form').dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true})));
 ok(calls.length===1&&calls[0].action==='case_execution_assign'&&calls[0].scope.project_id==='SYN-P1'&&calls[0].payload.execution_system==='workbench','submits exactly one single-case assignment');
-const payload={as_of:'2026-10-06',checked_at:'2026-10-06T01:00:00Z',date_basis:'synthetic',source:{status:'ready',mapping_status:'ready',last_success_at:null},
- totals:{cases:1,confirmed_cases:1,intake_records:0,workbench_cases:0,deliveries_confirmed:0,tasks_total:0,tasks_completed:0,tasks_overdue:0,pending_local_reviews:0,pending_native_reviews:0,source_status_counts:{},execution_status_counts:{}},
- missing:{task_due_date:0,group:0,source_status:0},groups:[],cases:[{case_type:'formal',id:'SYN-P1',code:'SYN-P1',name:'合成',group:'',source_status:'執行中',execution_status:'pending',execution_system:'pending',execution_system_label:'待確認歸屬',execution_readonly_reason:'等待管理員核定案件歸屬',case_visibility:'source_reference',tasks_total:0,tasks_completed:0,tasks_overdue:0,pending_local_reviews:0,pending_native_reviews:0}],
- pagination:{offset:0,limit:40,total:1,has_more:false}};
-globalThis.fetch=async()=>new Response(JSON.stringify(payload),{status:200,headers:{'content-type':'application/json'}});
-await flush(()=>root.render(React.createElement(CompanyCockpit,{refreshVersion:0,role:'pm'})));
-const cell=document.querySelector('.cockpit-case-table tbody .admission-cell');
-ok(!!cell&&cell.textContent.includes('待確認歸屬')&&cell.textContent.includes('等待管理員核定案件歸屬')&&cell.textContent.includes('無權自行指派'),'cockpit row shows execution_system, exact reason and request-review message');
 console.log(`Execution admission: ${checks} checks passed`);process.exit(0);

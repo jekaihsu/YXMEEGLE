@@ -31,13 +31,13 @@ const fixture=()=>({notice:MOCK_NOTICE,live:false,commands:[
   expected:{...clear,revision:0},current:{...set('ou_test_pm_9'),revision:3},intended:set('ou_test_pm_2'),resolution:null}]});
 const server=createServer((request,response)=>{
  response.setHeader('Content-Type',request.url==='/app.js'?'text/javascript':'text/html');
- response.end(request.url==='/app.js'?bundle.outputFiles[0].text:'<!doctype html><title>Ops sync</title><div id="root"></div><script src="/app.js"></script>');
+ response.end(request.url==='/app.js'?bundle.outputFiles[0].text:'<!doctype html><html data-browser-supported="true"><title>Ops sync</title><div id="root"></div><script src="/app.js"></script>');
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
 try{
  browser=await chromium.launch(process.env.CHROME_EXECUTABLE?{executablePath:process.env.CHROME_EXECUTABLE}:{});
- const w=structuredClone(workspace);
+ const w=structuredClone(workspace);w.environment='test';
  const open=async()=>{
   const page=await browser.newPage({viewport:{width:1100,height:1400}});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -53,9 +53,9 @@ try{
      statusBody={...statusBody,commands:statusBody.commands.map(c=>c.command_id==='c-conf'?{...c,state:'confirmed'}:c),conflicts:statusBody.conflicts.map(k=>({...k,open:false,resolution:posts.at(-1).body.resolution}))}}
     return route.fulfill({json:{...statusBody,mapping_notice:'未確認／模擬',roster:[],entities:[],mock_outcomes:['normal'],dispatch_denial:{suspended:[],held_commands:[]}}});
    }
-   return route.fulfill({json:path==='/api/session'?{user:w.users.find(u=>u.role==='manager')||w.users[0],users:w.users,mode:'demo',auth_configured:false}:w});
+   return route.fulfill({json:path==='/api/session'?{user:w.users.find(u=>u.role==='manager')||w.users[0],users:w.users,mode:'demo',auth_configured:false,features:{mock_ui:true}}:w});
   });
-  await page.goto(`http://127.0.0.1:${server.address().port}/#view=admin&tab=settings`);
+  await page.goto(`http://127.0.0.1:${server.address().port}/#view=admin&tab=configuration`);
   await page.getByRole('heading',{name:'管理設定'}).waitFor();
   return {page,errors};
  };

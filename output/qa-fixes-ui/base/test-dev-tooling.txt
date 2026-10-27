@@ -1,0 +1,65 @@
+✖ manifest and every locked tooling copy use patched, consistent versions (1.008667ms)
+✔ local CI runs tooling after the build and checks API responses (0.160458ms)
+✖ production does not ship the removed company cockpit route (0.088667ms)
+4:50:47 PM [vite] (client) Forced re-optimization of dependencies
+✔ default dev server binds locally and transforms the React entry without permissive CORS (513.625459ms)
+✖ default production preview also binds locally (5.518875ms)
+✔ normal overview script runs full and shell rendering regressions (1362.43ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 3
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1884.793708
+
+✖ failing tests:
+
+test at test-dev-tooling.mjs:30:1
+✖ manifest and every locked tooling copy use patched, consistent versions (1.008667ms)
+  Error: ENOENT: no such file or directory, open '/Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/.runtime/qa/base/frontend/node_modules/vite/node_modules/esbuild/package.json'
+      at async open (node:internal/fs/promises:697:25)
+      at async readFile (node:internal/fs/promises:1348:14)
+      at async json (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/.runtime/qa/base/frontend/test-dev-tooling.mjs:12:39)
+      at async TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/.runtime/qa/base/frontend/test-dev-tooling.mjs:39:21)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/.runtime/qa/base/frontend/node_modules/vite/node_modules/esbuild/package.json'
+  }
+
+test at test-dev-tooling.mjs:51:1
+✖ production does not ship the removed company cockpit route (0.088667ms)
+  Error: ENOENT: no such file or directory, open '/Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/.runtime/qa/base/frontend/dist/.vite/manifest.json'
+      at async open (node:internal/fs/promises:697:25)
+      at async readFile (node:internal/fs/promises:1348:14)
+      at async json (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/.runtime/qa/base/frontend/test-dev-tooling.mjs:12:39)
+      at async TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/.runtime/qa/base/frontend/test-dev-tooling.mjs:52:20)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/.runtime/qa/base/frontend/dist/.vite/manifest.json'
+  }
+
+test at test-dev-tooling.mjs:103:1
+✖ default production preview also binds locally (5.518875ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  404 !== 200
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/.runtime/qa/base/frontend/test-dev-tooling.mjs:109:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 404,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

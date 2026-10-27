@@ -10,6 +10,9 @@ from ..sources import normalized_case, number, text
 from .case_stage import Stage, stage
 from .quote_facts import case_facts, collect, live
 
+# Bound register transfers while avoiding repeated full-register work for small pages.
+MAX_PAGE_SIZE = 2000
+
 STAGES = frozenset(s.value for s in Stage)
 
 
@@ -87,4 +90,4 @@ def find(state, quote_no, *, today, amounts):
 
 
 def matches(item, q):
-    return q.casefold() in ' '.join(item.get(k) or '' for k in ('quote_no', 'local_reference', 'name', 'client')).casefold()
+    return q.casefold() in ' '.join(item.get(k) or '' for k in ('quote_no', 'engineering_no', 'local_reference', 'name', 'client')).casefold()

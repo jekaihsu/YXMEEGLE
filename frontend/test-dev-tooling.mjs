@@ -48,13 +48,11 @@ test('local CI runs tooling after the build and checks API responses', async () 
   assert.match(ci, /npm run build[\s\S]*npm run test:dev-tooling/);
 });
 
-test('production keeps the company route outside the initial JavaScript budget', async () => {
+test('production does not ship the removed company cockpit route', async () => {
   const manifest = await json('dist/.vite/manifest.json');
   const entry = manifest['index.html'];
-  const company = manifest['src/CompanyCockpit.tsx'];
   assert.ok(entry?.isEntry);
-  assert.ok(company?.isDynamicEntry, 'company must remain a lazy route');
-  assert.ok(entry.dynamicImports.includes('src/CompanyCockpit.tsx'));
+  assert.ok(!manifest['src/CompanyCockpit.tsx'], 'the removed cockpit route is absent');
 
   const initial = new Set();
   function visit(key) {
@@ -63,7 +61,6 @@ test('production keeps the company route outside the initial JavaScript budget',
     for (const dependency of manifest[key].imports || []) visit(dependency);
   }
   visit('index.html');
-  assert.ok(!initial.has('src/CompanyCockpit.tsx'), 'company must not be eagerly imported');
   const entryBytes = (await stat(new URL(`dist/${entry.file}`, import.meta.url))).size;
   const initialBytes = (await Promise.all([...initial].map(async key =>
     (await stat(new URL(`dist/${manifest[key].file}`, import.meta.url))).size
@@ -72,7 +69,7 @@ test('production keeps the company route outside the initial JavaScript budget',
   assert.ok(entryBytes < 300_000, `entry JavaScript is ${entryBytes} bytes (budget 300000)`);
   assert.ok(initialBytes < 460_000, `initial JavaScript is ${initialBytes} bytes (budget 460000)`);
   const html = await readFile(new URL('dist/index.html', import.meta.url), 'utf8');
-  assert.ok(!html.includes(company.file), 'company must not be preloaded on first paint');
+  assert.ok(!html.includes('CompanyCockpit'), 'the removed route is not preloaded');
 });
 
 function loopback(server) {
@@ -111,13 +108,8 @@ test('default production preview also binds locally', async () => {
     const response = await fetch(origin, { signal: AbortSignal.timeout(10000) });
     assert.equal(response.status, 200);
     assert.match(await response.text(), /src="\/assets\//, 'preview serves the production bundle');
-    const company = (await json('dist/.vite/manifest.json'))['src/CompanyCockpit.tsx'];
-    for (const file of [company.file, ...(company.css || [])]) {
-      const asset = await fetch(`${origin}/${file}`, { signal: AbortSignal.timeout(10000) });
-      assert.equal(asset.status, 200, `lazy route asset ${file}`);
-      assert.match(asset.headers.get('content-type'), file.endsWith('.css') ? /text\/css/ : /javascript/);
-      assert.ok((await asset.text()).length > 0);
-    }
+    const manifest = await json('dist/.vite/manifest.json');
+    assert.ok(!manifest['src/CompanyCockpit.tsx'], 'preview has no removed cockpit route asset');
   } finally {
     server.httpServer.closeAllConnections();
     await new Promise((resolve, reject) => server.httpServer.close(error => error ? reject(error) : resolve()));

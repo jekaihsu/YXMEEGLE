@@ -45,14 +45,20 @@ try {
   ...Array.from({length:48},(_,i)=>project(`F${String(i).padStart(2,'0')}`,`Future ${i}`,'2027-01-01'))];
  const root=createRoot(document.getElementById('root'));
  await act(async()=>{root.render(React.createElement(Projects,{c:{w,s:{user:a,workspace_id:'synthetic'},route:{view:'projects'},go:()=>{},run:async()=>{},reloadVersion:0,busy:false}}));await new Promise(r=>setTimeout(r,10))});
- assert.equal(document.querySelectorAll('tbody tr').length,50);
- assert.equal(document.querySelector('select[aria-label="每頁筆數"]').value,'50');
- assert.deepEqual([...document.querySelectorAll('tbody .case-link')].slice(0,2).map(a=>a.textContent),['Overdue','Next']);
- assert.ok(![...document.querySelectorAll('tbody .case-link')].some(a=>a.textContent==='Undated'));
- assert.match(document.querySelector('tbody').textContent,/來源 執行中/);
- assert.match(document.querySelector('.table-footer').textContent,/符合條件 51 筆 · 本頁已載入 50 筆 · 部分資料，總數未知/);
- assert.ok(!document.querySelector('thead').textContent.includes('合約金額'));
+ const size=document.querySelector('[aria-label="每組顯示筆數"]');
+ await act(async()=>{size.value='50';size.dispatchEvent(new Event('change',{bubbles:true}))});
+ assert.equal(document.querySelectorAll('.pl-case').length,50);
+ assert.equal(size.value,'50');
+ assert.deepEqual([...document.querySelectorAll('.pl-case .case-link')].slice(0,2).map(a=>a.textContent),['Overdue','Next']);
+ assert.ok(![...document.querySelectorAll('.pl-case .case-link')].some(a=>a.textContent==='Undated'));
+ const menu=document.querySelector('.pl-more>button');await act(async()=>menu.click());
+ await act(async()=>[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent.includes('查看案件詳情')).click());
+ assert.match(document.querySelector('.pl-details').textContent,/來源 執行中/);
+ assert.match(document.querySelector('.pl-footer').textContent,/符合條件 51 筆/);
+ assert.equal(document.querySelector('.pl-group:has(.pl-case) h2 span').textContent,'51');
+ await act(async()=>document.querySelector('.pl-expand').click());assert.equal(document.querySelectorAll('.pl-case').length,51);
+ assert.ok(!document.querySelector('.pl-groups').textContent.includes('合約金額'));
  await act(async()=>root.unmount());dom.window.close();
- console.log('PASS project table. Fifty-row default, overdue and deadline order, source status and loaded population.');
+ console.log('PASS project table. Fifty-row group limit and in-place expansion, overdue and deadline order, source status and loaded population.');
  console.log('PASS UX table sort. Numeric and date orders, Taipei calendar days, nulls, stable item order and population labels.');
 } finally {await fs.unlink(path)}

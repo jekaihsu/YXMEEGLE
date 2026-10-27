@@ -1,3 +1,4 @@
+import {projectFlowRoute} from './projectRoutes';
 // Opt-in load timing (?perf=1) lives here so api.ts stays self-contained; off means one boolean check.
 // Shared with App so every request captures the active session epoch.
 let sessionEpoch=0;
@@ -7,24 +8,27 @@ const pendingMutations=new Map<number,number>();
 export const getPendingMutations=()=>pendingMutations.get(sessionEpoch)||0;
 const mutationChanged=()=>{if(typeof window!=='undefined')window.dispatchEvent(new Event('yx:mutation-state'))};
 export const getSessionEpoch=()=>sessionEpoch;
-export const invalidateSessionEpoch=()=>{sessionEpoch++;etagCache.clear()};
+const epochListeners=new Set<()=>void>();
+export const onSessionEpochChange=(listener:()=>void)=>{epochListeners.add(listener);return ()=>{epochListeners.delete(listener)}};
+export const invalidateSessionEpoch=()=>{sessionEpoch++;etagCache.clear();for(const listener of epochListeners)listener()};
 export class ApiError extends Error {constructor(public status:number,message:string,public code?:string,public ceiling_seconds?:number,public warming?:boolean,public retry_after?:number,public payload?:unknown){super(message)}}
 export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boolean=()=>true,onResponse?:(status:number)=>void):Promise<T>{
   const epoch=getSessionEpoch();
   const mutating=!!init?.method&&!['GET','HEAD'].includes(init.method.toUpperCase());
   if(mutating){pendingMutations.set(epoch,(pendingMutations.get(epoch)||0)+1);mutationChanged()}
-  const {etag,timeoutMs,...request}=init||{};
-  const controller=timeoutMs?new AbortController():undefined;
+  const {etag,timeoutMs=mutating?0:30000,...request}=init||{};
+  // Race the whole read (headers and body), even when a transport ignores abort.
+  const controller=timeoutMs||request.signal?new AbortController():undefined;
   let timer:ReturnType<typeof setTimeout>|undefined;
   let cancel:()=>void=()=>{};
+  try{
+  if(request.signal?.aborted)throw new DOMException('aborted','AbortError');
   const deadline=controller?new Promise<never>((_resolve,reject)=>{
    cancel=()=>{reject(new DOMException('aborted','AbortError'));controller.abort()};
    request.signal?.addEventListener('abort',cancel,{once:true});
-   timer=setTimeout(()=>{reject(new ApiError(408,'讀取逾時，請重試。','client_timeout'));controller.abort()},timeoutMs);
-   if(request.signal?.aborted)cancel();
+   if(timeoutMs)timer=setTimeout(()=>{reject(new ApiError(408,'讀取逾時，請重試。','client_timeout'));controller.abort()},timeoutMs);
   }):undefined;
   const bounded=<V>(work:Promise<V>):Promise<V>=>deadline?Promise.race([work,deadline]):work;
-  try{
   const cacheable=etag===true&&!mutating&&(!init?.method||init.method.toUpperCase()==='GET');
   const cached=cacheable&&init?.cache!=='reload'&&init?.cache!=='no-store'?etagCache.get(url):undefined;
   const headers=new Headers(init?.headers);
@@ -50,18 +54,19 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
    }else etagCache.delete(url);
   }
   return data;
-  }finally{if(timer!==undefined)clearTimeout(timer);request.signal?.removeEventListener('abort',cancel);if(mutating){const remaining=(pendingMutations.get(epoch)||1)-1;if(remaining)pendingMutations.set(epoch,remaining);else pendingMutations.delete(epoch);mutationChanged()}}
+  }finally{if(timer!==undefined)clearTimeout(timer);request.signal?.removeEventListener('abort',cancel);controller?.abort();if(mutating){const remaining=(pendingMutations.get(epoch)||1)-1;if(remaining)pendingMutations.set(epoch,remaining);else pendingMutations.delete(epoch);mutationChanged()}}
 }
-export function normalizeRoute<T extends {view:string;tab?:string;section?:string}>(route:T):T {
+export function normalizeRoute<T extends {view:string;tab?:string;section?:string;node?:string;task?:string;focus?:string;approval?:string;comment?:string}>(route:T):T {
+ if(route.view==='company'||route.view==='schedule')return {...route,view:'projects'};
  if(route.view==='pm-glance')return {...route,view:'dashboard'};
  if(route.view==='learning')return {...route,view:'admin',tab:'people'};
  if(route.view!=='project')return route;
- if(['quotes','family','basic','participants','files'].includes(route.tab||''))return {...route,tab:'data',section:route.tab};
+ if(['quotes','family','basic','participants'].includes(route.tab||''))return {...route,tab:'data',section:route.tab};
  if(route.tab==='operations')return {...route,tab:'flow',section:route.section||'review'};
  if(route.tab==='approvals')return {...route,tab:'flow',section:'approvals'};
- return route;
+ const project=projectFlowRoute(route);return {...route,tab:project.tab,section:project.section,...(project.allTasks ? {all_tasks:'1'} : {})};
 }
-export function parseRoute(hash:string){const p=new URLSearchParams(hash.replace(/^#\/?/,''));return normalizeRoute({view:p.get('view')||'dashboard',project:p.get('project')||undefined,node:p.get('node')||undefined,task:p.get('task')||undefined,tab:p.get('tab')||undefined,section:p.get('section')||undefined,completion:p.get('completion')||undefined,focus:p.get('focus')||undefined,comment:p.get('comment')||undefined,approval:p.get('approval')||undefined,ctx:p.get('ctx')||undefined,task_source:p.get('task_source')||undefined})}
+export function parseRoute(hash:string){const p=new URLSearchParams(hash.replace(/^#\/?/,''));return normalizeRoute({view:p.get('view')||'dashboard',project:p.get('project')||undefined,node:p.get('node')||undefined,task:p.get('task')||undefined,tab:p.get('tab')||undefined,section:p.get('section')||undefined,completion:p.get('completion')||undefined,focus:p.get('focus')||undefined,comment:p.get('comment')||undefined,approval:p.get('approval')||undefined,ctx:p.get('ctx')||undefined,task_source:p.get('task_source')||undefined,all_tasks:p.get('all_tasks')||undefined})}
 export const readRoute=()=>parseRoute(location.hash);
 
 type LiveResult={freshness:import('./types').Freshness};
@@ -75,9 +80,9 @@ async function checkedLive(request:Promise<LiveResult>):Promise<LiveResult>{
  return result;
 }
 export function liveStatus(signal?:AbortSignal){return checkedLive(api<LiveResult>('/api/live/status',{signal}))}
-export function liveRefresh(datasets:import('./types').LiveDataset[],wait=false,signal?:AbortSignal){
+export function liveRefresh(datasets:import('./types').LiveDataset[],wait=false,signal?:AbortSignal,force=false){
  let status=200;
- return checkedLive(api<LiveResult>('/api/live/refresh',{signal,timeoutMs:120000,method:'POST',body:JSON.stringify({datasets,wait,force:false})},()=>true,value=>{status=value})).then(result=>{
+ return checkedLive(api<LiveResult>('/api/live/refresh',{signal,timeoutMs:120000,method:'POST',body:JSON.stringify({datasets,wait,force})},()=>true,value=>{status=value})).then(result=>{
   if(status!==202)return result;
   // Accepted work is still in flight, even if the response includes an older fresh snapshot.
   return {...result,freshness:{...result.freshness,datasets:Object.fromEntries(Object.entries(result.freshness.datasets).map(([key,d])=>[key,{...d,status:datasets.includes(key as import('./types').LiveDataset)&&!['error','blocked','needs-permission','unconfigured'].includes(d.status)?'refreshing':d.status}])) as import('./types').Freshness['datasets']}};

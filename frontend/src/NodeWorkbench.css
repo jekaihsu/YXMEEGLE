@@ -1,0 +1,22 @@
+@layer components {
+ .nw-task-editor{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-4);padding-block:var(--space-4);min-width:0}
+ .nw-task-editor label,.nw-local-form label{display:flex;flex-direction:column;gap:var(--space-2);min-width:0;color:var(--label);font-size:var(--fs-footnote)}
+ .nw-task-editor input,.nw-task-editor select,.nw-task-editor textarea,.nw-local-form input,.nw-local-form select,.nw-local-form textarea{width:100%;min-width:0;min-height:44px;background:var(--surface);color:var(--label);border:1px solid var(--sep);border-radius:var(--radius-s);padding:var(--space-2);font:inherit;box-sizing:border-box}
+ .nw-task-editor small{color:var(--label-2)}
+ .nw-editor-wide{grid-column:1/-1}.nw-editor-save,.nw-local-form{display:flex;gap:var(--space-3);flex-wrap:wrap;align-items:center}
+ .nw-actions{display:flex;flex-wrap:wrap;gap:var(--space-3);padding-block:var(--space-4)}
+ .nw-actions button,.nw-local-form button{min-height:44px;padding:var(--space-3) var(--space-4);font-size:var(--fs-footnote)}
+ .nw-actions .disabled-action{display:flex;flex-direction:column;align-items:flex-start;max-width:240px}
+ .nw-local-form{align-items:flex-end;padding:var(--space-4);background:var(--surface-2);border-radius:var(--radius-m)}
+ .nw-local-form label{flex:1 1 200px}
+ .nw-start{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap;padding-block:var(--space-2)}
+ .nw-start .ds-button[data-variant="primary"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+ .nw-selected{scroll-margin-top:var(--space-6)}
+ @media(max-width:600px){.nw-task-editor{grid-template-columns:minmax(0,1fr)}.nw-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.nw-actions button{width:100%}.nw-local-form{align-items:stretch}.nw-start{align-items:stretch}.nw-start>button{width:100%}}
+}
+
+.project-overview .nw-start .ds-button[data-variant="primary"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+
+.project-flow .pf-actions button,.project-flow .pf-filters button,.project-flow .pf-node-actions button,.project-overview .button,.project-overview .ds-button{min-height:44px}
+.project-overview a{display:inline-flex;align-items:center;min-height:44px}
+.project-overview .po-kpi,.project-overview .po-documents a{display:flex}

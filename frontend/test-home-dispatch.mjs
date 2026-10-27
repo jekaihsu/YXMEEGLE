@@ -17,7 +17,7 @@ const saved=m.parseHomeLayout('{"version":2,"layouts":{"company":{"order":["case
 assert.equal(saved.version,2);assert.equal(saved.layouts.company.hidden.includes('dispatch'),true);
 assert.deepEqual(m.homeSections('company',{order:['dispatch','cases'],hidden:[]}).map(s=>[s.id,s.cards]),[['todo',['dispatch','cases']]]);
 assert.equal(m.parseHomeLayout(null).layouts.assign.order.includes('dispatch'),true);
-assert.equal(m.parseHomeLayout(null).layouts.mine.order.includes('dispatch'),true);
+assert.equal(m.parseHomeLayout(null).layouts.mine.order.includes('dispatch'),false);
 const projects=[{id:'project A',code:'C001',name:'測量案'},{id:'project B',code:'C002',name:'另案'}];
 assert.equal(m.dispatchCaseHref({code:'C001',name:null,ref:'recSecret'},projects),'#view=project&project=project+A&tab=flow');
 assert.equal(m.dispatchCaseHref({code:null,name:'測量案',ref:null},projects),'#view=project&project=project+A&tab=flow');
@@ -63,20 +63,11 @@ const c={go(){},refresh:async()=>{},s:{...session,user:{id:'pm',name:'測試',ro
 const render=async(context=c)=>{await act(async()=>root.render(React.createElement(m.UnifiedHome,{c:context})));await act(async()=>new Promise(resolve=>setTimeout(resolve,10)))};
 const click=async(label,scope=document)=>{await act(async()=>[...scope.querySelectorAll('button')].find(button=>button.textContent.trim()===label).click());await act(async()=>new Promise(resolve=>setTimeout(resolve,10)))};
 try{
- await render();assert.deepEqual([...document.querySelectorAll('.home-dispatch-count')].map(el=>el.textContent),['1','2','2']);
- for(const label of ['分配工作','我的工作','全公司']){await click(label);assert.equal(document.querySelector('[data-home-card=dispatch] h3').textContent,'派工看板')}
- dispatchStatus=500;await click('重新讀取',document.querySelector('[data-home-card=dispatch]'));
- assert.equal(document.querySelector('.home-dispatch-summary').dataset.dispatchState,'retained');
- assert.equal(document.querySelector('[data-home-card=confirmation] h3').textContent,'待我確認');
- assert.deepEqual([...document.querySelectorAll('.home-dispatch-count')].map(el=>el.textContent),['1','2','2']);
- dispatchStatus=403;await click('重試',document.querySelector('[data-home-card=dispatch]'));
- assert.deepEqual([...document.querySelectorAll('.home-dispatch-count')].map(el=>el.textContent),['—','—','—']);
- const before=dispatchCalls;
- await render({...c,s:{...c.s,features:{dispatch_board:false}}});assert.equal(document.querySelector('[data-home-card=dispatch]'),null);assert.equal(dispatchCalls,before);
- await render({...c,s:{...c.s,user:{id:'member',role:'member'}}});assert.equal(document.querySelector('[data-home-card=dispatch]'),null);assert.equal(dispatchCalls,before);
- for(const [role,expected] of [['pm',true],['manager',true],['member',false]]){
+ await render();assert.equal(document.querySelector('[data-home-card=dispatch]'),null,'dispatch card is not on the home page');assert.equal(dispatchCalls,0);
+ for(const role of ['pm','manager','member']){
   await act(async()=>root.render(React.createElement(m.AppShell,{s:{...c.s,user:{name:'測試',role}},route:{view:'dashboard'},error:'',ready:true,go(){},children:null})));
-  assert.equal(document.querySelector('.workspace-nav-groups').textContent.includes('派工看板'),expected);
+  const nav=document.querySelector('.workspace-nav-groups').textContent;
+  for(const gone of ['派工看板','我的工作','工程確認單'])assert.equal(nav.includes(gone),false,gone+' is not in the navigation');
  }
 }finally{await act(async()=>root.unmount());dom.window.close()}
-console.log('Home dispatch mounted views, independent HTTP failure, 403 clearing, feature/role request gates and navigation passed.');
+console.log('Dispatch stays off the home page and out of the navigation.');

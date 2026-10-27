@@ -8,10 +8,21 @@ from .workspace_projection import _strip_source_payloads
 
 def case_navigation(workspace, project_id):
     """Pure, whitelisted projection; caller applies viewer privacy/admission."""
-    state=filter_visible_cases(deepcopy(workspace))
-    _strip_source_payloads(state)
-    project=next((p for p in state.get('projects',[]) if p['id']==project_id),None)
+    # Visibility replaces collections, without changing their rows. Copy only
+    # navigation inputs after that filter, not unrelated history and catalogues.
+    visible=filter_visible_cases(dict(workspace))
+    project=next((p for p in visible.get('projects',[]) if p['id']==project_id),None)
     if project is None:return {'confirmations':[]}
+    state=deepcopy({
+        'projects':[{'id':project_id,'nodes':project.get('nodes',[])}],
+        'source_confirmations':[c for c in visible.get('source_confirmations',[]) if c.get('project_id')==project_id],
+        'contract_items':[c for c in visible.get('contract_items',[]) if c.get('project_id')==project_id],
+        'source_work_items':[i for i in visible.get('source_work_items',[]) if i.get('project_id')==project_id],
+        'source_work_items_status':{pid:s for pid,s in visible.get('source_work_items_status',{}).items() if pid==project_id},
+        'source_work_items_enabled':visible.get('source_work_items_enabled',True),
+    })
+    _strip_source_payloads(state)
+    project=state['projects'][0]
     tasks={(node['id'],task['id']):task for node in project.get('nodes',[])
            for task in node.get('tasks',[])}
     new_items,status=project_work_items(state,project_id)
@@ -21,13 +32,24 @@ def case_navigation(workspace, project_id):
     incomplete_contracts={cid for i in workspace.get('source_work_items',[])
         if i.get('project_id') is None or i['id'] not in visible_items for cid in i['contract_ids']}
     incomplete_contracts.update(status.get('incomplete_contract_ids',[]))
+    items_by_contract={}
+    for item in new_items:
+        for cid in set(item['contract_ids']):
+            items_by_contract.setdefault(cid,[]).append(item)
+    contracts_by_confirmation={}
+    for contract in state.get('contract_items',[]):
+        for cid in set(contract.get('confirmation_ids',[])):
+            contracts_by_confirmation.setdefault(cid,[]).append(contract)
+    known_contracts=imported_contracts|incomplete_contracts
+    item_confirmations={cid for c in visible.get('contract_items',[]) if c['id'] in known_contracts
+                        for cid in c.get('confirmation_ids',[])}
     confirmations=[]
     for confirmation in state.get('source_confirmations',[]):
         if confirmation.get('project_id')!=project_id or confirmation.get('source_kind')!='confirmation':continue
-        case_items=use_items and any(confirmation['id'] in c.get('confirmation_ids',[]) and c['id'] in imported_contracts|incomplete_contracts for c in state.get('contract_items',[]))
+        case_contracts=contracts_by_confirmation.get(confirmation['id'],[])
+        case_items=use_items and confirmation['id'] in item_confirmations
         contracts=[]
-        for contract in state.get('contract_items',[]):
-            if contract.get('project_id')!=project_id or confirmation['id'] not in contract.get('confirmation_ids',[]):continue
+        for contract in case_contracts:
             items={};missing=False
             for ref in contract.get('task_refs',[]):
                 if ref.get('project_id')!=project_id:continue
@@ -42,7 +64,7 @@ def case_navigation(workspace, project_id):
                               'source_url':task.get('source_url')}
             missing=missing or bool(set(contract.get('reporting_ids',[]))-items.keys())
             if case_items:
-                linked=[i for i in new_items if contract['id'] in i['contract_ids']]
+                linked=items_by_contract.get(contract['id'],[])
                 items={i['id']:{k:i.get(k) for k in ('id','category','source_url')} for i in linked}
                 missing=status['partial'] or contract['id'] in incomplete_contracts or any(i.get('source_missing') for i in linked)
             contracts.append({'id':contract['id'],'item_number':contract.get('item_number'),

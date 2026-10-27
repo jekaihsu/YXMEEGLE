@@ -31,9 +31,20 @@ def projection_fingerprint(state):
 class SourceSyncService:
     def __init__(self,sessions,W,B,P,A,C,cfg,fetcher=None,adapter_factory=None):
         self.sessions=sessions; self.W=W; self.B=B; self.P=P; self.A=A; self.C=C; self.cfg=cfg
+        from .sop_import.service import Service
+        self.sop_enrollment = Service(sessions,
+            writes_enabled=lambda: str(cfg.get('SOP_TASK_WRITES_ENABLED', 'false')).lower() == 'true',
+            auto_enabled=lambda: str(cfg.get('SOP_AUTO_ENROLL_ENABLED', 'false')).lower() == 'true',
+            auto_since=lambda: cfg.get('SOP_AUTO_ENROLL_SINCE'))
         self.fetcher=fetcher
         self.adapter_factory=adapter_factory or (lambda config:application_adapter(config))
         self.partial=str(cfg.get('PARTIAL_WRITES_ENABLED','true')).lower()=='true'
+
+    @property
+    def projection_version(self):
+        if self.sop_enrollment.auto_active():
+            return SOURCE_PROJECTION_VERSION + ':sop:' + hashlib.sha256(str(self.sop_enrollment.auto_since()).encode()).hexdigest()[:16]
+        return SOURCE_PROJECTION_VERSION
 
     def _policy(self,wid):
         require(wid=='lark-'+self.cfg.get('LARK_WORKER_ORGANIZATION',''),'來源同步限已核定公司正式工作區',403)
@@ -43,8 +54,8 @@ class SourceSyncService:
                 '公司來源僅限已核定的 V4 與報價總表',403)
         return tuple(self.cfg.get(k) for k in ('LARK_APP_ID','LARK_WORKER_ORGANIZATION','LARK_SOURCE_TABLES_JSON','LARK_V4_BASE_TOKEN','LARK_QUOTE_BASE_TOKEN'))
 
-    def _state(self,db,row):
-        return upgrade(storage.load(db,self.B,row))
+    def _state(self,db,row,*,row_snapshot=None):
+        return upgrade(storage.load(db,self.B,row,**({'row_snapshot':row_snapshot} if row_snapshot is not None else {})))
 
     def _light(self,db,row):
         """Root fields, users and templates, upgraded, for a write that only changes the root.
@@ -73,13 +84,35 @@ class SourceSyncService:
         with self.sessions() as db:
             row=db.get(self.W,wid)
             if row is None: return None
-            version=row.version; state=self._state(db,row); matches=None; plan=None
+            version=row.version; matches=None; plan=None
+            cache=db.get(self.C,wid)
+            status=row.data.get('source_status',{})
+            from .live_read.fingerprint import fingerprint
+            unchanged=(skip_unchanged and status.get('projection_workspace_version')==version
+                       and status.get('projection_fingerprint')==digest
+                       and status.get('projection_version')==self.projection_version
+                       and cache and (cache.data or {}).get('status')=='ready'
+                       and cache.data.get('source_message')==snapshot['message']
+                       and fingerprint(cache.data)==digest)
+            # Every storage save invalidates this stamp. A matching version also
+            # excludes root-only writers, which advance the workspace revision.
+            state=self._light(db,row) if unchanged else None
+            if state is not None and all(state.get(key)==row.data.get(key)
+                                         for key in PROJECTION_FIELDS if key not in storage.COLLECTIONS):
+                return {'version':version,'state':state,'matches':True,'plan':None,'prior_projects':[]}
+            root_before=deepcopy(row.data)
+            can_plan=(row.data.get('storage_schema')==2
+                      and status.get('projection_workspace_version')==version
+                      and not self.sop_enrollment.auto_active()
+                      and 'report_case_bridges' not in row.data
+                      and db.get_bind().dialect.name in ('sqlite','postgresql'))
+            existing={} if can_plan else None
+            state=self._state(db,row,row_snapshot=existing)
+            prior_projects=deepcopy(state.get('projects', [])) if self.sop_enrollment.auto_active() else []
             if skip_unchanged:
                 status=state.get('source_status',{})
-                matches=(status.get('projection_fingerprint')==digest and status.get('projection_version')==SOURCE_PROJECTION_VERSION
+                matches=(status.get('projection_fingerprint')==digest and status.get('projection_version')==self.projection_version
                          and status.get('projection_state_fingerprint')==projection_fingerprint(state))
-            cache=db.get(self.C,wid)
-            from .live_read.fingerprint import fingerprint
             skippable=bool(matches and cache and (cache.data or {}).get('status')=='ready'
                            and cache.data.get('source_message')==snapshot['message'] and fingerprint(cache.data)==digest)
             if not skippable:
@@ -89,7 +122,10 @@ class SourceSyncService:
                     plan=candidate
                 except Exception: return None
             if db.scalar(select(self.W.version).where(self.W.id==wid))!=version: return None
-            return {'version':version,'state':state,'matches':matches,'plan':plan}
+            write_plan=(storage.prepare_save(self.B,wid,state,existing,root_before,indexed=db.info.get('index_tables'))
+                        if can_plan and plan is not None and 'report_case_bridges' not in state else None)
+            return {'version':version,'state':state,'matches':matches,'plan':plan,'prior_projects':prior_projects,
+                    'root_before':root_before,'write_plan':write_plan}
 
     def _import(self,state,snapshot,actor):
         """The heavy half of an apply: fold the records into the state and count what is visible."""
@@ -155,7 +191,7 @@ class SourceSyncService:
         finally:
             adapter.client.close()
 
-    def apply_snapshot(self,wid,snapshot,actor_id=None,*,expected_policy,expected_generation,skip_unchanged=False):
+    def _apply_snapshot(self,wid,snapshot,actor_id=None,*,expected_policy,expected_generation,skip_unchanged=False):
         # Both fences must be captured before fetch, never reconstructed at apply.
         require(expected_policy is not None and expected_generation is not None,
                 '來源快照缺少讀取前的同步保護',409)
@@ -177,8 +213,12 @@ class SourceSyncService:
         prepared=self._prepare(wid,snapshot,digest,skip_unchanged,actor_id) if self.partial else None
         with self.sessions.begin() as db:
             row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update()); require(row is not None,'工作區不存在',404)
-            fresh=prepared is not None and prepared['version']==row.version
+            fresh=(prepared is not None and prepared['version']==row.version
+                   and ('root_before' not in prepared or prepared['root_before']==row.data))
+            if fresh and '_partial' in prepared['state']:
+                fresh=row.data.get('source_status',{}).get('projection_workspace_version')==row.version
             state=prepared['state'] if fresh else self._state(db,row)
+            prior_projects=prepared['prior_projects'] if fresh else deepcopy(state.get('projects', []))
             require(self._policy(wid)==policy,'來源同步設定已變更，保留原資料',409)
             require(state.get('environment') not in ('test','demo'),'工作區環境已變更',403)
             actor=self._actor(db,wid,state,actor_id)
@@ -193,7 +233,7 @@ class SourceSyncService:
             planned=prepared['plan'] if fresh else None
             projection_matches=(prepared['matches'] if fresh and skip_unchanged
                                 else skip_unchanged and status.get('projection_fingerprint')==digest
-                                and status.get('projection_version')==SOURCE_PROJECTION_VERSION
+                                and status.get('projection_version')==self.projection_version
                                 and status.get('projection_state_fingerprint')==projection_fingerprint(state))
             if (skip_unchanged and projection_matches and cache
                     and (cache.data or {}).get('status')=='ready'
@@ -206,7 +246,7 @@ class SourceSyncService:
                 # Advance the workspace read metadata without re-importing entities
                 # or incrementing the source generation/event history.
                 status.update(last_sync=value['last_sync'],as_of=value['as_of'],
-                              last_attempt_at=value['last_attempt_at'])
+                              last_attempt_at=value['last_attempt_at'],projection_workspace_version=row.version+1)
                 previous=row.version
                 root=deepcopy(row.data)
                 root.update(source_status=status,version=row.version+1)
@@ -217,11 +257,18 @@ class SourceSyncService:
                     from . import index_tables
                     index_tables.advance_counters(db,self.B,wid,previous,previous+1)
                 return value
+            if '_partial' in state:
+                # A cache change can invalidate an early root-only plan even
+                # when the workspace version has not moved.
+                state=self._state(db,row)
+                prior_projects=deepcopy(state.get('projects', [])) if self.sop_enrollment.auto_active() else []
             if planned is not None:
                 snapshot.clear(); snapshot.update(planned)
             else:
                 snapshot.update(fingerprint=digest,as_of=snapshot['last_sync'],source_message=snapshot['message'])
                 self._import(state,snapshot,actor)
+            if self.sop_enrollment.auto_active():
+                self.sop_enrollment.admit_snapshot(db, wid, state, prior_projects, snapshot)
             mapping=snapshot['mapping']
             mapping['daily_total']=mapping['daily_imported']+mapping['daily_unmatched']
             warnings=[]
@@ -244,11 +291,13 @@ class SourceSyncService:
             authorized_by=actor_id or prior_connection.get('authorized_by') or prior_connection.get('actor_id')
             state['source_connection']=readonly_sync_connection(self.cfg,authorized_by)
             state['version']=row.version+1; event(state,actor,'source_sync',message=snapshot['message'])
-            root=storage.save(db,self.B,wid,state)
+            write_plan=prepared.get('write_plan') if fresh else None
+            root=(storage.save_prepared(db,self.B,wid,state,write_plan) if write_plan is not None
+                  else storage.save(db,self.B,wid,state))
             # storage.save assigns entity concurrency versions; stamp that final
             # representation so a subsequent unchanged read can safely skip.
             state['source_status'].update(projection_fingerprint=digest,
-                projection_version=SOURCE_PROJECTION_VERSION,
+                projection_version=self.projection_version,projection_workspace_version=state['version'],
                 projection_state_fingerprint=projection_fingerprint(state))
             root['source_status']=deepcopy(state['source_status'])
             changed=db.execute(update(self.W).where(self.W.id==wid,self.W.version==row.version)
@@ -258,6 +307,18 @@ class SourceSyncService:
             if cache: cache.data=snapshot
             else: db.add(self.C(id=wid,data=snapshot))
         return snapshot
+
+    def apply_snapshot(self,wid,snapshot,actor_id=None,*,expected_policy,expected_generation,skip_unchanged=False):
+        result=self._apply_snapshot(wid,snapshot,actor_id,expected_policy=expected_policy,
+                                    expected_generation=expected_generation,skip_unchanged=skip_unchanged)
+        # The source transaction and durable queue have committed, including unchanged snapshots.
+        try:
+            if self.sop_enrollment.auto_active():
+                self.sop_enrollment.run_enrollments(wid)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception('SOP enrollment queue remains pending for %s', wid)
+        return result
 
     def sync(self,wid,actor_id,token=None,*,skip_unchanged=False):
         # The compatible token argument never selects the company identity.

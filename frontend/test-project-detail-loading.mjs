@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {build} from 'esbuild';
+import {JSDOM} from 'jsdom';
+import {projectFixture} from './fixtures/node-assignments.mjs';
+
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
+for(const key of ['window','document','location','history','sessionStorage','Event','HTMLElement','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
+const bundle=await build({stdin:{contents:"export {ProjectDetailGate} from './src/ProjectDetail';export {invalidateSessionEpoch} from './src/api';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const file=new URL('./.project-detail-loading-test.mjs',import.meta.url);
+await fs.writeFile(file,bundle.outputFiles[0].text);
+let ui;try{ui=await import(file.href)}finally{await fs.unlink(file)}
+const {project,user,workspace}=projectFixture();
+const c={w:{...workspace,scope:'shell'},s:{user,workspace_id:'offline',features:{node_assignment:true}},route:{view:'project',project:project.id},go(){},registerDrafts(){},notify(){}};
+const requests=[];
+globalThis.fetch=url=>new Promise(resolve=>requests.push({url,resolve}));
+let root;
+const render=tab=>act(async()=>root.render(React.createElement(ui.ProjectDetailGate,{c:{...c,route:{...c.route,tab}}})));
+const settle=()=>{for(const request of requests)request.resolve(new Response('{"detail":"offline test complete"}',{status:503}));};
+try{
+ root=createRoot(document.getElementById('root'));
+ await render('overview');
+ assert.deepEqual(requests.map(r=>r.url).sort(),['/api/projects/p1','/api/projects/p1/node-assignments','/api/projects/p1/node-assignments/start-sop','/api/projects/p1/progress','/api/projects/p1/sop-assignees','/api/projects/p1/sop-tasks'],'overview data starts together while project detail is unresolved');
+ await render('flow');
+ assert.equal(requests.filter(r=>r.url==='/api/projects/p1').length,1,'changing tabs shares the pending detail read');
+ for(const suffix of ['start-sop','sop-tasks','sop-assignees'])assert.equal(requests.filter(r=>r.url.endsWith('/'+suffix)).length,1,'flow starts '+suffix+' without waiting for detail');
+ await act(async()=>{root.unmount();settle()});
+ ui.invalidateSessionEpoch();requests.length=0;
+ root=createRoot(document.getElementById('root'));
+ await render('files');
+ assert.deepEqual(requests.map(r=>r.url),['/api/projects/p1'],'opening documents does not load unrelated workflow data');
+ await act(async()=>requests[0].resolve(new Response(JSON.stringify({...workspace,scope:'project',project}))));
+ assert.match(document.body.textContent,/文件與交付/);
+ assert.equal(requests.length,1,'rendering documents adds no workflow waterfall');
+ console.log('PASS project detail: parallel visible reads, shared pending detail, and no unrelated workflow prefetch');
+}finally{await act(async()=>{root.unmount();settle()});dom.window.close()}

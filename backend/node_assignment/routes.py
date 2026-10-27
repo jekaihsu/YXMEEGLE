@@ -1,4 +1,5 @@
 """HTTP routes. Every route answers 404 while NODE_ASSIGNMENT_ENABLED is off."""
+from contextlib import nullcontext
 import json
 import re
 from dataclasses import replace
@@ -23,7 +24,7 @@ TASK_ID = re.compile(r'rec[A-Za-z0-9]{1,40}')
 
 
 def register(app, *, identity, load_case, sessions, receipt_model, audit_model, cfg, skipped_nodes,
-             transport=None, client_options=None, clock=None, reports=None, reports_visible=None):
+             transport=None, client_options=None, clock=None, reports=None, reports_visible=None, phase=None):
     """load_case(session_data, user, project_id) -> (state, project) for a case visible to that user."""
     options = {'transport': transport, 'client_options': client_options, 'reports': reports,
                'reports_visible': reports_visible}
@@ -48,7 +49,8 @@ def register(app, *, identity, load_case, sessions, receipt_model, audit_model, 
 
     def context(request, project_id):
         data, user = identity(request)
-        state, project = load_case(data, user, project_id)
+        with (phase(request, 'load') if phase else nullcontext()):
+            state, project = load_case(data, user, project_id)
 
         def authorize():
             fresh_data, fresh_user = identity(request)

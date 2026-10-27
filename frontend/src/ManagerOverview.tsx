@@ -5,9 +5,9 @@ import type {
   OverviewSort,
   FactCell,
   CaseRow,
-  UnresolvedRowView,
 } from './managerOverviewView.ts';
 import './p2-lists.css';
+import './manager-overview.css';
 
 export interface ManagerOverviewCallbacks {
   filters?: ReactNode;
@@ -25,26 +25,19 @@ export type ManagerOverviewProps = (
 ) & ManagerOverviewCallbacks;
 
 function renderFact(cell: FactCell) {
-  if (!cell.known) {
-    return (
-      <span className="p2-cell-unknown" title={[cell.stateLabel, cell.reason].filter(Boolean).join('：') || undefined}>
-        <span className="p2-dash">{cell.text}</span>
-        {cell.stateLabel && (
-          <small className="p2-sr-only">（{cell.stateLabel}）</small>
-        )}
-        {cell.reason && <span className="p2-sr-only">：{cell.reason}</span>}
-      </span>
-    );
-  }
-  return (
-    <span className="p2-cell-text" title={cell.reason ?? undefined}>
-      {cell.text}
-      {cell.stateLabel && (
-        <small className="p2-cell-statelabel">（{cell.stateLabel}）</small>
-      )}
-    </span>
-  );
+  return cell.known ? <span className="p2-cell-text">{cell.text}</span> : null;
 }
+
+const CASE_COLUMNS = [
+  {key: 'label', label: '案件名稱'},
+  {key: 'responsible', label: '負責人'},
+  {key: 'unfinished', label: '未完成狀態'},
+  {key: 'actionable', label: '可行動'},
+  {key: 'currentStage', label: '目前階段'},
+  {key: 'effectiveDueDate', label: '有效期限'},
+  {key: 'blocker', label: '受阻'},
+  {key: 'pendingDecision', label: '待決策'},
+] satisfies {key: keyof Pick<CaseRow, 'label' | 'responsible' | 'unfinished' | 'actionable' | 'currentStage' | 'effectiveDueDate' | 'blocker' | 'pendingDecision'>; label: string}[];
 
 export function ManagerOverview(props: ManagerOverviewProps) {
   const view: ManagerOverviewView =
@@ -79,7 +72,8 @@ export function ManagerOverview(props: ManagerOverviewProps) {
 
   if (!view) return null;
 
-  const snapshotStateClass = view.snapshot.state.states.join(' ');
+  const columns = CASE_COLUMNS.filter(column => ['label', 'responsible'].includes(column.key) || view.snapshot.cases.some(row => row[column.key].known));
+  const cards = view.snapshot.cards.filter(card => card.known);
 
   return (
     <div className="manager-overview-root">
@@ -111,24 +105,13 @@ export function ManagerOverview(props: ManagerOverviewProps) {
         </div>
       )}
 
-      {/* Snapshot state banner */}
-      <section
-        className={`p2-banner state-${snapshotStateClass}`}
-        role="status"
-        aria-live="polite"
-        aria-label="快照資料狀態"
-      >
-        <div className="p2-banner-header">
-          <span className="p2-banner-title">快照資料狀態</span>
-          <span className="p2-badge">{view.snapshot.stateLabel}</span>
-        </div>
-        {view.snapshot.reason && (
-          <p className="p2-banner-reason">{view.snapshot.reason}</p>
-        )}
-      </section>
+      <p className="overview-table-note" role="status">
+        {view.snapshot.state.states.some(state => !['complete_empty', 'filtered_empty'].includes(state)) ? '統計與來源資料尚未完整。' : '目前沒有符合條件的案件。'}{' '}
+        <button type="button" className="p2-btn-health-link" onClick={() => onSourceHealthLink ? onSourceHealthLink('sources') : onNavigate?.('sources')}>查看來源健康</button>
+      </p>
 
       {/* Overview Layout: Main Content + Side Panel */}
-      <div className="manager-overview-layout">
+      <div className={`manager-overview-layout${view.drawer.open ? " has-selection" : ""}`}>
         <div className="manager-overview-main">
           {/* Actionable Unfinished Cases FIRST */}
           <section
@@ -139,16 +122,13 @@ export function ManagerOverview(props: ManagerOverviewProps) {
               <h3 id={`${baseId}-cases-heading`} className="p2-section-title">
                 未完成案件
               </h3>
-              <p className="overview-table-note">— 表示資料尚未確認；指向欄位可查看原因。</p>
+
             </div>
 
             {view.snapshot.cases.length === 0 ? (
               <div className="p2-empty-state" role="status">
                 <p>
-                  {view.snapshot.casesEmptyLabel ??
-                    (view.snapshot.reason
-                      ? `${view.snapshot.stateLabel}：${view.snapshot.reason}`
-                      : view.snapshot.stateLabel)}
+                  {view.snapshot.casesEmptyLabel ?? '案件資料尚未提供。'}
                 </p>
               </div>
             ) : (
@@ -163,14 +143,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                     <caption className="p2-sr-only">未完成案件清單</caption>
                     <thead>
                       <tr>
-                        <th scope="col">案件名稱</th>
-                        <th scope="col">未完成狀態</th>
-                        <th scope="col">可行動</th>
-                        <th scope="col">負責人</th>
-                        <th scope="col">目前階段</th>
-                        <th scope="col">有效期限</th>
-                        <th scope="col">受阻</th>
-                        <th scope="col">待決策</th>
+                        {columns.map(column => <th scope="col" key={column.key}>{column.label}</th>)}
                         <th scope="col">操作</th>
                       </tr>
                     </thead>
@@ -197,14 +170,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                               }
                             }}
                           >
-                            <td>{renderFact(caseRow.label)}</td>
-                            <td>{renderFact(caseRow.unfinished)}</td>
-                            <td>{renderFact(caseRow.actionable)}</td>
-                            <td>{renderFact(caseRow.responsible)}</td>
-                            <td>{renderFact(caseRow.currentStage)}</td>
-                            <td>{renderFact(caseRow.effectiveDueDate)}</td>
-                            <td>{renderFact(caseRow.blocker)}</td>
-                            <td>{renderFact(caseRow.pendingDecision)}</td>
+                            {columns.map(column => <td key={column.key}>{renderFact(caseRow[column.key])}</td>)}
                             <td>
                               <div className="p2-toolbar-left">
                                 {caseRow.entry && (
@@ -217,7 +183,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                                     }}
                                     aria-label={`${caseRow.entry.label}：${caseRow.label.text}`}
                                   >
-                                    {caseRow.entry.label}
+                                    {caseRow.entry.label} →
                                   </button>
                                 )}
                                 <button
@@ -262,7 +228,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
           </section>
 
           {/* Cards labelled with their unit. Activates onDrilldown(card.drilldown) unchanged. */}
-          {view.snapshot.cards.length > 0 && (
+          {cards.length > 0 && (
             <section
               className="p2-section p2-cards-section"
               aria-labelledby={`${baseId}-cards-heading`}
@@ -271,7 +237,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                 快照摘要
               </h3>
               <div className="p2-cards-grid">
-                {view.snapshot.cards.map((card) => (
+                {cards.map((card) => (
                   <div
                     key={card.id}
                     className={`p2-card ${!card.known ? 'is-unavailable' : ''}`}
@@ -298,11 +264,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                         <span className="p2-card-value">{card.valueText}</span>
                         <span className="p2-card-state">{card.stateLabel}</span>
                       </div>
-                      {!card.known && (
-                        <div className="p2-card-reason" title={card.reason}>
-                          <span>{card.reason}</span>
-                        </div>
-                      )}
+
                     </div>
                     <div className="p2-card-footer">
                       <span className="p2-card-asof">{card.asOfLabel}</span>
@@ -319,191 +281,9 @@ export function ManagerOverview(props: ManagerOverviewProps) {
             </section>
           )}
 
-          {/* Unresolved summary (separate section; no bucket total) */}
-          <section
-            className="p2-section p2-unresolved-section"
-            aria-labelledby={`${baseId}-unresolved-heading`}
-          >
-            <div className="p2-section-header">
-              <h3
-                id={`${baseId}-unresolved-heading`}
-                className="p2-section-title"
-              >
-                未歸屬資料
-              </h3>
-              <div className="p2-unresolved-meta">
-                <span className="p2-unresolved-count">
-                  數量：
-                  <strong>{view.snapshot.unresolved.countText}</strong>
-                </span>
-                <span className="p2-badge">
-                  {view.snapshot.unresolved.stateLabel}
-                </span>
-              </div>
-            </div>
-
-            {!view.snapshot.unresolved.known &&
-              view.snapshot.unresolved.reason && (
-                <p className="p2-section-reason">
-                  {view.snapshot.unresolved.reason}
-                </p>
-              )}
-
-            {view.snapshot.unresolved.rows.length > 0 && (
-              <div className="p2-table-container">
-                <div
-                  className="p2-table-scroll"
-                  tabIndex={0}
-                  role="region"
-                  aria-label="未歸屬資料清單表格"
-                >
-                  <table className="p2-table is-dense">
-                    <caption className="p2-sr-only">未歸屬資料清單</caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">項目名稱</th>
-                        <th scope="col">對應狀態</th>
-                        <th scope="col">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {view.snapshot.unresolved.rows.map(
-                        (urow: UnresolvedRowView) => {
-                          const isSelected = view.selectedId === urow.id;
-
-                          return (
-                            <tr
-                              key={urow.id}
-                              className={`p2-row ${
-                                isSelected ? 'is-selected' : ''
-                              }`}
-                              onClick={() =>
-                                onSelect?.(isSelected ? null : urow.id)
-                              }
-                              tabIndex={0}
-                              onKeyDown={(e) => {
-                                if (e.repeat) return;
-                                if (
-                                  e.target === e.currentTarget &&
-                                  (e.key === 'Enter' || e.key === ' ')
-                                ) {
-                                  e.preventDefault();
-                                  onSelect?.(isSelected ? null : urow.id);
-                                }
-                              }}
-                            >
-                              <td>
-                                <strong>{urow.label}</strong>
-                              </td>
-                              <td>
-                                <span className="p2-badge p2-badge-verification">
-                                  {urow.mappingLabel}
-                                </span>
-                              </td>
-                              <td>
-                                <button
-                                  type="button"
-                                  ref={(el) => {
-                                    if (el) {
-                                      rowSelectButtonRefs.current.set(
-                                        urow.id,
-                                        el
-                                      );
-                                    } else {
-                                      rowSelectButtonRefs.current.delete(
-                                        urow.id
-                                      );
-                                    }
-                                  }}
-                                  className="p2-btn-select"
-                                  aria-expanded={isSelected}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onSelect?.(isSelected ? null : urow.id);
-                                  }}
-                                  aria-label={`選取${urow.label}詳情`}
-                                >
-                                  {isSelected ? '收合' : '詳情'}
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        }
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {view.snapshot.bucketNote && (
-              <p className="p2-bucket-policy-note" role="note">
-                {view.snapshot.bucketNote}
-              </p>
-            )}
-          </section>
-
-          {/* Weekly activity (separate section; unavailable) */}
-          <section
-            className="p2-section p2-weekly-section is-unavailable"
-            aria-labelledby={`${baseId}-weekly-heading`}
-          >
-            <div className="p2-section-header">
-              <h3 id={`${baseId}-weekly-heading`} className="p2-section-title">
-                本期活動
-              </h3>
-              <span className="p2-badge p2-badge-unavailable">暫不可用</span>
-            </div>
-            <div className="p2-weekly-body">
-              <span className="p2-weekly-state">{view.weekly.stateLabel}</span>
-              <p className="p2-weekly-reason">{view.weekly.reason}</p>
-              {view.weekly.period && (
-                <p className="p2-weekly-period">
-                  活動區間：{view.weekly.period.start} ~ {view.weekly.period.end}
-                </p>
-              )}
-            </div>
-          </section>
         </div>
 
-        {/* Source Health side panel: state labels only; no source names or counts */}
-        <div className="manager-overview-side">
-          <aside
-            className="p2-side-panel p2-source-health-panel"
-            aria-labelledby={`${baseId}-health-heading`}
-          >
-            <div className="p2-side-header">
-              <h3 id={`${baseId}-health-heading`}>來源健康</h3>
-              <span className="p2-badge">{view.sourceHealth.stateLabel}</span>
-            </div>
-            <div className="p2-health-rows">
-              {view.sourceHealth.rows.map((hr) => (
-                <div key={hr.key} className="p2-health-row">
-                  <div className="p2-health-row-header">
-                    <span className="p2-health-label">{hr.label}</span>
-                    <span className="p2-health-state">{hr.stateLabel}</span>
-                  </div>
-                  <details className="overview-health-detail"><summary>查看說明</summary><p className="p2-health-reason">{hr.reason}</p></details>
-                </div>
-              ))}
-            </div>
-            {view.sourceHealth.link && (
-              <button
-                type="button"
-                className="p2-btn-health-link"
-                onClick={() => {
-                  if (onSourceHealthLink) {
-                    onSourceHealthLink(view.sourceHealth.link!.route);
-                  } else {
-                    onNavigate?.(view.sourceHealth.link!.route);
-                  }
-                }}
-              >
-                {view.sourceHealth.link.label}
-              </button>
-            )}
-          </aside>
-
+        {view.drawer.open && <div className="manager-overview-side">
           {/* Selection-only Drawer */}
           {view.drawer.open && (view.drawer.case || view.drawer.unresolved) && (
             <aside
@@ -547,7 +327,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                             <dt>說明</dt>
                             <dd>
                               <span className="p2-amount-reason">
-                                {view.drawer.case.rowKeysReason}
+                                確認單版本資料尚待核對。
                               </span>
                             </dd>
                           </div>
@@ -581,7 +361,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                         {view.drawer.case.executionStatus && (
                           <div>
                             <dt>執行狀態</dt>
-                            <dd>{view.drawer.case.executionStatus}</dd>
+                            <dd>{{in_progress:'進行中',completed:'已完成',paused:'暫停中',pending:'待處理'}[view.drawer.case.executionStatus] || '執行狀態尚待核對'}</dd>
                           </div>
                         )}
                         <div>
@@ -595,27 +375,12 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                         {view.drawer.case.formula && (
                           <div>
                             <dt>版本規則</dt>
-                            <dd>{view.drawer.case.formula}</dd>
+                            <dd>確認單版本各自保留。</dd>
                           </div>
                         )}
                       </dl>
                     </div>
 
-                    {view.drawer.case.admission && (
-                      <div className="p2-drawer-section">
-                        <h4 className="p2-drawer-section-title">准入資訊</h4>
-                        <dl className="p2-dl">
-                          {Object.entries(view.drawer.case.admission).map(
-                            ([k, val]) => (
-                              <div key={k}>
-                                <dt>{k}</dt>
-                                <dd>{String(val ?? '—')}</dd>
-                              </div>
-                            )
-                          )}
-                        </dl>
-                      </div>
-                    )}
 
                     <div className="p2-drawer-section">
                       <h4 className="p2-drawer-section-title">合約金額</h4>
@@ -632,7 +397,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
                           <dt>未核准原因</dt>
                           <dd>
                             <span className="p2-amount-reason">
-                              {view.drawer.case.amounts.reason}
+                              合約金額尚未核准顯示。
                             </span>
                           </dd>
                         </div>
@@ -667,7 +432,7 @@ export function ManagerOverview(props: ManagerOverviewProps) {
               </div>
             </aside>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   );

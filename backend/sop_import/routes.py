@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 import json
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -6,21 +7,33 @@ from starlette.concurrency import run_in_threadpool
 
 from ..production_access import hr_view_allowed
 from .domain import Failure, require
-from .service import Context, Service, authorize
+from .service import Context, Service, authorize, has_reader_grant, can_manage
 
 PREFIX = '/api/projects/{project_id}'
 MAX_BODY = 64 * 1024
+ERROR_TEXT = {'local_node_only': '請使用此案件的正式節點流程', 'local_node_blocked': '節點目前無法操作', 'node_revision_conflict': '節點已更新，請重新載入後再試', 'legacy_case_requires_opt_in': '舊案需先確認套用 SOP', 'node_not_enrolled': '此節點尚未套用 SOP', 'node_already_started_or_finished': '已開始或已完成的節點不能套用 SOP', 'case_identity_unresolved': '案件識別待核對', 'confirmation_required': '請確認套用的節點', 'case_not_found': '找不到此案件或沒有讀取權限', 'result_note_required': '請填寫結果說明', 'task_revision_conflict': '任務已被更新，請重新載入後再試',
+              'sop_import_forbidden': '你沒有操作此 SOP 任務的權限', 'completion_evidence_missing': '此任務需先完成佐證或審核',
+              'applicability_unresolved': '需先確認任務適用', 'invalid_transition': '目前任務狀態不可執行此操作'}
 
 
-def register(app, *, identity, load_case, sessions, cfg, quote_view=None, workspace=None, persist_case=None):
+def register(app, *, identity, load_case, sessions, cfg, quote_view=None, workspace=None, persist_case=None, phase=None):
     flag = lambda name: lambda: str(cfg.get(name, 'false')).lower() == 'true'
     service = Service(sessions, writes_enabled=flag('SOP_TASK_WRITES_ENABLED'),
-                      local_cases_enabled=flag('LOCAL_CASE_CREATION_ENABLED'))
+                      local_cases_enabled=flag('LOCAL_CASE_CREATION_ENABLED'),
+                      auto_enabled=flag('SOP_AUTO_ENROLL_ENABLED'), auto_since=lambda: cfg.get('SOP_AUTO_ENROLL_SINCE'))
 
     def context(request, project_id):
         data, user = identity(request)
-        state, project = load_case(data, user, project_id)
-        ctx = Context(data['wid'], user, state, project, lambda: context(request, project_id))
+        require(user.get('active', True), 'sop_import_forbidden', 403)
+        assigned_only = not has_reader_grant(user)
+        with (phase(request, 'load') if phase else nullcontext()):
+            state, project = load_case(data, user, project_id)
+        ctx = Context(data['wid'], user, state, project, lambda: context(request, project_id),
+                      assigned_only=assigned_only)
+        ctx.assigned_only = assigned_only and not can_manage(ctx)
+        require(not ctx.assigned_only or service.participates(data['wid'], user['id'], project_id), 'sop_import_forbidden', 403)
+        if project.get('sop_assigned_only'):
+            ctx.assigned_only = True
         authorize(ctx)
         return ctx
 
@@ -28,11 +41,11 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
         try:
             body, status = run(), 200
         except Failure as exc:
-            body, status = {'code': exc.code, 'detail': exc.code, **exc.context}, exc.status
+            body, status = {'code': exc.code, 'detail': ERROR_TEXT.get(exc.code, exc.code), **exc.context}, exc.status
         except HTTPException as exc:
-            code = {401: 'session_expired', 403: 'sop_import_forbidden', 404: 'case_not_found',
+            code = {401: 'session_expired', 403: 'identity_forbidden', 404: 'case_not_found',
                     409: 'workspace_conflict'}.get(exc.status_code, 'invalid_request')
-            body, status = {'code': code, 'detail': code}, exc.status_code
+            body, status = {'code': code, 'detail': ERROR_TEXT.get(code, code)}, exc.status_code
         except (IntegrityError, OperationalError):
             body, status = {'code': 'import_unavailable', 'detail': 'import_unavailable'}, 503
         return JSONResponse(body, status_code=status, headers={'Cache-Control': 'no-store'})
@@ -87,6 +100,21 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
             return service.publish_version(data['wid'], user, version_id)
         return respond(run)
 
+    @app.get('/api/sop-import/readiness')
+    def readiness(request: Request):
+        def run():
+            data, user = identity(request)
+            return service.readiness(data['wid'], user)
+        return respond(run)
+
+    @app.post(PREFIX + '/sop-import/opt-in')
+    async def opt_in(request: Request, project_id: str):
+        return await mutation(request, project_id, service.opt_in)
+
+    @app.post(PREFIX + '/sop-import/retry')
+    async def retry(request: Request, project_id: str):
+        return await mutation(request, project_id, service.retry_enrollment)
+
     @app.get(PREFIX + '/sop-tasks')
     def tasks(request: Request, project_id: str, node_key: str = None):
         return respond(lambda: service.overview(context(request, project_id), node_key))
@@ -118,6 +146,15 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
     @app.post(PREFIX + '/sop-tasks/{task_id}/transition')
     async def transition(request: Request, project_id: str, task_id: str):
         return await mutation(request, project_id, lambda ctx, body: service.mutate(ctx, task_id, body, transition=True))
+
+    @app.post(PREFIX + '/sop-nodes/{node_key}')
+    async def local_node(request: Request, project_id: str, node_key: str):
+        from .local_nodes import mutate
+        return await mutation(request, project_id, lambda ctx, body: mutate(service, ctx, node_key, body))
+
+    @app.post(PREFIX + '/sop-tasks/close-node')
+    async def close_node(request: Request, project_id: str):
+        return await mutation(request, project_id, service.close_node)
 
     @app.post(PREFIX + '/sop-tasks/suggestions/accept')
     async def accept_suggestions(request: Request, project_id: str):

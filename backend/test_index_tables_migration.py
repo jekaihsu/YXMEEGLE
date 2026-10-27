@@ -1,4 +1,5 @@
 """VCC-97 P2-1: index tables are created by create_all and by the idempotent migration."""
+import pytest
 from sqlalchemy import create_engine, inspect
 from backend.models import Base
 from scripts.migrate_index_tables import TABLES, migrate
@@ -47,3 +48,28 @@ def test_scripts_run_directly_and_honour_help(tmp_path):
     for name in ('migrate_index_tables','backfill_index'):
         done=subprocess.run([sys.executable,str(root/'scripts'/f'{name}.py'),'--help'],cwd=tmp_path,capture_output=True,text=True)
         assert done.returncode==0 and 'usage' in done.stdout
+
+
+@pytest.mark.parametrize('module_name', ['migrate_index_tables', 'backfill_index'])
+@pytest.mark.parametrize('scheme', ['postgres', 'postgresql', 'postgresql+psycopg'])
+def test_operator_cli_uses_installed_postgres_driver(monkeypatch, module_name, scheme):
+    from importlib import import_module
+    import sys
+    module = import_module('scripts.' + module_name)
+    received = []
+    class Engine:
+        def dispose(self): pass
+    def engine(url):
+        received.append(url)
+        return Engine()
+    monkeypatch.setenv('DATABASE_URL', scheme + '://operator:fictional@db.internal/workspace')
+    monkeypatch.setattr(sys, 'argv', [module_name])
+    monkeypatch.setattr(module, 'create_engine', engine)
+    if module_name == 'backfill_index':
+        monkeypatch.setattr(module, 'backfill', lambda *_a, **_kw: [])
+    else:
+        monkeypatch.setattr(module, 'migrate', lambda _engine: None)
+    module.main()
+    assert received[0].drivername == 'postgresql+psycopg'
+    assert received[0].host == 'db.internal'
+    assert received[0].password == 'fictional'

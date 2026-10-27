@@ -5,7 +5,7 @@ import {JSDOM} from 'jsdom';
 import {response as dispatchExample} from './qa/dispatch-api-examples.mjs';
 import {projectFixture,embeddedAssignmentFixture} from './fixtures/node-assignments.mjs';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=project&project=p1',pretendToBeVisual:true});
-for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','HTMLDetailsElement','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.getComputedStyle=dom.window.getComputedStyle;
 HTMLElement.prototype.scrollIntoView=function(){globalThis.lastScroll=this.id};globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
@@ -14,7 +14,7 @@ const temp=new URL('./.project-flow-ui.mjs',import.meta.url);await writeFile(tem
 const progress=JSON.parse(await readFile(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));progress.project_id='p1';
 let root,c,fixture,calls,hold,evidenceStatus=200,nodeStatus=200,detailStatus=200,mutationStatus=200;
 const tick=()=>new Promise(r=>setTimeout(r,15));
-async function mount({tab,node,task,enabled=true,role='manager',dispatch=false,assign=true,evidenceHold=false,embedded=true,parentProject='p1',shell=false,detailHold=false,configure=()=>{}}={}){
+async function mount({tab='flow',node,task,enabled=true,role='manager',dispatch=false,assign=true,evidenceHold=false,embedded=true,parentProject='p1',shell=false,detailHold=false,configure=()=>{}}={}){
  if(root)await act(async()=>root.unmount());ui.invalidateSessionEpoch();
  const base=projectFixture();fixture=embeddedAssignmentFixture();
  for(const n of fixture.list.nodes){n.departments=['控制'];fixture.list.node_details[n.key].assignable_people.forEach(p=>p.departments=['控制']);}
@@ -31,7 +31,7 @@ async function mount({tab,node,task,enabled=true,role='manager',dispatch=false,a
    const key=url.split('/nodes/')[1].split('/')[0];const node=fixture.list.nodes.find(n=>n.key===key);if((init.method||'GET')==='GET'&&detailStatus!==200)return response({detail:'合成任務明細失敗'},detailStatus);
    if(init.method==='PATCH'){
     if(mutationStatus!==200)return response({detail:'沒有指派權限',code:'forbidden'},mutationStatus);
-    const t=fixture.list.node_details[key].tasks.find(t=>t.id===url.split('/').at(-1));const patch=JSON.parse(init.body);t.assignee={open_id:patch.assignee_open_id,name:'林安娜'};
+    const t=fixture.list.node_details[key].tasks.find(t=>t.id===url.split('/').at(-1));const patch=JSON.parse(init.body);if(patch.status)t.status=patch.status;else t.assignee={open_id:patch.assignee_open_id,name:'林安娜'};
    }
    return response({...fixture.list,node,can:fixture.list.can[key],...detailPayloads[key]});
   }
@@ -51,15 +51,14 @@ const value=async(el,v)=>act(async()=>{Object.getOwnPropertyDescriptor(el.tagNam
 
 const failures=[];
 async function check(name,run){try{await run();console.log('PASS '+name)}catch(error){failures.push(name);console.error('FAIL '+name+' '+error.stack)}}
-const otherTasks=()=>document.querySelector('#flow-selected details.pf-other');
 const secondary=name=>[...document.querySelectorAll('details')].find(d=>d.querySelector('summary')?.textContent===name);
 await check('round2 local workflow stays available with assignments',async()=>{
  await mount({node:'control',configure(base){base.project.nodes[4].tasks=[{id:'local',title:'本地驗收',status:'in_progress',owner_id:'ou_anna',required:true,can_execute:true,confirmation_hash:'fixture-confirmation',comments:[],description:'範本',revision:1}];}});
- const local=otherTasks();assert.equal(local?.open,false);assert.match(local.textContent,/增補任務/);assert.match(local.textContent,/本地驗收/);assert.match(local.textContent,/進行中/);assert.match(local.textContent,/一次確認我的成果（1）/);await click([...local.querySelectorAll('button')].find(b=>b.textContent==='本地驗收'));assert.equal(document.querySelector('[role=dialog]').getAttribute('aria-label'),'本地驗收');assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/找不到此 Lark 任務/);
+ const local=secondary('範本與本地流程');assert.equal(local?.open,false);assert.match(local.textContent,/增補任務/);assert.match(local.textContent,/本地驗收/);assert.match(local.textContent,/進行中/);assert.match(local.textContent,/一次確認我的成果（1）/);await click([...local.querySelectorAll('button')].find(b=>b.textContent==='本地驗收'));assert.equal(document.querySelector('[role=dialog]').getAttribute('aria-label'),'本地驗收');assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/找不到此 Lark 任務/);
 });
 await check('legacy task drawer shows facts, tabs and one footer reason',async()=>{
  await mount({node:'control',configure(base){base.project.nodes[4].tasks=[{id:'local',title:'本地驗收',status:'in_progress',owner_id:'ou_anna',required:true,can_execute:true,confirmation_hash:'fixture-confirmation',comments:[],description:'範本',revision:1}];}});
- await click([...otherTasks().querySelectorAll('button')].find(b=>b.textContent==='本地驗收'));
+ await click([...secondary('範本與本地流程').querySelectorAll('button')].find(b=>b.textContent==='本地驗收'));
  const drawer=document.querySelector('[role=dialog]');
  assert.equal(drawer.dataset.kind,'legacy');
  assert.deepEqual([...drawer.querySelectorAll('.task-drawer-trail>span')].map(s=>s.textContent),['YX-2026-042','控制']);
@@ -76,10 +75,10 @@ await check('round2 local flow list translates both pending and in-progress task
  await mount({enabled:false,node:'node_control',configure(base){base.project.nodes[4].tasks=[{id:'l1',title:'待開始工作',status:'pending',owner_id:'ou_anna'},{id:'l2',title:'進行工作',status:'in_progress',owner_id:'ou_anna'}]}});
  assert.deepEqual([...document.querySelectorAll('#flow-tasks .pf-task-open>span')].map(n=>n.textContent),['林安娜 · 尚未開始 · 未排期限','林安娜 · 進行中 · 未排期限']);
 });
-await check('round2 completed and skipped node mounted progress',async()=>{
+await check('round2 completed and skipped steps show state without progress bars',async()=>{
  await mount({node:'control',configure(base,f){Object.assign(f.list.nodes.find(n=>n.key==='control'),{derived_status:'已完成'});f.list.nodes.find(n=>n.key==='mapping').derived_status='略過';}});
  const completed=document.querySelector('.pf-node[aria-label^="控制節點"]'),skipped=document.querySelector('.pf-node[aria-label^="圖資節點"]');
- assert.equal(completed.querySelector('progress').value,100);assert.match(completed.textContent,/100%/);assert.equal(skipped.querySelector('progress'),null);assert.equal(skipped.querySelector('.pf-progress-unknown').textContent,'略過');
+ assert.equal(completed.querySelector('progress'),null);assert.equal(completed.querySelector('.pf-state').textContent,'已完成');assert.match(completed.getAttribute('aria-label'),/100%/);assert.equal(skipped.querySelector('progress'),null);assert.equal(skipped.querySelector('.pf-state').textContent,'略過');assert.equal(completed.querySelector('.pf-needs'),null);assert.equal(skipped.querySelector('.pf-needs'),null);
 });
 await check('round2 keyboard replaces history and never scrolls the selected panel',async()=>{
  let shellScroll=0;window.scrollTo=()=>shellScroll++;await mount({node:'control',shell:true});await act(tick);const before=history.length,scrollBefore=shellScroll;globalThis.lastScroll='untouched';
@@ -102,7 +101,21 @@ await check('round2 source timestamp and honest manager fallback',async()=>{
  assert.match(document.querySelector('.pf-source').textContent,/節點與任務.*2026\/10\/18 08:00:00 \(台北時間\)/);assert.doesNotMatch(document.querySelector('.pf-source').textContent,/節點 N/);
  const fact=[...document.querySelectorAll('.pf-facts>div')].find(d=>d.querySelector('dt').textContent==='組別主管');assert.equal(fact.querySelector('dd').textContent,'未能對應到本組主管');
 });
-await check('round2 overview goes to page header',async()=>{await mount({tab:'overview'});await act(tick);assert.equal(globalThis.lastScroll,'project-page-top')});
+await check('round2 overview is a real destination with one workflow strip',async()=>{await mount({tab:'overview'});await act(tick);assert.ok(document.querySelector('.project-overview'));assert.equal(document.querySelectorAll('.project-overview .pf-diagram').length,1);assert.equal(document.querySelector('.pf-overall'),null);assert.equal(document.querySelectorAll('.po-todo-primary button').length,1);assert.equal(document.querySelectorAll('.po-items-table').length,1);assert.deepEqual([...document.querySelectorAll('.po-kpi>span')].map(el=>el.textContent),['外業關聯工項','已指派待辦','待核對事項']);assert.doesNotMatch([...document.querySelectorAll('.po-kpi strong')].map(el=>el.textContent).join(' '),/未知|待核對|依各工項顯示/);assert.ok(document.querySelector('.pf-diagram').nextElementSibling.classList.contains('po-todos'));assert.doesNotMatch(document.querySelector('.po-sidebar').textContent,/來源未提供/);assert.equal(document.querySelectorAll('.po-items-table [data-item-id]').length,progress.production.field.items.length);assert.equal(document.querySelector('#flow-selected'),null);assert.equal(document.querySelector('.pds-tabs [aria-current=page]').textContent,'總覽')});
+await check('overview hides empty documents and reduces empty items to one line',async()=>{
+ const saved=structuredClone(progress.production.field);Object.assign(progress.production.field,{items:[],items_total:0});
+ try{await mount({tab:'overview',configure(base){base.project.files=[];delete base.project.project_type;delete base.project.planned_start_date;delete base.project.planned_end_date;delete base.project.original_due_date;}});assert.equal(document.querySelector('.po-documents'),null);assert.equal(document.querySelector('.po-dates'),null);assert.equal(document.querySelector('.po-items.po-card'),null);assert.match(document.querySelector('.po-items-empty').textContent,/尚未連結外業工項.*查看工項/);assert.equal(document.querySelector('.po-items-table'),null);assert.doesNotMatch(document.querySelector('.po-sidebar').textContent,/來源未提供/);}
+ finally{Object.assign(progress.production.field,saved)}
+});
+await check('overview item preview opens the immutable item in the existing inspector',async()=>{await mount({tab:'overview'});const rows=[...document.querySelectorAll('.po-items-table tbody tr')];assert.ok(rows.length);const row=rows.at(-1),id=row.dataset.itemId,link=row.querySelector('a');assert.equal(new URLSearchParams(link.hash.slice(1)).get('section'),`item:${id}`);await act(async()=>{link.click();await tick()});assert.equal(c.route.tab,'items');assert.equal(c.route.node,'field');assert.equal(c.route.section,`item:${id}`);assert.ok(document.querySelector('[role=dialog]'));assert.ok(document.querySelector('[role=dialog]').textContent.includes(id));});
+await check('overview keeps the workflow visible while evidence loads or fails',async()=>{
+ await mount({tab:'overview',evidenceHold:true});assert.match(document.querySelector('.po-items').textContent,/工項資料載入中/);assert.equal(document.querySelectorAll('.project-overview .pf-node').length,9);await act(async()=>{globalThis.releaseEvidence();await tick()});
+ evidenceStatus=500;await mount({tab:'overview'});assert.match(document.querySelector('.po-items').textContent,/工程證據暫不可用/);assert.equal(document.querySelectorAll('.po-todo-primary button').length,1);assert.equal(document.querySelectorAll('.project-overview .pf-node').length,9);evidenceStatus=200;
+});
+await check('overview labels stale assignments and denied sources without hiding other sections',async()=>{
+ await mount({tab:'overview',configure(base,f){f.list.stale=true;f.list.stale_reason='合成上次資料'}});assert.match(document.querySelector('.project-overview').textContent,/上次成功資料/);assert.equal(document.querySelector('.po-todo-primary button').textContent,'查看詳情');
+ nodeStatus=403;await mount({tab:'overview'});assert.match(document.querySelector('.po-source-state').textContent,/暫不可用/);assert.ok(document.querySelector('[aria-label="案件重點指標"]'));assert.equal(document.querySelectorAll('.po-todo-primary button').length,1);nodeStatus=200;
+});
 await check('round2 attention excludes manager-wide completion and unowned not-started nodes',async()=>{
  await mount({configure(base,f){f.list.node_details.control.tasks.forEach(t=>t.assignee={open_id:'other',name:'別人'});f.list.nodes.forEach(n=>n.owners=[{open_id:'other',name:'別人'}]);}});
  assert.equal(document.querySelector('.pf-attention').textContent,'');
@@ -115,11 +128,11 @@ await check('round2 manager resolved from loaded users and absent source disting
  await mount({node:'control',configure(base){base.workspace.users[0].department='控制'}});
  const manager=()=>[...document.querySelectorAll('.pf-facts>div')].find(d=>d.querySelector('dt').textContent==='組別主管').querySelector('dd').textContent;
  assert.equal(manager(),'林安娜');
- await mount({node:'control',configure(base,f){f.list.nodes.find(n=>n.key==='control').departments=[]}});assert.equal(manager(),'主管未設定');assert.doesNotMatch(document.querySelector('.pf-facts').textContent,/來源未提供負責組別，未能對應到本組主管/);
+ await mount({node:'control',configure(base,f){f.list.nodes.find(n=>n.key==='control').departments=[]}});assert.equal(manager(),'來源未提供負責組別，未能對應到本組主管');
 });
 await check('round2 background and file shortcut restored collapsed',async()=>{
  await mount({node:'control',configure(base){Object.assign(base.project.nodes[4],{description:'節點背景說明',collaborator_ids:['ou_anna'],started_at:'2026-10-10'})}});
- const background=secondary('節點資訊');assert.equal(background?.open,false);assert.match(background.textContent,/節點背景說明/);assert.match(background.textContent,/林安娜/);assert.match(background.textContent,/經過.*4.*天/);assert.match(background.textContent,/開啟 作業資料與成果/);
+ const background=secondary('節點說明與背景');assert.equal(background?.open,false);assert.match(background.textContent,/節點背景說明/);assert.match(background.textContent,/林安娜/);assert.match(background.textContent,/經過.*4.*天/);assert.match(background.textContent,/開啟 作業資料與成果/);
 });
 await check('round2 assignment readback wins over an in-flight stale detail and avoids refetch',async()=>{
  await mount({node:'control',detailHold:true});await click(button('指派'));await value(document.querySelector('select[aria-label="任務負責人"]'),'ou_anna');
@@ -135,4 +148,52 @@ await check('round2 failed evidence retains node and offers retry in item sheet'
  assert.match(document.querySelector('[role=dialog]').textContent,/重試工程證據/);
 });
 evidenceStatus=200;
+const seedDetail='依計畫數量完成控制。\n計畫數量：999\n合約明細：9 筆；工項：9 項\n工項連結：原生 9、推導 0、待確認 0、未連結 0\n[SOP-START:v1:control]';
+const seedConfig=(base,f)=>{Object.assign(f.list.node_details.control.tasks[0],{title:'控制：依計畫數量完成',detail:seedDetail});};
+await check('production seed is one task with expanded evidence, unique item IDs and no raw marker',async()=>{
+ await mount({node:'control',configure:seedConfig});
+ const seed=document.querySelector('[data-assignment-task="recTask1"]');
+ assert.equal(seed.querySelector('strong').textContent,'依計畫數量完成');
+ assert.equal(seed.querySelector('#flow-evidence').open,true);
+ assert.equal(document.querySelectorAll('#flow-selected .pf-plan-facts').length,1);
+ assert.equal(seed.querySelector('.pf-plan-facts dd').textContent,progress.production.control.planned.qty);
+ assert.doesNotMatch(seed.textContent,/999|SOP-START/);
+ assert.deepEqual([...seed.querySelectorAll('[data-item-id]')].map(row=>row.dataset.itemId),progress.production.control.items.map(item=>item.item_id));
+ await click(seed.querySelector('.pf-task-open'));
+ assert.doesNotMatch(document.querySelector('[role=dialog]').textContent,/SOP-START|999/);
+ assert.ok(document.querySelector('select[aria-label="任務狀態"]'));
+ await value(document.querySelector('select[aria-label="任務狀態"]'),'已完成');await click(button('儲存任務'));
+ assert.equal(calls.findLast(call=>call.method==='PATCH').body.status,'已完成');
+ await click(document.querySelector('[role=dialog] [aria-label=關閉]'));
+ assert.match(document.querySelector('[data-assignment-task="recTask1"]').textContent,/已完成/);
+ await click([...seed.querySelectorAll('button')].find(b=>b.textContent==='改派'));
+ assert.ok(document.querySelector('select[aria-label="任務負責人"]'));
+ await value(document.querySelector('select[aria-label="任務負責人"]'),'ou_anna');await click(button('儲存指派'));
+ assert.match(document.querySelector('[data-assignment-task="recTask1"]').textContent,/林安娜/);
+ await act(async()=>{document.querySelector('#flow-evidence a').click();await tick()});
+ assert.equal(c.route.tab,'items');assert.equal(c.route.node,'control');
+});
+await check('production fallback uses task facts while evidence loads and keeps the plan visible when filtered',async()=>{
+ await mount({node:'control',configure:seedConfig,evidenceHold:true});
+ assert.match(document.querySelector('.pf-plan-facts').textContent,/999/);
+ assert.doesNotMatch(document.querySelector('#flow-selected').textContent,/SOP-START/);
+ await act(async()=>{globalThis.releaseEvidence();await tick()});
+ assert.doesNotMatch(document.querySelector('.pf-plan-facts').textContent,/999/);
+ await click(button('未指派'));
+ assert.equal(document.querySelectorAll('#flow-selected .pf-plan-facts').length,1);
+ assert.equal(document.querySelector('#flow-evidence').open,true);
+});
+await check('completed node reopen stays secondary and preserves the reason form',async()=>{
+ await mount({node:'control',configure(base,f){f.list.nodes.find(n=>n.key==='control').derived_status='已完成';f.list.can.control={claim:false,assign:false,complete:false,approve:false,reject:true,create_task:false}}});
+ assert.equal(button('取消完成').classList.contains('primary'),false);
+ assert.equal(document.querySelector('.pf-next-line'),null);
+ await click(button('取消完成'));assert.match(document.querySelector('.ne-form').textContent,/取消完成/);
+});
+await check('legacy direct completion stays enabled when ordinary SOP writes are policy-blocked',async()=>{
+ await mount({tab:'overview',node:'control',configure(base,f){f.list.writes_enabled=false;f.list.writes_disabled_reason='舊案維持原流程';f.list.can.control={legacy_complete:true};}});
+ assert.equal(button('直接標記完成').disabled,false);
+ assert.equal(document.querySelector('.pf-node-actions button.primary'),null);
+ await click(button('直接標記完成'));
+ assert.ok(document.querySelector('.assignment-edit textarea'));
+});
 await act(async()=>root.unmount());assert.deepEqual(failures,[]);

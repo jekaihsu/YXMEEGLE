@@ -14,7 +14,7 @@ const temp=new URL('./.project-flow-ui.mjs',import.meta.url);await writeFile(tem
 const progress=JSON.parse(await readFile(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));progress.project_id='p1';
 let root,c,fixture,calls,hold,evidenceStatus=200,nodeStatus=200,detailStatus=200,mutationStatus=200;
 const tick=()=>new Promise(r=>setTimeout(r,15));
-async function mount({tab,node,task,enabled=true,role='manager',dispatch=false,assign=true,evidenceHold=false,embedded=true,parentProject='p1'}={}){
+async function mount({tab='flow',node,task,enabled=true,role='manager',dispatch=false,assign=true,evidenceHold=false,embedded=true,parentProject='p1'}={}){
  if(root)await act(async()=>root.unmount());ui.invalidateSessionEpoch();
  const base=projectFixture();fixture=embeddedAssignmentFixture();
  for(const n of fixture.list.nodes){n.departments=['控制'];fixture.list.node_details[n.key].assignable_people.forEach(p=>p.departments=['控制']);}
@@ -38,8 +38,7 @@ async function mount({tab,node,task,enabled=true,role='manager',dispatch=false,a
   if(url.endsWith('/dispatch/options'))return response({people:[{person_ref:'ou_anna',open_id:'ou_anna',name:'林安娜',active:true,has_lark_account:true}],instruments:[],vehicles:[],cases:[{ref:'recCase',code:'C001',name:'合成確認單'}],departments:['控制'],seats:[],joins:{}});
   if(url.endsWith('/dispatch/previews')){const data=dispatchExample('decision: PM final accepts');data.proposal=JSON.parse(init.body);data.crew=data.proposal.crew.map(person_ref=>({person_ref,name:'林安娜',feasibility:'feasible'}));data.resources=[];data.expires_at='2099-01-01T00:00:00Z';return response(data)}
   if(url.endsWith('/dispatch/commits')){fixture.list.node_details.control.tasks.push({...fixture.detail.tasks[0],id:'recPublished',record_id:'recPublished',title:'已發布的新排班'});return response({command:{command_id:JSON.parse(init.body).command_id,state:'committed',revision:1,task_record_id:'recPublished'}})}
-  if(url.endsWith('/sop-tasks')&&globalThis.sopOverview)return response(globalThis.sopOverview);
-  if(url.endsWith('/sop-tasks')&&globalThis.sopForbidden)return response({code:'sop_import_forbidden'},403);
+  if(url.endsWith('/sop-tasks'))return globalThis.sopOverview?response(globalThis.sopOverview):response({code:'sop_import_forbidden'},403);
   return response({detail:'disabled'},404);
  };
  root=createRoot(document.getElementById('root'));await act(async()=>{root.render(React.createElement(ui.ProjectDetail,{c}));await tick()});
@@ -49,17 +48,11 @@ const button=text=>[...document.querySelectorAll('button')].find(b=>b.textConten
 const click=async element=>{assert.ok(element,'requested control exists');assert.equal(element.disabled,false,element.textContent);await act(async()=>{element.click();await tick()})};
 const value=async(el,v)=>act(async()=>{Object.getOwnPropertyDescriptor(el.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype,'value').set.call(el,v);el.dispatchEvent(new Event(el.tagName==='SELECT'?'change':'input',{bubbles:true}));await tick()});
 await mount({node:'control'});
-assert.deepEqual([...document.querySelectorAll('.project-tabs button')].map(b=>b.textContent),['流程','日報','案件資料','檔案','紀錄']);
+assert.deepEqual([...document.querySelectorAll('.pds-tabs button')].map(b=>b.textContent),['總覽','流程與任務','工項與進度','排程與人員','文件與交付','案件資料']);
 assert.equal(document.querySelectorAll('.pf-node').length,9);assert.equal(document.querySelectorAll('[aria-label="流程任務列表"]').length,1);
 assert.match(document.querySelector('#flow-evidence').textContent,/實際完成量未知/);
-assert.doesNotMatch(document.querySelector('#flow-evidence').textContent,/依來源數量顯示|不代表尚未施工|怎麼補|下列週報不代表|週報為工作預排/);
-assert.ok(button('前往報表查看此案') || [...document.querySelectorAll('button')].some(b=>b.textContent.startsWith('前往報表')));
 assert.equal(calls.filter(r=>r.url.endsWith('/progress')).length,1);assert.equal(calls.filter(r=>r.url.endsWith('/node-assignments')).length,1);assert.equal(calls.filter(r=>r.url.includes('/nodes/')).length,0);
 assert.ok([...document.querySelectorAll('.pf-secondary')].every(d=>!d.open));
-assert.doesNotMatch(document.body.textContent,/本地流程任務與 Lark 任務分開|來源時間不等於工作台操作時間|財務與節點跳過保留原核准流程|核對本節點證據，指派具體工作並確認交接/);
-assert.match(document.querySelector('.pf-legacy').textContent,/本地流程任務/);
-assert.ok(button('增補任務'));
-assert.match(document.querySelector('.pf-next').textContent,/待處理|待審核|待認領/);
 await act(async()=>document.querySelector('.pf-node[aria-current]').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true})));
 assert.equal(c.route.node,'mapping');assert.equal(document.activeElement.getAttribute('aria-current'),'step');
 await mount({tab:'tasks',node:'control'});assert.equal(button('全部任務').getAttribute('aria-pressed'),'true');
@@ -69,8 +62,8 @@ await click(button('指派'));assert.equal(document.querySelector('select[aria-l
 mutationStatus=403;await value(document.querySelector('select[aria-label="任務負責人"]'),'ou_anna');await click(button('儲存指派'));
 assert.match(document.querySelector('.pf-task-picker').textContent,/沒有|權限/);assert.equal(document.querySelector('select[aria-label="任務負責人"]').value,'ou_anna');
 mutationStatus=200;await click(button('儲存指派'));const patch=calls.findLast(r=>r.method==='PATCH');assert.deepEqual(Object.keys(patch.body).sort(),['assignee_open_id','expected_revision','request_id']);assert.equal(patch.body.assignee_open_id,'ou_anna');
-await mount({node:'control'});await click(button('新增任務'));assert.match(document.querySelector('.na-form').textContent,/新增節點任務/);
-await click(button('建立任務'));assert.match(document.querySelector('.na-form').textContent,/請填寫任務名稱/);
+await mount({node:'control'});await click(button('新增任務'));assert.match(document.querySelector('.ne-form').textContent,/新增節點任務/);
+await click(button('建立任務'));assert.match(document.querySelector('.ne-form').textContent,/請填寫任務名稱/);
 await mount({node:'control',dispatch:true});await click(button('排班'));assert.match(document.querySelector('[role=dialog]').textContent,/新增排班/);
 const field=label=>[...document.querySelectorAll('.dp-field')].find(l=>l.firstElementChild.textContent===label)?.querySelector('input,select');
 assert.equal(field('專案編號').value,'p1');assert.equal(field('工程確認單').value,'recCase');assert.equal(field('部門').value,'控制');assert.equal(field('父義務').value,'recObligation');
@@ -81,14 +74,13 @@ await click(button('關閉'));assert.match(document.querySelector('#flow-tasks')
 await mount({node:'control',assign:false});const disabledAssign=button('指派');assert.equal(disabledAssign.disabled,true);assert.match(document.getElementById(disabledAssign.getAttribute('aria-describedby')).textContent,/指派權限/);await act(async()=>disabledAssign.click());assert.equal(document.querySelector('.pf-task-picker'),null);
 await mount({node:'control',dispatch:true,parentProject:'YX-2026-042'});await click(button('排班'));assert.match(document.querySelector('[role=dialog]').textContent,/尚無可核實的父義務/);assert.equal(document.querySelector('.dp-dialog'),null);
 for(const role of ['member','viewer']){await mount({node:'control',dispatch:true,role});assert.equal(button('排班'),undefined);assert.equal(calls.some(r=>r.url.includes('/dispatch/')),false)}
-for(const tab of ['overview','progress','flow','tasks']){await mount({tab,node:'control',task:tab==='flow'?'recTask1':undefined});assert.equal(document.querySelector('.project-tabs .active').textContent,'流程');if(tab==='flow')assert.match(document.querySelector('[role=dialog]').textContent,/控制點成果核對/)}
+for(const [tab,label] of [['overview','總覽'],['progress','工項與進度'],['flow','流程與任務'],['tasks','流程與任務']]){await mount({tab,node:'control',task:tab==='flow'?'recTask1':undefined});assert.equal(document.querySelector('.pds-tabs [aria-current=page]').textContent,label);if(tab==='flow')assert.match(document.querySelector('[role=dialog]').textContent,/控制點成果核對/)}
 evidenceStatus=500;await mount({node:'control'});assert.equal(document.querySelectorAll('.pf-node').length,9);assert.equal(document.querySelectorAll('.pf-task-open').length,2);assert.match(document.querySelector('#flow-evidence').textContent,/讀取失敗/);evidenceStatus=200;await click(button('重試工程證據'));assert.match(document.querySelector('#flow-evidence').textContent,/實際完成量未知/);
 await mount({node:'control',evidenceHold:true});assert.equal(document.querySelector('.pf-diagram').getAttribute('aria-busy'),'false');assert.equal(document.querySelectorAll('.pf-task-open').length,2);assert.equal(document.querySelector('#flow-evidence [aria-busy]').getAttribute('aria-busy'),'true');await act(async()=>{globalThis.releaseEvidence();await tick()});assert.match(document.querySelector('#flow-evidence').textContent,/實際完成量未知/);
-nodeStatus=500;await mount({node:'control'});assert.equal(document.querySelector('.pf-diagram').getAttribute('aria-busy'),'false');assert.match(document.querySelector('#flow-evidence').textContent,/實際完成量未知/);assert.match(document.querySelector('#flow-tasks').textContent,/任務來源暫不可用/);assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/尚無可見任務/);nodeStatus=200;
+nodeStatus=500;await mount({node:'control'});assert.equal(document.querySelector('.pf-diagram').getAttribute('aria-busy'),'false');assert.match(document.querySelector('#flow-evidence').textContent,/實際完成量未知/);assert.match(document.querySelector('#flow-tasks').textContent,/來源未完整/);assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/尚無可見任務/);nodeStatus=200;
 await mount({node:'control',embedded:false});await click(button('更新節點與任務'));await click(document.querySelector('.pf-node[aria-label^="外業節點"]'));await click(document.querySelector('.pf-node[aria-label^="控制節點"]'));assert.equal(calls.filter(r=>r.url.endsWith('/nodes/control')).length,2);
-detailStatus=500;await mount({node:'control',embedded:false});assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/請重試明細後再確認完整清單|項已載入，來源未完整/);assert.equal(document.querySelector('#flow-tasks .pf-filters [role=status]').textContent,'0 項');assert.ok(button('重試任務明細'));assert.match(document.querySelector('#flow-tasks').textContent,/任務來源暫不可用/);assert.match(document.querySelector('#flow-evidence').textContent,/實際完成量未知/);fixture.list.node_details=globalThis.detailPayloads;await click(button('更新節點與任務'));assert.equal(document.querySelectorAll('.pf-task-open').length,2);assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/任務來源暫不可用/);detailStatus=200;
+detailStatus=500;await mount({node:'control',embedded:false});assert.match(document.querySelector('#flow-tasks').textContent,/來源未完整/);assert.match(document.querySelector('#flow-evidence').textContent,/實際完成量未知/);fixture.list.node_details=globalThis.detailPayloads;await click(button('更新節點與任務'));assert.equal(document.querySelectorAll('.pf-task-open').length,2);assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/來源未完整/);detailStatus=200;
 await mount({enabled:false,node:'node_control'});assert.equal(calls.some(r=>r.url.includes('/node-assignments')),false);assert.equal(document.querySelectorAll('.pf-node').length,9);assert.match(document.querySelector('.pf-legacy').textContent,/本地/);
 globalThis.sopOverview=JSON.parse(await readFile(new URL('../backend/sop_import/api-examples.json',import.meta.url),'utf8')).sop_tasks;
-await mount({node:'sales'});assert.equal(document.querySelector('#flow-selected #sop-tasks .pf-task-open strong').textContent,'業主提出報價需求');const card=document.querySelector('#flow-selected');assert.ok(card.querySelector('#sop-tasks'),'SOP list renders inside the node card');assert.deepEqual([...card.querySelectorAll('#sop-tasks>header .pf-actions button')].map(b=>b.textContent),['匯入此節點任務','新增任務','匯入預設任務','重新整理']);const other=card.querySelector('details.pf-other');assert.equal(other.open,false);assert.ok(other.querySelector('#flow-tasks'));assert.ok(other.querySelector('.pf-legacy'));assert.ok(card.querySelector('#sop-tasks').compareDocumentPosition(other)&dom.window.Node.DOCUMENT_POSITION_FOLLOWING);assert.ok(other.compareDocumentPosition(card.querySelector('#flow-evidence'))&dom.window.Node.DOCUMENT_POSITION_FOLLOWING);globalThis.sopOverview=undefined;
-globalThis.sopForbidden=true;await mount({node:'sales'});assert.equal(document.querySelector('#flow-selected #sop-tasks').textContent,'SOP 任務無 SOP 任務權限');globalThis.sopForbidden=false;
+await mount({node:'sales'});assert.equal(document.querySelector('#flow-selected #sop-tasks .pf-task-open strong').textContent,'業主提出報價需求');assert.ok([...document.querySelectorAll('#sop-tasks button')].some(b=>b.textContent==='匯入預設任務'));globalThis.sopOverview=undefined;
 await act(async()=>root.unmount());console.log('Unified project flow rendered checks passed');

@@ -53,6 +53,7 @@ def validate(catalog, *, baseline=True):
         number = raw['meegle_id']
         require(row['source_row_key'] == f'meegle-v137:A:{number}', 'catalog_origin_invalid')
         require(proposal['disposition'] == SPECIAL.get(number, proposal['disposition']), 'catalog_dispositions_invalid')
+        require(proposal.get('completion_policy', 'result_note') in {'result_note', 'delivery', 'financial', 'proof_required'}, 'catalog_completion_policy_invalid')
         keys = proposal['candidate_node_keys']
         require(len(keys) == len(set(keys)) and set(keys) <= NODE_MAP.keys(), 'catalog_mapping_invalid')
         require(proposal['target_branch_node_keys'] == [NODE_MAP[k] for k in keys], 'catalog_mapping_invalid')

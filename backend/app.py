@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode, urlsplit
 import httpx
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 from itsdangerous import URLSafeTimedSerializer, BadSignature
@@ -193,7 +193,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         return (MANAGER_CAPABILITIES[:] if role=='manager' else [])+(['approve_capability'] if ident in capability_approvers else [])
 
     shell_enabled=str(cfg.get('WORKSPACE_SHELL_ENABLED','false')).lower()=='true'
-    TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('POST','/api/actions')}
+    TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('GET','/api/settings/overview'),('POST','/api/actions')}
     @contextmanager
     def phase(request,name):
         started=perf_counter()
@@ -230,11 +230,18 @@ def create_app(overrides=None,*,dispatch_transport=None):
         response.headers['X-Content-Type-Options']='nosniff'
         response.headers['Referrer-Policy']='same-origin'
         if request.url.path.startswith('/api'): response.headers['Cache-Control']='no-store'
-        if (request.method,request.url.path) in TIMED_ROUTES or (request.method=='GET' and re.fullmatch(r'/api/projects/[^/]+',request.url.path)):
+        elif response.status_code in (200,206,304) and re.fullmatch(r'/assets/(?:[^/]+/)*[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+',request.url.path):
+            response.headers['Cache-Control']='public, max-age=31536000, immutable'
+        if (request.method,request.url.path) in TIMED_ROUTES or (request.method=='GET' and response.status_code<400 and re.fullmatch(r'/api/(?:projects/[^/]+(?:/(?:navigation|progress|node-assignments|start-sop|sop-tasks|sop-assignees))?|case-detail/[^/]+)',request.url.path)):
             # Durations only. 'serialize' is the unmeasured remainder (response encoding and framework time).
             phases=dict(request.scope.get('phases',{})); total=perf_counter()-started
             phases['serialize']=max(total-sum(phases.values()),0)
             response.headers['Server-Timing']=', '.join([f'{k};dur={v*1000:.1f}' for k,v in phases.items()]+[f'total;dur={total*1000:.1f}'])
+        if request.url.path.startswith('/api'):
+            elapsed=perf_counter()-started
+            if elapsed>3:
+                import logging
+                logging.getLogger('backend.slow').warning('slow_request method=%s path=%s status=%s total_ms=%.0f phases=%s',request.method,request.url.path,response.status_code,elapsed*1000,{k:round(v*1000) for k,v in request.scope.get('phases',{}).items()})
         return response
 
     SESSION_MAX_AGE=7*24*3600
@@ -273,15 +280,20 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 row=WorkspaceRow(id=wid,version=1,data=data); db.add(row); db.flush()
                 row.data=storage.save(db,BusinessRow,wid,data)
 
-    def load(db,row,*,collections=None,project_ids=None):
-        if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=[c for c in storage.COLLECTIONS if c!='projects'],project_ids=project_ids,project_children=storage.PROJECT_CHILDREN)
-        else: state=storage.load(db,BusinessRow,row) if collections is None else storage.load_partial(db,BusinessRow,row,collections=collections)
-        state=upgrade(state)
+    def load(db,row,*,collections=None,project_ids=None,omit_kinds=()):
+        if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections if collections is not None else storage.DETAIL_COLLECTIONS,project_ids=project_ids,project_children=storage.PROJECT_CHILDREN,filter_project_rows=True)
+        elif collections is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections)
+        elif omit_kinds: state=storage.load(db,BusinessRow,row,omit_kinds=omit_kinds)
+        else: state=storage.load(db,BusinessRow,row)
+        state=upgrade(state,generate_sop_candidate=collections is None or 'sop_templates' in collections)
         return seal(db,row,state)
 
     def seal(db,row,state,*,scoped=False):
         from .workspace_seal import seal as seal_workspace
-        return seal_workspace(db,row,state,cfg,scoped=scoped)
+        state=seal_workspace(db,row,state,cfg,scoped=scoped)
+        from .report_bridge import load_bridges
+        state['report_case_bridges']=load_bridges(db,row.id)
+        return state
 
     def load_for_write(db,row,footprint):
         """load() over just a footprint, with the project order; PartialUnavailable when the stored state needs the full path."""
@@ -348,7 +360,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             row=db.get(WorkspaceRow,data['wid']); require(row is not None,'工作區不存在',401)
             if data.get('mode')=='lark':
                 profile=db.get(PersonRow,(organization(data),data['uid']))
-                user=deepcopy(profile.data) if profile else find(load(db,row)['users'],data['uid'],'登入人員')
+                user=deepcopy(profile.data) if profile else find(load(db,row,collections=('users',))['users'],data['uid'],'登入人員')
             else: user=find(load(db,row,collections=('users',))['users'],data['uid'],'登入人員')
             if (data.get('mode')=='lark' and not data['wid'].startswith('test-')
                     and request.url.path not in NO_ROSTER_REFRESH_PATHS):
@@ -367,7 +379,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             if data.get('mode')=='lark' and admission_required:
                 from .production_access import require_access
                 recovery_routes={('GET','/api/session'),('POST','/api/logout'),
-                    ('POST','/api/people/sync'),('GET','/api/admin/runtime-health')}
+                    ('POST','/api/people/sync'),('GET','/api/live/status'),('GET','/api/admin/runtime-health')}
                 if tenant_read:
                     from .production_access import access_mode
                     access=access_mode(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'))
@@ -402,6 +414,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         """owned=True: caller passes a fresh load nobody else uses; it is projected in place (no deepcopy)."""
         file_categories=categories(data); verification=data.get('native_definition_verification')
         result=strip_migration_archive(data) if owned else public_copy(data)
+        result.pop('report_case_bridges',None);result.pop('report_bridge_available_codes',None)
         from .source_case_policy import filter_visible_cases
         from . import case_redaction
         pre=case_redaction.snapshot(result)
@@ -509,7 +522,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                     entity_guard(state)
                 elif project_versions:
                     require(all(find(view['projects'],pid).get('concurrency_version',0)==version for pid,version in project_versions.items()),'此案件已被更新，請核對最新內容後重試',409)
-                else: require(row.version==expected,'資料已被其他操作更新，請重新整理後重試',409)
+                elif expected is not None: require(row.version==expected,'資料已被其他操作更新，請重新整理後重試',409)
                 expected=row.version
                 if actor_id: require(find(state['users'],actor_id).get('active',True),'帳號已停權',403)
                 if admission_required and wid.startswith(('lark-','test-lark-')):
@@ -557,7 +570,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
     @app.get('/api/health')
     def health():
         with engine.connect() as connection: connection.execute(select(1))
-        return {'status':'ok','mode':'demo' if demo else 'lark','database':'postgresql' if engine.dialect.name=='postgresql' else 'sqlite'}
+        from .build_identity import read_build_identity
+        return {'build':read_build_identity(),'status':'ok','mode':'demo' if demo else 'lark','database':'postgresql' if engine.dialect.name=='postgresql' else 'sqlite'}
 
     def features(environment=None):
         from .node_assignment.config import NodeAssignmentConfig
@@ -655,9 +669,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
         data,user=identity(request)
         require(offset>=0 and 1<=limit<=250 and attention in ('','overdue','review'),'駕駛艙查詢參數錯誤',422)
         require(len(q)<=240 and len(group)<=120 and len(source_status)<=120 and len(lifecycle)<=120,'查詢文字過長',422)
-        with sessions() as db: safe=public_ws(load(db,db.get(WorkspaceRow,data['wid'])),data['wid'],user,data['mode'],owned=True,task_details=False)
-        from .company_dashboard import overview
-        return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle)
+        from .company_dashboard import overview, READ_OMIT_KINDS
+        with sessions() as db: safe=public_ws(load(db,db.get(WorkspaceRow,data['wid']),omit_kinds=READ_OMIT_KINDS),data['wid'],user,data['mode'],owned=True,task_details=False)
+        return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle,complete_read=True)
 
     @app.get('/api/projects')
     def projects(request:Request,q:str='',status:str='',owner:str='',offset:int=0,limit:int=30,view:str='',tab:str='formal',sort:str='due',dir:str='asc'):
@@ -665,11 +679,15 @@ def create_app(overrides=None,*,dispatch_transport=None):
         from . import index_reads
         if view:
             from . import shell
-            require(view=='overview' and shell_enabled,'不支援的清單檢視',422)
+            require(view in ('overview','portfolio') and shell_enabled,'不支援的清單檢視',422)
             require(tab in shell.TABS and sort in shell.SORTS and dir in ('asc','desc') and len(q)<=240,'清單查詢參數錯誤',422)
             with phase(request,'load'),sessions() as db:
                 row=db.get(WorkspaceRow,data['wid'])
                 require(index_reads.ready(db,BusinessRow,row),'案件索引尚未就緒，請稍後重試',503)
+                if view=='portfolio':
+                    from .projects_portfolio import portfolio
+                    return JSONResponse(portfolio(db,BusinessRow,row,load(db,row,collections=()),now()[:10],
+                        assignments=app.state.home_panels,data=data,user=user))
                 return shell.overview_page(db,BusinessRow,row,load(db,row,collections=()),now()[:10],q=q,status=status,owner=owner,tab=tab,sort=sort,desc=dir=='desc',offset=offset,limit=limit)
         with phase(request,'load'),sessions() as db:
             row=db.get(WorkspaceRow,data['wid'])
@@ -697,7 +715,48 @@ def create_app(overrides=None,*,dispatch_transport=None):
         require(len(result['projects'])==1,'找不到這個案件',404)
         mine=lambda item:not isinstance(item,dict) or item.get('project_id',project_id)==project_id
         records={k:[i for i in v if mine(i)] if isinstance(v,list) else v for k,v in result.items() if k not in DETAIL_SKIP}
-        return dict(records,scope='project',version=result['version'],as_of=result['as_of'],project=result['projects'][0])
+        with phase(request,'encode'):
+            from fastapi.responses import JSONResponse
+            return JSONResponse(dict(records,scope='project',version=result['version'],as_of=result['as_of'],project=result['projects'][0]))
+
+    def report_link_state(data,user):
+        from .project_progress import ReportsView
+        from .report_bridge import reconcile_bridges,save_bridges
+        with sessions.begin() as db:
+            db.execute(update(WorkspaceRow).where(WorkspaceRow.id==data['wid']).values(version=WorkspaceRow.version))
+            row=db.execute(select(WorkspaceRow).where(WorkspaceRow.id==data['wid']).with_for_update()).scalar_one()
+            state=load(db,row)
+            current=find(state['users'],user['id'])
+            reports=ReportsView(getattr(app.state,'reports',None),warm=False) if current.get('role') in ('manager','pm') else ReportsView(status='restricted')
+            reconcile_bridges(state,reports)
+            state['report_bridge_available_codes']=sorted(c for c in (reports.data or {}).get('cases',{}) if c and reports.case(c))
+            save_bridges(db,data['wid'],state)
+        return state,current
+
+    @app.get('/api/report-links')
+    def report_links(request:Request):
+        from .report_link_review import review_queue
+        data,user=identity(request)
+        state,current=report_link_state(data,user)
+        return review_queue(state,current)
+
+    @app.get('/api/report-links/summary')
+    def report_links_summary(request:Request,project_id:str=''):
+        from .report_links import can_review_links,link_summary
+        from .report_link_review import allowed_source
+        from .source_case_policy import visible_project
+        data,user=identity(request)
+        state,current=report_link_state(data,user)
+        projects=[p for p in state['projects'] if visible_project(state,p) or can_review_links(current,p)]
+        if project_id: require(any(p['id']==project_id for p in projects),'找不到這個案件',404)
+        state['projects']=projects
+        reviewer=can_review_links(current) or any(can_review_links(current,p) for p in projects)
+        state['daily_unmatched']=[d for d in state.get('daily_unmatched',[]) if allowed_source(state,d) and (reviewer or current['id'] in d.get('source_actor_ids',[]))]
+        result=link_summary(state,project_id or None)
+        bridges=[b for pid,b in state.get('report_case_bridges',{}).items() if any(p['id']==pid for p in projects)]
+        result['bridges']={status:sum(b['status']==status for b in bridges) for status in ('auto_exact','reviewed','rejected','pending')}
+        result['bridge_unknown']=len(projects)-len(bridges)
+        return result
 
     @app.get('/api/daily-reports')
     def daily_reports(request:Request,project_id:str='',department:str='',actor_id:str='',date_from:str='',date_to:str='',status:str='all',q:str='',offset:int=0,limit:int=50):
@@ -721,10 +780,11 @@ def create_app(overrides=None,*,dispatch_transport=None):
         from .case_navigation import case_navigation
         from .source_case_policy import visible_project
         data,user=identity(request)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
+        with phase(request,'load'),sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
         require(any(p['id']==project_id and visible_project(state,p) for p in state.get('projects',[])),'找不到這個案件',404)
-        filter_private_workspace(state,user)
-        return case_navigation(state,project_id)
+        with phase(request,'project'):
+            filter_private_workspace(state,user)
+            return case_navigation(state,project_id)
 
     AUDIT_BATCH=100
 
@@ -868,10 +928,20 @@ def create_app(overrides=None,*,dispatch_transport=None):
             if body.action=='case_execution_assign':
                 assign_execution(ws,current,body.project_id,body.payload.get('execution_system'),body.payload.get('reason'))
                 return
+            from .report_link_review import LINK_ACTIONS
+            if body.action in LINK_ACTIONS:
+                from .report_bridge import reconcile_bridges
+                from .project_progress import ReportsView
+                reports=ReportsView(getattr(app.state,'reports',None),warm=False)
+                reconcile_bridges(ws,reports)
+                ws['report_bridge_available_codes']=sorted(c for c in (reports.data or {}).get('cases',{}) if c and reports.case(c))
+                apply_operation(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-'),cfg)
+                return
             affected_ids={i.get('project_id') for i in body.payload.get('items',[]) if isinstance(i,dict)} if body.action=='task_batch_complete' else ({body.project_id} if body.project_id else None)
             affected=[p for p in ws['projects'] if affected_ids is None or p['id'] in affected_ids]
             if affected_ids:
                 for project in affected:require_execution(ws,project)
+            protected_before=deepcopy(affected)
             hashes={n['id']:review_hash(p,n) for p in affected for n in p['nodes']}
             if not apply_learning(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-')) and not apply_operation(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-'),cfg):
                 apply_action(ws,current,raw,data['mode']=='demo' or data['wid'].startswith('test-'))
@@ -887,10 +957,16 @@ def create_app(overrides=None,*,dispatch_transport=None):
                     for n in p['nodes']:
                         for t in n['tasks']:
                             if t['id']==body.task_id: t['manual_updated']=True
+            from .sop_import.models import CasePolicy
+            from .sop_import.enrollment_policy import protected_node_changes
+            with sessions() as policy_db:
+                policies={p.project_id:p for p in policy_db.scalars(select(CasePolicy).where(CasePolicy.workspace_id==data['wid']))}
+            require(not protected_node_changes(policies,protected_before,ws['projects'],protect_unclassified=app.state.sop_import.auto_active()),
+                    '舊案節點維持原流程，請先由管理者套用 SOP 到剩餘節點',409)
         from .admin_concurrency import check
         entity_guard=(lambda ws:check(ws,body.action,body.payload,body.entity_versions)) if body.entity_versions and body.action in ('admin_person','admin_settings') else None
         try:
-            with phase(request,'mutate'): return persist_mutation(data['wid'],body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=(lambda lookup:resolve_footprint(raw,lookup)) if raw['action'] in FOOTPRINT_RULES else None,entity_guard=entity_guard)
+            with phase(request,'mutate'): return persist_mutation(data['wid'],None if body.action=='admin_person' and 'expected_authz_version' in body.payload else body.version,mutate,f"{data['wid']}:{user['id']}:{body.request_id}",fingerprint,actor_id=user['id'],action_name=body.action,project_versions=versions,footprint=(lambda lookup:resolve_footprint(raw,lookup)) if raw['action'] in FOOTPRINT_RULES and raw['action'] not in {'daily_propose','daily_approve'} else None,entity_guard=entity_guard)
         except HTTPException as exc:
             with sessions.begin() as db:
                 denied=audit.record(AuditRow,data['wid'],user['id'],body.action,result='denied',request_id=body.request_id,
@@ -985,7 +1061,21 @@ def create_app(overrides=None,*,dispatch_transport=None):
             result=public_source_response(state,cache.data,user) if cache else {'configured':bool(configuration(cfg)),'last_sync':None,'status':'never','message':'尚未同步來源','tables':[],'records':[]}
         return {**result,'as_of':freshness['datasets']['sources']['as_of'],'freshness':freshness}
 
-    def source_health_from(data,user,freshness,cache_data,state):
+    def source_refresh_permission(data,user,freshness=None):
+        if '_source_refresh_permission' not in data:
+            try:
+                require_refresh(app.state.live_read,data,user,'sources',authorize=authorize_live,enabled=freshness['enabled'] if freshness is not None else None)
+                permission=(True,None)
+            except Exception as exc:
+                reason='權限不足'
+                if user.get('role') not in ('pm','manager') and not capable(user,'manage_sources'):
+                    reason='需由有權限的 PM 或主管更新'
+                elif isinstance(exc,HTTPException): reason=exc.detail
+                permission=(False,reason)
+            data['_source_refresh_permission']=permission
+        return data['_source_refresh_permission']
+
+    def source_health_from(data,user,freshness,cache_data,state,*,metadata_only=False,diagnostic=False):
         """The GET /api/source-health computation over an already captured read (cache snapshot data and loaded workspace state)."""
         from .source_health import build_source_health
         if data['mode']!='lark' or data['wid'].startswith('test-'):
@@ -993,7 +1083,16 @@ def create_app(overrides=None,*,dispatch_transport=None):
         else:
             if cache_data is not None:
                 from .source_case_policy import visible_source_snapshot
-                snapshot=visible_source_snapshot(state,cache_data)
+                if metadata_only and state.get('environment') not in ('test','demo'):
+                    # Case reads need health, not source values. Count the same
+                    # admitted identities without copying/redacting every field.
+                    from collections import Counter
+                    from .source_case_policy import identity
+                    allowed=set(state.get('source_visible_record_ids',[]))
+                    counts=Counter((r.get('base_token'),r.get('table_id')) for r in cache_data.get('records',[]) if identity(r) in allowed)
+                    snapshot={k:deepcopy(v) for k,v in cache_data.items() if k not in ('records','case_filter','tables')}
+                    snapshot['tables']=[dict(deepcopy(t),count=counts[(t.get('base_token'),t.get('table_id'))]) for t in cache_data.get('tables',[])]
+                else: snapshot=visible_source_snapshot(state,cache_data)
                 if state.get('environment') not in ('test','demo'):
                     from . import case_redaction
                     from .source_case_policy import filter_visible_cases
@@ -1002,8 +1101,11 @@ def create_app(overrides=None,*,dispatch_transport=None):
             else: snapshot={'status':'never','tables':[],'records':[]}
         # Exactly the POST /api/sources/sync predicate. viewer_filtered stays None: visible_source_snapshot narrows
         # records to the admitted ids, so a zero count cannot be proven unfiltered.
-        read_authorized=data['mode']=='lark' and not data['wid'].startswith('test-') and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
-        return build_source_health(snapshot,freshness['datasets']['sources'],diagnostic=False,read_authorized=read_authorized,viewer_filtered=None)
+        read_authorized,refresh_reason=source_refresh_permission(data,user,freshness)
+        result=build_source_health(snapshot,freshness['datasets']['sources'],diagnostic=diagnostic,read_authorized=read_authorized,viewer_filtered=None)
+        result.update(can_refresh=read_authorized,refresh_reason=refresh_reason)
+        result.pop('diagnostic',None)
+        return result
 
     def source_health_page(data,user):
         """The GET /api/source-health computation, shared so the manager overview binds the identical page state."""
@@ -1014,11 +1116,11 @@ def create_app(overrides=None,*,dispatch_transport=None):
             with sessions() as db:
                 cache=db.get(CacheRow,data['wid']);state=load(db,db.get(WorkspaceRow,data['wid']))
                 cache_data=cache.data if cache else None
-        return source_health_from(data,user,freshness,cache_data,state)
+        return source_health_from(data,user,freshness,cache_data,state,diagnostic=True)
 
     @app.get('/api/source-health')
     def source_health(request:Request):
-        """Page state only (G-DIAG open: diagnostic=False). Same branches and visibility as GET /api/sources; no record values."""
+        """Visibility-filtered source read summaries without identifiers or record values."""
         data,user=identity(request)
         return source_health_page(data,user)
 
@@ -1068,24 +1170,48 @@ def create_app(overrides=None,*,dispatch_transport=None):
         return state
 
     def p2_generation(db,wid):
-        row,cache=db.get(WorkspaceRow,wid),db.get(CacheRow,wid)
-        data=(cache.data or {}) if cache else {}
-        return (row.version if row else None,data.get('status'),data.get('last_attempt_at'),data.get('last_sync'),data.get('as_of'))
+        version=db.scalar(select(WorkspaceRow.version).where(WorkspaceRow.id==wid))
+        # The generation fence needs four scalars, not the large source snapshot.
+        keys=('status','last_attempt_at','last_sync','as_of')
+        cache=db.execute(select(*(CacheRow.data[key] for key in keys)).where(CacheRow.id==wid)).first()
+        return (version,*(tuple(cache) if cache else (None,)*len(keys)))
 
-    def p2_read(data,user,keep_lines=False):
+    def p2_related_project_ids(state,project_id):
+        """Other projects whose visibility a scoped case read still needs.
+
+        filter_visible_cases drops a source row related to a project outside its visible set, so a scoped load that
+        holds only this project would drop rows a full load keeps when the related project is visible too."""
+        rows={r['id']:r for key in ('source_confirmations','contract_items','source_work_items') for r in state.get(key,[]) if r.get('id')}
+        frontier=[r for r in rows.values() if r.get('project_id')==project_id]; seen={r['id'] for r in frontier}; related=set()
+        while frontier:
+            row=frontier.pop()
+            related.update(row.get('project_ids',[]));related.update(row.get('review_project_ids',[]))
+            related.update(ref.get('project_id') for ref in row.get('task_refs',[]))
+            related.update((row.get('project_id'),row.get('linked_project_id')))
+            for ident in (*row.get('confirmation_ids',[]),*row.get('contract_ids',[])):
+                if ident in rows and ident not in seen: seen.add(ident);frontier.append(rows[ident])
+        return sorted(p for p in related-{None,project_id} if isinstance(p,str))
+
+    def p2_read(data,user,keep_lines=False,*,project_id=None):
         """Health and module input come from ONE capture fenced by a generation read BEFORE the first input read
         (freshness, cache, workspace) and re-checked after the last. A capture is returned only after its fence
         passed; when the bounded retries are exhausted nothing from any rejected capture is returned: the input is an
-        empty state under a read_failed page state (rows/counts/ids/labels absent, never current)."""
+        empty state under a read_failed page state (rows/counts/ids/labels absent, never current).
+        Single-project progress retains shared policy/redaction facts but loads only that project's tree."""
         wid=data['wid']
         app.state.live_read.ensure(wid,'sources')
         for _ in range(3):
             with sessions() as db: generation=p2_generation(db,wid)
             freshness=app.state.live_read.status(wid)
             with sessions() as db:
-                cache=db.get(CacheRow,wid);cache_data=deepcopy(cache.data) if cache else None
-                state=load(db,db.get(WorkspaceRow,wid))
-            health=source_health_from(data,user,freshness,cache_data,deepcopy(state))
+                # This session owns the freshly decoded JSON; health projection
+                # makes its own response copy before redacting formal sources.
+                cache=db.get(CacheRow,wid);cache_data=cache.data if cache else None
+                row=db.get(WorkspaceRow,wid)
+                state=load(db,row,project_ids=[project_id] if project_id is not None else None)
+                extra=p2_related_project_ids(state,project_id) if project_id is not None else []
+                if extra: state=load(db,row,project_ids=[project_id,*extra])
+            health=source_health_from(data,user,freshness,cache_data,state,metadata_only=project_id is not None)
             with sessions() as db: unchanged=p2_generation(db,wid)==generation
             if unchanged: return data,user,health,p2_narrowed_state(state,user,health.get('page_state'),freshness,keep_lines)
         failed={'page_state':{'states':['read_failed'],'count':None}}
@@ -1154,9 +1280,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
             card['drilldown']['filters']={k:v for k,v in card['drilldown']['filters'].items() if k not in P2_CASE_PARAMS}
         return result
 
-    def p2_visible_case_state(data,user,project_id,keep_lines=False):
+    def p2_visible_case_state(data,user,project_id,keep_lines=False,*,scoped=False):
         """The narrowed P2 state, or 404 (identical for absent and not visible) unless the case is visible to the viewer."""
-        _,_,_,state=p2_read(data,user,keep_lines)
+        _,_,_,state=p2_read(data,user,keep_lines,project_id=project_id if scoped else None)
         from .source_case_policy import visible_project
         require(any(p['id']==project_id and visible_project(state,p) for p in state.get('projects',[])),P2_NOT_FOUND,404)
         return state
@@ -1169,24 +1295,30 @@ def create_app(overrides=None,*,dispatch_transport=None):
         data,user=identity(request)
         require(len(project_id)<=200,'查詢參數過長',422)
         require(not request.query_params,'查詢參數錯誤',422)
-        state=p2_visible_case_state(data,user,project_id,keep_lines=True)
+        with phase(request,'capture'): state=p2_visible_case_state(data,user,project_id,keep_lines=True,scoped=True)
         privileged=data.get('access_mode','normal')=='normal' and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
         if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true': reports=ReportsView(status='disabled')
         elif not privileged or data.get('mode')!='lark' or data['wid'].startswith(('test-','demo-')): reports=ReportsView(status='restricted')
         else: reports=ReportsView(getattr(app.state,'reports',None))
-        return JSONResponse(build_project_progress(state,project_id,reports=reports,amounts=privileged,as_of=state['as_of']),headers={'Cache-Control':'no-store'})
+        # Automatic candidates are a read-time projection. Persisted owner
+        # decisions were loaded above; GET must not queue behind a source sync's
+        # workspace write lock. The link-review workflow persists its own rows.
+        with phase(request,'project'): result=build_project_progress(state,project_id,reports=reports,amounts=privileged,as_of=state['as_of'])
+        result['sources']['can_refresh_sources'],result['sources']['refresh_reason']=source_refresh_permission(data,user)
+        with phase(request,'encode'): return JSONResponse(result,headers={'Cache-Control':'no-store'})
 
     @app.get('/api/case-detail/{project_id}')
     def case_detail(request:Request,project_id:str):
+        from fastapi.responses import JSONResponse
         from .case_detail import build_case_detail
         data,user=identity(request)
         require(len(project_id)<=200,'查詢參數過長',422)
         require(set(request.query_params.keys())<={'confirmation_key'},'查詢參數錯誤',422)
         confirmation_key=p2_one(request,'confirmation_key',300)
-        state=p2_visible_case_state(data,user,project_id)
-        result=build_case_detail(state,project_id,confirmation_key=confirmation_key,as_of=state['as_of'])
+        with phase(request,'capture'): state=p2_visible_case_state(data,user,project_id,scoped=True)
+        with phase(request,'project'): result=build_case_detail(state,project_id,confirmation_key=confirmation_key,as_of=state['as_of'])
         require(result.get('header') is not None,P2_NOT_FOUND,404)
-        return result
+        with phase(request,'encode'): return JSONResponse(result)
 
     @app.get('/api/contract-detail')
     def contract_detail(request:Request):
@@ -1214,18 +1346,18 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     @app.get('/api/my-work')
     def my_work(request:Request):
-        """Read model for the viewer; same full-workspace load as GET /api/workspace. my_work applies case_redaction itself."""
-        from .my_work import build_my_work_input
+        """Complete legacy My Work inputs; my_work applies case_redaction itself."""
+        from .my_work import build_my_work_input, READ_OMIT_KINDS
         data,user=identity(request)
         if request.query_params: return app.state.home_panels.read_workspace(request,data,user)
         app.state.live_read.ensure(data['wid'],'sources')
         read={'admitted':data.get('access_mode','normal') in ('normal','tenant-read')}
         try:
-            with phase(request,'load'),sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']))
+            with phase(request,'load'),sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),omit_kinds=READ_OMIT_KINDS)
             read['loaded']=True
         except Exception:
             state={}; read['failed']=True
-        return build_my_work_input(state,user,read)
+        return build_my_work_input(state,user,read,sop_items=app.state.sop_import.personal_items(state,data['wid'],user) if read.get('loaded') else [],complete_read=True)
 
     @app.post('/api/sources/cutover-baseline')
     async def source_case_baseline(request:Request):
@@ -1502,7 +1634,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
     def node_assignment_case(data,user,project_id):
         from .source_case_policy import visible_project
         require(len(project_id)<=200,'查詢參數過長',422)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=storage.CASE_COLLECTIONS,project_ids=[project_id])
         project=next((p for p in state['projects'] if p['id']==project_id and visible_project(state,p)),None)
         require(project is not None,'找不到這個案件',404)
         return state,project
@@ -1510,9 +1642,16 @@ def create_app(overrides=None,*,dispatch_transport=None):
         """node_assignment_case plus the local planning cases this viewer may see; node assignment never gets those."""
         from .source_case_policy import visible_project,local_viewer
         require(len(project_id)<=200,'查詢參數過長',422)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
-        project=next((p for p in state['projects'] if p['id']==project_id and (visible_project(state,p) or local_viewer(user,p))),None)
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=storage.CASE_COLLECTIONS,project_ids=[project_id])
+        project=next((p for p in state['projects'] if p['id']==project_id),None)
         require(project is not None,'找不到這個案件',404)
+        if not (visible_project(state,project) or local_viewer(user,project)):
+            from .source_case_policy import local_planning
+            require(local_planning(project) and (user['id'] in project.get('sop_task_delegate_ids',[]) or app.state.sop_import.participates(data['wid'],user['id'],project_id)),'找不到這個案件',404)
+            if user['id'] not in project.get('sop_task_delegate_ids',[]):
+                project={k:project.get(k) for k in ('id','code','name')}
+                project['sop_assigned_only']=True
+                state={'users':[user], 'projects':[project]}
         return state,project
     def quote_view(data,user):
         """The quote register's cases and rows as the viewer may see them, and the /progress amounts gate."""
@@ -1537,7 +1676,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         db.add(audit.record(AuditRow,wid,actor_id,'create_local_case',details={'version':state['version'],'project_id':project['id'],
                                                                                'changes':audit.changes(before,state)}))
     from .sop_import.routes import register as register_sop_import
-    app.state.sop_import = register_sop_import(app, identity=identity, load_case=sop_case,
+    app.state.sop_import = register_sop_import(app, identity=identity, load_case=sop_case, phase=phase,
         sessions=sessions, cfg=cfg, quote_view=quote_view, workspace=quote_workspace, persist_case=persist_local_case)
     from .sop_import.lark_projection import Projection
     def sop_projection_state(wid):
@@ -1554,7 +1693,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         return ReportsView(app.state.reports,warm=False)
     app.state.node_assignment=register_node_assignment(app,identity=identity,load_case=node_assignment_case,sessions=sessions,
         receipt_model=Receipt,audit_model=AuditRow,cfg=cfg,skipped_nodes=valid_waiver,reports=node_reports,
-        reports_visible=lambda user: user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+        phase=phase,reports_visible=lambda user: user['role'] in ('pm','manager') or capable(user,'manage_sources'))
     from .dispatch_board.routes import register as register_dispatch_board
     from .dispatch_board.service import DispatchBoardService
     from .dispatch_board.lark_table import DispatchReader
@@ -1571,7 +1710,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         workspace=dispatch_workspace,allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'),
         transport=dispatch_transport)
     from .home_panels import register as register_home_panels
-    app.state.home_panels=register_home_panels(app,identity=identity,load=load,sessions=sessions,workspace_model=WorkspaceRow,nodes=app.state.node_assignment)
+    app.state.home_panels=register_home_panels(app,identity=identity,load=load,sessions=sessions,workspace_model=WorkspaceRow,nodes=app.state.node_assignment,sop=app.state.sop_import)
     from .native_poller import NativeApprovalPoller
     app.state.native_poller=NativeApprovalPoller(sessions,WorkspaceRow,BusinessRow,PersonRow,cfg)
     from .source_sync import SourceSyncService
@@ -1591,7 +1730,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         register_ops_routes(app,identity,load,sessions,WorkspaceRow)
     from .live_read.coordinator import RefreshCoordinator
     from .live_read.datasets import build_refreshers
-    from .live_read.routes import register as register_live, refresh as live_refresh
+    from .live_read.routes import register as register_live, refresh as live_refresh, require_refresh
     app.state.live_read=RefreshCoordinator(sessions,CacheRow,build_refreshers(
         app.state.source_sync,app.state.people_directory,app.state.attendance_schedule),cfg)
 
@@ -1635,13 +1774,14 @@ def create_app(overrides=None,*,dispatch_transport=None):
     register_live(app,identity,app.state.live_read,authorize=authorize_live,audit=audit_live_refresh)
     from .reports.routes import register as register_reports
     register_reports(app,identity,cfg,authorize=authorize_live,live_enabled=live_enabled,
-                     allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+                     allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'),
+                     links=lambda data,user:report_link_state(data,user)[0].get('report_case_bridges',{}))
     from .lark_pilot.routes import register as register_pilot
     register_pilot(app, identity=identity, authorize=authorize_live, cfg=cfg)
     from .runtime_health import register as register_runtime_health
     register_runtime_health(app,identity,sessions,CacheRow,cfg,workspace_model=WorkspaceRow,coordinator=app.state.live_read)
     from .settings_overview import register as register_settings_overview
-    register_settings_overview(app,identity,load,sessions,WorkspaceRow,CacheRow,cfg)
+    register_settings_overview(app,identity,load,sessions,WorkspaceRow,CacheRow,cfg,phase=phase)
 
     @app.post('/api/attendance/sync')
     async def sync_attendance(request:Request):
@@ -1668,8 +1808,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
         def frontend_page(path:str):
             if path.startswith('api/'): raise HTTPException(404,'API 不存在')
             candidate=(frontend/path).resolve()
-            if candidate.is_relative_to(frontend.resolve()) and candidate.is_file(): return FileResponse(candidate)
-            return FileResponse(frontend/'index.html')
+            page={'Cache-Control':'no-cache'}
+            if candidate.is_relative_to(frontend.resolve()) and candidate.is_file(): return FileResponse(candidate,headers=None if candidate.suffix!='.html' else page)
+            return FileResponse(frontend/'index.html',headers=page)
     return app
 
 app=create_app()

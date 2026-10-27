@@ -86,6 +86,10 @@ def _tree(state, pid):
                      if c.get('project_id') == pid and c.get('source_kind') == 'confirmation']
     contracts = [c for c in state.get('contract_items', []) if c.get('project_id') == pid]
     items = {i['id']: i for i in state.get('source_work_items', []) if i.get('project_id') == pid}
+    items_by_contract = {}
+    for iid, item in items.items():
+        for cid in item.get('contract_ids', []):
+            items_by_contract.setdefault(cid, []).append((iid, item))
     for c in confirmations:
         nodes[f"confirmation:{c['id']}"] = {'kind': 'confirmation', 'label': _text(c.get('code'))}
         edge('case_confirmation', f'case:{pid}', f"confirmation:{c['id']}")
@@ -105,9 +109,8 @@ def _tree(state, pid):
         if imported:
             # authority is per project (import status), never per surviving child: only
             # authorized imported rows may create work-item objects, edges or counts
-            for iid, it in items.items():
-                if ct['id'] in it.get('contract_ids', []):
-                    linked[iid] = (_text(it.get('category')), it.get('source_url'), len(it['contract_ids']) > 1)
+            for iid, it in items_by_contract.get(ct['id'], []):
+                linked[iid] = (_text(it.get('category')), it.get('source_url'), len(it['contract_ids']) > 1)
             missing = bool(status.get('partial') or status.get('truncated') or ct['id'] in incomplete
                            or any(items[i].get('source_missing') for i in linked)
                            or (not linked and bool(ct.get('reporting_ids') or ct.get('task_refs'))))
@@ -149,16 +152,20 @@ def _tree(state, pid):
         if ident not in seen:
             seen.add(ident)
             unique.append(e)
-    return {'project': project, 'nodes': nodes, 'edges': unique, 'confirmations': confirmations,
+    children, parents = {}, {}
+    for e in unique:
+        children.setdefault(e['parent_key'], []).append(e)
+        parents.setdefault(e['child_key'], []).append(e)
+    return {'project': project, 'nodes': nodes, 'edges': unique, 'children': children, 'parents': parents, 'confirmations': confirmations,
             'contracts': contracts, 'items': items, 'ct_unresolved': ct_unresolved}
 
 
 def _children(tree, parent_key):
-    return [e for e in tree['edges'] if e['parent_key'] == parent_key]
+    return tree['children'].get(parent_key, [])
 
 
 def _parents(tree, child_key):
-    return [e for e in tree['edges'] if e['child_key'] == child_key]
+    return tree['parents'].get(child_key, [])
 
 
 def parent_context(state, child_key):

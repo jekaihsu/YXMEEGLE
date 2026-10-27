@@ -9,7 +9,7 @@ export interface DatasetFreshness {
 }
 export interface Freshness {server_time:string;enabled:boolean;datasets:Record<LiveDataset,DatasetFreshness>}
 export type Status = 'pending'|'in_progress'|'completed'|'paused'|'superseded'|'rework'|string;
-export interface User {can_business_override?:boolean;can_mention?:boolean;id:string;name:string;role:string;department:string;avatar:string;avatar_url?:string;active?:boolean;capabilities?:string[];default_workspace?:string}
+export interface User {can_business_override?:boolean;can_mention?:boolean;id:string;name:string;role:string;department:string;avatar:string;avatar_url?:string;active?:boolean;capabilities?:string[];authz_version?:number;default_workspace?:string}
 export interface Comment {id:string;author_id:string;body:string;created_at:string;mentions?:string[];notifications?:{recipient_id:string;status:string;error?:string;simulated?:boolean}[]}
 export type HomeWaitingKind = 'paused'|'correction'|'prerequisite'|'upcoming'|'proxy';
 export interface HomeTaskDetail {
@@ -41,8 +41,8 @@ export interface Workspace {admin_revisions?:{people:Record<string,string>;setti
 export interface FeatureContract {local_case_creation?:boolean;sop_task_writes?:boolean;change_extension?:boolean;routines?:boolean;mock_ui?:boolean;workspace_shell?:boolean;node_assignment?:boolean;dispatch_board?:boolean;dispatch_write?:boolean}
 export interface Session {features?:FeatureContract;access_mode?:string;user:User|null;users:User[];mode:string;auth_configured:boolean;environment?:string;workspace_id?:string}
 export interface SourceData {freshness?:Freshness;as_of?:string|null;configured:boolean;last_sync:string;status:string;message:string;tables:unknown[];records:unknown[];mapping?:SourceMapping}
-export type View = 'quotes'|'dispatch'|'pm-glance'|'company'|'reports'|'dashboard'|'projects'|'work'|'schedule'|'people'|'approvals'|'sources'|'project'|'admin'|'routines'|'overview'|'confirmations'|'confirmation'|'contract'|'workitem';
-export interface Route {view:View;project?:string;node?:string;task?:string;tab?:string;section?:string;completion?:string;focus?:string;comment?:string;approval?:string;ctx?:string;task_source?:string}
+export type View = 'quotes'|'dispatch'|'pm-glance'|'reports'|'dashboard'|'projects'|'work'|'people'|'approvals'|'sources'|'project'|'admin'|'routines'|'overview'|'confirmations'|'confirmation'|'contract'|'workitem';
+export interface Route {all_tasks?:string;view:View;project?:string;node?:string;task?:string;tab?:string;section?:string;completion?:string;focus?:string;comment?:string;approval?:string;ctx?:string;task_source?:string}
 
 export interface WorkSchedule {id:string;user_id:string;day:string;end_time:string;version:number;active?:boolean;source_url?:string;basis?:string}
 export interface CapabilitySkill {id:string;name:string;department?:string;category?:string;level?:string|number;source_url?:string;source_record_id?:string;active?:boolean}

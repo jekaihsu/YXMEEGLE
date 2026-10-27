@@ -44,7 +44,8 @@ const SORTABLE = ['case_number', 'project_name', 'confirmation_version', 'pm', '
 const LABELS: Record<string, string> = {case_number: '案件編號', project_name: '工程名稱', confirmation_version: '確認單版本',
  pm: '案件負責人', admission_state: '准入狀態', effective_due: '有效期限', workflow_summary: '流程節點摘要',
  source_modified: '來源更新時間', source_status: '來源狀態', record_id: '來源記錄 ID', source_context: '來源脈絡'};
-const DEADLINE = 'effective due date is unknown: VCC-123 deadline provenance is unresolved';
+const DEADLINE = '尚無法判定期限：期限來源待確認';
+const deadlineReason = (reason: string) => /effective due date|deadline provenance|VCC-\d+/i.test(reason) ? DEADLINE : reason;
 const MODIFIED = 'no trustworthy source-modified field survives into confirmation entities';
 const AMOUNT = 'contract amounts are hidden pending gate G-AMT';
 const FILTERS = ['search', 'source_version', 'pm', 'admission', 'deadline_from', 'deadline_to',
@@ -166,7 +167,7 @@ export function buildConfirmationListView(input: unknown, options: ConfirmationL
  const pageState: DataState | null = forbidden ? {states: ['forbidden']} : blocked ? shortState : b ? b.page_state : {states: ['unknown'], count: null};
  const reason = forbidden ? '沒有權限' : blocked ? describeDataState(pageState!) : b ? null : 'confirmation list body is malformed or unavailable';
  const f = rec(options.filters) && Object.entries(options.filters).every(([k, v]) => FILTERS.includes(k) && text(v)) ? {...options.filters} : {};
- const wantedColumns: readonly string[] = Array.isArray(options.columns) && Array.from(options.columns).every(c => [...DEFAULT, ...TECHNICAL].includes(c as typeof DEFAULT[number])) ? options.columns : DEFAULT;
+ const wantedColumns: readonly string[] = Array.isArray(options.columns) && Array.from(options.columns).every(c => [...DEFAULT, ...TECHNICAL].includes(c as typeof DEFAULT[number])) ? options.columns : ['case_number', 'project_name', 'confirmation_version', 'pm'];
  const columns = [...DEFAULT, ...TECHNICAL].map(key => ({key, label: LABELS[key], visible: wantedColumns.includes(key),
   default: (DEFAULT as readonly string[]).includes(key), technical: (TECHNICAL as readonly string[]).includes(key), sortable: SORTABLE.includes(key),
   sortDisabledReason: SORTABLE.includes(key) ? null : key === 'source_modified' ? MODIFIED : 'server contract does not support sorting this column',
@@ -204,7 +205,7 @@ export function buildConfirmationListView(input: unknown, options: ConfirmationL
   pageState, pageStateLabel: pageState ? describeDataState(pageState) : null, reason,
   table: {density: 'dense', stickyColumns: ['case_number', 'project_name'], rows}, columns,
   controls: {filters: forbidden ? {} : f, sort: activeSort, cursor: activeCursor,
-   deadline: {disabled: true, reason: b?.filter_status.deadline.reason ?? DEADLINE}, resetFilters: {filters: {}, cursor: null}},
+   deadline: {disabled: true, reason: b ? deadlineReason(b.filter_status.deadline.reason) : DEADLINE}, resetFilters: {filters: {}, cursor: null}},
   footer: {matching: total(b?.totals.matching), loaded: total(b?.totals.loaded), authorizedSource: total(b?.totals.authorized_source), basis: b?.totals_basis ?? 'undetermined'},
   pagination: {kind: 'server_cursor', next: {enabled: !!b?.next_cursor, cursor: b?.next_cursor ?? null, reason: b?.next_cursor ? null : reason ?? 'server supplied no next cursor'},
    previous: {enabled: hasPrevious, cursor: hasPrevious ? history!.stack[history!.stack.length - 1] : null,

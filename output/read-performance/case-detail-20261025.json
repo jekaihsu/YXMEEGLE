@@ -1,0 +1,175 @@
+{
+  "baseline_commit": "5c39bb094e33d7a3e32bd73ad28b7e62343ec756",
+  "method": "11 sequential identity-encoded TestClient requests per endpoint; temporary SQLite; fictional fixtures; all Lark readers and reports disabled; setup excluded; shared developer-machine CPU",
+  "units": "milliseconds unless indicated",
+  "workloads": {
+    "company": {
+      "before": {
+        "projects": 319,
+        "rounds": 11,
+        "source_records": 0,
+        "dense_case": {
+          "contracts": 400,
+          "tasks": 800,
+          "tree_p50_ms": 272.8,
+          "navigation_p50_ms": 8.11
+        },
+        "endpoints": {
+          "/api/projects/p001": {
+            "p50_ms": 31.01,
+            "max_ms": 62.59,
+            "payload_bytes": 63592,
+            "queries": 10,
+            "server_timing": "identity;dur=3.6, load;dur=15.8, project;dur=7.6, encode;dur=1.8, serialize;dur=1.5, total;dur=30.3"
+          },
+          "/api/projects/p001/navigation": {
+            "p50_ms": 40.96,
+            "max_ms": 73.27,
+            "payload_bytes": 20,
+            "queries": 10,
+            "server_timing": null
+          },
+          "/api/case-detail/p001": {
+            "p50_ms": 739.35,
+            "max_ms": 784.16,
+            "payload_bytes": 20826,
+            "queries": 17,
+            "server_timing": null
+          },
+          "/api/projects/p001/progress": {
+            "p50_ms": 38.2,
+            "max_ms": 75.21,
+            "payload_bytes": 4665,
+            "queries": 21,
+            "server_timing": null
+          }
+        }
+      },
+      "after": {
+        "projects": 319,
+        "rounds": 11,
+        "source_records": 0,
+        "dense_case": {
+          "contracts": 400,
+          "tasks": 800,
+          "tree_p50_ms": 7.63,
+          "navigation_p50_ms": 4.52
+        },
+        "endpoints": {
+          "/api/projects/p001": {
+            "p50_ms": 26.67,
+            "max_ms": 52.57,
+            "payload_bytes": 63592,
+            "queries": 10,
+            "server_timing": "identity;dur=3.3, load;dur=15.5, project;dur=5.5, encode;dur=0.2, serialize;dur=1.2, total;dur=25.7"
+          },
+          "/api/projects/p001/navigation": {
+            "p50_ms": 23.88,
+            "max_ms": 55.6,
+            "payload_bytes": 20,
+            "queries": 10,
+            "server_timing": "identity;dur=3.0, load;dur=15.9, project;dur=3.5, serialize;dur=1.2, total;dur=23.6"
+          },
+          "/api/case-detail/p001": {
+            "p50_ms": 24.68,
+            "max_ms": 57.53,
+            "payload_bytes": 20826,
+            "queries": 21,
+            "server_timing": "identity;dur=3.4, capture;dur=19.4, project;dur=0.1, encode;dur=0.1, serialize;dur=1.0, total;dur=24.0"
+          },
+          "/api/projects/p001/progress": {
+            "p50_ms": 27.47,
+            "max_ms": 59.98,
+            "payload_bytes": 4665,
+            "queries": 21,
+            "server_timing": "identity;dur=3.6, capture;dur=23.3, project;dur=0.5, encode;dur=0.1, serialize;dur=1.5, total;dur=28.9"
+          }
+        }
+      }
+    },
+    "source": {
+      "before": {
+        "projects": 319,
+        "rounds": 11,
+        "source_records": 8565,
+        "dense_case": {
+          "contracts": 400,
+          "tasks": 800,
+          "tree_p50_ms": 284.68,
+          "navigation_p50_ms": 9.46
+        },
+        "endpoints": {
+          "/api/projects/p001": {
+            "p50_ms": 34.49,
+            "max_ms": 87.37,
+            "payload_bytes": 65254,
+            "queries": 12,
+            "server_timing": "identity;dur=1.3, load;dur=20.4, project;dur=10.8, encode;dur=1.4, serialize;dur=0.8, total;dur=34.7"
+          },
+          "/api/projects/p001/navigation": {
+            "p50_ms": 39.29,
+            "max_ms": 82.71,
+            "payload_bytes": 279,
+            "queries": 12,
+            "server_timing": null
+          },
+          "/api/case-detail/p001": {
+            "p50_ms": 864.75,
+            "max_ms": 931.34,
+            "payload_bytes": 21736,
+            "queries": 19,
+            "server_timing": null
+          },
+          "/api/projects/p001/progress": {
+            "p50_ms": 94.73,
+            "max_ms": 156.07,
+            "payload_bytes": 4829,
+            "queries": 23,
+            "server_timing": null
+          }
+        }
+      },
+      "after": {
+        "projects": 319,
+        "rounds": 11,
+        "source_records": 8565,
+        "dense_case": {
+          "contracts": 400,
+          "tasks": 800,
+          "tree_p50_ms": 5.73,
+          "navigation_p50_ms": 4.49
+        },
+        "endpoints": {
+          "/api/projects/p001": {
+            "p50_ms": 31.1,
+            "max_ms": 35.97,
+            "payload_bytes": 65254,
+            "queries": 12,
+            "server_timing": "identity;dur=1.1, load;dur=17.3, project;dur=7.7, encode;dur=0.2, serialize;dur=0.7, total;dur=27.0"
+          },
+          "/api/projects/p001/navigation": {
+            "p50_ms": 26.71,
+            "max_ms": 30.32,
+            "payload_bytes": 279,
+            "queries": 12,
+            "server_timing": "identity;dur=0.8, load;dur=19.5, project;dur=4.4, serialize;dur=1.3, total;dur=26.1"
+          },
+          "/api/case-detail/p001": {
+            "p50_ms": 49.29,
+            "max_ms": 96.99,
+            "payload_bytes": 21736,
+            "queries": 23,
+            "server_timing": "identity;dur=1.3, capture;dur=50.3, project;dur=0.1, encode;dur=0.1, serialize;dur=0.8, total;dur=52.7"
+          },
+          "/api/projects/p001/progress": {
+            "p50_ms": 48.41,
+            "max_ms": 74.97,
+            "payload_bytes": 4829,
+            "queries": 23,
+            "server_timing": "identity;dur=0.8, capture;dur=39.8, project;dur=0.1, encode;dur=0.0, serialize;dur=1.1, total;dur=41.8"
+          }
+        }
+      }
+    }
+  }
+}

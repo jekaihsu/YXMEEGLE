@@ -45,6 +45,8 @@ class LarkReader:
             for _ in range(100):
                 response = client.request('GET', f'/bitable/v1/apps/{self.base}/tables/{table.table_id}/records', params=params)
                 data = response.json().get('data')
+                if isinstance(data, dict) and data.get('items') is None and data.get('has_more') is False and data.get('total') == 0:
+                    data = {**data, 'items': []}
                 if not isinstance(data, dict) or not isinstance(data.get('items'), list) or type(data.get('has_more')) is not bool:
                     raise ReadFailure('Incomplete reports table')
                 for row in data['items']:

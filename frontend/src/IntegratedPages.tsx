@@ -1,19 +1,20 @@
+import {useSourceRefresh} from './useSourceRefresh';
 // P1-INT pages: #work -> MyWorkTable(buildMyWorkView(...)), #sources -> SourceHealth(buildSourceHealthView(...)).
 // The legacy MyWork / Sources screens stay reachable through tab=legacy. Transport only; all state text comes
 // from the view models. New GETs: /api/my-work and /api/source-health.
-import {lazy, Suspense, useCallback, useEffect, useMemo, useState} from 'react';
+import {lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {api, ApiError, getSessionEpoch, parseRoute} from './api';
 const MyWorkTable=lazy(()=>import('./MyWorkTable'));
 const AssignmentTable=lazy(()=>import('./MyWorkTable').then(module=>({default:module.AssignmentTable})));
+import {buildLabel} from './buildIdentity';
 import {buildMyWorkView} from './myWorkView.ts';
 import {buildSourceHealthView} from './sourceHealthView.ts';
 import {filtersFromRoute, hashOfRoute, isLegacyTab, myWorkInput, sourceHealthInput, withFilters} from './integrationRoutes.ts';
 import {Segmented} from './design';
 import {HOME_PANELS,useHomePanels,type HomePanel} from './useHomePanels';
-import {PanelStatus} from './DailyHome';
 import {Button} from './design';
+import './ProjectCalm.css';
 import type {Ctx} from './appCommon';
-export {DispatchWorkflowPage as DispatchPage} from './DispatchWorkflowPage';
 
 const SourceHealth = lazy(() => import('./SourceHealth').then(module => ({default: module.SourceHealth})));
 
@@ -72,12 +73,27 @@ function LegacyWorkPage({c}: {c: Ctx}) {
 }
 
 export function SourceHealthPage({c}: {c: Ctx}) {
- const fetched = useFetched('/api/source-health', c.reloadVersion ?? c.w.version, c.s?.user?.id);
- // G-DIAG is open: no diagnostic capability exists, so the page shows the page state only.
- const view = useMemo(() => buildSourceHealthView(sourceHealthInput(fetched), {diagnosticCapability: false}), [fetched]);
+ const refreshSources=useSourceRefresh(c.s.workspace_id);
+ const health=useFetched('/api/health',0,c.s?.user?.id);
+ const [attempt,setAttempt]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const fetched = useFetched('/api/source-health', `${c.reloadVersion ?? c.w.version}:${attempt}`, c.s?.user?.id);
+ const view = useMemo(() => buildSourceHealthView(sourceHealthInput(fetched), {diagnosticCapability: true}), [fetched]);
+ const retrying=useRef(false);
+ const body=fetched.status==='ok' && fetched.body && typeof fetched.body==='object'?fetched.body:null;
+ const reason=body && 'can_refresh' in body && body.can_refresh===false && 'refresh_reason' in body && typeof body.refresh_reason==='string'?body.refresh_reason:null;
+ const retry=async(handle:unknown)=>{
+  if(retrying.current || busy || !handle || typeof handle!=='object' || !('dataset' in handle) || handle.dataset!=='sources')return;
+  const epoch=getSessionEpoch();retrying.current=true;setBusy(true);setError('');
+  try{await refreshSources()}
+  catch(error){if(epoch===getSessionEpoch())setError(error instanceof ApiError && (error.status===401 || error.status===403)?'權限不足':'Lark 讀取失敗，請重試')}
+  finally{retrying.current=false;if(epoch===getSessionEpoch()){setBusy(false);setAttempt(n=>n+1)}}
+ };
  return <main className="page sources-page" aria-label="資料來源">
   <LegacyTabs c={c} view="sources"/>
-  <Suspense fallback={<p role="status">正在載入來源健康…</p>}><SourceHealth view={view}/></Suspense>
+  {error&&<p role="alert">{error}</p>}
+  {reason && <span role="status">權限不足</span>}
+  <Suspense fallback={<p role="status">正在載入來源健康…</p>}><SourceHealth view={view} onRetry={retry} busy={busy}/></Suspense>
+  {c.s.user?.role==='manager'&&<small className="source-build-id" aria-label="部署版本">{buildLabel(health.status==='ok'?health.body:null)}</small>}
  </main>;
 }
 
@@ -87,7 +103,7 @@ function AssignmentWorkPage({c}:{c:Ctx}) {
  const panel=HOME_PANELS.find(p=>p===c.route.tab) ?? 'assigned';
  const params=new URLSearchParams(c.route.ctx);
  const scope=params.get('scope')==='team' ? 'team' : 'mine';
- const read=useHomePanels(c,{panel,scope,q:params.get('q')||'',deadline:params.get('deadline')||'all',cursor:params.get('cursor')||''},true,true);
+ const read=useHomePanels(c,{panel,scope,q:params.get('q')||'',deadline:params.get('deadline')||'all',cursor:params.get('cursor')||'',kinds:params.get('kinds')||undefined},true,true);
  const update=(changes:Record<string,string>,nextPanel:HomePanel=panel)=>{
   const next=new URLSearchParams(c.route.ctx);
   next.delete('cursor');
@@ -95,21 +111,23 @@ function AssignmentWorkPage({c}:{c:Ctx}) {
   for(const [key,value] of Object.entries(changes))value ? next.set(key,value) : next.delete(key);
   c.go({view:'work',tab:nextPanel,ctx:next.toString()},true);
  };
- return <main className="page work-page" aria-label="我的工作完整表格">
-  <h1>我的工作</h1>
+ return <main className="page work-page project-detail-calm" aria-label="我的工作完整表格">
+  <header className="section-heading"><h1>我的工作</h1><Button disabled={read.pending} onClick={()=>void c.refresh()}>重新讀取</Button></header>
   <div className="my-work-toolbar">
    <label>工作清單<select value={panel} onChange={e=>{const next=HOME_PANELS.find(p=>p===e.target.value);if(next)update({},next)}}>
     <option value="assigned">指派給我</option><option value="confirmation">待我確認</option><option value="delegated">我交辦的</option><option value="proxy">代理給我</option><option value="local">本地 SOP</option><option value="completed">已完成</option>
    </select></label>
+   <label>工作類型<select value={params.get('kinds')||''} onChange={e=>update({kinds:e.target.value})}><option value="">全部類型</option><option value="sop_task">SOP 任務</option><option value="node_assignment">節點責任</option><option value="task">Lark 任務</option></select></label>
    <label>期限<select value={params.get('deadline')||'all'} onChange={e=>update({deadline:e.target.value})}><option value="all">全部期限</option><option value="unscheduled">未排期限</option></select></label>
    <label>搜尋<input placeholder="搜尋任務、案件或關鍵字" type="search" value={params.get('q')||''} onChange={e=>update({q:e.target.value})}/></label>
    {(read.body?.manager_view_available || scope==='team') && <label>範圍<select value={scope} onChange={e=>update({scope:e.target.value})}><option value="mine">我的工作</option><option value="team">同組</option></select></label>}
   </div>
-  <PanelStatus read={read}/>
-  {read.body && <><p>節點責任 {read.body.counts.node_assignments ?? '未知'} 項 · 任務 {read.body.counts.tasks ?? '未知'} 項{read.body.counts.local_workflow ? ` · 本地 SOP ${read.body.counts.local_workflow} 項` : ''}</p>
-   <Suspense fallback={<div aria-hidden="true" className="skeleton skeleton-row"/>}><AssignmentTable items={read.body.items} onNavigate={c.go}/></Suspense>
-   {!read.body.items.length && <p>{read.body.complete ? '目前沒有符合條件的工作' : '工作來源待核對'}</p>}
-  </>}
+  {read.pending&&<p className="my-work-loading" role="status">正在讀取工作…</p>}
+  {read.body && <>{read.body.items.length ? <>
+   <p className="my-work-banner-as-of">已讀取 {read.body.items.length} 項工作{read.body.as_of?` · 更新於 ${new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(read.body.as_of))}`:''}{!read.body.complete?' · 部分來源待讀取':''}{read.body.freshness.status==='stale'?' · 上次資料':''}</p>
+   <Suspense fallback={<p className="my-work-loading" role="status">正在載入工作…</p>}><AssignmentTable items={read.body.items} onNavigate={c.go}/></Suspense>
+  </> : !read.pending&&<p role="status">{read.body.complete ? '目前沒有符合條件的工作。' : '工作來源尚未完整，請重新讀取。'}</p>}</>}
+  {!read.body&&!read.pending&&!read.error&&<p role="status">工作暫時無法讀取，請重新讀取。</p>}
   <div className="my-work-actions">
    {params.has('cursor') && <Button onClick={()=>update({})}>回第一頁</Button>}
    {read.body?.next_cursor && <Button onClick={()=>update({cursor:read.body?.next_cursor||''})}>下一頁</Button>}

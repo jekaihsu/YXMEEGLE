@@ -1,0 +1,52 @@
+{
+  "base": "9f92eb492131e27eda8fcc21f9ba4115885ede02",
+  "tested_source_head": "7f304fab47af5e086cb3d54c4ce0b46954f4905b",
+  "tested_source_tree": "72ffba96cb1a91846f2a0628570931807dd6bd2c",
+  "frontend": {
+    "base_files": 118,
+    "base_passed": 105,
+    "base_failures": [
+      "test-dev-tooling.mjs",
+      "test-dispatch-board.mjs",
+      "test-dispatch-fixes.mjs",
+      "test-home-panels.mjs",
+      "test-home-target-navigation.mjs",
+      "test-legacy-complete.mjs",
+      "test-ops-sync-panel.mjs",
+      "test-p2-routes.mjs",
+      "test-plan-panel.mjs",
+      "test-read-loading.mjs",
+      "test-reports-interactions.mjs",
+      "test-search-input.mjs",
+      "test-shell-mode.mjs"
+    ],
+    "head_files": 121,
+    "head_passed": 108,
+    "head_failures": [
+      "test-dev-tooling.mjs",
+      "test-dispatch-board.mjs",
+      "test-dispatch-fixes.mjs",
+      "test-home-panels.mjs",
+      "test-home-target-navigation.mjs",
+      "test-legacy-complete.mjs",
+      "test-ops-sync-panel.mjs",
+      "test-p2-routes.mjs",
+      "test-plan-panel.mjs",
+      "test-read-loading.mjs",
+      "test-reports-interactions.mjs",
+      "test-search-input.mjs",
+      "test-shell-mode.mjs"
+    ],
+    "new_failures": []
+  },
+  "typecheck": "pass",
+  "scratch_vite_build": "pass",
+  "backend": "269 passed",
+  "browser": "see browser-results.json",
+  "limits": [
+    "No real Lark or business records were read or written.",
+    "Source details and progress retry browser tests use intercepted synthetic endpoints.",
+    "The local staged health endpoint is real; live staging deployment parity was not checked.",
+    "13 frontend baseline failures remain."
+  ]
+}

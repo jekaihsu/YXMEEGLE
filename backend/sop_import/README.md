@@ -23,12 +23,12 @@ The latest published revision of the active default family is the default select
 
 ## Grant access and enable writes
 
-Grant capabilities explicitly through the existing capability administration system. None is included in automatic manager defaults.
+Active application managers, including the web 系統管理員 with session `role=manager`, receive all SOP capabilities by default. `role=admin` is also admitted explicitly. The case PM and people named in `sop_task_delegate_ids` may manage that case without a separate capability grant. Other users receive capabilities through the existing capability administration system.
 
 - `sop_task_read` permits local checklist reads.
 - `sop_task_read_source` permits full source procedures and snapshots. Without it, task `instructions` and `source_snapshot` are null with a restriction reason. Manual instructions remain readable.
-- `sop_task_import` permits import and management for the case PM, a manager, or a user named in the case's `sop_task_delegate_ids`. For an intake case without a PM, the explicit grant and current case visibility permit local planning.
-- `sop_task_work` permits an explicitly assigned executor to transition their task. It does not permit import, applicability decisions, or archive.
+- `sop_task_import` permits import and management for an authorized case manager. For an intake case without a PM, the explicit grant and current case visibility permit local planning.
+- `sop_task_work` permits a person to see the checklist of cases and work tasks. A person with no SOP grant who a case manager assigns as a task's executor reads only the tasks assigned to them on that case and may start, block, resume, reset, complete or reopen them. They never get import, applicability decisions, archive or edit.
 - `sop_template_publish` permits publication and does not inherit `publish_sop`.
 
 Set `SOP_TASK_WRITES_ENABLED=true` in server configuration. The default is false. Disabling it stops new previews, imports, publication, edits, transitions, and manual task creation. Authorized reads, receipts, and exact committed replays remain available. Existing case visibility and session admission always apply. An import grant is the explicit local planning grant for source-reference cases.
@@ -85,9 +85,9 @@ The quote-base `合約明細工項` table is not read. On the 2026-10-20 dump, 1
 
 Display fields return values and codes. Preview outcomes contain `reason_code`, an optional recorded `exclusion_reason`, and `node_keys`, the selected nodes the row maps to (empty for node-less rows), without catalog helper prose. The node-less routine and disabled rows (#27, #28, #57, #58) appear only in a case-wide preview of all nine nodes. Errors name what failed beside `code`: `node_mapping_invalid` carries the unknown or unmapped `node_key` (none for an empty selection), `row_not_importable` and `applicability_unresolved` carry `source_row_key`, and `template_mapping_conflict` carries `source_row_key`. Catalog interpretation notes reside under `provenance`; immutable task source content resides under the optional `source_snapshot`.
 
-For an explicit participant binding, add `participant_bindings` keyed by source row key, with `executor`, `checker`, or `confirmer` user IDs. A binding requires one active user with `sop_task_work` and case participation. It never selects the importer or node owner automatically.
+For an explicit participant binding, add `participant_bindings` keyed by source row key, with `executor`, `checker`, or `confirmer` user IDs. A binding requires one active workspace user. Being the executor is what lets that person work the task, so no grant or case role is needed. It never selects the importer or node owner automatically.
 
-`GET /api/projects/{id}/sop-assignees` lists exactly the people a binding accepts: `{"project_id":"…","restricted":false,"people":[{"id":"u-pm","name":"林育寬","case_roles":["pm"]}]}`. `case_roles` holds every case role that makes the person eligible, ordered `pm`, `admin`, `supervisor`, `delegate`, `collaborator`, `manager`. It needs a local checklist read grant and case visibility. A viewer who is neither a case manager nor admitted by `HR_VIEWERS` gets only their own entry with `restricted: true`. A rejected binding names the offending `role` and, during import, the `source_row_key`.
+`GET /api/projects/{id}/sop-assignees` lists exactly the people a binding accepts, every active workspace user: `{"project_id":"…","restricted":false,"people":[{"id":"u-pm","name":"林育寬","case_roles":["pm"],"department":null}]}`. People with case roles come first. `case_roles` holds every case role the person holds, possibly none, ordered `pm`, `admin`, `supervisor`, `delegate`, `collaborator`, `manager`. It needs a local checklist read grant, or a task assigned on the case, and case visibility. A viewer who is neither a case manager nor admitted by `HR_VIEWERS` gets only their own entry with `restricted: true`. A rejected binding names the offending `role` and, during import, the `source_row_key`.
 
 Subcontract rows #7, #20, #49, #54, #55, and #56 start unselected. Selecting one requires an `applicability_decisions` entry with `value=applicable` and a reason. #18 and #22 start unresolved. Reference, review, routine, and disabled rows cannot be selected. No baseline row is configured mandatory. Optional deselection may include an `exclusion_reasons` map. #31 and #47 remain in related billing task snapshots.
 
@@ -97,7 +97,7 @@ Transition with `POST /api/projects/{id}/sop-tasks/{task_id}/transition` and `{"
 
 Manual creation, edits, transitions, and suggestion decisions return the updated `task` exactly as the list shows it, beside `checklist_revision`.
 
-Every listed task carries fields that need no `sop_task_read_source` grant. `node_keys` lists its linked node keys in canonical order. `instance_scope` is `case` or `office_shared`. `is_shared` is true for an `office_shared` task or one linked to several nodes. `is_conditional` is true for catalog rows #7, #18, #20, #22, #49, and #54 to #56, and it stays true after the applicability decision. `allowed_actions` lists what this actor may do to this task now, in this order: the transitions from the table above whose origin state matches, then `restore`, `set_applicability`, `edit`, `accept_suggestion`, and `dismiss_suggestion`. A case manager gets every applicable one. The assigned executor with `sop_task_work` gets the transitions except `archive`. `start`, `resume`, and `reopen` need an applicable task. `complete` also needs completion evidence, so imported tasks never list it; an accepted suggestion completes them. `restore` of a completed task needs the same. With writes disabled the list is empty.
+Every listed task carries fields that need no `sop_task_read_source` grant. `node_keys` lists its linked node keys in canonical order. `instance_scope` is `case` or `office_shared`. `is_shared` is true for an `office_shared` task or one linked to several nodes. `is_conditional` is true for catalog rows #7, #18, #20, #22, #49, and #54 to #56, and it stays true after the applicability decision. `allowed_actions` lists what this actor may do to this task now, in this order: the transitions from the table above whose origin state matches, then `restore`, `set_applicability`, `edit`, `accept_suggestion`, and `dismiss_suggestion`. A case manager gets every applicable one. The assigned executor with `sop_task_work` gets the transitions except `archive`. `start`, `resume`, and `reopen` need an applicable task. `complete` on an ordinary imported checklist requires nonempty `result_note`. The response includes `result` with `note`, `actor_id`, `actor_name`, and epoch-second `at`. The same result is persisted in task-local JSON and its immutable revisioned `TaskEvent`, atomically with the transition. Existing JSON and event tables need no schema migration. Reopening clears the current result while retaining its event history. Reassignment clears attestations, the current result, and evidence basis. Manual tasks retain their prior completion contract and also accept an optional result note. Template `proposed_import.completion_policy` is `result_note`, `delivery`, `financial`, or `proof_required`. Delivery rows #37 and #38, and financial rows #30, #41, #43, #44, #51, #52, #54, #55, and #56 retain evidence gates. These named obligations also retain gates in older immutable snapshots without the policy field. Manager proof and indicator suggestions remain available. `restore` of a completed task needs the same. With writes disabled the list is empty.
 
 ## Evidence suggestions
 
@@ -133,7 +133,7 @@ Repeating an accept whose hash already moved the task to its state replays the s
 
 ## Quote register
 
-`GET /api/quotes` lists one entry per 報價編號, newest number first. Query parameters are `stage` (one `stage` code), `q` (case-insensitive match on 報價編號, 工程名稱, or 行號單位, at most 240 characters), `offset`, and `limit` (1 to 100, default 30). `GET /api/quotes/{quote_no}` returns one entry plus `facts`, the merged quote facts, and `records`, the source row IDs and links. An unknown or hidden number returns `quote_not_found` (404).
+`GET /api/quotes` lists one entry per 報價編號, newest number first. Query parameters are `stage` (one `stage` code), `q` (case-insensitive match on 報價編號, 工程編號, local reference, 工程名稱, or 行號單位, at most 240 characters), `offset`, and `limit` (1 to 2,000, default 30). `GET /api/quotes/{quote_no}` returns one entry plus `facts`, the merged quote facts, and `records`, the source row IDs and links. An unknown or hidden number returns `quote_not_found` (404).
 
 The register reads the cached `source_quotes` collection and the stored cases. It never reads Lark during a request. The same `filter_visible_cases` policy as the case list decides which rows and cases appear; no extra capability is needed. Rows deleted at the source and rows without a 報價編號 are left out. Rows sharing a 報價編號 merge, and `stage` uses the same predicate table as `sop-tasks`, with a V4 confirmation on any linked case counting.
 
@@ -248,3 +248,50 @@ python scripts/sop_v4_canary.py --yes --cleanup --manifest /absolute/path/sop-v4
 ```
 
 Cleanup requires a separate operator run. It asserts that a project search returns exactly the recorded IDs, pauses the local canary outbox, and deletes only those IDs. The application role currently has no delete permission. Cleanup therefore needs an operator application identity with delete permission on this table, or manual deletion of the receipt IDs in Lark. Keep the local canary outbox paused after manual cleanup so the worker does not recreate those rows.
+
+## Closing a node the data proves done
+
+`GET /api/projects/{id}/sop-tasks` carries `node_done`, a map of node key to `{rule, reason}` for every node the case's own data proves finished (the rules in `backend/node_assignment/evidence.py`, for example a C-prefixed 工編 for `sales`). `POST /api/projects/{id}/sop-tasks/close-node` with `{"node_key":"sales"}` completes that node's open, applicable tasks. It needs the manager authority import needs and writes enabled. It answers 409 `node_not_done_by_data` when the node is not proven. A task shared with a node that is not proven, and a task whose applicability is unresolved, stay open and are counted in `left_open: {shared, unresolved}`. Each closed task records a `node_closed` event and an `evidence_basis` with rule id `node-evidence:<rule>` and tier `proof`. Repeating the call closes nothing and is safe.
+
+## Personal SOP assignments
+
+`GET /api/home-panels` and query-based `GET /api/my-work` accept `kinds=sop_task`. Items carry `kind=sop_task`, `origin=sop_local`, case ID/code/name, node keys, status, deadline, `assignment_roles`, and a route to the existing inspector. `counts.sop_tasks` counts the filtered list before pagination. Executor assignments are in `assigned` and `completed`; checker and confirmer assignments are in `confirmation`. These roles can inspect their assigned task but only the executor or a case manager may transition it. Team scope does not include personal SOP assignments. The no-query My Work contract also includes scoped SOP rows and confirmation flags.
+
+A local planning assignee outside the creator, PM, and collaborators receives only their assigned task rows and a minimal case header from the SOP routes. The normal case routes, official case lists, and other case records remain unavailable. The personal inspector route uses `task_source=sop_local&section=assigned-sop`. Disabled users have no access. Writes still require `SOP_TASK_WRITES_ENABLED` and `expected_revision`.
+
+## Automatic enrollment and legacy cases
+
+Automatic source enrollment defaults off. Configure both settings only after the owner agrees to a cutoff.
+
+```dotenv
+SOP_AUTO_ENROLL_ENABLED=false
+# SOP_AUTO_ENROLL_SINCE is unset by default.
+```
+
+To turn it on, set `SOP_AUTO_ENROLL_ENABLED=true` and `SOP_AUTO_ENROLL_SINCE` to the agreed ISO timestamp with a timezone, such as `2026-10-23T00:00:00+08:00`. Set `SOP_TASK_WRITES_ENABLED=true` and publish an active default SOP template. Restart the service with those settings. A missing or invalid cutoff never automatically classifies a source case as managed. The source projection revision includes the configured cutoff so that enabling enrollment also classifies an unchanged complete snapshot.
+
+`SOP_AUTO_ENROLL_ENABLED` does not grant import permissions to a user. Automatic task events record `system:auto-enroll`. The worker can process only durable enrollment requests for a managed policy revision. Every attempt checks the task-write switch and published template again. It has no Lark client and makes no external writes.
+
+The idempotent schema setup creates three tables through `Base.metadata.create_all`.
+
+- `sop_case_policies` stores `legacy`, `managed`, or `needs_review`, a decision revision, actor, epoch timestamp, reason, evidence facts, and the allowed node keys.
+- `sop_source_admissions` stores the complete source identity, original case ID, earliest observed admission time, and baseline facts. A source identity belongs to one original case.
+- `sop_case_enrollments` stores the deterministic enrollment ID, case and source identity, pinned template version, policy revision, chosen nodes, actor, reason, pending or failed or succeeded status, attempt count, last error, next retry time, and successful receipt.
+
+The pure policy function never reads node rows or statuses. A complete authorized source snapshot verifies the base, table, and record identity. A newly admitted identity after the configured cutoff becomes managed. Cases already present, identities in the historical source baseline, and source records demonstrably older than the cutoff remain legacy. Missing or ambiguous identities and merged cases require review. A source refresh cannot silently promote legacy policy. Locally created quotes are managed even when automatic source enrollment is off. Their existing optional task selection remains available.
+
+Source admission persists the policy and enrollment request inside the successful source transaction. Enrollment runs after commit. A task error leaves the source sync successful and the request inspectable. An unchanged source refresh also drains due retries. Each drain processes at most 20 requests. Automatic retries use exponential backoff from two minutes to one day and stop after eight attempts. Managers can request another single retry at any time. Restarting the service retains pending requests.
+
+Managed defaults use all nine nodes, preserve existing conditional-selection rules, and leave participants empty. Source admission uses empty canonical nodes for newly discovered cases so it does not create a second set of defaults in `project.nodes`. Task IDs derive from workspace, verified case identity, template family, source row, and instance scope. Existing origin uniqueness keeps task IDs and results across template revisions. Enrollment receipts identify the policy and template revision and replay exactly. A later template revision can add missing origins but cannot overwrite an existing result or task snapshot.
+
+A manager, system admin, case PM, or delegated SOP manager may explicitly opt a legacy case in. The node picker defaults to nodes that have never started and are not finished or skipped. Running, reviewing, completed, and finished nodes are refused. Enrollment checks the chosen scope again at retry time and never changes a node's status or owners. Unselected nodes retain legacy protection. Existing task and node mutations are refused for persisted legacy or review policies, including local workspace commands and native node writes. The future legacy direct-completion slice will provide its own explicit command.
+
+The existing `GET /api/projects/{project_id}/sop-tasks` response adds `sop_enrollment`, with policy, current enrollment status, eligible node choices, and server-authorized opt-in and retry flags. Assigned-only readers receive no policy evidence or node inventory.
+
+New routes are local only.
+
+- `POST /api/projects/{project_id}/sop-import/opt-in` accepts `confirmed=true`, optional `node_keys`, and an optional reason. It stores a managed policy decision and durable enrollment request before processing it.
+- `POST /api/projects/{project_id}/sop-import/retry` accepts `enrollment_id`. It requires current case management authority and permits exactly one attempt.
+- `GET /api/sop-import/readiness` is read-only. Managers and admins see case policies and queue status. PMs see cases they manage. A plain employee is denied. Unclassified pre-feature cases display legacy when a complete identity exists, and needs review when it does not. Source admission persists the decision.
+
+The SOP section shows `已自動帶入 N 項`, retryable failure, pending-template state, or `舊案 · 維持原流程`. Selective import remains under `其他操作` for managed cases. `管理設定` contains the policy and failed or pending enrollment filters with manager retry controls.

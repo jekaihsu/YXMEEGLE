@@ -22,27 +22,29 @@ globalThis.fetch=async url=>{
  if(url==='/api/workspace')return reply(workspace);
  if(url.includes('/node-assignments/nodes/'))return reply({...fixture.detail,node:fixture.list.nodes.find(n=>n.key==='field'),can:fixture.list.can.field});
  if(url.endsWith('/node-assignments'))return reply(fixture.list);
- if(url.includes('/home-panels')){const panel=new URL(url,'http://localhost').searchParams.get('panel');return reply({panel,scope:'mine',readState:'complete',snapshot_version:'v1',as_of:null,freshness:{status:'fresh',last_success_at:null,refreshing:false},counts:{node_assignments:0,tasks:1,local_workflow:0,complete:true},items:panel==='assigned'?[item]:[],next_cursor:null,has_more:false,complete:true,total_count:1,manager_view_available:false})}
+ if(url.includes('/home-panels')||url.startsWith('/api/my-work?')){const panel=new URL(url,'http://localhost').searchParams.get('panel');return reply({panel,scope:'mine',readState:'complete',snapshot_version:'v1',as_of:null,freshness:{status:'fresh',last_success_at:null,refreshing:false},counts:{node_assignments:0,tasks:1,local_workflow:0,complete:true},items:panel==='assigned'?[item]:[],next_cursor:null,has_more:false,complete:true,total_count:1,manager_view_available:false})}
  return reply({});
 };
 const root=createRoot(document.getElementById('root'));
 const flush=async fn=>act(async()=>{fn?.();await new Promise(r=>setTimeout(r,30))});
 try{
  await flush(()=>root.render(React.createElement(ui.App)));await flush();await flush();
- const open=[...document.querySelectorAll('button')].find(b=>b.textContent==='開啟案件');assert.ok(open,'home panel row is mounted by App');
+ const open=[...document.querySelectorAll('a')].find(link=>link.textContent.includes('首頁外業任務'));assert.ok(open,'home task link is mounted by App');
  await flush(()=>open.click());await flush();
  assert.equal(ui.parseRoute(location.hash).node,'field','real App go preserves the home node through the hash');
  assert.equal(ui.parseRoute(location.hash).task,'recTask1','real App go preserves the task through the hash');
  await flush(()=>window.dispatchEvent(new Event('hashchange')));await flush();
- assert.equal(document.querySelector('.na-row[aria-label^="外業節點"]').getAttribute('aria-expanded'),'true');
- assert.match(document.activeElement.textContent,/控制點成果核對/,'ProjectDetail focuses the target task');
- await flush(()=>document.querySelector('a.brand').click());await flush();
- await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='首頁外業任務').click());
+ assert.match(document.querySelector('.pf-node[aria-current=step]').getAttribute('aria-label'),/^外業節點/);
+ assert.equal(document.querySelector('[aria-label="任務名稱"]').value,'控制點成果核對');
+ assert.equal(document.activeElement?.closest('[role="dialog"]')?.getAttribute('aria-label'),'控制點成果核對','home navigation focuses the target task inspector');
+ await flush(()=>{location.hash='view=work&tab=assigned';window.dispatchEvent(new Event('hashchange'))});await flush();
+ await flush(()=>document.querySelector('tbody summary').click());
  await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='開啟任務').click());await flush();
  assert.equal(ui.parseRoute(location.hash).node,'field','child target retains its node');
  assert.equal(ui.parseRoute(location.hash).task,'recTask2','child target overrides the parent task');
- assert.equal(document.activeElement.getAttribute('data-assignment-task'),'recTask2');
- for(const tab of document.querySelectorAll('.project-tabs button'))assert.equal(window.getComputedStyle(tab).minWidth,'44px','project tabs retain the 44px width floor');
+ assert.equal(document.querySelector('[aria-label="任務名稱"]').value,'子任務核對');
+ assert.equal(document.activeElement?.closest('[role="dialog"]')?.getAttribute('aria-label'),'子任務核對','child navigation focuses the target task inspector');
+ assert.deepEqual([...document.querySelectorAll('[aria-label="案件頁面"] button')].map(button=>button.textContent),['總覽','流程與任務','工項與進度','排程與人員','文件與交付','案件資料']);
  await flush(()=>root.render(React.createElement(ui.AssignmentTable,{items:[],onNavigate(){}})));
  assert.equal(document.querySelector('[aria-label="工作表格，可左右捲動"]').getAttribute('role'),'region');
  console.log('PASS home panel click through real App go and parseRoute expands field and focuses recTask1');

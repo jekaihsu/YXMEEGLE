@@ -1,10 +1,12 @@
 import {SopLarkSync} from './SopLarkSync';
+import {InlineTaskEditor} from './InlineTaskEditor';
+import {editorFields,type TaskDraft} from './nodeWorkbenchModel';
 import {TaskSuggestion,SuggestionReview} from './SopSuggestions';
 import {useState, type ReactNode} from 'react';
 import {Badge, Button, Row, Section} from './design';
-import {TaskDrawer, DrawerFacts} from './TaskDrawer';
-import {ROLES, SopError, sopApi, sopErrorText, sopNodeLabel, type Applicability, type MutationResult, type Role, type SopTask} from './sopTaskApi';
-import {APPLICABILITY_LABEL, dueLabel, ROLE_LABEL, stateLabel, taskActions, type TaskAction} from './sopTaskModel';
+import {SopError, sopApi, sopErrorText, sopNodeLabel, type Applicability, type MutationResult, type SopTask, SOP_ERROR_TEXT} from './sopTaskApi';
+import {APPLICABILITY_LABEL, ROLE_LABEL, stateLabel, taskActions, type TaskAction} from './sopTaskModel';
+import {TaskDrawer} from './TaskDrawer';
 import {FlowAction} from './FlowActions';
 import type {useSopTasks} from './useSopTasks';
 import type {User} from './types';
@@ -17,13 +19,10 @@ function Provenance({task}: {task: SopTask}) {
  const row = record(task.source?.row), raw = record(row.raw), template = record(task.source?.template);
  return <details className="sop-source"><summary>來源</summary>
   {task.manual ? <Section><Row label="來源" value="手動建立"/></Section>
-   : task.restricted ? <Section><Row label="來源" value="無來源讀取權限"/><Row label="範本" value={task.origin.template_family_id}/></Section>
+   : task.restricted ? <Section><Row label="來源" value="無來源讀取權限"/></Section>
    : <><Section>
-     <Row label="範本" value={`${plain(template.template_family_id)} ${plain(template.revision)}`}/>
-     <Row label="版本" value={plain(template.version_id)}/>
-     <Row label="來源列" value={plain(row.source_row_key)}/>
+     <Row label="範本版本" value={plain(template.revision)}/>
      <Row label="位置" value={plain(row.source_locator)}/>
-     <Row label="範圍" value={task.origin.instance_scope}/>
     </Section>
     <Section title="原始內容">{RAW_FIELDS.filter(([k]) => plain(raw[k]).trim()).map(([k, label]) => <Row key={k} label={label} value={<span className="sop-raw">{plain(raw[k])}</span>}/>)}</Section></>}
  </details>;
@@ -44,71 +43,68 @@ function Field({label, children}: {label: string; children: ReactNode}) {
 
 export function SopTaskInspector({task, project, users, sop, onClose}: {task: SopTask; project: {id:string}; users: User[]; sop: ReturnType<typeof useSopTasks>; onClose: () => void}) {
  const [review,setReview]=useState(false);
+ const [resultNote,setResultNote]=useState('');
  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
- const [title, setTitle] = useState(task.title), [instructions, setInstructions] = useState(task.instructions ?? '');
- const [people, setPeople] = useState(task.participants);
- const [due, setDue] = useState(task.dueDate || ''), [dueReason, setDueReason] = useState('');
- const [applicability, setApplicability] = useState<Applicability>(task.applicability), [appReason, setAppReason] = useState('');
- const names = new Map([...users,...sop.assignees].map(u => [u.id, u.name]));
- const candidates = sop.assignees;
- const editReason = task.allowedActions.includes('edit') ? '' : '不可編輯';
  const run = async (call: () => Promise<MutationResult>, done: string) => {
   setBusy(true); setError(''); setNotice('');
-  try {await call(); await sop.reload(); if (sop.current()) setNotice(done)}
+  try {await call(); await sop.reload(); if (sop.current()) setNotice(done); return true}
   catch (e) {
-   if (!sop.current()) return;
+   if (!sop.current()) return false;
    setError(sopErrorText(e));
    if (e instanceof SopError && (e.code === 'task_revision_conflict' || e.ambiguous)) await sop.reload();
+  return false;
   } finally {if (sop.current()) setBusy(false)}
  };
  const patch = (body: Record<string, unknown>, done: string) => run(() => sopApi.patch(project.id, task.id, {expected_revision: task.revision, ...body}, sop.current), done);
  const transition = (action: TaskAction|'set_applicability', extra: Record<string, unknown> = {}) => run(() => sopApi.transition(project.id, task.id, {expected_revision: task.revision, action, ...extra}, sop.current), '已更新狀態');
- const contentChanged = title.trim() !== task.title || (task.instructions !== null && instructions !== task.instructions);
- const peopleChanged = ROLES.some(r => (people[r] || '') !== (task.participants[r] || ''));
- const options = (role: Role) => {
-  const current = task.participants[role];
-  const list = current && !candidates.some(u => u.id === current) ? [{id: current, name: names.get(current) || '人員待確認'}, ...candidates] : candidates;
-  return [<option key="" value="">未指派</option>, ...list.map(u => <option key={u.id} value={u.id}>{u.name}</option>)];
+ const completionReason=busy?'處理中':task.completionBlockedReason?SOP_ERROR_TEXT[task.completionBlockedReason]||'完成條件待核對':!task.allowedActions.includes('complete')?'目前無法完成此任務':!resultNote.trim()?'請填寫結果說明':'';
+ const draft={title:task.title,assignee:task.participants.executor || '',due:task.dueDate || '',notes:task.instructions || '',status:task.state,reason:''};
+ const editable=task.allowedActions.includes('edit');
+ const save=(value:TaskDraft)=>{
+  const body:Record<string,unknown>={};
+  if(value.title!==task.title)body.title=value.title.trim();
+  if(value.notes!==draft.notes && task.instructions!==null)body.instructions=value.notes;
+  if(value.assignee!==draft.assignee)body.participants=Object.fromEntries(Object.entries({...task.participants,executor:value.assignee}).filter(([,v])=>v));
+  if(value.due!==draft.due){body.due_date=value.due || null;body.reason=value.reason.trim()}
+  return patch(body,'已儲存任務');
  };
 
- const nodes = task.nodes.map(n => sopNodeLabel(n.node_key)).join('、') || '未連結節點';
- const person = (role: Role) => task.participants[role] ? names.get(task.participants[role]!) || '人員待確認' : '未指派';
- const status = <><Badge>{stateLabel(task)}</Badge><SopLarkSync task={task} link/>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.applicability !== 'applicable' && <Badge tone="warning">{APPLICABILITY_LABEL[task.applicability]}</Badge>}</>;
- const footer = <div className="task-drawer-primary sop-transitions" role="group" aria-label="狀態操作">{taskActions(task).reverse().map(a => a.reason
-  ? <Reasoned key={a.action} label={a.label} busy={busy} onSubmit={reason => void transition(a.action, {reason})}/>
-  : <FlowAction key={a.action} allowed={!busy} reason="處理中" onClick={() => void transition(a.action)}>{a.label}</FlowAction>)}</div>;
- return <TaskDrawer kind="sop" label={`SOP 任務 · ${task.title}`} trail={['SOP 任務', nodes]} title={task.title} status={status} footer={taskActions(task).length ? footer : undefined} onClose={() => {if (!busy) onClose()}}>
-  {error && <p role="alert" className="pg-callout">{error}</p>}
-  {notice && <p role="status" className="sop-muted">{notice}</p>}
-  <section className="task-drawer-section">
-   <DrawerFacts facts={[...ROLES.map(r => ({label: `${ROLE_LABEL[r]}人員`, value: person(r)})), {label: '期限', value: dueLabel(task)}, {label: '節點', value: nodes}]}/>
-   <TaskSuggestion projectId={project.id} task={task} current={sop.current} reload={sop.reload} onAccept={()=>setReview(true)}/>
-  </section>
-  <form className="sop-form task-drawer-section" onSubmit={e => {e.preventDefault(); if (contentChanged) void patch({title: title.trim(), ...(task.instructions !== null ? {instructions} : {})}, '已儲存內容')}}>
-   <h3>內容</h3>
-   <Field label="任務名稱"><input value={title} maxLength={500} disabled={!!editReason || busy} onChange={e => setTitle(e.target.value)}/></Field>
-   {task.instructions !== null && <Field label="作法"><textarea rows={4} value={instructions} disabled={!!editReason || busy} onChange={e => setInstructions(e.target.value)}/></Field>}
-   <Button type="submit" disabled={!!editReason || busy || !contentChanged || !title.trim()}>儲存內容</Button>
-  </form>
-  <form className="sop-form task-drawer-section" onSubmit={e => {e.preventDefault(); if (peopleChanged) void patch({participants: Object.fromEntries(ROLES.filter(r => people[r]).map(r => [r, people[r]]))}, '已更新人員')}}>
-   <h3>人員</h3>
-   {ROLES.map(r => <Field key={r} label={`${ROLE_LABEL[r]}人員`}><select value={people[r] || ''} disabled={!!editReason || busy} onChange={e => setPeople(p => ({...p, [r]: e.target.value || undefined}))}>{options(r)}</select></Field>)}
-   {sop.assigneeError && <small role="alert">{sop.assigneeError}</small>}{!candidates.length && <small className="sop-muted">無可指派人員</small>}
-   <Button type="submit" disabled={!!editReason || busy || !peopleChanged}>儲存人員</Button>
-  </form>
-  <form className="sop-form task-drawer-section" onSubmit={e => {e.preventDefault(); void patch({due_date: due || null, reason: dueReason.trim()}, '已更新期限')}}>
-   <h3>期限</h3>
-   <Field label="期限"><input type="date" value={due} disabled={!!editReason || busy} onChange={e => setDue(e.target.value)}/></Field>
-   <Field label="期限原因"><input value={dueReason} maxLength={1000} disabled={!!editReason || busy} onChange={e => setDueReason(e.target.value)}/></Field>
-   <Button type="submit" disabled={!!editReason || busy || (due || null) === task.dueDate || !dueReason.trim()}>儲存期限</Button>
-  </form>
-  {task.allowedActions.includes('set_applicability') && <form className="sop-form task-drawer-section" onSubmit={e => {e.preventDefault(); void transition('set_applicability', {applicability, reason: appReason.trim()})}}>
-   <h3>適用</h3>
-   <Field label="適用"><select value={applicability} disabled={busy} onChange={e => setApplicability(e.target.value as Applicability)}>{(Object.keys(APPLICABILITY_LABEL) as Applicability[]).map(a => <option key={a} value={a}>{APPLICABILITY_LABEL[a]}</option>)}</select></Field>
-   <Field label="適用原因"><input value={appReason} maxLength={1000} disabled={busy} onChange={e => setAppReason(e.target.value)}/></Field>
-   <Button type="submit" disabled={busy || applicability === task.applicability || !appReason.trim()}>儲存適用</Button>
-  </form>}
-  <section className="task-drawer-section"><Provenance task={task}/></section>
-  {review && <SuggestionReview projectId={project.id} tasks={'data' in sop.state ? sop.state.data?.tasks||[] : []} initial={[task.id]} current={sop.current} reload={sop.reload} onClose={()=>setReview(false)}/>}
+ const footer=<div className="pf-actions sop-transitions" role="group" aria-label="狀態操作">{taskActions(task).filter(a=>a.action!=='complete').reverse().map(a => a.reason
+    ? <Reasoned key={a.action} label={a.label} busy={busy} onSubmit={reason => void transition(a.action, {reason})}/>
+    : <FlowAction key={a.action} allowed={!busy} reason="處理中" onClick={() => void transition(a.action)}>{a.label}</FlowAction>)}</div>;
+ return <TaskDrawer footer={taskActions(task).length ? footer : undefined} kind="sop" label={`SOP 任務 · ${task.title}`} trail={['SOP 任務',task.nodes.map(n=>sopNodeLabel(n.node_key)).join('、')]} title={task.title} status={<SopLarkSync task={task} link/>} onClose={() => {if (!busy) onClose()}}>
+  <div className="sop-inspector">
+   <div className="sop-badges"><Badge tone="accent">SOP 任務</Badge><Badge>{stateLabel(task)}</Badge>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.applicability !== 'applicable' && <Badge tone="warning">{APPLICABILITY_LABEL[task.applicability]}</Badge>}</div>
+   {error && <p role="alert" className="pg-callout">{error}</p>}
+   {notice && <p role="status" className="sop-muted">{notice}</p>}
+   <InlineTaskEditor busy={busy || sop.state.kind!=='ready' || sop.state.refreshing} model={{draft,fields:editorFields({title:editable,assignee:editable,due:editable,notes:editable && task.instructions!==null,status:false},task.state==='archived'?'已封存':task.state==='done'?'已完成':'需管理權限'),people:sop.assignees,statuses:[{id:task.state,label:stateLabel(task)}],maxTitle:500,maxNotes:20000,dueReason:true,readOnlyReason:task.state==='archived'?'已封存':task.state==='done'?'已完成':undefined}} onSave={save}/>
+   {editable && <ParticipantRoles task={task} people={sop.assignees} busy={busy} save={participants=>patch({participants},'已更新人員')}/>}
+   {task.allowedActions.includes('set_applicability') && <ApplicabilityEditor task={task} busy={busy} save={(applicability,reason)=>transition('set_applicability',{applicability,reason})}/>}
+
+   {task.result && <Section title="完成結果"><Row label="完成人員" value={task.result.actorName}/><Row label="完成時間" value={new Date(task.result.at*1000).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false})}/><Row label="結果說明" value={<span className="sop-raw">{task.result.note}</span>}/></Section>}
+   {task.state!=='done'&&task.state!=='archived'&&<form className="sop-form sop-result" onSubmit={e=>{e.preventDefault();if(!completionReason)void transition('complete',{result_note:resultNote.trim()})}}>
+    <Field label="結果說明"><textarea rows={4} maxLength={20000} value={resultNote} disabled={busy||!task.allowedActions.includes('complete')} onChange={e=>setResultNote(e.target.value)}/></Field>
+    {completionReason&&<p className="sop-muted" role="status">{completionReason}</p>}
+    <Button type="submit" variant="primary" disabled={!!completionReason} disabledReason={completionReason}>完成</Button>
+   </form>}
+   <TaskSuggestion projectId={project.id} task={task} current={sop.current} reload={sop.reload} onAccept={()=>setReview(true)}/><Provenance task={task}/>{review && <SuggestionReview projectId={project.id} tasks={'data' in sop.state ? sop.state.data?.tasks||[] : []} initial={[task.id]} current={sop.current} reload={sop.reload} onClose={()=>setReview(false)}/>}
+  </div>
  </TaskDrawer>;
+}
+
+function ApplicabilityEditor({task,busy,save}:{task:SopTask;busy:boolean;save:(value:Applicability,reason:string)=>Promise<boolean|undefined>}) {
+ const [value,setValue]=useState(task.applicability),[reason,setReason]=useState('');
+ return <form className="sop-form" onSubmit={e=>{e.preventDefault();if(reason.trim())void save(value,reason.trim())}}>
+  <Field label="適用"><select aria-label="適用" value={value} disabled={busy} onChange={e=>{const next=e.target.value;if(next==='applicable'||next==='not_applicable'||next==='unresolved')setValue(next)}}>{(Object.entries(APPLICABILITY_LABEL)).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></Field>
+  <Field label="適用原因"><input aria-label="適用原因" value={reason} maxLength={1000} disabled={busy} onChange={e=>setReason(e.target.value)}/></Field>
+  <Button type="submit" disabled={busy||value===task.applicability||!reason.trim()} disabledReason="請變更適用狀態並填寫原因">儲存適用</Button>
+ </form>;
+}
+
+function ParticipantRoles({task,people,busy,save}:{task:SopTask;people:{id:string;name:string}[];busy:boolean;save:(participants:SopTask['participants'])=>Promise<boolean|undefined>}) {
+ const [roles,setRoles]=useState(task.participants);
+ return <details><summary>檢核與確認人員</summary><form className="sop-form" onSubmit={e=>{e.preventDefault();void save(Object.fromEntries(Object.entries({...task.participants,checker:roles.checker,confirmer:roles.confirmer}).filter(([,v])=>v)))}}>
+  {(['checker','confirmer'] as const).map(role=><Field key={role} label={ROLE_LABEL[role]}><select value={roles[role]||''} disabled={busy} onChange={e=>setRoles(old=>({...old,[role]:e.target.value||undefined}))}><option value="">未指派</option>{people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>)}
+  <Button type="submit" disabled={busy} disabledReason="正在儲存">儲存檢核與確認人員</Button>
+ </form></details>;
 }

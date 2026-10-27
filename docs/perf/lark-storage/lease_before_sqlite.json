@@ -1,0 +1,11 @@
+{
+  "database": "sqlite",
+  "runs": 5,
+  "lease_lock_ms": 250,
+  "request_ms": {
+    "median": 287.5,
+    "min": 271.0,
+    "max": 299.4
+  },
+  "refresh_calls": 5
+}

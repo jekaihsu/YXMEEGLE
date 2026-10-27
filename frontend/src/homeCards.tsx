@@ -1,4 +1,5 @@
 import type {ReactNode} from 'react';
+import {homeTarget} from './projectRoutes';
 import {ArrowUpRight} from 'lucide-react';
 import {Row,Skeleton} from './design';
 import {type Ctx,STATUS} from './appCommon';
@@ -29,8 +30,8 @@ function Deadline({value,today}:{value:string|null|undefined;today:string}){
  return <span className="home-deadline" data-tone={tone}>{label}</span>;
 }
 export function WorkPreview({item,today}:{item:HomeItem;today:string}){
- const detail=[item.case.name||item.case.code||'案件關聯待核對',item.source_status||STATUS[item.status]||item.status,item.blocked_reasons[0]].filter(Boolean).join(' · ');
- return <Row label={item.title} detail={detail} value={<Deadline value={item.deadline||item.next_due} today={today}/>} href={item.target?homeHref(item.target):undefined}/>;
+ const detail=[item.kind==='sop_task'?'SOP 任務':null,item.case.name||item.case.code||'案件關聯待核對',item.source_status||({todo:'待處理',done:'已完成',blocked:'受阻'}[item.status]||STATUS[item.status]||'狀態待核對'),item.blocked_reasons[0]].filter(Boolean).join(' · ');
+ return <Row label={item.title} detail={detail} value={<Deadline value={item.deadline||item.next_due} today={today}/>} href={item.target?homeHref(homeTarget(item.target)):undefined}/>;
 }
 export function WorkCard({c,panel,id,today,read}:{c:Ctx;panel:HomePanel;id:HomeCardId;today:string;read:PanelRead}) {
  const body=read.body;

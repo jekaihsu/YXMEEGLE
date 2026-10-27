@@ -2,7 +2,6 @@
 import base64
 import hashlib
 import json
-from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -12,16 +11,15 @@ from fastapi.responses import JSONResponse
 
 from .home_details import build_home_task, local_work_instance
 from .home_queues import home_queues
+from .node_assignment.bulk import AssignmentChains
 from .node_assignment.cache import ReadScope, StaleCache
-from .node_assignment.domain import CHAIN, NODE_DEPARTMENTS, NODE_LABELS, NodeAction, NodeKey, NodeStatus, TaskFacts, TaskStatus, derive_chain, node_permissions, task_permissions
+from .node_assignment.domain import CHAIN, NODE_DEPARTMENTS, NODE_LABELS, NodeAction, NodeStatus, TaskFacts, TaskStatus, node_permissions, task_permissions
 from .node_assignment.errors import Failure
-from .node_assignment.lark_table import NODE_FIELDS, TASK_FIELDS, CaseSnapshot, Table, assignment_key, iso_time, parse_node, parse_task
-from .node_assignment.evidence import applicable, evidence_of
-from .node_assignment.operations import facts_of
+from .node_assignment.lark_table import NODE_FIELDS, TASK_FIELDS, Table, iso_time
 from .node_assignment.roster import fetch_roster
 from .node_assignment.service import actor_for, confirmation_record
 from .source_case_policy import filter_visible_cases
-from .sources import link_ids, normalized_case, text
+from .sources import link_ids, text
 from .workflow import now
 
 PANELS = ('assigned', 'proxy', 'confirmation', 'delegated', 'completed', 'local')
@@ -45,8 +43,9 @@ def urgency(item, today):
 
 
 class HomePanels:
-    def __init__(self, nodes):
+    def __init__(self, nodes, sop=None):
         self.nodes = nodes
+        self.sop = sop
         self.config = nodes.config
         self.cache = StaleCache(self.config.read_ttl_seconds, self.config.stale_max_seconds, nodes.clock)
         self.roster_cache = StaleCache(self.config.roster_ttl_seconds, self.config.stale_max_seconds, nodes.clock)
@@ -71,18 +70,21 @@ class HomePanels:
                 return fetch_roster(client, self.nodes._check_roster_schema)
         return self.roster_cache.get(scope.key([self.config.base, self.config.people_table]), load, allow_stale=False)
 
-    def lark_items(self, state, data, user, scope, team, hidden_confirmations):
+    def assignment_unavailable(self, state, data):
         org = self.nodes.cfg.get('LARK_WORKER_ORGANIZATION')
         if not self.config.enabled:
-            return [], {}, None, 'disabled'
+            return 'disabled'
         if state.get('environment') != 'production' or not org or data['wid'] != 'lark-' + org:
-            return [], {}, None, 'unavailable'
+            return 'unavailable'
         if not self.config.writable or self.nodes.cfg.get('LARK_WORKER_IDENTITY') != 'application':
-            return [], {}, None, 'unconfigured'
+            return 'unconfigured'
+        return None
+
+    def assignment_sources(self, scope, *, include_roster=False):
         with ThreadPoolExecutor(max_workers=3) as pool:
             reads = {name: pool.submit(self.read_table, scope, table, spec) for name, table, spec in
                      (('node_assignments', Table.NODES, NODE_FIELDS), ('tasks', Table.TASKS, TASK_FIELDS))}
-            roster_future = pool.submit(self.roster, scope)
+            roster_future = pool.submit(self.roster, scope) if include_roster else None
             sources = {}
             for name, future in reads.items():
                 try:
@@ -90,9 +92,27 @@ class HomePanels:
                 except Failure as exc:
                     sources[name] = exc
             try:
-                roster = roster_future.result().value
+                roster = roster_future.result().value if roster_future else None
             except Failure:
                 roster = None
+        return sources, roster
+
+    def portfolio_statuses(self, state, data, user):
+        if self.assignment_unavailable(state, data):
+            return {}
+        sources, _ = self.assignment_sources(self.scope(data, user))
+        if any(isinstance(source, Failure) or not source.complete for source in sources.values()):
+            return {}
+        try:
+            return AssignmentChains(self.nodes, state, data, user, sources['node_assignments'].value,
+                                    sources['tasks'].value).portfolio_statuses
+        except Failure:
+            return {}
+
+    def lark_items(self, state, data, user, scope, team, hidden_confirmations):
+        if reason := self.assignment_unavailable(state, data):
+            return [], {}, None, reason
+        sources, roster = self.assignment_sources(scope, include_roster=True)
         actor = actor_for(user, roster)
         manager = any(actor.manages(key) for key in CHAIN) if roster is not None or actor.override else None
         if team and not manager:
@@ -100,42 +120,11 @@ class HomePanels:
         nodes_read, tasks_read = sources['node_assignments'], sources['tasks']
         raw_nodes = [] if isinstance(nodes_read, Failure) else nodes_read.value
         raw_tasks = [] if isinstance(tasks_read, Failure) else tasks_read.value
-        nodes = {r['record_id']: parse_node(r) for r in raw_nodes}
-        tasks = {r['record_id']: parse_task(r) for r in raw_tasks}
-        raw_by_id = {r['record_id']: r['fields'] for r in raw_nodes}
-        task_fields = {r['record_id']: r['fields'] for r in raw_tasks}
-        projects = defaultdict(list)
-        for project in state.get('projects', []):
-            if project.get('source_kind') in ('demo', 'mock', 'simulation'):
-                continue
-            rid = confirmation_record(project, self.config)
-            if rid:
-                projects[rid].append(project)
-        labels = {value: key for key, value in NODE_LABELS.items()}
-        groups = defaultdict(lambda: defaultdict(list))
-        node_keys, node_groups = {}, {}
-        duplicate_keys = Counter(row.assignment_key for row in nodes.values())
-        for rid, row in nodes.items():
-            fields = raw_by_id[rid]
-            code = normalized_case(fields.get('確認單編號'))
-            key = labels.get(text(fields.get('節點')).strip())
-            if code and key and row.assignment_key == assignment_key(code, key):
-                node_keys[rid] = (code, key)
-                group = (code, tuple(sorted(link_ids(fields.get('工程確認單')))))
-                node_groups[rid] = group
-                groups[group][key].append(row)
-        linked = {rid: tuple(t for t in tasks.values() if t.node_ids == (rid,)) for rid in nodes}
-        chains = {}
-        reports = self.nodes.reports() if self.nodes.reports else None
-        for group, rows in groups.items():
-            code, relations = group
-            candidates = projects.get(relations[0], []) if len(relations) == 1 else []
-            project = candidates[0] if len(candidates) == 1 and normalized_case(candidates[0].get('code')) == code else None
-            skipped = frozenset(NodeKey(n['key']) for n in project.get('nodes', [])
-                                if n.get('key') in NODE_LABELS and self.nodes.skipped_nodes(state, project, n)) if project else frozenset()
-            snap = CaseSnapshot(code, {k: tuple(v) for k, v in rows.items()}, linked)
-            evidence = applicable(evidence_of(project, state, reports), skipped) if project else {}
-            chains[group] = derive_chain(facts_of(snap, skipped, evidence))
+        bulk = AssignmentChains(self.nodes, state, data, user, raw_nodes, raw_tasks)
+        nodes, tasks = bulk.nodes, bulk.tasks
+        raw_by_id, task_fields = bulk.node_fields, bulk.task_fields
+        node_keys, node_groups = bulk.node_keys, bulk.node_groups
+        duplicate_keys, linked, chains = bulk.duplicate_keys, bulk.linked, bulk.chains
         items = []
         for kind, entries in (('node_assignment', nodes), ('task', tasks)):
             for rid, row in entries.items():
@@ -159,8 +148,7 @@ class HomePanels:
                 relations = link_ids(raw_by_id.get(parent_id, {}).get('工程確認單'))
                 if set(relations) & hidden_confirmations:
                     continue
-                matches = projects.get(relations[0], []) if len(relations) == 1 else []
-                project = matches[0] if len(matches) == 1 and normalized_case(matches[0].get('code')) == code else None
+                project = bulk.project_for(code, relations)
                 case = {'id': project['id'] if project else None, 'code': code, 'name': project.get('name') if project else None,
                         'relation_state': 'verified' if project else 'unverified'}
                 status = STATUS.get(derived if kind == 'node_assignment' and derived else source_status, 'unknown')
@@ -214,7 +202,7 @@ class HomePanels:
 
     def local_items(self, state, user, panel):
         items = []
-        for project in state.get('projects', []):
+        for project in state.get('projects', []) if panel in ('proxy', 'local', 'completed') else []:
             for node in project.get('nodes', []):
                 for task in node.get('tasks', []):
                     if not local_work_instance(project, task) or (task.get('owner_id') != user['id'] and panel != 'proxy'):
@@ -272,7 +260,7 @@ class HomePanels:
         hidden_confirmations = {confirmation_record(p, self.config) for p in state.get('projects', []) if p['id'] not in visible_ids} - {None}
         if not user.get('active', True):
             raise HTTPException(403, '此帳號已停用')
-        if panel in ('proxy', 'local'):
+        if panel in ('proxy', 'local') or params.get('kinds') == 'sop_task':
             items, sources, manager, reason = [], {}, None, None
         else:
             items, sources, manager, reason = self.lark_items(visible, data, user, scope, scope_name == 'team', hidden_confirmations)
@@ -281,15 +269,23 @@ class HomePanels:
         if scope_name == 'team' and manager is not True:
             raise HTTPException(403, '無法核實同組工作權限')
         if scope_name == 'mine':
-            items += self.local_items(visible, user, panel)
-        selector = {'assigned': lambda i: i['origin'] == 'lark' and (i.get('_team') or i.get('_mine')),
+            if panel != 'assigned' and params.get('kinds') != 'sop_task':
+                items += self.local_items(visible, user, panel)
+            sop_items = self.sop.personal_items(state, data['wid'], user) if self.sop else []
+            items += sop_items
+            if reason == 'disabled' and sop_items:
+                reason = 'partial'
+        if params.get('kinds') == 'sop_task' and scope_name == 'mine':
+            items = [i for i in items if i['kind'] == 'sop_task']
+            sources, reason = {}, None
+        selector = {'assigned': lambda i: i['origin'] in ('lark', 'sop_local') and (i.get('_team') or i.get('_mine')),
                     'proxy': lambda i: i.get('_proxy'), 'confirmation': lambda i: i.get('_review'),
                     'delegated': lambda i: i.get('_outgoing'), 'completed': lambda i: i.get('_mine'),
                     'local': lambda i: i['origin'] == 'local_workflow' and i.get('_mine') and not i.get('_proxy')}[panel]
         items = [i for i in items if selector(i) and ((i['status'] == 'done') if panel == 'completed' else i['status'] not in ('done', 'cancelled', 'skipped'))]
         kinds = set(params.get('kinds', '').split(',')) - {''}
         if kinds:
-            if not kinds <= {'node_assignment', 'task', 'local_workflow', 'local_confirmation', 'local_assignment'}:
+            if not kinds <= {'node_assignment', 'task', 'local_workflow', 'local_confirmation', 'local_assignment', 'sop_task'}:
                 raise HTTPException(422, '工作來源錯誤')
             items = [i for i in items if i['kind'] in kinds]
         if params.get('deadline') == 'unscheduled':
@@ -312,6 +308,7 @@ class HomePanels:
         complete = reason is None and all(s['readState'] in ('complete', 'stale') for s in states.values())
         counts = {name: sum(i['kind'] == kind for i in items) if reason is None and (name not in states or states[name]['readState'] != 'read_failed') else None
                   for name, kind in (('node_assignments', 'node_assignment'), ('tasks', 'task'), ('local_workflow', 'local_workflow'))}
+        counts['sop_tasks'] = sum(i['kind'] == 'sop_task' for i in items)
         counts.update(count_scope='viewer_visible', complete=complete)
         # Task visibility can depend on a node relation, so a failed N read cannot prove T counts.
         if states.get('node_assignments', {}).get('readState') == 'read_failed' and scope_name == 'team':
@@ -342,15 +339,29 @@ class HomePanels:
 
     def read_workspace(self, request, data, user):
         with self.sessions() as db:
-            state = self.load(db, db.get(self.workspace_model, data['wid']))
+            row = db.get(self.workspace_model, data['wid'])
+            state = self.load(db, row, collections=('users', 'projects'))
+            params = request.query_params
+            panel = 'completed' if params.get('status') == 'done' else params.get('panel', 'assigned')
+            sop_only = params.get('kinds') == 'sop_task'
+            if not sop_only and not (panel == 'assigned' and self.assignment_unavailable(state, data)):
+                omitted = ('project_comments', 'work_schedules', 'recurring', 'daily_unmatched', 'daily_reviews')
+                # Assigned shows Lark work and separate LocalTask rows only. Native
+                # task trees are needed here solely for verifying an applied skip.
+                if panel == 'assigned' and not state.get('node_skip_requests'):
+                    omitted += ('tasks', 'review_cycles', 'events', 'project_files', 'project_evidence',
+                                'project_finance_versions', 'project_payment_batches', 'project_delivery_batches')
+                if self.assignment_unavailable(state, data):
+                    omitted += ('project_daily_reports',)
+                state = self.load(db, row, omit_kinds=omitted)
         return self.read(request, data, user, state)
 
     def read(self, request, data, user, state):
         return self.query(state, data, user, dict(request.query_params))
 
 
-def register(app, *, identity, load, sessions, workspace_model, nodes):
-    service = HomePanels(nodes)
+def register(app, *, identity, load, sessions, workspace_model, nodes, sop=None):
+    service = HomePanels(nodes, sop)
     service.sessions, service.load, service.workspace_model = sessions, load, workspace_model
     @app.get('/api/home-panels')
     def panels(request: Request):

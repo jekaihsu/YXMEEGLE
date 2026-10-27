@@ -287,6 +287,13 @@ def seats(p,n):
     if n['key'] in TECHNICAL: result['supervisor']=n.get('supervisor_id') or p.get('supervisor_id','')
     return result
 
+def require_review_seats(ws,p,n):
+    targets=seats(p,n); require(targets and all(targets.values()),'確認人尚未完整分派',409)
+    for ident in targets.values(): active_user(ws,ident)
+    if n['key'] in FINANCIAL: require(len(set(targets.values()))==2,'PM 與行政必須是兩位不同的人',409)
+    else: require(len(set(targets.values()))==len(targets),'不同確認職責須由不同人擔任；負責人不可兼主管確認',409)
+    return targets
+
 def can_vote(ws,user,p,seat,representative):
     active_user(ws,representative)
     if user['id']==representative: return True
@@ -324,10 +331,7 @@ def submit_review(ws,user,p,n):
     current=next((c for c in reversed(n['review_cycles']) if c['status']=='pending'),None)
     fingerprint=review_hash(p,n)
     if current and current['content_hash']==fingerprint: return current
-    targets=seats(p,n); require(targets and all(targets.values()),'確認人尚未完整分派',409)
-    for ident in targets.values(): active_user(ws,ident)
-    if n['key'] in FINANCIAL: require(len(set(targets.values()))==2,'PM 與行政必須是兩位不同的人',409)
-    else: require(len(set(targets.values()))==len(targets),'不同確認職責須由不同人擔任；負責人不可兼主管確認',409)
+    targets=require_review_seats(ws,p,n)
     invalidate(n,'重新送審')
     cycle=dict(id=uid(),status='pending',content_hash=fingerprint,mode='all' if n['key'] in FINANCIAL else n['review_mode'],seats=targets,votes=[],created_at=now(),submitted_by=user['id'],rule_version=p['sop_version'])
     n['review_cycles'].append(cycle); return cycle
@@ -374,6 +378,8 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
     validate_action(body)
     """Returns False for legacy task actions, True for handled actions."""
     upgrade(ws); action=body['action']; data=body.get('payload') or {}
+    from .report_link_review import LINK_ACTIONS,apply_review
+    if action in LINK_ACTIONS: return apply_review(ws,user,body)
     from .case_cutover import resolve_action_projects,require_execution
     for target in resolve_action_projects(ws,body):require_execution(ws,target)
     if action in ('input_mapping','input_draft','input_submit'):
@@ -413,6 +419,10 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         ident=str(data.get('id','')).strip(); require(bool(ident),'請提供已核對的 Lark open_id 或測試人員識別',422)
         target=next((x for x in ws['users'] if x['id']==ident),None)
         require(demo or target is not None,'正式人員須由已核實的公司名冊建立，不能手填帳號造人',403)
+        if 'expected_authz_version' in data:
+            # A person edit conflicts only with another change to this person, not with unrelated workspace writes.
+            require(type(data['expected_authz_version']) is int,'人員版本格式錯誤',422)
+            require((target or {}).get('authz_version',0)==data['expected_authz_version'],'這位人員的資料剛被其他人更新，請重新整理後再編輯',409)
         role=data.get('role',(target or {}).get('role','member')); require(role in ('manager','pm','member'),'角色錯誤',422)
         if role=='manager' or (target or {}).get('role')=='manager': require(user['role']=='manager','只有最高管理員可以調整管理員身分',403)
         caps=list(dict.fromkeys(data.get('capabilities',(target or {}).get('capabilities',[])))); require(set(caps)<=set(CAPABILITIES),'未知操作權限',422)
@@ -842,22 +852,6 @@ def apply_operation(ws,user,body,demo=False,cfg=None):
         require(data.get('result') in ('accepted','returned') and data.get('evidence'),'需核准或退回及依據',422)
         entry.update(status=data['result'],reviewed_by=user['id'],reviewed_at=now(),review_evidence=data['evidence'])
         if data['result']=='accepted': r['due_date']=next_due(r['kind'],now()[:10],ws)
-    elif action=='daily_propose':
-        from .v4_sources import daily_source_version,daily_mapping_version
-        require(p is not None,'請指定案件',422); ident=data.get('daily_id')
-        entry=next((d for d in daily_entries(ws) if d['id']==ident),None); require(entry,'日報不存在',404)
-        require(lead(user,p) or user['id'] in entry.get('source_actor_ids',[]),'需由已核實日報填報人或案件主管補充關聯')
-        require(data.get('reason'),'需填核對依據',422)
-        require(not entry.get('source_missing'),'來源日報目前不存在，不能新增配對核准',409)
-        ws['daily_reviews'].append(dict(id=uid(),daily_id=ident,project_id=p['id'],source_fields=deepcopy(entry.get('source_fields',{})),source_version=daily_source_version(entry),mapping_version=daily_mapping_version(entry),entry=deepcopy(entry),reason=data['reason'],requested_by=user['id'],status='pending'))
-    elif action=='daily_approve':
-        from .v4_sources import daily_mapping_version,review_mapping_version
-        require(capable(user,'review_mapping')); r=find(ws['daily_reviews'],data.get('id')); require(r['status']=='pending','已核對',409); p=find(ws['projects'],r['project_id'])
-        current=[d for d in daily_entries(ws) if d['id']==r['daily_id']]
-        require(len(current)==1 and not current[0].get('source_missing') and daily_mapping_version(current[0])==review_mapping_version(r),'日報來源關聯已變更或不存在，請重新提出配對核對',409)
-        for project in loaded_projects(ws): project['daily_reports']=[d for d in project['daily_reports'] if d['id']!=r['daily_id']]
-        ws['daily_unmatched']=[d for d in ws['daily_unmatched'] if d['id']!=r['daily_id']]
-        entry=deepcopy(current[0]); entry.update(case_code=p['code'],match_basis='manual_review',case_mapping_status='matched'); p['daily_reports'].append(entry); r.update(status='approved',approved_by=user['id'],approved_at=now())
     elif action=='handover_request':
         require(p and lead(user,p)); active_user(ws,data.get('to_id')); active_user(ws,data.get('from_id')); require(data.get('reason'),'請填交接原因',422)
         ws['handover_requests'].append(dict(id=uid(),project_id=p['id'],from_id=data['from_id'],to_id=data['to_id'],reason=data['reason'],status='pending',requested_by=user['id']))

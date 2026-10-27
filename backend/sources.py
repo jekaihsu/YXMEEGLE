@@ -4,6 +4,7 @@ import json
 import os
 import time
 import unicodedata
+from functools import lru_cache
 from threading import Lock
 from copy import deepcopy
 from contextlib import nullcontext
@@ -255,9 +256,14 @@ def number(value):
     if isinstance(value,(list,dict)): value=text(value)
     try: return float(value) if value not in ('',None) else None
     except (ValueError,TypeError): return None
-def normalized_case(value):
+@lru_cache(maxsize=4096)
+def _normalized_case_text(value):
     # Strip only spacing/format characters; never truncate suffixes or infer similar codes.
-    return ''.join(c for c in text(value) if unicodedata.category(c)!='Cf').strip()
+    return ''.join(c for c in value if unicodedata.category(c)!='Cf').strip()
+
+def normalized_case(value):
+    # Lark formulas can be mutable lists/dicts; cache only their current text.
+    return _normalized_case_text(text(value))
 def day(value, *, formula_serial=False):
     # A formula returning a date may expose the spreadsheet serial-day number
     # (unlike a native Date field's Unix milliseconds). Enable this only for

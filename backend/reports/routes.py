@@ -6,6 +6,7 @@ import re
 import unicodedata
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 from .compute import TZ, monday, UnknownStatus, CaseNotFound
 from .home import compose
 from .reader import LarkReader
@@ -81,7 +82,7 @@ def parameters(endpoint, query):
     return p
 
 
-def register(app, identity, cfg=None, *, reader=None, authorize=None, live_enabled=None, allow=None):
+def register(app, identity, cfg=None, *, reader=None, authorize=None, live_enabled=None, allow=None, links=None):
     cfg=os.environ if cfg is None else cfg
     store=SnapshotStore(reader or LarkReader(cfg),cfg)
     ensure_visible_logs()
@@ -103,26 +104,31 @@ def register(app, identity, cfg=None, *, reader=None, authorize=None, live_enabl
         if allow is not None and not allow(data,user): raise HTTPException(403,'需要 PM 或主管權限查看週報')
         return data,user
     def handler(endpoint):
-        def read(request: Request):
+        def result(data,user,params,snapshot):
+            if endpoint=='home':
+                body=compose(lambda name,p:store.result(name,p,snapshot=snapshot),store.meta(snapshot),parameters('review',{})['week'])
+            else: body=store.result(endpoint,params,snapshot=snapshot)
+            if endpoint=='progress' and links is not None:
+                from .compute import attach_local_bridges
+                body=attach_local_bridges(body,links(data,user))
+            if endpoint=='progress':
+                body['meta']['can_refresh']=False
+                if authorize is not None and live_enabled is not None and live_enabled(data['wid']):
+                    try:
+                        authorize(data['wid'],'sources',user)
+                        body['meta']['can_refresh']=True
+                    except HTTPException:
+                        pass
+            return JSONResponse(body,headers={'Cache-Control':'no-store'})
+        async def read(request: Request):
             try:
-                data,user=gate(request)
+                data,user=await run_in_threadpool(gate,request)
                 try:
                     params=parameters(endpoint,request.query_params)
-                    if endpoint=='home':
-                        snapshot=store.get()
-                        result=compose(lambda name,p:store.result(name,p,snapshot=snapshot),store.meta(snapshot),parameters('review',{})['week'])
-                    else: result=store.result(endpoint,params)
+                    snapshot=await store.aget()
+                    return await run_in_threadpool(result,data,user,params,snapshot)
                 except UnknownStatus as exc: raise HTTPException(422,str(exc)) from None
                 except CaseNotFound: raise HTTPException(404,'case_not_found') from None
-                if endpoint=='progress':
-                    result['meta']['can_refresh']=False
-                    if authorize is not None and live_enabled is not None and live_enabled(data['wid']):
-                        try:
-                            authorize(data['wid'],'sources',user)
-                            result['meta']['can_refresh']=True
-                        except HTTPException:
-                            pass
-                return JSONResponse(result,headers={'Cache-Control':'no-store'})
             except HTTPException as exc:
                 return JSONResponse(exc.detail if isinstance(exc.detail,dict) else {'detail':str(exc.detail)},status_code=exc.status_code,headers={'Cache-Control':'no-store',**(exc.headers or {})})
         read.__name__='reports_'+endpoint.replace('/','_')

@@ -5,10 +5,11 @@ import type {Ctx} from './appCommon';
 
 export const HOME_PANELS = ['assigned', 'proxy', 'confirmation', 'delegated', 'completed', 'local'] as const;
 export type HomePanel = typeof HOME_PANELS[number];
+export const HOME_KINDS = ['node_assignment','task','local_workflow','local_confirmation','local_assignment','sop_task'] as const;
 export type HomePerson = {id:string; name:string; avatar_url:string|null};
-export type HomeTarget = {view:'project'; project:string; tab:'flow'; node?:string; task?:string; assignment_node?:string; assignment_task?:string};
+export type HomeTarget = {view:'project'; project:string; tab:'flow'; node?:string; task?:string; assignment_node?:string; assignment_task?:string; task_source?:'sop_local'; section?:string};
 export type HomeItem = {
- id:string; kind:string; origin:'lark'|'local_workflow'; title:string; status:string; source_status:string|null;
+ id:string; kind:typeof HOME_KINDS[number]; origin:'lark'|'local_workflow'|'sop_local'; title:string; status:string; source_status:string|null;
  case:{id:string|null; code:string|null; name:string|null; relation_state:string};
  assignees:HomePerson[]; assigned_by:HomePerson|null; assignment_state:string;
  deadline:string|null; next_due:string|null; original_deadline:string|null; deadline_basis:string;
@@ -20,7 +21,7 @@ export type HomeItem = {
 export type HomeResponse = {
  panel:HomePanel; scope:'mine'|'team'; readState:string; snapshot_version:string; as_of:string|null;
  freshness:{status:string; last_success_at:string|null; refreshing:boolean};
- counts:{node_assignments:number|null; tasks:number|null; local_workflow:number|null; complete:boolean};
+ counts:{node_assignments:number|null; tasks:number|null; local_workflow:number|null; sop_tasks?:number|null; complete:boolean};
  items:HomeItem[]; next_cursor:string|null; has_more:boolean; complete:boolean; total_count:number|null;
  manager_view_available:boolean|null;
 };
@@ -41,7 +42,7 @@ const count = (v:unknown):v is number|null => v === null || (typeof v === 'numbe
 const person = (v:unknown):v is HomePerson => object(v) && typeof v.id === 'string' && typeof v.name === 'string' && nullableText(v.avatar_url);
 function target(v:unknown):v is HomeTarget {
  return object(v) && v.view === 'project' && typeof v.project === 'string' && v.tab === 'flow' &&
-  ['node','task','assignment_node','assignment_task'].every(key => v[key] === undefined || typeof v[key] === 'string');
+  ['node','task','assignment_node','assignment_task','section'].every(key => v[key] === undefined || typeof v[key] === 'string') && (v.task_source === undefined || v.task_source === 'sop_local');
 }
 function children(v:unknown):boolean {
  return v === undefined || (Array.isArray(v) && v.every(child=>object(child) && ['id','title','status','detail'].every(key=>typeof child[key]==='string') && nullableText(child.deadline) && (child.assignee===null || person(child.assignee))));
@@ -54,33 +55,34 @@ function homeDetail(v:unknown):boolean {
 }
 function item(v:unknown):v is HomeItem {
  return object(v) && ['id','kind','title','status','assignment_state','deadline_basis'].every(key => typeof v[key] === 'string') &&
-  (v.origin === 'lark' || v.origin === 'local_workflow') && nullableText(v.source_status) &&
+  HOME_KINDS.some(kind=>kind===v.kind) && (v.origin === 'lark' || v.origin === 'local_workflow' || v.origin === 'sop_local') && nullableText(v.source_status) &&
   object(v.case) && nullableText(v.case.id) && nullableText(v.case.code) && nullableText(v.case.name) && typeof v.case.relation_state === 'string' &&
   Array.isArray(v.assignees) && v.assignees.every(person) && (v.assigned_by === null || person(v.assigned_by)) &&
   nullableText(v.deadline) && nullableText(v.next_due) && nullableText(v.original_deadline) &&
   typeof v.can_execute === 'boolean' && typeof v.overdue === 'boolean' && typeof v.due_today === 'boolean' &&
   Array.isArray(v.blocked_reasons) && v.blocked_reasons.every(r => typeof r === 'string') && nullableText(v.detail) &&
-  (v.target === null || target(v.target)) && homeDetail(v.home_detail) && children(v.children);
+  (v.target === null || target(v.target)) &&
+  (v.kind !== 'sop_task' || v.origin === 'sop_local' && target(v.target) && v.target.task_source === 'sop_local' && typeof v.target.task === 'string') && homeDetail(v.home_detail) && children(v.children);
 }
 export function parseHomeResponse(v:unknown):HomeResponse {
  const panel=object(v) ? HOME_PANELS.find(p=>p===v.panel) : undefined;
  if (!object(v) || !panel || (v.scope !== 'mine' && v.scope !== 'team') ||
   typeof v.readState !== 'string' || typeof v.snapshot_version !== 'string' || !nullableText(v.as_of) || (v.as_of!==null && !Number.isFinite(Date.parse(v.as_of))) ||
   !object(v.freshness) || typeof v.freshness.status !== 'string' || !nullableText(v.freshness.last_success_at) || typeof v.freshness.refreshing !== 'boolean' ||
-  !object(v.counts) || !count(v.counts.node_assignments) || !count(v.counts.tasks) || !count(v.counts.local_workflow) || typeof v.counts.complete !== 'boolean' ||
+  !object(v.counts) || !count(v.counts.node_assignments) || !count(v.counts.tasks) || !count(v.counts.local_workflow) || (v.counts.sop_tasks !== undefined && !count(v.counts.sop_tasks)) || typeof v.counts.complete !== 'boolean' ||
   !Array.isArray(v.items) || !v.items.every(item) || !nullableText(v.next_cursor) || typeof v.has_more !== 'boolean' ||
   typeof v.complete !== 'boolean' || !count(v.total_count) || (v.manager_view_available !== null && typeof v.manager_view_available !== 'boolean')) {
   throw new Error('工作資料格式待核對');
  }
  return {...v, panel, scope:v.scope, readState:v.readState, snapshot_version:v.snapshot_version, as_of:v.as_of,
   freshness:{status:v.freshness.status,last_success_at:v.freshness.last_success_at,refreshing:v.freshness.refreshing},
-  counts:{node_assignments:v.counts.node_assignments,tasks:v.counts.tasks,local_workflow:v.counts.local_workflow,complete:v.counts.complete},
+  counts:{node_assignments:v.counts.node_assignments,tasks:v.counts.tasks,local_workflow:v.counts.local_workflow,sop_tasks:v.counts.sop_tasks===undefined?0:v.counts.sop_tasks,complete:v.counts.complete},
   items:v.items,next_cursor:v.next_cursor,has_more:v.has_more,complete:v.complete,total_count:v.total_count,manager_view_available:v.manager_view_available};
 }
 export function homePanelUrl(query:HomeQuery, full=false) {
  const params = new URLSearchParams({sort:'urgency',limit:String(query.limit ?? (full ? 50 : 25))});
  for (const [key,value] of Object.entries(query)) if (value !== undefined && value !== '') params.set(key,String(value));
- if (full && query.panel==='assigned') params.set('kinds',query.kinds ?? 'node_assignment,task');
+ if (full && query.panel==='assigned') params.set('kinds',query.kinds ?? 'node_assignment,task,sop_task');
  return `${full ? '/api/my-work' : '/api/home-panels'}?${params}`;
 }
 export function useHomePanels(c:Ctx, query:HomeQuery, enabled=true, full=false):PanelRead {
@@ -117,7 +119,8 @@ export function useHomePanels(c:Ctx, query:HomeQuery, enabled=true, full=false):
   const visible = () => {if(document.visibilityState==='visible')load()};
   document.addEventListener('visibilitychange',visible);
   return () => {disposed=true;controller?.abort();window.clearInterval(timer);document.removeEventListener('visibilitychange',visible)};
- }, [key,url,scope,enabled,c.reloadVersion,c.w.version]);
+ }, [key,url,scope,enabled,c.reloadVersion??c.w.version]);
+ if(!enabled)return {body:null,pending:false,error:null};
  const read=state.key===key?state.read:{body:cachedSnapshot(key) ?? (state.scope===scope?state.read.body:null),pending:true,error:null};
  return query.q===search?read:{...read,pending:true};
 }

@@ -214,12 +214,8 @@ def filter_private_workspace(state, user, *, task_details=True):
     for item in state.get('events', []):
         if isinstance(item, dict) and item.get('action') == 'admin_person':
             _sanitize_person_event(item)
-    from .operations import capable
-    may_manage_people=bool(actor and capable(actor,'manage_people'))
     for person in state.get('users', []):
         safe = public_person(person, include_authority=person.get('id') == ident)
-        if may_manage_people:
-            safe['capabilities']=deepcopy(person.get('capabilities',[]))
         person.clear()
         person.update(safe)
     return state

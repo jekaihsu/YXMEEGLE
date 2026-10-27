@@ -5,11 +5,12 @@ export const NODE_ASSIGNMENT_ORDER = ['sales', 'pm', 'confirmation', 'field', 'c
 export const PRODUCTION_NODE_KEYS = ['field','control','mapping','report'] as const;
 export const FINISHED_NODE_STATES: readonly string[] = ['已完成','略過'];
 export const isProductionNode = (key: string): key is typeof PRODUCTION_NODE_KEYS[number] => PRODUCTION_NODE_KEYS.some(value => value === key);
-export type NodeAction = 'claim' | 'assign' | 'complete' | 'approve' | 'reject' | 'create_task';
+export type NodeAction = 'claim' | 'assign' | 'complete' | 'approve' | 'reject' | 'create_task' | 'legacy_complete';
 export type NodePermissions = Partial<Record<NodeAction, boolean>>;
 export interface AssignmentPerson {open_id: string; name: string; avatar_url?: string}
 export interface AssignablePerson extends AssignmentPerson {departments: string[]}
 export interface AutoDone {rule: string; reason: string}
+export interface LegacyCompletion {actor: AssignmentPerson; at: string; reason: string}
 export type WorkItemStatus = 'done' | 'partial' | 'no_signal';
 export interface WorkItem {
   code: string | null; name: string | null; planned_qty: string | null; planned_points: string | null; remaining_points: string | null;
@@ -30,6 +31,7 @@ export interface AssignmentNode {
   owners: AssignmentPerson[]; assigned_by: AssignmentPerson | null; approver: AssignmentPerson | null;
   approved_at: string | null; reject_reason: string | null; deadline: string | null; warnings: string[];
   auto_done?: AutoDone | null;
+  legacy_completion?: LegacyCompletion | null;
   evidence?: NodeEvidence | null; can_submit_hint?: boolean;
   next_due?: string | null; deadline_basis?: string; assignment_key?: string | null; origin?: 'lark';
 }
@@ -49,9 +51,9 @@ export interface NewAssignmentTask {title: string; detail: string; assignee_open
 export type AssignmentMutation =
   | {action: 'claim' | 'complete' | 'approve'; nodeKey: string; expected_revision: string | null}
   | {action: 'assign'; nodeKey: string; owner_open_ids: string[]; expected_revision: string | null}
-  | {action: 'reject'; nodeKey: string; reason: string; expected_revision: string | null}
+  | {action: 'reject' | 'legacy_complete'; nodeKey: string; reason: string; expected_revision: string | null}
   | {action: 'create_task'; nodeKey: string; task: NewAssignmentTask}
-  | {action: 'update_task'; nodeKey: string; taskId: string; expected_revision: string; patch: Partial<Pick<NewAssignmentTask, 'assignee_open_id' | 'deadline' | 'detail'>> & {status?: string}};
+  | {action: 'update_task'; nodeKey: string; taskId: string; expected_revision: string; patch: Partial<Pick<NewAssignmentTask, 'title' | 'detail'>> & {status?: string; assignee_open_id?:string|null; deadline?:string|null}};
 
 const NODE_LABELS: Record<string, string> = {
   not_started: '未開始', pending: '待處理', in_progress: '進行中', pending_review: '待審核', completed: '已完成', skipped: '略過',
@@ -83,6 +85,11 @@ function autoDone(value: unknown): AutoDone | null {
   if (value == null) return null;
   const a = record(value);
   return {rule: text(a.rule), reason: text(a.reason)};
+}
+function legacyCompletion(value: unknown): LegacyCompletion | null {
+  if (value == null) return null;
+  const c = record(value);
+  return {actor: person(c.actor), at: text(c.at), reason: text(c.reason)};
 }
 function optionalCount(value: unknown): number | null {return value == null ? null : count(value)}
 function decimalText(value: unknown): string | null {return isPlainDecimal(value) ? value : null}
@@ -127,6 +134,7 @@ function node(value: unknown): AssignmentNode {
     assigned_by: optionalPerson(n.assigned_by), approver: optionalPerson(n.approver), approved_at: optionalText(n.approved_at),
     reject_reason: optionalText(n.reject_reason), deadline: optionalText(n.deadline), warnings: array(n.warnings, text),
     ...('auto_done' in n ? {auto_done: autoDone(n.auto_done)} : {}),
+    ...('legacy_completion' in n ? {legacy_completion: legacyCompletion(n.legacy_completion)} : {}),
     ...('evidence' in n ? {evidence: evidence(n.evidence), can_submit_hint: n.can_submit_hint === true} : {}),
     ...('next_due' in n ? {next_due: optionalText(n.next_due)} : {}),
     ...('assignment_key' in n ? {assignment_key: optionalText(n.assignment_key)} : {}),
@@ -142,7 +150,7 @@ function task(value: unknown): AssignmentTask {
 }
 function permissions(value: unknown): NodePermissions {
   const p = record(value);
-  return {claim: p.claim === true, assign: p.assign === true, complete: p.complete === true, approve: p.approve === true, reject: p.reject === true, create_task: p.create_task === true};
+  return {claim: p.claim === true, assign: p.assign === true, complete: p.complete === true, approve: p.approve === true, reject: p.reject === true, create_task: p.create_task === true, legacy_complete: p.legacy_complete === true};
 }
 function taskPermissions(value: unknown): AssignmentTask['can'] {
   const p = record(value);
@@ -229,7 +237,8 @@ export async function mutateNodeAssignment(projectId: string, mutation: Assignme
   let url: string, body: object, method = 'POST';
   switch (mutation.action) {
     case 'assign': url = `${nodePath}/assign`; body = {owner_open_ids: mutation.owner_open_ids}; break;
-    case 'reject': url = `${nodePath}/reject`; body = {reason: mutation.reason}; break;
+    case 'reject':
+    case 'legacy_complete': url = `${nodePath}/${mutation.action}`; body = {reason: mutation.reason}; break;
     case 'create_task': url = `${nodePath}/tasks`; body = Object.fromEntries(Object.entries(mutation.task).filter(([key, value]) => key === 'title' || value !== '')); break;
     case 'update_task': url = `${nodePath}/tasks/${encodeURIComponent(mutation.taskId)}`; body = mutation.patch; method = 'PATCH'; break;
     default: url = `${nodePath}/${mutation.action}`; body = {};

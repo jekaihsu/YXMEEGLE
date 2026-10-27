@@ -5,12 +5,13 @@ export const HOME_VIEWS={mine:{label:'我的工作'},assign:{label:'分配工作
 export type HomeViewId=keyof typeof HOME_VIEWS;
 export const HOME_SECTIONS={todo:{label:'需要處理',hint:'需要你決定或追蹤的項目'},quality:{label:'品質',hint:'PM 週報 · 檢核品質'},business:{label:'業務',hint:'PM 週報 · 請款與應收'},progress:{label:'進度',hint:'預排達成與各組工作概況'},resources:{label:'資源',hint:'PM 週報 · 儀器與車輛'},people:{label:'人',hint:'本週出勤與人員工作安排'},shortcuts:{label:'捷徑',hint:'開啟完整管理頁面'}} as const;
 export type HomeSectionId=keyof typeof HOME_SECTIONS;
-export const SECTION_ORDER:Record<HomeViewId,HomeSectionId[]>={mine:['todo','people'],assign:['people','todo'],company:['todo','quality','business','progress','resources','people','shortcuts']};
+export const SECTION_ORDER:Record<HomeViewId,HomeSectionId[]>={mine:['todo'],assign:['people','todo'],company:['todo','quality','business','progress','resources','people','shortcuts']};
 type CardDefinition={section:HomeSectionId|null;title:string;description:string;views:HomeViewId[];kind:'kpi'|'table'|'chart'};
 const reportCards=Object.fromEntries(Object.entries(REPORT_CARDS).map(([id,card])=>[id,{...card,views:['company'],kind:'chart'}])) as {[K in keyof typeof REPORT_CARDS]:typeof REPORT_CARDS[K]&{views:['company'];kind:'chart'}};
 export const HOME_CARDS={
  ...reportCards,
  dispatch:{section:'todo',title:'派工看板',description:'本週待派與重疊預排，保留來源缺口',views:['mine','assign','company'],kind:'table'},
+ mycases:{section:'todo',title:'我的案件',description:'你負責、釘選或有你任務的案件',views:['mine'],kind:'table'},
  kpi:{section:null,title:'工作摘要',description:'目前視圖的重點數字',views:['mine', 'assign', 'company'],kind:'kpi'},
  work:{section:'todo',title:'我的工作',description:'依急迫程度排序的工作與期限',views:['mine', 'assign'],kind:'table'},
  confirmation:{section:'todo',title:'待我確認',description:'需要你覆核或確認的事項',views:['mine', 'company'],kind:'table'},
@@ -31,15 +32,14 @@ export type HomeCardId=keyof typeof HOME_CARDS;
 export type HomeLayout={order:HomeCardId[];hidden:HomeCardId[]};
 export type HomeSettings={version:2;view:HomeViewId|null;layouts:Record<HomeViewId,HomeLayout>};
 export const DEFAULT_LAYOUT:Record<HomeViewId,HomeLayout>={
- mine:{order:['kpi','work','confirmation','deadlines','leave','trips','dispatch'],hidden:[]},
+ mine:{order:['mycases','work'],hidden:[]},
  assign:{order:['kpi','allocation','workload','delegated','absence','impact','work','dispatch'],hidden:[]},
  company:{order:['kpi','attention','confirmation','cases','qualityTrend','qualityGroups','funnel','receivables','achievement','statuses','groups','instruments','vehicles','leave','trips','absence','links','dispatch'],hidden:[]},
 };
 type PersonaUser={role?:string|null;department?:string|null}|null|undefined;
 const companyPersona=(user:PersonaUser)=>!!user&&(user.role==='pm'||user.role==='manager'||/專案|PM|業務|管理/i.test(user.department||''));
 export function availableViews(user:PersonaUser,managerViewAvailable:boolean|null):HomeViewId[]{
- if(companyPersona(user))return ['company','assign','mine'];
- return managerViewAvailable===true?['assign','mine']:['mine'];
+ return ['mine'];
 }
 export function resolvePersona(user:PersonaUser,managerViewAvailable:boolean|null):HomeViewId{return availableViews(user,managerViewAvailable)[0]}
 export function defaultHomeLayout(view:HomeViewId='mine'):HomeLayout{return {order:[...DEFAULT_LAYOUT[view].order],hidden:[...DEFAULT_LAYOUT[view].hidden]}}

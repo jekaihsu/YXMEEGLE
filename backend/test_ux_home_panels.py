@@ -21,6 +21,7 @@ def home():
     nodes = NodeAssignmentService(cfg, sessions=None, receipt_model=None, audit_model=None, skipped_nodes=lambda *_: False,
                                   transport=httpx.MockTransport(fake), clock=lambda: clock[0],
                                   client_options={'token_cache': TenantTokenCache(), 'bucket': NoBucket(), 'sleep': lambda _: None})
+    nodes.legacy_completions = lambda *_: {}
     service = HomePanels(nodes)
     p = dict(project(), name='真實格式測試案', source_kind='lark', case_visibility='source_reference')
     for node in p['nodes']:
@@ -46,7 +47,7 @@ def test_member_keeps_waiting_and_separate_grains(home):
     n = node(home)
     t = task(home, n, 截止日=int((T0 - 86400) * 1000))
     result = home.read()
-    assert result['counts'] == {'node_assignments': 1, 'tasks': 1, 'local_workflow': 0, 'count_scope': 'viewer_visible', 'complete': True}
+    assert result['counts'] == {'node_assignments': 1, 'tasks': 1, 'local_workflow': 0, 'sop_tasks': 0, 'count_scope': 'viewer_visible', 'complete': True}
     rows = {i['source']['record_id']: i for i in result['items']}
     assert rows[n]['deadline'] == '2026-09-20'
     assert rows[n]['next_due'] == '2026-09-20'
@@ -272,7 +273,8 @@ def test_production_evidence_moves_a_node_to_in_progress_on_the_home_panels_too(
         node(home, label, owner='ou_sales', 狀態='已完成', 核准人=[{'id': 'ou_vp'}], 核准時間=int(T0 * 1000))
     rid = node(home, '外業')
     before = next(r for r in home.read()['items'] if r['source']['record_id'] == rid)
-    p['daily_reports'] = [{'id': 'd1', 'date': '2026-10-08', 'department': '外業組', 'points': 1}]
+    p['daily_reports'] = [{'id': 'd1', 'date': '2026-10-08', 'department': '外業組', 'points': 1,
+        'case_mapping_status': 'matched', 'match_basis': 'source_case_or_link'}]
     home.clock[0] += 1000
     after = next(r for r in home.read()['items'] if r['source']['record_id'] == rid)
     assert (before['derived_status'], after['derived_status']) == ('todo', 'in_progress')

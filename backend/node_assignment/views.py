@@ -12,7 +12,7 @@ PRODUCTION_KEYS = frozenset({NodeKey.FIELD, NodeKey.CONTROL, NodeKey.MAPPING, No
 # A 可送審 hint only makes sense while the work is still open; a submitted or finished node needs none.
 SUBMITTABLE = frozenset({NodeStatus.TODO, NodeStatus.IN_PROGRESS})
 NO_ACTIONS = {'claim': False, 'assign': False, 'complete': False, 'approve': False, 'reject': False,
-              'create_task': False}
+              'create_task': False, 'legacy_complete': False}
 
 
 def _user(ref):
@@ -86,34 +86,43 @@ def task_sort_key(task: TaskRow, now_ms):
     return (not overdue, task.deadline is None, task.deadline or '', priority[task.status], task.record_id)
 
 
-def _can(actor, key, status, snapshot, writes_enabled, auto=None):
+def _can(actor, key, status, snapshot, writes_enabled, auto=None, *, case_policy=None,
+         legacy_writes_enabled=False, legacy_completed=False):
     rows = snapshot.rows.get(key, ())
-    if not writes_enabled or len(rows) > 1 or auto:
+    if len(rows) > 1 or auto:
         return dict(NO_ACTIONS)
     owners = frozenset(u.open_id for u in rows[0].owners) if rows else frozenset()
-    return {action.value: ok for action, ok in node_permissions(actor, key, status, owners).items()}
+    return {action.value: ok and (legacy_writes_enabled if action.value == 'legacy_complete' or
+            action.value == 'reject' and legacy_completed and case_policy == 'legacy' else writes_enabled)
+            for action, ok in node_permissions(actor, key, status, owners, case_policy=case_policy,
+                                               legacy_completed=legacy_completed).items()}
 
 
-def case_view(snapshot: CaseSnapshot, skipped, actor, writes_enabled, now_ms, evidence=None):
+def case_view(snapshot: CaseSnapshot, skipped, actor, writes_enabled, now_ms, evidence=None, *,
+              case_policy=None, legacy_writes_enabled=False, legacy_completions=None):
     evidence = evidence or {}
+    legacy_completions = legacy_completions or {}
     done, found = auto_done(evidence), signals(evidence)
-    statuses = derive_chain(facts_of(snapshot, skipped, evidence))
-    without = derive_chain(facts_of(snapshot, skipped, done))
+    statuses = derive_chain(facts_of(snapshot, skipped, evidence, legacy_completions))
+    without = derive_chain(facts_of(snapshot, skipped, done, legacy_completions))
     by_data = {key: statuses[key] is NodeStatus.IN_PROGRESS and without[key] is not NodeStatus.IN_PROGRESS for key in CHAIN}
     summary = summarize(statuses)
     return statuses, {
         'code': snapshot.code,
         'summary': {'done': summary.done, 'total': summary.total,
                     'current_node': summary.current_node.value if summary.current_node else None},
-        'nodes': [node_view(key, snapshot, statuses[key], now_ms, done.get(key), found.get(key), by_data[key])
+        'nodes': [{**node_view(key, snapshot, statuses[key], now_ms, done.get(key), found.get(key), by_data[key]),
+                   'legacy_completion': legacy_completions.get(key)}
                   for key in CHAIN],
-        'can': {key.value: _can(actor, key, statuses[key], snapshot, writes_enabled, done.get(key)) for key in CHAIN},
+        'can': {key.value: _can(actor, key, statuses[key], snapshot, writes_enabled, done.get(key),
+                              case_policy=case_policy, legacy_writes_enabled=legacy_writes_enabled,
+                              legacy_completed=key in legacy_completions) for key in CHAIN},
         'warnings': list(snapshot.warnings),
     }
 
 
-def node_detail(snapshot: CaseSnapshot, skipped, actor, roster, key: NodeKey, writes_enabled, now_ms, evidence=None):
-    statuses, case = case_view(snapshot, skipped, actor, writes_enabled, now_ms, evidence)
+def node_detail(snapshot: CaseSnapshot, skipped, actor, roster, key: NodeKey, writes_enabled, now_ms, evidence=None, **policy):
+    statuses, case = case_view(snapshot, skipped, actor, writes_enabled, now_ms, evidence, **policy)
     status = statuses[key]
     tasks = []
     for task in sorted(snapshot.node_tasks(key), key=lambda t: task_sort_key(t, now_ms)):

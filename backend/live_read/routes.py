@@ -1,4 +1,5 @@
 """Authenticated freshness reads and permission-preserving refresh triggers."""
+import logging
 from typing import Literal
 
 from fastapi import HTTPException, Request
@@ -15,23 +16,47 @@ class RefreshRequest(BaseModel):
 def refresh(coordinator, wid, datasets, *, wait=False, force=False):
     """Share response semantics between the live and legacy manual endpoints."""
     previous = coordinator.status(wid)['datasets']
-    if force and any(previous[d]['status'] == 'refreshing' for d in datasets):
+    if force and not wait and any(previous[d]['status'] == 'refreshing' for d in datasets):
         raise HTTPException(409, '資料正在重新讀取，請稍後再試')
+    timed_out = False
+    results = []
     try:
-        results = [coordinator.ensure(wid, d, wait=wait, force=force) for d in datasets]
-    except Exception:
-        return JSONResponse({'detail': 'Lark 資料暫時無法讀取',
+        for dataset in datasets:
+            try:
+                results.append(coordinator.ensure(wid, dataset, wait=wait and not timed_out, force=force))
+            except TimeoutError:
+                timed_out = True
+    except Exception as exc:
+        logging.getLogger('backend.live').warning('refresh failed datasets=%s class=%s', ','.join(datasets), type(exc).__name__)
+        return JSONResponse({'detail': 'Lark 讀取失敗，請重試',
                              'freshness': coordinator.status(wid)}, status_code=502)
+    if timed_out:
+        freshness = coordinator.status(wid)
+        if any(freshness['datasets'][d]['status'] == 'refreshing' for d in datasets):
+            return JSONResponse({'freshness': freshness}, status_code=202)
+        return JSONResponse({'detail': 'Lark 讀取失敗，請重試', 'freshness': freshness}, status_code=502)
     freshness = coordinator.status(wid)
     if any(r['status'] == 'already_running' for r in results):
         return JSONResponse({'detail': '資料正在重新讀取，請稍後再試',
                              'freshness': freshness}, status_code=409)
     if wait and any(r['status'] != 'fresh' for r in results):
-        return JSONResponse({'detail': 'Lark 資料暫時無法讀取',
+        return JSONResponse({'detail': 'Lark 讀取失敗，請重試',
                              'freshness': freshness}, status_code=502)
     pending = (any(r['status'] != 'fresh' for r in results)
                or (not wait and (force or any(previous[d]['status'] != 'fresh' for d in datasets))))
     return JSONResponse({'freshness': freshness}, status_code=202 if pending else 200)
+
+
+def require_refresh(coordinator, data, user, dataset, *, authorize=None, force=True, enabled=None):
+    if enabled is None:
+        enabled = coordinator.status(data['wid'])['enabled']
+    if (data.get('mode') != 'lark' or data['wid'].startswith(('demo-', 'test-'))
+            or not enabled):
+        raise HTTPException(403, '即時讀取僅限已啟用的公司正式工作區')
+    if force or dataset == 'roster':
+        if authorize is None:
+            raise HTTPException(403, '需要資料同步權限')
+        authorize(data['wid'], dataset, user)
 
 
 def register(app, identity, coordinator, *, authorize=None, audit=None):
@@ -45,15 +70,9 @@ def register(app, identity, coordinator, *, authorize=None, audit=None):
     def trigger(body: RefreshRequest, request: Request):
         data, user = identity(request)
         wid = data['wid']
-        if (data.get('mode') != 'lark' or wid.startswith(('demo-', 'test-'))
-                or not coordinator.status(wid)['enabled']):
-            raise HTTPException(403, '即時讀取僅限已啟用的公司正式工作區')
         datasets = list(dict.fromkeys(body.datasets))
         for dataset in datasets:
-            if body.force or dataset == 'roster':
-                if authorize is None:
-                    raise HTTPException(403, '需要資料同步權限')
-                authorize(wid, dataset, user)
+            require_refresh(coordinator, data, user, dataset, authorize=authorize, force=body.force)
         if body.force and audit is not None:
             audit(wid, user, datasets)
         return refresh(coordinator, wid, datasets, wait=body.wait, force=body.force)

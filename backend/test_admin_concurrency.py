@@ -145,13 +145,15 @@ def test_production_grant_is_visible_in_session_and_admin_form(tmp_path):
     app,c,signin,ids=harness(tmp_path,{'u-manager':MANAGER_CAPABILITIES})
     try:
         ws=c.get('/api/workspace').json()
-        target=next(u for u in ws['users'] if u['id']=='u-pm')
+        assert 'capabilities' not in next(u for u in ws['users'] if u['id']=='u-pm')
+        target=next(u for u in c.get('/api/settings/personnel').json()['users'] if u['id']=='u-pm')
         assert target['capabilities']==[]
         caps=['sop_task_import','create_local_case','sop_template_publish']
         bump(app)
         response=c.post('/api/actions',json=command(ws,'admin_person',{'id':'u-pm','capabilities':caps}))
         assert response.status_code==200,response.text
-        assert next(u for u in response.json()['users'] if u['id']=='u-pm')['capabilities']==caps
+        assert 'capabilities' not in next(u for u in response.json()['users'] if u['id']=='u-pm')
+        assert next(u for u in c.get('/api/settings/personnel').json()['users'] if u['id']=='u-pm')['capabilities']==caps
         signin('u-pm')
         assert c.get('/api/session').json()['user']['capabilities']==caps
         assert c.get(f"/api/projects/{ids['formal']}/sop-tasks").status_code==200
@@ -170,13 +172,13 @@ def test_unknown_settings_key_is_validation_error(admin):
 
 
 @pytest.mark.parametrize('role,capabilities,active,exposed',[
-    ('manager',[],True,True),
-    ('member',['manage_people'],True,True),
+    ('manager',[],True,False),
+    ('member',['manage_people'],True,False),
     ('manager',[],False,False),
     ('member',['manage_people'],False,False),
     ('member',[],True,False),
 ])
-def test_capability_projection_matches_active_authority(role,capabilities,active,exposed):
+def test_workspace_keeps_other_person_grants_in_personnel_endpoint(role,capabilities,active,exposed):
     from .seed import seed
     from .workspace_projection import filter_private_workspace
     state=seed()
