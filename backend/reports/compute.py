@@ -447,7 +447,8 @@ def contacts(data, **p):
     people=tables.get('people', [])
     person_ids={r['id']:str(cell(r['f'].get('姓名'))) for r in people}
     groups={str(cell(r['f'].get('姓名'))):str(cell(r['f'].get('所屬組別') or r['f'].get('組別') or r['f'].get('部門'))) for r in people}
-    fallback={'朱雅琪':'工務助理','郭倢瑛':'工務助理','林瑩瑄':'工務助理','鍾智偉':'PM','吳重樺':'PM','吳科翰':'PM'}
+    fallback={'朱雅琪':'工務助理','郭倢瑛':'工務助理','林瑩瑄':'工務助理','鍾智偉':'PM','吳柏頤':'PM','吳重樺':'控制組','張家彬':'控制組','吳科翰':'外業經理'}
+    known_cases={'C115180-3':'115年度第二辦公室安全觀測','C115259-01':'鋼構垂直度測量','C115259':'鋼構垂直度測量'}
     def unique(value):
         return list(dict.fromkeys(x.strip() for x in re.split(r'[,，、/]',str(cell(value))) if x.strip()))
     def first(f,*keys):
@@ -473,21 +474,24 @@ def contacts(data, **p):
         if result.upper()=='OK' or result=='已完成' or f.get('已完成') is True: result='已完成'
         nextdate=day(first(f,'下一跟進日','下次追蹤日')) or ''
         table=BY_KIND[kind]
-        return dict(id=r['id'],orig_id=str(cell(f.get('原記錄ID'))),contact_date=dt,contact_date_slash=dt.replace('-','/'),sort_ts=timestamp(rawdate),case_code=code,case_name=name,person=person,group=groups.get(person) or fallback.get(person,''),client_contact=str(cell(first(f,'業主窗口','客戶(同步)','同步業主','客戶'))),method=' / '.join(methods),methods=methods,topic='、'.join(topics),topics=topics,content=str(cell(first(f,'內容摘要','聯繫內容/業主回覆','聯繫內容'))),next_date=nextdate,next_date_slash=nextdate.replace('-','/'),special_note=str(cell(first(f,'下一步','待辦事項','特別事項','摘要'))),result=result,result_status='completed' if result=='已完成' else 'pending',link=f'https://yong-xiang-survey.jp.larksuite.com/base/{table.base_token}?table={table.table_id}&record={r["id"]}')
+        return dict(id=r['id'],orig_id=str(cell(f.get('原記錄ID'))),contact_date=dt,contact_date_slash=dt.replace('-','/'),sort_ts=timestamp(rawdate),case_code=code,case_name=name,person=person,group=fallback.get(person) or groups.get(person) or '',client_contact=str(cell(first(f,'業主窗口','客戶(同步)','同步業主','客戶'))),method=' / '.join(methods),methods=methods,topic='、'.join(topics),topics=topics,content=str(cell(first(f,'內容摘要','聯繫內容/業主回覆','聯繫內容'))),next_date=nextdate,next_date_slash=nextdate.replace('-','/'),special_note=str(cell(first(f,'下一步','待辦事項','特別事項','摘要'))),result=result,result_status='completed' if result=='已完成' else 'pending',link=f'https://yong-xiang-survey.jp.larksuite.com/base/{table.base_token}?table={table.table_id}&record={r["id"]}')
     crm=[build(r,'crm_contact') for r in tables.get('crm_contact',[])]; legacy={r['id']:build(r,'v3_contact') for r in tables.get('v3_contact',[])}
     used=set()
     for r in crm:
         v=legacy.get(r['orig_id'])
         if v:
             used.add(v['id'])
-            for key in ('contact_date','contact_date_slash','sort_ts','case_code','case_name','person','group','client_contact','method','methods','topic','topics','content','next_date','next_date_slash','special_note','result'):
+            if v['contact_date']:
+                r['contact_date']=v['contact_date']; r['contact_date_slash']=v['contact_date_slash']; r['sort_ts']=v['sort_ts']
+            for key in ('case_code','case_name','person','group','client_contact','method','methods','topic','topics','content','next_date','next_date_slash','special_note','result'):
                 if not r[key]: r[key]=v[key]
             r['result_status']='completed' if r['result']=='已完成' else 'pending'
-    rows=crm+[v for ident,v in legacy.items() if ident not in used]
+    rows=crm+[v for ident,v in legacy.items() if ident not in used and not any(c['case_code']==v['case_code'] and c['contact_date']==v['contact_date'] and c['content'].strip()==v['content'].strip() for c in crm)]
     for r in rows:
         if not r['case_name']:
-            case=data['cases'].get(r['case_code']) or data['cases'].get(r['case_code'].split(',')[0].strip())
-            r['case_name']=str(cell(first(case['f'],'案件名稱','工程名稱'))) if case else ('115年度第二辦公室安全觀測' if r['case_code'].split(',')[0].strip()=='C115180-3' else '')
+            c0=r['case_code'].split(',')[0].strip()
+            case=data['cases'].get(r['case_code']) or data['cases'].get(c0)
+            r['case_name']=str(cell(first(case['f'],'案件名稱','工程名稱'))) if case else known_cases.get(c0,'')
     start=p.get('week') or p.get('from') or ''; end=(date.fromisoformat(p['week'])+timedelta(days=6)).isoformat() if p.get('week') else p.get('to') or ''
     rows=[r for r in rows if r['contact_date'] and (not start or r['contact_date']>=start) and (not end or r['contact_date']<=end) and any(r[k] for k in ('case_code','case_name','person','client_contact','content','special_note','method','topic','result'))]
     raw_total=len(rows)
