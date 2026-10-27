@@ -8,7 +8,13 @@ import os
 from sqlalchemy import MetaData, create_engine, inspect
 from sqlalchemy.schema import CreateTable
 
-from .models import TaskEvent
+from .models import LocalTask, TaskEvent
+
+
+def audit_history_detached(connection):
+    """True once sop_task_events no longer references sop_local_tasks, so a task row can be removed under its audit."""
+    return not any(fk['referred_table'] == LocalTask.__tablename__
+                   for fk in inspect(connection).get_foreign_keys(TaskEvent.__tablename__))
 
 
 def migrate(engine):

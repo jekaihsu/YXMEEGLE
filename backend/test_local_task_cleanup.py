@@ -1,10 +1,10 @@
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from sqlalchemy import create_engine, delete, inspect, select
+from sqlalchemy import create_engine, delete, event, inspect, select
 
 from .models import BusinessRow
-from .sop_import.cleanup_migration import migrate
+from .sop_import.cleanup_migration import audit_history_detached, migrate
 from .sop_import.domain import Failure
 from .sop_import.models import LocalTask, TaskNodeLink, TaskEvent
 from .test_sop_import import URL, apply, h, overview, post, preview  # noqa: F401
@@ -247,27 +247,37 @@ def test_concurrent_cleanup_only_appends_once(m):
     assert sum(value[1] == 'test_cleaned' for value in events(m).values()) == 1
 
 
-def test_legacy_foreign_key_migration_preserves_rows_and_is_repeatable(m):
+LEGACY_AUDIT_TABLE = '''CREATE TABLE sop_task_events (
+    workspace_id VARCHAR(120) NOT NULL, id VARCHAR(64) NOT NULL,
+    project_id VARCHAR(160) NOT NULL, task_id VARCHAR(64) NOT NULL,
+    actor_id VARCHAR(120) NOT NULL, at FLOAT NOT NULL, kind VARCHAR(40) NOT NULL,
+    revision INTEGER NOT NULL, changes JSON NOT NULL, PRIMARY KEY (workspace_id, id),
+    FOREIGN KEY(workspace_id, project_id, task_id)
+    REFERENCES sop_local_tasks (workspace_id, project_id, id))'''
+
+
+@pytest.mark.parametrize('enforced', [True, False])
+def test_unmigrated_audit_table_refuses_cleanup_before_any_write(m, enforced):
     # Recreate the exact pre-cleanup audit table before inserting history.
     with m.engine.begin() as db:
         db.exec_driver_sql('DROP TABLE sop_task_events')
-        db.exec_driver_sql('''CREATE TABLE sop_task_events (
-            workspace_id VARCHAR(120) NOT NULL, id VARCHAR(64) NOT NULL,
-            project_id VARCHAR(160) NOT NULL, task_id VARCHAR(64) NOT NULL,
-            actor_id VARCHAR(120) NOT NULL, at FLOAT NOT NULL, kind VARCHAR(40) NOT NULL,
-            revision INTEGER NOT NULL, changes JSON NOT NULL, PRIMARY KEY (workspace_id, id),
-            FOREIGN KEY(workspace_id, project_id, task_id)
-            REFERENCES sop_local_tasks (workspace_id, project_id, id))''')
+        db.exec_driver_sql(LEGACY_AUDIT_TABLE)
         db.exec_driver_sql('CREATE INDEX ix_sop_task_events_project_id ON sop_task_events (project_id)')
+    if not enforced:
+        event.listen(m.engine, 'connect', lambda connection, record: connection.execute('PRAGMA foreign_keys=OFF'))
+        m.engine.dispose()
+    with m.engine.connect() as db:
+        assert db.exec_driver_sql('PRAGMA foreign_keys').scalar() == int(enforced)
     task = fixture(m)
-    before = events(m)
-    assert clean(m, task, 503)['code'] == 'import_unavailable'
-    assert events(m) == before  # Failed deletion rolls back its cleanup event.
+    before, listing = events(m), overview(m)
+    assert clean(m, task, 503)['code'] == 'cleanup_migration_required'
+    assert stored(m, task['id']) is not None
+    assert overview(m) == listing and events(m) == before
     migrate(m.engine)
     migrate(m.engine)
     assert events(m) == before
     assert inspect(m.engine).get_foreign_keys('sop_task_events') == []
-    clean(m, task)
+    assert clean(m, task)['removed'] is True
     assert {key: events(m)[key] for key in before} == before
 
 
@@ -307,9 +317,11 @@ def test_migration_keeps_audit_after_physical_removal_on_each_database(audit_dat
             db.exec_driver_sql("INSERT INTO sop_local_tasks VALUES ('w', 'p', 't')")
             db.exec_driver_sql("INSERT INTO sop_task_events VALUES ('w', 'e', 'p', 't', 'actor', 100, 'created', 1, '{}')")
             before = db.exec_driver_sql('SELECT * FROM sop_task_events').all()
+            assert audit_history_detached(db) is False
         migrate(engine)
         migrate(engine)
         with engine.begin() as db:
+            assert audit_history_detached(db) is True
             db.exec_driver_sql('DELETE FROM sop_local_tasks')
             assert db.exec_driver_sql('SELECT * FROM sop_task_events').all() == before
         assert inspect(engine).get_foreign_keys('sop_task_events') == []

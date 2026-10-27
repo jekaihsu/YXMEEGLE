@@ -14,6 +14,7 @@ from ..sources import normalized_case
 from ..workflow import now
 from .catalog import digest, publish
 from .case_stage import stage, start_node
+from .cleanup_migration import audit_history_detached
 from . import local_case, quotes, suggestions, local_nodes
 from .enrollment import EnrollmentService
 from .enrollment_policy import identity_key
@@ -902,6 +903,7 @@ class Service(EnrollmentService):
             disposable(task)
             require(task.local.get('is_test') is True, 'test_task_required', 409)
             require(task.revision == body['expected_revision'], 'task_revision_conflict', 409)
+            require(audit_history_detached(db.connection()), 'cleanup_migration_required', 503)
             links = list(db.scalars(select(TaskNodeLink).where(TaskNodeLink.workspace_id == ctx.wid,
                                    TaskNodeLink.project_id == ctx.project['id'], TaskNodeLink.task_id == task_id)))
             self.event(db, ctx, task, 'test_cleaned', {'reason': reason, 'is_test': True,
