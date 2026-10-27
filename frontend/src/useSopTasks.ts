@@ -11,6 +11,9 @@ const requests = new Map<string, Promise<SopOverview>>();
 const assigneeRequests = new Map<string, Promise<SopAssignee[]>>();
 const assigneeCache = new Map<string, SopAssignee[]>();
 const readAt = new Map<string, number>();
+const startedAt = new Map<string, number>();
+// A forced read that arrives while an identical one has just started (a double-mounted effect, a sibling prefetch) shares it.
+const JOIN_WINDOW_MS = 1000;
 const denied = new Map<string, SopError>();
 const deniedAt = new Map<string, number>();
 // A denial lapses so a person newly assigned a task is not locked out of it until the session resets.
@@ -27,12 +30,12 @@ export function canReadSop(user: {active?:boolean} | null | undefined){
 export function prefetchSopTasks(projectId:string,workspace:string,force=false){
  const key=`${workspace}:${projectId}`, stored=cached(key), epoch=getSessionEpoch();
  const failure=deniedFor(key);if(failure)return Promise.reject(failure);
- const pending=requests.get(key);if(pending&&!force)return pending;
+ const pending=requests.get(key);if(pending&&(!force||Date.now()-(startedAt.get(key)||0)<JOIN_WINDOW_MS))return pending;
  if(!force&&stored&&Date.now()-(readAt.get(key)||0)<60000)return Promise.resolve(stored);
  const request=sopApi.overview(projectId,()=>epoch===getSessionEpoch()).then(data=>{
   if(epoch===getSessionEpoch()&&requests.get(key)===request){const prior=cache.get(key);if(!prior||prior.checklistRevision<=data.checklistRevision)cache.set(key,data);readAt.set(key,Date.now())}return data;
  }).catch(error=>{if(epoch===getSessionEpoch()&&requests.get(key)===request){cache.delete(key);readAt.delete(key);if(error instanceof SopError&&[401,403,404].includes(error.status))deny(key,error)}throw error}).finally(()=>{if(requests.get(key)===request)requests.delete(key)});
- requests.set(key,request);return request;
+ requests.set(key,request);startedAt.set(key,Date.now());return request;
 }
 export function prefetchSopAssignees(projectId:string,workspace:string){
  const key=`${workspace}:${projectId}`;cached(key);const epoch=getSessionEpoch();
