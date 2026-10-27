@@ -1,12 +1,13 @@
 // Run from frontend/: node src/reports/test-loading.mjs
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
+import {fileURLToPath} from 'node:url';
 import {writeFile,unlink} from 'node:fs/promises';
 import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 
-const bundle=await build({stdin:{contents:"export {useReport,clearReportCache} from './src/reports/useReport';export {invalidateSessionEpoch} from './src/api';export {default as ReportsPage} from './src/reports/ReportsPage';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',packages:'external',jsx:'automatic',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {useReport,clearReportCache} from './src/reports/useReport';export {invalidateSessionEpoch} from './src/api';export {default as ReportsPage} from './src/reports/ReportsPage';",resolveDir:fileURLToPath(new URL('../../',import.meta.url)),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',packages:'external',jsx:'automatic',loader:{'.css':'empty'}});
 const path=new URL('./.test-loading-bundle.mjs',import.meta.url);
 await writeFile(path,bundle.outputFiles[0].text);
 let useReport,clearReportCache,invalidateSessionEpoch,ReportsPage;

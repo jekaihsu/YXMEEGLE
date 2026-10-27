@@ -46,7 +46,7 @@ class SnapshotStore:
             fingerprint=hashlib.sha256(canonical.encode()).hexdigest()
             with self._lock: previous=self._snapshot
             data=previous['data'] if previous and previous['fingerprint']==fingerprint else compute.normalize(raw,self.base)
-            gaps=previous['gaps'] if previous and previous['fingerprint']==fingerprint else {(endpoint,dept):compute.report_gaps(data,endpoint,dept) for endpoint in ('sources','review','review/rows','sales','assets','progress','progress/case') for dept in ('field','office','control')}
+            gaps=previous['gaps'] if previous and previous['fingerprint']==fingerprint else {(endpoint,dept):compute.report_gaps(data,endpoint,dept) for endpoint in ('sources','review','review/rows','sales','assets','progress','progress/case','contacts') for dept in ('field','office','control')}
             current=dict(gaps=gaps,data=data,fingerprint=fingerprint,fetched_at=datetime.now(timezone.utc).isoformat(),at=self.clock(),cache=previous['cache'] if previous and previous['fingerprint']==fingerprint else OrderedDict(),pending=previous['pending'] if previous and previous['fingerprint']==fingerprint else {})
             with self._lock: self._snapshot=current;self._retry_at=0;self._refresh_error=False
             logger.info('reports snapshot ready tables=%s records=%s duration_ms=%.0f',len(raw),sum(len(t['records']) for t in raw.values()),(time.monotonic()-started)*1000)
@@ -128,7 +128,7 @@ class SnapshotStore:
             else:
                 try:
                     if endpoint=='sources': result=compute.sources(snapshot['data'],snapshot['fetched_at'])
-                    else: result={'review':compute.review,'review/rows':compute.rows_report,'sales':compute.sales,'assets':compute.assets,'progress':compute.progress,'progress/case':compute.progress_case}[endpoint](snapshot['data'],**params)
+                    else: result={'contacts':compute.contacts,'review':compute.review,'review/rows':compute.rows_report,'sales':compute.sales,'assets':compute.assets,'progress':compute.progress,'progress/case':compute.progress_case}[endpoint](snapshot['data'],**params)
                     with self._lock:
                         snapshot['cache'][key]=result
                         if len(snapshot['cache'])>512: snapshot['cache'].popitem(last=False)
@@ -143,7 +143,8 @@ class SnapshotStore:
             for table in result['tables']:
                 if table['status']=='ok': table['fetched_at']=snapshot['fetched_at']
         meta=self.meta(snapshot,endpoint)
-        meta['gaps']=deepcopy(snapshot['gaps'][(endpoint,params.get('dept','field'))])+result.pop('gaps',[])
+        meta['gaps']=deepcopy(snapshot['gaps'][(endpoint,params.get('dept','field'))])+([] if endpoint=='contacts' else result.get('gaps',[]))
+        result.pop('gaps',None)
         return dict(result,meta=meta)
 
     def close(self): self._executor.shutdown(wait=True)

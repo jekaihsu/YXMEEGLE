@@ -1774,7 +1774,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
     register_live(app,identity,app.state.live_read,authorize=authorize_live,audit=audit_live_refresh)
     from .reports.routes import register as register_reports
     register_reports(app,identity,cfg,authorize=authorize_live,live_enabled=live_enabled,
-                     allow=lambda data,user:user['role'] in ('pm','manager') or capable(user,'manage_sources'),
+                     allow=lambda data,user:user['role'] in ('pm','manager','工務助理') or any(user.get(k) in ('工務助理','郭倢瑛','朱雅琪','林瑩瑄') for k in ('name','display_name','group','department')) or capable(user,'manage_sources'),
                      links=lambda data,user:report_link_state(data,user)[0].get('report_case_bridges',{}))
     from .lark_pilot.routes import register as register_pilot
     register_pilot(app, identity=identity, authorize=authorize_live, cfg=cfg)
