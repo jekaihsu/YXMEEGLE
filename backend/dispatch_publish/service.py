@@ -31,7 +31,6 @@ from .store import DispatchStore, duplicate
 logger = logging.getLogger(__name__)
 KEYS = ('schedule', 'tasks', 'people', 'accounts', 'instruments', 'vehicles', 'cases', 'nodes')
 WORK_KEYS = ('tasks', 'nodes', 'people', 'accounts', 'instruments', 'vehicles', 'cases')
-_work_reads = ThreadPoolExecutor(max_workers=3, thread_name_prefix='dispatch-work')
 SEARCH_RETRY_SECONDS = 1
 FORM_FIELDS = [
     ('title', '標題', True), ('content', '內容', True), ('case_ref', '工程確認單', True), ('project_ref', '專案編號', True),
@@ -454,16 +453,18 @@ class DispatchPublishService:
         # Fail the primary read before scheduling optional joins, including on permission revocation.
         tasks = self._cached(wid, 'tasks')
         entries, rows, failed = {'tasks': tasks}, {'tasks': tasks.value}, []
-        futures = {key: _work_reads.submit(copy_context().run, self._cached, wid, key)
-                   for key in WORK_KEYS if key != 'tasks'}
-        for key, future in futures.items():
-            try:
-                entries[key] = future.result()
-                rows[key] = entries[key].value
-            except Exception as exc:
-                failed.append(key)
-                rows[key] = None
-                logger.warning('dispatch work join %s unavailable: %s', key, type(exc).__name__)
+        # A pool per request: a slow upstream read in one workspace must not queue other users' joins.
+        with ThreadPoolExecutor(max_workers=3, thread_name_prefix='dispatch-work') as pool:
+            futures = {key: pool.submit(copy_context().run, self._cached, wid, key)
+                       for key in WORK_KEYS if key != 'tasks'}
+            for key, future in futures.items():
+                try:
+                    entries[key] = future.result()
+                    rows[key] = entries[key].value
+                except Exception as exc:
+                    failed.append(key)
+                    rows[key] = None
+                    logger.warning('dispatch work join %s unavailable: %s', key, type(exc).__name__)
         sources = Sources(schedule=None, **{key: rows.get(key) for key in KEYS if key != 'schedule'})
         return sources, entries, failed
 
