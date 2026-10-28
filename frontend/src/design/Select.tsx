@@ -13,7 +13,7 @@ export function Select({className='',style,...props}:SelectHTMLAttributes<HTMLSe
   setDisabledOptions(old=>JSON.stringify(old)===JSON.stringify(blocked)?old:blocked);
   setValue(select.value);
   const owner=select.labels?.[0]?.cloneNode(true);
-  if(owner instanceof HTMLElement)owner.querySelectorAll('.ds-select,select,button').forEach(element=>element.remove());
+  if(owner instanceof window.HTMLElement)owner.querySelectorAll('.ds-select,select,button').forEach(element=>element.remove());
   const explicit=props['aria-label']||(props['aria-labelledby']?document.getElementById(props['aria-labelledby'])?.textContent:'')||owner?.textContent?.trim();
   setLabel(explicit||'選擇');
  });
