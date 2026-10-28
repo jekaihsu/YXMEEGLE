@@ -17,7 +17,7 @@ from .data_state import data_state
 def load_source_metadata(db, model, wid):
     """Capture health evidence without decoding source record values."""
     from sqlalchemy import func, select
-    from .storage import json_fields
+    from .case_source_reads import json_fields
     if db.get_bind().dialect.name!='sqlite':
         row=db.get(model,wid)
         return row.data if row else None
