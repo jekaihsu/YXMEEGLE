@@ -1,4 +1,4 @@
-"""Compact SQLite source projections for case and source-health reads."""
+"""Compact source projections for case and source-health reads."""
 from sqlalchemy import case, cast, func, select
 from sqlalchemy.dialects.postgresql import JSONB, array
 
@@ -10,7 +10,7 @@ CASE_SOURCE_FIELDS=('id','source_identity','source_url','url','source_kind','sou
 
 
 def json_fields(column, fields, dialect="sqlite"):
-    """SQLite JSON projection preserving absent keys, booleans and nested values."""
+    """JSON projection preserving absent keys, booleans and nested values."""
     if dialect == 'postgresql':
         parts=func.jsonb_each(cast(column,JSONB)).table_valued('key','value',joins_implicitly=True)
         return select(func.coalesce(func.jsonb_object_agg(parts.c.key,parts.c.value),cast({},JSONB))).where(parts.c.key.in_(fields)).scalar_subquery()

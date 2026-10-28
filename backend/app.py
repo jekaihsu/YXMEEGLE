@@ -1646,7 +1646,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         """node_assignment_case plus the local planning cases this viewer may see; node assignment never gets those."""
         from .source_case_policy import visible_project,local_viewer
         require(len(project_id)<=200,'查詢參數過長',422)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=('users',) if assignees else storage.CASE_COLLECTIONS,project_ids=[project_id],project_details=not assignees,case_sources=not assignees)
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=('users',) if assignees else storage.CASE_COLLECTIONS,project_ids=[project_id],project_details=not assignees)
         project=next((p for p in state['projects'] if p['id']==project_id),None)
         require(project is not None,'找不到這個案件',404)
         if not (visible_project(state,project) or local_viewer(user,project)):
