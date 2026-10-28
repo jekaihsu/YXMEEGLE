@@ -11,67 +11,90 @@ globalThis.getComputedStyle=dom.window.getComputedStyle;
 HTMLElement.prototype.scrollIntoView=function(){};
 HTMLElement.prototype.getClientRects=function(){return [{width:40,height:40}]};
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
-const bundle=await build({stdin:{contents:"export * from './src/startSop';export {useStartSop} from './src/useStartSop';export {SopControls,PlanLine} from './src/StartSopControls';export {invalidateSessionEpoch} from './src/api';",resolveDir:new URL('.',import.meta.url).pathname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export * from './src/startSop';export {useStartSop} from './src/useStartSop';export {SopControls,PlanLine} from './src/StartSopControls';export {EnsureSopStatus} from './src/EnsureSopStatus';export {useEnsureSop} from './src/useEnsureSop';export {invalidateSessionEpoch} from './src/api';",resolveDir:new URL('.',import.meta.url).pathname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const path=new URL('./.start-sop-test.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);let ui;try{ui=await import(path.href)}finally{await fs.unlink(path)}
 export const previewFixture=()=>({project_id:'p1',code:'A115001',eligible:true,can_start:true,already_started:false,seeds_pending:4,seeds_optional:false,blockers:[],warnings:[{code:'derived_links',message:'依工編推導，非 Lark 關聯。',node:null}],nodes:Object.entries({field:'外業',control:'控制',mapping:'圖資',report:'報告'}).map(([key,label])=>({key,label,category:label,planned_qty:'123.4500',lines:2,items:5,items_basis:{native:1,derived:4,ambiguous:0,unlinked:0},deadline:null,node_exists:false,seed_task_exists:false,will_create_node:true,will_create_task:true,task_title:'開始作業',task_detail:''})),chain_note:'依工項交接，可並行處理。',preview_hash:'h1',plan_rule_version:'v1'});
-function SopHarness(){const sop=ui.useStartSop('p1',true,async()=>{});return React.createElement(React.Fragment,null,React.createElement(ui.SopControls,{sop}),sop.state.kind==='ready'&&React.createElement('div',{className:'sop-test-plans'},...sop.state.data.nodes.map(node=>React.createElement('div',{'data-node':node.key,key:node.key},React.createElement(ui.PlanLine,{node})))))}
-let root,posts,gets,preview,postReply,hold;
-const response=(b,s=200)=>new Response(JSON.stringify(b),{status:s,headers:{'Content-Type':'application/json'}});
-async function mount({status=200,change=()=>{}}={}){ui.invalidateSessionEpoch();preview=previewFixture();change(preview);posts=[];gets=0;postReply=null;hold=null;globalThis.fetch=async(url,init={})=>{if(url.endsWith('/start-sop')){if(init.method==='POST'){posts.push(JSON.parse(init.body));if(hold)await hold;return postReply?response(postReply.body,postReply.status):response({started:true,complete:true,results:[],overview:{}})}gets++;return status===200?response(preview):response({code:status===403?'forbidden':'disabled',message:'無權啟動'},status)}return response(assignmentFixture().list)};root=createRoot(document.getElementById('root'));await act(async()=>root.render(React.createElement(SopHarness)));}
+let root, posts, reloads, reply, release;
+const response=body=>new Response(JSON.stringify(body),{status:200});
+const button=t=>[...document.querySelectorAll('button')].find(b=>b.textContent===t);
+function Harness({mayStart=true,exists=false,id='p1'}={}) {
+ const flow=ui.useEnsureSop(id,mayStart,exists,async()=>{reloads++});
+ return React.createElement('div',null,flow.state.kind,flow.state.kind==='failed'&&React.createElement('button',{onClick:flow.retry},'重試'));
+}
+async function mount(props={},strict=false) {
+ ui.invalidateSessionEpoch();posts=[];reloads=0;reply={state:'started'};release=null;
+ globalThis.fetch=async(url,init)=>{posts.push({url,method:init.method});if(release)await release;return response(reply)};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(strict?React.createElement(React.StrictMode,null,React.createElement(Harness,props)):React.createElement(Harness,props)));
+}
 afterEach(async()=>{if(root){await act(async()=>root.unmount());root=null}});
-const button=t=>[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===t);
-const click=async b=>{assert.ok(b);b.focus();await act(async()=>b.click())};
+test('automatic ensure posts once and reloads on success',async()=>{
+ await mount();assert.deepEqual(posts,[{url:'/api/projects/p1/sop/ensure',method:'POST'}]);assert.equal(reloads,1);assert.equal(document.body.textContent,'started');
+ await act(async()=>root.render(React.createElement(Harness)));assert.equal(posts.length,1);
+});
+test('viewers and existing SOPs never post',async()=>{
+ await mount({mayStart:false});assert.equal(posts.length,0);
+ await act(async()=>root.render(React.createElement(Harness,{exists:true})));assert.equal(posts.length,0);
+});
+test('StrictMode and remount reuse the same attempt',async()=>{
+ await mount({},true);assert.equal(posts.length,1);assert.equal(reloads,1);
+ await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(Harness)));assert.equal(posts.length,1);assert.equal(document.body.textContent,'started');
+});
+test('failed ensure waits for explicit retry',async()=>{
+ await mount({mayStart:false});reply={state:'not_ready',reason:'no_template'};
+ await act(async()=>root.render(React.createElement(Harness)));assert.equal(posts.length,1);assert.equal(document.body.textContent,'failed重試');
+ await act(async()=>root.render(React.createElement(Harness)));assert.equal(posts.length,1);
+ reply={state:'started'};await act(async()=>button('重試').click());assert.equal(posts.length,2);assert.equal(reloads,1);
+});
+test('session changes permit a new attempt and suppress stale completion',async()=>{
+ await mount({mayStart:false});release=new Promise(resolve=>{globalThis.finishEnsure=resolve});
+ await act(async()=>root.render(React.createElement(Harness)));assert.equal(posts.length,1);assert.equal(document.body.textContent,'preparing');
+ ui.invalidateSessionEpoch();await act(async()=>globalThis.finishEnsure());assert.equal(reloads,0);
+ release=null;await act(async()=>root.render(React.createElement(Harness,{id:'p2'})));assert.equal(posts.length,2);assert.equal(reloads,1);
+});
+test('start controls keep the existing chip and render no start button',async()=>{
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.SopControls,{sop:{state:{kind:'ready',data:{already_started:false}}}})));
+ assert.equal(document.querySelector('button'),null);assert.equal(document.body.textContent,'');
+ await act(async()=>root.render(React.createElement(ui.SopControls,{sop:{state:{kind:'ready',data:{already_started:true}}}})));
+ assert.equal(document.body.textContent,'SOP 已啟動');assert.equal(document.querySelector('button'),null);
+});
+test('preview parser still rejects malformed data and preserves plan quantities',()=>{
+ assert.equal(ui.parseSopPreview(previewFixture()).nodes[0].planned_qty,'123.4500');
+ assert.throws(()=>ui.parseSopPreview({...previewFixture(),nodes:[{}]}));
+});
+
+test('detail status shows preparing skeleton and one explicit retry link',async()=>{
+ ui.invalidateSessionEpoch();posts=[];reloads=0;reply={state:'not_ready',reason:'no_template'};
+ let finish;const pending=new Promise(resolve=>{finish=resolve});
+ globalThis.fetch=async(url,init)=>{posts.push({url,method:init.method});await pending;return response(reply)};
+ const props={c:{s:{features:{}}},p:{id:'p1',case_type:'intake'},sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true}}},reload:async()=>{reloads++}},assignments:{reload:async()=>{}}};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,props)));
+ assert.match(document.body.textContent,/SOP 準備中/);assert.ok(document.querySelector('.skeleton'));assert.equal(posts.length,1);
+ await act(async()=>finish());assert.equal(document.body.textContent,'SOP 尚未就緒重試');assert.equal(document.querySelectorAll('button').length,1);
+ reply={state:'started'};await act(async()=>button('重試').click());assert.equal(posts.length,2);assert.equal(document.body.textContent,'SOP 已啟動');
+});
 test('parser rejects malformed data and duplicate production nodes',()=>{assert.equal(ui.parseSopPreview(previewFixture()).nodes.length,4);const exponent=previewFixture();exponent.nodes[0].planned_qty='1.23e2';assert.equal(ui.parseSopPreview(exponent).nodes[0].planned_qty,'1.23e2');for(const patch of [{eligible:1},{nodes:[{}]},{blockers:null},{nodes:[previewFixture().nodes[0],previewFixture().nodes[0]]}])assert.throws(()=>ui.parseSopPreview({...previewFixture(),...patch}));});
-test('single GET supplies plan lines, modal focus trap and Escape return',async()=>{await mount();assert.equal(gets,1);const trigger=button('啟動 SOP');await click(trigger);const confirm=button('確認啟動');confirm.focus();await act(async()=>confirm.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true})));assert.equal(document.activeElement.getAttribute('aria-label'),'關閉');await act(async()=>document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.equal(document.querySelector('[role=dialog]'),null);assert.equal(document.activeElement,trigger);});
-test('blockers remain visible beside disabled confirm',async()=>{await mount({change:p=>p.blockers=[{code:'writes_disabled',message:'寫入已停用'}]});await click(button('啟動 SOP'));assert.equal(button('確認啟動').disabled,true);assert.match(document.querySelector('[role=dialog]').textContent,/寫入已停用/);});
-test('already started without optional seeds shows badge only',async()=>{await mount({change:p=>p.already_started=true});assert.equal(button('啟動 SOP'),undefined);assert.equal(button('補建計畫任務（選用）'),undefined);assert.match(document.body.textContent,/SOP 已啟動/)});
-test('a Lark started case shows SOP 已啟動 only, even with seeds pending',async()=>{await mount({change:p=>{p.already_started=true;p.seeds_optional=true;p.eligible=false}});assert.match(document.body.textContent,/SOP 已啟動/);assert.equal(button('啟動 SOP'),undefined);assert.equal(button('另外建立計畫任務（選用）'),undefined);assert.equal(button('補建計畫任務（選用）'),undefined);assert.equal(document.querySelector('.sop-seed-option'),null)});
-test('the primary start creates nodes only and sends no seed flag',async()=>{await mount();await click(button('啟動 SOP'));assert.doesNotMatch(document.querySelector('[role=dialog]').textContent,/建立任務/);assert.match(document.querySelector('[role=dialog]').textContent,/建立節點/);await click(button('確認啟動'));assert.equal(posts.length,1);assert.equal('seed_tasks' in posts[0],false);assert.equal(posts[0].preview_hash,'h1')});
-test('seed tasks are a quiet secondary opt-in without explanatory copy',async()=>{await mount();const option=document.querySelector('.sop-seed-option');assert.ok(option);assert.match(option.textContent,/另外建立計畫任務（選用）/);assert.equal(option.textContent,'另外建立計畫任務（選用）');await click(button('另外建立計畫任務（選用）'));assert.match(document.querySelector('[role=dialog]').textContent,/建立任務/);await click(button('確認建立節點與計畫任務'));assert.equal(posts.length,1);assert.equal(posts[0].seed_tasks,true)});
-test('the opt-in is hidden when no seed is pending',async()=>{await mount({change:p=>p.seeds_pending=0});assert.ok(button('啟動 SOP'));assert.equal(button('另外建立計畫任務（選用）'),undefined)});
-test('a nodes-only and a seed request never share a request id',async()=>{await mount();await click(button('啟動 SOP'));postReply={status:409,body:{code:'busy',message:'x'}};await click(button('確認啟動'));await click(button('取消'));await click(button('另外建立計畫任務（選用）'));await click(button('確認建立節點與計畫任務'));assert.equal(posts.length,2);assert.notEqual(posts[0].request_id,posts[1].request_id)});
 test('preview parser keeps the optional seed_tasks echo and rejects a non-boolean',()=>{assert.equal(ui.parseSopPreview({...previewFixture(),seed_tasks:true}).seed_tasks,true);assert.equal(ui.parseSopPreview(previewFixture()).seed_tasks,undefined);assert.throws(()=>ui.parseSopPreview({...previewFixture(),seed_tasks:'yes'}),/啟動預覽格式不正確/)});
 test('nodes-only result message talks about nodes, not tasks',()=>{const result=ui.parseSopResult({started:true,complete:true,overview:{},results:[{key:'field',node:'created',task:'skipped',error:null},{key:'control',node:'existing',task:'skipped',error:null}]});assert.equal(ui.sopResultMessage(result,previewFixture()),'已啟動 SOP。外業：節點已建立、控制：節點已存在');assert.equal(ui.sopResultMessage({...result,started:false,results:[result.results[1]]},previewFixture()),'已啟動，無需再建立。控制：節點已存在')});
-test('403 shows disabled trigger with reason',async()=>{await mount({status:403});assert.equal(button('啟動 SOP').disabled,true);assert.match(document.body.textContent,/權限/)});
-test('404 hides trigger',async()=>{await mount({status:404});assert.equal(button('啟動 SOP'),undefined)});
-test('malformed preview hides additions without breaking assignments',async()=>{await mount({change:p=>p.nodes=[{}]});assert.equal(button('啟動 SOP'),undefined)});
-test('stale refetches preview and requires confirmation',async()=>{await mount();await click(button('啟動 SOP'));postReply={status:409,body:{code:'preview_stale',message:'stale'}};await click(button('確認啟動'));assert.equal(gets,2);assert.match(document.body.textContent,/計畫已變更/);assert.ok(document.querySelector('[role=dialog]'))});
-test('partial failure names node with resume hint',async()=>{await mount();await click(button('啟動 SOP'));postReply={status:200,body:{started:true,complete:false,results:[{key:'field',node:'failed',task:'skipped',error:'Lark 無法使用'}],overview:{}}};await click(button('確認啟動'));assert.match(document.body.textContent,/已完成 0 個節點。未完成：外業（Lark 無法使用）.*再按一次可安全續做/)});
-test('double click is guarded and successful confirmation closes',async()=>{await mount();await click(button('啟動 SOP'));let release;hold=new Promise(r=>release=r);const b=button('確認啟動');await act(async()=>{b.click();b.click()});assert.equal(posts.length,1);assert.equal(button('啟動中…').disabled,true);await act(async()=>release());assert.equal(document.querySelector('[role=dialog]'),null);assert.match(document.body.textContent,/已啟動 SOP/);assert.match(posts[0].request_id,/^[a-f0-9-]{36}$/)});
-test('absent plan stays absent and derived warning explains native-only counts',async()=>{await mount({change:p=>{p.nodes=p.nodes.slice(0,1);p.nodes[0].items_basis={native:5,derived:0,ambiguous:0,unlinked:0}}});const field=document.querySelector('[data-node=field]');const control=document.querySelector('[data-node=control]');assert.doesNotMatch(field.textContent,/原生 5|依工編推導/);assert.doesNotMatch(field.querySelector('.sop-plan').textContent,/%/);assert.equal(control,null);assert.doesNotMatch(field.querySelector('.sop-plan').textContent,/推導 0|未關聯 0/)});
-
-test('can_start false disables confirmation with authority reason',async()=>{await mount({change:p=>p.can_start=false});await click(button('啟動 SOP'));assert.equal(button('確認啟動').disabled,true);assert.match(document.body.textContent,/僅案件 PM、主管或節點主管可以啟動/)});
 test('rate limit explains completed count and safe resume',()=>{assert.match(ui.sopResultMessage({complete:false,results:[{key:'field',node:'created',task:'created',error:null},{key:'control',node:'failed',task:'skipped',error:'rate_limited'}]},previewFixture()),/已完成 1 個節點.*稍後再按一次.*安全續做/)});
-
 test('all backend failure codes have Chinese messages',()=>{assert.deepEqual(Object.fromEntries(['forbidden','preview_stale','rate_limited','lark_permission','lark_error','outcome_unknown','busy'].map(k=>[k,ui.SOP_ERRORS[k]])),{forbidden:'僅案件 PM、主管或節點主管可以啟動',preview_stale:'計畫已變更，請重新讀取預覽後確認。',rate_limited:'操作過於頻繁，請稍後再按一次，可安全續做。',lark_permission:'Lark 權限不足，請聯絡管理員。',lark_error:'Lark 寫入失敗，請稍後再試。',outcome_unknown:'上次建立結果不確定，請稍後再試',busy:'其他啟動操作進行中，請稍後再試。'})});
-test('top-level rate limit includes finished count',async()=>{await mount();await click(button('啟動 SOP'));postReply={status:429,body:{code:'rate_limited',message:'slow down'}};await click(button('確認啟動'));assert.match(document.querySelector('[role=dialog]').textContent,/已完成 0 個節點.*稍後再按一次.*安全續做/)});
-test('problem chips remain on source plan lines without progress percentages',async()=>{await mount({change:p=>{p.nodes[0].items_basis.ambiguous=2;p.nodes[0].items_basis.unlinked=1}});assert.match(document.querySelector('[data-node=field] .sop-plan').textContent,/待確認 2未關聯 1/);assert.doesNotMatch(document.querySelector('[data-node=field] .sop-plan').textContent,/%/)});
-
-test('node sync failure and content difference remain visible in partial result',async()=>{await mount();await click(button('啟動 SOP'));postReply={status:200,body:{started:true,complete:false,results:[{key:'field',node:'created',task:'created',error:null,sync:'failed',warning:'content_differs'}],overview:{}}};await click(button('確認啟動'));assert.match(document.body.textContent,/已完成 0 個節點/);assert.match(document.body.textContent,/外業：節點進度同步失敗，再按一次可補同步/);assert.match(document.body.textContent,/外業：已存在的種子任務內容與目前計畫不同，未覆寫；如需更新請手動編輯任務/)});
-test('complete result keeps adopted content warning',async()=>{await mount();await click(button('啟動 SOP'));postReply={status:200,body:{started:false,complete:true,results:[{key:'field',node:'existing',task:'existing',error:null,warning:'content_differs'}],overview:{}}};await click(button('確認啟動'));assert.match(document.body.textContent,/已啟動，無需再建立/);assert.match(document.body.textContent,/外業：已存在的種子任務內容與目前計畫不同，未覆寫；如需更新請手動編輯任務/)});
-test('malformed optional result fields never break flow',async()=>{await mount();await click(button('啟動 SOP'));postReply={status:200,body:{started:true,complete:true,results:[{key:'field',node:'created',task:'created',error:null,sync:{bad:true},warning:['content_differs']}],overview:{}}};await click(button('確認啟動'));assert.match(document.body.textContent,/已啟動 SOP/);assert.doesNotMatch(document.body.textContent,/同步失敗|未覆寫/)});
-test('changed plan uncertain create explains stale window',async()=>{await mount();await click(button('啟動 SOP'));postReply={status:200,body:{started:false,complete:false,results:[{key:'field',node:'existing',task:'failed',error:'outcome_unknown'}],overview:{}}};await click(button('確認啟動'));assert.match(document.body.textContent,/外業（上次建立結果不確定，請稍後再試）/)});
-
-test('failed sync remains retryable when preview says seeds already exist',async()=>{await mount();await click(button('啟動 SOP'));preview.already_started=true;preview.eligible=false;postReply={status:200,body:{started:true,complete:false,results:[{key:'field',node:'created',task:'created',error:null,sync:'failed'}],overview:{}}};await click(button('確認啟動'));assert.equal(button('確認啟動').disabled,false);postReply={status:200,body:{started:false,complete:true,results:[{key:'field',node:'existing',task:'existing',error:null,sync:'ok'}],overview:{}}};await click(button('確認啟動'));assert.equal(posts.length,2);assert.equal(document.querySelector('[role=dialog]'),null);assert.equal(button('啟動 SOP'),undefined);assert.match(document.body.textContent,/SOP 已啟動/)});
 test('optional result parser keeps only literal contract values',()=>{const base={started:false,complete:false,overview:{},results:[{key:'field',node:'existing',task:'existing',error:null}]};for(const [sync,warning,expected] of [['ok','content_differs',{sync:'ok',warning:'content_differs'}],['failed',null,{sync:'failed'}],['unknown',42,{}],[{},[],{}],[undefined,undefined,{}]]){assert.deepEqual(ui.parseSopResult({...base,results:[{...base.results[0],sync,warning}]}).results,[{key:'field',node:'existing',task:'existing',error:null,...expected}])}});
 test('pure result message excludes unsynced node from completed count',()=>{assert.equal(ui.sopResultMessage({started:true,complete:false,overview:{},results:[{key:'field',node:'created',task:'created',error:null,sync:'failed'}]},previewFixture()),'已完成 0 個節點。未完成：部分節點尚未建立。稍後再按一次可安全續做。\n外業：節點進度同步失敗，再按一次可補同步')});
-
-test('existing result never claims creation and duplicate result counts extras',()=>{
- const result=ui.parseSopResult({started:false,complete:true,overview:{},results:[{key:'field',node:'existing',task:'existing',error:null,warning:'duplicate_seed',duplicates:['rec1','rec2']}]});
- assert.equal(ui.sopResultMessage(result,previewFixture(),true),'已啟動，無需再建立。外業：節點已存在／任務已存在。\n外業：偵測到重複的種子任務，未自動刪除，請由主管取消多餘的任務（多出 2 筆）');
-});
-test('duplicate preview uses backend extra ids and stays nonblocking',async()=>{
- await mount({change:p=>p.warnings=[{code:'duplicate_seed',node:'field',message:'外業有多筆啟動 SOP 種子任務（多出：rec1、rec2），請管理員取消多餘的任務'}]});
- await click(button('啟動 SOP'));
- assert.match(document.querySelector('[role=dialog]').textContent,/偵測到重複的種子任務，未自動刪除，請由主管取消多餘的任務（多出 2 筆）/);
- assert.equal(button('確認啟動').disabled,false);
-});
-test('unknown result shows retry and Taipei first send time',()=>{
- assert.equal(ui.sopResultMessage(ui.parseSopResult({started:false,complete:false,overview:{},results:[{key:'field',node:'existing',task:'failed',error:'outcome_unknown',first_sent_at:1790000000}]}),previewFixture()),'已完成 0 個節點。未完成：外業（上次建立結果不確定，請稍後再試；首次送出 2026/09/21 22:13:20 (台北時間)）。稍後再按一次可安全續做。');
-});
-test('malformed optional values and unknown fields are ignored',()=>{
- const base={started:false,complete:false,overview:{},results:[{key:'field',node:'existing',task:'existing',error:null}]};
- for(const extras of [{duplicates:[1],first_sent_at:'yesterday',unknown:42},{duplicates:{},first_sent_at:Infinity,warning:'future'},{duplicates:null,first_sent_at:1e20}])assert.deepEqual(ui.parseSopResult({...base,results:[{...base.results[0],...extras}]}),base);
- const p=previewFixture();p.warnings=[{code:'duplicate_seed',message:'duplicate',duplicates:42}];assert.equal(ui.parseSopPreview(p).warnings[0].duplicates,undefined);
-});
 test('preview parser carries seeds_pending and seeds_optional, defaults them for older servers and rejects bad types',()=>{const p=previewFixture();p.already_started=true;p.seeds_pending=4;p.seeds_optional=true;const parsed=ui.parseSopPreview(p);assert.equal(parsed.seeds_pending,4);assert.equal(parsed.seeds_optional,true);const old=previewFixture();delete old.seeds_pending;delete old.seeds_optional;const legacy=ui.parseSopPreview(old);assert.equal(legacy.seeds_pending,0);assert.equal(legacy.seeds_optional,false);for(const patch of [{seeds_pending:-1},{seeds_pending:'4'},{seeds_pending:1.5},{seeds_optional:'yes'}])assert.throws(()=>ui.parseSopPreview({...previewFixture(),...patch}),/啟動預覽格式不正確/)});
+
+test('opening a local case on a tab without an active SOP read still ensures it',async()=>{
+ ui.invalidateSessionEpoch();posts=[];
+ const examples=JSON.parse(await fs.readFile(new URL('../backend/sop_import/api-examples.json',import.meta.url),'utf8'));
+ const overview={...examples.sop_tasks,project_id:'direct-tab',tasks:[],allowed_actions:{import:true,manage:true,work:true}};
+ globalThis.fetch=async(url,init={})=>{
+  if(init.method==='POST'){posts.push(url);return response({state:'started'})}
+  return response(url.endsWith('/sop-assignees')?{people:[],restricted:false}:overview);
+ };
+ const props={c:{s:{workspace_id:'w',features:{}}},p:{id:'direct-tab',case_type:'intake'},sop:{state:{kind:'forbidden'},reload:async()=>{}},assignments:{reload:async()=>{}}};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,props)));
+ assert.deepEqual(posts,['/api/projects/direct-tab/sop/ensure']);assert.equal(document.body.textContent,'SOP 已啟動');
+});

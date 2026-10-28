@@ -49,7 +49,6 @@ export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}
  const status=text(p.source_status,'來源狀態待核對');
  return <div className="project-overview">
   <div className="po-main">
-   {!workbench && (remoteStart?<div className="nw-start"><SopControls sop={start}/></div>:<CaseSopStart projectId={p.id} sop={sopTasks}/>)}
    <FlowDiagram compact nodes={model.nodes} overall={model.overall} selected={c.route.node?selectedKey:current} loading={assignments.state.kind==='loading'} onSelect={node=>go({tab:'overview',node})}/>
    {workbench}
     <section className="po-card po-todos" aria-labelledby="po-todo-title"><header className="po-card-heading"><h2 id="po-todo-title">待辦事項</h2><Button variant="plain" onClick={()=>go({tab:'flow',section:'all-tasks'})}>查看全部任務{tasks.complete ? ` (${tasks.rows.length})` : ''} →</Button></header>

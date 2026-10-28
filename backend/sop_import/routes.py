@@ -79,6 +79,32 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
             return run(ctx, body)
         return await run_in_threadpool(respond, execute)
 
+    @app.post(PREFIX + '/sop/ensure')
+    def ensure(request: Request, project_id: str):
+        from .ensure import ensure_local
+        from ..node_assignment.errors import Failure as NodeFailure
+
+        def run():
+            try:
+                data, user = identity(request)
+                require(user.get('active', True), 'sop_import_forbidden', 403)
+                _, project = load_case(data, user, project_id)
+                if project.get('case_type') != 'intake' and str(project.get('code') or '').strip():
+                    nodes = getattr(app.state, 'node_assignment', None)
+                    if nodes is None:
+                        return {'state': 'not_ready', 'reason': 'writes_disabled'}
+                    return nodes.ensure_sop(request, project_id)
+                return ensure_local(service, context(request, project_id))
+            except (Failure, NodeFailure) as exc:
+                reason = {'import_unavailable': 'writes_disabled', 'template_unavailable': 'no_template'}.get(exc.code, exc.code)
+                return {'state': 'not_permitted' if reason in {'sop_import_forbidden', 'forbidden'} else 'not_ready',
+                        'reason': reason}
+            except HTTPException as exc:
+                if exc.status_code in {403, 404}:
+                    return {'state': 'not_permitted', 'reason': 'case_not_found' if exc.status_code == 404 else 'forbidden'}
+                raise
+        return respond(run)
+
     @app.get('/api/sop-templates')
     def templates(request: Request):
         def run():
