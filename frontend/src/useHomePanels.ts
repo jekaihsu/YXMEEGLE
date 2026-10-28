@@ -25,7 +25,7 @@ export type HomeResponse = {
  items:HomeItem[]; next_cursor:string|null; has_more:boolean; complete:boolean; total_count:number|null;
  manager_view_available:boolean|null;
 };
-export type PanelRead = {body:HomeResponse|null; pending:boolean; error:string|null};
+export type PanelRead = {body:HomeResponse|null; pending:boolean; error:string|null;retry?:()=>void};
 export type HomeQuery = {panel:HomePanel; scope?:'mine'|'team'; deadline?:string; q?:string; cursor?:string; kinds?:string; limit?:number};
 const snapshots = new Map<string,{body:HomeResponse;storedAt:number}>();
 function cachedSnapshot(key:string):HomeResponse|null {
@@ -86,6 +86,8 @@ export function homePanelUrl(query:HomeQuery, full=false) {
  return `${full ? '/api/my-work' : '/api/home-panels'}?${params}`;
 }
 export function useHomePanels(c:Ctx, query:HomeQuery, enabled=true, full=false):PanelRead {
+ const [retryTick,setRetryTick]=useState(0);
+ const retry=()=>setRetryTick(value=>value+1);
  const epoch = getSessionEpoch();
  if (cacheEpoch !== epoch) {snapshots.clear();cacheEpoch=epoch}
  const [search,setSearch]=useState(query.q);
@@ -103,7 +105,7 @@ export function useHomePanels(c:Ctx, query:HomeQuery, enabled=true, full=false):
    controller?.abort();controller=new AbortController();
    const signal=controller.signal;
    setState(previous=>({key,scope,read:{body:cachedSnapshot(key) ?? (previous.scope===scope?previous.read.body:null),pending:true,error:null}}));
-   readPanel(url,signal,scope,{timeoutMs:35000,reloadVersion:c.reloadVersion}).then(parseHomeResponse).then(body => {
+   readPanel(url,signal,scope,{timeoutMs:35000,reloadVersion:[c.reloadVersion??c.w.version,retryTick]}).then(parseHomeResponse).then(body => {
     if (disposed || signal.aborted || epoch !== getSessionEpoch()) return;
     if (body.complete || body.items.length) {snapshots.set(key,{body,storedAt:Date.now()});if(snapshots.size>100)snapshots.delete(snapshots.keys().next().value!)}
     setState({key,scope,read:{body,pending:false,error:null}});
@@ -119,8 +121,8 @@ export function useHomePanels(c:Ctx, query:HomeQuery, enabled=true, full=false):
   const visible = () => {if(document.visibilityState==='visible')load()};
   document.addEventListener('visibilitychange',visible);
   return () => {disposed=true;controller?.abort();window.clearInterval(timer);document.removeEventListener('visibilitychange',visible)};
- }, [key,url,scope,enabled,c.reloadVersion??c.w.version]);
+ }, [key,url,scope,enabled,c.reloadVersion??c.w.version,retryTick]);
  if(!enabled)return {body:null,pending:false,error:null};
  const read=state.key===key?state.read:{body:cachedSnapshot(key) ?? (state.scope===scope?state.read.body:null),pending:true,error:null};
- return query.q===search?read:{...read,pending:true};
+ return {...read,pending:query.q!==search||read.pending,retry};
 }
