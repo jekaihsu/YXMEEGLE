@@ -71,7 +71,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  useEffect(()=>{if(selectedTaskNode && selectedTaskNode!==selectedKey)c.go({...c.route,node:selectedTaskNode},true)},[selectedTaskNode,selectedKey]);
  useEffect(()=>{
   if(loading)return;
-  if(firstSelection.current){firstSelection.current=false;if(inline&&!c.route.task&&!c.route.section&&!route.focus)return}
+  if(firstSelection.current){firstSelection.current=false;if(inline&&!c.route.task&&!c.route.section&&!c.route.focus)return}
   if(keyboardMove.current){keyboardMove.current=false;return;}
   const id=c.route.section==='evidence' ? 'flow-evidence' : route.focus==='tasks' ? 'flow-tasks' : c.route.node ? 'flow-selected' : '';
   if(!id)return;const frame=requestAnimationFrame(()=>{const target=document.getElementById(id);if(id==='flow-evidence' && target instanceof HTMLDetailsElement)target.open=true;target?.scrollIntoView({block:'start',behavior:'auto'})});return()=>cancelAnimationFrame(frame);
