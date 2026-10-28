@@ -34,5 +34,26 @@ try{
  await act(async()=>requests[0].resolve(new Response(JSON.stringify({...workspace,scope:'project',project}))));
  assert.match(document.body.textContent,/文件與交付/);
  assert.equal(requests.length,1,'rendering documents adds no workflow waterfall');
+ await act(async()=>root.unmount());
+ ui.invalidateSessionEpoch();requests.length=0;
+ const originalTimeout=globalThis.setTimeout,originalClear=globalThis.clearTimeout;
+ const timers=new Map();let timerId=0;
+ globalThis.setTimeout=(fn,ms)=>{assert.equal(ms,10000);timers.set(++timerId,fn);return timerId};
+ globalThis.clearTimeout=id=>timers.delete(id);
+ try {
+  root=createRoot(document.getElementById('root'));await render('files');
+  assert.equal(requests.length,1);
+  await act(async()=>{[...timers.values()][0]()});
+  assert.equal(requests.length,2);
+  assert.equal(document.querySelector('[role=status]').textContent,'仍在載入案件，正在重試…');
+  assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent==='重試').disabled,false);
+  await act(async()=>{[...timers.values()][0]()});
+  assert.match(document.querySelector('[role=alert]').textContent,/案件讀取失敗/);
+  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重試').click());
+  assert.equal(requests.length,3);
+  globalThis.setTimeout=originalTimeout;globalThis.clearTimeout=originalClear;
+  await act(async()=>requests[2].resolve(new Response(JSON.stringify({...workspace,scope:'project',project}))));
+  assert.match(document.body.textContent,/文件與交付/);
+ } finally {globalThis.setTimeout=originalTimeout;globalThis.clearTimeout=originalClear}
  console.log('PASS project detail: parallel visible reads, shared pending detail, and no unrelated workflow prefetch');
 }finally{await act(async()=>{root.unmount();settle()});dom.window.close()}

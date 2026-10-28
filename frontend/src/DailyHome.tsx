@@ -7,7 +7,7 @@ import {isHomeAssigned,isHomeProxy,isHomeExecutable,isHomeLate,isHomeDueToday} f
 import './DailyHome.css';
 import {useHomePanels, type HomePanel, type PanelRead} from './useHomePanels';
 const AssignmentTable=lazy(()=>import('./MyWorkTable').then(module=>({default:module.AssignmentTable})));
-import {Skeleton} from './design';
+import {TableLoadingSkeleton} from './DetailLoadingSkeleton';
 
 type Item={key:string;title:string;detail:string;facts?:HomeTaskFacts|null;late?:number;today?:boolean;blocked?:boolean;icon:ReactNode;onClick:()=>void};
 
@@ -167,22 +167,24 @@ function ShellActivity({c}:{c:Ctx}){
 }
 
 
-export function PanelStatus({read}:{read:PanelRead}) {
+export function PanelStatus({read,onRetry}:{read:PanelRead;onRetry?:()=>void}) {
  const body=read.body;
- if (!body) return read.pending ? <p className="my-work-loading" role="status">正在載入工作…</p> : <p role="status">工作來源暫時無法讀取</p>;
+ if (!body) return read.pending ? <TableLoadingSkeleton label="正在載入工作…"/> : <div role="alert"><p>工作來源暫時無法讀取{read.error ? `：${read.error}` : ''}</p>{onRetry&&<Button onClick={onRetry}>重試</Button>}</div>;
  const time=body.as_of ? new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(body.as_of)) : null;
  if(!time && !read.pending && !read.error && body.complete && body.readState!=='partial' && body.freshness.status!=='stale')return null;
  return <small className="my-work-banner-as-of">{time ? `更新於 ${time}` : '尚無成功讀取時間'}{read.pending ? ' · 正在更新清單' : read.error ? ' · 上次資料，更新失敗' : body.freshness.status==='stale' ? ' · 上次資料' : ''}{!body.complete ? ' · 來源尚未完整' : ''}</small>;
 }
 export function HomePanelSection({c,panel,title,scope='mine',onManager}:{c:Ctx;panel:HomePanel;title:string;scope?:'mine'|'team';onManager?:(allowed:boolean)=>void}) {
- const read=useHomePanels(c,{panel,scope});
+ const [retry,setRetry]=useState(0);
+ // Keep a panel retry distinct from shared post-write reload generations.
+ const read=useHomePanels(retry?{...c,reloadVersion:-(Math.abs(c.reloadVersion??c.w.version)+retry)}:c,{panel,scope});
  useEffect(()=>{if(read.body?.manager_view_available!==null && read.body?.manager_view_available!==undefined)onManager?.(read.body.manager_view_available)},[read.body?.manager_view_available,onManager]);
  const counts=read.body?.counts;
  return <section className="ds-section dh-personal-queue" aria-label={title}>
   <h2>{title}</h2>
   {counts && panel==='assigned' && <p>節點責任 {counts.node_assignments ?? '未知'} 項 · 任務 {counts.tasks ?? '未知'} 項</p>}
-  <PanelStatus read={read}/>
-  {read.body && <><Suspense fallback={<Skeleton lines={3}/>}><AssignmentTable compact items={read.body.items} onNavigate={c.go}/></Suspense>
+  <PanelStatus read={read} onRetry={()=>setRetry(n=>n+1)}/>
+  {read.body && <><Suspense fallback={<TableLoadingSkeleton label="正在載入工作表格…"/>}><AssignmentTable compact items={read.body.items} onNavigate={c.go}/></Suspense>
    {!read.body.items.length && <p>{read.body.complete ? '目前沒有已核實的事項' : read.body.readState==='disabled' ? '工作來源尚未啟用' : '工作來源待核對'}</p>}
    <Button variant="plain" onClick={()=>c.go({view:'work',tab:panel,ctx:new URLSearchParams({scope}).toString()})}>查看完整表格</Button>
   </>}

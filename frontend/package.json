@@ -62,7 +62,8 @@
     "test:dispatch-publish": "node test-dispatch-publish.mjs && node test-dispatch-publish-ui.mjs && node test-dispatch-round2.mjs",
     "test:sop-tasks": "node test-sop-tasks.mjs",
     "test:quotes": "node test-quotes.mjs && node test-quotes-ui.mjs",
-    "test:task-list-context": "node test-task-list-context.mjs"
+    "test:task-list-context": "node test-task-list-context.mjs",
+    "test:detail-loading": "node test-project-detail-loading.mjs && node test-home-panels.mjs && node test-detail-skeleton.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",
