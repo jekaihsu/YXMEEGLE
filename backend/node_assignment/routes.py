@@ -63,6 +63,28 @@ def register(app, *, identity, load_case, sessions, receipt_model, audit_model, 
             return Context(data['wid'], fresh_user, fresh_state, fresh_project, authorize, refresh)
         return Context(data['wid'], user, state, project, authorize, refresh)
 
+    def ensure_sop(request, project_id):
+        if not enabled:
+            return {'state': 'not_ready', 'reason': 'writes_disabled'}
+        ctx = context(request, project_id)
+        with service.locks.hold((ctx.wid, 'ensure-sop:' + project_id), service.config.lock_timeout_seconds):
+            preview = start_sop.preview(ctx)
+            if preview['blockers']:
+                reason = preview['blockers'][0]['code']
+                return {'state': 'not_permitted' if reason == 'forbidden' else 'not_ready', 'reason': reason}
+            if not preview['can_start']:
+                return {'state': 'not_permitted', 'reason': 'forbidden'}
+            if preview['already_started']:
+                return {'state': 'already_started'}
+            from .operations import StartSopCommand
+            _, result, _ = start_sop.run(ctx, 'ensure-' + preview['preview_hash'], StartSopCommand(preview['preview_hash'], False))
+            if not result['complete']:
+                return {'state': 'not_ready', 'reason': next((r['error'] for r in result['results'] if r['error']), 'sync_failed')}
+            return {'state': 'started' if result['started'] else 'already_started'}
+
+    service.ensure_sop = ensure_sop
+    app.state.node_assignment = service
+
     def node_key(value):
         try:
             return NodeKey(value)
