@@ -95,7 +95,8 @@ def test_oversized_body_stops_before_consuming_stream(h, declared):
     async def receive():
         consumed.append(1)
         return {'type': 'http.request', 'body': b'x' * (MAX_BODY + 1), 'more_body': len(consumed) == 1}
-    request = Request({'type': 'http', 'headers': [(b'content-length', b'1000000')] if declared else []}, receive)
+    request = Request({'type': 'http', 'method': 'POST', 'path': '/api/projects/p1/sop-import/preview',
+                       'headers': [(b'content-length', b'1000000')] if declared else []}, receive)
     endpoint = next(r.endpoint for r in h.client.app.routes if r.path.endswith('/sop-import/preview'))
     response = asyncio.run(endpoint(request, 'p1'))
     assert response.status_code == 422

@@ -28,7 +28,7 @@ def ensure_local(service, ctx):
             return {'state': 'already_started'}
         keys = startable_nodes(service, db, ctx)
         if not keys:
-            return {'state': 'already_started'}
+            return {'state': 'not_ready', 'reason': 'no_startable_nodes'}
         service.writable()
         require(not ambiguous(ctx.project), 'case_identity_unresolved', 409)
         require(service.position(db, ctx, service.facts(ctx))['stage'] != 'cancelled', 'no_stage', 409)

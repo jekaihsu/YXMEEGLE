@@ -165,7 +165,7 @@ def test_workspace_manager_title_does_not_bypass_roster_scope(h):
     assert change(h, y, {'title': '越權'}, 403)['code'] == 'sop_import_forbidden'
     h.service.roster_required = True
     h.service.roster_provider = lambda fresh=False: None
-    assert change(h, y, {'title': '名冊未知'}, 403)['code'] == 'sop_import_forbidden'
+    assert change(h, y, {'title': '名冊未知'}, 503)['code'] == 'roster_unavailable'
 
 
 @pytest.mark.parametrize('path, body', [

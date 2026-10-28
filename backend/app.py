@@ -1706,7 +1706,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         from .node_assignment.errors import Failure as RosterFailure
         from .sop_import.domain import Failure
         try:
-            cached = service._roster(fresh=True) if fresh else service.roster_cache.peek('roster')
+            cached = service._roster(fresh=True) if fresh else service.roster_cache.peek('roster', allow_stale=True)
         except RosterFailure:
             raise Failure('roster_unavailable', 503, reason='無法確認最新人員名單，請重新載入後再試') from None
         return cached.value if cached else None

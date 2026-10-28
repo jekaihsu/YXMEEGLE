@@ -38,10 +38,11 @@ export interface SopEnrollment {
  nodes:{key:SopNodeKey; name:string; status:string; eligible:boolean}[];
 }
 export interface SopOverview {
+ managedNodeKeys?:SopNodeKey[];
  localNodes?:LocalNode[];
  enrollment?:SopEnrollment|null;
  caseHeader?:{id:string; code:string|null; name:string|null}; projectId: string; startNode: SopNodeKey; checklistRevision: number; caseCounts: SopCounts; nodeCounts: Record<SopNodeKey, SopCounts>;
- tasks: SopTask[]; allowed: {import: boolean; manage: boolean; work: boolean};
+ tasks: SopTask[]; allowed: {import: boolean; manage: boolean; work: boolean; startAllNodes?:boolean};
  nodeDone: Partial<Record<SopNodeKey, {rule: string; reason: string}>>;
 }
 export interface CloseNodeResult {closed: number; leftOpen: {shared: number; unresolved: number}}
@@ -127,9 +128,9 @@ export function parseOverview(v: unknown): SopOverview {
  const tasks = list(o.tasks, task);
  if (new Set(tasks.map(t => t.id)).size !== tasks.length) throw malformed();
  const header=o.case==null?null:object(o.case);
- return {localNodes:o.local_nodes==null?[]:list(o.local_nodes,parseLocalNode),enrollment:o.sop_enrollment==null?null:parseEnrollment(o.sop_enrollment),caseHeader:header?{id:str(header.id),code:optStr(header.code),name:optStr(header.name)}:undefined,projectId: str(o.project_id), startNode: node(o.start_node), checklistRevision: int(o.checklist_revision), caseCounts: counts(o.case_counts),
+ return {managedNodeKeys:o.managed_node_keys==null?undefined:list(o.managed_node_keys,node),localNodes:o.local_nodes==null?[]:list(o.local_nodes,parseLocalNode),enrollment:o.sop_enrollment==null?null:parseEnrollment(o.sop_enrollment),caseHeader:header?{id:str(header.id),code:optStr(header.code),name:optStr(header.name)}:undefined,projectId: str(o.project_id), startNode: node(o.start_node), checklistRevision: int(o.checklist_revision), caseCounts: counts(o.case_counts),
   nodeCounts: Object.fromEntries(SOP_NODE_KEYS.map(key => [key, counts(nodeCounts[key])])) as Record<SopNodeKey, SopCounts>,
-  tasks, allowed: {import: bool(allowed.import), manage: bool(allowed.manage), work: bool(allowed.work)},
+  tasks, allowed: {import: bool(allowed.import), manage: bool(allowed.manage), work: bool(allowed.work), startAllNodes: allowed.start_all_nodes===true},
   nodeDone: Object.fromEntries(Object.entries(o.node_done == null ? {} : object(o.node_done)).filter(([key]) => isSopNode(key)).map(([key, v]) => {const d = object(v); return [key, {rule: str(d.rule), reason: str(d.reason)}]}))};
 }
 export function parseTemplates(v: unknown): SopTemplate[] {

@@ -1,7 +1,7 @@
 import {createPortal} from 'react-dom';
 import {useEffect, useId} from 'react';
 import {Badge, Button, Row, Section, Sheet, Skeleton} from './design';
-import {SOP_NODES, sopNodeLabel, type ImportPreview, type PreviewOutcome, type SopNodeKey} from './sopTaskApi';
+import {SOP_NODES, SOP_NODE_KEYS, sopNodeLabel, type ImportPreview, type PreviewOutcome, type SopNodeKey} from './sopTaskApi';
 import {groupOutcomes, needsDecision, selectable, STATE_LABEL} from './sopTaskModel';
 import {defaultImportNodes, useSopImport} from './useSopTasks';
 
@@ -31,9 +31,12 @@ function OutcomeRow({o, flow}: {o: PreviewOutcome; flow: Flow}) {
  </li>;
 }
 
-export function SopImportSheet({projectId, startNode, only, onApplied, onClose, onOpenImported}: {projectId: string; startNode: SopNodeKey; only?: SopNodeKey; onApplied: () => Promise<void>; onClose: () => void; onOpenImported: () => void}) {
+export function SopImportSheet({projectId, startNode, only, allowedNodes=SOP_NODE_KEYS, onApplied, onClose, onOpenImported}: {projectId: string; startNode: SopNodeKey; only?: SopNodeKey; allowedNodes?:readonly SopNodeKey[]; onApplied: () => Promise<void>; onClose: () => void; onOpenImported: () => void}) {
  const flow = useSopImport(projectId, onApplied);
- useEffect(() => {void flow.open(defaultImportNodes(startNode, only))}, []);
+ useEffect(() => {
+  const initial=only ? [only] : allowedNodes.length < SOP_NODE_KEYS.length ? allowedNodes : defaultImportNodes(startNode);
+  void flow.open(initial.filter(key=>allowedNodes.includes(key)));
+ }, []);
  const {step, preview, status} = flow;
  const locked = status === 'applying' || status === 'confirming';
  const close = () => {if (!locked) onClose()};
@@ -48,8 +51,8 @@ export function SopImportSheet({projectId, startNode, only, onApplied, onClose, 
     {flow.templates === null ? (status === 'loading' ? <Skeleton lines={2} height="2.75rem"/> : null)
      : flow.templates.length ? <fieldset className="sop-choices"><legend>範本版本</legend>{flow.templates.map(t => <label key={t.version_id}><input type="radio" name="sop-version" checked={flow.version === t.version_id} onChange={() => flow.setVersion(t.version_id)}/><span>{t.name}</span><span className="sop-muted">{t.revision}</span>{t.is_default && <Badge tone="accent">預設</Badge>}</label>)}</fieldset>
      : <p className="pf-empty">無已發布範本</p>}
-    <Section><Row label="起始節點" value={`從 ${sopNodeLabel(only || startNode)} 開始`}/></Section>
-    {!only && <fieldset className="sop-nodes"><legend>匯入節點</legend>{SOP_NODES.map(([key, label]) => <Button key={key} aria-pressed={flow.nodes.includes(key)} disabled={flow.busy} onClick={() => flow.toggleNode(key)}>{label}</Button>)}</fieldset>}
+    <Section><Row label="起始節點" value={`從 ${sopNodeLabel(only || flow.nodes[0] || startNode)} 開始`}/></Section>
+    {!only && <fieldset className="sop-nodes"><legend>匯入節點</legend>{SOP_NODES.filter(([key])=>allowedNodes.includes(key)).map(([key, label]) => <Button key={key} aria-pressed={flow.nodes.includes(key)} disabled={flow.busy} onClick={() => flow.toggleNode(key)}>{label}</Button>)}</fieldset>}
     <div className="sop-sheet-actions"><Button onClick={close}>取消</Button><Button variant="primary" disabled={!flow.version || !flow.nodes.length || flow.busy} disabledReason={!flow.version ? '請選擇範本版本' : !flow.nodes.length ? '請選擇節點' : '讀取中'} onClick={() => void flow.loadDefault()}>{status === 'loading' && flow.templates ? '產生預覽中…' : '下一步'}</Button></div>
    </>}
    {step === 'select' && preview && (() => {

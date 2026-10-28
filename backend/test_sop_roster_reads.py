@@ -36,7 +36,7 @@ def test_cold_roster_recovers_manager_before_read_authorization(h, path, reader_
 
 
 @pytest.mark.parametrize('path', ['/sop-tasks', '/sop/ensure'])
-def test_cold_roster_failure_keeps_existing_503(h, path):
+def test_cold_roster_failure_is_passive_for_reads_and_503_for_ensure(h, path):
     h.service.roster_required = True
     h.who[0] = 'member'
     calls = []
@@ -49,8 +49,11 @@ def test_cold_roster_failure_keeps_existing_503(h, path):
 
     h.service.roster_provider = provider
     response = (h.client.post if path.endswith('ensure') else h.client.get)(URL + path)
-    assert response.status_code == 503
-    assert response.json()['code'] == 'roster_unavailable'
+    assert response.status_code == (503 if path.endswith('ensure') else 200)
+    if path.endswith('ensure'):
+        assert response.json()['code'] == 'roster_unavailable'
+    else:
+        assert response.json()['allowed_actions']['manage'] is False
     assert calls == [True]
 
 

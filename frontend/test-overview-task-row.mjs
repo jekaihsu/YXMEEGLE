@@ -28,7 +28,7 @@ async function mount({source='sop',assign=true,due=null}={}){
   if(call.method==='PATCH'){
    if(release)await release.promise;
    if(writeStatus!==200)return response({code:writeStatus===409?(source==='sop'?'task_revision_conflict':'revision_conflict'):'invalid',detail:'無法儲存'},writeStatus);
-   if(source==='lark'){const updated=structuredClone(fixture.detail);updated.tasks[0].assignee={open_id:'new',name:'新執行人'};return response(updated)}
+   if(source==='lark'){const updated=structuredClone(fixture.detail);updated.tasks[0].assignee={open_id:'eligible',name:'合格人員'};return response(updated)}
    const wire=structuredClone(examples.sop_tasks.tasks[0]);wire.id='sop-1';wire.participants=call.body.participants;wire.revision=8;
    return response({task_id:'sop-1',revision:8,checklist_revision:9,task:wire});
   }
@@ -37,7 +37,7 @@ async function mount({source='sop',assign=true,due=null}={}){
   return response(fixture.list);
  };
  const sop={current:()=>true,reload:async()=>{reloads++},applyTask:(...args)=>applied.push(args)};
- function Harness(){const assignments=ui.useNodeAssignments('p1',source==='lark');const saved=assignments.state.kind==='ready'?assignments.state.data.node_details?.control?.tasks[0]:null;const displayed=source==='lark'&&saved?{...row,task:saved,ownerId:saved.assignee?.open_id||'',owner:saved.assignee?.name||'未指派',revision:saved.revision,permissions:saved.can}:row;return React.createElement('ul',null,React.createElement(ui.OverviewTaskRow,{row:displayed,projectId:'p1',today:'2026-10-28',sop,assignments,go:target=>{route=target},href:'#detail'}))}
+ function Harness(){const assignments=ui.useNodeAssignments('p1',source==='lark');const saved=assignments.state.kind==='ready'?assignments.state.data.node_details?.control?.tasks[0]:null;const displayed=source==='lark'&&saved?{...row,task:saved,ownerId:saved.assignee?.open_id||'',owner:saved.assignee?.name||'未指派',revision:saved.revision,permissions:saved.can}:row;return React.createElement('ul',null,React.createElement(ui.OverviewTaskRow,{row:displayed,people:[{open_id:'eligible',name:'合格人員'}],projectId:'p1',today:'2026-10-28',sop,assignments,go:target=>{route=target},href:'#detail'}))}
  root=createRoot(document.getElementById('root'));await flush(()=>root.render(React.createElement(Harness)));
 }
 async function pick(){await flush(()=>document.querySelector('[aria-haspopup="listbox"]').click());await flush(()=>document.querySelector('[role="option"][aria-selected="false"]:last-child').click())}
@@ -63,7 +63,7 @@ test('SOP revision conflict reloads that source exactly once and asks for a fres
 });
 test('Lark row uses existing mutation endpoint with its own revision and applies returned detail',async()=>{
  await mount({source:'lark'});assert.equal(byText('指派').textContent,'指派');await pick();
- const call=calls.find(c=>c.method==='PATCH');assert.equal(call.url,'/api/projects/p1/node-assignments/nodes/control/tasks/recTask1');assert.equal(call.body.expected_revision,'9b0c1d2e3f405162');assert.equal(call.body.assignee_open_id,'new');assert.equal(typeof call.body.request_id,'string');assert.equal(applied.length,0);assert.match(document.body.textContent,/已更新負責人/);assert.equal(byText('新執行人').textContent,'新執行人');
+ const call=calls.find(c=>c.method==='PATCH');assert.equal(call.url,'/api/projects/p1/node-assignments/nodes/control/tasks/recTask1');assert.equal(call.body.expected_revision,'9b0c1d2e3f405162');assert.equal(call.body.assignee_open_id,'eligible');assert.equal(typeof call.body.request_id,'string');assert.equal(applied.length,0);assert.match(document.body.textContent,/已更新負責人/);assert.equal(byText('合格人員').textContent,'合格人員');
 });
 test('Lark revision conflict reloads once through the existing mutation hook',async()=>{
  await mount({source:'lark'});const before=calls.filter(c=>c.method==='GET'&&c.url.endsWith('/node-assignments')).length;writeStatus=409;await pick();
@@ -105,4 +105,24 @@ test('overview reads remote task details when summary has no embedded task paylo
  const c={w:workspace,s:{user,features:{}},route:{view:'project',project:'p1',tab:'overview'},go:()=>{}};
  root=createRoot(document.getElementById('root'));await flush(()=>root.render(React.createElement(ui.ProjectOverview,{c,p:project,assignments,selectedKey:'control',sopTasks:sop,workbench:null})));
  assert.equal(reads.filter(url=>url.includes('/nodes/')).length,9);assert.equal(document.querySelectorAll('.po-task-row').length,1);assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent.startsWith('查看全部任務')).textContent,'查看全部任務 (1) →');assert.match(document.querySelector('.po-task-row').textContent,/控制點成果核對/);
+ await flush(()=>document.querySelector('.po-task-row [aria-haspopup="listbox"]').click());
+ assert.deepEqual([...document.querySelectorAll('[role="option"]')].map(option=>option.textContent),['未指派',...detail.assignable_people.map(person=>person.name)]);
+ assert.equal(reads.filter(url=>url.includes('sop-assignees')).length,0);
+});
+
+test('Lark picker only offers node eligible people and never searches SOP assignees',async()=>{
+ await mount({source:'lark'});
+ await flush(()=>document.querySelector('[aria-haspopup="listbox"]').click());
+ assert.equal(calls.filter(c=>c.url.includes('sop-assignees')).length,0);
+ assert.deepEqual([...document.querySelectorAll('[role="option"]')].map(p=>p.textContent),['未指派','合格人員']);
+ const input=document.querySelector('[role="combobox"]');
+ await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,'新執行人');input.dispatchEvent(new Event('input',{bubbles:true}));await new Promise(r=>setTimeout(r,280))});
+ assert.equal(calls.filter(c=>c.url.includes('sop-assignees')).length,0);
+ assert.deepEqual([...document.querySelectorAll('[role="option"]')].map(p=>p.textContent),['未指派']);
+});
+test('local SOP picker still searches all SOP assignees while typing',async()=>{
+ await mount();await flush(()=>document.querySelector('[aria-haspopup="listbox"]').click());
+ const input=document.querySelector('[role="combobox"]');
+ await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,'新');input.dispatchEvent(new Event('input',{bubbles:true}));await new Promise(r=>setTimeout(r,280))});
+ await flush();assert.ok(calls.some(c=>c.url.includes('sop-assignees')&&c.url.includes('scope=all')&&c.url.includes('q=')));
 });

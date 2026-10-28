@@ -1,5 +1,6 @@
 from contextlib import nullcontext
 import json
+import threading
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, OperationalError
@@ -10,6 +11,7 @@ from .domain import Failure, require
 from .service import Context, Service, authorize, has_reader_grant, can_manage
 
 PREFIX = '/api/projects/{project_id}'
+ROSTER_FAILURE_RETRY_SECONDS = 30
 MAX_BODY = 64 * 1024
 ERROR_TEXT = {'local_node_only': '請使用此案件的正式節點流程', 'local_node_blocked': '節點目前無法操作', 'node_revision_conflict': '節點已更新，請重新載入後再試', 'legacy_case_requires_opt_in': '舊案需先確認套用 SOP', 'node_not_enrolled': '此節點尚未套用 SOP', 'node_already_started_or_finished': '已開始或已完成的節點不能套用 SOP', 'case_identity_unresolved': '案件識別待核對', 'confirmation_required': '請確認套用的節點', 'case_not_found': '找不到此案件或沒有讀取權限', 'result_note_required': '請填寫結果說明', 'task_revision_conflict': '任務已被更新，請重新載入後再試',
               'sop_import_forbidden': '你沒有操作此 SOP 任務的權限', 'completion_evidence_missing': '此任務需先完成佐證或審核',
@@ -22,12 +24,29 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
                       local_cases_enabled=flag('LOCAL_CASE_CREATION_ENABLED'),
                       auto_enabled=flag('SOP_AUTO_ENROLL_ENABLED'), auto_since=lambda: cfg.get('SOP_AUTO_ENROLL_SINCE'))
 
+    roster_refresh_lock = threading.Lock()
+    roster_retry_at = 0
+
     def context(request, project_id, case_loader=load_case):
         from .authority import global_manager
 
         def roster(fresh=False):
+            nonlocal roster_retry_at
+            if fresh and hasattr(request.state, 'sop_roster_error'):
+                raise request.state.sop_roster_error
             if fresh and not hasattr(request.state, 'sop_roster'):
-                request.state.sop_roster = service.roster_provider(fresh=True)
+                with roster_refresh_lock:
+                    try:
+                        require(service.clock() >= roster_retry_at, 'roster_unavailable', 503)
+                        request.state.sop_roster = service.roster_provider(fresh=True)
+                        require(not service.roster_required or request.state.sop_roster is not None, 'roster_unavailable', 503)
+                    except Failure as exc:
+                        if exc.code != 'roster_unavailable':
+                            raise
+                        if service.clock() >= roster_retry_at:
+                            roster_retry_at = service.clock() + ROSTER_FAILURE_RETRY_SECONDS
+                        request.state.sop_roster_error = exc
+                        raise
             if hasattr(request.state, 'sop_roster'):
                 return request.state.sop_roster
             return service.roster_provider()
@@ -42,12 +61,21 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
         ctx.roster_required = service.roster_required
         ctx.roster_loader = roster
         ctx.roster = roster()
-        if (ctx.roster_required and ctx.roster is None and not global_manager(ctx)
-                and (request.method == 'GET' or request.url.path.endswith('/sop/ensure'))):
-            ctx.refresh_roster(service.roster_provider)
-            require(ctx.roster is not None, 'roster_unavailable', 503)
+        participant = assigned_only and service.participates(data['wid'], user['id'], project_id)
+        roster_identity = data.get('mode') == 'lark' or user.get('oauth_identity', {}).get('open_id') == user['id']
+        executor_transition = request.url.path.endswith('/transition') and (not assigned_only or service.participates(
+            data['wid'], user['id'], project_id, executor_task_id=request.path_params['task_id']))
+        needs_authority = not project.get('sop_assigned_only') and not executor_transition and not (request.method == 'GET' and participant)
+        if (ctx.roster_required and roster_identity and not global_manager(ctx) and needs_authority
+                and (ctx.roster is None or request.method != 'GET')):
+            try:
+                ctx.refresh_roster(service.roster_provider)
+                require(ctx.roster is not None, 'roster_unavailable', 503)
+            except Failure as exc:
+                if request.method != 'GET' or exc.code != 'roster_unavailable':
+                    raise
         ctx.assigned_only = assigned_only and not can_manage(ctx)
-        require(not ctx.assigned_only or service.participates(data['wid'], user['id'], project_id), 'sop_import_forbidden', 403)
+        require(not ctx.assigned_only or participant, 'sop_import_forbidden', 403)
         if project.get('sop_assigned_only'):
             ctx.assigned_only = True
         authorize(ctx)

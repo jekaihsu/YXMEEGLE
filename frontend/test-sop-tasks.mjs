@@ -539,3 +539,34 @@ for(const [status,code,copy] of [[503,'cleanup_migration_required','稽核遷移
  assert.equal(panel.querySelector('textarea').value,'QA reason');
  assert.ok(document.querySelector('[data-sop-task=t1]'));
 });
+
+test('single-node manager imports and creates only managed nodes, and cannot close control',async()=>{
+ const pmTask=task('pm-only',{nodes:[link('pm',1)],can:{manage:true},allowed_actions:['edit','start','complete']});
+ const control=task('control-only',{nodes:[link('control',2)],can:{manage:false},allowed_actions:[]});
+ const extra={managed_node_keys:['pm'],allowed_actions:{import:true,manage:true,work:true,start_all_nodes:false},node_done:{pm:{rule:'test',reason:'完成'},control:{rule:'test',reason:'完成'}}};
+ await mount({tasks:[pmTask,control],route:{node:'pm'},extra});
+ assert.ok(button('匯入預設任務'));assert.ok(button('新增任務'));assert.ok([...document.querySelectorAll('button')].find(b=>b.textContent.startsWith('依節點完成')));
+ await click(button('匯入預設任務'));await click(button('下一步'));
+ assert.deepEqual(calls.find(c=>c.url.endsWith('/sop-import/preview')).body.node_keys,['pm']);
+ await click(document.querySelector('[aria-label="關閉"]'));
+ c={...c,route:{...c.route,node:'control'}};await act(async()=>{render();await tick()});
+ assert.equal(button('匯入預設任務'),undefined);assert.equal(button('新增任務'),undefined);assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent.startsWith('依節點完成')),undefined);
+ c={...c,route:{...c.route,node:undefined}};await act(async()=>{render();await tick()});
+ await click(button('匯入預設任務'));
+ assert.equal([...dialog().querySelectorAll('.sop-nodes button')].length,1);assert.match(dialog().textContent,/PM/);
+ await click(button('下一步'));assert.deepEqual(calls.filter(c=>c.url.endsWith('/sop-import/preview')).at(-1).body.node_keys,['pm']);
+ await click(document.querySelector('[aria-label="關閉"]'));await click(button('新增任務'));
+ await type(document.querySelector('.assignment-edit input'),'新增 PM');
+ await click(button('建立任務'));
+ assert.deepEqual(server.created.node_keys,['pm']);
+});
+
+test('mixed node bulk assignment skips tasks outside node manager authority',async()=>{
+ const tasks=[task('managed',{nodes:[link('pm',1)],allowed_actions:['edit']}),task('forbidden',{nodes:[link('control',2)],allowed_actions:[]})];
+ await mount({tasks,route:{node:'pm'},extra:{managed_node_keys:['pm'],allowed_actions:{import:true,manage:true,work:true,start_all_nodes:false}}});
+ await click(button('全案'));await click(button('選取此頁'));await click(button('指派'));
+ assert.match(dialog().textContent,/1 項待更新.*略過 1 項/);
+ await act(async()=>{const select=dialog().querySelector('select');select.value='pm';select.dispatchEvent(new Event('change',{bubbles:true}));await tick()});
+ await click(button('確認指派'));
+ assert.deepEqual(calls.filter(call=>call.method==='PATCH').map(call=>call.url),['/api/projects/p1/sop-tasks/managed']);
+});

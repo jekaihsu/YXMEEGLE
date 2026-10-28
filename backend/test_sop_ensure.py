@@ -47,14 +47,15 @@ def test_single_node_manager_cannot_ensure_all_nodes(h):
         assert db.scalar(select(func.count()).select_from(LocalTask)) == 0
 
 
-def test_single_node_manager_has_no_case_wide_actions(h):
+def test_single_node_manager_has_manual_actions_but_no_automatic_start(h):
     from .test_sop_node_authority import roster
     from .test_sop_import import overview
     h.service.roster_provider = lambda fresh=False: roster()
     h.who[0] = 'member'
     allowed = overview(h)['allowed_actions']
     assert {key: allowed[key] for key in ('import', 'manage', 'decide_suggestions')} == {
-        'import': False, 'manage': False, 'decide_suggestions': False}
+        'import': True, 'manage': True, 'decide_suggestions': True}
+    assert allowed['start_all_nodes'] is False
 
 
 def test_ensure_flags_and_template(h):
@@ -90,8 +91,8 @@ def test_ensure_does_not_opt_in_legacy(h):
     (['pm'], False, 'pm', 'started'),
     (['pm'], False, 'member', 'not_permitted'),
     (['control'], False, 'member', 'not_permitted'),
-    (['pm'], True, 'pm', 'already_started'),
-    ([], False, 'pm', 'already_started')])
+    (['pm'], True, 'pm', 'not_ready'),
+    ([], False, 'pm', 'not_ready')])
 def test_ensure_uses_only_enrolled_startable_nodes(h, keys, started, actor, expected):
     from .models import BusinessRow
     from .sop_import.models import CasePolicy, TaskNodeLink
@@ -105,7 +106,8 @@ def test_ensure_uses_only_enrolled_startable_nodes(h, keys, started, actor, expe
             node.data = {**node.data, 'status': 'in_progress'}
     h.service.roster_provider = lambda fresh=False: roster()
     h.who[0] = actor
-    assert overview(h)['allowed_actions']['import'] is (actor == 'pm')
+    assert overview(h)['allowed_actions']['import'] is True
+    assert overview(h)['allowed_actions']['start_all_nodes'] is (actor == 'pm')
     assert h.client.post(URL + '/sop/ensure').json()['state'] == expected
     with h.sessions() as db:
         assert set(db.scalars(select(TaskNodeLink.node_key))) == (set(keys) if expected == 'started' else set())

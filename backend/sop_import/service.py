@@ -44,6 +44,9 @@ class Context:
 
     def refresh_roster(self, provider):
         self.roster = (self.roster_loader or provider)(fresh=True)
+        if self.assigned_only and not self.project.get('sop_assigned_only'):
+            self.assigned_only = False
+            self.assigned_only = not can_manage(self)
 
 
 def administrator(user):
@@ -309,10 +312,13 @@ class Service(EnrollmentService):
         from .assignees import page
         return page(ctx, people_visible, **query)
 
-    def participates(self, wid, user_id, project_id):
+    def participates(self, wid, user_id, project_id, *, executor_task_id=None):
         with self.sessions() as db:
-            return any(holds_task(t, user_id) for t in db.scalars(
-                select(LocalTask).where(LocalTask.workspace_id == wid, LocalTask.project_id == project_id)))
+            query = select(LocalTask).where(LocalTask.workspace_id == wid, LocalTask.project_id == project_id)
+            if executor_task_id is not None:
+                query = query.where(LocalTask.id == executor_task_id)
+            return any(t.participants.get('executor') == user_id if executor_task_id is not None else holds_task(t, user_id)
+                       for t in db.scalars(query))
 
     def personal_items(self, state, wid, user):
         from ..home_details import build_sop_home_task
@@ -666,7 +672,9 @@ class Service(EnrollmentService):
             selected.sort(key=lambda t: (t.template_family_id == 'manual', min((l.ordinal for l in by_task[t.id]), default=0), t.id))
             enrollment = self.enrollment_status(db, ctx) if not ctx.assigned_only else None
             policy_write = not enrollment or enrollment['policy']['policy'] == 'managed' or enrollment['policy']['revision'] == 0 and not self.auto_active()
-            return {'local_nodes': local_nodes.projection(self, db, ctx), 'sop_enrollment': enrollment, 'project_id': ctx.project['id'], 'task_source': 'sop_local',
+            node_policies = self.policy_write_reasons(db, ctx, NODE_MAP.values())
+            return {'managed_node_keys': [key for key in NODE_MAP.values() if can_manage_nodes(ctx, [key]) and not node_policies[key]],
+                    'local_nodes': local_nodes.projection(self, db, ctx), 'sop_enrollment': enrollment, 'project_id': ctx.project['id'], 'task_source': 'sop_local',
                     'case': {k: ctx.project.get(k) for k in ('id', 'code', 'name')},
                     **({'start_node': next((key for key in NODE_MAP.values() if any(l.node_key == key for t in tasks for l in by_task[t.id])), 'sales'),
                         'stage': None} if ctx.assigned_only else self.position(db, ctx, self.facts(ctx))),
@@ -677,10 +685,11 @@ class Service(EnrollmentService):
                                     for key in NODE_MAP.values()},
                     'tasks': self.task_views(db, ctx, selected, by_task),
                     'node_done': {} if ctx.assigned_only else {key: auto.public() for key, auto in self.node_done(ctx).items()},
-                    'allowed_actions': {'import': can_manage_nodes(ctx, NODE_MAP.values()) and self.writes_enabled() and policy_write,
-                                        'manage': can_manage_nodes(ctx, NODE_MAP.values()) and self.writes_enabled() and policy_write,
+                    'allowed_actions': {'start_all_nodes': can_manage_nodes(ctx, NODE_MAP.values()) and self.writes_enabled() and policy_write,
+                                        'import': can_manage(ctx) and self.writes_enabled() and policy_write,
+                                        'manage': can_manage(ctx) and self.writes_enabled() and policy_write,
                                         'work': (can_manage(ctx) or any(t.participants.get('executor') == ctx.user['id'] for t in tasks)) and self.writes_enabled() and policy_write,
-                                        'decide_suggestions': can_manage_nodes(ctx, NODE_MAP.values()) and self.writes_enabled() and policy_write}}
+                                        'decide_suggestions': can_manage(ctx) and self.writes_enabled() and policy_write}}
 
     def with_sop_counts(self, wid, items):
         ids = sorted({pid for item in items for pid in item['project_ids']})

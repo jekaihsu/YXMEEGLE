@@ -99,7 +99,7 @@ def test_an_assigned_person_without_any_grant_sees_and_works_only_their_task(h):
     h.who[0] = staff
     seen = overview(h)
     assert [t['id'] for t in seen['tasks']] == [mine['id']]
-    assert seen['allowed_actions'] == {'import': False, 'manage': False, 'work': True, 'decide_suggestions': False}
+    assert seen['allowed_actions'] == {'start_all_nodes': False, 'import': False, 'manage': False, 'work': True, 'decide_suggestions': False}
     assert seen['tasks'][0]['allowed_actions'] == ['start', 'block', 'complete']
     started = act(h, mine, 'start')
     assert started['state'] == 'in_progress'

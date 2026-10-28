@@ -69,7 +69,7 @@ test('detail status shows preparing skeleton and one explicit retry link',async(
  ui.invalidateSessionEpoch();posts=[];reloads=0;reply={state:'not_ready',reason:'no_template'};
  let finish;const pending=new Promise(resolve=>{finish=resolve});
  globalThis.fetch=async(url,init)=>{posts.push({url,method:init.method});await pending;return response(reply)};
- const props={c:{s:{features:{}}},p:{id:'p1',case_type:'intake'},sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true}}},reload:async()=>{reloads++}},assignments:{reload:async()=>{}}};
+ const props={c:{s:{features:{}}},p:{id:'p1',case_type:'intake'},sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true,startAllNodes:true}}},reload:async()=>{reloads++}},assignments:{reload:async()=>{}}};
  root=createRoot(document.getElementById('root'));
  await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,props)));
  assert.match(document.body.textContent,/SOP 準備中/);assert.ok(document.querySelector('.skeleton'));assert.equal(posts.length,1);
@@ -88,7 +88,7 @@ test('preview parser carries seeds_pending and seeds_optional, defaults them for
 test('opening a local case on a tab without an active SOP read still ensures it',async()=>{
  ui.invalidateSessionEpoch();posts=[];
  const examples=JSON.parse(await fs.readFile(new URL('../backend/sop_import/api-examples.json',import.meta.url),'utf8'));
- const overview={...examples.sop_tasks,project_id:'direct-tab',tasks:[],allowed_actions:{import:true,manage:true,work:true}};
+ const overview={...examples.sop_tasks,project_id:'direct-tab',tasks:[],allowed_actions:{import:true,manage:true,work:true,start_all_nodes:true}};
  globalThis.fetch=async(url,init={})=>{
   if(init.method==='POST'){posts.push(url);return response({state:'started'})}
   return response(url.endsWith('/sop-assignees')?{people:[],restricted:false}:overview);
@@ -116,7 +116,26 @@ for(const result of [{state:'not_ready',reason:'writes_disabled'},{state:'not_re
  root=createRoot(document.getElementById('root'));
  await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,{
   c:{s:{features:{node_assignment:false}}},p:{id:'legacy-case',code:'C001'},
-  sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true}}},reload:async()=>{}},assignments:{reload:async()=>{}}
+  sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true,startAllNodes:true}}},reload:async()=>{}},assignments:{reload:async()=>{}}
  })));
  assert.equal(posts.length,1);assert.equal(document.body.textContent,'');assert.equal(document.querySelector('button'),null);
+});
+
+test('node-scoped import authority never triggers case-wide automatic ensure',async()=>{
+ ui.invalidateSessionEpoch();posts=[];
+ globalThis.fetch=async(url,init={})=>{posts.push(url);return response({state:'started'})};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,{
+  c:{s:{features:{}}},p:{id:'node-manager-review',case_type:'intake'},sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true,startAllNodes:false}}},reload:async()=>{}},assignments:{reload:async()=>{}}
+ })));
+ assert.deepEqual(posts,[]);assert.equal(document.body.textContent,'需由有權限的人員準備 SOP');
+});
+for(const result of [{state:'not_ready',reason:'no_startable_nodes'},{state:'already_started'}])test(`blocked enrollment status is passive while real SOP stays started: ${result.state}`,async()=>{
+ ui.invalidateSessionEpoch();posts=[];
+ globalThis.fetch=async(url,init={})=>{posts.push(url);return response(result)};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,{
+  c:{s:{features:{}}},p:{id:'blocked-enrollment',case_type:'intake'},sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true,startAllNodes:true}}},reload:async()=>{}},assignments:{reload:async()=>{}}
+ })));
+ assert.equal(document.body.textContent,result.state==='already_started'?'SOP 已啟動':'');assert.equal(document.querySelector('button'),null);
 });

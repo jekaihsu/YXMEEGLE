@@ -2,6 +2,7 @@ import {useEffect,useId,useRef,useState} from 'react';
 import {getSessionEpoch} from './api';
 import {AssigneePicker} from './AssigneePicker';
 import {Badge,Button} from './design';
+import type {AssignablePerson} from './nodeAssignmentApi';
 import type {OverviewTodo} from './overviewDashboardModel';
 import type {OverviewTarget} from './projectOverviewModel';
 import {SopError,sopApi,sopErrorText} from './sopTaskApi';
@@ -9,7 +10,7 @@ import type {useSopTasks} from './useSopTasks';
 import type {useNodeAssignments} from './useNodeAssignments';
 
 type TaskRow=Exclude<OverviewTodo,{kind:'recommendation'}>;
-export function OverviewTaskRow({row,projectId,today,sop,assignments,locked=false,go,href}:{row:TaskRow;projectId:string;today:string;sop:Pick<ReturnType<typeof useSopTasks>,'current'|'applyTask'|'reload'>;assignments:Pick<ReturnType<typeof useNodeAssignments>,'mutate'|'pending'>;locked?:boolean;go:(target:OverviewTarget)=>void;href:string}){
+export function OverviewTaskRow({row,projectId,today,sop,assignments,people=[],locked=false,go,href}:{row:TaskRow;projectId:string;today:string;sop:Pick<ReturnType<typeof useSopTasks>,'current'|'applyTask'|'reload'>;assignments:Pick<ReturnType<typeof useNodeAssignments>,'mutate'|'pending'>;people?:AssignablePerson[];locked?:boolean;go:(target:OverviewTarget)=>void;href:string}){
  const [saving,setSaving]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const [menu,setMenu]=useState(false);
  const menuRoot=useRef<HTMLDivElement>(null),writing=useRef(false),life=useRef(true),id=useId();
@@ -45,7 +46,7 @@ export function OverviewTaskRow({row,projectId,today,sop,assignments,locked=fals
  };
  return <li className="po-task-row" aria-busy={saving}>
   <div className="po-task-title"><a href={href} onClick={e=>{e.preventDefault();go(row.target)}}>{row.title} · {row.node.label}</a>{row.node.progress.basis==='tasks'&&<small>節點 {row.node.tasks.done}/{row.node.tasks.total} 已完成</small>}</div>
-  <div className="po-task-executor">{canAssign?<AssigneePicker projectId={projectId} nodeKey={row.node.key} title={row.title} value={row.ownerId} valueLabel={row.ownerId?row.owner:'指派'} busy={busy||locked} onChange={person=>void assign(person)}/>:<span>{row.ownerId?row.owner:'未指派'}</span>}</div>
+  <div className="po-task-executor">{canAssign?<AssigneePicker projectId={row.kind==='sopTask'?projectId:undefined} people={row.kind==='larkTask'?people.map(p=>({id:p.open_id,name:p.name})):undefined} nodeKey={row.node.key} title={row.title} value={row.ownerId} valueLabel={row.ownerId?row.owner:'指派'} busy={busy||locked} onChange={person=>void assign(person)}/>:<span>{row.ownerId?row.owner:'未指派'}</span>}</div>
   <Badge tone={status==='受阻'?'warning':status==='已完成'?'positive':undefined}>{status}</Badge>
   <div className="po-task-date">{row.deadline?<><time dateTime={row.deadline}>{row.deadline.slice(0,10)}</time>{overdue&&<span>已逾期</span>}</>:canEdit?<Button disabled={locked||busy} onClick={()=>go(row.target)}>排定日期</Button>:<span>未排定日期</span>}</div>
   <div ref={menuRoot} className="po-task-menu" onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget))setMenu(false)}}>
