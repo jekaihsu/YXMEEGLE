@@ -23,6 +23,15 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
                       auto_enabled=flag('SOP_AUTO_ENROLL_ENABLED'), auto_since=lambda: cfg.get('SOP_AUTO_ENROLL_SINCE'))
 
     def context(request, project_id, case_loader=load_case):
+        from .authority import global_manager
+
+        def roster(fresh=False):
+            if fresh and not hasattr(request.state, 'sop_roster'):
+                request.state.sop_roster = service.roster_provider(fresh=True)
+            if hasattr(request.state, 'sop_roster'):
+                return request.state.sop_roster
+            return service.roster_provider()
+
         data, user = identity(request)
         require(user.get('active', True), 'sop_import_forbidden', 403)
         assigned_only = not has_reader_grant(user)
@@ -31,7 +40,12 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
         ctx = Context(data['wid'], user, state, project, lambda: context(request, project_id, case_loader),
                       assigned_only=False)
         ctx.roster_required = service.roster_required
-        ctx.roster = service.roster_provider()
+        ctx.roster_loader = roster
+        ctx.roster = roster()
+        if (ctx.roster_required and ctx.roster is None and not global_manager(ctx)
+                and (request.method == 'GET' or request.url.path.endswith('/sop/ensure'))):
+            ctx.refresh_roster(service.roster_provider)
+            require(ctx.roster is not None, 'roster_unavailable', 503)
         ctx.assigned_only = assigned_only and not can_manage(ctx)
         require(not ctx.assigned_only or service.participates(data['wid'], user['id'], project_id), 'sop_import_forbidden', 403)
         if project.get('sop_assigned_only'):
@@ -80,7 +94,7 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
             require(isinstance(body, dict), 'invalid_request')
             from .authority import global_manager
             if refresh_roster and isinstance(ctx, Context) and not global_manager(ctx):
-                ctx.roster = service.roster_provider(fresh=True)
+                ctx.refresh_roster(service.roster_provider)
             return run(ctx, body)
         return await run_in_threadpool(respond, execute)
 
@@ -101,6 +115,8 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
                     return nodes.ensure_sop(request, project_id)
                 return ensure_local(service, context(request, project_id))
             except (Failure, NodeFailure) as exc:
+                if exc.code == 'roster_unavailable':
+                    raise Failure('roster_unavailable', 503) from None
                 reason = {'import_unavailable': 'writes_disabled', 'template_unavailable': 'no_template'}.get(exc.code, exc.code)
                 return {'state': 'not_permitted' if reason in {'sop_import_forbidden', 'forbidden'} else 'not_ready',
                         'reason': reason}
@@ -159,7 +175,7 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
         return await mutation(request, project_id, service.apply)
 
     @app.get(PREFIX + '/sop-assignees')
-    def assignees(request: Request, project_id: str, node_key: str = None, scope: str = 'team', q: str = '', limit: int = 20, cursor: str = None):
+    def assignees(request: Request, project_id: str, node_key: str = None, scope: str = None, q: str = None, limit: int = None, cursor: str = None):
         return respond(lambda: service.assignees(context(request, project_id, load_assignees or load_case), lambda user: hr_view_allowed(user, cfg), node_key=node_key, scope=scope, q=q, limit=limit, cursor=cursor))
 
     @app.get(PREFIX + '/sop-import/runs/{request_id}')

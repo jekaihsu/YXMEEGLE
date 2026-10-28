@@ -3,11 +3,12 @@ import {test,afterEach} from 'node:test';
 import fs from 'node:fs/promises';
 import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
+import {assignmentFixture} from './fixtures/node-assignments.mjs';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/',pretendToBeVisual:true});
 for(const key of ['window','document','location','Event','KeyboardEvent','MouseEvent','Node','HTMLElement','HTMLInputElement','navigator','DOMException'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
-const bundle=await build({stdin:{contents:"export {AssigneePicker} from './src/AssigneePicker';export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {AssigneePicker} from './src/AssigneePicker';export {AssignmentTaskInspector} from './src/AssignmentTaskInspector';export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const file=new URL('./.assignee-picker-test.mjs',import.meta.url);await fs.writeFile(file,bundle.outputFiles[0].text);let ui;try{ui=await import(file.href)}finally{await fs.unlink(file)}
 let root;const requests=[],chosen=[];
 const response=people=>({ok:true,status:200,headers:new Headers(),text:async()=>JSON.stringify({people,next_cursor:null})});
@@ -15,7 +16,7 @@ async function flush(){await act(async()=>{await new Promise(resolve=>setTimeout
 async function mount(projectId){root=createRoot(document.getElementById('root'));await act(async()=>root.render(React.createElement(ui.AssigneePicker,{projectId,nodeKey:'pm',title:'核對',value:'',onChange:id=>chosen.push(id)})))}
 async function click(node){await act(async()=>node.dispatchEvent(new MouseEvent('click',{bubbles:true})))}
 async function key(value){await act(async()=>document.querySelector('[role=combobox]').dispatchEvent(new KeyboardEvent('keydown',{key:value,bubbles:true})))}
-async function search(value){await act(async()=>{const input=document.querySelector('input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}))})}
+async function search(value){await act(async()=>{const input=document.querySelector('[role=combobox]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}))})}
 afterEach(async()=>{if(root)await act(async()=>root.unmount());ui.invalidateSessionEpoch();requests.length=0;chosen.length=0});
 
 test('team default, 250ms search across teams, keyboard selection and clearing',async()=>{
@@ -48,4 +49,26 @@ test('loading, empty and error states are announced',async()=>{
  globalThis.fetch=async()=>{throw new Error('offline')};await searchIfClosed();
  async function searchIfClosed(){await click(document.querySelector('button'));await search('missing');await act(async()=>{await new Promise(done=>setTimeout(done,280))});await flush()}
  assert.equal(document.querySelector('[role=alert]').textContent,'無法讀取人員，請重新開啟重試');
+});
+
+test('Lark assignment editor searches only its eligible node roster without SOP access',async()=>{
+ window.history.replaceState(null,'','#view=project&project=p1&tab=flow');
+ globalThis.fetch=async url=>{requests.push(url);return response([{id:'outside',name:'其他組王同仁'}])};
+ root=createRoot(document.getElementById('root'));
+ const task=assignmentFixture().detail.tasks[0];
+ await act(async()=>root.render(React.createElement(ui.AssignmentTaskInspector,{
+  assignment:task,people:[{open_id:'eligible',name:'同組王同仁',departments:['控制']}],
+  nodeLabel:'控制',nodeKey:'control',busy:false,reason:'',mutate:async value=>{chosen.push(value);return true},onClose:()=>{}
+ })));
+ await click(document.querySelector(`[aria-label="task: ${task.title}"]`));await flush();
+ assert.deepEqual(requests,[]);
+ assert.match(document.querySelector('[role=listbox]').textContent,/同組王同仁/);
+ await search('王');await act(async()=>{await new Promise(resolve=>setTimeout(resolve,280))});await flush();
+ assert.deepEqual(requests,[]);
+ assert.match(document.querySelector('[role=listbox]').textContent,/同組王同仁/);
+ assert.doesNotMatch(document.querySelector('[role=listbox]').textContent,/其他組/);
+ assert.equal(document.querySelector('[role=listbox]').getAttribute('aria-busy'),'false');
+ await key('ArrowDown');await key('Enter');
+ await act(async()=>document.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+ assert.equal(chosen[0].patch.assignee_open_id,'eligible');
 });

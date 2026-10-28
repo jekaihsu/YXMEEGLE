@@ -11,7 +11,7 @@ async function ensure(projectId: string, epoch: number): Promise<State> {
   if (result && typeof result === 'object' && 'state' in result) {
    if (result.state === 'started' || result.state === 'already_started') return {kind: 'started'};
    if (result.state === 'not_permitted') return {kind: 'not_permitted'};
-   if (result.state === 'not_ready' && 'reason' in result && typeof result.reason === 'string') return {kind: 'failed', reason: result.reason};
+   if (result.state === 'not_ready') return {kind: 'failed', reason: 'reason' in result && typeof result.reason === 'string' ? result.reason : 'not_ready'};
   }
   return {kind: 'failed', reason: 'invalid_response'};
  } catch {return {kind: 'failed', reason: 'unavailable'}}

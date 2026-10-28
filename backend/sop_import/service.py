@@ -40,6 +40,10 @@ class Context:
     assigned_only: bool = False
     roster: object = None
     roster_required: bool = False
+    roster_loader: object = None
+
+    def refresh_roster(self, provider):
+        self.roster = (self.roster_loader or provider)(fresh=True)
 
 
 def administrator(user):
@@ -192,7 +196,7 @@ class Service(EnrollmentService):
         fresh = ctx.refresh()
         require(fresh.wid == ctx.wid and fresh.user['id'] == ctx.user['id'], 'sop_import_forbidden', 403)
         if manager and not global_manager(fresh):
-            fresh.roster = self.roster_provider(fresh=True)
+            fresh.refresh_roster(self.roster_provider)
         authorize(fresh, manager)
         if not enrollment:
             self.check_policy_write(db, fresh)
@@ -673,10 +677,10 @@ class Service(EnrollmentService):
                                     for key in NODE_MAP.values()},
                     'tasks': self.task_views(db, ctx, selected, by_task),
                     'node_done': {} if ctx.assigned_only else {key: auto.public() for key, auto in self.node_done(ctx).items()},
-                    'allowed_actions': {'import': can_manage(ctx) and self.writes_enabled() and policy_write,
-                                        'manage': can_manage(ctx) and self.writes_enabled() and policy_write,
+                    'allowed_actions': {'import': can_manage_nodes(ctx, NODE_MAP.values()) and self.writes_enabled() and policy_write,
+                                        'manage': can_manage_nodes(ctx, NODE_MAP.values()) and self.writes_enabled() and policy_write,
                                         'work': (can_manage(ctx) or any(t.participants.get('executor') == ctx.user['id'] for t in tasks)) and self.writes_enabled() and policy_write,
-                                        'decide_suggestions': can_manage(ctx) and self.writes_enabled() and policy_write}}
+                                        'decide_suggestions': can_manage_nodes(ctx, NODE_MAP.values()) and self.writes_enabled() and policy_write}}
 
     def with_sop_counts(self, wid, items):
         ids = sorted({pid for item in items for pid in item['project_ids']})
@@ -971,10 +975,9 @@ class Service(EnrollmentService):
                     continue
                 if task.applicability != Applicability.APPLICABLE:
                     unresolved += 1
-                elif not nodes_of[task.id] <= proven.keys():
+                elif not nodes_of[task.id] <= proven.keys() or not can_manage_nodes(ctx, nodes_of[task.id]):
                     shared += 1
                 else:
-                    require_nodes(ctx, nodes_of[task.id])
                     rule = proven[node_key]
                     basis = {'rule_id': f'node-evidence:{rule.rule}', 'rule_revision': 1, 'tier': 'proof',
                              'actor_id': ctx.user['id'], 'at': self.clock(), 'confirmed': True, 'reason': rule.reason_zh}
@@ -1002,7 +1005,7 @@ class Service(EnrollmentService):
             task = self.task(db, ctx, task_id)
             executor_action = transition and task.participants.get('executor') == ctx.user['id'] and body.get('action') in TRANSITIONS and body['action'] != 'archive'
             if transition and not executor_action and not global_manager(ctx):
-                ctx.roster = self.roster_provider(fresh=True)
+                ctx.refresh_roster(self.roster_provider)
             manager = False if executor_action else self.task_manager(db, ctx, task)
             if not transition:
                 require(manager, 'sop_import_forbidden', 403)

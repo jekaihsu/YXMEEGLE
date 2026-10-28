@@ -98,3 +98,25 @@ test('opening a local case on a tab without an active SOP read still ensures it'
  await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,props)));
  assert.deepEqual(posts,['/api/projects/direct-tab/sop/ensure']);assert.equal(document.body.textContent,'SOP 已啟動');
 });
+
+test('single-node managers see passive authorization text and never ensure all nodes',async()=>{
+ ui.invalidateSessionEpoch();posts=[];
+ globalThis.fetch=async(url,init={})=>{posts.push({url,method:init.method});return response({state:'not_permitted'})};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,{
+  c:{s:{features:{}}},p:{id:'scoped-manager',case_type:'intake'},
+  sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:false}}},reload:async()=>{}},assignments:{reload:async()=>{}}
+ })));
+ assert.equal(document.body.textContent,'需由有權限的人員準備 SOP');assert.deepEqual(posts,[]);
+});
+
+for(const result of [{state:'not_ready',reason:'writes_disabled'},{state:'not_ready'}])test(`legacy coded case stays quiet for ${result.reason || result.state}`,async()=>{
+ ui.invalidateSessionEpoch();posts=[];
+ globalThis.fetch=async(url,init={})=>{posts.push({url,method:init.method});return response(result)};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,{
+  c:{s:{features:{node_assignment:false}}},p:{id:'legacy-case',code:'C001'},
+  sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true}}},reload:async()=>{}},assignments:{reload:async()=>{}}
+ })));
+ assert.equal(posts.length,1);assert.equal(document.body.textContent,'');assert.equal(document.querySelector('button'),null);
+});

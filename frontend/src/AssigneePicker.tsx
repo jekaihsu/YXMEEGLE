@@ -30,7 +30,7 @@ export function AssigneePicker({projectId,nodeKey,title,value,valueLabel,disable
  useEffect(()=>{
   if(!open)return;
   if(query.trim()!==search){setLoading(true);setPage({people:[],next_cursor:null});return}
-  if(!projectId){setPage({people:people.filter(p=>p.name.includes(search)),next_cursor:null});return}
+  if(!projectId){setPage({people:people.filter(p=>p.name.includes(search)),next_cursor:null});setLoading(false);return}
   const controller=new AbortController();let current=true;
   const scope=search?'all':'team';
   const key=JSON.stringify([epoch,projectId,nodeKey,scope,search,cursor]);

@@ -4,9 +4,21 @@ from .domain import require
 from .authority import global_manager
 
 
-def page(ctx, people_visible, *, node_key=None, scope='team', q='', limit=20, cursor=None):
-    from .service import authorize, case_roles, CASE_ROLES
+def page(ctx, people_visible, *, node_key=None, scope=None, q=None, limit=None, cursor=None):
+    from .service import authorize, can_manage, case_roles, CASE_ROLES
     authorize(ctx)
+    if all(value is None for value in (node_key, scope, q, limit, cursor)):
+        people = [(case_roles(u, ctx.project), u) for u in ctx.state.get('users', []) if u.get('active', True)]
+        restricted = ctx.assigned_only or not (can_manage(ctx) or people_visible(ctx.user))
+        if restricted:
+            people = [(roles, u) for roles, u in people if u['id'] == ctx.user['id']]
+        people.sort(key=lambda p: (CASE_ROLES.index(p[0][0]) if p[0] else len(CASE_ROLES), p[1].get('name') or '', p[1]['id']))
+        return {'project_id': ctx.project['id'], 'restricted': restricted,
+                'people': [{'id': u['id'], 'name': u.get('name'), 'case_roles': roles,
+                            'department': u.get('department')} for roles, u in people]}
+    scope = 'team' if scope is None else scope
+    q = '' if q is None else q
+    limit = 20 if limit is None else limit
     require(scope in {'team', 'all'} and isinstance(q, str) and len(q) <= 200, 'invalid_request')
     require(type(limit) is int and 1 <= limit <= 50, 'invalid_request')
     require(node_key is None or node_key in NODE_DEPARTMENTS, 'node_mapping_invalid')

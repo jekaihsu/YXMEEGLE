@@ -145,13 +145,17 @@ def test_existing_system_and_application_admin_grants_stay_global(h, role):
 
 
 def test_proof_bulk_close_cannot_touch_a_shared_task_outside_manager_scope(h):
-    x, _, _ = setup(h)
+    x, _, shared = setup(h)
+    proof = SimpleNamespace(rule='test', reason_zh='完成', public=lambda: {'rule': 'test'})
     h.service.node_done = lambda ctx: {
-        'pm': SimpleNamespace(rule='test', reason_zh='完成'),
-        'control': SimpleNamespace(rule='test', reason_zh='完成')}
-    assert post(h, URL + '/sop-tasks/close-node', {'node_key': 'pm'}, 403)['code'] == 'sop_import_forbidden'
+        'pm': proof, 'control': proof}
+    result = post(h, URL + '/sop-tasks/close-node', {'node_key': 'pm'})
+    assert result['closed'] == 1
+    assert result['left_open'] == {'shared': 1, 'unresolved': 0}
     h.service.node_done = lambda ctx: {}
-    assert next(t for t in overview(h)['tasks'] if t['id'] == x['id'])['state'] == 'pending'
+    tasks = {t['id']: t for t in overview(h)['tasks']}
+    assert tasks[x['id']]['state'] == 'done'
+    assert tasks[shared['id']]['state'] == 'pending'
 
 
 def test_workspace_manager_title_does_not_bypass_roster_scope(h):
