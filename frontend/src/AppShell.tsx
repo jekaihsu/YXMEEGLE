@@ -1,7 +1,7 @@
 import {createRoutePrefetch} from './routeLoader';
 import {RouteSkeleton} from './RouteSkeleton';
 import {canReadDispatch} from './dispatchAccess';
-import { CalendarDays, ChevronRight, Menu, TriangleAlert, X } from 'lucide-react';
+import { BookOpen, CalendarDays, ChevronRight, Menu, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { ClipboardList, FileBarChart, Clock3, FolderOpen, Gauge, GitBranch, LayoutDashboard, ListTodo, PanelLeftClose, Settings2 } from 'lucide-react';
 import {Avatar} from './Avatar';
@@ -9,9 +9,9 @@ import { useDialogFocus } from './useDialogFocus';
 import type { Freshness, Route, Session, Workspace } from './types';
 
 export const ROLE:Record<string,string>={pm:'專案經理',manager:'系統管理員',member:'組員'};
-export const ROUTE_LABELS:Record<Route['view'],string>={dashboard:'今日工作台',reports:'PM 週報',projects:'案件總覽',quotes:'報價總表',overview:'管理總覽',people:'人員與資源出勤',approvals:'變更與展延',routines:'追蹤與檢討',admin:'管理設定',work:'我的工作',sources:'資料來源',dispatch:'派工調度',project:'案件詳情',confirmations:'案件與確認單',confirmation:'案件與確認單詳情',contract:'合約明細詳情',workitem:'工作項詳情','pm-glance':'今日工作台'};
-const NAV=[{view:'dashboard',label:ROUTE_LABELS['dashboard'],icon:LayoutDashboard},{view:'reports',label:ROUTE_LABELS['reports'],icon:FileBarChart},{view:'projects',label:ROUTE_LABELS['projects'],icon:FolderOpen},{view:'quotes',label:ROUTE_LABELS['quotes'],icon:ClipboardList},{view:'overview',label:ROUTE_LABELS['overview'],icon:Gauge},{view:'people',label:ROUTE_LABELS['people'],icon:CalendarDays},{view:'approvals',label:ROUTE_LABELS['approvals'],icon:GitBranch},{view:'routines',label:ROUTE_LABELS['routines'],icon:Clock3},{view:'admin',label:ROUTE_LABELS['admin'],icon:Settings2}] as const;
-const NAV_GROUPS=[{label:'工作',views:['dashboard']},{label:'專案',views:['projects','quotes','people']},{label:'管理',views:['reports','overview','approvals','routines','admin']}] as const;
+export const ROUTE_LABELS:Record<Route['view'],string>={howto:'使用說明',dashboard:'今日工作台',reports:'PM 週報',projects:'案件總覽',quotes:'報價總表',overview:'管理總覽',people:'人員與資源出勤',approvals:'變更與展延',routines:'追蹤與檢討',admin:'管理設定',work:'我的工作',sources:'資料來源',dispatch:'派工調度',project:'案件詳情',confirmations:'案件與確認單',confirmation:'案件與確認單詳情',contract:'合約明細詳情',workitem:'工作項詳情','pm-glance':'今日工作台'};
+const NAV=[{view:'howto',label:ROUTE_LABELS.howto,icon:BookOpen},{view:'dashboard',label:ROUTE_LABELS['dashboard'],icon:LayoutDashboard},{view:'reports',label:ROUTE_LABELS['reports'],icon:FileBarChart},{view:'projects',label:ROUTE_LABELS['projects'],icon:FolderOpen},{view:'quotes',label:ROUTE_LABELS['quotes'],icon:ClipboardList},{view:'overview',label:ROUTE_LABELS['overview'],icon:Gauge},{view:'people',label:ROUTE_LABELS['people'],icon:CalendarDays},{view:'approvals',label:ROUTE_LABELS['approvals'],icon:GitBranch},{view:'routines',label:ROUTE_LABELS['routines'],icon:Clock3},{view:'admin',label:ROUTE_LABELS['admin'],icon:Settings2}] as const;
+const NAV_GROUPS=[{label:'工作',views:['dashboard','howto']},{label:'專案',views:['projects','quotes','people']},{label:'管理',views:['reports','overview','approvals','routines','admin']}] as const;
 export {Avatar} from './Avatar';
 
 type CallbackError={title:string;description:string;next:string};
