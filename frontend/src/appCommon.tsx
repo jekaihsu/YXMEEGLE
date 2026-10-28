@@ -1,3 +1,4 @@
+import {Select as FormSelect} from './design/Select';
 import {STATUS,NODE_NAMES} from './workflowLabels';
 export {STATUS,NODE_NAMES} from './workflowLabels';
 import {taipeiTime} from './taipeiTime';
@@ -50,7 +51,7 @@ export function Modal({title,subtitle,children,onClose,wide=false}:{title:string
 export function Field({label,children,hint}:{label:string;children:ReactNode;hint?:string}){return <label className="form-field"><span>{label}</span>{children}{hint&&<small>{hint}</small>}</label>}
 export function OwnerSelect({w,value,onChange,name,disabled=false}:{w:Workspace;value?:string;onChange?:(s:string)=>void;name?:string;disabled?:boolean}){
  const[localValue,setLocalValue]=useState(value||'');const selected=onChange?(value||''):localValue;
- return <>{name&&<input type="hidden" name={name} value={selected} disabled={disabled}/>}<select aria-label="選擇負責人" value={selected} onChange={e=>{setLocalValue(e.target.value);onChange?.(e.target.value)}} disabled={disabled}><option value="">尚未指派</option>{w.users.filter(u=>u.active!==false||u.id===selected).map(u=><option key={u.id} value={u.id} disabled={u.active===false}>{u.name} · {u.department}{u.active===false?'（已停用，保留歷史指派）':''}</option>)}</select></>
+ return <>{name&&<input type="hidden" name={name} value={selected} disabled={disabled}/>}<FormSelect aria-label="選擇負責人" value={selected} onChange={e=>{setLocalValue(e.target.value);onChange?.(e.target.value)}} disabled={disabled}><option value="">尚未指派</option>{w.users.filter(u=>u.active!==false||u.id===selected).map(u=><option key={u.id} value={u.id} disabled={u.active===false}>{u.name} · {u.department}{u.active===false?'（已停用，保留歷史指派）':''}</option>)}</FormSelect></>
 }
 export function Primary({children,busy,disabled,disabledReason,...rest}:{children:ReactNode;busy?:boolean;disabled?:boolean;disabledReason?:string;onClick?:(e:MouseEvent<HTMLButtonElement>)=>void;type?:'button'|'submit'}){return <DisabledAction disabled={disabled||busy} reason={busy?undefined:disabledReason}>{id=><button className="button primary" disabled={disabled||busy} {...rest} aria-describedby={id}>{busy?<Loader2 className="spin" size={15}/>:null}{children}</button>}</DisabledAction>}
 export function PageHead({eyebrow,title,subtitle,children}:{eyebrow?:string;title:string;subtitle?:string;children?:ReactNode}){return <div className="page-heading"><div>{eyebrow&&<div className="eyebrow">{eyebrow}</div>}<h1>{title}</h1>{subtitle&&<p>{subtitle}</p>}</div><div className="heading-actions">{children}</div></div>}

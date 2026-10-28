@@ -1,3 +1,4 @@
+import {Select as FormSelect} from './design/Select';
 import {AssigneePicker,AssigneeTaskEditor} from './AssigneePicker';
 import {SopLarkSync} from './SopLarkSync';
 import {editorFields,type TaskDraft} from './nodeWorkbenchModel';
@@ -138,7 +139,7 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
 function ApplicabilityEditor({task,busy,save}:{task:SopTask;busy:boolean;save:(value:Applicability,reason:string)=>Promise<boolean|undefined>}) {
  const [value,setValue]=useState(task.applicability),[reason,setReason]=useState('');
  return <form className="sop-form" onSubmit={e=>{e.preventDefault();if(reason.trim())void save(value,reason.trim())}}>
-  <Field label="適用"><select aria-label="適用" value={value} disabled={busy} onChange={e=>{const next=e.target.value;if(next==='applicable'||next==='not_applicable'||next==='unresolved')setValue(next)}}>{(Object.entries(APPLICABILITY_LABEL)).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></Field>
+  <Field label="適用"><FormSelect aria-label="適用" value={value} disabled={busy} onChange={e=>{const next=e.target.value;if(next==='applicable'||next==='not_applicable'||next==='unresolved')setValue(next)}}>{(Object.entries(APPLICABILITY_LABEL)).map(([key,label])=><option key={key} value={key}>{label}</option>)}</FormSelect></Field>
   <Field label="適用原因"><input aria-label="適用原因" value={reason} maxLength={1000} disabled={busy} onChange={e=>setReason(e.target.value)}/></Field>
   <Button type="submit" disabled={busy||value===task.applicability||!reason.trim()} disabledReason="請變更適用狀態並填寫原因">儲存適用</Button>
  </form>;

@@ -1,3 +1,4 @@
+import {Select as FormSelect} from './design/Select';
 import {useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {getSessionEpoch} from './api';
@@ -27,7 +28,7 @@ export function QuoteCreateSheet({users,canImport,onClose,onCreated,onOpen}:{use
   {status==='busy'&&<p className="quote-create-status" role="status">{step.kind==='preview'?'正在建立報價…':'正在產生預覽…'}</p>}
   {step.kind==='form'&&<form className="sop-form" onSubmit={e=>{e.preventDefault();void preview()}}>
    <label>案件名稱<input required maxLength={500} value={form.name} disabled={locked} onChange={e=>update('name',e.target.value)}/></label>
-   <label>PM<select value={form.pm_id||''} disabled={locked} onChange={e=>update('pm_id',e.target.value||null)}><option value="">未指派</option>{users.filter(u=>u.active!==false&&['pm','manager'].includes(u.role)).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></label>
+   <label>PM<FormSelect value={form.pm_id||''} disabled={locked} onChange={e=>update('pm_id',e.target.value||null)}><option value="">未指派</option>{users.filter(u=>u.active!==false&&['pm','manager'].includes(u.role)).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</FormSelect></label>
    <details className="quote-create-advanced"><summary>其他報價資料與任務選項</summary>
     <label>業主<input value={form.client} disabled={locked} maxLength={500} onChange={e=>update('client',e.target.value)}/></label>
     <label>說明<textarea value={form.description} disabled={locked} maxLength={5000} onChange={e=>update('description',e.target.value)}/></label>

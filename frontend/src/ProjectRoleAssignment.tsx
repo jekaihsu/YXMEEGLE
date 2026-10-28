@@ -1,3 +1,4 @@
+import {Select as FormSelect} from './design/Select';
 import {Section} from './design';
 import './owned-screens.css';
 import {ActionForm, Field, Person, type Context} from './Operations';
@@ -19,7 +20,7 @@ export function ProjectRoleAssignment({c,p,n}:{c:Context;p:Project;n:Node}){
    <Person c={c} name="supervisor_id" value={p.supervisor_id} label="案件主管"/>
    <Person c={c} name="node_supervisor_id" value={n.supervisor_id} label="本節點主管"/>
    <fieldset><legend>其他指定確認人</legend>{c.w.users.filter(u=>u.active!==false).map(u=><label key={u.id}><input type="checkbox" name="reviewers" value={u.id} defaultChecked={n.reviewers?.includes(u.id)}/>{u.name}</label>)}</fieldset>
-   <Field title="一般節點確認模式" name="review_mode"><select name="review_mode" defaultValue={n.review_mode||'all'}><option value="all">全員通過</option><option value="any">任一指定人通過（必要覆核仍適用）</option></select></Field>
+   <Field title="一般節點確認模式" name="review_mode"><FormSelect name="review_mode" defaultValue={n.review_mode||'all'}><option value="all">全員通過</option><option value="any">任一指定人通過（必要覆核仍適用）</option></FormSelect></Field>
   </>:<p>審核主管與通過規則由人員權限管理者維護，PM 可調整日常工作指派。</p>}
   <fieldset><legend>確認單發出承辦（可複選）</legend>{c.w.users.filter(u=>u.active!==false).map(u=><label key={u.id}><input type="checkbox" name="issuer_ids" value={u.id} defaultChecked={p.issuer_ids?.includes(u.id)}/>{u.name}</label>)}</fieldset>
  </ActionForm></Section></div>;

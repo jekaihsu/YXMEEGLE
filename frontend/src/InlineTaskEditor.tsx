@@ -1,3 +1,4 @@
+import {Select as FormSelect} from './design/Select';
 import {useState} from 'react';
 import {Button} from './design';
 import {draftChanged,type TaskDraft,type TaskEditorModel} from './nodeWorkbenchModel';
@@ -18,9 +19,9 @@ export function InlineTaskEditor({model,busy=false,onSave}:{model:TaskEditorMode
  return <form className="nw-task-editor" aria-label="編輯任務" onSubmit={e=>{e.preventDefault();void submit()}}>
   {readOnlyReason && <p className="nw-editor-wide" id="task-editor-readonly">{readOnlyReason}</p>}
   <label>任務名稱<input aria-label="任務名稱" value={draft.title} maxLength={model.maxTitle} required {...field('title')} onChange={e=>update('title',e.target.value)}/>{reason('title')}</label>
-  <label>負責人<select aria-label="任務負責人" value={draft.assignee} {...field('assignee')} onChange={e=>update('assignee',e.target.value)}><option value="">未指派</option>{draft.assignee && !model.people.some(p=>p.id===draft.assignee) && <option value={draft.assignee}>目前負責人</option>}{model.people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>{reason('assignee')}</label>
+  <label>負責人<FormSelect aria-label="任務負責人" value={draft.assignee} {...field('assignee')} onChange={e=>update('assignee',e.target.value)}><option value="">未指派</option>{draft.assignee && !model.people.some(p=>p.id===draft.assignee) && <option value={draft.assignee}>目前負責人</option>}{model.people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</FormSelect>{reason('assignee')}</label>
   <label>期限<input aria-label="任務期限" type="date" value={draft.due} {...field('due')} onChange={e=>update('due',e.target.value)}/>{reason('due')}</label>
-  <label>任務狀態<select aria-label="任務狀態" value={draft.status} {...field('status')} onChange={e=>update('status',e.target.value)}>{model.statuses.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select>{reason('status')}</label>
+  <label>任務狀態<FormSelect aria-label="任務狀態" value={draft.status} {...field('status')} onChange={e=>update('status',e.target.value)}>{model.statuses.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</FormSelect>{reason('status')}</label>
   {model.legacy && <><label>開始日期<input aria-label="任務開始日期" type="date" value={draft.start_date||''} disabled={blocked||!!locked||!model.legacy.start_date} onChange={e=>update('start_date',e.target.value)}/></label><label>營業額點數<input aria-label="任務營業額點數" type="number" min="0" step="0.01" value={draft.points||''} disabled={blocked||!!locked||!model.legacy.points} onChange={e=>update('points',e.target.value)}/></label></>}
   <label className="nw-editor-wide">備註<textarea aria-label="任務備註" rows={4} value={draft.notes} maxLength={model.maxNotes} {...field('notes')} onChange={e=>update('notes',e.target.value)}/>{reason('notes')}</label>
   {model.dueReason && dueChanged && <label className="nw-editor-wide">期限變更原因<input aria-label="期限變更原因" value={draft.reason} maxLength={1000} required disabled={blocked} onChange={e=>update('reason',e.target.value)}/></label>}

@@ -1,3 +1,4 @@
+import {Select as FormSelect} from './design/Select';
 import {useSourceRefresh} from './useSourceRefresh';
 // P1-INT pages: #work -> MyWorkTable(buildMyWorkView(...)), #sources -> SourceHealth(buildSourceHealthView(...)).
 // The legacy MyWork / Sources screens stay reachable through tab=legacy. Transport only; all state text comes
@@ -114,13 +115,13 @@ function AssignmentWorkPage({c}:{c:Ctx}) {
  return <main className="page work-page project-detail-calm" aria-label="我的工作完整表格">
   <header className="section-heading"><h1>我的工作</h1><Button disabled={read.pending} onClick={()=>void c.refresh()}>重新讀取</Button></header>
   <div className="my-work-toolbar">
-   <label>工作清單<select value={panel} onChange={e=>{const next=HOME_PANELS.find(p=>p===e.target.value);if(next)update({},next)}}>
+   <label>工作清單<FormSelect value={panel} onChange={e=>{const next=HOME_PANELS.find(p=>p===e.target.value);if(next)update({},next)}}>
     <option value="assigned">指派給我</option><option value="confirmation">待我確認</option><option value="delegated">我交辦的</option><option value="proxy">代理給我</option><option value="local">本地 SOP</option><option value="completed">已完成</option>
-   </select></label>
-   <label>工作類型<select value={params.get('kinds')||''} onChange={e=>update({kinds:e.target.value})}><option value="">全部類型</option><option value="sop_task">SOP 任務</option><option value="node_assignment">節點責任</option><option value="task">Lark 任務</option></select></label>
-   <label>期限<select value={params.get('deadline')||'all'} onChange={e=>update({deadline:e.target.value})}><option value="all">全部期限</option><option value="unscheduled">未排期限</option></select></label>
+   </FormSelect></label>
+   <label>工作類型<FormSelect value={params.get('kinds')||''} onChange={e=>update({kinds:e.target.value})}><option value="">全部類型</option><option value="sop_task">SOP 任務</option><option value="node_assignment">節點責任</option><option value="task">Lark 任務</option></FormSelect></label>
+   <label>期限<FormSelect value={params.get('deadline')||'all'} onChange={e=>update({deadline:e.target.value})}><option value="all">全部期限</option><option value="unscheduled">未排期限</option></FormSelect></label>
    <label>搜尋<input placeholder="搜尋任務、案件或關鍵字" type="search" value={params.get('q')||''} onChange={e=>update({q:e.target.value})}/></label>
-   {(read.body?.manager_view_available || scope==='team') && <label>範圍<select value={scope} onChange={e=>update({scope:e.target.value})}><option value="mine">我的工作</option><option value="team">同組</option></select></label>}
+   {(read.body?.manager_view_available || scope==='team') && <label>範圍<FormSelect value={scope} onChange={e=>update({scope:e.target.value})}><option value="mine">我的工作</option><option value="team">同組</option></FormSelect></label>}
   </div>
   {read.pending&&<p className="my-work-loading" role="status">正在讀取工作…</p>}
   {read.body && <>{read.body.items.length ? <>

@@ -1,3 +1,4 @@
+import {Select as FormSelect} from './design/Select';
 import {taipeiTime} from './taipeiTime';
 import {ReportLinkSummary} from './ReportLinkSummary';
 import {basisLabel} from './reportLinksModel';
@@ -43,7 +44,7 @@ export function WorkItemsTab({c,p,assignments,selectedKey}:Props) {
  const model=data ? departmentItems(data,department,stale || sourceUnverified || data.sources.reports_stale===true || data.sources.reports_status!=='ok') : null;
  const id=c.route.section?.startsWith('item:') ? c.route.section.slice(5) : null,row=model?.rows.find(item=>item.id===id);
  const openRow=(item:WorkItemRow,element:HTMLElement)=>{element.closest('tr')?.focus({preventScroll:true});goSection(`item:${item.id}`)};
- return <div className="work-items-tab"><ReportLinkSummary projectId={p.id} version={c.w.version} initial={data?.daily_links}/><div className="wi-toolbar"><label>生產部門<select value={department} onChange={e=>c.go({view:'project',project:p.id,tab:'items',node:e.target.value,section:c.route.section==='reports' ? 'reports' : undefined})}>{Object.entries(departmentLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>{read.canRefresh && <Button variant="plain" disabled={progressPending} aria-busy={progressPending} onClick={read.retry}>更新工程證據</Button>}</div>
+ return <div className="work-items-tab"><ReportLinkSummary projectId={p.id} version={c.w.version} initial={data?.daily_links}/><div className="wi-toolbar"><label>生產部門<FormSelect value={department} onChange={e=>c.go({view:'project',project:p.id,tab:'items',node:e.target.value,section:c.route.section==='reports' ? 'reports' : undefined})}>{Object.entries(departmentLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</FormSelect></label>{read.canRefresh && <Button variant="plain" disabled={progressPending} aria-busy={progressPending} onClick={read.retry}>更新工程證據</Button>}</div>
  {read.state.kind==='loading' && <p className="wi-card" role="status">{departmentLabels[department]}工項載入中，完成量尚未核實。</p>}
  {data && !read.canRefresh && <span role="status">權限不足</span>}
  {read.state.kind==='error' && <div className="wi-card" role="alert"><h2>{read.state.status===401 || read.state.status===403 ? '工程證據權限不足' : '工程證據暫不可用'}</h2><p>{read.state.message}</p><p>最近成功讀取 · {taipeiTime(read.state.lastGoodAt,'尚無成功紀錄')}</p><p>無法確認工項筆數與完成量，不代表沒有工項或尚未施工。</p>{(read.canRefresh || read.canRetryRead) && <Button disabled={progressPending} aria-busy={progressPending} onClick={read.retry}>重試工程證據</Button>}</div>}

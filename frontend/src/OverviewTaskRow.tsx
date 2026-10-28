@@ -2,6 +2,7 @@ import {useEffect,useId,useRef,useState} from 'react';
 import {getSessionEpoch} from './api';
 import {AssigneePicker} from './AssigneePicker';
 import {Badge,Button} from './design';
+import {PickerPopover} from './design/PickerPopover';
 import type {AssignablePerson} from './nodeAssignmentApi';
 import type {OverviewTodo} from './overviewDashboardModel';
 import type {OverviewTarget} from './projectOverviewModel';
@@ -51,7 +52,7 @@ export function OverviewTaskRow({row,projectId,today,sop,assignments,people=[],l
   <div className="po-task-date">{row.deadline?<><time dateTime={row.deadline}>{row.deadline.slice(0,10)}</time>{overdue&&<span>已逾期</span>}</>:canEdit?<Button disabled={locked||busy} onClick={()=>go(row.target)}>排定日期</Button>:<span>未排定日期</span>}</div>
   <div ref={menuRoot} className="po-task-menu" onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget))setMenu(false)}}>
    <Button aria-label={`更多操作：${row.title}`} aria-haspopup="menu" aria-expanded={menu} aria-controls={id} onClick={()=>menu?close():setMenu(true)} onKeyDown={e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();setMenu(true)}else if(e.key==='Escape')close()}}>⋯</Button>
-   {menu&&<div id={id} role="menu" aria-label={`任務操作：${row.title}`} onKeyDown={e=>{if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();menuRoot.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()}else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close()}else if(e.key==='Tab')setMenu(false)}}><Button role="menuitem" onClick={()=>{close();go(row.target)}}>{canEdit?'編輯詳情':'查看詳情'}</Button></div>}
+   {menu&&<PickerPopover anchor={menuRoot} onClose={()=>setMenu(false)}><div id={id} role="menu" aria-label={`任務操作：${row.title}`} onKeyDown={e=>{if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();menuRoot.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()}else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close()}else if(e.key==='Tab')setMenu(false)}}><Button role="menuitem" onClick={()=>{close();go(row.target)}}>{canEdit?'編輯詳情':'查看詳情'}</Button></div></PickerPopover>}
   </div>
   {(saving||error||notice)&&<div className="po-task-feedback">{saving?<span role="status">儲存中…</span>:error?<span role="alert">{error}</span>:<span role="status">{notice}</span>}</div>}
  </li>;

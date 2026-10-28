@@ -17,6 +17,7 @@ import {Badge,Button,Skeleton} from './design';
 import {useFlowDetails} from './useFlowDetails';
 import {OverviewTaskRow} from './OverviewTaskRow';
 import {Avatar} from './AppShell';
+import {CaseNextStep} from './CaseNextStep';
 import {eventMessage,isProjectLead,nameOf,stamp,type Ctx} from './appCommon';
 import type {Project} from './types';
 import './ProjectFlow.css';
@@ -54,15 +55,15 @@ export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}
  const status=text(p.source_status,'來源狀態待核對');
  return <div className="project-overview">
   <div className="po-main">
+   <CaseNextStep nodes={model.nodes} action={action} loading={assignments.state.kind==='loading'||sopTasks.state.kind==='loading'} error={assignments.state.kind==='error'?assignments.state.message:sopTasks.state.kind==='error'?sopTasks.state.message:''} stale={!!list?.stale} current={current} onOpen={go}/>
    <FlowDiagram compact nodes={model.nodes} overall={model.overall} selected={c.route.node?selectedKey:current} loading={assignments.state.kind==='loading'} onSelect={node=>go({tab:'overview',node})}/>
-   {workbench}
     <section className="po-card po-todos" aria-labelledby="po-todo-title"><header className="po-card-heading"><h2 id="po-todo-title">待辦事項</h2><Button variant="plain" onClick={()=>go({tab:'flow',section:'all-tasks'})}>查看全部任務 ({todos.filter(row=>row.kind!=='recommendation').length}) →</Button></header>
-     {tasksLoading&&<div role="status" aria-label="任務載入中"><Skeleton lines={3}/></div>}
-     <ul>{todos.map(row=>row.kind==='recommendation'?<li key={row.id} className="po-recommendation"><Badge>建議</Badge><div className="po-todo-content"><a href={href(row.target)} onClick={event=>{event.preventDefault();go(row.target)}}>{row.title}</a><small>{row.owner} · {row.reason}</small></div><Button onClick={()=>go(row.target)}>{row.primary?action.button:'查看詳情'}</Button></li>:<OverviewTaskRow key={`${p.id}:${row.id}`} row={row} people={merged?.node_details?.[row.node.key]?.assignable_people} projectId={p.id} today={c.w.as_of} sop={sopTasks} assignments={assignments} locked={row.kind==='sopTask'?sopTasks.state.kind!=='ready'||sopTasks.state.refreshing:assignments.state.kind!=='ready'||assignments.refreshing||!list?.writes_enabled||!!list?.stale} go={go} href={href(row.target)}/>)}</ul>
+     <ul>{tasksLoading&&!todos.some(row=>row.kind!=='recommendation')&&<li role="status" aria-label="任務載入中"><Skeleton lines={5}/></li>}{todos.map(row=>row.kind==='recommendation'?<li key={row.id} className="po-recommendation"><Badge>建議</Badge><div className="po-todo-content"><a href={href(row.target)} onClick={event=>{event.preventDefault();go(row.target)}}>{row.title}</a><small>{row.owner} · {row.reason}</small></div><Button onClick={()=>go(row.target)}>{row.primary?action.button:'查看詳情'}</Button></li>:<OverviewTaskRow key={`${p.id}:${row.id}`} row={row} people={merged?.node_details?.[row.node.key]?.assignable_people} projectId={p.id} today={c.w.as_of} sop={sopTasks} assignments={assignments} locked={row.kind==='sopTask'?sopTasks.state.kind!=='ready'||sopTasks.state.refreshing:assignments.state.kind!=='ready'||assignments.refreshing||!list?.writes_enabled||!!list?.stale} go={go} href={href(row.target)}/>)}</ul>
      {!tasksLoading&&!tasks.rows.length&&<p className="po-empty">尚無待辦任務</p>}
      {Object.keys(details.errors).length>0&&<p className="po-source-state" role="alert">部分任務暫不可用<Button onClick={details.retry}>重試任務來源</Button></p>}
      {sopTasks.state.kind==='error'&&<p className="po-source-state" role="alert">{sopTasks.state.message}<Button onClick={()=>void sopTasks.reload()}>重試任務</Button></p>}
     </section>
+   {workbench}
    {assignments.state.kind==='error' && <p className="po-source-state" role="alert">節點暫不可用<Button onClick={()=>void assignments.reload()}>重試</Button></p>}
    {sourceStale && !list?.stale && <p className="po-source-state">工程來源為上次成功資料，待更新核對。</p>}
    {list?.stale && <p className="po-source-state">節點來源為上次成功資料，待更新核對。</p>}

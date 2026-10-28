@@ -1,3 +1,4 @@
+import {Select as FormSelect} from './design/Select';
 import type {Project} from './types';
 import {ActionForm, Field, Status, who, type Context} from './Operations';
 import {executionAllowed} from './ProjectExecution';
@@ -25,12 +26,12 @@ export function SopApplicability({c,p}:{c:Context;p:Project}){
   {canPropose&&<ActionForm key={`${p.id}:${proposal?.id||'new'}`} title="彙整下包需求" draftId={`sop-propose:${p.id}:${proposal?.id||'new'}`} busy={c.busy} onSubmit={(d,e)=>c.run('sop_applicability_propose',{
    applies:d.applies==='true',groups:d.applies==='true'?new FormData(e.currentTarget).getAll('groups'):[],reason:d.reason,
   },{project_id:p.id})}>
-   <Field title="是否下包" name="applies"><select name="applies" required defaultValue=""><option value="" disabled>請選擇</option><option value="false">無下包需求</option><option value="true">有下包需求</option></select></Field>
+   <Field title="是否下包" name="applies"><FormSelect name="applies" required defaultValue=""><option value="" disabled>請選擇</option><option value="false">無下包需求</option><option value="true">有下包需求</option></FormSelect></Field>
    <fieldset><legend>下包作業組別（有下包時選填）</legend>{Object.entries(groups).map(([key,name])=><label key={key}><input type="checkbox" name="groups" value={key}/>{name}</label>)}</fieldset>
    <Field title="工作範圍及判斷理由" name="reason"><textarea placeholder="說明適用性調整的原因" name="reason" required maxLength={2000}/></Field>
   </ActionForm>}
   {canConfirm&&<ActionForm key={`${p.id}:${proposal.id}`} title="確認本次下包範圍" draftId={`sop-confirm:${p.id}:${proposal.id}`} busy={c.busy} onSubmit={d=>c.run('sop_applicability_confirm',{...d,proposal_id:proposal.id},{project_id:p.id})}>
-   <Field title="確認結果" name="result"><select name="result"><option value="approved">確認範圍</option><option value="returned">退回 PM 補充</option></select></Field>
+   <Field title="確認結果" name="result"><FormSelect name="result"><option value="approved">確認範圍</option><option value="returned">退回 PM 補充</option></FormSelect></Field>
    <Field title="退回理由（退回時必填）" name="reason" required={false}/>
   </ActionForm>}
  </section>;

@@ -1,3 +1,4 @@
+import {Select as FormSelect} from './design/Select';
 import {actionRegistry,type ActionRegistry} from './nodeWorkbenchModel';
 import {useEffect,useId,useRef,useState,type ReactNode} from 'react';
 import {CircleHelp} from 'lucide-react';
@@ -54,8 +55,8 @@ export function TaskPersonPicker({detail,taskId,busy,error,mutate,onClose}:{deta
  if(!task)return null;
  return <form className="pf-task-picker assignment-edit" aria-label={`指派 ${task.title}`} onSubmit={event=>{event.preventDefault();if(!busy && task.can.assign && valid)void mutate({action:'update_task',nodeKey:detail.node.key,taskId:task.id,expected_revision:task.revision,patch:{assignee_open_id:person}}).then(ok=>{if(ok)onClose()})}}>
   <p>指派既有任務 · {task.title}</p><small>僅列出來源已核實的此組在職人員。</small>
-  <label>組別<select value={department} onChange={e=>{setDepartment(e.target.value);setPerson('')}} disabled={busy}>{detail.node.departments.map(d=><option key={d}>{d}</option>)}</select></label>
-  <label>負責人<select aria-label="任務負責人" value={person} onChange={e=>setPerson(e.target.value)} disabled={busy}><option value="">選擇負責人</option>{people.map(p=><option key={p.open_id} value={p.open_id}>{p.name}</option>)}</select></label>
+  <label>組別<FormSelect value={department} onChange={e=>{setDepartment(e.target.value);setPerson('')}} disabled={busy}>{detail.node.departments.map(d=><option key={d}>{d}</option>)}</FormSelect></label>
+  <label>負責人<FormSelect aria-label="任務負責人" value={person} onChange={e=>setPerson(e.target.value)} disabled={busy}><option value="">選擇負責人</option>{people.map(p=><option key={p.open_id} value={p.open_id}>{p.name}</option>)}</FormSelect></label>
   {!people.length && <p>目前沒有可指派的在職人員，請核對名冊與組別。</p>}
   {error && <p role="alert">{error.fields.assignee_open_id || error.message}</p>}
   <div className="pf-actions"><Button disabled={busy} onClick={onClose}>取消</Button><Button type="submit" variant="primary" disabled={busy || !valid || !task.can.assign} disabledReason={busy ? '正在儲存，請稍候。' : !task.can.assign ? '需有此任務指派權限。' : '請選擇此組在職人員。'}>{busy ? '儲存中…' : '儲存指派'}</Button></div>

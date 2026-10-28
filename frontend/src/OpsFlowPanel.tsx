@@ -1,3 +1,4 @@
+import {Select as FormSelect} from './design/Select';
 import {useCallback,useEffect,useState} from 'react';
 import {Badge,Button,Section} from './design';
 import {api,ApiError} from './api';
@@ -55,7 +56,7 @@ export function OpsFlowPanel(){
    <Button disabled={!!busy} onClick={()=>void post('resume','resume-dispatch',{},()=>'已恢復派送（本機模擬），排隊申請將重新處理。')}>修復後恢復派送</Button></div>}
   {flow&&!flow.entities.length&&<p>您目前沒有可操作的模擬案件或節點。</p>}
   {flow&&entity&&<Section>
-   <div className="ops-flow-pick"><label>選擇案件或節點（模擬資料）<select value={entityId} onChange={e=>{setEntityId(e.target.value);setStale(null);setError('')}}>{flow.entities.map(e=><option key={e.entity_id} value={e.entity_id}>{entityTitle(e)}</option>)}</select></label></div>
+   <div className="ops-flow-pick"><label>選擇案件或節點（模擬資料）<FormSelect value={entityId} onChange={e=>{setEntityId(e.target.value);setStale(null);setError('')}}>{flow.entities.map(e=><option key={e.entity_id} value={e.entity_id}>{entityTitle(e)}</option>)}</FormSelect></label></div>
    <article className="ops-sync-item" aria-label={`${entityTitle(entity)}：${FIELDS[entity.seat_field]}`}>
     <header><strong>{FIELDS[entity.seat_field]}</strong><Badge tone="warning">{MAPPING_BADGE}</Badge></header>
     <p>{SEAT_LABEL[entity.kind]}</p>
@@ -82,7 +83,7 @@ export function OpsFlowPanel(){
     <p role="note" className="ops-sync-notice">{MOCK_DECISION_NOTE}</p>
    </article>
    <details className="ops-sync-item"><summary>模擬情境（僅本機 mock，用於演練失敗與復原）</summary>
-    <label>下一次派送的模擬結果<select value={draft.outcome} onChange={e=>setDrafts(all=>({...all,[entityId]:{...draft,outcome:e.target.value}}))}>{flow.mock_outcomes.map(o=><option key={o} value={o}>{MOCK_OUTCOME_LABEL[o]||o}</option>)}</select></label></details>
+    <label>下一次派送的模擬結果<FormSelect value={draft.outcome} onChange={e=>setDrafts(all=>({...all,[entityId]:{...draft,outcome:e.target.value}}))}>{flow.mock_outcomes.map(o=><option key={o} value={o}>{MOCK_OUTCOME_LABEL[o]||o}</option>)}</FormSelect></label></details>
   </Section>}
   <OpsSyncPanel key={tick} onRetry={retry}/>
  </section>;

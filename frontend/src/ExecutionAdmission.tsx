@@ -1,3 +1,4 @@
+import {Select as FormSelect} from './design/Select';
 import {useState} from 'react';
 import type {Project,Session,Workspace} from './types';
 import {Button} from './design';
@@ -27,7 +28,7 @@ function AdmissionQueueRow({p,run,busy}:{p:Project;run:Run;busy:boolean}){
  const ready=!!value&&!!reason.trim();
  return <li><a href={`#view=project&project=${encodeURIComponent(p.id)}`}>{p.code} {p.name}</a><small>{admissionState(p,'manager').reason}</small>
   <form onSubmit={e=>{e.preventDefault();if(!ready||busy)return;void run('case_execution_assign',{execution_system:value,reason},{project_id:p.id}).then(r=>{if(r){setValue('');setReason('')}})}}>
-   <label>執行系統<select value={value} disabled={busy} onChange={e=>setValue(e.target.value)}><option value="">請選擇</option><option value="meegle">Meegle 執行至完成</option><option value="workbench">本工作台執行</option></select></label>
+   <label>執行系統<FormSelect value={value} disabled={busy} onChange={e=>setValue(e.target.value)}><option value="">請選擇</option><option value="meegle">Meegle 執行至完成</option><option value="workbench">本工作台執行</option></FormSelect></label>
    <label>核定依據<input placeholder="說明執行系統的核定依據" required maxLength={1000} value={reason} disabled={busy} onChange={e=>setReason(e.target.value)}/></label>
    <Button variant="primary" type="submit" disabled={busy||!ready}>核定此案</Button></form></li>;
 }

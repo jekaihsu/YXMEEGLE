@@ -1,8 +1,10 @@
-import {createContext,useContext,useEffect,useId,useRef,useState} from 'react';
+import {createContext,useContext,useEffect,useId,useLayoutEffect,useRef,useState} from 'react';
 import type {ButtonHTMLAttributes,CSSProperties,KeyboardEvent,ReactNode} from 'react';
 import {Check,ChevronDown} from 'lucide-react';
 import {useDialogFocus} from '../useDialogFocus';
 import './primitives.css';
+import {PickerPopover} from './PickerPopover';
+export {Select} from './Select';
 
 export {ThemeProvider,useAppearance} from './appearance';
 
@@ -66,37 +68,42 @@ export function Progress({value,max=100,label}:{value:number;max?:number;label:s
 
 /** Dropdown for toolbar filters. Draws its own list instead of the native <select> popup,
  *  which some embedded browsers (e.g. app preview panes) never display. Keyboard: arrows, Home/End, Enter, Escape. */
-export function Picker<T extends string>({label,options,value,onChange,className=''}:{label:string;options:[T,string][];value:T;onChange:(v:T)=>void;className?:string}){
+export function Picker<T extends string>({label,options,value,onChange,className='',disabled=false,disabledOptions=[],searchable=false}:{label:string;options:[T,string][];value:T;onChange:(v:T)=>void;className?:string;disabled?:boolean;disabledOptions?:T[];searchable?:boolean}){
  const[open,setOpen]=useState(false);
  const[active,setActive]=useState(0);
+ const[query,setQuery]=useState('');
+ const visible=options.map((option,index)=>({option,index})).filter(({option})=>!query||option[1].toLocaleLowerCase().includes(query.toLocaleLowerCase()));
  const root=useRef<HTMLDivElement>(null);
  const button=useRef<HTMLButtonElement>(null);
  const list=useRef<HTMLUListElement>(null);
  const id=useId();
  const current=options.find(([k])=>k===value)?.[1]??options[0]?.[1]??'';
  useEffect(()=>{if(!open)return;
-  const away=(e:MouseEvent)=>{if(!root.current?.contains(e.target as Node))setOpen(false)};
-  document.addEventListener('mousedown',away);return()=>document.removeEventListener('mousedown',away)},[open]);
+  const away=(e:PointerEvent)=>{if(!root.current?.contains(e.target as Node))setOpen(false)};
+  document.addEventListener('pointerdown',away);return()=>document.removeEventListener('pointerdown',away)},[open]);
  useEffect(()=>{if(open)list.current?.querySelector<HTMLElement>(`[data-index="${active}"]`)?.scrollIntoView({block:'nearest'})},[open,active]);
- const show=()=>{setActive(Math.max(0,options.findIndex(([k])=>k===value)));setOpen(true);requestAnimationFrame(()=>list.current?.focus())};
- const pick=(i:number)=>{const o=options[i];if(o)onChange(o[0]);setOpen(false);button.current?.focus()};
+ useLayoutEffect(()=>{if(open)list.current?.focus()},[open]);
+ const show=()=>{if(disabled)return;setQuery('');setActive(Math.max(0,options.findIndex(([k])=>k===value)));setOpen(true)};
+ const pick=(i:number)=>{const o=options[i];if(!o||disabledOptions.includes(o[0]))return;onChange(o[0]);setOpen(false);button.current?.focus()};
  const onButtonKey=(e:KeyboardEvent)=>{if(['ArrowDown','ArrowUp','Enter',' '].includes(e.key)){e.preventDefault();show()}};
  const onListKey=(e:KeyboardEvent)=>{
-  const last=options.length-1;
-  if(e.key==='ArrowDown'){e.preventDefault();setActive(i=>Math.min(last,i+1))}
-  else if(e.key==='ArrowUp'){e.preventDefault();setActive(i=>Math.max(0,i-1))}
-  else if(e.key==='Home'){e.preventDefault();setActive(0)}
+  const available=visible.filter(({option})=>!disabledOptions.includes(option[0])).map(({index})=>index);
+  const last=available.at(-1)??0;
+  const move=(delta:number)=>setActive(i=>available[Math.max(0,Math.min(available.length-1,available.indexOf(i)+delta))]??0);
+  if(e.key==='ArrowDown'){e.preventDefault();move(1)}
+  else if(e.key==='ArrowUp'){e.preventDefault();move(-1)}
+  else if(e.key==='Home'){e.preventDefault();setActive(available[0]??0)}
   else if(e.key==='End'){e.preventDefault();setActive(last)}
   else if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(active)}
   else if(e.key==='Escape'||e.key==='Tab'){if(e.key==='Escape')e.preventDefault();setOpen(false);if(e.key==='Escape')button.current?.focus()}};
  return <div ref={root} className={`ds-picker ${open?'open':''} ${className}`}>
-  <button ref={button} type="button" aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-list`} aria-label={`${label}：${current}`} onClick={()=>open?setOpen(false):show()} onKeyDown={onButtonKey}>
+  <button ref={button} disabled={disabled} type="button" aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-list`} aria-label={`${label}：${current}`} onClick={()=>open?setOpen(false):show()} onKeyDown={onButtonKey}>
    <span>{current}</span><ChevronDown size={14} aria-hidden="true"/>
   </button>
-  {open&&<ul ref={list} id={`${id}-list`} role="listbox" tabIndex={-1} aria-label={label} aria-activedescendant={`${id}-${active}`} onKeyDown={onListKey}>
-   {options.map(([k,text],i)=><li key={k} id={`${id}-${i}`} data-index={i} role="option" aria-selected={k===value} className={i===active?'active':''} onMouseEnter={()=>setActive(i)} onMouseDown={e=>e.preventDefault()} onClick={()=>pick(i)}>
+  {open&&!disabled&&<PickerPopover anchor={root} onClose={()=>setOpen(false)}>{searchable&&<input className="ds-picker-search" aria-label={`搜尋${label}`} placeholder="輸入關鍵字搜尋" value={query} onChange={e=>{setQuery(e.target.value);setActive(0)}} onKeyDown={e=>{if(e.key==='ArrowDown'){e.preventDefault();setActive(visible[0]?.index??0);list.current?.focus()}else if(e.key==='Enter'){e.preventDefault();const first=visible.find(({option})=>!disabledOptions.includes(option[0]));if(first)pick(first.index)}}}/>}<ul ref={list} id={`${id}-list`} role="listbox" tabIndex={-1} aria-label={label} aria-activedescendant={`${id}-${active}`} onKeyDown={onListKey}>
+   {visible.map(({option:[k,text],index:i})=><li key={k} id={`${id}-${i}`} data-index={i} role="option" aria-selected={k===value} aria-disabled={disabledOptions.includes(k)||undefined} className={i===active?'active':''} onMouseEnter={()=>setActive(i)} onMouseDown={e=>e.preventDefault()} onClick={()=>pick(i)}>
     <span>{text}</span>{k===value&&<Check size={14} aria-hidden="true"/>}
    </li>)}
-  </ul>}
+  </ul>{!visible.length&&<p className="ds-picker-empty" role="status">沒有符合的選項</p>}</PickerPopover>}
  </div>;
 }

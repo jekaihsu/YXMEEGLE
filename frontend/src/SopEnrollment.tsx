@@ -1,3 +1,4 @@
+import {Select as FormSelect} from './design/Select';
 import {useEffect, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Button, Sheet} from './design';
@@ -60,7 +61,7 @@ export function SopReadiness() {
  const items=read.kind==='ready'?read.items.filter(c=>filter==='all'||c.policy===filter||filter==='pending'&&c.enrollments.some(e=>e.status!=='succeeded')):[];
  return <section className="so-card sop-readiness" aria-label="SOP 帶入狀態">
   <div className="so-card-header"><h3>SOP 帶入狀態</h3><Button variant="plain" onClick={()=>setRevision(v=>v+1)}>重新讀取</Button></div>
-  <label>案件範圍 <select value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">全部案件</option><option value="legacy">舊案</option><option value="managed">已納管</option><option value="needs_review">待核對</option><option value="pending">等待或帶入失敗</option></select></label>
+  <label>案件範圍 <FormSelect value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">全部案件</option><option value="legacy">舊案</option><option value="managed">已納管</option><option value="needs_review">待核對</option><option value="pending">等待或帶入失敗</option></FormSelect></label>
   {read.kind==='loading'&&<p role="status">讀取中…</p>}{read.kind==='error'&&<p role="alert">目前無法讀取，請重新讀取。</p>}{error&&<p role="alert">{error}</p>}
   {read.kind==='ready'&&<><p className="sop-muted">共 {items.length} 案</p><ul className="sop-readiness-list">{items.map(c=><li key={c.projectId}>
    <div><strong>{c.code} {c.name}</strong><span className="sop-muted">{policyLabel[c.policy]}</span></div>

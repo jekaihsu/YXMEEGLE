@@ -1,3 +1,4 @@
+import {Select as FormSelect} from './design/Select';
 import {useId,useState,type FormEvent,type ReactNode} from 'react';
 import type {NodeAssignmentDetail,NodeAssignmentError,NewAssignmentTask} from './nodeAssignmentApi';
 export function AssignForm({detail, busy, error, onCancel, onSubmit}: {detail: NodeAssignmentDetail; busy: boolean; error: NodeAssignmentError | null; onCancel: () => void; onSubmit: (ids: string[]) => Promise<void>}) {
@@ -27,8 +28,8 @@ export function TaskCreateForm({people,departments:nodeDepartments,busy,error,on
   return <form className="ne-form assignment-edit" noValidate onSubmit={submit}><fieldset disabled={busy}><legend>新增節點任務</legend><div className="na-form-grid">
     <label className="na-wide"><span>任務名稱</span><input value={draft.title} required {...invalid('title')} onChange={e => update('title', e.target.value)}/>{fieldError('title')}</label>
     <label className="na-wide"><span>任務說明</span><textarea value={draft.detail} {...invalid('detail')} onChange={e => update('detail', e.target.value)} rows={3}/>{fieldError('detail')}</label>
-    {people.length > 0 && <label><span>負責人</span><select value={draft.assignee_open_id} {...invalid('assignee_open_id')} onChange={e => update('assignee_open_id', e.target.value)}><option value="">選擇負責人</option>{people.map(p => <option key={p.open_id} value={p.open_id}>{p.name}</option>)}</select>{fieldError('assignee_open_id')}</label>}
-    {nodeDepartments && <label><span>部門</span><select value={draft.department} {...invalid('department')} onChange={e => update('department', e.target.value)}><option value="">選擇部門</option>{departments.map(d => <option key={d} value={d}>{d}</option>)}</select>{fieldError('department')}</label>}
+    {people.length > 0 && <label><span>負責人</span><FormSelect value={draft.assignee_open_id} {...invalid('assignee_open_id')} onChange={e => update('assignee_open_id', e.target.value)}><option value="">選擇負責人</option>{people.map(p => <option key={p.open_id} value={p.open_id}>{p.name}</option>)}</FormSelect>{fieldError('assignee_open_id')}</label>}
+    {nodeDepartments && <label><span>部門</span><FormSelect value={draft.department} {...invalid('department')} onChange={e => update('department', e.target.value)}><option value="">選擇部門</option>{departments.map(d => <option key={d} value={d}>{d}</option>)}</FormSelect>{fieldError('department')}</label>}
     <label><span>期限</span><input type="date" value={draft.deadline} {...invalid('deadline')} onChange={e => update('deadline', e.target.value)}/>{fieldError('deadline')}</label>
   </div>{children}{error?.message&&<p role="alert">{error.message}</p>}<div className="na-form-actions"><button type="button" className="button compact" onClick={onCancel}>取消</button><button type="submit" className="button primary compact">建立任務</button></div></fieldset></form>;
 }

@@ -1,3 +1,5 @@
+import {PickerPopover} from './design/PickerPopover';
+import {Select as FormSelect} from './design/Select';
 import {useSourceRefresh} from './useSourceRefresh';
 import {useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import {ArrowDown, ArrowRight, Check, CircleCheck, Clock3, Copy, FileText, LayoutGrid, List, MoreVertical, Pin, PlayCircle, Plus, Search, Settings2, Star, UserRound, X} from 'lucide-react';
@@ -16,7 +18,7 @@ const GROUP_ICONS:Record<string,typeof Pin>={pinned:Pin,mine:UserRound,sop:Setti
 const PROJECT_URL='/api/projects?view=portfolio';
 const readLimit=()=>{try{const value=Number(window.localStorage.getItem('yx.projects.groupSize'));return [3,5,10,25,50,100].includes(value)?value:3}catch{return 3}};
 function Select({label,value,onChange,children}:{label:string;value:string;onChange:(value:string)=>void;children:ReactNode}) {
- return <label className="pl-select"><span className="sr-only">{label}</span><select aria-label={label} value={value} onChange={e=>onChange(e.target.value)}>{children}</select></label>;
+ return <label className="pl-select"><span className="sr-only">{label}</span><FormSelect aria-label={label} value={value} onChange={e=>onChange(e.target.value)}>{children}</FormSelect></label>;
 }
 function Person({name}:{name:string}) {return <span className="pl-person"><span className="pl-avatar" aria-hidden="true"><UserRound size={12}/></span><span>{name}</span></span>}
 function Stepper({row}:{row:CaseRow}) {
@@ -27,6 +29,7 @@ function Stepper({row}:{row:CaseRow}) {
 }
 function CaseCard({row,c,pinned,onPin,today}:{row:CaseRow;c:Ctx;pinned:boolean;onPin:()=>void;today:string}) {
  const [menu,setMenu]=useState(false),[details,setDetails]=useState(false),[message,setMessage]=useState('');
+ const menuAnchor=useRef<HTMLDivElement>(null);
  const menuRef=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null);
  const p=row.project,href=`#view=project&project=${encodeURIComponent(p.id)}`,attention=caseAttention(p,today);
  const due=tableCalendarDay(p.due_date),day=tableCalendarDay(today),deadlineLate=!!due&&!!day&&due<day&&row.state!=='已完成';
@@ -46,12 +49,12 @@ function CaseCard({row,c,pinned,onPin,today}:{row:CaseRow;c:Ctx;pinned:boolean;o
    <div className="pl-field pl-current"><small>目前節點</small><span>{row.current?.label||(row.state==='已完成'?'流程完成':'待核對')}</span></div>
    <span className="pl-status" data-state={row.state}>{row.state}</span>
    <div className="pl-flow" tabIndex={0} role="region" aria-label="九階段流程，可左右捲動"><Stepper row={row}/></div>
-   <div className="pl-more"><button ref={trigger} aria-label={`${p.code} 更多操作`} aria-haspopup="menu" aria-expanded={menu} onClick={()=>setMenu(!menu)}><MoreVertical size={17}/></button>
-    {menu&&<div ref={menuRef} className="pl-menu" role="menu" aria-label={`${p.code} 操作`} onKeyDown={e=>{
+   <div className="pl-more" ref={menuAnchor}><button ref={trigger} aria-label={`${p.code} 更多操作`} aria-haspopup="menu" aria-expanded={menu} onClick={()=>setMenu(!menu)}><MoreVertical size={17}/></button>
+    {menu&&<PickerPopover anchor={menuAnchor} onClose={()=>setMenu(false)}><div ref={menuRef} className="pl-menu" role="menu" aria-label={`${p.code} 操作`} onKeyDown={e=>{
      if(e.key==='Escape'){setMenu(false);trigger.current?.focus()}
      if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const items=Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]'));const index=items.indexOf(document.activeElement instanceof HTMLElement?document.activeElement:items[0]);items[e.key==='Home'?0:e.key==='End'?items.length-1:(index+(e.key==='ArrowDown'?1:items.length-1))%items.length]?.focus()}
      if(e.key==='Tab')setMenu(false);
-    }}><a role="menuitem" href={href}>開啟案件 <ArrowRight size={14}/></a><button role="menuitem" onClick={()=>{onPin();setMenu(false);trigger.current?.focus()}}>{pinned?'取消釘選':'釘選案件'}<Star size={14}/></button><button role="menuitem" onClick={()=>void copy()}>複製連結<Copy size={14}/></button><button role="menuitem" onClick={()=>{setDetails(!details);setMenu(false);trigger.current?.focus()}}>{details?'收合':'查看'}案件詳情<FileText size={14}/></button></div>}
+    }}><a role="menuitem" href={href}>開啟案件 <ArrowRight size={14}/></a><button role="menuitem" onClick={()=>{onPin();setMenu(false);trigger.current?.focus()}}>{pinned?'取消釘選':'釘選案件'}<Star size={14}/></button><button role="menuitem" onClick={()=>void copy()}>複製連結<Copy size={14}/></button><button role="menuitem" onClick={()=>{setDetails(!details);setMenu(false);trigger.current?.focus()}}>{details?'收合':'查看'}案件詳情<FileText size={14}/></button></div></PickerPopover>}
    </div>
   </div>
   {details&&<div className="pl-details"><div><strong>資料來源</strong><span>來源 {p.source_status||'未填'}</span><span className="verification-cell" aria-label={verification(p)}>{verification(p)}</span><span>{p.case_type==='intake'?'待確認接案':'正式案件'}{p.parent_code?` · 母案 ${p.parent_code}`:''}</span><span>工作台狀態 {STATUS[p.execution_status||p.status]||p.execution_status||p.status||'未知'}</span>{p.source_lifecycle?.reasons?.length?<span>來源狀態待核對 · {p.source_lifecycle.reasons.join('、')}</span>:null}</div><div><strong>執行歸屬</strong><AdmissionCell p={p} role={c.s.user?.role}/></div><div><strong>期限與關注</strong><span className={`deadline${attention.soon?' is-upcoming':''}${deadlineLate?' is-overdue':''}`}>{taipeiDate(p.due_date,'未排期限')}</span><span>{[attention.late?'逾期':'',attention.blocked?'受阻':'',attention.soon?'即將到期':''].filter(Boolean).join(' · ')||'目前無已知期限警示'}</span></div><div><strong>SOP 納管</strong><span>{p.sop_summary?.policy==='managed'?'已納管':p.sop_summary?.policy==='legacy'?'歷史案件':p.sop_summary?.policy==='needs_review'?'政策待核對':'尚無納管紀錄'}{p.sop_summary?.imported_tasks?' · 已匯入 SOP 任務':''}</span><span>節點依工作區持久化摘要，最新指派請至案件核對。</span></div></div>}

@@ -1,13 +1,17 @@
+import {canWriteDispatch} from './dispatchAccess';
+import {DetailsMenu} from './design/DetailsMenu';
+import {Select as FormSelect} from './design/Select';
 import {ReportLinkReview} from './ReportLinkReview';
 import {withLocalChecklist,buildNodeWorkbench,localCase} from './nodeWorkbenchModel';
 import {LocalNodeActions} from './LocalNodeActions';
 import {CaseSopStart} from './CaseSopStart';
 import {ReportLinkSummary} from './ReportLinkSummary';
+import {DeferredDetails} from './DeferredDetails';
 import {NODE_NAMES} from './workflowLabels';
 import {taipeiTime} from './taipeiTime';
 import {elapsed,nameOf,safeUrl} from './appCommon';
 import {createPortal} from 'react-dom';
-import {useEffect,useRef,useState,type MutableRefObject,type ReactNode} from 'react';
+import {lazy,Suspense,useEffect,useRef,useState,type MutableRefObject,type ReactNode} from 'react';
 import {Button,Skeleton} from './design';
 import {useNodeAssignments} from './useNodeAssignments';
 import {useProjectProgress} from './useProjectProgress';
@@ -21,7 +25,7 @@ import {FlowAction,FlowNodeActions} from './FlowActions';
 import {FlowTasks} from './FlowTasks';
 import {SopTasks,type SopImportTarget} from './SopTasks';
 import {useSopTasks,canReadSop} from './useSopTasks';
-import {FlowSchedule} from './FlowSchedule';
+const FlowSchedule=lazy(()=>import('./FlowSchedule').then(m=>({default:m.FlowSchedule})));
 import {ProductionCard,ProductionPlanFacts} from './FlowEvidence';
 import {isProductionSeedTask,productionPlanFacts,productionPlanGaps} from './productionPlan';
 import {FlowSourceDetails} from './FlowSourceDetails';
@@ -98,7 +102,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
   {assignments.error && <div role="alert" className="pg-callout">{assignments.error.message}{['outcome_unknown','readback_mismatch','busy'].includes(assignments.error.code || '') && <Button onClick={()=>void assignments.retryMutation()}>重試同一操作</Button>}</div>}
   {!inline && <FlowDiagram compact selectionFollowsFocus nodes={model.nodes} overall={model.overall} selected={selected.key} loading={loading} onSelect={select}/>}
   <section id="flow-selected" className="pf-panel glass--card nw-selected" aria-label={`${selected.label}節點明細`} aria-busy={loading} tabIndex={-1}>
-   <header><div className="pf-selected-heading"><h2>{selected.label}</h2><span className="pf-selected-state" role="status">{nodeLoading?'正在載入節點資料…':selected.state}</span></div><div className="pf-panel-tools">{safeUrl(p.source_url)&&<a className="button" href={p.source_url} target="_blank" rel="noreferrer">開啟案件來源</a>}{inline&&enabled&&<SopControls sop={sop}/>} {!enabled&&<CaseSopStart projectId={p.id} sop={sopTasks}/>}{!nodeLoading&&<FlowSchedule key={selected.key} project={p} node={selected} session={c.s} onPublished={()=>{void assignments.reload()}}/>}{list && <details className="pf-attention-menu"><summary>需要我處理</summary><div className="pf-attention" aria-label="需要我處理">{model.nodes.filter(n=>needsViewerAction(n,list,c.s.user?.id || '')).map(n=><Button key={n.key} onClick={()=>select(n.key)}>{n.label} · {n.state==='待審核' ? '待審核' : !n.owners.length ? '待認領' : '待處理'}</Button>)}</div></details>}</div></header>
+   <header><div className="pf-selected-heading"><h2>{selected.label}</h2><span className="pf-selected-state" role="status">{nodeLoading?'正在載入節點資料…':selected.state}</span></div><div className="pf-panel-tools">{safeUrl(p.source_url)&&<a className="button" href={p.source_url} target="_blank" rel="noreferrer">開啟案件來源</a>}{inline&&enabled&&<SopControls sop={sop}/>} {!enabled&&<CaseSopStart projectId={p.id} sop={sopTasks}/>}{!nodeLoading&&category&&canWriteDispatch(c.s)&&<Suspense fallback={<Skeleton width="4rem"/>}><FlowSchedule key={selected.key} project={p} node={selected} session={c.s} onPublished={()=>{void assignments.reload()}}/></Suspense>}{list && <DetailsMenu className="pf-attention-menu" label="需要我處理"><div className="pf-attention" aria-label="需要我處理">{model.nodes.filter(n=>needsViewerAction(n,list,c.s.user?.id || '')).map(n=><Button key={n.key} onClick={()=>select(n.key)}>{n.label} · {n.state==='待審核' ? '待審核' : !n.owners.length ? '待認領' : '待處理'}</Button>)}</div></DetailsMenu>}</div></header>
    {nodeLoading ? <Skeleton height="5rem"/> : <dl className="pf-facts">{workbench.facts.map(fact=><div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}{selected.assignment?.legacy_completion && <div><dt>舊案直接完成</dt><dd>{selected.assignment.legacy_completion.actor.name} · {taipeiTime(selected.assignment.legacy_completion.at)}<small>{selected.assignment.legacy_completion.reason}</small></dd></div>}</dl>}
    {selected.assignment?.auto_done && <p className="pg-callout">自動判定 · {selected.assignment.auto_done.reason}</p>}
    {inline&&isLegacy&&!localCase(p)&&!workbench.local&&legacyActions}
@@ -110,7 +114,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
    {!selected.assignment&&<SopTasks c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>}
   </section>
   {!inline && p.nodes.length>0 && legacyActions && <details className="pf-secondary pf-legacy"><summary>範本與本地流程</summary>
-   <label>本地節點<select aria-label="本地節點" value={selectedKey} onChange={e=>select(e.target.value)}>{p.nodes.map(n=><option key={n.id} value={n.key}>{NODE_NAMES[n.key] || n.name}</option>)}</select></label>{legacyActions}
+   <label>本地節點<FormSelect aria-label="本地節點" value={selectedKey} onChange={e=>select(e.target.value)}>{p.nodes.map(n=><option key={n.id} value={n.key}>{NODE_NAMES[n.key] || n.name}</option>)}</FormSelect></label>{legacyActions}
   </details>}
   <details className="pf-secondary"><summary>節點說明與背景</summary>
    {isLegacy && <NextAction c={c} rows={p.nodes.flatMap(n=>n.tasks.map(t=>({p,n,t})))}/>}
@@ -119,10 +123,10 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
    <p>經過 {elapsed(localNode?.started_at || selected.assignment?.started_at,c.w.as_of)} 天</p>
    <Button onClick={()=>c.go({...c.route,node:selectedKey,tab:'files'})}>開啟 作業資料與成果</Button>
   </details>
-  <details className="pf-secondary"><summary>日報連結與核對</summary><ReportLinkSummary projectId={p.id} version={c.w.version} compact onReview={()=>setReviewLinks(true)}/>{reviewLinks&&<ReportLinkReview c={c} compact/>}</details>
+  <DeferredDetails title="日報連結與核對"><ReportLinkSummary projectId={p.id} version={c.w.version} compact onReview={()=>setReviewLinks(true)}/>{reviewLinks&&<ReportLinkReview c={c} compact/>}</DeferredDetails>
   {secondary}
-  {read.state.kind==='ready' && <FlowSourceDetails data={read.state.data}/>}
-  <details className="pf-secondary"><summary>案件就緒條件</summary><ProjectReadiness w={c.w} p={p}/></details>
+  <FlowSourceDetails data={read.state.kind==='ready'?read.state.data:undefined} hideIdentity={inline} readiness={<ProjectReadiness w={c.w} p={p}/>}/>
+
   {report && createPortal(<ProgressDetail caseKey={report.case_key} dept={report.dept} week={report.week} onClose={()=>setReport(null)}/>,document.body)}
  </div>;
 }
