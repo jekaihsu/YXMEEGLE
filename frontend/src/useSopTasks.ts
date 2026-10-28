@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {getSessionEpoch} from './api';
+import {useDetailRefresh} from './detailRefresh';
 import {requestId} from './nodeAssignmentApi';
 import {SOP_NODE_KEYS, SopError, type SopTask, sopApi, sopErrorText, type ImportPreview, type ImportReceipt, type SopNodeKey, type SopOverview, type SopTemplate, type SopAssignee} from './sopTaskApi';
 import {previewBody, sameSelection, selectionBlockers, type Decisions} from './sopTaskModel';
@@ -28,7 +29,7 @@ export function canReadSop(user: {active?:boolean} | null | undefined){
 export function prefetchSopTasks(projectId:string,workspace:string,force=false,join=false){
  const key=`${workspace}:${projectId}`, stored=cached(key), epoch=getSessionEpoch();
  const failure=deniedFor(key);if(failure)return Promise.reject(failure);
- // A passive caller (prefetch, poll, retry) shares any read already in flight; only a reload after a write must not, since that read can predate the write.
+ // A passive caller (prefetch, retry) shares any read already in flight; only a reload after a write must not, since that read can predate the write.
  const pending=requests.get(key);if(pending&&(!force||join))return pending;
  if(!force&&stored&&Date.now()-(readAt.get(key)||0)<60000)return Promise.resolve(stored);
  const request=sopApi.overview(projectId,()=>epoch===getSessionEpoch()).then(data=>{
@@ -36,12 +37,12 @@ export function prefetchSopTasks(projectId:string,workspace:string,force=false,j
  }).catch(error=>{if(epoch===getSessionEpoch()&&requests.get(key)===request){cache.delete(key);readAt.delete(key);if(error instanceof SopError&&[401,403,404].includes(error.status))deny(key,error)}throw error}).finally(()=>{if(requests.get(key)===request)requests.delete(key)});
  requests.set(key,request);return request;
 }
-export function prefetchSopAssignees(projectId:string,workspace:string){
+export function prefetchSopAssignees(projectId:string,workspace:string,force=false){
  const key=`${workspace}:${projectId}`;cached(key);const epoch=getSessionEpoch();
  const failure=deniedFor(key+':assignees');if(failure)return Promise.reject(failure);
- const pending=assigneeRequests.get(key);if(pending)return pending;
- const stored=assigneeCache.get(key);if(stored&&Date.now()-(readAt.get(key+':assignees')||0)<60000)return Promise.resolve(stored);
- const request=sopApi.assignees(projectId,()=>epoch===getSessionEpoch()).then(data=>{if(epoch===getSessionEpoch()){assigneeCache.set(key,data);readAt.set(key+':assignees',Date.now())}return data}).catch(error=>{if(epoch===getSessionEpoch()&&error instanceof SopError&&[401,403,404].includes(error.status)){assigneeCache.delete(key);deny(key+':assignees',error)}throw error}).finally(()=>{if(assigneeRequests.get(key)===request)assigneeRequests.delete(key)});
+ const pending=assigneeRequests.get(key);if(pending&&!force)return pending;
+ const stored=assigneeCache.get(key);if(!force&&stored&&Date.now()-(readAt.get(key+':assignees')||0)<60000)return Promise.resolve(stored);
+ const request=sopApi.assignees(projectId,()=>epoch===getSessionEpoch()).then(data=>{if(epoch===getSessionEpoch()&&assigneeRequests.get(key)===request){assigneeCache.set(key,data);readAt.set(key+':assignees',Date.now())}return data}).catch(error=>{if(epoch===getSessionEpoch()&&error instanceof SopError&&[401,403,404].includes(error.status)){assigneeCache.delete(key);deny(key+':assignees',error)}throw error}).finally(()=>{if(assigneeRequests.get(key)===request)assigneeRequests.delete(key)});
  assigneeRequests.set(key,request);return request;
 }
 
@@ -90,24 +91,16 @@ export function useSopTasks(projectId: string, workspace: string, enabled=true) 
   cache.set(key, next);
   setState(s => ({kind: 'ready', data: next, refreshing: s.kind === 'ready' && s.refreshing}));
  }, [key]);
- const syncing = 'data' in state && !!state.data?.tasks.some(task => task.larkSync.state === '同步中');
- useEffect(() => {
-  if (!syncing) return;
-  const scope = life.current;
-  let attempts = 0, pending = false;
-  const timer = setInterval(async () => {
-   if (!scope.active || scope !== life.current || scope.epoch !== getSessionEpoch() || attempts >= 30) {clearInterval(timer); return}
-   attempts += 1;
-   if (attempts >= 30) clearInterval(timer);
-   if (pending) return;
-   pending = true;
-   try {await reload(true, true)} finally {pending = false}
-  }, 10000);
-  return () => clearInterval(timer);
- }, [key, reload, syncing]);
+ const reloadAll = useCallback(async () => {
+  const scope=life.current;
+  await Promise.all([readback(), prefetchSopAssignees(projectId,workspace,true).then(people=>{
+   if(scope===life.current&&scope.active&&scope.epoch===getSessionEpoch()){setAssignees(people);setAssigneeError('')}
+  }).catch(error=>{if(scope===life.current&&scope.active&&scope.epoch===getSessionEpoch())setAssigneeError(sopErrorText(error))})]);
+ }, [readback,projectId,workspace]);
+ const refreshDetail = useDetailRefresh(reloadAll, enabled);
  const current = useCallback(() => life.current.active && life.current.epoch === getSessionEpoch(), []);
  const sameScope=life.current.key===key&&life.current.epoch===getSessionEpoch();
- return {state:!enabled?{kind:'forbidden'} satisfies SopListState:!sameScope?{kind:'loading'} satisfies SopListState:state, reload, readback, applyTask, current, assignees:enabled&&sameScope?assignees:[], assigneeError};
+ return {state:!enabled?{kind:'forbidden'} satisfies SopListState:!sameScope?{kind:'loading'} satisfies SopListState:state, reload: refreshDetail || reload, readback, applyTask, current, assignees:enabled&&sameScope?assignees:[], assigneeError};
 }
 
 export type ImportStep = 'version'|'select'|'confirm'|'receipt';

@@ -50,17 +50,18 @@ test('round2 forced detail replaces a pending read and keeps newest cached resul
  assert.equal(fresh.tasks[0].assignee.name,'陳威廷');assert.equal(count,2);releaseOld();await first;
  assert.equal((await ui.prefetchNodeAssignmentDetail('p1','control')).tasks[0].assignee.name,'陳威廷');
 });
-test('round2 browsing refreshes while an assignment edit input defers refresh',async()=>{
- await mount();const wrap=document.createElement('div');wrap.className='node-assignments';wrap.innerHTML='<button>瀏覽節點</button><form class="assignment-edit"><input/></form>';document.body.append(wrap);
- wrap.querySelector('button').focus();await act(async()=>document.dispatchEvent(new Event('visibilitychange')));assert.equal(calls.length,2);
- wrap.querySelector('input').focus();await act(async()=>document.dispatchEvent(new Event('visibilitychange')));assert.equal(calls.length,2);
- wrap.remove();
+test('browsing and visibility changes never schedule assignment polling',async()=>{
+ const original=window.setInterval;let intervals=0;window.setInterval=()=>{intervals++;return 1};
+ try{await mount();await act(async()=>{window.dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'))});assert.equal(calls.length,1);assert.equal(intervals,0);await act(async()=>latest.reload());assert.equal(calls.length,2)}finally{window.setInterval=original}
 });
 
-test('round2 sixty-second refresh runs while browsing and waits for an edit input',async()=>{
- const original=window.setInterval;let refresh;window.setInterval=(fn,ms)=>{assert.equal(ms,60000);refresh=fn;return 1};
- try{await mount();const wrap=document.createElement('div');wrap.className='assignment-edit';wrap.innerHTML='<input/><button>瀏覽</button>';document.body.append(wrap);
- wrap.querySelector('button').focus();await act(async()=>refresh());assert.equal(calls.length,2);
- wrap.querySelector('input').focus();await act(async()=>refresh());assert.equal(calls.length,2);wrap.remove();
- }finally{window.setInterval=original}
+test('forced list read bypasses a read started before a write and keeps the newest cache',async()=>{
+ await mount();let releaseOld,count=0;
+ const old=structuredClone(fixture.list),fresh=structuredClone(fixture.list);fresh.code='A115002-01';
+ globalThis.fetch=async()=>{const index=++count;if(index===1)await new Promise(resolve=>releaseOld=resolve);return response(index===1?old:fresh)};
+ const first=ui.prefetchNodeAssignments('p1',true);
+ const next=await ui.prefetchNodeAssignments('p1',true);
+ assert.equal(next.code,'A115002-01');assert.equal(count,2);
+ releaseOld();await first;
+ assert.equal((await ui.prefetchNodeAssignments('p1')).code,'A115002-01');
 });

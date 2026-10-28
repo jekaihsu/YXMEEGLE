@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {getSessionEpoch, getPendingMutations} from './api';
+import {getSessionEpoch} from './api';
+import {useDetailRefresh} from './detailRefresh';
 import {assignmentErrorMessage, assignmentsDisabled, fetchNodeAssignments, fetchNodeAssignmentDetail, mutateNodeAssignment, NodeAssignmentError, requestId, type AssignmentMutation, type NodeAssignmentDetail, type NodeAssignmentList} from './nodeAssignmentApi';
 
 let cacheEpoch = getSessionEpoch();
@@ -28,7 +29,7 @@ function cached(projectId: string) {syncEpoch(); return lists.get(projectId)}
 export function prefetchNodeAssignments(projectId: string, force = false): Promise<NodeAssignmentList> {
   syncEpoch();
   const existing = requests.get(projectId);
-  if (existing) return existing;
+  if (existing && !force) return existing;
   const stored=lists.get(projectId);
   if(!force && stored && Date.now()-(listReadAt.get(projectId)||0)<60000)return Promise.resolve(stored);
   const epoch = getSessionEpoch();
@@ -83,12 +84,8 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
     const controller = lifecycle.current.controller;
     return () => {controller.abort(); listRequest.current++};
   }, [reload]);
-  useEffect(() => {
-    const refresh = () => {if (enabled && document.visibilityState !== 'hidden' && !refreshing && !mutating.current && !getPendingMutations() && !document.activeElement?.closest('.assignment-edit input,.assignment-edit select,.assignment-edit textarea')) void reload(true)};
-    const timer = window.setInterval(refresh, 60000);
-    document.addEventListener('visibilitychange', refresh);
-    return () => {window.clearInterval(timer); document.removeEventListener('visibilitychange', refresh)};
-  }, [enabled, reload, refreshing]);
+  const reloadDetail = useCallback(()=>reload(),[reload]);
+  const refreshDetail = useDetailRefresh(reloadDetail, enabled);
   const mutate = async (mutation: AssignmentMutation): Promise<boolean> => {
     if (mutating.current || !current()) return false;
     const scope = lifecycle.current;
@@ -110,7 +107,7 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
         lists.set(projectId, data);
         return {kind: 'ready', data};
       });
-      setNotice('已儲存變更。'); return true;
+      setNotice('已儲存變更。'); if (refreshDetail) void refreshDetail(); return true;
     } catch (failure) {
       const uncertain = !(failure instanceof NodeAssignmentError) || failure.status === 408 || failure.code === 'client_timeout' || failure.code === 'outcome_unknown' || failure.code === 'readback_mismatch' || failure.code === 'busy' || (failure.status >= 500 && !['lark_unconfigured', 'writes_disabled', 'disabled'].includes(failure.code || ''));
       if (!uncertain) retryAttempt.current = null;
@@ -125,7 +122,7 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
       return false;
     } finally {mutating.current = false; if (mutationCurrent()) setPending('')}
   };
-  return {state, refreshing, revision, pending, notice, error, reload, mutate, retryMutation: () => retryAttempt.current ? mutate(retryAttempt.current.mutation) : Promise.resolve(false), clearFeedback: () => {retryAttempt.current = null; setError(null); setNotice('')}};
+  return {state, refreshing, revision, pending, notice, error, reload: refreshDetail || reload, mutate, retryMutation: () => retryAttempt.current ? mutate(retryAttempt.current.mutation) : Promise.resolve(false), clearFeedback: () => {retryAttempt.current = null; setError(null); setNotice('')}};
 }
 export function cachedNodeAssignmentDetail(projectId: string, nodeKey: string): NodeAssignmentDetail | undefined {
   syncEpoch();

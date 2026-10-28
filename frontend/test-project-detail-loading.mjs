@@ -34,6 +34,19 @@ try{
  await act(async()=>requests[0].resolve(new Response(JSON.stringify({...workspace,scope:'project',project}))));
  assert.match(document.body.textContent,/文件與交付/);
  assert.equal(requests.length,1,'rendering documents adds no workflow waterfall');
+ await act(async()=>root.render(React.createElement(ui.ProjectDetailGate,{c:{...c,reloadVersion:1,route:{...c.route,tab:'files'}}})));
+ assert.equal(requests.length,2,'workspace reload explicitly refreshes the mounted snapshot');
+ assert.match(document.body.textContent,/文件與交付/,'refresh keeps existing content');
+ await act(async()=>requests[1].resolve(new Response(JSON.stringify({...workspace,scope:'project',project:{...project,name:'更新後案件'}}))));
+ assert.match(document.body.textContent,/更新後案件/);
+ const originalNow=Date.now;let now=100000;Date.now=()=>now;
+ try {
+  await act(async()=>window.dispatchEvent(new Event('blur')));now+=60000;
+  await act(async()=>{document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('focus'))});
+  assert.equal(requests.length,3,'return refreshes the mounted snapshot once');
+  await act(async()=>requests[2].resolve(new Response(JSON.stringify({...workspace,scope:'project',project}))));
+ } finally {Date.now=originalNow}
+
  await act(async()=>root.unmount());
  ui.invalidateSessionEpoch();requests.length=0;
  const originalTimeout=globalThis.setTimeout,originalClear=globalThis.clearTimeout;
