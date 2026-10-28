@@ -25,7 +25,9 @@ def test_production_ensure_concurrent_nodes_only(s):
 def test_production_viewer(s):
     setup(s)
     s.who[0] = 'ou_member'
-    assert s.client.post(URL).json() == {'state': 'not_permitted', 'reason': 'forbidden'}
+    response = s.client.post(URL)
+    assert response.status_code == 403
+    assert response.json()['code'] == 'forbidden'
     assert len(s.fake.rows(NODES)) == 0
 
 

@@ -77,7 +77,7 @@ def test_denied_sop_read_does_not_materialize_case_and_read_grants_work_without_
             assert client.get('/api/projects/p001/' + endpoint).status_code == 200
             assert client.get('/api/projects/missing/' + endpoint).status_code == 404
         result = client.get('/api/projects/p001/sop-tasks').json()
-        assert result['allowed_actions'] == {'import': False, 'manage': False, 'work': False, 'decide_suggestions': False}
+        assert result['allowed_actions'] == {'import': False, 'manage': False, 'work': False, 'decide_suggestions': False, 'start_all_nodes': False}
         switch(client, 'u-manager')
         assert client.get('/api/projects/p001/sop-tasks').status_code == 200
 

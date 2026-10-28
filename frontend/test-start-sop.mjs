@@ -101,7 +101,7 @@ test('opening a local case on a tab without an active SOP read still ensures it'
 
 test('single-node managers see passive authorization text and never ensure all nodes',async()=>{
  ui.invalidateSessionEpoch();posts=[];
- globalThis.fetch=async(url,init={})=>{posts.push({url,method:init.method});return response({state:'not_permitted'})};
+ globalThis.fetch=async(url,init={})=>{posts.push({url,method:init.method});return new Response(JSON.stringify({code:'forbidden'}),{status:403})};
  root=createRoot(document.getElementById('root'));
  await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,{
   c:{s:{features:{}}},p:{id:'scoped-manager',case_type:'intake'},
@@ -138,4 +138,16 @@ for(const result of [{state:'not_ready',reason:'no_startable_nodes'},{state:'alr
   c:{s:{features:{}}},p:{id:'blocked-enrollment',case_type:'intake'},sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true,startAllNodes:true}}},reload:async()=>{}},assignments:{reload:async()=>{}}
  })));
  assert.equal(document.body.textContent,result.state==='already_started'?'SOP 已啟動':'');assert.equal(document.querySelector('button'),null);
+});
+
+for(const [status,text] of [[403,'需由有權限的人員準備 SOP'],[404,''],[503,'SOP 尚未就緒重試']])test(`ensure HTTP ${status} renders the appropriate detail status`,async()=>{
+ ui.invalidateSessionEpoch();posts=[];reloads=0;
+ globalThis.fetch=async(url,init={})=>{posts.push({url,method:init.method});return new Response(JSON.stringify({code:'unavailable'}),{status})};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,{
+  c:{s:{features:{}}},p:{id:'authority-race',case_type:'intake'},
+  sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true,startAllNodes:true}}},reload:async()=>{reloads++}},assignments:{reload:async()=>{}}
+ })));
+ assert.deepEqual(posts,[{url:'/api/projects/authority-race/sop/ensure',method:'POST'}]);
+ assert.equal(document.body.textContent,text);assert.equal(document.querySelectorAll('button').length,status===503?1:0);assert.equal(reloads,0);
 });

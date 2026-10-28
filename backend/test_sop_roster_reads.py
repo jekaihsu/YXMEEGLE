@@ -23,14 +23,14 @@ def test_cold_roster_recovers_manager_before_read_authorization(h, path, reader_
 
     h.service.roster_provider = provider
     response = (h.client.post if path.endswith('ensure') else h.client.get)(URL + path)
-    assert response.status_code == 200, response.text
+    assert response.status_code == (403 if path.endswith('ensure') else 200), response.text
     assert calls == [True]
     body = response.json()
     if path == '/sop-tasks':
         assert body['tasks'][0]['can']['manage'] is True
         assert 'edit' in body['tasks'][0]['allowed_actions']
     elif path.endswith('ensure'):
-        assert body == {'state': 'not_permitted', 'reason': 'sop_import_forbidden'}
+        assert body['code'] == 'sop_import_forbidden'
     elif path == '/sop-assignees':
         assert body['restricted'] is False
 

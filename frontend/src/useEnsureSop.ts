@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {api, getSessionEpoch, onSessionEpochChange} from './api';
+import {ApiError, api, getSessionEpoch, onSessionEpochChange} from './api';
 
 type State = {kind: 'idle' | 'preparing' | 'started' | 'not_permitted'} | {kind: 'failed'; reason: string};
 const attempts = new Map<string, Promise<State>>();
@@ -10,11 +10,16 @@ async function ensure(projectId: string, epoch: number): Promise<State> {
   const result = await api<unknown>(`/api/projects/${encodeURIComponent(projectId)}/sop/ensure`, {method: 'POST'}, () => epoch === getSessionEpoch());
   if (result && typeof result === 'object' && 'state' in result) {
    if (result.state === 'started' || result.state === 'already_started') return {kind: 'started'};
-   if (result.state === 'not_permitted') return {kind: 'not_permitted'};
    if (result.state === 'not_ready') return {kind: 'failed', reason: 'reason' in result && typeof result.reason === 'string' ? result.reason : 'not_ready'};
   }
   return {kind: 'failed', reason: 'invalid_response'};
- } catch {return {kind: 'failed', reason: 'unavailable'}}
+ } catch (error) {
+  if (error instanceof ApiError) {
+   if (error.status === 403) return {kind: 'not_permitted'};
+   if (error.status === 404) return {kind: 'idle'};
+  }
+  return {kind: 'failed', reason: 'unavailable'};
+ }
 }
 
 export function useEnsureSop(projectId: string, mayStart: boolean, exists: boolean, reload: () => Promise<void>) {

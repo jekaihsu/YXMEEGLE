@@ -145,13 +145,12 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
             except (Failure, NodeFailure) as exc:
                 if exc.code == 'roster_unavailable':
                     raise Failure('roster_unavailable', 503) from None
+                if exc.code in {'sop_import_forbidden', 'forbidden'}:
+                    raise Failure(exc.code, 403) from None
+                if exc.status == 404:
+                    raise Failure(exc.code, 404) from None
                 reason = {'import_unavailable': 'writes_disabled', 'template_unavailable': 'no_template'}.get(exc.code, exc.code)
-                return {'state': 'not_permitted' if reason in {'sop_import_forbidden', 'forbidden'} else 'not_ready',
-                        'reason': reason}
-            except HTTPException as exc:
-                if exc.status_code in {403, 404}:
-                    return {'state': 'not_permitted', 'reason': 'case_not_found' if exc.status_code == 404 else 'forbidden'}
-                raise
+                return {'state': 'not_ready', 'reason': reason}
         return respond(run)
 
     @app.get('/api/sop-templates')

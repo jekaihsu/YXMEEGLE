@@ -71,9 +71,11 @@ def register(app, *, identity, load_case, sessions, receipt_model, audit_model, 
             preview = start_sop.preview(ctx)
             if preview['blockers']:
                 reason = preview['blockers'][0]['code']
-                return {'state': 'not_permitted' if reason == 'forbidden' else 'not_ready', 'reason': reason}
+                if reason == 'forbidden':
+                    raise Failure('forbidden', '僅案件 PM、主管或節點主管可以啟動')
+                return {'state': 'not_ready', 'reason': reason}
             if not preview['can_start']:
-                return {'state': 'not_permitted', 'reason': 'forbidden'}
+                raise Failure('forbidden', '僅案件 PM、主管或節點主管可以啟動')
             if preview['already_started']:
                 return {'state': 'already_started'}
             from .operations import StartSopCommand

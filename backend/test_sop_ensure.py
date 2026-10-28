@@ -1,6 +1,9 @@
 from concurrent.futures import ThreadPoolExecutor
 import pytest
 from sqlalchemy import select, func
+from fastapi import HTTPException
+from .sop_import.domain import Failure
+from .node_assignment.errors import Failure as NodeFailure
 from .test_sop_import import h, URL
 from .sop_import.models import LocalTask, ImportRun, Family
 
@@ -33,7 +36,9 @@ def test_ensure_concurrent(h):
 
 def test_ensure_viewer(h):
     h.who[0] = 'member'
-    assert h.client.post(URL + '/sop/ensure').json() == {'state': 'not_permitted', 'reason': 'sop_import_forbidden'}
+    response = h.client.post(URL + '/sop/ensure')
+    assert response.status_code == 403
+    assert response.json()['code'] == 'sop_import_forbidden'
     with h.sessions() as db:
         assert db.scalar(select(func.count()).select_from(LocalTask)) == 0
 
@@ -42,7 +47,9 @@ def test_single_node_manager_cannot_ensure_all_nodes(h):
     from .test_sop_node_authority import roster
     h.service.roster_provider = lambda fresh=False: roster()
     h.who[0] = 'member'
-    assert h.client.post(URL + '/sop/ensure').json() == {'state': 'not_permitted', 'reason': 'sop_import_forbidden'}
+    response = h.client.post(URL + '/sop/ensure')
+    assert response.status_code == 403
+    assert response.json()['code'] == 'sop_import_forbidden'
     with h.sessions() as db:
         assert db.scalar(select(func.count()).select_from(LocalTask)) == 0
 
@@ -108,6 +115,37 @@ def test_ensure_uses_only_enrolled_startable_nodes(h, keys, started, actor, expe
     h.who[0] = actor
     assert overview(h)['allowed_actions']['import'] is True
     assert overview(h)['allowed_actions']['start_all_nodes'] is (actor == 'pm')
-    assert h.client.post(URL + '/sop/ensure').json()['state'] == expected
+    response = h.client.post(URL + '/sop/ensure')
+    if expected == 'not_permitted':
+        assert response.status_code == 403
+        assert response.json()['code'] == 'sop_import_forbidden'
+    else:
+        assert response.status_code == 200
+        assert response.json()['state'] == expected
     with h.sessions() as db:
         assert set(db.scalars(select(TaskNodeLink.node_key))) == (set(keys) if expected == 'started' else set())
+
+
+@pytest.mark.parametrize('error,status', [
+    (Failure('sop_import_forbidden', 403), 403),
+    (Failure('forbidden', 403), 403),
+    (Failure('case_not_found', 404), 404),
+    (HTTPException(403), 403),
+    (HTTPException(404), 404),
+    (NodeFailure('forbidden', 'denied'), 403),
+    (NodeFailure('not_found', 'missing'), 404),
+    (Failure('roster_unavailable', 503), 503),
+    (NodeFailure('roster_unavailable', 'unavailable'), 503),
+])
+def test_ensure_preserves_security_and_roster_status(h, monkeypatch, error, status):
+    from .sop_import import ensure
+
+    def denied(*_):
+        raise error
+
+    monkeypatch.setattr(ensure, 'ensure_local', denied)
+    response = h.client.post(URL + '/sop/ensure')
+    assert response.status_code == status
+    assert 'state' not in response.json()
+    with h.sessions() as db:
+        assert db.scalar(select(func.count()).select_from(LocalTask)) == 0
