@@ -66,11 +66,12 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  const nodeLoading=loading&&!workbench.local;
  const [reviewLinks,setReviewLinks]=useState(false);
  const [report,setReport]=useState<ProgressReportRow|null>(null);
- const keyboardMove=useRef(false);
+ const keyboardMove=useRef(false),firstSelection=useRef(true);
  const selectedTaskNode=Object.values(details.details).find(d=>d.tasks.some(t=>t.id===c.route.task))?.node.key;
  useEffect(()=>{if(selectedTaskNode && selectedTaskNode!==selectedKey)c.go({...c.route,node:selectedTaskNode},true)},[selectedTaskNode,selectedKey]);
  useEffect(()=>{
   if(loading)return;
+  if(firstSelection.current){firstSelection.current=false;if(inline&&!c.route.task&&!c.route.section&&!route.focus)return}
   if(keyboardMove.current){keyboardMove.current=false;return;}
   const id=c.route.section==='evidence' ? 'flow-evidence' : route.focus==='tasks' ? 'flow-tasks' : c.route.node ? 'flow-selected' : '';
   if(!id)return;const frame=requestAnimationFrame(()=>{const target=document.getElementById(id);if(id==='flow-evidence' && target instanceof HTMLDetailsElement)target.open=true;target?.scrollIntoView({block:'start',behavior:'auto'})});return()=>cancelAnimationFrame(frame);
