@@ -7,6 +7,7 @@
     "test:admin-concurrency": "node test-admin-concurrency.mjs",
     "test:admin-capabilities": "node test-admin-capabilities.mjs",
     "test:read-loading": "node test-read-loading.mjs",
+    "test:dispatch-loading": "node test-dispatch-loading.mjs",
     "test:dispatch-board": "node test-dispatch-board.mjs",
     "test:start-sop": "node test-start-sop.mjs",
     "test:plan-panel": "node test-plan-panel.mjs",

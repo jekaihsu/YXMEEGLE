@@ -1,7 +1,8 @@
 import {useEffect,useRef,useState} from 'react';
 import {Button} from './design';
 import {getSessionEpoch} from './api';
-import {DispatchBoardFrame,useDispatchBoardRead} from './DispatchBoard';
+import {DispatchBoardFrame} from './DispatchBoard';
+import {useDispatchBoardRead} from './dispatchBoardRead';
 import {canReadDispatch,canWriteDispatch} from './dispatchAccess';
 import {addDays,dispatchWeek,type DispatchSlot} from './dispatchBoardModel';
 import type {DispatchProject} from './dispatchLinks';

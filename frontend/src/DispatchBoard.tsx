@@ -1,12 +1,13 @@
 import {useEffect,useRef,useState,type KeyboardEvent} from 'react';
 import {CalendarDays,ChevronLeft,ChevronRight,RefreshCw,X} from 'lucide-react';
-import {api,ApiError,getSessionEpoch} from './api';
+import {api,getSessionEpoch} from './api';
 import {Badge,Button,Skeleton} from './design';
 import {useViewData} from './viewData';
 import {useDialogFocus} from './useDialogFocus';
 import {taipeiTime} from './taipeiTime';
-import {addDays,boardDisplay,dispatchReason,dispatchWeek,feasibilityLabels,parseDispatchBoard,personDayGrid,slotTitle,slotsByGroup,slotsPerDay,snapshotAge,unassignedQueue,weekDays,type DispatchBoardData,type DispatchSlot,type Feasibility} from './dispatchBoardModel';
+import {addDays,boardDisplay,dispatchReason,dispatchWeek,feasibilityLabels,personDayGrid,slotTitle,slotsByGroup,slotsPerDay,snapshotAge,unassignedQueue,weekDays,type DispatchSlot,type Feasibility} from './dispatchBoardModel';
 import {dispatchCaseHref,parseDispatchProjects,type DispatchProject} from './dispatchLinks';
+import {useDispatchBoardRead,type DispatchRead} from './dispatchBoardRead';
 import './DispatchBoard.css';
 
 const kinds={execution:'執行任務',work:'出工',leave:'休假',standby:'待命',support:'支援',unknown:'類型待確認'};
@@ -97,7 +98,6 @@ function SlotDetail({slot,slots,onOpen,onClose,projects}:{projects:DispatchProje
  </div>;
 }
 
-export type DispatchRead = {data?:DispatchBoardData;loading:boolean;error:string;reload:()=>void};
 
 export function DispatchBoardFrame({from,read,onWeek,projects=[],onAssign}:{from:string;read:DispatchRead;onWeek:(day:string)=>void;projects?:DispatchProject[];onAssign?:(slot?:DispatchSlot)=>void}) {
  const [selectedId,setSelectedId]=useState(''),[mode,setMode]=useState<'group'|'person'>('group');
@@ -141,7 +141,7 @@ export function DispatchBoardFrame({from,read,onWeek,projects=[],onAssign}:{from
 
   <div className="db-source">
    <span role="status" aria-live="polite">
-    {hidden?'沒有派工資料的檢視權限。':skeleton?'正在讀取工作預排，人員與資源名稱會陸續補上。':<>{board?'已載入工作預排。':'尚未成功讀取的派工資料。'}{(board?.source.quality.states.includes('stale')||display.kind==='retained')&&' · 上次成功快照，資料待更新'}{read.loading&&' · 更新中'}</>}
+    {hidden?'沒有派工資料的檢視權限。':skeleton?'正在讀取工作預排，人員與資源名稱會陸續補上。':<>{board?'已載入工作預排。':'尚未成功讀取的派工資料。'}{(read.stale||board?.source.quality.states.includes('stale')||display.kind==='retained')&&' · 上次成功快照，資料待更新'}{read.loading&&' · 更新中'}</>}
    </span>
    {board&&<> · 資料時間 {board.source.fetched_at?taipeiTime(board.source.fetched_at):'來源未提供'} · {board.source.quality.age_seconds!==null?`${Math.floor(board.source.quality.age_seconds/60)} 分鐘前`:snapshotAge(board.source.fetched_at,now)}</>}
   </div>
@@ -234,30 +234,6 @@ export function DispatchBoardFrame({from,read,onWeek,projects=[],onAssign}:{from
 
   {selected&&!hidden&&<SlotDetail projects={projects} slot={selected} slots={slots} onOpen={s=>setSelectedId(s.slot_id)} onClose={()=>setSelectedId('')}/>}
  </div>;
-}
-
-export function useDispatchBoardRead(from:string,reloadVersion=0) {
- const query=new URLSearchParams({from,to:addDays(from,6)});
- const key=`dispatch:${getSessionEpoch()}:${query}`;
- const read=useViewData(key,async(signal,current)=>{
-  let raw:unknown;
-  try {raw=await api<unknown>(`/api/v2/dispatch/board?${query}`,{signal,cache:'no-store',timeoutMs:30000},current)}
-  catch(error){if(error instanceof ApiError&&error.status===403)raw={schema_version:1,window:{from,to:addDays(from,6),tz:'Asia/Taipei'},source:{quality:{states:['forbidden']}},slots:[]};else throw error}
-  const board=parseDispatchBoard(raw);
-  if(board.window.from!==from||board.window.to!==addDays(from,6))throw new Error('回應週次與目前查詢不符，請重試。');
-  return board;
- },[reloadVersion]);
- const refreshes=useRef({key,started:Date.now()});
- useEffect(()=>{
-  if(refreshes.current.key!==key)refreshes.current={key,started:Date.now()};
-  if(!read.data||read.loading||read.error||Date.now()-refreshes.current.started>=30000||read.data.source.quality.states.some(s=>s==='forbidden'||s==='read_failed'))return;
-  const pending=(read.data.source.quality.states.includes('stale')&&read.data.source.quality.reason==='refreshing_last_good_snapshot')||Object.values(read.data.source.joins).some(s=>s==='unavailable');
-  if(!pending)return;
-  const epoch=getSessionEpoch();
-  const timer=setTimeout(()=>{if(epoch===getSessionEpoch()&&Date.now()-refreshes.current.started<30000)read.reload()},1500);
-  return()=>clearTimeout(timer);
- },[key,read.data,read.loading,read.error,read.reload]);
- return read;
 }
 
 export function DispatchBoard({projects=[]}:{projects?:DispatchProject[]}) {
