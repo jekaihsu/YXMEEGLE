@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "test:howto": "node test-howto.mjs",
     "test:admin-concurrency": "node test-admin-concurrency.mjs",
     "test:admin-capabilities": "node test-admin-capabilities.mjs",
     "test:read-loading": "node test-read-loading.mjs",
