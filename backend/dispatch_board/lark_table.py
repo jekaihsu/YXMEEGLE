@@ -1,8 +1,57 @@
 """Allowlisted, read-only V4 tables through the existing live HTTP boundary."""
 import json
+from concurrent.futures import Future
+from contextlib import contextmanager
+from contextvars import ContextVar
+from threading import Lock
 
 from ..live_read.client import LiveLarkClient, ReadFailure
+from ..node_assignment.cache import ReadScope
 from .config import DispatchBoardConfig, SOURCES
+
+
+_snapshot = ContextVar('dispatch_source_snapshot', default=None)
+
+
+class SourceSnapshot:
+    def __init__(self):
+        self._reads = {}
+        self._lock = Lock()
+
+    def read(self, key, load):
+        with self._lock:
+            future = self._reads.get(key)
+            owner = future is None
+            if owner:
+                future = self._reads[key] = Future()
+        if owner:
+            try:
+                future.set_result(load())
+            except Exception as exc:
+                future.set_exception(exc)
+        return future.result()
+
+
+@contextmanager
+def source_snapshot():
+    token = _snapshot.set(SourceSnapshot())
+    try:
+        yield
+    finally:
+        _snapshot.reset(token)
+
+
+def read_source(reader, cfg, wid, key):
+    snapshot = _snapshot.get()
+    if snapshot is None:
+        return reader.read_table(key)
+    table = SOURCES[key]
+    scope = ReadScope(str(cfg.get('LARK_WORKER_ORGANIZATION', '')), str(cfg.get('LARK_APP_ID', '')),
+                      str(cfg.get('LARK_WORKER_IDENTITY', '')), wid, str(cfg.get('LARK_AUTHZ_VERSION', '0')))
+    boundary = id(reader.transport) if isinstance(reader, DispatchReader) else id(reader)
+    cache_key = (boundary, scope.key(DispatchBoardConfig.from_env(cfg).base + '/' + table.table_id,
+                                     projection=table.fields))
+    return snapshot.read(cache_key, lambda: reader.read_table(key))
 
 
 class DispatchReader:

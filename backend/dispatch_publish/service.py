@@ -5,13 +5,15 @@ its reservations, then writes 任務 once and reports success only after the rea
 """
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import cache
 
 from ..dispatch_board.config import PUBLISH_TABLES
 from ..dispatch_board.domain import resource_state
-from ..dispatch_board.lark_table import DispatchReader
+from ..dispatch_board.lark_table import DispatchReader, read_source
 from ..node_assignment.cache import StaleCache, permission_failure
 from ..node_assignment.config import NodeAssignmentConfig
 from ..node_assignment.errors import Failure
@@ -29,6 +31,7 @@ from .store import DispatchStore, duplicate
 logger = logging.getLogger(__name__)
 KEYS = ('schedule', 'tasks', 'people', 'accounts', 'instruments', 'vehicles', 'cases', 'nodes')
 WORK_KEYS = ('tasks', 'nodes', 'people', 'accounts', 'instruments', 'vehicles', 'cases')
+_work_reads = ThreadPoolExecutor(max_workers=3, thread_name_prefix='dispatch-work')
 SEARCH_RETRY_SECONDS = 1
 FORM_FIELDS = [
     ('title', '標題', True), ('content', '內容', True), ('case_ref', '工程確認單', True), ('project_ref', '專案編號', True),
@@ -109,7 +112,7 @@ class DispatchPublishService:
     # Sources
 
     def _cached(self, wid, key):
-        return self.cache.get((wid, key), lambda: self.reader.read_table(key))
+        return self.cache.get((wid, key), lambda: read_source(self.reader, self.cfg, wid, key))
 
     def sources(self, wid, *, fresh=False, keys=KEYS):
         rows, entries = {}, {}
@@ -448,14 +451,16 @@ class DispatchPublishService:
     # Reads for the PM
 
     def _work_sources(self, wid):
-        entries, rows, failed = {}, {}, []
-        for key in WORK_KEYS:
+        # Fail the primary read before scheduling optional joins, including on permission revocation.
+        tasks = self._cached(wid, 'tasks')
+        entries, rows, failed = {'tasks': tasks}, {'tasks': tasks.value}, []
+        futures = {key: _work_reads.submit(copy_context().run, self._cached, wid, key)
+                   for key in WORK_KEYS if key != 'tasks'}
+        for key, future in futures.items():
             try:
-                entries[key] = self._cached(wid, key)
+                entries[key] = future.result()
                 rows[key] = entries[key].value
             except Exception as exc:
-                if key == 'tasks':
-                    raise
                 failed.append(key)
                 rows[key] = None
                 logger.warning('dispatch work join %s unavailable: %s', key, type(exc).__name__)
