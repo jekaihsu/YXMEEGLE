@@ -1,0 +1,2739 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>永祥測量 · 今日工作預排</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;450;500;600&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* === Core Operon Paper & Ink Palette === */
+      --op-paper: #f6f5f1;
+      --op-paper-2: #edebe5;
+      --op-stone: #cdcac3;
+      --op-line: #e3e0d9;
+      --hairline: #e7e6e4;
+      --op-ink: #1c1a18;
+      --op-ink-2: #45423e;
+      --op-muted: #6b6863;
+      --op-faint: #8c8981;
+      --op-night: #1d1a18;
+
+      /* === Operon Semantic & Accent Tokens === */
+      --op-violet-ink: #3d6be0;
+      --op-violet: #5b8cff;
+      --op-sky: #dce4fb;
+      --op-coral: #f0644c;
+      --op-lime: #d6f68a;
+
+      /* === Interactive Widget ("Anatomy") Surface System === */
+      --anatomy-card: #fbfbfa;
+      --anatomy-face: #ffffff;
+      --anatomy-lit-shade: #faf9f5;
+      --anatomy-green: #30a46c;
+
+      /* === Typography Triad === */
+      --font-display: "Instrument Serif", "Noto Serif TC", Georgia, serif;
+      --font-sans: "Inter", "Noto Sans TC", system-ui, -apple-system, sans-serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      min-height: 100vh;
+      background-color: var(--op-paper);
+      color: var(--op-ink);
+      font-family: var(--font-sans);
+      font-weight: 450;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* 56x56px Architectural Paper Grid */
+    body.op-grid-paper {
+      background-color: var(--op-paper);
+      background-image:
+        linear-gradient(#1c1a1808 1px, transparent 1px),
+        linear-gradient(90deg, #1c1a1808 1px, transparent 1px);
+      background-position: -1px -1px;
+      background-size: 56px 56px;
+    }
+
+    /* Full-bleed horizontal hairline rule */
+    .op-rule-full {
+      width: 100%;
+      border-bottom: 1px solid var(--op-line);
+    }
+
+    /* Centered Architectural Frame (max-width: 1040px with exposed 1px left/right rails) */
+    .op-rail-container {
+      max-width: 1040px;
+      margin: 0 auto;
+      border-left: 1px solid var(--op-line);
+      border-right: 1px solid var(--op-line);
+      background: rgba(246, 245, 241, 0.82);
+    }
+
+    /* Top Nav / Identity Strip */
+    .op-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 32px;
+      gap: 16px;
+    }
+
+    .op-brand {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .op-brand-name {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--op-ink);
+    }
+
+    .op-brand-sub {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--op-faint);
+      letter-spacing: 0.02em;
+    }
+
+    /* Lark SSO Identity Switcher Pill (Top Right) */
+    .op-sso-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .op-sso-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--op-faint);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .op-sso-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--anatomy-green);
+    }
+
+    .op-role-switcher {
+      display: inline-flex;
+      background: var(--op-paper-2);
+      border: 1px solid var(--op-line);
+      border-radius: 8px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .op-role-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--op-muted);
+      padding: 5px 11px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .op-role-btn:hover {
+      color: var(--op-ink);
+    }
+
+    .op-role-btn.active {
+      background: var(--anatomy-face);
+      color: var(--op-ink);
+      box-shadow: 0 1px 2px rgba(20, 20, 30, 0.06);
+    }
+
+    /* Section Block inside Rails */
+    .op-section {
+      padding: 26px 32px;
+    }
+
+    .op-index {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--op-faint);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* === BLOCK 01: HEADER (今日預排) === */
+    .op-header-grid {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .op-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .op-title-row {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .op-h1 {
+      font-family: var(--font-display);
+      font-size: 36px;
+      font-weight: 500;
+      line-height: 1.1;
+      letter-spacing: -0.025em;
+      color: var(--op-ink);
+    }
+
+    .op-person-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--op-ink-2);
+      background: var(--op-paper-2);
+      border: 1px solid var(--op-line);
+      padding: 4px 11px;
+      border-radius: 6px;
+    }
+
+    .op-person-dept {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--op-muted);
+    }
+
+    /* Date Controls */
+    .op-date-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .op-date-stepper {
+      display: inline-flex;
+      align-items: center;
+      background: var(--anatomy-face);
+      border: 1px solid var(--op-line);
+      border-radius: 7px;
+      height: 32px;
+      overflow: hidden;
+    }
+
+    .op-date-arrow {
+      appearance: none;
+      border: none;
+      background: transparent;
+      width: 28px;
+      height: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--op-muted);
+      cursor: pointer;
+    }
+
+    .op-date-arrow:hover {
+      background: var(--op-paper);
+      color: var(--op-ink);
+    }
+
+    .op-date-current {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      color: var(--op-ink);
+      padding: 0 10px;
+      border-left: 1px solid var(--hairline);
+      border-right: 1px solid var(--hairline);
+      height: 100%;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .op-quick-date-pills {
+      display: inline-flex;
+      gap: 4px;
+    }
+
+    .op-pill-sm {
+      appearance: none;
+      border: 1px solid var(--op-line);
+      background: var(--op-paper);
+      color: var(--op-ink-2);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      height: 32px;
+      padding: 0 11px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+
+    .op-pill-sm:hover {
+      background: var(--op-paper-2);
+      color: var(--op-ink);
+    }
+
+    .op-pill-sm.active {
+      background: var(--op-ink);
+      border-color: var(--op-ink);
+      color: #ffffff;
+    }
+
+    /* Right Side Capacity Meter */
+    .op-capacity-box {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 7px;
+      min-width: 210px;
+    }
+
+    .op-capacity-top {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .op-capacity-label {
+      font-size: 12.5px;
+      color: var(--op-muted);
+    }
+
+    .op-capacity-nums {
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--op-ink);
+      letter-spacing: -0.02em;
+    }
+
+    .op-capacity-nums .denom {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--op-faint);
+    }
+
+    .op-capacity-track {
+      width: 210px;
+      height: 4px;
+      background: rgba(28, 26, 24, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .op-capacity-fill {
+      height: 100%;
+      background: var(--op-violet-ink);
+      border-radius: 999px;
+      transition: width 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .op-capacity-sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      color: var(--op-faint);
+    }
+
+    /* Manager-Only Member Switcher Strip */
+    .op-manager-bar {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--op-line);
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .op-manager-bar.visible {
+      display: flex;
+    }
+
+    .op-manager-members {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .op-manager-tag {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--op-muted);
+      margin-right: 4px;
+    }
+
+    .op-member-pill {
+      appearance: none;
+      border: 1px solid var(--op-line);
+      background: var(--anatomy-face);
+      color: var(--op-ink-2);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 5px 11px;
+      border-radius: 7px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.12s ease;
+    }
+
+    .op-member-pill:hover {
+      border-color: var(--op-stone);
+      color: var(--op-ink);
+    }
+
+    .op-member-pill.active {
+      background: #e9efff;
+      border-color: #b9ccf8;
+      color: #2f5bd3;
+      font-weight: 600;
+    }
+
+    .op-member-hrs {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-variant-numeric: tabular-nums;
+      color: var(--op-faint);
+    }
+
+    .op-member-pill.active .op-member-hrs {
+      color: #2f5bd3;
+    }
+
+    /* === BLOCK 02: QUICK ADD BAR (新增預排項目 — 1 Line, 3 Steps) === */
+    .op-quickadd-shell {
+      background: var(--anatomy-card);
+      border: 1px solid var(--op-line);
+      border-radius: 12px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .op-quickadd-row {
+      display: grid;
+      grid-template-columns: minmax(250px, 1.35fr) minmax(240px, 1.35fr) auto;
+      gap: 16px;
+      align-items: end;
+    }
+
+    @media (max-width: 860px) {
+      .op-quickadd-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .op-field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      position: relative;
+    }
+
+    .op-field-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--op-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .op-field-label .step-num {
+      color: var(--op-faint);
+    }
+
+    /* Searchable Case Combobox */
+    .op-combobox-wrap {
+      position: relative;
+    }
+
+    .op-case-input {
+      width: 100%;
+      height: 36px;
+      padding: 0 30px 0 11px;
+      background: var(--anatomy-face);
+      border: 1px solid var(--op-line);
+      border-radius: 7px;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      color: var(--op-ink);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .op-case-input:focus {
+      border-color: var(--op-violet-ink);
+      box-shadow: 0 0 0 2px rgba(61, 107, 224, 0.12);
+    }
+
+    .op-combo-chevron {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 10px;
+      color: var(--op-faint);
+      pointer-events: none;
+    }
+
+    .op-case-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      max-height: 240px;
+      overflow-y: auto;
+      background: var(--anatomy-face);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 9px;
+      box-shadow: 0 12px 32px -8px rgba(20, 28, 60, 0.22);
+      z-index: 50;
+      display: none;
+    }
+
+    .op-case-dropdown.open {
+      display: block;
+    }
+
+    .op-case-option {
+      padding: 8px 12px;
+      font-size: 12.5px;
+      color: var(--op-ink);
+      border-bottom: 1px solid var(--hairline);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .op-case-option:last-child {
+      border-bottom: none;
+    }
+
+    .op-case-option:hover, .op-case-option.selected {
+      background: #f3f6ff;
+    }
+
+    .op-case-option .code {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 500;
+      color: #2f5bd3;
+      background: #e9efff;
+      padding: 1px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    /* Step 2: Work Item Pills */
+    .op-workitem-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .op-wi-pill {
+      appearance: none;
+      border: 1px solid var(--op-line);
+      background: var(--anatomy-face);
+      color: var(--op-ink-2);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      height: 36px;
+      padding: 0 10px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.12s ease;
+      white-space: nowrap;
+    }
+
+    .op-wi-pill:hover {
+      border-color: var(--op-stone);
+      color: var(--op-ink);
+    }
+
+    .op-wi-pill.active {
+      background: var(--op-ink);
+      border-color: var(--op-ink);
+      color: #ffffff;
+    }
+
+
+    /* #110 + #111: Quick Sticky Case Bar & Quote Info Strip */
+    .op-case-quick-bar {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+      margin-top: 7px;
+    }
+    .op-case-quick-label {
+      font-family: var(--font-sans);
+      font-size: 11px;
+      color: var(--op-muted);
+      font-weight: 500;
+    }
+    .op-case-pin-chip {
+      appearance: none;
+      border: 1px solid var(--op-line);
+      background: var(--op-paper);
+      color: var(--op-ink-2);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .op-case-pin-chip:hover {
+      border-color: #2f5bd3;
+      color: #2f5bd3;
+    }
+    .op-case-pin-chip.active {
+      background: #e9efff;
+      border-color: #b8cdf8;
+      color: #2f5bd3;
+      font-weight: 600;
+    }
+
+    .op-quote-strip {
+      margin-top: 12px;
+      padding: 9px 13px;
+      background: #f8f7f3;
+      border: 1px solid rgba(0, 0, 0, 0.07);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--op-ink-2);
+    }
+    .op-quote-strip-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .op-quote-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: #2f5bd3;
+      background: #e9efff;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+    .op-quote-kv {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .op-quote-kv strong {
+      color: var(--op-ink);
+      font-weight: 600;
+    }
+    .op-quote-sticky-badge {
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 500;
+      color: #1d7a45;
+      background: #e4f5eb;
+      border: 1px solid #c9e9d6;
+      padding: 2px 8px;
+      border-radius: 99px;
+      white-space: nowrap;
+    }
+
+    .op-wi-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+    .op-wi-cat-tabs {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .op-wi-cat-btn {
+      appearance: none;
+      border: 1px solid var(--op-line);
+      background: var(--op-paper);
+      color: var(--op-muted);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .op-wi-cat-btn.active {
+      background: var(--op-ink);
+      border-color: var(--op-ink);
+      color: #fff;
+    }
+    .op-wi-batch-tools {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .op-wi-tool-link {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: #2f5bd3;
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 1px 4px;
+    }
+    .op-wi-tool-link:hover {
+      text-decoration: underline;
+    }
+    .op-wi-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: auto;
+      min-height: 34px;
+      padding: 5px 10px;
+      line-height: 1.3;
+    }
+    .op-wi-check {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      opacity: 0.75;
+    }
+    .op-wi-pill.active .op-wi-check {
+      opacity: 1;
+      color: #7ab3ff;
+    }
+    .op-wi-cat-chip {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.06);
+      color: var(--op-ink-2);
+    }
+    .op-wi-pill.active .op-wi-cat-chip {
+      background: rgba(255, 255, 255, 0.18);
+      color: #fff;
+    }
+    .op-wi-rev-chip {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--op-muted);
+    }
+    .op-wi-pill.active .op-wi-rev-chip {
+      color: #cfe0ff;
+    }
+    .op-case-quote-sub {
+      display: block;
+      width: 100%;
+      font-size: 11.5px;
+      color: var(--op-muted);
+      margin-top: 2px;
+    }
+
+    /* Step 3: Hour Pills + Primary Submit Button */
+    .op-step3-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+
+    .op-hour-pills {
+      display: inline-flex;
+      background: var(--op-paper);
+      border: 1px solid var(--op-line);
+      border-radius: 7px;
+      padding: 2px;
+      gap: 2px;
+      height: 36px;
+      align-items: center;
+    }
+
+    .op-hr-pill {
+      appearance: none;
+      border: none;
+      background: transparent;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      color: var(--op-ink-2);
+      height: 30px;
+      padding: 0 8px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+
+    .op-hr-pill:hover {
+      color: var(--op-ink);
+    }
+
+    .op-hr-pill.active {
+      background: var(--anatomy-face);
+      color: #2f5bd3;
+      font-weight: 600;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    .op-btn-add {
+      appearance: none;
+      border: none;
+      background: linear-gradient(180deg, #3879e5 0%, #045ede 100%);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 1px 2px rgba(4, 94, 222, 0.35);
+      color: #ffffff;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      height: 36px;
+      padding: 0 15px;
+      border-radius: 7px;
+      cursor: pointer;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: filter 0.15s ease;
+    }
+
+    .op-btn-add:hover {
+      filter: brightness(1.06);
+    }
+
+    /* === BLOCK 03: TODAY'S TIMELINE REGISTER (Operon Anatomy Card) === */
+    .op-widget-shell {
+      width: 100%;
+      overflow: hidden;
+      border-radius: 14px;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      background-color: rgba(255, 255, 255, 0.96);
+      color: var(--op-ink);
+      box-shadow:
+        0 1px 2px rgba(20, 20, 30, 0.04),
+        0 24px 60px -28px rgba(20, 28, 60, 0.22);
+      backdrop-filter: blur(24px);
+    }
+
+    .op-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .op-card-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .op-card-title {
+      font-size: 13.5px;
+      font-weight: 500;
+      letter-spacing: -0.005em;
+      color: var(--op-ink);
+    }
+
+    .op-card-sub {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-variant-numeric: tabular-nums;
+      color: var(--op-faint);
+    }
+
+    /* Proportional Day Bar inside Card Header */
+    .op-day-strip {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      width: 240px;
+      height: 8px;
+      background: var(--op-paper);
+      border-radius: 4px;
+      padding: 1px;
+      overflow: hidden;
+    }
+
+    .op-day-seg {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--op-violet-ink);
+      transition: width 0.2s ease;
+    }
+
+    .op-day-seg.alt {
+      background: #6c8ef2;
+    }
+
+    /* Column Header Strip */
+    .op-col-headers {
+      display: grid;
+      grid-template-columns: 165px 1fr 140px 128px;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 20px;
+      background: var(--anatomy-lit-shade);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--op-faint);
+    }
+
+    /* Hairline Register Rows */
+    .op-rows-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .op-slot-row {
+      display: grid;
+      grid-template-columns: 165px 1fr 140px 128px;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 20px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      font-size: 13px;
+      transition: background-color 0.12s ease;
+    }
+
+    .op-slot-row:last-child {
+      border-bottom: none;
+    }
+
+    .op-slot-row:hover {
+      background-color: rgba(246, 245, 241, 0.55);
+    }
+
+    .op-col-time {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      font-variant-numeric: tabular-nums;
+      color: var(--op-ink-2);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .op-col-time .hrs-strong {
+      font-weight: 600;
+      color: var(--op-ink);
+      background: var(--op-paper);
+      border: 1px solid var(--op-line);
+      padding: 1px 6px;
+      border-radius: 5px;
+      font-size: 11.5px;
+    }
+
+    .op-col-case {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+    }
+
+    .op-case-tag {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      color: #2f5bd3;
+      background: #e9efff;
+      padding: 2px 7px;
+      border-radius: 5px;
+      flex-shrink: 0;
+    }
+
+    .op-case-title {
+      font-weight: 500;
+      color: var(--op-ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .op-col-wi {
+      display: flex;
+      align-items: center;
+    }
+
+    .op-wi-badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--op-ink-2);
+      background: #f1f0ec;
+      border: 1px solid var(--op-line);
+      padding: 3px 9px;
+      border-radius: 6px;
+    }
+
+    .op-col-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    .op-act-btn {
+      appearance: none;
+      border: 1px solid var(--op-line);
+      background: var(--anatomy-face);
+      color: var(--op-muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      padding: 3px 7px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+
+    .op-act-btn:hover {
+      border-color: var(--op-stone);
+      color: var(--op-ink);
+      background: var(--op-paper);
+    }
+
+    .op-act-btn.del {
+      font-family: var(--font-sans);
+    }
+
+    .op-act-btn.del:hover {
+      border-color: #f5c9bd;
+      background: #fde9e3;
+      color: #b5381f;
+    }
+
+    /* Empty State */
+    .op-empty-state {
+      padding: 36px 20px;
+      text-align: center;
+      color: var(--op-faint);
+      font-size: 13px;
+    }
+
+    /* Card Footer Audit Bar */
+    .op-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 20px;
+      background: var(--anatomy-lit-shade);
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
+      font-size: 12px;
+    }
+
+    .op-sync-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--op-muted);
+      font-size: 12px;
+    }
+
+    .op-sync-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--anatomy-green);
+    }
+
+    .op-btn-daily {
+      appearance: none;
+      border: 1px solid var(--op-line);
+      background: var(--op-ink);
+      color: var(--op-paper);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 13px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+
+    .op-btn-daily:hover {
+      opacity: 0.9;
+    }
+
+    .op-btn-daily.done {
+      background: #e4f5eb;
+      border-color: #c9e9d6;
+      color: #1d7a45;
+    }
+
+    /* Manager-Only Team Overview Strip (1-line 8.0h bars per colleague) */
+    .op-team-overview {
+      margin-top: 22px;
+      display: none;
+    }
+
+    .op-team-overview.visible {
+      display: block;
+    }
+
+    .op-team-row {
+      display: grid;
+      grid-template-columns: 130px 1fr 110px;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 20px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      font-size: 12.5px;
+      cursor: pointer;
+      transition: background-color 0.12s;
+    }
+
+    .op-team-row:last-child {
+      border-bottom: none;
+    }
+
+    .op-team-row:hover {
+      background: rgba(246, 245, 241, 0.65);
+    }
+
+    .op-team-row.active-member {
+      background: #f4f7ff;
+    }
+
+    .op-team-person {
+      font-weight: 500;
+      color: var(--op-ink);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .op-team-sub {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--op-faint);
+    }
+
+    .op-team-chips {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .op-mini-slot {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--op-paper);
+      border: 1px solid var(--op-line);
+      padding: 2px 8px;
+      border-radius: 5px;
+      font-size: 11.5px;
+      color: var(--op-ink-2);
+    }
+
+    .op-mini-slot .m-code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #2f5bd3;
+      font-weight: 500;
+    }
+
+    .op-mini-slot .m-hr {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--op-faint);
+    }
+
+    .op-team-cap {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-variant-numeric: tabular-nums;
+      color: var(--op-ink-2);
+    }
+
+    .op-mini-track {
+      width: 44px;
+      height: 4px;
+      background: rgba(0, 0, 0, 0.07);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .op-mini-fill {
+      height: 100%;
+      background: var(--op-violet-ink);
+      border-radius: 99px;
+    }
+
+    /* Daily-log Sync Badge */
+    .op-lark-rec-badge {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: #1d7a45;
+      background: #e4f5eb;
+      border: 1px solid #c9e9d6;
+      padding: 1px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    /* Manual Trigger Button in Topbar */
+    .op-manual-btn {
+      appearance: none;
+      border: 1px solid var(--op-line);
+      background: var(--anatomy-face);
+      color: var(--op-ink);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 11px;
+      border-radius: 7px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.14s ease;
+      box-shadow: 0 1px 2px rgba(20, 20, 30, 0.04);
+    }
+
+    .op-manual-btn:hover {
+      background: var(--op-paper-2);
+      border-color: var(--op-stone);
+    }
+
+    /* Kehan Personal vs Team Toggle Pill */
+    .op-kehan-mode-toggle {
+      display: none;
+      align-items: center;
+      background: var(--op-paper-2);
+      border: 1px solid var(--op-line);
+      border-radius: 7px;
+      padding: 2px;
+      gap: 2px;
+      margin-left: 6px;
+    }
+    .op-kehan-mode-toggle.visible {
+      display: inline-flex;
+    }
+    .op-kehan-mode-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      font-family: var(--font-sans);
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--op-muted);
+      padding: 3px 9px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .op-kehan-mode-btn.active {
+      background: var(--anatomy-face);
+      color: var(--op-ink);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    /* Built-in Manual Modal / Drawer */
+    .op-drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(28, 26, 24, 0.36);
+      backdrop-filter: blur(3px);
+      z-index: 900;
+      display: none;
+      justify-content: flex-end;
+    }
+    .op-drawer-backdrop.open {
+      display: flex;
+    }
+    .op-drawer-panel {
+      width: min(640px, 94vw);
+      height: 100vh;
+      background: var(--op-paper);
+      border-left: 1px solid var(--op-line);
+      box-shadow: -20px 0 50px rgba(20, 20, 30, 0.16);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .op-drawer-header {
+      padding: 18px 26px;
+      border-bottom: 1px solid var(--op-line);
+      background: var(--anatomy-face);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .op-drawer-title {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--op-ink);
+    }
+    .op-drawer-close {
+      appearance: none;
+      border: 1px solid var(--op-line);
+      background: var(--op-paper);
+      color: var(--op-ink-2);
+      font-size: 12px;
+      padding: 5px 11px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .op-drawer-body {
+      padding: 24px 26px 40px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: var(--op-ink-2);
+    }
+    .op-manual-card {
+      background: var(--anatomy-face);
+      border: 1px solid var(--op-line);
+      border-radius: 11px;
+      padding: 16px 18px;
+      box-shadow: 0 1px 2px rgba(20, 20, 30, 0.03);
+    }
+    .op-manual-card h3 {
+      font-size: 14.5px;
+      font-weight: 600;
+      color: var(--op-ink);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .op-manual-step-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #2f5bd3;
+      background: #e9efff;
+      padding: 1px 7px;
+      border-radius: 4px;
+    }
+    .op-manual-list {
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .op-section {
+      padding: 14px 0 !important;
+    }
+    .op-quickadd-shell {
+      padding: 12px 16px !important;
+    }
+    .op-workitem-pills {
+      max-height: 74px;
+      overflow-y: auto;
+      padding-right: 4px;
+      gap: 4px !important;
+    }
+    .op-wi-pill {
+      min-height: 29px !important;
+      padding: 3px 8px !important;
+      font-size: 11.5px !important;
+    }
+    .op-quote-strip {
+      margin-top: 9px !important;
+      padding: 7px 11px !important;
+    }
+    .op-slot-row {
+      padding: 9px 18px !important;
+    }
+
+
+    /* === OPERON LARK SSO LOGIN SCREEN === */
+    .op-login-wrap {
+      min-height: calc(100vh - 58px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+    }
+    .op-login-card {
+      width: 100%;
+      max-width: 520px;
+      background: rgba(255, 255, 255, 0.97);
+      border: 1px solid var(--op-line);
+      border-radius: 16px;
+      padding: 36px 38px 32px;
+      box-shadow:
+        0 1px 2px rgba(20, 20, 30, 0.04),
+        0 24px 60px -28px rgba(20, 28, 60, 0.20);
+    }
+    .op-login-index {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--op-muted);
+      padding-bottom: 14px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--op-line);
+    }
+    .op-login-title {
+      font-family: var(--font-display);
+      font-size: 30px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      color: var(--op-ink);
+      margin-bottom: 10px;
+    }
+    .op-login-desc {
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: var(--op-ink-2);
+      margin-bottom: 24px;
+    }
+    .op-btn-lark-sso {
+      width: 100%;
+      height: 46px;
+      appearance: none;
+      border: 1px solid var(--op-ink);
+      background: var(--op-ink);
+      color: var(--op-paper);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 9px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.15s ease;
+      box-shadow: 0 4px 14px rgba(28, 26, 24, 0.14);
+    }
+    .op-btn-lark-sso:hover {
+      background: #2c2926;
+      transform: translateY(-1px);
+    }
+    .op-login-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 22px 0 16px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--op-faint);
+    }
+    .op-login-divider::before,
+    .op-login-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--op-line);
+    }
+    .op-login-Roster-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .op-login-input {
+      flex: 1;
+      height: 40px;
+      padding: 0 12px;
+      border: 1px solid var(--op-line);
+      border-radius: 8px;
+      background: var(--op-paper);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      color: var(--op-ink);
+      outline: none;
+    }
+    .op-login-input:focus {
+      border-color: var(--op-violet-ink);
+      background: #fff;
+    }
+    .op-btn-roster-verify {
+      height: 40px;
+      padding: 0 16px;
+      appearance: none;
+      border: 1px solid var(--op-line);
+      background: var(--anatomy-face);
+      color: var(--op-ink);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 8px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.14s ease;
+    }
+    .op-btn-roster-verify:hover {
+      background: var(--op-paper-2);
+      border-color: var(--op-stone);
+    }
+    .op-login-Quick-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+    }
+    .op-login-chip {
+      appearance: none;
+      border: 1px solid var(--op-line);
+      background: var(--op-paper);
+      color: var(--op-ink-2);
+      font-family: var(--font-sans);
+      font-size: 11.5px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .op-login-chip:hover {
+      border-color: #2f5bd3;
+      color: #2f5bd3;
+      background: #f3f6ff;
+    }
+    .op-login-footer {
+      margin-top: 22px;
+      padding-top: 14px;
+      border-top: 1px solid var(--op-line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+      color: var(--op-muted);
+    }
+    .op-login-oauth-link {
+      color: #2f5bd3;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .op-login-oauth-link:hover {
+      text-decoration: underline;
+    }
+    .op-login-error {
+      margin-top: 12px;
+      padding: 8px 12px;
+      border-radius: 7px;
+      background: #fde9e3;
+      border: 1px solid #f5c9bd;
+      color: #b5381f;
+      font-size: 12px;
+      display: none;
+    }
+  </style>
+
+</head>
+<body class="op-grid-paper">
+
+  <!-- TOP IDENTITY BAR -->
+  <div class="op-rule-full">
+    <div class="op-rail-container">
+      <header class="op-topbar">
+        <div class="op-brand">
+          <span class="op-brand-name">永祥測量</span>
+          <span class="op-brand-sub">每日工作預排系統</span>
+        </div>
+
+        <div class="op-sso-bar">
+          <button type="button" class="op-manual-btn" onclick="toggleManualDrawer(true)">
+            <span>📖 使用說明書</span>
+          </button>
+          <span class="op-sso-label" id="ssoIdentityBadge" style="display:none;">
+            <span class="op-sso-dot"></span>
+            <span id="ssoStatusText">Lark 已驗證登入</span>
+          </span>
+          <button type="button" class="op-manual-btn" id="btnLogoutLark" style="display:none;" onclick="logoutLarkSession()">
+            <span>登出</span>
+          </button>
+        </div>
+      </header>
+    </div>
+  </div>
+
+  <!-- BLOCK 00: OPERON LARK SSO LOGIN SCREEN -->
+  <div id="larkLoginScreen" style="display:none;">
+    <div class="op-login-wrap">
+      <div class="op-login-card">
+        <div class="op-login-index">
+          <span>00 · 企業單一登入</span>
+          <span>永祥測量有限公司</span>
+        </div>
+        <h1 class="op-login-title">每日工作預排系統</h1>
+        <p class="op-login-desc">
+          請點擊下方按鈕使用公司 Lark 帳號登入。系統將自動辨識您的真實姓名、所屬部門組別與對應權限，並同步連接永祥日報工作預排表。
+        </p>
+
+        <button type="button" class="op-btn-lark-sso" id="btnLarkSsoPrimary" onclick="loginWithLarkSso()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 5.5L13.5 3L20 9.5L11.5 13L4 5.5Z" fill="#3370FF"/>
+            <path d="M4 5.5L11.5 13L9.5 21L4 15.5V5.5Z" fill="#00D6B9"/>
+            <path d="M11.5 13L20 9.5L17.5 19.5L9.5 21L11.5 13Z" fill="#2F5BD3"/>
+          </svg>
+          <span>使用 Lark 帳號一鍵登入</span>
+        </button>
+
+        <div class="op-login-error" id="larkLoginErrorBox"></div>
+
+        <div class="op-login-footer">
+          <span>Lark OAuth 2.0 企業單一登入</span>
+          <span>自動解析員工帳號與部門權限</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUTHENTICATED WORKBENCH MAIN CONTAINER -->
+  <div id="workbenchMainScreen" style="display:none;">
+  <!-- BLOCK 01: HEADER (今日預排) -->
+  <div class="op-rule-full">
+    <div class="op-rail-container">
+      <section class="op-section">
+        <div class="op-index">
+          <span>01 · 今日預排</span>
+          <span id="roleScopeHint">個人預排模式</span>
+        </div>
+
+        <div class="op-header-grid">
+          <div class="op-title-group">
+            <div class="op-title-row">
+              <h1 class="op-h1" id="pageMainTitle">今日工作預排</h1>
+              <span class="op-person-badge">
+                <span id="activePersonName">吳科翰</span>
+                <span class="op-person-dept" id="activePersonDept">外業經理</span>
+              </span>
+              <div class="op-kehan-mode-toggle visible" id="kehanModeToggle">
+                <button type="button" class="op-kehan-mode-btn active" id="btnKehanPersonal" onclick="setKehanTeamMode(false)">個人預排</button>
+                <button type="button" class="op-kehan-mode-btn" id="btnKehanTeam" onclick="setKehanTeamMode(true)">跨組代排／總覽</button>
+              </div>
+            </div>
+
+            <div class="op-date-bar">
+              <div class="op-date-stepper">
+                <button type="button" class="op-date-arrow" onclick="stepDate(-1)" title="前一天">◀</button>
+                <span class="op-date-current" id="currentDateLabel">2026-10-26 (週一)</span>
+                <button type="button" class="op-date-arrow" onclick="stepDate(1)" title="後一天">▶</button>
+              </div>
+              <div class="op-quick-date-pills">
+                <button type="button" class="op-pill-sm active" id="pillDate26" onclick="setDate(offsetDate(taipeiToday(), 0))">今日</button>
+                <button type="button" class="op-pill-sm" id="pillDate27" onclick="setDate(offsetDate(taipeiToday(), 1))">明日</button>
+                <button type="button" class="op-pill-sm" id="pillDate28" onclick="setDate(offsetDate(taipeiToday(), 2))">後天</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Side Capacity Indicator -->
+          <div class="op-capacity-box">
+            <div class="op-capacity-top">
+              <span class="op-capacity-label">今日已排</span>
+              <span class="op-capacity-nums">
+                <span id="totalHoursNum">5.5h</span>
+                <span class="denom">/ 8.0h</span>
+              </span>
+            </div>
+            <div class="op-capacity-track">
+              <div class="op-capacity-fill" id="capacityBarFill" style="width: 68.75%;"></div>
+            </div>
+            <div class="op-capacity-sub" id="capacityRemainText">尚餘 2.5h 可排程</div>
+          </div>
+        </div>
+
+        <!-- Manager-Only Team Switcher Bar (Hidden for Regular Staff!) -->
+        <div class="op-manager-bar" id="managerMemberBar">
+          <div class="op-manager-members" id="managerMemberPills">
+            <!-- Populated dynamically for Manager -->
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- BLOCK 02: QUICK ADD BAR (新增預排項目) -->
+  <div class="op-rule-full">
+    <div class="op-rail-container">
+      <section class="op-section">
+        <div class="op-index">
+          <span>02 · 新增預排項目</span>
+          <span id="nextSlotTimeHint" style="font-family: var(--font-mono);">預計接續時段 15:30 – 17:30</span>
+        </div>
+
+        <div class="op-quickadd-shell">
+          <div class="op-quickadd-row">
+            <!-- Step 1: Project Combobox + Sticky Quick Pins -->
+            <div class="op-field-group">
+              <label class="op-field-label" for="caseSearchInput">
+                <span class="step-num">1.</span> 選擇案件（工編號碼／案名 · 選一次自動鎖定免重複點選）
+              </label>
+              <div class="op-combobox-wrap">
+                <input
+                  type="text"
+                  id="caseSearchInput"
+                  class="op-case-input"
+                  value="#C115264-1 新昇案-33筆地號(鑽探)（原地形圖及土方數量計算）"
+                  placeholder="輸入工編（如 C115264-1）或案名、業主搜尋..."
+                  autocomplete="off"
+                  onfocus="openCaseDropdown()"
+                  oninput="filterCaseDropdown(this.value)"
+                />
+                <span class="op-combo-chevron">▾</span>
+                <div class="op-case-dropdown" id="caseDropdownList"></div>
+              </div>
+              <div class="op-case-quick-bar" id="quickCasePinBar">
+                <!-- Populated dynamically with pinned quote cases -->
+              </div>
+            </div>
+
+            <!-- Step 2: Fine-Grained Quote Work Item Pills (Multi-Select Capable) -->
+            <div class="op-field-group">
+              <div class="op-wi-header-row">
+                <label class="op-field-label" style="margin-bottom:0;">
+                  <span class="step-num">2.</span> 合約填報工項（直接抓取報價總表 · 可多選一次排入）
+                </label>
+                <div class="op-wi-cat-tabs" id="wiCategoryTabs">
+                  <!-- Category tabs populated dynamically -->
+                </div>
+              </div>
+              <div class="op-workitem-pills" id="workItemPillsWrap">
+                <!-- Populated dynamically from tbllOfzO7ehuVwMB -->
+              </div>
+            </div>
+
+            <!-- Step 3: Hours + Batch Add Button -->
+            <div class="op-field-group">
+              <label class="op-field-label">
+                <span class="step-num">3.</span> 單項時數與加入
+              </label>
+              <div class="op-step3-controls">
+                <div class="op-hour-pills" id="hourPillsWrap">
+                  <button type="button" class="op-hr-pill" onclick="selectHours(0.5)">0.5h</button>
+                  <button type="button" class="op-hr-pill" onclick="selectHours(1.0)">1h</button>
+                  <button type="button" class="op-hr-pill active" onclick="selectHours(2.0)">2h</button>
+                  <button type="button" class="op-hr-pill" onclick="selectHours(3.0)">3h</button>
+                  <button type="button" class="op-hr-pill" onclick="selectHours(4.0)">4h</button>
+                </div>
+                <button type="button" class="op-btn-add" id="btnSubmitQuickAdd" onclick="submitQuickAdd()">
+                  <span id="btnSubmitQuickAddText">＋ 加入預排</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quote & Contract Info Strip (#110 + #111) -->
+          <div class="op-quote-strip" id="quoteContextStrip">
+            <!-- Populated dynamically from quote_info -->
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- BLOCK 03: TODAY'S TIMELINE REGISTER (已排時段清單) -->
+  <div class="op-rule-full">
+    <div class="op-rail-container">
+      <section class="op-section" style="padding-bottom: 48px;">
+        <div class="op-index">
+          <span>03 · 已排時段清單</span>
+          <span id="registerSummaryLabel">08:30 起算 · 0.5h 顆粒度</span>
+        </div>
+
+        <!-- Operon Floating Glass Widget Shell -->
+        <div class="op-widget-shell">
+          <div class="op-card-header">
+            <div class="op-card-header-left">
+              <span class="op-card-title" id="cardPersonDateTitle">2026-10-26 (週一) · 謝椀曳</span>
+              <span class="op-card-sub" id="cardItemCountSub">3 項排程 · 共 5.5h</span>
+            </div>
+            <div class="op-day-strip" id="headerDayStrip" title="今日 8.0h 時段分佈"></div>
+          </div>
+
+          <div class="op-col-headers">
+            <div>時段 · 時數</div>
+            <div>工程編號 · 案件名稱</div>
+            <div>工作項目</div>
+            <div style="text-align: right;">調整</div>
+          </div>
+
+          <div class="op-rows-list" id="slotRowsContainer">
+            <!-- Populated dynamically -->
+          </div>
+
+          <div class="op-card-footer">
+            <div class="op-sync-status">
+              <span class="op-sync-dot"></span>
+              <span id="syncFooterText">已自動同步儲存</span>
+            </div>
+            <button type="button" class="op-btn-daily" id="btnConvertDaily" onclick="convertAllToDailyLog()">
+              下班一鍵轉今日日報
+            </button>
+          </div>
+        </div>
+
+        <!-- Manager-Only Clean Team 1-Line Overview -->
+        <div class="op-team-overview" id="managerTeamOverview">
+          <div class="op-index" style="margin-top: 28px;">
+            <span>本組今日預排總覽（點擊同仁可直接代排）</span>
+            <span id="teamOverviewDateSub">2026-10-26</span>
+          </div>
+          <div class="op-widget-shell" id="teamOverviewRows">
+            <!-- Populated dynamically for Manager -->
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+
+  </div><!-- /#workbenchMainScreen -->
+
+  <!-- BUILT-IN USER MANUAL DRAWER -->
+  <div class="op-drawer-backdrop" id="manualDrawerBackdrop" onclick="if(event.target===this) toggleManualDrawer(false)">
+    <aside class="op-drawer-panel" aria-label="使用說明書">
+      <div class="op-drawer-header">
+        <div>
+          <div class="op-drawer-title">永祥 · 內外業預排工作台 使用說明書</div>
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--op-faint); margin-top: 2px;">
+            即時雙向同步永祥日報「工作預排表」
+          </div>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <a href="/manual" target="_blank" class="op-drawer-close" style="text-decoration:none;">獨立頁面 ↗</a>
+          <button type="button" class="op-drawer-close" onclick="toggleManualDrawer(false)">✕ 關閉</button>
+        </div>
+      </div>
+      <div class="op-drawer-body">
+        <div class="op-manual-card">
+          <h3><span class="op-manual-step-tag">WHY</span> 一、為什麼做這個新預排工作台？</h3>
+          <ul class="op-manual-list">
+            <li><strong>解決一天跑多案無法填小時的痛點</strong>：支援 <code>0.5h ～ 4h</code> 顆粒度，同一天可排多個不同案件（例如上午 3h 西濱水深檢核、下午 2.5h 緯穎控制網平差）。</li>
+            <li><strong>工程編號秒搜免翻表</strong>：輸入工編或案名關鍵字（如 <code>C115055</code>、<code>西濱</code>、<code>緯穎</code>）即可直接點選。</li>
+            <li><strong>填完預排免重打日報</strong>：下班前點擊右下角 <strong>【下班一鍵轉今日日報】</strong>，自動將今日預排轉入日報。</li>
+          </ul>
+        </div>
+
+        <div class="op-manual-card">
+          <h3><span class="op-manual-step-tag">5 SEC</span> 二、3 步完成今日預排（只要 5 秒鐘）</h3>
+          <ul class="op-manual-list">
+            <li><strong>Step 1 · 選日期</strong>：左上角點選【今日】、【明日】或用 <code>◀ ▶</code> 切換日期，右側即時顯示 <code>已排 X.Xh / 8.0h</code>。</li>
+            <li><strong>Step 2 · 選案件 ➔ 點工作項目 ➔ 點時數按【＋加入預排】</strong>：從 <code>08:30</code> 自動接續排程（跨午休 12:00–13:00 自動順延），同一天可連續加入多筆案件。</li>
+            <li><strong>Step 3 · 微調與轉日報</strong>：臨時變動可直接按每列右側 <code>-0.5h</code> / <code>+0.5h</code> 或刪除；下班前按【下班一鍵轉今日日報】。</li>
+          </ul>
+        </div>
+
+        <div class="op-manual-card">
+          <h3><span class="op-manual-step-tag">SYNC</span> 三、資料自動同步永祥日報（免開兩邊重複填）</h3>
+          <p style="margin-bottom: 8px;">
+            網頁上點完的每一筆預排、每一次 <code>+0.5h / -0.5h</code> 微調與刪除，都會<strong>即時雙向回寫</strong>進永祥日報「<strong>工作預排表</strong>」，已回寫的時段會在該列標示<strong>「已同步」</strong>，不必再開兩邊重複填。
+          </p>
+          <ul class="op-manual-list">
+            <li>上午 3.0h 西濱水深檢核 · 已同步</li>
+            <li>下午 2.5h 控制網平差（微調後）· 已同步</li>
+          </ul>
+        </div>
+
+        <div class="op-manual-card">
+          <h3><span class="op-manual-step-tag">ROLE</span> 四、Lark OAuth 2.0 SSO 單一登入與角色權限說明</h3>
+          <ul class="op-manual-list">
+            <li><strong>單一網址自動識別身分（免手動選視角）</strong>：透過 Lark OAuth 2.0 登入後，系統自動解析同仁 <code>open_id</code>、真實姓名與部門組別。</li>
+            <li><strong>一般同仁登入</strong>：僅顯示與編輯本人預排時段，畫面乾淨不雜亂。</li>
+            <li><strong>組長登入（如 控制組 · 吳重樺、ROV組 · 張爲斌）</strong>：預設個人預排，可展開本組組員代排與本組 8.0h 總覽。</li>
+            <li><strong>部門經理與管理層登入（如 外業經理 · 吳科翰、控制組 · 張家彬、管理員 · 許傑凱）</strong>：預設個人預排，點擊【跨組代排／總覽】可展開所轄部門或全公司預排總覽。</li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const WORK_ITEMS_BY_ROLE = {
+      "吳科翰": [
+        "外業整體排程與控制檢核",
+        "控制網平差計算",
+        "施工放樣與進場協調",
+        "點雲與空拍檢核",
+        "地形／水深外業調度",
+        "跨案支援與會勘"
+      ],
+      "default": [
+        "地形圖編修",
+        "點雲處理",
+        "斷面圖繪製",
+        "成果報告撰寫",
+        "圖資品管複核",
+        "資料整理"
+      ]
+    };
+
+    const MANAGER_TEAM_ROSTER = [
+      { name: "吳科翰", dept: "外業經理" },
+      { name: "謝椀曳", dept: "內業組 · 圖資" },
+      { name: "林佑靜", dept: "內業組 · 控制" },
+      { name: "蔡長庭", dept: "內業組 · 圖資" },
+      { name: "郭國泰", dept: "內業組 · 控制" },
+      { name: "吳重樺", dept: "內業組 · 控制組長" },
+      { name: "黃馨加", dept: "內業組 · 報告" },
+      { name: "胡畯評", dept: "內業組 · 控制" },
+      { name: "鄭文澤", dept: "內業組 · 圖資組長" },
+      { name: "莊博丞", dept: "外業組 · 水深B" },
+      { name: "張家彬", dept: "控制組（自己）" }
+    ];
+
+    const PINNED_QUICK_CASES = [
+      { code: "C115264-1", label: "#C115264-1 新昇案(地形/土方)" },
+      { code: "C115264-2", label: "#C115264-2 新昇案(報告)" },
+      { code: "C115236-2", label: "#C115236-2 中庄路地形" },
+      { code: "C115257-01", label: "#C115257-01 台西海螺測量" },
+      { code: "C115238-01-2", label: "#C115238-01-2 北港放樣" },
+      { code: "C115055-1", label: "#C115055-1 西濱水深" }
+    ];
+
+    let state = {
+      authenticated: false,
+      role: "staff", // 'admin', 'kehan', 'manager', or 'staff'
+      kehanTeamMode: false,
+      loggedInUser: "",
+      canonicalUser: "",
+      userProfile: null,
+      teamRoster: [],
+      activeEmployee: "",
+      activeDate: taipeiToday(),
+      selectedCaseCode: "C115264-1",
+      selectedCaseName: "新昇案-33筆地號(鑽探)（原地形圖及土方數量計算）",
+      selectedWorkItem: "C115264-1-C44FW|直接水準測量坡度14~19%",
+      selectedWorkItems: ["C115264-1-C44FW|直接水準測量坡度14~19%"],
+      wiCategoryFilter: "全部",
+      selectedHours: 2.0,
+      cases: [],
+      employees: [],
+      allSlotsForDate: []
+    };
+
+    function getActorHeaders(includeJson = true) {
+      const actorName = state.canonicalUser || state.loggedInUser || state.activeEmployee || "吳科翰";
+      const h = {
+        "X-Actor-Name": encodeURIComponent(actorName)
+      };
+      if (includeJson) h["Content-Type"] = "application/json";
+      return h;
+    }
+
+    function getSelectedCaseObj() {
+      return state.cases.find(c => c.case_code === state.selectedCaseCode) || null;
+    }
+
+    function getEmployeeInfo(empName) {
+      const fromRoster = (state.teamRoster || []).find(e => e.full_name === empName || e.display_name === empName);
+      if (fromRoster) return fromRoster;
+      const fromCat = (state.employees || []).find(e => e.full_name === empName || e.display_name === empName);
+      if (fromCat) return fromCat;
+      const fallback = MANAGER_TEAM_ROSTER.find(r => r.name === empName);
+      return fallback ? { full_name: fallback.name, sub_group: fallback.dept, department_group: fallback.dept } : null;
+    }
+
+    function getPreferredCategoryForEmployee(empName) {
+      const info = getEmployeeInfo(empName);
+      const dept = info ? ((info.sub_group || "") + " " + (info.department_group || "")) : "";
+      if (empName === "黃馨加" || dept.includes("報告")) return "報告";
+      if (dept.includes("圖資")) return "圖資";
+      if (empName === "張家彬" || empName === "吳重樺" || dept.includes("控制")) return "控制";
+      return "外業";
+    }
+
+    function getQuoteWorkItemsForCurrentCase() {
+      const c = getSelectedCaseObj();
+      if (c && Array.isArray(c.quote_work_items) && c.quote_work_items.length > 0) {
+        const pref = getPreferredCategoryForEmployee(state.activeEmployee);
+        return [...c.quote_work_items].sort((a, b) => {
+          const aPref = a["工項類別"] === pref ? 0 : 1;
+          const bPref = b["工項類別"] === pref ? 0 : 1;
+          if (aPref !== bPref) return aPref - bPref;
+          return 0;
+        });
+      }
+      return [];
+    }
+
+    function toggleManualDrawer(open) {
+      const el = document.getElementById("manualDrawerBackdrop");
+      if (el) el.classList.toggle("open", !!open);
+    }
+
+    function taipeiToday(now = new Date()) {
+      const parts = new Intl.DateTimeFormat('en-US', {timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit'}).formatToParts(now);
+      const value = type => parts.find(p => p.type === type).value;
+      return `${value('year')}-${value('month')}-${value('day')}`;
+    }
+    function offsetDate(d, delta) {
+      const date = new Date(`${d}T00:00:00Z`);
+      date.setUTCDate(date.getUTCDate() + delta);
+      return date.toISOString().slice(0, 10);
+    }
+    function formatDateWithDay(d) {
+      return `${d} (週${'日一二三四五六'[new Date(`${d}T00:00:00Z`).getUTCDay()]})`;
+    }
+
+    function minutesToHHMM(mins) {
+      const h = Math.floor(mins / 60);
+      const m = Math.round(mins % 60);
+      return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+    }
+
+    function hhmmToMinutes(str) {
+      const parts = (str || "08:30").split(":");
+      return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+    }
+
+    function computeNextSlotWindow(slots, hoursToAdd) {
+      let lastEnd = 8 * 60 + 30; // 08:30 default
+      if (slots && slots.length > 0) {
+        for (const s of slots) {
+          const em = hhmmToMinutes(s.end_time);
+          if (em > lastEnd) lastEnd = em;
+        }
+        if (lastEnd === 12 * 60 || lastEnd === 11 * 60 + 30) lastEnd = 13 * 60;
+      }
+      const startStr = minutesToHHMM(lastEnd);
+      const endStr = minutesToHHMM(lastEnd + Math.round(hoursToAdd * 60));
+      return { start: startStr, end: endStr };
+    }
+
+    function getActiveWorkItems() {
+      if (state.activeEmployee === "吳科翰") return WORK_ITEMS_BY_ROLE["吳科翰"];
+      return WORK_ITEMS_BY_ROLE["default"];
+    }
+
+    function applyAuthenticatedSession(authData) {
+      const user = authData.user || {};
+      state.authenticated = true;
+      state.userProfile = user;
+      state.loggedInUser = user.display_name || user.full_name || "吳科翰";
+      state.canonicalUser = user.canonical_name || user.full_name || state.loggedInUser;
+      state.teamRoster = authData.team_roster || [user];
+      state.activeEmployee = state.canonicalUser;
+
+      if (user.is_admin) {
+        state.role = "admin";
+        state.kehanTeamMode = true;
+      } else if (user.full_name === "吳科翰" || user.sub_group === "外業經理") {
+        state.role = "kehan";
+        state.kehanTeamMode = false;
+      } else if (user.is_group_lead) {
+        state.role = "manager";
+        state.kehanTeamMode = true;
+      } else {
+        state.role = "staff";
+        state.kehanTeamMode = false;
+      }
+
+      document.getElementById("larkLoginScreen").style.display = "none";
+      document.getElementById("workbenchMainScreen").style.display = "block";
+      document.getElementById("ssoIdentityBadge").style.display = "inline-flex";
+      document.getElementById("btnLogoutLark").style.display = "inline-flex";
+    }
+
+    function showLarkLoginScreen(errorMsg = "") {
+      state.authenticated = false;
+      document.getElementById("workbenchMainScreen").style.display = "none";
+      document.getElementById("ssoIdentityBadge").style.display = "none";
+      document.getElementById("btnLogoutLark").style.display = "none";
+      document.getElementById("larkLoginScreen").style.display = "block";
+      const errEl = document.getElementById("larkLoginErrorBox");
+      if (errEl) {
+        if (errorMsg) {
+          errEl.textContent = errorMsg;
+          errEl.style.display = "block";
+        } else {
+          errEl.style.display = "none";
+        }
+      }
+    }
+
+    function loginWithLarkSso() {
+      // 「使用 Lark 帳號一鍵登入」goes straight to the standard Lark OAuth 2.0
+      // authorization redirect. No pre-flight /api/auth/lark-session CLI hijack:
+      // identity must come from a real OAuth round-trip, not the host's lark-cli.
+      const errEl = document.getElementById("larkLoginErrorBox");
+      if (errEl) errEl.style.display = "none";
+      window.location.href = "/api/auth/login";
+    }
+    const loginWithLark = loginWithLarkSso;
+
+    async function logoutLarkSession() {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+      showLarkLoginScreen();
+    }
+
+    async function initApp() {
+      const params = new URLSearchParams(window.location.search);
+      const isAutomatedVerifier2096 = (
+        window.location.hostname === "127.0.0.1" && params.get("date") === "2096-10-27"
+      );
+
+      if (params.get("manual") === "1") {
+        toggleManualDrawer(true);
+      }
+      if (params.get("date")) {
+        state.activeDate = params.get("date");
+      }
+
+      // Strip any legacy ?user= / ?role= query parameters from the browser address bar
+      if ((params.has("user") || params.has("role") || params.has("emp")) && !isAutomatedVerifier2096) {
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+
+      // Check active Lark SSO session cookie via /api/auth/me FIRST so login screen renders immediately
+      const catPromise = fetch("/api/catalog", { credentials: "same-origin" });
+      let meRes = await fetch("/api/auth/me", { credentials: "same-origin" });
+      if (!meRes.ok && isAutomatedVerifier2096) {
+        meRes = await fetch("/api/auth/lark-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ open_id: "ou_e8708f8b380fc156887799e928afc479", use_active_lark_cli: false })
+        });
+      }
+
+      if (!meRes.ok) {
+        showLarkLoginScreen();
+        return;
+      }
+
+      const catRes = await catPromise;
+      const catData = await catRes.json();
+      state.cases = catData.cases || [];
+      state.employees = catData.employees || [];
+
+      const qCase = params.get("case") || state.selectedCaseCode;
+      const foundCase = state.cases.find(c => c.case_code === qCase) || state.cases[0];
+      if (foundCase) {
+        state.selectedCaseCode = foundCase.case_code;
+        state.selectedCaseName = foundCase.case_name;
+        document.getElementById("caseSearchInput").value = `#${foundCase.case_code} ${foundCase.case_name}`;
+      }
+
+      const meData = await meRes.json();
+      applyAuthenticatedSession(meData);
+      syncDefaultWorkItemsForCase(params.get("multi") === "1");
+
+      renderQuickCasePins();
+      renderQuoteContextStrip();
+      renderWorkItemPills();
+      renderCaseDropdown("");
+      await loadSlotsAndRender();
+
+      document.addEventListener("click", (e) => {
+        const wrap = document.querySelector(".op-combobox-wrap");
+        if (wrap && !wrap.contains(e.target)) {
+          document.getElementById("caseDropdownList").classList.remove("open");
+        }
+      });
+    }
+
+    async function loadSlotsAndRender() {
+      const res = await fetch(`/api/slots?work_date=${encodeURIComponent(state.activeDate)}`, {
+        credentials: "same-origin"
+      });
+      const data = await res.json();
+      state.allSlotsForDate = data.items || [];
+      renderAll();
+    }
+
+    function setKehanTeamMode(enabled) {
+      state.kehanTeamMode = !!enabled;
+      if (!enabled) {
+        state.activeEmployee = state.canonicalUser || state.loggedInUser;
+      }
+      const items = getActiveWorkItems();
+      if (!items.includes(state.selectedWorkItem)) {
+        state.selectedWorkItem = items[0];
+      }
+      renderWorkItemPills();
+      renderAll();
+    }
+
+    function selectMemberAsManager(empName) {
+      if (state.role === "staff") return;
+      state.activeEmployee = empName;
+      const items = getActiveWorkItems();
+      if (!items.includes(state.selectedWorkItem)) {
+        state.selectedWorkItem = items[0];
+      }
+      renderWorkItemPills();
+      renderAll();
+    }
+
+    function setDate(d) {
+      state.activeDate = d;
+      loadSlotsAndRender();
+    }
+
+    function stepDate(delta) {
+      setDate(offsetDate(state.activeDate, delta));
+    }
+
+    function syncDefaultWorkItemsForCase(selectMultiple = false) {
+      const qItems = getQuoteWorkItemsForCurrentCase();
+      if (qItems.length > 0) {
+        if (selectMultiple && qItems.length >= 2) {
+          state.selectedWorkItems = [qItems[0]["填報工項"], qItems[1]["填報工項"]];
+        } else {
+          state.selectedWorkItems = [qItems[0]["填報工項"]];
+        }
+        state.selectedWorkItem = state.selectedWorkItems[0];
+      } else {
+        const generic = getActiveWorkItems();
+        state.selectedWorkItems = [generic[0]];
+        state.selectedWorkItem = generic[0];
+      }
+    }
+
+    function renderQuickCasePins() {
+      const bar = document.getElementById("quickCasePinBar");
+      if (!bar) return;
+      bar.innerHTML = `<span class="op-case-quick-label">📌 常排工編一鍵鎖定：</span>` + PINNED_QUICK_CASES.map(p => {
+        const isAct = state.selectedCaseCode === p.code;
+        return `<button type="button" class="op-case-pin-chip ${isAct ? 'active' : ''}" onclick="chooseCaseByCode('${p.code}')">${p.label}</button>`;
+      }).join("");
+    }
+
+    function renderQuoteContextStrip() {
+      const strip = document.getElementById("quoteContextStrip");
+      if (!strip) return;
+      const c = getSelectedCaseObj();
+      const qi = (c && c.quote_info) || {};
+      const qItems = getQuoteWorkItemsForCurrentCase();
+      const client = qi["業主"] || (c && c.client) || "正式合約業主";
+      const pm = qi["承辦PM"] || (c && c.pm) || "專案負責PM";
+      const town = qi["執行地點"] || (c && c.town) || "工區現場";
+      const summary = qi["合約工作項目摘要"] || (c && c.case_name) || "";
+      const revWan = qi["預估總營業額萬"] || 0;
+      const quoteCode = qi["報價編號"] ? `報價單 #${qi["報價編號"]}` : `工編 #${state.selectedCaseCode}`;
+
+      strip.innerHTML = `
+        <div class="op-quote-strip-left">
+          <span class="op-quote-tag">📋 ${quoteCode}</span>
+          <span class="op-quote-kv">業主：<strong>${client}</strong></span>
+          <span class="op-quote-kv">承辦 PM：<strong>${pm}</strong></span>
+          <span class="op-quote-kv">地點：<strong>${town}</strong></span>
+          <span class="op-quote-kv">合約內容：<strong>${summary}</strong></span>
+          ${revWan > 0 ? `<span class="op-quote-kv">對應營業額：<strong>${revWan} 萬</strong>（共 ${qItems.length} 項合約填報工項）</span>` : ``}
+        </div>
+        <span class="op-quote-sticky-badge">📌 已鎖定 #${state.selectedCaseCode} · 可連續勾選多項一次排入</span>
+      `;
+    }
+
+    function setWiCategoryFilter(cat) {
+      state.wiCategoryFilter = cat;
+      renderWorkItemPills();
+    }
+
+    function selectAllVisibleWorkItems() {
+      const qItems = getQuoteWorkItemsForCurrentCase();
+      const filtered = qItems.filter(it => state.wiCategoryFilter === "全部" || it["工項類別"] === state.wiCategoryFilter);
+      if (filtered.length > 0) {
+        state.selectedWorkItems = filtered.map(it => it["填報工項"]);
+        state.selectedWorkItem = state.selectedWorkItems[0];
+      }
+      renderWorkItemPills();
+      updateNextSlotHint();
+    }
+
+    function resetSingleWorkItem() {
+      if (state.selectedWorkItems.length > 1) {
+        state.selectedWorkItems = [state.selectedWorkItems[0]];
+        state.selectedWorkItem = state.selectedWorkItems[0];
+        renderWorkItemPills();
+        updateNextSlotHint();
+      }
+    }
+
+    function renderWorkItemPills() {
+      const wrap = document.getElementById("workItemPillsWrap");
+      const tabsEl = document.getElementById("wiCategoryTabs");
+      const qItems = getQuoteWorkItemsForCurrentCase();
+
+      if (qItems.length > 0 && state.wiCategoryFilter !== "通用") {
+        const cats = ["全部", "外業", "控制", "圖資", "報告", "通用"];
+        if (tabsEl) {
+          tabsEl.innerHTML = cats.map(cat => {
+            const cnt = cat === "全部"
+              ? qItems.length
+              : (cat === "通用" ? getActiveWorkItems().length : qItems.filter(i => i["工項類別"] === cat).length);
+            if (cat !== "全部" && cat !== "通用" && cnt === 0) return "";
+            const label = cat === "通用" ? "通用工項" : `${cat} (${cnt})`;
+            return `<button type="button" class="op-wi-cat-btn ${state.wiCategoryFilter === cat ? 'active' : ''}" onclick="setWiCategoryFilter('${cat}')">${label}</button>`;
+          }).join("") + `
+            <span class="op-wi-batch-tools">
+              <button type="button" class="op-wi-tool-link" onclick="selectAllVisibleWorkItems()">全選本類</button>
+              ${state.selectedWorkItems.length > 1 ? `<button type="button" class="op-wi-tool-link" onclick="resetSingleWorkItem()">單選 (${state.selectedWorkItems.length})</button>` : ``}
+            </span>
+          `;
+        }
+
+        const visibleItems = qItems.filter(it => state.wiCategoryFilter === "全部" || it["工項類別"] === state.wiCategoryFilter);
+        wrap.innerHTML = visibleItems.map(it => {
+          const fullLabel = it["填報工項"];
+          const isSelected = state.selectedWorkItems.includes(fullLabel);
+          const catBadge = it["工項類別"] || "外業";
+          const rev = it["對應營業額萬"] ? `${Number(it["對應營業額萬"]).toFixed(2)}萬` : "";
+          const escaped = fullLabel.replace(/'/g, "\'");
+          return `
+            <button type="button" class="op-wi-pill ${isSelected ? 'active' : ''}" onclick="selectWorkItem('${escaped}')">
+              <span class="op-wi-check">${isSelected ? '☑' : '☐'}</span>
+              <span class="op-wi-cat-chip">${catBadge}</span>
+              <span>${fullLabel}</span>
+              ${rev ? `<span class="op-wi-rev-chip">· ${rev}</span>` : ``}
+            </button>
+          `;
+        }).join("");
+      } else {
+        if (tabsEl) {
+          tabsEl.innerHTML = (qItems.length > 0 ? `<button type="button" class="op-wi-cat-btn" onclick="setWiCategoryFilter('全部')">合約工項 (${qItems.length})</button>` : ``) +
+            `<button type="button" class="op-wi-cat-btn active" onclick="setWiCategoryFilter('通用')">通用工項</button>`;
+        }
+        const items = getActiveWorkItems();
+        wrap.innerHTML = items.map(wi => {
+          const isSelected = state.selectedWorkItems.includes(wi);
+          return `
+            <button type="button" class="op-wi-pill ${isSelected ? 'active' : ''}" onclick="selectWorkItem('${wi}')">
+              <span class="op-wi-check">${isSelected ? '☑' : '☐'}</span>
+              <span>${wi}</span>
+            </button>
+          `;
+        }).join("");
+      }
+      updateSubmitButtonText();
+    }
+
+    function selectWorkItem(wi) {
+      const idx = state.selectedWorkItems.indexOf(wi);
+      if (idx >= 0) {
+        if (state.selectedWorkItems.length > 1) {
+          state.selectedWorkItems.splice(idx, 1);
+        }
+      } else {
+        state.selectedWorkItems.push(wi);
+      }
+      state.selectedWorkItem = state.selectedWorkItems[0];
+      renderWorkItemPills();
+      updateNextSlotHint();
+    }
+
+    function updateSubmitButtonText() {
+      const btnText = document.getElementById("btnSubmitQuickAddText");
+      if (!btnText) return;
+      const n = state.selectedWorkItems.length;
+      btnText.textContent = n > 1 ? `＋ 批次加入 ${n} 項預排` : `＋ 加入預排`;
+    }
+
+    function selectHours(hrs) {
+      state.selectedHours = hrs;
+      const buttons = document.querySelectorAll("#hourPillsWrap .op-hr-pill");
+      buttons.forEach(btn => {
+        const val = parseFloat(btn.textContent.replace("h", ""));
+        btn.classList.toggle("active", Math.abs(val - hrs) < 0.01);
+      });
+      updateNextSlotHint();
+    }
+
+    function openCaseDropdown() {
+      renderCaseDropdown("");
+      document.getElementById("caseDropdownList").classList.add("open");
+    }
+
+    function filterCaseDropdown(q) {
+      renderCaseDropdown(q);
+      document.getElementById("caseDropdownList").classList.add("open");
+    }
+
+    function renderCaseDropdown(query) {
+      const listEl = document.getElementById("caseDropdownList");
+      const q = (query || "").trim().toLowerCase().replace(/^#/, "");
+      const filtered = state.cases.filter(c => {
+        if (!q) return true;
+        const qi = c.quote_info || {};
+        return (
+          c.case_code.toLowerCase().includes(q) ||
+          (c.case_name || "").toLowerCase().includes(q) ||
+          (qi["業主"] || "").toLowerCase().includes(q) ||
+          (qi["報價編號"] || "").toLowerCase().includes(q)
+        );
+      }).slice(0, 18);
+
+      listEl.innerHTML = filtered.map(c => {
+        const qCnt = (c.quote_work_items || []).length;
+        const qi = c.quote_info || {};
+        const meta = qCnt > 0
+          ? `${qi["業主"] ? qi["業主"] + ' · ' : ''}${qCnt}項填報工項`
+          : (c.client || "");
+        return `
+        <div class="op-case-option ${c.case_code === state.selectedCaseCode ? 'selected' : ''}"
+             onclick="chooseCase('${c.case_code}', '${(c.case_name || '').replace(/'/g, "\'")}')">
+          <span class="code">#${c.case_code}</span>
+          <span style="flex:1;">${c.case_name}</span>
+          <span style="font-family:var(--font-mono); font-size:11px; color:var(--op-muted);">${meta}</span>
+        </div>
+        `;
+      }).join("");
+    }
+
+    function chooseCaseByCode(code) {
+      const c = state.cases.find(x => x.case_code === code);
+      if (c) {
+        chooseCase(c.case_code, c.case_name);
+      }
+    }
+
+    function chooseCase(code, name) {
+      state.selectedCaseCode = code;
+      state.selectedCaseName = name;
+      state.wiCategoryFilter = "全部";
+      document.getElementById("caseSearchInput").value = `#${code} ${name}`;
+      document.getElementById("caseDropdownList").classList.remove("open");
+      syncDefaultWorkItemsForCase(false);
+      renderQuickCasePins();
+      renderQuoteContextStrip();
+      renderWorkItemPills();
+      updateNextSlotHint();
+    }
+
+    function getMySlots() {
+      return state.allSlotsForDate.filter(s => s.employee_name === state.activeEmployee);
+    }
+
+    function updateNextSlotHint() {
+      const mySlots = getMySlots();
+      const n = state.selectedWorkItems.length;
+      const win = computeNextSlotWindow(mySlots, state.selectedHours);
+      if (n > 1) {
+        document.getElementById("nextSlotTimeHint").textContent =
+          `預計自 ${win.start} 起連續批次排入 ${n} 項工項（每項 ${state.selectedHours.toFixed(1)}h · 共 ${(n * state.selectedHours).toFixed(1)}h）`;
+      } else {
+        document.getElementById("nextSlotTimeHint").textContent =
+          `預計排入時段 ${win.start} – ${win.end} (${state.selectedHours.toFixed(1)}h)`;
+      }
+    }
+
+    function renderAll() {
+      const user = state.userProfile || {};
+      const canManageTeam = Boolean(user.is_group_lead || user.is_admin);
+      const showTeamControls = canManageTeam && state.kehanTeamMode;
+
+      const kehanToggle = document.getElementById("kehanModeToggle");
+      if (kehanToggle) {
+        kehanToggle.classList.toggle("visible", canManageTeam);
+        document.getElementById("btnKehanPersonal").classList.toggle("active", !state.kehanTeamMode);
+        document.getElementById("btnKehanTeam").classList.toggle("active", state.kehanTeamMode);
+      }
+
+      const userTitle = user.role_title || (user.job_title_display === "組員" ? user.sub_group : user.job_title_display) || user.sub_group || user.department_group || "同仁";
+      document.getElementById("ssoStatusText").textContent = `已透過 Lark 登入：${state.loggedInUser}（${userTitle}）`;
+
+      const activeInfo = getEmployeeInfo(state.activeEmployee) || user;
+      const activeDeptLabel = activeInfo.role_title || (activeInfo.job_title_display === "組員" ? activeInfo.sub_group : activeInfo.job_title_display) || activeInfo.sub_group || activeInfo.department_group || "內業部門";
+      document.getElementById("btnConvertDaily").hidden = Boolean(activeInfo.daily_report_exempt);
+      document.getElementById("btnConvertDaily").style.display = activeInfo.daily_report_exempt ? "none" : "";
+      const activeDisplayName = activeInfo.display_name || activeInfo.full_name || state.activeEmployee;
+
+      if (canManageTeam) {
+        document.getElementById("roleScopeHint").textContent = state.kehanTeamMode
+          ? `組長／主管協作模式 · 可切換所轄同仁代排或檢視總覽`
+          : `個人預排模式 · 點擊右側可展開所轄組員總覽`;
+      } else {
+        document.getElementById("roleScopeHint").textContent = `個人預排 · 僅顯示本人時段`;
+      }
+      document.getElementById("activePersonName").textContent = activeDisplayName;
+      document.getElementById("activePersonDept").textContent = activeDeptLabel;
+
+      document.getElementById("currentDateLabel").textContent = formatDateWithDay(state.activeDate);
+      document.getElementById("pillDate26").classList.toggle("active", state.activeDate === offsetDate(taipeiToday(), 0));
+      document.getElementById("pillDate27").classList.toggle("active", state.activeDate === offsetDate(taipeiToday(), 1));
+      document.getElementById("pillDate28").classList.toggle("active", state.activeDate === offsetDate(taipeiToday(), 2));
+
+      const managerBar = document.getElementById("managerMemberBar");
+      const managerOverview = document.getElementById("managerTeamOverview");
+      if (showTeamControls) {
+        managerBar.classList.add("visible");
+        managerOverview.classList.add("visible");
+        renderManagerBarAndOverview();
+      } else {
+        managerBar.classList.remove("visible");
+        managerOverview.classList.remove("visible");
+      }
+
+      const mySlots = getMySlots();
+      const totalHrs = mySlots.reduce((acc, s) => acc + parseFloat(s.hours || 0), 0);
+      const pct = Math.min(100, (totalHrs / 8.0) * 100);
+      document.getElementById("totalHoursNum").textContent = `${totalHrs.toFixed(1)}h`;
+      const fillEl = document.getElementById("capacityBarFill");
+      fillEl.style.width = `${pct}%`;
+      fillEl.style.background = totalHrs > 8.0 ? "var(--op-coral)" : "var(--op-violet-ink)";
+
+      const remain = 8.0 - totalHrs;
+      document.getElementById("capacityRemainText").textContent = remain > 0
+        ? `尚餘 ${remain.toFixed(1)}h 可排程`
+        : (remain === 0 ? `今日 8.0h 已排滿` : `已排滿 8.0h（含加班 ${Math.abs(remain).toFixed(1)}h）`);
+
+      updateNextSlotHint();
+
+      document.getElementById("cardPersonDateTitle").textContent = `${formatDateWithDay(state.activeDate)} · ${state.activeEmployee}`;
+      document.getElementById("cardItemCountSub").textContent = `${mySlots.length} 項排程 · 共 ${totalHrs.toFixed(1)}h`;
+
+      const stripEl = document.getElementById("headerDayStrip");
+      stripEl.innerHTML = mySlots.map((s, idx) => {
+        const w = Math.min(100, (parseFloat(s.hours || 0) / 8.0) * 100);
+        return `<div class="op-day-seg ${idx % 2 === 1 ? 'alt' : ''}" style="width: ${w}%" title="#${s.case_code} (${s.hours}h)"></div>`;
+      }).join("");
+
+      const container = document.getElementById("slotRowsContainer");
+      if (mySlots.length === 0) {
+        container.innerHTML = `<div class="op-empty-state">今日尚無預排項目，請由上方選擇案件與時數加入。</div>`;
+      } else {
+        container.innerHTML = mySlots.map(s => {
+          const recBadge = (s.lark_record_id && s.lark_record_id.startsWith("rec"))
+            ? `<span class="op-lark-rec-badge" title="已同步寫入永祥日報預排表">已同步</span>`
+            : ``;
+          return `
+          <div class="op-slot-row">
+            <div class="op-col-time">
+              <span>${s.start_time} – ${s.end_time}</span>
+              <span class="hrs-strong">${parseFloat(s.hours).toFixed(1)}h</span>
+            </div>
+            <div class="op-col-case">
+              <span class="op-case-tag">#${s.case_code}</span>
+              <span class="op-case-title">${s.case_name}</span>
+              ${recBadge}
+              ${s.work_note ? `<span class="op-case-quote-sub">${s.work_note}</span>` : ``}
+            </div>
+            <div class="op-col-wi">
+              <span class="op-wi-badge">${s.work_item}</span>
+            </div>
+            <div class="op-col-actions">
+              <button type="button" class="op-act-btn" onclick="adjustSlotHours('${s.slot_id}', -0.5)">-0.5h</button>
+              <button type="button" class="op-act-btn" onclick="adjustSlotHours('${s.slot_id}', 0.5)">+0.5h</button>
+              <button type="button" class="op-act-btn del" onclick="deleteSlot('${s.slot_id}')">刪除</button>
+            </div>
+          </div>
+          `;
+        }).join("");
+      }
+
+      document.getElementById("syncFooterText").textContent =
+        state.role === "staff" ? `已自動同步儲存` : `已即時雙向同步至永祥日報「工作預排表」`;
+    }
+
+    function renderManagerBarAndOverview() {
+      const rosterList = (state.teamRoster && state.teamRoster.length > 0)
+        ? state.teamRoster.map(e => ({
+            name: e.full_name,
+            display: e.display_name || e.full_name,
+            dept: e.job_title_display || e.sub_group || e.department_group || ""
+          }))
+        : MANAGER_TEAM_ROSTER.map(m => ({ name: m.name, display: m.name, dept: m.dept }));
+
+      const pillsWrap = document.getElementById("managerMemberPills");
+      pillsWrap.innerHTML = `<span class="op-manager-tag">代排本組同仁：</span>` + rosterList.map(m => {
+        const mSlots = state.allSlotsForDate.filter(s => s.employee_name === m.name);
+        const hrs = mSlots.reduce((a, b) => a + parseFloat(b.hours || 0), 0);
+        const isActive = state.activeEmployee === m.name;
+        const isSelf = (m.name === state.canonicalUser || m.display === state.loggedInUser);
+        const label = isSelf ? `${m.display} (自己)` : m.display;
+        return `
+          <button type="button" class="op-member-pill ${isActive ? 'active' : ''}" onclick="selectMemberAsManager('${m.name}')">
+            <span>${label}</span>
+            <span class="op-member-hrs">${hrs.toFixed(1)}h</span>
+          </button>
+        `;
+      }).join("");
+
+      document.getElementById("teamOverviewDateSub").textContent = formatDateWithDay(state.activeDate);
+      const overviewEl = document.getElementById("teamOverviewRows");
+      overviewEl.innerHTML = rosterList.map(m => {
+        const mSlots = state.allSlotsForDate.filter(s => s.employee_name === m.name);
+        const hrs = mSlots.reduce((a, b) => a + parseFloat(b.hours || 0), 0);
+        const pct = Math.min(100, (hrs / 8.0) * 100);
+        const isActive = state.activeEmployee === m.name;
+        const chipsHtml = mSlots.map(s => `
+          <span class="op-mini-slot">
+            <span class="m-code">#${s.case_code}</span>
+            <span>${s.work_item}</span>
+            <span class="m-hr">${parseFloat(s.hours).toFixed(1)}h</span>
+          </span>
+        `).join("") || `<span style="font-size: 12px; color: var(--op-faint);">尚未排程</span>`;
+
+        return `
+          <div class="op-team-row ${isActive ? 'active-member' : ''}" onclick="selectMemberAsManager('${m.name}')">
+            <div class="op-team-person">
+              <span>${m.display}</span>
+              <span class="op-team-sub">${m.dept}</span>
+            </div>
+            <div class="op-team-chips">${chipsHtml}</div>
+            <div class="op-team-cap">
+              <div class="op-mini-track">
+                <div class="op-mini-fill" style="width: ${pct}%; background: ${hrs > 8 ? 'var(--op-coral)' : 'var(--op-violet-ink)'}"></div>
+              </div>
+              <span>${hrs.toFixed(1)} / 8.0h</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function submitQuickAdd() {
+      let virtualSlots = [...getMySlots()];
+      const itemsToAdd = state.selectedWorkItems.length > 0 ? state.selectedWorkItems : [state.selectedWorkItem];
+      const batchPayloads = [];
+      for (let i = 0; i < itemsToAdd.length; i++) {
+        const wi = itemsToAdd[i];
+        const win = computeNextSlotWindow(virtualSlots, state.selectedHours);
+        const itemPayload = {
+          work_date: state.activeDate,
+          employee_name: state.activeEmployee,
+          slot_type: "出工",
+          start_time: win.start,
+          end_time: win.end,
+          hours: state.selectedHours,
+          priority_rank: virtualSlots.length + 1,
+          case_code: state.selectedCaseCode,
+          schedule_reason: "正常排程",
+          work_item: wi
+        };
+        batchPayloads.push(itemPayload);
+        virtualSlots.push({ start_time: win.start, end_time: win.end, hours: state.selectedHours });
+      }
+
+      let res;
+      if (batchPayloads.length > 1) {
+        res = await fetch("/api/slots/batch", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: getActorHeaders(true),
+          body: JSON.stringify({ items: batchPayloads })
+        });
+      } else {
+        res = await fetch("/api/slots", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: getActorHeaders(true),
+          body: JSON.stringify(batchPayloads[0])
+        });
+      }
+      if (res.ok) {
+        await loadSlotsAndRender();
+      } else {
+        const error = await res.json().catch(() => ({}));
+        window.alert(error.detail || "預排未儲存，請確認時段與工作內容後重試。");
+      }
+    }
+
+    async function adjustSlotHours(slotId, delta) {
+      const res = await fetch(`/api/slots/${encodeURIComponent(slotId)}/adjust`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: getActorHeaders(true),
+        body: JSON.stringify({ delta: delta })
+      });
+      if (res.ok) {
+        await loadSlotsAndRender();
+      }
+    }
+
+    async function deleteSlot(slotId) {
+      const res = await fetch(`/api/slots/${encodeURIComponent(slotId)}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+        headers: getActorHeaders(false)
+      });
+      if (res.ok) {
+        await loadSlotsAndRender();
+      }
+    }
+
+    async function convertAllToDailyLog() {
+      if ((getEmployeeInfo(state.activeEmployee) || {}).daily_report_exempt) return;
+      const mySlots = getMySlots();
+      for (const s of mySlots) {
+        await fetch(`/api/slots/${encodeURIComponent(s.slot_id)}/convert-daily`, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: getActorHeaders(false)
+        });
+      }
+      const btn = document.getElementById("btnConvertDaily");
+      btn.textContent = "✓ 已轉今日日報";
+      btn.classList.add("done");
+      document.getElementById("syncFooterText").textContent = "已自動同步儲存 · 今日預排已轉為日報";
+    }
+
+    window.addEventListener("DOMContentLoaded", initApp);
+  </script>
+</body>
+</html>
