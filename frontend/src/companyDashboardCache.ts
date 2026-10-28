@@ -70,6 +70,7 @@ export const cachedProjects=projects.cached;
 export const readProjects=projects.read;
 const dashboards=panelReader<CompanyDashboard>();
 export const readDashboard=dashboards.read;
+export const cachedDashboardRead=dashboards.cached;
 
 export function dashboardIsFresh(version:number,params:string){return Date.now()-(savedAt.get(key(version,params))??0)<60000}
 

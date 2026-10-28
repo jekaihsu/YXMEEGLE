@@ -1,7 +1,7 @@
 import type {ReactNode} from 'react';
 import {homeTarget} from './projectRoutes';
 import {ArrowUpRight} from 'lucide-react';
-import {Row,Skeleton} from './design';
+import {Button,Row,Skeleton} from './design';
 import {type Ctx,STATUS} from './appCommon';
 import {demoQueue,legacyWork,usesDemoWork} from './homeWorkSource';
 import type {HomePanel,HomeItem,PanelRead} from './useHomePanels';
@@ -40,14 +40,14 @@ export function WorkCard({c,panel,id,today,read}:{c:Ctx;panel:HomePanel;id:HomeC
  const queue=demoQueue(c,panel);
  const unavailable=demo?!legacy.length&&!queue?.length:!read.pending&&!body?.items.length;
  return <Card id={id} compact={unavailable} subtitle={panel==='assigned'?'依期限排序，先處理最緊急的工作':panel==='delegated'?'你交辦給他人的工作與目前進度':'需要你覆核或確認的事項'} href={homeHref({view:'work',tab:demo&&panel==='assigned'?'legacy':panel})}>
-  {read.pending&&!body&&!demo?<Skeleton lines={3}/>:null}
+  {read.pending&&!body&&!demo?<div role="status" aria-label="工作讀取中"><Skeleton lines={3}/></div>:null}
   {demo?<>
    {legacy.slice(0,PREVIEW_LIMIT).map(r=><Row key={r.t.id} href={homeHref({view:'project',project:r.p.id,node:r.n.id,task:r.t.id,tab:'flow'})} label={r.t.title} detail={`${r.p.name} · ${STATUS[r.t.status]||r.t.status}`} value={<Deadline value={r.t.due_date} today={today}/>}/>)}
    {queue?.slice(0,PREVIEW_LIMIT).map(item=><Row key={item.id} label={item.title} detail={item.reason} href={item.project_id?homeHref({view:'project',project:item.project_id,node:item.node_id||undefined,task:item.task_id||undefined,tab:item.tab||'flow'}):undefined}/>)}
    {!legacy.length&&!queue?.length&&<Message>{panel==='assigned'?'目前資料中沒有指派給你的工作。':panel==='delegated'?'示範資料中尚未提供你交辦的工作。':'示範資料中尚未提供待確認事項。'}</Message>}
   </>:<>
    {body?.items.slice(0,PREVIEW_LIMIT).map(item=><WorkPreview key={item.id} item={item} today={today}/>)}
-   {read.error&&<Message>{read.error}{body?.items.length?'，保留上次資料。':''}</Message>}
+   {read.error&&<><Message>{read.error}{body?.items.length?'，保留上次資料。':''}</Message>{read.retry&&<Button onClick={read.retry} disabled={read.pending}>重試讀取</Button>}</>}
    {!read.error&&!read.pending&&!body&&<Message>工作來源尚未提供。</Message>}
    {!read.error&&body&&!body.items.length&&<Message>{body.readState==='disabled'?'目前無法讀取這類工作。':body.complete?'目前沒有待處理的事項。':'工作清單尚未更新完成，請稍後重新讀取。'}</Message>}
    {!unavailable&&body&&(!body.complete||body.freshness.status==='stale')&&<p className="home-source-note">{body.freshness.status==='stale'?'上次快照 · ':''}資料尚未完整；預覽不代表完整清單。</p>}
