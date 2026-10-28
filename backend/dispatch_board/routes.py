@@ -10,6 +10,7 @@ from ..data_state import data_state
 from ..node_assignment.cache import permission_failure
 from .config import DispatchBoardConfig
 from .domain import TZ, Window
+from .lark_table import source_snapshot
 from .service import DispatchBoardService
 
 URL = '/api/v2/dispatch/board'
@@ -61,7 +62,8 @@ def register(app, *, identity, allow, cfg, service=None):
                 window = parameters(request.query_params)
             except (ValueError, OverflowError):
                 raise HTTPException(422, '日期區間須為 YYYY-MM-DD，起日不晚於迄日，最多 62 天') from None
-            status, body = service.board(data['wid'], window)
+            with source_snapshot():
+                status, body = service.board(data['wid'], window)
         except HTTPException as exc:
             status = exc.status_code
             body = {'detail': str(exc.detail)}

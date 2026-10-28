@@ -6,6 +6,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from ..dispatch_board.lark_table import source_snapshot
 from ..dispatch_board.routes import parameters
 from .config import DispatchPublishConfig
 from .domain import CommandResult, Refusal
@@ -59,8 +60,9 @@ def register(app, *, identity, allow, cfg, sessions, audit_model, workspace, tra
     async def guarded(request, need, run, with_body=False):
         try:
             body = await body_of(request) if with_body else None
-            ctx = await run_in_threadpool(context, request, need)
-            return await run_in_threadpool(run, ctx, body)
+            with source_snapshot():
+                ctx = await run_in_threadpool(context, request, need)
+                return await run_in_threadpool(run, ctx, body)
         except Refusal as exc:
             return respond(exc.status, exc.body())
         except HTTPException as exc:

@@ -1,6 +1,7 @@
 """Scoped single-flight reads with progressive joins and last-good snapshots."""
 from collections import OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
+from contextvars import copy_context
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import Lock
@@ -10,7 +11,7 @@ from ..data_state import data_state
 from ..node_assignment.cache import Cached, ReadScope, StaleCache, permission_failure
 from .config import DispatchBoardConfig, SOURCES
 from .domain import BoardInput, Window, build_board
-from .lark_table import DispatchReader
+from .lark_table import DispatchReader, read_source
 
 
 @dataclass(frozen=True)
@@ -49,7 +50,7 @@ class DispatchBoardService:
 
         def load():
             try:
-                rows = self.reader.read_table(key)
+                rows = read_source(self.reader, self.cfg, wid, key)
             except Exception as exc:
                 with self._lock:
                     self._errors[cache_key] = 'forbidden' if permission_failure(exc) else 'read_failed'
@@ -88,7 +89,7 @@ class DispatchBoardService:
                 if completed is None:
                     return previous
                 del self._joins[completed]
-            future = self._executor.submit(self._load_join, wid, key)
+            future = self._executor.submit(copy_context().run, self._load_join, wid, key)
             self._joins[scope] = JoinFlight(future, previous)
         return previous
 
