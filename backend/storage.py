@@ -432,13 +432,14 @@ def save_partial(db,model,wid,state,collections,project_ids,project_order,*,view
     return root
 
 
-def load_partial(db,model,row,*,collections=(),project_ids=None,project_children=(),filter_project_rows=False):
+def load_partial(db,model,row,*,collections=(),project_ids=None,project_children=(),filter_project_rows=False,project_details=True):
     """Read selected collections and project trees; never pass this to save.
 
     Project IDs also select their headers, nodes, tasks and review cycles.
     Without IDs, project headers have empty nested lists. Other project lists
     are loaded only when explicitly named in project_children. filter_project_rows
     is read-only opt-in: scoped writes need complete shared collections for diffs.
+    project_details=False reads project headers without nodes or child lists.
     """
     collections=tuple(collections)
     project_children=tuple(project_children)
@@ -458,9 +459,9 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
         if project_ids is not None:
             result['projects']=[p for p in result['projects'] if p['id'] in project_ids]
         for p in result['projects']:
-            if project_ids is None: p['nodes']=[]
+            if project_ids is None or not project_details: p['nodes']=[]
             for child in PROJECT_CHILDREN:
-                if project_ids is None or child not in project_children: p[child]=[]
+                if project_ids is None or not project_details or child not in project_children: p[child]=[]
     else:
         def fetch(selected,as_text=False,**filters):
             query=select(model.kind,model.parent_id,cast(model.data,Text) if as_text else model.data).where(model.workspace_id==row.id,model.kind.in_(selected))
@@ -493,7 +494,7 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
             if project_ids is not None: filters['entity_id']=project_ids
             result['projects']=[data for kind,parent,data in fetch(('projects',),**filters)]
         records={}
-        selected_ids=[p['id'] for p in result['projects']] if project_ids is not None else []
+        selected_ids=[p['id'] for p in result['projects']] if project_ids is not None and project_details else []
         if selected_ids:
             nested=('nodes',)+tuple('project_'+child for child in project_children)
             for kind,parent,data in fetch(nested,parent_id=selected_ids):

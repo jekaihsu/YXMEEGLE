@@ -280,8 +280,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 row=WorkspaceRow(id=wid,version=1,data=data); db.add(row); db.flush()
                 row.data=storage.save(db,BusinessRow,wid,data)
 
-    def load(db,row,*,collections=None,project_ids=None,omit_kinds=()):
-        if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections if collections is not None else storage.DETAIL_COLLECTIONS,project_ids=project_ids,project_children=storage.PROJECT_CHILDREN,filter_project_rows=True)
+    def load(db,row,*,collections=None,project_ids=None,omit_kinds=(),project_details=True):
+        if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections if collections is not None else storage.DETAIL_COLLECTIONS,project_ids=project_ids,project_children=storage.PROJECT_CHILDREN,filter_project_rows=True,project_details=project_details)
         elif collections is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections)
         elif omit_kinds: state=storage.load(db,BusinessRow,row,omit_kinds=omit_kinds)
         else: state=storage.load(db,BusinessRow,row)
@@ -1638,11 +1638,11 @@ def create_app(overrides=None,*,dispatch_transport=None):
         project=next((p for p in state['projects'] if p['id']==project_id and visible_project(state,p)),None)
         require(project is not None,'找不到這個案件',404)
         return state,project
-    def sop_case(data,user,project_id):
+    def sop_case(data,user,project_id,*,assignees=False):
         """node_assignment_case plus the local planning cases this viewer may see; node assignment never gets those."""
         from .source_case_policy import visible_project,local_viewer
         require(len(project_id)<=200,'查詢參數過長',422)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=storage.CASE_COLLECTIONS,project_ids=[project_id])
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=('users',) if assignees else storage.CASE_COLLECTIONS,project_ids=[project_id],project_details=not assignees)
         project=next((p for p in state['projects'] if p['id']==project_id),None)
         require(project is not None,'找不到這個案件',404)
         if not (visible_project(state,project) or local_viewer(user,project)):
@@ -1677,7 +1677,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
                                                                                'changes':audit.changes(before,state)}))
     from .sop_import.routes import register as register_sop_import
     app.state.sop_import = register_sop_import(app, identity=identity, load_case=sop_case, phase=phase,
-        sessions=sessions, cfg=cfg, quote_view=quote_view, workspace=quote_workspace, persist_case=persist_local_case)
+        sessions=sessions, cfg=cfg, quote_view=quote_view, workspace=quote_workspace, persist_case=persist_local_case,
+        load_assignees=lambda data,user,project_id: sop_case(data,user,project_id,assignees=True))
     from .sop_import.lark_projection import Projection
     def sop_projection_state(wid):
         with sessions() as db:

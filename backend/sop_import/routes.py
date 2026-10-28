@@ -16,19 +16,19 @@ ERROR_TEXT = {'local_node_only': '請使用此案件的正式節點流程', 'loc
               'applicability_unresolved': '需先確認任務適用', 'invalid_transition': '目前任務狀態不可執行此操作'}
 
 
-def register(app, *, identity, load_case, sessions, cfg, quote_view=None, workspace=None, persist_case=None, phase=None):
+def register(app, *, identity, load_case, sessions, cfg, quote_view=None, workspace=None, persist_case=None, phase=None, load_assignees=None):
     flag = lambda name: lambda: str(cfg.get(name, 'false')).lower() == 'true'
     service = Service(sessions, writes_enabled=flag('SOP_TASK_WRITES_ENABLED'),
                       local_cases_enabled=flag('LOCAL_CASE_CREATION_ENABLED'),
                       auto_enabled=flag('SOP_AUTO_ENROLL_ENABLED'), auto_since=lambda: cfg.get('SOP_AUTO_ENROLL_SINCE'))
 
-    def context(request, project_id):
+    def context(request, project_id, case_loader=load_case):
         data, user = identity(request)
         require(user.get('active', True), 'sop_import_forbidden', 403)
         assigned_only = not has_reader_grant(user)
         with (phase(request, 'load') if phase else nullcontext()):
-            state, project = load_case(data, user, project_id)
-        ctx = Context(data['wid'], user, state, project, lambda: context(request, project_id),
+            state, project = case_loader(data, user, project_id)
+        ctx = Context(data['wid'], user, state, project, lambda: context(request, project_id, case_loader),
                       assigned_only=assigned_only)
         ctx.assigned_only = assigned_only and not can_manage(ctx)
         require(not ctx.assigned_only or service.participates(data['wid'], user['id'], project_id), 'sop_import_forbidden', 403)
@@ -129,7 +129,7 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
 
     @app.get(PREFIX + '/sop-assignees')
     def assignees(request: Request, project_id: str):
-        return respond(lambda: service.assignees(context(request, project_id), lambda user: hr_view_allowed(user, cfg)))
+        return respond(lambda: service.assignees(context(request, project_id, load_assignees or load_case), lambda user: hr_view_allowed(user, cfg)))
 
     @app.get(PREFIX + '/sop-import/runs/{request_id}')
     def receipt(request: Request, project_id: str, request_id: str):
