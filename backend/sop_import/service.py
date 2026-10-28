@@ -23,6 +23,7 @@ from .domain import (Applicability, Lifecycle, Disposition, TRANSITIONS, NODE_MA
                      CONDITIONAL, PARTICIPANT_ROLES, Failure, require)
 from .models import (Family, Version, TemplateRow, CaseState, LocalTask, TaskNodeLink, Preview, ImportRun, TaskEvent,
                      LocalCaseRun, LarkOutbox)
+from .authority import can_manage_nodes, require_nodes, manages_any_node, global_manager
 from .quote_facts import case_facts
 from ..node_assignment.evidence import evidence_for
 from ..node_skip import valid_waiver
@@ -37,6 +38,8 @@ class Context:
     refresh: object
     # Participants without broader case access read only their assigned tasks. Execution still requires the executor role.
     assigned_only: bool = False
+    roster: object = None
+    roster_required: bool = False
 
 
 def administrator(user):
@@ -48,11 +51,7 @@ def explicitly_granted(user, capability):
 
 
 def can_manage(ctx):
-    return administrator(ctx.user) or ctx.user.get('active', True) and (
-        ctx.user['id'] == ctx.project.get('pm_id')
-        or ctx.user['id'] in ctx.project.get('sop_task_delegate_ids', [])
-        or (ctx.project.get('case_type') == 'intake' and not ctx.project.get('pm_id')
-            and explicitly_granted(ctx.user, 'sop_task_import')))
+    return manages_any_node(ctx)
 
 
 READER_GRANTS = ('sop_task_read', 'sop_task_import', 'sop_task_work')
@@ -172,6 +171,8 @@ class Service(EnrollmentService):
                  auto_enabled=lambda: False, auto_since=lambda: None):
         self.auto_enabled, self.auto_since = auto_enabled, auto_since
         self.projection = None
+        self.roster_provider = lambda fresh=False: None
+        self.roster_required = False
         self.sessions, self.writes_enabled, self.local_cases_enabled, self.clock = (
             sessions, writes_enabled, local_cases_enabled, clock)
 
@@ -190,6 +191,8 @@ class Service(EnrollmentService):
         self.lock_workspace_row(db, ctx.wid)
         fresh = ctx.refresh()
         require(fresh.wid == ctx.wid and fresh.user['id'] == ctx.user['id'], 'sop_import_forbidden', 403)
+        if manager and not global_manager(fresh):
+            fresh.roster = self.roster_provider(fresh=True)
         authorize(fresh, manager)
         if not enrollment:
             self.check_policy_write(db, fresh)
@@ -201,6 +204,11 @@ class Service(EnrollmentService):
                                                  CaseState.project_id == ctx.project['id']).with_for_update())
         state.lock_counter += 1
         return fresh, state
+
+    def task_manager(self, db, ctx, task):
+        keys = list(db.scalars(select(TaskNodeLink.node_key).where(
+            TaskNodeLink.workspace_id == ctx.wid, TaskNodeLink.task_id == task.id)))
+        return can_manage_nodes(ctx, keys)
 
     def nodes(self, db, ctx, keys):
         canonical_node_keys(keys)
@@ -293,17 +301,9 @@ class Service(EnrollmentService):
             result[role] = ident
         return result
 
-    def assignees(self, ctx, people_visible):
-        """Everyone active may be assigned; people on the case come first. Assigning is what lets them work the task."""
-        authorize(ctx)
-        people = [(case_roles(u, ctx.project), u) for u in ctx.state.get('users', []) if u.get('active', True)]
-        restricted = ctx.assigned_only or not (can_manage(ctx) or people_visible(ctx.user))
-        if restricted:
-            people = [(roles, u) for roles, u in people if u['id'] == ctx.user['id']]
-        people.sort(key=lambda p: (CASE_ROLES.index(p[0][0]) if p[0] else len(CASE_ROLES), p[1].get('name') or '', p[1]['id']))
-        return {'project_id': ctx.project['id'], 'restricted': restricted,
-                'people': [{'id': u['id'], 'name': u.get('name'), 'case_roles': roles,
-                            'department': u.get('department')} for roles, u in people]}
+    def assignees(self, ctx, people_visible, **query):
+        from .assignees import page
+        return page(ctx, people_visible, **query)
 
     def participates(self, wid, user_id, project_id):
         with self.sessions() as db:
@@ -454,6 +454,7 @@ class Service(EnrollmentService):
             ctx, state = self.lock(db, ctx)
             version = self.version(db, ctx.wid, body.get('template_version_id'))
             normalized = self.normalize(ctx, body, self.rows(db, version))
+            require_nodes(ctx, normalized['node_keys'])
             self.check_policy_write(db, ctx, normalized['node_keys'])
             plan = self.plan(db, ctx, state, version, normalized)
             self.prune_previews(db, ctx.wid, ctx.user['id'])
@@ -486,6 +487,7 @@ class Service(EnrollmentService):
             plan = preview.data
             version = self.version(db, ctx.wid, plan['input']['template_version_id'])
             normalized = self.normalize(ctx, plan['input'], self.rows(db, version))
+            require_nodes(ctx, normalized['node_keys'])
             live = self.plan(db, ctx, state, version, normalized)
             require(live['context_hash'] == preview.context_hash, 'preview_stale', 409)
             return self._enroll_case(db, ctx, state, version, normalized, rid, fingerprint, plan)
@@ -602,25 +604,27 @@ class Service(EnrollmentService):
         for task in tasks:
             found = None if ctx.assigned_only else suggestions.current(task, facts)
             found = None if found and (task.id, found['facts_hash']) in dismissed else found
+            manager = can_manage_nodes(ctx, [l.node_key for l in links[task.id]])
             views.append({**self.task_json(task, links[task.id], source), 'suggestion': found,
                           'lark_sync': sync[task.id] if self.projection else {'state': '未啟用', 'synced_at': None, 'record_id': None},
-                          'completion_blocked_reason': self.completion_blocker(ctx, task),
-                          'allowed_actions': self.task_actions(ctx, task, found) if (not policy or policy.policy == 'managed' and {l.node_key for l in links[task.id]} <= set(policy.node_keys)) else []})
+                          'can': {'manage': manager},
+                          'completion_blocked_reason': self.completion_blocker(ctx, task, manager),
+                          'allowed_actions': self.task_actions(ctx, task, found, manager) if (not policy or policy.policy == 'managed' and {l.node_key for l in links[task.id]} <= set(policy.node_keys)) else []})
         return views
 
-    def completion_blocker(self, ctx, task):
+    def completion_blocker(self, ctx, task, manager=None):
         if not self.writes_enabled():
             return 'import_unavailable'
-        if not (can_manage(ctx) or task.participants.get('executor') == ctx.user['id']):
+        if not ((can_manage(ctx) if manager is None else manager) or task.participants.get('executor') == ctx.user['id']):
             return 'sop_import_forbidden'
         if task.state not in TRANSITIONS['complete'][0]:
             return 'invalid_transition'
         return self.completion_failure(task)
 
-    def task_actions(self, ctx, task, suggestion):
+    def task_actions(self, ctx, task, suggestion, manager=None):
         if not self.writes_enabled():
             return []
-        manager = can_manage(ctx)
+        manager = can_manage(ctx) if manager is None else manager
         executor = task.participants.get('executor') == ctx.user['id']
         actions = [action for action, (origins, target, _) in TRANSITIONS.items()
                    if (manager or executor and action != 'archive') and task.state in origins
@@ -848,6 +852,7 @@ class Service(EnrollmentService):
             if is_test:
                 authorize_test_operator(ctx)
             keys = row_keys(body.get('node_keys', []))
+            require_nodes(ctx, keys)
             self.check_policy_write(db, ctx, keys)
             nodes = self.nodes(db, ctx, keys)
             due = body.get('due_date')
@@ -884,6 +889,7 @@ class Service(EnrollmentService):
             ctx, state = self.lock(db, ctx)
             authorize_test_operator(ctx)
             task = self.task(db, ctx, task_id)
+            require(self.task_manager(db, ctx, task), 'sop_import_forbidden', 403)
             disposable(task)
             require(task.revision == body['expected_revision'], 'task_revision_conflict', 409)
             before = task.local.get('is_test') is True
@@ -911,6 +917,7 @@ class Service(EnrollmentService):
                 return {'task_id': task_id, 'removed': False, 'replayed': True,
                         'checklist_revision': state.checklist_revision}
             task = self.task(db, ctx, task_id)
+            require(self.task_manager(db, ctx, task), 'sop_import_forbidden', 403)
             disposable(task)
             require(task.local.get('is_test') is True, 'test_task_required', 409)
             require(task.revision == body['expected_revision'], 'task_revision_conflict', 409)
@@ -949,6 +956,7 @@ class Service(EnrollmentService):
         self.writable()
         with self.sessions.begin() as db:
             ctx, state = self.lock(db, ctx)
+            require_nodes(ctx, [node_key])
             self.check_policy_write(db, ctx, [node_key])
             proven = self.node_done(ctx)
             require(node_key in proven, 'node_not_done_by_data', 409)
@@ -966,6 +974,7 @@ class Service(EnrollmentService):
                 elif not nodes_of[task.id] <= proven.keys():
                     shared += 1
                 else:
+                    require_nodes(ctx, nodes_of[task.id])
                     rule = proven[node_key]
                     basis = {'rule_id': f'node-evidence:{rule.rule}', 'rule_revision': 1, 'tier': 'proof',
                              'actor_id': ctx.user['id'], 'at': self.clock(), 'confirmed': True, 'reason': rule.reason_zh}
@@ -991,7 +1000,12 @@ class Service(EnrollmentService):
         with self.sessions.begin() as db:
             ctx, state = self.lock(db, ctx, manager=not transition)
             task = self.task(db, ctx, task_id)
-            manager = can_manage(ctx)
+            executor_action = transition and task.participants.get('executor') == ctx.user['id'] and body.get('action') in TRANSITIONS and body['action'] != 'archive'
+            if transition and not executor_action and not global_manager(ctx):
+                ctx.roster = self.roster_provider(fresh=True)
+            manager = False if executor_action else self.task_manager(db, ctx, task)
+            if not transition:
+                require(manager, 'sop_import_forbidden', 403)
             if transition:
                 require(manager or task.participants.get('executor') == ctx.user['id'], 'sop_import_forbidden', 403)
             require(task.revision == body['expected_revision'], 'task_revision_conflict', 409)
@@ -1145,6 +1159,7 @@ class Service(EnrollmentService):
 
     def accept_one(self, db, ctx, item, facts, accepted, confirm, reason):
         task = self.task(db, ctx, item['task_id'])
+        require(self.task_manager(db, ctx, task), 'sop_import_forbidden', 403)
         require((task.id, item['facts_hash']) not in self.decided(db, ctx, 'suggestion_dismissed'),
                 'suggestion_dismissed', 409)
         previous = accepted.get((task.id, item['facts_hash']))
@@ -1177,6 +1192,7 @@ class Service(EnrollmentService):
         with self.sessions.begin() as db:
             ctx, _ = self.lock(db, ctx)
             task = self.task(db, ctx, task_id)
+            require(self.task_manager(db, ctx, task), 'sop_import_forbidden', 403)
             previous = self.decided(db, ctx, 'suggestion_dismissed').get((task.id, facts_hash))
             if previous:
                 changes = previous.changes

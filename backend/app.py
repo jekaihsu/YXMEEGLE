@@ -1699,6 +1699,19 @@ def create_app(overrides=None,*,dispatch_transport=None):
     app.state.node_assignment=register_node_assignment(app,identity=identity,load_case=node_assignment_case,sessions=sessions,
         receipt_model=Receipt,audit_model=AuditRow,cfg=cfg,skipped_nodes=valid_waiver,reports=node_reports,
         phase=phase,reports_visible=lambda user: user['role'] in ('pm','manager') or capable(user,'manage_sources'))
+    def sop_roster(*, fresh=False):
+        service = app.state.node_assignment
+        if not service.config.enabled:
+            return None
+        from .node_assignment.errors import Failure as RosterFailure
+        from .sop_import.domain import Failure
+        try:
+            cached = service._roster(fresh=True) if fresh else service.roster_cache.peek('roster')
+        except RosterFailure:
+            raise Failure('roster_unavailable', 503, reason='無法確認最新人員名單，請重新載入後再試') from None
+        return cached.value if cached else None
+    app.state.sop_import.roster_provider = sop_roster
+    app.state.sop_import.roster_required = app.state.node_assignment.config.enabled
     from .dispatch_board.routes import register as register_dispatch_board
     from .dispatch_board.service import DispatchBoardService
     from .dispatch_board.lark_table import DispatchReader

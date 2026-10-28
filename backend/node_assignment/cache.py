@@ -72,6 +72,12 @@ class StaleCache:
         while len(self._entries) > self.max_entries:
             self._entries.popitem(last=False)
 
+    def peek(self, key):
+        """Read a fresh snapshot without starting network work."""
+        with self._lock:
+            entry = self._entries.get(key)
+            return entry if entry and self.clock() - entry.fetched_at <= self.ttl else None
+
     def get(self, key, load, *, max_age=None, allow_stale=True, revalidate=False) -> Cached:
         now = self.clock()
         window = self.ttl if max_age is None else max_age
