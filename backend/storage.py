@@ -8,7 +8,7 @@ import functools
 import json
 from copy import deepcopy
 from types import SimpleNamespace
-from sqlalchemy import Column, String, Integer, JSON, Text, ForeignKey, UniqueConstraint, cast, select, delete, func
+from sqlalchemy import Column, String, Integer, JSON, Text, ForeignKey, UniqueConstraint, cast, select, delete, func, case
 
 COLLECTIONS=('users','projects','approvals','events','sop_templates','delegations','jobs','recurring','input_mappings','input_revisions','cost_allocations','daily_unmatched','daily_reviews','handover_requests','sop_requests','training_plans','capability_catalog','capability_awards','learning_standards','work_schedules','approved_leave_delegations','capability_bindings','learning_mappings','financial_requests','source_quotes','source_confirmations','contract_items','source_work_items')
 PROJECT_CHILDREN=('files','comments','daily_reports','evidence','finance_versions','payment_batches','confirmation_issues','delivery_batches','quote_reviews')
@@ -73,6 +73,32 @@ CASE_COLLECTIONS=('users','source_quotes','source_confirmations','contract_items
 # supplies the complete hidden-identity universe to case_redaction.make_plan.
 # Filtering those before taking the privacy snapshot could leak cross-case IDs.
 READ_PROJECT_LINKED=(PROJECT_LINKED | {'events'})-{'source_quotes','source_confirmations','source_work_items'}
+
+CASE_SOURCE_FIELDS=('id','source_identity','source_url','url','source_kind','source_missing',
+    'project_id','linked_project_id','project_ids','review_project_ids','review_quote_id',
+    'code','quote_code','engineering_code','parent_code','code_history','fields',
+    'confirmation_ids','unresolved_confirmation_ids','quote_ids','unresolved_quote_ids',
+    'contract_ids','reporting_ids','task_refs','title','item_number')
+
+
+def json_fields(column, fields):
+    """SQLite JSON projection preserving absent keys, booleans and nested values."""
+    parts=func.json_each(column).table_valued('key','value','type',joins_implicitly=True)
+    value=case((parts.c.type=='true','true'),(parts.c.type=='false','false'),
+               (parts.c.type=='null','null'),(parts.c.type=='text',func.json_quote(parts.c.value)),
+               else_=parts.c.value)
+    return select(func.json_group_object(parts.c.key,func.json(value))).where(parts.c.key.in_(fields)).scalar_subquery()
+
+
+def case_source_data(model, project_ids):
+    from .source_case_policy import CODE_FIELDS
+    compact=json_fields(model.data,CASE_SOURCE_FIELDS)
+    # Unrelated confirmations and quotations still supply the complete redaction
+    # universe, but their source values and history are not case inputs.
+    metadata=func.json_set(compact,'$.fields',func.json(json_fields(model.data['fields'],CODE_FIELDS)))
+    return case((model.kind=='source_quotes',metadata),
+        ((model.kind=='source_confirmations') & ~func.coalesce(model.data['project_id'].as_string().in_(project_ids),False),metadata),
+        else_=compact)
 
 def _project_resolver(desired,existing):
     def project_of(key,value):
@@ -432,7 +458,7 @@ def save_partial(db,model,wid,state,collections,project_ids,project_order,*,view
     return root
 
 
-def load_partial(db,model,row,*,collections=(),project_ids=None,project_children=(),filter_project_rows=False,project_details=True):
+def load_partial(db,model,row,*,collections=(),project_ids=None,project_children=(),filter_project_rows=False,project_details=True,case_sources=False):
     """Read selected collections and project trees; never pass this to save.
 
     Project IDs also select their headers, nodes, tasks and review cycles.
@@ -440,6 +466,7 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
     are loaded only when explicitly named in project_children. filter_project_rows
     is read-only opt-in: scoped writes need complete shared collections for diffs.
     project_details=False reads project headers without nodes or child lists.
+    case_sources keeps only navigation/progress inputs and source identity/code metadata.
     """
     collections=tuple(collections)
     project_children=tuple(project_children)
@@ -464,13 +491,16 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
                 if project_ids is None or not project_details or child not in project_children: p[child]=[]
     else:
         def fetch(selected,as_text=False,**filters):
-            query=select(model.kind,model.parent_id,cast(model.data,Text) if as_text else model.data).where(model.workspace_id==row.id,model.kind.in_(selected))
+            compact=case_sources and set(selected)<=set(('source_quotes','source_confirmations','contract_items')) and db.get_bind().dialect.name=='sqlite'
+            value=case_source_data(model,project_ids or ()) if compact else model.data
+            query=select(model.kind,model.parent_id,cast(value,Text) if as_text else value).where(model.workspace_id==row.id,model.kind.in_(selected))
             for column,values in filters.items(): query=query.where(getattr(model,column).in_(values))
             if filter_project_rows and project_ids is not None and set(selected) & READ_PROJECT_LINKED:
                 # Mixed top-level kinds: retain shared policy rows and legacy globals.
                 linked=model.data['project_id'].as_string()
                 query=query.where((~model.kind.in_(READ_PROJECT_LINKED)) | linked.is_(None) | linked.in_(project_ids))
-            return db.execute(query.order_by(model.ordinal))
+            rows=db.execute(query.order_by(model.ordinal))
+            return ((kind,parent,json.loads(data)) for kind,parent,data in rows) if compact and not as_text else rows
         top=kinds-{'projects','source_work_items'}
         from . import shared_reads
         shared=top&shared_reads.KINDS if not db.info.get('shared_reads_wids') else frozenset()
@@ -478,7 +508,9 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
             for kind,parent,data in fetch(top-shared,parent_id=('',)): result[kind].append(data)
         if shared:
             scope=tuple(project_ids) if filter_project_rows and project_ids is not None else None
-            rows=shared_reads.rows((row.id,getattr(row,'version',None),tuple(sorted(shared)),scope),lambda:[(kind,text) for kind,parent,text in fetch(shared,as_text=True,parent_id=('',))])
+            key=(row.id,getattr(row,'version',None),tuple(sorted(shared)),scope)
+            if case_sources: key+=('case_sources',)
+            rows=shared_reads.rows(key,lambda:[(kind,text) for kind,parent,text in fetch(shared,as_text=True,parent_id=('',))])
             for kind,text in rows: result[kind].append(json.loads(text))
         if 'source_work_items' in kinds:
             query=select(model.data).where(model.workspace_id==row.id,model.kind=='source_work_items')

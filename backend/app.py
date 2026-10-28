@@ -280,8 +280,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 row=WorkspaceRow(id=wid,version=1,data=data); db.add(row); db.flush()
                 row.data=storage.save(db,BusinessRow,wid,data)
 
-    def load(db,row,*,collections=None,project_ids=None,omit_kinds=(),project_details=True):
-        if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections if collections is not None else storage.DETAIL_COLLECTIONS,project_ids=project_ids,project_children=storage.PROJECT_CHILDREN,filter_project_rows=True,project_details=project_details)
+    def load(db,row,*,collections=None,project_ids=None,omit_kinds=(),project_details=True,case_sources=False):
+        if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections if collections is not None else storage.DETAIL_COLLECTIONS,project_ids=project_ids,project_children=storage.PROJECT_CHILDREN,filter_project_rows=True,project_details=project_details,case_sources=case_sources)
         elif collections is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections)
         elif omit_kinds: state=storage.load(db,BusinessRow,row,omit_kinds=omit_kinds)
         else: state=storage.load(db,BusinessRow,row)
@@ -780,7 +780,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         from .case_navigation import case_navigation
         from .source_case_policy import visible_project
         data,user=identity(request)
-        with phase(request,'load'),sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
+        with phase(request,'load'),sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id],case_sources=True)
         require(any(p['id']==project_id and visible_project(state,p) for p in state.get('projects',[])),'找不到這個案件',404)
         with phase(request,'project'):
             filter_private_workspace(state,user)
@@ -1192,7 +1192,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 if ident in rows and ident not in seen: seen.add(ident);frontier.append(rows[ident])
         return sorted(p for p in related-{None,project_id} if isinstance(p,str))
 
-    def p2_read(data,user,keep_lines=False,*,project_id=None):
+    def p2_read(data,user,keep_lines=False,*,project_id=None,case_sources=False):
         """Health and module input come from ONE capture fenced by a generation read BEFORE the first input read
         (freshness, cache, workspace) and re-checked after the last. A capture is returned only after its fence
         passed; when the bounded retries are exhausted nothing from any rejected capture is returned: the input is an
@@ -1206,11 +1206,15 @@ def create_app(overrides=None,*,dispatch_transport=None):
             with sessions() as db:
                 # This session owns the freshly decoded JSON; health projection
                 # makes its own response copy before redacting formal sources.
-                cache=db.get(CacheRow,wid);cache_data=cache.data if cache else None
+                if project_id is not None:
+                    from .source_health import load_source_metadata
+                    cache_data=load_source_metadata(db,CacheRow,wid)
+                else:
+                    cache=db.get(CacheRow,wid);cache_data=cache.data if cache else None
                 row=db.get(WorkspaceRow,wid)
-                state=load(db,row,project_ids=[project_id] if project_id is not None else None)
+                state=load(db,row,project_ids=[project_id] if project_id is not None else None,case_sources=case_sources)
                 extra=p2_related_project_ids(state,project_id) if project_id is not None else []
-                if extra: state=load(db,row,project_ids=[project_id,*extra])
+                if extra: state=load(db,row,project_ids=[project_id,*extra],case_sources=case_sources)
             health=source_health_from(data,user,freshness,cache_data,state,metadata_only=project_id is not None)
             with sessions() as db: unchanged=p2_generation(db,wid)==generation
             if unchanged: return data,user,health,p2_narrowed_state(state,user,health.get('page_state'),freshness,keep_lines)
@@ -1280,9 +1284,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
             card['drilldown']['filters']={k:v for k,v in card['drilldown']['filters'].items() if k not in P2_CASE_PARAMS}
         return result
 
-    def p2_visible_case_state(data,user,project_id,keep_lines=False,*,scoped=False):
+    def p2_visible_case_state(data,user,project_id,keep_lines=False,*,scoped=False,case_sources=False):
         """The narrowed P2 state, or 404 (identical for absent and not visible) unless the case is visible to the viewer."""
-        _,_,_,state=p2_read(data,user,keep_lines,project_id=project_id if scoped else None)
+        _,_,_,state=p2_read(data,user,keep_lines,project_id=project_id if scoped else None,case_sources=case_sources)
         from .source_case_policy import visible_project
         require(any(p['id']==project_id and visible_project(state,p) for p in state.get('projects',[])),P2_NOT_FOUND,404)
         return state
@@ -1295,7 +1299,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         data,user=identity(request)
         require(len(project_id)<=200,'查詢參數過長',422)
         require(not request.query_params,'查詢參數錯誤',422)
-        with phase(request,'capture'): state=p2_visible_case_state(data,user,project_id,keep_lines=True,scoped=True)
+        with phase(request,'capture'): state=p2_visible_case_state(data,user,project_id,keep_lines=True,scoped=True,case_sources=True)
         privileged=data.get('access_mode','normal')=='normal' and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
         if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true': reports=ReportsView(status='disabled')
         elif not privileged or data.get('mode')!='lark' or data['wid'].startswith(('test-','demo-')): reports=ReportsView(status='restricted')
