@@ -6,10 +6,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && pip install --no-cache-dir psycopg2-binary "psycopg[binary]"
 WORKDIR /app
 COPY . /app
-RUN chmod +x /app/entrypoint.sh && service postgresql start && \
+RUN chmod +x /app/entrypoint.sh && \
+    sed -i 's/peer/trust/g; s/scram-sha-256/trust/g; s/md5/trust/g' /etc/postgresql/*/main/pg_hba.conf && \
+    service postgresql start && \
     su - postgres -c "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='box'\" | grep -q 1 || psql -c \"CREATE ROLE box WITH SUPERUSER LOGIN;\"" && \
     su - postgres -c "psql -tc \"SELECT 1 FROM pg_database WHERE datname='yongxiang_plumb_r39_clone'\" | grep -q 1 || createdb -O box yongxiang_plumb_r39_clone" && \
-    gunzip -c /app/seed_switchboard.sql.gz | su - postgres -c "psql -d yongxiang_plumb_r39_clone -q" && \
+    gunzip -c /app/seed_switchboard_clean.sql.gz | su - postgres -c "psql -d yongxiang_plumb_r39_clone -q" && \
     su - postgres -c "psql -d yongxiang_plumb_r39_clone -c \"UPDATE public.org_settings SET org_mode = 'shadow'; DELETE FROM public.auth_state; DELETE FROM public.user_session;\"" && \
     service postgresql stop
 ENV PORT=8080

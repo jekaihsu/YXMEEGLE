@@ -10,7 +10,7 @@ from typing import Optional
 app = FastAPI(title="永祥測量 · 今日工作預排")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-BASE_DIR = os.environ.get("PRESCHEDULE_DATA_DIR", "/workspace/deliverables/pre_schedule_workbench")
+BASE_DIR = os.environ.get("PRESCHEDULE_DATA_DIR") or os.path.dirname(os.path.abspath(__file__))
 SQLITE_PATH = os.path.join(BASE_DIR, "pre_schedule.db")
 CATALOG_PATH = os.path.join(BASE_DIR, "catalog.json")
 QUOTE_ITEMS_PATH = os.path.join(BASE_DIR, "quote_work_items.json")
