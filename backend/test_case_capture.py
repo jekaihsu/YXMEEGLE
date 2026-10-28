@@ -10,6 +10,11 @@ from .case_universe import build_universe
 from .test_p2_int_routes import http, WID  # noqa: F401
 
 
+@pytest.fixture(autouse=True)
+def enable_case_reads(monkeypatch):
+    monkeypatch.setenv('WORKSPACE_SHELL_ENABLED','true')
+
+
 @pytest.mark.parametrize('uid', ['u-manager', 'u-field', 'unauthorized', 'disabled', None])
 @pytest.mark.parametrize('endpoint', ['progress', 'navigation'])
 @pytest.mark.parametrize('environment', ['production', 'test'])
@@ -113,3 +118,18 @@ def test_progress_rejects_every_capture_when_metadata_generation_changes(http, m
     assert len(captures) == 3
     assert response.status_code == 404
     assert 'recCaseA' not in response.text and 'C115901' not in response.text
+
+
+@pytest.mark.parametrize('uid',['u-manager','u-field','unauthorized',None])
+def test_overview_matches_full_case_controls_and_privacy(http,uid):
+    app,client,seat,signin=http
+    state,_,pid=build_universe()
+    seat(state)
+    if uid: signin(uid)
+    compact=client.get(f'/api/projects/{pid}?overview=true')
+    complete=client.get(f'/api/projects/{pid}')
+    assert compact.status_code==complete.status_code
+    if uid in ('u-manager','u-field'): assert complete.status_code==200
+    if complete.status_code==200:
+        for key in ('project','policy_summary','approvals','financial_requests'):
+            assert compact.json().get(key)==complete.json().get(key)

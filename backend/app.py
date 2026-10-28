@@ -703,14 +703,14 @@ def create_app(overrides=None,*,dispatch_transport=None):
     DETAIL_SKIP=('_partial','projects','users','calendar','source_status','file_categories','approval_connection','freshness','environment','workspace_id','as_of','version','work_schedules','daily_unmatched')
 
     @app.get('/api/projects/{project_id}')
-    def project_detail(request:Request,project_id:str):
+    def project_detail(request:Request,project_id:str,overview:bool=False):
         """One project tree and the records of that case, projected exactly like /api/workspace (same visibility and privacy filters).
 
         Lists keep this case's rows plus global rows without a project_id (templates, catalogues); the rest of the workspace is not sent.
         """
         data,user=identity(request); require(shell_enabled,'尚未啟用單一案件讀取',404)
         with sessions() as db:
-            with phase(request,'load'): state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id])
+            with phase(request,'load'): state=load(db,db.get(WorkspaceRow,data['wid']),project_ids=[project_id],case_sources=overview)
             with phase(request,'project'): result=public_ws(state,data['wid'],user,data['mode'],owned=True)
         require(len(result['projects'])==1,'找不到這個案件',404)
         mine=lambda item:not isinstance(item,dict) or item.get('project_id',project_id)==project_id
@@ -1638,7 +1638,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
     def node_assignment_case(data,user,project_id):
         from .source_case_policy import visible_project
         require(len(project_id)<=200,'查詢參數過長',422)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=storage.CASE_COLLECTIONS,project_ids=[project_id])
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=storage.CASE_COLLECTIONS,project_ids=[project_id],case_sources=True)
         project=next((p for p in state['projects'] if p['id']==project_id and visible_project(state,p)),None)
         require(project is not None,'找不到這個案件',404)
         return state,project
@@ -1646,7 +1646,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         """node_assignment_case plus the local planning cases this viewer may see; node assignment never gets those."""
         from .source_case_policy import visible_project,local_viewer
         require(len(project_id)<=200,'查詢參數過長',422)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=('users',) if assignees else storage.CASE_COLLECTIONS,project_ids=[project_id],project_details=not assignees)
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=('users',) if assignees else storage.CASE_COLLECTIONS,project_ids=[project_id],project_details=not assignees,case_sources=not assignees)
         project=next((p for p in state['projects'] if p['id']==project_id),None)
         require(project is not None,'找不到這個案件',404)
         if not (visible_project(state,project) or local_viewer(user,project)):

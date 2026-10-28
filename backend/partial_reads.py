@@ -42,8 +42,9 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
         if case_sources:
             from .case_source_reads import case_source_data
         def fetch(selected,as_text=False,**filters):
-            compact=case_sources and set(selected)<=set(('source_quotes','source_confirmations','contract_items')) and db.get_bind().dialect.name=='sqlite'
-            value=case_source_data(model,project_ids or ()) if compact else model.data
+            dialect=db.get_bind().dialect.name
+            compact=case_sources and set(selected)<=set(('source_quotes','source_confirmations','contract_items')) and dialect in ('sqlite','postgresql')
+            value=case_source_data(model,project_ids or (),dialect) if compact else model.data
             query=select(model.kind,model.parent_id,cast(value,Text) if as_text else value).where(model.workspace_id==row.id,model.kind.in_(selected))
             for column,values in filters.items(): query=query.where(getattr(model,column).in_(values))
             if filter_project_rows and project_ids is not None and set(selected) & READ_PROJECT_LINKED:
