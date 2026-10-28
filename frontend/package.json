@@ -65,7 +65,8 @@
     "test:sop-tasks": "node test-sop-tasks.mjs",
     "test:quotes": "node test-quotes.mjs && node test-quotes-ui.mjs",
     "test:task-list-context": "node test-task-list-context.mjs",
-    "test:route-loading": "node test-route-loading.mjs"
+    "test:route-loading": "node test-route-loading.mjs",
+    "test:detail-loading": "node test-project-detail-loading.mjs && node test-home-panels.mjs && node test-detail-skeleton.mjs"
   },
   "dependencies": {
     "lucide-react": "0.468.0",

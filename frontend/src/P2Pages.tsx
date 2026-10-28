@@ -1,3 +1,4 @@
+import {CaseDetailSkeleton} from './DetailLoadingSkeleton';
 import {cachedPanel, readPanel} from './companyDashboardCache';
 // P2-INT-F pages: #view=overview | confirmations | confirmation | contract | workitem (VCC-128..132).
 // Read-only. Transport only: every state text comes from the view models or dataState labels. All navigation and
@@ -111,7 +112,7 @@ export function P2Page({c}: {c: Ctx}) {
  if (!parsed.ok) page = <InvalidContext label={ROUTE_LABEL[context.route]} onReset={() => open(context, true)}/>;
  else if (!pageRequest?.ok) page = <UnsupportedFilters unsupported={pageRequest?.ok === false ? pageRequest.unsupported : []} invalid={pageRequest?.ok === false ? pageRequest.invalid : []} unlocated={pageRequest?.ok === false && pageRequest.reason === 'unlocated'}
   onReset={() => open({...context, filters: {}, cursor: null}, true)}/>;
- else if (fetched.status === 'loading' && context.route !== 'confirmations') page = <div className="p2-card" aria-hidden="true"><Skeleton lines={6}/></div>;
+ else if (fetched.status === 'loading' && context.route !== 'confirmations') page = context.route === 'confirmation' ? <CaseDetailSkeleton/> : <div className="p2-card"><p role="status">正在載入資料…</p><Skeleton lines={6}/></div>;
  else if (failure && !(failure.state === 'forbidden' && context.route === 'confirmations')) page = <FailureNotice failure={failure} onRetry={onRetry}/>;
  else if (context.route === 'overview') page = <OverviewBody users={c.w.users} context={context} body={body} open={open} openEntryPoint={openEntryPoint} openSources={openSources} setNotice={setNotice} goBack={goBack}/>;
  else if (context.route === 'confirmations') page = <ConfirmationsBody context={context} body={failure ? {status: 403} : body} loading={fetched.status === 'loading'} open={open} setNotice={setNotice}/>;

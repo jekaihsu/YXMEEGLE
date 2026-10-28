@@ -79,10 +79,8 @@ export function useSopTasks(projectId: string, workspace: string, enabled=true) 
   setState(data ? {kind: 'ready', data, refreshing: true} : {kind: 'loading'});
   setAssignees([]); setAssigneeError('');
   const scope=life.current; const valid=()=>scope===life.current&&scope.active&&scope.epoch===getSessionEpoch();
-  void readback(false,true).then(()=>{
-   if(!valid())return;
-   void prefetchSopAssignees(projectId,workspace).then(people=>{if(valid())setAssignees(people)}).catch(e=>{if(valid())setAssigneeError(sopErrorText(e))});
-  });
+  void readback(false,true);
+  void prefetchSopAssignees(projectId,workspace).then(people=>{if(valid())setAssignees(people)}).catch(e=>{if(valid())setAssigneeError(sopErrorText(e))});
   return () => {life.current.active = false};
  }, [key, readback]);
  const applyTask = useCallback((task: SopTask, checklistRevision: number) => {

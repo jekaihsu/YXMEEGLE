@@ -44,7 +44,7 @@ const projectRequests=new Map<string,Promise<ProjectSlice>>();
 const deniedProjects=new Set<string>();
 const latestProjectReads=new Map<string,Promise<ProjectSlice>>();
 function cachedProject(id:string|undefined){if(projectEpoch!==getSessionEpoch()){projectSnapshots.clear();projectRequests.clear();latestProjectReads.clear();deniedProjects.clear();projectEpoch=getSessionEpoch()}return id?projectSnapshots.get(id):undefined}
-const readProject=async(id:string,epoch:number):Promise<ProjectSlice>=>{const url=`/api/projects/${encodeURIComponent(id)}`,current=()=>epoch===getSessionEpoch();try{return await api<ProjectSlice>(url,{timeoutMs:45000},current)}catch(error){if(error instanceof ApiError&&error.code==='client_timeout')return api<ProjectSlice>(url,{timeoutMs:45000},current);throw error}};
+const readProject=(id:string,epoch:number)=>api<ProjectSlice>(`/api/projects/${encodeURIComponent(id)}`,{timeoutMs:10000},()=>epoch===getSessionEpoch());
 function fetchProjectSnapshot(id:string,reloadVersion:number|undefined){
  cachedProject(id);const key=JSON.stringify([id,reloadVersion]);const pending=projectRequests.get(key);if(pending)return pending;
  const epoch=getSessionEpoch();const request=readProject(id,epoch).then(data=>{if(epoch===getSessionEpoch()&&latestProjectReads.get(id)===request){deniedProjects.delete(id);projectSnapshots.set(id,data);if(projectSnapshots.size>20)projectSnapshots.delete(projectSnapshots.keys().next().value!)}return data}).catch(error=>{if(epoch===getSessionEpoch()&&latestProjectReads.get(id)===request&&error instanceof ApiError&&[401,403,404].includes(error.status)){projectSnapshots.delete(id);deniedProjects.add(id)}throw error}).finally(()=>{if(projectRequests.get(key)===request)projectRequests.delete(key)});projectRequests.set(key,request);latestProjectReads.set(id,request);return request;
@@ -57,20 +57,22 @@ export function ProjectDetailGate({c}:{c:Ctx}){
   if(!shell||!id)return;
   if(c.s.features?.node_assignment&&!localCase(c.w.projects.find(p=>p.id===id)||{})&&['overview','flow','items','people'].includes(tab))void prefetchNodeAssignments(id).catch(()=>{});
   const warmProgress=()=>{if(['overview','flow','items'].includes(tab))void prefetchProjectProgress(id).catch(()=>{})};
-  if(!sopRead||!['overview','flow'].includes(tab))warmProgress();
+  warmProgress();
   if(['overview','flow'].includes(tab)){
    if(c.s.features?.node_assignment&&!localCase(c.w.projects.find(p=>p.id===id)||{}))void prefetchStartSop(id).catch(()=>{});
-   if(sopRead)void prefetchSopTasks(id,c.s.workspace_id||'',!!c.reloadVersion,true).catch(()=>{}).then(()=>{warmProgress();void prefetchSopAssignees(id,c.s.workspace_id||'').catch(()=>{})})
+   if(sopRead){void prefetchSopTasks(id,c.s.workspace_id||'',!!c.reloadVersion,true).catch(()=>{});void prefetchSopAssignees(id,c.s.workspace_id||'').catch(()=>{})}
   }
  },[shell,id,tab,c.s.workspace_id,sopRead,c.s.features?.node_assignment,c.reloadVersion]);
- const detail=useViewData<ProjectSlice|undefined>(shell?`project:${id}`:'project-legacy',()=>shell&&id?fetchProjectSnapshot(id,c.reloadVersion).catch(async error=>{if(!(error instanceof ApiError)||error.status!==404)throw error;const sop=await prefetchSopTasks(id,c.s.workspace_id||'');const project=checklistProject(sop);if(!project)throw error;deniedProjects.delete(id);return {scope:'project' as const,version:c.w.version,project}}):Promise.resolve(undefined),[c.reloadVersion]);
+ const [retrying,setRetrying]=useState(false);
+ const detail=useViewData<ProjectSlice|undefined>(shell?`project:${id}`:'project-legacy',(_signal,current)=>{setRetrying(false);return shell&&id?fetchProjectSnapshot(id,c.reloadVersion).catch(error=>{if(!(error instanceof ApiError)||error.code!=='client_timeout'||!current())throw error;setRetrying(true);return fetchProjectSnapshot(id,c.reloadVersion)}).catch(async error=>{if(!(error instanceof ApiError)||error.status!==404)throw error;const sop=await prefetchSopTasks(id,c.s.workspace_id||'');const project=checklistProject(sop);if(!project)throw error;deniedProjects.delete(id);return {scope:'project' as const,version:c.w.version,project}}):Promise.resolve(undefined)},[c.reloadVersion]);
  useEffect(()=>{if(shell&&detail.data)perfMark('project-detail-render')},[shell,detail.data]);
  if(!shell)return <ProjectDetail key={id} c={c}/>;
  const cached=cachedProject(id);const snapshot=id&&deniedProjects.has(id)?undefined:detail.data||cached;
  const summary=c.w.projects.find(p=>p.id===id);
- if(!snapshot)return detail.error?<div className="project-detail project-detail-calm"><div role="alert"><Empty title={detail.error.includes('找不到')?'找不到這個案件':'案件讀取失敗'} detail={detail.error.includes('找不到')?'案件連結可能已失效，請回到案件總覽重新開啟。':detail.error}/></div><div className="co-actions"><Button onClick={detail.reload}>重試</Button><Button onClick={()=>c.go({view:'projects'})}>案件總覽</Button></div></div>:<div className="project-detail project-detail-calm" aria-busy="true">{summary?<><Button variant="plain" onClick={()=>c.go({view:'projects'})}><ChevronLeft size={15}/>案件總覽</Button><p>{summary.code}</p><h1>{summary.name}</h1><p role="status">正在載入案件詳細內容…</p></>:<Skeleton height="2.5rem" width="60%"/>}<Skeleton height="3rem"/><FlowWorkspaceSkeleton/></div>;
+ const retryNotice=retrying&&detail.loading?<div><p role="status">仍在載入案件，正在重試…</p><Button onClick={detail.reload}>重試</Button></div>:null;
+ if(!snapshot)return detail.error?<div className="project-detail project-detail-calm"><div role="alert"><Empty title={detail.error.includes('找不到')?'找不到這個案件':'案件讀取失敗'} detail={detail.error.includes('找不到')?'案件連結可能已失效，請回到案件總覽重新開啟。':detail.error}/></div><div className="co-actions"><Button onClick={detail.reload}>重試</Button><Button onClick={()=>c.go({view:'projects'})}>案件總覽</Button></div></div>:<div className="project-detail project-detail-calm">{summary?<><Button variant="plain" onClick={()=>c.go({view:'projects'})}><ChevronLeft size={15}/>案件總覽</Button><p>{summary.code}</p><h1>{summary.name}</h1>{!retrying&&<p role="status">正在載入案件詳細內容…</p>}</>:<Skeleton height="2.5rem" width="60%"/>}{retryNotice||!summary&&<p role="status">正在載入案件詳細內容…</p>}<Skeleton height="3rem"/><FlowWorkspaceSkeleton/></div>;
  const {scope:_scope,version:_version,as_of:_asOf,project,...records}=snapshot;
- return <>{detail.error&&<div className="form-error" role="alert">案件更新失敗，以下顯示上次載入的資料：{detail.error}<Button onClick={detail.reload}>重試</Button></div>}<ProjectDetail key={project.id} c={{...c,w:{...c.w,...records,projects:c.w.projects.some(p=>p.id===project.id)?c.w.projects.map(p=>p.id===project.id?project:p):[...c.w.projects,project]}}}/></>;
+ return <>{retryNotice}{detail.error&&<div className="form-error" role="alert">案件更新失敗，以下顯示上次載入的資料：{detail.error}<Button onClick={detail.reload}>重試</Button></div>}<ProjectDetail key={project.id} c={{...c,w:{...c.w,...records,projects:c.w.projects.some(p=>p.id===project.id)?c.w.projects.map(p=>p.id===project.id?project:p):[...c.w.projects,project]}}}/></>;
 }
 export function ProjectDetail({c}:{c:Ctx}){
  const tabPrefetch=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);useEffect(()=>()=>clearTimeout(tabPrefetch.current),[]);
