@@ -3,7 +3,7 @@ import {build} from 'esbuild';
 import {readFile} from 'node:fs/promises';
 import {test} from 'node:test';
 import {assignmentFixture,projectFixture} from './fixtures/node-assignments.mjs';
-const bundle=await build({stdin:{contents:"export * from './src/overviewDashboardModel';export * from './src/projectOverviewModel';export {buildFlowModel} from './src/flowModel';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external'});
+const bundle=await build({stdin:{contents:"export * from './src/overviewDashboardModel';export * from './src/projectOverviewModel';export {withLocalChecklist} from './src/nodeWorkbenchModel';export {buildFlowModel} from './src/flowModel';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external'});
 const m=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 const progress=JSON.parse(await readFile(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));
 function fixture(){const {list,detail}=assignmentFixture();for(const node of list.nodes){node.owners=[{open_id:'owner',name:'負責人'}];node.tasks={done:0,total:0}}list.node_details={control:{tasks:[detail.tasks[0],{...detail.tasks[0],id:'unassigned',assignee:null},{...detail.tasks[0],id:'completed',status:'已完成'},{...detail.tasks[0],id:'cancelled',status:'取消'}],assignable_people:[]}};list.nodes.find(node=>node.key==='control').tasks={done:1,total:3};return {list,nodes:m.buildFlowModel({project:projectFixture().project,assignments:list,today:'2026-10-23'}).nodes}}
@@ -34,4 +34,25 @@ test('document counts use explicit categories and records, not filenames or exte
 test('todo rows preserve one primary action, task identity, owner and exact target without duplicates',()=>{
  const {nodes,list}=fixture();const action=m.selectNextAction({nodes,list,user:projectFixture().user,today:'2026-10-23',execution:{allowed:true,reason:''},localLead:true,assignmentsUnavailable:false});const issues=m.needsAttention(nodes,progress.production.field);const rows=m.overviewTodos(action,issues,nodes);
  assert.equal(rows[0].primary,true);assert.equal(rows.filter(row=>row.primary).length,1);assert.deepEqual(rows[0].target,{tab:'flow',node:'control',task:'recTask1'});assert.equal(rows[0].owner,'陳威廷');assert.equal(rows[0].deadline,'2026-10-20');assert.equal(rows.filter(row=>row.target.task==='recTask1').length,1);assert.ok(rows.some(row=>row.target.task==='unassigned'));assert.equal(rows.some(row=>row.target.task==='completed' || row.target.task==='cancelled'),false);
+});
+
+test('SOP on remote-assigned nodes retains identity, permissions, source and revision; shared tasks count once',()=>{
+ const {nodes}=fixture();
+ const task={id:'sop-1',title:'現場核對',state:'blocked',applicability:'applicable',participants:{executor:'u1'},dueDate:null,revision:7,allowedActions:['edit'],nodes:[{node_key:'control'},{node_key:'mapping'}]};
+ const enriched=m.withLocalChecklist(nodes,{tasks:[task],nodeCounts:{control:{done:0,total:1},mapping:{done:0,total:1}},localNodes:[]},[{id:'u1',name:'王執行'}]);
+ const action={title:'先確認案件執行歸屬',reason:'案件權責',owner:'案件主管',button:'查看詳情',target:{tab:'data',section:'participants'}};
+ const rows=m.overviewTodos(action,[{id:'duplicate',title:'重複建議',owner:'主管',reason:'核對',target:{tab:'flow',node:'control',task:'recTask1'}}],enriched);
+ assert.deepEqual(rows.map(r=>r.kind),['recommendation','larkTask','larkTask','sopTask']);
+ assert.equal(rows[0].source,'recommendation');assert.equal('task' in rows[0],false);assert.equal('permissions' in rows[0],false);
+ const sop=rows.find(r=>r.kind==='sopTask');assert.equal(sop.task,task);assert.equal(sop.source,'sop_local');assert.equal(sop.revision,7);assert.deepEqual(sop.permissions,['edit']);assert.equal(sop.owner,'王執行');assert.deepEqual(sop.target,{tab:'flow',node:'control',task:'sop-1',task_source:'sop_local'});
+ const lark=rows.find(r=>r.kind==='larkTask');assert.equal(lark.task.id,'recTask1');assert.equal(lark.revision,'9b0c1d2e3f405162');assert.equal(lark.permissions.assign,true);assert.equal(lark.source,'lark');
+ assert.equal(rows.filter(r=>r.kind!=='recommendation').length,3);assert.equal(m.overviewTasks(enriched,true).rows.length,3);
+ assert.equal(enriched.find(n=>n.key==='control').tasks.total,4);assert.equal(enriched.find(n=>n.key==='control').taskRows.find(t=>t.id==='sop-1').status,'受阻');
+ assert.equal(rows.filter(r=>r.target.task==='recTask1').length,1);
+});
+test('paused and blocked tasks stay visible even in paused or completed nodes',()=>{
+ const {nodes}=fixture(),node=nodes.find(n=>n.key==='control');node.state='暫停';node.taskRows[0].status='暫停';
+ assert.deepEqual(m.overviewTasks(nodes,true).rows.map(t=>t.id),['recTask1','unassigned']);
+ const action={title:'核對',reason:'核對',owner:'主管',button:'查看詳情',target:{tab:'flow',node:'control'}};
+ assert.equal(m.overviewTodos(action,[],nodes).filter(r=>r.kind==='larkTask').length,2);
 });

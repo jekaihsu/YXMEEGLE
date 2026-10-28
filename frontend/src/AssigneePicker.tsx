@@ -18,7 +18,7 @@ function parsePage(value:unknown):Page{
  return {people,next_cursor:'next_cursor' in value && typeof value.next_cursor==='string'?value.next_cursor:null};
 }
 
-export function AssigneePicker({projectId,nodeKey,title,value,valueLabel,disabled=false,onChange,people=EMPTY_PEOPLE}:{projectId?:string;nodeKey?:string;title:string;value:string;valueLabel?:string;disabled?:boolean;onChange:(id:string)=>void;people?:Person[]}){
+export function AssigneePicker({projectId,nodeKey,title,value,valueLabel,disabled=false,busy=false,onChange,people=EMPTY_PEOPLE}:{projectId?:string;nodeKey?:string;title:string;value:string;valueLabel?:string;disabled?:boolean;busy?:boolean;onChange:(id:string)=>void;people?:Person[]}){
  const [open,setOpen]=useState(false),[query,setQuery]=useState(''),[search,setSearch]=useState('');
  const [page,setPage]=useState<Page>({people:[],next_cursor:null}),[cursor,setCursor]=useState<string|null>(null);
  const [loading,setLoading]=useState(false),[error,setError]=useState(''),[active,setActive]=useState(0);
@@ -48,7 +48,7 @@ export function AssigneePicker({projectId,nodeKey,title,value,valueLabel,disable
  const options=[{id:'',name:'未指派'},...page.people];
  const pick=(index:number)=>{const person=options[index];if(person){onChange(person.id);setOpen(false);root.current?.querySelector('button')?.focus()}};
  return <div className="assignee-picker ds-picker" ref={root}>
-  <Button aria-label={`task: ${title}`} aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onKeyDown={e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();setOpen(true)}}} onClick={()=>{setOpen(v=>!v);setQuery('');setSearch('');setCursor(null)}}>{valueLabel || people.find(p=>p.id===value)?.name || page.people.find(p=>p.id===value)?.name || (value?'目前負責人':'未指派')}</Button>
+  <Button aria-label={`task: ${title}`} aria-haspopup="listbox" aria-expanded={open} disabled={disabled} aria-disabled={disabled || busy} onKeyDown={e=>{if(busy)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();setOpen(true)}}} onClick={()=>{if(busy)return;setOpen(v=>!v);setQuery('');setSearch('');setCursor(null)}}>{valueLabel || people.find(p=>p.id===value)?.name || page.people.find(p=>p.id===value)?.name || (value?'目前負責人':'未指派')}</Button>
   {open&&<div className="assignee-picker-popover"><input autoFocus role="combobox" aria-label={`搜尋人員：${title}`} aria-expanded="true" aria-controls={id} aria-autocomplete="list" aria-activedescendant={`${id}-${active}`} placeholder="搜尋所有在職人員" value={query} onChange={e=>{setQuery(e.target.value);setActive(0)}} onKeyDown={e=>{
    if(e.key==='Escape'){e.preventDefault();setOpen(false);root.current?.querySelector('button')?.focus()}
    else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();setActive(a=>Math.max(0,Math.min(options.length-1,a+(e.key==='ArrowDown'?1:-1))))}

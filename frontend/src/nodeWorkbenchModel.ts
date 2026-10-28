@@ -55,13 +55,12 @@ export function draftChanged(a:TaskDraft,b:TaskDraft) {return (['title','assigne
 export function withLocalChecklist(nodes:FlowNode[],sop?:SopOverview,people:{id:string;name:string}[]=[]) :FlowNode[] {
  if(!sop)return nodes;
  return nodes.map(node=>{
-  if(node.assignment)return node;
   const local=sop.localNodes?.find(n=>n.key===node.key),counts=Object.entries(sop.nodeCounts).find(([key])=>key===node.key)?.[1];
-  if(!local)return node;
-  const tasks=counts ? {done:counts.done,total:counts.total} : node.tasks;
-  const state=local.status==='completed'?'已完成':local.status==='in_progress'?'進行中':node.state;
-  const checklist:FlowTask[]=sop.tasks.filter(t=>t.nodes.some(n=>n.node_key===node.key)&&t.state!=='archived'&&t.applicability==='applicable').map(t=>({id:t.id,nodeKey:node.key,title:t.title,ownerId:t.participants.executor||'',owner:people.find(p=>p.id===t.participants.executor)?.name|| (t.participants.executor?'姓名待核對':'尚未指派'),status:t.state==='done'?'已完成':t.state==='in_progress'?'進行中':t.state==='blocked'?'暫停':'待處理',deadline:t.dueDate,done:t.state==='done',source:'SOP 任務',task:undefined,sopTask:t}));
-  return {...node,state,tasks,taskRows:[...node.taskRows,...checklist],owners:local.ownerId ? [{open_id:local.ownerId,name:people.find(p=>p.id===local.ownerId)?.name || node.owners.find(p=>p.open_id===local.ownerId)?.name || '姓名待核對'}] : [],progress:state==='已完成'?{basis:'nodes',percent:100,label:'節點已完成'}:counts&&counts.total?{basis:'tasks',percent:Math.round(counts.done/counts.total*100),label:'SOP 任務完成度'}:{basis:'unknown',percent:null,label:'進度未知'}};
+  if(!local && !counts?.total)return node;
+  const tasks=counts ? {done:node.tasks.done+counts.done,total:node.tasks.total+counts.total} : node.tasks;
+  const state=node.assignment?node.state:local?.status==='completed'?'已完成':local?.status==='in_progress'?'進行中':node.state;
+  const checklist:FlowTask[]=sop.tasks.filter(t=>t.nodes.some(n=>n.node_key===node.key)&&t.state!=='archived'&&t.applicability==='applicable').map(t=>({id:t.id,nodeKey:node.key,title:t.title,ownerId:t.participants.executor||'',owner:people.find(p=>p.id===t.participants.executor)?.name|| (t.participants.executor?'姓名待核對':'尚未指派'),status:t.state==='done'?'已完成':t.state==='in_progress'?'進行中':t.state==='blocked'?'受阻':'待處理',deadline:t.dueDate,done:t.state==='done',source:'SOP 任務',task:undefined,sopTask:t}));
+  return {...node,state,tasks,taskRows:[...node.taskRows,...checklist],owners:!node.assignment&&local?.ownerId ? [{open_id:local.ownerId,name:people.find(p=>p.id===local.ownerId)?.name || node.owners.find(p=>p.open_id===local.ownerId)?.name || '姓名待核對'}] : node.owners,progress:state==='已完成'?{basis:'nodes',percent:100,label:'節點已完成'}:tasks.total?{basis:'tasks',percent:Math.round(tasks.done/tasks.total*100),label:'任務完成度'}:node.progress};
  });
 }
 
