@@ -511,7 +511,7 @@ def test_progress_generation_fences_do_not_materialize_source_snapshots(progress
         assert run(state, vis).status_code == 200
     finally:
         event.remove(CacheRow, 'load', capture)
-    assert loaded == [WID], 'only the actual health capture decodes source records; generation fences read scalars'
+    assert loaded == [], 'health capture and generation fences never materialize source snapshots'
 
 
 def test_warm_progress_never_waits_for_reports_or_takes_a_workspace_write_lock(progress, monkeypatch):

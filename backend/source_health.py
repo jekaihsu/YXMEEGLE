@@ -14,6 +14,23 @@ import json
 from .data_state import data_state
 
 
+def load_source_metadata(db, model, wid):
+    """Capture health evidence without decoding source record values."""
+    from sqlalchemy import func, select
+    from .storage import json_fields
+    if db.get_bind().dialect.name!='sqlite':
+        row=db.get(model,wid)
+        return row.data if row else None
+    metadata=db.scalar(select(json_fields(model.data,('status','authorized','last_sync','last_attempt_at','tables'))).where(model.id==wid))
+    if metadata is None:return None
+    snapshot=json.loads(metadata)
+    records=func.json_each(model.data,'$.records').table_valued('value',joins_implicitly=True)
+    keys=('base_token','table_id','record_id')
+    rows=db.scalars(select(json_fields(records.c.value,keys)).select_from(model,records).where(model.id==wid))
+    snapshot['records']=[json.loads(row) for row in rows]
+    return snapshot
+
+
 def _time(value):
     """Normalize real instants to the frontend's millisecond ISO contract."""
     if not isinstance(value, str):
