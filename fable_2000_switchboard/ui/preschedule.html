@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>詠翔 · 內外業小時級多項預排工作台 ↔ Lark Base 自動回填（日報 V3/V4 預排獨立系統）</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-paper: #f6f5f1;
+      --bg-card: #ffffff;
+      --bg-subtle: #efede7;
+      --bg-elevated: #faf9f6;
+      --ink-primary: #141413;
+      --ink-secondary: #4a4945;
+      --ink-muted: #787670;
+      --hairline: #e3e0d9;
+      --hairline-strong: #c9c5bc;
+      --accent-navy: #1e293b;
+      --ok-fg: #15803d;
+      --ok-bg: #f0fdf4;
+      --ok-border: #bbf7d0;
+      --warn-fg: #b45309;
+      --warn-bg: #fffbeb;
+      --warn-border: #fde68a;
+      --err-fg: #b91c1c;
+      --err-bg: #fef2f2;
+      --err-border: #fecaca;
+      --info-fg: #1d4ed8;
+      --info-bg: #eff6ff;
+      --info-border: #bfdbfe;
+      --font-serif: 'Instrument Serif', 'Noto Serif TC', Georgia, serif;
+      --font-sans: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-paper);
+      color: var(--ink-primary);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.48;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .operon-shell {
+      max-width: 1420px;
+      margin: 0 auto;
+      padding: 18px 24px 40px;
+    }
+
+    /* Top Architectural Masthead */
+    .masthead {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: end;
+      padding-bottom: 14px;
+      border-bottom: 2px solid var(--ink-primary);
+      margin-bottom: 16px;
+    }
+
+    .masthead-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-secondary);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .masthead-title {
+      font-family: var(--font-serif);
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--ink-primary);
+      line-height: 1.2;
+    }
+
+    .masthead-sub {
+      color: var(--ink-secondary);
+      font-size: 12.5px;
+      margin-top: 4px;
+    }
+
+    .masthead-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+    }
+
+    .pill-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 9px;
+      border-radius: 3px;
+      border: 1px solid var(--hairline-strong);
+      background: var(--bg-card);
+    }
+
+    .pill-badge.ok {
+      color: var(--ok-fg);
+      background: var(--ok-bg);
+      border-color: var(--ok-border);
+    }
+
+    .pill-badge.warn {
+      color: var(--warn-fg);
+      background: var(--warn-bg);
+      border-color: var(--warn-border);
+    }
+
+    .pill-badge.err {
+      color: var(--err-fg);
+      background: var(--err-bg);
+      border-color: var(--err-border);
+    }
+
+    .pill-badge.info {
+      color: var(--info-fg);
+      background: var(--info-bg);
+      border-color: var(--info-border);
+    }
+
+    /* Section Header Blueprint Bar */
+    .section-block {
+      background: var(--bg-card);
+      border: 1px solid var(--hairline);
+      margin-bottom: 16px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 16px;
+      background: var(--bg-subtle);
+      border-bottom: 1px solid var(--hairline);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .section-header-left {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .section-num {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink-primary);
+      padding: 1px 6px;
+      border: 1px solid var(--ink-primary);
+      background: var(--bg-paper);
+    }
+
+    .section-title {
+      font-family: var(--font-serif);
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--ink-primary);
+    }
+
+    .section-subtitle {
+      font-size: 12px;
+      color: var(--ink-secondary);
+    }
+
+    /* 01 KPI & Filter Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .kpi-cell {
+      padding: 12px 16px;
+      border-right: 1px solid var(--hairline);
+    }
+
+    .kpi-cell:last-child {
+      border-right: none;
+    }
+
+    .kpi-label {
+      font-size: 11px;
+      color: var(--ink-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+
+    .kpi-value {
+      font-family: var(--font-mono);
+      font-size: 21px;
+      font-weight: 600;
+      color: var(--ink-primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .kpi-foot {
+      font-size: 11.5px;
+      color: var(--ink-secondary);
+      margin-top: 3px;
+    }
+
+    .dept-filter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      gap: 10px;
+      flex-wrap: wrap;
+      background: var(--bg-elevated);
+    }
+
+    .dept-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .dept-pill {
+      font-size: 12px;
+      padding: 4px 10px;
+      border: 1px solid var(--hairline-strong);
+      background: var(--bg-card);
+      color: var(--ink-primary);
+      cursor: pointer;
+      border-radius: 2px;
+      font-weight: 500;
+      transition: all 0.12s ease;
+    }
+
+    .dept-pill.active, .dept-pill:hover {
+      background: var(--ink-primary);
+      color: var(--bg-paper);
+      border-color: var(--ink-primary);
+    }
+
+    /* 02 Split Layout: Left Timeline + Right Composer */
+    .workspace-split {
+      display: grid;
+      grid-template-columns: 1.55fr 1fr;
+    }
+
+    .timeline-pane {
+      border-right: 1px solid var(--hairline);
+      padding: 14px 16px;
+    }
+
+    .composer-pane {
+      padding: 14px 16px;
+      background: var(--bg-elevated);
+    }
+
+    .ruler-header {
+      display: grid;
+      grid-template-columns: 158px 1fr 86px;
+      align-items: center;
+      padding: 6px 10px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--hairline);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-secondary);
+      margin-bottom: 8px;
+    }
+
+    .ruler-ticks {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 4px;
+    }
+
+    .person-row {
+      display: grid;
+      grid-template-columns: 158px 1fr 86px;
+      gap: 10px;
+      align-items: stretch;
+      padding: 9px 10px;
+      border: 1px solid var(--hairline);
+      border-top: none;
+      background: var(--bg-card);
+    }
+
+    .person-row:first-of-type {
+      border-top: 1px solid var(--hairline);
+    }
+
+    .person-row.highlight-person {
+      background: #fdfcf7;
+      border-left: 3px solid var(--ink-primary);
+    }
+
+    .person-meta {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .person-name {
+      font-weight: 600;
+      font-size: 13.5px;
+      color: var(--ink-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .person-group {
+      font-size: 11px;
+      color: var(--ink-secondary);
+      margin-top: 2px;
+    }
+
+    .timeline-track {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .slot-chip {
+      flex: 1 1 auto;
+      min-width: 145px;
+      padding: 6px 9px;
+      border: 1px solid var(--hairline-strong);
+      border-left: 3px solid var(--ink-primary);
+      background: var(--bg-paper);
+      border-radius: 2px;
+    }
+
+    .slot-chip.indoor-gis { border-left-color: #1d4ed8; background: #f8faff; }
+    .slot-chip.indoor-rpt { border-left-color: #6d28d9; background: #faf7ff; }
+    .slot-chip.indoor-qc  { border-left-color: #15803d; background: #f4fdf7; }
+    .slot-chip.indoor-ctrl{ border-left-color: #0369a1; background: #f3fafe; }
+    .slot-chip.field-topo { border-left-color: #b45309; background: #fffcf4; }
+    .slot-chip.field-bathy{ border-left-color: #0f766e; background: #f2fbf9; }
+    .slot-chip.admin-pm   { border-left-color: #be185d; background: #fdf5f8; }
+
+    .slot-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink-primary);
+      margin-bottom: 2px;
+    }
+
+    .slot-case {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--info-fg);
+    }
+
+    .slot-reason {
+      font-size: 11.5px;
+      color: var(--ink-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .person-total {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: center;
+      font-family: var(--font-mono);
+      border-left: 1px dashed var(--hairline);
+      padding-left: 8px;
+    }
+
+    .person-hours {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ink-primary);
+    }
+
+    .person-items-badge {
+      font-size: 10.5px;
+      padding: 1px 5px;
+      border-radius: 2px;
+      margin-top: 3px;
+    }
+
+    /* Composer Form Controls */
+    .form-box {
+      border: 1px solid var(--hairline);
+      background: var(--bg-card);
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .form-box-title {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--ink-primary);
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--hairline);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .quick-btn-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .btn-ghost {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 8px;
+      background: var(--bg-paper);
+      border: 1px solid var(--hairline-strong);
+      color: var(--ink-primary);
+      cursor: pointer;
+      border-radius: 2px;
+    }
+
+    .btn-ghost:hover {
+      background: var(--bg-subtle);
+    }
+
+    .btn-primary {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 12px;
+      background: var(--ink-primary);
+      color: var(--bg-paper);
+      border: 1px solid var(--ink-primary);
+      cursor: pointer;
+      border-radius: 2px;
+      width: 100%;
+    }
+
+    .btn-primary:hover {
+      background: #2b2b29;
+    }
+
+    .form-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-bottom: 8px;
+    }
+
+    .form-field label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink-secondary);
+    }
+
+    .form-field input, .form-field select, .form-field textarea {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      padding: 6px 8px;
+      border: 1px solid var(--hairline-strong);
+      background: var(--bg-paper);
+      color: var(--ink-primary);
+      border-radius: 2px;
+    }
+
+    .form-field textarea {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      line-height: 1.45;
+      resize: vertical;
+    }
+
+    .status-banner {
+      padding: 8px 10px;
+      border-radius: 2px;
+      font-size: 11.5px;
+      margin-top: 8px;
+      font-family: var(--font-mono);
+    }
+
+    /* Tables in 03 and 04 */
+    .table-wrap {
+      overflow-x: auto;
+    }
+    #section-03 .table-wrap {
+      max-height: 215px;
+      overflow-y: auto;
+    }
+
+    table.blueprint-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    table.blueprint-table th {
+      background: var(--bg-subtle);
+      color: var(--ink-secondary);
+      font-weight: 600;
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--hairline-strong);
+      border-right: 1px solid var(--hairline);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    table.blueprint-table td {
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--hairline);
+      border-right: 1px solid var(--hairline);
+      vertical-align: middle;
+    }
+
+    table.blueprint-table tr:hover td {
+      background: var(--bg-elevated);
+    }
+
+    .mono {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .unfilled-drawer {
+      padding: 10px 12px;
+      background: var(--bg-elevated);
+      border-top: 1px solid var(--hairline);
+      margin-top: 10px;
+    }
+
+    .unfilled-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 6px;
+    }
+
+    .unfilled-chip {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 7px;
+      border: 1px solid var(--err-border);
+      background: var(--err-bg);
+      color: var(--err-fg);
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="operon-shell">
+    <!-- Top Masthead -->
+    <header class="masthead">
+      <div>
+        <div class="masthead-eyebrow">
+          <span>OPERON CONSTRUCTION BLUEPRINT · R51 STANDALONE SYSTEM</span>
+          <span>|</span>
+          <span>DB: 永祥獨立預排測試庫 (R39 ISOLATED SANDBOX)</span>
+          <span>|</span>
+          <span>67 在職同仁 · 932+ 真實工程案號</span>
+        </div>
+        <h1 class="masthead-title">詠翔 · 內外業小時級多項預排工作台 ↔ Lark Base 自動回填（日報 V3/V4 預排獨立系統）</h1>
+        <p class="masthead-sub">
+          解決「以人日為顆粒度、一人一日僅能填單一項目、漏填隱形無感知、雙邊多對多對帳失真」四大痛點 —— 支援 0.5h 小時級多案排程、母表 67 人未填顯形、雙邊預聚合對帳與 Lark TEST Base 冪等自動回填。
+        </p>
+      </div>
+      <div class="masthead-right">
+        <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+          <span class="pill-badge ok" id="badge-db-assert">PS-01~PS-08: 8/8 PASS</span>
+          <span class="pill-badge info" id="badge-cutoff">基準凍結 Cutoff: 08:30 (v1 Locked)</span>
+          <span class="pill-badge ok" id="badge-lark-sync">Lark TEST Base: fdDdb52K4a1s6is9jB7j93fdp5d (0 重複)</span>
+        </div>
+        <div style="font-family:var(--font-mono); font-size:11px; color:var(--ink-secondary);">
+          正式環境保護：日報 V3 (Sdw1bG1...) & 外業 V4 (H7W6b0P...) 寫入硬鎖定 = 0 筆 · 同仁私訊打擾 = 0 封
+        </div>
+      </div>
+    </header>
+
+    <!-- SECTION 01: Top Department Filter & Plan_Day 67-Staff Coverage KPIs -->
+    <section class="section-block" id="section-01">
+      <div class="section-header">
+        <div class="section-header-left">
+          <span class="section-num">01</span>
+          <h2 class="section-title">內外業 8 大組別篩選與母表 67 人日覆蓋率總覽 (Plan_Day Master Rollup)</h2>
+          <span class="section-subtitle">預先展開全公司 67 位在職同仁母表，精準捕捉「未填 0h (UNFILLED_0H)」與「未排滿缺口 (gap_hours)」</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label class="mono" style="font-size:11.5px; color:var(--ink-secondary);">預排目標日期：</label>
+          <input type="date" id="work-date-picker" value="2026-10-27" class="mono" style="padding:4px 8px; border:1px solid var(--hairline-strong); background:var(--bg-card); font-size:12px;" />
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-cell">
+          <div class="kpi-label">母表 Plan_Day 全員覆蓋</div>
+          <div class="kpi-value" id="kpi-plan-day">67 人 <span style="font-size:13px; color:var(--ok-fg);">/ 已排 10 人</span></div>
+          <div class="kpi-foot" id="kpi-unfilled-foot">未填 0h 顯形警示：57 人 (杜絕漏填隱形)</div>
+        </div>
+        <div class="kpi-cell">
+          <div class="kpi-label">今日預排總工時 (Plan_Block)</div>
+          <div class="kpi-value" id="kpi-total-hours">69.5 h <span style="font-size:13px; color:var(--ink-secondary);">/ 25 筆時段</span></div>
+          <div class="kpi-foot">支援 0.5h ~ 12.0h 小時級時間軸切分</div>
+        </div>
+        <div class="kpi-cell">
+          <div class="kpi-label">一人一日多項排程人數</div>
+          <div class="kpi-value" id="kpi-multi-people">10 人 <span style="font-size:13px; color:var(--info-fg);">(≥3項: 6人)</span></div>
+          <div class="kpi-foot">謝椀曳 3案/8h · 羅薇 3案/8h · 吳重樺 2案3段/8h</div>
+        </div>
+        <div class="kpi-cell">
+          <div class="kpi-label">雙邊預聚合對帳 (防笛卡兒積翻倍)</div>
+          <div class="kpi-value" style="font-size:17px;">吳重樺 2×3 → 5.0h <span style="font-size:12px; color:var(--ok-fg);">100%</span></div>
+          <div class="kpi-foot">鄭文澤：達成率 37.5% · 突襲率 62.5% (R08急件)</div>
+        </div>
+        <div class="kpi-cell">
+          <div class="kpi-label">Lark Base 自動回填冪等狀態</div>
+          <div class="kpi-value" id="kpi-lark-mirror" style="color:var(--ok-fg);">25 / 25 SYNCED</div>
+          <div class="kpi-foot">Replay 重放測試：新增 0 · 冪等重用 25 · 重複 0</div>
+        </div>
+      </div>
+
+      <div class="dept-filter-bar">
+        <div class="dept-pills" id="dept-pills">
+          <button class="dept-pill active" data-dept="ALL">全部組別 (10人已排 / 67人母表)</button>
+          <button class="dept-pill" data-dept="品管組">內業 · 品管組 (張家彬 7.5h / 缺0.5h)</button>
+          <button class="dept-pill" data-dept="控制組">內業 · 控制組 (吳重樺 2×3 同案分段)</button>
+          <button class="dept-pill" data-dept="圖報A">內業 · 圖資組 圖報A (謝椀曳 / 鄭文澤 / 朱雅雯半日假)</button>
+          <button class="dept-pill" data-dept="圖報B">內業 · 報告組 圖報B (鄭秉彞)</button>
+          <button class="dept-pill" data-dept="地形A">外業 · 地形A組 (吳科翰)</button>
+          <button class="dept-pill" data-dept="地形C">外業 · 地形C組 (古恆安)</button>
+          <button class="dept-pill" data-dept="水深A">外業 · 水深A組 (黃士嘉)</button>
+          <button class="dept-pill" data-dept="行政組">行政 / PM (羅薇 3案 / 吳柏頤)</button>
+        </div>
+        <button class="btn-ghost" id="btn-toggle-unfilled" onclick="toggleUnfilledDrawer()">
+          [展開/收合] 母表未填 0h 名單 (57人 UNFILLED_0H)
+        </button>
+      </div>
+    </section>
+
+    <!-- SECTION 02: Interactive Hourly Timeline & Multi-Item Composer -->
+    <section class="section-block" id="section-02">
+      <div class="section-header">
+        <div class="section-header-left">
+          <span class="section-num">02</span>
+          <h2 class="section-title">一人一日多項小時級排程時間軸 & 3 秒極速排程器 (08:00–18:00 Hourly Multi-Item Grid)</h2>
+          <span class="section-subtitle">同一位同仁單日可排入多筆不同案號與標準化因由，DB Trigger 自動攔截時段重疊與請假衝突</span>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <span class="pill-badge ok">嚴格案號正則：^[A-MVXZ][0-9]{6}(-[0-9A-Z]{1,3})?$</span>
+          <span class="pill-badge info">支援異體字自動歸一：張為斌/張爲斌 · 鄭秉彞/鄭秉彜</span>
+        </div>
+      </div>
+
+      <div class="workspace-split">
+        <!-- Left: Visual 8-Hour Timeline Per Person -->
+        <div class="timeline-pane">
+          <div class="ruler-header">
+            <div>人員 / 所屬組別</div>
+            <div class="ruler-ticks">
+              <span>08:00</span>
+              <span>10:00</span>
+              <span>12:00 (午休)</span>
+              <span>14:00</span>
+              <span>16:00</span>
+              <span>18:00</span>
+            </div>
+            <div style="text-align:right;">當日合計 / 狀態</div>
+          </div>
+
+          <div id="timeline-rows-container">
+            <!-- Populated dynamically from /api/preschedule/state -->
+          </div>
+
+          <!-- Unfilled 0h Staff Visibility Drawer (Plan_Day Inv4) -->
+          <div class="unfilled-drawer" id="unfilled-drawer">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong style="font-size:12px; color:var(--err-fg);">
+                ● 母表 Plan_Day 未填寫預排顯形警示 (`plan_status = UNFILLED_0H` · 共 <span id="unfilled-count-label">57</span> 人，解決傳統「沒填就沒資料列」盲區)
+              </strong>
+              <span class="mono" style="font-size:11px; color:var(--ink-secondary);">08:15 自動彙整各組未填名單通知組長（零私訊打擾個人）</span>
+            </div>
+            <div class="unfilled-chips" id="unfilled-chips-container"></div>
+          </div>
+        </div>
+
+        <!-- Right: 3-Second Hourly Slot Picker + NL Multi-Item Quick Input -->
+        <div class="composer-pane">
+          <!-- Box A: Click Hourly Slot Composer -->
+          <div class="form-box" id="composer-form-box">
+            <div class="form-box-title">
+              <span>A. 點選式小時級多項新增器 (Hourly Slot Picker)</span>
+              <span class="pill-badge ok" style="font-size:10px;">0.5h 粒度</span>
+            </div>
+
+            <div class="quick-btn-strip">
+              <button type="button" class="btn-ghost" onclick="quickShiftSlot(1)">[+1h 順延時段]</button>
+              <button type="button" class="btn-ghost" onclick="quickShiftSlot(2)">[+2h 順延時段]</button>
+              <button type="button" class="btn-ghost" onclick="fillDemoConflictSlot()">[測試重疊攔截 PS-05]</button>
+              <button type="button" class="btn-ghost" onclick="expandOutdoorTeamTemplate()">[外業整組出工展開 (3人×2段)]</button>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-field">
+                <label>在職同仁 (67人名冊 / 支援異體字)</label>
+                <select id="input-employee"></select>
+              </div>
+              <div class="form-field">
+                <label>標準化預排因由 (8大類 16項代碼)</label>
+                <select id="input-reason"></select>
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-field">
+                <label>開始時間 (HH:MM)</label>
+                <input type="time" id="input-start" value="16:30" step="1800" class="mono" />
+              </div>
+              <div class="form-field">
+                <label>結束時間 (HH:MM)</label>
+                <input type="time" id="input-end" value="17:00" step="1800" class="mono" />
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-field">
+                <label>工程編號 (932+ 真實案件 / 正則驗證)</label>
+                <input type="text" id="input-case-code" list="case-datalist" value="C114109" class="mono" placeholder="例如 C114109 或 C115094-4" />
+                <datalist id="case-datalist"></datalist>
+              </div>
+              <div class="form-field">
+                <label>08:30 基準線後異動原因 (選填)</label>
+                <input type="text" id="input-change-reason" placeholder="例如：R08 業主急件插單" />
+              </div>
+            </div>
+
+            <div class="form-field">
+              <label>工作項目備註 (自動帶入 Lark Base 子表)</label>
+              <input type="text" id="input-task-note" value="補齊張家彬當日最後 0.5h 內業成果檢核，消除 gap_hours" />
+            </div>
+
+            <button type="button" class="btn-primary" id="btn-add-slot" onclick="submitHourlySlot()">
+              + 新增小時級預排時段並即時回填 Lark TEST Base
+            </button>
+
+            <div id="slot-feedback-banner" class="status-banner pill-badge ok" style="display:flex; width:100%; justify-content:space-between;">
+              <span>READY · 預設示範：可為張家彬補齊 16:30–17:00 (0.5h) 或點擊 [測試重疊攔截 PS-05]</span>
+              <span class="mono">trg_preschedule_no_time_overlap</span>
+            </div>
+          </div>
+
+          <!-- Box B: Natural Language Multi-Item Quick Composer -->
+          <div class="form-box" id="nl-composer-box">
+            <div class="form-box-title">
+              <span>B. 自然語言 / 語音多項快速預排解析器 (NL Multi-Item Parser)</span>
+              <span class="pill-badge info" style="font-size:10px;">支援單句拆解多案</span>
+            </div>
+
+            <div class="form-field">
+              <label>輸入單日多項自然語言指令（自動識別同仁、時段/時數、案號與預排因由代碼）：</label>
+              <textarea id="nl-input-text" rows="3">幫謝椀曳排明天 08:30-11:30 C114109 圖資編修、13:00-15:00 C115094-4 報告修正、15:00-18:00 C115211-01A 點雲建模</textarea>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+              <button type="button" class="btn-ghost" style="padding:7px; font-weight:600;" onclick="previewNlParse()">
+                1. 解析預覽多項時段 (Dry-Run)
+              </button>
+              <button type="button" class="btn-primary" onclick="executeNlParse()">
+                2. 一鍵寫入 DB 並回填 Lark Base
+              </button>
+            </div>
+
+            <div id="nl-preview-box" style="margin-top:8px; padding:8px; border:1px dashed var(--hairline-strong); background:var(--bg-paper); font-family:var(--font-mono); font-size:11px;">
+              <div><strong>[NL 多項拆解預覽 · 謝椀曳 (圖報A)]</strong> → 自動拆解為 3 筆小時級時段：</div>
+              <div>① 08:30–11:30 (3.0h) | #C114109 | GIS-EDIT (數值地形圖編修與圖資套疊)</div>
+              <div>② 13:00–15:00 (2.0h) | #C115094-4 | RPT-DRAFT (成果報告撰寫與圖表彙整)</div>
+              <div>③ 15:00–18:00 (3.0h) | #C115211-01A | GIS-3D-CLOUD (3D點雲建模與正射影像處理)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 03: Lark Base Auto-Backfill Ledger (Plan_Block Child Table) -->
+    <section class="section-block" id="section-03">
+      <div class="section-header">
+        <div class="section-header-left">
+          <span class="section-num">03</span>
+          <h2 class="section-title">Lark Base 自動回填明細台帳 (Plan_Block 1-to-N 子表 ↔ tblPrescheduleHourlyTest)</h2>
+          <span class="section-subtitle">透過唯一防重鍵 `idempotency_key` 執行冪等 Upsert，確保網路重試或重複點擊永遠 0 重複列</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="pill-badge ok" id="sync-ledger-badge">Target Base: fdDdb52K4a1s6is9jB7j93fdp5d · 25 筆已同步</span>
+          <button type="button" class="btn-primary" style="width:auto; padding:5px 12px;" onclick="triggerLarkSyncReplay()">
+            立即同步回填 Lark Base (驗證 Replay 冪等 0 重複)
+          </button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="blueprint-table" id="lark-ledger-table">
+          <thead>
+            <tr>
+              <th>Lark Record ID</th>
+              <th>唯一防重鍵 (idempotency_key)</th>
+              <th>對帳聚合鍵 (reconcile_key)</th>
+              <th>日期</th>
+              <th>人員 / 組別</th>
+              <th>時段區間</th>
+              <th>時數</th>
+              <th>工程編號 / 案件名稱</th>
+              <th>預排因由代碼 / 標準項目</th>
+              <th>基準線狀態</th>
+              <th>Lark 同步狀態</th>
+            </tr>
+          </thead>
+          <tbody id="lark-ledger-tbody">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTION 04: Pre-Aggregated Plan vs Actual Reconciliation Table -->
+    <section class="section-block" id="section-04">
+      <div class="section-header">
+        <div class="section-header-left">
+          <span class="section-num">04</span>
+          <h2 class="section-title">預排 vs. 日報雙邊預聚合對帳表 (Plan_Actual_Reconciliation · 防 M:N 笛卡兒積翻倍 & R08 證據鏈)</h2>
+          <span class="section-subtitle">先以 `reconcile_key = emp_id | date | case_code | reason_code` 雙邊預聚合 P 與 A 再執行 FULL OUTER JOIN</span>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <span class="pill-badge ok">Inv5: 吳重樺 2筆預排×3筆日報 = 5.0h (0 翻倍)</span>
+          <span class="pill-badge warn">PS-08: 鄭文澤 37.5% 達成 / 62.5% 突襲 (綁定 R08-業主往來12085)</span>
+          <span class="pill-badge info">PS-10: 待日報回填保護 (不誤判 0%)</span>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="blueprint-table" id="reconcile-table">
+          <thead>
+            <tr>
+              <th>人員 / 組別</th>
+              <th>工程編號 / 案件名稱</th>
+              <th>標準化因由代碼</th>
+              <th>預排筆數 / 時數 (P)</th>
+              <th>日報筆數 / 時數 (A)</th>
+              <th>匹配工時 M=min(P,A)</th>
+              <th>預排達成率 (M/P)</th>
+              <th>突襲插單率 (U/A)</th>
+              <th>配置偏離率</th>
+              <th>R08 業主急件 / R03 品管證據</th>
+              <th>對帳判定狀態</th>
+            </tr>
+          </thead>
+          <tbody id="reconcile-tbody">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    let STATE = null;
+    let CURRENT_DEPT = "ALL";
+    let UNFILLED_OPEN = true;
+
+    function reasonClass(code) {
+      if (!code) return "indoor-gis";
+      if (code.startsWith("GIS")) return "indoor-gis";
+      if (code.startsWith("RPT")) return "indoor-rpt";
+      if (code.startsWith("QC")) return "indoor-qc";
+      if (code.startsWith("CTRL")) return "indoor-ctrl";
+      if (code.startsWith("TOPO") || code.startsWith("UAV")) return "field-topo";
+      if (code.startsWith("BATHY") || code.startsWith("TIDE")) return "field-bathy";
+      return "admin-pm";
+    }
+
+    async function loadPrescheduleState() {
+      const workDate = document.getElementById("work-date-picker").value || "2026-10-27";
+      const resp = await fetch(`/api/preschedule/state?date=${encodeURIComponent(workDate)}&dept=${encodeURIComponent(CURRENT_DEPT)}`);
+      const data = await resp.json();
+      if (!data.ok) return;
+      STATE = data;
+      renderAll();
+    }
+
+    function renderAll() {
+      if (!STATE) return;
+      const k = STATE.kpis;
+      document.getElementById("kpi-plan-day").innerHTML =
+        `${k.plan_day_total_staff} 人 <span style="font-size:13px; color:var(--ok-fg);">/ 已排 ${k.scheduled_people_count} 人</span>`;
+      document.getElementById("kpi-unfilled-foot").textContent =
+        `未填 0h 顯形警示：${k.plan_day_unfilled_0h_count} 人 · 未排滿缺口：${k.plan_day_partial_gap_count} 人`;
+      document.getElementById("kpi-total-hours").innerHTML =
+        `${k.total_scheduled_hours.toFixed(1)} h <span style="font-size:13px; color:var(--ink-secondary);">/ ${k.total_entries_count} 筆時段</span>`;
+      document.getElementById("kpi-multi-people").innerHTML =
+        `${k.multi_item_people_count} 人 <span style="font-size:13px; color:var(--info-fg);">(≥3項: ${k.three_plus_item_people_count}人)</span>`;
+      document.getElementById("kpi-lark-mirror").textContent =
+        `${STATE.lark_test_base.synced_entries} / ${STATE.lark_test_base.total_entries} SYNCED`;
+
+      renderSelectors();
+      renderTimelineRows();
+      renderUnfilledDrawer();
+      renderLarkLedger();
+      renderReconciliationTable();
+    }
+
+    function renderSelectors() {
+      const empSel = document.getElementById("input-employee");
+      if (empSel.options.length === 0 && STATE.employees) {
+        STATE.employees.forEach(e => {
+          const opt = document.createElement("option");
+          opt.value = e.full_name;
+          opt.textContent = `${e.full_name} (${e.group_code} · ${e.department_name})`;
+          if (e.full_name === "張家彬") opt.selected = true;
+          empSel.appendChild(opt);
+        });
+      }
+
+      const reasonSel = document.getElementById("input-reason");
+      if (reasonSel.options.length === 0 && STATE.reasons) {
+        STATE.reasons.forEach(r => {
+          const opt = document.createElement("option");
+          opt.value = r.reason_code;
+          opt.textContent = `[${r.reason_code}] ${r.department_category} — ${r.reason_label}`;
+          if (r.reason_code === "QC-AUDIT") opt.selected = true;
+          reasonSel.appendChild(opt);
+        });
+      }
+
+      const caseList = document.getElementById("case-datalist");
+      if (caseList.children.length === 0 && STATE.cases) {
+        STATE.cases.forEach(c => {
+          const opt = document.createElement("option");
+          opt.value = c.case_code;
+          opt.label = `${c.case_code} — ${c.case_name}`;
+          caseList.appendChild(opt);
+        });
+      }
+    }
+
+    function renderTimelineRows() {
+      const container = document.getElementById("timeline-rows-container");
+      container.innerHTML = "";
+
+      const planDayMap = {};
+      (STATE.plan_days || []).forEach(pd => {
+        planDayMap[pd.employee_name] = pd;
+      });
+
+      (STATE.rollups || []).forEach(r => {
+        const pd = planDayMap[r.employee_name] || {};
+        const row = document.createElement("div");
+        const isHighlight = ["謝椀曳", "吳重樺", "鄭文澤", "張家彬", "朱雅雯", "羅薇"].includes(r.employee_name);
+        row.className = "person-row" + (isHighlight ? " highlight-person" : "");
+
+        const blocks = r.timeline_blocks || [];
+        const blocksHtml = blocks.map(b => `
+          <div class="slot-chip ${reasonClass(b.reason_code)}">
+            <div class="slot-top">
+              <span>${b.slot || (b.start_time + '–' + b.end_time)} (${Number(b.hours).toFixed(1)}h)</span>
+              <span class="slot-case">#${b.case_code}</span>
+            </div>
+            <div class="slot-reason">[${b.reason_code}] ${b.reason_label}</div>
+          </div>
+        `).join("");
+
+        let leaveBadge = "";
+        if (pd.duty_status === "HALF_DAY_LEAVE") {
+          leaveBadge = `<span class="pill-badge info" style="font-size:10px; padding:1px 5px;">半日假 ${pd.leave_start_time}-${pd.leave_end_time} (可用 ${pd.available_hours}h)</span>`;
+        }
+
+        let statusBadge = "";
+        if (r.remaining_capacity_hours > 0) {
+          statusBadge = `<span class="person-items-badge pill-badge warn">尚缺 ${Number(r.remaining_capacity_hours).toFixed(1)}h (PARTIAL_GAP)</span>`;
+        } else {
+          statusBadge = `<span class="person-items-badge pill-badge ok">${r.items_count} 項 · 100% 滿載</span>`;
+        }
+
+        row.innerHTML = `
+          <div class="person-meta">
+            <div class="person-name">
+              <span>${r.employee_name}</span>
+              <span class="pill-badge" style="font-size:10px; padding:1px 5px;">${r.sub_group}</span>
+            </div>
+            <div class="person-group">${r.department_group} · 可用 ${Number(r.available_hours).toFixed(1)}h</div>
+            ${leaveBadge ? `<div style="margin-top:3px;">${leaveBadge}</div>` : ""}
+          </div>
+          <div class="timeline-track">
+            ${blocksHtml}
+          </div>
+          <div class="person-total">
+            <div class="person-hours">${Number(r.total_hours).toFixed(1)} / ${Number(r.available_hours).toFixed(1)}h</div>
+            ${statusBadge}
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function renderUnfilledDrawer() {
+      const unfilled = (STATE.plan_days || []).filter(p => p.plan_status === "UNFILLED_0H");
+      document.getElementById("unfilled-count-label").textContent = unfilled.length;
+      const chipBox = document.getElementById("unfilled-chips-container");
+      chipBox.innerHTML = "";
+      unfilled.slice(0, 28).forEach(u => {
+        const span = document.createElement("span");
+        span.className = "unfilled-chip";
+        span.textContent = `${u.employee_name} (${u.sub_group} · 0/${u.available_hours}h)`;
+        chipBox.appendChild(span);
+      });
+      if (unfilled.length > 28) {
+        const more = document.createElement("span");
+        more.className = "pill-badge";
+        more.textContent = `+ 其餘 ${unfilled.length - 28} 位未填 0h 同仁 (母表 Plan_Day 全員列管)`;
+        chipBox.appendChild(more);
+      }
+    }
+
+    function toggleUnfilledDrawer() {
+      const d = document.getElementById("unfilled-drawer");
+      UNFILLED_OPEN = !UNFILLED_OPEN;
+      d.style.display = UNFILLED_OPEN ? "block" : "none";
+    }
+
+    function renderLarkLedger() {
+      const tbody = document.getElementById("lark-ledger-tbody");
+      tbody.innerHTML = "";
+      (STATE.entries || []).forEach(e => {
+        const tr = document.createElement("tr");
+        const baseBadge = e.is_baseline
+          ? `<span class="pill-badge ok" style="font-size:10px;">08:30 基準線 v${e.version}</span>`
+          : `<span class="pill-badge warn" style="font-size:10px;">盤中異動: ${e.change_reason || 'R08'}</span>`;
+        tr.innerHTML = `
+          <td class="mono" style="font-weight:600;">${e.lark_record_id || ("rec_" + e.idempotency_key.slice(0, 14))}</td>
+          <td class="mono" style="color:var(--ink-secondary);">${e.idempotency_key.slice(0, 16)}…</td>
+          <td class="mono" style="font-size:11px;">${e.employee_name}|${e.work_date}|${e.case_code}|${e.reason_code}</td>
+          <td class="mono">${e.work_date}</td>
+          <td><strong>${e.employee_name}</strong> <span style="color:var(--ink-secondary);">(${e.sub_group})</span></td>
+          <td class="mono">${e.start_time}–${e.end_time}</td>
+          <td class="mono"><strong>${Number(e.hours).toFixed(1)}h</strong></td>
+          <td><span class="mono" style="font-weight:600; color:var(--info-fg);">#${e.case_code}</span> ${e.case_name}</td>
+          <td><span class="mono">[${e.reason_code}]</span> ${e.reason_label}</td>
+          <td>${baseBadge}</td>
+          <td><span class="pill-badge ok" style="font-size:10px;">${e.sync_status} · ${e.lark_base_app_token.slice(0, 8)}…</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderReconciliationTable() {
+      const tbody = document.getElementById("reconcile-tbody");
+      tbody.innerHTML = "";
+      (STATE.reconciliations || []).slice(0, 12).forEach(rec => {
+        const tr = document.createElement("tr");
+        const achStr = rec.preschedule_achievement_rate !== null && rec.preschedule_achievement_rate !== undefined
+          ? `${Number(rec.preschedule_achievement_rate).toFixed(1)}%`
+          : "待日報 (NULL)";
+        const rushStr = rec.unplanned_rush_rate !== null && rec.unplanned_rush_rate !== undefined
+          ? `${Number(rec.unplanned_rush_rate).toFixed(1)}%`
+          : "—";
+        const devStr = rec.allocation_deviation_rate !== null && rec.allocation_deviation_rate !== undefined
+          ? `${Number(rec.allocation_deviation_rate).toFixed(1)}%`
+          : "—";
+
+        let statusClass = "ok";
+        if (rec.reconciliation_status === "RUSH_INSERT_PS08") statusClass = "warn";
+        else if (rec.reconciliation_status === "PLAN_DROPPED") statusClass = "err";
+        else if (rec.reconciliation_status === "PENDING_DAILY_REPORT_PS10") statusClass = "info";
+
+        const evBadge = rec.r08_evidence_ref
+          ? `<span class="pill-badge warn" style="font-size:10.5px;">${rec.r08_evidence_ref} (免責保護)</span>`
+          : (rec.r03_qc_ref ? `<span class="pill-badge info" style="font-size:10.5px;">${rec.r03_qc_ref}</span>` : `<span style="color:var(--ink-muted);">—</span>`);
+
+        tr.innerHTML = `
+          <td><strong>${rec.employee_name}</strong> <span style="color:var(--ink-secondary);">(${rec.sub_group})</span></td>
+          <td><span class="mono" style="font-weight:600; color:var(--info-fg);">#${rec.case_code}</span> ${rec.case_name}</td>
+          <td class="mono">[${rec.reason_code}] ${rec.reason_label}</td>
+          <td class="mono">${rec.planned_block_count} 筆 / <strong>${Number(rec.planned_hours_p).toFixed(1)}h</strong></td>
+          <td class="mono">${rec.actual_row_count} 筆 / <strong>${Number(rec.actual_hours_a).toFixed(1)}h</strong></td>
+          <td class="mono"><strong>${Number(rec.matched_hours_m).toFixed(1)}h</strong></td>
+          <td class="mono" style="font-weight:600;">${achStr}</td>
+          <td class="mono">${rushStr}</td>
+          <td class="mono">${devStr}</td>
+          <td>${evBadge}</td>
+          <td><span class="pill-badge ${statusClass}" style="font-size:10.5px;">${rec.reconciliation_status}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function quickShiftSlot(hoursDelta) {
+      const stEl = document.getElementById("input-start");
+      const etEl = document.getElementById("input-end");
+      const [sh, sm] = stEl.value.split(":").map(Number);
+      const [eh, em] = etEl.value.split(":").map(Number);
+      const newSh = Math.min(18, sh + hoursDelta);
+      const newEh = Math.min(19, eh + hoursDelta);
+      stEl.value = `${String(newSh).padStart(2, "0")}:${String(sm).padStart(2, "0")}`;
+      etEl.value = `${String(newEh).padStart(2, "0")}:${String(em).padStart(2, "0")}`;
+    }
+
+    async function fillDemoConflictSlot() {
+      document.getElementById("input-employee").value = "謝椀曳";
+      document.getElementById("input-start").value = "10:00";
+      document.getElementById("input-end").value = "12:00";
+      document.getElementById("input-case-code").value = "C114109";
+      await submitHourlySlot();
+    }
+
+    async function submitHourlySlot() {
+      const banner = document.getElementById("slot-feedback-banner");
+      const payload = {
+        work_date: document.getElementById("work-date-picker").value || "2026-10-27",
+        employee_name: document.getElementById("input-employee").value,
+        reason_code: document.getElementById("input-reason").value,
+        start_time: document.getElementById("input-start").value,
+        end_time: document.getElementById("input-end").value,
+        case_code: document.getElementById("input-case-code").value,
+        change_reason: document.getElementById("input-change-reason").value,
+        task_note: document.getElementById("input-task-note").value,
+      };
+      const resp = await fetch("/api/preschedule/add_entry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const res = await resp.json();
+      if (res.ok) {
+        banner.className = "status-banner pill-badge ok";
+        banner.innerHTML = `<span>✔ 已寫入並回填 Lark TEST Base：${res.employee_name} ${res.slot} #${res.case_code} (${res.reason_code})</span><span class="mono">idem=${res.idempotency_key.slice(0, 12)}…</span>`;
+        await loadPrescheduleState();
+      } else {
+        banner.className = "status-banner pill-badge err";
+        banner.innerHTML = `<span>✖ 排程護欄攔截：${res.error}</span><span class="mono">REJECTED</span>`;
+      }
+    }
+
+    async function expandOutdoorTeamTemplate() {
+      const banner = document.getElementById("slot-feedback-banner");
+      const resp = await fetch("/api/preschedule/expand_team_template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          work_date: document.getElementById("work-date-picker").value || "2026-10-27",
+          members: ["吳科翰", "黃耀興", "陳振德"],
+        }),
+      });
+      const res = await resp.json();
+      if (res.ok) {
+        banner.className = "status-banner pill-badge ok";
+        banner.innerHTML = `<span>✔ 外業整組模板展開成功：${res.members_count} 人 × ${res.blocks_per_member} 時段 = ${res.expanded_records_count} 筆 Plan_Block 已同步</span><span class="mono">TEAM_TEMPLATE_OK</span>`;
+        await loadPrescheduleState();
+      }
+    }
+
+    async function previewNlParse() {
+      const text = document.getElementById("nl-input-text").value;
+      const workDate = document.getElementById("work-date-picker").value || "2026-10-27";
+      const resp = await fetch("/api/preschedule/nl_parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, work_date: workDate, dry_run: true }),
+      });
+      const res = await resp.json();
+      const box = document.getElementById("nl-preview-box");
+      if (!res.ok) {
+        box.innerHTML = `<span style="color:var(--err-fg);">✖ 解析失敗：${res.error}</span>`;
+        return;
+      }
+      box.innerHTML = `<div><strong>[NL 多項拆解預覽 · ${res.employee_name}]</strong> → 共解析出 ${res.parsed_items.length} 筆時段：</div>` +
+        res.parsed_items.map((it, idx) =>
+          `<div>${idx + 1}. ${it.start_time}–${it.end_time} | #${it.case_code} | ${it.reason_code} (${it.task_note})</div>`
+        ).join("");
+    }
+
+    async function executeNlParse() {
+      const text = document.getElementById("nl-input-text").value;
+      const workDate = document.getElementById("work-date-picker").value || "2026-10-27";
+      const resp = await fetch("/api/preschedule/nl_parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, work_date: workDate, dry_run: false }),
+      });
+      const res = await resp.json();
+      const box = document.getElementById("nl-preview-box");
+      if (res.ok) {
+        box.innerHTML = `<div style="color:var(--ok-fg); font-weight:600;">✔ 已成功寫入 ${res.applied_count} 筆小時級時段並同步回填至 Lark TEST Base (fdDdb52K4a1s6is9jB7j93fdp5d)！</div>`;
+        await loadPrescheduleState();
+      } else {
+        box.innerHTML = `<div style="color:var(--err-fg); font-weight:600;">✖ 寫入攔截：${res.error || JSON.stringify(res.errors)}</div>`;
+      }
+    }
+
+    async function triggerLarkSyncReplay() {
+      const workDate = document.getElementById("work-date-picker").value || "2026-10-27";
+      const resp = await fetch("/api/preschedule/sync_lark", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ work_date: workDate }),
+      });
+      const res = await resp.json();
+      if (res.ok) {
+        document.getElementById("sync-ledger-badge").textContent =
+          `Replay 冪等驗證通過：處理 ${res.entries_processed} 筆 · 重放新增 ${res.replay_newly_inserted} 筆 · 重用 ${res.replay_idempotent_reused} 筆 · 重複 ${res.duplicate_rows} 筆`;
+        await loadPrescheduleState();
+      }
+    }
+
+    document.querySelectorAll(".dept-pill").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".dept-pill").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        CURRENT_DEPT = btn.getAttribute("data-dept") || "ALL";
+        loadPrescheduleState();
+      });
+    });
+
+    document.getElementById("work-date-picker").addEventListener("change", () => {
+      loadPrescheduleState();
+    });
+
+    loadPrescheduleState();
+  </script>
+</body>
+</html>

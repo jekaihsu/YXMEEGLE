@@ -1,0 +1,109 @@
+{
+  "generated_for": "R54 時光機評估（pre-arrival-only 路由）",
+  "dsn_database": "yongxiang_plumb_r39_clone",
+  "corpus_size": 283,
+  "rule": "router 評估每封信 m 時只讀 received_at < m.received_at；禁讀未來信與事後回填證據",
+  "actual_sends": 0,
+  "writes": 0,
+  "metrics_leaky_forbidden": {
+    "category_reproduction": {
+      "label": "類別重現（per-email 控制組）",
+      "hits": 3,
+      "N": 79,
+      "rate": 0.038
+    },
+    "org_attribution": {
+      "label": "組織歸屬（per-email 控制組）",
+      "hits": 283,
+      "N": 283,
+      "rate": 1.0
+    },
+    "sender_known": {
+      "label": "寄件者已知（歷史依賴）",
+      "hits": 250,
+      "N": 283,
+      "rate": 0.8834
+    },
+    "subject_thread": {
+      "label": "主旨串接（歷史依賴）",
+      "hits": 195,
+      "N": 283,
+      "rate": 0.689
+    },
+    "serial_continuity": {
+      "label": "序號串接（歷史依賴）",
+      "hits": 2,
+      "N": 18,
+      "rate": 0.1111
+    }
+  },
+  "metrics_cutoff_enforced": {
+    "category_reproduction": {
+      "label": "類別重現（per-email 控制組）",
+      "hits": 3,
+      "N": 79,
+      "rate": 0.038
+    },
+    "org_attribution": {
+      "label": "組織歸屬（per-email 控制組）",
+      "hits": 283,
+      "N": 283,
+      "rate": 1.0
+    },
+    "sender_known": {
+      "label": "寄件者已知（歷史依賴）",
+      "hits": 220,
+      "N": 283,
+      "rate": 0.7774
+    },
+    "subject_thread": {
+      "label": "主旨串接（歷史依賴）",
+      "hits": 125,
+      "N": 283,
+      "rate": 0.4417
+    },
+    "serial_continuity": {
+      "label": "序號串接（歷史依賴）",
+      "hits": 1,
+      "N": 18,
+      "rate": 0.0556
+    }
+  },
+  "delta_leaky_minus_cutoff": {
+    "category_reproduction": 0.0,
+    "org_attribution": 0.0,
+    "sender_known": 0.106,
+    "subject_thread": 0.2473,
+    "serial_continuity": 0.0555
+  },
+  "metrics_that_dropped_under_cutoff": [
+    "sender_known",
+    "subject_thread",
+    "serial_continuity"
+  ],
+  "canary_leak_test": {
+    "sender_known": {
+      "label": "寄件者已知（歷史依賴）",
+      "leaky_hit": true,
+      "cutoff_hit": false,
+      "leak_blocked": true
+    },
+    "subject_thread": {
+      "label": "主旨串接（歷史依賴）",
+      "leaky_hit": true,
+      "cutoff_hit": false,
+      "leak_blocked": true
+    },
+    "serial_continuity": {
+      "label": "序號串接（歷史依賴）",
+      "leaky_hit": true,
+      "cutoff_hit": false,
+      "leak_blocked": true
+    },
+    "_canary_passed": true
+  },
+  "verdict": {
+    "cutoff_effective": true,
+    "note": "有歷史依賴指標在 cutoff 後下降，且 canary 在 LEAKY 命中、CUTOFF 未命中 → cutoff 生效。"
+  }
+}

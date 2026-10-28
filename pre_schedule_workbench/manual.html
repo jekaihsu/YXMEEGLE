@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>永祥 · 內外業預排工作台 使用說明書</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;450;500;600&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --op-paper: #f6f5f1;
+      --op-paper-2: #edebe5;
+      --op-stone: #cdcac3;
+      --op-line: #e3e0d9;
+      --op-ink: #1c1a18;
+      --op-ink-2: #45423e;
+      --op-muted: #6b6863;
+      --op-faint: #8c8981;
+      --op-violet-ink: #3d6be0;
+      --anatomy-face: #ffffff;
+      --anatomy-lit-shade: #faf9f5;
+      --anatomy-green: #30a46c;
+      --font-display: "Instrument Serif", "Noto Serif TC", Georgia, serif;
+      --font-sans: "Inter", "Noto Sans TC", system-ui, -apple-system, sans-serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background-color: var(--op-paper);
+      background-image:
+        linear-gradient(#1c1a1808 1px, transparent 1px),
+        linear-gradient(90deg, #1c1a1808 1px, transparent 1px);
+      background-position: -1px -1px;
+      background-size: 56px 56px;
+      color: var(--op-ink);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+    }
+    .op-rule-full { width: 100%; border-bottom: 1px solid var(--op-line); }
+    .op-rail-container {
+      max-width: 960px;
+      margin: 0 auto;
+      border-left: 1px solid var(--op-line);
+      border-right: 1px solid var(--op-line);
+      background: rgba(246, 245, 241, 0.88);
+    }
+    .op-topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 32px;
+    }
+    .op-brand { font-family: var(--font-display); font-size: 20px; font-weight: 600; }
+    .op-btn-go {
+      text-decoration: none;
+      background: linear-gradient(180deg, #3879e5 0%, #045ede 100%);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 8px 16px;
+      border-radius: 7px;
+      box-shadow: 0 1px 2px rgba(4, 94, 222, 0.3);
+    }
+    .op-section { padding: 28px 32px; }
+    .op-index {
+      font-family: var(--font-mono); font-size: 11.5px; color: var(--op-faint);
+      letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 12px;
+    }
+    h1 {
+      font-family: var(--font-display); font-size: 32px; font-weight: 600;
+      letter-spacing: -0.02em; margin-bottom: 10px;
+    }
+    .op-lead { font-size: 14.5px; color: var(--op-muted); line-height: 1.65; }
+    .op-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 16px; }
+    .op-card {
+      background: var(--anatomy-face);
+      border: 1px solid var(--op-line);
+      border-radius: 12px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 2px rgba(20, 20, 30, 0.04);
+    }
+    .op-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; color: var(--op-ink); }
+    .op-card p, .op-card li { font-size: 13.5px; color: var(--op-ink-2); line-height: 1.65; }
+    .op-card ul { padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+    .op-tag {
+      display: inline-block; font-family: var(--font-mono); font-size: 11px;
+      color: #2f5bd3; background: #e9efff; padding: 2px 7px; border-radius: 4px; margin-bottom: 8px;
+    }
+    .op-tag.green { color: #1d7a45; background: #e4f5eb; }
+    .op-figure { margin-top: 18px; }
+    .op-figure img { width: 100%; height: auto; border: 1px solid var(--op-line); border-radius: 10px; display: block; box-shadow: 0 1px 2px rgba(20, 20, 30, 0.04); }
+    .op-figure figcaption { font-size: 12.5px; color: var(--op-muted); margin-top: 8px; font-family: var(--font-mono); }
+    .op-figure-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <div class="op-rule-full">
+    <div class="op-rail-container">
+      <div class="op-topbar">
+        <div class="op-brand">永祥測量 · 內外業預排工作台 使用說明書</div>
+        <a href="/?user=吳科翰" class="op-btn-go">➔ 前往科翰預排工作台</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="op-rule-full">
+    <div class="op-rail-container">
+      <div class="op-section">
+        <div class="op-index">內外業預排工作台 · 使用說明書 · 吳科翰試用版</div>
+        <h1>《永祥 · 內外業預排工作台 使用說明書》</h1>
+        <p class="op-lead">
+          專為永祥外業、控制與內業同仁打造的極簡小時級預排工作台。只要 5 秒鐘即可完成一日多案排程，並即時雙向同步永祥日報「工作預排表」。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="op-rule-full">
+    <div class="op-rail-container">
+      <div class="op-section">
+        <div class="op-index">01 · 為什麼做這個新預排工作台？</div>
+        <div class="op-card-grid">
+          <div class="op-card">
+            <span class="op-tag">痛點 1 解方</span>
+            <h3>一天跑多案，支援 0.5h～4h 小時級拆分</h3>
+            <p>以前一天同時處理 A 案外業排程檢核、下午處理 B 案控制網平差，沒辦法按小時拆開。現在支援 0.5 小時顆粒度，同一天可排多個不同案件。</p>
+          </div>
+          <div class="op-card">
+            <span class="op-tag">痛點 2 解方</span>
+            <h3>工程編號秒搜，告別大海撈針</h3>
+            <p>直接輸入工編或案名關鍵字（如 <code>C115055</code>、<code>西濱</code>、<code>緯穎</code>），下拉選單秒速過濾出對應案件。</p>
+          </div>
+          <div class="op-card">
+            <span class="op-tag">痛點 3 解方</span>
+            <h3>下班一鍵轉今日日報，免重打字</h3>
+            <p>早上排好的預排時段，下班前只要按右下角【下班一鍵轉今日日報】，直接標記轉為日報，不再重複填兩次。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="op-rule-full">
+    <div class="op-rail-container">
+      <div class="op-section">
+        <div class="op-index">02 · 3 步完成今日預排（只要 5 秒鐘）</div>
+        <div class="op-card-grid">
+          <div class="op-card">
+            <span class="op-tag">STEP 1</span>
+            <h3>選日期（預設今日／明日）</h3>
+            <p>左上角點選【今日】、【明日】或用 <code>◀ ▶</code> 切換日期，右側容量條即時顯示「今日已排 X.Xh / 8.0h」。</p>
+          </div>
+          <div class="op-card">
+            <span class="op-tag">STEP 2</span>
+            <h3>選案件 ➔ 點工作項目 ➔ 點時數按【＋加入預排】</h3>
+            <p>點選工作膠囊（如「外業整體排程與控制檢核」、「控制網平差計算」）與時數（<code>0.5h～4h</code>），系統自動從 08:30 接續排入時段。</p>
+          </div>
+          <div class="op-card">
+            <span class="op-tag">STEP 3</span>
+            <h3>微調時數（+0.5h / -0.5h）與轉日報</h3>
+            <p>臨時變動時直接在清單按 <code>+0.5h</code>、<code>-0.5h</code> 或刪除；下班前按【下班一鍵轉今日日報】即完成。</p>
+          </div>
+        </div>
+        <figure class="op-figure">
+          <img src="screenshot_view1_hourly_workbench.png" alt="小時級預排工作台總覽：日期切換、案件搜尋、工作膠囊與已排時段清單" />
+          <figcaption>圖 1 · 小時級預排工作台總覽（科翰個人視角）</figcaption>
+        </figure>
+        <figure class="op-figure">
+          <img src="../operon_preschedule/02_preschedule_add_slot_and_nl_composer.png" alt="選案件、點工作項目、按加入預排的操作區" />
+          <figcaption>圖 2 · Step 2：選案件 ➔ 點工作項目 ➔ 按【＋加入預排】</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+
+  <div class="op-rule-full">
+    <div class="op-rail-container">
+      <div class="op-section">
+        <div class="op-index">03 · 資料自動雙向同步 ＆ 04 · 權限說明</div>
+        <div class="op-card-grid">
+          <div class="op-card">
+            <span class="op-tag green">即時同步</span>
+            <h3>即時雙向同步永祥日報「工作預排表」</h3>
+            <ul>
+              <li>網頁新增、微調時數（<code>+0.5h/-0.5h</code>）、刪除或轉日報，都會<strong>即時同步進永祥日報「工作預排表」</strong>，不用開兩邊重複填。</li>
+              <li>每筆已回寫的時段都會在該列標示<strong>「已同步」</strong>，一眼確認資料已存檔。</li>
+            </ul>
+          </div>
+          <div class="op-card">
+            <span class="op-tag">視角權限</span>
+            <h3>個人極簡視角 vs. 組長／跨組代排總覽</h3>
+            <ul>
+              <li><strong>一般同仁登入</strong>：只排自己的預排，畫面乾淨不雜亂。</li>
+              <li><strong>科翰專屬切換</strong>：預設為乾淨的「個人預排」；點擊姓名旁【跨組代排／總覽】即可展開同仁切換列與本組 8.0h 容量總覽。</li>
+            </ul>
+          </div>
+        </div>
+        <div class="op-figure-grid">
+          <figure class="op-figure" style="margin-top:0;">
+            <img src="operon_kehan_view.png" alt="科翰個人預排乾淨視角" />
+            <figcaption>圖 3 · 科翰個人預排視角（乾淨極簡）</figcaption>
+          </figure>
+          <figure class="op-figure" style="margin-top:0;">
+            <img src="operon_manager_view.png" alt="組長／經理跨組代排與本組容量總覽視角" />
+            <figcaption>圖 4 · 組長／經理代排總覽視角（本組 8.0h 容量）</figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

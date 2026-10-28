@@ -1,0 +1,96 @@
+{
+  "all_passed": true,
+  "total": 10,
+  "scenarios": [
+    {
+      "scenario": "S01_delivery_date_thu_noon",
+      "kind": "edit_draft",
+      "reaction_ms": 0.0,
+      "signature_owner": "許喆凱",
+      "signature_email": "jekai@yxsurvey.com.tw",
+      "card_status": "pending",
+      "passed": true
+    },
+    {
+      "scenario": "S02_decline_project",
+      "kind": "edit_draft",
+      "reaction_ms": 0.001,
+      "signature_owner": "吳柏頤",
+      "signature_email": "wuboyi@yxsurvey.com.tw",
+      "card_status": "pending",
+      "passed": true
+    },
+    {
+      "scenario": "S03_adjust_quote_price",
+      "kind": "edit_draft",
+      "reaction_ms": 0.0,
+      "signature_owner": "沈宜蓁",
+      "signature_email": "shenyizhen@yxsurvey.com.tw",
+      "card_status": "pending",
+      "passed": true
+    },
+    {
+      "scenario": "S04_add_scope_commitment",
+      "kind": "edit_draft",
+      "reaction_ms": 0.001,
+      "signature_owner": "張家彬",
+      "signature_email": "zhangjiabin@yxsurvey.com.tw",
+      "card_status": "pending",
+      "passed": true
+    },
+    {
+      "scenario": "S05_request_client_upstream_data",
+      "kind": "edit_draft",
+      "reaction_ms": 0.0,
+      "signature_owner": "吳重樺",
+      "signature_email": "wuzhonghua@yxsurvey.com.tw",
+      "card_status": "pending",
+      "passed": true
+    },
+    {
+      "scenario": "S06_claim_softlock_by_luowei",
+      "kind": "claim",
+      "reaction_ms": 0.0,
+      "signature_owner": "羅薇",
+      "signature_email": "luowei@yxsurvey.com.tw",
+      "card_status": "claimed",
+      "passed": true
+    },
+    {
+      "scenario": "S07_softlock_collision_blocked",
+      "kind": "collision_softlock",
+      "reaction_ms": 0.001,
+      "signature_owner": "羅薇",
+      "signature_email": "luowei@yxsurvey.com.tw",
+      "card_status": "collision_softlock",
+      "passed": true
+    },
+    {
+      "scenario": "S08_multi_person_handoff_to_wukehan",
+      "kind": "handoff",
+      "reaction_ms": 0.0,
+      "signature_owner": "吳科翰",
+      "signature_email": "wukehan@yxsurvey.com.tw",
+      "card_status": "handoff",
+      "passed": true
+    },
+    {
+      "scenario": "S09_staged_partial_delivery_by_wukehan",
+      "kind": "edit_draft",
+      "reaction_ms": 0.0,
+      "signature_owner": "吳科翰",
+      "signature_email": "wukehan@yxsurvey.com.tw",
+      "card_status": "pending",
+      "passed": true
+    },
+    {
+      "scenario": "S10_edit_and_direct_approve_by_wukehan",
+      "kind": "edit_and_approve",
+      "reaction_ms": 0.0,
+      "signature_owner": "吳科翰",
+      "signature_email": "wukehan@yxsurvey.com.tw",
+      "card_status": "approved",
+      "passed": true
+    }
+  ]
+}

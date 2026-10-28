@@ -1,0 +1,27 @@
+{
+  "started_at": "2026-10-25T14:47:13.035720+08:00",
+  "baseline_im_position_oc_bbbb": 287,
+  "baseline_im_position_oc_bot": 169,
+  "processed_im_ids": [
+    "om_x100b62ee702b44a0ed659672240f650",
+    "om_x100b63fa3ee4bca0ed5e6dd06e721c8",
+    "om_x100b63fa3e3c98a0ed38f37be6ce9a0",
+    "om_x100b63e95becf0a0ed57045f035a227",
+    "om_x100b63ea9a9304a4ed3c52ae6cfa010",
+    "om_x100b621bd0fd80a0eed1d0287ad1649",
+    "om_x100b627b7f77d8a0ed59f68006feba3",
+    "om_x100b627b7c207ca4ed3250172625bbd",
+    "om_x100b62ee0d7890a0ed32cdac3a3073b",
+    "om_x100b62ee11eaf8a4ed4173a1add9024",
+    "om_x100b62ee047608a0ff50a77acbfd494",
+    "om_x100b62ee11f2d4a8eed3d15c0e8d694"
+  ],
+  "processed_mail_ids": [
+    "YmQ2MGU1Y2EtZDJhYi00YzA4LWIxYmYtMDMxMzUzYjEwMjMz"
+  ],
+  "sent_reply_ids": [
+    "om_x100b62ee11eaf8a4ed4173a1add9024",
+    "om_x100b62ee11f2d4a8eed3d15c0e8d694"
+  ],
+  "events_handled": []
+}

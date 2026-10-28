@@ -1,0 +1,44 @@
+{
+  "command": [
+    "python3",
+    "/workspace/pstack_verify/preflight_guard.py"
+  ],
+  "phase": "R30_INTEGRATION",
+  "started_at": "2026-10-25T00:54:32.199259+08:00",
+  "finished_at": "2026-10-25T00:55:20.427019+08:00",
+  "returncode": 0,
+  "passed": true,
+  "stdout": "[PASS CORR-01] R28_TEST_加班 (tblSnPG0k6PGREbA): 0 broken formula refs, 0 hardcoded PII names\n[PASS CORR-01] R28_TEST_R4公式驗證 (tblzWhaKdPW1xV2i): 0 broken formula refs, 0 hardcoded PII names\n[PASS CORR-01] R28_TEST_勞健保 (tblHhb5BzPcU3oQY): 0 broken formula refs, 0 hardcoded PII names\n[PASS CORR-01] v3_出工明細 (tblhO86UFMG2vZox): 0 broken formula refs, 0 hardcoded PII names\n[PASS CORR-01] V4_外業工作單 (tbl5zPLS0ExWNEty): 0 broken formula refs, 0 hardcoded PII names\n[PASS CORR-01] V4_工序 (tblWnXoAbdAiisjs): 0 broken formula refs, 0 hardcoded PII names\n[PASS CORR-01] v3_工序 (tbles151Dr2dsCyc): 0 broken formula refs, 0 hardcoded PII names\n[PASS CORR-01] V4_費用明細 (tbljBgi81x5YxzkV): 0 broken formula refs, 0 hardcoded PII names\n[PASS CORR-01] V4_計價請款 (tblKd3INeMtCKUpL): 0 broken formula refs, 0 hardcoded PII names\n[PASS CORR-01] V4_案件月損益 (tblPfWRC4jBQpHlu): 0 broken formula refs, 0 hardcoded PII names\n[PASS CORR-01] ASSET_儀器總表 (tblHZFEypeKfWOsF): 0 broken formula refs, 0 hardcoded PII names\n[PASS CORR-01] ASSET_儀器借單明細 (tbl5qdqsc4W7zYsS): 0 broken formula refs, 0 hardcoded PII names\n[PASS CORR-01] ASSET_車輛 (tblYUUwi0MEGuLZ0): 0 broken formula refs, 0 hardcoded PII names\n[PASS CORR-02] ASSET (YHqcbb8MHa4VdGsA0UnjajNDpgd) custom roles: all 5 roles explicitly govern `人員名單（同步）` (0 None)\n[PASS CORR-03a] v3 `腳本執行記錄` (`tblZCel5onAAA8Sm`) `reczz28R9pSoq9Dm`: `心跳有效 = \"true\"` under R11 formula\n[PASS CORR-03b] v3 `組日狀態` (`tblhTywZd0Mm5k5l`): all 5 dates (2026-10-24..2026-10-28) have >=22 active group rows seeded\n[PASS CORR-04] V4_費用明細 (tbljBgi81x5YxzkV): 0 residual test records\n[PASS CORR-04] v3_費用明細 (tbllNI0Tio504WRy): 0 residual test records\n[PASS CORR-04] V4_公司卡交易 (tbljx7gdse2bQ1tJ): 0 residual test records\n[PASS CORR-04] v3_公司卡交易 (tblccOhiJThCkh0v): 0 residual test records\n[PASS CORR-05] ASSET `人員名單（同步）` (`tblXmhGI18fQeOOS`): 16 `離職` rows, 83 total rows\n[PASS CORR-06] R7 v3 `案件` (`tblWsSaOcy4nKuGI`): `fldNVXQ8pC` (最早工作單日) & `fldyvBSPo3` (🔴重複編號) verified as formulas\n[PASS CORR-07] Ledger Integrity Guard (/workspace/ledger/需求總賬.md): 88 rows verified (0 duplicate IDs, all 9-column rows, valid 分類, all BLOCKED/卡住 rows have 解卡人 & 期限)\n[PASS CORR-08] V3 74 tables × 20 roles permission matrix guard: 0 downgrades (live_spot_checked=5, core_5_ext=PASS, core_5_int=PASS, six_bases=59roles/717unmapped, registry_sha=911b6a3766a6)\n[PASS CORR-09] 總機靜態＋狀態守衛：BFS 46284 狀態、98654 轉移、0違規、4/4舊突變；R29六鎖6/6＋回滾突變、實庫六鎖與競態dry-run通過；0寄送\n[PASS CORR-10] 加班邊界守衛（跨午夜／超4h截斷／同日拆單）：6筆跨日全數標記、5筆平日超4h截斷與4組同日拆單已由人日聚合修復、PAY_TEST R4公式 15/15 PASS\n[PASS CORR-11]] 自審自批／無佐證加班／雙重身分津貼守衛：[MASKED_HR_PRIVATE]筆已核准AUTO_PASS（總計[MASKED_HR_PRIVATE]筆空審批節點）全數改由真實上級主管路由（[MASKED_HR_PRIVATE]空主管、[MASKED_HR_PRIVATE]無佐證鎖定）、[MASKED_HR_PRIVATE]筆空白薪資姓名與[MASKED_HR_PRIVATE]人日同日多單津貼納入[MASKED_HR_PRIVATE]筆差異佇列監控\n[PASS CORR-12] 勞健保手動Override／三表封頂／破月與25日負數守衛：62筆PAY_TEST勞健保100%符合封頂(45800/150000/313000)與覆寫元資料、39人跨月修正漂移已識別、萬鈞10/05破月與3筆空白列已隔離、4筆25日負數(-2250/-29500)已由v2歸零攔截\n[PASS CORR-13] V3/V4切替邊界與隱形字元消毒守衛：6張表共 511 處尾端空白／換行污染經 norm_name/norm_case_code 100% 消毒（0殘留）、PostgreSQL 員工主檔 0 髒字元、V3/V4雙軌視圖 5456 人日 0 重複鍵\n=== ALL PRE-FLIGHT INVARIANTS (CORR-01 ~ CORR-13) PASSED ===\n",
+  "stderr": "",
+  "scope_note": "已檢視guard與v3_role_matrix_guard；只有Lark list/get與ledger唯讀檢查，沒有Gmail/Lark寫入。全域guard不替代本機總機驗收。",
+  "corr01_to09": {
+    "CORR-01": {
+      "passed": true
+    },
+    "CORR-02": {
+      "passed": true
+    },
+    "CORR-03": {
+      "passed": true
+    },
+    "CORR-04": {
+      "passed": true
+    },
+    "CORR-05": {
+      "passed": true
+    },
+    "CORR-06": {
+      "passed": true
+    },
+    "CORR-07": {
+      "passed": true
+    },
+    "CORR-08": {
+      "passed": true
+    },
+    "CORR-09": {
+      "passed": true
+    }
+  },
+  "requested_corr01_to09_passed": true
+}

@@ -1,0 +1,419 @@
+[
+  {
+    "category_id": "CAT-01",
+    "name_zh": "詢價、招標、議價與報價單往來 (RFQ, Tendering, Price Negotiation & Quote Confirmation)",
+    "reply_template": "{{client_name}}您好，已收到 {{case_code}} 詢價。報價編號 {{quote_no}}，請確認範圍及規格；核准版 {{approved_version}} 將由經辦查核。\n{{pm_name}}",
+    "keywords": [
+      "詢價",
+      "报价",
+      "報價",
+      "報編",
+      "議價",
+      "招標",
+      "rfq",
+      "quotation"
+    ],
+    "rules": [
+      "詢價/報價回傳須核實quote與核版文件；基本資料、詢價回覆-修、PM報價回傳回覆僅知範本名稱，未取得Gmail範本原文"
+    ],
+    "source_refs": [
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.json",
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.md",
+      "/workspace/yongxiang_arch/PLUMB_V2_CLIENT_COMM_HARMONY_SPEC_R28.md"
+    ],
+    "legacy_playbook_refs": [
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "QUOTE",
+        "reply_template_sha256": "cbb25e7b7a6a1ddc9d974c37b4e3ab5bb6bcd033592c908a9f751de2ad24c979"
+      }
+    ],
+    "grounded_thread_ids": [
+      "QUhEMUJzRGtJNUpLOGdyZytJRVBkNytTRFlBPQ=="
+    ],
+    "example_status": "GROUNDED",
+    "sla_hours": 24,
+    "requires_human": true,
+    "template_origin": "沿用既有playbook需求與用語，依權威CAT及零外發規格調整；非Gmail草稿原文"
+  },
+  {
+    "category_id": "CAT-02",
+    "name_zh": "測量成果提送、階段報告與施工日報繳交 (Survey Deliverables, Interim/Final Reports & Daily Logs)",
+    "reply_template": "{{client_name}}您好，附件提供 {{case_code}} 核准成果 {{approved_version}}。交付清單：{{deliverable_list}}。如需修正請標示圖號、頁次。\n{{pm_name}}",
+    "keywords": [
+      "成果提供",
+      "成果資料",
+      "成果交付",
+      "成果圖",
+      "成果图",
+      "成果提送",
+      "日報提供",
+      "期中成果",
+      "期末成果",
+      "舊成果"
+    ],
+    "rules": [
+      "⛔入帳後再寄出：未核實付款不得交付",
+      "台塑/麥電禁止外網連結；核准檔案依業主上限拆檔或紙本/光碟",
+      "成果PDF/DWG/照片清單由核版資料確認"
+    ],
+    "source_refs": [
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.json",
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.md",
+      "/workspace/yongxiang_arch/PLUMB_V2_CLIENT_COMM_HARMONY_SPEC_R28.md"
+    ],
+    "legacy_playbook_refs": [
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "DELIVERABLE",
+        "reply_template_sha256": "89e6a63c39fc7b0bb2691cc0ab6c3e6589110b4307776ad6370385657c67462d"
+      }
+    ],
+    "grounded_thread_ids": [],
+    "example_status": "NO_EXAMPLE",
+    "sla_hours": 24,
+    "requires_human": true,
+    "template_origin": "沿用既有playbook需求與用語，依權威CAT及零外發規格調整；非Gmail草稿原文"
+  },
+  {
+    "category_id": "CAT-03",
+    "name_zh": "審查意見回覆、成果修正、建築線補正與施測異常重測 (Review Comments, Deliverable Revisions, Building Line Corrections & Re-survey)",
+    "reply_template": "{{client_name}}您好，關於 {{case_code}}，逐條審查意見回覆如下：\n{{review_rows}}\n修正版 {{approved_version}} 待查核。\n{{pm_name}}",
+    "keywords": [
+      "審查",
+      "修正",
+      "補正",
+      "退件",
+      "不符合規範",
+      "重測",
+      "jsa"
+    ],
+    "rules": [
+      "高鐵逐條意見/回覆/頁碼/圖號；未有複測證據不可宣稱完成",
+      "台塑/南亞JSA教育訓練日期不得早於審查完成日並附彩色照片"
+    ],
+    "source_refs": [
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.json",
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.md",
+      "/workspace/yongxiang_arch/PLUMB_V2_CLIENT_COMM_HARMONY_SPEC_R28.md"
+    ],
+    "legacy_playbook_refs": [
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "DELIVERABLE",
+        "reply_template_sha256": "89e6a63c39fc7b0bb2691cc0ab6c3e6589110b4307776ad6370385657c67462d"
+      },
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "COMPLIANCE",
+        "reply_template_sha256": "f9c8781404e8a8e34fa142af07575228d66d37a323da323d333011c58c696a59"
+      }
+    ],
+    "grounded_thread_ids": [],
+    "example_status": "NO_EXAMPLE",
+    "sla_hours": 24,
+    "requires_human": true,
+    "template_origin": "沿用既有playbook需求與用語，依權威CAT及零外發規格調整；非Gmail草稿原文"
+  },
+  {
+    "category_id": "CAT-04",
+    "name_zh": "工務行政：出入廠申請、高鐵夜間違規/軌道作業核准、無人機空域與職安教育訓練 (Site Access Permits, Track/Airspace Approvals, EHS Training & Daily Headcount)",
+    "reply_template": "{{client_name}}您好，關於 {{case_code}} 入廠/作業申請，請查核 {{permit_details}}，進場條件須待核准。\n{{pm_name}}",
+    "keywords": [
+      "出入廠",
+      "入廠",
+      "入厂",
+      "作業申請",
+      "職安",
+      "空域",
+      "hsror",
+      "進場",
+      "进场",
+      "核准通知"
+    ],
+    "rules": [
+      "台塑出廠日期原則5工作天內；效期、保險與訓練須查核",
+      "高鐵HSROR/作業核准及無人機空域許可須綁案件日期；不自動寫預排"
+    ],
+    "source_refs": [
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.json",
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.md",
+      "/workspace/yongxiang_arch/PLUMB_V2_CLIENT_COMM_HARMONY_SPEC_R28.md"
+    ],
+    "legacy_playbook_refs": [
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "FIELD",
+        "reply_template_sha256": "8751132bf544f43e591cd9da2c34df86a264105f70d6415506491b4b14c0c7a4"
+      },
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "COMPLIANCE",
+        "reply_template_sha256": "f9c8781404e8a8e34fa142af07575228d66d37a323da323d333011c58c696a59"
+      }
+    ],
+    "grounded_thread_ids": [],
+    "example_status": "NO_EXAMPLE",
+    "sla_hours": 24,
+    "requires_human": true,
+    "template_origin": "沿用既有playbook需求與用語，依權威CAT及零外發規格調整；非Gmail草稿原文"
+  },
+  {
+    "category_id": "CAT-05",
+    "name_zh": "契約工作指示單、決標通知、開工/會勘通知與電子公文催收 (Contract Work Orders, Award Notices, Site Inspections & Official e-Documents)",
+    "reply_template": "{{client_name}}您好，關於 {{case_code}} 合約 {{contract_no}} 工單 {{work_order_no}} 已收悉。待確認事項：{{pending_items}}；範圍與期限請雙方核實。\n{{pm_name}}",
+    "keywords": [
+      "契約工作指示單",
+      "決標",
+      "開工",
+      "會勘",
+      "公文",
+      "合約",
+      "合同",
+      "用印",
+      "簽回",
+      "contract",
+      "加測",
+      "追加",
+      "口頭承諾"
+    ],
+    "rules": [
+      "高鐵PCDL-25-0376/0089開口合約核對母案、工單、子案、餘額及期限",
+      "契約/追加/折扣/變更由PM以上核准，不自動成案或改契約"
+    ],
+    "source_refs": [
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.json",
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.md",
+      "/workspace/yongxiang_arch/PLUMB_V2_CLIENT_COMM_HARMONY_SPEC_R28.md"
+    ],
+    "legacy_playbook_refs": [
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "CONTRACT",
+        "reply_template_sha256": "1afe4aab8903eefcc0a0bb62e13dd04ddeac043688b2aae754eb326f4ac7c2c7"
+      }
+    ],
+    "grounded_thread_ids": [
+      "Ym9JOFJqOW1RRVY0Rm1XU2RTU1kvWkN5K1VnPQ=="
+    ],
+    "example_status": "GROUNDED",
+    "sla_hours": 24,
+    "requires_human": true,
+    "template_origin": "沿用既有playbook需求與用語，依權威CAT及零外發規格調整；非Gmail草稿原文"
+  },
+  {
+    "category_id": "CAT-06",
+    "name_zh": "驗收核決、計價數量確認、請款通知與銀行入帳/電子發票 (Acceptance, Billing Quantity Confirmation, Invoicing & Payment Remittance)",
+    "reply_template": "{{client_name}}您好，關於 {{case_code}} 帳務文件 {{invoice_no}}，品名 {{invoice_item}}，請確認收件與處理狀態，核准版 {{approved_version}} 由財務查核。\n{{pm_name}}",
+    "keywords": [
+      "驗收",
+      "計價",
+      "請款",
+      "發票",
+      "发票",
+      "invoice",
+      "payment",
+      "入帳",
+      "付款",
+      "收款",
+      "帳款"
+    ],
+    "rules": [
+      "中華工程發票10–20日；品名嚴格為合約編號+合約名稱+第X期計價",
+      "估驗單、計價單一式二份；蓋合約計價及領款章（大小章）",
+      "台塑依工程編號至電子採購網請款；金額須核報價/發票"
+    ],
+    "source_refs": [
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.json",
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.md",
+      "/workspace/yongxiang_arch/PLUMB_V2_CLIENT_COMM_HARMONY_SPEC_R28.md"
+    ],
+    "legacy_playbook_refs": [
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "BILLING",
+        "reply_template_sha256": "c4bbed10e53f9970a3b359d8720ca51220ead7b5b634873abe2ada2e3b69ee92"
+      }
+    ],
+    "grounded_thread_ids": [
+      "WDNoZmxzdFgxNzhqK3o4STd6UmhpTThCcjl3PQ==",
+      "ZEVOM1ZuRGE2NzVkcWdFT0JIVm9hOVdQbU1JPQ==",
+      "aG1VTWFDNG5kR0V0N2l0MVJaVEtKc3g2NkJjPQ=="
+    ],
+    "example_status": "GROUNDED",
+    "sla_hours": 24,
+    "requires_human": true,
+    "template_origin": "沿用既有playbook需求與用語，依權威CAT及零外發規格調整；非Gmail草稿原文"
+  },
+  {
+    "category_id": "CAT-07",
+    "name_zh": "下包廠商/地政士請款、代墊規費與外包詢報價 (Subcontractor Billing, Land Scrivener Fees & Vendor Quotes)",
+    "reply_template": "{{client_name}}您好，已收到 {{case_code}} 下包/代墊資料，請協助補齊 {{pending_items}}；交易與金額由財務查核。\n{{pm_name}}",
+    "keywords": [
+      "下包",
+      "地政士",
+      "代墊",
+      "小柯",
+      "展洲",
+      "世和"
+    ],
+    "rules": [
+      "先區分應收與應付；下包/地政士代墊須核交易與單據，不輸出我方成本"
+    ],
+    "source_refs": [
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.json",
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.md",
+      "/workspace/yongxiang_arch/PLUMB_V2_CLIENT_COMM_HARMONY_SPEC_R28.md"
+    ],
+    "legacy_playbook_refs": [
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "BILLING",
+        "reply_template_sha256": "c4bbed10e53f9970a3b359d8720ca51220ead7b5b634873abe2ada2e3b69ee92"
+      },
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "QUOTE",
+        "reply_template_sha256": "cbb25e7b7a6a1ddc9d974c37b4e3ab5bb6bcd033592c908a9f751de2ad24c979"
+      }
+    ],
+    "grounded_thread_ids": [],
+    "example_status": "NO_EXAMPLE",
+    "sla_hours": 24,
+    "requires_human": true,
+    "template_origin": "沿用既有playbook需求與用語，依權威CAT及零外發規格調整；非Gmail草稿原文"
+  },
+  {
+    "category_id": "CAT-08",
+    "name_zh": "海事工程、離岸風電、無人船/水下設備跨國採購與報關物流 (Offshore Wind, Marine Survey, USV/ROV International Procurement & DHL Customs)",
+    "reply_template": "{{client_name}}您好，關於 {{case_code}} 海事設備與物流，請確認 {{pending_items}}。費用及責任條款待主管核實。\n{{pm_name}}",
+    "keywords": [
+      "海事",
+      "離岸",
+      "rov",
+      "usv",
+      "dhl",
+      "報關",
+      "报关",
+      "订单发货",
+      "訂單出貨",
+      "裝箱"
+    ],
+    "rules": [
+      "海事/離岸/USV/ROV/報關與採購責任、費用人工查核；不採信未核對銀行帳號"
+    ],
+    "source_refs": [
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.json",
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.md",
+      "/workspace/yongxiang_arch/PLUMB_V2_CLIENT_COMM_HARMONY_SPEC_R28.md"
+    ],
+    "legacy_playbook_refs": [
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "PROCUREMENT_LOGISTICS",
+        "reply_template_sha256": "b99d3391a52af017211a27fed6eaa0fe6bcab49e752aaaa101f409d48a0dd58f"
+      },
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "QUOTE",
+        "reply_template_sha256": "cbb25e7b7a6a1ddc9d974c37b4e3ab5bb6bcd033592c908a9f751de2ad24c979"
+      }
+    ],
+    "grounded_thread_ids": [
+      "eVN5djdpcGxobnZsSHp0YXBROTYxakJQUUNRPQ=="
+    ],
+    "example_status": "GROUNDED",
+    "sla_hours": 24,
+    "requires_human": true,
+    "template_origin": "沿用既有playbook需求與用語，依權威CAT及零外發規格調整；非Gmail草稿原文"
+  },
+  {
+    "category_id": "CAT-09",
+    "name_zh": "人力資源：104/1111 應徵履歷、配對推薦、勞健保帳單與培訓機構 (HR Recruitment, Job Bank Resumes, Labor/Health Insurance & Training Centers)",
+    "reply_template": "[MASKED_HR_PRIVATE]；僅限授權人資人工處理，禁止對外放行。",
+    "keywords": [
+      "104",
+      "1111",
+      "履歷",
+      "履历",
+      "應徵",
+      "招聘",
+      "招募",
+      "薪資",
+      "salary",
+      "勞保",
+      "健保"
+    ],
+    "rules": [
+      "人資/履歷與薪酬隔離；[MASKED_HR_PRIVATE]，不自動外發"
+    ],
+    "source_refs": [
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.json",
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.md",
+      "/workspace/yongxiang_arch/PLUMB_V2_CLIENT_COMM_HARMONY_SPEC_R28.md"
+    ],
+    "legacy_playbook_refs": [
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "HR_ADMIN",
+        "reply_template_sha256": "986281fc9165a07a5a27e92a7ae3c107f5f9e5e26815a89803d38bab0c67039b"
+      }
+    ],
+    "grounded_thread_ids": [
+      "OThkYjg1N2MtMDkwYS00OTZkLThjNTItMzc2MTAyNTQ4NmRl",
+      "cWE3SmtnZ1BzZzN1dXVMY3paSkhoMUVvcVlBPQ=="
+    ],
+    "example_status": "GROUNDED",
+    "sla_hours": 48,
+    "requires_human": true,
+    "template_origin": "沿用既有playbook需求與用語，依權威CAT及零外發規格調整；非Gmail草稿原文"
+  },
+  {
+    "category_id": "CAT-10",
+    "name_zh": "系統驗證碼 (OTP)、氣象警報、公協會活動與行銷電子報 (System OTPs, Weather Alerts, Association Newsletters & Marketing Noise)",
+    "reply_template": "系統通知待管理員查核；e-GNSS 驗證碼不對外回覆。",
+    "keywords": [
+      "驗證碼",
+      "confirmation code",
+      "verification code",
+      "password",
+      "登入",
+      "login",
+      "氣象",
+      "警報",
+      "newsletter",
+      "welcome",
+      "secure link"
+    ],
+    "rules": [
+      "e-GNSS/EBCS驗證碼為敏感系統事件；本MVP遮蔽且不推播、不回覆",
+      "氣象/行銷/無法分類只入待確認佇列"
+    ],
+    "source_refs": [
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.json",
+      "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.md",
+      "/workspace/yongxiang_arch/PLUMB_V2_CLIENT_COMM_HARMONY_SPEC_R28.md"
+    ],
+    "legacy_playbook_refs": [
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "HR_ADMIN",
+        "reply_template_sha256": "986281fc9165a07a5a27e92a7ae3c107f5f9e5e26815a89803d38bab0c67039b"
+      },
+      {
+        "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+        "intent_code": "OTHER",
+        "reply_template_sha256": "41948a21a4f697256a2055d75b48ce08a662c31e325e58a0c4299dd31a0a8a8a"
+      }
+    ],
+    "grounded_thread_ids": [
+      "K2gvRU0wcWt3NlhKMTZBS1RRQVpuSnpDVnF3PQ==",
+      "MDhCMHVZdnRlcHBiMGNPelFkM1dialBFTDFFPQ==",
+      "MWhoQzJteVZvdzQxellPOFJCN1c0ZCtqQ3NzPQ=="
+    ],
+    "example_status": "GROUNDED",
+    "sla_hours": 48,
+    "requires_human": true,
+    "template_origin": "沿用既有playbook需求與用語，依權威CAT及零外發規格調整；非Gmail草稿原文"
+  }
+]

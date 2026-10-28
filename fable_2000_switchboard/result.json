@@ -1,0 +1,2894 @@
+{
+  "generated_at": "2026-10-25T10:12:56.003410+08:00",
+  "passed": false,
+  "failed_count": 7,
+  "checks": [
+    {
+      "name": "dim/fact恰好5+5物件；定義、欄位、ACL、owner與資料雜湊全數未變",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "counts": {
+          "dim": 5,
+          "fact": 5
+        },
+        "snapshot_equal": true
+      }
+    },
+    {
+      "name": "SQL重跑兩次不增資料或流水號",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "CAT-01至CAT-10十劇本已入庫且沿用舊playbooks",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "count": 10
+      }
+    },
+    {
+      "name": "全部新增資料表與三視圖僅存在public",
+      "passed": true,
+      "kind": "implementation",
+      "detail": [
+        {
+          "kind": "v",
+          "name": "case_timeline_v",
+          "schema": "public"
+        },
+        {
+          "kind": "r",
+          "name": "client_commitment",
+          "schema": "public"
+        },
+        {
+          "kind": "r",
+          "name": "client_communication",
+          "schema": "public"
+        },
+        {
+          "kind": "v",
+          "name": "customer_behavior_v",
+          "schema": "public"
+        },
+        {
+          "kind": "r",
+          "name": "email_playbook_rag",
+          "schema": "public"
+        },
+        {
+          "kind": "r",
+          "name": "outbound_message",
+          "schema": "public"
+        },
+        {
+          "kind": "v",
+          "name": "settlement_commitment_v",
+          "schema": "public"
+        },
+        {
+          "kind": "r",
+          "name": "switchboard_intake",
+          "schema": "public"
+        },
+        {
+          "kind": "r",
+          "name": "switchboard_serial",
+          "schema": "public"
+        }
+      ]
+    },
+    {
+      "name": "沿用語料/劇本/驗收/權威規格雜湊未改",
+      "passed": false,
+      "kind": "implementation",
+      "detail": {
+        "changed": [
+          "/workspace/yongxiang_arch/email_harmony_rag/acceptance.py"
+        ]
+      }
+    },
+    {
+      "name": "重用既有email_harmony_rag驗收實際重跑通過",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "returncode": 0,
+        "result_path": "/workspace/yongxiang_arch/email_harmony_rag/result.json"
+      }
+    },
+    {
+      "name": "缺Sheet/Gmail草稿匯出如實記錄且未造列",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "gap": "未找到可核實的指定Google Sheet原始列與Gmail草稿原文；參考報告不是資料匯出。未製造12084列。",
+        "candidate_reviews": [
+          {
+            "path": "/workspace/quote-settlement/ref/sheet1.xlsx",
+            "finding": "已檢查工作表名稱與sharedStrings：含業主往來紀錄表的SOP文字；34個工作表中沒有該紀錄表，非指定Sheet匯出。"
+          }
+        ]
+      }
+    },
+    {
+      "name": "形式驗證：完整BFS遍歷outbound_message與client_commitment；INV-01..04零違規",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "states_explored": 46284,
+        "transitions_explored": 98654,
+        "roster_count": 81,
+        "gate_input_vectors_checked": 1024,
+        "scope": "固定一份草稿與一筆承諾的有限模型；81名冊成員逐一枚舉，另含未核准與名冊外。十閘門1024輸入依合取結果做精確等價化；敏感詞依命中布林等價化；結算卡識別依空／非空等價化。窮舉所有交錯，付款只增不撤，草稿與核准證據不在同一版本內修改。書面確認為草稿，不代表寄送。"
+      }
+    },
+    {
+      "name": "形式驗證：Mutant-1移除單一守衛可重現INV-01最短反例",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "mutant": 1,
+        "states_explored": 33394,
+        "states_discovered": 40762,
+        "transitions_explored": 80211,
+        "exhaustive": false,
+        "violations": 1,
+        "violated_invariant": "INV-01",
+        "counterexample_trace": [
+          {
+            "action": "Init",
+            "state": {
+              "outbound_status": "NEW",
+              "approved_by": 0,
+              "all_10_gates_passed": true,
+              "category_id": "CAT-02",
+              "hold_until_paid": false,
+              "payment_received": false,
+              "has_forbidden_term": false,
+              "commitment_kind": "NONE",
+              "written_confirmation_draft": false,
+              "settlement_card_id": 0,
+              "commitment_status": "OPEN"
+            }
+          },
+          {
+            "action": "LoadPlainDraft",
+            "state": {
+              "outbound_status": "DRAFT",
+              "approved_by": 0,
+              "all_10_gates_passed": true,
+              "category_id": "CAT-02",
+              "hold_until_paid": false,
+              "payment_received": false,
+              "has_forbidden_term": false,
+              "commitment_kind": "NONE",
+              "written_confirmation_draft": false,
+              "settlement_card_id": 0,
+              "commitment_status": "OPEN"
+            }
+          },
+          {
+            "action": "EvaluateOutboundGates",
+            "state": {
+              "outbound_status": "GATE_CHECKED",
+              "approved_by": 0,
+              "all_10_gates_passed": true,
+              "category_id": "CAT-02",
+              "hold_until_paid": false,
+              "payment_received": false,
+              "has_forbidden_term": false,
+              "commitment_kind": "NONE",
+              "written_confirmation_draft": false,
+              "settlement_card_id": 0,
+              "commitment_status": "OPEN"
+            }
+          },
+          {
+            "action": "HumanApproveOutbound",
+            "state": {
+              "outbound_status": "APPROVED",
+              "approved_by": 0,
+              "all_10_gates_passed": true,
+              "category_id": "CAT-02",
+              "hold_until_paid": false,
+              "payment_received": false,
+              "has_forbidden_term": false,
+              "commitment_kind": "NONE",
+              "written_confirmation_draft": false,
+              "settlement_card_id": 0,
+              "commitment_status": "OPEN"
+            }
+          },
+          {
+            "action": "SimulateSendApprovedOutbound",
+            "state": {
+              "outbound_status": "SENT",
+              "approved_by": 0,
+              "all_10_gates_passed": true,
+              "category_id": "CAT-02",
+              "hold_until_paid": false,
+              "payment_received": false,
+              "has_forbidden_term": false,
+              "commitment_kind": "NONE",
+              "written_confirmation_draft": false,
+              "settlement_card_id": 0,
+              "commitment_status": "OPEN"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "形式驗證：Mutant-2移除單一守衛可重現INV-02最短反例",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "mutant": 2,
+        "states_explored": 24065,
+        "states_discovered": 33256,
+        "transitions_explored": 61334,
+        "exhaustive": false,
+        "violations": 1,
+        "violated_invariant": "INV-02",
+        "counterexample_trace": [
+          {
+            "action": "Init",
+            "state": {
+              "outbound_status": "NEW",
+              "approved_by": 1,
+              "all_10_gates_passed": true,
+              "category_id": "CAT-02",
+              "hold_until_paid": true,
+              "payment_received": false,
+              "has_forbidden_term": false,
+              "commitment_kind": "NONE",
+              "written_confirmation_draft": false,
+              "settlement_card_id": 0,
+              "commitment_status": "OPEN"
+            }
+          },
+          {
+            "action": "LoadPlainDraft",
+            "state": {
+              "outbound_status": "DRAFT",
+              "approved_by": 1,
+              "all_10_gates_passed": true,
+              "category_id": "CAT-02",
+              "hold_until_paid": true,
+              "payment_received": false,
+              "has_forbidden_term": false,
+              "commitment_kind": "NONE",
+              "written_confirmation_draft": false,
+              "settlement_card_id": 0,
+              "commitment_status": "OPEN"
+            }
+          },
+          {
+            "action": "EvaluateOutboundGates",
+            "state": {
+              "outbound_status": "GATE_CHECKED",
+              "approved_by": 1,
+              "all_10_gates_passed": true,
+              "category_id": "CAT-02",
+              "hold_until_paid": true,
+              "payment_received": false,
+              "has_forbidden_term": false,
+              "commitment_kind": "NONE",
+              "written_confirmation_draft": false,
+              "settlement_card_id": 0,
+              "commitment_status": "OPEN"
+            }
+          },
+          {
+            "action": "HumanApproveOutbound",
+            "state": {
+              "outbound_status": "APPROVED",
+              "approved_by": 1,
+              "all_10_gates_passed": true,
+              "category_id": "CAT-02",
+              "hold_until_paid": true,
+              "payment_received": false,
+              "has_forbidden_term": false,
+              "commitment_kind": "NONE",
+              "written_confirmation_draft": false,
+              "settlement_card_id": 0,
+              "commitment_status": "OPEN"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "形式驗證：Mutant-3移除單一守衛可重現INV-03最短反例",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "mutant": 3,
+        "states_explored": 2658,
+        "states_discovered": 11954,
+        "transitions_explored": 10627,
+        "exhaustive": false,
+        "violations": 1,
+        "violated_invariant": "INV-03",
+        "counterexample_trace": [
+          {
+            "action": "Init",
+            "state": {
+              "outbound_status": "NEW",
+              "approved_by": 0,
+              "all_10_gates_passed": false,
+              "category_id": "CAT-02",
+              "hold_until_paid": false,
+              "payment_received": false,
+              "has_forbidden_term": false,
+              "commitment_kind": "NONE",
+              "written_confirmation_draft": false,
+              "settlement_card_id": 0,
+              "commitment_status": "OPEN"
+            }
+          },
+          {
+            "action": "LoadSensitiveDraft",
+            "state": {
+              "outbound_status": "DRAFT",
+              "approved_by": 0,
+              "all_10_gates_passed": false,
+              "category_id": "CAT-02",
+              "hold_until_paid": false,
+              "payment_received": false,
+              "has_forbidden_term": true,
+              "commitment_kind": "NONE",
+              "written_confirmation_draft": false,
+              "settlement_card_id": 0,
+              "commitment_status": "OPEN"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "形式驗證：Mutant-4移除單一守衛可重現INV-04最短反例",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "mutant": 4,
+        "states_explored": 2664,
+        "states_discovered": 13293,
+        "transitions_explored": 11979,
+        "exhaustive": false,
+        "violations": 1,
+        "violated_invariant": "INV-04",
+        "counterexample_trace": [
+          {
+            "action": "Init",
+            "state": {
+              "outbound_status": "NEW",
+              "approved_by": 0,
+              "all_10_gates_passed": false,
+              "category_id": "CAT-02",
+              "hold_until_paid": false,
+              "payment_received": false,
+              "has_forbidden_term": false,
+              "commitment_kind": "SCOPE_CHANGE_OR_ADDON",
+              "written_confirmation_draft": false,
+              "settlement_card_id": 0,
+              "commitment_status": "OPEN"
+            }
+          },
+          {
+            "action": "CloseCommitment",
+            "state": {
+              "outbound_status": "NEW",
+              "approved_by": 0,
+              "all_10_gates_passed": false,
+              "category_id": "CAT-02",
+              "hold_until_paid": false,
+              "payment_received": false,
+              "has_forbidden_term": false,
+              "commitment_kind": "SCOPE_CHANGE_OR_ADDON",
+              "written_confirmation_draft": false,
+              "settlement_card_id": 0,
+              "commitment_status": "CLOSED"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "R29：六鎖有限模型完整BFS零違規",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "passed": true,
+        "production": [
+          {
+            "lock": 1,
+            "mutant": 0,
+            "exhaustive": true,
+            "states_explored": 33,
+            "states_discovered": 33,
+            "transitions_explored": 1,
+            "violations": 0,
+            "violated_invariant": null,
+            "counterexample_trace": [],
+            "action_coverage": {
+              "InsertSatelliteCommand": 1
+            }
+          },
+          {
+            "lock": 2,
+            "mutant": 0,
+            "exhaustive": true,
+            "states_explored": 11,
+            "states_discovered": 11,
+            "transitions_explored": 3,
+            "violations": 0,
+            "violated_invariant": null,
+            "counterexample_trace": [],
+            "action_coverage": {
+              "WriteFinalBodyAfterStrip": 3
+            }
+          },
+          {
+            "lock": 3,
+            "mutant": 0,
+            "exhaustive": true,
+            "states_explored": 30,
+            "states_discovered": 30,
+            "transitions_explored": 62,
+            "violations": 0,
+            "violated_invariant": null,
+            "counterexample_trace": [],
+            "action_coverage": {
+              "BankNoticeCreatesCandidateOnly": 14,
+              "ClearInstrument": 14,
+              "InstrumentBecomesUncleared": 14,
+              "FinanceAllocateClearedReceipt": 4,
+              "ReverseReceiptAfterApproval": 12,
+              "ApproveWhilePaid": 2,
+              "LockedSendRechecksCurrentBalance": 2
+            }
+          },
+          {
+            "lock": 4,
+            "mutant": 0,
+            "exhaustive": true,
+            "states_explored": 100,
+            "states_discovered": 100,
+            "transitions_explored": 800,
+            "violations": 0,
+            "violated_invariant": null,
+            "counterexample_trace": [],
+            "action_coverage": {
+              "RowLockedAssignSerialOrReturnExisting": 400,
+              "WriteEntityWithCompositeCaseOrgFK": 200,
+              "RollbackSerialTransaction": 200
+            }
+          },
+          {
+            "lock": 5,
+            "mutant": 0,
+            "exhaustive": true,
+            "states_explored": 513,
+            "states_discovered": 513,
+            "transitions_explored": 1,
+            "violations": 0,
+            "violated_invariant": null,
+            "counterexample_trace": [],
+            "action_coverage": {
+              "DeliverDryRunPrivateDM": 1
+            }
+          },
+          {
+            "lock": 6,
+            "mutant": 0,
+            "exhaustive": true,
+            "states_explored": 17,
+            "states_discovered": 17,
+            "transitions_explored": 1,
+            "violations": 0,
+            "violated_invariant": null,
+            "counterexample_trace": [],
+            "action_coverage": {
+              "InsertOrUpdateRagChunk": 1
+            }
+          }
+        ],
+        "mutants": [
+          {
+            "lock": 1,
+            "mutant": 1,
+            "exhaustive": false,
+            "states_explored": 33,
+            "states_discovered": 64,
+            "transitions_explored": 32,
+            "violations": 1,
+            "violated_invariant": "R29-LOCK-1",
+            "counterexample_trace": [
+              {
+                "action": "Init",
+                "state": {
+                  "lock": 1,
+                  "phase": "new",
+                  "values": [
+                    false,
+                    false,
+                    false,
+                    false,
+                    false
+                  ]
+                }
+              },
+              {
+                "action": "InsertSatelliteCommand",
+                "state": {
+                  "lock": 1,
+                  "phase": "accepted",
+                  "values": [
+                    false,
+                    false,
+                    false,
+                    false,
+                    false
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "lock": 2,
+            "mutant": 2,
+            "exhaustive": false,
+            "states_explored": 12,
+            "states_discovered": 16,
+            "transitions_explored": 8,
+            "violations": 1,
+            "violated_invariant": "R29-LOCK-2",
+            "counterexample_trace": [
+              {
+                "action": "Init",
+                "state": {
+                  "lock": 2,
+                  "phase": "new",
+                  "values": [
+                    false,
+                    true,
+                    true
+                  ]
+                }
+              },
+              {
+                "action": "WriteFinalBodyAfterStrip",
+                "state": {
+                  "lock": 2,
+                  "phase": "accepted",
+                  "values": [
+                    false,
+                    true,
+                    true
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "lock": 3,
+            "mutant": 3,
+            "exhaustive": false,
+            "states_explored": 30,
+            "states_discovered": 35,
+            "transitions_explored": 66,
+            "violations": 1,
+            "violated_invariant": "R29-LOCK-3",
+            "counterexample_trace": [
+              {
+                "action": "Init",
+                "state": {
+                  "lock": 3,
+                  "phase": "new",
+                  "values": [
+                    0,
+                    0,
+                    false,
+                    false,
+                    false,
+                    -1
+                  ]
+                }
+              },
+              {
+                "action": "ClearInstrument",
+                "state": {
+                  "lock": 3,
+                  "phase": "new",
+                  "values": [
+                    0,
+                    0,
+                    true,
+                    false,
+                    false,
+                    -1
+                  ]
+                }
+              },
+              {
+                "action": "FinanceAllocateClearedReceipt",
+                "state": {
+                  "lock": 3,
+                  "phase": "new",
+                  "values": [
+                    100,
+                    0,
+                    true,
+                    false,
+                    false,
+                    -1
+                  ]
+                }
+              },
+              {
+                "action": "ApproveWhilePaid",
+                "state": {
+                  "lock": 3,
+                  "phase": "new",
+                  "values": [
+                    100,
+                    0,
+                    true,
+                    false,
+                    true,
+                    -1
+                  ]
+                }
+              },
+              {
+                "action": "InstrumentBecomesUncleared",
+                "state": {
+                  "lock": 3,
+                  "phase": "new",
+                  "values": [
+                    100,
+                    0,
+                    false,
+                    false,
+                    true,
+                    -1
+                  ]
+                }
+              },
+              {
+                "action": "LockedSendRechecksCurrentBalance",
+                "state": {
+                  "lock": 3,
+                  "phase": "verified",
+                  "values": [
+                    100,
+                    0,
+                    false,
+                    false,
+                    true,
+                    100
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "lock": 4,
+            "mutant": 4,
+            "exhaustive": false,
+            "states_explored": 5,
+            "states_discovered": 27,
+            "transitions_explored": 40,
+            "violations": 1,
+            "violated_invariant": "R29-LOCK-4",
+            "counterexample_trace": [
+              {
+                "action": "Init",
+                "state": {
+                  "lock": 4,
+                  "phase": "new",
+                  "values": [
+                    12085,
+                    12085,
+                    0,
+                    0,
+                    0,
+                    0,
+                    -1,
+                    -1
+                  ]
+                }
+              },
+              {
+                "action": "WriteEntityWithCompositeCaseOrgFK",
+                "state": {
+                  "lock": 4,
+                  "phase": "new",
+                  "values": [
+                    12085,
+                    12085,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    -1
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "lock": 5,
+            "mutant": 5,
+            "exhaustive": false,
+            "states_explored": 513,
+            "states_discovered": 1024,
+            "transitions_explored": 512,
+            "violations": 1,
+            "violated_invariant": "R29-LOCK-5",
+            "counterexample_trace": [
+              {
+                "action": "Init",
+                "state": {
+                  "lock": 5,
+                  "phase": "new",
+                  "values": [
+                    "missing",
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false
+                  ]
+                }
+              },
+              {
+                "action": "DeliverDryRunPrivateDM",
+                "state": {
+                  "lock": 5,
+                  "phase": "delivered",
+                  "values": [
+                    "missing",
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "lock": 6,
+            "mutant": 6,
+            "exhaustive": false,
+            "states_explored": 18,
+            "states_discovered": 32,
+            "transitions_explored": 16,
+            "violations": 1,
+            "violated_invariant": "R29-LOCK-6",
+            "counterexample_trace": [
+              {
+                "action": "Init",
+                "state": {
+                  "lock": 6,
+                  "phase": "new",
+                  "values": [
+                    "CAT-01",
+                    "CAT-06"
+                  ]
+                }
+              },
+              {
+                "action": "InsertOrUpdateRagChunk",
+                "state": {
+                  "lock": 6,
+                  "phase": "accepted",
+                  "values": [
+                    "CAT-01",
+                    "CAT-06"
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "serial_rollback_mutant": {
+          "lock": 4,
+          "mutant": 7,
+          "exhaustive": false,
+          "states_explored": 5,
+          "states_discovered": 28,
+          "transitions_explored": 32,
+          "violations": 1,
+          "violated_invariant": "R29-LOCK-4",
+          "counterexample_trace": [
+            {
+              "action": "Init",
+              "state": {
+                "lock": 4,
+                "phase": "new",
+                "values": [
+                  12085,
+                  12085,
+                  0,
+                  0,
+                  0,
+                  0,
+                  -1,
+                  -1
+                ]
+              }
+            },
+            {
+              "action": "RollbackSerialTransaction",
+              "state": {
+                "lock": 4,
+                "phase": "new",
+                "values": [
+                  12086,
+                  12085,
+                  0,
+                  0,
+                  0,
+                  0,
+                  -1,
+                  -1
+                ]
+              }
+            }
+          ]
+        },
+        "source_tla_sha256": "70955e68b4cfe0d7dbd0cb52a9bba757d3886c972330249c5e683d2584918f61",
+        "scope_note": "Six independent finite safety projections extending EmailSwitchboardHarmony; 32 satellite authentication vectors; command/link classes; partial/cleared/uncleared receipts, candidate notices, approval then reversal and send-time recheck; two orgs with two fingerprints each and atomic row-lock/rollback abstraction; OTP request time/authentication/private-target classes; source/chunk category pairs. Each projection exhausts all its enabled interleavings. Not a combined cross-product proof or liveness proof; PostgreSQL race tests validate the lock abstraction. Sent-folder truth is a trusted ingestor boundary, not established by the model."
+      }
+    },
+    {
+      "name": "R29：Lock-1移除守衛最短反例",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "lock": 1,
+        "mutant": 1,
+        "exhaustive": false,
+        "states_explored": 33,
+        "states_discovered": 64,
+        "transitions_explored": 32,
+        "violations": 1,
+        "violated_invariant": "R29-LOCK-1",
+        "counterexample_trace": [
+          {
+            "action": "Init",
+            "state": {
+              "lock": 1,
+              "phase": "new",
+              "values": [
+                false,
+                false,
+                false,
+                false,
+                false
+              ]
+            }
+          },
+          {
+            "action": "InsertSatelliteCommand",
+            "state": {
+              "lock": 1,
+              "phase": "accepted",
+              "values": [
+                false,
+                false,
+                false,
+                false,
+                false
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "R29：Lock-2移除守衛最短反例",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "lock": 2,
+        "mutant": 2,
+        "exhaustive": false,
+        "states_explored": 12,
+        "states_discovered": 16,
+        "transitions_explored": 8,
+        "violations": 1,
+        "violated_invariant": "R29-LOCK-2",
+        "counterexample_trace": [
+          {
+            "action": "Init",
+            "state": {
+              "lock": 2,
+              "phase": "new",
+              "values": [
+                false,
+                true,
+                true
+              ]
+            }
+          },
+          {
+            "action": "WriteFinalBodyAfterStrip",
+            "state": {
+              "lock": 2,
+              "phase": "accepted",
+              "values": [
+                false,
+                true,
+                true
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "R29：Lock-3移除守衛最短反例",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "lock": 3,
+        "mutant": 3,
+        "exhaustive": false,
+        "states_explored": 30,
+        "states_discovered": 35,
+        "transitions_explored": 66,
+        "violations": 1,
+        "violated_invariant": "R29-LOCK-3",
+        "counterexample_trace": [
+          {
+            "action": "Init",
+            "state": {
+              "lock": 3,
+              "phase": "new",
+              "values": [
+                0,
+                0,
+                false,
+                false,
+                false,
+                -1
+              ]
+            }
+          },
+          {
+            "action": "ClearInstrument",
+            "state": {
+              "lock": 3,
+              "phase": "new",
+              "values": [
+                0,
+                0,
+                true,
+                false,
+                false,
+                -1
+              ]
+            }
+          },
+          {
+            "action": "FinanceAllocateClearedReceipt",
+            "state": {
+              "lock": 3,
+              "phase": "new",
+              "values": [
+                100,
+                0,
+                true,
+                false,
+                false,
+                -1
+              ]
+            }
+          },
+          {
+            "action": "ApproveWhilePaid",
+            "state": {
+              "lock": 3,
+              "phase": "new",
+              "values": [
+                100,
+                0,
+                true,
+                false,
+                true,
+                -1
+              ]
+            }
+          },
+          {
+            "action": "InstrumentBecomesUncleared",
+            "state": {
+              "lock": 3,
+              "phase": "new",
+              "values": [
+                100,
+                0,
+                false,
+                false,
+                true,
+                -1
+              ]
+            }
+          },
+          {
+            "action": "LockedSendRechecksCurrentBalance",
+            "state": {
+              "lock": 3,
+              "phase": "verified",
+              "values": [
+                100,
+                0,
+                false,
+                false,
+                true,
+                100
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "R29：Lock-4移除守衛最短反例",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "lock": 4,
+        "mutant": 4,
+        "exhaustive": false,
+        "states_explored": 5,
+        "states_discovered": 27,
+        "transitions_explored": 40,
+        "violations": 1,
+        "violated_invariant": "R29-LOCK-4",
+        "counterexample_trace": [
+          {
+            "action": "Init",
+            "state": {
+              "lock": 4,
+              "phase": "new",
+              "values": [
+                12085,
+                12085,
+                0,
+                0,
+                0,
+                0,
+                -1,
+                -1
+              ]
+            }
+          },
+          {
+            "action": "WriteEntityWithCompositeCaseOrgFK",
+            "state": {
+              "lock": 4,
+              "phase": "new",
+              "values": [
+                12085,
+                12085,
+                0,
+                0,
+                0,
+                0,
+                1,
+                -1
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "R29：Lock-5移除守衛最短反例",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "lock": 5,
+        "mutant": 5,
+        "exhaustive": false,
+        "states_explored": 513,
+        "states_discovered": 1024,
+        "transitions_explored": 512,
+        "violations": 1,
+        "violated_invariant": "R29-LOCK-5",
+        "counterexample_trace": [
+          {
+            "action": "Init",
+            "state": {
+              "lock": 5,
+              "phase": "new",
+              "values": [
+                "missing",
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ]
+            }
+          },
+          {
+            "action": "DeliverDryRunPrivateDM",
+            "state": {
+              "lock": 5,
+              "phase": "delivered",
+              "values": [
+                "missing",
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "R29：Lock-6移除守衛最短反例",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "lock": 6,
+        "mutant": 6,
+        "exhaustive": false,
+        "states_explored": 18,
+        "states_discovered": 32,
+        "transitions_explored": 16,
+        "violations": 1,
+        "violated_invariant": "R29-LOCK-6",
+        "counterexample_trace": [
+          {
+            "action": "Init",
+            "state": {
+              "lock": 6,
+              "phase": "new",
+              "values": [
+                "CAT-01",
+                "CAT-06"
+              ]
+            }
+          },
+          {
+            "action": "InsertOrUpdateRagChunk",
+            "state": {
+              "lock": 6,
+              "phase": "accepted",
+              "values": [
+                "CAT-01",
+                "CAT-06"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "R29：配號回滾留洞突變反例",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "lock": 4,
+        "mutant": 7,
+        "exhaustive": false,
+        "states_explored": 5,
+        "states_discovered": 28,
+        "transitions_explored": 32,
+        "violations": 1,
+        "violated_invariant": "R29-LOCK-4",
+        "counterexample_trace": [
+          {
+            "action": "Init",
+            "state": {
+              "lock": 4,
+              "phase": "new",
+              "values": [
+                12085,
+                12085,
+                0,
+                0,
+                0,
+                0,
+                -1,
+                -1
+              ]
+            }
+          },
+          {
+            "action": "RollbackSerialTransaction",
+            "state": {
+              "lock": 4,
+              "phase": "new",
+              "values": [
+                12086,
+                12085,
+                0,
+                0,
+                0,
+                0,
+                -1,
+                -1
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "形式驗證：本機TLC已執行或如實註明不可用",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "java_available": true,
+        "tlc_available": true,
+        "jar": "/home/box/.local/share/tla2tools.jar",
+        "runs": [
+          {
+            "mutant": 0,
+            "returncode": 0,
+            "passed": true,
+            "states_generated": 101310,
+            "distinct_states": 46284,
+            "log": "/workspace/yongxiang_arch/ai_switchboard_mvp/formal/tlc_mutant_0.log"
+          },
+          {
+            "mutant": 1,
+            "returncode": 12,
+            "passed": true,
+            "states_generated": 64798,
+            "distinct_states": 33394,
+            "log": "/workspace/yongxiang_arch/ai_switchboard_mvp/formal/tlc_mutant_1.log"
+          },
+          {
+            "mutant": 2,
+            "returncode": 12,
+            "passed": true,
+            "states_generated": 39640,
+            "distinct_states": 24065,
+            "log": "/workspace/yongxiang_arch/ai_switchboard_mvp/formal/tlc_mutant_2.log"
+          },
+          {
+            "mutant": 3,
+            "returncode": 12,
+            "passed": true,
+            "states_generated": 2658,
+            "distinct_states": 2658,
+            "log": "/workspace/yongxiang_arch/ai_switchboard_mvp/formal/tlc_mutant_3.log"
+          },
+          {
+            "mutant": 4,
+            "returncode": 12,
+            "passed": true,
+            "states_generated": 2667,
+            "distinct_states": 2664,
+            "log": "/workspace/yongxiang_arch/ai_switchboard_mvp/formal/tlc_mutant_4.log"
+          }
+        ],
+        "status": "passed",
+        "note": "已實際執行 TLC：正式模型與四個移除守衛的突變；SENT 僅為模型狀態。"
+      }
+    },
+    {
+      "name": "形式驗證：router與gates靜態連接及INV-01..04實際行為",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "passed": true,
+        "checks": [
+          {
+            "name": "靜態：route實際呼叫INV-01..03守衛",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "靜態：CLOSED轉移由INV-04守衛與raise攔截",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "靜態：十閘門仍存在且既有付款／禁詞／人工核准規則仍在",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "R29：router付款來源為沖帳／撤銷推導視圖",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "靜態：資料庫零寄送限制與防洩漏trigger保留",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "R29：CORR-09保留六鎖模型與實庫驗證連接",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "CORR-01..08原判斷與讀取／ledger函式逐字及AST保留",
+            "passed": true,
+            "detail": {
+              "backup": {
+                "path": "/workspace/pstack_verify/preflight_guard.py.bak_phase2_20261025_001543_450967",
+                "sha256": "06eeb5e6c7c8bd5733ff2576ef4da9a57e400e36adc3e56500b4295c284a9403"
+              }
+            }
+          },
+          {
+            "name": "名冊81個真實識別與本機資料庫一致",
+            "passed": true,
+            "detail": {
+              "total": 81,
+              "active": 71
+            }
+          },
+          {
+            "name": "十閘門正向可達且仍為DRY_RUN",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "INV-01：逐一核對81人＋空值／名冊外拒絕",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "INV-01：十閘門1024組輸入與偽造總旗標均核對",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "INV-01：實際router拒絕名冊外人工核准",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "INV-02：CAT-02四組付款旗標均由實際router攔截",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "INV-03：五種禁詞及預算變體日夜皆BLOCKED_SENSITIVE",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "INV-04：範圍變更／追加結案前兩項證據缺一不可",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "INV-04：電話先有書面草稿、結算卡待人工連結且不能結案",
+            "passed": true,
+            "detail": null
+          }
+        ],
+        "source_sha256": {
+          "router.py": "d4c7b070fddf9a01c05c56c19b6f8b211e6c1e4d45e32c29ee3181b60e9ca158",
+          "gates.py": "8040e1ab84f6571cc63d0123225a8596da8c6a428c61264ec9542b1d104158ce",
+          "sql/switchboard.sql": "9915180e2f535e8e49c89d70a68e72ce0f0357de57c3d9257229df8c964eb3c1"
+        },
+        "note": "靜態AST確認守衛連接，行為測試核對實際router與純函式；CLOSED為本機承諾生命週期，既有資料庫仍只允許DRY_RUN，未新增傳送途徑。"
+      }
+    },
+    {
+      "name": "CORR-09靜態＋狀態guard實際執行通過",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "output": "/workspace/yongxiang_arch/ai_switchboard_mvp/formal/corr09_output.txt",
+        "scope": "本機CORR-09；全域CORR-01..08證據另列"
+      }
+    },
+    {
+      "name": "Phase 2形式驗證程式與guard可完成執行",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "R29：實庫六鎖、雙連線競態、migration冪等、測試前後dim/fact零變更",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "suite": "Fable 5.1 R29 + R29-PSTACK 6 Structural Guards",
+        "verified_at": "2026-10-25T02:12:45.535129+00:00",
+        "passed": true,
+        "failed_count": 0,
+        "guards_verified": 6,
+        "checks_count": 10,
+        "checks": [
+          {
+            "guard": "migration",
+            "name": "apply migration twice with schema/data hashes",
+            "passed": true,
+            "detail": {
+              "applications": 2,
+              "schema_identical": true,
+              "data_identical": true,
+              "schema_sha256": "cc586d0658ec4a64ccd95d611d6e4e3454bb67e3156d28a83f5a138dcba79307",
+              "dim_fact_unchanged": true
+            }
+          },
+          {
+            "guard": 1,
+            "name": "satellite authentication truth table and forged command",
+            "passed": true,
+            "detail": {
+              "authentication_vectors": 32,
+              "external_injection_blocked": true,
+              "evidence": "synthetic IMAP Sent observations; no live IMAP contacted"
+            }
+          },
+          {
+            "guard": 2,
+            "name": "outbound residual commands and customer no_links",
+            "passed": true,
+            "detail": {
+              "residual_patterns_rejected": 12,
+              "url_cases_rejected": 4,
+              "clean_body_accepted": true
+            }
+          },
+          {
+            "guard": 3,
+            "name": "dynamic cleared totals, reversal fan-out and send recheck",
+            "passed": true,
+            "detail": {
+              "candidate_only": true,
+              "uncleared_excluded": true,
+              "two_reversal_balance": 30,
+              "reversal_blocks_send": true,
+              "clearance_recomputed": true,
+              "actual_sends": 0
+            }
+          },
+          {
+            "guard": 4,
+            "name": "org isolation and serial idempotency/rollback",
+            "passed": true,
+            "detail": {
+              "org_tables_verified": 36,
+              "cross_org_indirect_relationships_rejected": true,
+              "cross_org_instrument_rejected": true,
+              "YX_SJ_composite_fk": true,
+              "first": 12085,
+              "idempotent": true,
+              "rollback_gapless": true
+            }
+          },
+          {
+            "guard": 5,
+            "name": "OTP pull/TTL/authentication/exclusions/private target",
+            "passed": true,
+            "detail": {
+              "excluded_subject_and_body_vectors": 10,
+              "unrequested_expired_forged_replay_blocked": true,
+              "private_requester_only": true,
+              "group_broadcasts": 0
+            }
+          },
+          {
+            "guard": 6,
+            "name": "RAG privacy CHECK and source relabel defense",
+            "passed": true,
+            "detail": {
+              "private_categories_rejected": 2,
+              "source_relabel_bypass_rejected": true,
+              "public_chunk_accepted": true
+            }
+          },
+          {
+            "guard": 4,
+            "name": "two-connection duplicate and distinct serial race",
+            "passed": true,
+            "detail": {
+              "duplicate_serials": [
+                12085,
+                12085
+              ],
+              "distinct_serials": [
+                12086,
+                12087
+              ],
+              "lock_wait_observed": true
+            }
+          },
+          {
+            "guard": 3,
+            "name": "two-connection reversal versus outbound_send race",
+            "passed": true,
+            "detail": {
+              "send_waited_for_reversal": true,
+              "rechecked_after_commit": true,
+              "send_rejected": true
+            }
+          },
+          {
+            "guard": 3,
+            "name": "two-connection double send verifies exactly once",
+            "passed": true,
+            "detail": {
+              "successful_gate_transitions": 1,
+              "duplicate_blocked": 1,
+              "actual_sends": 0
+            }
+          }
+        ],
+        "box": {
+          "database": "yongxiang_plumb_r39_clone",
+          "status": "verified"
+        },
+        "windows": {
+          "status": "not_requested",
+          "note": "portable SQL only; laptop database not accessed"
+        },
+        "migration_sha256": "d9871332fff963dd6f6eb6f6b8a01c63c29917479dd9c7b3355a3f36ac13e13c",
+        "external_messages": 0,
+        "group_broadcasts": 0,
+        "scope_notes": [
+          "All email/OTP evidence is synthetic; live Gmail IMAP ingestion and real messaging transport are not tested.",
+          "outbound_send and otp_deliver record dry-run verification/outbox evidence; existing zero-send CHECK constraints remain enforced.",
+          "TLC proves only its documented finite safety configuration; SQL and race tests exercise the six database guards."
+        ]
+      }
+    },
+    {
+      "name": "十閘門完整且正常已核准情境可供檢視但永不送出",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "synthetic": true,
+        "gate_names": [
+          "no_send_mode",
+          "recipient_known_client",
+          "case_code_resolved",
+          "amount_requires_human",
+          "contract_requires_human",
+          "no_hr_private",
+          "no_raw_phone_id",
+          "attachment_present_if_promised",
+          "sla_deadline_check",
+          "template_variables_all_filled"
+        ]
+      }
+    },
+    {
+      "name": "所有對外須human approved_by；缺核准產Action Card與草稿",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "跨客戶或未知收件人禁止放行",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "群發與任意to/cc/bcc禁止",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "C115301未知案不臆造且擷取中興候選",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "複數案件與錯配報價須人工",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "同客戶其他案件的報價不可混用",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "禁詞攔截：底價",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "禁詞攔截：成本",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "禁詞攔截：毛利",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "禁詞攔截：A-B-C 預算",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "禁詞攔截：A/B/C預算",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "禁詞攔截：內部",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "禁詞攔截：點數單價",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "薪資數字與中文待遇全部遮蔽",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "電話或身分證遮蔽：091",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "電話或身分證遮蔽：02-",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "電話或身分證遮蔽：+88",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "電話或身分證遮蔽：136",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "電話或身分證遮蔽：ID",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "金額相符有核版與人工查核才可過",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "金額不一致與無核版資料均攔截",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "外幣不可直接比對TWD核版金額",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "金額缺人工核對與合約缺PM核准均攔截",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "承諾附件卻未附檔攔截",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "附件只允許核版清單與雜湊一致",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "CAT-02核定交付清單缺檔即攔截",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "CAT-02 ⛔入帳後再寄出未付款攔截；已核實付款通過該閘",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "台塑外部連結與未拆分過大檔攔截",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "台塑核版附件符合業主拆檔上限可過",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "中華工程發票日期邊界：9",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "中華工程發票日期邊界：10",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "中華工程發票日期邊界：20",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "中華工程發票日期邊界：21",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "中華工程品名嚴格比對合約與期別",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "高鐵審查逐條意見回覆頁碼圖號缺項即攔截",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "高鐵開口合約須核實母案工單額度",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "e-GNSS驗證碼不對外且不保留代碼",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "夜間邊界21:59進排程且0寄送",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "夜間邊界22:00進排程且0寄送",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "夜間邊界00:00進排程且0寄送",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "夜間邊界06:59進排程且0寄送",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "夜間邊界07:00進排程且0寄送",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "一般郵件的電話簽名不誤判為口頭承諾",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "未填變數、相對期限、未知日期、逾期SLA攔截",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "電話→200m追加承諾列＋書面確認稿＋結算視圖（合成且ROLLBACK）",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "synthetic": true,
+        "rolled_back": true,
+        "observed": {
+          "quantity": 200,
+          "commitments": 1,
+          "communications": 1,
+          "written_shadow": false
+        }
+      }
+    },
+    {
+      "name": "電話未有人確認抽取只暫存不建立正式承諾",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "自動流水號max+1、同來源重跑不增號、公司Gmail與內部一句話皆支援",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "rolled_back": true,
+        "previous_global_max": 8100407,
+        "next_serials": [
+          -12106,
+          -12107
+        ]
+      }
+    },
+    {
+      "name": "DB禁止sent",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "DB禁止sent_at",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "DB禁止actual_sends",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "DB禁止未核准定稿",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "DB禁詞不可繞過API",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "DB個資不可繞過API",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "DB國際電話不可繞過API",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "DB事件append-only",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "驗收測試聯絡人與合成事件未留在資料庫",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "最近20個真實threads，順序日期與來源符合既有corpus",
+      "passed": true,
+      "kind": "real_backtest",
+      "detail": {
+        "count": 20,
+        "body_threads": 3
+      }
+    },
+    {
+      "name": "最近20端到端可重現且已寫入本機DRY_RUN草稿",
+      "passed": true,
+      "kind": "real_backtest",
+      "detail": {
+        "invalid_thread_ids": []
+      }
+    },
+    {
+      "name": "涵蓋優先20端到端可重現且已寫入本機DRY_RUN草稿",
+      "passed": true,
+      "kind": "real_backtest",
+      "detail": {
+        "invalid_thread_ids": []
+      }
+    },
+    {
+      "name": "20真實樣本涵蓋CAT-01",
+      "passed": false,
+      "kind": "real_coverage",
+      "detail": {
+        "corpus_20_count": 1,
+        "stratified_200_gold_count": 4,
+        "backtest_gate_pass": false,
+        "reason": "結合本地53-thread快取與R37 200封分層抽樣Gold基準(switchboard_gold_label + backtest_gate)"
+      }
+    },
+    {
+      "name": "20真實樣本涵蓋CAT-02",
+      "passed": false,
+      "kind": "real_coverage",
+      "detail": {
+        "corpus_20_count": 0,
+        "stratified_200_gold_count": 0,
+        "backtest_gate_pass": false,
+        "reason": "結合本地53-thread快取與R37 200封分層抽樣Gold基準(switchboard_gold_label + backtest_gate)"
+      }
+    },
+    {
+      "name": "20真實樣本涵蓋CAT-03",
+      "passed": false,
+      "kind": "real_coverage",
+      "detail": {
+        "corpus_20_count": 0,
+        "stratified_200_gold_count": 0,
+        "backtest_gate_pass": false,
+        "reason": "結合本地53-thread快取與R37 200封分層抽樣Gold基準(switchboard_gold_label + backtest_gate)"
+      }
+    },
+    {
+      "name": "20真實樣本涵蓋CAT-04",
+      "passed": false,
+      "kind": "real_coverage",
+      "detail": {
+        "corpus_20_count": 0,
+        "stratified_200_gold_count": 0,
+        "backtest_gate_pass": false,
+        "reason": "結合本地53-thread快取與R37 200封分層抽樣Gold基準(switchboard_gold_label + backtest_gate)"
+      }
+    },
+    {
+      "name": "20真實樣本涵蓋CAT-06",
+      "passed": false,
+      "kind": "real_coverage",
+      "detail": {
+        "corpus_20_count": 3,
+        "stratified_200_gold_count": 1,
+        "backtest_gate_pass": false,
+        "reason": "結合本地53-thread快取與R37 200封分層抽樣Gold基準(switchboard_gold_label + backtest_gate)"
+      }
+    },
+    {
+      "name": "20真實樣本涵蓋電話口頭承諾",
+      "passed": false,
+      "kind": "real_coverage",
+      "detail": {
+        "thread_ids": [],
+        "stratified_200_oral_commitment_count": 0,
+        "backtest_gate_pass": false,
+        "reason": "結合本地快取與R37 200封分層抽樣ORAL_COMMITMENT基準(15筆call_note/line_note)"
+      }
+    },
+    {
+      "name": "所有已持久化草稿DRY_RUN且實際寄送0",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "sent": 0,
+        "total": 24,
+        "non_dry": 0,
+        "approved": 0
+      }
+    },
+    {
+      "name": "沒有把未核實來信臆造成客戶事件與承諾",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "staging_explanation": "未知客戶/承辦保存在public.switchboard_intake，非虛構客戶"
+      }
+    },
+    {
+      "name": "R30：種子實庫雙跑冪等、public限定、組織及dim/fact不變",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "generated_at": "2026-10-25T02:12:52.143870+00:00",
+        "database": "yongxiang_plumb_r39_clone",
+        "search_path": "public, pg_catalog",
+        "seed_sha256": "bf4a24fa63e92c2c27bfd0c4921e06c2b6bf6730e79abed16375900467b60f98",
+        "first": {
+          "org": {
+            "hash": "5e11b24164ca78125ea91e752826b739",
+            "count": 2
+          },
+          "client_playbook_rule": {
+            "hash": "5b8418235a6870aad97ed83ffef59707",
+            "count": 13
+          },
+          "customer": {
+            "hash": "5d2472fe1fa14ac9c90a3dcc43790d61",
+            "count": 148
+          },
+          "email_template": {
+            "hash": "77af64b18dfe1411364f80251ee4fd10",
+            "count": 14
+          },
+          "otp_forward_rule": {
+            "hash": "00de72a8e85c25f2da18433bde5ca315",
+            "count": 3
+          },
+          "invoice": {
+            "hash": "d41d8cd98f00b204e9800998ecf8427e",
+            "count": 0
+          }
+        },
+        "second": {
+          "org": {
+            "hash": "5e11b24164ca78125ea91e752826b739",
+            "count": 2
+          },
+          "client_playbook_rule": {
+            "hash": "5b8418235a6870aad97ed83ffef59707",
+            "count": 13
+          },
+          "customer": {
+            "hash": "5d2472fe1fa14ac9c90a3dcc43790d61",
+            "count": 148
+          },
+          "email_template": {
+            "hash": "77af64b18dfe1411364f80251ee4fd10",
+            "count": 14
+          },
+          "otp_forward_rule": {
+            "hash": "00de72a8e85c25f2da18433bde5ca315",
+            "count": 3
+          },
+          "invoice": {
+            "hash": "d41d8cd98f00b204e9800998ecf8427e",
+            "count": 0
+          }
+        },
+        "schema_equal": true,
+        "column_definitions_equal": true,
+        "first_public_schema_sha256": "d3b452c1c493e2338a49356c01e6a90536efe3ca97f81f9f0be589a7fa765e3c",
+        "public_schema_sha256": "d3b452c1c493e2338a49356c01e6a90536efe3ca97f81f9f0be589a7fa765e3c",
+        "data_equal": true,
+        "dim_fact_unchanged": true,
+        "org_unchanged": true,
+        "actual_sends": 0,
+        "passed": true
+      }
+    },
+    {
+      "name": "R30：pytest實際執行及23個黃金案例完整收集",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "command": [
+          "/workspace/yongxiang_arch/ai_switchboard_mvp/.venv-r31b/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/test_switchboard_golden.py",
+          "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/test_interrogate_regressions.py",
+          "--junitxml=/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml"
+        ],
+        "returncode": 0,
+        "golden_count": 23,
+        "regression_count": 45,
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml"
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_01_sender_recipient_header",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.059",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_02_please_send_fullwidth_punct",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_03_send_to_with_admin_tag",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_04_forward_register_from_switchboard_style",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_05_quote_forward_register",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_06_residual_internal_pattern_in_body_is_flagged",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_07_external_injection_never_becomes_command",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_08_spoofed_satellite_display_name_is_not_satellite",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_09_satellite_sender_is_internal_cmd_category",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_10_egnss_otp_whitelisted",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_11_google_password_reset_disguised_as_otp_blocked",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_12_whitelisted_sender_but_dkim_domain_mismatch_blocked",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_13_org_sj_insurance_bill_routed_to_sj",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_14_org_ambiguous_insurance_bill_quarantined",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_15_bank_notice_is_cat06_never_auto_paid_semantics",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_16_fpg_permit_cat04_and_thsrc_work_order_cat05",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_17_fpg_no_links_blocked",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_18_sealed_dwg_blocked_until_paid_but_preview_ok",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_19_bes_invoice_rules",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_20_forbidden_words_and_fingerprint_idempotency",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_21_switchboard_forward_is_internal_not_injection_and_cannot_send",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_22_strip_is_idempotent_and_keeps_fullwidth_punctuation",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_switchboard_golden.test_23_loose_hash_matches_forward_quote_to_original",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_positive_baseline_and_zero_transport",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.011",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_A_obfuscated_forbidden[\\u5e95 \\u50f9]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.002",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_A_obfuscated_forbidden[\\u5e95\\u3000\\u50f9]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.002",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_A_obfuscated_forbidden[\\u5e95\\u200b\\u50f9]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_A_obfuscated_forbidden[\\u5e95\\xad\\u50f9]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_A_obfuscated_forbidden[\\u6210\\u202e\\u672c]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_A_obfuscated_forbidden[\\u6210\\u200d\\u672c]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_A_obfuscated_forbidden[\\u6bdb \\u5229]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_A_obfuscated_forbidden[\\u9ede \\u6578 \\u55ae \\u50f9]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_A_obfuscated_forbidden[\\uff21 \\uff0f \\uff22 \\uff0f \\uff23 \\u9810\\u7b97]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_C_amount_mismatch_and_unparsed[\\u672c\\u671f\\u8a08\\u50f9 500000\\uff08\\u672a\\u7a05\\uff09\\uff0c\\u8acb\\u67e5\\u6536\\u3002]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_C_amount_mismatch_and_unparsed[\\u672c\\u671f\\u8a08\\u50f9\\u4e00\\u767e\\u842c\\u5143\\u3002]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_C_amount_mismatch_and_unparsed[NT$100000.01]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_C_amount_mismatch_and_unparsed[\\u91d1\\u984d\\uff1a\\uff11\\uff10\\uff10\\uff10\\uff10\\uff10\\uff0e\\uff10\\uff11\\u5143]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_C_matching_amount_exact_decimal",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_D_fpg_links_in_body_and_attachment_metadata[drive.google.com/file/x]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.003",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_D_fpg_links_in_body_and_attachment_metadata[bit.ly/a]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.003",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_D_fpg_links_in_body_and_attachment_metadata[ftp://example.test/a]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.003",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_D_fpg_links_in_body_and_attachment_metadata[hxxps://evil.example/out]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.003",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_D_fpg_links_in_body_and_attachment_metadata[https://example.test/a]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.003",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_E_otp_independent_of_category[text]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_E_otp_independent_of_category[draft_body]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_E_otp_independent_of_category[subject]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_F_fullwidth_pii[\\u8acb\\u64a5\\uff10\\uff19\\uff11\\uff12\\uff13\\uff14\\uff15\\uff16\\uff17\\uff18\\u3002]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.002",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_F_fullwidth_pii[\\u8eab\\u5206\\u8b49\\uff21\\uff11\\uff12\\uff13\\uff14\\uff15\\uff16\\uff17\\uff18\\uff19\\u3002]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.002",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_F_fullwidth_pii[\\u96fb\\u8a71\\uff10\\uff12\\uff0d\\uff11\\uff12\\uff13\\uff14\\uff15\\uff16\\uff17\\uff18\\u3002]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.002",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_G_keyword_substrings[A104200]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_G_keyword_substrings[handhld]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_G_keyword_substrings[\\u4e16\\u548c\\u5e73]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_H_night_preserves_content_block",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.002",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_I_naive_time_is_taipei",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.002",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_sealed_release_cannot_change_category_to_bypass",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_SQL_trigger_blocks_normalized_leaks[\\u5e95 \\u50f9]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.241",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_SQL_trigger_blocks_normalized_leaks[\\u5e95\\u200b\\u50f9]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.253",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_SQL_trigger_blocks_normalized_leaks[\\u5e95\\xad\\u50f9]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.230",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_SQL_trigger_blocks_normalized_leaks[\\u6210\\u202e\\u672c]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.218",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_SQL_trigger_blocks_normalized_leaks[\\u9ede\\u3000\\u6578\\u3000\\u55ae\\u3000\\u50f9]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.227",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_SQL_trigger_blocks_normalized_leaks[\\uff10\\uff19\\uff11\\uff12\\uff13\\uff14\\uff15\\uff16\\uff17\\uff18]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.224",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_SQL_trigger_blocks_normalized_leaks[\\uff21\\uff11\\uff12\\uff13\\uff14\\uff15\\uff16\\uff17\\uff18\\uff19]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.222",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_integration_copies_and_provenance",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.001",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_R29_otp_exclusions_not_weakened[google]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_R29_otp_exclusions_not_weakened[apple]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_R29_otp_exclusions_not_weakened[tcb]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_R29_otp_exclusions_not_weakened[password]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：r30.test_interrogate_regressions.test_R29_otp_exclusions_not_weakened[reset]",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "seconds": "0.000",
+        "junit": "/workspace/yongxiang_arch/ai_switchboard_mvp/r30/pytest_result.xml",
+        "failure": null
+      }
+    },
+    {
+      "name": "R30：Python與PostgreSQL共用守衛逐案相同",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "returncode": 0,
+        "output": "{\"passed\": true, \"cases\": 142, \"matched\": 142, \"parity_percent\": 100, \"patterns\": 27, \"source_sha256\": \"79ce41677188bd7a6107bca3d96a5b410be7f5673bfac2e560d25eb5cf649036\"}\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "R30：本階段dim/fact定義、ACL與資料快照不變",
+      "passed": true,
+      "kind": "implementation",
+      "detail": {
+        "before": "r30/dim_fact_before.json",
+        "after": "r30/dim_fact_after.json"
+      }
+    },
+    {
+      "name": "R30：完整整合驗證已執行",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "所有測試後dim/fact仍與基準完全相同",
+      "passed": true,
+      "kind": "implementation",
+      "detail": null
+    },
+    {
+      "name": "指定preflight_guard已實際執行並附加輸出",
+      "passed": true,
+      "kind": "external_guard",
+      "detail": {
+        "returncode": 0
+      }
+    },
+    {
+      "name": "preflight_guard實際退出碼為0",
+      "passed": true,
+      "kind": "external_guard",
+      "detail": {
+        "returncode": 0,
+        "scope": "全域唯讀檢查，不替代總機MVP驗收"
+      }
+    }
+  ],
+  "implementation_passed": false,
+  "real_coverage_complete": false,
+  "actual_sends": 0,
+  "note": "合成防呆測試僅ROLLBACK；未取得真實情境不以合成測試冒充，整體不得假報通過。",
+  "r30_functional_passed": true,
+  "r30_dim_fact_evidence": {
+    "before": "r30/dim_fact_before.json",
+    "after": "r30/dim_fact_after.json",
+    "snapshot_equal": true,
+    "differences": [],
+    "note": "保留起始快照；共享資料庫期間任何差異均保留失敗，不重設基準。seed雙跑另有即時前後不變證據。"
+  },
+  "r30_passed": true,
+  "phase": "R30_INTEGRATION",
+  "phase2_passed": true,
+  "r29_hardlocks_passed": true,
+  "r29_dim_fact_evidence": {
+    "phase_snapshot_equal": true,
+    "differences": [],
+    "note": "保留原始與本階段起始快照；共享資料庫期間的差異如實列出，不覆寫ACL或基準以消除失敗。"
+  },
+  "preflight_evidence_scope": {
+    "corr01_to08_run_finished_at": "2026-10-25T00:55:20.427019+08:00",
+    "corr01_to08_returncode": 0,
+    "corr01_to08_rerun_this_phase": true,
+    "corr09_rerun_this_phase": true,
+    "requested_corr01_to09_passed": true,
+    "note": "CORR-09於驗收重跑；CORR-01..08是否本階段重跑依phase及實際時間記錄，Lark僅唯讀。"
+  }
+}

@@ -1,0 +1,142 @@
+{"kind": "internal", "text": "寄件人:倢瑛", "expect": true}
+{"kind": "internal", "text": "寄件人：倢瑛", "expect": true}
+{"kind": "internal", "text": "收件人:客戶", "expect": true}
+{"kind": "internal", "text": "收件人：客戶", "expect": true}
+{"kind": "internal", "text": "麻煩幫我寄出", "expect": true}
+{"kind": "internal", "text": "請寄給業主", "expect": true}
+{"kind": "internal", "text": "收到請登記", "expect": true}
+{"kind": "internal", "text": "業主往來12090", "expect": true}
+{"kind": "internal", "text": "業主往來 12090", "expect": true}
+{"kind": "internal", "text": "報編115715", "expect": true}
+{"kind": "internal", "text": "報編 115715", "expect": true}
+{"kind": "internal", "text": "#14行政", "expect": true}
+{"kind": "internal", "text": "#14 行政", "expect": true}
+{"kind": "internal", "text": "給恆安，業主往來6084", "expect": true}
+{"kind": "internal", "text": "給很長的多人收件名單，", "expect": true}
+{"kind": "internal", "text": "您好\n給恆安，", "expect": true}
+{"kind": "internal", "text": "寄件人 ：倢瑛", "expect": true}
+{"kind": "internal", "text": "收件人　：客戶", "expect": true}
+{"kind": "internal", "text": "業主往來１２３４", "expect": true}
+{"kind": "internal", "text": "＃１４行政", "expect": true}
+{"kind": "internal", "text": "成果如附件", "expect": false}
+{"kind": "internal", "text": "臺灣高鐵股份有限公司", "expect": false}
+{"kind": "internal", "text": "給予協助", "expect": false}
+{"kind": "internal", "text": "您好，感謝", "expect": false}
+{"kind": "internal", "text": "請參閱附件", "expect": false}
+{"kind": "internal", "text": "寄件地址", "expect": false}
+{"kind": "forbidden", "text": "成本", "expect": true}
+{"kind": "forbidden", "text": "毛利", "expect": true}
+{"kind": "forbidden", "text": "底價", "expect": true}
+{"kind": "forbidden", "text": "A/B/C", "expect": true}
+{"kind": "forbidden", "text": "ABC預算", "expect": true}
+{"kind": "forbidden", "text": "內部", "expect": true}
+{"kind": "forbidden", "text": "點數單價", "expect": true}
+{"kind": "forbidden", "text": "a / b / c", "expect": true}
+{"kind": "forbidden", "text": "Ａ／Ｂ／Ｃ", "expect": true}
+{"kind": "forbidden", "text": "底價與成本", "expect": true}
+{"kind": "forbidden", "text": "政策單價", "expect": false}
+{"kind": "forbidden", "text": "底線單價", "expect": false}
+{"kind": "forbidden", "text": "工程報價", "expect": false}
+{"kind": "forbidden", "text": "ABCDEF公司", "expect": true}
+{"kind": "case_code", "text": "A000000", "expect": true}
+{"kind": "case_code", "text": "M999999", "expect": true}
+{"kind": "case_code", "text": "V126001", "expect": true}
+{"kind": "case_code", "text": "X999999-A", "expect": true}
+{"kind": "case_code", "text": "Z100000-ABC", "expect": true}
+{"kind": "case_code", "text": "Z129999-9", "expect": true}
+{"kind": "case_code", "text": "B000000-0", "expect": true}
+{"kind": "case_code", "text": "L999999-9Z9", "expect": true}
+{"kind": "case_code", "text": "N115094", "expect": false}
+{"kind": "case_code", "text": "O115094", "expect": false}
+{"kind": "case_code", "text": "P115094", "expect": false}
+{"kind": "case_code", "text": "Q115094", "expect": false}
+{"kind": "case_code", "text": "R115094", "expect": false}
+{"kind": "case_code", "text": "S115094", "expect": false}
+{"kind": "case_code", "text": "T115094", "expect": false}
+{"kind": "case_code", "text": "U115094", "expect": false}
+{"kind": "case_code", "text": "W115094", "expect": false}
+{"kind": "case_code", "text": "Y115094", "expect": false}
+{"kind": "case_code", "text": "a115094", "expect": false}
+{"kind": "case_code", "text": "c115094", "expect": false}
+{"kind": "case_code", "text": "A11509", "expect": false}
+{"kind": "case_code", "text": "A1150940", "expect": false}
+{"kind": "case_code", "text": "A115094-", "expect": false}
+{"kind": "case_code", "text": "A115094-ABCD", "expect": false}
+{"kind": "case_code", "text": "A115094-a", "expect": false}
+{"kind": "case_code", "text": "A115094-!", "expect": false}
+{"kind": "case_code", "text": "A115094-A-B", "expect": false}
+{"kind": "case_code", "text": "A115094--A", "expect": false}
+{"kind": "case_code", "text": " A115094", "expect": false}
+{"kind": "case_code", "text": "A115094 ", "expect": false}
+{"kind": "case_code", "text": "A115094\n", "expect": false}
+{"kind": "case_code", "text": "\nA115094", "expect": false}
+{"kind": "case_code", "text": "xA115094", "expect": false}
+{"kind": "case_code", "text": "A115094x", "expect": false}
+{"kind": "case_code", "text": "Ａ１１５０９４", "expect": false}
+{"kind": "case_code", "text": "C115094A", "expect": false}
+{"kind": "case_code", "text": "C115094-1-A", "expect": false}
+{"kind": "case_code", "text": "C115094_1", "expect": false}
+{"kind": "case_code", "text": "C115094.1", "expect": false}
+{"kind": "case_code", "text": "C115094/1", "expect": false}
+{"kind": "case_code", "text": "C115094-abc", "expect": false}
+{"kind": "case_code", "text": "C115094-中", "expect": false}
+{"kind": "case_code", "text": "C115094-１２", "expect": false}
+{"kind": "case_code", "text": "C11509A", "expect": false}
+{"kind": "case_code", "text": "C11A094", "expect": false}
+{"kind": "case_code", "text": "C1 5094", "expect": false}
+{"kind": "case_code", "text": "C-115094", "expect": false}
+{"kind": "case_code", "text": "115094", "expect": false}
+{"kind": "case_code", "text": "C", "expect": false}
+{"kind": "case_code", "text": "", "expect": false}
+{"kind": "case_code", "text": "CC115094", "expect": false}
+{"kind": "case_code", "text": "C115094\u000b", "expect": false}
+{"kind": "case_code", "text": "C115094\r", "expect": false}
+{"kind": "case_code", "text": "C115094\t", "expect": false}
+{"kind": "case_code", "text": "C115094-1234", "expect": false}
+{"kind": "case_code", "text": "C115094-AB_", "expect": false}
+{"kind": "otp_subject", "text": "驗證碼", "expect": true}
+{"kind": "otp_subject", "text": "Verification", "expect": true}
+{"kind": "otp_subject", "text": "verification", "expect": true}
+{"kind": "otp_subject", "text": "登入 OTP", "expect": true}
+{"kind": "otp_subject", "text": "一般通知", "expect": false}
+{"kind": "otp_subject", "text": "成果提送", "expect": false}
+{"kind": "otp_subject", "text": "請款", "expect": false}
+{"kind": "otp_forbidden", "text": "密碼重設", "expect": true}
+{"kind": "otp_forbidden", "text": "銀行驗證碼", "expect": true}
+{"kind": "otp_forbidden", "text": "google.com 驗證碼", "expect": true}
+{"kind": "otp_forbidden", "text": "APPLE.COM OTP", "expect": true}
+{"kind": "otp_forbidden", "text": "reset verification", "expect": true}
+{"kind": "otp_forbidden", "text": "password", "expect": true}
+{"kind": "otp_forbidden", "text": "轉帳", "expect": true}
+{"kind": "otp_forbidden", "text": "tcb-bank OTP", "expect": true}
+{"kind": "otp_forbidden", "text": "mufg OTP", "expect": true}
+{"kind": "otp_forbidden", "text": "accounts.google", "expect": true}
+{"kind": "otp_forbidden", "text": "e-GNSS 驗證碼", "expect": false}
+{"kind": "otp_forbidden", "text": "CPC登入通知", "expect": false}
+{"kind": "otp_forbidden", "text": "驗證碼 123456", "expect": false}
+{"kind": "otp_code", "text": "123456", "expect": true}
+{"kind": "otp_code", "text": "驗證碼 123456", "expect": true}
+{"kind": "otp_code", "text": "1234", "expect": true}
+{"kind": "otp_code", "text": "12345678", "expect": true}
+{"kind": "otp_code", "text": "123", "expect": false}
+{"kind": "otp_code", "text": "123456789", "expect": false}
+{"kind": "otp_code", "text": "abc123456def", "expect": false}
+{"kind": "url", "text": "https://example.test", "expect": true}
+{"kind": "url", "text": "HTTP://example.test", "expect": true}
+{"kind": "url", "text": "您好\nhttps://example.test", "expect": true}
+{"kind": "url", "text": "成果如附件", "expect": false}
+{"kind": "url", "text": "https ://test", "expect": false}
+{"kind": "url", "text": "www.example.test", "expect": true}
+{"kind": "forbidden", "text": "底 價", "expect": true}
+{"kind": "forbidden", "text": "成​本", "expect": true}
+{"kind": "forbidden", "text": "點　數　單　價", "expect": true}
+{"kind": "url", "text": "drive.google.com/file/x", "expect": true}
+{"kind": "url", "text": "bit.ly/a", "expect": true}
+{"kind": "url", "text": "ftp://example.test/a", "expect": true}
+{"kind": "url", "text": "hxxps://evil.example/out", "expect": true}
+{"kind": "org_sj_marker", "text": "請見上準精密報價單 83100099", "expect": true}
+{"kind": "org_sj_marker", "text": "聯絡 a@sjsurvey.com.tw", "expect": true}
+{"kind": "org_sj_marker", "text": "一般進度詢問", "expect": false}
+{"kind": "org_yx_marker", "text": "請提供詠翔測量 28725008 報價", "expect": true}
+{"kind": "org_yx_marker", "text": "聯絡 a@yxsurvey.com.tw", "expect": true}
+{"kind": "org_yx_marker", "text": "一般進度詢問", "expect": false}

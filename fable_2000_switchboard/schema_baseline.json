@@ -1,0 +1,1074 @@
+[
+  {
+    "acl": [
+      "box=arwdDxtm/box",
+      "plumb_r28_views_reader=r/box",
+      "app_ro=r/box",
+      "app_rw=r/box",
+      "hr_payroll_admin=r/box",
+      "app_readonly=r/box",
+      "pm_sales_finance_role=r/box",
+      "payroll_admin_role=r/box"
+    ],
+    "kind": "v",
+    "name": "asset_instrument",
+    "owner": "box",
+    "schema": "dim",
+    "columns": [
+      {
+        "name": "asset_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "asset_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "asset_type",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "asset_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "brand_model",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "serial_no",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "plate_no",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "asset_status",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "custodian_employee_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "custodian_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "custodian_status",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "purchase_date",
+        "type": "date",
+        "not_null": false
+      },
+      {
+        "name": "purchase_cost_twd",
+        "type": "numeric(12,2)",
+        "not_null": false
+      }
+    ],
+    "definition": " SELECT a.id AS asset_id,\n    a.asset_code,\n    a.asset_type,\n    a.name AS asset_name,\n    a.brand_model,\n    a.serial_no,\n    a.plate_no,\n    a.status AS asset_status,\n    a.custodian_id AS custodian_employee_id,\n    e.full_name AS custodian_name,\n    e.employment_status AS custodian_status,\n    a.purchase_date,\n    a.purchase_cost AS purchase_cost_twd\n   FROM asset a\n     LEFT JOIN employee e ON e.id = a.custodian_id;",
+    "data": {
+      "md5": "e389f639c56b950873b8d2534e112eb7",
+      "count": 153
+    }
+  },
+  {
+    "acl": [
+      "box=arwdDxtm/box",
+      "pm_sales_finance_role=r/box",
+      "hr_payroll_admin=r/box",
+      "payroll_admin_role=r/box",
+      "plumb_r28_views_reader=r/box"
+    ],
+    "kind": "v",
+    "name": "case_project",
+    "owner": "box",
+    "schema": "dim",
+    "columns": [
+      {
+        "name": "case_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "case_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "main_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "sub_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "suffix_depth",
+        "type": "integer",
+        "not_null": false
+      },
+      {
+        "name": "parent_case_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "parent_case_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "case_title",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "case_category",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "region",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "customer_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "customer_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "pm_employee_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "pm_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "sales_employee_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "sales_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "lifecycle_stage",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "quoted_total_twd",
+        "type": "numeric(14,2)",
+        "not_null": false
+      },
+      {
+        "name": "contract_amount_twd",
+        "type": "numeric(14,2)",
+        "not_null": false
+      },
+      {
+        "name": "billed_total_twd",
+        "type": "numeric(14,2)",
+        "not_null": false
+      },
+      {
+        "name": "received_total_twd",
+        "type": "numeric(14,2)",
+        "not_null": false
+      },
+      {
+        "name": "start_date",
+        "type": "date",
+        "not_null": false
+      },
+      {
+        "name": "due_date",
+        "type": "date",
+        "not_null": false
+      },
+      {
+        "name": "closed_date",
+        "type": "date",
+        "not_null": false
+      },
+      {
+        "name": "source_v3_record_id",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "source_v4_record_id",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "source_quote_record_id",
+        "type": "text",
+        "not_null": false
+      }
+    ],
+    "definition": " SELECT ca.id AS case_id,\n    ca.case_code,\n    ca.main_code,\n    ca.suffix_code AS sub_code,\n    ca.suffix_depth,\n    ca.parent_case_id,\n    p.case_code AS parent_case_code,\n    ca.title AS case_title,\n    ca.category AS case_category,\n    ca.region,\n    ca.customer_id,\n    cu.name AS customer_name,\n    ca.pm_employee_id,\n    pm.full_name AS pm_name,\n    ca.sales_employee_id,\n    sa.full_name AS sales_name,\n    ca.status AS lifecycle_stage,\n    ca.quoted_total AS quoted_total_twd,\n    ca.contract_total AS contract_amount_twd,\n    ca.billed_total AS billed_total_twd,\n    ca.received_total AS received_total_twd,\n    ca.start_date,\n    ca.due_date,\n    ca.closed_date,\n    ca.source_v3_id AS source_v3_record_id,\n    ca.source_v4_id AS source_v4_record_id,\n    ca.source_quote_id AS source_quote_record_id\n   FROM \"case\" ca\n     LEFT JOIN \"case\" p ON p.id = ca.parent_case_id\n     LEFT JOIN customer cu ON cu.id = ca.customer_id\n     LEFT JOIN employee pm ON pm.id = ca.pm_employee_id\n     LEFT JOIN employee sa ON sa.id = ca.sales_employee_id;",
+    "data": {
+      "md5": "c671c6c02864aa66cdf1f5597fa64fac",
+      "count": 1349
+    }
+  },
+  {
+    "acl": [
+      "box=arwdDxtm/box",
+      "plumb_r28_views_reader=r/box",
+      "app_ro=r/box",
+      "app_rw=r/box",
+      "hr_payroll_admin=r/box",
+      "app_readonly=r/box",
+      "pm_sales_finance_role=r/box",
+      "payroll_admin_role=r/box"
+    ],
+    "kind": "v",
+    "name": "customer",
+    "owner": "box",
+    "schema": "dim",
+    "columns": [
+      {
+        "name": "customer_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "customer_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "customer_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "normalized_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "tax_id",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "customer_type",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "phone",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "address",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "customer_status",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "not_null": false
+      }
+    ],
+    "definition": " SELECT id AS customer_id,\n    customer_code,\n    name AS customer_name,\n    norm_name AS normalized_name,\n    tax_id,\n    category AS customer_type,\n    phone,\n    address,\n    status AS customer_status,\n    created_at\n   FROM customer c;",
+    "data": {
+      "md5": "8140913247070409026787b5a32d2b3e",
+      "count": 148
+    }
+  },
+  {
+    "acl": [
+      "box=arwdDxtm/box",
+      "plumb_r28_views_reader=r/box",
+      "app_ro=r/box",
+      "app_rw=r/box",
+      "hr_payroll_admin=r/box",
+      "app_readonly=r/box",
+      "pm_sales_finance_role=r/box",
+      "payroll_admin_role=r/box"
+    ],
+    "kind": "v",
+    "name": "district_mileage",
+    "owner": "box",
+    "schema": "dim",
+    "columns": [
+      {
+        "name": "district_mileage_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "city_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "district_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "round_trip_km",
+        "type": "numeric(8,2)",
+        "not_null": false
+      },
+      {
+        "name": "allowance_amount_twd",
+        "type": "numeric(10,2)",
+        "not_null": false
+      },
+      {
+        "name": "source_base_token",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "source_record_id",
+        "type": "text",
+        "not_null": false
+      }
+    ],
+    "definition": " SELECT id AS district_mileage_id,\n    city_name,\n    district_name,\n    distance_km AS round_trip_km,\n    allowance_tier AS allowance_amount_twd,\n    source_base_token,\n    source_record_id\n   FROM district_distance dd;",
+    "data": {
+      "md5": "bea9d7303d8ac29acebafc3172e5f955",
+      "count": 370
+    }
+  },
+  {
+    "acl": [
+      "box=arwdDxtm/box",
+      "plumb_r28_views_reader=r/box",
+      "app_ro=r/box",
+      "app_rw=r/box",
+      "hr_payroll_admin=r/box",
+      "app_readonly=r/box",
+      "pm_sales_finance_role=r/box",
+      "payroll_admin_role=r/box"
+    ],
+    "kind": "v",
+    "name": "employee",
+    "owner": "box",
+    "schema": "dim",
+    "columns": [
+      {
+        "name": "employee_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "employee_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "full_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "normalized_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "department_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "department_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "team_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "job_title",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "employment_status",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "hire_date",
+        "type": "date",
+        "not_null": false
+      },
+      {
+        "name": "termination_date",
+        "type": "date",
+        "not_null": false
+      },
+      {
+        "name": "is_field_staff",
+        "type": "boolean",
+        "not_null": false
+      },
+      {
+        "name": "is_inner_staff",
+        "type": "boolean",
+        "not_null": false
+      },
+      {
+        "name": "lark_open_id",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "lark_union_id",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "union_id_source",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "identity_confirmed",
+        "type": "boolean",
+        "not_null": false
+      },
+      {
+        "name": "identity_confirmed_by",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "identity_confirmed_by_employee_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "identity_confirmed_at",
+        "type": "timestamp with time zone",
+        "not_null": false
+      }
+    ],
+    "definition": " SELECT id AS employee_id,\n    employee_no AS employee_code,\n    full_name,\n    norm_name AS normalized_name,\n    department_id,\n    department_name,\n    team_code,\n    job_title,\n    employment_status,\n    hire_date,\n    resign_date AS termination_date,\n    is_field_staff,\n    is_inner_staff,\n    lark_open_id,\n    lark_union_id,\n    union_id_source,\n    identity_confirmed,\n    identity_confirmed_by,\n    identity_confirmed_by_employee_id,\n    identity_confirmed_at\n   FROM employee e;",
+    "data": {
+      "md5": "88401fad3c3c71b6c6110c884e1de887",
+      "count": 81
+    }
+  },
+  {
+    "acl": [
+      "box=arwdDxtm/box",
+      "plumb_r28_views_reader=r/box",
+      "app_ro=r/box",
+      "app_rw=r/box",
+      "hr_payroll_admin=r/box",
+      "app_readonly=r/box",
+      "pm_sales_finance_role=r/box",
+      "payroll_admin_role=r/box"
+    ],
+    "kind": "v",
+    "name": "attendance_daily",
+    "owner": "box",
+    "schema": "fact",
+    "columns": [
+      {
+        "name": "attendance_day_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "employee_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "employee_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "employee_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "attendance_date",
+        "type": "date",
+        "not_null": false
+      },
+      {
+        "name": "person_day_key",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "emp_date_key",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "emp_month_key",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "source_system",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "payroll_feed_source",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "day_type",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "first_punch_in",
+        "type": "timestamp with time zone",
+        "not_null": false
+      },
+      {
+        "name": "last_punch_out",
+        "type": "timestamp with time zone",
+        "not_null": false
+      },
+      {
+        "name": "regular_hours",
+        "type": "numeric(4,2)",
+        "not_null": false
+      },
+      {
+        "name": "anomaly_status",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "employee_confirmed",
+        "type": "boolean",
+        "not_null": false
+      },
+      {
+        "name": "lark_att_record_id",
+        "type": "text",
+        "not_null": false
+      }
+    ],
+    "definition": " SELECT ad.id AS attendance_day_id,\n    ad.employee_id,\n    e.employee_no AS employee_code,\n    e.full_name AS employee_name,\n    ad.work_date AS attendance_date,\n    (e.employee_no || '_'::text) || to_char(ad.work_date::timestamp with time zone, 'YYYYMMDD'::text) AS person_day_key,\n    (e.employee_no || '_'::text) || to_char(ad.work_date::timestamp with time zone, 'YYYYMMDD'::text) AS emp_date_key,\n    (e.employee_no || '_'::text) || to_char(ad.work_date::timestamp with time zone, 'YYYYMM'::text) AS emp_month_key,\n    ad.source_system,\n        CASE\n            WHEN ad.work_date < d0() THEN 'V3'::text\n            ELSE 'V4'::text\n        END AS payroll_feed_source,\n    ad.day_type,\n    ad.clock_in_at AS first_punch_in,\n    ad.clock_out_at AS last_punch_out,\n    ad.regular_hours,\n    ad.anomaly_status,\n    ad.employee_confirmed,\n    ad.source_record_id AS lark_att_record_id\n   FROM attendance_day ad\n     JOIN employee e ON e.id = ad.employee_id;",
+    "data": {
+      "md5": "abc29d984b6f9c132979223ca0613162",
+      "count": 4630
+    }
+  },
+  {
+    "acl": [
+      "box=arwdDxtm/box",
+      "plumb_r28_views_reader=r/box",
+      "app_ro=r/box",
+      "app_rw=r/box",
+      "hr_payroll_admin=r/box",
+      "app_readonly=r/box",
+      "pm_sales_finance_role=r/box",
+      "payroll_admin_role=r/box"
+    ],
+    "kind": "v",
+    "name": "attendance_hours_monthly",
+    "owner": "box",
+    "schema": "fact",
+    "columns": [
+      {
+        "name": "employee_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "employee_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "employee_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "period_ym",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "work_days",
+        "type": "numeric(4,1)",
+        "not_null": false
+      },
+      {
+        "name": "leave_hours",
+        "type": "numeric(5,2)",
+        "not_null": false
+      },
+      {
+        "name": "weekday_tier1_min",
+        "type": "integer",
+        "not_null": false
+      },
+      {
+        "name": "weekday_tier2_min",
+        "type": "integer",
+        "not_null": false
+      },
+      {
+        "name": "weekday_tier3_min",
+        "type": "integer",
+        "not_null": false
+      },
+      {
+        "name": "restday_tier1_min",
+        "type": "integer",
+        "not_null": false
+      },
+      {
+        "name": "restday_tier2_min",
+        "type": "integer",
+        "not_null": false
+      },
+      {
+        "name": "restday_tier3_min",
+        "type": "integer",
+        "not_null": false
+      },
+      {
+        "name": "holiday_tier1_min",
+        "type": "integer",
+        "not_null": false
+      },
+      {
+        "name": "holiday_tier2_min",
+        "type": "integer",
+        "not_null": false
+      },
+      {
+        "name": "holiday_tier3_min",
+        "type": "integer",
+        "not_null": false
+      },
+      {
+        "name": "ot_minutes_by_type_tier",
+        "type": "jsonb",
+        "not_null": false
+      }
+    ],
+    "definition": " WITH ot_by_emp_month AS (\n         SELECT ot.employee_id,\n            to_char(ot.work_date::timestamp with time zone, 'YYYY-MM'::text) AS period_ym,\n            round(sum(\n                CASE\n                    WHEN ot.day_type = 'weekday'::text THEN LEAST(COALESCE(ot.approved_ot_hours, 0::numeric), 2.0) * 60::numeric\n                    ELSE 0::numeric\n                END))::integer AS weekday_tier1_min,\n            round(sum(\n                CASE\n                    WHEN ot.day_type = 'weekday'::text THEN GREATEST(LEAST(COALESCE(ot.approved_ot_hours, 0::numeric) - 2.0, 2.0), 0::numeric) * 60::numeric\n                    ELSE 0::numeric\n                END))::integer AS weekday_tier2_min,\n            round(sum(\n                CASE\n                    WHEN ot.day_type = 'weekday'::text THEN GREATEST(COALESCE(ot.approved_ot_hours, 0::numeric) - 4.0, 0::numeric) * 60::numeric\n                    ELSE 0::numeric\n                END))::integer AS weekday_tier3_min,\n            round(sum(\n                CASE\n                    WHEN ot.day_type = 'restday'::text THEN LEAST(COALESCE(ot.approved_ot_hours, 0::numeric), 2.0) * 60::numeric\n                    ELSE 0::numeric\n                END))::integer AS restday_tier1_min,\n            round(sum(\n                CASE\n                    WHEN ot.day_type = 'restday'::text THEN GREATEST(LEAST(COALESCE(ot.approved_ot_hours, 0::numeric) - 2.0, 6.0), 0::numeric) * 60::numeric\n                    ELSE 0::numeric\n                END))::integer AS restday_tier2_min,\n            round(sum(\n                CASE\n                    WHEN ot.day_type = 'restday'::text THEN GREATEST(COALESCE(ot.approved_ot_hours, 0::numeric) - 8.0, 0::numeric) * 60::numeric\n                    ELSE 0::numeric\n                END))::integer AS restday_tier3_min,\n            round(sum(\n                CASE\n                    WHEN ot.day_type = ANY (ARRAY['holiday'::text, 'national_holiday'::text]) THEN LEAST(COALESCE(ot.approved_ot_hours, 0::numeric), 8.0) * 60::numeric\n                    ELSE 0::numeric\n                END))::integer AS holiday_tier1_min,\n            round(sum(\n                CASE\n                    WHEN ot.day_type = ANY (ARRAY['holiday'::text, 'national_holiday'::text]) THEN GREATEST(LEAST(COALESCE(ot.approved_ot_hours, 0::numeric) - 8.0, 2.0), 0::numeric) * 60::numeric\n                    ELSE 0::numeric\n                END))::integer AS holiday_tier2_min,\n            round(sum(\n                CASE\n                    WHEN ot.day_type = ANY (ARRAY['holiday'::text, 'national_holiday'::text]) THEN GREATEST(COALESCE(ot.approved_ot_hours, 0::numeric) - 10.0, 0::numeric) * 60::numeric\n                    ELSE 0::numeric\n                END))::integer AS holiday_tier3_min\n           FROM overtime_day ot\n          WHERE ot.status = 'approved'::text\n          GROUP BY ot.employee_id, (to_char(ot.work_date::timestamp with time zone, 'YYYY-MM'::text))\n        )\n SELECT pl.employee_id,\n    e.employee_no AS employee_code,\n    e.full_name AS employee_name,\n    pr.period_ym,\n    pl.work_days,\n    pl.leave_hours,\n    COALESCE(otm.weekday_tier1_min, round(COALESCE(pl.ot_tier1_hours, 0::numeric) * 60::numeric)::integer) AS weekday_tier1_min,\n    COALESCE(otm.weekday_tier2_min, round(COALESCE(pl.ot_tier2_hours, 0::numeric) * 60::numeric)::integer) AS weekday_tier2_min,\n    COALESCE(otm.weekday_tier3_min, 0) AS weekday_tier3_min,\n    COALESCE(otm.restday_tier1_min, 0) AS restday_tier1_min,\n    COALESCE(otm.restday_tier2_min, 0) AS restday_tier2_min,\n    COALESCE(otm.restday_tier3_min, 0) AS restday_tier3_min,\n    COALESCE(otm.holiday_tier1_min, round(COALESCE(pl.ot_tier3_hours, 0::numeric) * 60::numeric)::integer) AS holiday_tier1_min,\n    COALESCE(otm.holiday_tier2_min, 0) AS holiday_tier2_min,\n    COALESCE(otm.holiday_tier3_min, 0) AS holiday_tier3_min,\n    jsonb_build_object('weekday', jsonb_build_object('tier1_min', COALESCE(otm.weekday_tier1_min, round(COALESCE(pl.ot_tier1_hours, 0::numeric) * 60::numeric)::integer), 'tier2_min', COALESCE(otm.weekday_tier2_min, round(COALESCE(pl.ot_tier2_hours, 0::numeric) * 60::numeric)::integer), 'tier3_min', COALESCE(otm.weekday_tier3_min, 0)), 'restday', jsonb_build_object('tier1_min', COALESCE(otm.restday_tier1_min, 0), 'tier2_min', COALESCE(otm.restday_tier2_min, 0), 'tier3_min', COALESCE(otm.restday_tier3_min, 0)), 'holiday', jsonb_build_object('tier1_min', COALESCE(otm.holiday_tier1_min, round(COALESCE(pl.ot_tier3_hours, 0::numeric) * 60::numeric)::integer), 'tier2_min', COALESCE(otm.holiday_tier2_min, 0), 'tier3_min', COALESCE(otm.holiday_tier3_min, 0))) AS ot_minutes_by_type_tier\n   FROM payroll_line pl\n     JOIN payroll_run pr ON pr.id = pl.run_id\n     JOIN employee e ON e.id = pl.employee_id\n     LEFT JOIN ot_by_emp_month otm ON otm.employee_id = pl.employee_id AND otm.period_ym = pr.period_ym;",
+    "data": {
+      "md5": "7799f88c2095e2285cfbb61fe7c22fe7",
+      "count": 71
+    }
+  },
+  {
+    "acl": [
+      "box=arwdDxtm/box",
+      "plumb_r28_views_reader=r/box",
+      "app_ro=r/box",
+      "app_rw=r/box",
+      "hr_payroll_admin=r/box",
+      "app_readonly=r/box",
+      "pm_sales_finance_role=r/box",
+      "payroll_admin_role=r/box"
+    ],
+    "kind": "v",
+    "name": "quote_pipeline",
+    "owner": "box",
+    "schema": "fact",
+    "columns": [
+      {
+        "name": "quote_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "quote_no",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "customer_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "customer_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "linked_case_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "linked_case_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "quote_title",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "quote_status",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "quoted_date",
+        "type": "date",
+        "not_null": false
+      },
+      {
+        "name": "quoted_total_twd",
+        "type": "numeric(14,2)",
+        "not_null": false
+      },
+      {
+        "name": "legacy_prelim_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "source_base_token",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "lark_quote_record_id",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "raw_unique_quote_no",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "auto_quote_no",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "auto_seq_no",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "canonical_quote_no",
+        "type": "text",
+        "not_null": false
+      }
+    ],
+    "definition": " SELECT q.id AS quote_id,\n    q.quote_no,\n    q.customer_id,\n    cu.name AS customer_name,\n    q.case_id AS linked_case_id,\n    ca.case_code AS linked_case_code,\n    q.project_title AS quote_title,\n    q.status AS quote_status,\n    q.quote_date AS quoted_date,\n    q.quoted_total AS quoted_total_twd,\n    q.raw_case_code AS legacy_prelim_code,\n    q.source_base_token,\n    q.source_record_id AS lark_quote_record_id,\n    q.raw_unique_quote_no,\n    q.auto_quote_no,\n    q.auto_seq_no,\n    q.canonical_quote_no\n   FROM quote q\n     LEFT JOIN customer cu ON cu.id = q.customer_id\n     LEFT JOIN \"case\" ca ON ca.id = q.case_id;",
+    "data": {
+      "md5": "5c01ea0c93b92999dcfff338ac35ec23",
+      "count": 1299
+    }
+  },
+  {
+    "acl": [
+      "box=arwdDxtm/box",
+      "plumb_r28_views_reader=r/box",
+      "app_ro=r/box",
+      "app_rw=r/box",
+      "hr_payroll_admin=r/box",
+      "app_readonly=r/box",
+      "pm_sales_finance_role=r/box",
+      "payroll_admin_role=r/box"
+    ],
+    "kind": "v",
+    "name": "work_order_crew_share",
+    "owner": "box",
+    "schema": "fact",
+    "columns": [
+      {
+        "name": "crew_share_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "work_order_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "work_order_no",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "work_type",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "work_date",
+        "type": "date",
+        "not_null": false
+      },
+      {
+        "name": "source_system",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "sot_system_by_d0",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "employee_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "employee_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "employee_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "crew_share_natural_key",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "person_day_key",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "emp_date_key",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "emp_month_key",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "case_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "case_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "role_in_crew",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "hours_worked",
+        "type": "numeric(5,2)",
+        "not_null": false
+      },
+      {
+        "name": "share_ratio",
+        "type": "numeric(5,4)",
+        "not_null": false
+      },
+      {
+        "name": "allocated_points",
+        "type": "numeric(12,2)",
+        "not_null": false
+      },
+      {
+        "name": "employee_confirmed",
+        "type": "boolean",
+        "not_null": false
+      }
+    ],
+    "definition": " SELECT woc.id AS crew_share_id,\n    wo.work_order_id,\n    wo.work_order_no,\n    wo.work_type,\n    wo.work_date,\n    wo.source_system,\n    wo.sot_system_by_d0,\n    woc.employee_id,\n    e.employee_no AS employee_code,\n    e.full_name AS employee_name,\n    (((e.employee_no || '_'::text) || to_char(wo.work_date::timestamp with time zone, 'YYYYMMDD'::text)) || '_'::text) || wo.work_order_id::text AS crew_share_natural_key,\n    (e.employee_no || '_'::text) || to_char(wo.work_date::timestamp with time zone, 'YYYYMMDD'::text) AS person_day_key,\n    (e.employee_no || '_'::text) || to_char(wo.work_date::timestamp with time zone, 'YYYYMMDD'::text) AS emp_date_key,\n    (e.employee_no || '_'::text) || to_char(wo.work_date::timestamp with time zone, 'YYYYMM'::text) AS emp_month_key,\n    wo.case_id,\n    wo.case_code,\n    woc.role_in_crew,\n    woc.hours_worked,\n    woc.share_ratio,\n    woc.allocated_points,\n    woc.employee_confirmed\n   FROM work_order_crew woc\n     JOIN fact.work_order_daily wo ON wo.work_order_id = woc.work_order_id\n     JOIN employee e ON e.id = woc.employee_id;",
+    "data": {
+      "md5": "d70327c35d88892411ce71947bb34807",
+      "count": 3779
+    }
+  },
+  {
+    "acl": [
+      "box=arwdDxtm/box",
+      "plumb_r28_views_reader=r/box",
+      "app_ro=r/box",
+      "app_rw=r/box",
+      "hr_payroll_admin=r/box",
+      "app_readonly=r/box",
+      "pm_sales_finance_role=r/box",
+      "payroll_admin_role=r/box"
+    ],
+    "kind": "v",
+    "name": "work_order_daily",
+    "owner": "box",
+    "schema": "fact",
+    "columns": [
+      {
+        "name": "work_order_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "work_order_no",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "work_type",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "work_date",
+        "type": "date",
+        "not_null": false
+      },
+      {
+        "name": "source_system",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "sot_system_by_d0",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "case_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "case_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "case_title",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "pending_bucket_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "contract_item_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "team_code",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "leader_employee_id",
+        "type": "uuid",
+        "not_null": false
+      },
+      {
+        "name": "leader_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "work_item_name",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "review_status",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "output_points",
+        "type": "numeric(12,2)",
+        "not_null": false
+      },
+      {
+        "name": "output_value_twd",
+        "type": "numeric(14,2)",
+        "not_null": false
+      },
+      {
+        "name": "weather",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "location_text",
+        "type": "text",
+        "not_null": false
+      },
+      {
+        "name": "lark_wo_record_id",
+        "type": "text",
+        "not_null": false
+      }
+    ],
+    "definition": " SELECT wo.id AS work_order_id,\n    wo.wo_no AS work_order_no,\n    wo.kind AS work_type,\n    wo.work_date,\n    wo.source_system,\n        CASE\n            WHEN wo.work_date < d0() THEN 'V3'::text\n            ELSE 'V4'::text\n        END AS sot_system_by_d0,\n    wo.case_id,\n    ca.case_code,\n    ca.title AS case_title,\n    wo.pending_bucket_id,\n    wo.contract_item_id,\n    wo.team_code,\n    wo.lead_employee_id AS leader_employee_id,\n    le.full_name AS leader_name,\n    wo.work_item_name,\n    wo.status AS review_status,\n    wo.output_points,\n    wo.output_value_twd,\n    wo.weather,\n    wo.location_text,\n    wo.source_record_id AS lark_wo_record_id\n   FROM work_order wo\n     LEFT JOIN \"case\" ca ON ca.id = wo.case_id\n     LEFT JOIN employee le ON le.id = wo.lead_employee_id;",
+    "data": {
+      "md5": "094798c4f848f9878b75f5c4932e13fd",
+      "count": 2207
+    }
+  }
+]

@@ -1,0 +1,43 @@
+{
+  "generated_at": "2026-10-25T00:11:16.402343+08:00",
+  "sources": [
+    {
+      "path": "/workspace/yongxiang_arch/email_harmony_rag/corpus.ndjson",
+      "sha256": "7044324cfa95d9ff16547c6edaa480853c5e628dcfe7ab452b66e86e147d595a"
+    },
+    {
+      "path": "/workspace/yongxiang_arch/email_harmony_rag/playbooks.json",
+      "sha256": "75d43d57336aa687e74e696dc1c6572331894732e668b8f7c06f5e760bb0f449"
+    },
+    {
+      "path": "/workspace/yongxiang_arch/email_harmony_rag/acceptance.py",
+      "sha256": "a996dacd4a238be55416c56147a8832ba744120c682173f6a726886653cd7e43"
+    },
+    {
+      "path": "/workspace/yongxiang_arch/email_harmony_rag/privacy.py",
+      "sha256": "c475739eb69f356ff0aaaae3720ac1e6f9bcb27b4422ae3588870ac70ab59b7c"
+    },
+    {
+      "path": "/workspace/yongxiang_arch/email_harmony_rag/inventory.json",
+      "sha256": "399c2e997b1f4a76e1e2f5d6afb3df46e5b077e45e9d79a5a85d54ac604e392e"
+    },
+    {
+      "path": "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.md",
+      "sha256": "d5b578f8cddc40ee3567f10e0fc6e507da0caa0f677bb2622f0e65ec5a64c5b0"
+    },
+    {
+      "path": "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.json",
+      "sha256": "ffc344772fe34381512bd5f329e0823976620115548edd7152ec1d5f1fb67763"
+    },
+    {
+      "path": "/workspace/yongxiang_arch/PLUMB_V2_CLIENT_COMM_HARMONY_SPEC_R28.md",
+      "sha256": "b87b4e0cfe48ad8d2838237c151455f3af2814da0fc06180766fb10b589455f5"
+    }
+  ],
+  "corpus_threads": 53,
+  "newest": "2026-10-24T17:50:00+08:00",
+  "oldest": "2026-04-21T17:42:00+08:00",
+  "serial_floor": 12084,
+  "serial_floor_basis": "權威稽核已觀察到12084；不是本機已匯入12084列",
+  "source_mailbox": "jekai@yxsurvey.com.tw；不是公司Gmail全信箱匯出"
+}

@@ -1,0 +1,17 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>業主聯繫 · 工作流程</title><script src="/static/operon_workflow.js"></script>
+<style>body{margin:32px auto;padding:0 24px;max-width:1240px;background:#faf9f4;font:15px system-ui;color:#22251f}h1{font:32px Georgia,serif}label{display:inline-block;margin:0 20px 20px 0}button,select,input{font:inherit;padding:6px;margin:4px}#status{min-height:24px}</style>
+<h1>業主聯繫 · 工作流程</h1><p>本機演練 · 未對外寄送</p>
+<label>資料來源 <select id="cohort"><option> SANDBOX_OBSERVED </option><option>REHEARSAL</option><option>LIVE</option></select></label>
+<label>同仁檢視 <select id="viewer"><option>吳柏頤</option><option>涂振邦</option><option>羅薇</option></select></label>
+<button id="reload">重新讀取</button><div id="status" role="status" aria-live="polite"></div><main id="workflow"></main>
+<script>
+const q=new URLSearchParams(location.search),byId=id=>document.getElementById(id);
+byId('cohort').options[0].value='SANDBOX_OBSERVED';byId('cohort').value=q.get('dataset_kind')||'SANDBOX_OBSERVED';byId('viewer').value=q.get('viewer')||'吳柏頤';
+let snapshot;
+async function request(path,data){const response=await fetch('/api/r50/'+path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:{});const body=await response.json();if(!response.ok)throw Error(body.error||body.status||'讀取失敗');return body;}
+async function refresh(){try{const p=new URLSearchParams({dataset_kind:byId('cohort').value});if(q.get('case_code'))p.set('case_code',q.get('case_code'));snapshot=await request('state?'+p);byId('workflow').innerHTML=window.renderR50Workflow(snapshot,byId('viewer').value);byId('status').textContent='已從本機資料庫更新';}catch(e){byId('status').textContent=e.message;throw e;}}
+byId('reload').onclick=refresh;byId('cohort').onchange=refresh;byId('viewer').onchange=()=>{byId('workflow').innerHTML=window.renderR50Workflow(snapshot,byId('viewer').value)};
+document.addEventListener('click',async e=>{const intent=e.target.dataset.r50Intent;if(!intent)return;const d=snapshot.dispatches.find(x=>x.dispatch_id===e.target.dataset.dispatch);try{let body;if(intent==='EDIT_APPROVE'){body=prompt('輸入完整核准正文');if(!body)return;}if(intent==='NL_ADJUST'){const text=prompt('輸入調整要求');if(!text)return;await request('nl-chat',{actor_open_id:d.actor_open_id,context_token:d.context_token,message_id:crypto.randomUUID(),text});}else{await request('card-action',{actor_open_id:d.actor_open_id,context_token:d.context_token,callback_event_id:crypto.randomUUID(),intent,body});}await refresh();}catch(error){byId('status').textContent=error.message;}});
+refresh();
+</script></html>

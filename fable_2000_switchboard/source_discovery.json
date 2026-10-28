@@ -1,0 +1,104 @@
+{
+  "search_root": "/workspace",
+  "text_files_scanned": 6294,
+  "large_files_skipped": 0,
+  "excluded_directory_names": [
+    ".cache",
+    ".git",
+    ".venv",
+    "__pycache__",
+    "chrome-profile",
+    "node_modules",
+    "site-packages",
+    "venv"
+  ],
+  "workbook_paths_checked": [
+    "/workspace/candidate-tracker.xlsx",
+    "/workspace/code.xlsx",
+    "/workspace/tracker-backup-20261023.xlsx",
+    "/workspace/qa/dm_1006_9月勞健保.xlsx",
+    "/workspace/rollcall/rollcall_luowei_1021_1022.xlsx",
+    "/workspace/payroll/bli_11509/廠商進場資料登錄表11510.xlsx",
+    "/workspace/payroll/bli_11509/115_10月_人員證照清冊.xlsx",
+    "/workspace/payroll/round2/9月勞健保.xlsx",
+    "/workspace/payroll/round2/v/yijun.xlsx",
+    "/workspace/payslip_fix/before/202609_recvtTAinUGgJN_before.xlsx",
+    "/workspace/payslip_fix/before/202609_recvtTAjVgNgrf_before.xlsx",
+    "/workspace/quote-settlement/ref/1PlNvkgouA6fDdRMZcRvoa5ZCIcaGGKtSNhSM3mT2AHE.xlsx",
+    "/workspace/quote-settlement/ref/sheet1.xlsx",
+    "/workspace/quote-settlement/ref/1uniANEesSNvVUz8AoWh_UJU99MjNCfMwL87FMnc5AsU.xlsx"
+  ],
+  "reference_hits": [
+    {
+      "path": "/workspace/claude_share_e56b.md",
+      "sha256": "4da5a037fdaf34f7ce8b0851efa2ab8eb93455927da6943693aaff097ed46eca",
+      "kind": "提及規格/名稱，須有原始列才可匯入"
+    },
+    {
+      "path": "/workspace/generate_email_taxonomy_report.py",
+      "sha256": "676467b7d4c8952d9088b79a86a70aaf54ae273c1d15cc1685586faebbb36880",
+      "kind": "提及規格/名稱，須有原始列才可匯入"
+    },
+    {
+      "path": "/workspace/prd/claude_share_e56b.md",
+      "sha256": "25536b020aa8e8f12a08119f68c9bcf3dc950d1d76746e90f843381f627f01f8",
+      "kind": "提及規格/名稱，須有原始列才可匯入"
+    },
+    {
+      "path": "/workspace/prd/raw_paste.txt",
+      "sha256": "7976478db7c51e3228242bba0164d0ba6d38f590e9a4721195a6628de97a1254",
+      "kind": "提及規格/名稱，須有原始列才可匯入"
+    },
+    {
+      "path": "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.md",
+      "sha256": "d5b578f8cddc40ee3567f10e0fc6e507da0caa0f677bb2622f0e65ec5a64c5b0",
+      "kind": "提及規格/名稱，須有原始列才可匯入"
+    },
+    {
+      "path": "/workspace/yongxiang_arch/w0_reports/08_email_3to5yr_taxonomy_audit.json",
+      "sha256": "ffc344772fe34381512bd5f329e0823976620115548edd7152ec1d5f1fb67763",
+      "kind": "提及規格/名稱，須有原始列才可匯入"
+    },
+    {
+      "path": "/workspace/settle/si/docs/prd/data/sop-template-review-catalog-v1.0.json",
+      "sha256": "1aa4837c155e28ede095bfb5190998240131a097a84fafaa2c584c6716fa5805",
+      "kind": "提及規格/名稱，須有原始列才可匯入"
+    },
+    {
+      "path": "/workspace/fable/r29/q_r29_email_rag_ai_switchboard.txt",
+      "sha256": "7f50df28e857bc2581a918716916d28d0174a52d03dacea95285bf486dfc70d4",
+      "kind": "提及規格/名稱，須有原始列才可匯入"
+    },
+    {
+      "path": "/workspace/fable/r29/q_r29_pstack_followup.txt",
+      "sha256": "d9f715d469707e9ff8537cbe2694cc766adc15404eab806c489dbbf6384a7689",
+      "kind": "提及規格/名稱，須有原始列才可匯入"
+    },
+    {
+      "path": "/workspace/rx/part_136.txt",
+      "sha256": "828befef8539bcffe8bac5dbc2188b90b001f3cdcd4d969e97444ff9b6722efb",
+      "kind": "提及規格/名稱，須有原始列才可匯入"
+    },
+    {
+      "path": "/workspace/agent-tools/bca15c4c-8b6d-4fef-ba75-749e417d06f4.txt",
+      "sha256": "cb745e0118851986262dc3814699495e1440a018f72bac129992304568e4e6eb",
+      "kind": "提及規格/名稱，須有原始列才可匯入"
+    }
+  ],
+  "possible_sheet_exports": [
+    "/workspace/quote-settlement/ref/sheet1.xlsx"
+  ],
+  "candidate_reviews": [
+    {
+      "path": "/workspace/quote-settlement/ref/sheet1.xlsx",
+      "finding": "已檢查工作表名稱與sharedStrings：含業主往來紀錄表的SOP文字；34個工作表中沒有該紀錄表，非指定Sheet匯出。"
+    }
+  ],
+  "sheet_id": "1943hxNCcVIngRUesLas2t_tMTYmq8H1joKTgBrHKRHQ",
+  "sheet_available": false,
+  "sheet_rows_loaded": 0,
+  "gmail_draft_templates_available": false,
+  "gmail_templates_loaded": 0,
+  "gap": "未找到可核實的指定Google Sheet原始列與Gmail草稿原文；參考報告不是資料匯出。未製造12084列。",
+  "search_limit": "略過程式依賴、瀏覽器二進位cache及大於20MB文字；xlsx僅檢查小於12MB的XML項目。"
+}
