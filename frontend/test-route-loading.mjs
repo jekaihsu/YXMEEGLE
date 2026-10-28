@@ -49,4 +49,6 @@ await flush(()=>session(json({user:a,users:[a,b],mode:'lark',environment:'produc
 await flush();
 assert.deepEqual(calls.map(url=>url.split('?')[0]),['/api/session','/api/workspace','/api/reports/review','/api/reports/review/rows'],'authorized reports read while the workspace request remains unresolved');
 await flush(()=>reportsRoot.unmount());dom.window.close();
+const skeletonCss=await fs.readFile(new URL('./src/RouteSkeleton.css',import.meta.url),'utf8');
+assert.match(skeletonCss,/\.route-skeleton \.sr-only\{[^}]*position:absolute[^}]*clip:rect\(0,0,0,0\)/,'the skeleton announcement is hidden visually, not rendered above the heading');
 console.log('Route loading: chunk before session/workspace, shared promise, skeleton, canceled hover, focus prefetch, swallowed failure, reconnect and click passed');

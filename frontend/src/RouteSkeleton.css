@@ -12,3 +12,4 @@
 .route-skeleton-detail .route-skeleton-content{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
 .route-skeleton-detail .route-skeleton-block{min-height:320px;align-content:start}
 @media(max-width:760px){.route-skeleton-cards .route-skeleton-content,.route-skeleton-detail .route-skeleton-content{grid-template-columns:minmax(0,1fr)}}
+.route-skeleton .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
