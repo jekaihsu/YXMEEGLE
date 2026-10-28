@@ -1,5 +1,5 @@
+import {AssigneePicker,AssigneeTaskEditor} from './AssigneePicker';
 import {SopLarkSync} from './SopLarkSync';
-import {InlineTaskEditor} from './InlineTaskEditor';
 import {editorFields,type TaskDraft} from './nodeWorkbenchModel';
 import {TaskSuggestion,SuggestionReview} from './SopSuggestions';
 import {useRef, useState, type ReactNode} from 'react';
@@ -110,8 +110,8 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
   <div className="sop-inspector">
    <div className="sop-badges"><Badge tone="accent">SOP 任務</Badge>{task.isTest && <Badge tone="warning">測試</Badge>}<Badge>{stateLabel(task)}</Badge>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.applicability !== 'applicable' && <Badge tone="warning">{APPLICABILITY_LABEL[task.applicability]}</Badge>}</div>
    {notice && <p role="status" className="sop-muted">{notice}</p>}
-   <InlineTaskEditor busy={busy || sop.state.kind!=='ready' || sop.state.refreshing} model={{draft,fields:editorFields({title:editable,assignee:editable,due:editable,notes:editable && task.instructions!==null,status:false},task.state==='archived'?'已封存':task.state==='done'?'已完成':'需管理權限'),people:sop.assignees,statuses:[{id:task.state,label:stateLabel(task)}],maxTitle:500,maxNotes:20000,dueReason:true,readOnlyReason:task.state==='archived'?'已封存':task.state==='done'?'已完成':undefined}} onSave={save}/>
-   {editable && <ParticipantRoles task={task} people={sop.assignees} busy={busy} save={participants=>patch({participants},'已更新人員')}/>}
+   <AssigneeTaskEditor projectId={project.id} nodeKey={task.nodes[0]?.node_key} busy={busy || sop.state.kind!=='ready' || sop.state.refreshing} model={{draft,fields:editorFields({title:editable,assignee:editable,due:editable,notes:editable && task.instructions!==null,status:false},task.state==='archived'?'已封存':task.state==='done'?'已完成':'需管理權限'),people:sop.assignees,statuses:[{id:task.state,label:stateLabel(task)}],maxTitle:500,maxNotes:20000,dueReason:true,readOnlyReason:task.state==='archived'?'已封存':task.state==='done'?'已完成':undefined}} onSave={save}/>
+   {editable && <ParticipantRoles projectId={project.id} task={task} people={sop.assignees} busy={busy} save={participants=>patch({participants},'已更新人員')}/>}
    {task.allowedActions.includes('set_applicability') && <ApplicabilityEditor task={task} busy={busy} save={(applicability,reason)=>transition('set_applicability',{applicability,reason})}/>}
 
    {task.result && <Section title="完成結果"><Row label="完成人員" value={task.result.actorName}/><Row label="完成時間" value={new Date(task.result.at*1000).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false})}/><Row label="結果說明" value={<span className="sop-raw">{task.result.note}</span>}/></Section>}
@@ -144,10 +144,10 @@ function ApplicabilityEditor({task,busy,save}:{task:SopTask;busy:boolean;save:(v
  </form>;
 }
 
-function ParticipantRoles({task,people,busy,save}:{task:SopTask;people:{id:string;name:string}[];busy:boolean;save:(participants:SopTask['participants'])=>Promise<boolean|undefined>}) {
+function ParticipantRoles({projectId,task,people,busy,save}:{projectId:string;task:SopTask;people:{id:string;name:string}[];busy:boolean;save:(participants:SopTask['participants'])=>Promise<boolean|undefined>}) {
  const [roles,setRoles]=useState(task.participants);
  return <details><summary>檢核與確認人員</summary><form className="sop-form" onSubmit={e=>{e.preventDefault();void save(Object.fromEntries(Object.entries({...task.participants,checker:roles.checker,confirmer:roles.confirmer}).filter(([,v])=>v)))}}>
-  {(['checker','confirmer'] as const).map(role=><Field key={role} label={ROLE_LABEL[role]}><select value={roles[role]||''} disabled={busy} onChange={e=>setRoles(old=>({...old,[role]:e.target.value||undefined}))}><option value="">未指派</option>{people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>)}
+  {(['checker','confirmer'] as const).map(role=><div key={role}>{ROLE_LABEL[role]}<AssigneePicker projectId={projectId} nodeKey={task.nodes[0]?.node_key} title={`${task.title} · ${ROLE_LABEL[role]}`} value={roles[role]||''} people={people} disabled={busy} onChange={id=>setRoles(old=>({...old,[role]:id||undefined}))}/></div>)}
   <Button type="submit" disabled={busy} disabledReason="正在儲存">儲存檢核與確認人員</Button>
  </form></details>;
 }

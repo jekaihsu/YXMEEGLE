@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
 const dom = new JSDOM('<div id="root"></div>', {url: 'http://localhost/', pretendToBeVisual: true});
-for (const k of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','Element','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','navigator','DOMException']) Object.defineProperty(globalThis, k, {value: dom.window[k], configurable: true});
+for (const k of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','Element','HTMLElement','Node','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','navigator','DOMException']) Object.defineProperty(globalThis, k, {value: dom.window[k], configurable: true});
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 globalThis.getComputedStyle = dom.window.getComputedStyle;
 globalThis.requestAnimationFrame = fn => setTimeout(fn, 0);
@@ -66,7 +66,7 @@ async function mount({tasks = [task('t1')], route = {}, role = 'pm', overviewSta
   if (url === '/api/projects/p1/sop-tasks' && method === 'GET' && server.overviewOk) return response(server.overview);
   if (url === '/api/projects/p1/sop-tasks' && method === 'GET' && server.overviewFail) return response({code: 'upstream'}, 502);
   if (url === '/api/projects/p1/sop-tasks' && method === 'GET') return overviewStatus === 200 ? response(server.overview) : response({code: 'sop_import_forbidden'}, overviewStatus);
-  if (url.endsWith('/sop-assignees')) return response({people:[{id:'pm',name:'王經理',case_roles:['pm']},{id:'member',name:'林組員',case_roles:['collaborator']}]});
+  if (url.split('?')[0].endsWith('/sop-assignees')) return response({people:[{id:'pm',name:'王經理',case_roles:['pm']},{id:'member',name:'林組員',case_roles:['collaborator']}]});
   if (url === '/api/sop-templates') return response({templates: [{...examples.preview.template, name: 'Plumb 案件 SOP', is_default: true}]});
   if (url.endsWith('/sop-import/preview')) return response(previewFixture(body));
   if (url.endsWith('/sop-import/apply')) {server.apply.push(body); return server.applyReply ? server.applyReply(body) : response({...examples.apply, request_id: body.request_id})}
@@ -254,7 +254,7 @@ test('a deep link opens the SOP drawer, Escape clears the discriminator and retu
 test('a task row leads with its state marker and ends with the bulk checkbox; the drawer footer ends with the primary action', async () => {
  await mount({route: {task: 't1', task_source: 'sop_local'}});
  const row = document.querySelector('[data-sop-task=t1] .sop-task-select');
- assert.deepEqual([...row.children].map(e => e.className || e.type), ['sop-state', 'pf-task-open', 'sop-quick-assign', 'checkbox']);
+ assert.deepEqual([...row.children].map(e => e.className || e.type), ['sop-state', 'pf-task-open', 'assignee-picker ds-picker', 'checkbox']);
  assert.equal(row.firstElementChild.dataset.state, 'pending');
  assert.equal(dialog().dataset.kind, 'sop');
  assert.deepEqual([...dialog().querySelectorAll('.task-drawer-trail>span')].map(s => s.textContent), ['SOP 任務', '報價']);
@@ -378,8 +378,9 @@ test('a revision conflict reloads the task and keeps the draft for the next save
 
 test('participant choices come only from eligible case people', async () => {
  await mount({route: {task: 't1', task_source: 'sop_local'}});
- const executor = dialog().querySelector('[aria-label="任務負責人"]');
- assert.deepEqual([...executor.options].map(o => o.textContent), ['未指派', '王經理', '林組員']);
+ const executor = dialog().querySelector('button[aria-label="task: 業主提出報價需求"]');
+ await click(executor);
+ assert.deepEqual([...dialog().querySelectorAll('[role=option]')].map(o => o.textContent), ['未指派', '王經理', '林組員']);
 });
 
 test('suggestion controls remain inside the task block without an internal separator', async()=>{
@@ -454,7 +455,7 @@ test('projection polling stops after five minutes and on session change or unmou
   document.body.innerHTML = '<div id="root"></div>';
   await mount({tasks: [task('t1', {lark_sync: {state: '同步中'}})]});
   const stale = [...timers.values()][0], before = calls.length;
-  ui.invalidateSessionEpoch();
+  await act(async()=>ui.invalidateSessionEpoch());
   await act(async () => {await stale(); await tick()});
   assert.equal(calls.length, before);
   await act(async () => root.unmount()); root = null;
@@ -483,17 +484,18 @@ test('slow overview requests do not extend the projection polling window', async
 
 test('a manager assigns the executor from the list row without opening the task', async () => {
  await mount({tasks: [task('t1', {allowed_actions: ['start', 'edit']})]});
- const select = document.querySelector('select[aria-label="指派 業主提出報價需求"]');
- assert.ok(select, 'row has an inline assignee picker');
- assert.deepEqual([...select.options].map(o => o.textContent), ['未指派', '王經理', '林組員']);
- await act(async () => {Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, 'member'); select.dispatchEvent(new Event('change', {bubbles: true})); await tick()});
+ const picker = document.querySelector('button[aria-label="task: 業主提出報價需求"]');
+ assert.ok(picker, 'row has an inline assignee picker');
+ await click(picker);
+ assert.deepEqual([...document.querySelectorAll('[role=option]')].map(o => o.textContent), ['未指派', '王經理', '林組員']);
+ await act(async()=>{[...document.querySelectorAll('[role=option]')].find(o=>o.textContent==='林組員').click();await tick()});
  assert.deepEqual(server.patch, [{expected_revision: 1, participants: {executor: 'member'}}]);
  assert.equal(document.querySelector('[role=dialog]'), null);
 });
 
 test('a task a person cannot edit has no inline assignee picker', async () => {
  await mount({tasks: [task('t1', {allowed_actions: ['start']})]});
- assert.equal(document.querySelector('.sop-quick-assign'), null);
+ assert.equal(document.querySelector('.assignee-picker'), null);
 });
 
 test('a node the data proves done offers one manager action that closes its open tasks', async () => {

@@ -143,7 +143,7 @@ def test_warm_reads_recheck_roster_project_and_participation_without_version_bum
     from .sop_import.models import LocalTask
 
     app, client, signin, pid, mine = setup(local)
-    url = f'/api/projects/{pid}/sop-assignees'
+    url = f'/api/projects/{pid}/sop-assignees?scope=all'
     signin('u-manager')
     before = same_as_old(client, url, monkeypatch)
     with app.state.sessions.begin() as db:

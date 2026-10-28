@@ -29,7 +29,7 @@ def case_workspace(db, root, ctx):
 
 
 def projection(service, db, ctx):
-    from .service import can_manage
+    from .authority import can_manage_nodes
     if not eligible(ctx.project) or ctx.assigned_only:
         return []
     nodes = list(db.scalars(select(BusinessRow).where(BusinessRow.workspace_id == ctx.wid,
@@ -58,7 +58,7 @@ def projection(service, db, ctx):
             t.applicability == Applicability.APPLICABLE and t.state != Lifecycle.DONE) for t in linked)
         unfinished = unfinished or any(t.data.get('required') and t.data.get('status') not in {'completed', 'superseded'} for t in legacy)
         policy = policies[key]
-        reason = ('任務寫入尚未開放' if not service.writes_enabled() else '需由案件 PM 或管理者操作' if not can_manage(ctx)
+        reason = ('任務寫入尚未開放' if not service.writes_enabled() else '需由案件 PM 或管理者操作' if not can_manage_nodes(ctx, [key])
                   else policy[1] if policy else None)
         node = next(n for n in project['nodes'] if n['key'] == key)
         issues = missing(project, node, workspace)
@@ -81,6 +81,7 @@ def projection(service, db, ctx):
 
 def mutate(service, ctx, key, body):
     from .service import authorize, fields, text
+    from .authority import require_nodes, global_manager
     fields(body, {'action', 'expected_revision', 'owner_id', 'reason'})
     require(key in NODE_MAP.values(), 'node_mapping_invalid')
     authorize(ctx, True)
@@ -91,7 +92,10 @@ def mutate(service, ctx, key, body):
     with service.sessions.begin() as db:
         service.lock_workspace_row(db, ctx.wid)
         fresh = ctx.refresh()
+        if not global_manager(fresh):
+            fresh.roster = service.roster_provider(fresh=True)
         authorize(fresh, True)
+        require_nodes(fresh, [key])
         require(eligible(fresh.project) and not fresh.assigned_only, 'local_node_only', 409)
         service.check_policy_write(db, fresh, [key])
         view = next((n for n in projection(service, db, fresh) if n['key'] == key), None)

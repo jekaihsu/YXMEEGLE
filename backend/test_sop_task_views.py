@@ -67,18 +67,18 @@ def test_edit_and_transition_return_the_updated_task(h):
 def test_assignable_people_follow_the_participant_rule_and_people_visibility(h):
     response = h.client.get(URL + '/sop-assignees')
     assert response.status_code == 200, response.text
-    assert response.json() == {'project_id': 'p1', 'restricted': False, 'people': [
-        {'id': 'pm', 'name': '林育寬', 'case_roles': ['pm'], 'department': None},
-        {'id': 'member', 'name': '陳柏翰', 'case_roles': ['collaborator'], 'department': None},
-        {'id': 'manager', 'name': '張智偉', 'case_roles': ['manager'], 'department': None},
-        {'id': 'other', 'name': '吳柏頤', 'case_roles': [], 'department': None}]}
+    assert response.json() == {'project_id': 'p1', 'restricted': False, 'next_cursor': None, 'people': [
+        {'id': 'pm', 'name': '林育寬', 'case_roles': ['pm'], 'department': None, 'teams': []},
+        {'id': 'member', 'name': '陳柏翰', 'case_roles': ['collaborator'], 'department': None, 'teams': []},
+        {'id': 'manager', 'name': '張智偉', 'case_roles': ['manager'], 'department': None, 'teams': []},
+        {'id': 'other', 'name': '吳柏頤', 'case_roles': [], 'department': None, 'teams': []}]}
     assert manual(h, {'executor': 'other'})['participants'] == {'executor': 'other'}
     failed = post(h, URL + '/sop-tasks', {'title': 'x', 'node_keys': ['pm'], 'participants': {'checker': 'ghost'}}, 422)
     assert failed == {'code': 'participant_unresolved', 'detail': 'participant_unresolved', 'role': 'checker'}
     h.cfg['HR_VIEWERS'] = 'pm'
     h.who[0] = 'member'
-    assert h.client.get(URL + '/sop-assignees').json() == {'project_id': 'p1', 'restricted': True, 'people': [
-        {'id': 'member', 'name': '陳柏翰', 'case_roles': ['collaborator'], 'department': None}]}
+    assert h.client.get(URL + '/sop-assignees').json() == {'project_id': 'p1', 'restricted': True, 'next_cursor': None, 'people': [
+        {'id': 'member', 'name': '陳柏翰', 'case_roles': ['collaborator'], 'department': None, 'teams': []}]}
     h.who[0] = 'pm'
     assert h.client.get(URL + '/sop-assignees').json()['restricted'] is False
     h.users['member']['active'] = False

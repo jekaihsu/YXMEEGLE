@@ -29,7 +29,9 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
         with (phase(request, 'load') if phase else nullcontext()):
             state, project = case_loader(data, user, project_id)
         ctx = Context(data['wid'], user, state, project, lambda: context(request, project_id, case_loader),
-                      assigned_only=assigned_only)
+                      assigned_only=False)
+        ctx.roster_required = service.roster_required
+        ctx.roster = service.roster_provider()
         ctx.assigned_only = assigned_only and not can_manage(ctx)
         require(not ctx.assigned_only or service.participates(data['wid'], user['id'], project_id), 'sop_import_forbidden', 403)
         if project.get('sop_assigned_only'):
@@ -50,7 +52,7 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
             body, status = {'code': 'import_unavailable', 'detail': 'import_unavailable'}, 503
         return JSONResponse(body, status_code=status, headers={'Cache-Control': 'no-store'})
 
-    async def mutation(request, project_id, run, resolve=None):
+    async def mutation(request, project_id, run, resolve=None, *, refresh_roster=True):
         try:
             ctx = await run_in_threadpool(resolve or context, request, project_id)
         except (Failure, HTTPException) as exc:
@@ -76,6 +78,9 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
             except (ValueError, RecursionError):
                 raise Failure('invalid_request') from None
             require(isinstance(body, dict), 'invalid_request')
+            from .authority import global_manager
+            if refresh_roster and isinstance(ctx, Context) and not global_manager(ctx):
+                ctx.roster = service.roster_provider(fresh=True)
             return run(ctx, body)
         return await run_in_threadpool(respond, execute)
 
@@ -128,8 +133,8 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
         return await mutation(request, project_id, service.apply)
 
     @app.get(PREFIX + '/sop-assignees')
-    def assignees(request: Request, project_id: str):
-        return respond(lambda: service.assignees(context(request, project_id, load_assignees or load_case), lambda user: hr_view_allowed(user, cfg)))
+    def assignees(request: Request, project_id: str, node_key: str = None, scope: str = 'team', q: str = '', limit: int = 20, cursor: str = None):
+        return respond(lambda: service.assignees(context(request, project_id, load_assignees or load_case), lambda user: hr_view_allowed(user, cfg), node_key=node_key, scope=scope, q=q, limit=limit, cursor=cursor))
 
     @app.get(PREFIX + '/sop-import/runs/{request_id}')
     def receipt(request: Request, project_id: str, request_id: str):
@@ -153,7 +158,7 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
 
     @app.post(PREFIX + '/sop-tasks/{task_id}/transition')
     async def transition(request: Request, project_id: str, task_id: str):
-        return await mutation(request, project_id, lambda ctx, body: service.mutate(ctx, task_id, body, transition=True))
+        return await mutation(request, project_id, lambda ctx, body: service.mutate(ctx, task_id, body, transition=True), refresh_roster=False)
 
     @app.post(PREFIX + '/sop-nodes/{node_key}')
     async def local_node(request: Request, project_id: str, node_key: str):

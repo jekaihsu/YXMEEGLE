@@ -239,6 +239,7 @@ class EnrollmentService:
             checklist_revision=0, identity_revision=0, lock_counter=0).on_conflict_do_nothing())
 
     def retry_enrollment(self, ctx, body):
+        from .authority import require_nodes
         from .service import authorize, fields, identifier
         authorize(ctx, True)
         fields(body, {'enrollment_id'})
@@ -247,6 +248,7 @@ class EnrollmentService:
             ctx, _ = self.lock(db, ctx, enrollment=True)
             row = db.get(Enrollment, (ctx.wid, ident))
             require(row and row.project_id == ctx.project['id'], 'enrollment_not_found', 404)
+            require_nodes(ctx, row.node_keys)
         return self.enroll_case(ctx.wid, ident)
 
     def run_enrollments(self, wid, limit=20):
@@ -259,6 +261,7 @@ class EnrollmentService:
             self.enroll_case(wid, ident)
 
     def opt_in(self, ctx, body):
+        from .authority import require_nodes
         from .service import authorize, fields, canonical_node_keys, row_keys, text
         authorize(ctx, True)
         fields(body, {'node_keys','confirmed','reason'})
@@ -269,6 +272,7 @@ class EnrollmentService:
             require(not ambiguous(ctx.project), 'case_identity_unresolved', 409)
             eligible = [n['key'] for n in ctx.project.get('nodes', []) if self.node_enrollable(n)]
             keys = canonical_node_keys(row_keys(body.get('node_keys', eligible)))
+            require_nodes(ctx, keys)
             require(set(keys) <= set(eligible), 'node_already_started_or_finished', 409)
             old = db.get(CasePolicy, (ctx.wid, ctx.project['id']))
             require(not old or old.policy == 'legacy', 'case_already_managed', 409)
