@@ -39,6 +39,16 @@ def measure(name):
         current.add(name, perf_counter() - started)
 
 
+@contextmanager
+def timed_lock(lock):
+    with measure('lockwait'):
+        lock.acquire()
+    try:
+        yield
+    finally:
+        lock.release()
+
+
 class TimedRoute(APIRoute):
     def __init__(self, path, endpoint, **kwargs):
         if inspect.iscoroutinefunction(endpoint):

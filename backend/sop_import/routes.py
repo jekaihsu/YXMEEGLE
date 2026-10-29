@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from starlette.concurrency import run_in_threadpool
 
 from ..production_access import hr_view_allowed
+from ..request_timing import timed_lock
 from .domain import Failure, require
 from .service import Context, Service, authorize, has_reader_grant, can_manage
 
@@ -35,7 +36,7 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
             if fresh and hasattr(request.state, 'sop_roster_error'):
                 raise request.state.sop_roster_error
             if fresh and not hasattr(request.state, 'sop_roster'):
-                with roster_refresh_lock:
+                with timed_lock(roster_refresh_lock):
                     try:
                         require(service.clock() >= roster_retry_at, 'roster_unavailable', 503)
                         request.state.sop_roster = service.roster_provider(fresh=True)

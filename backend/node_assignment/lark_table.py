@@ -398,9 +398,10 @@ class BitableClient:
             token = self._token()
             try:
                 local = table_bucket(self.cfg, path, self.read_config.table_rps) if self._shared_limits else None
-                if local:
-                    local.acquire(self.deadline)
-                self.bucket.acquire(self.deadline)
+                with measure('ratelimit'):
+                    if local:
+                        local.acquire(self.deadline)
+                    self.bucket.acquire(self.deadline)
             except BudgetExceeded:
                 raise Failure('lark_unavailable', 'Lark 請求額度暫時用盡，請稍後再試') from None
             if write:
@@ -410,14 +411,16 @@ class BitableClient:
             remaining = self.deadline - self.clock()
             if remaining <= 0:
                 raise Failure('lark_unavailable', 'Lark 讀取已超過時間預算')
-            if not write and not read_slots.acquire(timeout=max(0, remaining)):
-                raise Failure('lark_unavailable', 'Lark 讀取已超過時間預算')
+            with measure('larkslots'):
+                if not write and not read_slots.acquire(timeout=max(0, remaining)):
+                    raise Failure('lark_unavailable', 'Lark 讀取已超過時間預算')
             try:
                 try:
                     remaining = max(.001, self.deadline - self.clock())
-                    response = self.http.request(method, API + path, params=params, json=json,
-                                                 timeout=15 if write else min(self.read_config.request_timeout_seconds, remaining),
-                                                 headers={'Authorization': 'Bearer ' + token})
+                    with measure('http'):
+                        response = self.http.request(method, API + path, params=params, json=json,
+                                                     timeout=15 if write else min(self.read_config.request_timeout_seconds, remaining),
+                                                     headers={'Authorization': 'Bearer ' + token})
                 finally:
                     if not write:
                         read_slots.release()

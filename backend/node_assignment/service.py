@@ -350,7 +350,8 @@ class NodeAssignmentService:
                 'writes_enabled': block is None, 'writes_disabled_reason': block}
 
     def _check_roster_schema(self, client, table):
-        with self._schema_lock:
+        from ..request_timing import timed_lock
+        with timed_lock(self._schema_lock):
             if self.clock() - self._schema_checked.get(table, float('-inf')) > SCHEMA_RECHECK_SECONDS:
                 check_schema(client, table)
                 self._schema_checked[table] = self.clock()
