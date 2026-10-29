@@ -126,14 +126,18 @@ def create_app(overrides=None,*,dispatch_transport=None):
     if db_url.startswith('sqlite'):
         database_path=make_url(db_url).database
         if database_path and database_path!=':memory:': Path(database_path).resolve().parent.mkdir(parents=True,exist_ok=True)
-    engine=create_engine(db_url,connect_args={'check_same_thread':False,'timeout':20} if db_url.startswith('sqlite') else {},pool_pre_ping=True)
+    engine=create_engine(db_url,connect_args={'check_same_thread':False,'timeout':20} if db_url.startswith('sqlite') else {'connect_timeout':5},pool_pre_ping=True)
     from .request_timing import instrument_database
     instrument_database(engine)
     from .sop_import import models as sop_import_models
-    Base.metadata.create_all(engine); sessions=sessionmaker(engine,expire_on_commit=False,info={'index_tables':str(cfg.get('INDEX_TABLES_ENABLED','false')).lower()=='true'})
+    sessions=sessionmaker(engine,expire_on_commit=False,info={'index_tables':str(cfg.get('INDEX_TABLES_ENABLED','false')).lower()=='true'})
     # Migration is reversible: preserve the original JSON before normalizing.
     from .workspace_migration import migrate_workspaces
-    migrate_workspaces(sessions,WorkspaceRow,BusinessRow,upgrade,storage)
+    from .database_startup import initialize
+    def initialize_database():
+        Base.metadata.create_all(engine)
+        migrate_workspaces(sessions,WorkspaceRow,BusinessRow,upgrade,storage)
+    initialize(initialize_database)
     signer=URLSafeTimedSerializer(secret,salt='meegle-session-v1',signer_kwargs={'digest_method':hashlib.sha256})
     upload_dir=Path(cfg.get('UPLOAD_DIR','./backend/uploads')).resolve(); upload_dir.mkdir(parents=True,exist_ok=True)
     @asynccontextmanager
@@ -160,7 +164,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
     app=FastAPI(title='詠翔專案工作台',docs_url=None if production else '/api/docs',lifespan=lifespan); app.state.engine=engine; app.state.sessions=sessions; app.state.signer=signer
     from .request_timing import TimedRoute, RequestTimingMiddleware
     app.router.route_class=TimedRoute
-    app.add_middleware(RequestTimingMiddleware)
     app.state.cfg=cfg; app.state.upload_dir=upload_dir
     from starlette.exceptions import HTTPException as StarletteHTTPException
     @app.exception_handler(StarletteHTTPException)
@@ -246,11 +249,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
             phases=dict(request.scope.get('phases',{})); total=perf_counter()-started
             phases['serialize']=max(total-sum(phases.values()),0)
             response.headers['Server-Timing']=', '.join([f'{k};dur={v*1000:.1f}' for k,v in phases.items()]+[f'total;dur={total*1000:.1f}'])
-        if request.url.path.startswith('/api'):
-            elapsed=perf_counter()-started
-            if elapsed>3:
-                import logging
-                logging.getLogger('backend.slow').warning('slow_request method=%s path=%s status=%s total_ms=%.0f phases=%s',request.method,request.url.path,response.status_code,elapsed*1000,{k:round(v*1000) for k,v in request.scope.get('phases',{}).items()})
         return response
 
     SESSION_MAX_AGE=7*24*3600
@@ -586,7 +584,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     @app.get('/api/health')
     def health():
-        with engine.connect() as connection: connection.execute(select(1))
+        try:
+            with engine.connect() as connection: connection.execute(select(1))
+        except OperationalError:
+            return JSONResponse({'status':'unavailable','database':'unavailable'},status_code=503)
         from .build_identity import read_build_identity
         return {'build':read_build_identity(),'status':'ok','mode':'demo' if demo else 'lark','database':'postgresql' if engine.dialect.name=='postgresql' else 'sqlite'}
 
@@ -1659,11 +1660,11 @@ def create_app(overrides=None,*,dispatch_transport=None):
         project=next((p for p in state['projects'] if p['id']==project_id and visible_project(state,p)),None)
         require(project is not None,'找不到這個案件',404)
         return state,project
-    def sop_case(data,user,project_id,*,assignees=False):
+    def sop_case(data,user,project_id,*,assignees=False,read_tasks=False):
         """node_assignment_case plus the local planning cases this viewer may see; node assignment never gets those."""
         from .source_case_policy import visible_project,local_viewer
         require(len(project_id)<=200,'查詢參數過長',422)
-        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=('users',) if assignees else storage.CASE_COLLECTIONS,project_ids=[project_id],project_details=not assignees)
+        with sessions() as db: state=load(db,db.get(WorkspaceRow,data['wid']),collections=('users',) if assignees else storage.CASE_COLLECTIONS,project_ids=[project_id],project_details=not assignees,case_sources='sop' if read_tasks else False)
         project=next((p for p in state['projects'] if p['id']==project_id),None)
         require(project is not None,'找不到這個案件',404)
         if not (visible_project(state,project) or local_viewer(user,project)):
@@ -1699,7 +1700,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
     from .sop_import.routes import register as register_sop_import
     app.state.sop_import = register_sop_import(app, identity=identity, load_case=sop_case, phase=phase,
         sessions=sessions, cfg=cfg, quote_view=quote_view, workspace=quote_workspace, persist_case=persist_local_case,
-        load_assignees=lambda data,user,project_id: sop_case(data,user,project_id,assignees=True))
+        load_assignees=lambda data,user,project_id: sop_case(data,user,project_id,assignees=True),
+        load_tasks=lambda data,user,project_id: sop_case(data,user,project_id,read_tasks=True))
     from .sop_import.lark_projection import Projection
     def sop_projection_state(wid):
         with sessions() as db:
@@ -1846,6 +1848,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             page={'Cache-Control':'no-cache'}
             if candidate.is_relative_to(frontend.resolve()) and candidate.is_file(): return FileResponse(candidate,headers=None if candidate.suffix!='.html' else page)
             return FileResponse(frontend/'index.html',headers=page)
+    app.add_middleware(RequestTimingMiddleware)
     return app
 
 app=create_app()

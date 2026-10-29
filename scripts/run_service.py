@@ -64,7 +64,7 @@ def supervise(commands, *, stop_event=None, shutdown_timeout=10, poll_interval=0
                     print(f'service child exited during startup: {name} status={code}',flush=True)
                     return code if 1 <= code <= 125 else 1
                 if check(): break
-                if time.monotonic()>=deadline:
+                if startup_timeout and time.monotonic()>=deadline:
                     print(f'service child startup deadline exceeded: {name}',flush=True)
                     return 1
                 stop_event.wait(poll_interval)
@@ -135,7 +135,7 @@ def main():
         commands.append(('backup',[sys.executable,str(ROOT/'scripts'/'backup_schedule.py')]))
     # Web initializes the schema during import. Wait for its DB-aware health
     # endpoint before starting the worker so an empty database has one creator.
-    return supervise(commands,readiness={'web':lambda:web_ready(port)})
+    return supervise(commands,readiness={'web':lambda:web_ready(port)},startup_timeout=0)
 
 
 if __name__ == '__main__':

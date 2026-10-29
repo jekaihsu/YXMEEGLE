@@ -130,8 +130,9 @@ class StartSopRunner:
         if code is not None:
             try:
                 with ThreadPoolExecutor(max_workers=2) as pool:
-                    roster_future = pool.submit(svc._roster, fresh=False)
-                    case_future = pool.submit(svc._case, ctx, code)
+                    from contextvars import copy_context
+                    roster_future = pool.submit(copy_context().run, svc._roster, fresh=False)
+                    case_future = pool.submit(copy_context().run, svc._case, ctx, code)
                     roster, cached = roster_future.result(), case_future.result()
                 skipped, evidence = svc.skipped(ctx), svc.evidence(ctx)
                 states = {n.key: observe(cached.value, skipped, n.key, self.ledger.ids(ctx.wid, ctx.project['id'], n.key),

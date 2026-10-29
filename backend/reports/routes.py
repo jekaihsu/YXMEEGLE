@@ -1,6 +1,5 @@
 """Authenticated adapters for the shared PM reports contract."""
 from datetime import datetime, timedelta
-from contextlib import asynccontextmanager
 import os
 import re
 import unicodedata
@@ -95,15 +94,6 @@ def register(app, identity, cfg=None, *, reader=None, authorize=None, live_enabl
     store=SnapshotStore(reader or LarkReader(cfg),cfg)
     ensure_visible_logs()
     app.state.reports=store
-    if (str(cfg.get('REPORTS_ENABLED','true')).lower()=='true'
-            and isinstance(store.reader,LarkReader) and cfg.get('LARK_APP_ID') and cfg.get('LARK_APP_SECRET')):
-        lifespan=app.router.lifespan_context
-        @asynccontextmanager
-        async def reports_lifespan(app):
-            store.start()
-            async with lifespan(app) as state:
-                yield state
-        app.router.lifespan_context=reports_lifespan
     def gate(request):
         data,user=identity(request)
         if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true': raise HTTPException(404,'報表未啟用')

@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 import httpx
 import pytest
 from backend.reports.reader import FixtureReader, LarkReader
-from backend.reports.registry import BY_KIND
+from backend.reports.registry import BY_KIND, TABLES
 from backend.reports.routes import register
 from backend.reports.snapshot import SnapshotStore
 from backend.test_reports_compute import FIXTURES
@@ -280,7 +280,7 @@ def test_cold_failure_logs_safely(caplog):
 
 
 @pytest.mark.parametrize('kind',['live','failure','fixture','disabled','missing'])
-def test_startup_warming(kind):
+def test_startup_does_not_read_reports(kind):
     started=Event()
     class Live(LarkReader):
         def read(self):
@@ -298,7 +298,15 @@ def test_startup_warming(kind):
     app=FastAPI(lifespan=lifespan)
     store=register(app,lambda _:({},{}),cfg,reader=Fixture(FIXTURES) if kind=='fixture' else Live(cfg))
     with TestClient(app):
-        assert started.wait(.2)==(kind in ('live','failure'))
+        assert not started.is_set()
+        assert store.peek() is None
+        # Only an actual reports consumer starts the snapshot.
+        future=store.start()
+        assert started.wait(2)
+        if kind=='failure':
+            with pytest.raises(RuntimeError): future.result(timeout=2)
+        else:
+            assert future.result(timeout=2)['data']
     store.close()
 
 
@@ -386,3 +394,31 @@ def test_contacts_route_and_validation():
         for params in ({'dedup_mode':'wrong'},{'result_status':'wrong'},{'from':'bad'},{'sort':'wrong'}):
             assert client.get('/api/reports/contacts',params=params).status_code==422
     store.close()
+
+
+def test_bulk_reports_leave_lark_slots_available_to_case_reads():
+    from concurrent.futures import ThreadPoolExecutor
+    from backend.live_read.rate_limit import read_slots
+    started, release = Event(), Event()
+    reader=LarkReader({},tables=TABLES[:3])
+    def read_table(table):
+        assert read_slots.acquire(timeout=2)
+        try:
+            started.set()
+            assert release.wait(3)
+            return {'records':[]}
+        finally:
+            read_slots.release()
+    reader.read_table=read_table
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future=pool.submit(reader.read)
+        assert started.wait(2)
+        first=read_slots.acquire(timeout=.5)
+        second=read_slots.acquire(timeout=.5)
+        try:
+            assert first and second, 'bulk reports occupied foreground Lark capacity'
+        finally:
+            if first: read_slots.release()
+            if second: read_slots.release()
+            release.set()
+        assert len(future.result(timeout=3))==3

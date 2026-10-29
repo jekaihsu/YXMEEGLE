@@ -21,12 +21,21 @@ def json_fields(column, fields, dialect="sqlite"):
     return select(func.json_group_object(parts.c.key,func.json(value))).where(parts.c.key.in_(fields)).scalar_subquery()
 
 
-def case_source_data(model, project_ids, dialect="sqlite"):
+def case_source_data(model, project_ids, dialect="sqlite", *, quote_facts=False):
     from .source_case_policy import CODE_FIELDS
     compact=json_fields(model.data,CASE_SOURCE_FIELDS,dialect)
     # Unrelated confirmations and quotations still supply the complete redaction
     # universe, but their source values and history are not case inputs.
     metadata=(func.jsonb_set(compact,array(['fields']),json_fields(model.data['fields'],CODE_FIELDS,dialect)) if dialect=='postgresql' else func.json_set(compact,'$.fields',func.json(json_fields(model.data['fields'],CODE_FIELDS))))
-    return case((model.kind=='source_quotes',metadata),
+    if quote_facts:
+        from .sop_import.quote_facts import DATE_FIELDS, TEXT_FIELDS
+        from .sources import QUOTE_POINT_FIELDS
+        fields=tuple(dict.fromkeys((*CODE_FIELDS,*DATE_FIELDS.values(),*TEXT_FIELDS.values(),*QUOTE_POINT_FIELDS,
+            '編號','狀態 (1)','狀態','此案確認單','契約價格(未稅)','契約價格(含稅)',
+            '外業負責組別','外業期限','案件已入帳')))
+        quote=(func.jsonb_set(compact,array(['fields']),json_fields(model.data['fields'],fields,dialect)) if dialect=='postgresql' else func.json_set(compact,'$.fields',func.json(json_fields(model.data['fields'],fields))))
+    else:
+        quote=metadata
+    return case((model.kind=='source_quotes',quote),
         ((model.kind=='source_confirmations') & ~func.coalesce(model.data['project_id'].as_string().in_(project_ids),False),metadata),
         else_=compact)

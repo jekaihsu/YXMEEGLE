@@ -18,7 +18,7 @@ ERROR_TEXT = {'local_node_only': '請使用此案件的正式節點流程', 'loc
               'applicability_unresolved': '需先確認任務適用', 'invalid_transition': '目前任務狀態不可執行此操作'}
 
 
-def register(app, *, identity, load_case, sessions, cfg, quote_view=None, workspace=None, persist_case=None, phase=None, load_assignees=None):
+def register(app, *, identity, load_case, sessions, cfg, quote_view=None, workspace=None, persist_case=None, phase=None, load_assignees=None, load_tasks=None):
     flag = lambda name: lambda: str(cfg.get(name, 'false')).lower() == 'true'
     service = Service(sessions, writes_enabled=flag('SOP_TASK_WRITES_ENABLED'),
                       local_cases_enabled=flag('LOCAL_CASE_CREATION_ENABLED'),
@@ -191,7 +191,7 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
 
     @app.get(PREFIX + '/sop-tasks')
     def tasks(request: Request, project_id: str, node_key: str = None):
-        return respond(lambda: service.overview(context(request, project_id), node_key))
+        return respond(lambda: service.overview(context(request, project_id, load_tasks or load_case), node_key))
 
     @app.post(PREFIX + '/sop-import/preview')
     async def preview(request: Request, project_id: str):

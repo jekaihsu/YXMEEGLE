@@ -103,7 +103,10 @@ class RequestTimingMiddleware:
                 if scope['path'] != '/api/health':
                     entries = ', '.join(f'{k};dur={v*1000:.1f}' for k, v in values.items() if k != 'queries')
                     headers = list(message.get('headers', []))
-                    headers.append((b'server-timing', entries.encode()))
+                    existing = next((v for k, v in headers if k.lower() == b'server-timing'), None)
+                    headers = [(k, v) for k, v in headers if k.lower() != b'server-timing']
+                    suffix = existing.decode() if existing else f'total;dur={(perf_counter()-timing.started)*1000:.1f}'
+                    headers.append((b'server-timing', (entries+', '+suffix).encode()))
                     message['headers'] = headers
             await send(message)
         try:
@@ -112,7 +115,7 @@ class RequestTimingMiddleware:
             elapsed = perf_counter() - timing.started
             if elapsed > 3:
                 logging.getLogger('backend.slow').warning(
-                    'request_timing method=%s path=%s status=%s total_ms=%.0f timings=%s phases=%s',
+                    'slow_request method=%s path=%s status=%s total_ms=%.0f timings=%s phases=%s',
                     scope['method'], scope['path'], status, elapsed*1000,
                     {k: round(v if k == 'queries' else v*1000) for k, v in timing.values.items()},
                     {k: round(v*1000) for k, v in scope.get('phases', {}).items()})

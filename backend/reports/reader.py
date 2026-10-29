@@ -73,5 +73,7 @@ class LarkReader:
         raise ReadFailure('Reports table page budget exhausted')
 
     def read(self):
-        with ThreadPoolExecutor(max_workers=3) as pool:
+        # Bulk reports share three process-wide Lark read slots with live case
+        # reads. Leave capacity for those readers instead of occupying all slots.
+        with ThreadPoolExecutor(max_workers=1) as pool:
             return dict(zip((t.kind for t in self.tables), pool.map(self.read_table, self.tables)))

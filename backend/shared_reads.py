@@ -38,7 +38,10 @@ def rows(key,fetch):
             _entries.move_to_end(key)
             return hit[2]
         flight=_flights.setdefault(key,threading.Lock())
-    with flight:
+    from .request_timing import measure
+    with measure('lockwait'):
+        flight.acquire()
+    try:
         with _guard:
             hit=_entries.get(key)
             if hit and time.monotonic()-hit[0]<TTL: return hit[2]
@@ -56,6 +59,9 @@ def rows(key,fetch):
         finally:
             with _guard:
                 if _flights.get(key) is flight: del _flights[key]
+
+    finally:
+        flight.release()
 
 
 def drop_after_commit(db,wid):

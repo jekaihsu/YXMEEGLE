@@ -44,7 +44,7 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
         def fetch(selected,as_text=False,**filters):
             dialect=db.get_bind().dialect.name
             compact=case_sources and set(selected)<=set(('source_quotes','source_confirmations','contract_items')) and dialect in ('sqlite','postgresql')
-            value=case_source_data(model,project_ids or (),dialect) if compact else model.data
+            value=case_source_data(model,project_ids or (),dialect,quote_facts=case_sources=='sop') if compact else model.data
             query=select(model.kind,model.parent_id,cast(value,Text) if as_text else value).where(model.workspace_id==row.id,model.kind.in_(selected))
             for column,values in filters.items(): query=query.where(getattr(model,column).in_(values))
             if filter_project_rows and project_ids is not None and set(selected) & READ_PROJECT_LINKED:
@@ -61,7 +61,7 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
         if shared:
             scope=tuple(project_ids) if filter_project_rows and project_ids is not None else None
             key=(row.id,getattr(row,'version',None),tuple(sorted(shared)),scope)
-            if case_sources: key+=('case_sources',)
+            if case_sources: key+=('case_sources',case_sources)
             rows=shared_reads.rows(key,lambda:[(kind,text) for kind,parent,text in fetch(shared,as_text=True,parent_id=('',))])
             for kind,text in rows: result[kind].append(json.loads(text))
         if 'source_work_items' in kinds:
