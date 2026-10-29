@@ -39,3 +39,43 @@ def case_source_data(model, project_ids, dialect="sqlite", *, quote_facts=False)
     return case((model.kind=='source_quotes',quote),
         ((model.kind=='source_confirmations') & ~func.coalesce(model.data['project_id'].as_string().in_(project_ids),False),metadata),
         else_=compact)
+
+
+def cached_rows(db, model, workspace, selected, project_ids, *, filter_project_rows=False, quote_facts=False):
+    """Project one version once, outside PostgreSQL's per-row JSONB casts.
+
+    The cache contains source data only. Each caller still loads authority and
+    applies visibility against its own fresh workspace and person records.
+    """
+    import json
+    from sqlalchemy import Text
+    from . import shared_reads
+    from .source_case_policy import CODE_FIELDS
+    from .storage import READ_PROJECT_LINKED
+    from .sop_import.quote_facts import DATE_FIELDS, TEXT_FIELDS
+    from .sources import QUOTE_POINT_FIELDS
+    policy_fields=set((*CODE_FIELDS,*DATE_FIELDS.values(),*TEXT_FIELDS.values(),*QUOTE_POINT_FIELDS,
+        '編號','狀態 (1)','狀態','此案確認單','契約價格(未稅)','契約價格(含稅)',
+        '外業負責組別','外業期限','案件已入帳'))
+    key=(workspace.id,workspace.version,tuple(sorted(selected)),None,'case_source_rows')
+    def fetch():
+        query=select(model.kind,cast(model.data,Text)).where(model.workspace_id==workspace.id,
+            model.kind.in_(selected),model.parent_id=='').order_by(model.ordinal)
+        result=[]
+        for kind,payload in db.execute(query):
+            value=json.loads(payload)
+            value={k:v for k,v in value.items() if k in CASE_SOURCE_FIELDS}
+            if kind=='source_quotes':
+                value['fields']={k:v for k,v in (value.get('fields') or {}).items() if k in policy_fields}
+            result.append((kind,json.dumps(value,ensure_ascii=False,separators=(',',':'))))
+        return result
+    rows=shared_reads.rows(key,fetch)
+    scoped=set(project_ids or ())
+    for kind,payload in rows:
+        value=json.loads(payload)
+        if filter_project_rows and project_ids is not None and kind in READ_PROJECT_LINKED:
+            if value.get('project_id') is not None and value['project_id'] not in scoped:
+                continue
+        if kind=='source_quotes' and not quote_facts or kind=='source_confirmations' and value.get('project_id') not in scoped:
+            value['fields']={k:v for k,v in (value.get('fields') or {}).items() if k in CODE_FIELDS}
+        yield kind,json.dumps(value,ensure_ascii=False,separators=(',',':'))

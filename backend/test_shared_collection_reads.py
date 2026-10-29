@@ -211,3 +211,23 @@ def test_shared_cache_bounds_small_entries_and_cleans_failed_flights(monkeypatch
         shared_reads.rows(('w', 5), fail)
     assert not shared_reads._flights
     shared_reads.invalidate(None)
+
+
+def test_case_projection_fetch_is_shared_across_projects_and_sop_read_shapes(world):
+    app, _, _, ids = world
+    seen = counted(app)
+    def compact(pid, mode):
+        with app.state.sessions() as db:
+            return storage.load_partial(db, BusinessRow, db.get(WorkspaceRow, WID),
+                collections=storage.CASE_COLLECTIONS, project_ids=[pid],
+                filter_project_rows=True, case_sources=mode)
+    first = compact(ids['intake'], True)
+    tasks = compact(ids['intake'], 'sop')
+    other = compact('another-project', True)
+    assert len(seen) == 1
+    assert first['source_quotes'] and tasks['source_quotes']
+    assert not other['projects']
+    assert all('history' not in quote for state in (first, tasks, other) for quote in state['source_quotes'])
+    # A response copy cannot poison the version-wide cached projection.
+    tasks['source_quotes'][0]['fields']['poison'] = True
+    assert all('poison' not in quote['fields'] for quote in compact(ids['intake'], 'sop')['source_quotes'])
