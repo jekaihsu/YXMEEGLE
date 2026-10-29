@@ -76,11 +76,11 @@ def test_first_screen_matches_individual_readers_and_invalidates(tmp_path):
         assert client.get(base + '/first-screen?invalid=1').status_code == 422
 
 
-def test_portfolio_first_screen_uses_persisted_cards_not_bulk_projection(tmp_path, monkeypatch):
+def test_portfolio_cached_response_does_not_repeat_bulk_projection(tmp_path, monkeypatch):
     with scaled_client(tmp_path, 6, **ON) as (app, client):
-        def unexpected(*args, **kwargs):
-            raise AssertionError('portfolio first screen must not construct Lark assignment chains')
-        monkeypatch.setattr(app.state.home_panels, 'portfolio_statuses', unexpected)
+        calls = []
+        monkeypatch.setattr(app.state.home_panels, 'assignment_unavailable', lambda *_: False)
+        monkeypatch.setattr(app.state.home_panels, 'portfolio_statuses', lambda *_: calls.append(1) or {})
         first = client.get('/api/projects?view=portfolio')
         assert first.status_code == 200
         assert first.json()['total'] == 6
@@ -89,6 +89,7 @@ def test_portfolio_first_screen_uses_persisted_cards_not_bulk_projection(tmp_pat
         second = client.get('/api/projects?view=portfolio')
         assert second.json() == first.json()
         assert second.headers['x-read-snapshot'] == 'hit'
+        assert calls == [1]
 
 
 def test_background_revision_revalidates_last_good_without_blocking():

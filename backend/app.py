@@ -765,7 +765,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                         with sessions() as snapshot_db:
                             root = snapshot_db.get(WorkspaceRow, data['wid'])
                             return JSONResponse(portfolio(snapshot_db, BusinessRow, root, load(snapshot_db, root, collections=()), today,
-                                assignments=app.state.home_panels, data=data, user=user, overlay=False)).body
+                                assignments=app.state.home_panels, data=data, user=user)).body
                     with phase(request, 'snapshot'):
                         body, snapshot_status = read_snapshots.get(key, build_portfolio, revision=row.version)
                     from fastapi.responses import Response

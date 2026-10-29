@@ -21,7 +21,7 @@ Raw evidence: ignored `.runtime/case-detail-perf/round3-{before-probes,cpu,memor
 - `/api/projects/{id}/first-screen` returns project detail, assignments, SOP tasks, start status and progress in one response. Its builder seals one scoped case capture, gives each existing projection a private copy, and retains the existing visibility/permission checks and normal-versus-SOP quote-field projection. Responses are encoded once, compressed by the existing gzip middleware, bounded to 8 MB / 32 entries, single-flight, fresh for 15 seconds and stale-while-revalidate for up to 120 seconds.
 - Cache keys include authenticated identity/admission and SOP checklist/identity/policy revisions. A changed workspace version marks the last-good snapshot stale and starts revalidation instead of discarding the first screen; it still expires after 120 seconds. A new roster verification timestamp alone does not change the identity key: admission is checked against that fresh timestamp before cache lookup. All other viewer fields remain in the key. Identity is rechecked on every HTTP read and background case refresh. Write attempts (including ambiguous failures) invalidate snapshots; invalidated in-flight work cannot repopulate the cache. Existing mutation paths still reauthorize writes and obtain fresh read-backs.
 - The frontend seeds its existing validated readers before mounting the case view. Status and tasks render together, without the four separate heavy reads or the progress waterfall. Assignee choices load after the first payload. Existing skeletons reserve space during reads; legacy/document routes retain their prior behavior.
-- Portfolio first-screen reads use labeled persisted index cards and node summaries, with no bulk Lark-chain projection, source-evidence load or upstream wait. The encoded portfolio is cached with the same bounded mechanism. Per-group display limits already bound rendered rows; all cards remain available for complete counts and filters. Assignment detail is checked in the case view.
+- Portfolio reads keep persisted index cards and the existing last-good Lark-derived overlay when available. Upstream table refreshes remain nonblocking; the bounded encoded-response cache removes repeated bulk projection work from warm requests. Per-group display limits already bound rendered rows; all cards remain available for complete counts and filters. Assignment detail is checked in the case view.
 
 ## Validation / staging acceptance
 
@@ -47,3 +47,25 @@ The persisted-card list on the first rollout rendered in **2,414 ms first / 17,4
 Final cache safeguards: indexed case visibility and case-owner/delegate fields are checked before cache lookup, independently of background workspace freshness. A newly hidden case cannot return its previous snapshot. Unindexed/legacy storage retains strict workspace-version invalidation. A queued build also rechecks the same viewer authority before publication, preventing it from being cached under a different permission state. The authority-change and hidden-case regressions pass.
 
 Final pre-push rerun: **5,499 passed, 39 skipped, 1 xfailed**, with only the documented report-normalization baseline failure. The obsolete portfolio expectation (one legacy audit read) was corrected to assert the new persisted behavior and zero reads; it is not classified as a baseline failure. The latest affected cache/portfolio/home/timing selection passes **45 tests**. Frontend hook commands: 22/23 pass, with only the documented shell-mode failure. The full suite preceded the final visibility-key patch; the affected 45-test selection covers that patch.
+
+
+### Final-runtime measurements before portfolio status correction
+
+`f20aa1c`, deployment `6ae2dcf9ea16512cf741962b`, passed 306 seconds of health 200, 05:46:10–05:51:16 UTC; both services were RUNNING and all 229 runtime files matched.
+
+| Full document run | SOP status + four task rows | First-screen cache | API browser / server | Transfer |
+| --- | ---: | --- | ---: | ---: |
+| Cold snapshot | 17,315 ms | miss | 15,558 / 9,903 ms | 5,600 ms |
+| Warm 1 | 12,013 ms | stale | 8,241 / 311 ms | 7,880 ms |
+| Warm 2 | 9,069 ms | hit | 7,689 / 109 ms | 7,536 ms |
+| Warm 3 | 9,347 ms | stale | 3,251 / 204 ms | 2,989 ms |
+
+First-screen JSON was 174 KB decoded / 30.7–30.8 KB gzip. Complete cold ASGI time was 9,907 ms, independently confirming a 5,651 ms gap to browser completion. Snapshot encoding took 6 ms; the cold builder used 1,903 ms CPU and 9,746 ms wall, including 2,295 ms upstream and 1,721 ms DB spans (overlap; do not sum). Warm revalidation now returns last-good bytes immediately despite changing source workspace revisions. All measured page content had four task rows, no alerts, runtime errors or observed long tasks. Warm 1/2 resource captures were taken before the secondary assignee request completed; cold and warm 3 complete captures contain four APIs. The first-screen portion has no four-request fan-out.
+
+Portfolio rendered at 6,597 / 14,892 ms, with API server time 1,724 / 109 ms. The warm portfolio spent **9,237 ms transferring 48,214 gzip bytes**. Its preceding session spent 3,161 ms transferring 5,103 bytes. These exceed the acceptance limits independently of the cached handler.
+
+Screenshot QA caught a correctness regression in the persisted-only variant: it labeled all 385 cases unstarted because Lark-derived statuses were never overlaid. That variant is rejected. The final correction restores the existing nonblocking, cached-source overlay and retains encoded response caching. The legacy audit-query expectation is restored, and **94 affected tests pass**. No frontend runtime code changed in this correction.
+
+Read-only interaction: clicking an overview SOP task opens its matching visible detail dialog with source evidence and existing denied-write controls; no alerts or errors. An additional all-tasks navigation check changed URL and pressed state but did not expose the fifth confirmation-node SOP row in its default field-node scope. This scope behavior was not changed here and its baseline was not established.
+
+Latest one-hour Zeabur metrics: CPU average 50.12%, maximum 93.62%; memory average 1,438 MB, maximum 1,774 MB. Two GB remains the minimum measured RAM estimate with limited headroom; two guaranteed vCPUs are a capacity experiment, not a verified SKU or price. No plan or limit changes were made.
