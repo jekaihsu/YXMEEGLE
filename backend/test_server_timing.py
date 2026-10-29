@@ -32,4 +32,4 @@ def test_server_timing_leaves_body_and_gzip_intact(client):
     assert 'server-timing' in plain.headers
     strip = lambda body: {k: v for k, v in body.items() if k not in ('freshness', 'task_capabilities_checked_at')}
     assert strip(plain.json()) == strip(zipped.json())
-    assert 'server-timing' not in client.get('/api/health').headers
+    assert 'server-timing' in client.get('/api/health').headers

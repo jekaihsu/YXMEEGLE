@@ -9,7 +9,7 @@ const load=async(search)=>{
 };
 const logs=[];const log=console.log;console.log=(...a)=>logs.push(a);
 const marks=()=>performance.getEntriesByType('mark').filter(m=>m.name.startsWith('yx:')).length;
-globalThis.fetch=async()=>new Response('{"ok":"中"}',{status:200,headers:{'Server-Timing':'identity;dur=1.0, total;dur=2.0'}});
+globalThis.fetch=async()=>new Response('{"ok":"中"}',{status:200,headers:{'Server-Timing':'identity;dur=1.0, total;dur=2.0','X-Request-Id':'test-request'}});
 globalThis.requestAnimationFrame=cb=>setTimeout(cb,0);
 for(const search of ['','?perf=0']){
  const {api}=await load(search);
@@ -22,6 +22,8 @@ const [req]=window.__yxPerf.requests;
 assert.equal(req.url,'/api/workspace');assert.equal(req.status,200);assert.equal(req.bytes,12);
 assert.equal(req.serverTiming,'identity;dur=1.0, total;dur=2.0');
 assert.ok(req.headersMs>=0&&req.parseMs>=0);
+assert.equal(req.requestId,'test-request');assert.equal(req.serverTotalMs,2);
+assert.equal(req.browserWaitMs,req.headersMs);assert.equal(req.outsideServerMs,Math.max(0,req.browserTotalMs-2));
 perfFirstRender();await new Promise(r=>setTimeout(r,10));
 assert.ok(window.__yxPerf.firstRenderMs>=0);
 assert.equal(performance.getEntriesByName('yx:fetch->first-render').length,1);

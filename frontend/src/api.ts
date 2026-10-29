@@ -39,7 +39,7 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
   const response=await bounded(fetch(url,{credentials:'same-origin',...request,headers,...(controller?{signal:controller.signal}:{})}));
   perfHeaders(trace,response);
   onResponse?.(response.status,response);
-  if(response.status===304&&cached)return cached.data as T;
+  if(response.status===304&&cached){perfParsed(trace,'');return cached.data as T;}
   const malformed='服務回應格式不正確，請稍後再試。';
   let data:any;let parsed=true;
   try{const text=await bounded(response.text());data=JSON.parse(text);perfParsed(trace,text)}catch(error){if(controller?.signal.aborted)throw error;data={detail:malformed};parsed=false}
@@ -90,7 +90,7 @@ export function liveRefresh(datasets:import('./types').LiveDataset[],wait=false,
 }
 
 export const perfOn=typeof location!=='undefined'&&new URLSearchParams(location.search).get('perf')==='1';
-export type PerfTrace={id:number;url:string;status?:number;bytes?:number;serverTiming?:string|null;headersMs?:number;parseMs?:number};
+export type PerfTrace={id:number;url:string;status?:number;bytes?:number;serverTiming?:string|null;requestId?:string|null;serverTotalMs?:number;browserWaitMs?:number;browserTotalMs?:number;outsideServerMs?:number;headersMs?:number;parseMs?:number};
 type PerfSummary={requests:PerfTrace[];firstRenderMs?:number;marks:Record<string,number>};
 let seq=0,firstFetch:string|undefined;
 const summary:PerfSummary={requests:[],marks:{}};
@@ -105,6 +105,9 @@ export function perfHeaders(trace:PerfTrace|undefined,response:Response){
   if(!trace)return;
   performance.mark(`yx:${trace.id}:headers`);
   trace.status=response.status;trace.serverTiming=response.headers.get('Server-Timing');
+  trace.requestId=response.headers.get('X-Request-Id');
+  const total=trace.serverTiming?.match(/(?:^|,)\s*total;dur=([\d.]+)/);
+  if(total)trace.serverTotalMs=Number(total[1]);
   trace.headersMs=measure(`yx:${trace.id}:fetch->headers`,`yx:${trace.id}:fetch`,`yx:${trace.id}:headers`);
 }
 export function perfParsed(trace:PerfTrace|undefined,text:string){
@@ -112,6 +115,9 @@ export function perfParsed(trace:PerfTrace|undefined,text:string){
   performance.mark(`yx:${trace.id}:parsed`);
   trace.bytes=new TextEncoder().encode(text).length;
   trace.parseMs=measure(`yx:${trace.id}:headers->parsed`,`yx:${trace.id}:headers`,`yx:${trace.id}:parsed`);
+  trace.browserWaitMs=trace.headersMs;
+  trace.browserTotalMs=(trace.headersMs||0)+(trace.parseMs||0);
+  if(trace.serverTotalMs!==undefined)trace.outsideServerMs=Math.max(0,trace.browserTotalMs-trace.serverTotalMs);
   summary.requests.push(trace);console.log('[yx-perf]',trace);
 }
 export function perfFirstRender(){

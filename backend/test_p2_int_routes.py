@@ -175,7 +175,11 @@ def test_forbidden_case_404_is_identical_to_absent_with_no_leak_in_body_or_heade
     assert forbidden.json() == absent.json()
     blob = forbidden.text + json.dumps(dict(forbidden.headers))
     for s in (ids['hid'], HIDDEN_NAME, HIDDEN_CODE): assert s not in blob
-    assert {k: v for k, v in forbidden.headers.items() if k != 'content-length'} == {k: v for k, v in absent.headers.items() if k != 'content-length'}
+    variable = {'content-length', 'server-timing', 'x-request-id'}
+    assert forbidden.headers['x-request-id'] != absent.headers['x-request-id']
+    assert 'total;dur=' in forbidden.headers['server-timing']
+    assert 'total;dur=' in absent.headers['server-timing']
+    assert {k: v for k, v in forbidden.headers.items() if k not in variable} == {k: v for k, v in absent.headers.items() if k not in variable}
 
 
 @pytest.mark.parametrize('path,hidden_key', [('/api/contract-detail', 'kh'), ('/api/work-item-detail', 'wh')])

@@ -141,7 +141,7 @@ def main():
         print('service configuration error: invalid PORT', flush=True)
         return 1
     commands = [
-        ('web', [sys.executable, '-m', 'uvicorn', 'backend.app:app', '--host', '0.0.0.0', '--port', port, '--proxy-headers', '--forwarded-allow-ips='+os.getenv('FORWARDED_ALLOW_IPS','127.0.0.1'), '--no-access-log']),
+        ('web', [sys.executable, '-m', 'backend.request_protocol', 'backend.app:app', '--host', '0.0.0.0', '--port', port, '--proxy-headers', '--forwarded-allow-ips='+os.getenv('FORWARDED_ALLOW_IPS','127.0.0.1'), '--no-access-log', '--http', 'httptools']),
         ('worker', [sys.executable, str(ROOT/'scripts'/'run_worker.py')]),
     ]
     if os.getenv('BACKUP_DIR'):

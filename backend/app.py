@@ -5,13 +5,14 @@ from pathlib import Path
 import secrets
 import re
 from copy import deepcopy
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import asynccontextmanager, contextmanager, nullcontext
 from time import perf_counter
 from datetime import datetime, timezone
 from urllib.parse import urlencode, urlsplit
 import httpx
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
-from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
+from fastapi.responses import FileResponse, RedirectResponse
+from .request_timing import TimedJSONResponse as JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 from itsdangerous import URLSafeTimedSerializer, BadSignature
@@ -164,7 +165,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             app.state.people_attendance.close()
             app.state.live_read.close()
 
-    app=FastAPI(title='詠翔專案工作台',docs_url=None if production else '/api/docs',lifespan=lifespan); app.state.engine=engine; app.state.sessions=sessions; app.state.signer=signer
+    app=FastAPI(default_response_class=JSONResponse,title='詠翔專案工作台',docs_url=None if production else '/api/docs',lifespan=lifespan); app.state.engine=engine; app.state.sessions=sessions; app.state.signer=signer
     from .request_timing import TimedRoute, RequestTimingMiddleware
     app.router.route_class=TimedRoute
     app.state.cfg=cfg; app.state.upload_dir=upload_dir
@@ -172,7 +173,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
     @app.exception_handler(StarletteHTTPException)
     @app.exception_handler(HTTPException)
     async def safe_auth_error(request,exc):
-        from fastapi.responses import JSONResponse
         if request.url.path=='/api/auth/lark/callback' and 'text/html' in request.headers.get('accept',''):
             detail=str(exc.detail)
             code=('provider_unavailable' if exc.status_code>=500 else
@@ -247,7 +247,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
     @contextmanager
     def phase(request,name):
         started=perf_counter()
-        try: yield
+        try:
+            from .request_timing import measure
+            with (nullcontext() if name=='encode' else measure(name)): yield
         finally:
             phases=request.scope.setdefault('phases',{}); phases[name]=phases.get(name,0)+perf_counter()-started
 
@@ -258,7 +260,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
             response=await call_next(request)
         except Exception as exc:
             import logging
-            from fastapi.responses import JSONResponse
             logging.getLogger(__name__).warning('oauth_callback_failed error_class=%s',type(exc).__name__)
             response=(RedirectResponse('/?auth_error=provider_unavailable',status_code=303)
                       if 'text/html' in request.headers.get('accept','') else
@@ -274,7 +275,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
             actual=f"{request.url.scheme}://{request.url.netloc}"
             # Proxy deployments should set PUBLIC_ORIGIN, not blindly trust forwarded host.
             if (origin and origin not in {expected,actual}) or request.headers.get('sec-fetch-site')=='cross-site':
-                from fastapi.responses import JSONResponse
                 return JSONResponse({'detail':'跨站請求已拒絕'},status_code=403)
         response=await call_next(request)
         response.headers['X-Content-Type-Options']='nosniff'
@@ -438,7 +438,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 from .live_read.admission import ensure_roster_for_admission
                 # Release the transaction before scheduling the background roster refresh.
                 db.rollback()
-                ensure_roster_for_admission(app.state.live_read,organization(data),user)
+                with phase(request,'roster'):
+                    ensure_roster_for_admission(app.state.live_read,organization(data),user)
                 db.expire_all()
                 profile=db.get(PersonRow,(organization(data),data['uid']))
                 if profile: user=deepcopy(profile.data)
@@ -669,7 +670,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     @app.get('/api/session')
     def get_session(request:Request):
-        from fastapi.responses import JSONResponse
         data=read_cookie(request)
         if not data and demo:
             data={'mode':'demo','uid':'u-pm','wid':'demo-'+uid()}; ensure_workspace(data['wid'])
@@ -685,7 +685,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     @app.post('/api/demo/session')
     async def demo_session(request:Request):
-        from fastapi.responses import JSONResponse
         require(demo,'未啟用示範角色切換',403); data,user=identity(request); require(data['mode']=='demo','正式身分不可切換為示範角色',403)
         body=await json_object(request)
         with sessions() as db: users=load(db,db.get(WorkspaceRow,data['wid']))['users']
@@ -694,7 +693,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     @app.post('/api/logout')
     def logout(request:Request):
-        from fastapi.responses import JSONResponse
         data=read_cookie(request)
         if data and data.get('sid'):
             with sessions.begin() as db:
@@ -704,7 +702,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     def shell_response(request,data,user,coordinator):
         """Slim index-backed workspace; None means the index cannot vouch for it, so the caller serves the full workspace."""
-        from fastapi.responses import JSONResponse, Response
+        from fastapi.responses import Response
         from . import shell, index_reads
         wid=data['wid']
         if not hr_visible(user): return None
@@ -737,7 +735,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
             with phase(request,'project'): result=public_ws(state,data['wid'],user,data['mode'],owned=True)
         result['freshness']=coordinator.status(data['wid'])
         as_of=result['freshness']['datasets']['sources']['as_of']
-        from fastapi.responses import JSONResponse
         return JSONResponse(result,headers={'X-Data-As-Of':as_of} if as_of else {})
 
     @app.get('/api/company-dashboard')
@@ -821,7 +818,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
         mine=lambda item:not isinstance(item,dict) or item.get('project_id',project_id)==project_id
         records={k:[i for i in v if mine(i)] if isinstance(v,list) else v for k,v in result.items() if k not in DETAIL_SKIP}
         with phase(request,'encode'):
-            from fastapi.responses import JSONResponse
             return JSONResponse(dict(records,scope='project',version=result['version'],as_of=result['as_of'],project=result['projects'][0]))
 
     def report_link_state(data,user):
@@ -1399,7 +1395,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
     @app.get('/api/projects/{project_id}/progress')
     def project_progress(request:Request,project_id:str):
         """One case's engineering progress. Same gates as case-detail; amounts and v3 reports only for PM/manager in normal access."""
-        from fastapi.responses import JSONResponse
         from .project_progress import build_project_progress,ReportsView
         data,user=identity(request)
         require(len(project_id)<=200,'查詢參數過長',422)
@@ -1418,7 +1413,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     @app.get('/api/case-detail/{project_id}')
     def case_detail(request:Request,project_id:str):
-        from fastapi.responses import JSONResponse
         from .case_detail import build_case_detail
         data,user=identity(request)
         require(len(project_id)<=200,'查詢參數過長',422)
@@ -1685,7 +1679,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     @app.post('/api/workspace/switch')
     async def switch_workspace(request:Request):
-        from fastapi.responses import JSONResponse
         data,user=identity(request); require(data['mode']=='lark','需公司登入',403)
         body=await json_object(request); target=body.get('environment'); require(isinstance(target,str) and target in ('test','production'),'工作區錯誤',422)
         wid=('test-' if target=='test' else '')+organization(data); ensure_workspace(wid,True)
@@ -1865,7 +1858,6 @@ def create_app(overrides=None,*,dispatch_transport=None):
     def people_attendance(request:Request,week:str|None=None):
         data,user=identity(request)
         require(hr_visible(user),'不在人事資料查看名單（HR_VIEWERS）',403)
-        from fastapi.responses import JSONResponse
         return JSONResponse(app.state.people_attendance.view(data['wid'],week),
                             headers={'Cache-Control':'no-store'})
 
