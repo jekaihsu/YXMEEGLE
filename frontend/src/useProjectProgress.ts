@@ -20,6 +20,7 @@ export function prefetchProjectProgress(id: string, force = false, signal?:Abort
  pending.set(id, {request,signal,batch});
  return request;
 }
+export function seedProjectProgress(id:string,data:ProjectProgress) {if(epoch!==getSessionEpoch()){cache.clear();pending.clear();epoch=getSessionEpoch()}cache.set(id,{data,at:Date.now()})}
 export function useProjectProgress(id: string, enabled = true) {
  const [state, setState] = useState<State>({kind: 'loading'});
  const [refreshError,setRefreshError]=useState('');

@@ -40,6 +40,7 @@ export function prefetchNodeAssignments(projectId: string, force = false): Promi
   requests.set(projectId, request);
   return request;
 }
+export function seedNodeAssignments(id:string, data:NodeAssignmentList) {syncEpoch(); lists.set(id,data); listReadAt.set(id,Date.now())}
 export type AssignmentListState = {kind: 'loading'} | {kind: 'disabled'} | {kind: 'ready'; data: NodeAssignmentList} | {kind: 'error'; message: string; data?: NodeAssignmentList};
 export function useNodeAssignments(projectId: string, enabled: boolean) {
   const [state, setState] = useState<AssignmentListState>(() => {const data = enabled ? cached(projectId) : undefined; return !enabled ? {kind: 'disabled'} : data ? {kind: 'ready', data} : {kind: 'loading'}});

@@ -199,7 +199,10 @@ export async function assignmentRequest(url: string, init: RequestInit, isCurren
   }
 }
 export async function fetchNodeAssignments(projectId: string, signal: AbortSignal, isCurrent: () => boolean): Promise<NodeAssignmentList> {
-  const result = record(await assignmentRequest(basePath(projectId), {signal, cache: 'no-store'}, isCurrent));
+  return parseNodeAssignments(await assignmentRequest(basePath(projectId), {signal, cache: 'no-store'}, isCurrent));
+}
+export function parseNodeAssignments(value: unknown): NodeAssignmentList {
+  const result = record(value);
   if (result.code === 'disabled') throw new NodeAssignmentError(404, '', 'disabled');
   const actions = record(result.can);
   if (typeof result.stale !== 'boolean') throw malformed();

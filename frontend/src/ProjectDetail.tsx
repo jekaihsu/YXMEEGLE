@@ -37,7 +37,14 @@ import {DisabledActionReasons,Button,Skeleton} from './design';
 import './ProjectDetail.css';
 import './ProjectCalm.css';
 import {prefetchNodeAssignments, useNodeAssignments} from './useNodeAssignments';
-import {prefetchStartSop} from './useStartSop';
+import {prefetchStartSop,seedStartSop} from './useStartSop';
+import {seedNodeAssignments} from './useNodeAssignments';
+import {seedSopTasks} from './useSopTasks';
+import {seedProjectProgress} from './useProjectProgress';
+import {parseNodeAssignments} from './nodeAssignmentApi';
+import {parseOverview} from './sopTaskApi';
+import {parseSopPreview} from './startSop';
+import {parseProjectProgress} from './projectProgressApi';
 import {assignmentTarget} from './nodeAssignmentApi';
 import {ApprovalList} from './App';
 
@@ -49,11 +56,28 @@ const projectRequests=new Map<string,Promise<ProjectSlice>>();
 const deniedProjects=new Set<string>();
 const latestProjectReads=new Map<string,Promise<ProjectSlice>>();
 function cachedProject(id:string|undefined){if(projectEpoch!==getSessionEpoch()){projectSnapshots.clear();projectRequests.clear();latestProjectReads.clear();deniedProjects.clear();projectEpoch=getSessionEpoch()}return id?projectSnapshots.get(id):undefined}
-const readProject=(id:string,epoch:number,overview:boolean)=>api<ProjectSlice>(`/api/projects/${encodeURIComponent(id)}${overview?'?overview=true':''}`,{timeoutMs:20000},()=>epoch===getSessionEpoch());
-function fetchProjectSnapshot(id:string,reloadVersion:number|string|undefined,overview=false){
+type FirstScreenPart={status:number;body:unknown};
+type FirstScreen={project:ProjectSlice;assignments:FirstScreenPart;tasks:FirstScreenPart;start:FirstScreenPart;progress:FirstScreenPart};
+const readProject=async(id:string,epoch:number,overview:boolean,workspace:string)=>{
+ const current=()=>epoch===getSessionEpoch();
+ if(overview){
+  try {
+   const payload=await api<FirstScreen>(`/api/projects/${encodeURIComponent(id)}/first-screen`,{timeoutMs:20000},current);
+   if(current()){
+    if(payload.assignments.status===200)seedNodeAssignments(id,parseNodeAssignments(payload.assignments.body));
+    if(payload.tasks.status===200)seedSopTasks(id,workspace,parseOverview(payload.tasks.body));
+    if(payload.start.status===200)seedStartSop(id,parseSopPreview(payload.start.body));
+    if(payload.progress.status===200)seedProjectProgress(id,parseProjectProgress(payload.progress.body));
+   }
+   return payload.project;
+  }catch(error){if(!(error instanceof ApiError)||error.status!==404)throw error}
+ }
+ return api<ProjectSlice>(`/api/projects/${encodeURIComponent(id)}${overview?'?overview=true':''}`,{timeoutMs:20000},current);
+};
+function fetchProjectSnapshot(id:string,reloadVersion:number|string|undefined,overview=false,workspace=''){
  const scoped=`${id}:${overview}`;
  cachedProject(scoped);const key=JSON.stringify([scoped,reloadVersion]);const pending=projectRequests.get(key);if(pending)return pending;
- const epoch=getSessionEpoch();const request=readProject(id,epoch,overview).then(data=>{if(epoch===getSessionEpoch()&&latestProjectReads.get(scoped)===request){deniedProjects.delete(scoped);projectSnapshots.set(scoped,data);if(projectSnapshots.size>20)projectSnapshots.delete(projectSnapshots.keys().next().value!)}return data}).catch(error=>{if(epoch===getSessionEpoch()&&latestProjectReads.get(scoped)===request&&error instanceof ApiError&&[401,403,404].includes(error.status)){projectSnapshots.delete(scoped);deniedProjects.add(scoped)}throw error}).finally(()=>{if(projectRequests.get(key)===request)projectRequests.delete(key)});projectRequests.set(key,request);latestProjectReads.set(scoped,request);return request;
+ const epoch=getSessionEpoch();const request=readProject(id,epoch,overview,workspace).then(data=>{if(epoch===getSessionEpoch()&&latestProjectReads.get(scoped)===request){deniedProjects.delete(scoped);projectSnapshots.set(scoped,data);if(projectSnapshots.size>20)projectSnapshots.delete(projectSnapshots.keys().next().value!)}return data}).catch(error=>{if(epoch===getSessionEpoch()&&latestProjectReads.get(scoped)===request&&error instanceof ApiError&&[401,403,404].includes(error.status)){projectSnapshots.delete(scoped);deniedProjects.add(scoped)}throw error}).finally(()=>{if(projectRequests.get(key)===request)projectRequests.delete(key)});projectRequests.set(key,request);latestProjectReads.set(scoped,request);return request;
 }
 
 export function ProjectDetailGate({c}:{c:Ctx}){
@@ -63,7 +87,7 @@ function ProjectDetailContent({c}:{c:Ctx}){
  // Shell mode reads only this project (tree plus its own approvals, events and records); a full workspace, after any mutation, takes the legacy path unchanged.
  const shell=c.w.scope==='shell'||!!c.route.project&&!c.w.projects.some(p=>p.id===c.route.project);const id=c.route.project;const sopRead=canReadSop(c.s.user);const {tab}=projectFlowRoute(c.route);const overview=['overview','flow'].includes(tab);const snapshotKey=`${id}:${overview}`;
  useEffect(()=>{
-  if(!shell||!id)return;
+  if(!shell||!id||overview)return;
   if(c.s.features?.node_assignment&&!localCase(c.w.projects.find(p=>p.id===id)||{})&&['overview','flow','items','people'].includes(tab))void prefetchNodeAssignments(id).catch(()=>{});
   const warmProgress=()=>{if(['items'].includes(tab))void prefetchProjectProgress(id).catch(()=>{})};
   warmProgress();
@@ -73,7 +97,7 @@ function ProjectDetailContent({c}:{c:Ctx}){
   }
  },[shell,id,tab,c.s.workspace_id,sopRead,c.s.features?.node_assignment]);
  const snapshotVersion=useRef(0);
- const detail=useViewData<ProjectSlice|undefined>(shell?`project:${snapshotKey}`:'project-legacy',()=>{return shell&&id?fetchProjectSnapshot(id,`${c.reloadVersion}:${snapshotVersion.current}`,overview).catch(async error=>{if(!(error instanceof ApiError)||error.status!==404)throw error;const sop=await prefetchSopTasks(id,c.s.workspace_id||'');const project=checklistProject(sop);if(!project)throw error;deniedProjects.delete(snapshotKey);return {scope:'project' as const,version:c.w.version,project}}):Promise.resolve(undefined)},[]);
+ const detail=useViewData<ProjectSlice|undefined>(shell?`project:${snapshotKey}`:'project-legacy',()=>{return shell&&id?fetchProjectSnapshot(id,`${c.reloadVersion}:${snapshotVersion.current}`,overview,c.s.workspace_id||'').catch(async error=>{if(!(error instanceof ApiError)||error.status!==404)throw error;const sop=await prefetchSopTasks(id,c.s.workspace_id||'');const project=checklistProject(sop);if(!project)throw error;deniedProjects.delete(snapshotKey);return {scope:'project' as const,version:c.w.version,project}}):Promise.resolve(undefined)},[]);
  const reloadSnapshot=useCallback(()=>{snapshotVersion.current++;detail.reload()},[detail.reload]);
  const refreshDetail=useDetailRefresh(reloadSnapshot,shell);
  useEffect(()=>{if(shell&&detail.data)perfMark('project-detail-render')},[shell,detail.data]);

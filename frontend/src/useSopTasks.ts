@@ -23,6 +23,7 @@ const cached = (key: string) => {
  return cache.get(key);
 };
 
+export function seedSopTasks(id:string,workspace:string,data:SopOverview) {const key=`${workspace}:${id}`;cached(key);denied.delete(key);cache.set(key,data);readAt.set(key,Date.now())}
 export function canReadSop(user: {active?:boolean} | null | undefined){
  return !!user && user.active!==false;
 }

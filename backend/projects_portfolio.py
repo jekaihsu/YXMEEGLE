@@ -29,7 +29,7 @@ def collapse_same_code(items):
     return result, duplicates
 
 
-def portfolio(db, model, row, state, today, *, assignments, data, user):
+def portfolio(db, model, row, state, today, *, assignments, data, user, overlay=True):
     pi, ti, _ = index_tables.tables(model)
     rows = db.execute(select(pi).where(pi.c.workspace_id == row.id,
         *visibility(pi, state.get('environment', 'production'))).order_by(pi.c.ordinal)).mappings().all()
@@ -39,7 +39,7 @@ def portfolio(db, model, row, state, today, *, assignments, data, user):
         .where(CasePolicy.workspace_id == row.id)).all())
     imported = set(db.scalars(select(LocalTask.project_id).where(LocalTask.workspace_id == row.id,
         LocalTask.imported_version_id.is_not(None)).distinct()))
-    overlay_enabled = bool(ids) and not assignments.assignment_unavailable(state, data)
+    overlay_enabled = overlay and bool(ids) and not assignments.assignment_unavailable(state, data)
     headers, nodes, daily = {}, {}, {}
     if row.data.get('storage_schema') == 2:
         records = db.execute(select(model.kind, model.entity_id, model.parent_id, model.data)

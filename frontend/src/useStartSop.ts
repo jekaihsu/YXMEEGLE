@@ -19,6 +19,7 @@ export function prefetchStartSop(id: string, force = false) {
  const promise = fetchSop(id, current).then(data => {if (current()) {cache.set(id, data); readAt.set(id, Date.now())} return data}).finally(() => {if (requests.get(id) === promise) requests.delete(id)});
  requests.set(id, promise); return promise;
 }
+export function seedStartSop(id:string,data:SopPreview) {if(epoch!==getSessionEpoch()){cache.clear();readAt.clear();requests.clear();epoch=getSessionEpoch()}cache.set(id,data);readAt.set(id,Date.now())}
 export function useStartSop(id: string, enabled: boolean, refreshOverview: () => Promise<void>) {
  const [state, setState] = useState<State>({kind: 'hidden'});
  const [busy, setBusy] = useState(false), [notice, setNotice] = useState('');

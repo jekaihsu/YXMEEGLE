@@ -159,6 +159,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             yield
         finally:
             loop_monitor.cancel()
+            await asyncio.to_thread(app.state.read_snapshots.close)
             app.state.sop_projection.close()
             app.state.people_attendance.close()
             app.state.live_read.close()
@@ -206,6 +207,19 @@ def create_app(overrides=None,*,dispatch_transport=None):
     def initial_capabilities(ident,role):
         return (MANAGER_CAPABILITIES[:] if role=='manager' else [])+(['approve_capability'] if ident in capability_approvers else [])
 
+    from .read_snapshots import ReadSnapshots
+    read_snapshots = ReadSnapshots()
+    app.state.read_snapshots = read_snapshots
+
+    @app.middleware('http')
+    async def invalidate_read_snapshots(request, call_next):
+        try:
+            return await call_next(request)
+        finally:
+            # Also fence ambiguous failures after a write may already have committed.
+            if request.method not in ('GET', 'HEAD', 'OPTIONS'):
+                read_snapshots.invalidate()
+
     shell_enabled=str(cfg.get('WORKSPACE_SHELL_ENABLED','false')).lower()=='true'
     TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('GET','/api/settings/overview'),('POST','/api/actions')}
     @contextmanager
@@ -246,7 +260,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         if request.url.path.startswith('/api'): response.headers['Cache-Control']='no-store'
         elif response.status_code in (200,206,304) and re.fullmatch(r'/assets/(?:[^/]+/)*[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+',request.url.path):
             response.headers['Cache-Control']='public, max-age=31536000, immutable'
-        if (request.method,request.url.path) in TIMED_ROUTES or (request.method=='GET' and response.status_code<400 and re.fullmatch(r'/api/(?:projects/[^/]+(?:/(?:navigation|progress|node-assignments|start-sop|sop-tasks|sop-assignees))?|case-detail/[^/]+)',request.url.path)):
+        if (request.method,request.url.path) in TIMED_ROUTES or (request.method=='GET' and response.status_code<400 and re.fullmatch(r'/api/(?:projects/[^/]+(?:/(?:navigation|progress|node-assignments|start-sop|sop-tasks|sop-assignees|first-screen))?|case-detail/[^/]+)',request.url.path)):
             # Durations only. 'serialize' is the unmeasured remainder (response encoding and framework time).
             phases=dict(request.scope.get('phases',{})); total=perf_counter()-started
             phases['serialize']=max(total-sum(phases.values()),0)
@@ -290,6 +304,19 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 row.data=storage.save(db,BusinessRow,wid,data)
 
     def load(db,row,*,collections=None,project_ids=None,omit_kinds=(),project_details=True,case_sources=False):
+        from .read_snapshots import capture
+        shared = capture.get()
+        if shared and project_ids == [shared['project_id']] and row.id == shared['wid'] and shared.get('state') is not None:
+            state = deepcopy(shared['state'])
+            if collections is not None:
+                for kind in storage.COLLECTIONS:
+                    if kind not in collections and kind != 'projects':
+                        state[kind] = []
+            if case_sources != 'sop':
+                from .source_case_policy import CODE_FIELDS
+                for quote in state.get('source_quotes', []):
+                    quote['fields'] = {k:v for k,v in (quote.get('fields') or {}).items() if k in CODE_FIELDS}
+            return state
         from .request_timing import measure
         with measure('storage'):
             return load_state(db,row,collections=collections,project_ids=project_ids,omit_kinds=omit_kinds,project_details=project_details,case_sources=case_sources)
@@ -367,6 +394,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
         db.add(PersonRow(organization_id=org,person_id=user['id'],data=result)); db.commit()
         return result
     def identity(request):
+        from .read_snapshots import capture
+        shared = capture.get()
+        if shared:
+            return deepcopy(shared['identity'])
         with phase(request,'identity'): return _identity(request)
     def _identity(request):
         data=read_cookie(request); require(data is not None,'請先登入',401)
@@ -706,8 +737,16 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 require(index_reads.ready(db,BusinessRow,row),'案件索引尚未就緒，請稍後重試',503)
                 if view=='portfolio':
                     from .projects_portfolio import portfolio
-                    return JSONResponse(portfolio(db,BusinessRow,row,load(db,row,collections=()),now()[:10],
-                        assignments=app.state.home_panels,data=data,user=user))
+                    today = now()[:10]
+                    key = ('portfolio', data['wid'], row.version, today, json.dumps(data, sort_keys=True), json.dumps(user, sort_keys=True))
+                    def build_portfolio():
+                        with sessions() as snapshot_db:
+                            root = snapshot_db.get(WorkspaceRow, data['wid'])
+                            return JSONResponse(portfolio(snapshot_db, BusinessRow, root, load(snapshot_db, root, collections=()), today,
+                                assignments=app.state.home_panels, data=data, user=user, overlay=False)).body
+                    body, snapshot_status = read_snapshots.get(key, build_portfolio)
+                    from fastapi.responses import Response
+                    return Response(body, media_type='application/json', headers={'Cache-Control': 'no-store', 'X-Read-Snapshot': snapshot_status})
                 return shell.overview_page(db,BusinessRow,row,load(db,row,collections=()),now()[:10],q=q,status=status,owner=owner,tab=tab,sort=sort,desc=dir=='desc',offset=offset,limit=limit)
         with phase(request,'load'),sessions() as db:
             row=db.get(WorkspaceRow,data['wid'])
@@ -1817,6 +1856,48 @@ def create_app(overrides=None,*,dispatch_transport=None):
                      links=lambda data,user:report_link_state(data,user)[0].get('report_case_bridges',{}))
     from .lark_pilot.routes import register as register_pilot
     register_pilot(app, identity=identity, authorize=authorize_live, cfg=cfg)
+    @app.get('/api/projects/{project_id}/first-screen')
+    def project_first_screen(request:Request, project_id:str):
+        from .read_snapshots import capture
+        require(shell_enabled, '尚未啟用單一案件讀取', 404)
+        data, user = identity(request)
+        require(len(project_id) <= 200 and not request.query_params, '查詢參數錯誤', 422)
+        with sessions() as db:
+            version = db.get(WorkspaceRow, data['wid']).version
+            from .sop_import.models import CaseState, CasePolicy
+            revision = db.get(CaseState, (data['wid'], project_id))
+            policy = db.get(CasePolicy, (data['wid'], project_id))
+            signature = (revision.checklist_revision, revision.identity_revision) if revision else None
+            policy_revision = policy.revision if policy else None
+        key = ('case', data['wid'], version, signature, policy_revision, project_id, json.dumps(data, sort_keys=True), json.dumps(user, sort_keys=True))
+        readers = {r.path: r.endpoint for r in app.routes if 'GET' in (getattr(r, 'methods', None) or ())}
+        def build():
+            child = Request(dict(request.scope, state={}, phases={}, query_string=b''))
+            # A refresh checks the cookie/admission again instead of extending a logged-out session.
+            fresh_identity = identity(child)
+            shared = dict(wid=data['wid'], project_id=project_id, identity=fresh_identity)
+            token = capture.set(shared)
+            try:
+                with sessions() as db:
+                    shared['state'] = load(db, db.get(WorkspaceRow, data['wid']), project_ids=[project_id], case_sources='sop')
+                result = {'project': json.loads(project_detail(child, project_id, overview=True).body)}
+                for name, path in (
+                    ('assignments', '/api/projects/{project_id}/node-assignments'),
+                    ('tasks', '/api/projects/{project_id}/sop-tasks'),
+                    ('start', '/api/projects/{project_id}/node-assignments/start-sop'),
+                    ('progress', '/api/projects/{project_id}/progress')):
+                    try:
+                        response = readers[path](child, project_id)
+                    except HTTPException as exc:
+                        response = JSONResponse({'detail': exc.detail}, status_code=exc.status_code)
+                    result[name] = {'status': response.status_code, 'body': json.loads(response.body)}
+                return JSONResponse(result).body
+            finally:
+                capture.reset(token)
+        body, status = read_snapshots.get(key, build)
+        from fastapi.responses import Response
+        return Response(body, media_type='application/json', headers={'Cache-Control': 'no-store', 'X-Read-Snapshot': status})
+
     from .runtime_health import register as register_runtime_health
     register_runtime_health(app,identity,sessions,CacheRow,cfg,workspace_model=WorkspaceRow,coordinator=app.state.live_read)
     from .settings_overview import register as register_settings_overview
