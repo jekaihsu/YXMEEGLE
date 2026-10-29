@@ -225,6 +225,23 @@ def create_app(overrides=None,*,dispatch_transport=None):
         # successful roster verification alone does not change view authority.
         return json.dumps({k:v for k,v in user.items() if k != 'directory_last_seen_at'}, sort_keys=True)
 
+    def snapshot_visibility(db, row, project_id=None):
+        from . import index_tables, index_reads
+        if row.data.get('storage_schema') != 2 or not index_reads.ready(db, BusinessRow, row):
+            return ('strict_version', row.version)
+        pi, _, _ = index_tables.tables(BusinessRow)
+        visible = [tuple(r) for r in db.execute(select(pi.c.project_id, pi.c.case_visibility,
+            pi.c.source_kind, pi.c.case_type, pi.c.execution_system).where(pi.c.workspace_id == row.id).order_by(pi.c.project_id))]
+        digest = hashlib.sha256(json.dumps(visible, separators=(',', ':')).encode()).hexdigest()
+        if project_id is None:
+            return digest
+        project = db.scalar(select(BusinessRow.data).where(BusinessRow.workspace_id == row.id,
+            BusinessRow.kind == 'projects', BusinessRow.entity_id == project_id))
+        fields = ('pm_id', 'created_by', 'collaborator_ids', 'owner_id', 'admin_id', 'supervisor_id',
+            'sop_task_delegate_ids', 'planning_origin', 'case_visibility', 'source_kind', 'execution_system')
+        authority = json.dumps({k: (project or {}).get(k) for k in fields}, sort_keys=True)
+        return digest, authority
+
     shell_enabled=str(cfg.get('WORKSPACE_SHELL_ENABLED','false')).lower()=='true'
     TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('GET','/api/settings/overview'),('POST','/api/actions')}
     @contextmanager
@@ -743,7 +760,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 if view=='portfolio':
                     from .projects_portfolio import portfolio
                     today = now()[:10]
-                    key = ('portfolio', data['wid'], today, json.dumps(data, sort_keys=True), snapshot_viewer(user))
+                    key = ('portfolio', data['wid'], today, snapshot_visibility(db, row), json.dumps(data, sort_keys=True), snapshot_viewer(user))
                     def build_portfolio():
                         with sessions() as snapshot_db:
                             root = snapshot_db.get(WorkspaceRow, data['wid'])
@@ -1875,7 +1892,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
             policy = db.get(CasePolicy, (data['wid'], project_id))
             signature = (revision.checklist_revision, revision.identity_revision) if revision else None
             policy_revision = policy.revision if policy else None
-        key = ('case', data['wid'], signature, policy_revision, project_id, json.dumps(data, sort_keys=True), snapshot_viewer(user))
+            visibility_revision = snapshot_visibility(db, db.get(WorkspaceRow, data['wid']), project_id)
+        key = ('case', data['wid'], signature, policy_revision, visibility_revision, project_id, json.dumps(data, sort_keys=True), snapshot_viewer(user))
         readers = {r.path: r.endpoint for r in app.routes if 'GET' in (getattr(r, 'methods', None) or ())}
         def build():
             child = Request(dict(request.scope, state={}, phases={}, query_string=b''))

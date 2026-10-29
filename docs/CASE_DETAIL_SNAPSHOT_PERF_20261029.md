@@ -42,3 +42,8 @@ Separate same-page snapshot probes proved the delivery gap even when caching wor
 
 
 The persisted-card list on the first rollout rendered in **2,414 ms first / 17,410 ms reload**. Portfolio server time fell to **1,289 ms cold / 85 ms cached**, versus the prior same-document 4,989 ms server measurement. Its reload spent 6,558 ms transferring 48,216 gzip bytes, while the preceding shell spent 9,962 ms in transfer despite 341 ms server time. Five was a prior grouping result; the new rendered grouping contains three first-visible cards, while the complete data set remains available for counts and filtering. No virtualization was added because grouped display already limits mounted cards.
+
+
+Final cache safeguards: indexed case visibility and case-owner/delegate fields are checked before cache lookup, independently of background workspace freshness. A newly hidden case cannot return its previous snapshot. Unindexed/legacy storage retains strict workspace-version invalidation. A queued build also rechecks the same viewer authority before publication, preventing it from being cached under a different permission state. The authority-change and hidden-case regressions pass.
+
+Final pre-push rerun: **5,499 passed, 39 skipped, 1 xfailed**, with only the documented report-normalization baseline failure. The obsolete portfolio expectation (one legacy audit read) was corrected to assert the new persisted behavior and zero reads; it is not classified as a baseline failure. The latest affected cache/portfolio/home/timing selection passes **45 tests**. Frontend hook commands: 22/23 pass, with only the documented shell-mode failure. The full suite preceded the final visibility-key patch; the affected 45-test selection covers that patch.

@@ -141,3 +141,26 @@ def test_changed_authority_cannot_publish_under_previous_viewer_key(tmp_path, mo
                 release.set()
             assert pending.result(timeout=5).status_code == 409
         assert not app.state.read_snapshots.entries
+
+
+def test_hidden_case_is_not_served_from_last_good_snapshot(tmp_path, monkeypatch):
+    from . import storage, workspace_environment
+    from .models import BusinessRow
+    with scaled_client(tmp_path, 2, **ON) as (app, client):
+        monkeypatch.setattr(workspace_environment, 'normalize_environment',
+            lambda state, *_: state.update(environment='production') or state)
+        with app.state.sessions() as db:
+            root = db.scalars(select(WorkspaceRow)).first()
+            pid = storage.load(db, BusinessRow, root)['projects'][0]['id']
+        url = '/api/projects/' + pid + '/first-screen'
+        assert client.get(url).status_code == 200
+        assert client.get(url).headers['x-read-snapshot'] == 'hit'
+        # Model a background source write, outside the HTTP invalidation middleware.
+        with app.state.sessions.begin() as db:
+            root = db.scalars(select(WorkspaceRow)).first()
+            state = storage.load(db, BusinessRow, root)
+            next(p for p in state['projects'] if p['id'] == pid)['case_visibility'] = 'excluded_history'
+            root.version += 1
+            state['version'] = root.version
+            root.data = storage.save(db, BusinessRow, root.id, state)
+        assert client.get(url).status_code == 404
