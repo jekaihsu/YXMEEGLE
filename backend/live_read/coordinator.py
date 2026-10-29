@@ -315,8 +315,6 @@ class RefreshCoordinator:
             raise ValueError('Unknown live-read dataset')
         if not self._enabled(wid) or dataset not in self.refreshers:
             return dict(self._status(wid, (dataset,))['datasets'][dataset], status='unconfigured')
-        if str(self.cfg.get('LIVE_READ_BACKGROUND_PROCESS','false')).lower()=='true' and not wait and not force:
-            return self._status(wid,(dataset,))['datasets'][dataset]
         slots = self._roster_slots if dataset == 'roster' else self._slots
         executor = self.roster_executor if dataset == 'roster' else self.executor
         key = self._key(wid, dataset)

@@ -22,6 +22,7 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
     project_ids=None if project_ids is None else tuple(project_ids)
     if set(collections)-set(COLLECTIONS): raise ValueError('unknown workspace collection')
     if set(project_children)-set(PROJECT_CHILDREN): raise ValueError('unknown project child')
+    strict_events=row.id.startswith('lark-') and row.data.get('environment') not in ('demo','test')
     kinds=set(collections)
     if project_ids is not None: kinds.add('projects')
     result={key:deepcopy(value) for key,value in row.data.items() if key not in COLLECTIONS}
@@ -30,7 +31,7 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
         for collection in kinds:
             values=row.data.get(collection,[])
             if filter_project_rows and project_ids is not None and collection in READ_PROJECT_LINKED:
-                values=[item for item in values if item.get('project_id') is None or item.get('project_id') in project_ids]
+                values=[item for item in values if item.get('project_id') in project_ids or (item.get('project_id') is None and not (strict_events and collection=='events'))]
             result[collection]=deepcopy(values)
         if project_ids is not None:
             result['projects']=[p for p in result['projects'] if p['id'] in project_ids]
@@ -50,7 +51,8 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
             if filter_project_rows and project_ids is not None and set(selected) & READ_PROJECT_LINKED:
                 # Mixed top-level kinds: retain shared policy rows and legacy globals.
                 linked=model.data['project_id'].as_string()
-                query=query.where((~model.kind.in_(READ_PROJECT_LINKED)) | linked.is_(None) | linked.in_(project_ids))
+                global_row=linked.is_(None) & (model.kind!='events') if strict_events else linked.is_(None)
+                query=query.where((~model.kind.in_(READ_PROJECT_LINKED)) | global_row | linked.in_(project_ids))
             rows=db.execute(query.order_by(model.ordinal))
             return ((kind,parent,json.loads(data)) for kind,parent,data in rows) if compact and not as_text else rows
         top=kinds-{'projects','source_work_items'}

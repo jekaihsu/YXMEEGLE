@@ -133,3 +133,26 @@ def test_overview_matches_full_case_controls_and_privacy(http,uid):
     if complete.status_code==200:
         for key in ('project','policy_summary','approvals','financial_requests'):
             assert compact.json().get(key)==complete.json().get(key)
+
+
+def test_formal_case_read_never_materializes_global_events_or_unrelated_feeds(http):
+    from types import SimpleNamespace
+    app,_,seat,_=http
+    state,_,pid=build_universe()
+    state['environment']='production'
+    state['events']=[{'id':f'global-{i}','message':'global event'} for i in range(500)]
+    state['events'] += [{'id':'mine','project_id':pid,'message':'case event'},
+                        {'id':'other','project_id':'another-case','message':'other case'}]
+    seat(state)
+    with app.state.sessions() as db:
+        row=db.get(WorkspaceRow,WID)
+        result=storage.load_partial(db,BusinessRow,row,collections=('events',),
+                                    project_ids=[pid],filter_project_rows=True)
+        assert [event['id'] for event in result['events']]==['mine']
+        assert len(storage.load_partial(db,BusinessRow,row,collections=('events',))['events'])==502
+        legacy=SimpleNamespace(id=WID,data=dict(state,storage_schema=1))
+        result=storage.load_partial(db,BusinessRow,legacy,collections=('events',),
+                                    project_ids=[pid],filter_project_rows=True)
+        assert [event['id'] for event in result['events']]==['mine']
+    assert not {'work_schedules','daily_unmatched'} & set(storage.CASE_DETAIL_COLLECTIONS)
+    assert {'approvals','financial_requests','delegations','approved_leave_delegations'} <= set(storage.CASE_DETAIL_COLLECTIONS)

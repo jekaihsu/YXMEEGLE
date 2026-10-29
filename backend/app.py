@@ -152,10 +152,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 ensure_workspace(wid,True)
                 for dataset in ('roster','attendance','sources'):
                     app.state.live_read.ensure(wid,dataset,wait=False)
-                if str(cfg.get('LIVE_READ_BACKGROUND_PROCESS','false')).lower()!='true':
-                    app.state.people_attendance.view(wid)
-            if str(cfg.get('LIVE_READ_BACKGROUND_PROCESS','false')).lower()!='true':
-                app.state.sop_projection.start()
+                app.state.people_attendance.view(wid)
+            app.state.sop_projection.start()
             yield
         finally:
             loop_monitor.cancel()
@@ -296,7 +294,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     def load_state(db,row,*,collections=None,project_ids=None,omit_kinds=(),project_details=True,case_sources=False):
         from .request_timing import measure
-        if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections if collections is not None else storage.DETAIL_COLLECTIONS,project_ids=project_ids,project_children=storage.PROJECT_CHILDREN,filter_project_rows=True,project_details=project_details,case_sources=case_sources)
+        if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections if collections is not None else storage.CASE_DETAIL_COLLECTIONS,project_ids=project_ids,project_children=storage.PROJECT_CHILDREN,filter_project_rows=True,project_details=project_details,case_sources=case_sources)
         elif collections is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections)
         elif omit_kinds: state=storage.load(db,BusinessRow,row,omit_kinds=omit_kinds)
         else: state=storage.load(db,BusinessRow,row)

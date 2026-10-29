@@ -67,6 +67,8 @@ PROJECT_LINKED=frozenset({'approvals','sop_requests','financial_requests','deleg
 # Global training/leave/schedule/template inputs remain shared. Quote facts explicitly
 # union duplicate quote numbers across projects, so source_quotes stays workspace-wide.
 DETAIL_COLLECTIONS=tuple(c for c in COLLECTIONS if c!='projects')
+# Case responses omit these workspace-wide feeds; they are read on their own destinations.
+CASE_DETAIL_COLLECTIONS=tuple(c for c in DETAIL_COLLECTIONS if c not in ('work_schedules','daily_unmatched'))
 CASE_COLLECTIONS=('users','source_quotes','source_confirmations','contract_items','source_work_items')
 # JSON rows with a project_id can be filtered without losing truly global rows.
 # source_quotes is excluded for duplicate-number facts; source_confirmations

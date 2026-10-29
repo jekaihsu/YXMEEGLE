@@ -559,20 +559,3 @@ def test_missing_permission_preserves_last_good_and_scope_names(harness,wrapped)
     assert state['missing_scopes']==['bitable:app:readonly']
     assert state['as_of']=='2026-10-07T10:00:00+08:00'
     assert state['last_error']=='Lark refresh failed'
-
-
-def test_external_background_worker_publishes_through_existing_lease_cache(harness):
-    h=harness
-    web,worker=h.make(),h.make()
-    web.cfg=dict(web.cfg,LIVE_READ_BACKGROUND_PROCESS='true')
-    assert web.ensure(h.wid,'sources')['status']=='never'
-    assert h.calls==[]
-    assert worker.ensure(h.wid,'sources')['status']=='fresh'
-    assert web.ensure(h.wid,'sources')['status']=='fresh'
-    assert h.calls==[h.wid]
-    h.clock[0]+=timedelta(seconds=61)
-    assert web.ensure(h.wid,'sources')['status']=='stale'
-    assert h.calls==[h.wid]
-    # Explicit blocking/forced refresh keeps its previous execution and fences.
-    assert web.ensure(h.wid,'sources',wait=True,force=True)['status']=='fresh'
-    assert h.calls==[h.wid,h.wid]
