@@ -220,6 +220,11 @@ def create_app(overrides=None,*,dispatch_transport=None):
             if request.method not in ('GET', 'HEAD', 'OPTIONS'):
                 read_snapshots.invalidate()
 
+    def snapshot_viewer(user):
+        # Admission uses the fresh timestamp before this key is computed. A new
+        # successful roster verification alone does not change view authority.
+        return json.dumps({k:v for k,v in user.items() if k != 'directory_last_seen_at'}, sort_keys=True)
+
     shell_enabled=str(cfg.get('WORKSPACE_SHELL_ENABLED','false')).lower()=='true'
     TIMED_ROUTES={('GET','/api/workspace'),('GET','/api/session'),('GET','/api/projects'),('GET','/api/settings/overview'),('POST','/api/actions')}
     @contextmanager
@@ -738,13 +743,14 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 if view=='portfolio':
                     from .projects_portfolio import portfolio
                     today = now()[:10]
-                    key = ('portfolio', data['wid'], row.version, today, json.dumps(data, sort_keys=True), json.dumps(user, sort_keys=True))
+                    key = ('portfolio', data['wid'], today, json.dumps(data, sort_keys=True), snapshot_viewer(user))
                     def build_portfolio():
                         with sessions() as snapshot_db:
                             root = snapshot_db.get(WorkspaceRow, data['wid'])
                             return JSONResponse(portfolio(snapshot_db, BusinessRow, root, load(snapshot_db, root, collections=()), today,
                                 assignments=app.state.home_panels, data=data, user=user, overlay=False)).body
-                    body, snapshot_status = read_snapshots.get(key, build_portfolio)
+                    with phase(request, 'snapshot'):
+                        body, snapshot_status = read_snapshots.get(key, build_portfolio, revision=row.version)
                     from fastapi.responses import Response
                     return Response(body, media_type='application/json', headers={'Cache-Control': 'no-store', 'X-Read-Snapshot': snapshot_status})
                 return shell.overview_page(db,BusinessRow,row,load(db,row,collections=()),now()[:10],q=q,status=status,owner=owner,tab=tab,sort=sort,desc=dir=='desc',offset=offset,limit=limit)
@@ -1869,7 +1875,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             policy = db.get(CasePolicy, (data['wid'], project_id))
             signature = (revision.checklist_revision, revision.identity_revision) if revision else None
             policy_revision = policy.revision if policy else None
-        key = ('case', data['wid'], version, signature, policy_revision, project_id, json.dumps(data, sort_keys=True), json.dumps(user, sort_keys=True))
+        key = ('case', data['wid'], signature, policy_revision, project_id, json.dumps(data, sort_keys=True), snapshot_viewer(user))
         readers = {r.path: r.endpoint for r in app.routes if 'GET' in (getattr(r, 'methods', None) or ())}
         def build():
             child = Request(dict(request.scope, state={}, phases={}, query_string=b''))
@@ -1891,10 +1897,13 @@ def create_app(overrides=None,*,dispatch_transport=None):
                     except HTTPException as exc:
                         response = JSONResponse({'detail': exc.detail}, status_code=exc.status_code)
                     result[name] = {'status': response.status_code, 'body': json.loads(response.body)}
-                return JSONResponse(result).body
+                from .request_timing import measure
+                with measure('snapshotencode'):
+                    return JSONResponse(result).body
             finally:
                 capture.reset(token)
-        body, status = read_snapshots.get(key, build)
+        with phase(request, 'snapshot'):
+            body, status = read_snapshots.get(key, build, revision=version)
         from fastapi.responses import Response
         return Response(body, media_type='application/json', headers={'Cache-Control': 'no-store', 'X-Read-Snapshot': status})
 

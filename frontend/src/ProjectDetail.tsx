@@ -62,9 +62,10 @@ const readProject=async(id:string,epoch:number,overview:boolean,workspace:string
  const current=()=>epoch===getSessionEpoch();
  if(overview){
   try {
-   const payload=await api<FirstScreen>(`/api/projects/${encodeURIComponent(id)}/first-screen`,{timeoutMs:20000},current);
+   let stale=false;
+   const payload=await api<FirstScreen>(`/api/projects/${encodeURIComponent(id)}/first-screen`,{timeoutMs:20000},current,(_status,response)=>{stale=response.headers.get('X-Read-Snapshot')==='stale'});
    if(current()){
-    if(payload.assignments.status===200)seedNodeAssignments(id,parseNodeAssignments(payload.assignments.body));
+    if(payload.assignments.status===200){const data=parseNodeAssignments(payload.assignments.body);seedNodeAssignments(id,stale?{...data,stale:true,stale_reason:'snapshot_refreshing'}:data)}
     if(payload.tasks.status===200)seedSopTasks(id,workspace,parseOverview(payload.tasks.body));
     if(payload.start.status===200)seedStartSop(id,parseSopPreview(payload.start.body));
     if(payload.progress.status===200)seedProjectProgress(id,parseProjectProgress(payload.progress.body));

@@ -89,3 +89,23 @@ def test_portfolio_first_screen_uses_persisted_cards_not_bulk_projection(tmp_pat
         second = client.get('/api/projects?view=portfolio')
         assert second.json() == first.json()
         assert second.headers['x-read-snapshot'] == 'hit'
+
+
+def test_background_revision_revalidates_last_good_without_blocking():
+    cache = ReadSnapshots()
+    entered, release = Event(), Event()
+    try:
+        assert cache.get('case', lambda: b'v1', revision=1) == (b'v1', 'miss')
+        def next_revision():
+            entered.set()
+            assert release.wait(2)
+            return b'v2'
+        assert cache.get('case', next_revision, revision=2) == (b'v1', 'stale')
+        assert entered.wait(2)
+        assert cache.get('case', next_revision, revision=2) == (b'v1', 'stale')
+        release.set()
+        cache.close()
+        assert cache.get('case', lambda: b'unexpected', revision=2) == (b'v2', 'hit')
+    finally:
+        release.set()
+        cache.close()

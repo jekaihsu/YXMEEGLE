@@ -12,7 +12,7 @@ const epochListeners=new Set<()=>void>();
 export const onSessionEpochChange=(listener:()=>void)=>{epochListeners.add(listener);return ()=>{epochListeners.delete(listener)}};
 export const invalidateSessionEpoch=()=>{sessionEpoch++;etagCache.clear();for(const listener of epochListeners)listener()};
 export class ApiError extends Error {constructor(public status:number,message:string,public code?:string,public ceiling_seconds?:number,public warming?:boolean,public retry_after?:number,public payload?:unknown){super(message)}}
-export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boolean=()=>true,onResponse?:(status:number)=>void):Promise<T>{
+export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boolean=()=>true,onResponse?:(status:number,response:Response)=>void):Promise<T>{
   const epoch=getSessionEpoch();
   const mutating=!!init?.method&&!['GET','HEAD'].includes(init.method.toUpperCase());
   if(mutating){pendingMutations.set(epoch,(pendingMutations.get(epoch)||0)+1);mutationChanged()}
@@ -38,7 +38,7 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
   const trace=perfStart(url);
   const response=await bounded(fetch(url,{credentials:'same-origin',...request,headers,...(controller?{signal:controller.signal}:{})}));
   perfHeaders(trace,response);
-  onResponse?.(response.status);
+  onResponse?.(response.status,response);
   if(response.status===304&&cached)return cached.data as T;
   const malformed='服務回應格式不正確，請稍後再試。';
   let data:any;let parsed=true;
