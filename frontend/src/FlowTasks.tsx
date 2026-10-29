@@ -27,6 +27,7 @@ export function FlowTasks({c,p,title,nodes,selected,details,all,onScope,busy,rea
  },[c.route.task,loading,filtered.length]);
  return <section id="flow-tasks" className="pf-tasks" aria-label="流程任務列表" tabIndex={-1}>
   <header><h3>{title||taskListHeading(rows)}</h3><div className="pf-actions" aria-label="任務範圍">{[false,true].map(value=><Button key={String(value)} aria-pressed={all===value} onClick={()=>onScope(value)}>{value ? '全部任務' : '此節點'}</Button>)}</div></header>
+  <p className="pf-empty">此列表顯示 Lark 與本地流程任務；SOP 任務另列於下方，待辦事項合併顯示兩種來源的未完成任務。</p>
   <div className="pf-filters" aria-label="任務篩選">{([['mine','我的'],['unassigned','未指派'],['overdue','逾期']] as const).map(([key,label])=><Button key={key} aria-pressed={filters[key]} onClick={()=>c.go(withTaskFilter(c.route,key,!filters[key]),true)}>{label}</Button>)}<span role="status">{incomplete ? `${filtered.length} 項已載入，來源未完整` : `${filtered.length} 項符合`}</span></div>
   {incomplete && <p role="status">任務來源暫不可用，請重試明細後再確認完整清單。</p>}
   {loading && <div aria-label="任務載入中" aria-busy="true"><Skeleton lines={3} height="3.5rem"/></div>}
@@ -37,7 +38,7 @@ export function FlowTasks({c,p,title,nodes,selected,details,all,onScope,busy,rea
    {assigning===row.id && details[row.nodeKey] && <TaskPersonPicker key={row.id} taskId={row.id} detail={details[row.nodeKey]} busy={busy} error={error} mutate={mutate} onClose={()=>setAssigning('')}/>}
    {row.id===seed?.id ? evidence : plan && <ProductionPlanFacts plan={plan}/>}
   </li>})}</ul>
-  {!loading && !incomplete && !filtered.length && <p className="pf-empty">{rows.length ? '沒有符合篩選條件的任務。' : '尚無任務'}</p>}
+  {!loading && !incomplete && !filtered.length && <p className="pf-empty">{rows.length ? '沒有符合篩選條件的任務。' : '此範圍尚無 Lark／本地流程任務'}</p>}
   {!seed && evidence}
   {children}
   {selectedRow?.task && <AssignmentTaskInspector key={selectedRow.id} assignment={selectedRow.task} people={details[selectedRow.nodeKey]?.assignable_people} plan={taskPlan} nodeLabel={nodes.find(n=>n.key===selectedRow.nodeKey)?.label || ''} busy={busy} reason={reason} mutate={m=>mutate(m)} nodeKey={selectedRow.nodeKey} onClose={()=>c.go({...c.route,task:undefined})}/>}

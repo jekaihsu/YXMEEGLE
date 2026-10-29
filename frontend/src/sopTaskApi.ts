@@ -20,7 +20,7 @@ export interface SopTask {
  isTest: boolean;
  larkSync: SopLarkSync;
  result?:{note:string; actorId:string; actorName:string; at:number}|null; completionBlockedReason?:string|null;
- allowedActions: string[]; suggestion: SopSuggestion|null; shared: boolean; conditional: boolean;
+ assignmentBlockedReason?:string; allowedActions: string[]; suggestion: SopSuggestion|null; shared: boolean; conditional: boolean;
  id: string; title: string; instructions: string|null; participants: Partial<Record<Role,string>>;
  applicability: Applicability; state: Lifecycle; revision: number; overdue: boolean; manual: boolean;
  dueDate: string|null; dateStatus: string; completionRule: string;
@@ -95,7 +95,7 @@ function task(v: unknown): SopTask {
  if (dueDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) throw malformed();
  const result=t.result==null?null:object(t.result);
  return {isTest: local.is_test == null ? false : bool(local.is_test), larkSync: parseLarkSync(t.lark_sync), result:result?{note:str(result.note),actorId:str(result.actor_id),actorName:str(result.actor_name),at:seconds(result.at)}:null,
-  completionBlockedReason:optStr(t.completion_blocked_reason),allowedActions: list(t.allowed_actions,str), suggestion: t.suggestion == null ? null : parseSuggestion(t.suggestion), shared: bool(t.is_shared), conditional: bool(t.is_conditional), id: str(t.id), title: str(t.title), instructions: optStr(t.instructions), participants, applicability: applicability(t.applicability),
+  assignmentBlockedReason:optStr(t.assignment_blocked_reason) ?? undefined,completionBlockedReason:optStr(t.completion_blocked_reason),allowedActions: list(t.allowed_actions,str), suggestion: t.suggestion == null ? null : parseSuggestion(t.suggestion), shared: bool(t.is_shared), conditional: bool(t.is_conditional), id: str(t.id), title: str(t.title), instructions: optStr(t.instructions), participants, applicability: applicability(t.applicability),
   state: lifecycle(t.state), revision: int(t.revision), overdue: bool(t.overdue), manual: origin.template_family_id === 'manual',
   dueDate, dateStatus: str(local.date_status), completionRule: str(local.completion_rule_status),
   nodes: list(t.nodes, n => {const l = object(n); return {node_key: node(l.node_key), node_id: str(l.node_id), order: int(l.order)}}),

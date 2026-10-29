@@ -11,7 +11,8 @@ from collections import OrderedDict
 # delegations) is always read fresh.
 KINDS=frozenset({'source_quotes','source_confirmations','contract_items'})
 TTL=30.0
-MAX_BYTES=160_000_000
+MAX_BYTES=32_000_000
+MAX_ENTRIES=16
 _guard=threading.Lock()
 _entries=OrderedDict()
 _flights={}
@@ -29,6 +30,9 @@ def invalidate(wid):
 def rows(key,fetch):
     if key[1] is None: return fetch()
     with _guard:
+        now=time.monotonic()
+        for expired in [k for k,v in _entries.items() if now-v[0]>=TTL]:
+            del _entries[expired]
         hit=_entries.get(key)
         if hit and time.monotonic()-hit[0]<TTL:
             _entries.move_to_end(key)
@@ -39,15 +43,19 @@ def rows(key,fetch):
             hit=_entries.get(key)
             if hit and time.monotonic()-hit[0]<TTL: return hit[2]
             generation=_generation
-        fetched=fetch()
-        size=sum(len(text) for _,text in fetched)
-        with _guard:
-            if generation==_generation:
-                _entries[key]=(time.monotonic(),size,fetched)
-                _entries.move_to_end(key)
-                while len(_entries)>1 and sum(entry[1] for entry in _entries.values())>MAX_BYTES: _entries.popitem(last=False)
-            if _flights.get(key) is flight: del _flights[key]
-        return fetched
+        try:
+            fetched=fetch()
+            size=sum(len(text.encode('utf-8')) for _,text in fetched)
+            with _guard:
+                if generation==_generation and size<=MAX_BYTES:
+                    _entries[key]=(time.monotonic(),size,fetched)
+                    _entries.move_to_end(key)
+                    while len(_entries)>MAX_ENTRIES or sum(entry[1] for entry in _entries.values())>MAX_BYTES:
+                        _entries.popitem(last=False)
+            return fetched
+        finally:
+            with _guard:
+                if _flights.get(key) is flight: del _flights[key]
 
 
 def drop_after_commit(db,wid):

@@ -66,3 +66,17 @@ def test_people_schema_accepts_single_and_multi_select_departments():
 def test_roster_rejects_columns_it_did_not_ask_for():
     with pytest.raises(Failure, match='未要求的欄位'):
         parse_roster([{'record_id': 'r', 'fields': {'姓名': '甲', '薪資': 1}}])
+
+
+def test_token_mint_timeout_respects_remaining_read_budget():
+    now = [0.0]
+    timeouts = []
+    def handler(request):
+        timeouts.append(request.extensions['timeout']['read'])
+        return httpx.Response(200, json={'tenant_access_token': 'fake', 'expire': 7200})
+    with BitableClient(CFG, NodeAssignmentConfig(), httpx.MockTransport(handler),
+                       token_cache=TenantTokenCache(clock=lambda: now[0]), bucket=NoBucket(),
+                       clock=lambda: now[0], budget_seconds=2) as client:
+        now[0] = 1.5
+        assert client._token() == 'fake'
+    assert timeouts == [.5]

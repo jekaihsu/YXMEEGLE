@@ -86,12 +86,12 @@ test('overview keeps suggestions distinct and count equals visible SOP plus Lark
  const assignments={state:{kind:'ready',data:list},revision:1,refreshing:false,pending:'',error:null,notice:'',mutate:async()=>true,reload:async()=>{}};
  const c={w:workspace,s:{user,features:{}},route:{view:'project',project:'p1',tab:'overview'},go:()=>{}};
  root=createRoot(document.getElementById('root'));await flush(()=>root.render(React.createElement(ui.ProjectOverview,{c,p:project,assignments,selectedKey:'control',sopTasks:sop,workbench:null})));
- assert.equal(document.querySelectorAll('.po-task-row').length,2);assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent.startsWith('查看全部任務')).textContent,'查看全部任務 (2) →');
- assert.ok(document.querySelector('.po-recommendation'));assert.equal(document.querySelector('.po-recommendation [aria-haspopup="listbox"]'),null);assert.equal(document.querySelector('.po-recommendation .ds-badge').textContent,'建議');
+ assert.equal(document.querySelectorAll('.po-task-row').length,2);assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent.startsWith('全部任務 · 待辦')).textContent,'全部任務 · 待辦 2 →');
+ assert.equal(document.querySelector('.po-recommendations').open,false);assert.equal(document.querySelector('.po-todos ul').firstElementChild.className,'po-task-row');assert.ok(document.querySelector('.po-recommendation'));assert.equal(document.querySelector('.po-recommendation [aria-haspopup="listbox"]'),null);assert.equal(document.querySelector('.po-recommendation .ds-badge').textContent,'建議');
 });
 
-test('unassigned Lark row without server assignment permission is plain text',async()=>{
- await mount({source:'lark',assign:false});assert.equal(document.querySelector('[aria-haspopup="listbox"]'),null);assert.match(document.body.textContent,/未指派/);assert.equal(byText('排定日期'),undefined);
+test('unassigned Lark row explains disabled assignment',async()=>{
+ await mount({source:'lark',assign:false});assert.equal(document.querySelector('[aria-haspopup="listbox"]'),null);assert.match(document.body.textContent,/未指派/);assert.match(document.querySelector('.po-assignment-reason').textContent,/節點主管/);assert.equal(document.querySelector('.po-task-executor button').disabled,true);assert.equal(byText('排定日期'),undefined);
 });
 test('unscheduled permitted task opens existing editor from date action',async()=>{
  await mount();await flush(()=>byText('排定日期').click());assert.deepEqual(route,{tab:'flow',node:'control',task:'sop-1',task_source:'sop_local'});
@@ -104,7 +104,7 @@ test('overview reads remote task details when summary has no embedded task paylo
  const assignments={state:{kind:'ready',data:list},revision:1,refreshing:false,pending:'',error:null,notice:'',mutate:async()=>true,reload:async()=>{}};
  const c={w:workspace,s:{user,features:{}},route:{view:'project',project:'p1',tab:'overview'},go:()=>{}};
  root=createRoot(document.getElementById('root'));await flush(()=>root.render(React.createElement(ui.ProjectOverview,{c,p:project,assignments,selectedKey:'control',sopTasks:sop,workbench:null})));
- assert.equal(reads.filter(url=>url.includes('/nodes/')).length,9);assert.equal(document.querySelectorAll('.po-task-row').length,1);assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent.startsWith('查看全部任務')).textContent,'查看全部任務 (1) →');assert.match(document.querySelector('.po-task-row').textContent,/控制點成果核對/);
+ assert.equal(reads.filter(url=>url.includes('/nodes/')).length,9);assert.equal(document.querySelectorAll('.po-task-row').length,1);assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent.startsWith('全部任務 · 待辦')).textContent,'全部任務 · 待辦 1 →');assert.match(document.querySelector('.po-task-row').textContent,/控制點成果核對/);
  await flush(()=>document.querySelector('.po-task-row [aria-haspopup="listbox"]').click());
  assert.deepEqual([...document.querySelectorAll('[role="option"]')].map(option=>option.textContent),['未指派',...detail.assignable_people.map(person=>person.name)]);
  assert.equal(reads.filter(url=>url.includes('sop-assignees')).length,0);

@@ -49,7 +49,7 @@ const projectRequests=new Map<string,Promise<ProjectSlice>>();
 const deniedProjects=new Set<string>();
 const latestProjectReads=new Map<string,Promise<ProjectSlice>>();
 function cachedProject(id:string|undefined){if(projectEpoch!==getSessionEpoch()){projectSnapshots.clear();projectRequests.clear();latestProjectReads.clear();deniedProjects.clear();projectEpoch=getSessionEpoch()}return id?projectSnapshots.get(id):undefined}
-const readProject=(id:string,epoch:number,overview:boolean)=>api<ProjectSlice>(`/api/projects/${encodeURIComponent(id)}${overview?'?overview=true':''}`,{timeoutMs:10000},()=>epoch===getSessionEpoch());
+const readProject=(id:string,epoch:number,overview:boolean)=>api<ProjectSlice>(`/api/projects/${encodeURIComponent(id)}${overview?'?overview=true':''}`,{timeoutMs:20000},()=>epoch===getSessionEpoch());
 function fetchProjectSnapshot(id:string,reloadVersion:number|string|undefined,overview=false){
  const scoped=`${id}:${overview}`;
  cachedProject(scoped);const key=JSON.stringify([scoped,reloadVersion]);const pending=projectRequests.get(key);if(pending)return pending;
@@ -73,18 +73,16 @@ function ProjectDetailContent({c}:{c:Ctx}){
   }
  },[shell,id,tab,c.s.workspace_id,sopRead,c.s.features?.node_assignment]);
  const snapshotVersion=useRef(0);
- const [retrying,setRetrying]=useState(false);
- const detail=useViewData<ProjectSlice|undefined>(shell?`project:${snapshotKey}`:'project-legacy',(_signal,current)=>{setRetrying(false);return shell&&id?fetchProjectSnapshot(id,`${c.reloadVersion}:${snapshotVersion.current}`,overview).catch(error=>{if(!(error instanceof ApiError)||error.code!=='client_timeout'||!current())throw error;setRetrying(true);return fetchProjectSnapshot(id,`${c.reloadVersion}:${snapshotVersion.current}`,overview)}).catch(async error=>{if(!(error instanceof ApiError)||error.status!==404)throw error;const sop=await prefetchSopTasks(id,c.s.workspace_id||'');const project=checklistProject(sop);if(!project)throw error;deniedProjects.delete(snapshotKey);return {scope:'project' as const,version:c.w.version,project}}):Promise.resolve(undefined)},[]);
+ const detail=useViewData<ProjectSlice|undefined>(shell?`project:${snapshotKey}`:'project-legacy',()=>{return shell&&id?fetchProjectSnapshot(id,`${c.reloadVersion}:${snapshotVersion.current}`,overview).catch(async error=>{if(!(error instanceof ApiError)||error.status!==404)throw error;const sop=await prefetchSopTasks(id,c.s.workspace_id||'');const project=checklistProject(sop);if(!project)throw error;deniedProjects.delete(snapshotKey);return {scope:'project' as const,version:c.w.version,project}}):Promise.resolve(undefined)},[]);
  const reloadSnapshot=useCallback(()=>{snapshotVersion.current++;detail.reload()},[detail.reload]);
  const refreshDetail=useDetailRefresh(reloadSnapshot,shell);
  useEffect(()=>{if(shell&&detail.data)perfMark('project-detail-render')},[shell,detail.data]);
  if(!shell)return <ProjectDetail key={id} c={c}/>;
  const cached=cachedProject(snapshotKey);const snapshot=id&&deniedProjects.has(snapshotKey)?undefined:detail.data||cached;
  const summary=c.w.projects.find(p=>p.id===id);
- const retryNotice=retrying&&detail.loading?<div><p role="status">仍在載入案件，正在重試…</p><Button onClick={()=>void (refreshDetail || detail.reload)()}>重試</Button></div>:null;
- if(!snapshot)return detail.error?<div className="project-detail project-detail-calm"><div role="alert"><Empty title={detail.error.includes('找不到')?'找不到這個案件':'案件讀取失敗'} detail={detail.error.includes('找不到')?'案件連結可能已失效，請回到案件總覽重新開啟。':detail.error}/></div><div className="co-actions"><Button onClick={()=>void (refreshDetail || detail.reload)()}>重試</Button><Button onClick={()=>c.go({view:'projects'})}>案件總覽</Button></div></div>:<div className="project-detail project-detail-calm">{summary?<><Button variant="plain" onClick={()=>c.go({view:'projects'})}><ChevronLeft size={15}/>案件總覽</Button><p>{summary.code}</p><h1>{summary.name}</h1>{!retrying&&<p role="status">正在載入案件詳細內容…</p>}</>:<Skeleton height="2.5rem" width="60%"/>}{retryNotice||!summary&&<p role="status">正在載入案件詳細內容…</p>}<Skeleton height="3rem"/><FlowWorkspaceSkeleton/></div>;
+ if(!snapshot)return detail.error?<div className="project-detail project-detail-calm"><div role="alert"><Empty title={detail.error.includes('找不到')?'找不到這個案件':'案件讀取失敗'} detail={detail.error.includes('找不到')?'案件連結可能已失效，請回到案件總覽重新開啟。':detail.error}/></div><div className="co-actions"><Button onClick={()=>void (refreshDetail || detail.reload)()}>重試</Button><Button onClick={()=>c.go({view:'projects'})}>案件總覽</Button></div></div>:<div className="project-detail project-detail-calm">{summary?<><Button variant="plain" onClick={()=>c.go({view:'projects'})}><ChevronLeft size={15}/>案件總覽</Button><p>{summary.code}</p><h1>{summary.name}</h1><p role="status">正在載入案件詳細內容…</p></>:<Skeleton height="2.5rem" width="60%"/>}{!summary&&<p role="status">正在載入案件詳細內容…</p>}<Skeleton height="3rem"/><FlowWorkspaceSkeleton/></div>;
  const {scope:_scope,version:_version,as_of:_asOf,project,...records}=snapshot;
- return <>{retryNotice}{detail.error&&<div className="form-error" role="alert">案件更新失敗，以下顯示上次載入的資料：{detail.error}<Button onClick={()=>void (refreshDetail || detail.reload)()}>重試</Button></div>}<ProjectDetail key={project.id} c={{...c,w:{...c.w,...records,projects:c.w.projects.some(p=>p.id===project.id)?c.w.projects.map(p=>p.id===project.id?project:p):[...c.w.projects,project]}}}/></>;
+ return <>{detail.error&&<div className="form-error" role="alert">案件更新失敗，以下顯示上次載入的資料：{detail.error}<Button onClick={()=>void (refreshDetail || detail.reload)()}>重試</Button></div>}<ProjectDetail key={project.id} c={{...c,w:{...c.w,...records,projects:c.w.projects.some(p=>p.id===project.id)?c.w.projects.map(p=>p.id===project.id?project:p):[...c.w.projects,project]}}}/></>;
 }
 export function ProjectDetail({c}:{c:Ctx}){
  const tabPrefetch=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);useEffect(()=>()=>clearTimeout(tabPrefetch.current),[]);

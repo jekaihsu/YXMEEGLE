@@ -65,7 +65,7 @@ def register(app, *, identity, load_case, sessions, cfg, quote_view=None, worksp
         roster_identity = data.get('mode') == 'lark' or user.get('oauth_identity', {}).get('open_id') == user['id']
         executor_transition = request.url.path.endswith('/transition') and (not assigned_only or service.participates(
             data['wid'], user['id'], project_id, executor_task_id=request.path_params['task_id']))
-        needs_authority = not project.get('sop_assigned_only') and not executor_transition and not (request.method == 'GET' and participant)
+        needs_authority = not project.get('sop_assigned_only') and not executor_transition
         if (ctx.roster_required and roster_identity and not global_manager(ctx) and needs_authority
                 and (ctx.roster is None or request.method != 'GET')):
             try:

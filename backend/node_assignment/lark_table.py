@@ -373,7 +373,11 @@ class BitableClient:
 
     def _token(self):
         def mint(credentials):
-            response = self.http.post(API + '/auth/v3/tenant_access_token/internal', json=credentials, timeout=15)
+            remaining = self.deadline - self.clock()
+            if remaining <= 0:
+                raise BudgetExceeded()
+            response = self.http.post(API + '/auth/v3/tenant_access_token/internal', json=credentials,
+                                      timeout=min(self.read_config.request_timeout_seconds, remaining))
             return response.json()
         try:
             return self.token_cache.get(self.cfg, mint, deadline=self.deadline)

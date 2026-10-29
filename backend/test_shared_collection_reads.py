@@ -187,3 +187,27 @@ def test_a_writer_reading_back_inside_its_own_transaction_sees_its_write_not_the
         inside = storage.load_partial(db, BusinessRow, row, collections=storage.CASE_COLLECTIONS,
                                       project_ids=[ids['intake']], filter_project_rows=True)
         assert any(q.get('marker') == 'mine' for q in inside['source_quotes'])
+
+
+def test_shared_cache_counts_utf8_bytes_and_rejects_oversized_entries(monkeypatch):
+    from . import shared_reads
+    monkeypatch.setattr(shared_reads, 'MAX_BYTES', 5)
+    shared_reads.invalidate(None)
+    assert shared_reads.rows(('w', 1), lambda: [('k', '中文')]) == [('k', '中文')]
+    assert not shared_reads._entries
+    assert not shared_reads._flights
+
+
+def test_shared_cache_bounds_small_entries_and_cleans_failed_flights(monkeypatch):
+    from . import shared_reads
+    monkeypatch.setattr(shared_reads, 'MAX_ENTRIES', 2)
+    shared_reads.invalidate(None)
+    for version in range(4):
+        shared_reads.rows(('w', version), lambda: [('k', 'x')])
+    assert len(shared_reads._entries) == 2
+    def fail():
+        raise RuntimeError('upstream unavailable')
+    with pytest.raises(RuntimeError):
+        shared_reads.rows(('w', 5), fail)
+    assert not shared_reads._flights
+    shared_reads.invalidate(None)

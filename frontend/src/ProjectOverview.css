@@ -29,3 +29,5 @@
 
 .po-todos>ul{height:24rem;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}.po-todos>ul>[aria-label="任務載入中"]{display:block}
 @media(max-width:759px){.po-todos>ul{height:22rem}}
+
+.po-assignment-reason{display:block;font-size:11px;color:var(--po-muted)}.po-recommendations{border-top:1px solid var(--po-border);margin-top:8px;padding-top:8px}.po-recommendations>summary{cursor:pointer;color:var(--po-muted);min-height:32px;align-content:center}

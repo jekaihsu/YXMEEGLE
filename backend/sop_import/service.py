@@ -615,11 +615,19 @@ class Service(EnrollmentService):
             found = None if ctx.assigned_only else suggestions.current(task, facts)
             found = None if found and (task.id, found['facts_hash']) in dismissed else found
             manager = can_manage_nodes(ctx, [l.node_key for l in links[task.id]])
+            policy_allowed = not policy or policy.policy == 'managed' and {l.node_key for l in links[task.id]} <= set(policy.node_keys)
+            actions = self.task_actions(ctx, task, found, manager) if policy_allowed else []
+            assignment_reason = None if 'edit' in actions else (
+                'SOP 任務修改尚未啟用' if not self.writes_enabled() else
+                '此節點尚未套用 SOP，請由案件主管確認' if not policy_allowed else
+                '人員名單暫不可用，無法確認指派權限，請重新載入' if ctx.roster_required and ctx.roster is None and not global_manager(ctx) else
+                '需由案件 PM、授權主管或此任務所有節點的主管指派' if not manager else
+                '已完成或封存的任務無法改派')
             views.append({**self.task_json(task, links[task.id], source), 'suggestion': found,
                           'lark_sync': sync[task.id] if self.projection else {'state': '未啟用', 'synced_at': None, 'record_id': None},
                           'can': {'manage': manager},
                           'completion_blocked_reason': self.completion_blocker(ctx, task, manager),
-                          'allowed_actions': self.task_actions(ctx, task, found, manager) if (not policy or policy.policy == 'managed' and {l.node_key for l in links[task.id]} <= set(policy.node_keys)) else []})
+                          'assignment_blocked_reason': assignment_reason, 'allowed_actions': actions})
         return views
 
     def completion_blocker(self, ctx, task, manager=None):

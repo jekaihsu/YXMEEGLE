@@ -19,6 +19,7 @@ export function OverviewTaskRow({row,projectId,today,sop,assignments,people=[],l
  useEffect(()=>{if(menu)menuRoot.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()},[menu]);
  const close=()=>{setMenu(false);menuRoot.current?.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')?.focus()};
  const canAssign=row.kind==='sopTask'?row.permissions.includes('edit'):row.permissions.assign;
+ const assignmentReason=row.kind==='sopTask'?row.task.assignmentBlockedReason||'需有此任務的指派權限':'需由案件 PM、授權主管或此節點主管指派';
  const canEdit=row.kind==='sopTask'?row.permissions.includes('edit'):row.permissions.edit_details;
  const status=row.kind==='sopTask'?({pending:'待處理',in_progress:'進行中',blocked:'受阻',done:'已完成',archived:'已封存'})[row.task.state]:row.task.status;
  const overdue=row.kind==='sopTask'?row.task.overdue:!!row.deadline&&row.deadline.slice(0,10)<today.slice(0,10)&&status!=='已完成';
@@ -47,7 +48,7 @@ export function OverviewTaskRow({row,projectId,today,sop,assignments,people=[],l
  };
  return <li className="po-task-row" aria-busy={saving}>
   <div className="po-task-title"><a href={href} onClick={e=>{e.preventDefault();go(row.target)}}>{row.title} · {row.node.label}</a>{row.node.progress.basis==='tasks'&&<small>節點 {row.node.tasks.done}/{row.node.tasks.total} 已完成</small>}</div>
-  <div className="po-task-executor">{canAssign?<AssigneePicker projectId={row.kind==='sopTask'?projectId:undefined} people={row.kind==='larkTask'?people.map(p=>({id:p.open_id,name:p.name})):undefined} nodeKey={row.node.key} title={row.title} value={row.ownerId} valueLabel={row.ownerId?row.owner:'指派'} busy={busy||locked} onChange={person=>void assign(person)}/>:<span>{row.ownerId?row.owner:'未指派'}</span>}</div>
+  <div className="po-task-executor">{canAssign?<AssigneePicker projectId={row.kind==='sopTask'?projectId:undefined} people={row.kind==='larkTask'?people.map(p=>({id:p.open_id,name:p.name})):undefined} nodeKey={row.node.key} title={row.title} value={row.ownerId} valueLabel={row.ownerId?row.owner:'指派'} busy={busy||locked} onChange={person=>void assign(person)}/>:<div><Button disabled aria-label={`指派 ${row.title}：${assignmentReason}`} title={assignmentReason}>{row.ownerId?row.owner:'未指派'}</Button><small className="po-assignment-reason">{assignmentReason}</small></div>}</div>
   <Badge tone={status==='受阻'?'warning':status==='已完成'?'positive':undefined}>{status}</Badge>
   <div className="po-task-date">{row.deadline?<><time dateTime={row.deadline}>{row.deadline.slice(0,10)}</time>{overdue&&<span>已逾期</span>}</>:canEdit?<Button disabled={locked||busy} onClick={()=>go(row.target)}>排定日期</Button>:<span>未排定日期</span>}</div>
   <div ref={menuRoot} className="po-task-menu" onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget))setMenu(false)}}>

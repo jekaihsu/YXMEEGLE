@@ -68,3 +68,38 @@ def test_global_manager_cold_reads_do_not_refresh_roster(h):
     assert h.client.get(URL + '/sop-tasks').status_code == 200
     assert h.client.get(URL + '/sop-assignees').status_code == 200
     assert h.client.post(URL + '/sop/ensure').json() == {'state': 'started'}
+
+
+def test_cold_roster_participant_recovers_node_manager_controls(h):
+    post(h, URL + '/sop-tasks', {'title': 'Managed task', 'node_keys': ['pm'],
+                               'participants': {'executor': 'member'}})
+    h.service.roster_required = True
+    h.who[0] = 'member'
+    h.users['member']['capabilities'] = []
+    calls = []
+    def provider(fresh=False):
+        if fresh:
+            calls.append(True)
+            return roster()
+        return None
+    h.service.roster_provider = provider
+    result = h.client.get(URL + '/sop-tasks')
+    assert result.status_code == 200
+    task = result.json()['tasks'][0]
+    assert 'edit' in task['allowed_actions']
+    assert task['assignment_blocked_reason'] is None
+    assert calls == [True]
+
+
+def test_unavailable_roster_explains_disabled_assignment(h):
+    post(h, URL + '/sop-tasks', {'title': 'X', 'node_keys': ['pm']})
+    h.service.roster_required = True
+    h.who[0] = 'member'
+    def provider(fresh=False):
+        if fresh:
+            raise Failure('roster_unavailable', 503)
+        return None
+    h.service.roster_provider = provider
+    task = h.client.get(URL + '/sop-tasks').json()['tasks'][0]
+    assert 'edit' not in task['allowed_actions']
+    assert '人員名單暫不可用' in task['assignment_blocked_reason']
