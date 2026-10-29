@@ -1,6 +1,8 @@
 # Case detail snapshot follow-up — 2026-10-29
 
-**Latest verified runtime: `04286c29ed8c250a712de808d153a2feb4b69f4a`. Performance acceptance: NOT MET.** One cached first-screen response and portfolio response caching are deployed. Warm handlers are fast; measured delivery delays independently exceed the SLA. Cold rebuild cost remains an application optimization opportunity. Final results and remaining items are at the end of this report.
+Latest follow-up: [wire delivery, precompression, conditional reads and pagination](CASE_DETAIL_WIRE_PERF_20261029.md), verified staging runtime `62a4174`.
+
+**Runtime verified in this report: `04286c29ed8c250a712de808d153a2feb4b69f4a`. Performance acceptance: NOT MET.** One cached first-screen response and portfolio response caching are deployed. Warm handlers are fast; measured delivery delays independently exceed the SLA. Cold rebuild cost remains an application optimization opportunity. Final results and remaining items are at the end of this report.
 
 Worktree: `/Users/vc/Local/YXMEEGLE-worktrees/case-detail-perf`, starting at `28c62fe`. Only the requested staging app and database are in scope. Production and the bare repository are not modified.
 

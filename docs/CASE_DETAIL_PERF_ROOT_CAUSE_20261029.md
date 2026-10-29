@@ -1,6 +1,6 @@
 # Case detail performance investigation — 2026-10-29
 
-Latest follow-up: [snapshot implementation and verified 04286c2 staging measurements](CASE_DETAIL_SNAPSHOT_PERF_20261029.md). The acceptance target is still not met; that report supersedes the release measurements below.
+Latest follow-up: [wire delivery and verified 62a4174 staging measurements](CASE_DETAIL_WIRE_PERF_20261029.md); earlier [snapshot implementation](CASE_DETAIL_SNAPSHOT_PERF_20261029.md). The acceptance target is still not met; that report supersedes the release measurements below.
 
 Worktree: `/Users/vc/Local/YXMEEGLE-worktrees/case-detail-perf`. Only staging app `6abc0821454b8f31a5ef614a` and staging PostgreSQL `6abc081caa61051740e67fbd` were used. Production was not accessed or deployed.
 
