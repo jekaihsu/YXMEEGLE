@@ -127,6 +127,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
         database_path=make_url(db_url).database
         if database_path and database_path!=':memory:': Path(database_path).resolve().parent.mkdir(parents=True,exist_ok=True)
     engine=create_engine(db_url,connect_args={'check_same_thread':False,'timeout':20} if db_url.startswith('sqlite') else {},pool_pre_ping=True)
+    from .request_timing import instrument_database
+    instrument_database(engine)
     from .sop_import import models as sop_import_models
     Base.metadata.create_all(engine); sessions=sessionmaker(engine,expire_on_commit=False,info={'index_tables':str(cfg.get('INDEX_TABLES_ENABLED','false')).lower()=='true'})
     # Migration is reversible: preserve the original JSON before normalizing.
@@ -136,6 +138,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
     upload_dir=Path(cfg.get('UPLOAD_DIR','./backend/uploads')).resolve(); upload_dir.mkdir(parents=True,exist_ok=True)
     @asynccontextmanager
     async def lifespan(app):
+        import asyncio
+        from .request_timing import monitor_loop
+        loop_monitor=asyncio.create_task(monitor_loop())
         try:
             tenant=cfg.get('LARK_WORKER_ORGANIZATION')
             if tenant and tenant in allowed_tenants:
@@ -147,11 +152,15 @@ def create_app(overrides=None,*,dispatch_transport=None):
             app.state.sop_projection.start()
             yield
         finally:
+            loop_monitor.cancel()
             app.state.sop_projection.close()
             app.state.people_attendance.close()
             app.state.live_read.close()
 
     app=FastAPI(title='詠翔專案工作台',docs_url=None if production else '/api/docs',lifespan=lifespan); app.state.engine=engine; app.state.sessions=sessions; app.state.signer=signer
+    from .request_timing import TimedRoute, RequestTimingMiddleware
+    app.router.route_class=TimedRoute
+    app.add_middleware(RequestTimingMiddleware)
     app.state.cfg=cfg; app.state.upload_dir=upload_dir
     from starlette.exceptions import HTTPException as StarletteHTTPException
     @app.exception_handler(StarletteHTTPException)
@@ -281,12 +290,20 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 row.data=storage.save(db,BusinessRow,wid,data)
 
     def load(db,row,*,collections=None,project_ids=None,omit_kinds=(),project_details=True,case_sources=False):
+        from .request_timing import measure
+        with measure('storage'):
+            return load_state(db,row,collections=collections,project_ids=project_ids,omit_kinds=omit_kinds,project_details=project_details,case_sources=case_sources)
+
+    def load_state(db,row,*,collections=None,project_ids=None,omit_kinds=(),project_details=True,case_sources=False):
+        from .request_timing import measure
         if project_ids is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections if collections is not None else storage.DETAIL_COLLECTIONS,project_ids=project_ids,project_children=storage.PROJECT_CHILDREN,filter_project_rows=True,project_details=project_details,case_sources=case_sources)
         elif collections is not None: state=storage.load_partial(db,BusinessRow,row,collections=collections)
         elif omit_kinds: state=storage.load(db,BusinessRow,row,omit_kinds=omit_kinds)
         else: state=storage.load(db,BusinessRow,row)
-        state=upgrade(state,generate_sop_candidate=collections is None or 'sop_templates' in collections)
-        return seal(db,row,state)
+        with measure('upgrade'):
+            state=upgrade(state,generate_sop_candidate=collections is None or 'sop_templates' in collections)
+        with measure('seal'):
+            return seal(db,row,state)
 
     def seal(db,row,state,*,scoped=False):
         from .workspace_seal import seal as seal_workspace

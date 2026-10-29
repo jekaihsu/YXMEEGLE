@@ -4,6 +4,8 @@ The client can only address the configured tables. Writes additionally pass the
 code-level formal write allowlist, run once (never retried on an uncertain
 outcome) and re-check the caller's authority right before each request.
 """
+from ..request_timing import measure
+
 import hashlib
 import json
 import logging
@@ -384,6 +386,7 @@ class BitableClient:
         except (TokenError, BudgetExceeded, httpx.HTTPError, ValueError):
             raise Failure('lark_unavailable', 'Lark 應用授權暫時無法取得') from None
 
+    @measure('upstream')
     def _call(self, method, path, *, write=False, params=None, json=None):
         if self.deny:
             raise Failure('lark_unavailable', 'Lark 連線已停用')

@@ -134,7 +134,9 @@ class StaleCache:
         if background:
             return Cached(entry.value, True, entry.fetched_at, 'refreshing')
         try:
-            return future.result()
+            from ..request_timing import measure
+            with measure('lockwait'):
+                return future.result()
         except Exception as exc:
             if not permission_failure(exc) and stale:
                 return Cached(entry.value, True, entry.fetched_at, getattr(exc, 'code', type(exc).__name__))

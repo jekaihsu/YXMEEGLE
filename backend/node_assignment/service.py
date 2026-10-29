@@ -361,8 +361,9 @@ class NodeAssignmentService:
         try:
             code = self.open(ctx)
             with ThreadPoolExecutor(max_workers=2) as pool:
-                roster_future = pool.submit(self._roster, fresh=False, calls=calls)
-                case_future = pool.submit(self._case, ctx, code, calls)
+                from contextvars import copy_context
+                roster_future = pool.submit(copy_context().run, self._roster, fresh=False, calls=calls)
+                case_future = pool.submit(copy_context().run, self._case, ctx, code, calls)
                 roster, cached = roster_future.result(), case_future.result()
             cache_status = 'stale' if cached.stale else ('miss' if calls else 'hit')
             people = roster.value if roster else None
