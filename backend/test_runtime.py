@@ -209,6 +209,8 @@ def test_live_child_shuts_down_cleanly_without_web_import_or_network(tmp_path):
                 assert process.poll() is None,output.read_text()
                 time.sleep(.02)
             assert 'live refresh worker ready' in output.read_text()
+            if hasattr(os,'getpriority'):
+                assert os.getpriority(os.PRIO_PROCESS,process.pid)>=10
             process.terminate()
             process.wait(timeout=8)
             assert process.returncode==0,output.read_text()

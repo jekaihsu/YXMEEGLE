@@ -2,6 +2,7 @@
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, Future
 import asyncio
 import multiprocessing
+import os
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -30,6 +31,10 @@ def ensure_visible_logs():
         handler=logging.StreamHandler();handler.setFormatter(logging.Formatter('%(levelname)s:     %(name)s %(message)s'));logger.addHandler(handler)
 
 
+def background_priority():
+    if hasattr(os,'nice'): os.nice(10)
+
+
 def build_data(reader, base, previous_fingerprint=None):
     """Picklable read/normalization job. No app, locks or request state crosses processes."""
     raw=reader.read()
@@ -48,7 +53,7 @@ class SnapshotStore:
         self.budget=setting(cfg,'REPORTS_COLD_WAIT_SECONDS',20,.01,60)
         self.base=cfg.get('LARK_REPORT_BASE_TOKEN',compute.BASE_TOKEN)
         self._lock=Lock();self._executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix='reports')
-        self._process=(ProcessPoolExecutor(max_workers=1,mp_context=multiprocessing.get_context('spawn'))
+        self._process=(ProcessPoolExecutor(max_workers=1,mp_context=multiprocessing.get_context('spawn'),initializer=background_priority)
                        if str(cfg.get('REPORTS_WORKER_PROCESS','false')).lower()=='true' else None)
         self._future=None;self._snapshot=None;self._last_request=None;self._retry_at=0;self._refresh_error=False
 

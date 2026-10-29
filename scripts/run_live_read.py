@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
 
 
 def main():
+    if hasattr(os,'nice'): os.nice(10)
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from backend.models import WorkspaceRow, BusinessRow, PersonRow, AuthRow, CacheRow
