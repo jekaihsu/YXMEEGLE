@@ -350,6 +350,11 @@ class RefreshCoordinator:
                     future.add_done_callback(lambda _: slots.release())
                     with self._lock:
                         self._futures[key] = future
+                    def discard(completed):
+                        with self._lock:
+                            if self._futures.get(key) is completed:
+                                self._futures.pop(key, None)
+                    future.add_done_callback(discard)
                 except Exception:
                     slots.release()
                     self._submission_failed(key, row)

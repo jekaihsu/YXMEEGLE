@@ -83,6 +83,8 @@ def worker_status(sessions,cache_row,now):
     heartbeat,heartbeat_age=timestamp(data.get('at'),now)
     result.update(last_success_at=success,success_age_seconds=success_age,
                   last_heartbeat_at=heartbeat,heartbeat_age_seconds=heartbeat_age)
+    depth = data.get('queue_depth')
+    result['queue_depth'] = depth if isinstance(depth, int) and depth >= 0 else None
     reported=data.get('status')
     result['reported_status']=reported if reported in ('ok','running','degraded') else 'unknown'
     if heartbeat_age is None: result['status']='invalid'
@@ -142,6 +144,9 @@ def snapshot(sessions,cache_row,cfg,*,now=None,workspace_model=None,coordinator=
             'scope':'runtime_only','external_integrations_verified':False,
             'backup_archive_verified_by_this_request':False}
     if live_read is not None: result['live_read']=live_read
+    from .resource_gauge import processes
+    result['resources'] = {'processes': processes()}
+
     return result
 
 
@@ -157,4 +162,11 @@ def register(app,identity,sessions,CacheRow,cfg,*,workspace_model=None,coordinat
         if not (tenant and data.get('mode')=='lark' and (data.get('wid')=='lark-'+tenant or recovery)
                 and user.get('role')=='manager' and user.get('active',True)):
             raise HTTPException(403,'僅公司正式工作區管理員可查看維護狀態')
-        return JSONResponse(snapshot(sessions,CacheRow,cfg,workspace_model=workspace_model,coordinator=coordinator),headers={'Cache-Control':'no-store'})
+        result = snapshot(sessions,CacheRow,cfg,workspace_model=workspace_model,coordinator=coordinator)
+        reads = getattr(app.state, 'read_snapshots', None)
+        if reads:
+            with reads.lock:
+                result['resources']['read_snapshots'] = dict(entries=len(reads.entries),
+                    bytes=sum(len(entry[1]) for entry in reads.entries.values()),
+                    limit_bytes=reads.max_bytes, queue_depth=len(reads.flights))
+        return JSONResponse(result,headers={'Cache-Control':'no-store'})

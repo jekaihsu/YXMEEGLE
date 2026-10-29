@@ -132,7 +132,6 @@ def main():
     commands = [
         ('web', [sys.executable, '-m', 'uvicorn', 'backend.app:app', '--host', '0.0.0.0', '--port', port, '--proxy-headers', '--forwarded-allow-ips='+os.getenv('FORWARDED_ALLOW_IPS','127.0.0.1'), '--no-access-log']),
         ('worker', [sys.executable, str(ROOT/'scripts'/'run_worker.py')]),
-        ('live', [sys.executable, str(ROOT/'scripts'/'run_live_read.py')]),
     ]
     if os.getenv('BACKUP_DIR'):
         commands.append(('backup',[sys.executable,str(ROOT/'scripts'/'backup_schedule.py')]))

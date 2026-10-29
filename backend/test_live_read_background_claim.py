@@ -97,3 +97,24 @@ def test_immediate_claim_failure_returns_an_error_to_nonblocking_caller(harness,
     assert result['status'] == 'error'
     assert result['last_error'] == 'Lark refresh failed'
     assert h.calls == []
+
+
+def test_completed_failure_releases_refresh_working_set(harness):
+    import gc
+    import weakref
+    h = harness
+    observed = []
+    class WorkingSet:
+        pass
+    def fail(wid):
+        working = WorkingSet()
+        observed.append(weakref.ref(working))
+        raise RuntimeError('failed bulk read')
+    coordinator = RefreshCoordinator(h.sessions, CacheRow, {'sources': fail}, h.cfg)
+    try:
+        with pytest.raises(RuntimeError):
+            coordinator.ensure(h.wid, 'sources', wait=True)
+        gc.collect()
+        assert observed and observed[0]() is None
+    finally:
+        coordinator.close()

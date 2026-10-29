@@ -7,6 +7,7 @@ COPY backend/report_link_vocabulary.json /build/backend/report_link_vocabulary.j
 RUN npm run build
 
 FROM python:3.12-slim AS runtime
+ENV MALLOC_ARENA_MAX=2 MALLOC_TRIM_THRESHOLD_=131072
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PORT=8080 UPLOAD_DIR=/data/uploads APP_ENV=production DEMO_MODE=false
 WORKDIR /app
 COPY backend/requirements.lock ./backend/requirements.lock

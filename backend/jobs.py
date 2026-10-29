@@ -255,7 +255,28 @@ class Worker:
             raise RemoteFailure('業主裁示停用：能力與訓練紀錄禁止回寫','blocked')
         return state,actor
 
+    def has_work(self, wid):
+        """Cheap preflight only. Any execution still reloads and fences full state."""
+        from .features import resolve_features
+        if resolve_features(self.cfg)['routines']: return True
+        with self.sessions() as db:
+            row = db.get(self.W, wid)
+            if row is None: return False
+            if row.data.get('storage_schema') != 2: return True
+            state = storage.load_partial(db, self.B, row, collections=('jobs', 'delegations'))
+            if any(j.get('status') in ('queued', 'running') or
+                   j.get('kind') in ('capability', 'training_record') and not j.get('policy_blocked_at')
+                   for j in state['jobs']): return True
+            if any(d.get('source') == 'approval' and d.get('status') == 'active' and
+                   d.get('end_date', '') >= now()[:10] for d in state['delegations']): return True
+            # A pending task without a start date cannot activate on a timer.
+            return db.scalar(select(self.B.entity_id).where(self.B.workspace_id == wid,
+                self.B.kind == 'tasks', self.B.data['status'].as_string() == 'pending',
+                self.B.data['start_date'].as_string() <= now()[:10],
+                self.B.data['start_date'].as_string() != '').limit(1)) is not None
+
     def run_one(self,wid):
+        if not self.has_work(wid): return None
         self.refresh_delegations(wid)
         with self.sessions.begin() as db:
             row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update()); state=self.state(db,row); before=deepcopy(state); schedule(state,cfg=self.cfg)

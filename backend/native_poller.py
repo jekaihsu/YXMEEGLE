@@ -149,6 +149,9 @@ class NativeApprovalPoller:
         with self.sessions() as db:
             row=db.get(self.W,wid)
             if not row:return []
+            preview=storage.load_partial(db,self.B,row,collections=tuple(c for c in COLLECTIONS if c in storage.COLLECTIONS))
+            if not any(i.get('native_binding',{}).get('attempted') and not i.get('simulated')
+                       for c in COLLECTIONS for i in preview.get(c,[])): return []
             state=self._load(db,row)
             candidates=[(c,i['id'],i.get('native_poll_status',{}).get('last_attempt_at') or '')
                         for c in COLLECTIONS for i in state.get(c,[])

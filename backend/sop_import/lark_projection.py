@@ -249,6 +249,13 @@ class Projection:
                         or self._case_retry.get((wid, pid), (0, 0))[0] > self.clock()):
                     continue
                 try:
+                    # Check the small durable queue before decoding the workspace.
+                    with self.sessions() as db:
+                        rows = self.current_rows(db, wid, pid)
+                        receipt = db.get(LarkReconcile, (wid, pid))
+                        pending = any(r.state not in {'done', 'paused'} and r.retry_at <= self.clock() for r in rows)
+                        if not pending and receipt and receipt.checked_at > self.clock() - 600:
+                            continue
                     if wid in state_errors:
                         raise state_errors[wid]
                     if wid not in states:
