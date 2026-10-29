@@ -250,3 +250,24 @@ def test_shell_validator_survives_clock_aging_but_not_freshness_errors(tmp_path,
         changed = shell_get(client, tag)
         assert changed.status_code == 200 and changed.headers['etag'] != tag
         assert changed.json()['freshness']['datasets']['sources']['status'] == 'error'
+
+
+def test_blocked_deferred_progress_does_not_queue_shell(tmp_path):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    entered, release = threading.Event(), threading.Event()
+    with scaled_client(tmp_path, 6, **ON) as (app, client), ThreadPoolExecutor(max_workers=2) as pool:
+        switch(client, 'u-pm')
+        def blocked():
+            entered.set()
+            assert release.wait(5)
+            return b'progress'
+        work = pool.submit(app.state.progress_snapshots.get, ('slow-progress',), blocked)
+        try:
+            assert entered.wait(2)
+            response = pool.submit(shell_get, client).result(timeout=2)
+            assert response.status_code == 200
+            assert not work.done()
+        finally:
+            release.set()
+        assert work.result(timeout=2)[0] == b'progress'

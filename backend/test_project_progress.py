@@ -655,3 +655,21 @@ def test_progress_cache_rebuilds_for_new_report_snapshot(progress):
         assert changed.headers['etag'] != first.headers['etag']
     finally:
         reports.close()
+
+
+def test_progress_cache_does_not_hide_a_source_read_error(progress, monkeypatch):
+    from copy import deepcopy
+    run, client, app = progress
+    app.state.sessions.configure(info={'index_tables': True})
+    state, vis, _ = chain_state()
+    first = run(state, vis)
+    status = app.state.live_read.status
+    def failed(wid):
+        value = deepcopy(status(wid))
+        value['datasets']['sources'].update(status='error', last_error='read failed')
+        return value
+    monkeypatch.setattr(app.state.live_read, 'status', failed)
+    changed = client.get(f'/api/projects/{vis}/progress', headers={'If-None-Match': first.headers['etag']})
+    assert changed.status_code == 200
+    assert changed.headers['etag'] != first.headers['etag']
+    assert changed.json()['sources']['source_status'] == 'error'

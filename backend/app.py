@@ -168,6 +168,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 warmup.cancel()
                 await asyncio.gather(warmup,return_exceptions=True)
             await asyncio.to_thread(app.state.read_snapshots.close)
+            await asyncio.to_thread(app.state.progress_snapshots.close)
             app.state.sop_projection.close()
             app.state.people_attendance.close()
             app.state.live_read.close()
@@ -219,6 +220,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
     from .build_identity import read_build_identity
     shell_wire_revision=json.dumps(read_build_identity(),sort_keys=True)
     app.state.read_snapshots = read_snapshots
+    progress_snapshots=ReadSnapshots(max_bytes=1_000_000)
+    app.state.progress_snapshots=progress_snapshots
 
     @app.middleware('http')
     async def invalidate_read_snapshots(request, call_next):
@@ -228,6 +231,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
             # Also fence ambiguous failures after a write may already have committed.
             if request.method not in ('GET', 'HEAD', 'OPTIONS'):
                 read_snapshots.invalidate()
+                progress_snapshots.invalidate()
 
     def snapshot_viewer(user):
         # Admission uses the fresh timestamp before this key is computed. A new
@@ -1432,14 +1436,18 @@ def create_app(overrides=None,*,dispatch_transport=None):
         if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true': reports=ReportsView(status='disabled')
         elif not privileged or data.get('mode')!='lark' or data['wid'].startswith(('test-','demo-')): reports=ReportsView(status='restricted')
         else: reports=ReportsView(getattr(app.state,'reports',None))
+        app.state.live_read.ensure(data['wid'],'sources')
+        source_freshness=app.state.live_read.status(data['wid'])['datasets']['sources']
+        source_fence=json.dumps({k:v for k,v in source_freshness.items() if k!='age_seconds'},sort_keys=True)
         with sessions() as db:
+            source_generation=p2_generation(db,data['wid'])
             row=db.get(WorkspaceRow,data['wid'])
             version=row.version
             from . import index_reads
             cacheable=index_reads.ready(db,BusinessRow,row)
             visibility_revision=snapshot_visibility(db,row,project_id)
         key=('progress',data['wid'],project_id,version,visibility_revision,json.dumps(data,sort_keys=True),
-             snapshot_viewer(user),reports.status,reports.fetched_at,reports.stale)
+             snapshot_viewer(user),reports.status,reports.fetched_at,reports.stale,json.dumps(source_generation,sort_keys=True),source_fence)
         def build():
             child=Request(dict(request.scope,state={},phases={}))
             fresh_data,fresh_user=identity(child)
@@ -1453,7 +1461,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
             result['sources']['can_refresh_sources'],result['sources']['refresh_reason']=source_refresh_permission(fresh_data,fresh_user)
             return EncodedSnapshot.encode(JSONResponse(result).body)
         with phase(request,'snapshot'):
-            body,status=read_snapshots.get(key,build,revision=version) if cacheable else (build(),'uncached')
+            body,status=progress_snapshots.get(key,build,revision=version) if cacheable else (build(),'uncached')
+        with sessions() as db: unchanged=p2_generation(db,data['wid'])==source_generation
+        if not unchanged:
+            body,status=build(),'uncached'
         return body.response(request,status)
 
     @app.get('/api/case-detail/{project_id}')
