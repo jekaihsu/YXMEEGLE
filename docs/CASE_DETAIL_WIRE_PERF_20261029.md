@@ -1,5 +1,7 @@
 # Case-detail wire delivery follow-up — 2026-10-29
 
+Latest follow-up: [container resource attribution, fixes and final staging validation](CASE_DETAIL_RESOURCE_PERF_20261029.md).
+
 Continuation from [snapshot perf](CASE_DETAIL_SNAPSHOT_PERF_20261029.md) and [root-cause investigation](CASE_DETAIL_PERF_ROOT_CAUSE_20261029.md). Worktree `case-detail-perf`, starting `dd97a71`. Only the existing staging app/DB are in scope. No spending, resource-plan changes, production deployment, or service suspension.
 
 ## Baseline: payload and delivery
