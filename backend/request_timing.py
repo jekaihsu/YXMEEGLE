@@ -69,7 +69,8 @@ class TimedRoute(APIRoute):
                 finally:
                     if current:
                         current.add('cpu', thread_time() - cpu)
-        super().__init__(path, wrapped, **kwargs)
+        super().__init__(path, endpoint, **kwargs)
+        self.dependant.call = wrapped
 
 
 def instrument_database(engine):
@@ -110,7 +111,7 @@ class RequestTimingMiddleware:
                 status = message['status']
                 timing.values['looplag'] = max((lag for at, lag in _loop_lags if at >= timing.started), default=0)
                 values = dict(timing.values)
-                if scope['path'] != '/api/health':
+                if scope['path'] != '/api/health' and status < 400:
                     entries = ', '.join(f'{k};dur={v*1000:.1f}' for k, v in values.items() if k != 'queries')
                     headers = list(message.get('headers', []))
                     existing = next((v for k, v in headers if k.lower() == b'server-timing'), None)

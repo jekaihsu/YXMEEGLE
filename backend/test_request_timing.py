@@ -2,7 +2,7 @@ import asyncio
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 
@@ -24,8 +24,16 @@ def test_sync_worker_timings_include_database_and_upstream():
             pass
         return {'ok': True}
 
+    @app.get('/api/hidden')
+    def hidden():
+        raise HTTPException(404, 'missing')
+
+    assert next(route.endpoint for route in app.routes if route.path == '/api/read') is read
     with TestClient(app) as client:
         response = client.get('/api/read')
+        denied = client.get('/api/hidden')
+        assert denied.status_code == 404
+        assert 'server-timing' not in denied.headers
     assert response.json() == {'ok': True}
     names = {entry.strip().split(';')[0] for entry in response.headers['server-timing'].split(',')}
     assert {'queue', 'handler', 'cpu', 'dbpool', 'db', 'upstream', 'looplag'} <= names
