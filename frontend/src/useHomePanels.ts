@@ -117,10 +117,22 @@ export function useHomePanels(c:Ctx, query:HomeQuery, enabled=true, full=false):
    });
   };
   load();
-  const timer = window.setInterval(load,60000);
-  const visible = () => {if(document.visibilityState==='visible')load()};
+  let lastActivity=Date.now();
+  const active=()=>{const idle=Date.now()-lastActivity>=180000;lastActivity=Date.now();if(idle)load()};
+  let timer:number;
+  const schedule=()=>{timer=window.setTimeout(()=>{
+   if(Date.now()-lastActivity<180000)load();
+   if(!disposed)schedule();
+  },270000+Math.random()*60000)};
+  schedule();
+  const visible=()=>{if(document.visibilityState==='visible'){lastActivity=Date.now();load()}};
   document.addEventListener('visibilitychange',visible);
-  return () => {disposed=true;controller?.abort();window.clearInterval(timer);document.removeEventListener('visibilitychange',visible)};
+  for(const event of ['pointerdown','keydown','wheel'])window.addEventListener(event,active,{passive:true});
+  return ()=>{
+   disposed=true;controller?.abort();window.clearTimeout(timer);
+   document.removeEventListener('visibilitychange',visible);
+   for(const event of ['pointerdown','keydown','wheel'])window.removeEventListener(event,active);
+  };
  }, [key,url,scope,enabled,c.reloadVersion??c.w.version,retryTick]);
  if(!enabled)return {body:null,pending:false,error:null};
  const read=state.key===key?state.read:{body:cachedSnapshot(key) ?? (state.scope===scope?state.read.body:null),pending:true,error:null};
