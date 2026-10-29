@@ -1,5 +1,7 @@
 # Case detail snapshot follow-up — 2026-10-29
 
+**Latest verified runtime: `04286c29ed8c250a712de808d153a2feb4b69f4a`. Performance acceptance: NOT MET.** One cached first-screen response and portfolio response caching are deployed. Warm handlers are fast; measured delivery delays independently exceed the SLA. Cold rebuild cost remains an application optimization opportunity. Final results and remaining items are at the end of this report.
+
 Worktree: `/Users/vc/Local/YXMEEGLE-worktrees/case-detail-perf`, starting at `28c62fe`. Only the requested staging app and database are in scope. Production and the bare repository are not modified.
 
 ## Before: attribute the browser/ASGI gap
@@ -25,7 +27,7 @@ Raw evidence: ignored `.runtime/case-detail-perf/round3-{before-probes,cpu,memor
 
 ## Validation / staging acceptance
 
-Release measurements and exact served SHA will be recorded after staging deployment and five minutes of health 200 on that SHA. The prior runtime's SLA failure remains the baseline until that verification completes.
+Release checkpoints and the final verified SHA are recorded below. The acceptance target remains unmet; final measured results take precedence over intermediate experiments.
 
 Pre-release checks: 72 focused backend tests pass, including reader parity, failed/oversized cache entries, stale single-flight, post-write fencing, viewer isolation, and persisted portfolio behavior. All 23 frontend hook commands ran; 22 pass, with only the documented baseline `test:shell-mode` assertion failure. The rendered first-screen regression verifies status and task rows together and no separate heavy API reads. Full backend hook result is recorded with release evidence below.
 
@@ -69,3 +71,48 @@ Screenshot QA caught a correctness regression in the persisted-only variant: it 
 Read-only interaction: clicking an overview SOP task opens its matching visible detail dialog with source evidence and existing denied-write controls; no alerts or errors. An additional all-tasks navigation check changed URL and pressed state but did not expose the fifth confirmation-node SOP row in its default field-node scope. This scope behavior was not changed here and its baseline was not established.
 
 Latest one-hour Zeabur metrics: CPU average 50.12%, maximum 93.62%; memory average 1,438 MB, maximum 1,774 MB. Two GB remains the minimum measured RAM estimate with limited headroom; two guaranteed vCPUs are a capacity experiment, not a verified SKU or price. No plan or limit changes were made.
+
+
+## Verified final release — 04286c2
+
+Deployment `6ae2e2dab1b373d6123a7a86`. Twenty-one consecutive health-200 samples span **306 seconds**, 06:10:41–06:15:47 UTC, all reporting the exact SHA above. Both staging app and DB were RUNNING; all 229 runtime source files matched the checked 532-file source package. Runtime smoke and manifest checks passed. No production deployment, resource/plan change or spend was performed.
+
+Authenticated real Chromium / T3 shared browser, 1280×800. Navigation went to health and back for a full document load; cold means the first application snapshot after deployment, with browser static assets cached. Times are from navigation start; rendered visibility uses dimensions/CSS visibility, including task rows below the first viewport.
+
+| Screen/run | Previous 8a1ac90 | Final 04286c2 | Target |
+| --- | ---: | ---: | ---: |
+| Case, cold | 13,821 ms | **8,566 ms** | <4,000 ms |
+| Case, warm reloads | 6,945–16,420 ms | **12,494 / 12,862 ms** | <2,000 ms |
+| Project list, first | 8,174 ms | **5,971 ms** | <3,000 ms |
+| Project list, reload | 18,620 ms | **16,917 ms** | <3,000 ms |
+
+These are observed runs under changing infrastructure/load, not a controlled causal speedup estimate. None passes final acceptance, and some browser API requests still exceed three seconds.
+
+| API | Cache | Browser total | Server-Timing total | Response transfer |
+| --- | --- | ---: | ---: | ---: |
+| First-screen, cold | miss | 7,734 ms | 7,627 ms | 1 ms |
+| First-screen, warm 1 | hit | 7,610 ms | **103 ms** | **7,402 ms** for 30,751 gzip bytes |
+| First-screen, warm 2 | stale | 4,646 ms | **183 ms** | **4,384 ms** for 30,751 gzip bytes |
+| Portfolio, first | miss | 5,049 ms | 4,909 ms | 38 ms |
+| Portfolio, reload | hit | 8,900 ms | **169 ms** | **8,664 ms** for 48,393 gzip bytes |
+
+Warm 2 shell transfer alone took **7,492 ms for 33,007 gzip bytes**, despite 365 ms Server-Timing. Warm list shell transfer took another **5,393 ms**. Browser queues remain small (typically 1–13 ms); all final APIs used HTTP/3 and gzip. Complete cold first-screen ASGI time was **7,630 ms**, matching its 7,627 ms header timer. No warm first-screen >3-second ASGI slow log was recorded despite 4.6–7.6-second browser requests. Thus the missing seconds are not first-screen domain construction or JavaScript rendering. The precise delivery component is still unverified.
+
+Cold first-screen construction used **1,533 ms CPU**, 7,543 ms snapshot wall, a 3,816 ms upstream span and 1,751 ms DB span. Encoding was **3.5 ms**. Spans can overlap and must not be summed. Cold portfolio generation used **930 ms CPU / 4,647 ms snapshot wall**. These cold paths are not certified optimal; durable/precomputed snapshots and a smaller session→shell bootstrap remain potential next application improvements.
+
+Correctness QA: status and four pending SOP rows render together from the aggregate; no observed long tasks, framework overlays, alerts or runtime errors. Deferred assignees do not block these milestones; initial resource captures may precede completion of that fourth API. The portfolio overlay is restored: **385 cases / 2 in progress / 3 with SOP progress**. Searching `115575` shows the exact case `src-a5aa822b0a1ee779575c` at **外業 / 進行中**. Native grouped display limits mounted cards; the complete dataset remains available for counts and search. No source writes were used for QA.
+
+Final correction validation: **94 affected backend tests passed**. The prior full hook had **5,499 passed, 39 skipped, 1 xfailed**, with the documented report-normalization failure; the final visibility and overlay patches were covered by affected selections rather than another full eight-minute run. All 23 frontend hook commands ran, 22 passed; the existing shell-mode assertion is the only frontend failure. Push bypass followed actual hook execution and documented baseline policy. Read-only list search and the SOP-task detail interaction were verified; write workflows were not exercised against live staging data.
+
+### Remaining items
+
+- Investigate delivery between complete ASGI responses and Chromium resource completion, including host/proxy/HTTP3 path comparison. Delivery alone is large enough to fail the SLA even with zero handler work. No particular proxy or provider component is proven responsible.
+- Investigate scheduling pressure and concurrent load before a paid resize. Independent process CPU work took 20.6 ms CPU / 88.8 ms median wall; quota-throttling counters were zero. Final-hour CPU was 49.08% average / 71.64% maximum; memory peaked at 1,774 MB. The smallest measured capacity experiment remains two guaranteed vCPUs and at least 2 GB RAM, with little memory headroom; this is not a verified plan or price.
+- Concurrent `/api/home-panels` slow logs (3.2–8.8 seconds) remain in the final runtime, outside the measured case/list request sets. Their caller and contribution to contention are unverified; no other client's work was stopped.
+- Cold snapshot generation, smaller bootstrap, long-duration cache/freshness behavior and the all-tasks scope observation above remain open. The report does not claim all residual application work optimal or the SLA achieved.
+
+Code commits: `95b6ddb` aggregate/encoded snapshots; `ba09026` revision-aware revalidation; `b601f84` viewer publication fence; `f20aa1c` fresh visibility keys; `04286c2` restore cached Lark-derived portfolio statuses. The later evidence-only commit does not change runtime code.
+
+Raw final measurements, request timers, health samples, tests and screenshots are in ignored `.runtime/case-detail-perf/round5-*`. Screenshots: `round5-cold-case.png`, `round5-warm-case.png`, `round5-tasks.png`, `round5-list.png`, `round5-list-case.png`. Earlier experiment artifacts use `round3-*` and `round4-*`.
+
+Final pod cgroup checks again show unlimited CPU/memory (`cpu.max=max 100000`, `memory.max=max`) and zero quota throttling. At the last sample, cgroup CPU PSI full avg10 was 7.21%, avg60 13.13%, and avg300 16.63%. This does not identify the source of scheduling pressure or establish a paid-plan CPU ceiling.
