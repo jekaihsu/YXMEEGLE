@@ -216,6 +216,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     from .read_snapshots import ReadSnapshots, EncodedSnapshot
     read_snapshots = ReadSnapshots()
+    from .build_identity import read_build_identity
+    shell_wire_revision=json.dumps(read_build_identity(),sort_keys=True)
     app.state.read_snapshots = read_snapshots
 
     @app.middleware('http')
@@ -724,17 +726,29 @@ def create_app(overrides=None,*,dispatch_transport=None):
             version=row.version
         # Every read still validates the session, roster admission, viewer and
         # current visibility before either a cached body or a 304 can be served.
-        key=('shell',wid,tag,visibility_revision,snapshot_viewer(user),state.get('environment'))
+        freshness=coordinator.status(wid)
+        semantic={k:v for k,v in freshness.items() if k!='server_time'}
+        semantic['datasets']={k:{field:value for field,value in dataset.items() if field!='age_seconds'}
+                              for k,dataset in freshness['datasets'].items()}
+        key=('shell',wid,tag,visibility_revision,snapshot_viewer(user),state.get('environment'),
+             shell_wire_revision,json.dumps(state.get('features',{}),sort_keys=True),json.dumps(semantic,sort_keys=True))
+        # Clock-only changes are semantically equivalent. The client advances
+        # cached ages from the origin Date; source timestamps/errors still fence.
+        validator='W/"shell-'+hashlib.sha256(json.dumps(key).encode()).hexdigest()+'"'
+        as_of=freshness['datasets']['sources']['as_of']
+        if validator in [v.strip() for v in request.headers.get('if-none-match','').split(',')]:
+            return EncodedSnapshot(b'',b'',validator,as_of).response(request,'validated')
         def build():
             with sessions() as db, phase(request,'project'):
                 current=db.get(WorkspaceRow,wid)
                 result=shell.build(db,BusinessRow,current,state,user,facts,today,approval_connection(cfg,simulation_available=(data['mode']=='demo') or wid.startswith('test-'),definition_verification=state.get('native_definition_verification')))
             restrict_hr(result,user)
-            result['freshness']=coordinator.status(wid)
-            return EncodedSnapshot.encode(JSONResponse(result).body,as_of=result['freshness']['datasets']['sources']['as_of'])
+            result['freshness']=freshness
+            return EncodedSnapshot.encode(JSONResponse(result).body,as_of=as_of)
         with phase(request,'snapshot'):
             body,status=read_snapshots.get(key,build,revision=version)
-        return body.response(request,status)
+        from dataclasses import replace
+        return replace(body,etag=validator).response(request,status)
 
     @app.get('/api/workspace')
     def workspace(request:Request,scope:str=''):

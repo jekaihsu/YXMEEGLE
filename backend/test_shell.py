@@ -217,3 +217,36 @@ def test_shell_reuses_encoded_body_after_fresh_authority_checks(tmp_path, monkey
         assert validated.status_code == 304 and validated.content == b''
         assert validated.headers['vary'] == 'Accept-Encoding, Cookie'
         assert validated.headers['x-request-id'] != first.headers['x-request-id']
+
+
+def test_shell_validator_survives_clock_aging_but_not_freshness_errors(tmp_path, monkeypatch):
+    from copy import deepcopy
+    from . import shell
+    with scaled_client(tmp_path, 6, **ON) as (app, client):
+        switch(client, 'u-pm')
+        first = shell_get(client); tag = first.headers['etag']
+        fresh = app.state.live_read.status
+        def aged(wid):
+            result = deepcopy(fresh(wid))
+            result['server_time'] = '2099-01-01T00:00:00+00:00'
+            for dataset in result['datasets'].values():
+                if dataset['age_seconds'] is not None: dataset['age_seconds'] += 121
+            return result
+        monkeypatch.setattr(app.state.live_read, 'status', aged)
+        clock = app.state.read_snapshots.clock
+        monkeypatch.setattr(app.state.read_snapshots, 'clock', lambda: clock()+121)
+        build = shell.build
+        def unexpected(*args, **kw): raise AssertionError('clock-only revalidation must not rebuild')
+        monkeypatch.setattr(shell, 'build', unexpected)
+        validated = shell_get(client, tag)
+        assert validated.status_code == 304 and validated.headers['etag'] == tag
+        assert validated.content == b''
+        def failed(wid):
+            result = aged(wid)
+            result['datasets']['sources'].update(status='error', last_error='read failed')
+            return result
+        monkeypatch.setattr(app.state.live_read, 'status', failed)
+        monkeypatch.setattr(shell, 'build', build)
+        changed = shell_get(client, tag)
+        assert changed.status_code == 200 and changed.headers['etag'] != tag
+        assert changed.json()['freshness']['datasets']['sources']['status'] == 'error'
