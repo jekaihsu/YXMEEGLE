@@ -31,7 +31,7 @@ def _signal_child(process, force=False):
         pass
 
 
-def supervise(commands, *, stop_event=None, shutdown_timeout=10, poll_interval=0.2, readiness=None, startup_timeout=60):
+def supervise(commands, *, stop_event=None, shutdown_timeout=10, poll_interval=0.2, readiness=None, startup_timeout=60, child_env=None):
     """Run named argv lists, returning zero only for requested shutdown."""
     stop_event = stop_event if stop_event is not None else threading.Event()
     children = []
@@ -47,6 +47,8 @@ def supervise(commands, *, stop_event=None, shutdown_timeout=10, poll_interval=0
             if stop_event.is_set():
                 return 0
             options = {'cwd': str(ROOT)}
+            if child_env:
+                options['env'] = dict(os.environ, **child_env)
             if os.name == 'posix':
                 options['start_new_session'] = True
             elif os.name == 'nt':
@@ -130,12 +132,14 @@ def main():
     commands = [
         ('web', [sys.executable, '-m', 'uvicorn', 'backend.app:app', '--host', '0.0.0.0', '--port', port, '--proxy-headers', '--forwarded-allow-ips='+os.getenv('FORWARDED_ALLOW_IPS','127.0.0.1'), '--no-access-log']),
         ('worker', [sys.executable, str(ROOT/'scripts'/'run_worker.py')]),
+        ('live', [sys.executable, str(ROOT/'scripts'/'run_live_read.py')]),
     ]
     if os.getenv('BACKUP_DIR'):
         commands.append(('backup',[sys.executable,str(ROOT/'scripts'/'backup_schedule.py')]))
     # Web initializes the schema during import. Wait for its DB-aware health
     # endpoint before starting the worker so an empty database has one creator.
-    return supervise(commands,readiness={'web':lambda:web_ready(port)},startup_timeout=0)
+    return supervise(commands,readiness={'web':lambda:web_ready(port)},startup_timeout=0,
+        child_env={'LIVE_READ_BACKGROUND_PROCESS':'true','REPORTS_WORKER_PROCESS':'true'})
 
 
 if __name__ == '__main__':

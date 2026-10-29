@@ -165,3 +165,20 @@ def test_spawn_normalization_experiment_roundtrips_snapshot_data_and_gaps():
         assert measured['peak_rss_mib'] > 0
     finally:
         store.close()
+
+
+def test_process_worker_preserves_complete_snapshot_and_refresh_reuses_data():
+    from backend.reports.reader import FixtureReader
+    from backend.test_reports_compute import FIXTURES
+    inline=SnapshotStore(FixtureReader(FIXTURES))
+    isolated=SnapshotStore(FixtureReader(FIXTURES),{'REPORTS_WORKER_PROCESS':'true'})
+    try:
+        expected=inline.get()
+        first=isolated.get()
+        assert (first['data'],first['gaps'],first['fingerprint'])==(expected['data'],expected['gaps'],expected['fingerprint'])
+        assert isolated._process is not None
+        second=isolated.start().result(timeout=10)
+        assert second['data'] is first['data'] and second['gaps'] is first['gaps']
+    finally:
+        inline.close()
+        isolated.close()

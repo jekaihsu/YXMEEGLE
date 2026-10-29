@@ -1,6 +1,7 @@
 """Single-flight snapshots with bounded cold waits and stale reads."""
-from concurrent.futures import ThreadPoolExecutor, Future
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, Future
 import asyncio
+import multiprocessing
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -28,6 +29,18 @@ def ensure_visible_logs():
     if not logging.getLogger().handlers and not logger.handlers:
         handler=logging.StreamHandler();handler.setFormatter(logging.Formatter('%(levelname)s:     %(name)s %(message)s'));logger.addHandler(handler)
 
+
+def build_data(reader, base, previous_fingerprint=None):
+    """Picklable read/normalization job. No app, locks or request state crosses processes."""
+    raw=reader.read()
+    canonical=json.dumps({k:dict(v,records=sorted(v['records'],key=lambda r:r['record_id'])) for k,v in raw.items()},sort_keys=True,ensure_ascii=False,separators=(',',':'))
+    fingerprint=hashlib.sha256(canonical.encode()).hexdigest()
+    data=gaps=None
+    if fingerprint!=previous_fingerprint:
+        data=compute.normalize(raw,base)
+        gaps={(endpoint,dept):compute.report_gaps(data,endpoint,dept) for endpoint in ('sources','review','review/rows','sales','assets','progress','progress/case','contacts') for dept in ('field','office','control')}
+    return dict(fingerprint=fingerprint,data=data,gaps=gaps,tables=len(raw),records=sum(len(t['records']) for t in raw.values()))
+
 class SnapshotStore:
     def __init__(self, reader, cfg=None, *, clock=time.monotonic):
         cfg=cfg or {}; self.reader=reader;self.clock=clock
@@ -35,21 +48,24 @@ class SnapshotStore:
         self.budget=setting(cfg,'REPORTS_COLD_WAIT_SECONDS',20,.01,60)
         self.base=cfg.get('LARK_REPORT_BASE_TOKEN',compute.BASE_TOKEN)
         self._lock=Lock();self._executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix='reports')
+        self._process=(ProcessPoolExecutor(max_workers=1,mp_context=multiprocessing.get_context('spawn'))
+                       if str(cfg.get('REPORTS_WORKER_PROCESS','false')).lower()=='true' else None)
         self._future=None;self._snapshot=None;self._last_request=None;self._retry_at=0;self._refresh_error=False
 
     def _build(self):
         started=time.monotonic()
         logger.info('reports snapshot build started')
         try:
-            raw=self.reader.read()
-            canonical=json.dumps({k:dict(v,records=sorted(v['records'],key=lambda r:r['record_id'])) for k,v in raw.items()},sort_keys=True,ensure_ascii=False,separators=(',',':'))
-            fingerprint=hashlib.sha256(canonical.encode()).hexdigest()
             with self._lock: previous=self._snapshot
-            data=previous['data'] if previous and previous['fingerprint']==fingerprint else compute.normalize(raw,self.base)
-            gaps=previous['gaps'] if previous and previous['fingerprint']==fingerprint else {(endpoint,dept):compute.report_gaps(data,endpoint,dept) for endpoint in ('sources','review','review/rows','sales','assets','progress','progress/case','contacts') for dept in ('field','office','control')}
+            prior=previous['fingerprint'] if previous else None
+            result=(self._process.submit(build_data,self.reader,self.base,prior).result() if self._process
+                    else build_data(self.reader,self.base,prior))
+            fingerprint=result['fingerprint']
+            data=previous['data'] if previous and previous['fingerprint']==fingerprint else result['data']
+            gaps=previous['gaps'] if previous and previous['fingerprint']==fingerprint else result['gaps']
             current=dict(gaps=gaps,data=data,fingerprint=fingerprint,fetched_at=datetime.now(timezone.utc).isoformat(),at=self.clock(),cache=previous['cache'] if previous and previous['fingerprint']==fingerprint else OrderedDict(),pending=previous['pending'] if previous and previous['fingerprint']==fingerprint else {})
             with self._lock: self._snapshot=current;self._retry_at=0;self._refresh_error=False
-            logger.info('reports snapshot ready tables=%s records=%s duration_ms=%.0f',len(raw),sum(len(t['records']) for t in raw.values()),(time.monotonic()-started)*1000)
+            logger.info('reports snapshot ready tables=%s records=%s duration_ms=%.0f',result['tables'],result['records'],(time.monotonic()-started)*1000)
             return current
         except Exception as exc:
             logger.warning('reports snapshot failed error_class=%s duration_ms=%.0f',type(exc).__name__,(time.monotonic()-started)*1000)
@@ -147,4 +163,6 @@ class SnapshotStore:
         result.pop('gaps',None)
         return dict(result,meta=meta)
 
-    def close(self): self._executor.shutdown(wait=True)
+    def close(self):
+        self._executor.shutdown(wait=True)
+        if self._process: self._process.shutdown(wait=True)

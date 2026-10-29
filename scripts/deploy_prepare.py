@@ -137,7 +137,7 @@ def staging():
     folder = RUNTIME / ('zeabur-stage-' + secrets.token_hex(4))
     folder.mkdir(parents=True)
     exact = ['Dockerfile', '.dockerignore', 'backend/requirements.txt', 'scripts/backup_restore.py', 'scripts/backup_live_legacy.py', 'scripts/restore_drill.py',
-             'scripts/run_service.py', 'scripts/run_worker.py', 'scripts/backup_schedule.py', 'scripts/backup_offsite.py', 'deployment/source-tables.json',
+             'scripts/run_service.py', 'scripts/run_worker.py', 'scripts/run_live_read.py', 'scripts/backup_schedule.py', 'scripts/backup_offsite.py', 'deployment/source-tables.json',
              'frontend/package.json', 'frontend/package-lock.json', 'frontend/index.html',
              'frontend/tsconfig.json', 'frontend/vite.config.ts']
     exact += ['backend/sop_source_contracts.json', 'backend/sop_import/catalog.json', 'backend/report_link_vocabulary.json']

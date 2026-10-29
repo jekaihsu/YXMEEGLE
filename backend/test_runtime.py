@@ -92,7 +92,7 @@ def test_startup_deadline_stops_web_without_launching_worker(tmp_path):
 
 def test_deployment_staging_includes_runtime_and_omits_credentials(tmp_path,monkeypatch):
     root=tmp_path/'root'; runtime=root/'.runtime'; runtime.mkdir(parents=True)
-    paths=['Dockerfile','.dockerignore','backend/requirements.txt','backend/app.py','scripts/backup_restore.py','scripts/backup_live_legacy.py','scripts/run_service.py','scripts/run_worker.py','scripts/backup_schedule.py','frontend/package.json','frontend/package-lock.json','frontend/index.html','frontend/tsconfig.json','frontend/vite.config.ts','frontend/src/app.ts','frontend/public/logo.svg']
+    paths=['Dockerfile','.dockerignore','backend/requirements.txt','backend/app.py','scripts/backup_restore.py','scripts/backup_live_legacy.py','scripts/run_service.py','scripts/run_worker.py','scripts/run_live_read.py','scripts/backup_schedule.py','frontend/package.json','frontend/package-lock.json','frontend/index.html','frontend/tsconfig.json','frontend/vite.config.ts','frontend/src/app.ts','frontend/public/logo.svg']
     paths.append('scripts/backup_offsite.py')
     paths.append('scripts/restore_drill.py')
     paths += ['backend/sop_source_contracts.json','backend/sop_import/catalog.json','backend/report_link_vocabulary.json','scripts/backup_publish.py',
@@ -112,7 +112,7 @@ def test_deployment_staging_includes_runtime_and_omits_credentials(tmp_path,monk
     from scripts import verify_stage_package
     monkeypatch.setattr(verify_stage_package,'verify_stage',lambda stage:{'ok':True})
     folder=deploy_prepare.staging()
-    for name in ('scripts/run_service.py','scripts/run_worker.py','scripts/backup_schedule.py','scripts/backup_live_legacy.py','deployment/source-tables.json'):
+    for name in ('scripts/run_service.py','scripts/run_worker.py','scripts/run_live_read.py','scripts/backup_schedule.py','scripts/backup_live_legacy.py','deployment/source-tables.json'):
         assert (folder/name).is_file()
     assert all(secret not in p.read_text(encoding='utf-8') for p in folder.rglob('*') if p.is_file())
     manifest=json.loads((runtime/'zeabur-stage-manifest.json').read_text())
@@ -190,3 +190,28 @@ def test_worker_log_carries_http_status_without_detail(tmp_path,monkeypatch,caps
     out=capsys.readouterr().out
     assert json.loads(out.strip().splitlines()[0])=={'component':'source','error_type':'HTTPException','status_code':409}
     assert 'secret-detail' not in out
+
+
+def test_live_child_shuts_down_cleanly_without_web_import_or_network(tmp_path):
+    from backend.app import create_app
+    database=tmp_path/'live-worker.db'
+    app=create_app({'DATABASE_URL':f'sqlite:///{database}','UPLOAD_DIR':str(tmp_path/'uploads')})
+    app.state.engine.dispose()
+    env=dict(os.environ,DATABASE_URL=f'sqlite:///{database}',LARK_WORKER_ORGANIZATION='',
+             LARK_ALLOWED_TENANTS='',LARK_LIVE_READ_ENABLED='false',SOP_LARK_PROJECTION_ENABLED='false')
+    output=tmp_path/'live-worker.log'
+    with output.open('w') as log:
+        process=subprocess.Popen([sys.executable,str(ROOT/'scripts'/'run_live_read.py')],cwd=ROOT,env=env,
+                                 stdout=log,stderr=log,text=True)
+        try:
+            deadline=time.monotonic()+8
+            while 'live refresh worker ready' not in output.read_text() and time.monotonic()<deadline:
+                assert process.poll() is None,output.read_text()
+                time.sleep(.02)
+            assert 'live refresh worker ready' in output.read_text()
+            process.terminate()
+            process.wait(timeout=8)
+            assert process.returncode==0,output.read_text()
+        finally:
+            if process.poll() is None:
+                process.kill();process.wait(timeout=3)
