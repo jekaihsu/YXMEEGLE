@@ -36,7 +36,8 @@ try{
  assert.match(document.body.textContent,/SOP 已啟動/,'aggregate status renders without a second request');
  assert.ok(document.querySelector('.po-todos .po-task-row'),'aggregate tasks render with status');
  assert.match(document.body.textContent,/上次成功資料，待更新/,'background snapshot refresh is visibly labeled');
- assert.equal(requests.filter(r=>['/progress','/sop-tasks','/node-assignments','/start-sop'].some(s=>r.url.endsWith(s))).length,0,'seeded first-screen readers add no heavy requests');
+ assert.equal(requests.filter(r=>['/sop-tasks','/node-assignments','/start-sop'].some(s=>r.url.endsWith(s))).length,0,'seeded status/task readers add no heavy requests');
+ assert.equal(requests.filter(r=>r.url.endsWith('/progress')).length,1,'progress starts only after status/tasks have rendered');
 
  await act(async()=>{root.unmount();settle()});
  ui.invalidateSessionEpoch();requests.length=0;

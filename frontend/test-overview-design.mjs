@@ -85,5 +85,5 @@ for(const [sort,expected,reversed] of [['due',['z','b','a'],['z','a','b']],['nam
 }
 const requests=[];globalThis.fetch=async url=>{requests.push(String(url));return new Response(JSON.stringify({items:[],total:0,as_of:'2026-10-23',basis:'persisted_workspace'}),{status:200})};
 await flush(()=>root.render(React.createElement(Projects,{key:'shell-default',c:{...c,w:{...w,scope:'shell'},route:{view:'projects'}}})));
-assert.ok(requests.some(url=>url==='/api/projects?view=portfolio'),requests.join(' | '));
+assert.ok(requests.some(url=>url==='/api/projects?view=portfolio&page=1'),requests.join(' | '));
 await flush(()=>root.unmount());dom.window.close();console.log('Overview design: ready action, separate assigned waiting parity, preserved original deadline, verification/deadline states and 300-case paging passed');

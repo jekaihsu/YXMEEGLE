@@ -15,7 +15,7 @@ import {caseRow, caseAttention, filterRows, groupRows, portfolioCounts, pinStora
 import './ProjectsList.css';
 
 const GROUP_ICONS:Record<string,typeof Pin>={pinned:Pin,mine:UserRound,sop:Settings2,notStarted:Clock3,done:CircleCheck,other:FileText};
-const PROJECT_URL='/api/projects?view=portfolio';
+const PROJECT_URL='/api/projects?view=portfolio&page=1';
 const readLimit=()=>{try{const value=Number(window.localStorage.getItem('yx.projects.groupSize'));return [3,5,10,25,50,100].includes(value)?value:3}catch{return 3}};
 function Select({label,value,onChange,children}:{label:string;value:string;onChange:(value:string)=>void;children:ReactNode}) {
  return <label className="pl-select"><span className="sr-only">{label}</span><FormSelect aria-label={label} value={value} onChange={e=>onChange(e.target.value)}>{children}</FormSelect></label>;
@@ -69,7 +69,25 @@ export function Projects({c}:{c:Ctx}) {
  const read=useViewData<PortfolioPage|undefined>(shell?`projects-portfolio:${scope}`:'projects-local',async signal=>shell?readPortfolio(PROJECT_URL,signal,scope,{reloadVersion:c.reloadVersion}):undefined,[c.reloadVersion]);
  const cached=shell?cachedPortfolio(PROJECT_URL,scope):undefined;
  const data=read.data||cached;
- const projects=shell?data?.items:c.w.projects;
+ const [remaining,setRemaining]=useState<{first:PortfolioPage;items:PortfolioPage['items'];complete:boolean;error:string}>();
+ useEffect(()=>{
+  if(!shell||!data?.next_page)return;
+  const first=data,controller=new AbortController();
+  setRemaining({first,items:[],complete:false,error:''});
+  void (async()=>{
+   let page=first.next_page;const items:PortfolioPage['items']=[];
+   while(page&&!controller.signal.aborted){
+    const next=await readPortfolio(`/api/projects?view=portfolio&page=${page}&snapshot=${encodeURIComponent(first.snapshot||'')}`,controller.signal,scope,{reloadVersion:c.reloadVersion});
+    if(next.snapshot!==first.snapshot)throw new Error('案件清單已更新，請重新讀取。');
+    items.push(...next.items);page=next.next_page;
+   }
+   if(!controller.signal.aborted)setRemaining({first,items,complete:true,error:''});
+  })().catch(error=>{if(!controller.signal.aborted)setRemaining({first,items:[],complete:false,error:error instanceof Error?error.message:'案件清單讀取失敗'})});
+  return()=>controller.abort();
+ },[shell,data,scope,c.reloadVersion]);
+ const tail=remaining?.first===data?remaining:undefined;
+ const complete=!shell||!data?.next_page||tail?.complete===true;
+ const projects=useMemo(()=>shell?data?[...data.items,...(tail?.items||[])]:undefined:c.w.projects,[shell,data,tail,c.w.projects]);
  const asOf=data?.as_of||c.w.as_of;
  const pinKey=pinStorageKey(c.w.workspace_id||c.s.workspace_id||'default',c.s.user?.id||'anonymous');
  const [pinState,setPinState]=useState(()=>({key:pinKey,ids:readPins(window.localStorage,pinKey)}));
@@ -87,10 +105,11 @@ export function Projects({c}:{c:Ctx}) {
  const canSync=c.s.mode==='lark'&&(c.s.access_mode||'normal')==='normal'&&c.s.user?.active!==false&&!String(c.s.workspace_id||c.w.workspace_id||'').startsWith('test-')&&(['pm','manager'].includes(c.s.user?.role||'')||c.s.user?.capabilities?.includes('manage_sources')===true);
  const sync=async()=>{if(syncing)return;setSyncing(true);setSyncStatus('');try{await refreshSources('sources',{url:'/api/sources/sync',body:'{}'});await c.refresh();read.reload();setSyncStatus('Lark 同步完成，案件清單已更新。')}catch(error){setSyncStatus(`Lark 同步失敗：${error instanceof Error?error.message:String(error)}`)}finally{setSyncing(false)}};
  const hasFilters=Object.entries(filters).some(([k,v])=>v!==Object.entries(DEFAULT_FILTERS).find(([key])=>key===k)?.[1]);
- const kpis=[{label:'全部案件',value:counts.all,icon:FileText},{label:'進行中',value:counts.active,icon:PlayCircle},{label:'SOP 進行中',value:counts.sop,icon:Settings2},{label:'已完成',value:counts.done,icon:CircleCheck}];
+ const kpis=[{label:'全部案件',value:complete?counts.all:hasFilters?null:data?.total,icon:FileText},{label:'進行中',value:complete?counts.active:null,icon:PlayCircle},{label:'SOP 進行中',value:complete?counts.sop:null,icon:Settings2},{label:'已完成',value:complete?counts.done:null,icon:CircleCheck}];
  return <div className="pl-page">
   <header className="pl-header"><div><h1>案件總覽</h1></div><div className="pl-header-actions"><label className="pl-search"><Search size={16}/><input aria-label="搜尋案件" placeholder="搜尋案件、客戶或案號…" maxLength={240} value={filters.q} onChange={e=>update('q',e.target.value)}/>{filters.q&&<button aria-label="清除搜尋" onClick={()=>update('q','')}><X size={15}/></button>}</label><div className="pl-view" role="group" aria-label="案件顯示方式"><button aria-label="清單檢視" aria-pressed={view==='list'} onClick={()=>setView('list')}><List size={17}/></button><button aria-label="卡片檢視" aria-pressed={view==='grid'} onClick={()=>setView('grid')}><LayoutGrid size={17}/></button></div>{canSync&&<button className="pl-sync" aria-label="重新同步 Lark" disabled={syncing} onClick={()=>void sync()}>{syncing?'同步中…':'重新同步 Lark'}</button>}{canCreate&&<button className="pl-create" onClick={()=>setCreating(true)}><Plus size={17}/>新增案件</button>}</div></header>
   <p className="pl-sync-status sr-only" role="status" aria-live="polite">{syncStatus}</p>
+  {!complete&&<p role={tail?.error?'alert':'status'}>{tail?.error||`已載入 ${projects?.length||0} / ${data?.total||0} 筆，其餘案件載入中；篩選與統計待完整清單。`}{tail?.error&&<button onClick={read.reload}>重新讀取</button>}</p>}
   <section className="pl-kpis" aria-label="案件統計">{kpis.filter(k=>ready && k.value!==null).map(k=><div className="pl-kpi" key={k.label}><span className="pl-kpi-icon"><k.icon size={21}/></span><div><span>{k.label}</span><strong>{k.value}</strong></div></div>)}</section>
   <div className="pl-filters" role="group" aria-label="案件篩選">
    <Select label="客戶" value={filters.client} onChange={v=>update('client',v)}><option value="">客戶</option>{clients.map(client=><option key={client}>{client}</option>)}</Select>
@@ -103,8 +122,8 @@ export function Projects({c}:{c:Ctx}) {
   {notice&&<p role="status">{notice}</p>}
   {shell&&read.error&&<div className="pl-state" role="alert"><h2>案件讀取失敗</h2><p>{read.error}</p><button onClick={read.reload}>重新載入案件</button>{data&&<p>下方保留上次成功讀取的資料。</p>}</div>}
   {shell&&read.loading&&!data?<div className="pl-state" role="status" aria-busy="true"><p>正在載入案件…</p><Skeleton lines={5}/></div>:ready?<div className={`pl-groups ${view==='grid'?'pl-grid':''}`}>{groups.filter(g=>g.rows.length>0).map(group=>{const Icon=GROUP_ICONS[group.key];const open=expanded.includes(group.key);return <section className="pl-group" key={group.key} aria-label={group.label}><header><h2><Icon size={19}/>{group.label}<span>{group.rows.length}</span></h2>{group.rows.length>limit&&<button className="pl-expand" aria-expanded={open} onClick={()=>setExpanded(open?expanded.filter(key=>key!==group.key):[...expanded,group.key])}>{open?'收合':'顯示更多'}<ArrowRight size={15}/></button>}</header><div className="pl-group-rows">{(open?group.rows:group.rows.slice(0,limit)).map(row=><CaseCard key={row.project.id} row={row} c={c} today={asOf} pinned={pins.includes(row.project.id)} onPin={()=>togglePin(row.project.id)}/>)}</div></section>})}</div>:null}
-  {ready&&!rows.length&&<Empty title="沒有符合條件的案件" detail="試試其他關鍵字或清除篩選條件。"/>}
-  <footer className="pl-footer">{ready?`符合條件 ${rows.length} 筆 · 統計依目前篩選，釘選不重複計算${data?.hidden_duplicates?` · 已合併 Lark 重複編號 ${data.hidden_duplicates} 筆`:''}`:'案件統計載入中'}{taipeiDate(asOf,'')&&` · 資料日期 ${taipeiDate(asOf,'')}`}{ready&&kpis.some(k=>k.value===null)?' · 部分統計待核實':''}{shell&&read.loading&&data?' · 更新中':''}{data?.source_synced_at&&taipeiTime(data.source_synced_at,'')&&` · 上次同步 Lark：${taipeiTime(data.source_synced_at,'').slice(11,16)}`}{!!data?.hidden_removed&&` · 已隱藏 ${data.hidden_removed} 筆已從 Lark 移除的報價`}</footer>
+  {ready&&complete&&!rows.length&&<Empty title="沒有符合條件的案件" detail="試試其他關鍵字或清除篩選條件。"/>}
+  <footer className="pl-footer">{ready?`${complete?'符合條件':'目前已載入符合條件'} ${rows.length} 筆 · 統計依目前篩選，釘選不重複計算${data?.hidden_duplicates?` · 已合併 Lark 重複編號 ${data.hidden_duplicates} 筆`:''}`:'案件統計載入中'}{taipeiDate(asOf,'')&&` · 資料日期 ${taipeiDate(asOf,'')}`}{ready&&kpis.some(k=>k.value===null)?' · 部分統計待核實':''}{shell&&read.loading&&data?' · 更新中':''}{data?.source_synced_at&&taipeiTime(data.source_synced_at,'')&&` · 上次同步 Lark：${taipeiTime(data.source_synced_at,'').slice(11,16)}`}{!!data?.hidden_removed&&` · 已隱藏 ${data.hidden_removed} 筆已從 Lark 移除的報價`}</footer>
   <details className="pl-admission"><summary>執行歸屬核定與案件生命週期</summary><p>工程確認單成案，報價資料先保留為待確認接案。來源商務狀態與工作台節點狀態分開顯示，詳見各案件的更多操作。</p><ExecutionAdmissionQueue w={c.w} s={c.s} run={(action,payload,scope)=>c.run(action,payload,scope)} busy={c.busy}/></details>
   {creating&&<QuoteCreateSheet users={c.w.users} canImport={c.s.features?.sop_task_writes===true&&(c.s.user?.role==='manager'||c.s.user?.capabilities?.includes('sop_task_import')===true)} onClose={()=>setCreating(false)} onCreated={read.reload} onOpen={ref=>{setCreating(false);c.go({view:'quotes',project:ref,tab:'flow'})}}/>}
  </div>;

@@ -13,6 +13,8 @@ from sqlalchemy import event
 
 _current = ContextVar('request_timing', default=None)
 _loop_lags = deque(maxlen=2400)
+delivery_logger = logging.getLogger('backend.delivery')
+delivery_logger.setLevel(logging.INFO)
 
 
 class Timings:
@@ -97,6 +99,10 @@ def instrument_database(engine):
 class RequestTimingMiddleware:
     def __init__(self, app):
         self.app = app
+        if not logging.getLogger().handlers and not delivery_logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter('%(levelname)s:     %(name)s %(message)s'))
+            delivery_logger.addHandler(handler)
 
     async def __call__(self, scope, receive, send):
         if scope['type'] != 'http' or not scope['path'].startswith('/api'):
@@ -105,9 +111,13 @@ class RequestTimingMiddleware:
         token = _current.set(timing)
         scope['request_timing'] = timing
         status = 500
+        body_bytes = chunks = 0
+        headers_at = first_body_at = None
+        send_seconds = 0
         async def timed_send(message):
-            nonlocal status
+            nonlocal status, body_bytes, chunks, headers_at, first_body_at, send_seconds
             if message['type'] == 'http.response.start':
+                headers_at = perf_counter()
                 status = message['status']
                 timing.values['looplag'] = max((lag for at, lag in _loop_lags if at >= timing.started), default=0)
                 values = dict(timing.values)
@@ -119,11 +129,23 @@ class RequestTimingMiddleware:
                     suffix = existing.decode() if existing else f'total;dur={(perf_counter()-timing.started)*1000:.1f}'
                     headers.append((b'server-timing', (entries+', '+suffix).encode()))
                     message['headers'] = headers
+            if message['type'] == 'http.response.body':
+                first_body_at = first_body_at or perf_counter()
+                body_bytes += len(message.get('body', b''))
+                chunks += 1
+            started = perf_counter()
             await send(message)
+            send_seconds += perf_counter() - started
         try:
             await self.app(scope, receive, timed_send)
         finally:
             elapsed = perf_counter() - timing.started
+            if headers_at and (scope['path'].startswith('/api/projects/') or
+                               scope['path'] in ('/api/projects', '/api/workspace', '/api/session')):
+                delivery_logger.info(
+                    'response_delivery path=%s status=%s bytes=%s chunks=%s headers_ms=%.1f first_body_ms=%.1f complete_ms=%.1f send_ms=%.1f',
+                    scope['path'], status, body_bytes, chunks, (headers_at-timing.started)*1000,
+                    ((first_body_at or headers_at)-headers_at)*1000, elapsed*1000, send_seconds*1000)
             if elapsed > 3:
                 logging.getLogger('backend.slow').warning(
                     'slow_request method=%s path=%s status=%s total_ms=%.0f timings=%s phases=%s',

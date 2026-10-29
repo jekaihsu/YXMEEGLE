@@ -5,6 +5,54 @@ from contextvars import ContextVar, copy_context
 from threading import Lock
 from time import monotonic, thread_time
 import logging
+import gzip
+import hashlib
+from dataclasses import dataclass
+
+from starlette.responses import Response
+
+
+@dataclass(frozen=True)
+class EncodedSnapshot:
+    body: bytes
+    compressed: bytes
+    etag: str
+
+    def __len__(self):
+        return len(self.body) + len(self.compressed)
+
+    @classmethod
+    def encode(cls, body):
+        from .request_timing import measure
+        with measure('snapshotcompress'):
+            compressed = gzip.compress(body, compresslevel=1, mtime=0)
+        return cls(body, compressed, 'W/"' + hashlib.sha256(body).hexdigest() + '"')
+
+    def response(self, request, status):
+        # Always reauthorize before conditional validation. Browser freshness must
+        # not extend admission; stale-while-revalidate lives in ReadSnapshots.
+        headers = {'ETag': self.etag, 'Cache-Control': 'private, max-age=0, must-revalidate',
+                   'Vary': 'Accept-Encoding, Cookie', 'X-Read-Snapshot': status}
+        tags = request.headers.get('if-none-match', '').split(',')
+        if any(tag.strip().removeprefix('W/') in ('*', self.etag.removeprefix('W/')) for tag in tags):
+            return Response(status_code=304, headers=headers)
+        encodings = {}
+        for entry in request.headers.get('accept-encoding', '').lower().split(','):
+            name, *parameters = entry.strip().split(';')
+            quality = 1.0
+            for parameter in parameters:
+                if parameter.strip().startswith('q='):
+                    try:
+                        quality = float(parameter.strip()[2:])
+                    except ValueError:
+                        quality = 0
+            encodings[name] = quality
+        if encodings.get('gzip', encodings.get('*', 0)) > 0:
+            headers['Content-Encoding'] = 'gzip'
+            return Response(self.compressed, media_type='application/json', headers=headers)
+        # Prevent the outer middleware from recompressing a negotiated identity body.
+        headers['Content-Encoding'] = 'identity'
+        return Response(self.body, media_type='application/json', headers=headers)
 
 capture = ContextVar('case_snapshot_capture', default=None)
 
@@ -23,6 +71,23 @@ class ReadSnapshots:
             self.generation += 1
             self.entries.clear()
 
+    def peek(self, key):
+        with self.lock:
+            entry = self.entries.get(key)
+            return entry[1] if entry and self.clock()-entry[0] < self.stale else None
+
+    def _store(self, key, value, revision):
+        if len(value) <= self.max_bytes:
+            self.entries[key] = (self.clock(), value, revision)
+            self.entries.move_to_end(key)
+            while len(self.entries) > 32 or sum(len(v[1]) for v in self.entries.values()) > self.max_bytes:
+                self.entries.popitem(last=False)
+
+    def retain(self, key, value, generation):
+        with self.lock:
+            if generation == self.generation and key not in self.entries:
+                self._store(key, value, None)
+
     def _build(self, key, generation, build, revision):
         from .request_timing import _current
         cpu = thread_time()
@@ -33,11 +98,8 @@ class ReadSnapshots:
             if timing:
                 timing.add("snapshotcpu", thread_time() - cpu)
         with self.lock:
-            if generation == self.generation and len(value) <= self.max_bytes:
-                self.entries[key] = (self.clock(), value, revision)
-                self.entries.move_to_end(key)
-                while len(self.entries) > 32 or sum(len(v[1]) for v in self.entries.values()) > self.max_bytes:
-                    self.entries.popitem(last=False)
+            if generation == self.generation:
+                self._store(key, value, revision)
         return value
 
     def get(self, key, build, *, revision=None):

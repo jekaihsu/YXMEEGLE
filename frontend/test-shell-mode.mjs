@@ -34,7 +34,7 @@ globalThis.fetch=async(url,init)=>{
  if(url==='/api/my-work')return json({rows:[],readState:'ready',assignment:'unassigned',canSeeAwaitingConfirmation:false});
  if(url==='/api/source-health')return json({page_state:null,sources:[]});
  if(url==='/api/workspace'){await fullGate();return json({...workspace,version:current.version});}
- if(url==='/api/projects?view=portfolio'){await overviewGate(new URLSearchParams());return json({items:current.projects,total:current.projects.length,as_of:current.as_of,basis:'persisted_workspace'})}
+ if(url==='/api/projects?view=portfolio&page=1'){await overviewGate(new URLSearchParams());return json({items:current.projects,total:current.projects.length,as_of:current.as_of,basis:'persisted_workspace'})}
  if(url.endsWith('/node-assignments'))return new Response(JSON.stringify({code:'disabled',detail:'disabled'}),{status:404});
  if(url.startsWith('/api/projects/'))return detail(url);
  if(url.startsWith('/api/daily-reports?'))return json({items:[],total:0,offset:0,limit:30,summary:{}});
@@ -52,7 +52,7 @@ try{
   assert.equal(document.querySelector('.notification-button i'),null);
  }
  await mount({workspace_shell:true});
- assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects?view=portfolio']);
+ assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects?view=portfolio&page=1']);
  assert.equal(window.shellContext.w.scope,'shell');assert.equal(rows().length,2);
  assert.ok(document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期 1'));
  assert.equal(document.querySelector('.notification-button'),null);assert.equal(window.shellContext.unmatchedDaily(window.shellContext.w),535);
@@ -102,7 +102,7 @@ try{
 
  const many=Array.from({length:25},(_,i)=>({...shell.projects[1],id:`c${i}`,code:`CODE_${String(i).padStart(2,'0')}`,name:`NAME_${i}`,created_at:`2026-10-${String(25-i).padStart(2,'0')}`,case_type:i%5===0?'intake':'formal',due_date:`2026-11-${String(i+1).padStart(2,'0')}`}));
  current={...shell,projects:many};etag='W/"shell-big"';await mount({workspace_shell:true});
- const portfolioReads=()=>requests.filter(r=>r.url==='/api/projects?view=portfolio').length;
+ const portfolioReads=()=>requests.filter(r=>r.url==='/api/projects?view=portfolio&page=1').length;
  assert.equal(portfolioReads(),1);assert.equal(rows().length,3);
  await change('每組顯示筆數','10');assert.equal(rows().length,10);
  await flush(()=>document.querySelector('.pl-expand').click());assert.equal(rows().length,25);

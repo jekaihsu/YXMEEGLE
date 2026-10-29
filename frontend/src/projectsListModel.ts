@@ -4,7 +4,7 @@ import {compareTableValues, tableCalendarDay, tableDate} from './companyDashboar
 
 export type PortfolioNode = {key:string;status:string;owner_id:string|null;collaborator_ids:string[]};
 export type PortfolioProject = Project & {duplicate_count?:number;source_removed_at?:string;portfolio_nodes?:PortfolioNode[];sop_summary?:{policy:string|null;imported_tasks:boolean}};
-export type PortfolioPage = {items:PortfolioProject[];total:number;hidden_duplicates?:number;hidden_removed?:number;source_synced_at?:string;as_of:string;basis:string};
+export type PortfolioPage = {items:PortfolioProject[];total:number;hidden_duplicates?:number;hidden_removed?:number;source_synced_at?:string;as_of:string;basis:string;page?:number;next_page?:number|null;snapshot?:string};
 export type CaseState = '進行中'|'待審核'|'尚未開始'|'已完成'|'待核對'|'暫停';
 export type CaseRow = {project:PortfolioProject;nodes:FlowNode[];current:FlowNode|undefined;state:CaseState;mine:boolean;sop:boolean|null};
 export type GroupKey = 'pinned'|'mine'|'sop'|'notStarted'|'done'|'other';

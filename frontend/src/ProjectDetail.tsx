@@ -40,11 +40,9 @@ import {prefetchNodeAssignments, useNodeAssignments} from './useNodeAssignments'
 import {prefetchStartSop,seedStartSop} from './useStartSop';
 import {seedNodeAssignments} from './useNodeAssignments';
 import {seedSopTasks} from './useSopTasks';
-import {seedProjectProgress} from './useProjectProgress';
 import {parseNodeAssignments} from './nodeAssignmentApi';
 import {parseOverview} from './sopTaskApi';
 import {parseSopPreview} from './startSop';
-import {parseProjectProgress} from './projectProgressApi';
 import {assignmentTarget} from './nodeAssignmentApi';
 import {ApprovalList} from './App';
 
@@ -57,18 +55,17 @@ const deniedProjects=new Set<string>();
 const latestProjectReads=new Map<string,Promise<ProjectSlice>>();
 function cachedProject(id:string|undefined){if(projectEpoch!==getSessionEpoch()){projectSnapshots.clear();projectRequests.clear();latestProjectReads.clear();deniedProjects.clear();projectEpoch=getSessionEpoch()}return id?projectSnapshots.get(id):undefined}
 type FirstScreenPart={status:number;body:unknown};
-type FirstScreen={project:ProjectSlice;assignments:FirstScreenPart;tasks:FirstScreenPart;start:FirstScreenPart;progress:FirstScreenPart};
+type FirstScreen={project:ProjectSlice;assignments:FirstScreenPart;tasks:FirstScreenPart;start:FirstScreenPart};
 const readProject=async(id:string,epoch:number,overview:boolean,workspace:string)=>{
  const current=()=>epoch===getSessionEpoch();
  if(overview){
   try {
    let stale=false;
-   const payload=await api<FirstScreen>(`/api/projects/${encodeURIComponent(id)}/first-screen`,{timeoutMs:20000},current,(_status,response)=>{stale=response.headers.get('X-Read-Snapshot')==='stale'});
+   const payload=await api<FirstScreen>(`/api/projects/${encodeURIComponent(id)}/first-screen`,{etag:true,timeoutMs:20000},current,(_status,response)=>{stale=response.headers.get('X-Read-Snapshot')==='stale'});
    if(current()){
     if(payload.assignments.status===200){const data=parseNodeAssignments(payload.assignments.body);seedNodeAssignments(id,stale?{...data,stale:true,stale_reason:'snapshot_refreshing'}:data)}
     if(payload.tasks.status===200)seedSopTasks(id,workspace,parseOverview(payload.tasks.body));
     if(payload.start.status===200)seedStartSop(id,parseSopPreview(payload.start.body));
-    if(payload.progress.status===200)seedProjectProgress(id,parseProjectProgress(payload.progress.body));
    }
    return payload.project;
   }catch(error){if(!(error instanceof ApiError)||error.status!==404)throw error}

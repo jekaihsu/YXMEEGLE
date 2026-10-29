@@ -207,7 +207,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
     def initial_capabilities(ident,role):
         return (MANAGER_CAPABILITIES[:] if role=='manager' else [])+(['approve_capability'] if ident in capability_approvers else [])
 
-    from .read_snapshots import ReadSnapshots
+    from .read_snapshots import ReadSnapshots, EncodedSnapshot
     read_snapshots = ReadSnapshots()
     app.state.read_snapshots = read_snapshots
 
@@ -279,7 +279,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
         response=await call_next(request)
         response.headers['X-Content-Type-Options']='nosniff'
         response.headers['Referrer-Policy']='same-origin'
-        if request.url.path.startswith('/api'): response.headers['Cache-Control']='no-store'
+        if request.url.path.startswith('/api'): response.headers.setdefault('Cache-Control','no-store')
         elif response.status_code in (200,206,304) and re.fullmatch(r'/assets/(?:[^/]+/)*[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+',request.url.path):
             response.headers['Cache-Control']='public, max-age=31536000, immutable'
         if (request.method,request.url.path) in TIMED_ROUTES or (request.method=='GET' and response.status_code<400 and re.fullmatch(r'/api/(?:projects/[^/]+(?:/(?:navigation|progress|node-assignments|start-sop|sop-tasks|sop-assignees|first-screen))?|case-detail/[^/]+)',request.url.path)):
@@ -747,8 +747,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
         return overview(safe,offset=offset,limit=limit,q=q,group=group,source_status=source_status,attention=attention,lifecycle=lifecycle,complete_read=True)
 
     @app.get('/api/projects')
-    def projects(request:Request,q:str='',status:str='',owner:str='',offset:int=0,limit:int=30,view:str='',tab:str='formal',sort:str='due',dir:str='asc'):
+    def projects(request:Request,q:str='',status:str='',owner:str='',offset:int=0,limit:int=30,view:str='',tab:str='formal',sort:str='due',dir:str='asc',page:int=0,snapshot:str=''):
         data,user=identity(request); require(0<=offset and 1<=limit<=100,'分頁參數錯誤',422)
+        require(0<=page<=10000 and (not page or view=='portfolio'), '分頁參數錯誤', 422)
+        require(len(snapshot)<=100 and (not snapshot or page>0), '分頁參數錯誤', 422)
         from . import index_reads
         if view:
             from . import shell
@@ -764,12 +766,30 @@ def create_app(overrides=None,*,dispatch_transport=None):
                     def build_portfolio():
                         with sessions() as snapshot_db:
                             root = snapshot_db.get(WorkspaceRow, data['wid'])
-                            return JSONResponse(portfolio(snapshot_db, BusinessRow, root, load(snapshot_db, root, collections=()), today,
-                                assignments=app.state.home_panels, data=data, user=user)).body
+                            return EncodedSnapshot.encode(JSONResponse(portfolio(snapshot_db, BusinessRow, root, load(snapshot_db, root, collections=()), today,
+                                assignments=app.state.home_panels, data=data, user=user)).body)
                     with phase(request, 'snapshot'):
-                        body, snapshot_status = read_snapshots.get(key, build_portfolio, revision=row.version)
-                    from fastapi.responses import Response
-                    return Response(body, media_type='application/json', headers={'Cache-Control': 'no-store', 'X-Read-Snapshot': snapshot_status})
+                        generation = read_snapshots.generation
+                        if snapshot:
+                            body = read_snapshots.peek(('portfolio-version', key, snapshot))
+                            require(body is not None, '案件清單已更新，請重新讀取。', 409)
+                            snapshot_status = 'hit'
+                        else:
+                            body, snapshot_status = read_snapshots.get(key, build_portfolio, revision=row.version)
+                    if page:
+                        version_body = body
+                        read_snapshots.retain(('portfolio-version', key, body.etag), body, generation)
+                        # Pages share the same authority-checked portfolio capture.
+                        # Cache their wire bytes as well; no re-projection per page.
+                        def build_page():
+                            result = json.loads(version_body.body)
+                            start = (page-1)*30
+                            result['items'] = result['items'][start:start+30]
+                            result.update(page=page, next_page=page+1 if start+30<result['total'] else None,
+                                          snapshot=version_body.etag)
+                            return EncodedSnapshot.encode(JSONResponse(result).body)
+                        body, _ = read_snapshots.get(('portfolio-page', key, body.etag, page), build_page)
+                    return body.response(request, snapshot_status)
                 return shell.overview_page(db,BusinessRow,row,load(db,row,collections=()),now()[:10],q=q,status=status,owner=owner,tab=tab,sort=sort,desc=dir=='desc',offset=offset,limit=limit)
         with phase(request,'load'),sessions() as db:
             row=db.get(WorkspaceRow,data['wid'])
@@ -1911,22 +1931,28 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 for name, path in (
                     ('assignments', '/api/projects/{project_id}/node-assignments'),
                     ('tasks', '/api/projects/{project_id}/sop-tasks'),
-                    ('start', '/api/projects/{project_id}/node-assignments/start-sop'),
-                    ('progress', '/api/projects/{project_id}/progress')):
+                    ('start', '/api/projects/{project_id}/node-assignments/start-sop')):
                     try:
                         response = readers[path](child, project_id)
                     except HTTPException as exc:
                         response = JSONResponse({'detail': exc.detail}, status_code=exc.status_code)
                     result[name] = {'status': response.status_code, 'body': json.loads(response.body)}
+                # Administrative history and connection diagnostics are unrelated
+                # to the case screen. Full detail destinations retain their reader.
+                for field in ('admin_revisions', 'people_directory_status', 'people_directory_connection',
+                              'source_connection', 'attendance_schedule_status', 'attendance_schedule_connection',
+                              'attendance_identity_status', 'native_approval_authority'):
+                    result['project'].pop(field, None)
+                # Older open tabs can also fall through to the deferred reader.
+                result['progress'] = {'status': 202, 'body': None}
                 from .request_timing import measure
                 with measure('snapshotencode'):
-                    return JSONResponse(result).body
+                    return EncodedSnapshot.encode(JSONResponse(result).body)
             finally:
                 capture.reset(token)
         with phase(request, 'snapshot'):
             body, status = read_snapshots.get(key, build, revision=version)
-        from fastapi.responses import Response
-        return Response(body, media_type='application/json', headers={'Cache-Control': 'no-store', 'X-Read-Snapshot': status})
+        return body.response(request, status)
 
     from .runtime_health import register as register_runtime_health
     register_runtime_health(app,identity,sessions,CacheRow,cfg,workspace_model=WorkspaceRow,coordinator=app.state.live_read)

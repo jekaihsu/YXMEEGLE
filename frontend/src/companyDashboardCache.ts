@@ -22,7 +22,7 @@ export function rememberDashboard(epoch:number,version:number,params:string,data
 }
 
 type PendingRead<T>={promise:Promise<T>;controller:AbortController;readers:Set<AbortSignal>};
-function panelReader<T>(){
+function panelReader<T>(conditional=false){
  const panels=new Map<string,T>();
  const pending=new Map<string,PendingRead<T>>();
  const latest=new Map<string,AbortController>();
@@ -38,7 +38,7 @@ function panelReader<T>(){
   let entry=pending.get(flight);
   if(!entry){
    const controller=new AbortController();latest.set(ident,controller);
-   const promise=api<T>(url,{signal:controller.signal,cache:'no-store',timeoutMs},()=>started===getSessionEpoch())
+   const promise=api<T>(url,{signal:controller.signal,etag:conditional,cache:conditional?'no-cache':'no-store',timeoutMs},()=>started===getSessionEpoch())
     .then(body=>{if(!controller.signal.aborted&&started===getSessionEpoch()&&latest.get(ident)===controller){
      panels.set(ident,body);
      if(panels.size>32){const oldest=panels.keys().next();if(!oldest.done)panels.delete(oldest.value)}
@@ -62,7 +62,7 @@ function panelReader<T>(){
 const panels=panelReader<unknown>();
 export const cachedPanel=panels.cached;
 export const readPanel=panels.read;
-const portfolios=panelReader<PortfolioPage>();
+const portfolios=panelReader<PortfolioPage>(true);
 export const cachedPortfolio=portfolios.cached;
 export const readPortfolio=portfolios.read;
 const projects=panelReader<ProjectPage>();
