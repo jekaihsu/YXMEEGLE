@@ -73,15 +73,16 @@ def test_cold_write_failure_is_503_before_assigned_only_denial(h):
     assert calls == [True]
 
 
-def test_participant_read_and_executor_transition_need_no_refresh(h):
+def test_participant_read_recovers_authority_but_executor_transition_needs_no_refresh(h):
     task = post(h, URL + '/sop-tasks', {'title': 'mine', 'node_keys': ['pm'],
                 'participants': {'executor': 'member'}})['task']
     h.who[0] = 'member'
     h.users['member']['capabilities'] = []
     calls = cold_roster(h, failing=True)
     assert overview(h)['tasks'][0]['id'] == task['id']
+    assert calls == [True], 'cold read checks whether the participant is also a node manager'
     post(h, URL + f"/sop-tasks/{task['id']}/transition", {'action': 'start', 'expected_revision': task['revision']})
-    assert calls == []
+    assert calls == [True], 'executor can still work during a roster outage without another refresh'
 
 
 @pytest.mark.parametrize('actor', ['pm', 'expired'])
