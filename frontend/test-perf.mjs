@@ -27,4 +27,26 @@ assert.equal(req.browserWaitMs,req.headersMs);assert.equal(req.outsideServerMs,M
 perfFirstRender();await new Promise(r=>setTimeout(r,10));
 assert.ok(window.__yxPerf.firstRenderMs>=0);
 assert.equal(performance.getEntriesByName('yx:fetch->first-render').length,1);
+let conditional=0;
+globalThis.fetch=async()=>++conditional===1
+ ? new Response('{"ok":true}',{headers:{'ETag':'"v1"','Server-Timing':'total;dur=1','X-Request-Id':'initial'}})
+ : new Response(null,{status:304,headers:{'Server-Timing':'total;dur=2','X-Request-Id':'revalidated'}});
+assert.deepEqual(await api('/conditional',{etag:true}),{ok:true});
+assert.deepEqual(await api('/conditional',{etag:true}),{ok:true});
+const revalidated=window.__yxPerf.requests.at(-1);
+assert.equal(revalidated.status,304);assert.equal(revalidated.requestId,'revalidated');
+assert.equal(revalidated.bytes,0);assert.equal(revalidated.serverTotalMs,2);
+assert.ok(revalidated.browserTotalMs>=0);
+const freshBody={freshness:{server_time:'2026-10-29T00:00:00Z',datasets:{sources:{as_of:'2026-10-29T00:00:00Z',age_seconds:0,ttl_seconds:60,status:'fresh'}}}};
+let freshCalls=0;
+globalThis.fetch=async()=>++freshCalls===1
+ ? new Response(JSON.stringify(freshBody),{headers:{'ETag':'"age"','Date':'Thu, 29 Oct 2026 00:00:30 GMT'}})
+ : new Response(null,{status:304,headers:{'Date':'Thu, 29 Oct 2026 00:01:30 GMT'}});
+const fresh=await api('/freshness',{etag:true});
+assert.equal(fresh.freshness.datasets.sources.age_seconds,30);
+assert.equal(fresh.freshness.datasets.sources.status,'fresh');
+const older=await api('/freshness',{etag:true});
+assert.equal(older.freshness.datasets.sources.age_seconds,90);
+assert.equal(older.freshness.datasets.sources.status,'stale');
+assert.equal(older.freshness.datasets.sources.as_of,freshBody.freshness.datasets.sources.as_of);
 console.log=log;console.log('perf tests passed');

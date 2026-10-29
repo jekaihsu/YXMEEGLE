@@ -39,7 +39,7 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
   const response=await bounded(fetch(url,{credentials:'same-origin',...request,headers,...(controller?{signal:controller.signal}:{})}));
   perfHeaders(trace,response);
   onResponse?.(response.status,response);
-  if(response.status===304&&cached){perfParsed(trace,'');return cached.data as T;}
+  if(response.status===304&&cached){perfParsed(trace,'');return receivedFreshness(cached.data,response) as T;}
   const malformed='服務回應格式不正確，請稍後再試。';
   let data:any;let parsed=true;
   try{const text=await bounded(response.text());data=JSON.parse(text);perfParsed(trace,text)}catch(error){if(controller?.signal.aborted)throw error;data={detail:malformed};parsed=false}
@@ -53,8 +53,22 @@ export async function api<T>(url:string,init?:ApiRequestInit,isCurrent:()=>boole
     if(etagCache.size>100)etagCache.delete(etagCache.keys().next().value!);
    }else etagCache.delete(url);
   }
-  return data;
+  return receivedFreshness(data,response) as T;
   }finally{if(timer!==undefined)clearTimeout(timer);request.signal?.removeEventListener('abort',cancel);controller?.abort();if(mutating){const remaining=(pendingMutations.get(epoch)||1)-1;if(remaining)pendingMutations.set(epoch,remaining);else pendingMutations.delete(epoch);mutationChanged()}}
+}
+// A revalidated HTTP representation keeps its original body timestamps. Use
+// the origin's Date (not the device clock) to advance age, never to freshen it.
+function receivedFreshness(data:any,response:Response):unknown {
+ const at=Date.parse(response.headers.get('Date')||'');
+ const freshness=data?.freshness;
+ if(!Number.isFinite(at)||!freshness?.datasets||typeof freshness.datasets!=='object')return data;
+ return {...data,freshness:{...freshness,datasets:Object.fromEntries(Object.entries(freshness.datasets).map(([key,value])=>{
+  if(!value||typeof value!=='object')return [key,value];
+  const d=value as Record<string,any>,asOf=Date.parse(d.as_of||'');
+  if(!Number.isFinite(asOf))return [key,d];
+  const age=Math.max(0,Number.isFinite(d.age_seconds)?d.age_seconds:0,(at-asOf)/1000);
+  return [key,{...d,age_seconds:age,status:d.status==='fresh'&&age>=d.ttl_seconds?'stale':d.status}];
+ }))}};
 }
 export function normalizeRoute<T extends {view:string;tab?:string;section?:string;node?:string;task?:string;focus?:string;approval?:string;comment?:string}>(route:T):T {
  if(route.view==='company'||route.view==='schedule')return {...route,view:'projects'};

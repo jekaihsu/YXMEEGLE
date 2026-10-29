@@ -310,12 +310,26 @@ class NodeAssignmentService:
 
     # Reads
 
+    def warm_roster(self):
+        if not (self.config.enabled and self.cfg.get('LARK_WORKER_IDENTITY')=='application'
+                and self.cfg.get('LARK_APP_ID') and self.cfg.get('LARK_APP_SECRET')):
+            return
+        started=time.monotonic()
+        try:
+            self._roster(fresh=False)
+        except Exception as exc:
+            logger.warning('node_roster_warmup_failed error_class=%s',type(exc).__name__)
+        finally:
+            logger.warning('node_roster_warmup complete_ms=%.1f',(time.monotonic()-started)*1000)
+
     def _roster(self, *, fresh, calls=None):
         caller = threading.get_ident()
         def load():
             with self.client() as client:
                 try:
-                    return fetch_roster(client, self._check_roster_schema)
+                    from ..request_timing import measure
+                    with measure('noderoster'):
+                        return fetch_roster(client, self._check_roster_schema)
                 finally:
                     if calls is not None and threading.get_ident() == caller:
                         calls.append(client.calls)
@@ -332,7 +346,9 @@ class NodeAssignmentService:
         def load():
             with self.client() as client:
                 try:
-                    return read_case(client, code)
+                    from ..request_timing import measure
+                    with measure('nodecase'):
+                        return read_case(client, code)
                 finally:
                     if calls is not None and threading.get_ident() == caller:
                         calls.append(client.calls)

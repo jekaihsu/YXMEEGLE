@@ -147,8 +147,9 @@ def test_shell_budget_319(tmp_path):
         print('shell', stats['queries'], 'queries', raw, 'raw', response.headers['content-length'], 'wire')
         assert response.json()['scope'] == 'shell' and 'server-timing' in response.headers
         # Fixture names are long CJK strings: 319 slim cards alone are ~148 KB. The 150 KB plan target needs P4-2 (server-paged cards).
+        # The visibility fence and snapshot builder add two queries.
         # Queries include ~14 from live-read ensure()/status and identity that are outside the shell itself (11: two more load the pending approvals the dashboard lists).
-        assert stats['queries'] <= 26 and raw <= 165_000 and int(response.headers['content-length']) <= 30_000
+        assert stats['queries'] <= 28 and raw <= 165_000 and int(response.headers['content-length']) <= 30_000
 
 
 def shell_get(client, tag=None):
@@ -159,7 +160,7 @@ def test_shell_etag_304_and_server_timing(tmp_path):
     with scaled_client(tmp_path, 6, **ON) as (app, client):
         switch(client, 'u-pm')
         first = shell_get(client); tag = first.headers['etag']
-        assert first.status_code == 200 and tag.startswith('W/"shell-') and first.headers['cache-control'] == 'no-store'
+        assert first.status_code == 200 and tag.startswith('W/"') and first.headers['cache-control'] == 'private, max-age=0, must-revalidate'
         again = shell_get(client, tag)
         assert again.status_code == 304 and again.content == b'' and again.headers['etag'] == tag
         assert shell_get(client, 'W/"other", ' + tag).status_code == 304
@@ -198,3 +199,21 @@ def test_shell_etag_changes_with_version_authority_and_day(tmp_path, monkeypatch
         assert shell.etag('w2', user, 1, '2026-10-08', []) != base and shell.etag('w', user, 1, '2026-10-09', []) != base
         monkeypatch.setattr(backend_app, 'now', lambda: '2030-01-01T00:00:00+08:00')
         assert shell_get(client, tag).status_code == 200
+
+
+def test_shell_reuses_encoded_body_after_fresh_authority_checks(tmp_path, monkeypatch):
+    from . import shell
+    with scaled_client(tmp_path, 6, **ON) as (app, client):
+        switch(client, 'u-pm')
+        first = shell_get(client)
+        tag = first.headers['etag']
+        def unexpected(*args, **kwargs):
+            raise AssertionError('warm shell must not rebuild its cards and counts')
+        monkeypatch.setattr(shell, 'build', unexpected)
+        again = shell_get(client)
+        assert again.status_code == 200 and again.json() == first.json()
+        assert again.headers['x-read-snapshot'] == 'hit'
+        validated = shell_get(client, tag)
+        assert validated.status_code == 304 and validated.content == b''
+        assert validated.headers['vary'] == 'Accept-Encoding, Cookie'
+        assert validated.headers['x-request-id'] != first.headers['x-request-id']

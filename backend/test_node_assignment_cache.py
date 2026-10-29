@@ -68,3 +68,18 @@ def test_nonblocking_cold_read_starts_one_refresh_without_waiting():
         release.set()
     assert future.result(timeout=2).value == {'value': 'ready'}
     assert cache.get('cold', load, wait=False).value == {'value': 'ready'}
+
+
+def test_hosted_roster_warmup_obeys_feature_and_application_identity():
+    from types import SimpleNamespace
+    from .node_assignment.service import NodeAssignmentService
+    calls = []
+    service = SimpleNamespace(config=SimpleNamespace(enabled=False), cfg={},
+                              _roster=lambda **kw: calls.append(kw))
+    NodeAssignmentService.warm_roster(service)
+    service.config.enabled = True
+    NodeAssignmentService.warm_roster(service)
+    assert calls == []
+    service.cfg = dict(LARK_WORKER_IDENTITY='application', LARK_APP_ID='app', LARK_APP_SECRET='test')
+    NodeAssignmentService.warm_roster(service)
+    assert calls == [{'fresh': False}]

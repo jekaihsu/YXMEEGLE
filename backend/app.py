@@ -146,6 +146,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
         import asyncio
         from .request_timing import monitor_loop
         loop_monitor=asyncio.create_task(monitor_loop())
+        # Hosted GETs must not pay the roster schema/token bootstrap after boot.
+        # This only warms the existing in-memory read cache; writes still refresh.
+        warmup=(asyncio.create_task(asyncio.to_thread(app.state.node_assignment.warm_roster))
+                if str(cfg.get('LIVE_READ_BACKGROUND_PROCESS','false')).lower()=='true' else None)
         try:
             tenant=cfg.get('LARK_WORKER_ORGANIZATION')
             if tenant and tenant in allowed_tenants:
@@ -160,6 +164,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
             yield
         finally:
             loop_monitor.cancel()
+            if warmup:
+                warmup.cancel()
+                await asyncio.gather(warmup,return_exceptions=True)
             await asyncio.to_thread(app.state.read_snapshots.close)
             app.state.sop_projection.close()
             app.state.people_attendance.close()
@@ -713,13 +720,21 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 state=load(db,row,collections=('users','delegations','approved_leave_delegations'))
             today=now()[:10]; facts=shell.prepare(state,user,today)
             tag=shell.etag(wid,user,row.version,today,state['users'])
-            if tag in [v.strip() for v in request.headers.get('if-none-match','').split(',')]: return Response(status_code=304,headers={'ETag':tag})
-            with phase(request,'project'):
-                result=shell.build(db,BusinessRow,row,state,user,facts,today,approval_connection(cfg,simulation_available=(data['mode']=='demo') or wid.startswith('test-'),definition_verification=state.get('native_definition_verification')))
-        restrict_hr(result,user)
-        result['freshness']=coordinator.status(wid)
-        as_of=result['freshness']['datasets']['sources']['as_of']
-        return JSONResponse(result,headers={'ETag':tag,**({'X-Data-As-Of':as_of} if as_of else {})})
+            visibility_revision=snapshot_visibility(db,row)
+            version=row.version
+        # Every read still validates the session, roster admission, viewer and
+        # current visibility before either a cached body or a 304 can be served.
+        key=('shell',wid,tag,visibility_revision,snapshot_viewer(user),state.get('environment'))
+        def build():
+            with sessions() as db, phase(request,'project'):
+                current=db.get(WorkspaceRow,wid)
+                result=shell.build(db,BusinessRow,current,state,user,facts,today,approval_connection(cfg,simulation_available=(data['mode']=='demo') or wid.startswith('test-'),definition_verification=state.get('native_definition_verification')))
+            restrict_hr(result,user)
+            result['freshness']=coordinator.status(wid)
+            return EncodedSnapshot.encode(JSONResponse(result).body,as_of=result['freshness']['datasets']['sources']['as_of'])
+        with phase(request,'snapshot'):
+            body,status=read_snapshots.get(key,build,revision=version)
+        return body.response(request,status)
 
     @app.get('/api/workspace')
     def workspace(request:Request,scope:str=''):

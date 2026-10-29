@@ -17,16 +17,17 @@ class EncodedSnapshot:
     body: bytes
     compressed: bytes
     etag: str
+    as_of: str | None = None
 
     def __len__(self):
         return len(self.body) + len(self.compressed)
 
     @classmethod
-    def encode(cls, body):
+    def encode(cls, body, *, as_of=None):
         from .request_timing import measure
         with measure('snapshotcompress'):
             compressed = gzip.compress(body, compresslevel=1, mtime=0)
-        return cls(body, compressed, 'W/"' + hashlib.sha256(body).hexdigest() + '"')
+        return cls(body, compressed, 'W/"' + hashlib.sha256(body).hexdigest() + '"', as_of)
 
     def response(self, request, status):
         # Always reauthorize before conditional validation. Browser freshness must
@@ -34,6 +35,8 @@ class EncodedSnapshot:
         request.scope['read_snapshot_response'] = True
         headers = {'ETag': self.etag, 'Cache-Control': 'private, max-age=0, must-revalidate',
                    'Vary': 'Accept-Encoding, Cookie', 'X-Read-Snapshot': status}
+        if self.as_of:
+            headers['X-Data-As-Of'] = self.as_of
         tags = request.headers.get('if-none-match', '').split(',')
         if any(tag.strip().removeprefix('W/') in ('*', self.etag.removeprefix('W/')) for tag in tags):
             return Response(status_code=304, headers=headers)
