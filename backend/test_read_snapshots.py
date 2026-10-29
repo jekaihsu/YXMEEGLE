@@ -109,3 +109,35 @@ def test_background_revision_revalidates_last_good_without_blocking():
     finally:
         release.set()
         cache.close()
+
+
+def test_changed_authority_cannot_publish_under_previous_viewer_key(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from .models import BusinessRow
+    from . import storage
+    with scaled_client(tmp_path, 2, **ON) as (app, client):
+        with app.state.sessions() as db:
+            root = db.scalars(select(WorkspaceRow)).first()
+            pid = storage.load(db, BusinessRow, root)['projects'][0]['id']
+        blocker_started, release, lookup = Event(), Event(), Event()
+        def block():
+            blocker_started.set()
+            assert release.wait(5)
+        app.state.read_snapshots.executor.submit(block)
+        assert blocker_started.wait(2)
+        original = app.state.read_snapshots.get
+        def get(*args, **kwargs):
+            lookup.set()
+            return original(*args, **kwargs)
+        monkeypatch.setattr(app.state.read_snapshots, 'get', get)
+        with ThreadPoolExecutor(max_workers=1) as requests:
+            pending = requests.submit(client.get, '/api/projects/' + pid + '/first-screen')
+            try:
+                assert lookup.wait(2)
+                with app.state.sessions.begin() as db:
+                    person = db.scalars(select(BusinessRow).where(BusinessRow.kind == 'users', BusinessRow.entity_id == 'u-manager')).one()
+                    person.data = dict(person.data, role='member')
+            finally:
+                release.set()
+            assert pending.result(timeout=5).status_code == 409
+        assert not app.state.read_snapshots.entries

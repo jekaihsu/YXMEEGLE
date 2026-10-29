@@ -1881,6 +1881,9 @@ def create_app(overrides=None,*,dispatch_transport=None):
             child = Request(dict(request.scope, state={}, phases={}, query_string=b''))
             # A refresh checks the cookie/admission again instead of extending a logged-out session.
             fresh_identity = identity(child)
+            fresh_data, fresh_user = fresh_identity
+            require(fresh_data == data and snapshot_viewer(fresh_user) == snapshot_viewer(user),
+                '登入身分已變更，請重新整理後再操作', 409)
             shared = dict(wid=data['wid'], project_id=project_id, identity=fresh_identity)
             token = capture.set(shared)
             try:

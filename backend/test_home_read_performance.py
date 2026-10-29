@@ -75,7 +75,8 @@ def test_mocked_assignments_match_full_load_and_batch_legacy_queries(tmp_path):
             audits.clear()
             response = client.get('/api/projects?view=portfolio')
             assert response.status_code == 200
-            assert len(audits) == 1
+            assert response.json()['basis'] == 'persisted_workspace'
+            assert len(audits) == 0  # persisted cards no longer project Lark legacy-completion chains
         finally:
             event.remove(app.state.engine, 'before_cursor_execute', count)
 
