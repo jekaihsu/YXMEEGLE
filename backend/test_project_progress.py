@@ -301,7 +301,7 @@ def test_response_carries_no_raw_source_fields_names_or_contract_totals(progress
     assert 'source_fields' not in text and 'source_records' not in text and 'fields' not in response.json().keys()
     for sentinel in (SECRET_PERSON, 'RAW_NOTE_SENTINEL', '918273', 'HIDDEN_CASE_SENTINEL', 'recH1'):
         assert sentinel not in text
-    assert response.headers['cache-control'] == 'no-store'
+    assert response.headers['cache-control'] == 'private, max-age=0, must-revalidate'
 
 
 def test_nothing_is_mutated_by_a_read(progress):
@@ -614,3 +614,44 @@ def test_refresh_permission_failures_preserve_read_routes(http, monkeypatch, fai
             assert response.json()['sources']['can_refresh_sources'] is False
     if failure == 'disabled':
         assert client.post('/api/live/refresh', json={'datasets':['sources'], 'force':True}).status_code == 403
+
+
+def test_encoded_progress_reuse_still_checks_session_and_visibility(progress, monkeypatch):
+    from . import project_progress as module
+    from .app import AuthRow, BusinessRow
+    from sqlalchemy import select
+    run, client, app = progress
+    app.state.sessions.configure(info={'index_tables': True})
+    state, vis, _ = chain_state()
+    first = run(state, vis)
+    assert first.status_code == 200
+    tag = first.headers['etag']
+    def unexpected(*args, **kw): raise AssertionError('unchanged progress must not rebuild')
+    monkeypatch.setattr(module, 'build_project_progress', unexpected)
+    again = client.get(f'/api/projects/{vis}/progress')
+    assert again.status_code == 200 and again.json() == first.json()
+    assert again.headers['x-read-snapshot'] == 'hit'
+    assert client.get(f'/api/projects/{vis}/progress', headers={'If-None-Match': tag}).status_code == 304
+    with app.state.sessions.begin() as db:
+        row = db.scalar(select(BusinessRow).where(BusinessRow.workspace_id == WID, BusinessRow.kind == 'projects', BusinessRow.entity_id == vis))
+        row.data = dict(row.data, case_visibility='excluded_history')
+    assert client.get(f'/api/projects/{vis}/progress', headers={'If-None-Match': tag}).status_code == 404
+    with app.state.sessions.begin() as db: db.delete(db.get(AuthRow, 'sess-'+WID))
+    assert client.get(f'/api/projects/{vis}/progress', headers={'If-None-Match': tag}).status_code == 401
+
+
+def test_progress_cache_rebuilds_for_new_report_snapshot(progress):
+    run, client, app = progress
+    app.state.sessions.configure(info={'index_tables': True})
+    state, vis, _ = chain_state()
+    first = run(state, vis, cases=[('recV3', 'C115264', '執行中', .25)])
+    assert first.json()['production']['field']['actual']['value'] == '0.25'
+    reports = SnapshotStore(RawReader([('recV3', 'C115264', '執行中', .5)]))
+    try:
+        reports.get(); app.state.reports = reports
+        changed = client.get(f'/api/projects/{vis}/progress', headers={'If-None-Match': first.headers['etag']})
+        assert changed.status_code == 200
+        assert changed.json()['production']['field']['actual']['value'] == '0.5'
+        assert changed.headers['etag'] != first.headers['etag']
+    finally:
+        reports.close()

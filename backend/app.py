@@ -1428,17 +1428,33 @@ def create_app(overrides=None,*,dispatch_transport=None):
         data,user=identity(request)
         require(len(project_id)<=200,'查詢參數過長',422)
         require(not request.query_params,'查詢參數錯誤',422)
-        with phase(request,'capture'): state=p2_visible_case_state(data,user,project_id,keep_lines=True,scoped=True,case_sources=True)
         privileged=data.get('access_mode','normal')=='normal' and (user['role'] in ('pm','manager') or capable(user,'manage_sources'))
         if str(cfg.get('REPORTS_ENABLED','true')).lower()!='true': reports=ReportsView(status='disabled')
         elif not privileged or data.get('mode')!='lark' or data['wid'].startswith(('test-','demo-')): reports=ReportsView(status='restricted')
         else: reports=ReportsView(getattr(app.state,'reports',None))
-        # Automatic candidates are a read-time projection. Persisted owner
-        # decisions were loaded above; GET must not queue behind a source sync's
-        # workspace write lock. The link-review workflow persists its own rows.
-        with phase(request,'project'): result=build_project_progress(state,project_id,reports=reports,amounts=privileged,as_of=state['as_of'])
-        result['sources']['can_refresh_sources'],result['sources']['refresh_reason']=source_refresh_permission(data,user)
-        with phase(request,'encode'): return JSONResponse(result,headers={'Cache-Control':'no-store'})
+        with sessions() as db:
+            row=db.get(WorkspaceRow,data['wid'])
+            version=row.version
+            from . import index_reads
+            cacheable=index_reads.ready(db,BusinessRow,row)
+            visibility_revision=snapshot_visibility(db,row,project_id)
+        key=('progress',data['wid'],project_id,version,visibility_revision,json.dumps(data,sort_keys=True),
+             snapshot_viewer(user),reports.status,reports.fetched_at,reports.stale)
+        def build():
+            child=Request(dict(request.scope,state={},phases={}))
+            fresh_data,fresh_user=identity(child)
+            require(fresh_data==data and snapshot_viewer(fresh_user)==snapshot_viewer(user),
+                    '登入身分已變更，請重新整理後再操作',409)
+            with phase(child,'capture'):
+                state=p2_visible_case_state(fresh_data,fresh_user,project_id,keep_lines=True,scoped=True,case_sources=True)
+            # Pure read-time link candidates; no workspace write lock or update.
+            with phase(child,'project'):
+                result=build_project_progress(state,project_id,reports=reports,amounts=privileged,as_of=state['as_of'])
+            result['sources']['can_refresh_sources'],result['sources']['refresh_reason']=source_refresh_permission(fresh_data,fresh_user)
+            return EncodedSnapshot.encode(JSONResponse(result).body)
+        with phase(request,'snapshot'):
+            body,status=read_snapshots.get(key,build,revision=version) if cacheable else (build(),'uncached')
+        return body.response(request,status)
 
     @app.get('/api/case-detail/{project_id}')
     def case_detail(request:Request,project_id:str):
