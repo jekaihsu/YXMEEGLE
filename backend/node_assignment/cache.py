@@ -79,7 +79,7 @@ class StaleCache:
             window = self.stale_max if allow_stale else self.ttl
             return entry if entry and self.clock() - entry.fetched_at <= window else None
 
-    def get(self, key, load, *, max_age=None, allow_stale=True, revalidate=False) -> Cached:
+    def get(self, key, load, *, max_age=None, allow_stale=True, revalidate=False, wait=True) -> Cached | None:
         now = self.clock()
         window = self.ttl if max_age is None else max_age
         with self._lock:
@@ -94,10 +94,10 @@ class StaleCache:
             if future is not None and future.done():
                 future = None
             owner = future is None
-            background = bool(revalidate and stale)
+            background = bool(not wait or revalidate and stale)
             if owner:
                 if background and not _background_slots.acquire(blocking=False):
-                    return Cached(entry.value, True, entry.fetched_at, 'busy')
+                    return Cached(entry.value, True, entry.fetched_at, 'busy') if entry else None
                 future = Future()
                 self._flights[key] = future
                 version = self._versions.get(key, 0)
@@ -132,7 +132,7 @@ class StaleCache:
             else:
                 refresh()
         if background:
-            return Cached(entry.value, True, entry.fetched_at, 'refreshing')
+            return Cached(entry.value, True, entry.fetched_at, 'refreshing') if entry else None
         try:
             from ..request_timing import measure
             with measure('lockwait'):

@@ -45,3 +45,26 @@ def test_failed_background_refresh_keeps_last_good_value(caplog):
     assert result.value == 'good' and result.stale_reason == 'refreshing'
     assert failed.wait(1)
     assert cache.get('case', lambda: 'fresh', allow_stale=False).value == 'fresh'
+
+
+def test_nonblocking_cold_read_starts_one_refresh_without_waiting():
+    from threading import Event
+    from .node_assignment.cache import StaleCache
+    cache = StaleCache(60, 900)
+    entered, release = Event(), Event()
+    calls = []
+    def load():
+        calls.append(1)
+        entered.set()
+        assert release.wait(3)
+        return {'value': 'ready'}
+    try:
+        assert cache.get('cold', load, wait=False) is None
+        assert entered.wait(2)
+        assert cache.get('cold', load, wait=False) is None
+        assert len(calls) == 1
+        future = cache._flights['cold']
+    finally:
+        release.set()
+    assert future.result(timeout=2).value == {'value': 'ready'}
+    assert cache.get('cold', load, wait=False).value == {'value': 'ready'}

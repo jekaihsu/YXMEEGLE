@@ -101,11 +101,14 @@ def portfolio_case(tmp_path, home):
                 n.update(status='not_started', tasks=[])
     with scaled_client(tmp_path, 2, upgraded=True, mutate=prepare,
                        INDEX_TABLES_ENABLED='true', WORKSPACE_SHELL_ENABLED='true') as (app, client):
-        def read(*, enabled=True):
+        def read(*, enabled=True, warm=True):
             with app.state.sessions() as db:
                 row = db.scalars(select(WorkspaceRow)).first()
                 state = storage.load_partial(db, BusinessRow, row)
                 state['environment'] = 'production'
+                data={'wid': 'lark-company' if enabled else row.id}
+                if warm and not home.service.assignment_unavailable(state,data):
+                    home.service.assignment_sources(home.service.scope(data,{'id':'ou_member'}))
                 return portfolio(db, BusinessRow, row, state, '2026-10-23', assignments=home.service,
                                  data={'wid': 'lark-company' if enabled else row.id}, user={'id': 'ou_member'})
         def change(fn):
@@ -222,7 +225,7 @@ def test_portfolio_falls_back_on_unparseable_source_records(portfolio_case, monk
     from .node_assignment.cache import Cached
     from .node_assignment.lark_table import Table
     h = portfolio_case
-    def read_table(_scope, table, _spec):
+    def read_table(_scope, table, _spec, **_options):
         return Cached([{'record_id': 'recBroken', 'fields': None}] if table is Table.NODES else [], False, T0)
     monkeypatch.setattr(h.home.service, 'read_table', read_table)
     assert h.read() == h.persisted
@@ -237,3 +240,23 @@ def test_same_case_code_collapses_to_one_card_and_a_confirmed_case_wins():
     assert [i['id'] for i in kept]==['a','d','e','f']
     assert hidden==2
     assert kept[0]['duplicate_count']==1 and kept[1]['duplicate_count']==1
+
+
+def test_cold_portfolio_serves_persisted_cards_while_lark_is_blocked(portfolio_case):
+    from threading import Event
+    from concurrent.futures import ThreadPoolExecutor
+    h=portfolio_case
+    entered, release=Event(),Event()
+    def blocked(_):
+        entered.set()
+        assert release.wait(3)
+        return httpx.Response(200,json={'code':0,'data':{'items':[],'has_more':False}})
+    h.home.fake.fault('GET','/'+NODES+'/records',blocked,times=1)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future=pool.submit(h.read,warm=False)
+        try:
+            body=future.result(timeout=2)
+            assert body==h.persisted
+            assert entered.wait(2)
+        finally:
+            release.set()

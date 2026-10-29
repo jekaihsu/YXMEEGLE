@@ -3,6 +3,8 @@ import base64
 import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
+from threading import Lock
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -44,6 +46,7 @@ def urgency(item, today):
 
 class HomePanels:
     def __init__(self, nodes, sop=None):
+        self._portfolio_refresh_lock = Lock()
         self.nodes = nodes
         self.sop = sop
         self.config = nodes.config
@@ -55,14 +58,15 @@ class HomePanels:
                          user['id'], data['wid'], fingerprint([user.get('authz_version'), user.get('role'),
                          sorted(user.get('capabilities', [])), user.get('active', True)]))
 
-    def read_table(self, scope, table, spec):
+    def read_table(self, scope, table, spec, *, wait=True):
         projection = [name for name, _ in spec.values()]
         key = scope.key([self.config.base, getattr(self.config, table.value)], projection=projection)
         def load():
-            with self.nodes.client() as client:
-                self.nodes._check_roster_schema(client, table)
-                return client.list_records(table, projection)
-        return self.cache.get(key, load, revalidate=True)
+            with (nullcontext() if wait else self._portfolio_refresh_lock):
+                with self.nodes.client() as client:
+                    self.nodes._check_roster_schema(client, table)
+                    return client.list_records(table, projection)
+        return self.cache.get(key, load, revalidate=True, wait=wait)
 
     def roster(self, scope):
         def load():
@@ -100,8 +104,10 @@ class HomePanels:
     def portfolio_statuses(self, state, data, user):
         if self.assignment_unavailable(state, data):
             return {}
-        sources, _ = self.assignment_sources(self.scope(data, user))
-        if any(isinstance(source, Failure) or not source.complete for source in sources.values()):
+        scope = self.scope(data, user)
+        sources = {name: self.read_table(scope, table, spec, wait=False) for name, table, spec in
+                   (('node_assignments', Table.NODES, NODE_FIELDS), ('tasks', Table.TASKS, TASK_FIELDS))}
+        if any(source is None or isinstance(source, Failure) or not source.complete for source in sources.values()):
             return {}
         try:
             return AssignmentChains(self.nodes, state, data, user, sources['node_assignments'].value,
