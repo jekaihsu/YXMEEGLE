@@ -31,6 +31,7 @@ class EncodedSnapshot:
     def response(self, request, status):
         # Always reauthorize before conditional validation. Browser freshness must
         # not extend admission; stale-while-revalidate lives in ReadSnapshots.
+        request.scope['read_snapshot_response'] = True
         headers = {'ETag': self.etag, 'Cache-Control': 'private, max-age=0, must-revalidate',
                    'Vary': 'Accept-Encoding, Cookie', 'X-Read-Snapshot': status}
         tags = request.headers.get('if-none-match', '').split(',')
