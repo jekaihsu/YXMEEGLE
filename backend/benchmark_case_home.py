@@ -15,6 +15,7 @@ from unittest.mock import patch
 from .test_perf_budget import count_queries, scaled_client
 from .test_node_assignment_routes import BASE, project
 from .node_assignment.cache import Cached
+from .node_assignment.lark_table import Table
 from .node_assignment.domain import NODE_LABELS
 
 
@@ -31,6 +32,7 @@ def offline_assignments(app):
         '指派鍵': f'C11{5000+p}|{label}', '確認單編號': f'C11{5000+p}', '節點': label,
         '工程確認單': [f'recp{p+1:03d}'], '狀態': '未開始', '負責人': [{'id': 'ou_015'}]}}
         for p in range(319) for key, label in NODE_LABELS.items()]
+    service.read_table = lambda _scope,table,_spec,**__: Cached(rows if table is Table.NODES else [],False,1790000000)
     service.assignment_sources = lambda *_, **__: ({
         'node_assignments': Cached(rows, False, 1790000000),
         'tasks': Cached([], False, 1790000000)}, None)

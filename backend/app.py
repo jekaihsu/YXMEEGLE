@@ -152,8 +152,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
                 ensure_workspace(wid,True)
                 for dataset in ('roster','attendance','sources'):
                     app.state.live_read.ensure(wid,dataset,wait=False)
-                app.state.people_attendance.view(wid)
-            app.state.sop_projection.start()
+                if str(cfg.get('LIVE_READ_BACKGROUND_PROCESS','false')).lower()!='true':
+                    app.state.people_attendance.view(wid)
+            if str(cfg.get('LIVE_READ_BACKGROUND_PROCESS','false')).lower()!='true':
+                app.state.sop_projection.start()
             yield
         finally:
             loop_monitor.cancel()

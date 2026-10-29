@@ -62,11 +62,12 @@ def load_partial(db,model,row,*,collections=(),project_ids=None,project_children
             if case_sources:
                 from .case_source_reads import cached_rows
                 rows=cached_rows(db,model,row,shared,project_ids,filter_project_rows=filter_project_rows,quote_facts=case_sources=='sop')
+                for kind,value in rows: result[kind].append(value)
             else:
                 scope=tuple(project_ids) if filter_project_rows and project_ids is not None else None
                 key=(row.id,getattr(row,'version',None),tuple(sorted(shared)),scope)
                 rows=shared_reads.rows(key,lambda:[(kind,text) for kind,parent,text in fetch(shared,as_text=True,parent_id=('',))])
-            for kind,text in rows: result[kind].append(json.loads(text))
+                for kind,text in rows: result[kind].append(json.loads(text))
         if 'source_work_items' in kinds:
             query=select(model.data).where(model.workspace_id==row.id,model.kind=='source_work_items')
             if project_ids is not None:

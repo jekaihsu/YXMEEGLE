@@ -50,6 +50,7 @@ def cached_rows(db, model, workspace, selected, project_ids, *, filter_project_r
     import json
     from sqlalchemy import Text
     from . import shared_reads
+    from .request_timing import measure
     from .source_case_policy import CODE_FIELDS
     from .storage import READ_PROJECT_LINKED
     from .sop_import.quote_facts import DATE_FIELDS, TEXT_FIELDS
@@ -58,6 +59,7 @@ def cached_rows(db, model, workspace, selected, project_ids, *, filter_project_r
         '編號','狀態 (1)','狀態','此案確認單','契約價格(未稅)','契約價格(含稅)',
         '外業負責組別','外業期限','案件已入帳'))
     key=(workspace.id,workspace.version,tuple(sorted(selected)),None,'case_source_rows')
+    @measure('sourcebuild')
     def fetch():
         query=select(model.kind,cast(model.data,Text)).where(model.workspace_id==workspace.id,
             model.kind.in_(selected),model.parent_id=='').order_by(model.ordinal)
@@ -71,11 +73,12 @@ def cached_rows(db, model, workspace, selected, project_ids, *, filter_project_r
         return result
     rows=shared_reads.rows(key,fetch)
     scoped=set(project_ids or ())
-    for kind,payload in rows:
-        value=json.loads(payload)
-        if filter_project_rows and project_ids is not None and kind in READ_PROJECT_LINKED:
-            if value.get('project_id') is not None and value['project_id'] not in scoped:
-                continue
-        if kind=='source_quotes' and not quote_facts or kind=='source_confirmations' and value.get('project_id') not in scoped:
-            value['fields']={k:v for k,v in (value.get('fields') or {}).items() if k in CODE_FIELDS}
-        yield kind,json.dumps(value,ensure_ascii=False,separators=(',',':'))
+    with measure('sourcecopy'):
+        for kind,payload in rows:
+            value=json.loads(payload)
+            if filter_project_rows and project_ids is not None and kind in READ_PROJECT_LINKED:
+                if value.get('project_id') is not None and value['project_id'] not in scoped:
+                    continue
+            if kind=='source_quotes' and not quote_facts or kind=='source_confirmations' and value.get('project_id') not in scoped:
+                value['fields']={k:v for k,v in (value.get('fields') or {}).items() if k in CODE_FIELDS}
+            yield kind,value

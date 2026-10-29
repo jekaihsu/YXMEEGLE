@@ -10,7 +10,7 @@ from collections import OrderedDict
 # Only large, data-only kinds are shared. Anything that carries authority (users and their capabilities, approvals,
 # delegations) is always read fresh.
 KINDS=frozenset({'source_quotes','source_confirmations','contract_items'})
-TTL=30.0
+TTL=300.0
 MAX_BYTES=32_000_000
 MAX_ENTRIES=16
 _guard=threading.Lock()
