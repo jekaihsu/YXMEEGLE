@@ -49,7 +49,21 @@ def test_implicit_source_token_rotations_do_not_retain_unbounded_snapshots(monke
         result = sources.fetch_sources(f'token-{rotation}', {})
         assert result['records'] == [{'record_id': f'token-{rotation}'}]
         assert result['stale'] is False
-    assert len(cache._entries) == 32
+    assert len(cache._entries) == 0
     clock.now = 901
     assert sources.fetch_sources('latest', {})['records'] == [{'record_id': 'latest'}]
-    assert len(cache._entries) == 1
+    assert len(cache._entries) == 0
+
+
+def test_source_cache_budget_rejects_one_oversized_value_and_evicts_old_values():
+    cache = StaleCache(60, 900, max_entries=2, max_bytes=100)
+    for key in range(4): cache.put(key, {'text': 'x' * 45})
+    assert sum(e.size_bytes for e in cache._entries.values()) <= 100
+    assert cache.get('huge', lambda: {'text': 'x' * 200}).value['text'] == 'x' * 200
+    assert 'huge' not in cache._entries
+
+
+def test_transient_single_flight_does_not_retain_decoded_snapshot():
+    cache = StaleCache(60, 900)
+    assert cache.get('bulk', lambda: {'records': [1]}, retain=False).value == {'records': [1]}
+    assert cache.peek('bulk', allow_stale=True) is None

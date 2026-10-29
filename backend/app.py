@@ -459,7 +459,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
                     access=require_access(user,cfg.get('LARK_APP_ID'),cfg=cfg,tenant=organization(data).removeprefix('lark-'),allow_recovery=(request.method,request.url.path) in recovery_routes)
                 data={**data,'access_mode':access}
         from .resource_gauge import mark_activity
-        mark_activity()
+        mark_activity(request.url.path, request.method)
         return data,user
 
     def user_access_token(db,data):

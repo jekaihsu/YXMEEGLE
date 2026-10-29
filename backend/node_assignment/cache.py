@@ -33,6 +33,7 @@ class Cached:
     stale: bool
     fetched_at: float
     stale_reason: str | None = None
+    size_bytes: int = 0
 
     @property
     def complete(self):
@@ -54,11 +55,12 @@ def permission_failure(exc):
 
 
 class StaleCache:
-    def __init__(self, ttl, stale_max, clock=time.time, *, max_entries=32):
+    def __init__(self, ttl, stale_max, clock=time.time, *, max_entries=32, max_bytes=None):
         self.ttl, self.stale_max, self.clock = ttl, stale_max, clock
         if max_entries < 1:
             raise ValueError("max_entries must be positive")
         self.max_entries = max_entries
+        self.max_bytes = max_bytes
         self._entries = OrderedDict()
         self._lock = threading.Lock()
         self._flights = {}
@@ -69,7 +71,8 @@ class StaleCache:
                    if now - entry.fetched_at > self.stale_max]
         for key in expired:
             self._entries.pop(key)
-        while len(self._entries) > self.max_entries:
+        while len(self._entries) > self.max_entries or (self.max_bytes is not None and
+                sum(entry.size_bytes for entry in self._entries.values()) > self.max_bytes):
             self._entries.popitem(last=False)
 
     def peek(self, key, *, allow_stale=False):
@@ -79,7 +82,7 @@ class StaleCache:
             window = self.stale_max if allow_stale else self.ttl
             return entry if entry and self.clock() - entry.fetched_at <= window else None
 
-    def get(self, key, load, *, max_age=None, allow_stale=True, revalidate=False, wait=True) -> Cached | None:
+    def get(self, key, load, *, max_age=None, allow_stale=True, revalidate=False, wait=True, retain=True) -> Cached | None:
         now = self.clock()
         window = self.ttl if max_age is None else max_age
         with self._lock:
@@ -104,9 +107,11 @@ class StaleCache:
 
         def refresh():
             try:
-                fresh = Cached(load(), False, self.clock())
+                value = load()
+                size = len(json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode()) if retain and self.max_bytes is not None else 0
+                fresh = Cached(value, False, self.clock(), size_bytes=size)
                 with self._lock:
-                    if self._versions.get(key, 0) == version and fresh.complete:
+                    if retain and self._versions.get(key, 0) == version and fresh.complete and (self.max_bytes is None or fresh.size_bytes <= self.max_bytes):
                         self._entries[key] = fresh
                         self._entries.move_to_end(key)
                         self._evict(self.clock())
@@ -143,10 +148,11 @@ class StaleCache:
             raise
 
     def put(self, key, value):
+        size = len(json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode()) if self.max_bytes is not None else 0
         with self._lock:
             if key in self._flights:
                 self._versions[key] = self._versions.get(key, 0) + 1
-            self._entries[key] = Cached(value, False, self.clock())
+            self._entries[key] = Cached(value, False, self.clock(), size_bytes=size)
             self._entries.move_to_end(key)
             self._evict(self.clock())
 

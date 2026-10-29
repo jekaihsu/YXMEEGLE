@@ -217,3 +217,27 @@ def test_live_child_shuts_down_cleanly_without_web_import_or_network(tmp_path):
         finally:
             if process.poll() is None:
                 process.kill();process.wait(timeout=3)
+
+
+def test_requested_worker_recycle_keeps_web_alive(tmp_path):
+    stop = threading.Event()
+    web_pid = tmp_path/'web.pid'
+    worker_pids = tmp_path/'worker.pids'
+    code = "import os,sys,time;from pathlib import Path;p=Path(sys.argv[1]);first=not p.exists();p.open('a').write(str(os.getpid())+'\\n');sys.exit(75) if first else time.sleep(120)"
+    observed = []
+    def finish():
+        deadline = time.monotonic()+5
+        while time.monotonic() < deadline:
+            if worker_pids.exists() and len(worker_pids.read_text().splitlines()) == 2:
+                observed.append(alive(int(web_pid.read_text())))
+                break
+            time.sleep(.02)
+        stop.set()
+    thread = threading.Thread(target=finish, daemon=True)
+    thread.start()
+    result = run_service.supervise([('web',long_lived(web_pid)),
+        ('worker',[sys.executable,'-c',code,str(worker_pids)])],stop_event=stop,
+        shutdown_timeout=1,poll_interval=.02,restart_codes={'worker':75})
+    thread.join(timeout=1)
+    assert result == 0 and observed == [True]
+    assert all(not alive(int(pid)) for pid in worker_pids.read_text().splitlines())

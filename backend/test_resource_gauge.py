@@ -45,3 +45,13 @@ def test_stage_log_keeps_interval_and_process_cpu_separate(monkeypatch, caplog):
     gauge.log_stage('test', time.monotonic(), time.process_time())
     assert '"cpu_seconds": 123' in caplog.text
     assert '"stage_cpu_seconds":' in caplog.text
+
+
+def test_read_timers_do_not_count_as_user_activity(tmp_path, monkeypatch):
+    monkeypatch.setattr(gauge, 'ACTIVITY', tmp_path/'activity')
+    monkeypatch.setattr(gauge, '_last_activity', 0)
+    for path in ('/api/home-panels', '/api/my-work', '/api/live/status', '/api/source-health'):
+        gauge.mark_activity(path)
+    assert not gauge.user_active()
+    gauge.mark_activity('/api/projects/example/first-screen')
+    assert gauge.user_active()

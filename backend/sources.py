@@ -221,7 +221,7 @@ def fetch_sources(token, cfg=None, client=None, *, scope=None, revalidate=False)
     cfg = os.environ if cfg is None else cfg
     with _source_cache_lock:
         if _source_cache is None:
-            _source_cache = StaleCache(60, 900)
+            _source_cache = StaleCache(60, 900, max_entries=2, max_bytes=8_000_000)
             _schema_cache = StaleCache(1800, 1800)
     explicit_scope = scope is not None
     if scope is None:
@@ -241,7 +241,7 @@ def fetch_sources(token, cfg=None, client=None, *, scope=None, revalidate=False)
                 _schema_cache.drop_scope(key)
             raise
     cached = _source_cache.get(key, load, max_age=60 if explicit_scope else -1,
-                               allow_stale=explicit_scope, revalidate=revalidate and client is None)
+                               allow_stale=explicit_scope, revalidate=revalidate and client is None, retain=explicit_scope)
     from .live_read.fingerprint import fingerprint
     return dict(deepcopy(cached.value), snapshot_version=fingerprint(cached.value), stale=cached.stale,
                 stale_reason=cached.stale_reason, complete=cached.complete,

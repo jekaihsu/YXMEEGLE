@@ -31,7 +31,7 @@ def _signal_child(process, force=False):
         pass
 
 
-def supervise(commands, *, stop_event=None, shutdown_timeout=10, poll_interval=0.2, readiness=None, startup_timeout=60, child_env=None):
+def supervise(commands, *, stop_event=None, shutdown_timeout=10, poll_interval=0.2, readiness=None, startup_timeout=60, child_env=None, restart_codes=None):
     """Run named argv lists, returning zero only for requested shutdown."""
     stop_event = stop_event if stop_event is not None else threading.Event()
     children = []
@@ -71,9 +71,20 @@ def supervise(commands, *, stop_event=None, shutdown_timeout=10, poll_interval=0
                     return 1
                 stop_event.wait(poll_interval)
         while not stop_event.is_set():
-            for name, process in children:
+            for index, (name, process) in enumerate(children):
                 code = process.poll()
                 if code is not None:
+                    if name in (restart_codes or {}) and code == restart_codes[name]:
+                        if stop_event.is_set(): return 0
+                        command = next(argv for child_name, argv in commands if child_name == name)
+                        options = {'cwd': str(ROOT)}
+                        if child_env: options['env'] = dict(os.environ, **child_env)
+                        if os.name == 'posix': options['start_new_session'] = True
+                        elif os.name == 'nt': options['creationflags'] = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+                        replacement = subprocess.Popen(command, **options)
+                        children[index] = (name, replacement)
+                        print(f'service child recycled: {name} pid={replacement.pid}', flush=True)
+                        continue
                     print(f'service child exited unexpectedly: {name} status={code}', flush=True)
                     return code if 1 <= code <= 125 else 1
             stop_event.wait(poll_interval)
@@ -138,7 +149,7 @@ def main():
     # Web initializes the schema during import. Wait for its DB-aware health
     # endpoint before starting the worker so an empty database has one creator.
     return supervise(commands,readiness={'web':lambda:web_ready(port)},startup_timeout=0,
-        child_env={'LIVE_READ_BACKGROUND_PROCESS':'true','REPORTS_WORKER_PROCESS':'true'})
+        child_env={'LIVE_READ_BACKGROUND_PROCESS':'true','REPORTS_WORKER_PROCESS':'true'}, restart_codes={'worker':75})
 
 
 if __name__ == '__main__':

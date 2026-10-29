@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from fastapi import HTTPException
 from sqlalchemy import select
-from backend.resource_gauge import user_active, container_busy, release_working_memory, log_stage
+from backend.resource_gauge import user_active, container_busy, release_working_memory, log_stage, processes
 from backend.live_read.config import LiveReadConfig
 from backend.app import app, WorkspaceRow, CacheRow
 
@@ -45,7 +45,12 @@ def main():
     # remain the authority; web force/wait reads still use their existing fences.
     app.state.live_read.cfg = dict(cfg, LIVE_READ_BACKGROUND_PROCESS='false')
     app.state.people_attendance.cfg = dict(cfg, LIVE_READ_BACKGROUND_PROCESS='false')
-    next_refresh = 0
+    refresh_deadline = Path('/tmp/yx-workbench-refresh-deadline')
+    try:
+        next_refresh = float(refresh_deadline.read_text())
+        if not time.monotonic() <= next_refresh <= time.monotonic()+360: next_refresh = 0
+    except (OSError, ValueError):
+        next_refresh = 0
     while not stopped.is_set():
         try:
             heartbeat('running','enumerate')
@@ -74,6 +79,10 @@ def main():
                 if user_active() and not container_busy():
                     app.state.people_attendance.view(wid)
             next_refresh = time.monotonic() + (random.uniform(285, 315) if user_active() else random.uniform(28, 32))
+            try:
+                refresh_deadline.write_text(str(next_refresh))
+            except OSError:
+                pass
         started, cpu = time.monotonic(), time.process_time()
         for wid in ids:
             try:
@@ -106,6 +115,16 @@ def main():
         log_stage('released', time.monotonic(), time.process_time())
         heartbeat('degraded' if failed else 'ok','cycle_complete')
         if args.once: return
+        own = next((row for row in processes() if row['pid'] == os.getpid()), {})
+        if own.get('rss_bytes', 0) > 200 * 1024 * 1024:
+            # Only after durable work/heartbeat commit; the supervisor replaces
+            # this interpreter alone. Leases and snapshots live in PostgreSQL.
+            app.state.people_attendance.close()
+            app.state.live_read.close()
+            app.state.read_snapshots.close()
+            app.state.engine.dispose()
+            print('worker recycle requested: RSS above 200 MiB after release', flush=True)
+            return 75
         stopped.wait(random.uniform(28, 32))
 
-if __name__=='__main__': main()
+if __name__=='__main__': raise SystemExit(main())

@@ -12,7 +12,10 @@ ACTIVITY = Path('/tmp/yx-workbench-activity')
 _last_activity = 0.0
 
 
-def mark_activity():
+def mark_activity(path='', method='GET'):
+    # Read timers alone must not keep bulk source refresh alive indefinitely.
+    if method == 'GET' and path in ('/api/home-panels', '/api/my-work', '/api/live/status', '/api/source-health'):
+        return
     global _last_activity
     now = time.monotonic()
     if now - _last_activity >= 30:
@@ -68,6 +71,8 @@ def release_working_memory():
 
 def log_stage(stage, started, cpu):
     own = next((row for row in processes() if row['pid'] == os.getpid()), {})
+    source_cache = getattr(sys.modules.get('backend.sources'), '_source_cache', None)
+    source_entries = len(source_cache._entries) if source_cache is not None else 0
     logging.getLogger('backend.resources').warning('resource_stage %s', json.dumps(dict(
-        stage=stage, stage_wall_seconds=round(time.monotonic()-started, 3),
+        stage=stage, source_cache_entries=source_entries, stage_wall_seconds=round(time.monotonic()-started, 3),
         stage_cpu_seconds=round(time.process_time()-cpu, 3), allocated_blocks=sys.getallocatedblocks(), **own)))
