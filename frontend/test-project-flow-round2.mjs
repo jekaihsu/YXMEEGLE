@@ -150,11 +150,11 @@ await check('round2 failed evidence retains node and offers retry in item sheet'
 evidenceStatus=200;
 const seedDetail='依計畫數量完成控制。\n計畫數量：999\n合約明細：9 筆；工項：9 項\n工項連結：原生 9、推導 0、待確認 0、未連結 0\n[SOP-START:v1:control]';
 const seedConfig=(base,f)=>{Object.assign(f.list.node_details.control.tasks[0],{title:'控制：依計畫數量完成',detail:seedDetail});};
-await check('production seed is one task with expanded evidence, unique item IDs and no raw marker',async()=>{
+await check('production seed is one task with collapsed evidence, unique item IDs and no raw marker',async()=>{
  await mount({node:'control',configure:seedConfig});
  const seed=document.querySelector('[data-assignment-task="recTask1"]');
  assert.equal(seed.querySelector('strong').textContent,'依計畫數量完成');
- assert.equal(seed.querySelector('#flow-evidence').open,true);
+ assert.equal(seed.querySelector('#flow-evidence').open,false);
  assert.equal(document.querySelectorAll('#flow-selected .pf-plan-facts').length,1);
  assert.equal(seed.querySelector('.pf-plan-facts dd').textContent,progress.production.control.planned.qty);
  assert.doesNotMatch(seed.textContent,/999|SOP-START/);
@@ -181,7 +181,7 @@ await check('production fallback uses task facts while evidence loads and keeps 
  assert.doesNotMatch(document.querySelector('.pf-plan-facts').textContent,/999/);
  await click(button('未指派'));
  assert.equal(document.querySelectorAll('#flow-selected .pf-plan-facts').length,1);
- assert.equal(document.querySelector('#flow-evidence').open,true);
+ assert.equal(document.querySelector('#flow-evidence').open,false);
 });
 await check('completed node reopen stays secondary and preserves the reason form',async()=>{
  await mount({node:'control',configure(base,f){f.list.nodes.find(n=>n.key==='control').derived_status='已完成';f.list.can.control={claim:false,assign:false,complete:false,approve:false,reject:true,create_task:false}}});

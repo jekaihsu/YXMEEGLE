@@ -92,7 +92,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  const plan=seed?.task ? productionPlanFacts(seed.task,selected.key,selected.production) : null;
  const taskLoading=loading || !isLegacy && !!list && !!selected.assignment && !detail && !details.errors[selected.key];
  const gapCount=category && selected.production ? productionPlanGaps(selected).length : selected.gaps.length;
- const evidence=<details id="flow-evidence" className="pf-evidence" key={selected.key} open><summary>工程證據與節點待補<span className="pf-evidence-state">{read.state.kind==='error' ? '讀取失敗，可重試' : read.state.kind==='loading' ? '讀取中' : gapCount ? `${gapCount} 項待核對` : '查看來源'}</span></summary><div>
+ const evidence=<details id="flow-evidence" className="pf-evidence" key={selected.key}><summary>工程證據與節點待補<span className="pf-evidence-state">{read.state.kind==='error' ? '讀取失敗，可重試' : read.state.kind==='loading' ? '讀取中' : gapCount ? `${gapCount} 項待核對` : '查看來源'}</span></summary><div>
     {read.state.kind!=='ready' && plan && <ProductionPlanFacts plan={plan}/>}
     {read.state.kind==='error' ? <div role="alert" className="pg-callout">工程證據讀取失敗。{read.state.message}{(read.canRefresh || read.canRetryRead) && <Button onClick={read.retry}>重試工程證據</Button>}</div>
      : read.state.kind==='loading' ? <div aria-label="工程證據載入中" aria-busy="true"><Skeleton height="12rem"/></div>

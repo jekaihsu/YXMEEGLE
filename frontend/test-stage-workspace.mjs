@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
 import {projectFixture,embeddedAssignmentFixture} from './fixtures/node-assignments.mjs';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=project&project=p1',pretendToBeVisual:true});
-for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','MouseEvent','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','Element','Node','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','MouseEvent','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','HTMLDetailsElement','Element','Node','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.getComputedStyle=dom.window.getComputedStyle;
 HTMLElement.prototype.scrollIntoView=function(){};globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
@@ -16,7 +16,7 @@ const can={assign:true,edit_status:true,cancel:true,edit_details:true,claim:fals
 const mk=(id,over={})=>({id,record_id:id,revision:`rev-${id}-1`,title:`任務 ${id}`,detail:'',assignee:{open_id:'ou_wei',name:'合成 陳威廷'},assigned_by:null,department:'控制',deadline:'2026-10-25',status:'待處理',done_at:null,created_at:null,can:{...can},...over});
 let root,c,fixture,calls,mode,holdDetail,tasksByNode;
 const jsonResponse=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
-async function mount({node,task,tab='overview',tasks,embedded=true,assign=true,filters,detailStatus,project}={}){
+async function mount({node,task,tab='overview',tasks,embedded=true,assign=true,filters,detailStatus,project,section}={}){
  if(root)await act(async()=>root.unmount());ui.invalidateSessionEpoch();
  const base=projectFixture();Object.assign(base.project,project||{});fixture=embeddedAssignmentFixture();mode={detailStatus};holdDetail=null;
  tasksByNode=tasks||{control:[mk('c1',{status:'已完成'}),mk('c2',{status:'已完成'}),mk('c3',{status:'已完成'}),mk('c4',{assignee:null}),mk('c5',{status:'進行中'})],field:[mk('f1',{assignee:null,deadline:'2026-10-10'})],pm:[]};
@@ -29,7 +29,7 @@ async function mount({node,task,tab='overview',tasks,embedded=true,assign=true,f
  if(!assign)for(const rows of Object.values(fixture.list.node_details))rows.tasks.forEach(t=>t.can.assign=false);
  if(!embedded)fixture.list.node_details=undefined;
  calls=[];
- c={w:base.workspace,s:{user:{...base.user,role:'manager'},mode:'lark',workspace_id:'stage-ws',features:{node_assignment:true}},route:{view:'project',project:'p1',tab,node,task,task_filters:filters},busy:false,run:async()=>true,notify(){},registerDrafts(){},refresh:async()=>{},go(route){c={...c,route};root.render(React.createElement(ui.ProjectDetail,{c}))}};
+ c={w:base.workspace,s:{user:{...base.user,role:'manager'},mode:'lark',workspace_id:'stage-ws',features:{node_assignment:true}},route:{view:'project',project:'p1',tab,node,task,section,task_filters:filters},busy:false,run:async()=>true,notify(){},registerDrafts(){},refresh:async()=>{},go(route){c={...c,route};root.render(React.createElement(ui.ProjectDetail,{c}))}};
  const detailOf=key=>({...fixture.list,node:fixture.list.nodes.find(n=>n.key===key),can:fixture.list.can[key],tasks:tasksByNode[key]||[],assignable_people:[{open_id:'ou_anna',name:'合成 林安娜',departments:['控制']},{open_id:'ou_wei',name:'合成 陳威廷',departments:['控制']}]});
  globalThis.fetch=async(url,init={})=>{const method=init.method||'GET';calls.push({url,method,body:init.body?JSON.parse(init.body):null});
   if(url.endsWith('/progress'))return jsonResponse(progress);
@@ -88,6 +88,13 @@ await check('overview DOM places tasks before the selectable diagram, node facts
  assert.equal(tasks.contains(evidence),false);
  await click(document.querySelector('.pf-node[aria-label^="PM"]'));
  assert.match(document.querySelector('#flow-tasks h3').textContent,/PM/);
+});
+await check('evidence starts folded and an evidence deep link opens it on either tab',async()=>{
+ for(const tab of ['overview','flow']){
+  await mount({tab});assert.equal(document.querySelector('#flow-evidence').open,false);
+  await mount({tab,section:'evidence'});await act(async()=>{await tick(40)});
+  assert.equal(document.querySelector('#flow-evidence').open,true);
+ }
 });
 await check('T01 opening, selecting nodes and switching tabs cause zero writes',async()=>{
  await mount();assert.ok(document.querySelector('.cs-summary'));
