@@ -74,11 +74,22 @@ test('optional result parser keeps only literal contract values',()=>{const base
 test('pure result message excludes unsynced node from completed count',()=>{assert.equal(ui.sopResultMessage({started:true,complete:false,overview:{},results:[{key:'field',node:'created',task:'created',error:null,sync:'failed'}]},previewFixture()),'已完成 0 個節點。未完成：部分節點尚未建立。稍後再按一次可安全續做。\n外業：節點進度同步失敗，再按一次可補同步')});
 test('preview parser carries seeds_pending and seeds_optional, defaults them for older servers and rejects bad types',()=>{const p=previewFixture();p.already_started=true;p.seeds_pending=4;p.seeds_optional=true;const parsed=ui.parseSopPreview(p);assert.equal(parsed.seeds_pending,4);assert.equal(parsed.seeds_optional,true);const old=previewFixture();delete old.seeds_pending;delete old.seeds_optional;const legacy=ui.parseSopPreview(old);assert.equal(legacy.seeds_pending,0);assert.equal(legacy.seeds_optional,false);for(const patch of [{seeds_pending:-1},{seeds_pending:'4'},{seeds_pending:1.5},{seeds_optional:'yes'}])assert.throws(()=>ui.parseSopPreview({...previewFixture(),...patch}),/啟動預覽格式不正確/)});
 
+test('detail status shows preparing skeleton and one explicit retry link',async()=>{
+ ui.invalidateSessionEpoch();posts=[];reloads=0;reply={state:'not_ready',reason:'no_template'};
+ let finish;const pending=new Promise(resolve=>{finish=resolve});
+ globalThis.fetch=async(url,init)=>{posts.push({url,method:init.method});await pending;return response(reply)};
+ const props={c:{s:{features:{}}},p:{id:'p1',case_type:'intake'},sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true,startAllNodes:true}}},reload:async()=>{reloads++}},assignments:{reload:async()=>{}}};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,props)));
+ assert.match(document.body.textContent,/SOP 準備中/);assert.ok(document.querySelector('.skeleton'));assert.equal(posts.length,1);
+ await act(async()=>finish());assert.equal(document.body.textContent,'SOP 尚未就緒重試');assert.equal(document.querySelectorAll('button').length,1);
+ reply={state:'started'};await act(async()=>button('重試').click());assert.equal(posts.length,2);assert.equal(document.body.textContent,'SOP 已啟動');
+});
 for(const allowed of [{import:true,manage:true,startAllNodes:true},{import:false,manage:false}])test(`legacy nodes without checklist stay unapplied and never write (${allowed.import})`,async()=>{
  ui.invalidateSessionEpoch();posts=[];
- globalThis.fetch=async(url,init={})=>{posts.push({url,method:init.method});throw new Error('No request expected')};
+ globalThis.fetch=async(url,init={})=>{posts.push({url,method:init.method});return response({state:'started'})};
  root=createRoot(document.getElementById('root'));
- const props={c:{s:{features:{node_assignment:true}}},p:{id:'legacy',nodes:assignmentFixture().list.nodes},sop:{state:{kind:'ready',data:{tasks:[],enrollment:null,checklistRevision:0,allowed}},reload:async()=>{}},assignments:{reload:async()=>{}}};
+ const props={c:{s:{features:{}}},p:{id:'legacy',case_type:'intake'},sop:{state:{kind:'ready',data:{tasks:[],enrollment:{policy:'legacy',attempt:null},checklistRevision:0,allowed}},reload:async()=>{}},assignments:{reload:async()=>{}}};
  await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,props)));
  assert.match(document.body.textContent,/預設清單尚未套用/);
  assert.match(document.body.textContent,/具備此節點匯入與管理權限.*匯入預設任務/);
@@ -87,6 +98,80 @@ for(const allowed of [{import:true,manage:true,startAllNodes:true},{import:false
  await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,{...props,sop:{...props.sop,state:{kind:'ready',data:{...props.sop.state.data,tasks:[{manual:false}]}}}})));
  assert.equal(document.body.textContent,'SOP 已啟動');assert.deepEqual(posts,[]);
 });
+for(const policy of ['managed','needs_review'])test(`non-legacy ${policy} case still initializes on page entry`,async()=>{
+ ui.invalidateSessionEpoch();posts=[];reloads=0;
+ globalThis.fetch=async(url,init={})=>{posts.push({url,method:init.method});return response({state:'started'})};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,{c:{s:{features:{}}},p:{id:'fresh',case_type:'intake'},sop:{state:{kind:'ready',data:{tasks:[],enrollment:{policy,attempt:null},checklistRevision:0,allowed:{import:true,manage:true,startAllNodes:true}}},reload:async()=>{reloads++}},assignments:{reload:async()=>{}}})));
+ assert.deepEqual(posts,[{url:'/api/projects/fresh/sop/ensure',method:'POST'}]);assert.equal(document.body.textContent,'SOP 已啟動');assert.doesNotMatch(document.body.textContent,/尚未套用/);
+});
+test('opening a local case on a tab without an active SOP read still ensures it',async()=>{
+ ui.invalidateSessionEpoch();posts=[];
+ const examples=JSON.parse(await fs.readFile(new URL('../backend/sop_import/api-examples.json',import.meta.url),'utf8'));
+ const overview={...examples.sop_tasks,project_id:'direct-tab',tasks:[],allowed_actions:{import:true,manage:true,work:true,start_all_nodes:true}};
+ globalThis.fetch=async(url,init={})=>{
+  if(init.method==='POST'){posts.push(url);return response({state:'started'})}
+  return response(url.endsWith('/sop-assignees')?{people:[],restricted:false}:overview);
+ };
+ const props={c:{s:{workspace_id:'w',features:{}}},p:{id:'direct-tab',case_type:'intake'},sop:{state:{kind:'forbidden'},reload:async()=>{}},assignments:{reload:async()=>{}}};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,props)));
+ assert.deepEqual(posts,['/api/projects/direct-tab/sop/ensure']);assert.equal(document.body.textContent,'SOP 已啟動');
+});
+
+test('single-node managers see passive authorization text and never ensure all nodes',async()=>{
+ ui.invalidateSessionEpoch();posts=[];
+ globalThis.fetch=async(url,init={})=>{posts.push({url,method:init.method});return new Response(JSON.stringify({code:'forbidden'}),{status:403})};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,{
+  c:{s:{features:{}}},p:{id:'scoped-manager',case_type:'intake'},
+  sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:false}}},reload:async()=>{}},assignments:{reload:async()=>{}}
+ })));
+ assert.equal(document.body.textContent,'需由有權限的人員準備 SOP');assert.deepEqual(posts,[]);
+});
+
+for(const result of [{state:'not_ready',reason:'writes_disabled'},{state:'not_ready'}])test(`legacy coded case stays quiet for ${result.reason || result.state}`,async()=>{
+ ui.invalidateSessionEpoch();posts=[];
+ globalThis.fetch=async(url,init={})=>{posts.push({url,method:init.method});return response(result)};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,{
+  c:{s:{features:{node_assignment:false}}},p:{id:'legacy-case',code:'C001'},
+  sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true,startAllNodes:true}}},reload:async()=>{}},assignments:{reload:async()=>{}}
+ })));
+ assert.equal(posts.length,1);assert.equal(document.body.textContent,'');assert.equal(document.querySelector('button'),null);
+});
+
+test('node-scoped import authority never triggers case-wide automatic ensure',async()=>{
+ ui.invalidateSessionEpoch();posts=[];
+ globalThis.fetch=async(url,init={})=>{posts.push(url);return response({state:'started'})};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,{
+  c:{s:{features:{}}},p:{id:'node-manager-review',case_type:'intake'},sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true,startAllNodes:false}}},reload:async()=>{}},assignments:{reload:async()=>{}}
+ })));
+ assert.deepEqual(posts,[]);assert.equal(document.body.textContent,'需由有權限的人員準備 SOP');
+});
+for(const result of [{state:'not_ready',reason:'no_startable_nodes'},{state:'already_started'}])test(`blocked enrollment status is passive while real SOP stays started: ${result.state}`,async()=>{
+ ui.invalidateSessionEpoch();posts=[];
+ globalThis.fetch=async(url,init={})=>{posts.push(url);return response(result)};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,{
+  c:{s:{features:{}}},p:{id:'blocked-enrollment',case_type:'intake'},sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true,startAllNodes:true}}},reload:async()=>{}},assignments:{reload:async()=>{}}
+ })));
+ assert.equal(document.body.textContent,result.state==='already_started'?'SOP 已啟動':'');assert.equal(document.querySelector('button'),null);
+});
+
+for(const [status,text] of [[403,'需由有權限的人員準備 SOP'],[404,''],[503,'SOP 尚未就緒重試']])test(`ensure HTTP ${status} renders the appropriate detail status`,async()=>{
+ ui.invalidateSessionEpoch();posts=[];reloads=0;
+ globalThis.fetch=async(url,init={})=>{posts.push({url,method:init.method});return new Response(JSON.stringify({code:'unavailable'}),{status})};
+ root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(ui.EnsureSopStatus,{
+  c:{s:{features:{}}},p:{id:'authority-race',case_type:'intake'},
+  sop:{state:{kind:'ready',data:{tasks:[],allowed:{import:true,startAllNodes:true}}},reload:async()=>{reloads++}},assignments:{reload:async()=>{}}
+ })));
+ assert.deepEqual(posts,[{url:'/api/projects/authority-race/sop/ensure',method:'POST'}]);
+ assert.equal(document.body.textContent,text);assert.equal(document.querySelectorAll('button').length,status===503?1:0);assert.equal(reloads,0);
+});
+
 test('checklist evidence distinguishes manual tasks, successful enrollment and uncertain revisions',()=>{
  const base={tasks:[],enrollment:null,checklistRevision:0};
  assert.equal(ui.defaultChecklistState(), 'unknown');
