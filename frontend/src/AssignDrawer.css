@@ -3,3 +3,4 @@
 .ad-actions{display:flex;gap:8px;flex-wrap:wrap}.ad-diff{width:100%;border-collapse:collapse;font-size:14px}.ad-diff th,.ad-diff td{text-align:left;padding:6px 8px;border-top:1px solid var(--sep);overflow-wrap:anywhere}.ad-diff thead th{font-size:12px;color:var(--label-2);border-top:0}
 .ad-reason,.ad-note,.ad-dirty{font-size:13px;color:var(--label-2)}.ad-status{font-size:13px;color:var(--label-2)}
 @media(max-width:480px){.ad-diff thead{display:none}.ad-diff tr{display:grid;gap:2px;padding:6px 0;border-top:1px solid var(--sep)}.ad-diff th,.ad-diff td{border-top:0;padding:0 8px}.ad-diff td:nth-of-type(1)::before{content:"你的草稿：";color:var(--label-2)}.ad-diff td:nth-of-type(2)::before{content:"最新值：";color:var(--label-2)}}
+@media(min-width:641px){.task-drawer:has(.ad-form){width:min(440px,100%)}}

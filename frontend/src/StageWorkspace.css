@@ -7,3 +7,4 @@
 .st-others{margin-top:16px;display:grid;gap:8px}.st-others>h3{margin:0}.st-group{border:1px solid var(--po-border,#e5e7eb);border-radius:10px}.st-group>h4{margin:0}.st-group>h4>button{width:100%;min-height:44px;display:flex;gap:8px;align-items:center;text-align:left;padding:8px 12px;background:none;border:0;font:inherit;cursor:pointer;flex-wrap:wrap}.st-group-meta{font-size:12px;color:var(--po-muted,#667085)}.st-group>div{padding:0 12px 12px}
 .st-row .pf-task-line{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
 @media(max-width:480px){.st-row .pf-task-line{flex-direction:column;align-items:stretch}}
+@media(max-width:640px){#flow-selected>header{flex-wrap:wrap;gap:8px}#flow-selected .pf-panel-tools{flex-wrap:wrap;width:100%}#flow-selected .pf-attention-menu,#flow-selected .pf-attention-menu summary{white-space:nowrap;writing-mode:horizontal-tb}}
