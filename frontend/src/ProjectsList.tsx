@@ -49,7 +49,7 @@ function CaseCard({row,c,pinned,onPin,today}:{row:CaseRow;c:Ctx;pinned:boolean;o
    <div className="pl-field pl-pm"><small>負責 PM</small><Person name={person(p.pm_id)}/></div>
    <div className="pl-field pl-owner"><small>目前節點負責人</small><Person name={row.current?.owners.map(o=>o.name).join('、')||'未指派'}/></div>
    <div className="pl-field pl-current"><small>目前節點</small><span>{row.current?.label||(row.state==='已完成'?'流程完成':'待核對')}</span></div>
-   <small className="pl-case-status">案件狀態：{caseStatusLabel(row.project.status)}</small><span className="pl-status" data-state={row.state}>流程進度：{row.state}</span>
+   <div className="pl-states"><small className="pl-case-status">案件狀態：{caseStatusLabel(row.project.status)}</small><span className="pl-status" data-state={row.state}>流程進度：{row.state}</span></div>
    <div className="pl-flow" tabIndex={0} role="region" aria-label="九階段流程，可左右捲動"><Stepper row={row}/></div>
    <div className="pl-more" ref={menuAnchor}><button ref={trigger} aria-label={`${p.code} 更多操作`} aria-haspopup="menu" aria-expanded={menu} onClick={()=>setMenu(!menu)}><MoreVertical size={17}/></button>
     {menu&&<PickerPopover anchor={menuAnchor} onClose={()=>setMenu(false)}><div ref={menuRef} className="pl-menu" role="menu" aria-label={`${p.code} 操作`} onKeyDown={e=>{
