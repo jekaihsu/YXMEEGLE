@@ -454,17 +454,27 @@ test('a task a person cannot edit has no inline assignee picker', async () => {
  assert.equal(document.querySelector('.assignee-picker'), null);
 });
 
-test('P4 a task that can only be blocked explains each unavailable action once, grouped, without the generic admin-permission text', async () => {
+test('P4b with no reason from the API the dialog says so and offers a read-only refresh, not an invented condition', async () => {
  await mount({route: {task: 't1', task_source: 'sop_local'}, tasks: [task('t1', {allowed_actions: ['block']})]});
  const body = dialog().textContent;
- assert.doesNotMatch(body, /需管理權限/);
+ assert.doesNotMatch(body, /需管理權限|條件尚未滿足|沒有這項操作的權限/);
  assert.deepEqual([...dialog().querySelectorAll('[aria-label=狀態操作] button')].map(b => b.textContent), ['標記受阻']);
  const groups = [...dialog().querySelectorAll('.sop-unavailable li')];
- assert.equal(groups.length, 2, 'one permission explanation for the actions the viewer cannot take, and a separate unassigned reason for completion');
- assert.match(groups[1].textContent, /完成：尚未指派執行人/);
- assert.match(groups[0].textContent, /編輯任務內容.*開始.*：你可查看此任務，但目前沒有這項操作的權限/);
- assert.equal((body.match(/目前沒有這項操作的權限/g) || []).length, 1, 'the reason is not repeated per control');
- assert.match(dialog().querySelector('#task-editor-readonly').textContent, /原因見下方/, 'edit controls point to the one grouped reason');
+ assert.equal(groups.length, 1, 'actions sharing the same missing reason are grouped once');
+ assert.match(groups[0].textContent, /編輯任務內容.*開始.*完成.*封存：系統未提供原因/);
+ assert.equal((body.match(/系統未提供原因/g) || []).length, 1, 'the reason is not repeated per control');
+ assert.match(dialog().querySelector('#task-editor-readonly').textContent, /原因見下方/);
+ const before = calls.filter(x => x.method === 'GET' && x.url.endsWith('/sop-tasks')).length, writes = calls.filter(x => x.method !== 'GET').length;
+ await click([...groups[0].querySelectorAll('button')].find(b => b.textContent === '重新整理'));
+ assert.ok(calls.filter(x => x.method === 'GET' && x.url.endsWith('/sop-tasks')).length > before, 'refresh re-reads');
+ assert.equal(calls.filter(x => x.method !== 'GET').length, writes, 'refresh is not a state transition');
+});
+
+test('P4b with a server reason the dialog shows that reason for that action', async () => {
+ await mount({route: {task: 't1', task_source: 'sop_local'}, tasks: [task('t1', {allowed_actions: ['block'], completion_blocked_reason: 'completion_evidence_missing'})]});
+ const text = [...dialog().querySelectorAll('.sop-unavailable li')].map(li => li.textContent).join('|');
+ assert.match(text, /完成：前置條件未完成：此任務需先完成佐證或審核/);
+ assert.match(text, /系統未提供原因/, 'actions with no reason are still stated as such, separately');
 });
 
 test('a node the data proves done offers one manager action that closes its open tasks', async () => {

@@ -100,7 +100,9 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
  };
  const patch = (body: Record<string, unknown>, done: string) => run(() => sopApi.patch(project.id, task.id, {expected_revision: task.revision, ...body}, sop.current), done);
  const transition = (action: TaskAction|'set_applicability', extra: Record<string, unknown> = {}, label?: string) => run(() => sopApi.transition(project.id, task.id, {expected_revision: task.revision, action, ...extra}, sop.current), '已更新狀態', label ? `${label}中…` : undefined);
- const view=sopActionView(task,busy||sop.state.kind==='ready'&&!sop.state.refreshing);
+ const nodeOwnerId='data' in sop.state?sop.state.data?.localNodes?.find(n=>n.key===task.nodes[0]?.node_key)?.ownerId:undefined;
+ const ownerName=nodeOwnerId?users.find(u=>u.id===nodeOwnerId)?.name:undefined;
+ const view=sopActionView(task,busy||sop.state.kind==='ready'&&!sop.state.refreshing,ownerName);
  const completionReason=busy?'處理中':!view.completion.allowed?view.completion.reason:!resultNote.trim()?'請填寫結果說明':'';
  const reasonsId=`sop-unavailable-${task.id}`;
  const draft={title:task.title,assignee:task.participants.executor || '',due:task.dueDate || '',notes:task.instructions || '',status:task.state,reason:''};
@@ -117,7 +119,7 @@ export function SopTaskInspector({task, project, users, sop, onClose, testOperat
  const footer=<>{error && !cleanupOpen && <p role="alert" className="pg-callout">{error}</p>}{writeBusy && <p role="status" className="sop-muted">{pending}</p>}{verify==='checking' && <p role="status" className="sop-muted">正在確認剛才的操作結果，確認前不能再修改…</p>}{verify==='failed' && <div role="alert" className="pg-callout">無法確認剛才的操作是否已完成，請先重新讀取，不要重複送出。<Button onClick={() => void confirmOutcome()}>重新讀取</Button></div>}{view.available.length>0&&<div className="pf-actions sop-transitions" role="group" aria-label="狀態操作" aria-busy={busy}>{view.available.slice().reverse().map(a => a.reason
     ? <Reasoned key={a.action} label={a.label} busy={busy} onSubmit={reason => void transition(a.action, {reason}, a.label)}/>
     : <FlowAction key={a.action} allowed={!busy} reason="處理中" onClick={() => void transition(a.action, {}, a.label)}>{busy && pending===`${a.label}中…` ? pending : a.label}</FlowAction>)}</div>}
-  {view.unavailable.length>0&&<div id={reasonsId} className="sop-unavailable" role="group" aria-label="目前無法使用的操作"><strong>目前無法使用</strong><ul>{view.unavailable.map(g=><li key={g.kind+g.reason} data-kind={g.kind}><span>{g.actions.map(x=>x.label).join('、')}</span>：{g.reason}</li>)}</ul></div>}</>;
+  {view.unavailable.length>0&&<div id={reasonsId} className="sop-unavailable" role="group" aria-label="目前無法使用的操作"><strong>目前無法使用</strong><ul>{view.unavailable.map(g=><li key={g.kind+g.reason} data-kind={g.kind}><span>{g.actions.map(x=>x.label).join('、')}</span>：{g.reason}{g.hint&&<small>{g.hint}</small>}{(g.kind==='no_reason'||g.kind==='stale')&&<Button disabled={busy||sop.state.kind==='loading'||sop.state.kind==='ready'&&sop.state.refreshing} onClick={()=>void sop.reload()}>重新整理</Button>}</li>)}</ul></div>}</>;
  return <TaskDrawer footer={view.available.length||view.unavailable.length||busy||(error&&!cleanupOpen) ? footer : undefined} kind="sop" label={`SOP 任務 · ${task.title}`} trail={['SOP 任務',task.nodes.map(n=>sopNodeLabel(n.node_key)).join('、')]} title={task.title} status={<SopLarkSync task={task} link/>} onClose={() => {if (!busy) onClose()}}>
   <div className="sop-inspector">
    <div className="sop-badges"><Badge tone="accent">SOP 任務</Badge>{task.isTest && <Badge tone="warning">測試</Badge>}<Badge>{stateLabel(task)}</Badge>{task.overdue && <Badge tone="critical">逾期</Badge>}{task.shared && <Badge>共用</Badge>}{task.applicability !== 'applicable' && <Badge tone="warning">{APPLICABILITY_LABEL[task.applicability]}</Badge>}</div>
