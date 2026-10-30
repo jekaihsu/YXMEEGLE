@@ -462,6 +462,20 @@
   white-space: nowrap;
 }
 
+.pl-states {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.pl-case-status {
+  font-size: 10px;
+  white-space: nowrap;
+  color: #667085;
+}
+
 .pl-status {
   justify-self: start;
   font-size: 10px;
@@ -739,7 +753,7 @@
   grid-column: 1 / 3;
 }
 
-.pl-grid .pl-status {
+.pl-grid .pl-states {
   grid-column: 3;
   grid-row: 3;
 }
@@ -779,7 +793,7 @@
     grid-row: 2;
   }
 
-  .pl-status {
+  .pl-states {
     grid-column: 6;
     grid-row: 1;
   }
@@ -829,7 +843,7 @@
     grid-template-columns: 28px 1fr 32px;
   }
 
-  .pl-grid .pl-current, .pl-grid .pl-status, .pl-grid .pl-more, .pl-grid .pl-flow {
+  .pl-grid .pl-current, .pl-grid .pl-states, .pl-grid .pl-more, .pl-grid .pl-flow {
     grid-row: auto;
   }
 
@@ -955,7 +969,7 @@
     width: 44px;
   }
 
-  .pl-status {
+  .pl-states {
     grid-column: 3;
     grid-row: 1;
     font-size: 11px;
@@ -1030,7 +1044,7 @@
     grid-template-columns: 44px minmax(0,1fr) auto 44px;
   }
 
-  .pl-grid .pl-status {
+  .pl-grid .pl-states {
     grid-column: 3;
     grid-row: 1;
   }
@@ -1133,7 +1147,7 @@
 }
 
 .pl-row {
-  grid-template-columns: 44px minmax(85px,.75fr) minmax(130px,1.3fr) minmax(94px,.85fr) minmax(105px,.9fr) minmax(60px,.6fr) 72px minmax(280px,2.8fr) 44px;
+  grid-template-columns: 44px minmax(85px,.75fr) minmax(130px,1.3fr) minmax(94px,.85fr) minmax(105px,.9fr) minmax(60px,.6fr) 108px minmax(280px,2.8fr) 44px;
   min-height: 62px;
   padding: 7px 6px;
   gap: 6px;
@@ -1248,7 +1262,7 @@
 
 @media (min-width:1200px) and (max-width:1399px) {
   .pl-row {
-    grid-template-columns: 44px minmax(70px,.75fr) minmax(100px,1.3fr) minmax(70px,.85fr) minmax(85px,.9fr) minmax(50px,.6fr) 60px minmax(225px,2.8fr) 44px;
+    grid-template-columns: 44px minmax(70px,.75fr) minmax(100px,1.3fr) minmax(70px,.85fr) minmax(85px,.9fr) minmax(50px,.6fr) 104px minmax(225px,2.8fr) 44px;
     gap: 5px;
   }
 
@@ -1286,7 +1300,7 @@
     grid-row: 1;
   }
 
-  .pl-status {
+  .pl-states {
     grid-column: 2;
     grid-row: 2;
   }
@@ -1318,7 +1332,7 @@
     grid-column: 3;
   }
 
-  .pl-grid .pl-status {
+  .pl-grid .pl-states {
     grid-column: 3;
     grid-row: 3;
   }
