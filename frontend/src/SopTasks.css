@@ -45,7 +45,7 @@
 .sop-state[data-state=done]{border-color:var(--positive,#15803d);background:var(--positive,#15803d) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E") center/12px no-repeat}
 .sop-state[data-state=blocked]{border-color:var(--critical,#c62828)}
 .sop-state:is([data-state=archived],[data-state=not_applicable]){border-style:dashed;opacity:.6}
-#flow-selected>.sop-tasks{border-top:1px solid var(--sep);padding-top:20px}
+#flow-selected>.sop-tasks,#flow-selected .pf-stage-tasks>.sop-tasks{border-top:1px solid var(--sep);padding-top:20px}
 .sop-tasks>header .pf-actions{flex-wrap:wrap}
 .sop-tasks>header .pf-actions :is(.button,.ds-button){font-size:14px;font-weight:500;min-height:44px}
 .task-drawer-body details.sop-source>summary{display:list-item;min-height:0;padding:12px 0}

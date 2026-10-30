@@ -43,6 +43,7 @@ import type {Project} from './types';
 import './NodeAssignments.css';
 import './StartSop.css';
 import './ProjectFlow.css';
+import './CaseDetailRedesign.css';
 export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions,sopTasks:providedSop,reopened,inline=false}:{c:Ctx;p:Project;assignments:ReturnType<typeof useNodeAssignments>;selectedKey:string;secondary:ReactNode;legacyActions:ReactNode;sopTasks?:ReturnType<typeof useSopTasks>;reopened?:MutableRefObject<string>;inline?:boolean}){
  const route=projectFlowRoute(c.route),enabled=!localCase(p)&&c.s.features?.node_assignment===true;
  const read=useProjectProgress(p.id);
