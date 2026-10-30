@@ -1,4 +1,4 @@
-import {SOP_NODE_KEYS, type Applicability, type ImportPreview, type Lifecycle, type PreviewOutcome, type SopCounts, type SopNodeKey, type SopTask} from './sopTaskApi';
+import {SOP_NODE_KEYS, type Applicability, type ImportPreview, type Lifecycle, type PreviewOutcome, type SopCounts, type SopNodeKey, type SopTask, type SopOverview} from './sopTaskApi';
 
 export const STATE_LABEL: Record<Lifecycle, string> = {pending: '待處理', in_progress: '進行中', blocked: '受阻', done: '已完成', archived: '已封存'};
 export const APPLICABILITY_LABEL: Record<Applicability, string> = {applicable: '適用', not_applicable: '不適用', unresolved: '適用待確認'};
@@ -99,3 +99,12 @@ export function suggestionBody(tasks: SopTask[], confirm: boolean, reason: strin
 export const requiresSuggestionConfirmation = (tasks: SopTask[]) => tasks.some(t => t.suggestion?.tier === 'indicator');
 
 export const canOperateTestTasks = (user: {role?:string;active?:boolean}|null|undefined) => !!user && user.active !== false && ['manager','admin'].includes(user.role || '');
+
+export type DefaultChecklistState = 'applied'|'not-applied'|'unknown';
+export function defaultChecklistState(data?: Pick<SopOverview,'tasks'|'enrollment'|'checklistRevision'>): DefaultChecklistState {
+ if (!data) return 'unknown';
+ if (data.tasks.some(task=>!task.manual) || data.enrollment?.attempt?.status==='succeeded') return 'applied';
+ if (data.checklistRevision>0 && data.enrollment?.policy!=='legacy') return 'unknown';
+ return 'not-applied';
+}
+export const DEFAULT_CHECKLIST_NEXT_STEP='請由具備此節點匯入與管理權限的人員，在任務區選擇「匯入預設任務」。';

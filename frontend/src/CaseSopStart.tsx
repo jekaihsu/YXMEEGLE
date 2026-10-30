@@ -1,5 +1,6 @@
 import type {useSopTasks} from './useSopTasks';
+import {defaultChecklistState, DEFAULT_CHECKLIST_NEXT_STEP} from './sopTaskModel';
 export function CaseSopStart({sop}:{projectId:string;sop:ReturnType<typeof useSopTasks>}) {
- const data='data' in sop.state?sop.state.data:undefined;
- return data && !data.allowed.import && !data.tasks.some(task=>!task.manual) ? <p role="status">需由有權限的人員準備 SOP</p> : null;
+ const data=sop.state.kind==='ready'?sop.state.data:undefined;
+ return defaultChecklistState(data)==='not-applied' ? <p role="status">預設清單尚未套用。{DEFAULT_CHECKLIST_NEXT_STEP}</p> : null;
 }
