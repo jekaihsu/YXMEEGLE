@@ -10,3 +10,4 @@
 @media(max-width:640px){#flow-selected>header{flex-wrap:wrap;gap:8px}#flow-selected .pf-panel-tools{flex-wrap:wrap;width:100%}#flow-selected .pf-attention-menu,#flow-selected .pf-attention-menu summary{white-space:nowrap;writing-mode:horizontal-tb}}
 .pds-case-status{flex-wrap:wrap}.pds-case-status>small{flex-basis:100%;font-weight:400;color:var(--label-2,#667085);font-size:12px}.po-source-note{display:block;font-size:11px;color:var(--po-muted,#667085);font-weight:400;text-align:right}
 .pl-case-status{font-size:12px;color:var(--label-2,#667085);margin-right:6px}
+.stage-fixture{padding-bottom:24px}.stage-fixture ol,.stage-fixture li{overflow-wrap:anywhere;min-width:0}.stage-fixture .pf-filters{flex-wrap:wrap}.stage-fixture .pf-filters .button{white-space:normal}

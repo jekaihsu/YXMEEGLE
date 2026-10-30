@@ -41,7 +41,7 @@ export interface Workspace {admin_revisions?:{people:Record<string,string>;setti
 export interface FeatureContract {local_case_creation?:boolean;sop_task_writes?:boolean;change_extension?:boolean;routines?:boolean;mock_ui?:boolean;workspace_shell?:boolean;node_assignment?:boolean;dispatch_board?:boolean;dispatch_write?:boolean}
 export interface Session {features?:FeatureContract;access_mode?:string;user:User|null;users:User[];mode:string;auth_configured:boolean;environment?:string;workspace_id?:string}
 export interface SourceData {freshness?:Freshness;as_of?:string|null;configured:boolean;last_sync:string;status:string;message:string;tables:unknown[];records:unknown[];mapping?:SourceMapping}
-export type View = 'howto'|'quotes'|'dispatch'|'pm-glance'|'reports'|'dashboard'|'projects'|'work'|'people'|'approvals'|'sources'|'project'|'admin'|'routines'|'overview'|'confirmations'|'confirmation'|'contract'|'workitem';
+export type View = 'howto'|'quotes'|'dispatch'|'pm-glance'|'reports'|'dashboard'|'projects'|'work'|'people'|'approvals'|'sources'|'project'|'admin'|'routines'|'overview'|'confirmations'|'confirmation'|'contract'|'workitem'|'stage-fixture';
 export interface Route {all_tasks?:string;view:View;project?:string;node?:string;task?:string;tab?:string;section?:string;completion?:string;focus?:string;comment?:string;approval?:string;ctx?:string;task_source?:string;task_filters?:string}
 
 export interface WorkSchedule {id:string;user_id:string;day:string;end_time:string;version:number;active?:boolean;source_url?:string;basis?:string}

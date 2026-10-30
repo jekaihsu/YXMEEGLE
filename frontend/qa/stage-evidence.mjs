@@ -51,6 +51,28 @@ for(const [mode,expect,file] of [['conflict','此任務已被他人修改','conf
  await page.close();
 }
 
+// The in-app synthetic route (#view=stage-fixture) is the same page Metis opens on staging after login.
+const fixtureFlow={
+ normal:async page=>{},validation:async page=>{},conflict:async page=>{},forbidden:async page=>{},timeout:async page=>{},
+ partial:async page=>{await page.locator('.task-drawer input[type=date]').fill('2026-12-01')},revoked:async page=>{}
+};
+const expectText={normal:null,validation:'已停用或不可指派',conflict:'此任務已被他人修改',forbidden:'權限已變更',timeout:'儲存結果不明',partial:'只有部分欄位已儲存',revoked:'目前無指派權限'};
+for(const [name,vp,scale] of [['1440',{width:1440,height:900},1],['1024',{width:1024,height:800},1],['768',{width:768,height:900},1],['390',{width:390,height:844},2],['zoom200',{width:720,height:450},2]]){
+ for(const scenario of Object.keys(fixtureFlow)){
+  const page=await browser.newPage({viewport:vp,deviceScaleFactor:scale});let nonGet=0;page.on('request',r=>{if(r.method()!=='GET'&&r.url().startsWith(base))nonGet++});
+  await page.goto(`${base}/#view=stage-fixture&tab=${scenario}`,{waitUntil:'networkidle'});await page.waitForSelector('.stage-fixture');
+  await page.getByRole('button',{name:'指派',exact:true}).click();await page.waitForSelector('.task-drawer');
+  if(scenario==='revoked'){await page.waitForTimeout(3200)}
+  else{await page.locator('.task-drawer .assignee-picker button').click();await page.getByRole('option',{name:/王小明/}).click();await fixtureFlow[scenario](page);await page.locator('.task-drawer').getByRole('button',{name:'儲存',exact:true}).click();await page.waitForTimeout(900);
+   if(['timeout','partial'].includes(scenario)){await page.getByRole('button',{name:'查詢最新結果'}).click();await page.waitForTimeout(700)}}
+  const text=await page.locator('.task-drawer').innerText().catch(()=>'');
+  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
+  await page.screenshot({path:`${out}/fixture-${scenario}-${name}.png`});
+  const wanted=expectText[scenario],ok=overflow<=0&&nonGet===0&&(wanted?text.includes(wanted):!(await page.locator('.task-drawer').count()));
+  record(`fixture route ${scenario} @${name}`,ok,`overflow ${overflow}px, non-GET requests ${nonGet}${wanted?`, shows "${wanted}"`:', drawer closed after save'}`);
+  await page.close();
+ }
+}
 await state({tasks:100});
 const loads=[];
 for(let i=0;i<5;i++){

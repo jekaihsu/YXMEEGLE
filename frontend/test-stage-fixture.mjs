@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import {writeFile,unlink} from 'node:fs/promises';
+import {build} from 'esbuild';
+import {JSDOM} from 'jsdom';
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=stage-fixture',pretendToBeVisual:true});
+for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','HTMLElement','HTMLInputElement','Element','Node','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.getComputedStyle=dom.window.getComputedStyle;HTMLElement.prototype.scrollIntoView=function(){};globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+let fetched=0;globalThis.fetch=async()=>{fetched++;throw new Error('the fixture must not use the network')};
+const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
+const bundle=await build({stdin:{contents:"export {StageFixture} from './src/StageFixture';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
+const temp=new URL('./.stage-fixture.mjs',import.meta.url);await writeFile(temp,bundle.outputFiles[0].text);const ui=await import(temp.href);await unlink(temp);
+const tick=(ms=30)=>new Promise(r=>setTimeout(r,ms));
+const dialog=()=>document.querySelector('.task-drawer[role=dialog]');
+const inDialog=t=>[...dialog().querySelectorAll('button')].find(b=>b.textContent.trim()===t);
+const click=async el=>{assert.ok(el);await act(async()=>{el.click();await tick(40)})};
+const pick=async name=>{await click(dialog().querySelector('.assignee-picker button'));await act(async()=>{[...document.querySelectorAll('[role=option]')].find(o=>o.textContent.includes(name)).click();await tick()})};
+const setDate=async v=>act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(dialog().querySelector('input[type=date]'),v);dialog().querySelector('input[type=date]').dispatchEvent(new Event('input',{bubbles:true}));await tick()});
+let root;
+async function run(scenario){
+ if(root)await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));
+ await act(async()=>{root.render(React.createElement(ui.StageFixture,{scenario}));await tick()});
+ await click([...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='指派'));
+}
+const save=async()=>{await click(inDialog('儲存'));await act(async()=>{await tick(500)})};
+const results=[];const check=async(id,fn)=>{try{await fn();results.push(['PASS',id])}catch(e){results.push(['FAIL',id,e.message.split('\n')[0]]);console.error(e)}};
+await check('normal: saves and the list shows the new executor',async()=>{await run('normal');await pick('王小明');await save();assert.equal(dialog(),null);assert.match(document.querySelector('[data-assignment-task]').textContent,/王小明/)});
+await check('validation: field error, draft kept',async()=>{await run('validation');await pick('王小明');await save();assert.match(dialog().textContent,/已停用或不可指派/);assert.ok(dialog().querySelector('.ad-summary'));assert.match(dialog().querySelector('.assignee-picker button').textContent,/王小明/)});
+await check('conflict: diff shown, explicit resubmit only',async()=>{await run('conflict');await pick('王小明');await save();assert.match(dialog().textContent,/此任務已被他人修改/);assert.match(dialog().querySelector('.ad-diff').textContent,/張大同/);await click(inDialog('以最新值重新檢查'));await save();assert.equal(dialog(),null)});
+await check('forbidden: capability message, save disabled',async()=>{await run('forbidden');await pick('王小明');await save();assert.match(dialog().textContent,/權限已變更/);assert.ok(inDialog('儲存').disabled)});
+await check('timeout: verify first, then same-request retry',async()=>{await run('timeout');await pick('王小明');await save();assert.match(dialog().textContent,/儲存結果不明/);assert.ok(inDialog('重試同一操作').disabled);await click(inDialog('查詢最新結果'));await act(async()=>{await tick(400)});assert.equal(inDialog('重試同一操作').disabled,false);await click(inDialog('重試同一操作'));await act(async()=>{await tick(400)});assert.equal(dialog(),null)});
+await check('partial: executor saved, deadline not',async()=>{await run('partial');await pick('王小明');await setDate('2026-12-01');await save();await click(inDialog('查詢最新結果'));await act(async()=>{await tick(400)});assert.match(dialog().textContent,/執行人：已儲存/);assert.match(dialog().textContent,/期限：尚未儲存/)});
+await check('revoked: capability lost before saving blocks the save with a reason',async()=>{await run('revoked');await pick('王小明');await act(async()=>{await tick(2800)});assert.ok(inDialog('儲存').disabled);assert.match(dialog().textContent,/目前無指派權限/)});
+await check('no network use in any scenario',async()=>assert.equal(fetched,0));
+await act(async()=>root.unmount());
+for(const r of results)console.log(r.join(' '));
+if(results.some(r=>r[0]==='FAIL'))process.exit(1);
