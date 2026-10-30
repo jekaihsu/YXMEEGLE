@@ -26,7 +26,7 @@ import './ProjectOverview.css';
 
 const text=(value:unknown,fallback:string)=>typeof value==='string' && value.trim() ? value : fallback;
 const shortDate=(value:unknown)=>typeof value==='string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0,10) : '未設定';
-export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}:{c:Ctx;p:Project;assignments:ReturnType<typeof useNodeAssignments>;selectedKey:string;sopTasks:ReturnType<typeof useSopTasks>;workbench:ReactNode}){
+export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}:{c:Ctx;p:Project;assignments:ReturnType<typeof useNodeAssignments>;selectedKey:string;sopTasks:ReturnType<typeof useSopTasks>;workbench:(diagram:ReactNode)=>ReactNode}){
  const remoteStart=!localCase(p)&&c.s.features?.node_assignment===true;
  const start=useStartSop(p.id,remoteStart&&!workbench,assignments.reload);
  const read=useProjectProgress(p.id),list='data' in assignments.state ? assignments.state.data : undefined;
@@ -58,8 +58,7 @@ export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}
  return <div className="project-overview">
   <div className="po-main">
    <CaseSummary status={p.status} ctx={stage} step={step} blockers={blockers} loading={assignments.state.kind==='loading'} error={assignments.state.kind==='error'?assignments.state.message:''} stale={!!list?.stale} onStep={openStep} onCurrent={()=>go({tab:'overview',node:stage.currentIds[0]})}/>
-   <FlowDiagram compact nodes={model.nodes} overall={model.overall} selected={stage.selectedId} loading={assignments.state.kind==='loading'} onSelect={node=>go({tab:'overview',node})}/>
-   {workbench}
+   {workbench(<FlowDiagram compact nodes={model.nodes} overall={model.overall} selected={stage.selectedId} loading={assignments.state.kind==='loading'} onSelect={node=>go({tab:'overview',node})}/>)}
    {assignments.state.kind==='error' && <p className="po-source-state" role="alert">節點暫不可用<Button onClick={()=>void assignments.reload()}>重試</Button></p>}
    {sourceStale && !list?.stale && <p className="po-source-state">工程來源為上次成功資料，待更新核對。</p>}
    {list?.stale && <p className="po-source-state">節點來源為上次成功資料，待更新核對。</p>}

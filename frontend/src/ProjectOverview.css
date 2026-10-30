@@ -37,3 +37,6 @@
 .po-fold{padding:0!important}.po-fold:not(.po-card){background:#fff;border:1px solid var(--po-border);border-radius:12px}.po-fold>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;padding:0 20px;font-size:14px;font-weight:650}.po-fold[open]>summary{border-bottom:1px solid var(--po-border)}.po-fold>:not(summary){margin:16px 20px}.po-fold>.po-card{margin:12px}
 @media(max-width:767px){.cs-summary .cs-band{grid-template-columns:repeat(3,minmax(0,1fr))}.cs-next{grid-column:1/-1;border-left:0;padding-left:0;border-top:1px solid var(--po-border);padding-top:8px}}
 @media(max-width:600px){.cs-summary .cs-band{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.cs-stage{grid-column:1/-1}}
+
+.project-detail:has(.project-overview)>div[role=status]{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px;line-height:1.5}.project-detail:has(.project-overview)>div[role=status]>p{margin:0;min-width:0}
+.project-overview #flow-selected>.pf-stage-tasks .pf-tasks{border-top:0;padding-top:0}.project-overview #flow-selected>.pf-diagram{margin:16px 0}.project-overview #flow-selected>.pf-stage-detail{margin-top:16px}

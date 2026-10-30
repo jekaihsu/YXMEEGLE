@@ -80,6 +80,15 @@ await check('Concept B defaults to action-first and stage selection never change
  await click(button('行動優先'));
  assert.equal(c.route.node,'pm');assert.equal(writes().length,0);
 });
+await check('overview DOM places tasks before the selectable diagram, node facts and evidence',async()=>{
+ await mount();
+ const tasks=document.querySelector('#flow-tasks'),diagram=document.querySelector('.pf-diagram'),detail=document.querySelector('.pf-stage-detail'),evidence=document.querySelector('#flow-evidence');
+ const precedes=(a,b)=>assert.ok(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING);
+ precedes(document.querySelector('.cs-summary'),tasks);precedes(tasks,diagram);precedes(diagram,detail);precedes(detail,evidence);
+ assert.equal(tasks.contains(evidence),false);
+ await click(document.querySelector('.pf-node[aria-label^="PM"]'));
+ assert.match(document.querySelector('#flow-tasks h3').textContent,/PM/);
+});
 await check('T01 opening, selecting nodes and switching tabs cause zero writes',async()=>{
  await mount();assert.ok(document.querySelector('.cs-summary'));
  assert.match(document.querySelector('.cs-summary').textContent,/目前階段控制/);
