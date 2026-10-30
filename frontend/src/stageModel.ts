@@ -25,13 +25,13 @@ export function taskView(row:FlowTask,node:FlowNode,today:string):TaskView {
  return {...row,statusText:taskStatusText(row.status),flags:{unassigned:!row.ownerId,blocker:blockerOf(row,node),overdue:overdueTask(row.deadline,row.done,today),pending:!row.done&&!cancelled}};
 }
 
-export const STAGE_FILTERS=['pending','unassigned','blocked','mine'] as const;
+export const STAGE_FILTERS=['pending','unassigned','blocked','mine','overdue'] as const;
 export type StageFilterKey=typeof STAGE_FILTERS[number];
-export const STAGE_FILTER_LABELS:Record<StageFilterKey,string>={pending:'待處理',unassigned:'未指派',blocked:'受阻',mine:'我的任務'};
+export const STAGE_FILTER_LABELS:Record<StageFilterKey,string>={pending:'待處理',unassigned:'未指派',blocked:'受阻',mine:'我的任務',overdue:'逾期'};
 export type StageFilters=Record<StageFilterKey,boolean>;
 export const activeFilters=(filters:StageFilters)=>STAGE_FILTERS.filter(k=>filters[k]);
 export function matchesFilters(task:TaskView,filters:StageFilters,userId:string) {
- return (!filters.pending||task.flags.pending)&&(!filters.unassigned||task.flags.unassigned)&&(!filters.blocked||task.flags.blocker.state==='blocked')&&(!filters.mine||(!!userId&&task.ownerId===userId));
+ return (!filters.pending||task.flags.pending)&&(!filters.unassigned||task.flags.unassigned)&&(!filters.blocked||task.flags.blocker.state==='blocked')&&(!filters.mine||(!!userId&&task.ownerId===userId))&&(!filters.overdue||task.flags.overdue);
 }
 export const blockedKnown=(tasks:TaskView[])=>tasks.some(t=>t.flags.blocker.state!=='unknown');
 
@@ -76,12 +76,13 @@ export type NextStep=
  |{kind:'view';title:string;reason:string;nodeKey:string;taskId?:string;button:string}
  |{kind:'none';title:string;reasons:string[]}
  |{kind:'unknown';title:string;reasons:string[]};
-type StepInput={ctx:StageContext;list?:NodeAssignmentList;userId:string;today:string;fresh:boolean;crossStageAllowed?:(from:string,to:string)=>string|null};
-export function stageNextStep({ctx,list,userId,today,fresh,crossStageAllowed}:StepInput):NextStep {
+type StepInput={ctx:StageContext;list?:NodeAssignmentList;userId:string;today:string;fresh:boolean;blockedReason?:string;crossStageAllowed?:(from:string,to:string)=>string|null};
+export function stageNextStep({ctx,list,userId,today,fresh,blockedReason,crossStageAllowed}:StepInput):NextStep {
  if(ctx.workflow==='missing')return {kind:'unknown',title:'流程尚未設定',reasons:['此案件目前沒有可顯示的流程節點，不會自動建立或啟動流程。']};
  if(!ctx.currentKnown)return {kind:'unknown',title:'目前階段待確認',reasons:['來源未提供目前階段，無法推薦下一步。請重新整理後再試。']};
  if(ctx.finished)return {kind:'none',title:'目前沒有你可執行的動作',reasons:['所有節點皆已完成或略過。']};
  const reasons:string[]=[];
+ if(blockedReason)reasons.push(blockedReason);
  if(!fresh)reasons.push('資料可能已過期或寫入尚未開放，請先重新整理。');
  const candidates=(keys:string[])=>keys.flatMap(key=>{
   const node=ctx.nodes.find(n=>n.key===key);if(!node)return [];
@@ -98,9 +99,10 @@ export function stageNextStep({ctx,list,userId,today,fresh,crossStageAllowed}:St
    const blocked=rows.filter(t=>t.flags.blocker.state==='blocked').sort(rank)[0];
    const free=rows.filter(t=>t.flags.blocker.state!=='blocked');
    const unassigned=free.filter(t=>t.flags.unassigned&&t.task?.can.assign).sort(rank)[0];
-   if(unassigned&&fresh)return {kind:'action',title:`${label(unassigned)}尚未指派，你可指派執行人`,reason:`${node.label} · ${unassigned.deadline?`期限 ${unassigned.deadline.slice(0,10)}`:'期限未排定'}`,stage,scope:'stage',nodeKey:node.key,taskId:unassigned.id,button:'指派執行人',needs:'assign'};
-   const exec=free.filter(t=>t.task?.can.edit_status&&!t.flags.unassigned).sort((a,b)=>Number(b.flags.overdue)-Number(a.flags.overdue)||rank(a,b))[0];
-   if(exec&&fresh)return {kind:'action',title:`${exec.flags.overdue?'處理逾期任務':'接續'}${label(exec)}`,reason:`${node.label} · ${exec.deadline?`期限 ${exec.deadline.slice(0,10)}`:'期限未排定'}`,stage,scope:'stage',nodeKey:node.key,taskId:exec.id,button:'開啟任務',needs:'edit_status'};
+   if(unassigned&&fresh&&!blockedReason)return {kind:'action',title:`${label(unassigned)}尚未指派，你可指派執行人`,reason:`${node.label} · ${unassigned.deadline?`期限 ${unassigned.deadline.slice(0,10)}`:'期限未排定'}`,stage,scope:'stage',nodeKey:node.key,taskId:unassigned.id,button:'指派執行人',needs:'assign'};
+   const runnable=(t:TaskView)=>t.task?t.task.can.edit_status:node.legacy?.tasks.find(x=>x.id===t.id)?.can_execute===true;
+   const exec=free.filter(t=>runnable(t)&&!t.flags.unassigned).sort((a,b)=>Number(b.flags.overdue)-Number(a.flags.overdue)||rank(a,b))[0];
+   if(exec&&fresh&&!blockedReason)return {kind:'action',title:`${exec.flags.overdue?'處理逾期任務':'接續'}${label(exec)}`,reason:`${node.label} · ${exec.deadline?`期限 ${exec.deadline.slice(0,10)}`:'期限未排定'}`,stage,scope:'stage',nodeKey:node.key,taskId:exec.id,button:'開啟任務',needs:'edit_status'};
    if(blocked)return {kind:'view',title:`${label(blocked)}受阻，先查看前置條件`,reason:blocked.flags.blocker.state==='blocked'?blocked.flags.blocker.reasons.join('、'):'',nodeKey:node.key,taskId:blocked.id,button:'查看前置任務'};
   }
  };

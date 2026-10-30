@@ -17,11 +17,11 @@ export function withTaskScope<T extends ProjectRoute>(route:T,all:boolean):T {
  return {...route,section:all ? 'all-tasks' : undefined,all_tasks:undefined};
 }
 
-const TASK_FILTER_KEYS=['mine','unassigned','overdue'] as const;
+const TASK_FILTER_KEYS=['pending','unassigned','blocked','mine','overdue'] as const;
 export type TaskFilterKey=typeof TASK_FILTER_KEYS[number];
 export function taskFilters(route:Pick<ProjectRoute,'task_filters'>):Record<TaskFilterKey,boolean> {
  const active=new Set(route.task_filters?.split(','));
- return {mine:active.has('mine'),unassigned:active.has('unassigned'),overdue:active.has('overdue')};
+ return {pending:active.has('pending'),unassigned:active.has('unassigned'),blocked:active.has('blocked'),mine:active.has('mine'),overdue:active.has('overdue')};
 }
 export function withTaskFilter<T extends ProjectRoute>(route:T,key:TaskFilterKey,on:boolean):T {
  const next={...taskFilters(route),[key]:on};

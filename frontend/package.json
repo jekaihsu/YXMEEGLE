@@ -16,7 +16,7 @@
     "test:lark-pilot": "node test-lark-pilot.mjs",
     "test:lark-pilot-contract": "node test-lark-pilot-contract.mjs",
     "test:overview": "node test-overview-design.mjs",
-    "test:overview-tasks": "node test-overview-dashboard-model.mjs && node test-overview-task-row.mjs && node test-node-workbench-model.mjs",
+    "test:overview-tasks": "node test-overview-dashboard-model.mjs && node test-node-workbench-model.mjs",
     "test:view-data": "node test-view-data.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",

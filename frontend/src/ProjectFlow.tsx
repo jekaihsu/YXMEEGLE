@@ -17,12 +17,13 @@ import {useNodeAssignments} from './useNodeAssignments';
 import {useProjectProgress} from './useProjectProgress';
 import {useStartSop} from './useStartSop';
 import {SopControls} from './StartSopControls';
+import {NodeStats} from './NodeStats';
 import {useFlowDetails} from './useFlowDetails';
 import {buildFlowModel,needsViewerAction,productionKey,projectFlowRoute} from './flowModel';
-import {withTaskScope} from './projectRoutes';
 import {FlowDiagram} from './FlowDiagram';
 import {FlowAction,FlowNodeActions} from './FlowActions';
 import {FlowTasks} from './FlowTasks';
+import {resolveStages} from './stageModel';
 import {SopTasks,type SopImportTarget} from './SopTasks';
 import {useSopTasks,canReadSop} from './useSopTasks';
 const FlowSchedule=lazy(()=>import('./FlowSchedule').then(m=>({default:m.FlowSchedule})));
@@ -50,13 +51,15 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  const sop=useStartSop(p.id,enabled,assignments.reload);
  const list='data' in assignments.state ? assignments.state.data : undefined;
  const isLegacy=assignments.state.kind==='disabled';
- const all=route.allTasks || c.route.section==='all-tasks';
- const details=useFlowDetails(p.id,list,selectedKey,all || !!c.route.task,assignments.revision);
+ const [expanded,setExpanded]=useState<string[]>([]);
+ const details=useFlowDetails(p.id,list,selectedKey,expanded.length>0 || route.allTasks || c.route.section==='all-tasks' || !!c.route.task,assignments.revision);
  const merged=list ? {...list,node_details:{...list.node_details,...Object.fromEntries(Object.entries(details.details).map(([key,d])=>[key,{tasks:d.tasks,assignable_people:d.assignable_people}]))}} : undefined;
  const flow=buildFlowModel({project:isLegacy ? p : {...p,nodes:[]},assignments:merged,progress:read.state.kind==='ready' ? read.state.data : undefined,today:c.w.as_of,users:c.w.users});
  const sopData='data' in sopTasks.state?sopTasks.state.data:undefined;
  const model={...flow,nodes:withLocalChecklist(flow.nodes,sopData,sopTasks.assignees)};
  const selected=model.nodes.find(n=>n.key===selectedKey) || model.nodes[0];
+ const stage=resolveStages({nodes:model.nodes,list,requested:selected.key});
+ useEffect(()=>{if(route.allTasks || c.route.section==='all-tasks')setExpanded(model.nodes.filter(n=>n.key!==selectedKey).map(n=>n.key))},[route.allTasks,c.route.section,model.nodes.length]);
  const category=productionKey(selected.key),detail=details.details[selected.key];
  const loading=assignments.state.kind==='loading';
  const nodeBusy=!!list?.stale || assignments.refreshing || !!assignments.pending || assignments.state.kind!=='ready';
@@ -79,10 +82,10 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  const reports=(row?:ReportTarget)=>{location.hash=progressHash('#view=reports&tab=progress',{dept:row?.dept || 'field',week:row?.week || '',group:'',caseKey:'',q:row?.case_code || p.code})};
  const select=(node:string,keyboard=false)=>{keyboardMove.current=keyboard;c.go({...c.route,tab:inline ? 'overview' : keyboard ? c.route.tab : 'flow',node,task:undefined,task_source:undefined,focus:undefined},keyboard)};
  const localNode=p.nodes.find(n=>n.key===selected.key);
- const taskIncomplete=(!isLegacy && assignments.state.kind==='error' && !list) || (all ? Object.keys(details.errors).length>0 : !!details.errors[selected.key]);
+ const taskIncomplete=(!isLegacy && assignments.state.kind==='error' && !list) || !!details.errors[selected.key];
  const seed=selected.taskRows.find(row=>row.task && isProductionSeedTask(row.task,selected.key));
  const plan=seed?.task ? productionPlanFacts(seed.task,selected.key,selected.production) : null;
- const taskLoading=loading || !isLegacy && !!list && (all ? list.nodes.some(n=>!details.details[n.key] && !details.errors[n.key]) : !!selected.assignment && !detail && !details.errors[selected.key]);
+ const taskLoading=loading || !isLegacy && !!list && !!selected.assignment && !detail && !details.errors[selected.key];
  const gapCount=category && selected.production ? productionPlanGaps(selected).length : selected.gaps.length;
  const evidence=<details id="flow-evidence" className="pf-evidence" key={selected.key} open><summary>工程證據與節點待補<span className="pf-evidence-state">{read.state.kind==='error' ? '讀取失敗，可重試' : read.state.kind==='loading' ? '讀取中' : gapCount ? `${gapCount} 項待核對` : '查看來源'}</span></summary><div>
     {read.state.kind!=='ready' && plan && <ProductionPlanFacts plan={plan}/>}
@@ -103,15 +106,16 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
   {assignments.error && <div role="alert" className="pg-callout">{assignments.error.message}{['outcome_unknown','readback_mismatch','busy'].includes(assignments.error.code || '') && <Button onClick={()=>void assignments.retryMutation()}>重試同一操作</Button>}</div>}
   {!inline && <FlowDiagram compact selectionFollowsFocus nodes={model.nodes} overall={model.overall} selected={selected.key} loading={loading} onSelect={select}/>}
   <section id="flow-selected" className="pf-panel glass--card nw-selected" aria-label={`${selected.label}節點明細`} aria-busy={loading} tabIndex={-1}>
-   <header><div className="pf-selected-heading"><h2>{selected.label}</h2><span className="pf-selected-state" role="status">{nodeLoading?'正在載入節點資料…':selected.state}</span></div><div className="pf-panel-tools">{safeUrl(p.source_url)&&<a className="button" href={p.source_url} target="_blank" rel="noreferrer">開啟案件來源</a>}{inline&&enabled&&<SopControls sop={sop}/>} {!enabled&&<CaseSopStart projectId={p.id} sop={sopTasks}/>}{!nodeLoading&&category&&canWriteDispatch(c.s)&&<Suspense fallback={<Skeleton width="4rem"/>}><FlowSchedule key={selected.key} project={p} node={selected} session={c.s} onPublished={()=>{void assignments.reload()}}/></Suspense>}{list && <DetailsMenu className="pf-attention-menu" label="需要我處理"><div className="pf-attention" aria-label="需要我處理">{model.nodes.filter(n=>needsViewerAction(n,list,c.s.user?.id || '')).map(n=><Button key={n.key} onClick={()=>select(n.key)}>{n.label} · {n.state==='待審核' ? '待審核' : !n.owners.length ? '待認領' : '待處理'}</Button>)}</div></DetailsMenu>}</div></header>
-   {nodeLoading ? <Skeleton height="5rem"/> : <dl className="pf-facts">{workbench.facts.map(fact=><div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}{selected.assignment?.legacy_completion && <div><dt>舊案直接完成</dt><dd>{selected.assignment.legacy_completion.actor.name} · {taipeiTime(selected.assignment.legacy_completion.at)}<small>{selected.assignment.legacy_completion.reason}</small></dd></div>}</dl>}
+   <header><div className="pf-selected-heading"><span className="nc-eyebrow">目前選取的節點</span><h2>{selected.label}</h2><span className="pf-selected-state" role="status">{nodeLoading?'正在載入節點資料…':`節點狀態：${selected.state}`}</span></div><div className="pf-panel-tools">{safeUrl(p.source_url)&&<a className="button" href={p.source_url} target="_blank" rel="noreferrer">開啟案件來源</a>}{inline&&enabled&&<SopControls sop={sop}/>} {!enabled&&<CaseSopStart projectId={p.id} sop={sopTasks}/>}{!nodeLoading&&category&&canWriteDispatch(c.s)&&<Suspense fallback={<Skeleton width="4rem"/>}><FlowSchedule key={selected.key} project={p} node={selected} session={c.s} onPublished={()=>{void assignments.reload()}}/></Suspense>}{list && <DetailsMenu className="pf-attention-menu" label="需要我處理"><div className="pf-attention" aria-label="需要我處理">{model.nodes.filter(n=>needsViewerAction(n,list,c.s.user?.id || '')).map(n=><Button key={n.key} onClick={()=>select(n.key)}>{n.label} · {n.state==='待審核' ? '待審核' : !n.owners.length ? '待認領' : '待處理'}</Button>)}</div></DetailsMenu>}</div></header>
+   {!nodeLoading && stage.workflow==='ready' && <NodeStats node={selected} current={stage} onCurrent={()=>select(stage.currentIds[0])}/>}
+   {nodeLoading ? <Skeleton height="5rem"/> : <dl className="pf-facts">{workbench.facts.map(fact=><div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}{selected.assignment?.approver && <div><dt>核准人</dt><dd>{selected.assignment.approver.name}</dd></div>}{selected.assignment?.legacy_completion && <div><dt>舊案直接完成</dt><dd>{selected.assignment.legacy_completion.actor.name} · {taipeiTime(selected.assignment.legacy_completion.at)}<small>{selected.assignment.legacy_completion.reason}</small></dd></div>}</dl>}
    {selected.assignment?.auto_done && <p className="pg-callout">自動判定 · {selected.assignment.auto_done.reason}</p>}
    {inline&&isLegacy&&!localCase(p)&&!workbench.local&&legacyActions}
    {workbench.local ? <LocalNodeActions workbench={workbench} sop={sopTasks} projectId={p.id}/> : detail ? <FlowNodeActions key={selected.key} detail={detail} busy={nodeBusy} reason={nodeBusy||!list?.writes_enabled?reason:''} error={assignments.error} mutate={assignments.mutate} registry={workbench.actions} /> : !isLegacy && !!selected.assignment && assignments.state.kind==='ready' && !details.errors[selected.key] ? <Skeleton height="3rem"/> : null}
    {!loading && !workbench.local && !isLegacy && !selected.assignment && <p className="pf-empty">尚無節點指派</p>}
 
    {Object.entries(details.errors).map(([key,error])=><p role="alert" key={key}>{model.nodes.find(n=>n.key===key)?.label}任務明細讀取失敗。{error}<Button onClick={details.retry}>重試任務明細</Button></p>)}
-   {(!workbench.local || selected.taskRows.some(row=>row.source!=='SOP 任務')) && <FlowTasks c={c} p={p} nodes={model.nodes} selected={selected.key} details={details.details} all={all} onScope={value=>c.go(withTaskScope({...c.route,tab:inline?'overview':'flow'},value))} busy={busy} reason={reason} error={assignments.error} mutate={assignments.mutate} loading={taskLoading} incomplete={taskIncomplete} evidence={evidence} reopened={reopened}>{selected.assignment&&<SopTasks remote c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>}</FlowTasks>}
+   {(!workbench.local || selected.taskRows.some(row=>row.source!=='SOP 任務')) && <FlowTasks c={c} p={p} ctx={stage} details={details.details} detailErrors={details.errors} assignments={assignments} busy={busy} reason={reason} loading={taskLoading} incomplete={taskIncomplete} retryDetails={details.retry} expanded={expanded} setExpanded={setExpanded} evidence={evidence} reopened={reopened}>{selected.assignment&&<SopTasks remote c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>}</FlowTasks>}
    {!selected.assignment&&<SopTasks c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>}
   </section>
   {!inline && p.nodes.length>0 && legacyActions && <details className="pf-secondary pf-legacy"><summary>範本與本地流程</summary>

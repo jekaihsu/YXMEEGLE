@@ -17,9 +17,9 @@ export function AssignDrawer({task,nodeKey,nodeLabel,caseLabel,people,unavailabl
  const [draft,setDraft]=useState<AssignDraft>(baseDraft);
  const [phase,setPhase]=useState<Phase>({k:'edit'});
  const [errors,setErrors]=useState<Partial<Record<AssignField,string>>>({});
- const failure=useRef<unknown>(null);const id=useId();
+ const failure=useRef<unknown>(null);const id=useId();const [fetched,setFetched]=useState<AssignmentTask>();
  const dirty=!!base&&changedFields(baseDraft,draft).length>0;
- const live=task;const latestDraft=live?draftOf(live):baseDraft;
+ const live=fetched||task;const latestDraft=live?draftOf(live):baseDraft;
  const blockReason=!live?'此任務已不在可見範圍。':unavailableReason||(!live.can.assign?'你可查看此任務，但目前無指派權限。':phase.k==='revoked'?'權限已變更，已停止送出。':'');
  const locked=!!blockReason||phase.k==='saving'||phase.k==='unknown'||phase.k==='partial';
  const requestClose=()=>{if(phase.k==='saving')return;if(dirty&&phase.k!=='discard'&&phase.k!=='revoked'){setPhase({k:'discard'});return}onClose(false)};
@@ -32,7 +32,7 @@ export function AssignDrawer({task,nodeKey,nodeLabel,caseLabel,people,unavailabl
   const ok=await mutate({action:'update_task',nodeKey,taskId:base.id,expected_revision:base.revision,patch:patchOf(baseDraft,draft)},(_message,error)=>{failure.current=error});
   if(ok){onClose(true);return}
   const result=classifyFailure(failure.current);
-  if(result.kind==='conflict')setPhase({k:'conflict'});
+  if(result.kind==='conflict'){setPhase({k:'conflict'});void verify().then(setFetched).catch(()=>{})}
   else if(result.kind==='revoked'){refresh();setPhase({k:'revoked'})}
   else if(result.kind==='unknown')setPhase({k:'unknown',verifying:false,note:'尚無法確認儲存結果。請先查詢最新結果，確認未套用後才能重試。',canRetry:false});
   else{setErrors(result.fields);setPhase({k:'edit'})}
@@ -42,6 +42,7 @@ export function AssignDrawer({task,nodeKey,nodeLabel,caseLabel,people,unavailabl
   try{
    const latest=await verify();
    if(!latest){onClose(false);return}
+   setFetched(latest);
    const saved=draftOf(latest),result=verdict(baseDraft,draft,saved,base?.revision||'',latest.revision);
    if(result==='applied'){onClose(true);return}
    if(result==='partial'){setPhase({k:'partial',latest:saved});return}
@@ -54,7 +55,7 @@ export function AssignDrawer({task,nodeKey,nodeLabel,caseLabel,people,unavailabl
   if(await retry()){onClose(true);return}
   setPhase({k:'unknown',verifying:false,note:'重試後仍無法確認結果，請再次查詢最新結果。',canRetry:false});
  };
- const rebase=()=>{if(live){setBase(live);setErrors({});setPhase({k:'edit'})}};
+ const rebase=()=>{if(live){setBase(live);setFetched(undefined);setErrors({});setPhase({k:'edit'})}};
  const messages=Object.entries(errors).filter(([,v])=>v) as [AssignField,string][];
  const diff=(rows:{label:string;mine:string;theirs:string}[])=><table className="ad-diff"><thead><tr><th scope="col">欄位</th><th scope="col">你的草稿</th><th scope="col">最新值</th></tr></thead><tbody>{rows.map(r=><tr key={r.label}><th scope="row">{r.label}</th><td>{r.mine}</td><td>{r.theirs}</td></tr>)}</tbody></table>;
  const fields=(Object.keys(FIELD_LABELS) as AssignField[]).filter(k=>baseDraft[k]!==draft[k]);
