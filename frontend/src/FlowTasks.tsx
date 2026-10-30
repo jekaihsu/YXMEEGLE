@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState,type MutableRefObject,type ReactNode} from 'react';
+import {useEffect,useState,type MutableRefObject,type ReactNode} from 'react';
 import {ChevronDown,ChevronRight,TriangleAlert} from 'lucide-react';
 import {Badge,Button,Skeleton} from './design';
 import type {Ctx} from './appCommon';
@@ -23,7 +23,7 @@ function Executor({row}:{row:TaskView}){
 export function FlowTasks({c,p,ctx,details,detailErrors,assignments,busy,reason,loading,incomplete,retryDetails,expanded,setExpanded,evidence,reopened,children}:Props){
  const filters=taskFilters(c.route),applied=activeFilters(filters),userId=c.s.user?.id||'';
  const [assigning,setAssigning]=useState<{nodeKey:string;taskId:string}|null>(null);
- const trigger=useRef<HTMLElement|null>(null);
+ const [restore,setRestore]=useState('');
  const groups=groupTasks({ctx,filters,userId,today:c.w.as_of,loaded:key=>!!details[key]||!ctx.nodes.find(n=>n.key===key)?.assignment});
  const selected=groups.selected,selectedId=ctx.selectedId;
  const sopTask=c.route.task_source==='sop_local';
@@ -32,7 +32,8 @@ export function FlowTasks({c,p,ctx,details,detailErrors,assignments,busy,reason,
  const targetRow=sopTask?undefined:everything.find(r=>r.id===c.route.task&&r.task);
  const seed=selected?.matching.find(row=>row.task&&isProductionSeedTask(row.task,selectedId));
  const taskPlan=targetRow?.task?productionPlanFacts(targetRow.task,targetRow.nodeKey,ctx.nodes.find(n=>n.key===targetRow.nodeKey)?.production):null;
- const open=(nodeKey:string,taskId:string)=>{trigger.current=document.activeElement as HTMLElement|null;setAssigning({nodeKey,taskId})};
+ const open=(nodeKey:string,taskId:string)=>setAssigning({nodeKey,taskId});
+ useEffect(()=>{if(!restore||assigning)return;const row=document.querySelector(`[data-assignment-task="${restore}"]`);const el=row?.querySelector<HTMLElement>('.pf-task-line button:not(.pf-task-open)')||row?.querySelector<HTMLElement>('.pf-task-open');if(el){el.focus();setRestore('')}});
  useEffect(()=>assignRequests.subscribe((nodeKey,taskId)=>{if(nodeKey===selectedId||details[nodeKey])open(nodeKey,taskId)}),[selectedId,details]);
  useEffect(()=>{
   if(c.route.task||loading||!reopened?.current)return;
@@ -69,6 +70,7 @@ export function FlowTasks({c,p,ctx,details,detailErrors,assignments,busy,reason,
   {loading&&<div aria-label="任務載入中" aria-busy="true"><Skeleton lines={3} height="3.5rem"/></div>}
   <ul className="pf-task-list">{shown.map(row=>rowView(row,selected!))}</ul>
   {!loading&&!incomplete&&selected&&selected.loaded&&!shown.length&&<p className="pf-empty">{selected.rows.length?'沒有符合條件的任務':'此節點尚無可顯示任務'}{selected.rows.length>0&&<Button variant="plain" onClick={clear}>清除篩選</Button>}</p>}
+  {targetRow&&!ctx.currentIds.includes(targetRow.nodeKey)&&ctx.currentIds.length>0&&<p className="st-note" role="status">此任務屬於「{ctx.nodes.find(n=>n.key===targetRow.nodeKey)?.label}」階段，不是目前階段「{ctx.nodes.find(n=>n.key===ctx.currentIds[0])?.label}」；開啟連結不會變更活動階段。</p>}
   {pinned&&<p className="st-note" role="status">這項任務不符合目前的篩選條件，因連結指向它而保留顯示。</p>}
   {!seed&&evidence}
   {children}
@@ -89,6 +91,6 @@ export function FlowTasks({c,p,ctx,details,detailErrors,assignments,busy,reason,
    unavailableReason={assignments.state.kind==='error'?'節點來源更新失敗，請重新整理後再試。':assignments.state.kind==='ready'&&assignments.state.data.stale?'資料已過期，請重新整理後再試。':!drawerDetail?.writes_enabled?drawerDetail?.writes_disabled_reason||'節點修改尚未開放。':''}
    mutate={assignments.mutate} retry={assignments.retryMutation} refresh={()=>void assignments.reload()}
    verify={async()=>{const detail=await prefetchNodeAssignmentDetail(p.id,assigning.nodeKey,undefined,true);void assignments.reload();return detail.tasks.find(t=>t.id===assigning.taskId)}}
-   onClose={()=>{const target=assigning;setAssigning(null);requestAnimationFrame(()=>{const t=trigger.current;if(t?.isConnected)t.focus();else document.querySelector<HTMLElement>(`[data-assignment-task="${target.taskId}"] button`)?.focus()})}}/>}
+   onClose={()=>{setRestore(assigning.taskId);setAssigning(null)}}/>}
  </section>;
 }
