@@ -2,6 +2,7 @@ import {Badge, Skeleton} from './design';
 import {localCase} from './nodeWorkbenchModel';
 import {useStartSop} from './useStartSop';
 import {useEnsureSop} from './useEnsureSop';
+import {defaultChecklistState, DEFAULT_CHECKLIST_NEXT_STEP} from './sopTaskModel';
 import {useSopTasks} from './useSopTasks';
 import type {useNodeAssignments} from './useNodeAssignments';
 import type {Ctx} from './appCommon';
@@ -14,9 +15,16 @@ export function EnsureSopStatus({c, p, sop, assignments}: {c: Ctx; p: Project; s
  const fallback = useSopTasks(p.id, c.s.workspace_id || '', !remote && sop.state.kind === 'forbidden');
  const local = sop.state.kind === 'forbidden' ? fallback : sop;
  const data = local.state.kind === 'ready' ? local.state.data : undefined;
+ const legacy = data?.enrollment?.policy === 'legacy';
  const exists = remote ? !!preview?.already_started : !!data?.tasks.some(task => !task.manual);
- const mayStart = remote ? !!preview?.can_start : !!data?.allowed.startAllNodes;
+ const mayStart = local.state.kind !== 'loading' && !legacy && (remote ? !!preview?.can_start : !!data?.allowed.startAllNodes);
  const flow = useEnsureSop(p.id, mayStart, exists, async () => {await Promise.all([local.reload(), assignments.reload()])});
+ if (legacy) {
+  const state = defaultChecklistState(data);
+  if (state === 'applied') return <Badge>SOP 已啟動</Badge>;
+  if (state === 'not-applied') return <div role="status"><Badge>預設清單尚未套用</Badge><p>{DEFAULT_CHECKLIST_NEXT_STEP}</p></div>;
+  return <p role="status">預設清單狀態待確認</p>;
+ }
  if (exists || flow.state.kind === 'started') return <Badge>SOP 已啟動</Badge>;
  if (flow.state.kind === 'preparing') return <div role="status">SOP 準備中<Skeleton lines={2}/></div>;
  if (flow.state.kind === 'failed' && flow.state.reason === 'no_startable_nodes') return null;

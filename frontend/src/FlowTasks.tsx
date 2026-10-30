@@ -15,12 +15,12 @@ import {STAGE_FILTERS,STAGE_FILTER_LABELS,activeFilters,blockedKnown,groupTasks,
 import {prefetchNodeAssignmentDetail,type useNodeAssignments} from './useNodeAssignments';
 import {assignRequests} from './assignRequests';
 
-type Props={c:Ctx;p:Project;ctx:StageContext;details:Record<string,NodeAssignmentDetail>;detailErrors:Record<string,string>;assignments:ReturnType<typeof useNodeAssignments>;busy:boolean;reason:string;loading:boolean;incomplete:boolean;retryDetails:()=>void;expanded:string[];setExpanded:(keys:string[])=>void;evidence:ReactNode;reopened?:MutableRefObject<string>;children?:ReactNode};
+type Props={selectedOnly?:boolean;c:Ctx;p:Project;ctx:StageContext;details:Record<string,NodeAssignmentDetail>;detailErrors:Record<string,string>;assignments:ReturnType<typeof useNodeAssignments>;busy:boolean;reason:string;loading:boolean;incomplete:boolean;retryDetails:()=>void;expanded:string[];setExpanded:(keys:string[])=>void;evidence:ReactNode;reopened?:MutableRefObject<string>;children?:ReactNode};
 
 function Executor({row}:{row:TaskView}){
  return row.flags.unassigned ? <span className="st-unassigned"><TriangleAlert size={14} aria-hidden="true"/>尚未指派</span> : <span>{row.owner}</span>;
 }
-export function FlowTasks({c,p,ctx,details,detailErrors,assignments,busy,reason,loading,incomplete,retryDetails,expanded,setExpanded,evidence,reopened,children}:Props){
+export function FlowTasks({selectedOnly=false,c,p,ctx,details,detailErrors,assignments,busy,reason,loading,incomplete,retryDetails,expanded,setExpanded,evidence,reopened,children}:Props){
  const filters=taskFilters(c.route),applied=activeFilters(filters),userId=c.s.user?.id||'';
  const [assigning,setAssigning]=useState<{nodeKey:string;taskId:string}|null>(null);
  const [restore,setRestore]=useState('');
@@ -75,7 +75,7 @@ export function FlowTasks({c,p,ctx,details,detailErrors,assignments,busy,reason,
   {pinned&&<p className="st-note" role="status">這項任務不符合目前的篩選條件，因連結指向它而保留顯示。</p>}
   {!seed&&evidence}
   {children}
-  {groups.others.length>0&&<div className="st-others"><h3>其他階段任務</h3>
+  {!selectedOnly&&groups.others.length>0&&<div className="st-others"><h3>其他階段任務</h3>
    {groups.others.map(group=>{
     const key=group.node.key,isOpen=expanded.includes(key),err=detailErrors[key],current=ctx.currentIds.includes(key);
     return <section key={key} className="st-group" data-node={key}>

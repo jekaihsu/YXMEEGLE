@@ -9,7 +9,7 @@ import {useEffect,useState} from 'react';
 import {Badge, Button, Skeleton} from './design';
 import {FlowAction} from './FlowActions';
 import {isSopNode, SOP_NODE_KEYS, sopApi, sopErrorText, sopNodeLabel, type SopNodeKey, type SopTask} from './sopTaskApi';
-import {canOperateTestTasks, checklistComplete, closableTasks, countTasks, dueLabel, FILTERS, progressLabel, stateLabel, visibleTasks, suggestionSelection, type SopFilter} from './sopTaskModel';
+import {defaultChecklistState, DEFAULT_CHECKLIST_NEXT_STEP, canOperateTestTasks, checklistComplete, closableTasks, countTasks, dueLabel, FILTERS, progressLabel, stateLabel, visibleTasks, suggestionSelection, type SopFilter} from './sopTaskModel';
 import {SopImportSheet} from './SopImportSheet';
 import {SopTaskInspector} from './SopTaskInspector';
 import type {useSopTasks} from './useSopTasks';
@@ -106,6 +106,7 @@ const assign = async (t: SopTask, id: string) => {
     <Button variant="plain" onClick={() => {void sop.reload()}} disabled={state.kind === 'loading' || state.kind === 'ready' && state.refreshing}>重新整理</Button></div>
   </header>
 
+  {data && defaultChecklistState(data)==='not-applied' && <p role="status">預設清單尚未套用。實際 SOP 任務 {data.tasks.length} 項。{DEFAULT_CHECKLIST_NEXT_STEP}</p>}
   {creating && createNode && <CreateTask testOperator={canOperateTestTasks(c.s.user)} projectId={p.id} node={createNode} sop={sop} onClose={() => setCreating(false)}/>}
   {!remote && data?.enrollment && <SopEnrollmentStatus projectId={p.id} enrollment={data.enrollment} current={sop.current} reload={sop.reload}/>}
   {(!remote || rows.length>0) && (!data || !counts || filtered || history || rows.length>0) && <div className="pf-filters sop-filters">

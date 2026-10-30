@@ -63,7 +63,7 @@
 .project-detail-calm .pf-toolbar-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .project-detail-calm .pf-toolbar-actions>.button{background:transparent;border-color:transparent;color:#667085;padding-inline:8px}
 .project-detail-calm .sop-controls{gap:8px}.project-detail-calm .sop-controls .ds-badge{font-size:12px;padding:2px 8px;background:#f0f2f5;color:#667085}
-.project-detail-calm .pf-panel{padding:20px}.project-detail-calm .pf-panel>header{margin-bottom:4px}.project-detail-calm .pf-panel h2{margin:0;font-size:20px}
+.project-detail-calm .pf-panel{padding:20px}.project-detail-calm :is(.pf-panel,.pf-stage-detail)>header{margin-bottom:4px}.project-detail-calm .pf-panel h2{margin:0;font-size:20px}
 .project-detail-calm .pf-next-line{color:#667085;font-size:13px;margin:0 0 8px}
 .project-detail-calm .pf-attention-menu{font-size:12px;color:#667085}.project-detail-calm .pf-attention-menu>summary{min-height:32px;cursor:pointer;align-content:center}.project-detail-calm .pf-attention{padding:8px 0}
 .project-detail-calm .pf-facts{grid-template-columns:repeat(5,minmax(0,1fr));margin:8px 0 12px;padding-bottom:12px;gap:8px 20px}.project-detail-calm .pf-facts dd{font-size:14px}
@@ -100,13 +100,13 @@ body:has(.project-detail-calm)>.ds-backdrop .pf-facts{grid-template-columns:repe
 .project-detail-calm .po-todo-primary button{white-space:nowrap;flex-shrink:0;font-size:12px}
 .workspace .project-detail-calm>.pds-execution+.detail-page-content{margin-top:16px}
 .project-detail-calm .table-scroll>.data-table{min-width:650px}
-@media(max-width:767px){.project-detail-calm .pf-panel-tools{gap:8px}.project-detail-calm .pf-panel>header{flex-wrap:nowrap}.project-detail-calm .pf-toolbar .pf-source{flex:1 1 180px}.project-detail-calm .pf-toolbar-actions>.button{font-size:12px}.project-detail-calm .pf-panel-tools .pf-attention-menu[open]>.pf-attention{right:0}}
+@media(max-width:767px){.project-detail-calm .pf-panel-tools{gap:8px}.project-detail-calm :is(.pf-panel,.pf-stage-detail)>header{flex-wrap:nowrap}.project-detail-calm .pf-toolbar .pf-source{flex:1 1 180px}.project-detail-calm .pf-toolbar-actions>.button{font-size:12px}.project-detail-calm .pf-panel-tools .pf-attention-menu[open]>.pf-attention{right:0}}
 
 .project-detail-calm .pf-selected-heading{display:flex;align-items:baseline;gap:8px}
 
 .project-detail-calm .pf-evidence-state{margin-left:8px;color:#667085;font-size:12px;font-weight:400}
 
-.project-detail-calm .pf-panel>header{margin-bottom:16px;align-items:center}
+.project-detail-calm :is(.pf-panel,.pf-stage-detail)>header{margin-bottom:16px;align-items:center}
 .project-detail-calm .pf-selected-heading{align-items:center;gap:8px;flex-shrink:0}
 .project-detail-calm .pf-selected-state{margin:0;padding:3px 8px;border:1px solid #e5e7eb;border-radius:6px;background:#f7f8fa;color:#667085;white-space:nowrap}
 .project-detail-calm .pf-facts{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 16px;margin:0 0 16px;padding-bottom:16px;border-bottom:1px solid #e5e7eb}
@@ -127,7 +127,7 @@ body:has(.project-detail-calm)>.ds-backdrop .pf-facts{grid-template-columns:repe
 .project-detail-calm .sop-quiet{padding-top:12px;margin-top:12px}.project-detail-calm .sop-quiet>header{margin-bottom:0}.project-detail-calm .sop-quiet .ds-button{border-color:transparent;background:none;color:#667085}.project-detail-calm .sop-quiet .sop-progress{font-weight:400}
 .project-detail-calm :is(.pf-items-heading a,.pf-departments summary,.pf-evidence>summary):focus-visible{outline:2px solid #2563eb;outline-offset:2px}
 @media(max-width:767px){
- .project-detail-calm .pf-panel>header{gap:8px;flex-wrap:nowrap}.project-detail-calm .pf-panel h2{font-size:20px}.project-detail-calm .pf-panel-tools{gap:4px}.project-detail-calm .pf-panel-tools .pf-attention-menu{font-size:12px}.project-detail-calm .pf-panel-tools>.button{padding-inline:8px;font-size:13px}
+ .project-detail-calm :is(.pf-panel,.pf-stage-detail)>header{gap:8px;flex-wrap:nowrap}.project-detail-calm .pf-panel h2{font-size:20px}.project-detail-calm .pf-panel-tools{gap:4px}.project-detail-calm .pf-panel-tools .pf-attention-menu{font-size:12px}.project-detail-calm .pf-panel-tools>.button{padding-inline:8px;font-size:13px}
  .project-detail-calm .pf-facts{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.project-detail-calm .pf-facts dd{font-size:13px}.project-detail-calm .pf-task-line{gap:8px}
  .project-detail-calm .pf-plan-facts dl{gap:8px 16px}.project-detail-calm .pf-plan-facts dl>div{gap:6px}.project-detail-calm .pf-evidence-state{display:block;margin-left:16px}.project-detail-calm .pf-items-heading{gap:0}
  .project-detail-calm .pf-plan-table tbody{gap:0}.project-detail-calm .pf-plan-table tr{border:0;border-radius:0;border-bottom:1px solid #e5e7eb;padding:12px 0}.project-detail-calm .pf-plan-table td{padding:3px 0;grid-template-columns:84px minmax(0,1fr);font-size:13px}.project-detail-calm .pf-plan-table td:first-child{padding-right:0;white-space:normal}.project-detail-calm .pf-plan-table .pf-basis-chip{justify-self:start}

@@ -26,7 +26,7 @@ import './ProjectOverview.css';
 
 const text=(value:unknown,fallback:string)=>typeof value==='string' && value.trim() ? value : fallback;
 const shortDate=(value:unknown)=>typeof value==='string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0,10) : '未設定';
-export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}:{c:Ctx;p:Project;assignments:ReturnType<typeof useNodeAssignments>;selectedKey:string;sopTasks:ReturnType<typeof useSopTasks>;workbench:ReactNode}){
+export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}:{c:Ctx;p:Project;assignments:ReturnType<typeof useNodeAssignments>;selectedKey:string;sopTasks:ReturnType<typeof useSopTasks>;workbench:(diagram:ReactNode)=>ReactNode}){
  const remoteStart=!localCase(p)&&c.s.features?.node_assignment===true;
  const start=useStartSop(p.id,remoteStart&&!workbench,assignments.reload);
  const read=useProjectProgress(p.id),list='data' in assignments.state ? assignments.state.data : undefined;
@@ -58,11 +58,11 @@ export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}
  return <div className="project-overview">
   <div className="po-main">
    <CaseSummary status={p.status} ctx={stage} step={step} blockers={blockers} loading={assignments.state.kind==='loading'} error={assignments.state.kind==='error'?assignments.state.message:''} stale={!!list?.stale} onStep={openStep} onCurrent={()=>go({tab:'overview',node:stage.currentIds[0]})}/>
-   <FlowDiagram compact nodes={model.nodes} overall={model.overall} selected={stage.selectedId} loading={assignments.state.kind==='loading'} onSelect={node=>go({tab:'overview',node})}/>
-   {workbench}
+   {workbench(<FlowDiagram compact nodes={model.nodes} overall={model.overall} selected={stage.selectedId} loading={assignments.state.kind==='loading'} onSelect={node=>go({tab:'overview',node})}/>)}
    {assignments.state.kind==='error' && <p className="po-source-state" role="alert">節點暫不可用<Button onClick={()=>void assignments.reload()}>重試</Button></p>}
    {sourceStale && !list?.stale && <p className="po-source-state">工程來源為上次成功資料，待更新核對。</p>}
    {list?.stale && <p className="po-source-state">節點來源為上次成功資料，待更新核對。</p>}
+   <details className="po-fold"><summary>工程證據與工項進度</summary>
    {!!kpis.length && <section className="po-kpis po-card" aria-label="案件重點指標">{kpis.map(cell=><a key={cell.id} className={`po-kpi${cell.compact ? ' po-kpi-text' : ''}${cell.id==='latest_report' ? ' po-kpi-date' : ''}${cell.alert ? ' po-kpi-alert' : ''}`} href={href(cell.target)} onClick={event=>{event.preventDefault();go(cell.target)}}><span>{cell.label}</span><strong>{cell.value}</strong><small>{cell.detail}</small></a>)}</section>}
 
    <section className={rows.length ? "po-card po-items" : "po-items po-items-empty"} aria-label="工項進度">
@@ -73,13 +73,16 @@ export function ProjectOverview({c,p,assignments,selectedKey,sopTasks,workbench}
     {data?.sources.reports_status==='restricted' && <p className="po-source-state">週報來源權限不足，日報與工項狀態分開核對。</p>}
     {data?.sources.reports_stale && <p className="po-source-state">回報為上次成功資料，待更新。</p>}
    </section>
+   </details>
+   <details className="po-fold"><summary>近期活動與相關文件</summary>
     <section className="po-card po-activity" aria-labelledby="po-activity-title"><header className="po-card-heading"><h2 id="po-activity-title">近期活動</h2><Button variant="plain" onClick={()=>go({tab:'data',section:'activity'})}>查看全部 →</Button></header>{events.length ? <ol>{events.map(event=><li key={event.id}><time dateTime={event.created_at}>{shortDate(event.created_at).slice(5).replace('-','/')}</time><a href={href({tab:'data',section:'activity'})} onClick={e=>{e.preventDefault();go({tab:'data',section:'activity'})}}>{eventMessage(event)}</a>{event.actor_id && <span>{nameOf(c.w,event.actor_id)}</span>}</li>)}</ol> : <p className="po-empty">尚無可顯示的案件活動</p>}</section>
    {!!documents?.length && <section className="po-card po-documents" aria-labelledby="po-documents-title"><h2 id="po-documents-title">相關文件</h2><div>{documents.map(group=><a key={group.id} href={href({tab:'files'})} onClick={event=>{event.preventDefault();go({tab:'files'})}}><FileText size={18}/>{group.label} {group.count}</a>)}</div><Button variant="plain" onClick={()=>go({tab:'files'})}>查看全部 →</Button></section>}
+   </details>
   </div>
   <aside className="po-sidebar" aria-label="案件摘要資料">
-   <section className="po-card"><h2>案件資訊</h2><dl><div><dt>來源紀錄狀態</dt><dd><span className={`po-pill${status.includes('待核對') ? ' po-pill-amber' : ''}`}>{status}</span><small className="po-source-note">來源系統紀錄上的狀態，不等於案件狀態</small></dd></div>{text(p.project_type,'') && <div><dt>案件類型</dt><dd>{p.project_type}</dd></div>}{['demo','lark','local'].includes(p.source_kind) && <div><dt>來源</dt><dd>{p.source_kind==='demo' ? '獨立示範資料' : p.source_kind==='lark' ? '飛書' : '工作台'}</dd></div>}{p.created_at && <div><dt>建立時間</dt><dd>{shortDate(p.created_at)}</dd></div>}{sync && <div><dt>最後同步</dt><dd><time dateTime={sync} title={stamp(sync)}>{stamp(sync).replaceAll('/','-').slice(0,16)}</time></dd></div>}</dl></section>
    {(p.planned_start_date || p.planned_end_date || p.original_due_date) && <section className="po-card po-dates"><h2>關鍵日期</h2><dl>{p.planned_start_date && <div><dt><Flag size={17}/>預計開工</dt><dd>{shortDate(p.planned_start_date)}</dd></div>}{p.planned_end_date && <div><dt><CalendarDays size={17}/>預計完工</dt><dd>{shortDate(p.planned_end_date)}</dd></div>}{p.original_due_date && <div><dt><Clock3 size={17}/>合約期限</dt><dd>{shortDate(p.original_due_date)}</dd></div>}</dl></section>}
    <section className="po-card po-team"><h2>負責人與團隊</h2><dl><div><dt>PM</dt><dd className="po-person"><Avatar small user={pm}/>{p.pm_id ? nameOf(c.w,p.pm_id) : p.sop_only?'未提供':'未指派'}</dd></div><div><dt>組別主管</dt><dd className="po-person"><Avatar small user={supervisor}/>{supervisor?.name || '未指派'}</dd></div>{!!fieldNode?.departments.length && <div><dt>外業組別</dt><dd>{fieldNode.departments.join('、')}</dd></div>}{fieldNode?.assignment?.assigned_by?.name && <div><dt>指派主管</dt><dd>{fieldNode.assignment.assigned_by.name}</dd></div>}</dl></section>
+   <details className="po-card po-fold"><summary>案件資訊與來源狀態</summary><dl><div><dt>來源紀錄狀態</dt><dd><span className={`po-pill${status.includes('待核對') ? ' po-pill-amber' : ''}`}>{status}</span><small className="po-source-note">來源系統紀錄上的狀態，不等於案件狀態</small></dd></div>{text(p.project_type,'') && <div><dt>案件類型</dt><dd>{p.project_type}</dd></div>}{['demo','lark','local'].includes(p.source_kind) && <div><dt>來源</dt><dd>{p.source_kind==='demo' ? '獨立示範資料' : p.source_kind==='lark' ? '飛書' : '工作台'}</dd></div>}{p.created_at && <div><dt>建立時間</dt><dd>{shortDate(p.created_at)}</dd></div>}{sync && <div><dt>最後同步</dt><dd><time dateTime={sync} title={stamp(sync)}>{stamp(sync).replaceAll('/','-').slice(0,16)}</time></dd></div>}</dl></details>
   </aside>
  </div>;
 }
