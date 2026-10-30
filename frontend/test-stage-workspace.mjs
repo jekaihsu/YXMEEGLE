@@ -16,9 +16,9 @@ const can={assign:true,edit_status:true,cancel:true,edit_details:true,claim:fals
 const mk=(id,over={})=>({id,record_id:id,revision:`rev-${id}-1`,title:`任務 ${id}`,detail:'',assignee:{open_id:'ou_wei',name:'合成 陳威廷'},assigned_by:null,department:'控制',deadline:'2026-10-25',status:'待處理',done_at:null,created_at:null,can:{...can},...over});
 let root,c,fixture,calls,mode,holdDetail,tasksByNode;
 const jsonResponse=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
-async function mount({node,task,tab='overview',tasks,embedded=true,assign=true,filters,detailStatus}={}){
+async function mount({node,task,tab='overview',tasks,embedded=true,assign=true,filters,detailStatus,project}={}){
  if(root)await act(async()=>root.unmount());ui.invalidateSessionEpoch();
- const base=projectFixture();fixture=embeddedAssignmentFixture();mode={detailStatus};holdDetail=null;
+ const base=projectFixture();Object.assign(base.project,project||{});fixture=embeddedAssignmentFixture();mode={detailStatus};holdDetail=null;
  tasksByNode=tasks||{control:[mk('c1',{status:'已完成'}),mk('c2',{status:'已完成'}),mk('c3',{status:'已完成'}),mk('c4',{assignee:null}),mk('c5',{status:'進行中'})],field:[mk('f1',{assignee:null,deadline:'2026-10-10'})],pm:[]};
  for(const n of fixture.list.nodes){
   const rows=tasksByNode[n.key]||[];fixture.list.node_details[n.key]={tasks:rows,assignable_people:[{open_id:'ou_anna',name:'合成 林安娜',departments:['控制']},{open_id:'ou_wei',name:'合成 陳威廷',departments:['控制']}]};
@@ -183,6 +183,16 @@ await check('other stages are collapsed by default, expand on demand and are lab
  await click(toggle);assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.ok(document.querySelector('[data-assignment-task="f1"]'));
 });
 
+await check('P2 case status and source record status are labelled as different layers and never share a label',async()=>{
+ await mount({node:'control',project:{status:'paused',source_status:'待確認單'}});
+ const header=document.querySelector('.pds-case-status').textContent;
+ assert.match(header,/案件狀態暫停中/);assert.match(header,/案件狀態描述整體案件；節點狀態描述此階段；任務狀態描述單項工作/);
+ const labels=[...document.querySelectorAll('.po-sidebar dt')].map(d=>d.textContent);
+ assert.ok(labels.includes('來源紀錄狀態'));assert.ok(!labels.includes('案件狀態'),'sidebar no longer calls the source status 案件狀態');
+ const side=[...document.querySelectorAll('.po-sidebar dl>div')].find(d=>d.querySelector('dt').textContent==='來源紀錄狀態').textContent;
+ assert.match(side,/待確認單/);assert.match(side,/不等於案件狀態/);
+ assert.match(document.querySelector('#flow-selected').textContent,/節點狀態：/);assert.match(rowOf('c4').textContent,/任務狀態：/);
+});
 await act(async()=>root.unmount());
 for(const r of results)console.log(r.join(' '));
 if(results.some(r=>r[0]==='FAIL'))process.exit(1);

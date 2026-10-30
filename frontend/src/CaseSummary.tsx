@@ -8,7 +8,7 @@ export function CaseSummary({status,ctx,step,blockers,loading,error,stale,onStep
   <h2>案件摘要</h2>
   {error ? <p role="alert">流程來源暫不可用，無法確認目前階段。{error}</p> : loading ? <div role="status"><p>正在核對節點與任務…</p><Skeleton lines={3}/></div> : <>
    <dl>
-    <div><dt>案件狀態</dt><dd>{caseStatusLabel(status)}</dd></div>
+    <div><dt>案件狀態</dt><dd>{caseStatusLabel(status)}<small>整體案件的生命週期</small></dd></div>
     <div><dt>目前階段</dt><dd>{ctx.workflow==='missing' ? '流程尚未設定' : current.length ? <>{current[0]}{current.length>1 && <small>，另有進行中：{current.slice(1).join('、')}</small>}{!ctx.currentSelected && <Button variant="plain" onClick={onCurrent}>回到目前階段</Button>}</> : ctx.finished ? '所有節點已完成或略過' : '目前階段待確認'}</dd></div>
     <div><dt>待處理原因</dt><dd>{blockers.length ? <ul>{blockers.map((b,i)=><li key={i}>{b}</li>)}</ul> : '目前沒有已知阻礙'}</dd></div>
     <div><dt>下一步</dt><dd>{step.kind==='action'||step.kind==='view' ? <><strong>{step.title}</strong><small>{step.reason}</small><Button variant="primary" onClick={()=>onStep(step)}>{step.button}</Button></> : <><strong>{step.title}</strong>{step.reasons.map((r,i)=><small key={i}>{r}</small>)}</>}</dd></div>
