@@ -28,7 +28,31 @@ await check('validation: field error, draft kept',async()=>{await run('validatio
 await check('conflict: diff shown, explicit resubmit only',async()=>{await run('conflict');await pick('王小明');await save();assert.match(dialog().textContent,/此任務已被他人修改/);assert.match(dialog().querySelector('.ad-diff').textContent,/張大同/);await click(inDialog('以最新值重新檢查'));await save();assert.equal(dialog(),null)});
 await check('forbidden: capability message, save disabled',async()=>{await run('forbidden');await pick('王小明');await save();assert.match(dialog().textContent,/權限已變更/);assert.ok(inDialog('儲存').disabled)});
 await check('timeout: verify first, then same-request retry',async()=>{await run('timeout');await pick('王小明');await save();assert.match(dialog().textContent,/儲存結果不明/);assert.ok(inDialog('重試同一操作').disabled);await click(inDialog('查詢最新結果'));await act(async()=>{await tick(400)});assert.equal(inDialog('重試同一操作').disabled,false);await click(inDialog('重試同一操作'));await act(async()=>{await tick(400)});assert.equal(dialog(),null)});
-await check('partial: executor saved, deadline not',async()=>{await run('partial');await pick('王小明');await setDate('2026-12-01');await save();await click(inDialog('查詢最新結果'));await act(async()=>{await tick(400)});assert.match(dialog().textContent,/執行人：已儲存/);assert.match(dialog().textContent,/期限：尚未儲存/)});
+await check('partial: first response marks version/executor unconfirmed, recovery shows per-field results and the right unsaved summary',async()=>{
+ await run('partial');await pick('王小明');await setDate('2026-12-01');await save();
+ assert.match(dialog().textContent,/儲存結果不明/);
+ const facts=()=>[...dialog().querySelectorAll('.task-drawer-facts div')].map(d=>d.textContent);
+ assert.ok(facts().some(t=>/目前執行人.*尚未指派（結果不明，尚未確認）/.test(t)),'old executor is marked unconfirmed, not shown as current');
+ assert.ok(facts().some(t=>/最新讀取版本syn-rev-1（結果不明，尚未確認）/.test(t)),'old version is marked unconfirmed');
+ assert.ok(inDialog('重試同一操作').disabled,'no retry before the result is known');
+ await click(inDialog('查詢最新結果'));await act(async()=>{await tick(400)});
+ assert.match(dialog().textContent,/執行人：已儲存/);assert.match(dialog().textContent,/期限：尚未儲存/);
+ assert.ok(facts().some(t=>/目前執行人合成 王小明$/.test(t)),'re-read updates 目前執行人');
+ assert.ok(facts().some(t=>/最新讀取版本syn-rev-part$/.test(t)),'re-read updates 最新讀取版本');
+ const summary=dialog().querySelector('.ad-dirty').textContent;assert.equal(summary,'尚未儲存：期限','summary lists only the field that is really unsaved');
+ assert.match(dialog().textContent,/此次不算完整成功/,'never claims full success');
+});
+await check('P7 switching scenario with the drawer open resets task, log, attempts and drawer',async()=>{
+ await run('validation');await pick('王小明');await save();
+ assert.match(dialog().textContent,/已停用或不可指派/);assert.ok(document.querySelectorAll('.stage-fixture ol li').length>0);
+ await act(async()=>{root.render(React.createElement(ui.StageFixture,{scenario:'conflict'}));await tick()});
+ assert.equal(dialog(),null,'drawer closed');assert.equal(document.querySelectorAll('.stage-fixture ol li').length,0,'log cleared');
+ assert.match(document.querySelector('[data-assignment-task]').textContent,/尚未指派/,'task reset');
+ assert.match(document.querySelector('[role=status]').textContent,/版本衝突/);
+ await click([...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='指派'));await pick('王小明');await save();
+ assert.match(dialog().textContent,/此任務已被他人修改/,'first save in the new scenario is a conflict, not a success');
+ assert.doesNotMatch(document.querySelector('[data-assignment-task]').textContent,/王小明/);
+});
 await check('revoked: capability lost before saving blocks the save with a reason',async()=>{await run('revoked');await pick('王小明');await act(async()=>{await tick(2800)});assert.ok(inDialog('儲存').disabled);assert.match(dialog().textContent,/目前無指派權限/)});
 await check('no network use in any scenario',async()=>assert.equal(fetched,0));
 await act(async()=>root.unmount());

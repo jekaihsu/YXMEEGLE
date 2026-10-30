@@ -16,6 +16,9 @@ const fail=(status:number,message:string,code?:string,fields:Record<string,strin
 
 export function StageFixture({scenario}:{scenario:string}){
  const active=(FIXTURE_SCENARIOS.find(([id])=>id===scenario)?.[0]||'normal') as FixtureScenario;
+ return <FixtureRun key={active} active={active}/>;
+}
+function FixtureRun({active}:{active:FixtureScenario}){
  const [task,setTask]=useState<AssignmentTask>(base);
  const [open,setOpen]=useState(false);
  const [log,setLog]=useState<string[]>([]);
@@ -41,7 +44,7 @@ export function StageFixture({scenario}:{scenario:string}){
  return <div className="project-detail project-detail-calm stage-fixture">
   <h1>合成驗證環境：任務指派流程</h1>
   <p role="note" className="cs-note"><strong>這是合成資料。</strong>此頁不讀取也不寫入任何真實案件、任務或 Lark，操作只在瀏覽器記憶體中模擬，不會送出任何寫入請求。</p>
-  <nav aria-label="情境" className="pf-filters">{FIXTURE_SCENARIOS.map(([id,label])=><a key={id} className="button" aria-current={id===active?'page':undefined} href={`#view=stage-fixture&tab=${id}`} onClick={()=>{setTask(base);setLog([]);attempts.current=0;setOpen(false)}}>{label}</a>)}</nav>
+  <nav aria-label="情境" className="pf-filters">{FIXTURE_SCENARIOS.map(([id,label])=><a key={id} className="button" aria-current={id===active?'page':undefined} href={`#view=stage-fixture&tab=${id}`}>{label}</a>)}</nav>
   <section className="po-card" aria-label="合成任務">
    <h2>節點任務（合成）</h2>
    <ul className="pf-task-list"><li data-assignment-task={task.id}><div className="pf-task-line"><span><strong>{task.title}</strong><span className="st-meta"><span>任務狀態：{task.status}</span><span>執行人：{task.assignee?.name||'尚未指派'}</span><span>{task.deadline||'未排期限'}</span></span></span><Button disabled={!task.can.assign} disabledReason="你可查看此任務，但目前無指派權限。" onClick={()=>setOpen(true)}>{task.assignee?'改派':'指派'}</Button></div></li></ul>
