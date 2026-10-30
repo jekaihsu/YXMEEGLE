@@ -82,6 +82,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
   if(firstSelection.current){firstSelection.current=false;if(inline&&!c.route.task&&!c.route.section&&!c.route.focus)return}
   if(keyboardMove.current){keyboardMove.current=false;return;}
   const id=c.route.section==='evidence' ? 'flow-evidence' : route.focus==='tasks' ? 'flow-tasks' : c.route.node ? 'flow-selected' : '';
+  if(id==='flow-evidence'){const target=document.getElementById(id);if(target instanceof HTMLDetailsElement)target.open=true}
   if(stageNavigation||!id)return;const frame=requestAnimationFrame(()=>{const target=document.getElementById(id);if(id==='flow-evidence' && target instanceof HTMLDetailsElement)target.open=true;target?.scrollIntoView({block:'start',behavior:'auto'})});return()=>cancelAnimationFrame(frame);
  },[c.route.tab,c.route.node,c.route.section,loading,stageNavigation]);
  const reports=(row?:ReportTarget)=>{location.hash=progressHash('#view=reports&tab=progress',{dept:row?.dept || 'field',week:row?.week || '',group:'',caseKey:'',q:row?.case_code || p.code})};

@@ -96,6 +96,11 @@ await check('evidence starts folded and an evidence deep link opens it on either
   assert.equal(document.querySelector('#flow-evidence').open,true);
  }
 });
+await check('an evidence deep link also opens the folded evidence in 階段導覽',async()=>{
+ await mount({tab:'flow'});await click(button('階段導覽'));assert.equal(document.querySelector('#flow-evidence').open,false);
+ await act(async()=>{React.startTransition(()=>c.go({...c.route,section:'evidence'}));await tick(40)});
+ assert.equal(document.querySelector('#flow-evidence').open,true);
+});
 await check('T01 opening, selecting nodes and switching tabs cause zero writes',async()=>{
  await mount();assert.ok(document.querySelector('.cs-summary'));
  assert.match(document.querySelector('.cs-summary').textContent,/目前階段控制/);
