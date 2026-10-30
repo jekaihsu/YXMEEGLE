@@ -10,3 +10,4 @@
 
 .pf-stage-context{font-size:14px;color:var(--label);padding:0 6px 12px}
 @media(max-width:640px){#flow-selected .pf-stage-detail>header{flex-wrap:wrap;gap:8px}}
+.cs-summary .cs-next dd>strong,.cs-summary .cs-next dd>small{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;overflow:hidden}
