@@ -1,0 +1,538 @@
+{
+  "schema_version": 1,
+  "window": {
+    "from": "2026-10-19",
+    "to": "2026-10-25",
+    "tz": "Asia/Taipei"
+  },
+  "scope": "all",
+  "group": null,
+  "source": {
+    "registry_key": "v4",
+    "table_id": "tblsoyGcC6K5AipF",
+    "fetched_at": "2026-10-18T12:16:45+00:00",
+    "quality": {
+      "states": [
+        "complete"
+      ],
+      "reason": null
+    },
+    "joins": {
+      "nodes": "ok",
+      "people": "ok",
+      "accounts": "ok",
+      "instruments": "ok",
+      "vehicles": "ok",
+      "cases": "ok"
+    }
+  },
+  "approval_policy": "required",
+  "my_seats": [
+    "manager_review"
+  ],
+  "progress": {
+    "total": 7,
+    "status": {
+      "unknown": 2,
+      "待處理": 5
+    },
+    "planning_status": {
+      "pending_approval": 3,
+      "confirmed": 2,
+      "unassigned": 2
+    },
+    "needs_me": 0
+  },
+  "needs_me": [],
+  "rows": [
+    {
+      "task_id": null,
+      "title": "整合驗證 港區全欄位派工",
+      "content": "測區量測、原始資料紀錄與成果交付。",
+      "case": {
+        "ref": "recCase1",
+        "code": null,
+        "name": null,
+        "resolved": false
+      },
+      "project_id": "SYN-001",
+      "package_id": "PKG-E2E-21",
+      "parent_task_ref": null,
+      "kind": "execution",
+      "phase": "formal",
+      "node": null,
+      "department": "外業",
+      "status": null,
+      "planning_status": "pending_approval",
+      "acceptance_status": null,
+      "acceptance_summary": null,
+      "owner": {
+        "person_ref": "recP2",
+        "open_id": "ou_yi",
+        "name": "乙"
+      },
+      "crew": [
+        {
+          "person_ref": "recP2",
+          "open_id": "ou_yi",
+          "name": "乙"
+        },
+        {
+          "person_ref": "recP3",
+          "open_id": "ou_bing",
+          "name": "丙"
+        }
+      ],
+      "assigned_by": null,
+      "interval": {
+        "start": "2026-10-19T08:00+08:00",
+        "end": "2026-10-19T12:00+08:00",
+        "precision": "datetime"
+      },
+      "instruments": [
+        {
+          "ref": "recI1",
+          "label": null
+        }
+      ],
+      "vehicles": [
+        {
+          "ref": "recV1",
+          "label": null
+        }
+      ],
+      "deadline": "2026-10-25",
+      "est_person_hours": 8,
+      "revision": null,
+      "versions": {
+        "scope": null,
+        "rule": null,
+        "evidence": null
+      },
+      "command_ref": null,
+      "readback_at": null,
+      "source": "workbench_preview",
+      "preview_id": "pv_2a1e9086ec7947e342852fde",
+      "command": null,
+      "draft_id": null,
+      "needs_me": [],
+      "allowed_actions": []
+    },
+    {
+      "task_id": "recDone",
+      "title": "B 區外業",
+      "content": "B 區水深測量",
+      "case": {
+        "ref": "recCase1",
+        "code": "SYN-001",
+        "name": "合成示範案",
+        "resolved": true
+      },
+      "project_id": "SYN-001",
+      "package_id": null,
+      "parent_task_ref": null,
+      "kind": "execution",
+      "phase": "formal",
+      "node": null,
+      "department": "外業",
+      "status": "待處理",
+      "planning_status": "confirmed",
+      "acceptance_status": null,
+      "acceptance_summary": null,
+      "owner": {
+        "person_ref": "recP3",
+        "open_id": "ou_bing",
+        "name": "丙"
+      },
+      "crew": [
+        {
+          "person_ref": "recP3",
+          "open_id": "ou_bing",
+          "name": "丙"
+        },
+        {
+          "person_ref": "recP2",
+          "open_id": "ou_yi",
+          "name": "乙"
+        }
+      ],
+      "assigned_by": {
+        "person_ref": "recP9",
+        "open_id": "ou_pm",
+        "name": "派工PM"
+      },
+      "interval": {
+        "start": "2026-10-20T08:00:00+08:00",
+        "end": "2026-10-20T12:00:00+08:00",
+        "precision": "datetime"
+      },
+      "instruments": [
+        {
+          "ref": "recI1",
+          "label": "GNSS-01"
+        }
+      ],
+      "vehicles": [],
+      "deadline": null,
+      "est_person_hours": 8,
+      "revision": 1,
+      "versions": {
+        "scope": null,
+        "rule": null,
+        "evidence": null
+      },
+      "command_ref": "ba61e88c-7c3a-4646-b227-c3d108b48908",
+      "readback_at": "2026-10-18T09:00+08:00",
+      "source": "v4_task",
+      "command": null,
+      "preview_id": null,
+      "draft_id": null,
+      "needs_me": [],
+      "allowed_actions": [
+        "reassign",
+        "edit_detail"
+      ]
+    },
+    {
+      "task_id": "recTask0001",
+      "title": "整合驗證 競爭提案甲",
+      "content": "第一份競爭改派",
+      "case": {
+        "ref": "recCase1",
+        "code": "SYN-001",
+        "name": "合成示範案",
+        "resolved": true
+      },
+      "project_id": "SYN-001",
+      "package_id": "PKG-E2E-21",
+      "parent_task_ref": null,
+      "kind": "execution",
+      "phase": "formal",
+      "node": null,
+      "department": "外業",
+      "status": "待處理",
+      "planning_status": "pending_approval",
+      "acceptance_status": null,
+      "acceptance_summary": null,
+      "owner": {
+        "person_ref": "recP1",
+        "open_id": "ou_jia",
+        "name": "甲"
+      },
+      "crew": [
+        {
+          "person_ref": "recP1",
+          "open_id": "ou_jia",
+          "name": "甲"
+        }
+      ],
+      "assigned_by": {
+        "person_ref": "recP9",
+        "open_id": "ou_pm",
+        "name": "派工PM"
+      },
+      "interval": {
+        "start": "2026-10-21T08:00:00+08:00",
+        "end": "2026-10-21T12:00:00+08:00",
+        "precision": "datetime"
+      },
+      "instruments": [
+        {
+          "ref": "recI1",
+          "label": "GNSS-01"
+        }
+      ],
+      "vehicles": [
+        {
+          "ref": "recV1",
+          "label": "SYN-001"
+        }
+      ],
+      "deadline": "2026-10-25",
+      "est_person_hours": 4,
+      "revision": 3,
+      "versions": {
+        "scope": null,
+        "rule": null,
+        "evidence": null
+      },
+      "command_ref": "a89a0c18-b7e3-435d-b11d-2df8974775c6",
+      "readback_at": "2026-10-18T20:16+08:00",
+      "source": "v4_task",
+      "preview_id": "pv_285de06cdea98186785b6df5",
+      "command": {
+        "command_id": "a89a0c18-b7e3-435d-b11d-2df8974775c6",
+        "state": "committed",
+        "label": "已確認"
+      },
+      "draft_id": null,
+      "needs_me": [],
+      "allowed_actions": [
+        "edit_detail"
+      ]
+    },
+    {
+      "task_id": null,
+      "title": "整合驗證 逾時後對帳",
+      "content": "測區量測、原始資料紀錄與成果交付。",
+      "case": {
+        "ref": "recCase1",
+        "code": null,
+        "name": null,
+        "resolved": false
+      },
+      "project_id": "SYN-001",
+      "package_id": "PKG-E2E-21",
+      "parent_task_ref": null,
+      "kind": "execution",
+      "phase": "formal",
+      "node": null,
+      "department": "外業",
+      "status": null,
+      "planning_status": "pending_approval",
+      "acceptance_status": null,
+      "acceptance_summary": null,
+      "owner": {
+        "person_ref": "recP2",
+        "open_id": "ou_yi",
+        "name": "乙"
+      },
+      "crew": [
+        {
+          "person_ref": "recP2",
+          "open_id": "ou_yi",
+          "name": "乙"
+        },
+        {
+          "person_ref": "recP3",
+          "open_id": "ou_bing",
+          "name": "丙"
+        }
+      ],
+      "assigned_by": null,
+      "interval": {
+        "start": "2026-10-22T08:00+08:00",
+        "end": "2026-10-22T12:00+08:00",
+        "precision": "datetime"
+      },
+      "instruments": [
+        {
+          "ref": "recI1",
+          "label": null
+        }
+      ],
+      "vehicles": [
+        {
+          "ref": "recV1",
+          "label": null
+        }
+      ],
+      "deadline": "2026-10-25",
+      "est_person_hours": 8,
+      "revision": null,
+      "versions": {
+        "scope": null,
+        "rule": null,
+        "evidence": null
+      },
+      "command_ref": null,
+      "readback_at": null,
+      "source": "workbench_preview",
+      "preview_id": "pv_02074b28cc356137246840ff",
+      "command": null,
+      "draft_id": null,
+      "needs_me": [],
+      "allowed_actions": []
+    },
+    {
+      "task_id": "recTask0002",
+      "title": "整合驗證 逾時後對帳",
+      "content": "測區量測、原始資料紀錄與成果交付。",
+      "case": {
+        "ref": "recCase1",
+        "code": "SYN-001",
+        "name": "合成示範案",
+        "resolved": true
+      },
+      "project_id": "SYN-001",
+      "package_id": "PKG-E2E-21",
+      "parent_task_ref": null,
+      "kind": "execution",
+      "phase": "formal",
+      "node": null,
+      "department": "外業",
+      "status": "待處理",
+      "planning_status": "confirmed",
+      "acceptance_status": null,
+      "acceptance_summary": null,
+      "owner": {
+        "person_ref": "recP2",
+        "open_id": "ou_yi",
+        "name": "乙"
+      },
+      "crew": [
+        {
+          "person_ref": "recP2",
+          "open_id": "ou_yi",
+          "name": "乙"
+        },
+        {
+          "person_ref": "recP3",
+          "open_id": "ou_bing",
+          "name": "丙"
+        }
+      ],
+      "assigned_by": {
+        "person_ref": "recP9",
+        "open_id": "ou_pm",
+        "name": "派工PM"
+      },
+      "interval": {
+        "start": "2026-10-22T08:00:00+08:00",
+        "end": "2026-10-22T12:00:00+08:00",
+        "precision": "datetime"
+      },
+      "instruments": [
+        {
+          "ref": "recI1",
+          "label": "GNSS-01"
+        }
+      ],
+      "vehicles": [
+        {
+          "ref": "recV1",
+          "label": "SYN-001"
+        }
+      ],
+      "deadline": "2026-10-25",
+      "est_person_hours": 8,
+      "revision": 1,
+      "versions": {
+        "scope": null,
+        "rule": null,
+        "evidence": null
+      },
+      "command_ref": "8c43e790-65c9-49dc-845e-8bb895175b1a",
+      "readback_at": "2026-10-18T20:16+08:00",
+      "source": "v4_task",
+      "command": {
+        "command_id": "8c43e790-65c9-49dc-845e-8bb895175b1a",
+        "state": "committed",
+        "label": "已確認"
+      },
+      "preview_id": null,
+      "draft_id": null,
+      "needs_me": [],
+      "allowed_actions": [
+        "reassign",
+        "edit_detail"
+      ]
+    },
+    {
+      "task_id": "recLegacy",
+      "title": "外業：待指派",
+      "content": "",
+      "case": {
+        "ref": "recCase1",
+        "code": "SYN-001",
+        "name": "合成示範案",
+        "resolved": true
+      },
+      "project_id": "SYN-001",
+      "package_id": null,
+      "parent_task_ref": null,
+      "kind": null,
+      "phase": null,
+      "node": {
+        "record_id": "recN1",
+        "label": "外業"
+      },
+      "department": "外業",
+      "status": "待處理",
+      "planning_status": "unassigned",
+      "acceptance_status": null,
+      "acceptance_summary": null,
+      "owner": null,
+      "crew": [],
+      "assigned_by": {
+        "person_ref": "recP9",
+        "open_id": "ou_pm",
+        "name": "派工PM"
+      },
+      "interval": null,
+      "instruments": [],
+      "vehicles": [],
+      "deadline": "2026-10-25",
+      "est_person_hours": null,
+      "revision": null,
+      "versions": {
+        "scope": null,
+        "rule": null,
+        "evidence": null
+      },
+      "command_ref": null,
+      "readback_at": null,
+      "source": "v4_task",
+      "command": null,
+      "preview_id": null,
+      "draft_id": null,
+      "needs_me": [],
+      "allowed_actions": [
+        "assign",
+        "edit_detail"
+      ]
+    },
+    {
+      "task_id": "recNext",
+      "title": "控制測量：待排",
+      "content": "",
+      "case": {
+        "ref": "recCase2",
+        "code": "SYN-002",
+        "name": "合成第二案",
+        "resolved": true
+      },
+      "project_id": "SYN-002",
+      "package_id": null,
+      "parent_task_ref": null,
+      "kind": "execution",
+      "phase": null,
+      "node": null,
+      "department": "外業",
+      "status": "待處理",
+      "planning_status": "unassigned",
+      "acceptance_status": null,
+      "acceptance_summary": null,
+      "owner": null,
+      "crew": [],
+      "assigned_by": {
+        "person_ref": "recP9",
+        "open_id": "ou_pm",
+        "name": "派工PM"
+      },
+      "interval": null,
+      "instruments": [],
+      "vehicles": [],
+      "deadline": null,
+      "est_person_hours": null,
+      "revision": null,
+      "versions": {
+        "scope": null,
+        "rule": null,
+        "evidence": null
+      },
+      "command_ref": null,
+      "readback_at": null,
+      "source": "v4_task",
+      "command": null,
+      "preview_id": null,
+      "draft_id": null,
+      "needs_me": [],
+      "allowed_actions": [
+        "assign",
+        "edit_detail"
+      ]
+    }
+  ],
+  "gaps": []
+}

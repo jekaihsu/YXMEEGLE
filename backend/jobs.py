@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select, update
 from . import storage
 from .policy import upgrade
+from .source_lifecycle import declared, needs_review
 from .workflow import now, find, require, event
 from .operations import queue, is_workday, next_due, operator, capable, active_user
 from .lark_adapter import application_adapter, RemoteFailure
@@ -48,34 +49,37 @@ def reflect_job_status(state,job,status,message):
         issue.update(status=status,error=message)
 
 
-def schedule(ws,clock=None):
+def schedule(ws,clock=None,*,cfg=None):
     clock=clock or now(); today=clock[:10]; upgrade(ws)
     from .case_cutover import execution_allowed
     from .workflow_rules import activate_scheduled
     activate_scheduled(ws,clock)
+    from .features import enabled, task_enabled
+    if not enabled(ws,'routines'): return
     for p in ws['projects']:
         if not execution_allowed(ws,p):continue
         if p.get('case_type')=='intake': continue
         if not p.get('pm_id'): continue
-        if p.get('source_status') in ('報價中','已結案','中止') or p.get('execution_status')=='completed': continue
+        if needs_review(p) or declared(p) in ('報價中','已結案','中止') or p.get('execution_status')=='completed': continue
         definitions=[('daily_progress',p['pm_id']),('field_schedule',next((n['owner_id'] for n in p['nodes'] if n['key']=='field'),'')),('indoor_schedule',p['supervisor_id']),('weekly_review',p['pm_id'])]
-        if p.get('source_status')=='執行中' or p['execution_status']=='in_progress': definitions.append(('client_contact',p['pm_id']))
+        if declared(p)=='執行中' or p['execution_status']=='in_progress': definitions.append(('client_contact',p['pm_id']))
         for kind,owner in definitions:
             if not owner or any(r['project_id']==p['id'] and r['kind']==kind for r in ws['recurring']): continue
             ident='routine-'+hashlib.sha256((p['id']+kind).encode()).hexdigest()[:24]
             ws['recurring'].append(dict(id=ident,project_id=p['id'],kind=kind,title=LABELS[kind],owner_id=owner,supervisor_id=p['supervisor_id'],status='active',start_date=today,due_date=today if kind=='daily_progress' else next_due(kind,today,ws),history=[]))
     due={}; source_projects={}
     for r in ws['recurring']:
+        if not task_enabled(ws,r,'recurring'): continue
         if r['kind']=='monthly':
             if r['status']=='active':
                 r.update(status='disabled',disabled_reason='業主裁示停用考評；財務結算另依案件流程',disabled_at=clock)
             continue
         if r['status']!='active': continue
         p=next((p for p in ws['projects'] if p['id']==r['project_id']),None); kind=r['kind']
-        if not p or not execution_allowed(ws,p) or p.get('case_type')=='intake':continue
+        if not p or not execution_allowed(ws,p) or p.get('case_type')=='intake' or needs_review(p):continue
         instant=datetime.fromisoformat(clock)
         if instant.tzinfo is None:instant=instant.replace(tzinfo=ZoneInfo('Asia/Taipei'))
-        r['deadline']=cutoff(ws,r['owner_id'],r['due_date'],clock=instant)
+        r['deadline']=cutoff(ws,r['owner_id'],r['due_date'],clock=instant,cfg=cfg)
         r['cutoff_time']=r['deadline']['time']
         r['deadline_status']=r['deadline']['status']
         r['overdue']=False
@@ -88,9 +92,9 @@ def schedule(ws,clock=None):
                 r['overdue']=instant>deadline
             except (KeyError,ValueError,TypeError):r['deadline_status']='pending_schedule'
         financial=kind in ('receivable','subcontract_receivable')
-        if kind=='client_contact' and p.get('source_status') in ('已完工','已結案'): continue
-        if p.get('source_status')=='中止' and not financial: continue
-        if p.get('source_status') in ('已完工','已結案') and kind in ('daily_progress','field_schedule','indoor_schedule','weekly_review'): continue
+        if kind=='client_contact' and declared(p) in ('已完工','已結案'): continue
+        if declared(p)=='中止' and not financial: continue
+        if declared(p) in ('已完工','已結案') and kind in ('daily_progress','field_schedule','indoor_schedule','weekly_review'): continue
         if financial and r.get('batch_id') and any(b['id']==r['batch_id'] and b['status']=='paid' for b in p['payment_batches']): continue
         if r['due_date']>today: continue
         targets={r['owner_id']}
@@ -123,6 +127,8 @@ class Worker:
         from .workspace_environment import normalize_environment
         from .case_cutover import initialize_execution_system
         normalize_environment(state,row.id,self.cfg)
+        from .features import resolve_features
+        state['features']=resolve_features(self.cfg)
         initialize_execution_system(state)
         if row.id.startswith(('lark-','test-lark-')):
             org=row.id.removeprefix('test-')
@@ -194,6 +200,9 @@ class Worker:
         with self.sessions() as db:
             row=db.get(self.W,wid); state=self.state(db,row); job=find(state['jobs'],jid)
         require(job.get('lease_token')==token and job['status']=='running','工作已失去執行權',409)
+        from .features import enabled
+        if job['kind']=='digest' and not enabled(state,'routines'):
+            raise RemoteFailure('追蹤與檢討尚未開放','blocked_feature')
         actor=active_user(state,job['actor_id']); payload=job['payload']
         from .case_cutover import require_execution
         if payload.get('project_id'):require_execution(state,find(state['projects'],payload['project_id']))
@@ -246,11 +255,37 @@ class Worker:
             raise RemoteFailure('業主裁示停用：能力與訓練紀錄禁止回寫','blocked')
         return state,actor
 
+    def has_work(self, wid):
+        """Cheap preflight only. Any execution still reloads and fences full state."""
+        from .features import resolve_features
+        if resolve_features(self.cfg)['routines']: return True
+        with self.sessions() as db:
+            row = db.get(self.W, wid)
+            if row is None: return False
+            if row.data.get('storage_schema') != 2: return True
+            state = storage.load_partial(db, self.B, row, collections=('jobs', 'delegations'))
+            if any(j.get('status') in ('queued', 'running') or
+                   j.get('kind') in ('capability', 'training_record') and not j.get('policy_blocked_at')
+                   for j in state['jobs']): return True
+            if any(d.get('source') == 'approval' and d.get('status') == 'active' and
+                   d.get('end_date', '') >= now()[:10] for d in state['delegations']): return True
+            # A pending task without a start date cannot activate on a timer.
+            return db.scalar(select(self.B.entity_id).where(self.B.workspace_id == wid,
+                self.B.kind == 'tasks', self.B.data['status'].as_string() == 'pending',
+                self.B.data['start_date'].as_string() <= now()[:10],
+                self.B.data['start_date'].as_string() != '').limit(1)) is not None
+
     def run_one(self,wid):
+        if not self.has_work(wid): return None
         self.refresh_delegations(wid)
         with self.sessions.begin() as db:
-            row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update()); state=self.state(db,row); before=deepcopy(state); schedule(state)
+            row=db.scalar(select(self.W).where(self.W.id==wid).with_for_update()); state=self.state(db,row); before=deepcopy(state); schedule(state,cfg=self.cfg)
             for j in state['jobs']:
+                from .features import enabled
+                if j['kind']=='digest' and not enabled(state,'routines') and j['status'] not in ('succeeded','canceled','cancelled'):
+                    j.update(status='blocked_feature',error='追蹤與檢討尚未開放')
+                    j.pop('lease_token',None); j.pop('lease_until',None)
+                    continue
                 if j['kind']=='digest' and LABELS['monthly'] in j.get('payload',{}).get('text','') and j['status'] not in ('succeeded','canceled','cancelled'):
                     j.update(status='blocked',error='此舊提醒含已停用的月考評，禁止發送；其他工作請看工作台')
                     j.pop('lease_token',None); j.pop('lease_until',None)
@@ -308,12 +343,19 @@ class Worker:
                     self.authorize(wid,jid,token,test,policy)
                     active_user(state,recipient)
                     if any(s['key']==recipient for s in job['steps']): continue
+                    remote_attempted=not test
                     receipt={'recipient':recipient,'message_id':'simulated-'+jid+'-'+recipient,'simulated':True} if test else adapter.message(recipient,payload['text'],hashlib.sha256((jid+recipient).encode()).hexdigest()[:32])
+                    remote_completed=not test
                     self.checkpoint(wid,jid,token,lambda s,j: j['steps'].append({'key':recipient,'receipt':receipt,'at':now()}))
+                    remote_completed=False;remote_attempted=False
                 def finish(s,j):
                     if kind=='confirmation':
                         p=find(s['projects'],payload['project_id']); issue=find(p['confirmation_issues'],payload['issue_id']); issue.update(status='simulated' if test else 'issued',issued_at=now(),receipts=deepcopy(j['steps']))
-                        if not any(h.get('issue_id')==issue['id'] for h in p['handoffs']): p['handoffs'].append({'issue_id':issue['id'],'pm_id':issue['pm_id'],'at':now(),'simulated':test})
+                        from .sop_execution import formal_issue,record_fan_out
+                        # Preview/simulated issuance never hands off or fans out.
+                        if formal_issue(issue) and not any(h.get('issue_id')==issue['id'] or h.get('version')==issue['version'] for h in p['handoffs']):
+                            p['handoffs'].append({'issue_id':issue['id'],'version':issue['version'],'pm_id':issue['pm_id'],'at':now(),'simulated':False})
+                        record_fan_out(p,issue)
                     j.update(status='succeeded',finished_at=now(),simulated=test)
                 self.checkpoint(wid,jid,token,finish)
             elif kind in ('capability','training_record'):
@@ -329,6 +371,7 @@ class Worker:
                     from .input_registration import RegistrationAdapter
                     receipt=RegistrationAdapter(adapter).submit(i['registration_plan'],policy)
                     receipt['value']=deepcopy(i['value'])
+                    remote_completed=True
                 receipt.update(simulated=test,remote_mode=policy['mode'],base_token=None if test else policy['base_token'])
                 def finish(s,j):
                     target=find(s['input_revisions'],i['id']); target.update(status='succeeded',receipt=receipt,finished_at=now()); find(s['input_mappings'],m['id'])['remote_value']=receipt['value']; j.update(status='succeeded',finished_at=now(),receipt=receipt,simulated=test,remote_mode=policy['mode'])

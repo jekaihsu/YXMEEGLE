@@ -1,0 +1,56 @@
+import assert from 'node:assert/strict';
+import {readFile,writeFile,unlink} from 'node:fs/promises';
+import {build} from 'esbuild';
+import {JSDOM} from 'jsdom';
+import {projectFixture} from './fixtures/node-assignments.mjs';
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=project&project=p1&tab=items',pretendToBeVisual:true});
+for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','navigator','Element'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+let scrollResets=[];dom.window.scrollTo=position=>scrollResets.push(position);
+globalThis.getComputedStyle=dom.window.getComputedStyle;globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const keyWarnings=[],originalError=console.error;console.error=(...args)=>{if(args.some(arg=>/same key|unique.*key/i.test(String(arg))))keyWarnings.push(args);originalError(...args)};
+const React=await import('react'),{act}=React,{createRoot}=await import('react-dom/client');
+const bundle=await build({stdin:{contents:"export {AppShell} from './src/AppShell';export {WorkItemsTab} from './src/WorkItemsTab';export {invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
+const temp=new URL('./.work-items-ui.mjs',import.meta.url);await writeFile(temp,bundle.outputFiles[0].text);const ui=await import(temp.href);await unlink(temp);
+const fixture=JSON.parse(await readFile(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));fixture.project_id='p1';fixture.production.field.items=[5,10,50].map((q,i)=>({item_id:`id-${i}`,code:i?'C115264-1':'C115264-2',name:['C42FW','C44FW','C31FW'][i],planned_qty:String(q),link_basis:i===2?'ambiguous':'native'}));fixture.production.field.items_total=3;
+let root,c,data,status=200,hold=null,calls=[];const tick=()=>new Promise(r=>setTimeout(r,15));
+const render=()=>root.render(React.createElement(ui.AppShell,{s:c.s,w:c.w,route:c.route,error:'',ready:true,go:c.go},React.createElement(ui.WorkItemsTab,{c,p:c.w.projects[0],assignments:{state:{kind:'disabled'}},selectedKey:c.route.node || 'field'})));
+async function mount({patch=()=>{},section}={}){if(root)await act(async()=>root.unmount());ui.invalidateSessionEpoch();data=structuredClone(fixture);data.sources.can_refresh_sources=true;data.production.control.items=[];data.production.control.items_total=0;patch(data);const base=projectFixture();c={w:base.workspace,s:{user:base.user,features:{}},route:{view:'project',project:'p1',tab:'items',section},go(route){c.route=route;render()}};c.w.projects[0].nodes[0].tasks=[{id:'exact-task',title:'ID linked task',work_item_id:'id-2',status:'pending'},{id:'wrong-task',title:'Wrong duplicate code task',work_item_id:'id-1',status:'pending'}];calls=[];globalThis.fetch=async(url)=>{calls.push(url);if(url==='/api/live/refresh')return new Response(JSON.stringify({freshness:{enabled:true,server_time:'2026-10-26T00:00:00Z',datasets:Object.fromEntries(['sources','roster','attendance'].map(k=>[k,{status:'fresh',ttl_seconds:60,age_seconds:0}]))}}));if(url.endsWith('/progress')){if(hold)await hold;return new Response(JSON.stringify(status===200?data:{detail:status===403?'Forbidden':'測試來源失敗'}),{status,headers:{'Content-Type':'application/json'}})}return new Response(JSON.stringify({items:[],total:0,summary:{}}),{headers:{'Content-Type':'application/json'}})};root=createRoot(document.getElementById('root'));await act(async()=>{render();await tick()})}
+const click=async el=>{assert.ok(el);await act(async()=>{el.click();await tick()})};
+await mount();assert.equal(document.querySelectorAll('table').length,1);assert.equal(document.querySelectorAll('[data-item-id]').length,3);assert.deepEqual([...document.querySelectorAll('[data-label="計畫量"]')].map(el=>el.textContent),['5','10','50']);assert.deepEqual([...document.querySelectorAll('[data-label="實際完成量"]')].map(el=>el.textContent),['未知','未知','未知']);assert.equal(calls.some(url=>url.includes('daily-reports')),false);
+scrollResets=[];let rows=document.querySelectorAll('[data-item-id]');assert.equal(rows[1].firstChild.textContent,rows[2].firstChild.textContent);await click(rows[2].querySelector('button'));assert.equal(c.route.section,'item:id-2');assert.match(document.querySelector('[role="dialog"]').textContent,/C31FW/);assert.match(document.querySelector('[role="dialog"]').textContent,/ID linked task/);const taskLink=[...document.querySelectorAll('[role="dialog"] a')].find(a=>a.textContent==='ID linked task');assert.equal(new URLSearchParams(taskLink.hash.slice(1)).get('node'),c.w.projects[0].nodes[0].id);assert.equal(new URLSearchParams(taskLink.hash.slice(1)).get('task'),'exact-task');assert.doesNotMatch(document.querySelector('[role="dialog"]').textContent,/Wrong duplicate code task/);assert.equal(document.querySelector('body').style.overflow,'hidden');await act(async()=>{document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});assert.equal(document.querySelector('[role="dialog"]'),null);assert.equal(document.activeElement.dataset.itemId,'id-2');assert.deepEqual(scrollResets,[],'item sections preserve page scroll in the app shell');
+rows=document.querySelectorAll('[data-item-id]');await act(async()=>rows[1].dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})));assert.match(document.querySelector('[role="dialog"]').textContent,/C44FW/);assert.doesNotMatch(document.querySelector('[role="dialog"]').textContent,/ID linked task/);await click(document.querySelector('[aria-label="關閉工項明細"]'));assert.equal(document.activeElement.dataset.itemId,'id-1');
+const select=document.querySelector('select');await act(async()=>{select.value='control';select.dispatchEvent(new Event('change',{bubbles:true}));await tick()});assert.equal(c.route.node,'control');assert.match(document.querySelector('.wi-empty').textContent,/控制/);assert.equal(document.querySelectorAll('[data-item-id]').length,0);
+await mount({section:'item:id-2'});assert.match(document.querySelector('[role="dialog"]').textContent,/C31FW/);await click(document.querySelector('[aria-label="關閉工項明細"]'));
+await mount({patch:d=>{d.production.field.items_truncated=true;d.production.field.items_total=12;d.sources.reports_status='restricted'}});assert.match(document.body.textContent,/僅顯示 3／12/);assert.match(document.body.textContent,/權限不足/);await click(document.querySelector('#project-reports summary'));assert.match(document.body.textContent,/日報代表作業活動/);assert.ok(calls.some(url=>url.includes('daily-reports')));const query=document.querySelector('.daily-filters input[placeholder]');await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(query,'preserved filter');query.dispatchEvent(new Event('input',{bubbles:true}));await tick()});await click(document.querySelector('[data-item-id="id-1"] button'));await click(document.querySelector('[aria-label="關閉工項明細"]'));assert.equal(document.querySelector('.daily-filters input[placeholder]').value,'preserved filter');
+await mount({patch:d=>{d.sources.source_status='stale'}});assert.match(document.body.textContent,/上次成功來源資料/);
+status=403;await mount();assert.match(document.querySelector('[role="alert"]').textContent,/權限不足/);status=500;await mount();assert.match(document.querySelector('[role="alert"]').textContent,/工程證據暫不可用/);status=200;
+let release;hold=new Promise(resolve=>release=resolve);await mount();assert.match(document.querySelector('[role="status"]').textContent,/載入中/);await act(async()=>{release();await tick()});hold=null;
+await mount({patch:d=>{d.sources.source_status='stale';d.sources.reports_stale=true}});
+await click([...document.querySelectorAll('button')].find(b=>b.textContent==='更新工程證據'));
+assert.match(document.querySelector('[role="alert"]')?.textContent??'',/來源仍待更新/);
+assert.match(document.querySelector('[role="alert"]').textContent,/2026\/10\/17/);
+assert.equal(document.querySelectorAll('[data-item-id]').length,0,'stale retry never presents items as success');
+data.sources.source_status='ready';data.sources.reports_status='ok';data.sources.reports_stale=false;
+await click([...document.querySelectorAll('button')].find(b=>b.textContent==='重試工程證據'));
+assert.equal(document.querySelector('[role="alert"]'),null);assert.equal(document.querySelectorAll('[data-item-id]').length,3);
+status=500;await click([...document.querySelectorAll('button')].find(b=>b.textContent==='更新工程證據'));
+assert.match(document.querySelector('[role="alert"]').textContent,/2026\/10\/17/,'failed refresh retains last good source time');
+status=200;
+for(const initialStatus of [200,500]){
+ status=initialStatus;await mount();status=200;
+ let finish;hold=new Promise(resolve=>finish=resolve);
+ const button=[...document.querySelectorAll('button')].find(b=>b.textContent===(initialStatus===500?'重試工程證據':'更新工程證據'));
+ const before=calls.filter(url=>url.endsWith('/progress')).length;
+ await act(async()=>{for(let i=0;i<5;i++)button.click();await tick()});
+ const refresh=initialStatus===500?button:[...document.querySelectorAll('button')].find(b=>b.textContent==='更新工程證據');
+ if(initialStatus===500)assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent==='更新工程證據'),false,'unknown permission never exposes source refresh');
+ for(let i=0;i<5;i++)await click(refresh);
+ assert.equal(calls.filter(url=>url.endsWith('/progress')).length-before,1,'rapid retry/refresh clicks start exactly one progress request');
+ if(initialStatus===200){assert.equal(refresh.disabled,true,'progress control is disabled while the read is pending');assert.equal(refresh.getAttribute('aria-busy'),'true')}
+ else assert.match(document.querySelector('[role="status"]').textContent,/載入中/);
+ await act(async()=>{finish();await tick()});hold=null;
+ const settled=[...document.querySelectorAll('button')].find(b=>b.textContent==='更新工程證據');
+ assert.equal(settled.disabled,false,'progress control is enabled after settlement');
+ assert.equal(settled.getAttribute('aria-busy'),'false');
+}
+assert.deepEqual(keyWarnings,[],'duplicate work codes produce no React key warnings');console.error=originalError;await act(async()=>root.unmount());console.log('Work items DOM checks passed, including duplicate identities, exact task joins, focus return, routes and source states.');

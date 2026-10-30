@@ -38,7 +38,7 @@
 
 - `NativeApprovalService` 提供 prepare/submit/poll。authorize 必須每次回傳最新 server context；checkpoint 必須先 durable CAS。context 包含 app_id/tenant/workspace_id/project_id/request_id/version/scope_hash。
 - 設定 `LARK_NATIVE_APPROVAL_MAPPINGS_JSON` 各類實際 approval_code、fields 與節點 seats，未設定或定義漂移一律阻擋。不可由 token/scope/唯讀成功推論可正式送審。
-- `native_routes.register(app, identity, load, persist, sessions, W, cfg)`；POST `/api/native-approvals/{kind}/{request_id}/{prepare|submit|poll}`，body `{version}`，回 workspace。
+- `native_routes.register(app, identity, load, persist, sessions, W, cfg)`；POST `/api/native-approvals/{kind}/{request_id}/{prepare|submit|poll}`，body `{project_version}`（所屬案件目前的 concurrency_version，非工作區 version），回 workspace。
 - prepare 僅讀定義；首次 submit 在 HTTP POST 前保存 UUID/版本與 outcome_unknown，重試只查同 UUID，不重複 POST。設計變更首次 attempted 同交易 freeze_change；prepared 不暫停任務。
 - 實例表單、申請人、UUID、定義、每位指定核准人的 AND task 與 PASS timeline 皆需吻合；同人不得兩票。遠端自動通過、改派／增減核准人及回滾不視為本規則核准。
 - route 保存 native_binding/native_receipt；只有真正查回才有 verified_at。fresh apply 要求 5 分鐘內證據。暫時查詢失敗不延長證據，阻擋新套用；既成 waiver 保留先前真核准歷史並標待核對。確定性內容／定義不符及撤回清除核准效力。已 applied 再查回 APPROVED 不降回 approved。
@@ -92,3 +92,23 @@
 - 仍需公司權限與實際 employee_id 的真排班查回驗收；fake adapter 測試不等於 Attendance 已正式串通。
 
 第二輪 source entity／Attendance service與reader／native poller／native route／局部失效／finance 專項 **54 passed**。此前較廣 source/daily/native 組 **72 passed**。兩組有重疊，不相加宣稱總測試數；本輪無遠端業務寫入。
+
+### F7 — source work items (2026-10-13, VCC-120)
+
+`source_work_items` adds a read-only `base/table/record` collection alongside existing source entities, without a database migration. It stores only identity, project, native contract links, source category/URL, and missing-source state; 外業 is retained without creating executable tasks. Links resolve through schema field IDs `flduW5c5uF` (item→contract) and `fldDSpokn5` (contract→confirmation); `fldOFyOZgb` is the forward contract→item link. Hidden/unresolved linked cases fail closed; completed refreshes mark removed rows missing and retain data.
+
+The importer projection version forces backfill on the next normal refresh, even when the source snapshot is unchanged. Navigation uses it only for cases with collection readiness metadata; otherwise the prior task projection and 外業 warning remain. Partial snapshots and capped reads show explicit partial states and return `work_items_status.partial/truncated` booleans. Reads cap at 200 records and 24,000 serialized collection bytes; project SQL reads request at most 201 rows so overflow is detectable. Regression checks assert 24 queries, 165,000 raw bytes, 30,000 gzip bytes and collection size below the 10 MB workspace budget. These are local fixture checks, **not acceptance evidence**: acceptance requires replay of C115264 against the deployed application.
+
+Rollback sets workspace `source_work_items_enabled=false` or reverts the navigation reader; preserve the stored collection. Do not revert storage registration or delete cached rows as a rollback procedure. No new Lark scope, dependency, existing collection shape, amount/count display, or source writes are introduced.
+
+
+F7 reversible rollback verification (local only): load the full workspace with `storage.load`,
+record the count and sorted IDs of `source_work_items`, set the root
+`source_work_items_enabled` to `False`, and save with `storage.save` in a transaction.
+GET `/api/projects/{pid}/navigation` must use the old projection and its 外業 warning;
+reload storage and compare both count and IDs unchanged. Set the same root key to
+`True` and save again; GET navigation must restore the prior items. The HTTP regression
+`test_http_rollback_and_missing_links_preserve_rows_and_public_omission` exercises both
+transactions and checks the entire stored rows are unchanged. This does not add a flag
+setter; operational flag management remains a follow-up. Public `/api/workspace` omits
+both the root collection and its status; items are served only by project navigation.

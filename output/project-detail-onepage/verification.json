@@ -1,0 +1,109 @@
+{
+  "base_commit": "1f284bae6de8dae4dc4f73a030f4da7836e3b89b",
+  "tested_code_commit": "176957cce86f7bdf8508d379308bc7a9c103dd86",
+  "frontend": {
+    "typecheck": "pass",
+    "vite_build": "pass",
+    "scratch_out_dir": "tmp/onepage/fix-dist",
+    "total_files": 118,
+    "passing_files": 105,
+    "base_passing_files": 104,
+    "failed_files": [
+      "test-build-loading.mjs",
+      "test-dev-tooling.mjs",
+      "test-dispatch-board.mjs",
+      "test-dispatch-fixes.mjs",
+      "test-home-panels.mjs",
+      "test-home-target-navigation.mjs",
+      "test-ops-sync-panel.mjs",
+      "test-p2-routes.mjs",
+      "test-plan-panel.mjs",
+      "test-read-loading.mjs",
+      "test-reports-interactions.mjs",
+      "test-search-input.mjs",
+      "test-shell-mode.mjs"
+    ],
+    "base_failed_files": [
+      "test-build-loading.mjs",
+      "test-dev-tooling.mjs",
+      "test-dispatch-board.mjs",
+      "test-dispatch-fixes.mjs",
+      "test-home-panels.mjs",
+      "test-home-target-navigation.mjs",
+      "test-ops-sync-panel.mjs",
+      "test-p2-routes.mjs",
+      "test-plan-panel.mjs",
+      "test-read-loading.mjs",
+      "test-reports-interactions.mjs",
+      "test-search-input.mjs",
+      "test-shell-mode.mjs"
+    ],
+    "new_failures": [],
+    "required_files": {
+      "test-node-workbench-model.mjs": "pass",
+      "test-inline-task-editor.mjs": "pass",
+      "test-project-flow-model.mjs": "pass",
+      "test-project-flow-round2.mjs": "pass",
+      "test-project-flow-ui.mjs": "pass",
+      "test-project-overview-model.mjs": "pass",
+      "test-node-assignments.mjs": "pass",
+      "test-node-assignment-api.mjs": "pass",
+      "test-sop-tasks.mjs": "pass",
+      "test-start-sop.mjs": "pass",
+      "test-sop-assignment-loop.mjs": "pass",
+      "test-legacy-complete.mjs": "pass",
+      "test-report-links.mjs": "pass",
+      "test-ux-case-detail.mjs": "pass",
+      "test-project-detail-loading.mjs": "pass",
+      "test-local-node-actions.mjs": "pass"
+    }
+  },
+  "backend": {
+    "passed": 417,
+    "failed": 1,
+    "skipped": 1,
+    "base_passed": 411,
+    "base_failed": 1,
+    "base_skipped": 1,
+    "unchanged_failure": "test_node_assignment_start_sop.py::test_start_agrees_with_the_evidence_overlay_and_mirrors_it_only_onto_rows_it_creates"
+  },
+  "browser": {
+    "result": "pass",
+    "checks": 22,
+    "could_not_run": [
+      {
+        "label": "formal SOP start apply",
+        "result": "could not run",
+        "evidence": "啟動 SOP 預覽\n✕\n建立內容\n取消\n確認啟動\n目前無法操作\n\n此案件沒有大於 0 的計畫數量，無法啟動 SOP"
+      }
+    ],
+    "transport": "httpx.MockTransport(FakeBitable), other Lark live reads denied",
+    "screenshots": {
+      "local-overview-1440.png": [
+        1440,
+        2951
+      ],
+      "remote-overview-1440.png": [
+        1440,
+        2557
+      ],
+      "local-editor-390.png": [
+        390,
+        844
+      ],
+      "local-start-390.png": [
+        390,
+        844
+      ],
+      "local-overview-390.png": [
+        390,
+        3756
+      ],
+      "remote-overview-390.png": [
+        390,
+        3158
+      ]
+    }
+  },
+  "declined_findings": []
+}

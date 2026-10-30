@@ -1,0 +1,47 @@
+✔ the list parser carries evidence and the submit hint, and nulls stay null (6.106875ms)
+✔ a payload from an older server without evidence still parses (0.257333ms)
+✔ malformed evidence is rejected as a whole payload (0.986958ms)
+✔ evidence line wording (0.178ms)
+✔ an unbounded or non-decimal quantity is neutralized to null and the list still parses (1.088ms)
+✔ the quantity formatter never throws (0.089875ms)
+✔ the parser carries the item progress and work items and defaults them for an older server (0.211542ms)
+✔ hostile item numbers and statuses are neutralized without rejecting the payload (0.201625ms)
+✔ a percent outside 0..100 drops the percent but keeps the counts (0.324708ms)
+✔ work items are capped at fifty when parsed (0.2345ms)
+✔ progress wording (0.102916ms)
+✖ clicking a work item opens its detail and Escape closes it (28.943791ms)
+✔ item progress needs a certain link and a valid pair of points (0.053042ms)
+✔ a truncated list says how many are shown (1.326792ms)
+✔ the item table is touch sized and cannot overflow at 390px (0.243667ms)
+✔ a percent over few known items says it covers only them (0.050875ms)
+✔ selected node evidence renders every work item with honest per-item signals (1.159291ms)
+✔ unlinked daily evidence keeps unknown text without a zero percent (0.744958ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 17
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 43.952666
+
+✖ failing tests:
+
+test at test-node-evidence.mjs:148:1
+✖ clicking a work item opens its detail and Escape closes it (28.943791ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + '#view=project&project=p1&tab=progress'
+  - '#view=project&project=p1&tab=progress&node=field'
+
+      at TestContext.<anonymous> (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-node-evidence.mjs:157:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '#view=project&project=p1&tab=progress',
+    expected: '#view=project&project=p1&tab=progress&node=field',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

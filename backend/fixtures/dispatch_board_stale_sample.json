@@ -1,0 +1,397 @@
+{
+  "schema_version": 1,
+  "window": {
+    "from": "2026-07-27",
+    "to": "2026-07-28",
+    "tz": "Asia/Taipei"
+  },
+  "source": {
+    "dataset_key": "operational_schedule",
+    "registry_key": "v4",
+    "table_id": "tblZz6Mkhv9gHrB2",
+    "fetched_at": "2026-07-27T00:00:00+00:00",
+    "latest_booking_date": "2026-07-28",
+    "quality": {
+      "states": [
+        "stale"
+      ],
+      "reason": "refreshing_last_good_snapshot",
+      "age_seconds": 120
+    },
+    "joins": {
+      "people": "ok",
+      "instruments": "ok",
+      "vehicles": "ok",
+      "cases": "ok"
+    }
+  },
+  "kpi": {
+    "slots": 7,
+    "unassigned": 5,
+    "unknown_overlap": 2,
+    "conflict": 2
+  },
+  "unassigned_queue": [
+    "v4:tblZz6Mkhv9gHrB2:recDateA",
+    "v4:tblZz6Mkhv9gHrB2:recDateB",
+    "v4:tblZz6Mkhv9gHrB2:recTimedA",
+    "v4:tblZz6Mkhv9gHrB2:recTimedB",
+    "v4:tblZz6Mkhv9gHrB2:recUnassigned"
+  ],
+  "slots": [
+    {
+      "slot_id": "v4:tblZz6Mkhv9gHrB2:recDateA",
+      "record_id": "recDateA",
+      "kind": "work",
+      "planning_status": "unassigned",
+      "provenance": "v4_row",
+      "interval": {
+        "start": "2026-07-28",
+        "end": "2026-07-28",
+        "precision": "date"
+      },
+      "group": "水深A組",
+      "discipline": "外業",
+      "case": {
+        "ref": "recCase",
+        "code": "SYN-001",
+        "name": "Synthetic dispatch demonstration"
+      },
+      "work_content": "SYNTHETIC demonstration only. No real assignments or personnel.",
+      "crew": [
+        {
+          "person_ref": "recDatePerson",
+          "name": "合成日期人員",
+          "active": true,
+          "feasibility": "unknown",
+          "reasons": [
+            "no_leave_source",
+            "no_capability_source",
+            "same_day_other_slot"
+          ]
+        }
+      ],
+      "resources": [],
+      "gaps": [
+        "no_instrument_for_field_work"
+      ],
+      "issues": [
+        "v4:tblZz6Mkhv9gHrB2:recDateB"
+      ]
+    },
+    {
+      "slot_id": "v4:tblZz6Mkhv9gHrB2:recDateB",
+      "record_id": "recDateB",
+      "kind": "work",
+      "planning_status": "unassigned",
+      "provenance": "v4_row",
+      "interval": {
+        "start": "2026-07-28",
+        "end": "2026-07-28",
+        "precision": "date"
+      },
+      "group": "水深A組",
+      "discipline": "外業",
+      "case": {
+        "ref": "recCase",
+        "code": "SYN-001",
+        "name": "Synthetic dispatch demonstration"
+      },
+      "work_content": null,
+      "crew": [
+        {
+          "person_ref": "recDatePerson",
+          "name": "合成日期人員",
+          "active": true,
+          "feasibility": "unknown",
+          "reasons": [
+            "no_leave_source",
+            "no_capability_source",
+            "same_day_other_slot"
+          ]
+        }
+      ],
+      "resources": [],
+      "gaps": [
+        "no_instrument_for_field_work"
+      ],
+      "issues": [
+        "v4:tblZz6Mkhv9gHrB2:recDateA"
+      ]
+    },
+    {
+      "slot_id": "v4:tblZz6Mkhv9gHrB2:recRepaired",
+      "record_id": "recRepaired",
+      "kind": "work",
+      "planning_status": "confirmed",
+      "provenance": "v4_row",
+      "interval": {
+        "start": "2026-07-28",
+        "end": "2026-07-28",
+        "precision": "date"
+      },
+      "group": "水深A組",
+      "discipline": "外業",
+      "case": {
+        "ref": "recCase",
+        "code": "SYN-001",
+        "name": "Synthetic dispatch demonstration"
+      },
+      "work_content": "SYNTHETIC fixture. Repaired instrument returned to normal.",
+      "crew": [
+        {
+          "person_ref": "recRepairedPerson",
+          "name": "合成修復儀器操作員",
+          "active": true,
+          "feasibility": "unknown",
+          "reasons": [
+            "no_leave_source",
+            "no_capability_source"
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "kind": "instrument",
+          "ref": "recInstrument",
+          "label": "合成儀器",
+          "feasibility": "feasible",
+          "reasons": []
+        }
+      ],
+      "gaps": [],
+      "issues": []
+    },
+    {
+      "slot_id": "v4:tblZz6Mkhv9gHrB2:recTimedA",
+      "record_id": "recTimedA",
+      "kind": "work",
+      "planning_status": "unassigned",
+      "provenance": "v4_row",
+      "interval": {
+        "start": "2026-07-27T09:00:00+08:00",
+        "end": "2026-07-27T11:00:00+08:00",
+        "precision": "datetime"
+      },
+      "group": "水深A組",
+      "discipline": "外業",
+      "case": {
+        "ref": "recCase",
+        "code": "SYN-001",
+        "name": "Synthetic dispatch demonstration"
+      },
+      "work_content": null,
+      "crew": [
+        {
+          "person_ref": "recActive",
+          "name": "合成人員",
+          "active": true,
+          "feasibility": "conflict",
+          "reasons": [
+            "no_leave_source",
+            "no_capability_source",
+            "timed_overlap"
+          ]
+        }
+      ],
+      "resources": [],
+      "gaps": [
+        "no_instrument_for_field_work"
+      ],
+      "issues": [
+        "v4:tblZz6Mkhv9gHrB2:recTimedB"
+      ]
+    },
+    {
+      "slot_id": "v4:tblZz6Mkhv9gHrB2:recTimedB",
+      "record_id": "recTimedB",
+      "kind": "work",
+      "planning_status": "unassigned",
+      "provenance": "v4_row",
+      "interval": {
+        "start": "2026-07-27T10:00:00+08:00",
+        "end": "2026-07-27T12:00:00+08:00",
+        "precision": "datetime"
+      },
+      "group": "水深A組",
+      "discipline": "外業",
+      "case": {
+        "ref": "recCase",
+        "code": "SYN-001",
+        "name": "Synthetic dispatch demonstration"
+      },
+      "work_content": null,
+      "crew": [
+        {
+          "person_ref": "recActive",
+          "name": "合成人員",
+          "active": true,
+          "feasibility": "conflict",
+          "reasons": [
+            "no_leave_source",
+            "no_capability_source",
+            "timed_overlap"
+          ]
+        }
+      ],
+      "resources": [],
+      "gaps": [
+        "no_instrument_for_field_work"
+      ],
+      "issues": [
+        "v4:tblZz6Mkhv9gHrB2:recTimedA"
+      ]
+    },
+    {
+      "slot_id": "v4:tblZz6Mkhv9gHrB2:recUnassigned",
+      "record_id": "recUnassigned",
+      "kind": "work",
+      "planning_status": "unassigned",
+      "provenance": "v4_row",
+      "interval": {
+        "start": "2026-07-27",
+        "end": "2026-07-27",
+        "precision": "date"
+      },
+      "group": "水深A組",
+      "discipline": "外業",
+      "case": null,
+      "work_content": null,
+      "crew": [],
+      "resources": [],
+      "gaps": [
+        "no_crew",
+        "no_case",
+        "no_instrument_for_field_work"
+      ],
+      "issues": []
+    },
+    {
+      "slot_id": "v4:tblZz6Mkhv9gHrB2:recUnavailable",
+      "record_id": "recUnavailable",
+      "kind": "work",
+      "planning_status": "confirmed",
+      "provenance": "v4_row",
+      "interval": {
+        "start": "2026-07-28",
+        "end": "2026-07-28",
+        "precision": "date"
+      },
+      "group": "水深A組",
+      "discipline": "外業",
+      "case": {
+        "ref": "recCase",
+        "code": "SYN-001",
+        "name": "Synthetic dispatch demonstration"
+      },
+      "work_content": null,
+      "crew": [
+        {
+          "person_ref": "recInactive",
+          "name": "離職人員",
+          "active": false,
+          "feasibility": "unavailable",
+          "reasons": [
+            "inactive",
+            "no_leave_source",
+            "no_capability_source"
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "kind": "instrument",
+          "ref": "recRepair",
+          "label": "送修儀器",
+          "feasibility": "unavailable",
+          "reasons": [
+            "repair"
+          ]
+        },
+        {
+          "kind": "vehicle",
+          "ref": "recVehicle",
+          "label": "SYNTHETIC",
+          "feasibility": "unavailable",
+          "reasons": [
+            "inactive"
+          ]
+        }
+      ],
+      "gaps": [],
+      "issues": []
+    }
+  ],
+  "capacity": {
+    "people": [
+      {
+        "person_ref": "recActive",
+        "name": "合成人員",
+        "days": {
+          "2026-07-27": {
+            "booked_slots": 2,
+            "state": "overbooked_unknown"
+          },
+          "2026-07-28": {
+            "booked_slots": 0,
+            "state": "unknown"
+          }
+        }
+      },
+      {
+        "person_ref": "recDatePerson",
+        "name": "合成日期人員",
+        "days": {
+          "2026-07-27": {
+            "booked_slots": 0,
+            "state": "unknown"
+          },
+          "2026-07-28": {
+            "booked_slots": 2,
+            "state": "overbooked_unknown"
+          }
+        }
+      },
+      {
+        "person_ref": "recInactive",
+        "name": "離職人員",
+        "days": {
+          "2026-07-27": {
+            "booked_slots": 0,
+            "state": "unknown"
+          },
+          "2026-07-28": {
+            "booked_slots": 1,
+            "state": "booked"
+          }
+        }
+      },
+      {
+        "person_ref": "recRepairedPerson",
+        "name": "合成修復儀器操作員",
+        "days": {
+          "2026-07-27": {
+            "booked_slots": 0,
+            "state": "unknown"
+          },
+          "2026-07-28": {
+            "booked_slots": 1,
+            "state": "booked"
+          }
+        }
+      }
+    ]
+  },
+  "gaps": [
+    {
+      "code": "no_capability_source",
+      "message": "No qualification or capability source is registered.",
+      "count": 7
+    },
+    {
+      "code": "no_leave_source",
+      "message": "No complete leave availability source is registered.",
+      "count": 7
+    }
+  ]
+}

@@ -12,14 +12,11 @@ from .operations import capable, queue, operator
 from .lark_adapter import application_adapter, RemoteFailure
 from .jobs import Worker, PermissionCheckedClient
 from .remote_policy import connection_policy, require_same_policy
+from .input_validation import json_object
 
 
 async def input_request_body(request):
-    try:
-        body=await request.json()
-    except (ValueError,TypeError,UnicodeDecodeError,RecursionError):
-        raise HTTPException(422,'Input 請求必須是有效 JSON 物件')
-    require(isinstance(body,dict),'Input 請求必須是 JSON 物件',422)
+    body=await json_object(request)
     require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
     if 'project_version' in body:
         require(type(body['project_version']) is int and body['project_version']>=0,
@@ -76,16 +73,10 @@ def register(app,identity,load,persist,sessions,W,B,P,cfg,uploads):
         return persist(data['wid'],body['version'],mutate,actor_id=user['id'],
                        project_versions={project_id:body['project_version']} if 'project_version' in body else None)
 
-    @app.post('/api/input-revisions/{revision_id}/reconcile')
-    async def reconcile_input(revision_id:str,request:Request):
+    def unknown_input_guard(data,revision_id,revision,plan):
+        """Shared by read-only reconcile and explicit disposal: only an unchanged unknown."""
         from .case_cutover import require_execution
-        from .input_registration import RegistrationAdapter,registration_fields
-        data,user=identity(request);body=await input_request_body(request)
-        with sessions() as db:state=load(db,db.get(W,data['wid']))
-        revision=deepcopy(find(state['input_revisions'],revision_id))
-        from .source_case_policy import visible_project
-        require(visible_project(state,find(state['projects'],revision['project_id'])),'Input 紀錄不存在',404)
-        plan=deepcopy(revision.get('registration_plan'));require(plan,'舊式 Input 不支援此登錄核實入口',409)
+        from .input_registration import registration_fields
         def allowed(s,actor):
             current=find(s['input_revisions'],revision_id);p=find(s['projects'],current['project_id']);n=find(p['nodes'],current['node_id'])
             require(current['project_id']==revision['project_id'],'Input 所屬案件已變更',409)
@@ -96,7 +87,11 @@ def register(app,identity,load,persist,sessions,W,B,P,cfg,uploads):
             require(plan.get('destination',{}).get('fields')==fields,'Input 登錄欄位核定設定已變更',409)
             jobs=[j for j in s['jobs'] if j.get('key')=='input:'+revision_id]
             require(len(jobs)==1 and jobs[0]['status']=='outcome_unknown','背景工作狀態不允許查回',409)
-        allowed(state,user);adapter=None
+        return allowed
+
+    def read_only_input_check(request,data,state,allowed,read):
+        """Run one registration read under per-hop permission and policy re-checks."""
+        adapter=None
         try:
             policy=connection_policy(data['wid'],state,cfg,'input')
             def check():
@@ -104,11 +99,28 @@ def register(app,identity,load,persist,sessions,W,B,P,cfg,uploads):
                 with sessions() as db:fresh=load(db,db.get(W,data['wid']))
                 allowed(fresh,actor);require_same_policy(policy,connection_policy(data['wid'],fresh,cfg,'input'))
             adapter=application_adapter(cfg);check();adapter.client=PermissionCheckedClient(adapter.client,check)
-            receipt=RegistrationAdapter(adapter).reconcile(plan,policy)
+            result=read(adapter,policy)
             check()
         except RemoteFailure as exc:raise HTTPException(409 if exc.status in ('outcome_unknown','conflict','blocked') else 503,str(exc))
         finally:
             if adapter:adapter.client.close()
+        return policy,result
+
+    def load_unknown_input(data,revision_id):
+        from .source_case_policy import visible_project
+        with sessions() as db:state=load(db,db.get(W,data['wid']))
+        revision=deepcopy(find(state['input_revisions'],revision_id))
+        require(visible_project(state,find(state['projects'],revision['project_id'])),'Input 紀錄不存在',404)
+        plan=deepcopy(revision.get('registration_plan'));require(plan,'舊式 Input 不支援此登錄核實入口',409)
+        return state,revision,plan
+
+    @app.post('/api/input-revisions/{revision_id}/reconcile')
+    async def reconcile_input(revision_id:str,request:Request):
+        from .input_registration import RegistrationAdapter
+        data,user=identity(request);body=await input_request_body(request)
+        state,revision,plan=load_unknown_input(data,revision_id)
+        allowed=unknown_input_guard(data,revision_id,revision,plan);allowed(state,user)
+        policy,receipt=read_only_input_check(request,data,state,allowed,lambda a,pol:RegistrationAdapter(a).reconcile(plan,pol))
         def mutate(s):
             _,actor=identity(request);allowed(s,actor)
             try:require_same_policy(policy,connection_policy(data['wid'],s,cfg,'input'))
@@ -119,6 +131,29 @@ def register(app,identity,load,persist,sessions,W,B,P,cfg,uploads):
             job.update(status='succeeded',receipt=receipt,finished_at=now(),error=None,reconciled_by=actor['id'])
             event(s,actor,'input_registration_reconciled',current['project_id'],current['node_id'],message='只讀核實專用登錄內容相符')
         return persist(data['wid'],body['version'],mutate,actor_id=user['id'],
+                       project_versions={revision['project_id']:body['project_version']} if 'project_version' in body else None)
+
+    @app.post('/api/input-revisions/{revision_id}/dispose-not-created')
+    async def dispose_input_not_created(revision_id:str,request:Request):
+        """Close an unknown only on explicit confirmation plus a fresh read-only absence check."""
+        from .input_registration import RegistrationAdapter
+        data,user=identity(request);body=await input_request_body(request)
+        require(body.get('confirm_not_created') is True,'請明確確認遠端未建立此登錄',422)
+        reason=body.get('reason');require(isinstance(reason,str) and 0<len(reason.strip())<=500,'請填寫處置原因（500 字內）',422)
+        state,revision,plan=load_unknown_input(data,revision_id)
+        allowed=unknown_input_guard(data,revision_id,revision,plan);allowed(state,user)
+        policy,_=read_only_input_check(request,data,state,allowed,lambda a,pol:RegistrationAdapter(a).confirm_absent(plan,pol))
+        def mutate(s):
+            _,actor=identity(request);allowed(s,actor)
+            try:require_same_policy(policy,connection_policy(data['wid'],s,cfg,'input'))
+            except RemoteFailure as exc:raise HTTPException(409,str(exc))
+            current=find(s['input_revisions'],revision_id)
+            disposal=dict(actor_id=actor['id'],reason=reason.strip(),at=now(),basis='explicit_confirmation_and_fresh_readonly_absence')
+            current.update(status='not_created',superseded=True,disposal=disposal,finished_at=now())
+            job=next(j for j in s['jobs'] if j.get('key')=='input:'+revision_id)
+            job.update(status='canceled',error='已由人員確認未建立並處置：'+disposal['reason'],finished_at=now(),disposed_by=actor['id'])
+            event(s,actor,'input_registration_disposed_not_created',current['project_id'],current['node_id'],message='確認遠端未建立並處置：'+disposal['reason'])
+        return persist(data['wid'],body['version'],mutate,actor_id=user['id'],action_name='input_registration_disposed_not_created',
                        project_versions={revision['project_id']:body['project_version']} if 'project_version' in body else None)
 
     @app.post('/api/admin/worker/run')
@@ -153,6 +188,7 @@ def register(app,identity,load,persist,sessions,W,B,P,cfg,uploads):
         finally:
             if adapter: adapter.client.close()
         def mutate(s):
+            require(capable(find(s['users'],user['id']),'manage_sources'),'來源查證權限已改變',403)
             try: require_same_policy(policy,connection_policy(data['wid'],s,cfg,'input',for_verification=True))
             except RemoteFailure as exc: raise HTTPException(409,str(exc))
             m=find(s['input_mappings'],mapping_id); require(m==mapping,'映射已變更',409); m.update(verified=True,verified_at=now(),remote_value=value,schema=field,verified_mode=policy['mode'])
@@ -160,16 +196,18 @@ def register(app,identity,load,persist,sessions,W,B,P,cfg,uploads):
 
     @app.post('/api/files/{file_id}/store-lark')
     async def store_file(file_id:str,request:Request):
-        data,user=identity(request); body=await request.json()
+        data,user=identity(request); body=await json_object(request)
+        require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
         def mutate(s):
+            actor=find(s['users'],user['id'],'操作者')
             p=next((p for p in s['projects'] if any(f['id']==file_id for f in p['files'])),None); require(p is not None,'文件不存在',404)
             from .case_cutover import require_execution
             require_execution(s,p)
             f=find(p['files'],file_id); n=next((n for n in p['nodes'] if n['id']==f.get('node_id')),None)
-            require(operator(user,p,n)); require(f['storage']=='local' and not f.get('withdrawn'),'文件不可送出',409)
+            require(operator(actor,p,n)); require(f['storage']=='local' and not f.get('withdrawn'),'文件不可送出',409)
             require(not f.get('remote_status') and not any(j.get('key')=='file:'+file_id for j in s.get('jobs',[])),
                     '此文件已有送存紀錄，請至背景工作核對結果；失敗重試須使用原工作，不能重新排隊',409)
-            queue(s,'file',user,{'project_id':p['id'],'file_id':file_id},'file:'+file_id); f['remote_status']='queued'
+            queue(s,'file',actor,{'project_id':p['id'],'file_id':file_id},'file:'+file_id); f['remote_status']='queued'
         return persist(data['wid'],body['version'],mutate,actor_id=user['id'])
 
     @app.post('/api/learning/mappings/verify')
@@ -177,7 +215,10 @@ def register(app,identity,load,persist,sessions,W,B,P,cfg,uploads):
         from .features import require_learning
         require_learning()
         data,user=identity(request); require(capable(user,'manage_sources'),'需要來源管理權限',403)
-        body=await request.json(); candidate=body.get('mapping') or {}
+        body=await json_object(request)
+        require(type(body.get('version')) is int and body['version']>=1,'請提供有效的工作區版本',422)
+        candidate=body.get('mapping') or {}
+        require(isinstance(candidate,dict),'映射必須是 JSON 物件',422)
         mapping={'id':str(candidate.get('id') or uid()),'purpose':'training','base_token':str(candidate.get('base_token','')),'table_id':str(candidate.get('table_id','')),'fields':candidate.get('fields') or {}}
         require(not data['wid'].startswith(('test-','demo-')),'正式訓練映射只能在正式工作區核實',409)
         adapter=None

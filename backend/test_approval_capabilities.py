@@ -38,7 +38,7 @@ def test_missing_definition_is_distinct_from_unverified_configuration():
     ('lark', 'lark-approval', False),
 ])
 def test_workspace_and_mutation_capabilities_match_actual_submit_guard(tmp_path, mode, wid, simulate):
-    app = create_app({'DATABASE_URL': f'sqlite:///{tmp_path}/capabilities.db',
+    app = create_app({'FEATURE_CHANGE_EXTENSION':'true','FEATURE_ROUTINES':'true','DATABASE_URL': f'sqlite:///{tmp_path}/capabilities.db',
                       'UPLOAD_DIR': str(tmp_path / 'uploads'), 'DEMO_MODE': 'true',
                           'APP_ENV': 'development', 'SESSION_SECRET': 'approval-tests' * 4,
                           'LARK_WORKER_ORGANIZATION':'approval','LARK_ALLOWED_TENANTS':'approval'})
@@ -48,6 +48,7 @@ def test_workspace_and_mutation_capabilities_match_actual_submit_guard(tmp_path,
         state['environment'] = 'demo' if mode=='demo' else ('test' if wid.startswith('test-') else 'production')
         if state['environment']=='production':
             for project in state['projects']:
+                project['source_kind']='lark'
                 project['execution_system']='workbench';project['case_visibility']='new_case'
         state['approval_connection'] = {'native_submit': {'available': True}}
         state['native_definition_verification'] = {'checked_by': 'private-health-actor',

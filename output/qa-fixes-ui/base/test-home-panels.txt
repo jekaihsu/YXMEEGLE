@@ -1,0 +1,18 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: The input did not match the regular expression /已核對案件/. Input:
+
+'我的工作總覽先處理到期工作，再確認待覆核與交辦進度。我的案件指派給我正在載入工作…待我確認正在載入工作…我交辦的正在載入工作…代理給我正在載入工作…本地 SOP 工作正在載入工作…已完成我的案件開啟案件列表依案號、案名尋找案件'
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-a034f2d5/.runtime/qa/base/frontend/test-home-panels.mjs:48:8 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: '我的工作總覽先處理到期工作，再確認待覆核與交辦進度。我的案件指派給我正在載入工作…待我確認正在載入工作…我交辦的正在載入工作…代理給我正在載入工作…本地 SOP 工作正在載入工作…已完成我的案件開啟案件列表依案號、案名尋找案件',
+  expected: /已核對案件/,
+  operator: 'match',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

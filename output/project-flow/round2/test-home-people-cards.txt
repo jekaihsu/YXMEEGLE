@@ -1,0 +1,3 @@
+Home people cards: 18 rendered scope, summary, table, navigation and honest-state checks passed.
+PASS 7 departed-person rendered roster, certainty and impact assertions
+PASS 2 literal rendered class-attribute arrays

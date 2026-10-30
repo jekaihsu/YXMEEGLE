@@ -1,0 +1,136 @@
+"""Pure projection of a case snapshot into the public JSON shape."""
+from datetime import datetime
+
+from .domain import (
+    CHAIN, NODE_DEPARTMENTS, NODE_LABELS, NodeKey, NodeStatus, TaskFacts, TaskStatus, derive_chain,
+    node_permissions, progress, summarize, task_counts, task_permissions)
+from .evidence import auto_done, signals
+from .lark_table import CaseSnapshot, NodeRow, TaskRow, TAIPEI, iso_time
+from .operations import facts_of, mirror
+
+PRODUCTION_KEYS = frozenset({NodeKey.FIELD, NodeKey.CONTROL, NodeKey.MAPPING, NodeKey.REPORT})
+# A 可送審 hint only makes sense while the work is still open; a submitted or finished node needs none.
+SUBMITTABLE = frozenset({NodeStatus.TODO, NodeStatus.IN_PROGRESS})
+NO_ACTIONS = {'claim': False, 'assign': False, 'complete': False, 'approve': False, 'reject': False,
+              'create_task': False, 'legacy_complete': False}
+
+
+def _user(ref):
+    return ref.public() if ref else None
+
+
+def node_warnings(key, row: NodeRow | None, duplicates, status, tasks, now_ms, auto=None, by_data=False):
+    warnings = []
+    if duplicates:
+        warnings.append('duplicate_assignment_key')
+    if row is None or auto:
+        return warnings
+    if row.status == NodeStatus.DONE.value and not row.approved:
+        warnings.append('unapproved_completion')
+    expected = mirror(row, status, task_counts(t.status for t in tasks), now_ms).get('status')
+    # A row whose status the case data decides differs from Lark's by design, so only that drift is explained away.
+    if expected and row.status != expected and not by_data:
+        warnings.append('lark_status_drift')
+    if status is NodeStatus.NOT_STARTED and any(t.status is TaskStatus.IN_PROGRESS for t in tasks):
+        warnings.append('previous_node_not_done')
+    return warnings
+
+
+def node_view(key: NodeKey, snapshot: CaseSnapshot, status: NodeStatus, now_ms, auto=None, signal=None, by_data=False):
+    rows = snapshot.rows.get(key, ())
+    row = rows[0] if len(rows) == 1 else None
+    tasks = snapshot.node_tasks(key)
+    counts = task_counts(t.status for t in tasks)
+    live_deadlines = [t.deadline for t in tasks if t.deadline and t.status is not TaskStatus.CANCELLED]
+    open_deadlines = [t.deadline for t in tasks if t.deadline and t.status not in (TaskStatus.CANCELLED, TaskStatus.DONE)]
+    view = {
+        'key': key.value, 'label': NODE_LABELS[key], 'departments': list(NODE_DEPARTMENTS[key]),
+        'record_id': row.record_id if row else None, 'revision': row.revision if row else None,
+        'status': (row.status or None) if row else None, 'derived_status': status.value,
+        'tasks': {'done': counts.done, 'total': counts.total}, 'progress': progress(status, counts),
+        'owners': [u.public() for u in row.owners] if row else [],
+        'assignment_method': (row.method or None) if row else None,
+        'assigned_by': _user(row and row.assigned_by), 'approver': _user(row and row.approved and row.approver),
+        'approved_at': iso_time(row.approved_at) if row and row.approved else None,
+        'reject_reason': row.reject_reason if row and row.rejected else None,
+        'started_at': iso_time(row and row.started_at), 'finished_at': iso_time(row and row.finished_at),
+        'deadline': max(live_deadlines) if live_deadlines else None,
+        'next_due': min(open_deadlines) if open_deadlines else None,
+        'deadline_basis': 'related_tasks_max',
+        'assignment_key': row.assignment_key if row else None,
+        'origin': 'lark', 'auto_done': auto.public() if auto else None,
+        'warnings': node_warnings(key, row, len(rows) > 1, status, tasks, now_ms, auto, by_data),
+    }
+    if key in PRODUCTION_KEYS:
+        view['evidence'] = {**signal.public(), 'drives_status': by_data} if signal else None
+        view['can_submit_hint'] = bool(signal and signal.can_submit and status in SUBMITTABLE)
+    else:
+        view['evidence'], view['can_submit_hint'] = None, False
+    if len(rows) > 1:
+        view['duplicate_record_ids'] = [r.record_id for r in rows]
+    return view
+
+
+def task_view(task: TaskRow, allowed):
+    return {'id': task.record_id, 'revision': task.revision, 'title': task.title, 'detail': task.detail,
+            'assignee': _user(task.assignee), 'assigned_by': _user(task.assigned_by), 'department': task.department or None,
+            'deadline': task.deadline, 'status': task.status.value, 'done_at': iso_time(task.done_at),
+            'created_at': iso_time(task.created_at), 'can': allowed}
+
+
+def task_sort_key(task: TaskRow, now_ms):
+    today = datetime.fromtimestamp(now_ms / 1000, TAIPEI).date().isoformat()
+    open_task = task.status not in (TaskStatus.DONE, TaskStatus.CANCELLED)
+    overdue = open_task and task.deadline is not None and task.deadline < today
+    priority = {TaskStatus.IN_PROGRESS: 0, TaskStatus.TODO: 1, TaskStatus.DONE: 2, TaskStatus.CANCELLED: 3}
+    return (not overdue, task.deadline is None, task.deadline or '', priority[task.status], task.record_id)
+
+
+def _can(actor, key, status, snapshot, writes_enabled, auto=None, *, case_policy=None,
+         legacy_writes_enabled=False, legacy_completed=False):
+    rows = snapshot.rows.get(key, ())
+    if len(rows) > 1 or auto:
+        return dict(NO_ACTIONS)
+    owners = frozenset(u.open_id for u in rows[0].owners) if rows else frozenset()
+    return {action.value: ok and (legacy_writes_enabled if action.value == 'legacy_complete' or
+            action.value == 'reject' and legacy_completed and case_policy == 'legacy' else writes_enabled)
+            for action, ok in node_permissions(actor, key, status, owners, case_policy=case_policy,
+                                               legacy_completed=legacy_completed).items()}
+
+
+def case_view(snapshot: CaseSnapshot, skipped, actor, writes_enabled, now_ms, evidence=None, *,
+              case_policy=None, legacy_writes_enabled=False, legacy_completions=None):
+    evidence = evidence or {}
+    legacy_completions = legacy_completions or {}
+    done, found = auto_done(evidence), signals(evidence)
+    statuses = derive_chain(facts_of(snapshot, skipped, evidence, legacy_completions))
+    without = derive_chain(facts_of(snapshot, skipped, done, legacy_completions))
+    by_data = {key: statuses[key] is NodeStatus.IN_PROGRESS and without[key] is not NodeStatus.IN_PROGRESS for key in CHAIN}
+    summary = summarize(statuses)
+    return statuses, {
+        'code': snapshot.code,
+        'summary': {'done': summary.done, 'total': summary.total,
+                    'current_node': summary.current_node.value if summary.current_node else None},
+        'nodes': [{**node_view(key, snapshot, statuses[key], now_ms, done.get(key), found.get(key), by_data[key]),
+                   'legacy_completion': legacy_completions.get(key)}
+                  for key in CHAIN],
+        'can': {key.value: _can(actor, key, statuses[key], snapshot, writes_enabled, done.get(key),
+                              case_policy=case_policy, legacy_writes_enabled=legacy_writes_enabled,
+                              legacy_completed=key in legacy_completions) for key in CHAIN},
+        'warnings': list(snapshot.warnings),
+    }
+
+
+def node_detail(snapshot: CaseSnapshot, skipped, actor, roster, key: NodeKey, writes_enabled, now_ms, evidence=None, **policy):
+    statuses, case = case_view(snapshot, skipped, actor, writes_enabled, now_ms, evidence, **policy)
+    status = statuses[key]
+    tasks = []
+    for task in sorted(snapshot.node_tasks(key), key=lambda t: task_sort_key(t, now_ms)):
+        allowed = task_permissions(actor, key, status, TaskFacts(
+            task.status, task.assignee and task.assignee.open_id, task.assigned_by and task.assigned_by.open_id))
+        tasks.append(task_view(task, allowed.__dict__ if writes_enabled else {k: False for k in allowed.__dict__}))
+    # The roster serves the assignee picker only, so only someone who may assign sees it.
+    people = [roster.public(p, key) for p in roster.assignable(key)] if roster and actor.manages(key) else []
+    return {'code': case['code'], 'summary': case['summary'],
+            'node': next(n for n in case['nodes'] if n['key'] == key.value), 'can': case['can'][key.value],
+            'tasks': tasks, 'assignable_people': people, 'warnings': case['warnings']}

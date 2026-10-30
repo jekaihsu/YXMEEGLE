@@ -4,10 +4,13 @@ Workspace metadata and append-only migration archives stay in workspaces.data;
 business collections are rows with indexed workspace, kind, parent and ordering.
 All materialization happens within the caller's version-checked transaction.
 """
+import functools
+import json
 from copy import deepcopy
-from sqlalchemy import Column, String, Integer, JSON, ForeignKey, UniqueConstraint, select, delete
+from types import SimpleNamespace
+from sqlalchemy import Column, String, Integer, JSON, Text, ForeignKey, UniqueConstraint, cast, select, delete, func
 
-COLLECTIONS=('users','projects','approvals','events','sop_templates','delegations','jobs','recurring','input_mappings','input_revisions','cost_allocations','daily_unmatched','daily_reviews','handover_requests','sop_requests','training_plans','capability_catalog','capability_awards','learning_standards','work_schedules','approved_leave_delegations','capability_bindings','learning_mappings','financial_requests','source_quotes','source_confirmations','contract_items')
+COLLECTIONS=('users','projects','approvals','events','sop_templates','delegations','jobs','recurring','input_mappings','input_revisions','cost_allocations','daily_unmatched','daily_reviews','handover_requests','sop_requests','training_plans','capability_catalog','capability_awards','learning_standards','work_schedules','approved_leave_delegations','capability_bindings','learning_mappings','financial_requests','source_quotes','source_confirmations','contract_items','source_work_items')
 PROJECT_CHILDREN=('files','comments','daily_reports','evidence','finance_versions','payment_batches','confirmation_issues','delivery_batches','quote_reviews')
 
 def models(base):
@@ -26,30 +29,54 @@ def models(base):
         data=Column(JSON,nullable=False)
     return BusinessRow,PersonRow
 
-def save(db,model,wid,state):
-    """Replace only changed entity rows; preserve one atomic workspace revision."""
-    root=deepcopy(state); desired={}
-    archive=root.pop('migration_archive',None)
-    if archive is not None:
-        if db.get(model,(wid,'migration_archive','original')) is None:
-            db.add(model(workspace_id=wid,kind='migration_archive',entity_id='original',parent_id='',ordinal=0,data=deepcopy(archive)))
-        root['migration_archive_ref']='original'
-    def add(kind,record,parent='',ordinal=0):
-        item=deepcopy(record); ident=str(item.get('id') or f'{parent}:{ordinal}')
+
+class PartialUnavailable(Exception):
+    """The stored state cannot be served by a partial write (legacy layout, pending upgrade); run the full path."""
+
+class FootprintViolation(BaseException):
+    """A partial write reached data outside the footprint it declared.
+
+    BaseException on purpose: the mutation callbacks and index helpers contain broad
+    `except Exception` clauses, and a swallowed violation would save a partial view.
+    """
+
+def _adder(desired,origin):
+    def add(kind,record,parent='',ordinal=0,nested=()):
+        # Nested lists become rows of their own, so they are copied there and not here.
+        item={k:deepcopy(v) for k,v in record.items() if k not in nested}; ident=str(item.get('id') or f'{parent}:{ordinal}')
+        if (kind,ident) in desired: raise ValueError(f'duplicate record id in {origin}: kind={kind} id={ident}')
         desired[(kind,ident)]={'parent_id':parent,'ordinal':ordinal,'data':item}
         return item
-    for collection in COLLECTIONS:
-        for i,record in enumerate(root.pop(collection,[])):
-            row=add(collection,record,ordinal=i)
-            if collection=='projects':
-                pid=record['id']
-                for j,node in enumerate(row.pop('nodes',[])):
-                    nr=add('nodes',node,pid,j)
-                    for k,task in enumerate(nr.pop('tasks',[])): add('tasks',task,node['id'],k)
-                    for k,review in enumerate(nr.pop('review_cycles',[])): add('review_cycles',review,node['id'],k)
-                for child in PROJECT_CHILDREN:
-                    for j,value in enumerate(row.pop(child,[])): add('project_'+child,value,pid,j)
-    existing={(r.kind,r.entity_id):r for r in db.scalars(select(model).where(model.workspace_id==wid,model.kind!='migration_archive'))}
+    return add
+
+def _flatten_project(add,record,ordinal):
+    pid=record['id']
+    add('projects',record,ordinal=ordinal,nested=('nodes',)+PROJECT_CHILDREN)
+    for j,node in enumerate(record.get('nodes',[])):
+        add('nodes',node,pid,j,nested=('tasks','review_cycles'))
+        for k,task in enumerate(node.get('tasks',[])): add('tasks',task,node['id'],k)
+        for k,review in enumerate(node.get('review_cycles',[])): add('review_cycles',review,node['id'],k)
+    for child in PROJECT_CHILDREN:
+        for j,value in enumerate(record.get(child,[])): add('project_'+child,value,pid,j)
+
+PROJECT_LINKED=frozenset({'approvals','sop_requests','financial_requests','delegations','recurring',
+                          'input_mappings','input_revisions','cost_allocations','daily_reviews','handover_requests',
+                          'source_quotes','source_confirmations','contract_items','source_work_items'})
+
+# Detail preserves shared authority/policy inputs and the existing response contract.
+# Global training/leave/schedule/template inputs remain shared. Quote facts explicitly
+# union duplicate quote numbers across projects, so source_quotes stays workspace-wide.
+DETAIL_COLLECTIONS=tuple(c for c in COLLECTIONS if c!='projects')
+# Case responses omit these workspace-wide feeds; they are read on their own destinations.
+CASE_DETAIL_COLLECTIONS=tuple(c for c in DETAIL_COLLECTIONS if c not in ('work_schedules','daily_unmatched'))
+CASE_COLLECTIONS=('users','source_quotes','source_confirmations','contract_items','source_work_items')
+# JSON rows with a project_id can be filtered without losing truly global rows.
+# source_quotes is excluded for duplicate-number facts; source_confirmations
+# supplies the complete hidden-identity universe to case_redaction.make_plan.
+# Filtering those before taking the privacy snapshot could leak cross-case IDs.
+READ_PROJECT_LINKED=(PROJECT_LINKED | {'events'})-{'source_quotes','source_confirmations','source_work_items'}
+
+def _project_resolver(desired,existing):
     def project_of(key,value):
         kind,ident=key
         if kind=='projects': return ident
@@ -58,36 +85,84 @@ def save(db,model,wid,state):
         if kind in ('tasks','review_cycles'):
             node=desired.get(('nodes',parent)); old=existing.get(('nodes',parent))
             return node['parent_id'] if node else old.parent_id if old else None
-        if kind in {'approvals','sop_requests','financial_requests','delegations','recurring',
-                    'input_mappings','input_revisions','cost_allocations','daily_reviews','handover_requests',
-                    'source_quotes','source_confirmations','contract_items'}:
+        if kind in PROJECT_LINKED:
             return value['data'].get('project_id') or value['data'].get('linked_project_id')
         return None
-    changed_projects=set()
+    return project_of
+
+def _changed_projects(desired,existing,project_of):
+    changed=set()
     for key,value in desired.items():
         old=existing.get(key)
         left={k:v for k,v in old.data.items() if k!='concurrency_version'} if old else None
         right={k:v for k,v in value['data'].items() if k!='concurrency_version'}
         if left!=right:
             pid=project_of(key,value)
-            if pid: changed_projects.add(pid)
+            if pid: changed.add(pid)
             if old:
                 previous=project_of(key,{'parent_id':old.parent_id,'data':old.data})
-                if previous:changed_projects.add(previous)
+                if previous: changed.add(previous)
     for key,old in existing.items():
         if key not in desired:
             pid=project_of(key,{'parent_id':old.parent_id,'data':old.data})
-            if pid: changed_projects.add(pid)
-    # Root-level skip requests also govern completion and approval scope.
+            if pid: changed.add(pid)
+    return changed
+
+def _changed_skip_projects(db,model,wid,root):
+    """Root-level skip requests also govern completion and approval scope."""
     workspace_table=model.metadata.tables['workspaces']
     previous_root=db.scalar(select(workspace_table.c.data).where(workspace_table.c.id==wid)) or {}
     old_skips={item['id']:item for item in previous_root.get('node_skip_requests',[])}
     new_skips={item['id']:item for item in root.get('node_skip_requests',[])}
+    changed=set()
     for ident in old_skips.keys() | new_skips.keys():
         old,new=old_skips.get(ident),new_skips.get(ident)
         if old!=new:
-            changed_projects.update(item['project_id'] for item in (old,new) if item and item.get('project_id'))
-    if any(key[0]=='sop_templates' and (key not in existing or existing[key].data!=value['data']) for key,value in desired.items()) or any(key[0]=='sop_templates' and key not in desired for key in existing):
+            changed.update(item['project_id'] for item in (old,new) if item and item.get('project_id'))
+    return changed
+
+def _templates_changed(desired,existing):
+    return (any(key[0]=='sop_templates' and (key not in existing or existing[key].data!=value['data']) for key,value in desired.items())
+            or any(key[0]=='sop_templates' and key not in desired for key in existing))
+
+def _invalidate_projection(root):
+    # A source refresh may trust its workspace revision only until another save.
+    # Invalidate even when a caller stores content without bumping that revision.
+    if isinstance(root.get('source_status'),dict):
+        root['source_status'].pop('projection_workspace_version',None)
+
+def invalidate_shared_reads(wid):
+    from . import shared_reads
+    shared_reads.invalidate(wid)
+
+def _drops_shared_reads(write):
+    @functools.wraps(write)
+    def wrapper(db,model,wid,*args,**kwargs):
+        try: return write(db,model,wid,*args,**kwargs)
+        finally:
+            from . import shared_reads
+            shared_reads.drop_after_commit(db,wid)
+    return wrapper
+
+@_drops_shared_reads
+def save(db,model,wid,state):
+    """Replace only changed entity rows; preserve one atomic workspace revision."""
+    if '_partial' in state: raise ValueError('partial workspaces are read-only')
+    root={k:deepcopy(v) for k,v in state.items() if k not in COLLECTIONS and k not in ('migration_archive','report_bridge_available_codes')}; desired={}
+    archive=state.get('migration_archive')
+    if archive is not None: root['migration_archive_ref']='original'
+    add=_adder(desired,'storage.save')
+    for collection in COLLECTIONS:
+        for i,record in enumerate(state.get(collection,[])):
+            if collection=='projects': _flatten_project(add,record,i)
+            else: add(collection,record,ordinal=i)
+    if archive is not None and db.get(model,(wid,'migration_archive','original')) is None:
+        db.add(model(workspace_id=wid,kind='migration_archive',entity_id='original',parent_id='',ordinal=0,data=deepcopy(archive)))
+    existing={(r.kind,r.entity_id):r for r in db.scalars(select(model).where(model.workspace_id==wid,model.kind!='migration_archive'))}
+    project_of=_project_resolver(desired,existing)
+    changed_projects=_changed_projects(desired,existing,project_of)
+    changed_projects|=_changed_skip_projects(db,model,wid,root)
+    if _templates_changed(desired,existing):
         changed_projects.update(project['id'] for project in state.get('projects',[]))
     for project in state.get('projects',[]):
         old=existing.get(('projects',project['id']))
@@ -100,6 +175,15 @@ def save(db,model,wid,state):
     new_events=[key for key in desired if key[0]=='events' and key not in existing]
     for index,key in enumerate(new_events):
         desired[key]['ordinal']=event_ordinal-len(new_events)+index
+    indexed=db.info.get('index_tables')
+    dirty=set(changed_projects)
+    if indexed:
+        # Moves and reorders change index rows without changing entity data.
+        for key,value in desired.items():
+            old=existing.get(key)
+            if old and key[0] in ('projects','nodes','tasks') and (old.parent_id!=value['parent_id'] or old.ordinal!=value['ordinal']):
+                pid=project_of(key,value)
+                if pid: dirty.add(pid)
     for key,value in desired.items():
         old=existing.pop(key,None)
         if old:
@@ -109,18 +193,283 @@ def save(db,model,wid,state):
         else: db.add(model(workspace_id=wid,kind=key[0],entity_id=key[1],**value))
     for row in existing.values():
         if row.kind!='events': db.delete(row)
+    if indexed:
+        from . import index_tables  # lazy: storage must stay importable inside the isolated backup helper bundle
+        index_tables.replace_projects(db,model,wid,state,dirty)
+        index_tables.replace_counters(db,model,wid,state)
+    if 'report_case_bridges' in state:
+        from .report_bridge import save_bridges
+        save_bridges(db,wid,state)
     root['storage_schema']=2
+    _invalidate_projection(root)
     return root
 
-def load(db,model,row):
-    if row.data.get('storage_schema')!=2: return deepcopy(row.data)
+def prepare_save(model,wid,state,existing,previous_root,*,indexed=False):
+    """Prepare a normalized source-import delta before acquiring the workspace lock.
+
+    The caller must recheck both the workspace revision and original root under
+    the lock. The revision proof must still be present: every storage writer
+    invalidates it, including writers that do not advance the revision.
+    """
+    desired={}; add=_adder(desired,'storage.prepare_save')
+    for collection in COLLECTIONS:
+        if collection=='events': continue  # append-only events are finalized at commit
+        for i,record in enumerate(state.get(collection,[])):
+            if collection=='projects': _flatten_project(add,record,i)
+            else: add(collection,record,ordinal=i)
+    existing={key:value for key,value in existing.items() if key[0]!='events'}
+    project_of=_project_resolver(desired,existing)
+    changed=_changed_projects(desired,existing,project_of)
+    if previous_root.get('node_skip_requests',[])!=state.get('node_skip_requests',[]):
+        changed.update(item['project_id'] for root in (previous_root,state)
+                       for item in root.get('node_skip_requests',[]) if item.get('project_id'))
+    if _templates_changed(desired,existing): changed.update(p['id'] for p in state['projects'])
+    dirty=set(changed)
+    for key,value in desired.items():
+        old=existing.get(key)
+        if old and key[0] in ('projects','nodes','tasks') and (old.parent_id!=value['parent_id'] or old.ordinal!=value['ordinal']):
+            pid=project_of(key,value)
+            if pid: dirty.add(pid)
+    for project in state['projects']:
+        old=existing.get(('projects',project['id']))
+        revision=(old.data.get('concurrency_version',0) if old else 0)+(project['id'] in changed)
+        project['concurrency_version']=revision
+        desired[('projects',project['id'])]['data']['concurrency_version']=revision
+    writes=[dict(workspace_id=wid,kind=kind,entity_id=ident,**value)
+            for (kind,ident),value in desired.items()
+            if (kind,ident) not in existing or any(getattr(existing[(kind,ident)],field)!=value[field]
+                                                  for field in ('parent_id','ordinal','data'))]
+    plan={'writes':writes,'deletes':existing.keys()-desired.keys(),'dirty':dirty}
+    if indexed:
+        from . import index_tables
+        view=dict(state,version=state['version']+1)
+        plan['indexes']=index_tables.project_rows(wid,view,dirty)
+        plan['counters']=index_tables.counter_values(view)
+    return plan
+
+
+@_drops_shared_reads
+def save_prepared(db,model,wid,state,plan):
+    """Apply only the prepared changed rows, inside the caller's fenced transaction."""
+    if '_partial' in state: raise ValueError('partial workspaces are read-only')
+    table=model.__table__
+    dialect=db.get_bind().dialect.name
+    if dialect=='postgresql':
+        from sqlalchemy.dialects.postgresql import insert
+    elif dialect=='sqlite':
+        from sqlalchemy.dialects.sqlite import insert
+    else: raise PartialUnavailable('prepared saves require SQLite or PostgreSQL')
+    for part in _row_chunks(plan['writes']):
+        statement=insert(table).values(part)
+        db.execute(statement.on_conflict_do_update(
+            index_elements=['workspace_id','kind','entity_id'],
+            set_={key:getattr(statement.excluded,key) for key in ('parent_id','ordinal','data')}))
+    by_kind={}
+    for kind,ident in plan['deletes']: by_kind.setdefault(kind,[]).append(ident)
+    for kind,ids in by_kind.items():
+        for part in _in_chunks(model.entity_id,ids):
+            db.execute(delete(table).where(table.c.workspace_id==wid,table.c.kind==kind,part))
+    # Events may have been appended after preparation (the sync receipt itself).
+    event_state=dict(state,_partial={'collections':['events']})
+    root=save_collections(db,model,wid,event_state,('events',))
+    if db.info.get('index_tables'):
+        from . import index_tables
+        index_tables.replace_projects(db,model,wid,state,plan['dirty'],rows=plan['indexes'])
+        index_tables.replace_counters(db,model,wid,state,desired=plan['counters'])
+    return root
+
+
+def _row_chunks(rows,size=100):
+    # Bound SQL parameters for SQLite as well as PostgreSQL.
+    for start in range(0,len(rows),size): yield rows[start:start+size]
+
+
+@_drops_shared_reads
+def save_collections(db,model,wid,state,collections):
+    """Write only the named non-project collections of a load_partial state.
+
+    Rows of every other kind are not read, copied or compared, so a write that
+    changes a few people or events no longer pays for the whole workspace. Events
+    stay insert-only and may be named without having been loaded.
+    """
+    collections=tuple(collections)
+    partial=state.get('_partial')
+    if (partial is None or 'projects' in collections or set(collections)-set(COLLECTIONS)
+            or set(collections)-set(partial['collections'])-{'events'}):
+        raise ValueError('save_collections needs a partial state that loaded every named non-project collection')
+    root={k:deepcopy(v) for k,v in state.items() if k not in COLLECTIONS and k!='_partial'}
+    desired={}
+    for collection in collections:
+        for i,record in enumerate(state.get(collection,[])):
+            ident=str(record.get('id') or f':{i}')
+            if (collection,ident) in desired: raise ValueError(f'duplicate record id in storage.save_collections: kind={collection} id={ident}')
+            desired[(collection,ident)]={'parent_id':'','ordinal':i,'data':deepcopy(record)}
+    stored=[c for c in collections if c!='events']
+    existing={(r.kind,r.entity_id):r for r in db.scalars(select(model).where(model.workspace_id==wid,model.kind.in_(stored)))} if stored else {}
+    if 'events' in collections:
+        ids=[ident for kind,ident in desired if kind=='events']
+        known=set()
+        for i in range(0,len(ids),400):
+            known.update(db.scalars(select(model.entity_id).where(model.workspace_id==wid,model.kind=='events',model.entity_id.in_(ids[i:i+400]))))
+        fresh=[key for key in desired if key[0]=='events' and key[1] not in known]
+        floor=db.scalar(select(func.min(model.ordinal)).where(model.workspace_id==wid,model.kind=='events')) or 0
+        for index,key in enumerate(fresh):
+            desired[key]['ordinal']=floor-len(fresh)+index
+        for key in desired.keys()-set(fresh):
+            if key[0]=='events': del desired[key]
+    for key,value in desired.items():
+        old=existing.pop(key,None)
+        if old:
+            if old.data!=value['data'] or old.parent_id!=value['parent_id'] or old.ordinal!=value['ordinal']:
+                old.data=value['data']; old.parent_id=value['parent_id']; old.ordinal=value['ordinal']
+        else: db.add(model(workspace_id=wid,kind=key[0],entity_id=key[1],**value))
+    for row in existing.values(): db.delete(row)
+    if db.info.get('index_tables'):
+        from . import index_tables
+        index_tables.advance_counters(db,model,wid,state['version']-1,state['version'])
+    root['storage_schema']=2
+    _invalidate_projection(root)
+    return root
+
+def load_scoped(db,model,row,*,collections,project_ids):
+    """The state a partial write runs on: whole named collections plus whole project trees.
+
+    Returns the plain state (projects holds only the selected trees) and the full project
+    id order, so a caller can show every other project as an untouchable placeholder.
+    """
+    collections=tuple(collections); project_ids=tuple(dict.fromkeys(project_ids))
+    if row.data.get('storage_schema')!=2: raise PartialUnavailable('partial writes need normalized storage')
+    if 'projects' in collections or 'events' in collections: raise ValueError('projects and events are never loaded as collections')
+    state=load_partial(db,model,row,collections=collections,project_ids=project_ids,project_children=PROJECT_CHILDREN)
+    order=list(db.scalars(select(model.entity_id).where(model.workspace_id==row.id,model.kind=='projects',model.parent_id=='').order_by(model.ordinal)))
+    missing=set(project_ids)-{p['id'] for p in state['projects']}
+    if missing: raise PartialUnavailable(f'unknown project in footprint: {sorted(missing)[0]}')
+    return state,order
+
+def _in_chunks(column,values,size=400):
+    values=list(values)
+    for i in range(0,len(values),size): yield column.in_(values[i:i+size])
+
+@_drops_shared_reads
+def save_partial(db,model,wid,state,collections,project_ids,project_order,*,view=None):
+    """Write the named collections and project trees of a load_scoped state.
+
+    Produces the rows, project concurrency versions, event ordinals and index rows a full
+    save of the same change would produce, without reading or comparing anything else.
+    A change that reaches a project, template or root record outside the footprint raises
+    FootprintViolation before any row is written, because a full save would have rewritten
+    that project too and only the full path can do that.
+    """
+    collections=tuple(collections); project_ids=tuple(project_ids)
+    partial=state.get('_partial')
+    if (partial is None or 'projects' in collections or set(collections)-set(COLLECTIONS)
+            or set(collections)-set(partial['collections'])-{'events'}):
+        raise ValueError('save_partial needs a scoped state that loaded every named collection')
+    if db.info.get('index_tables') and view is None: raise ValueError('save_partial needs the view with every project in order to rebuild index rows')
+    loaded=[p['id'] for p in state['projects']]
+    if sorted(loaded)!=sorted(project_ids): raise FootprintViolation('projects were added or removed by a partial write')
+    root={k:deepcopy(v) for k,v in state.items() if k not in COLLECTIONS and k!='_partial'}
+    if 'migration_archive' in root: raise ValueError('archives are written by the full save only')
+    ordinals={pid:i for i,pid in enumerate(project_order)}
+    desired={}; add=_adder(desired,'storage.save_partial')
+    for collection in collections:
+        records=state.get(collection,[])
+        for i,record in enumerate(records.new() if hasattr(records,'new') else records): add(collection,record,ordinal=i)
+    for project in state['projects']: _flatten_project(add,project,ordinals[project['id']])
+    stored=[c for c in collections if c!='events']
+    existing={}
+    def pull(*clauses):
+        for r in db.scalars(select(model).where(model.workspace_id==wid,*clauses)): existing[(r.kind,r.entity_id)]=r
+    if stored: pull(model.kind.in_(stored))
+    if project_ids:
+        for part in _in_chunks(model.entity_id,project_ids): pull(model.kind=='projects',part)
+        children=('nodes',)+tuple('project_'+c for c in PROJECT_CHILDREN)
+        for part in _in_chunks(model.parent_id,project_ids): pull(model.kind.in_(children),part)
+        node_ids=[ident for kind,ident in existing if kind=='nodes']
+        for part in _in_chunks(model.parent_id,node_ids): pull(model.kind.in_(('tasks','review_cycles')),part)
+    project_of=_project_resolver(desired,existing)
+    changed_projects=_changed_projects(desired,existing,project_of)
+    changed_projects|=_changed_skip_projects(db,model,wid,root)
+    if 'sop_templates' in collections and _templates_changed(desired,existing):
+        raise FootprintViolation('a template change rewrites every project')
+    outside=changed_projects-set(project_ids)
+    if outside: raise FootprintViolation(f'write changed project {sorted(outside)[0]} outside the footprint')
+    for project in state['projects']:
+        old=existing.get(('projects',project['id']))
+        revision=(old.data.get('concurrency_version',0) if old else 0)+(1 if project['id'] in changed_projects else 0)
+        project['concurrency_version']=revision
+        desired[('projects',project['id'])]['data']['concurrency_version']=revision
+    if 'events' in collections:
+        ids=[ident for kind,ident in desired if kind=='events']
+        known=set()
+        for part in _in_chunks(model.entity_id,ids): known.update(db.scalars(select(model.entity_id).where(model.workspace_id==wid,model.kind=='events',part)))
+        fresh=[key for key in desired if key[0]=='events' and key[1] not in known]
+        floor=db.scalar(select(func.min(model.ordinal)).where(model.workspace_id==wid,model.kind=='events')) or 0
+        for index,key in enumerate(fresh): desired[key]['ordinal']=floor-len(fresh)+index
+        for key in desired.keys()-set(fresh):
+            if key[0]=='events': del desired[key]
+    indexed=db.info.get('index_tables')
+    dirty=set(changed_projects)
+    if indexed:
+        for key,value in desired.items():
+            old=existing.get(key)
+            if old and key[0] in ('projects','nodes','tasks') and (old.parent_id!=value['parent_id'] or old.ordinal!=value['ordinal']):
+                pid=project_of(key,value)
+                if pid: dirty.add(pid)
+        from . import index_tables
+        before=index_tables.scoped_counters((r.kind,r.entity_id,r.parent_id,r.data) for r in existing.values())
+        after=index_tables.scoped_counters((kind,ident,value['parent_id'],value['data']) for (kind,ident),value in desired.items() if kind!='events')
+    for key,value in desired.items():
+        old=existing.pop(key,None)
+        if old:
+            if old.data!=value['data'] or old.parent_id!=value['parent_id'] or old.ordinal!=value['ordinal']:
+                old.data=value['data']; old.parent_id=value['parent_id']; old.ordinal=value['ordinal']
+        else: db.add(model(workspace_id=wid,kind=key[0],entity_id=key[1],**value))
+    for row in existing.values(): db.delete(row)
+    if indexed:
+        index_tables.replace_projects(db,model,wid,view,dirty)
+        index_tables.apply_counter_deltas(db,model,wid,state['version']-1,state['version'],before,after)
+    root['storage_schema']=2
+    _invalidate_projection(root)
+    return root
+
+
+def load_partial(db,model,row,*,collections=(),project_ids=None,project_children=(),filter_project_rows=False,project_details=True,case_sources=False):
+    """Read selected workspace data; never pass this to save."""
+    # Backup bundles omit application reads.
+    from .partial_reads import load_partial as read_partial
+    return read_partial(db,model,row,collections=collections,project_ids=project_ids,
+        project_children=project_children,filter_project_rows=filter_project_rows,
+        project_details=project_details,case_sources=case_sources)
+
+def load(db,model,row,*,omit_kinds=(),row_snapshot=None):
+    """Materialize a workspace, optionally omitting read-only presentation inputs."""
+    omit_kinds=tuple(omit_kinds)
+    allowed=set(COLLECTIONS)|{'project_'+child for child in PROJECT_CHILDREN}|{'tasks','review_cycles'}
+    if 'projects' in omit_kinds: raise ValueError('project headers cannot be omitted')
+    if set(omit_kinds)-allowed: raise ValueError('unknown workspace kind')
+    if row.data.get('storage_schema')!=2:
+        result=deepcopy(row.data)
+        for kind in omit_kinds:
+            if kind in COLLECTIONS: result[kind]=[]
+            elif kind in ('tasks','review_cycles'):
+                for p in result.get('projects',[]):
+                    for n in p.get('nodes',[]): n[kind]=[]
+            else:
+                for p in result.get('projects',[]): p[kind.removeprefix('project_')]=[]
+        if omit_kinds: result['_partial']={'omitted_kinds':list(omit_kinds)}
+        return result
     result=deepcopy(row.data); records={}
-    for r in db.scalars(select(model).where(model.workspace_id==row.id,model.kind!='migration_archive').order_by(model.ordinal)):
-        records.setdefault((r.kind,r.parent_id),[]).append(deepcopy(r.data))
+    # Column selection decodes fresh JSON without aliasing identity-map objects.
+    for kind,ident,parent,ordinal,data in db.execute(select(model.kind,model.entity_id,model.parent_id,model.ordinal,model.data).where(model.workspace_id==row.id,model.kind.notin_(('migration_archive',)+omit_kinds)).order_by(model.ordinal)):
+        if row_snapshot is not None and kind!='events':
+            row_snapshot[(kind,ident)]=SimpleNamespace(kind=kind,entity_id=ident,parent_id=parent,ordinal=ordinal,data=deepcopy(data))
+        records.setdefault((kind,parent),[]).append(data)
     for collection in COLLECTIONS: result[collection]=records.get((collection,''),result.get(collection,[]))
     for p in result['projects']:
         p['nodes']=records.get(('nodes',p['id']),[])
         for n in p['nodes']:
             n['tasks']=records.get(('tasks',n['id']),[]); n['review_cycles']=records.get(('review_cycles',n['id']),[])
         for child in PROJECT_CHILDREN: p[child]=records.get(('project_'+child,p['id']),[])
+    if omit_kinds: result['_partial']={'omitted_kinds':list(omit_kinds)}
     return result

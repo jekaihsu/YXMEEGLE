@@ -1,0 +1,413 @@
+{
+  "source": "T3 collaborative preview on the real Vite app with synthetic endpoints",
+  "captures": [
+    {
+      "name": "preview",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -119.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/preview-1280.png"
+    },
+    {
+      "name": "preview",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 432.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/preview-390.png"
+    },
+    {
+      "name": "approvals",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -119.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/approvals-1280.png"
+    },
+    {
+      "name": "approvals",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 432.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/approvals-390.png"
+    },
+    {
+      "name": "confirmed",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -119.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/confirmed-1280.png"
+    },
+    {
+      "name": "confirmed",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 432.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/confirmed-390.png"
+    },
+    {
+      "name": "work-queue",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": 816.485107421875,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/work-queue-1280.png"
+    },
+    {
+      "name": "work-queue",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 1368.453125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/work-queue-390.png"
+    },
+    {
+      "name": "form",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -119.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/form-1280.png"
+    },
+    {
+      "name": "form",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 432.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/form-390.png"
+    },
+    {
+      "name": "pending-202",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -119.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/pending-202-1280.png"
+    },
+    {
+      "name": "pending-202",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 432.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/pending-202-390.png"
+    },
+    {
+      "name": "outcome-unknown",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -119.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/outcome-unknown-1280.png"
+    },
+    {
+      "name": "outcome-unknown",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 432.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/outcome-unknown-390.png"
+    },
+    {
+      "name": "reconciled",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -119.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/reconciled-1280.png"
+    },
+    {
+      "name": "reconciled",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 432.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/reconciled-390.png"
+    },
+    {
+      "name": "conflict-409",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -119.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/conflict-409-1280.png"
+    },
+    {
+      "name": "conflict-409",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 432.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/conflict-409-390.png"
+    },
+    {
+      "name": "blocked-unknown",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -119.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/blocked-unknown-1280.png"
+    },
+    {
+      "name": "blocked-unknown",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 432.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/blocked-unknown-390.png"
+    },
+    {
+      "name": "stale",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": 816.484375,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/stale-1280.png"
+    },
+    {
+      "name": "stale",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 1368.453125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/stale-390.png"
+    },
+    {
+      "name": "retained-failure",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": 816.484375,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/retained-failure-1280.png"
+    },
+    {
+      "name": "retained-failure",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 1368.453125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/retained-failure-390.png"
+    },
+    {
+      "name": "forbidden",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": 816.484375,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/forbidden-1280.png"
+    },
+    {
+      "name": "forbidden",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 1368.453125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/forbidden-390.png"
+    },
+    {
+      "name": "write-flag-off",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": 721.6875,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/write-flag-off-1280.png"
+    },
+    {
+      "name": "write-flag-off",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 1273.65625,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/write-flag-off-390.png"
+    },
+    {
+      "name": "flag-off",
+      "width": 1280,
+      "documentWidth": 1280,
+      "path": "output/dispatch-publish/flag-off-1280.png"
+    },
+    {
+      "name": "flag-off",
+      "width": 390,
+      "documentWidth": 390,
+      "path": "output/dispatch-publish/flag-off-390.png"
+    },
+    {
+      "name": "loading",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": 816.484375,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/loading-1280.png"
+    },
+    {
+      "name": "loading",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 1368.453125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/loading-390.png"
+    },
+    {
+      "name": "needs-reconciliation",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -119.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/needs-reconciliation-1280.png"
+    },
+    {
+      "name": "needs-reconciliation",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 432.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/needs-reconciliation-390.png"
+    },
+    {
+      "name": "failed",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -119.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/failed-1280.png"
+    },
+    {
+      "name": "failed",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 432.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/failed-390.png"
+    },
+    {
+      "name": "saved-draft",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -119.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/saved-draft-1280.png"
+    },
+    {
+      "name": "saved-draft",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 432.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/saved-draft-390.png"
+    },
+    {
+      "name": "returned",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -119.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/returned-1280.png"
+    },
+    {
+      "name": "returned",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 432.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/returned-390.png"
+    },
+    {
+      "name": "detail",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -119.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/detail-1280.png"
+    },
+    {
+      "name": "detail",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 432.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/detail-390.png"
+    },
+    {
+      "name": "needs-me-approval",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": 816.484375,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/needs-me-approval-1280.png"
+    },
+    {
+      "name": "needs-me-approval",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 1368.453125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/needs-me-approval-390.png"
+    },
+    {
+      "name": "board-entry",
+      "width": 1280,
+      "documentWidth": 1280,
+      "path": "output/dispatch-publish/board-entry-1280.png"
+    },
+    {
+      "name": "board-entry",
+      "width": 390,
+      "documentWidth": 390,
+      "path": "output/dispatch-publish/board-entry-390.png"
+    },
+    {
+      "name": "new-assignment",
+      "width": 1280,
+      "documentWidth": 1280,
+      "path": "output/dispatch-publish/new-assignment-1280.png"
+    },
+    {
+      "name": "new-assignment",
+      "width": 390,
+      "documentWidth": 390,
+      "path": "output/dispatch-publish/new-assignment-390.png"
+    },
+    {
+      "name": "form-time-resources",
+      "width": 1280,
+      "documentWidth": 1280,
+      "path": "output/dispatch-publish/form-time-resources-1280.png"
+    },
+    {
+      "name": "form-time-resources",
+      "width": 390,
+      "documentWidth": 390,
+      "path": "output/dispatch-publish/form-time-resources-390.png"
+    },
+    {
+      "name": "needs-me-reconcile",
+      "width": 1280,
+      "documentWidth": 1280,
+      "needsTop": -207.015625,
+      "progressHeight": 160,
+      "path": "output/dispatch-publish/needs-me-reconcile-1280.png"
+    },
+    {
+      "name": "needs-me-reconcile",
+      "width": 390,
+      "documentWidth": 390,
+      "needsTop": 344.953125,
+      "progressHeight": 200,
+      "path": "output/dispatch-publish/needs-me-reconcile-390.png"
+    }
+  ],
+  "keyboard": {
+    "escape_closes": true,
+    "focus_restored": "dp-work-open",
+    "shift_tab_wraps_to": "檢核並預覽",
+    "focus_remains_in_dialog": true
+  },
+  "final_artifact_result": "pass: reassignment with an existing preview opens the form; publishing reaches read-back success; needs-me command-only reconciliation reaches committed",
+  "limitations": "Synthetic endpoints only. Not backend transaction or live Lark validation."
+}

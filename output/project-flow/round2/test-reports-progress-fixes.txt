@@ -1,0 +1,1 @@
+Progress regression behavior checks passed. Focus, page 2 identity, zero chip, hash, detail, 202, 429, bounded refresh and fingerprint.

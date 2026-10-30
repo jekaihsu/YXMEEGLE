@@ -1,0 +1,19 @@
+@layer tokens,legacy,components,pages,surfaces,controls,polish;
+@layer polish{
+.error-page{box-sizing:border-box;min-height:100svh;display:grid;place-items:center;padding:var(--space-6);color:var(--label)}
+.error-panel{box-sizing:border-box;width:min(100%,38rem);padding:clamp(24px,5vw,44px);border:0;border-radius:var(--radius-dialog);box-shadow:var(--glass-shadow)}
+.error-symbol{display:grid;place-items:center;width:56px;height:56px;margin-bottom:var(--space-6);border-radius:50%;background:var(--accent-fill);color:var(--accent)}
+.error-panel .error-eyebrow{margin:0 0 var(--space-2);font-size:var(--fs-footnote);color:var(--label-2)}
+.error-panel h1{margin:0;font-size:var(--fs-title1);font-weight:600;line-height:1.35;letter-spacing:-.02em;overflow-wrap:anywhere}
+.error-panel .error-description{margin:var(--space-3) 0 0;font-size:var(--fs-subhead);line-height:1.7;color:var(--label-2)}
+.error-actions{display:flex;flex-wrap:wrap;gap:var(--space-3);margin-top:var(--space-6)}
+.error-actions .ds-button{font-size:var(--fs-subhead);text-decoration:none}
+.error-panel .error-help{margin:var(--space-6) 0 0;font-size:var(--fs-footnote);color:var(--label-2);line-height:1.7}
+.error-report{margin-top:var(--space-3);font-size:var(--fs-footnote);color:var(--label-2)}
+.error-report summary{display:list-item;width:fit-content;min-height:44px;align-content:center;cursor:pointer;color:var(--accent)}
+.error-report-body{padding-top:var(--space-2);min-width:0}
+.error-report-body>p{margin:0 0 var(--space-3);line-height:1.6}
+.error-report pre{box-sizing:border-box;max-height:14rem;overflow:auto;margin:0 0 var(--space-3);padding:var(--space-4);font-size:var(--fs-caption);line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--glass-fill-strong);border-radius:var(--radius-m);color:var(--label);user-select:text}
+.error-report .error-copy-status{min-height:1.7em;margin:var(--space-2) 0 0}
+@media(max-width:480px){.error-page{padding:var(--space-4)}.error-actions{flex-direction:column}.error-actions>*{width:100%}}
+}

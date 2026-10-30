@@ -1,0 +1,42 @@
+FAIL round2 local workflow stays available with assignments AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /找不到此 Lark 任務/. Input:
+
+'任務此節點全部任務我的未指派逾期2 項符合尚待指派的核對任務尚未指派 · 進行中 · 2026-10-01逾期控制 · Lark 任務指派控制點成果核對陳威廷 · 進行中 · 2026-10-20控制 · Lark 任務改派找不到此 Lark 任務，可能已移除或不在可見範圍。'
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:57:362
+    at async check (file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:53:36)
+    at async file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:55:1
+PASS round2 local flow list translates both pending and in-progress task statuses
+PASS round2 completed and skipped node mounted progress
+PASS round2 keyboard replaces history and never scrolls the selected panel
+PASS round2 one selected node for panel and local operations
+PASS round2 dispatch independent of node writes
+PASS round2 source timestamp and honest manager fallback
+PASS round2 overview goes to page header
+PASS round2 attention excludes manager-wide completion and unowned not-started nodes
+PASS round2 attention includes actual pending task, approval and owned not-started work
+PASS round2 manager resolved from loaded users and absent source distinguished
+PASS round2 background and file shortcut restored collapsed
+PASS round2 assignment readback wins over an in-flight stale detail and avoids refetch
+PASS round2 failed evidence retains node and offers retry in item sheet
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ [
++   'round2 local workflow stays available with assignments'
++ ]
+- []
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-project-flow-round2.mjs:122:43 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [ 'round2 local workflow stays available with assignments' ],
+  expected: [],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.9.0

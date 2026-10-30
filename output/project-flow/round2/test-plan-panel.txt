@@ -1,0 +1,19 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+'—' !== '0'
+
+    at file:///Users/vc/.t3/worktrees/YXMEEGLE/t3-9dacab7b/frontend/test-plan-panel.mjs:14:141
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: '—',
+  expected: '0',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.9.0

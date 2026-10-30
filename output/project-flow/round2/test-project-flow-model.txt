@@ -1,0 +1,17 @@
+✔ four old tabs keep node, task, completion and focus while selecting one workspace (0.54325ms)
+✔ task basis excludes cancellation and superseded work and does not use opaque progress (0.419125ms)
+✔ missing daily quantity remains unknown even with zero item counts and completed tasks (0.227416ms)
+✔ known quantities retain unit text without adding unlike quantities (0.120917ms)
+✔ legacy has one honest local-task number and source state never overwrites workflow authority (3.386334ms)
+✔ task filters compose for mine, unassigned and overdue without hiding other source identities (0.083791ms)
+✔ dispatch proposal uses stable case references and never treats the assignment row as parent obligation (0.066292ms)
+✔ round2 node state overrides task ratio and skipped nodes have no bar (0.099875ms)
+✔ round2 overall stays unknown when a counted node has unknown progress (0.068459ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6.783042

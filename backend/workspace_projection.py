@@ -1,5 +1,7 @@
 """Response-only privacy projection; authoritative storage remains intact."""
+from .avatar import avatar_url
 from copy import deepcopy
+import json
 
 
 def public_person(person, *, include_authority=False):
@@ -8,10 +10,78 @@ def public_person(person, *, include_authority=False):
     if include_authority:
         fields |= {'capabilities','authz_version'}
     result = {key: deepcopy(value) for key, value in person.items() if key in fields}
+    if photo := avatar_url(person.get('avatar_url')):
+        result['avatar_url'] = photo
     if include_authority:
         from .business_policy import can_business_override
         result['can_business_override'] = can_business_override(person)
     return result
+
+
+PERSON_EVENT_FIELDS = ('name','department','role','active','default_workspace')
+PERSON_EVENT_MAX_TEXT = 200
+
+
+def _bounded_scalar(value):
+    """Scalars only: nested containers and oversized text collapse to None."""
+    if isinstance(value, str):
+        return value[:PERSON_EVENT_MAX_TEXT]
+    if isinstance(value, (bool, int)) or value is None:
+        return value
+    if isinstance(value, float) and value == value and value not in (float('inf'), float('-inf')):
+        return value
+    return None
+
+
+def _event_json(person_id, changes, capabilities_changed=False):
+    summary = {'person': _bounded_scalar(person_id), 'changes': changes}
+    if capabilities_changed:
+        summary['capabilities_changed'] = True
+    return json.dumps(summary, ensure_ascii=False)
+
+
+def person_event_message(person_id, before, after):
+    """Whitelisted audit summary for a person change; never serializes the profile.
+
+    Capability names are authority data visible only to their owner, so the event
+    records that they changed, not which ones. Full diffs live in action receipts.
+    """
+    before, after = before or {}, after or {}
+    changes = {key: {'before': _bounded_scalar(before.get(key)), 'after': _bounded_scalar(after.get(key))}
+               for key in PERSON_EVENT_FIELDS if before.get(key) != after.get(key)}
+    try:
+        changed = sorted(map(str, before.get('capabilities') or [])) != sorted(map(str, after.get('capabilities') or []))
+    except TypeError:
+        changed = True
+    return _event_json(person_id, changes, changed)
+
+
+def _sanitize_person_event(event):
+    """Rewrite legacy and current person events to the whitelisted summary.
+
+    Only scalar, bounded values of whitelisted fields survive; every other key
+    (including top-level before/details) is discarded.
+    """
+    message = event.get('message')
+    try:
+        data = json.loads(message) if isinstance(message, (str, bytes)) else None
+    except ValueError:
+        data = None
+    if not isinstance(data, dict):
+        event['message'] = _event_json(None, {})
+        return
+    if isinstance(data.get('before'), dict) or isinstance(data.get('after'), dict):
+        event['message'] = person_event_message(
+            data.get('person'),
+            data['before'] if isinstance(data.get('before'), dict) else {},
+            data['after'] if isinstance(data.get('after'), dict) else {})
+        return
+    changes = data.get('changes') if isinstance(data.get('changes'), dict) else {}
+    event['message'] = _event_json(
+        data.get('person'),
+        {key: {'before': _bounded_scalar(value.get('before')), 'after': _bounded_scalar(value.get('after'))}
+         for key, value in changes.items() if key in PERSON_EVENT_FIELDS and isinstance(value, dict)},
+        data.get('capabilities_changed') is True)
 
 
 def public_source_cache(cache, user=None):
@@ -20,7 +90,7 @@ def public_source_cache(cache, user=None):
     Source readers keep original fields for matching/hashing. This response copy
     is not suitable as an authoritative sync input.
     """
-    from .sources import FIELDS, REVIEW_FIELDS
+    from .sources import FIELDS, REVIEW_FIELDS, SERVER_ONLY_FIELDS
     result = {key: deepcopy(value) for key, value in cache.items()
               if key in {'configured','last_sync','status','message','tables','records'}}
     result['tables'] = [{k: deepcopy(v) for k,v in row.items()
@@ -29,7 +99,7 @@ def public_source_cache(cache, user=None):
     records = []
     for row in cache.get('records', []):
         kind = row.get('kind')
-        allowed = set(FIELDS.get(kind, []))
+        allowed = set(FIELDS.get(kind, [])) - SERVER_ONLY_FIELDS
         if kind in ('daily','cost'):
             # Dates and names are represented by the normalized daily report;
             # payroll/allowance identity formulas never enter public raw fields.
@@ -62,7 +132,19 @@ def public_copy(value):
     return deepcopy(value)
 
 
-def filter_private_workspace(state, user):
+def strip_migration_archive(value):
+    """In-place twin of public_copy for data the caller owns (a fresh decode nobody else holds)."""
+    if isinstance(value, dict):
+        value.pop('migration_archive', None)
+        for item in value.values():
+            strip_migration_archive(item)
+    elif isinstance(value, list):
+        for item in value:
+            strip_migration_archive(item)
+    return value
+
+
+def filter_private_workspace(state, user, *, task_details=True):
     """Apply the existing leave-view policy after authoritative policy calculations.
 
     Use the current workspace profile, never stale role/capability claims supplied
@@ -80,15 +162,27 @@ def filter_private_workspace(state, user):
                                 or 'manage_handover' in actor.get('capabilities', [])))
     # Compute against the complete authority state, before hiding unrelated leave
     # records. The known project avoids scanning all tasks for every task.
-    from .workflow import is_owner, now
-    state['task_capabilities_checked_at'] = now()
+    from .workflow import now
+    from .workflow_rules import confirmation_hash, activation_reasons
+    from .home_details import build_home_task
+    from .home_queues import home_queues
+    if task_details:
+        state['task_capabilities_checked_at'] = now()
+        state['home_queues'] = home_queues(state, actor)
     for project in state.get('projects', []):
-        for node in project.get('nodes', []):
-            for task in node.get('tasks', []):
-                task['can_execute'] = bool(actor and is_owner(actor, task, state, project=project))
-                from .workflow_rules import confirmation_hash, activation_reasons
-                task['confirmation_hash'] = confirmation_hash(project, node, task)
-                task['activation_blockers'] = activation_reasons(state, project, node, task)
+        if task_details:
+            for node in project.get('nodes', []):
+                for task in node.get('tasks', []):
+                    home = build_home_task(state, project, node, task, actor, state.get('as_of') or now()[:10])
+                    task['can_execute'] = home['can_execute']
+                    task['assigned_to_viewer'] = home['assigned']
+                    task['confirmation_hash'] = confirmation_hash(project, node, task)
+                    task['activation_blockers'] = activation_reasons(state, project, node, task, clock=state.get('as_of'))
+                    task['execution_blockers'] = home['execution_blockers']
+                    if home['assigned']:
+                        task['home_detail'] = home['detail']
+                    else:
+                        task.pop('home_detail', None)
         # Operational source provenance remains server-side for reconciliation.
         # Browser pages use normalized business fields and explicit source URLs.
         _strip_source_payloads(project)
@@ -100,9 +194,14 @@ def filter_private_workspace(state, user):
     if not may_manage:
         state['delegations'] = [item for item in state.get('delegations', [])
             if ident in (item.get('principal_id'), item.get('delegate_id'))]
+        # Handover rows use from_id/to_id (operations.handover_request); delegations
+        # use principal_id/delegate_id. The project's PM/supervisor may also see them.
+        leads = {project.get('id'): (project.get('pm_id'), project.get('supervisor_id'))
+                 for project in state.get('projects', [])}
         state['handover_requests'] = [item for item in state.get('handover_requests', [])
-            if ident in (item.get('principal_id'), item.get('delegate_id'), item.get('requested_by'))]
-    if not actor or actor.get('role')!='manager':
+            if ident and (ident in (item.get('from_id'), item.get('to_id'), item.get('requested_by'))
+                          or ident in leads.get(item.get('project_id'), ()))]
+    if simulated and (not actor or actor.get('role')!='manager'):
         state.pop('source_case_review',None)
     # Background snapshots and source payloads are operational, not public case
     # data. A manager gets metadata through the same projection, never secrets.
@@ -112,6 +211,9 @@ def filter_private_workspace(state, user):
     for key in ('capability_bindings','capability_awards','training_plans','learning_mappings'):
         state.pop(key, None)
     state.pop('_mention_reservations', None)
+    for item in state.get('events', []):
+        if isinstance(item, dict) and item.get('action') == 'admin_person':
+            _sanitize_person_event(item)
     for person in state.get('users', []):
         safe = public_person(person, include_authority=person.get('id') == ident)
         person.clear()
@@ -121,7 +223,7 @@ def filter_private_workspace(state, user):
 
 def _strip_source_payloads(value):
     if isinstance(value, dict):
-        for key in ('source_fields','source_records','raw_fields','_business_authority'):
+        for key in ('source_fields','source_records','raw_fields','_business_authority','change_explanation'):
             value.pop(key, None)
         # Quote snapshots carry an unbounded copy of source fields as `fields`.
         if 'fields' in value and isinstance(value['fields'],dict):

@@ -1,0 +1,21 @@
+✔ prefetch and StrictMode share one case request (10.756792ms)
+✔ feature off makes zero source requests and has an explicit disabled state (0.868916ms)
+✔ person attachment uses the existing revision checked task PATCH and merges returned details (1.596583ms)
+✔ uncertain outcome retries the same request UUID and exact payload (0.876792ms)
+✔ double submits are blocked while mutation is pending (0.758ms)
+✔ revision conflict refreshes and keeps the task authority server owned (0.702875ms)
+✔ field errors retain the form field name and a definite failure gets a new request id (0.59325ms)
+✔ detail prefetch shares a pending request and a fresh result (0.480167ms)
+✔ an unmounted mutation does not replace the next case snapshot (0.678833ms)
+✔ session change clears cached list and details before the next mount (0.935792ms)
+✔ round2 forced detail replaces a pending read and keeps newest cached result (0.497084ms)
+✔ round2 browsing refreshes while an assignment edit input defers refresh (5.377458ms)
+✔ round2 sixty-second refresh runs while browsing and waits for an edit input (0.892875ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28.238208

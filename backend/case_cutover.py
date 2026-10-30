@@ -21,6 +21,7 @@ def isolated(ws):
 
 def execution_allowed(ws,project):
     # Missing environment must not grant production business authority.
+    if project.get('planning_origin')=='local': return False
     return isolated(ws) or project.get('case_visibility')!='excluded_history' and execution_system(project)=='workbench'
 
 
@@ -85,6 +86,15 @@ def project_execution_view(ws,project):
             'execution_allowed':execution_allowed(ws,project),
             'execution_readonly_reason':None if execution_allowed(ws,project) else
                 ('舊案留在 Meegle 完成' if system=='meegle' else '等待管理員核定案件歸屬')}
+
+
+def admission_fields(project,allowed):
+    """Read-only admission facts for list surfaces; never grants or changes authority."""
+    system=execution_system(project)
+    reason=None if allowed else project.get('execution_readonly_reason') or (
+        '舊案留在 Meegle 完成' if system=='meegle' else '等待管理員核定案件歸屬')
+    return {'execution_system':system,'execution_system_label':LABELS[system],
+            'execution_readonly_reason':reason,'case_visibility':project.get('case_visibility')}
 
 
 def resolve_action_projects(ws,body):

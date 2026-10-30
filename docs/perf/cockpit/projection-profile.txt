@@ -1,0 +1,60 @@
+before
+Wed Oct 14 22:47:31 2026    /Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/.cockpit-before.prof
+
+         13398177 function calls (12410434 primitive calls) in 1.366 seconds
+
+   Ordered by: cumulative time
+   List reduced from 176 to 20 due to restriction <20>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.001    0.001    1.371    1.371 benchmark_company_cockpit.py:93(legacy_workspace)
+        1    0.000    0.000    1.370    1.370 app.py:394(public_ws)
+        1    0.009    0.009    0.849    0.849 workspace_projection.py:144(filter_private_workspace)
+    17608    0.045    0.000    0.484    0.000 workflow_rules.py:58(execution_reasons)
+     7018    0.008    0.000    0.432    0.000 home_details.py:153(build_home_task)
+70503/55191    0.174    0.000    0.429    0.000 {built-in method builtins.any}
+    19010    0.004    0.000    0.409    0.000 workflow.py:54(blocked)
+    10590    0.014    0.000    0.332    0.000 workflow_rules.py:81(activation_reasons)
+      319    0.004    0.000    0.273    0.001 operations.py:961(project_summary)
+  5722010    0.241    0.000    0.242    0.000 workflow.py:55(<genexpr>)
+     3190    0.011    0.000    0.202    0.000 operations.py:210(missing)
+    53724    0.008    0.000    0.188    0.000 {built-in method builtins.next}
+    10846    0.002    0.000    0.163    0.000 operations.py:230(<genexpr>)
+        1    0.000    0.000    0.133    0.133 case_redaction.py:112(apply)
+  93418/1    0.103    0.000    0.133    0.133 case_redaction.py:70(sweep)
+428332/324    0.088    0.000    0.127    0.000 workspace_projection.py:221(_strip_source_payloads)
+    17608    0.069    0.000    0.127    0.000 workflow_rules.py:67(<genexpr>)
+  2757999    0.120    0.000    0.120    0.000 {method 'get' of 'dict' objects}
+ 450559/1    0.067    0.000    0.098    0.098 workspace_projection.py:132(strip_migration_archive)
+     7018    0.023    0.000    0.074    0.000 workflow_rules.py:114(confirmation_hash)
+
+
+after
+Wed Oct 14 22:47:18 2026    /Users/vc/.t3/worktrees/YXMEEGLE/cockpit-perf-20261014/.cockpit-after.prof
+
+         3359411 function calls (2499785 primitive calls) in 0.347 seconds
+
+   Ordered by: cumulative time
+   List reduced from 119 to 20 due to restriction <20>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.347    0.347 app.py:394(public_ws)
+        1    0.001    0.001    0.111    0.111 workspace_projection.py:144(filter_private_workspace)
+340415/324    0.074    0.000    0.109    0.000 workspace_projection.py:221(_strip_source_payloads)
+        1    0.000    0.000    0.109    0.109 case_redaction.py:112(apply)
+  68530/1    0.084    0.000    0.109    0.109 case_redaction.py:70(sweep)
+ 450559/1    0.071    0.000    0.104    0.104 workspace_projection.py:132(strip_migration_archive)
+  1570085    0.051    0.000    0.051    0.000 {built-in method builtins.isinstance}
+   185599    0.014    0.000    0.014    0.000 {method 'pop' of 'dict' objects}
+   301287    0.009    0.000    0.009    0.000 {built-in method builtins.len}
+        1    0.001    0.001    0.008    0.008 case_redaction.py:46(make_plan)
+    77432    0.008    0.000    0.008    0.000 {method 'isdisjoint' of 'frozenset' objects}
+        1    0.003    0.003    0.007    0.007 source_case_policy.py:216(filter_visible_cases)
+      853    0.002    0.000    0.005    0.000 case_redaction.py:13(forms)
+    67870    0.005    0.000    0.005    0.000 {method 'get' of 'dict' objects}
+      319    0.001    0.000    0.004    0.000 operations.py:161(refresh_project_state)
+    77432    0.004    0.000    0.004    0.000 {method 'keys' of 'dict' objects}
+    71478    0.004    0.000    0.004    0.000 {method 'values' of 'dict' objects}
+        1    0.001    0.001    0.003    0.003 policy.py:72(upgrade)
+      853    0.001    0.000    0.002    0.000 case_redaction.py:25(codes_of)
+    39585    0.002    0.000    0.002    0.000 {method 'append' of 'list' objects}

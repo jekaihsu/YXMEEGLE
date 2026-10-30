@@ -1,0 +1,8 @@
+PASS R1 saved proposal wins over approved preview and approvals are void
+PASS R2 failed reconciliation restores options task and parent obligation
+PASS R3 seat holder sees every hashed proposal field and exclusive interval
+PASS R4 absent hours stay null omitted and show estimation hint
+PASS R5 unresolved display names never expose record IDs
+PASS R6 forbidden read clears open detail and actions
+PASS R6 identity epoch clears open detail before new read
+PASS wire errors use plain Chinese and receipt reasons survive parsing
