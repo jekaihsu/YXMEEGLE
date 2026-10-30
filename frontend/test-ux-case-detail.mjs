@@ -77,7 +77,7 @@ test('zero Lark tasks remain separate from expandable local templates', async ()
   await mount(React.createElement(ui.ProjectDetail, {c:context({tab:'flow',node:'sales'})}));
   assert.equal(document.querySelectorAll('#flow-tasks .pf-task-open').length,0);
   assert.equal(document.querySelector('.pf-legacy').open,false);
-  assert.match(document.querySelector('#flow-tasks').textContent,/尚無任務/);
+  assert.match(document.querySelector('#flow-tasks').textContent,/此節點尚無可顯示任務/);
 });
 test('an unavailable remote link does not pretend to focus local workflow', async () => {
   ui.invalidateSessionEpoch();

@@ -65,6 +65,21 @@ async function openDrawer(id,label='指派'){await click([...rowOf(id).querySele
 const results=[];
 async function check(id,fn){try{await fn();results.push(['PASS',id])}catch(error){results.push(['FAIL',id,error.message.split('\n')[0]]);console.error(error)}}
 
+await check('Concept B defaults to action-first and stage selection never changes the current stage',async()=>{
+ await mount({tab:'flow',node:'control'});
+ assert.equal(button('行動優先').getAttribute('aria-pressed'),'true');
+ assert.equal(document.querySelector('.pf-stage-workspace'),null);
+ await click(button('階段導覽'));
+ assert.equal(document.querySelectorAll('.pf-stage-nav .pf-node').length,9);
+ await click(document.querySelector('.pf-stage-nav .pf-node[aria-label^="PM"]'));
+ assert.equal(c.route.node,'pm');
+ assert.equal(fixture.list.summary.current_node,'control');
+ assert.match(document.querySelector('.pf-stage-nav .pf-node[aria-label^="控制"] .pf-stage-marker').textContent,/目前階段/);
+ assert.equal(document.querySelector('.pf-stage-nav .pf-node[aria-label^="PM"]').getAttribute('aria-current'),'step');
+ assert.match(document.querySelector('#flow-tasks h3').textContent,/PM/);
+ await click(button('行動優先'));
+ assert.equal(c.route.node,'pm');assert.equal(writes().length,0);
+});
 await check('T01 opening, selecting nodes and switching tabs cause zero writes',async()=>{
  await mount();assert.ok(document.querySelector('.cs-summary'));
  assert.match(document.querySelector('.cs-summary').textContent,/目前階段控制/);
@@ -186,7 +201,7 @@ await check('other stages are collapsed by default, expand on demand and are lab
 await check('P2 case status and source record status are labelled as different layers and never share a label',async()=>{
  await mount({node:'control',project:{status:'paused',source_status:'待確認單'}});
  const header=document.querySelector('.pds-case-status').textContent;
- assert.match(header,/案件狀態暫停中/);assert.match(header,/案件狀態描述整體案件；節點狀態描述此階段；任務狀態描述單項工作/);
+ assert.match(header,/案件狀態暫停中/);assert.match(document.querySelector('.pds-case-status').title,/案件狀態描述整體案件；節點狀態描述此階段；任務狀態描述單項工作/);
  const labels=[...document.querySelectorAll('.po-sidebar dt')].map(d=>d.textContent);
  assert.ok(labels.includes('來源紀錄狀態'));assert.ok(!labels.includes('案件狀態'),'sidebar no longer calls the source status 案件狀態');
  const side=[...document.querySelectorAll('.po-sidebar dl>div')].find(d=>d.querySelector('dt').textContent==='來源紀錄狀態').textContent;
