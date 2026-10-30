@@ -27,7 +27,7 @@ def normalize(raw):
     started = time.perf_counter()
     data = compute.normalize(raw)
     gaps = {(endpoint, dept): compute.report_gaps(data, endpoint, dept)
-            for endpoint in ('sources', 'review', 'review/rows', 'sales', 'assets', 'progress', 'progress/case')
+            for endpoint in ('sources', 'review', 'review/rows', 'sales', 'assets', 'progress', 'progress/case', 'contacts')
             for dept in ('field', 'office', 'control')}
     ended = time.perf_counter()
     rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
