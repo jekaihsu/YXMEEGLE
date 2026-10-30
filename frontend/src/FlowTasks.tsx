@@ -4,7 +4,7 @@ import {Badge,Button,Skeleton} from './design';
 import type {Ctx} from './appCommon';
 import type {Project} from './types';
 import type {NodeAssignmentDetail} from './nodeAssignmentApi';
-import {overdueTask} from './flowModel';
+import {flowTaskTarget,overdueTask} from './flowModel';
 import {taskFilters,withTaskFilter} from './projectRoutes';
 import {FlowAction} from './FlowActions';
 import {AssignDrawer} from './AssignDrawer';
@@ -47,10 +47,10 @@ export function FlowTasks({c,p,ctx,details,detailErrors,assignments,busy,reason,
  const rowView=(row:TaskView,group:TaskGroup)=>{
   const plan=row.task?productionPlanFacts(row.task,row.nodeKey,group.node.production):null;
   return <li key={row.id} data-assignment-task={row.id} className="st-row">
-   <div className="pf-task-line"><button className="pf-task-open" onClick={()=>c.go({...c.route,tab:c.route.tab==='overview'?'overview':'flow',node:row.task?row.nodeKey:group.node.legacy?.id,task:row.id,task_source:undefined})}><strong>{plan?'依計畫數量完成':row.title}</strong>
+   <div className="pf-task-line"><button className="pf-task-open" onClick={()=>c.go({...c.route,...(row.source==='SOP 任務'?flowTaskTarget(row):{node:row.task?row.nodeKey:group.node.legacy?.id,task:row.id,task_source:undefined}),tab:c.route.tab==='overview'?'overview':'flow'})}><strong>{plan?'依計畫數量完成':row.title}</strong>
     <span className="st-meta"><span>任務狀態：{row.statusText}</span><span>執行人：<Executor row={row}/></span><span>{row.deadline?.slice(0,10)||'未排期限'}</span>{row.flags.blocker.state==='blocked'&&<Badge tone="critical" icon={<TriangleAlert size={12} aria-hidden="true"/>}>受阻：{row.flags.blocker.reasons.join('、')}</Badge>}{overdueTask(row.deadline,row.done,c.w.as_of)&&<Badge tone="critical">逾期</Badge>}</span>
     <small>{plan&&'生產計畫 · '}{group.node.label} · {row.source}</small></button>
-    {assignButton(row)}</div>
+    {assignButton(row)}{row.source==='SOP 任務'&&row.sopTask.allowedActions.includes('edit')&&<Button onClick={()=>c.go({...c.route,...flowTaskTarget(row),tab:c.route.tab==='overview'?'overview':'flow'})}>{row.ownerId?'改派':'指派'}</Button>}</div>
    {row.id===seed?.id?evidence:plan&&<ProductionPlanFacts plan={plan}/>}
   </li>;
  };
@@ -63,6 +63,7 @@ export function FlowTasks({c,p,ctx,details,detailErrors,assignments,busy,reason,
  const drawerTask=drawerDetail?.tasks.find(t=>t.id===assigning?.taskId);
  return <section id="flow-tasks" className="pf-tasks st-tasks" aria-label="流程任務列表" tabIndex={-1}>
   <header><h3>{selected?`${selected.node.label}節點任務`:'節點任務'}</h3><span className="st-count" role="status">{incomplete?`${matchCount} 項已載入，來源未完整`:selected&&selected.loaded?`符合條件 ${matchCount} 項 · 節點共 ${selected.total} 項`:'載入任務中'}</span></header>
+  {selected&&selected.loaded&&!incomplete&&selected.rows.length!==selected.total&&<p className="st-note" role="status">列表載入 {selected.rows.length} 項，與節點總數 {selected.total} 項不一致，請重新整理後再確認。</p>}
   <div className="pf-filters" role="group" aria-label="任務篩選"><Button aria-pressed={applied.length===0} onClick={clear}>全部</Button>{STAGE_FILTERS.map(key=><Button key={key} aria-pressed={filters[key]} onClick={()=>filterRoute(key)}>{STAGE_FILTER_LABELS[key]}</Button>)}</div>
   {applied.length>0&&<p className="st-applied">已套用條件（需同時符合）：{applied.map(k=>STAGE_FILTER_LABELS[k]).join(' ＋ ')}<Button variant="plain" onClick={clear}>清除篩選</Button></p>}
   {filters.blocked&&selected&&!blockedKnown(selected.rows)&&<p className="st-note" role="status">此來源未提供任務阻礙資訊，無法判定哪些任務受阻。</p>}

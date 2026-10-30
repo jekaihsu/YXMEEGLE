@@ -25,6 +25,7 @@ import {FlowAction,FlowNodeActions} from './FlowActions';
 import {FlowTasks} from './FlowTasks';
 import {resolveStages} from './stageModel';
 import {SopTasks,type SopImportTarget} from './SopTasks';
+import {SopTools} from './SopTools';
 import {useSopTasks,canReadSop} from './useSopTasks';
 const FlowSchedule=lazy(()=>import('./FlowSchedule').then(m=>({default:m.FlowSchedule})));
 import {ProductionCard,ProductionPlanFacts} from './FlowEvidence';
@@ -48,6 +49,7 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  const ownSop=useSopTasks(p.id,c.s.workspace_id || '',!providedSop&&canReadSop(c.s.user));
  const sopTasks=providedSop||ownSop;
  const [sopImport,setSopImport]=useState<SopImportTarget>(null);
+ const sopOpen=!!sopImport||c.route.task_source==='sop_local';
  const sop=useStartSop(p.id,enabled,assignments.reload);
  const list='data' in assignments.state ? assignments.state.data : undefined;
  const isLegacy=assignments.state.kind==='disabled';
@@ -115,8 +117,8 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
    {!loading && !workbench.local && !isLegacy && !selected.assignment && <p className="pf-empty">尚無節點指派</p>}
 
    {Object.entries(details.errors).map(([key,error])=><p role="alert" key={key}>{model.nodes.find(n=>n.key===key)?.label}任務明細讀取失敗。{error}<Button onClick={details.retry}>重試任務明細</Button></p>)}
-   {(!workbench.local || selected.taskRows.some(row=>row.source!=='SOP 任務')) && <FlowTasks c={c} p={p} ctx={stage} details={details.details} detailErrors={details.errors} assignments={assignments} busy={busy} reason={reason} loading={taskLoading} incomplete={taskIncomplete} retryDetails={details.retry} expanded={expanded} setExpanded={setExpanded} evidence={evidence} reopened={reopened}>{selected.assignment&&<SopTasks remote c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>}</FlowTasks>}
-   {!selected.assignment&&<SopTasks c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>}
+   {<FlowTasks c={c} p={p} ctx={stage} details={details.details} detailErrors={details.errors} assignments={assignments} busy={busy} reason={reason} loading={taskLoading} incomplete={taskIncomplete} retryDetails={details.retry} expanded={expanded} setExpanded={setExpanded} evidence={evidence} reopened={reopened}>{selected.assignment&&<SopTools open={sopOpen}><SopTasks remote c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/></SopTools>}</FlowTasks>}
+   {!selected.assignment&&<SopTools open={sopOpen}><SopTasks c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/></SopTools>}
   </section>
   {!inline && p.nodes.length>0 && legacyActions && <details className="pf-secondary pf-legacy"><summary>範本與本地流程</summary>
    <label>本地節點<FormSelect aria-label="本地節點" value={selectedKey} onChange={e=>select(e.target.value)}>{p.nodes.map(n=><option key={n.id} value={n.key}>{NODE_NAMES[n.key] || n.name}</option>)}</FormSelect></label>{legacyActions}

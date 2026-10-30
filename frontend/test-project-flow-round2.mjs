@@ -73,7 +73,7 @@ await check('legacy task drawer shows facts, tabs and one footer reason',async()
 });
 await check('round2 local flow list translates both pending and in-progress task statuses',async()=>{
  await mount({enabled:false,node:'node_control',configure(base){base.project.nodes[4].tasks=[{id:'l1',title:'待開始工作',status:'pending',owner_id:'ou_anna'},{id:'l2',title:'進行工作',status:'in_progress',owner_id:'ou_anna'}]}});
- assert.deepEqual([...document.querySelectorAll('#flow-tasks .pf-task-open>span')].map(n=>n.textContent),['林安娜 · 尚未開始 · 未排期限','林安娜 · 進行中 · 未排期限']);
+ assert.deepEqual([...document.querySelectorAll('#flow-tasks .pf-task-open>span')].map(n=>n.textContent),['任務狀態：待處理執行人：林安娜未排期限','任務狀態：進行中執行人：林安娜未排期限']);
 });
 await check('round2 completed and skipped steps show state without progress bars',async()=>{
  await mount({node:'control',configure(base,f){Object.assign(f.list.nodes.find(n=>n.key==='control'),{derived_status:'已完成'});f.list.nodes.find(n=>n.key==='mapping').derived_status='略過';}});
@@ -135,9 +135,9 @@ await check('round2 background and file shortcut restored collapsed',async()=>{
  const background=secondary('節點說明與背景');assert.equal(background?.open,false);assert.match(background.textContent,/節點背景說明/);assert.match(background.textContent,/林安娜/);assert.match(background.textContent,/經過.*4.*天/);assert.match(background.textContent,/開啟 作業資料與成果/);
 });
 await check('round2 assignment readback wins over an in-flight stale detail and avoids refetch',async()=>{
- await mount({node:'control',detailHold:true});await click(button('指派'));await value(document.querySelector('select[aria-label="任務負責人"]'),'ou_anna');
+ await mount({node:'control',detailHold:true});await click(button('指派'));const drawer=document.querySelector('.task-drawer[role=dialog]');await click(drawer.querySelector('.assignee-picker button'));await act(async()=>{[...document.querySelectorAll('[role=option]')].find(o=>o.textContent.includes('林安娜')).click();await tick()});
  const pending=ui.prefetchNodeAssignmentDetail('p1','control',undefined,true);
- await click(button('儲存指派'));globalThis.releaseDetail();await act(async()=>{await pending;await tick()});
+ await click([...drawer.querySelectorAll('button')].find(b=>b.textContent.trim()==='儲存'));globalThis.releaseDetail();await act(async()=>{await pending;await tick()});
  const row=document.querySelector('[data-assignment-task="recUnassigned"]');assert.match(row.textContent,/林安娜/);assert.doesNotMatch(row.textContent,/尚未指派/);
  assert.equal(calls.filter(c=>c.url.endsWith('/nodes/control')).length,1);assert.equal(calls.filter(c=>c.url.endsWith('/node-assignments')).length,1);
 });
@@ -167,8 +167,8 @@ await check('production seed is one task with expanded evidence, unique item IDs
  await click(document.querySelector('[role=dialog] [aria-label=關閉]'));
  assert.match(document.querySelector('[data-assignment-task="recTask1"]').textContent,/已完成/);
  await click([...seed.querySelectorAll('button')].find(b=>b.textContent==='改派'));
- assert.ok(document.querySelector('select[aria-label="任務負責人"]'));
- await value(document.querySelector('select[aria-label="任務負責人"]'),'ou_anna');await click(button('儲存指派'));
+ const drawer=document.querySelector('.task-drawer[role=dialog]');assert.ok(drawer);
+ await click(drawer.querySelector('.assignee-picker button'));await act(async()=>{[...document.querySelectorAll('[role=option]')].find(o=>o.textContent.includes('林安娜')).click();await tick()});await click([...drawer.querySelectorAll('button')].find(b=>b.textContent.trim()==='儲存'));
  assert.match(document.querySelector('[data-assignment-task="recTask1"]').textContent,/林安娜/);
  await act(async()=>{document.querySelector('#flow-evidence a').click();await tick()});
  assert.equal(c.route.tab,'items');assert.equal(c.route.node,'control');

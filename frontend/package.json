@@ -70,7 +70,7 @@
     "test:task-list-context": "node test-task-list-context.mjs",
     "test:route-loading": "node test-route-loading.mjs",
     "test:detail-loading": "node test-project-detail-loading.mjs && node test-detail-refresh.mjs && node test-home-panels.mjs && node test-detail-skeleton.mjs",
-    "test:stage-model": "node test-stage-model.mjs && node test-assign-drawer-model.mjs && node test-stage-workspace.mjs",
+    "test:stage-model": "node test-stage-model.mjs && node test-assign-drawer-model.mjs && node test-stage-workspace.mjs && node test-stage-sop-merge.mjs",
     "test:picker-browser": "node test-picker-browser.mjs",
     "test:picker-sweep": "node scripts/verify-pickers.mjs"
   },

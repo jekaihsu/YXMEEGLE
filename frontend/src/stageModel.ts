@@ -5,7 +5,8 @@ export const STATUS_LEVEL_NOTE='案件狀態描述整體案件；節點狀態描
 export const UNKNOWN_STATUS='狀態待確認';
 const CASE_STATUS:Record<string,string>={pending:'尚未開始',in_progress:'進行中',completed:'已完成',paused:'暫停中',engineering_complete:'工程完成、財務待結',source_conflict:'來源待核對',internal:'內部案',active:'進行中',ongoing:'進行中'};
 export const caseStatusLabel=(status:string|undefined)=>(status&&CASE_STATUS[status])||UNKNOWN_STATUS;
-const TASK_STATUS:Record<string,string>={pending:'待處理',in_progress:'進行中',completed:'已完成',paused:'暫停中',rework:'退回修正',superseded:'舊版留存',canceled:'取消',cancelled:'取消',待處理:'待處理',進行中:'進行中',已完成:'已完成',取消:'取消',待修正:'退回修正'};
+// One dictionary for Lark, local-flow and SOP tasks: the same lifecycle state reads the same everywhere (R12, R38).
+const TASK_STATUS:Record<string,string>={pending:'待處理',in_progress:'進行中',completed:'已完成',paused:'暫停中',rework:'退回修正',blocked:'受阻',superseded:'舊版留存',canceled:'取消',cancelled:'取消',待處理:'待處理',尚未開始:'待處理',進行中:'進行中',已完成:'已完成',取消:'取消',待修正:'退回修正',退回修正:'退回修正',暫停中:'暫停中',受阻:'受阻'};
 export const taskStatusText=(status:string)=>TASK_STATUS[status]||UNKNOWN_STATUS;
 export const nodeStatusText=(state:string)=>state||UNKNOWN_STATUS;
 
@@ -14,7 +15,8 @@ export type TaskFlags={unassigned:boolean;blocker:Blocker;overdue:boolean;pendin
 export type TaskView=FlowTask&{flags:TaskFlags;statusText:string};
 
 export function blockerOf(row:FlowTask,node:FlowNode):Blocker {
- if(row.source==='Lark 任務'||row.source==='SOP 任務')return {state:'unknown'};
+ if(row.source==='SOP 任務')return row.sopTask.state==='blocked'?{state:'blocked',reasons:['SOP 任務標示受阻']}:{state:'clear'};
+ if(row.source==='Lark 任務')return {state:'unknown'};
  const local=node.legacy?.tasks.find(t=>t.id===row.id);
  if(!local)return {state:'unknown'};
  const reasons=[...(local.execution_blockers||[]),...(local.activation_blockers||[]),...(local.status==='paused'?['任務暫停中']:[])];
@@ -64,7 +66,7 @@ export function resolveStages({nodes,list,requested}:{nodes:FlowNode[];list?:Nod
 export type TaskGroup={node:FlowNode;rows:TaskView[];matching:TaskView[];total:number;done:number;loaded:boolean};
 export function groupTasks({ctx,filters,userId,today,loaded}:{ctx:StageContext;filters:StageFilters;userId:string;today:string;loaded:(key:string)=>boolean}):{selected:TaskGroup|undefined;others:TaskGroup[]} {
  const group=(node:FlowNode):TaskGroup=>{
-  const rows=node.taskRows.filter(r=>r.source!=='SOP 任務'&&!cancelledTask(r.status)).map(r=>taskView(r,node,today));
+  const rows=node.taskRows.filter(r=>!cancelledTask(r.status)).map(r=>taskView(r,node,today));
   return {node,rows,matching:rows.filter(t=>matchesFilters(t,filters,userId)),total:node.tasks.total,done:node.tasks.done,loaded:loaded(node.key)};
  };
  const all=ctx.nodes.filter(n=>n.assignment||n.legacy).map(group);
@@ -86,7 +88,7 @@ export function stageNextStep({ctx,list,userId,today,fresh,blockedReason,crossSt
  if(!fresh)reasons.push('資料可能已過期或寫入尚未開放，請先重新整理。');
  const candidates=(keys:string[])=>keys.flatMap(key=>{
   const node=ctx.nodes.find(n=>n.key===key);if(!node)return [];
-  const rows=node.taskRows.filter(r=>r.source!=='SOP 任務'&&!cancelledTask(r.status)&&!r.done).map(r=>taskView(r,node,today));
+  const rows=node.taskRows.filter(r=>!cancelledTask(r.status)&&!r.done).map(r=>taskView(r,node,today));
   return [{node,rows}];
  });
  const rank=(a:TaskView,b:TaskView)=>Number(!a.deadline)-Number(!b.deadline)||(a.deadline||'').localeCompare(b.deadline||'')||a.id.localeCompare(b.id);
@@ -98,9 +100,10 @@ export function stageNextStep({ctx,list,userId,today,fresh,blockedReason,crossSt
    if(approve)return {kind:'action',title:`確認${node.label}節點的送審成果`,reason:`${node.label}節點正在等待核准，你有核准權限。`,stage,scope:'stage',nodeKey:node.key,button:'前往審核',needs:'approve'};
    const blocked=rows.filter(t=>t.flags.blocker.state==='blocked').sort(rank)[0];
    const free=rows.filter(t=>t.flags.blocker.state!=='blocked');
-   const unassigned=free.filter(t=>t.flags.unassigned&&t.task?.can.assign).sort(rank)[0];
+   const canAssign=(t:TaskView)=>t.source==='SOP 任務'?t.sopTask.allowedActions.includes('edit'):!!t.task?.can.assign;
+   const unassigned=free.filter(t=>t.flags.unassigned&&canAssign(t)).sort(rank)[0];
    if(unassigned&&fresh&&!blockedReason)return {kind:'action',title:`${label(unassigned)}尚未指派，你可指派執行人`,reason:`${node.label} · ${unassigned.deadline?`期限 ${unassigned.deadline.slice(0,10)}`:'期限未排定'}`,stage,scope:'stage',nodeKey:node.key,taskId:unassigned.id,button:'指派執行人',needs:'assign'};
-   const runnable=(t:TaskView)=>t.task?t.task.can.edit_status:node.legacy?.tasks.find(x=>x.id===t.id)?.can_execute===true;
+   const runnable=(t:TaskView)=>t.source==='SOP 任務'?t.sopTask.allowedActions.some(a=>['start','complete','resume'].includes(a)):t.task?t.task.can.edit_status:node.legacy?.tasks.find(x=>x.id===t.id)?.can_execute===true;
    const exec=free.filter(t=>runnable(t)&&!t.flags.unassigned).sort((a,b)=>Number(b.flags.overdue)-Number(a.flags.overdue)||rank(a,b))[0];
    if(exec&&fresh&&!blockedReason)return {kind:'action',title:`${exec.flags.overdue?'處理逾期任務':'接續'}${label(exec)}`,reason:`${node.label} · ${exec.deadline?`期限 ${exec.deadline.slice(0,10)}`:'期限未排定'}`,stage,scope:'stage',nodeKey:node.key,taskId:exec.id,button:'開啟任務',needs:'edit_status'};
    if(blocked)return {kind:'view',title:`${label(blocked)}受阻，先查看前置條件`,reason:blocked.flags.blocker.state==='blocked'?blocked.flags.blocker.reasons.join('、'):'',nodeKey:node.key,taskId:blocked.id,button:'查看前置任務'};
