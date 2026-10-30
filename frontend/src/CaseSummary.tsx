@@ -2,6 +2,7 @@ import {TriangleAlert} from 'lucide-react';
 import {Button,Skeleton} from './design';
 import {STATUS_LEVEL_NOTE,caseStatusLabel,nodeStatusText,type NextStep,type StageContext} from './stageModel';
 import './StageWorkspace.css';
+import './CaseDetailRedesign.css';
 export function CaseSummary({status,ctx,step,blockers,loading,error,stale,onStep,onCurrent}:{status:string|undefined;ctx:StageContext;step:NextStep;blockers:string[];loading:boolean;error:string;stale:boolean;onStep:(step:NextStep)=>void;onCurrent:()=>void}){
  const current=ctx.currentIds.map(key=>ctx.nodes.find(n=>n.key===key)?.label||key);
  const label=(key:string)=>ctx.nodes.find(n=>n.key===key)?.label||key;
