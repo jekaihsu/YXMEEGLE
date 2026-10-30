@@ -10,6 +10,7 @@ import {a,b,workspace} from './session-epoch-fixture.mjs';
 const bundle=await build({entryPoints:['src/App.tsx'],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'},plugins:[{name:'observe-shell',setup(build){build.onLoad({filter:/\/App\.tsx$/},async({path})=>({contents:"import {unmatchedDaily} from './appCommon';\n"+(await fs.readFile(path,'utf8')).replace(' const overdue=w?',' window.shellContext={w,s,error,run,upload,refresh,unmatchedDaily};\n const overdue=w?'),loader:'tsx'}))}}]});
 const path=new URL('./.shell-test-bundle.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);
 let App;try{App=(await import(path.href)).default}finally{await fs.unlink(path)}
+const sopExample=JSON.parse(await fs.readFile(new URL('../backend/sop_import/api-examples.json',import.meta.url),'utf8')).sop_tasks;
 const shell={...workspace,scope:'shell',attention:[{task_id:'tA',project_id:'pA',project_code:'PRIVATE_CASE_A',project_name:'PRIVATE_CASE_A',node_id:'nA',node_key:'sales',node_name:'NODE_A',assignee_id:workspace.users[0].id,status:'pending',due_date:'2026-10-01',title:'TASK_A'}],pending_approvals:[{id:'apA',title:'APPROVAL_A',type:'change',project_id:'pA'}],counts:{approvals_pending:3,daily_unmatched:535,my_overdue_tasks:1,my_active_tasks:2,active_tasks:30,overdue_tasks:1,due_today_tasks:0},home_waiting:[{task_id:'wait-paused',project_id:'pA',project_code:'PRIVATE_CASE_A',node_id:'nA',title:'WAIT_PAUSED',kind:'paused',reason:'任務暫停，原期限保留',original_due_date:'2026-10-01',due_date:null},{task_id:'wait-prerequisite',project_id:'pA',project_code:'PRIVATE_CASE_A',node_id:'nA',title:'WAIT_PREREQUISITE',kind:'prerequisite',reason:'指定前置成果尚未交付',due_date:'2026-10-01'},{task_id:'wait-upcoming',project_id:'pA',project_code:'PRIVATE_CASE_A',node_id:'nA',title:'WAIT_UPCOMING',kind:'upcoming',reason:'排定 2026/10/10 開始',due_date:'2026-10-12'},{task_id:'wait-proxy',project_id:'pA',project_code:'PRIVATE_CASE_A',node_id:'nA',title:'WAIT_PROXY',kind:'proxy',reason:'代理同事執行；有效至 2026/10/31',due_date:'2026-10-12'}],projects:workspace.projects.map((p,i)=>{
  const {nodes,files,comments,daily_reports,...summary}=p;
  return {...summary,created_at:i?'2026-10-01':'2026-10-02',concurrency_version:i+7,progress:{completed_nodes:i?0:4,approved_skipped_nodes:i?0:1,total_nodes:i?0:10},overdue_tasks:i?0:2,active_tasks:5,execution_status:i?'completed':'in_progress'};
@@ -23,7 +24,7 @@ const flush=async(fn=()=>{})=>act(async()=>{await fn();await new Promise(resolve
 let fullGate=async()=>{};let overviewGate=async()=>{};let detailGate=async()=>{};
 // Stand-in for GET /api/projects/{id}: the single project tree plus its own records.
 const detail=async(url)=>{
- const id=decodeURIComponent(url.split('/').pop());await detailGate(id);const project=workspace.projects.find(p=>p.id===id);
+ const id=decodeURIComponent(url.split('?')[0].split('/').pop());await detailGate(id);const project=workspace.projects.find(p=>p.id===id);
  if(!project)return new Response(JSON.stringify({detail:'找不到這個案件'}),{status:404});
  return json({scope:'project',version:current.version,as_of:workspace.as_of,project,settings:{},delegations:[],handover_requests:[],sop_requests:[],sop_templates:[],approved_leave_delegations:[],approvals:[],events:[],policy_summary:[],financial_requests:[],source_quotes:[],source_confirmations:[],contract_items:[],node_skip_requests:[]});
 };
@@ -36,6 +37,8 @@ globalThis.fetch=async(url,init)=>{
  if(url==='/api/workspace'){await fullGate();return json({...workspace,version:current.version});}
  if(url==='/api/projects?view=portfolio&page=1'){await overviewGate(new URLSearchParams());return json({items:current.projects,total:current.projects.length,as_of:current.as_of,basis:'persisted_workspace'})}
  if(url.endsWith('/node-assignments'))return new Response(JSON.stringify({code:'disabled',detail:'disabled'}),{status:404});
+ if(url.endsWith('/first-screen'))return new Response(JSON.stringify({detail:'not found'}),{status:404,headers:{'Content-Type':'application/json'}});
+ if(url.endsWith('/sop-tasks')){const known=workspace.projects.some(p=>url.startsWith(`/api/projects/${p.id}/`));return new Response(JSON.stringify(known?{code:'sop_import_forbidden'}:sopExample),{status:known?403:200,headers:{'Content-Type':'application/json'}})}
  if(url.startsWith('/api/projects/'))return detail(url);
  if(url.startsWith('/api/daily-reports?'))return json({items:[],total:0,offset:0,limit:30,summary:{}});
  if(url==='/api/workspace?scope=shell')return init.headers.get('If-None-Match')===etag?new Response(null,{status:304,headers:{ETag:etag}}):json(current,{ETag:etag});
@@ -54,20 +57,16 @@ try{
  await mount({workspace_shell:true});
  assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects?view=portfolio&page=1']);
  assert.equal(window.shellContext.w.scope,'shell');assert.equal(rows().length,2);
- assert.ok(document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期 1'));
+ assert.equal(window.shellContext.w.counts.my_overdue_tasks,1,'the shell still carries the server overdue count');assert.ok(!document.querySelector('[aria-label="主要導覽"]').textContent.includes('逾期'),'the nav badge was removed in 155b65a');
  assert.equal(document.querySelector('.notification-button'),null);assert.equal(window.shellContext.unmatchedDaily(window.shellContext.w),535);
  assert.equal(rows()[0].querySelector('.pl-current>span').textContent,'待核對'); // 目前作業 no longer repeats the workflow badge shown in the status column
- assert.equal(rows()[0].querySelectorAll('.pl-stepper li').length,9);assert.equal(rows()[0].querySelector('.pl-status').textContent,'待核對');
+ assert.equal(rows()[0].querySelectorAll('.pl-stepper li').length,9);assert.equal(rows()[0].querySelector('.pl-status').textContent,'流程進度：待核對');
  // P4-1: the dashboard renders from counts, the attention list and cards; no tree scan and no full workspace.
  await flush(()=>{location.hash='view=dashboard';window.dispatchEvent(new window.Event('hashchange'))});
- const todo=document.querySelector('.work-inbox');
- assert.ok(todo.textContent.includes('TASK_A')&&todo.textContent.includes('逾期 1 個曆日')&&todo.textContent.includes('APPROVAL_A')&&todo.textContent.includes('NODE_A')&&todo.textContent.includes(workspace.users[0].name)&&todo.textContent.includes('本人可執行逾期 1'));
- assert.equal(todo.querySelector('.heading-count').textContent,'4');assert.ok(document.querySelector('.dh-hero').textContent.includes('2 項待處理'));
- const waitingSections=[...document.querySelectorAll('.dh-waiting')];assert.deepEqual(waitingSections.map(section=>section.querySelector('h2').textContent),['暫停中的指派1','等待前置條件1','即將開始1','代理工作1']);
- for(const title of ['WAIT_PAUSED','WAIT_PREREQUISITE','WAIT_UPCOMING','WAIT_PROXY'])assert.ok(waitingSections.some(section=>section.textContent.includes(title)),`shell waiting displays ${title}`);
- assert.ok(waitingSections[0].textContent.includes('原期限 2026/10/01'),'paused source deadline remains visible');assert.ok(document.querySelector('.today-aside').textContent.includes('535 筆日報待配對'));
- assert.ok(document.querySelector('.project-preview-row').textContent.includes('PRIVATE_CASE_A'));
- assert.ok(!requests.some(r=>r.url==='/api/workspace'),'dashboard waiting groups render without a full workspace read');
+ // The old home markup (.work-inbox, .dh-hero, .dh-waiting) was replaced by the unified home (155b65a and later); the shell contract kept here is that the dashboard renders from shell data alone.
+ assert.ok(document.querySelector('.unified-home'),'dashboard renders the unified home from the shell workspace');
+ assert.equal(window.shellContext.w.counts.approvals_pending,3);assert.equal(window.shellContext.w.attention.length,1);
+ assert.ok(!requests.some(r=>r.url==='/api/workspace'),'dashboard renders without a full workspace read');
  await flush(()=>{location.hash='view=projects';window.dispatchEvent(new window.Event('hashchange'))});
  const change=async(label,value)=>flush(()=>{const select=document.querySelector(`[aria-label="${label}"]`);select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}))});
  const beforeFilters=requests.length;
@@ -106,7 +105,7 @@ try{
  assert.equal(portfolioReads(),1);assert.equal(rows().length,3);
  await change('每組顯示筆數','10');assert.equal(rows().length,10);
  await flush(()=>document.querySelector('.pl-expand').click());assert.equal(rows().length,25);
- assert.match(document.querySelector('.pl-footer').textContent,/已授權案件 25 筆/);
+ assert.match(document.querySelector('.pl-footer').textContent,/符合條件 25 筆/);
  await change('案件分類','intake');assert.equal(rows().length,5);
  await change('案件分類','formal');assert.equal(rows().length,10);
  assert.equal(document.querySelector('.pl-group:has(.pl-case) h2 span').textContent,'20');
@@ -118,15 +117,15 @@ try{
  current=shell;etag='W/"shell-A:1"';failMutation=false;mutationResponse=undefined;location.hash='view=project&project=pA';
  await mount({workspace_shell:true});
  const goto=async hash=>flush(()=>{location.hash=hash;window.dispatchEvent(new window.Event('hashchange'))});
- const detailUrls=()=>requests.map(r=>r.url).filter(u=>u.startsWith('/api/projects/')&&!u.endsWith('/node-assignments'));
- assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects/pA']);
- assert.ok(document.querySelector('.workspace').textContent.includes('PRIVATE_CASE_A')&&document.querySelector('.workspace').textContent.includes('TASK_A'),'detail renders the project tree');
+ const detailUrls=()=>[...new Set(requests.map(r=>r.url).filter(u=>/^\/api\/projects\/[^/?]+(\?overview=true)?$/.test(u)).map(u=>u.split('?')[0]))];
+ assert.deepEqual(requests.map(r=>r.url),['/api/session','/api/workspace?scope=shell','/api/projects/pA/first-screen','/api/projects/pA?overview=true','/api/projects/pA/progress','/api/projects/pA/sop-tasks','/api/projects/pA/sop-assignees'],'the overview reads only this project (first screen, fallback snapshot, progress, SOP tasks and assignees), never the full workspace');
+ assert.ok(document.querySelector('.workspace').textContent.includes('PRIVATE_CASE_A'),'detail renders the project from the shell read');
  await goto('view=project&project=pA&tab=flow');await goto('view=project&project=pA&tab=data&section=basic');assert.deepEqual(detailUrls(),['/api/projects/pA'],'tabs do not refetch the project');
  assert.deepEqual(requests.filter(r=>r.url.endsWith('/node-assignments')).map(r=>r.url),[],'session flag off: no node-assignment request');
  await goto('view=project&project=pB');assert.deepEqual(detailUrls(),['/api/projects/pA','/api/projects/pB']);assert.ok(document.querySelector('.workspace').textContent.includes('CASE_B'));
  // The 日報 tab lists through /api/daily-reports; the other cards in the shell are summaries without daily_reports and must not be scanned.
- await goto('view=project&project=pB&tab=daily');assert.ok(!document.querySelector('.workspace').textContent.includes('畫面暫時無法顯示'),'daily tab survives summary projects without daily_reports');assert.ok(document.querySelector('.daily-records'),'daily tab renders');
- assert.ok(requests.some(r=>r.url.startsWith('/api/daily-reports?')&&r.url.includes('project_id=pB')),'daily tab reads the project daily list from the API');
+ await goto('view=project&project=pB&tab=daily');assert.ok(!document.querySelector('.workspace').textContent.includes('畫面暫時無法顯示'),'daily tab survives summary projects without daily_reports');assert.equal(document.querySelector('.pds-tabs [aria-current=page]').textContent,'工項與進度','the legacy 日報 link opens the merged 工項與進度 tab');
+ assert.ok(requests.some(r=>r.url==='/api/projects/pB/progress'),'that tab reads the project progress from the API');
  await goto('view=project&project=zz');assert.ok(document.querySelector('.workspace').textContent.includes('找不到這個案件'));
  let freeA;const heldA=new Promise(resolve=>{freeA=resolve});detailGate=async id=>{if(id==='pA')await heldA};
  await goto('view=project&project=pA');await goto('view=project&project=pB');await flush(async()=>{freeA();await heldA});
@@ -148,10 +147,9 @@ try{
  assert.ok(document.querySelector('.workspace').textContent.includes('TASK_A'),'my work renders the loaded task');
  for(const view of ['approvals','schedule','routines','admin','work&tab=legacy'])await goto('view='+view);
  assert.equal(fullReads(),1,'one full read per shell version, shared by every screen');
- await goto('view=dashboard');await flush(()=>[...document.querySelectorAll('.today-activity button')].find(b=>b.textContent==='載入近期活動').click());
- assert.equal(fullReads(),1);assert.ok(document.querySelector('.today-activity').textContent.includes('尚無操作紀錄'));
- current={...shell,version:5};etag='W/"shell-A:5"';await flush(()=>window.shellContext.refresh());await goto('view=approvals');
- assert.equal(fullReads(),2,'a newer shell version reads the full workspace again');
+ await goto('view=dashboard');assert.equal(fullReads(),1,'the dashboard (the old lazy activity panel was replaced by the unified home) triggers no further full read');
+ current={...shell,version:5};etag='W/"shell-A:5"';await flush(()=>window.shellContext.refresh());await goto('view=work&tab=legacy');
+ assert.equal(fullReads(),2,'a newer shell version reads the full workspace again (approvals is feature-gated, so the legacy work tab is used)');
  await flush(()=>window.shellContext.run('case_execution_assign',{execution_system:'workbench'},{project_id:'pA'}));
  await goto('view=schedule');await goto('view=work&tab=legacy');assert.equal(fullReads(),2,'after a mutation the app holds the full workspace and reads nothing');
  // P1-INT: the default #work/#sources pages read their own GETs and never the full workspace.

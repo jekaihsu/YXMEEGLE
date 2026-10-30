@@ -87,7 +87,7 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
   }, [reload]);
   const reloadDetail = useCallback(()=>reload(),[reload]);
   const refreshDetail = useDetailRefresh(reloadDetail, enabled);
-  const mutate = async (mutation: AssignmentMutation, onFailure?: (message:string)=>void): Promise<boolean> => {
+  const mutate = async (mutation: AssignmentMutation, onFailure?: (message:string, failure:unknown)=>void): Promise<boolean> => {
     if (mutating.current || !current()) return false;
     const scope = lifecycle.current;
     const mutationCurrent = () => !scope.controller.signal.aborted && scope.epoch === getSessionEpoch();
@@ -113,7 +113,7 @@ export function useNodeAssignments(projectId: string, enabled: boolean) {
       const uncertain = !(failure instanceof NodeAssignmentError) || failure.status === 408 || failure.code === 'client_timeout' || failure.code === 'outcome_unknown' || failure.code === 'readback_mismatch' || failure.code === 'busy' || (failure.status >= 500 && !['lark_unconfigured', 'writes_disabled', 'disabled'].includes(failure.code || ''));
       if (!uncertain) retryAttempt.current = null;
       if (!mutationCurrent()) return false;
-      onFailure?.(assignmentErrorMessage(failure));
+      onFailure?.(assignmentErrorMessage(failure), failure);
       if (assignmentsDisabled(failure)) {setState({kind: 'disabled'}); return false}
       if (failure instanceof NodeAssignmentError && failure.code === 'revision_conflict') {
         setNotice('資料已被他人更新，已為你重新載入'); await reload();

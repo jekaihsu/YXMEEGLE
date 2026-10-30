@@ -37,7 +37,7 @@ const click=async element=>{assert.ok(element,'requested control exists');await 
 const back=async()=>{await act(async()=>{history.back();await tick();await tick()})};
 
 await mount('view=project&project=p1&tab=tasks&node=node_sales');
-assert.equal(pressed('全部任務'),'true');assert.equal(rows(),21);
+assert.equal(pressed('全部'),'true');assert.equal(rows(),21,'the all-tasks link expands every stage group');
 assert.match(document.querySelector('.pf-task-open small').textContent,/本地流程/,'local rows name their source');
 await click(button('逾期'));assert.equal(rows(),5);
 await click(document.querySelector('.pf-task-open'));
@@ -45,10 +45,8 @@ assert.ok(document.querySelector('.task-drawer[data-kind="legacy"]'),'local draw
 await click(document.querySelector('[aria-label="關閉"]'));
 assert.equal(document.querySelector('.task-drawer[data-kind="legacy"]'),null);
 assert.equal(rows(),5,'closing the drawer keeps the five overdue results');
-assert.equal(pressed('全部任務'),'true');assert.equal(pressed('逾期'),'true');assert.equal(c.route.section,'all-tasks');
+assert.equal(pressed('逾期'),'true');assert.equal(c.route.section,'all-tasks');
 await click(button('逾期'));assert.equal(rows(),21);
-await click(button('此節點'));assert.equal(rows(),2,'scope toggle returns to the node');assert.equal(pressed('此節點'),'true');assert.equal(c.route.all_tasks,undefined);
-await click(button('全部任務'));assert.equal(rows(),21);
 
 
 await mount('view=project&project=p1&tab=tasks&node=node_sales');
@@ -58,7 +56,7 @@ await click([...document.querySelectorAll('.task-drawer[data-kind="legacy"] butt
 assert.equal(c.route.tab,'files');assert.equal(document.querySelector('.task-drawer[data-kind="legacy"]'),null);assert.equal(rows(),0);
 await back();
 assert.equal(c.route.task,opened);assert.ok(document.querySelector('.task-drawer[data-kind="legacy"]'),'history restores the drawer');
-assert.equal(rows(),5,'overdue filter survives Files and Back');assert.equal(pressed('逾期'),'true');assert.equal(pressed('全部任務'),'true');
+assert.equal(rows(),5,'overdue filter survives Files and Back');assert.equal(pressed('逾期'),'true');
 await act(async()=>{document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});
 assert.equal(document.querySelector('.task-drawer[data-kind="legacy"]'),null);assert.equal(rows(),5);
 const row=[...document.querySelectorAll('[data-assignment-task]')].find(li=>li.dataset.assignmentTask===opened).querySelector('.pf-task-open');

@@ -16,7 +16,7 @@
     "test:lark-pilot": "node test-lark-pilot.mjs",
     "test:lark-pilot-contract": "node test-lark-pilot-contract.mjs",
     "test:overview": "node test-overview-design.mjs",
-    "test:overview-tasks": "node test-overview-dashboard-model.mjs && node test-overview-task-row.mjs && node test-node-workbench-model.mjs",
+    "test:overview-tasks": "node test-overview-dashboard-model.mjs && node test-node-workbench-model.mjs",
     "test:view-data": "node test-view-data.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -70,6 +70,7 @@
     "test:task-list-context": "node test-task-list-context.mjs",
     "test:route-loading": "node test-route-loading.mjs",
     "test:detail-loading": "node test-project-detail-loading.mjs && node test-detail-refresh.mjs && node test-home-panels.mjs && node test-detail-skeleton.mjs",
+    "test:stage-model": "node test-stage-model.mjs && node test-assign-drawer-model.mjs && node test-stage-workspace.mjs && node test-stage-sop-merge.mjs && node test-library-memory.mjs && node test-sop-action-reasons.mjs && node test-stage-fixture.mjs",
     "test:picker-browser": "node test-picker-browser.mjs",
     "test:picker-sweep": "node scripts/verify-pickers.mjs"
   },

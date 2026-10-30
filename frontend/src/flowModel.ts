@@ -21,9 +21,10 @@ export const doneTask = (status: string) => ['已完成','completed'].includes(s
 export const overdueTask = (deadline: string|null, done: boolean, today: string) => !!deadline && deadline.slice(0,10) < today.slice(0,10) && !done;
 type FlowInput = {project: Project; users?:Pick<User,'id'|'name'>[]; assignments?:NodeAssignmentList; progress?:ProjectProgress; today:string};
 
+export const workflowKeys=(list?:NodeAssignmentList):readonly string[]=>list?.nodes.length ? list.nodes.map(n=>n.key) : NODE_ASSIGNMENT_ORDER;
 export function selectedFlowNode(project:Project, requested:string|undefined, list?:NodeAssignmentList) {
- const key=project.nodes.find(n=>n.id===requested)?.key || requested;
- return NODE_ASSIGNMENT_ORDER.find(n=>n===key) || list?.summary.current_node || project.nodes.find(n=>n.status==='in_progress')?.key || 'sales';
+ const key=project.nodes.find(n=>n.id===requested)?.key || requested, keys=workflowKeys(list);
+ return keys.find(n=>n===key) || list?.summary.current_node || project.nodes.find(n=>n.status==='in_progress')?.key || keys[0];
 }
 function workflowState(assignment:AssignmentNode|undefined, legacy:Node|undefined, stage:ReturnType<typeof joinProgressStages>[number]|undefined) {
  if(assignment)return nodeStatusLabel(assignment.derived_status);
@@ -83,7 +84,7 @@ export function needsViewerAction(node:FlowNode,list:NodeAssignmentList,userId:s
 }
 export function buildFlowModel({project,assignments,progress,today,users=[]}:FlowInput) {
  const stages=joinProgressStages(progress?.stages || [],assignments?.nodes || []);
- const nodes=NODE_ASSIGNMENT_ORDER.map(key=>{
+ const nodes=workflowKeys(assignments).map(key=>{
   const stage=stages.find(s=>s.key===(key==='pricing' ? 'billing' : key));
   const assignment=stage?.sop || assignments?.nodes.find(n=>n.key===key);
   const legacy=assignments ? undefined : project.nodes.find(n=>n.key===key);
@@ -98,7 +99,7 @@ export function buildFlowModel({project,assignments,progress,today,users=[]}:Flo
   const owners=assignment?.owners || (owner ? [{open_id:owner,name:users.find(u=>u.id===owner)?.name || '姓名待核對'}] : []);
   const overdue=overdueTask(deadline,FINISHED_NODE_STATES.includes(state),today);
   return {
-   key,label:NODE_NAMES[key],state,owners,needs:nodeNeeds({state,owners,tasks,overdue,assignment}),
+   key,label:assignment?.label || NODE_NAMES[key] || key,state,owners,needs:nodeNeeds({state,owners,tasks,overdue,assignment}),
    departments:assignment?.departments || [],tasks,progress:nodeFlowProgress(state,tasks,!assignments),deadline,
    finalDeadline:assignment?.deadline || legacy?.due_date || null,overdue,quantity,
    gaps:[...(assignment?.warnings.map(w=>nodeWarnings[w] || '來源有待核對的節點警示，請主管核對指派資料。') || []),

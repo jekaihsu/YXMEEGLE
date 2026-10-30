@@ -16,13 +16,21 @@ globalThis.fetch = async (url, init) => {
   return new Response(JSON.stringify(response.body), {status: response.status, headers: {'Content-Type': 'application/json'}});
 };
 
-test('list parses into chain order and preserves literal progress', async () => {
+test('list keeps the server order and unknown keys and preserves literal progress', async () => {
   response = {status: 200, body: assignmentFixture().list};
   const list = await api.fetchNodeAssignments('p/1', signal, () => true);
   assert.deepEqual(list.nodes.map(n => n.label), ['業務', 'PM', '確認單', '外業', '控制', '圖資', '報告', '計價', '結算']);
   assert.deepEqual(list.summary, {done: 4, total: 9, current_node: 'control'});
   assert.deepEqual(list.nodes[4].tasks, {done: 2, total: 5});
   assert.equal(requests.at(-1).url, '/api/projects/p%2F1/node-assignments');
+});
+test('T03 a workflow with another node count and a long unknown node name renders in server order', async () => {
+  const fixture = assignmentFixture().list;
+  const picked = [fixture.nodes[2], fixture.nodes[0], {...fixture.nodes[4], key: 'custom_review', label: '第三方獨立複核與外部單位會審'}];
+  response = {status: 200, body: {...fixture, nodes: picked, summary: {done: 0, total: 3, current_node: 'custom_review'}}};
+  const list = await api.fetchNodeAssignments('p1', signal, () => true);
+  assert.deepEqual(list.nodes.map(n => n.key), ['confirmation', 'sales', 'custom_review']);
+  assert.equal(list.nodes[2].label, '第三方獨立複核與外部單位會審');
 });
 test('mutations encode identifiers and send fresh UUIDs', async () => {
   requests = []; response = {status: 200, body: assignmentFixture().detail};

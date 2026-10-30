@@ -212,7 +212,7 @@ export function parseNodeAssignments(value: unknown): NodeAssignmentList {
   if (new Set(nodes.map(n => n.key)).size !== nodes.length) throw malformed();
   return {code: text(result.code), ...envelope(result),
     node_details: result.node_details == null ? undefined : Object.fromEntries(Object.entries(record(result.node_details)).map(([key, value]) => [key, detailPayload(value)])),
-    nodes: NODE_ASSIGNMENT_ORDER.flatMap(key => nodes.filter(n => n.key === key)), stale: result.stale, can};
+    nodes, stale: result.stale, can};
 }
 export async function fetchNodeAssignmentDetail(projectId: string, key: string, signal: AbortSignal, isCurrent: () => boolean): Promise<NodeAssignmentDetail> {
   const result = record(await assignmentRequest(`${basePath(projectId)}/nodes/${encodeURIComponent(key)}`, {signal, cache: 'no-store'}, isCurrent));
@@ -260,8 +260,8 @@ export const assignmentErrorMessage = (error: unknown) => error instanceof NodeA
   ? ERROR_MESSAGES[error.code] : error instanceof Error ? error.message : '節點資料讀取失敗，請稍後重試。';
 export const assignmentsDisabled = (error: unknown) => error instanceof NodeAssignmentError && error.code === 'disabled';
 
-export function assignmentTarget(route: {node?: string; task?: string}, nodes: {id: string; key: string}[] = []) {
-  const key = NODE_ASSIGNMENT_ORDER.find(key => key === route.node);
+export function assignmentTarget(route: {node?: string; task?: string}, nodes: {id: string; key: string}[] = [], known: readonly string[] = NODE_ASSIGNMENT_ORDER) {
+  const key = known.find(key => key === route.node);
   if (key) return {nodeKey: key, taskId: route.task || ''};
   if (route.task && /^rec[A-Za-z0-9]+$/.test(route.task)) {
     const legacyNode = nodes.find(n => n.id === route.node);

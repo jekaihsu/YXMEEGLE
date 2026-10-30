@@ -24,6 +24,7 @@ export const routeLoaders={
  MyWorkBoard:shared(() => import('./MyWorkBoard').then(module => ({default: module.MyWorkBoard}))),
  TaskTimeline:shared(() => import('./TaskTimeline')),
  P2Page:shared(() => import('./P2Pages').then(module => ({default: module.P2Page}))),
+ StageFixture:shared(()=>import('./StageFixture').then(m=>({default:m.StageFixture}))),
  ReportsPage:shared(() => import('./reports/ReportsPage'))
 };
 

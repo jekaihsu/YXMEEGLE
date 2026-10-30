@@ -1,3 +1,4 @@
+import os
 import json
 import subprocess
 from datetime import datetime
@@ -6,7 +7,8 @@ from .app import create_app
 from scripts import deploy_prepare
 
 
-def test_stage_identity_tracks_commit_branch_dirty_and_utc(tmp_path):
+def test_stage_identity_tracks_commit_branch_dirty_and_utc(tmp_path, monkeypatch):
+    for key in [k for k in os.environ if k.startswith('GIT_')]:monkeypatch.delenv(key)
     subprocess.run(['git','init','-b','qa-build',str(tmp_path)],check=True,capture_output=True)
     source=tmp_path/'source.txt';source.write_text('first')
     subprocess.run(['git','add','.'],cwd=tmp_path,check=True)
