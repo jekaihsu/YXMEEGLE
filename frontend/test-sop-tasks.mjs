@@ -454,6 +454,19 @@ test('a task a person cannot edit has no inline assignee picker', async () => {
  assert.equal(document.querySelector('.assignee-picker'), null);
 });
 
+test('P4 a task that can only be blocked explains each unavailable action once, grouped, without the generic admin-permission text', async () => {
+ await mount({route: {task: 't1', task_source: 'sop_local'}, tasks: [task('t1', {allowed_actions: ['block']})]});
+ const body = dialog().textContent;
+ assert.doesNotMatch(body, /需管理權限/);
+ assert.deepEqual([...dialog().querySelectorAll('[aria-label=狀態操作] button')].map(b => b.textContent), ['標記受阻']);
+ const groups = [...dialog().querySelectorAll('.sop-unavailable li')];
+ assert.equal(groups.length, 2, 'one permission explanation for the actions the viewer cannot take, and a separate unassigned reason for completion');
+ assert.match(groups[1].textContent, /完成：尚未指派執行人/);
+ assert.match(groups[0].textContent, /編輯任務內容.*開始.*：你可查看此任務，但目前沒有這項操作的權限/);
+ assert.equal((body.match(/目前沒有這項操作的權限/g) || []).length, 1, 'the reason is not repeated per control');
+ assert.match(dialog().querySelector('#task-editor-readonly').textContent, /原因見下方/, 'edit controls point to the one grouped reason');
+});
+
 test('a node the data proves done offers one manager action that closes its open tasks', async () => {
  const proven = {sales: {rule: 'c_code', reason: '工編以 C 開頭，業務階段已完成'}};
  await mount({tasks: [task('t1'), task('t2', {state: 'done'})], extra: {node_done: proven, allowed_actions: {...examples.sop_tasks.allowed_actions, manage: true}}});

@@ -61,3 +61,4 @@
 .sop-result {padding-block:1rem;border-block:1px solid var(--border-color,#d9dedb)}
 
 .pf-tasks .sop-tasks{border-top:0;padding-top:0}
+.sop-unavailable{display:grid;gap:4px;font-size:13px;color:var(--label-2,#667085);width:100%}.sop-unavailable ul{margin:0;padding-left:18px}.sop-unavailable li>span{font-weight:600;color:var(--label,#172033)}

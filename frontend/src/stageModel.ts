@@ -1,5 +1,6 @@
 import {FINISHED_NODE_STATES,type NodeAssignmentList} from './nodeAssignmentApi';
 import {cancelledTask,overdueTask,type FlowNode,type FlowTask} from './flowModel';
+import {uniqueReasons} from './sopActionReasons';
 
 export const STATUS_LEVEL_NOTE='案件狀態描述整體案件；節點狀態描述此階段；任務狀態描述單項工作';
 export const UNKNOWN_STATUS='狀態待確認';
@@ -19,7 +20,7 @@ export function blockerOf(row:FlowTask,node:FlowNode):Blocker {
  if(row.source==='Lark 任務')return {state:'unknown'};
  const local=node.legacy?.tasks.find(t=>t.id===row.id);
  if(!local)return {state:'unknown'};
- const reasons=[...(local.execution_blockers||[]),...(local.activation_blockers||[]),...(local.status==='paused'?['任務暫停中']:[])];
+ const reasons=uniqueReasons([...(local.execution_blockers||[]),...(local.activation_blockers||[]),...(local.status==='paused'?['任務暫停中']:[])]);
  return reasons.length?{state:'blocked',reasons}:{state:'clear'};
 }
 export function taskView(row:FlowTask,node:FlowNode,today:string):TaskView {
@@ -139,5 +140,5 @@ export function blockerSummary(ctx:StageContext,tasksByNode:(key:string)=>TaskVi
   if(late)out.push(`${late} 項任務已逾期`);
   for(const warning of node.gaps)out.push(warning);
  }
- return out;
+ return uniqueReasons(out);
 }
