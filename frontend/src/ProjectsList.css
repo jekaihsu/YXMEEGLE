@@ -754,8 +754,12 @@
 }
 
 .pl-grid .pl-states {
-  grid-column: 3;
-  grid-row: 3;
+  grid-column: 1 / -1;
+  grid-row: auto;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
 }
 
 .pl-grid .pl-flow {
@@ -1330,11 +1334,6 @@
 
   .pl-grid .pl-more {
     grid-column: 3;
-  }
-
-  .pl-grid .pl-states {
-    grid-column: 3;
-    grid-row: 3;
   }
 
   .pl-grid .pl-current {
