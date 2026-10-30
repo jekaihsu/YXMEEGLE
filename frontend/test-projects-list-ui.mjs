@@ -32,6 +32,8 @@ assert.equal(group('我的案件').querySelectorAll('.pl-case').length,3);
 assert.equal(group('我的案件').querySelector('h2 span').textContent,'9');
 assert.equal(document.querySelectorAll('.pl-stepper li').length,document.querySelectorAll('.pl-case').length*9);
 assert.equal(document.querySelector('.pl-create'),null);
+for(const row of document.querySelectorAll('.pl-row'))assert.equal(row.children.length,9);
+assert.equal(document.querySelector('.pl-row > .pl-case-status'),null);assert.match(document.querySelector('.pl-row > .pl-states').textContent,/^案件狀態：.+流程進度：/);
 await flush(()=>group('我的案件').querySelector('.pl-expand').click());assert.equal(group('我的案件').querySelectorAll('.pl-case').length,9);
 await flush(()=>document.querySelector('[aria-label="釘選 A0"]').click());
 assert.equal(group('已釘選').querySelectorAll('.pl-case').length,1);assert.equal(group('我的案件').querySelector('h2 span').textContent,'8');assert.equal(document.querySelectorAll('[data-project="A0"]').length,1);
