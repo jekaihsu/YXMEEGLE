@@ -2,6 +2,8 @@ import {PickerPopover} from './design/PickerPopover';
 import {Select as FormSelect} from './design/Select';
 import {useSourceRefresh} from './useSourceRefresh';
 import {useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
+import {readLibraryMemory,writeLibraryMemory} from './libraryMemory';
+import {caseStatusLabel} from './stageModel';
 import {ArrowDown, ArrowRight, Check, CircleCheck, Clock3, Copy, FileText, LayoutGrid, List, MoreVertical, Pin, PlayCircle, Plus, Search, Settings2, Star, UserRound, X} from 'lucide-react';
 import {useViewData} from './viewData';
 import {readPortfolio, cachedPortfolio, tableCalendarDay} from './companyDashboardCache';
@@ -47,7 +49,7 @@ function CaseCard({row,c,pinned,onPin,today}:{row:CaseRow;c:Ctx;pinned:boolean;o
    <div className="pl-field pl-pm"><small>負責 PM</small><Person name={person(p.pm_id)}/></div>
    <div className="pl-field pl-owner"><small>目前節點負責人</small><Person name={row.current?.owners.map(o=>o.name).join('、')||'未指派'}/></div>
    <div className="pl-field pl-current"><small>目前節點</small><span>{row.current?.label||(row.state==='已完成'?'流程完成':'待核對')}</span></div>
-   <span className="pl-status" data-state={row.state}>{row.state}</span>
+   <small className="pl-case-status">案件狀態：{caseStatusLabel(row.project.status)}</small><span className="pl-status" data-state={row.state}>流程進度：{row.state}</span>
    <div className="pl-flow" tabIndex={0} role="region" aria-label="九階段流程，可左右捲動"><Stepper row={row}/></div>
    <div className="pl-more" ref={menuAnchor}><button ref={trigger} aria-label={`${p.code} 更多操作`} aria-haspopup="menu" aria-expanded={menu} onClick={()=>setMenu(!menu)}><MoreVertical size={17}/></button>
     {menu&&<PickerPopover anchor={menuAnchor} onClose={()=>setMenu(false)}><div ref={menuRef} className="pl-menu" role="menu" aria-label={`${p.code} 操作`} onKeyDown={e=>{
@@ -63,8 +65,10 @@ function CaseCard({row,c,pinned,onPin,today}:{row:CaseRow;c:Ctx;pinned:boolean;o
 }
 export function Projects({c}:{c:Ctx}) {
  const refreshSources=useSourceRefresh(c.s.workspace_id);
- const [filters,setFilters]=useState<CaseFilters>({...DEFAULT_FILTERS,kind:c.route.tab==='intake'?'intake':''});
- const [view,setView]=useState('list'),[expanded,setExpanded]=useState<string[]>([]),[limit,setLimit]=useState(readLimit),[creating,setCreating]=useState(false),[notice,setNotice]=useState(''),[syncing,setSyncing]=useState(false),[syncStatus,setSyncStatus]=useState('');
+ const libraryScope=JSON.stringify([c.s.user?.id,c.s.workspace_id]);
+ const remembered=useRef(readLibraryMemory(libraryScope)).current;
+ const [filters,setFilters]=useState<CaseFilters>({...DEFAULT_FILTERS,...remembered?.filters,...(c.route.tab==='intake'?{kind:'intake'}:{})});
+ const [view,setView]=useState(remembered?.view||'list'),[expanded,setExpanded]=useState<string[]>(remembered?.expanded||[]),[limit,setLimit]=useState(readLimit),[creating,setCreating]=useState(false),[notice,setNotice]=useState(''),[syncing,setSyncing]=useState(false),[syncStatus,setSyncStatus]=useState('');
  const shell=c.w.scope==='shell',scope=JSON.stringify([c.s.user?.id,c.s.user?.role,c.s.workspace_id,c.w.workspace_id]);
  const read=useViewData<PortfolioPage|undefined>(shell?`projects-portfolio:${scope}`:'projects-local',async signal=>shell?readPortfolio(PROJECT_URL,signal,scope,{reloadVersion:c.reloadVersion}):undefined,[c.reloadVersion]);
  const cached=shell?cachedPortfolio(PROJECT_URL,scope):undefined;
@@ -89,12 +93,17 @@ export function Projects({c}:{c:Ctx}) {
  const complete=!shell||!data?.next_page||tail?.complete===true;
  const projects=useMemo(()=>shell?data?[...data.items,...(tail?.items||[])]:undefined:c.w.projects,[shell,data,tail,c.w.projects]);
  const asOf=data?.as_of||c.w.as_of;
+ const filtersRef=useRef(filters),viewRef=useRef(view),expandedRef=useRef(expanded);filtersRef.current=filters;viewRef.current=view;expandedRef.current=expanded;
  const pinKey=pinStorageKey(c.w.workspace_id||c.s.workspace_id||'default',c.s.user?.id||'anonymous');
  const [pinState,setPinState]=useState(()=>({key:pinKey,ids:readPins(window.localStorage,pinKey)}));
  const pins=pinState.key===pinKey?pinState.ids:readPins(window.localStorage,pinKey);
  useEffect(()=>{setPinState({key:pinKey,ids:readPins(window.localStorage,pinKey)})},[pinKey]);
  useEffect(()=>{const sync=(e:StorageEvent)=>{if(e.key===pinKey)setPinState({key:pinKey,ids:readPins(window.localStorage,pinKey)})};window.addEventListener('storage',sync);return()=>window.removeEventListener('storage',sync)},[pinKey]);
  const togglePin=(id:string)=>{const next=pins.includes(id)?pins.filter(p=>p!==id):[...pins,id];setPinState({key:pinKey,ids:next});if(!writePins(window.localStorage,pinKey,next))setNotice('瀏覽器無法儲存釘選，本次瀏覽仍可使用。')};
+ const scrollY=useRef(remembered?.scrollY||0),restored=useRef(false);
+ useEffect(()=>{const track=()=>{if(new URLSearchParams(location.hash.replace(/^#\/?/,'')).get('view')==='projects')scrollY.current=window.scrollY};window.addEventListener('scroll',track,{passive:true});return()=>window.removeEventListener('scroll',track)},[]);
+ useEffect(()=>{writeLibraryMemory({scope:libraryScope,filters,view,expanded,scrollY:scrollY.current})},[libraryScope,filters,view,expanded]);
+ useEffect(()=>()=>{writeLibraryMemory({scope:libraryScope,filters:filtersRef.current,view:viewRef.current,expanded:expandedRef.current,scrollY:scrollY.current})},[libraryScope]);
  const update=(key:keyof CaseFilters,value:string|number|boolean)=>{setFilters(f=>({...f,[key]:value}));setExpanded([])};
  const modeled=useMemo(()=>(projects??[]).map(p=>caseRow(p,c.w.users,c.s.user?.id||'',asOf)),[projects,c.w.users,c.s.user?.id,asOf]);
  const rows=useMemo(()=>filterRows(modeled,filters,asOf),[modeled,filters,asOf]);
@@ -104,6 +113,7 @@ export function Projects({c}:{c:Ctx}) {
  const canCreate=c.s.features?.local_case_creation===true&&c.s.user?.capabilities?.includes('create_local_case')===true;
  const canSync=c.s.mode==='lark'&&(c.s.access_mode||'normal')==='normal'&&c.s.user?.active!==false&&!String(c.s.workspace_id||c.w.workspace_id||'').startsWith('test-')&&(['pm','manager'].includes(c.s.user?.role||'')||c.s.user?.capabilities?.includes('manage_sources')===true);
  const sync=async()=>{if(syncing)return;setSyncing(true);setSyncStatus('');try{await refreshSources('sources',{url:'/api/sources/sync',body:'{}'});await c.refresh();read.reload();setSyncStatus('Lark 同步完成，案件清單已更新。')}catch(error){setSyncStatus(`Lark 同步失敗：${error instanceof Error?error.message:String(error)}`)}finally{setSyncing(false)}};
+ useEffect(()=>{if(!ready||restored.current)return;restored.current=true;const top=scrollY.current;if(top>0)requestAnimationFrame(()=>window.scrollTo({top,left:0,behavior:'instant'}))},[ready]);
  const hasFilters=Object.entries(filters).some(([k,v])=>v!==Object.entries(DEFAULT_FILTERS).find(([key])=>key===k)?.[1]);
  const kpis=[{label:'全部案件',value:complete?counts.all:hasFilters?null:data?.total,icon:FileText},{label:'進行中',value:complete?counts.active:null,icon:PlayCircle},{label:'SOP 進行中',value:complete?counts.sop:null,icon:Settings2},{label:'已完成',value:complete?counts.done:null,icon:CircleCheck}];
  return <div className="pl-page">
