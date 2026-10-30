@@ -12,7 +12,7 @@ import {prefetchProjectProgress} from './useProjectProgress';
 import {ProjectFlow} from './ProjectFlow';
 import {TaskDrawer,DrawerFacts} from './TaskDrawer';
 import {FlowWorkspaceSkeleton} from './FlowDiagram';
-import {projectFlowRoute,selectedFlowNode} from './flowModel';
+import {projectFlowRoute,selectedFlowNode,workflowKeys} from './flowModel';
 import {executionAllowed, executionReason} from './ProjectExecution';
 import {projectQuotes} from './sourceQuotes';
 import {SourceContractIndex} from './ProjectReadiness';
@@ -117,7 +117,7 @@ export function ProjectDetail({c}:{c:Ctx}){
  if(!p)return <Empty title="找不到這個案件" detail="案件連結可能已失效，請回到案件總覽重新開啟。"/>;
  const selectedKey=selectedFlowNode(p,c.route.node,'data' in assignments.state ? assignments.state.data : undefined);
  const selected=p.nodes.find(n=>n.key===selectedKey);
- const target=assignmentTarget(c.route,p.nodes);const changeEnabled=c.s.features?.change_extension===true;const routinesEnabled=c.s.features?.routines===true;
+ const target=assignmentTarget(c.route,p.nodes,workflowKeys('data' in assignments.state ? assignments.state.data : undefined));const changeEnabled=c.s.features?.change_extension===true;const routinesEnabled=c.s.features?.routines===true;
  const route=projectFlowRoute(c.route),tab=route.tab;const dataSection=tab==='data'?(route.section||'basic'):'';const selectedTask=target&&c.s.features?.node_assignment?undefined:p.nodes.flatMap(n=>n.tasks.map(t=>({p,n,t}))).find(r=>r.t.id===c.route.task);const approvals=c.w.approvals.filter(a=>a.project_id===p.id);
  const closeTask=()=>c.go({...c.route,node:c.route.node||selectedTask?.n.id,task:undefined,task_source:undefined,comment:undefined});
  const flowApprovals=<details className="pf-secondary" open={c.route.section==='approvals' || undefined}><summary>審批與歷史</summary><section className="major-approval-summary"><div><h2>重大事項審批</h2><p>財務與節點跳過保留原核准流程。變更與展延尚未開放。</p></div><button className="button compact" onClick={()=>c.go({view:'project',project:p.id,node:selected?.id,tab:'flow',section:'approvals'})}>查看審批（{approvals.filter(a=>(changeEnabled||!['change','extension'].includes(a.type))&&['draft','pending','approved'].includes(a.status)).length+(c.w.financial_requests||[]).filter((r:any)=>r.project_id===p.id&&['draft','pending','approved'].includes(r.status)).length}）</button>{approvals.filter(a=>(changeEnabled||!['change','extension'].includes(a.type))&&['pending','approved'].includes(a.status)).map(a=><p key={a.id}>{a.title} · {a.status==='approved'?'已核准，待套用':'審批中'}</p>)}</section></details>;
