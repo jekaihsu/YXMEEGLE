@@ -175,7 +175,9 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
 
 
 def iso(value):
-    return value.replace(tzinfo=timezone.utc).isoformat() if value.tzinfo is None else value.isoformat()
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat()
 
 
 ADDED_USAGE_COLUMNS = ('scope', 'project_id')
