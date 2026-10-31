@@ -25,7 +25,7 @@ export function DataTable({title,caption,columns,rows,rowKey,truncated,note}:Tab
  const keyFor=(row:Record<string,Cell>,index:number)=>`${rowKey?row[rowKey]??index:index}-${index}`;
  return <section data-slot="data-table" className="assistant-data-table" aria-labelledby={id}>
   <header className="assistant-element-heading"><h3 id={id}>{title}</h3>{caption&&<p>{caption}</p>}</header>
-  <div className="assistant-data-wide"><table>
+  <div className="assistant-data-wide" tabIndex={0} role="region" aria-label={`${title}表格，可左右捲動`}><table>
    <caption className="assistant-sr-only">{title}{caption?`，${caption}`:''}</caption>
    <thead><tr>{columns.map(column=><th key={column.key} scope="col" data-numeric={numeric(column.key)||undefined} aria-sort={sort?.key===column.key?(sort.direction==='asc'?'ascending':'descending'):undefined}>
     {comparable(column.key)?<button type="button" onClick={()=>changeSort(column.key,column.label)} aria-label={`依${column.label}排序`}>{column.label}<span aria-hidden="true">{sort?.key===column.key?(sort.direction==='asc'?' ↑':' ↓'):' ↕'}</span></button>:column.label}

@@ -45,5 +45,5 @@
 .assistant-thinking-dot{width:6px;height:6px;flex-shrink:0;border-radius:var(--radius-pill);background:var(--accent);animation:assistant-pulse 1.4s ease-in-out infinite}
 @keyframes assistant-pulse{50%{opacity:.3}}
 @media(prefers-reduced-motion:reduce){.assistant-thinking-dot{animation:none}}
-.assistant-data-wide button:focus-visible,.assistant-chart-point button:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+.assistant-data-wide:focus-visible,.assistant-data-wide button:focus-visible,.assistant-chart-point button:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
 }
