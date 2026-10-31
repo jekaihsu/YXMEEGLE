@@ -107,6 +107,9 @@ export function Projects({c}:{c:Ctx}) {
  const update=(key:keyof CaseFilters,value:string|number|boolean)=>{setFilters(f=>({...f,[key]:value}));setExpanded([])};
  const modeled=useMemo(()=>(projects??[]).map(p=>caseRow(p,c.w.users,c.s.user?.id||'',asOf)),[projects,c.w.users,c.s.user?.id,asOf]);
  const rows=useMemo(()=>filterRows(modeled,filters,asOf),[modeled,filters,asOf]);
+ const degraded=shell&&data?.node_status_degraded===true,[retries,setRetries]=useState(0);
+ useEffect(()=>{if(!degraded||read.loading||retries>=4)return;const t=window.setTimeout(()=>{setRetries(n=>n+1);read.reload()},1500*(retries+1));return()=>window.clearTimeout(t)},[degraded,read.loading,retries]);
+ useEffect(()=>{if(!degraded)setRetries(0)},[degraded]);
  const groups=groupRows(rows,new Set(pins)),counts=portfolioCounts(rows),ready=!shell||!!data;
  const clients=useMemo(()=>[...new Set((projects??[]).map(p=>p.client).filter(Boolean))].sort(),[projects]);
  const pmIds=useMemo(()=>[...new Set((projects??[]).map(p=>p.pm_id).filter(Boolean))],[projects]);
@@ -130,6 +133,7 @@ export function Projects({c}:{c:Ctx}) {
    {hasFilters&&<button className="pl-clear" onClick={()=>{setFilters({...DEFAULT_FILTERS});setExpanded([])}}>清除全部<X size={13}/></button>}
   </div>
   {notice&&<p role="status">{notice}</p>}
+  {degraded&&<p className="pl-state" role="status">{retries<4?'節點進度同步中，分組暫時可能不完整…':'節點進度暫時無法從 Lark 讀取，目前分組可能不正確。'}{retries>=4&&<button onClick={()=>{setRetries(0);read.reload()}}>重新載入</button>}</p>}
   {shell&&read.error&&<div className="pl-state" role="alert"><h2>案件讀取失敗</h2><p>{read.error}</p><button onClick={read.reload}>重新載入案件</button>{data&&<p>下方保留上次成功讀取的資料。</p>}</div>}
   {shell&&read.loading&&!data?<div className="pl-state" role="status" aria-busy="true"><p>正在載入案件…</p><Skeleton lines={5}/></div>:ready?<div className={`pl-groups ${view==='grid'?'pl-grid':''}`}>{groups.filter(g=>g.rows.length>0).map(group=>{const Icon=GROUP_ICONS[group.key];const open=expanded.includes(group.key);return <section className="pl-group" key={group.key} aria-label={group.label}><header><h2><Icon size={19}/>{group.label}<span>{group.rows.length}</span></h2>{group.rows.length>limit&&<button className="pl-expand" aria-expanded={open} onClick={()=>setExpanded(open?expanded.filter(key=>key!==group.key):[...expanded,group.key])}>{open?'收合':'顯示更多'}<ArrowRight size={15}/></button>}</header><div className="pl-group-rows">{(open?group.rows:group.rows.slice(0,limit)).map(row=><CaseCard key={row.project.id} row={row} c={c} today={asOf} pinned={pins.includes(row.project.id)} onPin={()=>togglePin(row.project.id)}/>)}</div></section>})}</div>:null}
   {ready&&complete&&!rows.length&&<Empty title="沒有符合條件的案件" detail="試試其他關鍵字或清除篩選條件。"/>}

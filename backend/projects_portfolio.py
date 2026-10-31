@@ -61,7 +61,7 @@ def portfolio(db, model, row, state, today, *, assignments, data, user):
             if p['id'] in ids:
                 nodes[p['id']] = p.get('nodes', [])
                 daily[p['id']] = p.get('daily_reports', [])
-    statuses = {}
+    statuses, degraded = {}, False
     if overlay_enabled:
         evidence = storage.load_partial(db, model, row,
             collections=('source_confirmations', 'contract_items', 'source_work_items'))
@@ -69,7 +69,8 @@ def portfolio(db, model, row, state, today, *, assignments, data, user):
             ('source_confirmations', 'contract_items', 'source_work_items')})
         assignment_state['projects'] = [dict(p, nodes=nodes.get(pid, []), daily_reports=daily.get(pid, []))
                                         for pid, p in headers.items()]
-        statuses = {pid: chain for pid, chain in assignments.portfolio_statuses(assignment_state, data, user).items() if pid in ids}
+        chains, degraded = assignments.portfolio_overlay(assignment_state, data, user)
+        statuses = {pid: chain for pid, chain in chains.items() if pid in ids}
     items = []
     hidden_removed = 0
     for r in rows:
@@ -89,4 +90,5 @@ def portfolio(db, model, row, state, today, *, assignments, data, user):
     items, duplicates = collapse_same_code(items)
     return dict(items=items, total=len(items), hidden_duplicates=duplicates, hidden_removed=hidden_removed,
                 source_synced_at=state.get('source_status', {}).get('last_sync'), as_of=today,
-                basis='persisted_workspace+lark_derived' if statuses else 'persisted_workspace')
+                basis='persisted_workspace+lark_derived' if statuses else 'persisted_workspace',
+                node_status_degraded=degraded)

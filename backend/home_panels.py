@@ -102,18 +102,22 @@ class HomePanels:
         return sources, roster
 
     def portfolio_statuses(self, state, data, user):
+        return self.portfolio_overlay(state, data, user)[0]
+
+    def portfolio_overlay(self, state, data, user):
+        """Return (chains, degraded). degraded means the overlay is configured but not readable yet (cold or failed)."""
         if self.assignment_unavailable(state, data):
-            return {}
+            return {}, False
         scope = self.scope(data, user)
         sources = {name: self.read_table(scope, table, spec, wait=False) for name, table, spec in
                    (('node_assignments', Table.NODES, NODE_FIELDS), ('tasks', Table.TASKS, TASK_FIELDS))}
         if any(source is None or isinstance(source, Failure) or not source.complete for source in sources.values()):
-            return {}
+            return {}, True
         try:
             return AssignmentChains(self.nodes, state, data, user, sources['node_assignments'].value,
-                                    sources['tasks'].value).portfolio_statuses
+                                    sources['tasks'].value).portfolio_statuses, False
         except Failure:
-            return {}
+            return {}, True
 
     def lark_items(self, state, data, user, scope, team, hidden_confirmations):
         if reason := self.assignment_unavailable(state, data):
