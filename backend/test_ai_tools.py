@@ -36,7 +36,7 @@ def test_real_search_and_owners_without_shell(app, client, monkeypatch):
     result = tool(app, client, 'search_cases', {'query': query, 'status': 'all', 'owner': 'anyone', 'overdue': False, 'offset': 0})
     assert requests == ['/api/workspace']
     requests.clear()
-    assert result['total'] == source['total']
+    assert result['population_total'] == source['total']
     assert [p['id'] for p in result['cases']] == [p['id'] for p in source['items']]
     assert all(p['status_label'] == '進行中' for p in result['cases'])
     pid = source['items'][0]['id']

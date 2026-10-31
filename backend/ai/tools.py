@@ -53,7 +53,7 @@ NODE_STATES = {'not_started': '未開始', 'pending': '待處理', 'in_progress'
 
 def calendar_day(value):
     from datetime import datetime, timedelta, timezone
-    if value is None or value == '':
+    if value is None or value == '' or type(value) not in (str, int, float):
         return None
     try:
         if isinstance(value, (int, float)) or re.fullmatch(r'\d{13}', value.strip()):
@@ -70,9 +70,10 @@ def calendar_day(value):
 
 
 def project_state(project, day):
-    source = project.get('portfolio_nodes', project.get('nodes', []))
-    by_key = {n['key']: n for n in reversed(source)}
-    states = [NODE_STATES.get(by_key.get(key, {}).get('status'), '狀態待確認') for key in NODE_ORDER]
+    source = project.get('portfolio_nodes', project.get('nodes')) or []
+    by_key = {n['key']: n for n in reversed(source)
+              if isinstance(n, dict) and isinstance(n.get('key'), str)}
+    states = [NODE_STATES.get(str(by_key.get(key, {}).get('status')), '狀態待確認') for key in NODE_ORDER]
     finished = {'已完成', '略過'}
     current = next((s for s in states if s not in finished), None)
     if all(s in finished for s in states):
@@ -83,12 +84,17 @@ def project_state(project, day):
         state = '尚未開始'
     else:
         state = current if current in {'待審核', '暫停'} else '進行中'
-    tasks = [t for n in project.get('nodes', []) for t in n.get('tasks', [])
-             if t['status'] not in {'completed', 'superseded', 'approved_skipped'}]
-    due = calendar_day(project.get('due_date'))
+    tasks = [t for n in project.get('nodes') or [] if isinstance(n, dict)
+             for t in n.get('tasks') or [] if isinstance(t, dict)
+             and t.get('status') not in ('completed', 'superseded', 'approved_skipped')]
+    due, current_day = calendar_day(project.get('due_date')), calendar_day(day)
     closed = (project.get('execution_status') or project.get('status')) == 'completed'
-    overdue = not closed and (float(project.get('overdue_tasks') or 0) > 0 or
-        bool(due and due < calendar_day(day)) or any(t.get('due_date') and t['due_date'][:10] < day[:10] for t in tasks))
+    try:
+        overdue_tasks = float(project.get('overdue_tasks') or 0) > 0
+    except (ValueError, TypeError):
+        overdue_tasks = False
+    overdue = not closed and (overdue_tasks or bool(due and current_day and due < current_day) or
+        any(isinstance(t.get('due_date'), str) and t['due_date'][:10] < day[:10] for t in tasks))
     return dict(state=state, overdue=bool(overdue))
 
 
@@ -112,9 +118,9 @@ async def search(reader, args):
     total = len(items)
     status = CASE_STATUS.get(args['status'], args['status'])
     items = [p for p in items if status == 'all' or p['state'] == status]
-    items.sort(key=lambda p: (p.get('due_date') or '9999', p['id']))
+    items.sort(key=lambda p: (calendar_day(p.get('due_date')) or '9999', str(p.get('id', ''))))
     offset = args['offset']
-    return dict(total=total, matched_total=len(items), offset=offset,
+    return dict(population_total=total, matched_total=len(items), offset=offset,
                 next_offset=offset+8 if offset+8 < len(items) else None,
                 items=items[offset:offset+8], status_counts=counts)
 
@@ -158,14 +164,14 @@ async def attendance(reader, args):
 
 def search_notice(data):
     count = len(data.get('cases', []))
-    total = data.get('matched_total', data.get('total', count))
-    if total > count:
+    total = data.get('matched_total', count)
+    if data.get('truncated') or data.get('next_offset') is not None:
         return dict(truncated=True, note=f'符合 {total} 筆，本頁列出 {count} 筆，起點 {data.get("offset", 0)}')
     return {}
 
 
 def project_search(value):
-    data = {**pick(value, 'as_of', 'matched_total', 'offset', 'next_offset'), 'total': value['total'], 'cases': [pick(p, 'id', 'code', 'name', 'status', 'state', 'overdue', 'pm_id', 'due_date')
+    data = {**pick(value, 'as_of', 'matched_total', 'offset', 'next_offset'), 'population_total': value['population_total'], 'cases': [pick(p, 'id', 'code', 'name', 'state', 'overdue', 'pm_id', 'due_date')
                                               for p in value['items']]}
     data['status_counts'] = value.get('status_counts', {})
     for p in data['cases']:
@@ -372,6 +378,8 @@ async def execute(app, cookie, name, args):
             if summary and longest is summary.get('rows'):
                 summary['truncated'] = True
             if name == 'search_cases':
+                following = data['offset'] + len(data['cases'])
+                data['next_offset'] = following if following < data['matched_total'] else None
                 data.update(search_notice(data))
             result = json.dumps(data, ensure_ascii=False)
         return result, False

@@ -17,16 +17,25 @@ def test_status_only_real_demo(app, client):
     with app.state.sessions.begin() as db:
         row = db.get(WorkspaceRow, wid)
         state = storage.load(db, BusinessRow, row)
-        for project, status in zip(state['projects'][-2:], ['completed', 'pending']):
+        import copy
+        for i, status in enumerate(['completed', 'pending']):
+            project = copy.deepcopy(state['projects'][0])
+            project.update(id=f'extra{i}', code=f'EXTRA{i}')
+            for key, value in list(project.items()):
+                if isinstance(value, list) and key != 'nodes':
+                    project[key] = []
             for node in project['nodes']:
-                node['status'] = status
+                node.update(id=f'extra{i}-' + node['key'], status=status)
+                for task in node['tasks']:
+                    task['id'] = f'extra{i}-' + task['id']
+            state['projects'].append(project)
         row.data = storage.save(db, BusinessRow, wid, state)
     result, error = asyncio.run(execute(app, cookie(client), 'search_cases',
         dict(query='', status='in_progress', owner='anyone', overdue=False, offset=0)))
     assert not error, result
     data = json.loads(result)
-    assert data['population_total'] == 7
-    assert data['matched_total'] == data['status_counts']['in_progress'] == 5
+    assert data['population_total'] == 9
+    assert data['matched_total'] == data['status_counts']['in_progress'] == 7
     assert all(p['state'] == '進行中' for p in data['cases'])
 
 

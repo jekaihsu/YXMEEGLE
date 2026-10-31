@@ -102,6 +102,9 @@ def test_paging_and_counts_real_workspace(app, client):
 
 
 def test_portfolio_frontend_parity(app, client, tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    if not (root / 'frontend/node_modules/esbuild/lib/main.js').is_file():
+        pytest.skip('Frontend parity requires esbuild. Run npm ci in frontend/')
     from .ai.tools import project_state
     from fastapi.testclient import TestClient
     from .app import create_app
@@ -135,8 +138,7 @@ def test_portfolio_frontend_parity(app, client, tmp_path):
     root = Path(__file__).resolve().parents[1]
     script = '''
 import fs from 'node:fs';
-const path='./frontend/node_modules/esbuild/lib/main.js';
-const {build}=await import(process.env.PARITY_ESBUILD || (fs.existsSync(path)?path:'./backend/ai/.parity/node_modules/esbuild/lib/main.js'));
+const {build}=await import('./frontend/node_modules/esbuild/lib/main.js');
 const bundle=await build({entryPoints:['frontend/src/projectsListModel.ts'],bundle:true,write:false,platform:'node',format:'esm',packages:'external',loader:{'.css':'empty'}});
 const m=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const {projects,today}=JSON.parse(fs.readFileSync(0,'utf8'));
