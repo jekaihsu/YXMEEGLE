@@ -44,8 +44,8 @@ const feedbackFixture={...fixture,totals:{...fixture.totals,questions:12,feedbac
  by_provider:[{...fixture.by_provider[0],provider:'claude',up:7,down:3},{...fixture.by_provider[0],up:0,down:0}],
  by_day:[{day:'2026-10-31',questions:12,input_tokens:1234,output_tokens:50,cost_usd:.02,up:7,down:3}],
  reasons:{wrong:2,incomplete:1,slow:0,other:0},
- recent:[{created_at:'2026-10-31T00:00:00Z',name:'陳雅文',actor_id:'b',provider:'claude',input_tokens:200,output_tokens:30,cost_usd:.01,latency_ms:2000,status:'ok',rating:'down',reason:'wrong'},
- {created_at:'2026-10-30T00:00:00Z',name:'王小明',actor_id:'a',provider:'claude',input_tokens:300,output_tokens:40,cost_usd:.01,latency_ms:1000,status:'ok',rating:'up',reason:null},
+ recent:[{created_at:'2026-10-31T00:00:00Z',name:'陳雅文',actor_id:'b',provider:'claude',input_tokens:200,output_tokens:30,cost_usd:.01,latency_ms:2000,status:'ok',scope:'project',rating:'down',reason:'wrong'},
+ {created_at:'2026-10-30T00:00:00Z',name:'王小明',actor_id:'a',provider:'claude',input_tokens:300,output_tokens:40,cost_usd:.01,latency_ms:1000,status:'ok',scope:'global',rating:'up',reason:null},
  {created_at:'2026-10-29T00:00:00Z',name:'王小明',actor_id:'a',provider:'gpt',input_tokens:100,output_tokens:20,cost_usd:.01,latency_ms:1000,status:'ok'}]};
 await flush(()=>{history.pushState(null,'','?from=2026-10-01&to=2026-10-31&rating=down');window.dispatchEvent(new Event('popstate'))});
 assert.equal(new URL(requests[5].url,'http://localhost').searchParams.get('rating'),'down');
@@ -86,6 +86,9 @@ for(const reasons of [{unspecified:3},undefined]){
  assert.match(document.querySelector('.td-reasons').textContent,/倒讚原因/);
  assert.equal(document.querySelector('.td-reasons li:last-child').textContent,`未填寫3 次`);
 }
+assert.deepEqual([...document.querySelectorAll('[aria-label="最近提問表，可左右捲動"] tbody tr')].map(row=>row.cells[3].textContent),['案件','全域','—']);
+for(const scope of ['project','global','']){await flush(()=>{const select=[...document.querySelectorAll('label')].find(el=>el.textContent.startsWith('範圍')).querySelector('select');select.value=scope;select.dispatchEvent(new Event('change',{bubbles:true}))});assert.equal(new URLSearchParams(location.search).get('scope'),scope||null);assert.equal(new URL(requests.at(-1).url,'http://localhost').searchParams.get('scope'),scope||null);await flush(()=>requests.at(-1).resolve(json(feedbackFixture)))}
+await flush(()=>{history.pushState(null,'','?scope=project');window.dispatchEvent(new Event('popstate'))});assert.equal([...document.querySelectorAll('label')].find(el=>el.textContent.startsWith('範圍')).querySelector('select').value,'project');
 const countBeforeRange=requests.length;
 await flush(()=>{history.pushState(null,'','?from=2025-01-01&to=2026-10-31');window.dispatchEvent(new Event('popstate'))});
 assert.match(document.body.textContent,/日期範圍最多 366 天/);assert.equal(requests.length,countBeforeRange,'oversized custom range does not fetch');
