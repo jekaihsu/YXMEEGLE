@@ -50,12 +50,22 @@ function AssistantMessage(){
 
 function MessageLog({children}:{children:ReactNode}){
  const running=useAuiState(s=>s.thread.isRunning);
- const completed=useAuiState(s=>{const message=s.thread.messages.at(-1);return message?.role==='assistant'&&message.status?.type==='complete'?message.id:null});
- return <ThreadPrimitive.Viewport data-slot="aui_thread-viewport" className="assistant-viewport" autoScroll role="log" aria-live="polite" aria-relevant="additions" aria-busy={running}>
-  <div aria-live="off">{children}<ThreadPrimitive.Messages components={{UserMessage,AssistantMessage}}/></div>
-  <div className="assistant-completion" role="status">{!running&&completed&&<span key={completed}>回答完成</span>}</div>
-  <ThreadPrimitive.ScrollToBottom asChild><Button data-slot="scroll-anchor" className="assistant-bottom">回到最新回答</Button></ThreadPrimitive.ScrollToBottom>
- </ThreadPrimitive.Viewport>;
+ const outcome=useAuiState(s=>{
+  const message=s.thread.messages.at(-1);
+  if(message?.role!=='assistant')return '';
+  const status=message.status;
+  if(status?.type==='complete')return `${message.id}|回答完成`;
+  if(status?.type==='incomplete')return `${message.id}|${status.reason==='cancelled'?'已停止':`回答失敗${typeof status.error==='string'&&status.error?`：${status.error}`:''}`}`;
+  return '';
+ });
+ const [outcomeId,outcomeText]=outcome.split('|');
+ return <>
+  <ThreadPrimitive.Viewport data-slot="aui_thread-viewport" className="assistant-viewport" autoScroll role="log" aria-live="off" aria-busy={running}>
+   {children}<ThreadPrimitive.Messages components={{UserMessage,AssistantMessage}}/>
+   <ThreadPrimitive.ScrollToBottom asChild><Button data-slot="scroll-anchor" className="assistant-bottom">回到最新回答</Button></ThreadPrimitive.ScrollToBottom>
+  </ThreadPrimitive.Viewport>
+  <div className="assistant-completion" role="status">{!running&&outcomeText&&<span key={outcomeId}>{outcomeText}</span>}</div>
+ </>;
 }
 
 function Conversation({catalog,newConversation,projectId,projectLabel,compact}:AssistantChatProps&{catalog:ModelCatalog;newConversation:()=>void}){
