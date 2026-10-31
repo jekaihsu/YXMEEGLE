@@ -1,0 +1,97 @@
+"""Authenticated AI endpoints; provider substitution lives on app.state."""
+from datetime import date, timedelta
+from typing import Literal
+
+from fastapi import HTTPException, Query, Request
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from starlette.concurrency import run_in_threadpool
+
+from . import ledger
+from .agent import ChatRun
+from .catalog import ModelId, registry
+from .providers import ADAPTERS
+
+
+class Message(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    role: Literal['user', 'assistant']
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    model: ModelId
+    conversation_id: str = Field(min_length=1, max_length=120)
+    messages: list[Message] = Field(min_length=1, max_length=20)
+
+    @model_validator(mode='after')
+    def last_is_user(self):
+        if self.messages[-1].role != 'user':
+            raise ValueError('last message must be user')
+        return self
+
+
+class ChatResponse(StreamingResponse):
+    def __init__(self, run):
+        self.run = run
+        super().__init__(run.stream(), media_type='text/event-stream',
+                         headers={'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no'})
+
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            await self.body_iterator.aclose()
+            self.run.finish()
+
+
+def register(app, *, identity, sessions, cfg):
+    models = registry(cfg.get('AI_PRICE_TABLE_JSON'))
+    app.state.ai_providers = {key: ADAPTERS[spec.provider](cfg[spec.key_env])
+                              for key, spec in models.items() if cfg.get(spec.key_env)}
+    active = {}
+    limit = int(cfg.get('AI_DAILY_TOKEN_LIMIT_PER_USER', '400000'))
+
+    @app.get('/api/ai/models')
+    def get_models(request: Request):
+        identity(request)
+        return {'default': 'claude', 'models': [dict(id=key, label=spec.label,
+                available=key in app.state.ai_providers) for key, spec in models.items()]}
+
+    @app.post('/api/ai/chat')
+    async def chat(request: Request, body: ChatRequest):
+        data, user = await run_in_threadpool(identity, request)
+        adapter = app.state.ai_providers.get(body.model)
+        if adapter is None:
+            return JSONResponse({'code': 'ai_unconfigured', 'message': '此模型尚未設定金鑰'}, status_code=503)
+        used = await run_in_threadpool(ledger.daily_tokens, sessions, data['wid'], user['id'])
+        if used >= limit:
+            return JSONResponse({'code': 'ai_quota', 'message': '今日用量已達上限'}, status_code=429)
+        key = (data['wid'], user['id'])
+        if active.get(key, 0) >= 2:
+            return JSONResponse({'code': 'ai_busy', 'message': '最多同時進行兩個提問'}, status_code=429)
+        active[key] = active.get(key, 0) + 1
+
+        def release():
+            remaining = active[key] - 1
+            if remaining:
+                active[key] = remaining
+            else:
+                del active[key]
+
+        run = ChatRun(app, body, data, user, models[body.model], adapter, release)
+        run.cookie = request.headers.get('cookie', '')
+        return ChatResponse(run)
+
+    @app.get('/api/ai/usage')
+    def usage(request: Request, from_: date | None = Query(None, alias='from'), to: date | None = None,
+              actor: str | None = Query(None, max_length=120), provider: ModelId | None = None):
+        data, user = identity(request)
+        if user['role'] != 'manager':
+            raise HTTPException(403, '僅主管可查看 AI 用量')
+        end = to or date.fromisoformat(ledger.today())
+        start = from_ or end - timedelta(days=29)
+        if start > end:
+            raise HTTPException(422, '日期範圍錯誤')
+        return ledger.query(sessions, data['wid'], start.isoformat(), end.isoformat(), actor, provider)

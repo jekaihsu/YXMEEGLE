@@ -32,3 +32,13 @@ def test_additive_migration_preserves_existing_rows_and_repairs_indexes(tmp_path
     with engine.connect() as db:
         assert db.exec_driver_sql('SELECT id FROM workspaces').all() == [('w',)]
     engine.dispose()
+
+
+def test_ledger_failure_never_raises_or_logs_values(caplog):
+    from .ai.ledger import record
+    class Broken:
+        def begin(self):
+            raise RuntimeError('private question must not be logged')
+    record(Broken(), conversation_id='private question must not be logged')
+    assert 'ai_usage_write_failed' in caplog.text
+    assert 'private question' not in caplog.text

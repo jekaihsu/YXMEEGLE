@@ -72,7 +72,9 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None):
 
     def public(result):
         value = dict(result)
-        value['cost_usd'] = value.pop('cost_micro_usd') / 1_000_000
+        value['cost_usd'] = int(value.pop('cost_micro_usd')) / 1_000_000
+        for key in ('questions', 'input_tokens', 'output_tokens'):
+            value[key] = int(value[key])
         if 'last_at' in value:
             value['last_at'] = iso(value['last_at'])
         return value

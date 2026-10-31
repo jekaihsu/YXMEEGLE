@@ -131,6 +131,7 @@ def create_app(overrides=None,*,dispatch_transport=None):
     from .request_timing import instrument_database
     instrument_database(engine)
     from .sop_import import models as sop_import_models
+    from .ai import ledger as ai_ledger
     sessions=sessionmaker(engine,expire_on_commit=False,info={'index_tables':str(cfg.get('INDEX_TABLES_ENABLED','false')).lower()=='true'})
     # Migration is reversible: preserve the original JSON before normalizing.
     from .workspace_migration import migrate_workspaces
@@ -1786,6 +1787,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
 
     from .integration_routes import register
     register(app,identity,load,persist_mutation,sessions,WorkspaceRow,BusinessRow,PersonRow,cfg,upload_dir)
+    from .ai.routes import register as register_ai
+    register_ai(app, identity=identity, sessions=sessions, cfg=cfg)
     from .native_routes import register as register_native
     register_native(app,identity,load,persist_mutation,sessions,WorkspaceRow,cfg)
 

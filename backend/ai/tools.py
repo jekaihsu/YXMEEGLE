@@ -38,7 +38,7 @@ def case_path(args):
 async def search(reader, args):
     page = await reader.get('/api/projects', q=args['query'], limit=20)
     details = await asyncio.gather(*(reader.get(case_path({'case_id': p['id']})) for p in page['items']))
-    return dict(total=page['total'], items=[detail['project'] for detail in details], details=details)
+    return dict(total=page['total'], items=[detail['project'] for detail in details])
 
 
 async def progress(reader, args):
