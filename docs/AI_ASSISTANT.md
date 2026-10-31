@@ -8,7 +8,7 @@
 - 助理只能看到發問者本人原本就看得到的資料。
 - 模型只有兩個選項：`claude` 與 `gpt`。使用者不能選型號或 effort。
 - 每次提問都記錄 token 用量與費用。儀表板只能用網址 `/token_dashboard` 進入，導覽列沒有按鈕，僅 `manager` 角色可看。
-- 不記錄問題與回答的內容，只記錄用量。
+- 預設保存最後一則問題與串流回答，供主管調整提示詞。內容經遮蔽且有保存期限。
 
 ## 模型目錄（伺服器端固定，前端不能覆寫）
 
@@ -154,3 +154,20 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
 啟動時會自動補齊 `ai_usage` 在首次部署後新增的 `scope` 與 `project_id` 欄位。既有資料的 `scope` 預設為 `global`，`project_id` 為 `NULL`。`scripts/migrate_ai_usage.py` 仍可作為選用的手動遷移工具。
 
 執行真實 PostgreSQL 回歸測試（需非 root 帳號及 PostgreSQL 工具）使用 `PATH=/opt/homebrew/bin:$PATH /tmp/ai-backend-venv/bin/python scripts/test_action_audit_postgres.py --ai`。runner 建立暫存 cluster、私有 Unix socket 與隨機 port，結束時清除。測試逐一隔離 schema，同時執行 SQLite 與 PostgreSQL，並比較相同資料的用量 JSON。整個後端測試使用相同命令加上 `backend -q -ra`。未設 `AI_TEST_POSTGRES_URL` 的一般 pytest 會明確跳過 PostgreSQL 案例。
+
+
+## 問答內容與提示詞調整
+
+`AI_STORE_CONTENT` 預設為 `true`。`ai_exchange` 以 `usage_id` 對應每題用量，只保存最後一則使用者訊息，最多 4000 字元，以及實際串流給使用者的助理文字，最多 20000 字元。失敗或中止時保存已送出的部分回答。另保存 workspace、actor、時間、工具名稱清單，以及主管可見的已清理上游錯誤摘要，例如 `OpenAI 401 invalid_api_key`。不保存工具參數、工具結果、system prompt、案件脈絡 JSON、較早對話、cookie、金鑰或 displays。回答若引用工具資料，引用文字會是回答的一部分。
+
+保存前會遮蔽 `sk-` 金鑰、Bearer token、至少 9 位的連續數字及四組四位數卡號。短數字保留。此規則不保證識別所有個人資料格式。
+
+只有同一 workspace 的主管可透過 usage API 讀取內容。一般成員收到 403。明細對不存在或其他 workspace 的 usage_id 一律回傳相同 404。`AI_STORE_CONTENT=false` 停止新增內容，且所有 usage API 隱藏既有內容，文字欄位為 null，工具清單為空。
+
+`AI_CONTENT_RETENTION_DAYS` 預設 90 天，依 UTC created_at 計算期限。過期內容立即從讀取結果隱藏。帳本寫入時順便清除過期內容，每個 process 最多每小時一次。用量及評分仍保留。啟動時 `ledger.ensure_schema` 自動建立 `ai_exchange`，既有資料庫不需手動遷移。帳本與內容在同一完成路徑的執行緒交易中寫入，失敗重試一次且不影響串流結束。
+
+`GET /api/ai/usage` 的 recent 新增 `usage_id`、`question_preview`、`answer_preview`、`tools`、`error_detail`。preview 最多 120 字元，沒有內容或關閉保存時為 null。新增 `q` 查詢參數，最多 200 字元，以不區分大小寫的文字子字串比對問題或回答。`%`、`_`、反斜線都當作一般文字。`q` 與 actor、provider、rating、scope、from、to 可同時使用，也套用到聚合。
+
+`GET /api/ai/usage/{usage_id}/exchange` 回傳 `usage_id, created_at, actor_id, name, provider, scope, project_id, status, rating, reason, question, answer, tools, error_detail, latency_ms, input_tokens, output_tokens, cost_usd`。
+
+`GET /api/ai/usage/export` 使用相同篩選，依時間新到舊回傳最多 500 筆 JSON lines。每列只有 `usage_id, created_at, name, provider, scope, rating, reason, question, answer, tools`。內容類型為 `application/x-ndjson`，供主管挑選好壞回答並調整提示詞。
