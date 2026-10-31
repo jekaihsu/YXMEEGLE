@@ -14,7 +14,7 @@ The requested literal old shape of 58 null records including four exempt people 
 
 The screenshot's 59 to 58 change is not explained by including both leave approvals, which changes a count by two. Repeating the same snapshot is deterministic. A changed record or roster could change the count by one after refresh, and model arithmetic could also do so. Distinguishing these requires both staging tool payloads and their `as_of` values. No live staging data or Claude replay was available in this worktree.
 
-Each day now has complete `counts`, plus semantic lists `unaccounted`, `late`, `early_leave`, `missing_punch`, `on_leave`, `trip`, `out`, `exempt`, and `supplemented`. `arrived` is a labelled count only. Explained people have one primary explanation, in leave, trip, out, exemption order, and never enter `unaccounted`. Unexplained people may retain multiple source labels, such as late and early leave. Displays merge their labels into one row.
+Each day now has complete `counts`, plus semantic lists `unaccounted`, `late`, `early_leave`, `missing_punch`, `on_leave`, `trip`, `out`, `exempt`, and `supplemented`. `arrived` is a labelled count only. Each evidence group is independent. A person can appear in multiple explanation and punch groups, including late and on leave on the same day. `unaccounted` requires no record and no explanation and is disjoint from every other group. Counts equal full list lengths before documented truncation. Weekly person-days and displays preserve these overlaps. Displays merge their labels into one row.
 
 ```json
 {"range":"today","date":"2026-10-12","counts":{"arrived":0,"unaccounted":52,"on_leave":2,"exempt":4,"missing_punch":0},"unaccounted":[{"id":"ou_10","name":"同事10"}],"incomplete":true,"truncated":false}

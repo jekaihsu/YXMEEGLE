@@ -189,13 +189,10 @@ def attendance_day(view, day):
         explained = [key for key in ('on_leave', 'trip', 'out', 'exempt')
                      if ATTENDANCE_LABELS[key] in tokens or person['id'] in approvals.get(key, set())]
         arrived += int('到班' in tokens)
-        if explained:
-            groups[explained[0]].append(entry)
-            continue
         for key, text in ATTENDANCE_LABELS.items():
-            if text in tokens:
+            if key != 'unaccounted' and (text in tokens or key in explained):
                 groups[key].append(entry)
-        if label is None and working:
+        if label is None and not explained and working:
             groups['unaccounted'].append(entry)
     return dict(date=day, evaluated=working, counts=dict(arrived=arrived, **{k: len(v) for k, v in groups.items()}),
                 **groups)
