@@ -122,9 +122,11 @@ class GPT:
                 async for event in stream:
                     if event.type == 'response.output_text.delta':
                         yield Event('text', event.delta)
+                    elif event.type in ('response.refusal.delta', 'response.refusal.done'):
+                        raise ProviderError('ai_refused')
                     elif event.type == 'response.output_item.done' and event.item.type == 'function_call':
                         call = event.item
-                        if call.status != 'completed':
+                        if call.status == 'incomplete':
                             dropped_call = True
                             continue
                         try:
@@ -137,12 +139,15 @@ class GPT:
                         response = event.response
                         if response.usage is not None:
                             yield Event('usage', openai_usage(response.usage), response.model)
+                        if any(block.type == 'refusal' for item in response.output if item.type == 'message'
+                               for block in item.content):
+                            raise ProviderError('ai_refused')
                         truncated = event.type == 'response.incomplete' and getattr(response.incomplete_details, 'reason', None) == 'max_output_tokens'
                         if event.type != 'response.completed' and not truncated:
                             raise ProviderError()
                         if truncated or dropped_call:
                             yield Event('text', '（回答太長，已截斷）')
-                        yield Event('stop', [item.model_dump(exclude_none=True) for item in response.output],
+                        yield Event('stop', [item.model_dump(exclude_none=True, by_alias=True) for item in response.output],
                                     truncated=truncated or dropped_call)
                     elif event.type == 'error':
                         raise ProviderError()
