@@ -249,6 +249,12 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
         else:
             # SQLite SELECT alone does not start a snapshot with the legacy driver.
             db.connection().exec_driver_sql('BEGIN')
+        if export:
+            entries = [exchange_json(r, f, e if content_enabled else None)
+                       for r, f, e in db.execute(select(row, rating_row, AiExchangeRow).select_from(joined)
+                           .where(*filters).order_by(row.created_at.desc(), row.id.desc()).limit(501))]
+            keys = ('usage_id', 'created_at', 'name', 'provider', 'scope', 'rating', 'reason', 'question', 'answer', 'tools')
+            return dict(rows=[{k: entry[k] for k in keys} for entry in entries[:500]], truncated=len(entries) > 500)
         names = dict(db.execute(select(latest.c.actor_id, latest.c.actor_name).where(latest.c.rank == 1)).all())
         totals = public(db.execute(select(*metrics).select_from(joined).where(*filters)).mappings().one())
         up, down = totals.pop('up'), totals.pop('down')
@@ -267,10 +273,7 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
         people = [dict(actor_id=k, name=v) for k, v in sorted(names.items())]
         entries = [exchange_json(r, f, e if content_enabled else None)
                    for r, f, e in db.execute(select(row, rating_row, AiExchangeRow).select_from(joined)
-                       .where(*filters).order_by(row.created_at.desc(), row.id.desc()).limit(500 if export else 50))]
-        if export:
-            keys = ('usage_id', 'created_at', 'name', 'provider', 'scope', 'rating', 'reason', 'question', 'answer', 'tools')
-            return [{k: entry[k] for k in keys} for entry in entries]
+                       .where(*filters).order_by(row.created_at.desc(), row.id.desc()).limit(50))]
         recent = [{k: v for k, v in entry.items() if k not in ('question', 'answer', 'project_id')} for entry in entries]
         reasons = dict.fromkeys(('wrong', 'incomplete', 'slow', 'other', 'unspecified'), 0)
         reasons.update(dict(db.execute(select(func.coalesce(rating_row.reason, 'unspecified'), func.count()).select_from(joined)

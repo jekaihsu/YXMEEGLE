@@ -231,8 +231,14 @@ def register(app, *, identity, sessions, cfg):
         result = ledger.query(sessions, data['wid'], start.isoformat(), end.isoformat(), actor, provider, rating, scope, q,
             content_enabled=app.state.ai_store_content, retention_days=app.state.ai_content_retention_days, export=exporting)
         if exporting:
-            return Response(''.join(json.dumps(row, ensure_ascii=False) + '\n' for row in result),
-                            media_type='application/x-ndjson', headers={'Cache-Control': 'no-store'})
+            rows = result['rows']
+            truncated = result['truncated']
+            count = len(rows)
+            if truncated:
+                rows.append(dict(truncated=True, limit=500, row_count=count))
+            return Response(''.join(json.dumps(row, ensure_ascii=False) + '\n' for row in rows),
+                            media_type='application/x-ndjson', headers={'Cache-Control': 'no-store',
+                                'X-Export-Truncated': str(truncated).lower(), 'X-Export-Row-Count': str(count)})
         return result
 
     @app.get('/api/ai/usage/{usage_id}/exchange')

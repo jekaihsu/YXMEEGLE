@@ -182,6 +182,32 @@ def test_usage_read_purges_when_off(app, client, monkeypatch):
         assert db.get(ledger.AiExchangeRow, 'old') is None
 
 
+def test_export_skips_aggregates_and_reports_cap(app, client):
+    from .test_ai_api import wid
+    role(client, 'u-manager')
+    workspace = wid(app, client)
+    with app.state.sessions.begin() as db:
+        for i in range(501):
+            data = values()
+            data.update(id=str(i), workspace_id=workspace, created_at=datetime.now(timezone.utc), day=ledger.today())
+            db.add(ledger.AiUsageRow(**data))
+    engine = app.state.sessions.kw['bind']
+    statements = []
+    def capture(conn, cursor, statement, *args):
+        statements.append(statement.lower())
+    event.listen(engine, 'before_cursor_execute', capture)
+    try:
+        response = client.get('/api/ai/usage/export')
+    finally:
+        event.remove(engine, 'before_cursor_execute', capture)
+    rows = [json.loads(line) for line in response.text.splitlines()]
+    assert response.headers['X-Export-Truncated'] == 'true'
+    assert response.headers['X-Export-Row-Count'] == '500'
+    assert len(rows) == 501
+    assert rows[-1] == dict(truncated=True, limit=500, row_count=500)
+    assert not any('sum(' in s or 'count(' in s or 'row_number(' in s for s in statements)
+
+
 @pytest.mark.parametrize('raw, expected', [('0', 0), (' 12 ', 12), ('365', 365)])
 def test_valid_retention(raw, expected):
     assert ledger.content_retention({'AI_CONTENT_RETENTION_DAYS': raw}) == expected

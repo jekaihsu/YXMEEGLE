@@ -324,7 +324,9 @@ def test_export_limit_and_question_answer_caps(app, client):
             data = values()
             data.update(id=f'bulk-{i}', workspace_id=wid(app, client), created_at=datetime.now(timezone.utc), day=ledger.today())
             db.add(ledger.AiUsageRow(**data))
-    assert len(client.get('/api/ai/usage/export').text.splitlines()) == 500
+    response = client.get('/api/ai/usage/export')
+    assert len(response.text.splitlines()) == 501
+    assert json.loads(response.text.splitlines()[-1]) == dict(truncated=True, limit=500, row_count=500)
     assert len(client.get('/api/ai/usage').json()['recent']) == 50
 
 
