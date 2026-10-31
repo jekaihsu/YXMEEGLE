@@ -83,15 +83,19 @@ def test_ledger_retries_off_event_loop(app, client, monkeypatch):
     import threading
     from .ai import ledger
     original = ledger.record
-    main = threading.get_ident()
-    threads = []
+    loop_threads, threads = [], []
+    class Observed(Fake):
+        async def stream(self, *args):
+            loop_threads.append(threading.get_ident())
+            async for event in super().stream(*args):
+                yield event
     def record(*args, **kwargs):
         threads.append(threading.get_ident())
         return original(*args, **kwargs)
     monkeypatch.setattr(ledger, 'record', record)
-    app.state.ai_providers = {'claude': Fake()}
+    app.state.ai_providers = {'claude': Observed()}
     events(client.post('/api/ai/chat', json=BODY))
-    assert threads and all(t != main for t in threads)
+    assert threads and loop_threads and set(threads).isdisjoint(loop_threads)
     assert len(rows(app)) == 1
 
 
