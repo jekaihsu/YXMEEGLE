@@ -111,7 +111,7 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
 | --- | --- | --- |
 | `search_cases` | `GET /api/projects?q=` | 最多 8 筆案件 id、編號、名稱、狀態、PM id、到期日及總筆數；來源有 `as_of` 時保留 |
 | `case_progress` | `GET /api/projects/{id}/progress` | 階段與 `basis` 證據強度、節點完成數與百分比、`as_of`、缺口 |
-| `case_owners` | `GET /api/case-detail/{id}` 與啟用時的節點指派 API | PM id 與姓名；無姓名為 `name_unavailable`；節點未啟用或無權限時 `nodes:null` 並明示 `node assignment data unavailable` |
+| `case_owners` | `GET /api/case-detail/{id}` 與啟用時的節點指派 API | PM id 與姓名；無姓名為 `name_unavailable`；案件來源時間為 `as_of`，節點指派讀取時間另列 `node_assignments_as_of`，缺少時間時省略欄位；節點未啟用、無權限或讀取失敗時 `nodes:null` 並明示 `node assignment data unavailable` |
 | `attendance_today` | `GET /api/people/attendance` | 今天（Asia/Taipei）的遲到、早退、缺卡、免打卡、補卡／修正、請假／出差／外出、無紀錄名單，加 `as_of` 與資料是否完整 |
 
 出勤只有「遲到、缺卡、請假、出差、外出、到班」等證據標籤，沒有明確的缺勤判定。助理必須說「尚無打卡紀錄」，不可斷定「缺席」。
@@ -120,7 +120,11 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
 
 每日配額與每人同時兩個提問是軟限制。併發限制只在單一 web process 內有效；每日用量讀取 ledger，但檢查與寫入不保留額度，多個 process 或同時請求可能超額。
 
-整題期限預設 120 秒，可用 `AI_QUESTION_TIMEOUT_SECONDS` 設定。逾時回傳 `ai_upstream` 並說明逾時。中止、錯誤或逾時且該步無最終用量時，以序列化 system、tools、messages 字數除二向上取整估算輸入，以已串流文字字數估算輸出；不低於已有用量。ledger 的 `error_code` 為 `usage_estimated`，費用照估算量計算。ledger 在背景執行緒寫入，失敗重試一次，每題僅一列。
+整題期限預設 120 秒，可用 `AI_QUESTION_TIMEOUT_SECONDS` 設定。逾時回傳 `ai_upstream` 並說明逾時。中止、錯誤或逾時且該步無最終用量時，以序列化 system、tools、messages 字數除二向上取整估算輸入，以已串流文字字數估算輸出；不低於已有用量。保留供應商已回報的快取讀取與寫入量，只將輸入估算的不足量加到未快取輸入。中止或沒有既有錯誤碼時，ledger 的 `error_code` 為 `usage_estimated`；錯誤或逾時保留原有錯誤碼。費用照估算量計算。先釋放併發名額，再於背景執行緒寫入 ledger；寫入不受請求取消影響，失敗重試一次，每題僅一列。
+
+中止與錯誤時的 token 估算只是近似值，不含隱藏推理 token，且可能高估精簡輸入。每日配額是軟限制，不是供應商費用的硬上限。
+
+模型回答仍可能包含使用者可點擊的外部連結，這是殘餘風險。前端永不渲染圖片。
 
 兩個模型輸出上限皆為 16000 token，含推理。因長度截斷時仍是 `ok`，最後追加「（回答太長，已截斷）」。
 

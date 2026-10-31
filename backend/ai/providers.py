@@ -117,23 +117,33 @@ class GPT:
                 input=messages, tools=definitions, stream=True, store=False,
                 include=['reasoning.encrypted_content'], max_output_tokens=16000,
             )
+            dropped_call = False
             async with stream:
                 async for event in stream:
                     if event.type == 'response.output_text.delta':
                         yield Event('text', event.delta)
                     elif event.type == 'response.output_item.done' and event.item.type == 'function_call':
                         call = event.item
-                        yield Event('tool', ToolCall(call.call_id, call.name, json.loads(call.arguments)))
+                        if call.status != 'completed':
+                            dropped_call = True
+                            continue
+                        try:
+                            arguments = json.loads(call.arguments)
+                        except (ValueError, TypeError):
+                            dropped_call = True
+                            continue
+                        yield Event('tool', ToolCall(call.call_id, call.name, arguments))
                     elif event.type in ('response.completed', 'response.incomplete', 'response.failed'):
                         response = event.response
                         if response.usage is not None:
                             yield Event('usage', openai_usage(response.usage), response.model)
-                        if event.type == 'response.incomplete' and getattr(response.incomplete_details, 'reason', None) == 'max_output_tokens':
-                            yield Event('text', '（回答太長，已截斷）')
-                        elif event.type != 'response.completed':
+                        truncated = event.type == 'response.incomplete' and getattr(response.incomplete_details, 'reason', None) == 'max_output_tokens'
+                        if event.type != 'response.completed' and not truncated:
                             raise ProviderError()
+                        if truncated or dropped_call:
+                            yield Event('text', '（回答太長，已截斷）')
                         yield Event('stop', [item.model_dump(exclude_none=True) for item in response.output],
-                                    truncated=event.type == 'response.incomplete')
+                                    truncated=truncated or dropped_call)
                     elif event.type == 'error':
                         raise ProviderError()
 

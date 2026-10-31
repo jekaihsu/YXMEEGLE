@@ -81,7 +81,13 @@ def register(app, *, identity, sessions, cfg):
             return JSONResponse({'code': 'ai_busy', 'message': '最多同時進行兩個提問'}, status_code=429)
         active[key] = active.get(key, 0) + 1
 
+        released = False
+
         def release():
+            nonlocal released
+            if released:
+                return
+            released = True
             remaining = active[key] - 1
             if remaining:
                 active[key] = remaining

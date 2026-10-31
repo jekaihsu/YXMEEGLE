@@ -119,3 +119,65 @@ def test_pm_name_unavailable_preserves_real_id(app, client):
         row.data = storage.save(db, BusinessRow, wid, state)
     result = tool(app, client, 'case_owners', {'case_id': pid})
     assert result['pm'] == {'id': 'unresolved-person', 'name': 'name_unavailable'}
+
+
+@pytest.mark.parametrize('failure', ['503', 'timeout'])
+def test_owners_assignment_failure_keeps_pm(app, client, monkeypatch, failure):
+    import httpx
+    from fastapi.testclient import TestClient
+    from .app import create_app
+    from .node_assignment.errors import Failure
+    app = create_app({**app.state.cfg, 'NODE_ASSIGNMENT_ENABLED': 'true'})
+    client = TestClient(app, cookies=dict(client.cookies.items()))
+    if failure == '503':
+        def unavailable(ctx):
+            raise Failure('lark_unavailable', 'Lark unavailable')
+        monkeypatch.setattr(app.state.node_assignment, 'overview', unavailable)
+        response = client.get('/api/projects/p1/node-assignments')
+        assert response.status_code == 503 and response.json()['code'] == 'lark_unavailable'
+    else:
+        class TimeoutTransport(httpx.ASGITransport):
+            async def handle_async_request(self, request):
+                if request.url.path.endswith('/node-assignments'):
+                    raise httpx.ReadTimeout('node read timed out', request=request)
+                return await super().handle_async_request(request)
+        monkeypatch.setattr('backend.ai.tools.httpx.ASGITransport', TimeoutTransport)
+    pid = client.get('/api/projects').json()['items'][0]['id']
+    detail = client.get('/api/case-detail/' + pid).json()
+    result = tool(app, client, 'case_owners', {'case_id': pid})
+    assert result['pm']['name'] == detail['header']['pm']['name']
+    assert result['node_assignment_status'] == 'node assignment data unavailable'
+    assert result['nodes'] is None
+
+
+def test_owners_real_source_timestamp_and_missing_time(app, client):
+    from .test_backend import WorkspaceRow, BusinessRow, storage
+    wid = app.state.signer.loads(client.cookies.get('meegle_session'))['wid']
+    for timestamp in ['2026-10-30T01:02:03Z', None]:
+        with app.state.sessions.begin() as db:
+            row = db.get(WorkspaceRow, wid)
+            state = storage.load(db, BusinessRow, row)
+            pid = state['projects'][0]['id']
+            state['source_status'] = {'last_sync': timestamp}
+            row.data = storage.save(db, BusinessRow, wid, state)
+        detail = client.get('/api/case-detail/' + pid).json()
+        assert 'as_of' not in detail
+        assert detail['sections']['overview']['source_time']['value'] == timestamp
+        result = tool(app, client, 'case_owners', {'case_id': pid})
+        if timestamp:
+            assert result['as_of'] == timestamp
+        else:
+            assert 'as_of' not in result
+        assert 'node_assignments_as_of' not in result
+
+
+def test_search_real_routes_do_not_claim_timestamp(app, client):
+    from .ai.prompts import system_prompt
+    page = client.get('/api/projects').json()
+    query = page['items'][0]['code']
+    assert 'as_of' not in page
+    assert 'as_of' not in client.get('/api/projects', params={'q': query}).json()
+    assert 'as_of' not in tool(app, client, 'search_cases', {'query': query})
+    prompt = system_prompt()
+    assert '查詢當下資料' in prompt
+    assert 'case_progress' in prompt and 'attendance_today' in prompt
