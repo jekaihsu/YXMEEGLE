@@ -44,7 +44,7 @@
 ### `POST /api/ai/feedback`
 
 ```json
-{ "usage_id": "…", "rating": "up", "reason": "wrong" }
+{ "usage_id": "…", "rating": "down", "reason": "wrong" }
 ```
 
 - `rating`：`up`、`down` 或 `none`（取消）。
