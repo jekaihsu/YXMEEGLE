@@ -11,7 +11,7 @@ from pydantic import TypeAdapter
 from openai.types.responses.response_create_params import ResponseCreateParamsStreaming
 
 from .ai import providers
-from .ai.catalog import MODELS, Usage, prices
+from .ai.catalog import MODELS, Usage, prices, cost_micro_usd
 from .ai.tools import TOOLS
 from .test_ai_providers import wire
 from .test_backend import app, client
@@ -502,6 +502,10 @@ def test_sdk_status_diagnostics_and_redaction(monkeypatch, caplog, provider):
     log_failure(provider, 1, failure.value, model='model', elapsed_ms=10)
     assert 'status_code=404' in caplog.text and 'request_id=req_test' in caplog.text
     assert 'upstream_type=invalid_request_error' in caplog.text
+    assert 'upstream_param=model' in caplog.text
+    assert 'upstream_code=model_not_found' in caplog.text
+    assert len(caplog.records) == 1
+    assert '\n' not in caplog.records[0].getMessage()
     for secret in ['SYSTEM_SENTINEL', 'PROMPT_SENTINEL', 'TOOL_SENTINEL', 'sk-secret', 'token-secret', 'COOKIE_SENTINEL']:
         assert secret not in caplog.text
     assert len(failure.value.diagnostics['message']) <= 200
@@ -541,6 +545,40 @@ def test_stream_diagnostics_redact_echoed_private_input_before_bounding(monkeypa
     assert 'SYSTEM_SENTINEL' not in caplog.text and 'sk-secret' not in caplog.text
     assert 'token-secret' not in caplog.text and len(caplog.records) == 1
     assert len(failure.value.diagnostics['message']) <= 200
+
+
+@pytest.mark.parametrize('provider', ['openai', 'anthropic'])
+def test_sdk_timeout_construction_fits_question_deadline(monkeypatch, provider):
+    from anthropic import AsyncAnthropic
+    from .test_ai_providers import anthropic_events
+    observed = []
+    cls = AsyncOpenAI if provider == 'openai' else AsyncAnthropic
+    values = FIXTURES['text'] if provider == 'openai' else anthropic_events()
+    def handler(request):
+        return httpx2.Response(200, headers={'content-type': 'text/event-stream'}, content=wire(values))
+    def client(**kwargs):
+        observed.append(kwargs)
+        return cls(**kwargs, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler)))
+    monkeypatch.setattr(providers, 'AsyncOpenAI' if provider == 'openai' else 'AsyncAnthropic', client)
+    async def run():
+        adapter = providers.GPT('fictional') if provider == 'openai' else providers.Claude('fictional')
+        return [e async for e in adapter.stream(MODELS['gpt' if provider == 'openai' else 'claude'], 'system', [], TOOLS)]
+    asyncio.run(run())
+    timeout = observed[0]['timeout']
+    assert isinstance(timeout, httpx2.Timeout)
+    assert (timeout.connect, timeout.read, timeout.write, timeout.pool) == (10, 60, 10, 10)
+    assert observed[0]['max_retries'] == 0
+
+
+@pytest.mark.parametrize('write_rate,expected,cost', [(0, Usage(80, 20, 0, 12), 141),
+    (2, Usage(50, 20, 30, 12), 171), (None, Usage(80, 20, 0, 12), None)])
+def test_cache_write_tokens_use_write_rate_or_count_as_uncached_input(monkeypatch, write_rate, expected, cost):
+    install(monkeypatch, FIXTURES['tool-async-field'])
+    monkeypatch.setitem(MODELS, 'gpt', replace(MODELS['gpt'], prices=None if write_rate is None else prices(1, .05, write_rate, 5)))
+    result = collect()
+    usage = next(e.value for e in result if e.kind == 'usage')
+    assert usage == expected and usage.input_tokens == 100
+    assert cost_micro_usd(MODELS['gpt'], usage) == cost
 
 
 @pytest.mark.parametrize('source', ['failed', 'error-flat', 'error-nested'])

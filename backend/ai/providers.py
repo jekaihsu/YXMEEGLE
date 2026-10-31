@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 import json
 import re
+import httpx2 as httpx
 from functools import wraps
 from typing import Any, Literal
 
@@ -120,7 +121,7 @@ class Claude:
         definitions = [dict(name=name, description=t.label, input_schema=t.schema, strict=True)
                        for name, t in tools.items()]
         definitions[-1]['cache_control'] = {'type': 'ephemeral'}
-        async with AsyncAnthropic(api_key=self.key, max_retries=0, timeout=60) as client:
+        async with AsyncAnthropic(api_key=self.key, max_retries=0, timeout=httpx.Timeout(connect=10, read=60, write=10, pool=10)) as client:
             async with client.beta.messages.stream(
                 model=spec.model, max_tokens=16000, output_config={'effort': spec.effort},
                 system=[{'type': 'text', 'text': system, 'cache_control': {'type': 'ephemeral'}}],
@@ -165,9 +166,12 @@ class Claude:
             for call, result in zip(calls, results)]})
 
 
-def openai_usage(value):
+def openai_usage(value, spec=None):
     cached = value.input_tokens_details.cached_tokens or 0
-    return Usage(value.input_tokens - cached, cached, 0, value.output_tokens)
+    written = getattr(value.input_tokens_details, 'cache_write_tokens', 0) or 0
+    if spec is None or spec.prices is None or not spec.prices[2]:
+        written = 0
+    return Usage(value.input_tokens - cached - written, cached, written, value.output_tokens)
 
 
 class GPT:
@@ -181,7 +185,7 @@ class GPT:
         last_event_type = None
         sensitive = [self.key, system, *private_strings(messages)]
         try:
-            async with AsyncOpenAI(api_key=self.key, max_retries=0, timeout=60) as client:
+            async with AsyncOpenAI(api_key=self.key, max_retries=0, timeout=httpx.Timeout(connect=10, read=60, write=10, pool=10)) as client:
                 stream = await client.responses.create(
                     model=spec.model, reasoning={'effort': spec.effort}, instructions=system,
                     input=messages, tools=definitions, stream=True, store=False,
@@ -211,7 +215,7 @@ class GPT:
                         elif event.type in ('response.completed', 'response.incomplete', 'response.failed'):
                             response = event.response
                             if response.usage is not None:
-                                yield Event('usage', openai_usage(response.usage), response.model)
+                                yield Event('usage', openai_usage(response.usage, spec), response.model)
                             if any(block.type == 'refusal' for item in response.output if item.type == 'message'
                                    for block in item.content):
                                 raise ProviderError('ai_refused')

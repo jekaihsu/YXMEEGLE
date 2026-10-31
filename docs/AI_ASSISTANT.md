@@ -135,3 +135,5 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
 `attendance_today` 的 `labelled_arrival_count` 只計算標籤「到班」，不代表實際在場人數。`early_leave`、`exempt`、`supplemented` 分別為早退、免打卡、補卡／修正。任何人無紀錄均為 `incomplete:true`。工具過長時刪除完整項目並回傳 `truncated:true`，助理必須說明名單僅部分資料。`basis=rule` 是規則推導，不代表經查證完成。
 
 上游錯誤的 `detail` 僅提供給 `role == "manager"` 的提問者，與 `done.cost_usd` 使用相同權限判斷。例如 `OpenAI 404 model_not_found`。其他角色不會收到此欄位。`detail` 最多 200 字元，僅含供應商、HTTP 狀態及已清理的錯誤代碼或類型。伺服器以單行 warning 記錄供應商、模型、步數、耗時、例外類別、HTTP 狀態、上游代碼、類型、參數、request id、最後事件類型及最多 200 字元的清理後訊息。清理會遮蔽已知的提示詞、工具資料、金鑰及 bearer token。
+
+兩個供應商均停用 SDK 自動重試，並使用明確的 HTTP timeout。connect、write、pool 各 10 秒，read 為 60 秒，整題仍受 120 秒期限限制。OpenAI 回報 `input_tokens_details.cache_write_tokens` 時，若模型目錄有大於零的快取寫入單價，會拆分並按該單價計費；否則歸入未快取輸入，輸入總量不變。
