@@ -19,8 +19,9 @@ export function createChatAdapter(model:()=>ModelId,conversation:()=>string,onFo
   const epoch=getSessionEpoch();
   const content:ThreadAssistantMessagePart[]=[];
   try {
-   const history=messages.filter(m=>m.role==='user'||(m.role==='assistant'&&m.status?.type!=='incomplete')).map(m=>({role:m.role,content:m.content.filter(p=>p.type==='text').map(p=>p.text).join('')})).filter(m=>m.content);
-   if(history.some(m=>m.role==='user'&&m.content.length>4000))throw new Error('message_limit');
+   const all=messages.filter(m=>m.role==='user'||(m.role==='assistant'&&m.status?.type!=='incomplete')).map(m=>({role:m.role,content:m.content.filter(p=>p.type==='text').map(p=>p.text).join('')})).filter(m=>m.content);
+   if(all.at(-1)?.role==='user'&&all.at(-1)!.content.length>4000)throw new Error('message_limit');
+   const history=all.filter((m,i)=>m.role!=='user'||m.content.length<=4000||i===all.length-1);
    while(history.at(-1)?.role==='assistant')history.pop();
    const recent=history.slice(-20).map(m=>({...m,content:m.role==='assistant'?m.content.slice(0,20000):m.content}));
    if(recent[0]?.role==='assistant')recent.shift();

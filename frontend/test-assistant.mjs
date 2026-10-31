@@ -44,6 +44,8 @@ await run([...longHistory,turn('assistant','stale')]);assert.equal(sent().at(-1)
 let validationFetches=0;const successFetch=globalThis.fetch;
 globalThis.fetch=async(...args)=>{validationFetches++;return successFetch(...args)};
 assert.equal((await run([turn('user','x'.repeat(4001))])).at(-1).status.error,ui.ERROR_TEXT.message_limit);assert.equal(validationFetches,0,'long user validation happens before fetch');
+await run([turn('user','x'.repeat(4001)),turn('assistant','discard',{type:'incomplete',reason:'error'}),turn('user','short retry')]);
+assert.deepEqual(sent().map(m=>m.content),['short retry'],'a rejected oversized question does not poison later sends');
 for(const body of [{code:'ai_forbidden'},{}]){
  let forbidden=0;globalThis.fetch=async()=>json(body,403);
  assert.equal((await run(messages,()=>forbidden++)).at(-1).status.error,ui.ERROR_TEXT.ai_forbidden);assert.equal(forbidden,1,'403 reports forbidden without retry');
