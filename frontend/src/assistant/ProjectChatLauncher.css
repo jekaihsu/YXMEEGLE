@@ -19,3 +19,8 @@
 @media(max-width:640px){.project-chat-panel{inset:0;width:100%;height:100dvh;max-width:none;border:0;border-radius:0;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);box-sizing:border-box}.project-chat-header{padding:12px 16px}.project-chat-content{padding-bottom:12px}}
 @keyframes project-chat-enter{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
 @media(prefers-reduced-motion:reduce){.project-chat-panel{animation:none}}
+@container(max-width:750px){
+ .project-detail.project-detail-calm .pf-diagram-compact .pf-chain{flex-wrap:wrap}
+ .project-detail.project-detail-calm .pf-diagram-compact .pf-chain>li{flex:0 0 calc(100% / 3)}
+ .project-detail.project-detail-calm .pf-diagram-compact .pf-chain>li::after{display:none}
+}

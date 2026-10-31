@@ -80,6 +80,7 @@ const links=[...document.querySelectorAll('.assistant-message a')];assert.equal(
 await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='新對話').click());assert.equal(document.querySelectorAll('.assistant-suggestions button').length,4);
 globalThis.fetch=async()=>json({code:'ai_upstream'},503);
 await flush(()=>document.querySelectorAll('.assistant-suggestions button')[0].click(),60);assert.match(document.body.textContent,/AI 服務暫時無法回應/);assert.equal(document.querySelector('textarea').disabled,false);
+globalThis.fetch=async()=>new Response(stream(event({type:'text',delta:'重試成功'})+event({type:'done'})));await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重試').click(),60);assert.match(document.body.textContent,/重試成功/);assert.equal(document.querySelector('textarea').disabled,false);
 globalThis.fetch=async()=>json({code:'ai_forbidden'},403);
 await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重試').click(),60);
 assert.match(document.body.textContent,/你沒有權限查詢這項資料/);assert.equal(document.querySelector('textarea').disabled,true,'chat 403 disables composer');assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent==='送出').disabled,true,'chat 403 disables send');
@@ -127,7 +128,7 @@ await flush(()=>document.querySelector('.assistant-suggestions button').click(),
 assert.equal(document.querySelectorAll('[data-slot=thinking-indicator]').length,1);assert.equal(document.querySelector('[role=log]').getAttribute('aria-busy'),'true');assert.equal(document.querySelector('.assistant-completion').textContent,'');
 assert.doesNotMatch(document.body.textContent,/不應顯示的工具標籤/);
 await flush(()=>liveController.enqueue(encoder.encode(event({type:'text',delta:'第一段回答'}))),40);
-assert.match(document.body.textContent,/第一段回答/);
+assert.match(document.body.textContent,/第一段回答/);assert.equal(document.querySelector('.assistant-completion').textContent,'');assert.equal(document.querySelector('[data-role=assistant]').closest('[aria-live=off]')!==null,true);
 assert.equal(document.querySelector('[data-slot=thinking-indicator]'),null,'thinking disappears when answer starts');
 await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='停止回應').click(),40);
 assert.equal(liveSignal.aborted,true,'stop cancels the underlying fetch');
