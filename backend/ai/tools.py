@@ -255,6 +255,15 @@ def attendance_day(view, day):
                 **groups)
 
 
+APPROVAL_GROUPS = ('on_leave', 'trip', 'out')
+
+
+def counted(item, key):
+    """Punch evidence only counts on evaluated days; approvals also count on future weekdays so planned leave stays visible."""
+    from datetime import date
+    return item['evaluated'] or (key in APPROVAL_GROUPS and date.fromisoformat(item['date']).weekday() < 5)
+
+
 def project_attendance(value):
     day, view = value['day'], value['view']
     period = value['range']
@@ -273,6 +282,8 @@ def project_attendance(value):
         people = {}
         for item in daily:
             for key in ATTENDANCE_LABELS:
+                if not counted(item, key):
+                    continue
                 for person in item[key]:
                     row = people.setdefault(person['id'], dict(**person, days={}))
                     row['days'].setdefault(key, []).append(item['date'])
@@ -282,9 +293,10 @@ def project_attendance(value):
                    for p in ranked if p['days'].get('unaccounted')]
         result.update(week_start=dates[0] if dates else None, week_end=dates[-1] if dates else None,
             days=[pick(item, 'date', 'evaluated', 'counts') for item in daily],
-            summary={k: dict(person_days=sum(item['counts'][k] for item in daily),
-                            people=len({p['id'] for item in daily for p in item[k]})) for k in ATTENDANCE_LABELS},
-            top_unaccounted=ranking[:10], people=ranked[:50], labelled_arrival_count=sum(item['counts']['arrived'] for item in daily))
+            summary={k: dict(person_days=sum(item['counts'][k] for item in daily if counted(item, k)),
+                            people=len({p['id'] for item in daily if counted(item, k) for p in item[k]})) for k in ATTENDANCE_LABELS},
+            top_unaccounted=ranking[:10], people=ranked[:50],
+            labelled_arrival_count=sum(item['counts']['arrived'] for item in daily if item['evaluated']))
         result['truncated'] = len(ranked) > 50 or len(ranking) > 10
     # Preserve counts before trimming lists so partial names never change the headline.
     while len(json.dumps(result, ensure_ascii=False)) > 6000:

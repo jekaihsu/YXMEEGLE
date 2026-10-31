@@ -190,3 +190,23 @@ def test_approval_explanations_exclude_no_record(attendance_route):
     assert result['trip'] == [{'id': 'ou_6', 'name': '同事6'}]
     assert result['out'] == [{'id': 'ou_7', 'name': '同事7'}]
     assert not {'ou_0', 'ou_1', 'ou_6', 'ou_7'} & {p['id'] for p in result['unaccounted']}
+
+
+@pytest.mark.parametrize('attendance_route', ['mixed'], indirect=True)
+def test_week_summary_ignores_punch_labels_on_unevaluated_days(attendance_route, monkeypatch):
+    monkeypatch.setattr('backend.ai.tools.today', lambda: '2026-10-14')
+    result = call(attendance_route, {'range': 'week', 'date': '2026-10-12'})
+    assert [d['evaluated'] for d in result['days']] == [True, True, True, False, False, False, False]
+    late = result['summary']['late']
+    assert late == {'people': 1, 'person_days': 3}, 'the fixture also labels Thursday and Friday, which are still in the future'
+    person = next(p for p in result['people'] if p['id'] == 'ou_6')
+    assert person['days']['late'] == ['2026-10-12', '2026-10-13', '2026-10-14']
+    assert result['summary']['missing_punch']['person_days'] == 3
+
+
+@pytest.mark.parametrize('attendance_route', ['approvals'], indirect=True)
+def test_week_summary_keeps_approved_leave_on_future_weekdays(attendance_route, monkeypatch):
+    monkeypatch.setattr('backend.ai.tools.today', lambda: '2026-10-12')
+    result = call(attendance_route, {'range': 'week', 'date': '2026-10-12'})
+    assert result['summary']['on_leave']['person_days'] == 2
+    assert result['summary']['trip']['people'] == 1 and result['summary']['out']['people'] == 1
