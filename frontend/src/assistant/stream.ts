@@ -19,7 +19,7 @@ export async function* readEvents(body:ReadableStream<Uint8Array>, signal:AbortS
   if(event.type==='text'&&typeof event.delta!=='string')throw new Error('invalid_event');
   if(event.type==='tool'&&(!['running','done','error'].includes(event.status)||!['id','name','label'].every(key=>typeof event[key]==='string')))throw new Error('invalid_event');
   if(event.type==='start'&&event.usage_id!==undefined&&typeof event.usage_id!=='string')throw new Error('invalid_event');
-  if(event.type==='tool'&&event.displays!==undefined&&(!Array.isArray(event.displays)||!event.displays.every(isDisplay)))throw new Error('invalid_display');
+  if(event.type==='tool'&&event.displays!==undefined)event.displays=Array.isArray(event.displays)?event.displays.filter(isDisplay):[];
   if(event.type==='error'&&typeof event.code!=='string')throw new Error('invalid_event');
   return event;
  }

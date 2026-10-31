@@ -39,7 +39,7 @@ try{
  await page.locator('[data-slot=chart]').scrollIntoViewIfNeeded();
  await page.locator('.assistant-chart-bar').first().hover();
  assert.match(await page.getByRole('tooltip').innerText(),/100%/);
- await page.getByRole('button',{name:'規劃 100%'}).focus();
+ await page.getByRole('button',{name:'查看規劃的圖表提示'}).focus();
  assert.match(await page.getByRole('tooltip').innerText(),/100%/);
  await screenshot('chart-light');
  await theme('dark');
