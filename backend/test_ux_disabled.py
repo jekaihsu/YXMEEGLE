@@ -143,6 +143,7 @@ def test_production_quarantines_stored_seed_data(client):
         row = WorkspaceRow(id='isolated-production', version=1, data=seed())
         row.data['environment'] = 'production'
         db.add(row)
+    client.cookies.clear()
     client.cookies.set('meegle_session', app.state.signer.dumps({
         'mode': 'demo', 'wid': 'isolated-production', 'uid': 'u-pm'}))
     response = client.get('/api/workspace')

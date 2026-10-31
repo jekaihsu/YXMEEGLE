@@ -2,7 +2,7 @@
 from datetime import date, timedelta
 from typing import Literal
 
-from fastapi import HTTPException, Query, Request
+from fastapi import Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.concurrency import run_in_threadpool
@@ -53,15 +53,17 @@ def register(app, *, identity, sessions, cfg):
     active = {}
     limit = int(cfg.get('AI_DAILY_TOKEN_LIMIT_PER_USER', '400000'))
 
+    def authenticated(request: Request):
+        return identity(request)
+
     @app.get('/api/ai/models')
-    def get_models(request: Request):
-        identity(request)
+    def get_models(auth=Depends(authenticated)):
         return {'default': 'claude', 'models': [dict(id=key, label=spec.label,
                 available=key in app.state.ai_providers) for key, spec in models.items()]}
 
     @app.post('/api/ai/chat')
-    async def chat(request: Request, body: ChatRequest):
-        data, user = await run_in_threadpool(identity, request)
+    async def chat(request: Request, body: ChatRequest, auth=Depends(authenticated)):
+        data, user = auth
         adapter = app.state.ai_providers.get(body.model)
         if adapter is None:
             return JSONResponse({'code': 'ai_unconfigured', 'message': '此模型尚未設定金鑰'}, status_code=503)
@@ -86,8 +88,9 @@ def register(app, *, identity, sessions, cfg):
 
     @app.get('/api/ai/usage')
     def usage(request: Request, from_: date | None = Query(None, alias='from'), to: date | None = None,
-              actor: str | None = Query(None, max_length=120), provider: ModelId | None = None):
-        data, user = identity(request)
+              actor: str | None = Query(None, max_length=120), provider: ModelId | None = None,
+              auth=Depends(authenticated)):
+        data, user = auth
         if user['role'] != 'manager':
             raise HTTPException(403, '僅主管可查看 AI 用量')
         end = to or date.fromisoformat(ledger.today())

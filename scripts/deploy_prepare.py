@@ -143,9 +143,10 @@ def staging():
     exact += ['backend/sop_source_contracts.json', 'backend/sop_import/catalog.json', 'backend/report_link_vocabulary.json']
     exact += ['scripts/backup_publish.py','scripts/backup_reconcile.py',
               'scripts/backup_offsite_acceptance.py','backend/requirements.lock',
-              'scripts/migrate_index_tables.py','scripts/backfill_index.py']
+              'scripts/migrate_index_tables.py','scripts/backfill_index.py','scripts/migrate_ai_usage.py']
     files = [ROOT / x for x in exact]
     files += [p for p in (ROOT/'backend').glob('*.py') if not p.name.startswith('test_')]
+    files += [p for p in (ROOT/'backend'/'ai').rglob('*.py') if not p.name.startswith('test_')]
     files += [p for p in (ROOT/'backend'/'live_read').rglob('*.py') if not p.name.startswith('test_')]
     # ops_sync is imported by app.py when FEATURE_LARK_AUTHORITATIVE_OPS is on; its test-only helpers (testing*.py) stay out.
     files += [p for p in (ROOT/'backend'/'ops_sync').rglob('*.py') if not p.name.startswith('test')]
