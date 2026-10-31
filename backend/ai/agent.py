@@ -12,7 +12,7 @@ from time import perf_counter
 from . import ledger
 from .catalog import Usage, cost_micro_usd
 from .prompts import system_prompt, project_system_prompt
-from .providers import ProviderError
+from .providers import ProviderError, failure_diagnostics
 from .tools import TOOLS, execute, displays
 
 
@@ -20,10 +20,12 @@ QUESTION_TIMEOUT_SECONDS = 120
 logger = logging.getLogger(__name__)
 
 
-def log_failure(provider, step, exc):
-    logger.warning('ai_upstream provider=%s step=%s exception=%s status_code=%s request_id=%s',
-                   provider, step, type(exc).__name__, getattr(exc, 'status_code', None),
-                   getattr(exc, 'request_id', None))
+def log_failure(provider, step, exc, *, model=None, elapsed_ms=None):
+    detail = failure_diagnostics(exc)
+    logger.warning('ai_upstream provider=%s model=%s step=%s elapsed_ms=%s exception=%s status_code=%s request_id=%s upstream_code=%s upstream_type=%s upstream_param=%s last_event_type=%s message=%s',
+                   provider, model, step, elapsed_ms, getattr(exc, 'exception_class', type(exc).__name__),
+                   detail['status_code'], detail['request_id'], detail['upstream_code'],
+                   detail['upstream_type'], detail['upstream_param'], detail['last_event_type'], detail['message'])
 
 
 def sse(value):
@@ -92,7 +94,7 @@ class ChatRun:
                     yield event
         except TimeoutError as exc:
             self.status, self.error_code = 'error', 'ai_upstream'
-            log_failure(self.spec.id, self.steps, exc)
+            log_failure(self.spec.provider, self.steps, exc, model=self.model, elapsed_ms=self.elapsed())
             yield sse(dict(type='error', code='ai_upstream', message='助理回答逾時，請稍後重試'))
         finally:
             await self.finish()
@@ -183,7 +185,14 @@ class ChatRun:
             self.status = 'aborted'
             raise
         except Exception as exc:
-            log_failure(self.spec.id, self.steps, exc)
+            log_failure(self.spec.provider, self.steps, exc, model=self.model, elapsed_ms=self.elapsed())
             self.status = 'error'
             self.error_code = exc.code if isinstance(exc, ProviderError) else 'ai_upstream'
-            yield sse(dict(type='error', code=self.error_code, message='助理暫時無法回答，請稍後重試'))
+            error = dict(type='error', code=self.error_code, message='助理暫時無法回答，請稍後重試')
+            if self.user['role'] == 'manager':
+                diagnostic = failure_diagnostics(exc)
+                parts = [diagnostic['status_code'], diagnostic['upstream_code'] or diagnostic['upstream_type']]
+                if any(parts):
+                    name = 'OpenAI' if self.spec.provider == 'openai' else 'Anthropic'
+                    error['detail'] = ' '.join([name, *(str(p) for p in parts if p)])[:200]
+            yield sse(error)
