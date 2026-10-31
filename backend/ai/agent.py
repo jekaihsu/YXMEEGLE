@@ -11,7 +11,7 @@ from time import perf_counter
 
 from . import ledger
 from .catalog import Usage, cost_micro_usd
-from .prompts import system_prompt
+from .prompts import system_prompt, project_system_prompt
 from .providers import ProviderError
 from .tools import TOOLS, execute, displays
 
@@ -45,6 +45,8 @@ class ChatRun:
         self.unpriced = False
         self.finished = False
         self.cookie = ''
+        self.project_context = None
+        self.scope = 'project' if body.project_id is not None else 'global'
         self.recorded = lambda: None
         self.step_final_usage = False
         self.streamed_chars = self.input_floor = 0
@@ -73,6 +75,7 @@ class ChatRun:
                 await run_in_threadpool(ledger.record, self.app.state.sessions, id=self.usage_id, workspace_id=self.data['wid'], actor_id=self.user['id'],
                       actor_name=self.user.get('name') or '', conversation_id=self.body.conversation_id,
                       provider=self.spec.id, model=self.model, effort=self.spec.effort,
+                      scope=self.scope, project_id=self.body.project_id,
                       input_tokens=usage.input_tokens, cache_read_tokens=usage.cache_read,
                       cache_write_tokens=usage.cache_write, output_tokens=usage.output,
                       cost_micro_usd=self.cost(), price_version=self.spec.price_version,
@@ -84,7 +87,7 @@ class ChatRun:
 
     async def stream(self):
         try:
-            async with asyncio.timeout(float(self.app.state.cfg.get('AI_QUESTION_TIMEOUT_SECONDS', QUESTION_TIMEOUT_SECONDS))):
+            async with asyncio.timeout(max(0, float(self.app.state.cfg.get('AI_QUESTION_TIMEOUT_SECONDS', QUESTION_TIMEOUT_SECONDS)) - self.elapsed() / 1000)):
                 async for event in self._stream():
                     yield event
         except TimeoutError as exc:
@@ -98,18 +101,19 @@ class ChatRun:
         messages = [m.model_dump() for m in self.body.messages]
         cache = {}
         try:
-            yield sse(dict(type='start', usage_id=self.usage_id, conversation_id=self.body.conversation_id, provider=self.spec.id))
-            system = system_prompt()
+            yield sse(dict(type='start', usage_id=self.usage_id, conversation_id=self.body.conversation_id, provider=self.spec.id, scope=self.scope))
+            system = project_system_prompt(self.project_context) if self.project_context else system_prompt()
+            tools = {} if self.project_context else TOOLS
             for _ in range(5):
                 self.steps += 1
                 self.step_usage = Usage()
                 self.step_final_usage = False
                 self.streamed_chars = 0
                 self.input_floor = math.ceil(len(json.dumps(dict(system=system,
-                    tools={k: dict(description=t.label, schema=t.schema) for k, t in TOOLS.items()},
+                    tools={k: dict(description=t.label, schema=t.schema) for k, t in tools.items()},
                     messages=messages), ensure_ascii=False)) / 2)
                 calls, content = [], None
-                async for event in self.adapter.stream(self.spec, system, messages, TOOLS):
+                async for event in self.adapter.stream(self.spec, system, messages, tools):
                     if event.kind == 'text':
                         self.streamed_chars += len(event.value)
                         if self.first_token_ms is None:
@@ -138,7 +142,7 @@ class ChatRun:
                         done['cost_usd'] = None if cost is None else cost / 1_000_000
                     yield sse(done)
                     return
-                if self.steps == 5:
+                if self.project_context or self.steps == 5:
                     raise ProviderError()
                 keys = [(c.name, json.dumps(c.args, sort_keys=True, ensure_ascii=False)) for c in calls]
                 pending = {}

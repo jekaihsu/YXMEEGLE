@@ -53,3 +53,15 @@
 - 案件側邊對話在案件 A 問「誰負責」會依案件 A 的脈絡回答；不能回答其他案件的問題，會說明只能回答本案件。
 - 同一個使用者無權查看的案件，開啟側邊對話後送出問題得到 `ai_forbidden`。
 - 案件範圍的一個提問恰好一次模型呼叫、零工具呼叫，帳本一列，`scope='project'`。
+
+## 後端執行細節
+
+案件脈絡沿用 case-detail、progress 與 node-assignments 路由及工具投影。基本資料只保留案件 id、案名、案號與目前階段，另保留已授權的期限與阻礙。不載入金額、合約列或來源連結。現有路由沒有最近變更清單，因此以 `recent_changes.unavailable` 明示無法取得。
+
+基本資料讀取失敗（含 5xx）在模型呼叫前回傳相同的 HTTP 403 `ai_forbidden`，不寫帳、不註冊可評分的提問。進度失敗以 `progress.unavailable` 表示；節點指派未啟用、讀取失敗或無權限時保留 `nodes:null` 與 `node assignment data unavailable`。
+
+每個 app process 最多快取 128 個使用者案件鍵，90 秒從建置完成起算。同鍵同時建置共用一個 task；單一等待者取消不取消建置。滿載時優先移除已完成項目，全部仍在建置時等待任一完成，不無限增加 task。權限異動可能需等待既有快取到期才反映。
+
+JSON 使用固定欄位順序與緊湊編碼。超過 12,000 字元時標示 `truncated:true`，依最近變更、阻礙、期限、進度、負責人、案件基本資料順序移除完整清單項目。單一欄位仍過長時替換為 `unavailable`，不截斷 JSON 字串。
+
+帳本遷移可重跑，新增 `scope VARCHAR(16) NOT NULL DEFAULT 'global'` 與可空的 `project_id VARCHAR(200)`。既有資料保持不變。`scope` 篩選同時限制用量、評分、原因分佈、people 與 recent；`by_*` 結構不變。

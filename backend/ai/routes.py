@@ -2,19 +2,21 @@
 import asyncio
 from collections import deque
 from dataclasses import dataclass, field
-from time import monotonic
+from time import monotonic, perf_counter
 from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from starlette.concurrency import run_in_threadpool
 
 from . import ledger
 from .agent import QUESTION_TIMEOUT_SECONDS, ChatRun
 from .catalog import ModelId, registry
 from .providers import ADAPTERS
+from .project_context import ProjectContextCache
+from .tools import ReadDenied, valid_case_id
 
 
 class Message(BaseModel):
@@ -33,6 +35,15 @@ class ChatRequest(BaseModel):
     model_config = ConfigDict(extra='forbid')
     model: ModelId
     conversation_id: str = Field(min_length=1, max_length=120)
+    project_id: str | None = None
+
+    @field_validator('project_id')
+    @classmethod
+    def project_id_valid(cls, value):
+        if value is not None and not valid_case_id(value):
+            raise ValueError('invalid project id')
+        return value
+
     messages: list[Message] = Field(min_length=1, max_length=20)
 
     @model_validator(mode='after')
@@ -82,6 +93,8 @@ def register(app, *, identity, sessions, cfg):
     models = registry(cfg.get('AI_PRICE_TABLE_JSON'))
     app.state.ai_providers = {key: ADAPTERS[spec.provider](cfg[spec.key_env])
                               for key, spec in models.items() if cfg.get(spec.key_env)}
+    contexts = ProjectContextCache()
+    app.state.ai_project_contexts = contexts
     active = {}
     feedback_writes = {}
     feedback_lock = asyncio.Lock()
@@ -133,7 +146,20 @@ def register(app, *, identity, sessions, cfg):
             else:
                 del active[key]
 
+        started = perf_counter()
+        context = None
+        if body.project_id is not None:
+            try:
+                context = await contexts.get(app, request.headers.get('cookie', ''), data['wid'], user['id'], body.project_id)
+            except ReadDenied:
+                release()
+                return JSONResponse({'code': 'ai_forbidden', 'message': '找不到或沒有權限查看這個案件'}, status_code=403)
+            except BaseException:
+                release()
+                raise
         run = ChatRun(app, body, data, user, models[body.model], adapter, release)
+        run.started = started
+        run.project_context = context
         entry = PendingRun(key)
         remember(run.usage_id, entry, RUN_REGISTRATION_SECONDS)
 
@@ -177,6 +203,7 @@ def register(app, *, identity, sessions, cfg):
     @app.get('/api/ai/usage')
     def usage(request: Request, from_: date | None = Query(None, alias='from'), to: date | None = None,
               rating: Literal['up', 'down', 'none'] | None = None,
+              scope: Literal['global', 'project'] | None = None,
               actor: str | None = Query(None, max_length=120), provider: ModelId | None = None,
               auth=Depends(authenticated)):
         data, user = auth
@@ -186,4 +213,4 @@ def register(app, *, identity, sessions, cfg):
         start = from_ or end - timedelta(days=29)
         if start > end or (end - start).days >= 366:
             raise HTTPException(422, '日期範圍錯誤')
-        return ledger.query(sessions, data['wid'], start.isoformat(), end.isoformat(), actor, provider, rating)
+        return ledger.query(sessions, data['wid'], start.isoformat(), end.isoformat(), actor, provider, rating, scope)

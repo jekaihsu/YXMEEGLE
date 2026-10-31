@@ -70,7 +70,7 @@ def test_scope_migration_preserves_old_rows_and_is_noop_on_repeat(tmp_path):
         AiUsageRow.__table__.create(db)
         db.exec_driver_sql('ALTER TABLE ai_usage DROP COLUMN scope')
         db.exec_driver_sql('ALTER TABLE ai_usage DROP COLUMN project_id')
-        db.exec_driver_sql("INSERT INTO ai_usage (id, created_at, day, workspace_id, actor_id, actor_name, conversation_id, provider, model, effort, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, cost_micro_usd, price_version, steps, tool_calls, latency_ms, status) VALUES ('old', ?, '2026-10-31', 'w', 'actor', 'Name', 'c', 'claude', 'model', 'medium', 10, 0, 0, 5, 1, 'v1', 1, 0, 20, 'ok')", (datetime.now(timezone.utc),))
+        db.exec_driver_sql("INSERT INTO ai_usage (id, created_at, day, workspace_id, actor_id, actor_name, conversation_id, provider, model, effort, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, cost_micro_usd, price_version, steps, tool_calls, latency_ms, status) VALUES ('old', ?, '2026-10-31', 'w', 'actor', 'Name', 'c', 'claude', 'model', 'medium', 10, 0, 0, 5, 1, 'v1', 1, 0, 20, 'ok')", (datetime.now(timezone.utc).isoformat(),))
     migrate(engine)
     with engine.connect() as db:
         assert db.exec_driver_sql('SELECT id, scope, project_id, input_tokens, output_tokens, actor_name FROM ai_usage').all() == [('old', 'global', None, 10, 5, 'Name')]

@@ -33,6 +33,10 @@ def pick(value, *keys):
     return {k: value[k] for k in keys if k in value}
 
 
+def valid_case_id(value):
+    return isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,200}', value) is not None and value not in ('.', '..')
+
+
 def case_path(args):
     return '/api/projects/' + quote(args['case_id'], safe='')
 
@@ -45,8 +49,9 @@ async def progress(reader, args):
     return await reader.get(case_path(args) + '/progress')
 
 
-async def owners(reader, args):
-    detail = await reader.get('/api/case-detail/' + args['case_id'])
+async def owners(reader, args, *, detail=None):
+    if detail is None:
+        detail = await reader.get('/api/case-detail/' + args['case_id'])
     assignments = {'unavailable': True}
     if reader.assignments_enabled:
         try:
@@ -170,7 +175,7 @@ async def execute(app, cookie, name, args):
         return json.dumps({'error': '工具參數錯誤'}, ensure_ascii=False), True
     if any(not isinstance(v, str) or not 1 <= len(v) <= 240 for v in args.values()):
         return json.dumps({'error': '工具參數錯誤'}, ensure_ascii=False), True
-    if 'case_id' in args and (not re.fullmatch(r'[A-Za-z0-9_.:-]{1,200}', args['case_id']) or args['case_id'] in ('.', '..')):
+    if 'case_id' in args and not valid_case_id(args['case_id']):
         return json.dumps({'error': '工具參數錯誤'}, ensure_ascii=False), True
     try:
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://ai.internal',
