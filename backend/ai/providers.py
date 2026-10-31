@@ -53,12 +53,13 @@ class Claude:
     async def stream(self, spec, system, messages, tools):
         definitions = [dict(name=name, description=t.label, input_schema=t.schema, strict=True)
                        for name, t in tools.items()]
-        definitions[-1]['cache_control'] = {'type': 'ephemeral'}
+        if definitions:
+            definitions[-1]['cache_control'] = {'type': 'ephemeral'}
         async with AsyncAnthropic(api_key=self.key, max_retries=0, timeout=60) as client:
             async with client.beta.messages.stream(
                 model=spec.model, max_tokens=16000, output_config={'effort': spec.effort},
                 system=[{'type': 'text', 'text': system, 'cache_control': {'type': 'ephemeral'}}],
-                tools=definitions, messages=messages,
+                messages=messages, **({'tools': definitions} if definitions else {}),
                 betas=['server-side-fallback-2026-07-01'], fallbacks='default',
             ) as stream:
                 async for event in stream:
@@ -114,7 +115,7 @@ class GPT:
         async with AsyncOpenAI(api_key=self.key, max_retries=0, timeout=60) as client:
             stream = await client.responses.create(
                 model=spec.model, reasoning={'effort': spec.effort}, instructions=system,
-                input=messages, tools=definitions, stream=True, store=False,
+                input=messages, stream=True, store=False, **({'tools': definitions} if definitions else {}),
                 include=['reasoning.encrypted_content'], max_output_tokens=16000,
             )
             dropped_call = False

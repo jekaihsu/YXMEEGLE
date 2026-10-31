@@ -179,3 +179,13 @@ def test_progress_known_percent_and_gaps_real_route(progress, monkeypatch, trunc
     assert '週報快照已過期，等待重新讀取' in chart['note']
     if truncated:
         assert '合約規劃項目過多，清單已截斷' in chart['note']
+
+
+def test_prompt_has_no_banned_narration():
+    from .ai.prompts import system_prompt
+    prompt = system_prompt()
+    assert '直接回答' in prompt
+    assert '一句自然的話' in prompt
+    assert '即使表格或圖表已顯示' not in prompt
+    for phrase in ('已整理', '詳見上方結果', '依你可查看的資料'):
+        assert phrase not in prompt
