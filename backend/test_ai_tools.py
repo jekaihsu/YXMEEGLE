@@ -1,67 +1,121 @@
 import asyncio
 import json
-from datetime import date, timedelta
-from .test_backend import app, client, role
-from .ai.tools import project_attendance, project_progress, project_owners, execute
-from .ai.ledger import today
 
+import pytest
 
-def test_attendance_uses_today_column_and_preserves_unknowns():
-    current = date.fromisoformat(today())
-    days = [(current - timedelta(days=current.weekday()) + timedelta(days=i)).isoformat() for i in range(7)]
-    index = days.index(today())
-    people = []
-    for n, label in enumerate(['遲到、到班', '缺卡', '請假', '出差', '外出', None, '到班', None]):
-        values = ['到班'] * 7
-        values[index] = label
-        people.append(dict(id=str(n), name='同事' + str(n), in_service=True, attendance=values))
-    people.append(dict(id='left', name='已離職', in_service=False, attendance=[None] * 7))
-    result = project_attendance({'day': today(), 'view': dict(days=days, people=people, as_of='stamp', status='ok',
-        trips=[dict(person_id='7', kind='out', start=today(), end=today())], leaves=[])})
-    assert result['late'] == [{'id': '0', 'name': '同事0'}]
-    assert result['missing_punch'] == [{'id': '1', 'name': '同事1'}]
-    assert result['no_record'] == [{'id': '5', 'name': '同事5'}, {'id': '7', 'name': '同事7'}]
-    assert result['out'] == [{'id': '4', 'name': '同事4'}, {'id': '7', 'name': '同事7'}]
-    assert result['arrived_count'] == 2 and result['incomplete'] is True
-    assert result['as_of'] == 'stamp'
-    assert 'no record yet' in result['no_record_label']
-    assert 'absent' not in result
-
-
-def test_progress_and_owner_projection_exclude_finance():
-    raw = dict(project_id='case', as_of='time', finance={'secret_amount': 123456},
-               stages=[dict(key='field', label='外業', state='active', evidence=[{'amount': 999}]),
-                       dict(key='billing', label='計價', state='done')],
-               production={'field': {'progress': dict(items_done=3, items_total=5, percent='60', earned_points='900')}},
-               gaps=[dict(id='finance_empty', message_zh='money'), dict(id='plan_unavailable', message_zh='no plan')])
-    result = project_progress(raw)
-    assert result == dict(project_id='case', as_of='time', stages=[dict(key='field', label='外業', state='active')],
-                          nodes={'field': dict(items_done=3, items_total=5, percent='60')},
-                          gaps=[dict(id='plan_unavailable', message_zh='no plan')])
-    owners = project_owners(dict(detail=dict(as_of='t', project={'id': 'p', 'pm_id': 'u', 'amount': 100},
-        users=[{'id': 'u', 'name': '主管', 'salary': 1000}]), assignments={'nodes': [
-            {'key': 'field', 'label': '外業', 'owners': [{'open_id': 'u', 'name': '主管', 'salary': 1000}]}]}))
-    assert owners['pm'] == {'id': 'u', 'name': '主管'}
-    assert 'salary' not in json.dumps(owners) and 'amount' not in json.dumps(owners)
-
-
-def test_attendance_route_cookie_forwarded_for_allowed_viewer(app, client, monkeypatch):
-    role(client, 'u-manager')
-    app.state.cfg['HR_VIEWERS'] = 'u-manager'
-    calls = []
-    def view(workspace_id, week):
-        calls.append((workspace_id, week))
-        return dict(days=[today()], people=[dict(id='u', name='准許查看的人員', in_service=True, attendance=['遲到'])],
-                    status='ok', as_of='2026-10-31T09:00:00+08:00')
-    monkeypatch.setattr(app.state.people_attendance, 'view', view)
-    cookie = '; '.join(f'{k}={v}' for k, v in client.cookies.items())
-    result, error = asyncio.run(execute(app, cookie, 'attendance_today', {}))
-    assert error is False
-    assert json.loads(result)['late'] == [{'id': 'u', 'name': '准許查看的人員'}]
-    assert calls[0][1] == today()
+from .test_backend import app, client
+from .ai.tools import execute
 
 
 def test_tool_rejects_unknown_and_extra_arguments(app):
     for name, args in [('write', {}), ('attendance_today', {'extra': 'x'}), ('case_progress', {'case_id': '../x/y'})]:
         result, error = asyncio.run(execute(app, '', name, args))
         assert error and 'error' in json.loads(result)
+
+
+def tool(app, client, name, args):
+    cookie = '; '.join(f'{k}={v}' for k, v in client.cookies.items())
+    result, error = asyncio.run(execute(app, cookie, name, args))
+    assert not error, result
+    return json.loads(result)
+
+
+
+def test_real_search_and_owners_without_shell(app, client, monkeypatch):
+    from .ai.tools import Reader
+    requests = []
+    original = Reader.get
+    async def observed(self, path, **params):
+        requests.append(path)
+        return await original(self, path, **params)
+    monkeypatch.setattr(Reader, 'get', observed)
+    page = client.get('/api/projects', params={'limit': 8}).json()
+    assert page['items']
+    query = page['items'][0]['code']
+    source = client.get('/api/projects', params={'q': query, 'limit': 8}).json()
+    result = tool(app, client, 'search_cases', {'query': query})
+    assert requests == ['/api/projects']
+    requests.clear()
+    assert result['total'] == source['total']
+    assert result['cases'] == [{k: p[k] for k in ('id', 'code', 'name', 'status', 'pm_id', 'due_date')} for p in source['items']]
+    pid = source['items'][0]['id']
+    assert client.get('/api/projects/' + pid).status_code == 404
+    detail = client.get('/api/case-detail/' + pid).json()
+    owners = tool(app, client, 'case_owners', {'case_id': pid})
+    assert requests == ['/api/case-detail/' + pid]
+    assert owners['pm']['id'] == source['items'][0]['pm_id']
+    assert owners['pm']['name'] == detail['header']['pm']['name']
+    assert owners['node_assignment_status'] == 'node assignment data unavailable'
+    assert owners['nodes'] is None
+    progress = client.get('/api/projects/' + pid + '/progress').json()
+    result = tool(app, client, 'case_progress', {'case_id': pid})
+    assert result['as_of'] == progress['as_of']
+    assert result['stages'][0]['basis'] == progress['stages'][0]['basis']
+
+
+
+@pytest.mark.parametrize('pid', ['../x', 'a/progress', '%2F', '.', '..'])
+def test_invalid_id_before_http(app, monkeypatch, pid):
+    async def forbidden(*args, **kwargs):
+        pytest.fail('invalid id reached HTTP')
+    monkeypatch.setattr('backend.ai.tools.Reader.get', forbidden)
+    result, error = asyncio.run(execute(app, '', 'case_progress', {'case_id': pid}))
+    assert error and json.loads(result)['error'] == '工具參數錯誤'
+
+
+
+@pytest.mark.parametrize('large', [False, True])
+def test_attendance_real_producer_route_and_structural_truncation(app, client, monkeypatch, large):
+    from datetime import datetime, timezone
+    from .live_read.datasets.weekly_attendance import fetch_week, week_window
+    from .test_live_read_coordinator import SynchronousExecutor
+    labels = [('Normal', None), ('Late', None), ('Early', None), ('Lack', None), ('NoNeedCheck', None),
+              ('Normal', 'CardReplacement'), ('Normal', 'Leave'), ('Normal', 'Travel'), ('Normal', 'GoOut'), (None, None)]
+    users = [dict(id=f'ou_{i}', name=f'同事{i}', directory_status='employed',
+                  directory_source={'app_id': 'app', 'record_id': f'rec{i}'}) for i in range(800 if large else 10)]
+    class Adapter:
+        def request(self, method, path, **kwargs):
+            if path == '/contact/v3/users/batch':
+                return {'items': [dict(open_id=u['id'], user_id=u['id'].replace('ou_', 'employee-')) for u in users if u['id'] in kwargs['params']['user_ids']]}
+            if path == '/attendance/v1/groups':
+                return {'group_list': [], 'has_more': False}
+            if path == '/attendance/v1/user_tasks/query':
+                return {'user_task_results': [dict(user_id=u['id'].replace('ou_', 'employee-'), day=20261012, records=[dict(
+                    check_in_result=labels[i % 10][0], check_in_result_supplement=labels[i % 10][1])])
+                    for i, u in enumerate(users) if u['id'].replace('ou_', 'employee-') in kwargs['json']['user_ids']], 'invalid_user_ids': []}
+            return {'user_approvals': []}
+    reader = app.state.people_attendance
+    reader.executor = SynchronousExecutor()
+    reader.clock = lambda: datetime(2026, 10, 12, tzinfo=timezone.utc)
+    monkeypatch.setattr(reader, '_enabled', lambda wid: True)
+    reader.refreshers['attendance'] = lambda key: dict(fingerprint='test', snapshot=fetch_week(
+        Adapter(), users, 'app', 'company', week_window('2026-10-12'), True))
+    monkeypatch.setattr('backend.ai.tools.today', lambda: '2026-10-12')
+    source = client.get('/api/people/attendance?week=2026-10-12').json()
+    assert source['people'] and source['as_of']
+    result = tool(app, client, 'attendance_today', {})
+    assert result['as_of'] == source['as_of'] and result['incomplete'] is True
+    assert result['labelled_arrival_count'] == (80 if large else 1)
+    if large:
+        assert result['truncated'] is True and 'partial_data' not in result
+        assert len(json.dumps(result, ensure_ascii=False)) <= 6000
+    else:
+        for group, i in [('late', 1), ('early_leave', 2), ('missing_punch', 3), ('exempt', 4),
+                         ('supplemented', 5), ('leave', 6), ('trip', 7), ('out', 8), ('no_record', 9)]:
+            assert result[group] == [{'id': f'ou_{i}', 'name': f'同事{i}'}]
+    assert '缺席' not in json.dumps(result, ensure_ascii=False)
+
+
+
+def test_pm_name_unavailable_preserves_real_id(app, client):
+    from .test_backend import WorkspaceRow, BusinessRow, storage
+    wid = app.state.signer.loads(client.cookies.get('meegle_session'))['wid']
+    with app.state.sessions.begin() as db:
+        row = db.get(WorkspaceRow, wid)
+        state = storage.load(db, BusinessRow, row)
+        project = state['projects'][0]
+        pid = project['id']
+        project['pm_id'] = 'unresolved-person'
+        row.data = storage.save(db, BusinessRow, wid, state)
+    result = tool(app, client, 'case_owners', {'case_id': pid})
+    assert result['pm'] == {'id': 'unresolved-person', 'name': 'name_unavailable'}
