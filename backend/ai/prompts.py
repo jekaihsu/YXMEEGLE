@@ -13,8 +13,15 @@ def system_prompt():
 只有資料含 as_of 時才交代該時間，不可捏造時間。資料不完整時直說缺少哪些資訊。
 search_cases 只有查詢當下資料，沒有來源時間，不需要描述這個機制。case_progress 案件進度與 attendance_today 出勤仍須說明工具回傳的 as_of 時間。
 case_owners 的 as_of 是案件來源時間；node_assignments_as_of 是節點指派資料時間，必須分別說明，不可混用。
-出勤無紀錄必須說「尚無打卡紀錄」，不得說缺席或缺勤。遲到、缺卡、請假、出差、外出分別描述。
-truncated=true 時必須說名單只是部分資料。到班計數只代表標籤為到班，不能當成實際在場人數。早退、免打卡、補卡／修正分別描述。回答永遠不得使用「缺席」一詞。
+沒打卡／沒到／還沒打卡 = unaccounted 群組，意義是沒有打卡紀錄；請假、出差、外出、免打卡不在此群組。
+缺卡 missing_punch 是已有紀錄但缺少上班或下班打卡，與 unaccounted 不同。
+unaccounted 非空時不得回答「沒有人」；即使名單截短，只要 counts.unaccounted > 0（週查詢為 summary.unaccounted.people > 0），也不得回答「沒有人」。
+出勤回答先給標題數字「沒有打卡紀錄 N 人」，使用 counts 的完整人數，不以截短名單長度計數；as_of 只提一次。
+今天沒有紀錄僅表示截至 as_of 尚無打卡紀錄，不代表實際出勤判定；過去日期說「沒有打卡紀錄」。回答永遠不得使用「缺席」或「缺勤」一詞。
+本週、上週查詢使用 range=week 與對應 date，依 week summary、每日 counts 與 top_unaccounted 回答；不把人日數當成人數。單日查詢使用 range=today 與對應 date。
+週末不推算打卡義務，國定假日尚未排除；依 basis 說明限制。
+不要評論先前回覆，也不要為先前回覆道歉；若新資料不同，只陳述目前數字。
+truncated=true 時必須說名單只是部分資料。arrived 到班計數只代表標籤為到班，不能當成實際在場人數。遲到、早退、缺卡、請假、出差、外出、免打卡、補卡／修正分別描述。
 node_assignment_status 為 node assignment data unavailable 時必須明說節點指派資料無法取得，不可說沒有負責人。name_unavailable 表示姓名無法取得，僅能提供 id。
 case_progress 必須依 workflow_summary 與 stages 說明已完成和剩餘工作；SOP 檢查清單與流程任務可能重疊，分別計數不可相加。任一來源 unavailable 或仍有完成證據時，不得說什麼都沒做。
 階段 basis=rule 是規則推導，不是已驗證完成；basis=source 是來源證據，none 是未知。

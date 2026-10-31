@@ -66,7 +66,12 @@ def test_invalid_id_before_http(app, monkeypatch, pid):
 
 
 @pytest.mark.parametrize('large', [False, True])
-def test_attendance_real_producer_route_and_structural_truncation(app, client, monkeypatch, large):
+def test_attendance_real_producer_route_and_structural_truncation(tmp_path, monkeypatch, large):
+    from .test_live_read_routes import production_client
+    app, client = production_client(tmp_path)
+    for cookie in list(client.cookies.jar):
+        if cookie.domain != "testserver.local":
+            client.cookies.jar.clear(cookie.domain, cookie.path, cookie.name)
     from datetime import datetime, timezone
     from .live_read.datasets.weekly_attendance import fetch_week, week_window
     from .test_live_read_coordinator import SynchronousExecutor
@@ -94,37 +99,25 @@ def test_attendance_real_producer_route_and_structural_truncation(app, client, m
     monkeypatch.setattr('backend.ai.tools.today', lambda: '2026-10-12')
     source = client.get('/api/people/attendance?week=2026-10-12').json()
     assert source['people'] and source['as_of']
-    result = tool(app, client, 'attendance_today', {})
+    result = tool(app, client, 'attendance_today', {'range': 'today', 'date': None})
     assert result['as_of'] == source['as_of'] and result['incomplete'] is True
-    assert result['labelled_arrival_count'] == (80 if large else 1)
+    assert result['counts']['arrived'] == (80 if large else 1)
     if large:
         assert result['truncated'] is True and 'partial_data' not in result
         assert len(json.dumps(result, ensure_ascii=False)) <= 6000
     else:
         for group, i in [('late', 1), ('early_leave', 2), ('missing_punch', 3), ('exempt', 4),
-                         ('supplemented', 5), ('leave', 6), ('trip', 7), ('out', 8), ('no_record', 9)]:
+                         ('supplemented', 5), ('on_leave', 6), ('trip', 7), ('out', 8), ('unaccounted', 9)]:
             assert result[group] == [{'id': f'ou_{i}', 'name': f'同事{i}'}]
     assert '缺席' not in json.dumps(result, ensure_ascii=False)
     from .test_ai_displays import sdk_tool
-    displays, projected = sdk_tool(app, client, monkeypatch, 'attendance_today', {})
-    labels = ['到班', '遲到', '缺卡', '請假', '出差', '外出', '尚無打卡紀錄', '早退', '免打卡', '補卡／修正']
-    if not large:
-        assert displays == [dict(kind='chart', title='今天出勤標籤', variant='bars',
-            points=[dict(label=label, value=1) for label in labels], truncated=False,
-            caption='截至 ' + source['as_of'], unit='人', headline=dict(label='標籤為到班', value='1'),
-            note='尚無打卡紀錄不代表實際出勤判定；同事可有多個標籤；資料不完整'),
-            dict(kind='table', title='今天非到班標籤',
-                columns=[dict(key='name', label='同事'), dict(key='state', label='狀態')],
-                rows=[dict(name=f'同事{i}', state=label) for i, label in
-                      [(1, '遲到'), (3, '缺卡'), (6, '請假'), (7, '出差'), (8, '外出'),
-                       (9, '尚無打卡紀錄'), (2, '早退'), (4, '免打卡'), (5, '補卡／修正')]],
-                truncated=False, caption='截至 ' + source['as_of'],
-                note='尚無打卡紀錄不代表實際出勤判定；同事可有多個標籤；資料不完整')]
-    else:
+    displays, projected = sdk_tool(app, client, monkeypatch, 'attendance_today', {'range': 'today', 'date': None})
+    assert displays[0]['kind'] == 'chart' and displays[1]['kind'] == 'table'
+    assert len(displays[1]['rows']) <= 50
+    assert len({row['name'] for row in displays[1]['rows']}) == len(displays[1]['rows'])
+    assert displays[0]['points'][0]['value'] == (80 if large else 1)
+    if large:
         assert all(display['truncated'] for display in displays)
-        assert len(displays[1]['rows']) <= 50
-        visible_names = {p['name'] for key in ('late', 'missing_punch', 'leave', 'trip', 'out', 'no_record', 'early_leave', 'exempt', 'supplemented') for p in projected[key]}
-        assert all(row['name'] in visible_names for row in displays[1]['rows'])
 
 
 

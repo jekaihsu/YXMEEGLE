@@ -93,8 +93,17 @@ async def owners(reader, args, *, detail=None):
 
 
 async def attendance(reader, args):
-    day = today()
-    return {'day': day, 'view': await reader.get('/api/people/attendance', week=day)}
+    from datetime import date
+    day = args['date'] or today()
+    try:
+        if args['range'] not in ('today', 'week') or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
+            raise ValueError()
+        target, current = date.fromisoformat(day), date.fromisoformat(today())
+        if abs((target.toordinal() - target.weekday()) - (current.toordinal() - current.weekday())) > 182:
+            raise ValueError()
+    except (ValueError, TypeError):
+        raise ReadDenied('請提供 range=today 或 week，date 為有效 YYYY-MM-DD 或 null（台北日期，限目前週前後26週）') from None
+    return {'range': args['range'], 'day': day, 'view': await reader.get('/api/people/attendance', week=day)}
 
 
 def search_notice(data):
@@ -152,36 +161,94 @@ def project_owners(value):
     return result
 
 
-def project_attendance(value):
-    day, view = value['day'], value['view']
+ATTENDANCE_LABELS = {'unaccounted': '沒有打卡紀錄', 'late': '遲到', 'missing_punch': '缺卡',
+    'on_leave': '請假', 'trip': '出差', 'out': '外出', 'early_leave': '早退',
+    'exempt': '免打卡', 'supplemented': '補卡／修正'}
+
+
+def attendance_day(view, day):
+    from datetime import date
     days = view.get('days', [])
     column = days.index(day) if day in days else None
-    groups = {'late': [], 'missing_punch': [], 'leave': [], 'trip': [], 'out': [], 'no_record': [], 'early_leave': [], 'exempt': [], 'supplemented': []}
-    labels = {'遲到': 'late', '缺卡': 'missing_punch', '請假': 'leave', '出差': 'trip', '外出': 'out', '早退': 'early_leave', '免打卡': 'exempt', '補卡／修正': 'supplemented'}
-    arrived = 0
-    approvals = {'leave': set(), 'trip': set(), 'out': set()}
-    for kind, records in (('leave', view.get('leaves', [])), ('trip', view.get('trips', []))):
+    groups = {key: [] for key in ATTENDANCE_LABELS}
+    approvals = {key: set() for key in ('on_leave', 'trip', 'out')}
+    for kind, records in (('on_leave', view.get('leaves', [])), ('trip', view.get('trips', []))):
         for record in records:
             if record['start'] <= day <= record['end']:
-                key = record.get('kind', kind)
-                approvals[key].add(record['person_id'])
+                approvals[record.get('kind', kind)].add(record['person_id'])
+    arrived, seen = 0, set()
+    working = date.fromisoformat(day).weekday() < 5 and day <= today()
     for person in view.get('people', []):
-        if person.get('in_service') is not True:
+        if person.get('in_service') is not True or person['id'] in seen:
             continue
+        seen.add(person['id'])
         evidence = person.get('attendance', [])
         label = evidence[column] if column is not None and column < len(evidence) else None
-        entry = pick(person, 'id', 'name')
         tokens = set((label or '').split('、'))
-        for text, key in labels.items():
-            if text in tokens or person['id'] in approvals.get(key, set()):
-                groups[key].append(entry)
+        entry = pick(person, 'id', 'name')
+        explained = [key for key in ('on_leave', 'trip', 'out', 'exempt')
+                     if ATTENDANCE_LABELS[key] in tokens or person['id'] in approvals.get(key, set())]
         arrived += int('到班' in tokens)
-        if label is None:
-            groups['no_record'].append(entry)
-    return dict(date=day, as_of=view.get('as_of'),
-                incomplete=bool(view.get('incomplete') or view.get('status') != 'ok' or column is None or
-                                groups['no_record'] or view.get('refreshing')),
-                labelled_arrival_count=arrived, **groups, no_record_label='尚無打卡紀錄（no record yet），不代表實際出勤判定')
+        if explained:
+            groups[explained[0]].append(entry)
+            continue
+        for key, text in ATTENDANCE_LABELS.items():
+            if text in tokens:
+                groups[key].append(entry)
+        if label is None and working:
+            groups['unaccounted'].append(entry)
+    return dict(date=day, evaluated=working, counts=dict(arrived=arrived, **{k: len(v) for k, v in groups.items()}),
+                **groups)
+
+
+def project_attendance(value):
+    day, view = value['day'], value['view']
+    period = value['range']
+    dates = view.get('days', []) if period == 'week' else [day]
+    daily = [attendance_day(view, d) for d in dates]
+    result = dict(range=period, date=day, as_of=view.get('as_of'),
+        incomplete=bool(view.get('incomplete') or view.get('status') != 'ok' or view.get('refreshing') or
+                        not dates or any(d not in view.get('days', []) for d in dates)),
+        truncated=False,
+        basis='no punch obligation or holiday calendar in the source; weekends excluded, public holidays not excluded',
+        unaccounted_meaning='今天為截至 as_of 尚無打卡紀錄，不代表實際出勤判定；過去日期為沒有打卡紀錄；未來日期不推算',
+        arrived_meaning='arrived 只計到班標籤，不代表實際在場人數')
+    if period == 'today':
+        result.update(daily[0])
+    else:
+        people = {}
+        for item in daily:
+            for key in ATTENDANCE_LABELS:
+                for person in item[key]:
+                    row = people.setdefault(person['id'], dict(**person, days={}))
+                    row['days'].setdefault(key, []).append(item['date'])
+        ranked = sorted(people.values(), key=lambda p: (-len(p['days'].get('unaccounted', [])),
+            -len(p['days'].get('late', [])), -len(p['days'].get('missing_punch', [])), p['id']))
+        ranking = [dict(**pick(p, 'id', 'name'), unaccounted_days=len(p['days']['unaccounted']))
+                   for p in ranked if p['days'].get('unaccounted')]
+        result.update(week_start=dates[0] if dates else None, week_end=dates[-1] if dates else None,
+            days=[pick(item, 'date', 'evaluated', 'counts') for item in daily],
+            summary={k: dict(person_days=sum(item['counts'][k] for item in daily),
+                            people=len({p['id'] for item in daily for p in item[k]})) for k in ATTENDANCE_LABELS},
+            top_unaccounted=ranking[:10], people=ranked[:50], labelled_arrival_count=sum(item['counts']['arrived'] for item in daily))
+        result['truncated'] = len(ranked) > 50 or len(ranking) > 10
+    # Preserve counts before trimming lists so partial names never change the headline.
+    while len(json.dumps(result, ensure_ascii=False)) > 6000:
+        result['truncated'] = True
+        if period == 'week':
+            candidates = [result[k] for k in ('people', 'top_unaccounted') if result[k]]
+        else:
+            candidates = [result[k] for k in reversed(ATTENDANCE_LABELS) if result[k]]
+        if not candidates:
+            break
+        candidates[0].pop()
+    return result
+
+
+ATTENDANCE_SCHEMA = dict(type='object', properties={
+    'range': dict(type='string', enum=['today', 'week'], description='today 查詢單日；week 查詢包含 date 的週一至週日。'),
+    'date': dict(type=['string', 'null'], description='YYYY-MM-DD 台北日期；null 代表今天。上週請填上週日期。')},
+    required=['range', 'date'], additionalProperties=False)
 
 
 def schema(properties):
@@ -211,7 +278,7 @@ TOOLS = {
     'search_cases': ToolSpec(SEARCH_SCHEMA, '搜尋案件', search, project_search),
     'case_progress': ToolSpec(schema(['case_id']), '查詢案件進度', progress, project_progress),
     'case_owners': ToolSpec(schema(['case_id']), '查詢案件負責人', owners, project_owners),
-    'attendance_today': ToolSpec(schema([]), '查詢今天出勤', attendance, project_attendance),
+    'attendance_today': ToolSpec(ATTENDANCE_SCHEMA, '查詢單日或每週出勤', attendance, project_attendance),
 }
 
 
@@ -226,7 +293,8 @@ async def execute(app, cookie, name, args):
                 continue
             if ('enum' in prop and value not in prop['enum']) or (key == 'overdue' and type(value) is not bool) or (key != 'overdue' and (not isinstance(value, str) or len(value) > 240)):
                 return json.dumps({'error': '工具參數錯誤：status 請使用 ' + '、'.join(CASE_STATUS) + '；owner 僅支援 me'}, ensure_ascii=False), True
-    elif any(not isinstance(v, str) or not 1 <= len(v) <= 240 for v in args.values()):
+    elif any(not isinstance(v, str) or not 1 <= len(v) <= 240
+             for k, v in args.items() if not (name == 'attendance_today' and k == 'date' and v is None)):
         return json.dumps({'error': '工具參數錯誤'}, ensure_ascii=False), True
     if 'case_id' in args and not valid_case_id(args['case_id']):
         return json.dumps({'error': '工具參數錯誤'}, ensure_ascii=False), True
@@ -321,23 +389,36 @@ def display_progress(data):
     return charts
 
 
-ATTENDANCE_LABELS = {'late': '遲到', 'missing_punch': '缺卡', 'leave': '請假', 'trip': '出差',
-    'out': '外出', 'no_record': '尚無打卡紀錄', 'early_leave': '早退', 'exempt': '免打卡', 'supplemented': '補卡／修正'}
-
-
 def display_attendance(data):
-    points = [dict(label='到班', value=data.get('labelled_arrival_count', 0))]
-    rows = []
-    for key, label in ATTENDANCE_LABELS.items():
-        people = data.get(key, [])
-        points.append(dict(label=label, value=len(people)))
-        rows.extend(dict(name=p.get('name') or p.get('id'), state=label) for p in people)
-    note = '尚無打卡紀錄不代表實際出勤判定；同事可有多個標籤'
+    note = data.get('unaccounted_meaning', '')
     if data.get('incomplete'):
         note += '；資料不完整'
-    return [display_chart('今天出勤標籤', points, data, unit='人',
-                headline=dict(label='標籤為到班', value=str(data.get('labelled_arrival_count', 0))), note=note),
-            display_table('今天非到班標籤', [('name', '同事'), ('state', '狀態')], rows, data, note=note)]
+    if data.get('range') == 'week':
+        days = [item['date'] for item in data.get('days', [])]
+        codes = dict(unaccounted='無紀錄', late='遲', missing_punch='卡', on_leave='假', trip='出',
+                     out='外', exempt='免', early_leave='早', supplemented='補')
+        rows = [dict(name=p.get('name') or p['id'], **{day: '／'.join(codes[k]
+            for k, dates in p['days'].items() if day in dates) or None for day in days}) for p in data.get('people', [])]
+        caption = f"{data.get('week_start')} 至 {data.get('week_end')}"
+        if data.get('as_of'):
+            caption += '；截至 ' + str(data['as_of'])
+        result = [display_table('每週出勤', [('name', '同事')] + [(d, d[5:]) for d in days], rows, data, note=note),
+                  display_chart('每日沒有打卡紀錄', [dict(label=item['date'], value=item['counts']['unaccounted'])
+                      for item in data.get('days', [])], data, unit='人', note=note)]
+        for display in result:
+            display['caption'] = caption
+        return result
+    counts = data.get('counts', {})
+    points = [dict(label='到班', value=counts.get('arrived', 0))]
+    people = {}
+    for key, label in ATTENDANCE_LABELS.items():
+        points.append(dict(label=label, value=counts.get(key, 0)))
+        for person in data.get(key, []):
+            row = people.setdefault(person['id'], dict(name=person.get('name') or person['id'], state=[]))
+            row['state'].append(label)
+    rows = [dict(name=p['name'], state='、'.join(p['state'])) for p in people.values()]
+    return [display_chart('單日出勤標籤', points, data, unit='人', note=note),
+            display_table('單日非到班標籤', [('name', '同事'), ('state', '狀態')], rows, data, note=note)]
 
 
 DISPLAY_PROJECTORS = {'search_cases': display_search, 'case_owners': display_owners,
