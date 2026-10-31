@@ -12,7 +12,7 @@ from .ai.tools import ATTENDANCE_LABELS
 
 
 @pytest.mark.parametrize('attendance_route', ['mixed'], indirect=True)
-def test_explained_independent_punches(attendance_route):
+def test_explained_independent_punches(attendance_route, monkeypatch):
     a, c = attendance_route
     a.state.attendance_fixture_punches.append(dict(user_id='employee-0', day=20261012,
         records=[dict(check_in_result='Late', check_out_result='Normal', check_out_result_supplement='Leave')]))
@@ -25,6 +25,7 @@ def test_explained_independent_punches(attendance_route):
         assert data['counts'][key] == len(data[key])
         if key != 'unaccounted':
             assert not {p['id'] for p in data[key]} & {p['id'] for p in data['unaccounted']}
+    monkeypatch.setattr('backend.ai.tools.today', lambda: '2026-10-16')
     week = call(attendance_route, dict(range='week', date='2026-10-12'))
     assert week['summary']['late'] == dict(people=2, person_days=6)
     assert next(p for p in week['people'] if p['id'] == 'ou_0')['days']['late'] == ['2026-10-12']
