@@ -24,7 +24,7 @@ def test_deadline_estimates_and_releases(app, client, monkeypatch, caplog):
     assert result[-1]['code'] == 'ai_upstream' and '逾時' in result[-1]['message']
     row = rows(app)[0]
     assert row.input_tokens > 0 and row.output_tokens == len('已產生文字')
-    assert row.cost_micro_usd > 0 and row.error_code == 'usage_estimated'
+    assert row.cost_micro_usd > 0 and row.error_code == 'ai_upstream'
     assert 'TimeoutError' in caplog.text
     app.state.ai_providers['claude'] = Fake()
     assert events(client.post('/api/ai/chat', json=BODY))[-1]['type'] == 'done'
@@ -74,7 +74,7 @@ def test_partial_usage_is_estimated_and_error_log_is_safe(app, client, caplog):
     app.state.ai_providers = {'claude': Partial()}
     assert events(client.post('/api/ai/chat', json=BODY))[-1]['code'] == 'ai_upstream'
     row, = rows(app)
-    assert row.error_code == 'usage_estimated' and row.input_tokens > 10 and row.output_tokens == 2
+    assert row.error_code == 'ai_upstream' and row.input_tokens > 10 and row.output_tokens == 2
     assert 'exception=SDKFailure status_code=502 request_id=req-safe' in caplog.text
     assert 'secret prompt cookie' not in caplog.text
 
@@ -174,3 +174,49 @@ def test_length_finish_is_ok_even_with_incomplete_tool(app, client):
     assert result[-1]['type'] == 'done'
     row, = rows(app)
     assert row.status == 'ok' and row.tool_calls == 0 and row.cost_micro_usd > 0
+
+
+def test_partial_claude_cache_split_survives_timeout(app, client, monkeypatch):
+    from anthropic.types.beta import BetaRawMessageStartEvent
+    from .test_ai_providers import anthropic_events
+    from .ai.providers import claude_usage_event
+    from .ai.catalog import Usage, MODELS, cost_micro_usd
+    start = BetaRawMessageStartEvent.model_validate(anthropic_events()[0])
+    class Partial(Fake):
+        async def stream(self, *args):
+            yield claude_usage_event(start.message.usage, start.message.model, start.message.model, final_usage=False)
+            yield Event('text', '文字')
+            await asyncio.sleep(10)
+    app.state.cfg['AI_QUESTION_TIMEOUT_SECONDS'] = '.02'
+    app.state.ai_providers = {'claude': Partial()}
+    assert events(client.post('/api/ai/chat', json=BODY))[-1]['code'] == 'ai_upstream'
+    row, = rows(app)
+    assert (row.cache_read_tokens, row.cache_write_tokens) == (20, 30)
+    assert row.input_tokens > 60 and row.output_tokens == 2
+    assert row.error_code == 'ai_upstream'
+    assert row.cost_micro_usd == cost_micro_usd(MODELS['claude'], Usage(row.input_tokens - 50, 20, 30, 2))
+
+
+def test_blocked_ledger_releases_slot(app, client, live_server, monkeypatch):
+    import threading
+    import httpx
+    from .ai import ledger
+    entered, unblock = threading.Event(), threading.Event()
+    original = ledger.record
+    def blocked(*args, **kwargs):
+        entered.set()
+        assert unblock.wait(10)
+        return original(*args, **kwargs)
+    monkeypatch.setattr(ledger, 'record', blocked)
+    app.state.ai_providers = {'claude': Fake()}
+    with httpx.Client(base_url=live_server, cookies=dict(client.cookies.items()), timeout=5) as connection:
+        try:
+            with connection.stream('POST', '/api/ai/chat', json=BODY) as first:
+                assert first.status_code == 200 and entered.wait(3)
+                with connection.stream('POST', '/api/ai/chat', json=BODY) as second:
+                    assert second.status_code == 200
+                    with connection.stream('POST', '/api/ai/chat', json=BODY) as third:
+                        assert third.status_code == 200
+                        assert not unblock.is_set()
+        finally:
+            unblock.set()

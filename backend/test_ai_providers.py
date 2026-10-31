@@ -7,6 +7,7 @@ import pytest
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI
 
+from .test_backend import app, client
 from .ai import providers
 from .ai.catalog import MODELS, Usage
 from .ai.tools import TOOLS
@@ -148,3 +149,49 @@ def test_gpt_responses_request_events_usage_and_tool_call(monkeypatch, length):
     messages = []
     providers.GPT('').continue_with(messages, events[-1].value, [events[1].value], ['result'])
     assert messages[-1] == {'type': 'function_call_output', 'call_id': 'call_1', 'output': 'result'}
+
+
+@pytest.mark.parametrize('status,arguments', [('incomplete', '{"case_id":"p'), ('completed', '{"case_id":"p')])
+def test_gpt_partial_tool_reads_terminal_usage(app, client, monkeypatch, status, arguments):
+    from openai.types.responses import ResponseFunctionToolCall, ResponseOutputItemDoneEvent, ResponseIncompleteEvent, Response
+    from .test_ai_api import BODY, events, rows
+    call = ResponseFunctionToolCall(type='function_call', id='fc_partial', call_id='call_partial',
+        name='case_owners', status=status, arguments=arguments)
+    response = Response.model_construct(id='resp_partial', object='response', model=MODELS['gpt'].model,
+        status='incomplete', output=[call], incomplete_details={'reason': 'max_output_tokens'},
+        usage={'input_tokens': 150, 'input_tokens_details': {'cached_tokens': 100},
+               'output_tokens': 16000, 'output_tokens_details': {'reasoning_tokens': 50}, 'total_tokens': 16150})
+    values = [ResponseOutputItemDoneEvent(type='response.output_item.done', item=call, output_index=0, sequence_number=1),
+              ResponseIncompleteEvent(type='response.incomplete', response=response, sequence_number=2)]
+    def handler(request):
+        return httpx2.Response(200, headers={'content-type': 'text/event-stream'},
+                               content=wire([v.model_dump(exclude_none=True) for v in values]))
+    monkeypatch.setattr(providers, 'AsyncOpenAI', lambda **kwargs: AsyncOpenAI(**kwargs,
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler))))
+    app.state.ai_providers = {'gpt': providers.GPT('fictional')}
+    result = events(client.post('/api/ai/chat', json=dict(BODY, model='gpt')))
+    assert result[-1]['type'] == 'done'
+    assert {'type': 'text', 'delta': '（回答太長，已截斷）'} in result
+    assert not any(e['type'] == 'tool' for e in result)
+    row, = rows(app)
+    assert (row.status, row.input_tokens, row.cache_read_tokens, row.output_tokens, row.tool_calls) == ('ok', 150, 100, 16000, 0)
+
+
+def test_claude_partial_tool_at_max_tokens(app, client, monkeypatch):
+    from .test_ai_api import BODY, events, rows
+    values = anthropic_events('max_tokens')
+    values[1:4] = [
+        dict(type='content_block_start', index=0, content_block=dict(type='tool_use', id='tool_partial', name='case_owners', input={})),
+        dict(type='content_block_delta', index=0, delta=dict(type='input_json_delta', partial_json='{"case_id":"p')),
+        dict(type='content_block_stop', index=0)]
+    def handler(request):
+        return httpx2.Response(200, headers={'content-type': 'text/event-stream'}, content=wire(values))
+    monkeypatch.setattr(providers, 'AsyncAnthropic', lambda **kwargs: AsyncAnthropic(**kwargs,
+        http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler))))
+    app.state.ai_providers = {'claude': providers.Claude('fictional')}
+    result = events(client.post('/api/ai/chat', json=BODY))
+    assert result[-1]['type'] == 'done'
+    assert {'type': 'text', 'delta': '（回答太長，已截斷）'} in result
+    assert not any(e['type'] == 'tool' for e in result)
+    row, = rows(app)
+    assert (row.status, row.input_tokens, row.output_tokens, row.tool_calls) == ('ok', 60, 40, 0)
