@@ -13,7 +13,7 @@ from . import ledger
 from .catalog import Usage, cost_micro_usd
 from .prompts import system_prompt
 from .providers import ProviderError
-from .tools import TOOLS, execute
+from .tools import TOOLS, execute, displays
 
 
 QUESTION_TIMEOUT_SECONDS = 120
@@ -160,7 +160,10 @@ class ChatRun:
                     result, error = cache[key]
                     outputs.append(result)
                     label = TOOLS[call.name].label if call.name in TOOLS else '查詢資料'
-                    yield sse(dict(type='tool', id=call.id, name=call.name, label=label, status='error' if error else 'done'))
+                    event = dict(type='tool', id=call.id, name=call.name, label=label, status='error' if error else 'done')
+                    if not error:
+                        event['displays'] = displays(call.name, result)
+                    yield sse(event)
                 self.adapter.continue_with(messages, content, calls, outputs)
             raise ProviderError()
         except (asyncio.CancelledError, GeneratorExit):

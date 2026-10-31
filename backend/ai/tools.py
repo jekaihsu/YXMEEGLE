@@ -1,6 +1,7 @@
 """Read tools reuse HTTP authorization and whitelist their model-visible fields."""
 from dataclasses import dataclass
 import re
+import math
 from typing import Callable
 from urllib.parse import quote
 import json
@@ -180,3 +181,87 @@ async def execute(app, cookie, name, args):
         return json.dumps({'error': exc.message}, ensure_ascii=False), True
     except Exception:
         return json.dumps({'error': '資料暫時無法讀取，請稍後重試'}, ensure_ascii=False), True
+
+
+def display_table(title, columns, rows, data, **extra):
+    keys = [key for key, _ in columns[:8]]
+    def cell(value):
+        if isinstance(value, str):
+            return value[:240]
+        if value is None or type(value) is int or (type(value) is float and math.isfinite(value)):
+            return value
+        return None
+    return dict(kind='table', title=title, columns=[dict(key=k, label=v) for k, v in columns[:8]],
+                rows=[{k: cell(row.get(k)) for k in keys} for row in rows[:50]],
+                truncated=bool(data.get('truncated') or len(rows) > 50 or len(columns) > 8),
+                **({'caption': '截至 ' + str(data['as_of'])[:240]} if data.get('as_of') else {}), **extra)
+
+
+def display_chart(title, points, data, **extra):
+    safe_points = [dict(label=str(p['label'])[:240], value=p['value']) for p in points
+                   if type(p['value']) in (int, float) and math.isfinite(p['value'])]
+    return dict(kind='chart', title=title, variant='bars', points=safe_points[:12],
+                truncated=bool(data.get('truncated') or len(points) > 12 or len(safe_points) != len(points)),
+                **({'caption': '截至 ' + str(data['as_of'])[:240]} if data.get('as_of') else {}), **extra)
+
+
+def display_search(data):
+    return [display_table('案件搜尋結果', [('code', '案號'), ('name', '案名'), ('status', '狀態'),
+        ('pm_id', 'PM'), ('due_date', '交期')], data.get('cases', []), data)]
+
+
+def display_owners(data):
+    pm = data.get('pm', {})
+    rows = [dict(role='PM', owner=pm.get('name') if pm.get('name') != 'name_unavailable' else pm.get('id'))]
+    for node in data.get('nodes') or []:
+        for person in node['owners']:
+            rows.append(dict(role=node['label'], owner=person.get('name') or person.get('id') or person.get('open_id')))
+    extra = {'note': '節點指派資料無法取得'} if data.get('nodes') is None else {}
+    return [display_table('案件負責人', [('role', '職務或節點'), ('owner', '負責人')], rows, data, **extra)]
+
+
+def display_progress(data):
+    points = []
+    bases = set()
+    unknown = 0
+    for stage in data.get('stages', []):
+        node = data.get('nodes', {}).get(stage['key'], {})
+        percent = node.get('percent')
+        if percent is None:
+            percent = 100 if stage['state'] == 'done' else 0 if stage['state'] in ('active', 'waiting') and stage['basis'] != 'none' else None
+        if percent is None:
+            unknown += 1
+            continue
+        points.append(dict(label=stage['label'][:240], value=float(percent)))
+        bases.add(stage['basis'])
+    basis = '、'.join(text for key, text in [('rule', '規則推算'), ('source', '來源證據')] if key in bases)
+    headline = dict(label=f'整體（已知階段平均；{basis or "無資料基礎"}；{unknown} 階段未知）',
+                    value=f'{sum(p["value"] for p in points) / len(points):.1f}%' if points else '未知')
+    return [display_chart('案件階段完成百分比', points, data, unit='%', headline=headline)]
+
+
+ATTENDANCE_LABELS = {'late': '遲到', 'missing_punch': '缺卡', 'leave': '請假', 'trip': '出差',
+    'out': '外出', 'no_record': '尚無打卡紀錄', 'early_leave': '早退', 'exempt': '免打卡', 'supplemented': '補卡／修正'}
+
+
+def display_attendance(data):
+    points = [dict(label='到班', value=data.get('labelled_arrival_count', 0))]
+    rows = []
+    for key, label in ATTENDANCE_LABELS.items():
+        people = data.get(key, [])
+        points.append(dict(label=label, value=len(people)))
+        rows.extend(dict(name=p.get('name') or p.get('id'), state=label) for p in people)
+    note = '尚無打卡紀錄不代表實際出勤判定；同事可有多個標籤'
+    if data.get('incomplete'):
+        note += '；資料不完整'
+    return [display_chart('今天出勤標籤', points, data, unit='人',
+                headline=dict(label='標籤為到班', value=str(data.get('labelled_arrival_count', 0))), note=note),
+            display_table('今天非到班標籤', [('name', '同事'), ('state', '狀態')], rows, data, note=note)]
+
+
+DISPLAY_PROJECTORS = {'search_cases': display_search, 'case_owners': display_owners,
+                      'case_progress': display_progress, 'attendance_today': display_attendance}
+
+
+def displays(name, result):
+    return DISPLAY_PROJECTORS[name](json.loads(result))

@@ -1,5 +1,5 @@
 from .test_backend import app, client, role
-from .test_ai_api import BODY, Fake, events, rows
+from .test_ai_api import BODY, Fake, events, rows, live_server
 
 
 def question(app, client):
@@ -103,7 +103,7 @@ def test_feedback_aggregation_and_rating_filters(app, client):
         assert len(db.scalars(select(AiFeedbackRow)).all()) == 3
 
 
-def test_postgres_statements_compile(app, client, monkeypatch):
+def test_postgres_statements_compile(app, client):
     from sqlalchemy.dialects import postgresql
     from sqlalchemy import event
     from .ai import ledger
@@ -118,8 +118,6 @@ def test_postgres_statements_compile(app, client, monkeypatch):
             ledger.query(app.state.sessions, 'w', '2026-01-01', '2026-12-31', rating=rating)
     finally:
         event.remove(engine, 'before_execute', check)
+    assert len(statements) == 28
     assert any('LEFT OUTER JOIN ai_feedback' in s for s in statements)
     assert 'ON CONFLICT (usage_id, actor_id) DO UPDATE' in str(ledger.feedback_statement('postgresql', 'u', 'a', 1, None).compile(dialect=postgresql.dialect()))
-
-
-from .test_ai_api import live_server
