@@ -34,7 +34,7 @@
 
 | 工具 | displays |
 | --- | --- |
-| `search_cases` | 表格：案號、案名、狀態、PM、交期；總筆數超過列出筆數時 `truncated:true`，工具與表格皆附 `note`「共 N 筆，僅列出 M 筆」 |
+| `search_cases` | 表格：案號、案名、狀態、PM、交期；有下一頁或因長度移除資料時 `truncated:true`，工具與表格皆附符合筆數、本頁筆數及起點的 `note` |
 | `case_owners` | 表格：職務或節點、負責人；節點指派不可用時以 `note` 說明 |
 | `case_progress` | 長條圖：各階段完成百分比，`headline` 為整體百分比與資料基礎（規則推算或來源證據） |
 | `attendance_today` | 長條圖：各出勤標籤人數；表格：非「到班」的同事與其標籤 |

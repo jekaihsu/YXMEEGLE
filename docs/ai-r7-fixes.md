@@ -51,3 +51,11 @@ Completion conflict means node completion differs between sources, or the workfl
 Weekly displays omit unevaluated dates from chart points and show their dates with 不評估 in the note and table cells. The numeric chart contract cannot represent null points. Display notes use 查詢時間 rather than an internal timestamp field, and node evidence cells use Chinese source names. `test_display_chinese_and_unevaluated_days` checks visible text for internal identifiers.
 
 `project_state` ignores malformed node and task rows, defaults missing states to 待核對 and tolerates invalid date and overdue values. Schema tests reject null query, status and date, plus boolean and string offsets. No frontend or CI-script edits are included.
+
+### Final review verification
+
+`/tmp/ai-backend-venv/bin/python -m pytest backend -q` passes with 5723 passed, 40 skipped, 1 xfailed and 4 warnings. The warnings are the existing unregistered `pytest.mark.perf`. The focused `backend/test_ai_*.py` run passes with 200 passed and 1 skipped. The standard parity test skips because frontend esbuild is absent, with the instruction to run `npm ci` in `frontend/`.
+
+A supplemental local probe installs esbuild 0.28.2 under `backend/ai/.parity` and runs the same expanded parity fixture with only the dependency guard removed and the JavaScript import redirected to that backend installation. It passes against the actual TypeScript implementation. That run exposed and corrected a fixture error, selecting a real workspace project with tasks for the task-deadline case. The normal test still requires frontend dependencies and skips even with backend esbuild installed.
+
+The independent real-socket run passes all three checks for incremental delivery, project streaming with forbidden-case handling, and status-question tool displays. The 19-case fixture prints its final search result with `population_total:19`, `matched_total:19`, `offset:16`, `next_offset:null`, three cases, derived state and overdue flags, and no raw stored status or truncation flag. `git diff --check` passes. All commits remain local, without a push or frontend changes.
