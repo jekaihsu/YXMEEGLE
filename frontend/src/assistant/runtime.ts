@@ -14,8 +14,8 @@ export const ERROR_TEXT:Record<string,string>={
  message_limit:'問題或對話過長，請縮短問題或開始新對話。',
 };
 export const errorText=(code:string)=>ERROR_TEXT[code]||ERROR_TEXT.ai_upstream;
-export function createChatAdapter(model:()=>ModelId,conversation:()=>string,onForbidden:()=>void=()=>{}):ChatModelAdapter {
- return {async *run({messages,abortSignal}){
+export function createChatAdapter(conversation:()=>string,onForbidden:()=>void=()=>{},projectId?:string):ChatModelAdapter {
+ return {async *run({messages,abortSignal,context}){
   const epoch=getSessionEpoch();
   const content:ThreadAssistantMessagePart[]=[];
   let usageId:string|undefined;
@@ -27,7 +27,7 @@ export function createChatAdapter(model:()=>ModelId,conversation:()=>string,onFo
    while(history.at(-1)?.role==='assistant')history.pop();
    const recent=history.slice(-20).map(m=>({...m,content:m.role==='assistant'?m.content.slice(0,20000):m.content}));
    if(recent[0]?.role==='assistant')recent.shift();
-   const response=await fetch('/api/ai/chat',{method:'POST',credentials:'same-origin',signal:abortSignal,headers:{'Content-Type':'application/json'},body:JSON.stringify({model:model(),conversation_id:conversation(),messages:recent})});
+   const response=await fetch('/api/ai/chat',{method:'POST',credentials:'same-origin',signal:abortSignal,headers:{'Content-Type':'application/json'},body:JSON.stringify({model:context.config?.modelName==='gpt'?'gpt':'claude',conversation_id:conversation(),messages:recent,...(projectId?{project_id:projectId}:{})})});
    if(response.status===401){if(epoch===getSessionEpoch()&&!abortSignal.aborted)window.dispatchEvent(new Event('yx:session-expired'));throw new Error('session_expired')}
    if(response.status===403)throw new Error('ai_forbidden');
    if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.code||'ai_upstream')}
