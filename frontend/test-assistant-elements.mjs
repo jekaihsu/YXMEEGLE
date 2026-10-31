@@ -23,12 +23,12 @@ for(const display of [{...ui.fixtureDisplays.search_cases[0],rows:[{x:{private:t
 }
 assert.deepEqual(await collect(ui.readEvents(stream(sse([tool('bad')])),new AbortController().signal)),[tool([])]);
 globalThis.fetch=async()=>new Response(stream(sse([{type:'text',delta:'保留回答'},tool([{kind:'bad'}]),{type:'text',delta:'，繼續回答'},{type:'done'}])));
-const preserved=await collect(ui.createChatAdapter(()=>'claude',()=>'c').run({messages:[{role:'user',content:[{type:'text',text:'查詢'}]}],abortSignal:new AbortController().signal}));
+const preserved=await collect(ui.createChatAdapter(()=>'c').run({messages:[{role:'user',content:[{type:'text',text:'查詢'}]}],abortSignal:new AbortController().signal,context:{config:{modelName:'gpt'}}}));
 assert.equal(preserved.at(-1).content.filter(part=>part.type==='text').map(part=>part.text).join(''),'保留回答，繼續回答');
 assert.equal(preserved.at(-1).content.find(part=>part.type==='tool-call').result.status,'done');
 assert.deepEqual(preserved.at(-1).status,{type:'complete',reason:'stop'});
 globalThis.fetch=async()=>new Response(stream(ui.fixtureSSE('attendance_today')));
-const updates=await collect(ui.createChatAdapter(()=>'claude',()=>'c').run({messages:[{role:'user',content:[{type:'text',text:'出勤'}]}],abortSignal:new AbortController().signal}));
+const updates=await collect(ui.createChatAdapter(()=>'c').run({messages:[{role:'user',content:[{type:'text',text:'出勤'}]}],abortSignal:new AbortController().signal,context:{config:{modelName:'gpt'}}}));
 assert.equal(updates.at(-1).metadata.custom.usage_id,'fixture-attendance_today');
 assert.deepEqual(updates.at(-1).content[0].result.displays,ui.fixtureDisplays.attendance_today);
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=assistant',pretendToBeVisual:true});
