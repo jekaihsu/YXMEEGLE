@@ -1,5 +1,6 @@
 """Authenticated AI endpoints; provider substitution lives on app.state."""
 import asyncio
+import json
 from collections import deque
 from dataclasses import dataclass, field
 from time import monotonic, perf_counter
@@ -7,7 +8,7 @@ from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import Depends, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from starlette.concurrency import run_in_threadpool
 
@@ -203,11 +204,13 @@ def register(app, *, identity, sessions, cfg):
             feedback_writes.setdefault(key, deque()).append(monotonic())
         return body.model_dump()
 
+    @app.get('/api/ai/usage/export')
     @app.get('/api/ai/usage')
     def usage(request: Request, from_: date | None = Query(None, alias='from'), to: date | None = None,
               rating: Literal['up', 'down', 'none'] | None = None,
               scope: Literal['global', 'project'] | None = None,
               actor: str | None = Query(None, max_length=120), provider: ModelId | None = None,
+              q: str | None = Query(None, max_length=200),
               auth=Depends(authenticated)):
         data, user = auth
         if user['role'] != 'manager':
@@ -216,4 +219,21 @@ def register(app, *, identity, sessions, cfg):
         start = from_ or end - timedelta(days=29)
         if start > end or (end - start).days >= 366:
             raise HTTPException(422, '日期範圍錯誤')
-        return ledger.query(sessions, data['wid'], start.isoformat(), end.isoformat(), actor, provider, rating, scope)
+        exporting = request.url.path.endswith('/export')
+        result = ledger.query(sessions, data['wid'], start.isoformat(), end.isoformat(), actor, provider, rating, scope, q,
+            content_enabled=ledger.stores_content(cfg), retention_days=int(cfg.get('AI_CONTENT_RETENTION_DAYS', 90)), export=exporting)
+        if exporting:
+            return Response(''.join(json.dumps(row, ensure_ascii=False) + '\n' for row in result),
+                            media_type='application/x-ndjson', headers={'Cache-Control': 'no-store'})
+        return result
+
+    @app.get('/api/ai/usage/{usage_id}/exchange')
+    def get_exchange(usage_id: str, auth=Depends(authenticated)):
+        data, user = auth
+        if user['role'] != 'manager':
+            raise HTTPException(403, '僅主管可查看 AI 用量')
+        result = ledger.exchange(sessions, data['wid'], usage_id, content_enabled=ledger.stores_content(cfg),
+                                 retention_days=int(cfg.get('AI_CONTENT_RETENTION_DAYS', 90)))
+        if result is None:
+            raise HTTPException(404, '找不到提問')
+        return result
