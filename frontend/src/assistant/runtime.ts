@@ -19,6 +19,7 @@ export function createChatAdapter(conversation:()=>string,onForbidden:()=>void=(
   const epoch=getSessionEpoch();
   const content:ThreadAssistantMessagePart[]=[];
   let usageId:string|undefined;
+  let forbidden=false;
   const metadata=()=>({custom:{usage_id:usageId}});
   try {
    const all=messages.filter(m=>m.role==='user'||(m.role==='assistant'&&m.status?.type!=='incomplete')).map(m=>({role:m.role,content:m.content.filter(p=>p.type==='text').map(p=>p.text).join('')})).filter(m=>m.content);
@@ -29,8 +30,7 @@ export function createChatAdapter(conversation:()=>string,onForbidden:()=>void=(
    if(recent[0]?.role==='assistant')recent.shift();
    const response=await fetch('/api/ai/chat',{method:'POST',credentials:'same-origin',signal:abortSignal,headers:{'Content-Type':'application/json'},body:JSON.stringify({model:context.config?.modelName==='gpt'?'gpt':'claude',conversation_id:conversation(),messages:recent,...(projectId?{project_id:projectId}:{})})});
    if(response.status===401){if(epoch===getSessionEpoch()&&!abortSignal.aborted)window.dispatchEvent(new Event('yx:session-expired'));throw new Error('session_expired')}
-   if(response.status===403)throw new Error('ai_forbidden');
-   if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.code||'ai_upstream')}
+   if(!response.ok){const data=await response.json().catch(()=>({}));forbidden=response.status===403&&data.code==='ai_forbidden';throw new Error(data.code||'ai_upstream')}
    if(!response.body)throw new Error('network');
    for await(const event of readEvents(response.body,abortSignal)){
     if(event.type==='start')usageId=event.usage_id;
@@ -52,7 +52,7 @@ export function createChatAdapter(conversation:()=>string,onForbidden:()=>void=(
   }catch(error){
    if(abortSignal.aborted)throw error;
    const code=error instanceof Error?error.message:'network';
-   if(code==='ai_forbidden')onForbidden();
+   if(forbidden)onForbidden();
    yield {metadata:metadata(),content:[...content],status:{type:'incomplete',reason:'error',error:errorText(code in ERROR_TEXT?code:error instanceof TypeError?'network':'ai_upstream')}};
   }
  }};

@@ -48,13 +48,14 @@ globalThis.fetch=async(...args)=>{validationFetches++;return successFetch(...arg
 assert.equal((await run([turn('user','x'.repeat(4001))])).at(-1).status.error,ui.ERROR_TEXT.message_limit);assert.equal(validationFetches,0,'long user validation happens before fetch');
 await run([turn('user','x'.repeat(4001)),turn('assistant','discard',{type:'incomplete',reason:'error'}),turn('user','short retry')]);
 assert.deepEqual(sent().map(m=>m.content),['short retry'],'a rejected oversized question does not poison later sends');
-for(const body of [{code:'ai_forbidden'},{}]){
+for(const body of [{code:'ai_forbidden'}]){
  let forbidden=0;globalThis.fetch=async()=>json(body,403);
  assert.equal((await run(messages,()=>forbidden++)).at(-1).status.error,ui.ERROR_TEXT.ai_forbidden);assert.equal(forbidden,1,'403 reports forbidden without retry');
 }
 for(const code of ['ai_unconfigured','ai_quota','ai_busy','ai_upstream','ai_forbidden','ai_refused']){
  for(const http of [false,true]){globalThis.fetch=async()=>http?json({code,message:'private upstream details'},503):new Response(stream(event({type:'error',code,message:'private upstream details'})));const result=await run();assert.deepEqual(result.at(-1).status,{type:'incomplete',reason:'error',error:ui.ERROR_TEXT[code]})}
 }
+for(const [status,code] of [[503,'ai_upstream'],[503,'ai_forbidden'],[403,'other']]){let forbidden=0;globalThis.fetch=async()=>json({code},status);await run(messages,()=>forbidden++);assert.equal(forbidden,0,'only 403 ai_forbidden latches')}
 globalThis.fetch=async()=>{throw new TypeError('Failed to fetch')};assert.equal((await run()).at(-1).status.error,ui.ERROR_TEXT.network);
 globalThis.fetch=async()=>new Response(stream(event({type:'text',delta:'partial'})));assert.equal((await run()).at(-1).status.error,ui.ERROR_TEXT.network);
 const runAbort=new AbortController();let fetchSignal;globalThis.fetch=async(_url,init)=>{fetchSignal=init.signal;return new Response(new ReadableStream())};const abortedRun=collect(ui.createChatAdapter(()=>'abort').run({messages,abortSignal:runAbort.signal,context:{}}));await new Promise(resolve=>setTimeout(resolve,0));runAbort.abort();await assert.rejects(()=>abortedRun,{name:'AbortError'});assert.equal(fetchSignal,runAbort.signal);
@@ -70,14 +71,17 @@ await flush(()=>root.render(React.createElement(ui.Assistant)),40);
 assert.equal(document.querySelectorAll('.assistant-suggestions button').length,4);assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent==='送出').disabled,true);
 await flush(()=>document.querySelectorAll('.assistant-suggestions button')[2].click());assert.equal(document.querySelector('textarea').value,'請查詢案件進度：');
 await flush(()=>document.querySelectorAll('.assistant-suggestions button')[0].click(),80);assert.match(document.body.textContent,/今天尚無遲到紀錄/);assert.equal(document.querySelectorAll('.assistant-table table tbody tr').length,1);
+assert.equal(document.querySelector('[role=log]').getAttribute('aria-live'),'polite');assert.equal(document.querySelector('[role=log]').getAttribute('aria-relevant'),'additions');assert.match(document.querySelector('.assistant-completion').textContent,/回答完成/);
 assert.equal(document.querySelectorAll('.assistant-message img').length,0,'markdown images render no image element');
 assert.match(document.body.textContent,/private alt/);
 assert.equal(document.querySelector('.assistant-message iframe'),null,'raw HTML stays escaped');
 assert.match(document.body.textContent,/<iframe/);
 const links=[...document.querySelectorAll('.assistant-message a')];assert.equal(links.length,1,'unsafe schemes render plain text');assert.equal(links[0].target,'_blank');assert.equal(links[0].rel,'noopener noreferrer nofollow');
 await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='新對話').click());assert.equal(document.querySelectorAll('.assistant-suggestions button').length,4);
-globalThis.fetch=async()=>json({},403);
-await flush(()=>document.querySelectorAll('.assistant-suggestions button')[0].click(),60);
+globalThis.fetch=async()=>json({code:'ai_upstream'},503);
+await flush(()=>document.querySelectorAll('.assistant-suggestions button')[0].click(),60);assert.match(document.body.textContent,/AI 服務暫時無法回應/);assert.equal(document.querySelector('textarea').disabled,false);
+globalThis.fetch=async()=>json({code:'ai_forbidden'},403);
+await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重試').click(),60);
 assert.match(document.body.textContent,/你沒有權限查詢這項資料/);assert.equal(document.querySelector('textarea').disabled,true,'chat 403 disables composer');assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent==='送出').disabled,true,'chat 403 disables send');
 assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent==='重試'),false,'forbidden chat cannot retry');
 const both={default:'claude',models:[{id:'claude',label:'Claude',available:true},{id:'gpt',label:'GPT',available:true}]};
@@ -120,7 +124,7 @@ globalThis.fetch=async(url,init)=>{
 };
 await flush(()=>root.render(React.createElement(ui.AssistantChat,{key:'live',projectId:'live-project',compact:true})),40);
 await flush(()=>document.querySelector('.assistant-suggestions button').click(),40);
-assert.equal(document.querySelectorAll('[data-slot=thinking-indicator]').length,1);
+assert.equal(document.querySelectorAll('[data-slot=thinking-indicator]').length,1);assert.equal(document.querySelector('[role=log]').getAttribute('aria-busy'),'true');assert.equal(document.querySelector('.assistant-completion').textContent,'');
 assert.doesNotMatch(document.body.textContent,/不應顯示的工具標籤/);
 await flush(()=>liveController.enqueue(encoder.encode(event({type:'text',delta:'第一段回答'}))),40);
 assert.match(document.body.textContent,/第一段回答/);
@@ -128,7 +132,7 @@ assert.equal(document.querySelector('[data-slot=thinking-indicator]'),null,'thin
 await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='停止回應').click(),40);
 assert.equal(liveSignal.aborted,true,'stop cancels the underlying fetch');
 await flush(()=>root.unmount());
-for(const body of [{code:'ai_forbidden'},{}]){
+for(const body of [{code:'ai_forbidden'}]){
  const forbiddenRoot=createRoot(document.getElementById('root'));let calls=0;globalThis.fetch=async()=>{calls++;return json(body,403)};
  await flush(()=>forbiddenRoot.render(React.createElement(ui.Assistant)),40);
  assert.match(document.body.textContent,/你沒有權限查詢這項資料/);assert.equal(document.querySelector('textarea')?.disabled??true,true);assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent==='重試'),false);assert.equal(calls,1);
