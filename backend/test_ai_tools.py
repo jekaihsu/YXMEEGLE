@@ -111,7 +111,7 @@ def test_attendance_real_producer_route_and_structural_truncation(tmp_path, monk
             assert result[group] == [{'id': f'ou_{i}', 'name': f'同事{i}'}]
     assert '缺席' not in json.dumps(result, ensure_ascii=False)
     from .test_ai_displays import sdk_tool
-    displays, projected = sdk_tool(app, client, monkeypatch, 'attendance_today', {'range': 'today', 'date': ''})
+    displays, projected = sdk_tool(app, client, monkeypatch, 'attendance_today', {'range': 'today', 'date': ''}, ids=('d1', 'd2'))
     assert displays[0]['kind'] == 'chart' and displays[1]['kind'] == 'table'
     assert len(displays[1]['rows']) <= 50
     assert len({row['name'] for row in displays[1]['rows']}) == len(displays[1]['rows'])

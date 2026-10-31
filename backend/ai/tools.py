@@ -353,11 +353,18 @@ class ToolSpec:
     projector: Callable
 
 
+SHOW_DISPLAY_SCHEMA = dict(type='object', properties={
+    'display_id': dict(type='string', description='工具結果 display_options 裡的 id，例如 d1。'),
+    'columns': dict(type='array', items=dict(type='string'), description='表格要顯示的欄位 key，依顯示順序；空陣列代表全部欄位。圖表忽略。'),
+    'max_rows': dict(type='integer', description='表格或圖表最多顯示幾筆；0 代表全部（上限 50）。')},
+    required=['display_id', 'columns', 'max_rows'], additionalProperties=False)
+
 TOOLS = {
     'search_cases': ToolSpec(SEARCH_SCHEMA, '搜尋案件', search, project_search),
     'case_progress': ToolSpec(schema(['case_id']), '查詢案件進度', progress, project_progress),
     'case_owners': ToolSpec(schema(['case_id']), '查詢案件負責人', owners, project_owners),
     'attendance_today': ToolSpec(ATTENDANCE_SCHEMA, '查詢單日或每週出勤', attendance, project_attendance),
+    'show_display': ToolSpec(SHOW_DISPLAY_SCHEMA, '只在表格或圖表比文字更清楚時，顯示先前工具結果中的一個表格或圖表', None, None),
 }
 
 
@@ -412,7 +419,7 @@ def display_table(title, columns, rows, data, **extra):
     return dict(kind='table', title=title, columns=[dict(key=k, label=v) for k, v in columns[:8]],
                 rows=[{k: cell(row.get(k)) for k in keys} for row in rows[:50]],
                 truncated=bool(data.get('truncated') or len(rows) > 50 or len(columns) > 8),
-                **({'caption': '截至 ' + str(data['as_of'])[:240]} if data.get('as_of') else {}), **extra)
+                **({'caption': '截至 ' + str(data['as_of'])[:16].replace('T', ' ')} if data.get('as_of') else {}), **extra)
 
 
 def display_chart(title, points, data, **extra):
@@ -420,7 +427,7 @@ def display_chart(title, points, data, **extra):
                    if type(p['value']) in (int, float) and math.isfinite(p['value'])]
     return dict(kind='chart', title=title, variant='bars', points=safe_points[:12],
                 truncated=bool(data.get('truncated') or len(points) > 12 or len(safe_points) != len(points)),
-                **({'caption': '截至 ' + str(data['as_of'])[:240]} if data.get('as_of') else {}), **extra)
+                **({'caption': '截至 ' + str(data['as_of'])[:16].replace('T', ' ')} if data.get('as_of') else {}), **extra)
 
 
 def display_search(data):
@@ -508,3 +515,48 @@ DISPLAY_PROJECTORS = {'search_cases': display_search, 'case_owners': display_own
 
 def displays(name, result):
     return DISPLAY_PROJECTORS[name](json.loads(result))
+
+
+def display_options(name, result):
+    """Candidate displays for one tool result, keyed by short ids the model can pick from."""
+    return displays(name, result)
+
+
+def describe_options(options, first_id):
+    described = []
+    for offset, item in enumerate(options):
+        entry = dict(id=f'd{first_id + offset}', kind=item['kind'], title=item['title'])
+        if item['kind'] == 'table':
+            entry.update(columns=[c['key'] for c in item['columns']], rows=len(item['rows']))
+        else:
+            entry.update(points=len(item['points']))
+        described.append(entry)
+    return described
+
+
+def select_display(options, args):
+    """Validate a show_display call against the server-built options; returns (display, error)."""
+    if not isinstance(args, dict) or set(args) != {'display_id', 'columns', 'max_rows'}:
+        return None, '參數錯誤'
+    item = options.get(args['display_id']) if isinstance(args['display_id'], str) else None
+    cols, limit = args['columns'], args['max_rows']
+    if item is None:
+        return None, '找不到這個 display_id'
+    if not isinstance(cols, list) or not all(isinstance(c, str) for c in cols) or type(limit) is not int or limit < 0:
+        return None, '參數錯誤'
+    item = json.loads(json.dumps(item))
+    limit = min(limit or 50, 50)
+    if item['kind'] == 'table':
+        if cols:
+            known = {c['key']: c for c in item['columns']}
+            if any(c not in known for c in cols):
+                return None, '欄位不存在：可用欄位為 ' + '、'.join(known)
+            item['columns'] = [known[c] for c in dict.fromkeys(cols)]
+            item['rows'] = [{c['key']: row.get(c['key']) for c in item['columns']} for row in item['rows']]
+        if len(item['rows']) > limit:
+            item['rows'] = item['rows'][:limit]
+            item['truncated'] = True
+    elif len(item['points']) > limit:
+        item['points'] = item['points'][:limit]
+        item['truncated'] = True
+    return item, None

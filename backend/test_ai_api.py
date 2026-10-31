@@ -22,8 +22,8 @@ BODY = {'model': 'claude', 'conversation_id': 'c-123', 'messages': [{'role': 'us
 
 
 class Fake(Claude):
-    def __init__(self, *, calls=(), failure=False, delay=0):
-        self.calls, self.failure, self.delay = calls, failure, delay
+    def __init__(self, *, calls=(), failure=False, delay=0, shows=()):
+        self.calls, self.failure, self.delay, self.shows = calls, failure, delay, shows
         self.inputs = []
 
     async def stream(self, spec, system, messages, tools):
@@ -35,6 +35,11 @@ class Fake(Claude):
             for call in self.calls:
                 yield Event('tool', call)
             yield Event('stop', [{'type': 'tool_use', 'id': c.id, 'name': c.name, 'input': c.args} for c in self.calls])
+            return
+        if self.shows and len(self.inputs) == 2:
+            for call in self.shows:
+                yield Event('tool', call)
+            yield Event('stop', [{'type': 'tool_use', 'id': c.id, 'name': c.name, 'input': c.args} for c in self.shows])
             return
         yield Event('text', '截至目前，')
         await asyncio.sleep(self.delay)

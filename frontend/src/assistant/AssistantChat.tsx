@@ -93,8 +93,9 @@ function Conversation({catalog,newConversation,projectId,projectLabel,compact}:A
  const available=!forbidden&&catalog.models.some(m=>m.available);
  const input=useRef<HTMLTextAreaElement>(null);
  return <AssistantRuntimeProvider runtime={runtime}><FeedbackContext.Provider value={feedback}><ForbiddenContext.Provider value={forbidden}>
-  <div className={`assistant-chat${compact?' assistant-chat-compact':''}`}><header className="assistant-heading">{!compact&&<h1>AI 助理</h1>}<Button variant="plain" onClick={()=>{runtime.thread.cancelRun();newConversation()}}>新對話</Button></header>
+  <div className={`assistant-chat${compact?' assistant-chat-compact':''}`}>
    <ThreadPrimitive.Root data-slot="aui_thread-root" className="assistant-thread">
+    <Button variant="plain" className="assistant-new" onClick={()=>{runtime.thread.cancelRun();newConversation()}}>新對話</Button>
     <MessageLog>
      <ThreadPrimitive.Empty>
       <div data-slot="empty-state" className="assistant-empty">
@@ -130,7 +131,7 @@ export function AssistantChat(props:AssistantChatProps){
   }).catch(error=>{if(!controller.signal.aborted)setError(error instanceof ApiError&&(error.status===403&&error.code==='ai_forbidden')?'forbidden':'load')});
   return()=>controller.abort();
  },[attempt,props.catalog]);
- if(!catalog)return <div className="assistant-chat">{!props.compact&&<h1>AI 助理</h1>}{error
+ if(!catalog)return <div className="assistant-chat">{error
   ?error==='forbidden'?<p role="alert">{errorText('ai_forbidden')}</p>:<p role="alert">無法載入 AI 助理。<Button onClick={()=>setAttempt(n=>n+1)}>重試</Button></p>
   :<p role="status">正在載入 AI 助理…</p>}
  </div>;

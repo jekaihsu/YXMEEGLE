@@ -25,9 +25,10 @@
 }
 @layer pages {
 .assistant-chat{width:100%;min-width:0;max-width:960px;margin-inline:auto;container-type:inline-size}
-.assistant-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-5)}
-.assistant-heading h1{font-size:var(--fs-title1);letter-spacing:-.025em;margin:0}
-.assistant-thread{width:100%;max-width:880px;margin-inline:auto;min-width:0;display:flex;flex-direction:column;height:calc(100dvh - 220px);min-height:380px;max-height:1000px}
+.assistant-thread{position:relative;width:100%;max-width:880px;margin-inline:auto;min-width:0;display:flex;flex-direction:column;height:calc(100dvh - 150px);min-height:420px}
+.assistant-new{position:absolute;top:var(--space-1);right:var(--space-2);z-index:3}
+.assistant-viewport{padding-top:var(--space-6)}
+.assistant-composer{margin-bottom:var(--space-2)}
 .assistant-scroll-region{position:relative;display:flex;flex:1;min-height:0}
 .assistant-viewport:focus:not(:focus-visible){outline:none}.assistant-viewport:focus-visible{outline:2px solid var(--focus-ring);outline-offset:-2px}.assistant-viewport{height:auto;min-width:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:var(--space-4);border:0;border-radius:var(--radius-card);background:transparent;flex:1;min-height:0;position:relative}
 .assistant-empty{padding:clamp(1rem,6cqw,4rem) var(--space-2);max-width:640px;margin:auto}
@@ -45,7 +46,6 @@
 .assistant-model-menu small{display:block}
 .assistant-error{color:var(--critical);background:var(--surface-2);padding:var(--space-3);border-radius:var(--radius-m)}
 .assistant-chat-compact{height:100%;display:flex;flex-direction:column}
-.assistant-chat-compact .assistant-heading{justify-content:flex-end;margin-bottom:0}
 .assistant-chat-compact .assistant-thread{flex:1;height:auto;min-height:0}
 @container(max-width:480px){.assistant-suggestions{grid-template-columns:1fr}.assistant-viewport{padding:var(--space-2)}.assistant-empty{padding:var(--space-4) var(--space-2)}.assistant-empty h2{font-size:var(--fs-headline)}}
 }

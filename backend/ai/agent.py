@@ -13,7 +13,7 @@ from . import ledger
 from .catalog import Usage, cost_micro_usd
 from .prompts import system_prompt, project_system_prompt
 from .providers import ProviderError, failure_diagnostics
-from .tools import TOOLS, execute, displays
+from .tools import TOOLS, execute, displays, describe_options, select_display
 
 
 QUESTION_TIMEOUT_SECONDS = 120
@@ -110,6 +110,8 @@ class ChatRun:
     async def _stream(self):
         messages = [m.model_dump() for m in self.body.messages]
         cache = {}
+        display_pool = {}
+        shown_displays = {}
         try:
             yield sse(dict(type='start', usage_id=self.usage_id, conversation_id=self.body.conversation_id, provider=self.spec.id, scope=self.scope))
             system = project_system_prompt(self.project_context) if self.project_context else system_prompt()
@@ -172,26 +174,35 @@ class ChatRun:
                         return json.dumps({'error': '查詢逾時，請稍後重試'}, ensure_ascii=False), True
 
                 self.tool_calls += len(pending)
-                results = await asyncio.gather(*(run_tool(c) for c in pending.values()))
-                cache.update(zip(pending, results))
+                async def run_any(call):
+                    if call.name == 'show_display':
+                        shown, problem = select_display(display_pool, call.args)
+                        if problem:
+                            return json.dumps({'error': problem}, ensure_ascii=False), True
+                        shown_displays[call.id] = shown
+                        return json.dumps({'status': '已顯示，不要再重複表格或圖表內容'}, ensure_ascii=False), False
+                    return await run_tool(call)
+                results = await asyncio.gather(*(run_any(c) for c in pending.values()))
+                for (key, call), (result, error) in zip(pending.items(), results):
+                    if call.name != 'show_display' and not error:
+                        try:
+                            options = displays(call.name, result)
+                            described = describe_options(options, len(display_pool) + 1)
+                            for entry, option in zip(described, options):
+                                display_pool[entry['id']] = option
+                            result = json.dumps({**json.loads(result), 'display_options': described}, ensure_ascii=False)
+                        except Exception as exc:
+                            logger.warning('ai_display tool=%s exception=%s', call.name, type(exc).__name__)
+                    cache[key] = (result, error)
                 outputs = []
                 for call, key in zip(calls, keys):
                     result, error = cache[key]
                     outputs.append(result)
                     label = TOOLS[call.name].label if call.name in TOOLS else '查詢資料'
                     event = dict(type='tool', id=call.id, name=call.name, label=label, status='error' if error else 'done')
-                    display_failed = False
-                    if not error:
-                        try:
-                            event['displays'] = displays(call.name, result)
-                        except Exception as exc:
-                            display_failed = True
-                            logger.warning('ai_display tool=%s exception=%s', call.name, type(exc).__name__)
+                    if call.id in shown_displays:
+                        event['displays'] = [shown_displays[call.id]]
                     yield sse(event)
-                    if display_failed:
-                        fallback = '（此結果無法以表格或圖表顯示，以下以文字說明。）\n\n'
-                        self.answer = (self.answer + fallback)[:20000]
-                        yield sse(dict(type='text', delta=fallback))
                 self.adapter.continue_with(messages, content, calls, outputs)
             raise ProviderError()
         except (asyncio.CancelledError, GeneratorExit):

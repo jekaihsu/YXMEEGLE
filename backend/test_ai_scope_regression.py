@@ -147,13 +147,13 @@ def test_status_question_real_socket(app, client, live_server):
     from .test_ai_api import Fake, BODY
     from .ai.providers import ToolCall
     args = dict(query='', status='in_progress', owner='anyone', overdue=False, offset=0)
-    app.state.ai_providers = {'claude': Fake(calls=[ToolCall('status', 'search_cases', args)])}
+    app.state.ai_providers = {'claude': Fake(calls=[ToolCall('status', 'search_cases', args)], shows=[ToolCall('show', 'show_display', dict(display_id='d1', columns=[], max_rows=0))])}
     response = subprocess.run(['curl', '-sS', '-N', '--max-time', '10', '-b', cookie(client),
         '-H', 'Content-Type: application/json', '--data', json.dumps(dict(BODY, messages=[dict(role='user', content='哪些案件進行中？')])),
         live_server + '/api/ai/chat'], capture_output=True, text=True, check=True)
     events = [json.loads(line[6:]) for line in response.stdout.splitlines() if line.startswith('data: ')]
     assert events[-1]['type'] == 'done', events
-    table = next(e['displays'][0] for e in events if e['type'] == 'tool' and e['status'] == 'done')
+    table = next(e['displays'][0] for e in events if e['type'] == 'tool' and e['name'] == 'show_display' and e['status'] == 'done')
     assert len(table['rows']) == 7
     assert all(row['status_label'] == '進行中' for row in table['rows'])
 
