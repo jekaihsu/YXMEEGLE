@@ -139,3 +139,12 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
 上游錯誤的 `detail` 僅提供給 `role == "manager"` 的提問者，與 `done.cost_usd` 使用相同權限判斷。例如 `OpenAI 404 model_not_found`。其他角色不會收到此欄位。`detail` 最多 200 字元，僅含供應商、HTTP 狀態及已清理的錯誤代碼或類型。伺服器以單行 warning 記錄供應商、模型、步數、耗時、例外類別、HTTP 狀態、上游代碼、類型、參數、request id、最後事件類型及最多 200 字元的清理後訊息。清理會遮蔽已知的提示詞、工具資料、金鑰及 bearer token。
 
 兩個供應商均停用 SDK 自動重試，並使用明確的 HTTP timeout。connect、write、pool 各 10 秒，read 為 60 秒，整題仍受 120 秒期限限制。OpenAI 回報 `input_tokens_details.cache_write_tokens` 時，若模型目錄有大於零的快取寫入單價，會拆分並按該單價計費；否則歸入未快取輸入，輸入總量不變。
+
+### 案件脈絡建置錯誤
+
+| 情況 | HTTP | code | 行為 |
+| --- | --- | --- | --- |
+| 基本案件路由 401、403、404 或案件不存在 | 403 | ai_forbidden | 相同的拒絕本文，不洩漏案件存在與否 |
+| 基本案件路由 5xx、逾時或非預期例外 | 503 | ai_upstream | 可重試，顯示「助理暫時無法回答，請稍後重試」 |
+
+兩種建置失敗都發生在模型呼叫及帳本註冊之前，因此沒有模型呼叫與 ledger 列。503 產生結構化 warning `ai_context_failed`，只含案件 id 雜湊、狀態碼、例外類別與耗時，不含 cookie 或內容。次要區段不可讀時仍以 unavailable 交代缺口。

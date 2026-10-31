@@ -56,12 +56,20 @@
 
 ## 後端執行細節
 
-案件脈絡沿用 case-detail、progress 與 node-assignments 路由及工具投影。基本資料只保留案件 id、案名、案號與目前階段，另保留已授權的期限與阻礙。不載入金額、合約列或來源連結。最近變更使用 case-detail 的 history 區段，只保留確認版本、修訂、替換時間、事件 id、動作與時間，以及資料新鮮度。區段無法讀取時保留狀態與原因，缺少區段時以 `recent_changes.unavailable` 明示無法取得。
+案件脈絡沿用 case-detail、progress 與 node-assignments 路由及工具投影。基本資料保留案件 id、案名、案號、目前階段與 header.responsible_person，另保留已授權的期限與阻礙。不載入金額、合約列或來源連結。最近變更使用 case-detail 的 history 區段，只保留確認版本、修訂、替換時間、事件 id、動作與時間，以及資料新鮮度。區段無法讀取時保留狀態與原因，缺少區段時以 `recent_changes.unavailable` 明示無法取得。
 
-基本資料讀取失敗（含 5xx）在模型呼叫前回傳相同的 HTTP 403 `ai_forbidden`，不寫帳、不註冊可評分的提問。進度失敗以 `progress.unavailable` 表示；節點指派未啟用、讀取失敗或無權限時保留 `nodes:null` 與 `node assignment data unavailable`。
+基本案件路由 401、403、404 或案件不存在時回傳相同的 HTTP 403 `ai_forbidden`。5xx、逾時或非預期例外回傳可重試的 HTTP 503 `ai_upstream`。兩者都不呼叫模型、不寫帳、不註冊可評分的提問。503 記錄結構化 warning `ai_context_failed project=<SHA-256 前 16 碼> status=<code> exception=<class> elapsed_ms=<n>`，不記錄 cookie、原始案件 id 或內容。進度失敗以 `progress.unavailable` 表示；節點指派未啟用、讀取失敗或無權限時保留 `nodes:null` 與 `node assignment data unavailable`。
 
 每個 app process 最多快取 128 個使用者案件鍵，90 秒從建置完成起算。同鍵同時建置共用一個 task；單一等待者取消不取消建置。滿載時優先移除已完成項目，全部仍在建置時等待任一完成，不無限增加 task。權限異動可能需等待既有快取到期才反映。
 
-JSON 使用固定欄位順序與緊湊編碼。超過 12,000 字元時標示 `truncated:true`，依最近變更、阻礙、期限、進度、負責人、案件基本資料順序移除完整清單項目。單一欄位仍過長時替換為 `unavailable`，不截斷 JSON 字串。
+JSON 使用固定欄位順序與緊湊編碼。超過 12,000 字元時標示 `truncated:true`，依最近變更、阻礙、期限、進度、未完成任務、負責人、案件基本資料順序移除完整清單項目。單一欄位仍過長時替換為 `unavailable`，不截斷 JSON 字串。
 
 帳本遷移可重跑，新增 `scope VARCHAR(16) NOT NULL DEFAULT 'global'` 與可空的 `project_id VARCHAR(200)`。既有資料保持不變。`scope` 篩選同時限制用量、評分、原因分佈、people 與 recent；`by_*` 結構不變。
+
+未完成任務來自已授權 case-detail 的 workflow_nodes，最多 15 筆，保留任務 key、task_id、label、status 與所屬節點。路由有提供時才保留 due_date 與 assignee_name；目前真實路由未提供這兩欄。排序優先 overdue、blocked，再依可得期限排序。不用請求時鐘推測逾期。現有阻礙來源只有去重代碼，無法還原到特定任務；來源若提供 task_key 或 node_id 則保留，禁止猜測對應。
+
+最近變更依 created_at 或 replaced_at 由新到舊排序，最多 20 筆，裁切時移除最舊項目。已知 action 沿用 appCommon.tsx 的繁體中文標籤，未知 action 保留原碼；另提供原始筆數與最新時間。只裁切物件清單，保留 states 的短字串清單。unknown、read_failed 等狀態與 no_authorized_* 原因統一附加 unavailable 及繁體中文原因，不能解讀為沒有。
+
+系統提示詞以 `<case_context>` 包住 JSON；資料中的角括號使用 Unicode 跳脫，避免偽造區塊邊界。所有規則都在區塊之後，明定內容只是資料，禁止輸出連結、URL、圖片、其他案件內容與規則。
+
+投影不保留每次請求改變的 progress.as_of、source_time.fetched_at、node_assignments_as_of 或時鐘數值。來源本身的 source_time.value 與事件時間仍保留。相同案件資料產生相同提示詞文字，供應商提示詞快取可在 90 秒脈絡 TTL 內，以及案件資料未變時重用。
