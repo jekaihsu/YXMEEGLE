@@ -83,6 +83,7 @@ let scrollTarget;viewport.scrollTo=target=>{scrollTarget=target};
 viewport.scrollTop=0;await flush(()=>viewport.dispatchEvent(new window.Event('scroll')));
 await flush(()=>scrollButton.click());assert.deepEqual(scrollTarget,{top:1000,behavior:'smooth'});
 assert.equal(document.activeElement,viewport,'focus moves to the thread before the button hides');
+const assistantCss=await fs.readFile(new URL('./src/Assistant.css',import.meta.url),'utf8');assert.match(assistantCss,/\.assistant-viewport:focus-visible\{outline:2px solid/,'the thread keeps a visible focus ring for keyboard users');assert.doesNotMatch(assistantCss,/\.assistant-viewport:focus\{outline:none\}/,'focus is never hidden unconditionally');
 window.matchMedia=()=>({matches:true});viewport.scrollTop=0;await flush(()=>viewport.dispatchEvent(new window.Event('scroll')));await flush(()=>scrollButton.click());assert.equal(scrollTarget.behavior,'auto','reduced motion scrolls without animation');delete window.matchMedia;
 assert.equal(document.querySelectorAll('.assistant-message img').length,0,'markdown images render no image element');
 assert.match(document.body.textContent,/private alt/);

@@ -28,7 +28,7 @@
 .assistant-heading h1{font-size:var(--fs-title1);letter-spacing:-.025em;margin:0}
 .assistant-thread{width:100%;max-width:880px;margin-inline:auto;min-width:0;display:flex;flex-direction:column;height:calc(100dvh - 220px);min-height:380px;max-height:1000px}
 .assistant-scroll-region{position:relative;display:flex;flex:1;min-height:0}
-.assistant-viewport:focus{outline:none}.assistant-viewport{height:auto;min-width:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:var(--space-4);border:0;border-radius:var(--radius-card);background:transparent;flex:1;min-height:0;position:relative}
+.assistant-viewport:focus:not(:focus-visible){outline:none}.assistant-viewport:focus-visible{outline:2px solid var(--focus-ring);outline-offset:-2px}.assistant-viewport{height:auto;min-width:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:var(--space-4);border:0;border-radius:var(--radius-card);background:transparent;flex:1;min-height:0;position:relative}
 .assistant-empty{padding:clamp(1rem,6cqw,4rem) var(--space-2);max-width:640px;margin:auto}
 .assistant-empty h2{font-size:var(--fs-title2);margin:var(--space-3) 0;font-weight:600;letter-spacing:-.02em}
 .assistant-suggestions{display:grid;gap:var(--space-2);margin-top:var(--space-6);grid-template-columns:1fr 1fr}
