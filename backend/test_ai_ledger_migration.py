@@ -42,3 +42,21 @@ def test_ledger_failure_never_raises_or_logs_values(caplog):
     record(Broken(), conversation_id='private question must not be logged')
     assert 'ai_usage_write_failed' in caplog.text
     assert 'private question' not in caplog.text
+
+
+def test_feedback_additive_migration(tmp_path):
+    from .ai.ledger import AiFeedbackRow
+    engine = create_engine('sqlite:///' + str(tmp_path / 'feedback.db'))
+    AiUsageRow.__table__.create(engine)
+    with engine.begin() as db:
+        db.exec_driver_sql('CREATE TABLE sentinel (value TEXT)')
+        db.exec_driver_sql("INSERT INTO sentinel VALUES ('preserve')")
+    migrate(engine)
+    migrate(engine)
+    inspector = inspect(engine)
+    assert inspector.get_pk_constraint('ai_feedback')['constrained_columns'] == ['usage_id', 'actor_id']
+    assert {c['name'] for c in inspector.get_columns('ai_feedback')} == {
+        'usage_id', 'actor_id', 'rating', 'reason', 'created_at', 'updated_at'}
+    with engine.connect() as db:
+        assert db.exec_driver_sql('SELECT value FROM sentinel').scalar() == 'preserve'
+    engine.dispose()

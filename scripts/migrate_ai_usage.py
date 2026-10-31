@@ -8,9 +8,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from backend.models import Base
-from backend.ai.ledger import AiUsageRow
+from backend.ai.ledger import AiUsageRow, AiFeedbackRow
 
-TABLES = [AiUsageRow.__table__]
+TABLES = [AiUsageRow.__table__, AiFeedbackRow.__table__]
 
 
 def migrate(engine):

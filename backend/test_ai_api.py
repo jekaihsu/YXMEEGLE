@@ -96,7 +96,8 @@ def test_success_error_usage_and_cost_visibility(app, client):
     assert rows(app)[-1].input_tokens == 60
     dashboard = client.get('/api/ai/usage').json()
     assert dashboard['totals'] == {'questions': 3, 'input_tokens': 180, 'output_tokens': 120,
-                                   'cost_usd': .001497, 'unpriced_calls': 0}
+                                   'cost_usd': .001497, 'unpriced_calls': 0,
+                                   'feedback': dict(up=0, down=0, rated=0, up_rate=None)}
 
 
 def test_usage_filters_and_unpriced(app, client):
@@ -168,6 +169,7 @@ def test_hr_and_case_permissions_apply_to_tools_and_sse(app, client):
     assert '你沒有權限查看出勤資料' in text
     assert '機密隱藏案件' not in text
     assert 'late' not in text and 'production' not in text
+    assert all('displays' not in e for e in result if e['type'] == 'tool')
     assert rows(app)[0].tool_calls == 2 and rows(app)[0].steps == 2
 
 

@@ -1,4 +1,7 @@
 """Authenticated AI endpoints; provider substitution lives on app.state."""
+import asyncio
+from collections import deque
+from time import monotonic
 from datetime import date, timedelta
 from typing import Literal
 
@@ -38,6 +41,19 @@ class ChatRequest(BaseModel):
         return self
 
 
+class FeedbackRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    usage_id: str = Field(min_length=1, max_length=36)
+    rating: Literal['up', 'down', 'none']
+    reason: Literal['wrong', 'incomplete', 'slow', 'other'] | None = None
+
+    @model_validator(mode='after')
+    def reason_only_down(self):
+        if self.reason is not None and self.rating != 'down':
+            raise ValueError('reason is only allowed with down')
+        return self
+
+
 class ChatResponse(StreamingResponse):
     def __init__(self, run):
         self.run = run
@@ -57,6 +73,7 @@ def register(app, *, identity, sessions, cfg):
     app.state.ai_providers = {key: ADAPTERS[spec.provider](cfg[spec.key_env])
                               for key, spec in models.items() if cfg.get(spec.key_env)}
     active = {}
+    feedback_writes = {}
     limit = int(cfg.get('AI_DAILY_TOKEN_LIMIT_PER_USER', '400000'))
 
     def authenticated(request: Request):
@@ -98,8 +115,29 @@ def register(app, *, identity, sessions, cfg):
         run.cookie = request.headers.get('cookie', '')
         return ChatResponse(run)
 
+    @app.post('/api/ai/feedback')
+    async def feedback(body: FeedbackRequest, auth=Depends(authenticated)):
+        data, user = auth
+        now = monotonic()
+        key = (data['wid'], user['id'])
+        writes = feedback_writes.setdefault(key, deque())
+        while writes and writes[0] <= now - 60:
+            writes.popleft()
+        if len(writes) >= 60:
+            raise HTTPException(429, '評分過於頻繁')
+        writes.append(now)
+        deadline = now + 3
+        while not await run_in_threadpool(ledger.owns_usage, sessions, data['wid'], user['id'], body.usage_id):
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                raise HTTPException(404, '找不到提問')
+            await asyncio.sleep(min(.05, remaining))
+        await run_in_threadpool(ledger.feedback, sessions, body.usage_id, user['id'], body.rating, body.reason)
+        return body.model_dump()
+
     @app.get('/api/ai/usage')
     def usage(request: Request, from_: date | None = Query(None, alias='from'), to: date | None = None,
+              rating: Literal['up', 'down', 'none'] | None = None,
               actor: str | None = Query(None, max_length=120), provider: ModelId | None = None,
               auth=Depends(authenticated)):
         data, user = auth
@@ -109,4 +147,4 @@ def register(app, *, identity, sessions, cfg):
         start = from_ or end - timedelta(days=29)
         if start > end or (end - start).days >= 366:
             raise HTTPException(422, '日期範圍錯誤')
-        return ledger.query(sessions, data['wid'], start.isoformat(), end.isoformat(), actor, provider)
+        return ledger.query(sessions, data['wid'], start.isoformat(), end.isoformat(), actor, provider, rating)

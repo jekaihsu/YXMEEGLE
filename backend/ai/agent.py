@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import math
+from uuid import uuid4
 
 import anyio
 from starlette.concurrency import run_in_threadpool
@@ -33,6 +34,7 @@ class ChatRun:
     def __init__(self, app, body, data, user, spec, adapter, release):
         self.app, self.body, self.data, self.user = app, body, data, user
         self.spec, self.adapter, self.release = spec, adapter, release
+        self.usage_id = str(uuid4())
         self.started = perf_counter()
         self.usage = Usage()
         self.step_usage = Usage()
@@ -67,7 +69,7 @@ class ChatRun:
         self.release()
         try:
             with anyio.CancelScope(shield=True):
-                await run_in_threadpool(ledger.record, self.app.state.sessions, workspace_id=self.data['wid'], actor_id=self.user['id'],
+                await run_in_threadpool(ledger.record, self.app.state.sessions, id=self.usage_id, workspace_id=self.data['wid'], actor_id=self.user['id'],
                       actor_name=self.user.get('name') or '', conversation_id=self.body.conversation_id,
                       provider=self.spec.id, model=self.model, effort=self.spec.effort,
                       input_tokens=usage.input_tokens, cache_read_tokens=usage.cache_read,
@@ -94,7 +96,7 @@ class ChatRun:
         messages = [m.model_dump() for m in self.body.messages]
         cache = {}
         try:
-            yield sse(dict(type='start', conversation_id=self.body.conversation_id, provider=self.spec.id))
+            yield sse(dict(type='start', usage_id=self.usage_id, conversation_id=self.body.conversation_id, provider=self.spec.id))
             system = system_prompt()
             for _ in range(5):
                 self.steps += 1
