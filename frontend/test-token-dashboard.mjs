@@ -52,8 +52,15 @@ assert.equal(new URL(requests[5].url,'http://localhost').searchParams.get('ratin
 await flush(()=>requests[5].resolve(json(feedbackFixture)));
 assert.match(document.querySelector('.td-satisfaction').textContent,/70.0%.*👍 7 \/ 👎 3.*已評分 10 次/);
 assert.match(document.querySelector('.td-providers').textContent,/Claude.*70.0%.*👍 7 \/ 👎 3.*GPT.*尚無評分/s);
-assert.deepEqual([...document.querySelectorAll('.td-reasons li')].map(row=>row.textContent),['答錯2 次','不完整1 次','太慢0 次','其他0 次']);
+assert.deepEqual([...document.querySelectorAll('.td-reasons li')].map(row=>row.textContent),['答錯2 次','不完整1 次','太慢0 次','其他0 次','未填寫0 次']);
 assert.equal(document.querySelectorAll('.td-dislike-marker').length,1);
+const dailyBar=document.querySelector('rect[aria-label*="3 次倒讚"]');
+assert.match(dailyBar.getAttribute('aria-label'),/7 次按讚/);
+await flush(()=>dailyBar.focus());
+assert.match(document.querySelector('.td-chart-tooltip').textContent,/👍 7 次按讚.*👎 3 次倒讚/);
+const dailyTable=document.querySelector('[aria-label="每日用量表，可左右捲動"] table');
+assert.deepEqual([...dailyTable.querySelectorAll('th')].map(cell=>cell.textContent),['日期','提問數','👍 按讚','👎 倒讚','輸入 tokens','輸出 tokens','費用 USD']);
+assert.deepEqual([...dailyTable.querySelector('tbody tr:last-child').cells].map(cell=>cell.textContent),['2026-10-31','12','7','3','1,234','50','US$0.0200']);
 assert.match(document.querySelector('rect[aria-label*="3 次倒讚"]').getAttribute('aria-label'),/12 次提問/);
 assert.equal(document.querySelector('span[aria-label="倒讚"]').nextElementSibling.textContent,'答錯');
 assert.ok(document.querySelector('span[aria-label="按讚"]'));assert.ok(document.querySelector('span[aria-label="未評分"]'));
@@ -73,6 +80,12 @@ await flush(()=>{history.pushState(null,'','?from=2026-10-01&to=2026-10-31&ratin
 await flush(()=>requests[9].resolve(json({...fixture,totals:{...fixture.totals,feedback:{up:0,down:0,rated:0,up_rate:0}}})));
 assert.doesNotMatch(document.querySelector('.td-satisfaction').textContent,/%/);
 assert.equal(document.querySelectorAll('select')[2].value,'none','popstate restores the rating control');
+for(const reasons of [{unspecified:3},undefined]){
+ await flush(()=>{history.pushState(null,'',`?from=2026-10-01&to=2026-10-31&rating=${reasons?'up':'down'}`);window.dispatchEvent(new Event('popstate'))});
+ await flush(()=>requests.at(-1).resolve(json({...feedbackFixture,reasons})));
+ assert.match(document.querySelector('.td-reasons').textContent,/倒讚原因/);
+ assert.equal(document.querySelector('.td-reasons li:last-child').textContent,`未填寫${reasons?3:0} 次`);
+}
 const countBeforeRange=requests.length;
 await flush(()=>{history.pushState(null,'','?from=2025-01-01&to=2026-10-31');window.dispatchEvent(new Event('popstate'))});
 assert.match(document.body.textContent,/日期範圍最多 366 天/);assert.equal(requests.length,countBeforeRange,'oversized custom range does not fetch');
