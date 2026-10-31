@@ -2,7 +2,7 @@
 import {createContext,useContext,useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
 import {AssistantRuntimeProvider,useLocalRuntime,ThreadPrimitive,ComposerPrimitive,MessagePrimitive,ActionBarPrimitive,ErrorPrimitive,useAuiState} from '@assistant-ui/react';
 import {MarkdownTextPrimitive} from '@assistant-ui/react-markdown';
-import remarkGfm from 'remark-gfm';
+import {assistantRemarkPlugins} from './markdown';
 import {Button} from '../design';
 import {api,ApiError} from '../api';
 import {createChatAdapter,errorText} from './runtime';
@@ -14,7 +14,7 @@ import '../Assistant.css';
 import './elements/elements.css';
 
 const suggestions=['今天誰遲到？','今天誰還沒打卡？','某案件進度（請輸入案名或編號）','某案件負責人是誰？'];
-const Markdown=()=> <MarkdownTextPrimitive smooth={false} remarkPlugins={[remarkGfm]} components={{
+const Markdown=()=> <MarkdownTextPrimitive smooth={false} remarkPlugins={assistantRemarkPlugins} components={{
  img:({alt})=><>{alt}</>,
  a:({href,children})=>href&&/^https?:\/\//i.test(href)?<a href={href} target="_blank" rel="noopener noreferrer nofollow">{children}</a>:<>{children}</>,
  table:({children})=><div className="assistant-table" tabIndex={0} role="region" aria-label="回答表格"><table>{children}</table></div>,
@@ -59,11 +59,23 @@ function MessageLog({children}:{children:ReactNode}){
   return '';
  });
  const [outcomeId,outcomeText]=outcome.split('|');
+ const viewport=useRef<HTMLDivElement>(null),messages=useRef<HTMLDivElement>(null);
+ const [away,setAway]=useState(false);
+ useEffect(()=>{
+  const element=viewport.current!;
+  const update=()=>setAway(element.scrollHeight-element.clientHeight-element.scrollTop>80);
+  element.addEventListener('scroll',update,{passive:true});
+  const observer=new ResizeObserver(update);
+  observer.observe(element);observer.observe(messages.current!);update();
+  return()=>{element.removeEventListener('scroll',update);observer.disconnect()};
+ },[]);
  return <>
-  <ThreadPrimitive.Viewport data-slot="aui_thread-viewport" className="assistant-viewport" autoScroll role="log" aria-live="off" aria-busy={running}>
-   {children}<ThreadPrimitive.Messages components={{UserMessage,AssistantMessage}}/>
-   <ThreadPrimitive.ScrollToBottom asChild><Button data-slot="scroll-anchor" className="assistant-bottom">回到最新回答</Button></ThreadPrimitive.ScrollToBottom>
+  <div className="assistant-scroll-region">
+  <ThreadPrimitive.Viewport ref={viewport} data-slot="aui_thread-viewport" className="assistant-viewport" autoScroll role="log" aria-live="off" aria-busy={running}>
+   <div ref={messages}>{children}<ThreadPrimitive.Messages components={{UserMessage,AssistantMessage}}/></div>
   </ThreadPrimitive.Viewport>
+  <Button hidden={!away} data-slot="scroll-anchor" className="assistant-bottom" onClick={()=>viewport.current!.scrollTo({top:viewport.current!.scrollHeight,behavior:'smooth'})}>回到最新回答</Button>
+  </div>
   <div className="assistant-completion" role="status">{!running&&outcomeText&&<span key={outcomeId}>{outcomeText}</span>}</div>
  </>;
 }
