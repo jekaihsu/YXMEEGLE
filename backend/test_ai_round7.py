@@ -128,7 +128,7 @@ def test_portfolio_frontend_parity(app, client, tmp_path):
         projects.append({**copy.deepcopy(projects[0]), 'portfolio_nodes': list(reversed(overlay))})
     projects.append({**copy.deepcopy(projects[0]), 'portfolio_nodes': [dict(status='completed'),
         dict(key='pm', status='paused'), dict(key='pm', status='completed')]})
-    task_due = copy.deepcopy(projects[0])
+    task_due = copy.deepcopy(next(p for p in projects if p.get('nodes')))
     task_due.pop('overdue_tasks', None)
     task_due.update(due_date=None, execution_status='in_progress')
     task_due['nodes'][0]['tasks'] = [dict(id='due', status='pending', due_date='2026-10-01')]
