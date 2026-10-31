@@ -40,3 +40,11 @@ npm install --prefix "$PWD/backend/ai/.parity" --no-save --package-lock=false --
 The parity test prefers frontend/node_modules when available. `PARITY_ESBUILD` can name an alternative module path. Missing Node or esbuild fails the test explicitly.
 
 Prompt regressions require question-specific attendance headlines, unevaluated day wording, no exposed internal field names, no absence terminology, no operational narration and one source-time mention. These are rule-text checks. No live model behavior or live provider schema acceptance is claimed.
+
+## Final verification
+
+The final `python -m pytest backend -q` run passes with 5710 passed, 39 skipped and 1 xfailed in 513.40 seconds. Four warnings concern the existing unregistered `pytest.mark.perf`. The final focused `backend/test_ai_*.py` run passes 187 tests. The independent real-socket run passes all three selected tests, including incremental delivery, project streaming and the status question. `git diff --check` passes.
+
+A replay of the original `6cbac90` tool module against real demo routes fails the UI population assertion with six stored in-progress cases instead of seven UI-derived cases. It also rejects the required offset contract. Initial regressions captured lost attendance labels, overwritten completion evidence, skipped denominators, misleading field errors, missing prompt rules and nullable schemas. The corrected 19-case paging fixture verifies three complete pages without duplicates.
+
+All changes are local commits. No push or frontend edit was made. No live Anthropic or OpenAI request was made. Adapter tests inspect the serialized SDK requests and parse synthetic provider streams. The Model the Domain principle shaped the shared node-order and status-label tables in `project_state`.
