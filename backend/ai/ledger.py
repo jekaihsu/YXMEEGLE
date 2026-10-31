@@ -105,13 +105,13 @@ def daily_tokens(sessions, workspace_id, actor_id):
 
 def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=None):
     row = AiUsageRow
-    feedback = AiFeedbackRow
-    joined = row.__table__.outerjoin(feedback, and_(row.id == feedback.usage_id, row.actor_id == feedback.actor_id))
+    rating_row = AiFeedbackRow
+    joined = row.__table__.outerjoin(rating_row, and_(row.id == rating_row.usage_id, row.actor_id == rating_row.actor_id))
     filters = [row.workspace_id == workspace_id, row.day >= start, row.day <= end]
     if provider:
         filters.append(row.provider == provider)
     if rating:
-        filters.append(feedback.rating.is_(None) if rating == 'none' else feedback.rating == (1 if rating == 'up' else -1))
+        filters.append(rating_row.rating.is_(None) if rating == 'none' else rating_row.rating == (1 if rating == 'up' else -1))
     people_filters = filters[:]
     if actor:
         filters.append(row.actor_id == actor)
@@ -119,8 +119,8 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
                func.coalesce(func.sum(row.output_tokens), 0).label('output_tokens'),
                func.coalesce(func.sum(row.cost_micro_usd), 0).label('cost_micro_usd'),
                func.coalesce(func.sum(case((row.cost_micro_usd.is_(None), 1), else_=0)), 0).label('unpriced_calls'),
-               func.coalesce(func.sum(case((feedback.rating == 1, 1), else_=0)), 0).label('up'),
-               func.coalesce(func.sum(case((feedback.rating == -1, 1), else_=0)), 0).label('down')]
+               func.coalesce(func.sum(case((rating_row.rating == 1, 1), else_=0)), 0).label('up'),
+               func.coalesce(func.sum(case((rating_row.rating == -1, 1), else_=0)), 0).label('down')]
 
     def public(result):
         value = dict(result)
@@ -135,6 +135,11 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
         partition_by=row.actor_id, order_by=(row.created_at.desc(), row.id.desc())).label('rank')
     ).select_from(joined).where(*people_filters).subquery()
     with sessions() as db:
+        if db.get_bind().dialect.name == 'postgresql':
+            db.connection(execution_options={'isolation_level': 'REPEATABLE READ'})
+        else:
+            # SQLite SELECT alone does not start a snapshot with the legacy driver.
+            db.connection().exec_driver_sql('BEGIN')
         names = dict(db.execute(select(latest.c.actor_id, latest.c.actor_name).where(latest.c.rank == 1)).all())
         totals = public(db.execute(select(*metrics).select_from(joined).where(*filters)).mappings().one())
         up, down = totals.pop('up'), totals.pop('down')
@@ -149,17 +154,17 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
             groups[name] = [public(r) for r in db.execute(select(*columns, *metrics).select_from(joined).where(*filters)
                                                          .group_by(key).order_by(key)).mappings()]
         for person in groups['by_person']:
-            person['name'] = names[person['actor_id']]
+            person['name'] = names.get(person['actor_id'], person['actor_id'])
         people = [dict(actor_id=k, name=v) for k, v in sorted(names.items())]
         recent = [dict(created_at=iso(r.created_at), actor_id=r.actor_id, name=r.actor_name, provider=r.provider,
                        input_tokens=r.input_tokens, output_tokens=r.output_tokens,
                        cost_usd=None if r.cost_micro_usd is None else r.cost_micro_usd / 1_000_000,
                        latency_ms=r.latency_ms, status=r.status,
                        rating={1: 'up', -1: 'down'}.get(f.rating) if f else None, reason=f.reason if f else None)
-                  for r, f in db.execute(select(row, feedback).select_from(joined).where(*filters).order_by(row.created_at.desc(), row.id.desc()).limit(50))]
-        reasons = dict.fromkeys(('wrong', 'incomplete', 'slow', 'other'), 0)
-        reasons.update(dict(db.execute(select(feedback.reason, func.count()).select_from(joined)
-            .where(*filters, feedback.rating == -1, feedback.reason.is_not(None)).group_by(feedback.reason)).all()))
+                  for r, f in db.execute(select(row, rating_row).select_from(joined).where(*filters).order_by(row.created_at.desc(), row.id.desc()).limit(50))]
+        reasons = dict.fromkeys(('wrong', 'incomplete', 'slow', 'other', 'unspecified'), 0)
+        reasons.update(dict(db.execute(select(func.coalesce(rating_row.reason, 'unspecified'), func.count()).select_from(joined)
+            .where(*filters, rating_row.rating == -1).group_by(rating_row.reason)).all()))
     return dict(range={'from': start, 'to': end}, totals=totals, **groups, people=people, recent=recent, reasons=reasons)
 
 

@@ -96,7 +96,7 @@ def test_feedback_aggregation_and_rating_filters(app, client):
     result = client.get('/api/ai/usage').json()
     assert result['totals']['questions'] == 4
     assert result['totals']['feedback'] == dict(up=1, down=2, rated=3, up_rate=1/3)
-    assert result['reasons'] == dict(wrong=1, incomplete=0, slow=1, other=0)
+    assert result['reasons'] == dict(wrong=1, incomplete=0, slow=1, other=0, unspecified=0)
     assert [(r['provider'], r['up'], r['down']) for r in result['by_provider']] == [('claude', 1, 1), ('gpt', 0, 1)]
     assert result['by_person'][0]['up'] == result['by_day'][0]['up'] == 1
     assert result['by_person'][0]['down'] == result['by_day'][0]['down'] == 2
@@ -133,3 +133,41 @@ def test_postgres_statements_compile(app, client):
     assert len(statements) == 28
     assert any('LEFT OUTER JOIN ai_feedback' in s for s in statements)
     assert 'ON CONFLICT (usage_id, actor_id) DO UPDATE' in str(ledger.feedback_statement('postgresql', 'u', 'a', 1, None).compile(dialect=postgresql.dialect()))
+
+
+def test_usage_feedback_change_between_reads_keeps_snapshot(app, client, monkeypatch):
+    from sqlalchemy.orm import Session
+    from .ai import ledger
+    uid = question(app, client)
+    role(client, 'u-manager')
+    with app.state.sessions() as db:
+        db.connection().exec_driver_sql('PRAGMA journal_mode=WAL')
+        usage = db.get(ledger.AiUsageRow, uid)
+        actor = usage.actor_id
+    original = Session.execute
+    changed = False
+
+    def interleaved(self, statement, *args, **kwargs):
+        nonlocal changed
+        result = original(self, statement, *args, **kwargs)
+        if not changed and 'anon_1.rank' in str(statement):
+            changed = True
+            ledger.feedback(app.state.sessions, uid, actor, 'down', None)
+        return result
+
+    monkeypatch.setattr(Session, 'execute', interleaved)
+    response = client.get('/api/ai/usage?rating=down')
+    assert changed and response.status_code == 200
+    result = response.json()
+    assert result['totals']['questions'] == 0
+    assert result['by_person'] == result['by_day'] == result['by_provider'] == result['recent'] == []
+    assert client.get('/api/ai/usage?rating=down').json()['totals']['questions'] == 1
+
+
+def test_usage_unspecified_down_reason_reconciles(app, client):
+    uid = question(app, client)
+    assert client.post('/api/ai/feedback', json=dict(usage_id=uid, rating='down')).status_code == 200
+    role(client, 'u-manager')
+    result = client.get('/api/ai/usage').json()
+    assert result['reasons'] == dict(wrong=0, incomplete=0, slow=0, other=0, unspecified=1)
+    assert sum(result['reasons'].values()) == result['totals']['feedback']['down']

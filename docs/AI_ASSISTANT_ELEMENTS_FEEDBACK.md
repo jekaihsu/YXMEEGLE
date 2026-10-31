@@ -71,7 +71,7 @@
 - `totals.feedback`：`{ "up": 0, "down": 0, "rated": 0, "up_rate": 0.0 }`，沒有評分時 `up_rate` 為 null。
 - `by_person`、`by_provider`、`by_day` 每列增加 `up`、`down`。
 - `recent` 每列增加 `rating`（`up`、`down` 或 null）與 `reason`。
-- `reasons`：`{ "wrong": 0, "incomplete": 0, "slow": 0, "other": 0 }`（區間內倒讚原因分佈）。
+- `reasons`：`{ "wrong": 0, "incomplete": 0, "slow": 0, "other": 0, "unspecified": 0 }`（區間內倒讚原因分佈；`unspecified` 為未填原因，總和等於 `totals.feedback.down`）。
 
 ## 儀表板呈現
 
@@ -83,6 +83,7 @@
 
 ## 伺服器查詢與顯示語意
 
+查詢在 PostgreSQL 使用 REPEATABLE READ，在 SQLite 明確 BEGIN，讓姓名、總計與分組共用同一份快照。
 `rating` 篩選先限制提問集合，再計算 totals、by_person、by_provider、by_day、recent 與 reasons。
 `none` 表示沒有評分列，包含功能上線前的帳列。people 仍不受 actor 篩選影響，但遵守日期、provider、rating 篩選。
 評分每個 workspace 與使用者每分鐘最多 60 次提交，超過回 429；此限制在單一 web process 內有效。
