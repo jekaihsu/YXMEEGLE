@@ -20,24 +20,17 @@ Every tool property is required and non-nullable. The exact schemas are generate
 
 `search_cases` uses empty query, status `all`, owner `anyone`, overdue false and offset 0 as defaults supplied by the caller. The status enum includes the six UI states and their canonical English keys. `attendance_today` uses empty date for today's Taipei date and current week. Types and enums are validated from each property's schema. String length and nonnegative integer checks report the offending field. Overlong query originally produced the misleading status error.
 
-Search returns `total` for the keyword, owner and overdue filtered population before status filtering. `status_counts` is computed on that population and includes `other`, so its values sum to `total`. `matched_total` counts the status-filtered population. Offset is zero-based, with eight cases per page and `next_offset` for the next page. The 19-case real workspace regression checks pages of 8, 8 and 3 without duplicates and proves an empty selected status does not erase the other status counts.
+Search returns `population_total` for the keyword, owner and overdue filtered population before status filtering. `status_counts` is computed on that population and includes `other`, so its values sum to `population_total`. `matched_total` counts the status-filtered population. Offset is zero-based, with eight cases per page and `next_offset` for the next page. The 19-case real workspace regression checks pages of 8, 8 and 3 without duplicates and proves an empty selected status does not erase the other status counts.
 
 A search makes one portfolio snapshot read per call when workspace shell is enabled. The route caches snapshots per viewer and authority context. Owner `me` adds a session lookup. With shell disabled, it reads the heavier complete workspace projection. Paging repeats the snapshot read and then slices in memory. No per-case detail requests are introduced.
 
 ## UI parity
 
-`project_state` contains the node-order and status-label tables used to reproduce `caseRow` and `caseAttention`. Stored execution status is retained as source evidence but no longer drives the status filter. Only execution status completed closes the UI overdue flag. Engineering-complete cases can still be overdue.
+`project_state` contains the node-order and status-label tables used to reproduce `caseRow` and `caseAttention`. Stored execution status no longer drives the status filter and is omitted from model-visible search rows. Only execution status completed closes the UI overdue flag. Engineering-complete cases can still be overdue.
 
 `test_portfolio_frontend_parity` reads a real demo portfolio and workspace, adds producer-shaped node overlays, then bundles the actual `frontend/src/projectsListModel.ts` with esbuild and calls `caseRow` and `caseAttention` in Node. Python and TypeScript receive identical JSON. The test checks each case's state and overdue flag. It covers pending, active, review, paused, completed, skipped, unknown, absent nodes and a timezone deadline. The demo workspace contains seven UI-derived in-progress cases, compared with six stored in-progress statuses.
 
-The frontend dependencies were absent. This run installs only esbuild under the allowed backend directory. Reproduce from this worktree with:
-
-```sh
-npm install --prefix "$PWD/backend/ai/.parity" --no-save --package-lock=false --cache "$PWD/backend/ai/.parity/cache" esbuild@0.28.2
-/tmp/ai-backend-venv/bin/python -m pytest backend/test_ai_round7.py -q
-```
-
-The parity test prefers frontend/node_modules when available. `PARITY_ESBUILD` can name an alternative module path. Missing Node or esbuild fails the test explicitly.
+The parity test requires frontend dependencies. Run `npm ci` in `frontend/` before running `backend/test_ai_round7.py::test_portfolio_frontend_parity`. It locates esbuild in `frontend/node_modules` and skips with that explicit instruction when esbuild is absent. It does not depend on a gitignored backend installation. The fixture also covers mixed node order, an unknown middle node, missing keys, duplicate keys and a task deadline without `overdue_tasks`.
 
 Prompt regressions require question-specific attendance headlines, unevaluated day wording, no exposed internal field names, no absence terminology, no operational narration and one source-time mention. These are rule-text checks. No live model behavior or live provider schema acceptance is claimed.
 
@@ -48,3 +41,13 @@ The final `python -m pytest backend -q` run passes with 5710 passed, 39 skipped 
 A replay of the original `6cbac90` tool module against real demo routes fails the UI population assertion with six stored in-progress cases instead of seven UI-derived cases. It also rejects the required offset contract. Initial regressions captured lost attendance labels, overwritten completion evidence, skipped denominators, misleading field errors, missing prompt rules and nullable schemas. The corrected 19-case paging fixture verifies three complete pages without duplicates.
 
 All changes are local commits. No push or frontend edit was made. No live Anthropic or OpenAI request was made. Adapter tests inspect the serialized SDK requests and parse synthetic provider streams. The Model the Domain principle shaped the shared node-order and status-label tables in `project_state`.
+
+## Final review corrections
+
+`population_total` counts cases after keyword, owner and overdue filters but before the status filter. `matched_total` counts the requested status. Prompts require `matched_total` or `status_counts` for filtered questions. The real demo regression adds completed and pending cases, so the counts differ. Last pages have no truncation flag unless size trimming removed rows. After trimming, `next_offset` advances by the number actually returned.
+
+Completion conflict means node completion differs between sources, or the workflow shows completed work for a node whose assignment source explicitly shows none. Different task totals alone do not conflict. Both task populations remain in the payload. The conflict note contains aggregate counts, while row evidence retains node figures. Both prompts require source-specific figures on conflict, exclude skipped nodes from outstanding work and prohibit zero-work claims when any source shows completion. A 25-node real-route fixture checks row trimming under the 6000-character tool and 12000-character project limits.
+
+Weekly displays omit unevaluated dates from chart points and show their dates with 不評估 in the note and table cells. The numeric chart contract cannot represent null points. Display notes use 查詢時間 rather than an internal timestamp field, and node evidence cells use Chinese source names. `test_display_chinese_and_unevaluated_days` checks visible text for internal identifiers.
+
+`project_state` ignores malformed node and task rows, defaults missing states to 待核對 and tolerates invalid date and overdue values. Schema tests reject null query, status and date, plus boolean and string offsets. No frontend or CI-script edits are included.

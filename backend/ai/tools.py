@@ -265,7 +265,7 @@ def project_attendance(value):
                         not dates or any(d not in view.get('days', []) for d in dates)),
         truncated=False,
         basis='no punch obligation or holiday calendar in the source; weekends excluded, public holidays not excluded',
-        unaccounted_meaning='今天為截至 as_of 尚無打卡紀錄，不代表實際出勤判定；過去日期為沒有打卡紀錄；未來日期不推算',
+        unaccounted_meaning='今天為截至查詢時間尚無打卡紀錄，不代表實際出勤判定；過去日期為沒有打卡紀錄；未來日期不推算',
         arrived_meaning='arrived 只計到班標籤，不代表實際在場人數')
     if period == 'today':
         result.update(daily[0])
@@ -448,7 +448,10 @@ def display_progress(data):
                           **({'note': note} if note else {}))]
     summary = data.get('workflow_summary')
     if summary:
-        charts.append(display_table('全部流程節點', [('label', '節點'), ('status', '狀態'), ('tasks_done', '完成任務'), ('tasks_total', '全部任務'), ('sop_tasks_done', 'SOP 完成'), ('sop_tasks_total', 'SOP 全部'), ('basis', '依據')], summary.get('rows', []), data, note=summary.get('unavailable', '')))
+        charts.append(display_table('全部流程節點', [('label', '節點'), ('status', '狀態'), ('tasks_done', '完成任務'), ('tasks_total', '全部任務'), ('sop_tasks_done', 'SOP 完成'), ('sop_tasks_total', 'SOP 全部'), ('basis', '依據')], [{**row, 'basis': {'workflow_nodes': '工作流程',
+                'node_assignments.derived_status': '節點指派狀態', 'sop_tasks.case_counts': 'SOP 檢查清單',
+                'sop_tasks': 'SOP 檢查清單'}.get(row.get('basis'), '來源待確認')}
+                for row in summary.get('rows', [])], data, note=summary.get('unavailable', '')))
     return charts
 
 
@@ -458,16 +461,19 @@ def display_attendance(data):
         note += '；資料不完整'
     if data.get('range') == 'week':
         days = [item['date'] for item in data.get('days', [])]
+        excluded = {item['date'] for item in data.get('days', []) if not item.get('evaluated', True)}
+        if excluded:
+            note += '；' + '、'.join(day + ' 不評估' for day in sorted(excluded))
         codes = dict(unaccounted='無紀錄', late='遲', missing_punch='卡', on_leave='假', trip='出',
                      out='外', exempt='免', early_leave='早', supplemented='補')
-        rows = [dict(name=p.get('name') or p['id'], **{day: '／'.join(codes[k]
+        rows = [dict(name=p.get('name') or p['id'], **{day: '不評估' if day in excluded else '／'.join(codes[k]
             for k, dates in p['days'].items() if day in dates) or None for day in days}) for p in data.get('people', [])]
         caption = f"{data.get('week_start')} 至 {data.get('week_end')}"
         if data.get('as_of'):
             caption += '；截至 ' + str(data['as_of'])
         result = [display_table('每週出勤', [('name', '同事')] + [(d, d[5:]) for d in days], rows, data, note=note),
                   display_chart('每日沒有打卡紀錄', [dict(label=item['date'], value=item['counts']['unaccounted'])
-                      for item in data.get('days', [])], data, unit='人', note=note)]
+                      for item in data.get('days', []) if item.get('evaluated', True)], data, unit='人', note=note)]
         for display in result:
             display['caption'] = caption
         return result

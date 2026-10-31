@@ -80,20 +80,15 @@ def completion_notes(summary):
                ('工作流程任務', summary.get('workflow_completed_tasks', {})),
                ('目前節點', summary.get('completed_nodes', {})),
                ('目前任務', summary.get('completed_tasks', {}))]
-    for row in summary.get('rows', []):
-        evidence = row.get('workflow_evidence')
-        if evidence:
-            sources.append((row['label'] + '流程節點', dict(done=int(evidence['completed']), total=1)))
-            sources.append((row['label'] + '流程任務', dict(done=evidence['tasks_done'], total=evidence['tasks_total'])))
-        if 'sop_tasks_done' in row:
-            sources.append((row['label'] + ' SOP 任務', dict(done=row['sop_tasks_done'], total=row['sop_tasks_total'])))
     sop = summary.get('sop_tasks', {}).get('case_counts')
     if sop is not None:
         sources.append(('SOP 檢查清單', sop))
     summary.pop('completion_note', None)
     summary.pop('completion_conflict', None)
     conflicts = any((e := row.get('workflow_evidence')) and
-                    (e['completed'] != row['completed'] or e['tasks_done'] != row['tasks_done'] or e['tasks_total'] != row['tasks_total'])
+                    (e['completed'] != row['completed'] or
+                     ((e['completed'] or (e['tasks_done'] or 0) > 0) and
+                      not row['completed'] and row['tasks_done'] == 0))
                     for row in summary.get('rows', []))
     counts = '；'.join(f"{label}已完成 {c.get('done')}／{c.get('total')}" for label, c in sources)
     if conflicts:

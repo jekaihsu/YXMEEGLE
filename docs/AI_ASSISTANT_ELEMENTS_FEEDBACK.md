@@ -96,3 +96,11 @@ headline 明示已知階段平均、規則推算或來源證據，以及「另�
 顯示格值字串最多 240 字；表格超過上限時刪除完整列。顯示只從送給模型的最終投影產生。
 
 部署時重跑 `python scripts/migrate_ai_usage.py`，會以 additive migration 建立 ai_usage 與 ai_feedback，保留既有資料。
+
+## 不評估日期的相容處理
+
+目前 `ChartDisplay.points[].value` 必須是有限數字，驗證器不接受 null，Chart 也沒有不評估點的呈現方式。每週出勤圖表因此省略不評估日期，並在 note 列出日期與「不評估」。出勤表格對應儲存格顯示「不評估」，不以數值 0 表示。
+
+未來可加上每點可選的 `evaluated:false` 旗標作為加法擴充，前端收到時應顯示「不評估」且不繪製數值。這個旗標尚未實作，目前伺服器不傳送這類點，以維持既有數字格式相容。
+
+案件搜尋的 `population_total` 是狀態篩選前的母體筆數，`matched_total` 是符合完整篩選條件的筆數。`truncated` 只在有下一頁或因長度移除資料時為 true。最後一頁不因筆數少於總數而標示截短。

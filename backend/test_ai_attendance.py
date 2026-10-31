@@ -109,7 +109,8 @@ def test_week_and_weekends(attendance_route, monkeypatch):
     table, chart = display_attendance(result)
     assert len(table['columns']) == 8 and len(table['rows']) <= 50
     assert '2026-10-12 至 2026-10-18' in table['caption']
-    assert [p['value'] for p in chart['points']] == [52, 58, 58, 58, 58, 0, 0]
+    assert [p['value'] for p in chart['points']] == [52, 58, 58, 58, 58]
+    assert all(row['2026-10-17'] == row['2026-10-18'] == '不評估' for row in table['rows'])
     assert all(isinstance(v, (str, int, float)) or v is None for row in table['rows'] for v in row.values())
     weekend = call(attendance_route, {'range': 'today', 'date': '2026-10-17'})
     assert not weekend['unaccounted']
