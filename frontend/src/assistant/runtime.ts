@@ -20,7 +20,8 @@ export function createChatAdapter(conversation:()=>string,onForbidden:()=>void=(
   const content:ThreadAssistantMessagePart[]=[];
   let usageId:string|undefined;
   let forbidden=false;
-  const metadata=()=>({custom:{usage_id:usageId}});
+  let errorDetail:string|undefined;
+  const metadata=()=>({custom:{usage_id:usageId,...(errorDetail?{error_detail:errorDetail}:{})}});
   try {
    const all=messages.filter(m=>m.role==='user'||(m.role==='assistant'&&m.status?.type!=='incomplete')).map(m=>({role:m.role,content:m.content.filter(p=>p.type==='text').map(p=>p.text).join('')})).filter(m=>m.content);
    if(all.at(-1)?.role==='user'&&all.at(-1)!.content.length>4000)throw new Error('message_limit');
@@ -34,7 +35,7 @@ export function createChatAdapter(conversation:()=>string,onForbidden:()=>void=(
    if(!response.body)throw new Error('network');
    for await(const event of readEvents(response.body,abortSignal)){
     if(event.type==='start')usageId=event.usage_id;
-    if(event.type==='error')throw new Error(event.code);
+    if(event.type==='error'){errorDetail=event.detail;throw new Error(event.code)}
     if(event.type==='done'){yield {metadata:metadata(),content:[...content],status:{type:'complete',reason:'stop'}};return}
     if(event.type==='text'){
      const last=content.at(-1);

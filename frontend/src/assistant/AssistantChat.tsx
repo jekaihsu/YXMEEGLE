@@ -21,7 +21,8 @@ const Markdown=()=> <MarkdownTextPrimitive smooth={false} remarkPlugins={assista
 }}/>;
 
 function AnswerError(){
- return <MessagePrimitive.Error><ErrorPrimitive.Root data-slot="error-state" role="alert" className="assistant-error"><ErrorPrimitive.Message/></ErrorPrimitive.Root></MessagePrimitive.Error>;
+ const detail=useAuiState(s=>s.message.metadata.custom?.error_detail);
+ return <MessagePrimitive.Error><ErrorPrimitive.Root data-slot="error-state" role="alert" className="assistant-error"><ErrorPrimitive.Message/>{typeof detail==='string'&&detail&&<small className="assistant-error-detail">{detail}</small>}</ErrorPrimitive.Root></MessagePrimitive.Error>;
 }
 
 function UserMessage(){

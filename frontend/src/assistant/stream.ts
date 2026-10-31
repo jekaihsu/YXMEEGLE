@@ -4,7 +4,7 @@ export type StreamEvent =
  | {type:'tool';id:string;name:string;label:string;status:'running'|'done'|'error';displays?:Display[]}
  | {type:'text';delta:string}
  | {type:'done'}
- | {type:'error';code:string;message?:string};
+ | {type:'error';code:string;message?:string;detail?:string};
 
 export async function* readEvents(body:ReadableStream<Uint8Array>, signal:AbortSignal):AsyncGenerator<StreamEvent> {
  const reader=body.getReader(),decoder=new TextDecoder();
@@ -22,6 +22,7 @@ export async function* readEvents(body:ReadableStream<Uint8Array>, signal:AbortS
   if(event.type==='start'&&event.usage_id!==undefined&&typeof event.usage_id!=='string')throw new Error('invalid_event');
   if(event.type==='tool'&&event.displays!==undefined)event.displays=Array.isArray(event.displays)?event.displays.filter(isDisplay):[];
   if(event.type==='error'&&typeof event.code!=='string')throw new Error('invalid_event');
+  if(event.type==='error'&&event.detail!==undefined&&typeof event.detail!=='string')throw new Error('invalid_event');
   return event;
  }
  try {

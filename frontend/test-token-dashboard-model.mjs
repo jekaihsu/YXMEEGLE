@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 const result=await build({entryPoints:['src/tokenDashboardModel.ts'],bundle:true,write:false,format:'esm',platform:'node'});
 const m=await import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].text).toString('base64'));
-const filters={from:'2026-10-01',to:'2026-10-31',actor:'王 & a',provider:'gpt',rating:'down',scope:'project'};
+const filters={from:'2026-10-01',to:'2026-10-31',actor:'王 & a',provider:'gpt',rating:'down',scope:'project',q:'進度 & <script>'};
 assert.deepEqual(m.readFilters(m.filterQuery(filters)),filters);
 for(const path of ['/token_dashboard','/token_dashboard/','/token_dashboard///'])assert.equal(m.isTokenDashboardPath(path),true);
 for(const path of ['/token_dashboard_x','/x/token_dashboard','/','/TOKEN_DASHBOARD'])assert.equal(m.isTokenDashboardPath(path),false);
@@ -59,3 +59,5 @@ assert.deepEqual(m.reasonSeries({unspecified:3}).at(-1),{key:'unspecified',label
 
 for(const scope of ['global','project',''])assert.equal(m.readFilters(m.filterQuery({...filters,scope})).scope,scope);
 assert.equal(m.readFilters('?scope=invalid').scope,'');assert.equal(m.scopeLabel(undefined),'—');assert.equal(m.scopeLabel('global'),'全域');assert.equal(m.scopeLabel('project'),'案件');
+
+assert.equal(m.contentText(undefined),'—');assert.equal(m.contentText(null),'（未保存內容）');assert.equal(m.contentText('<script> **問題**'),'<script> **問題**');assert.equal(m.toolLabel('case_progress'),'案件進度');assert.equal(m.toolLabel('new_tool'),'new_tool');assert.equal(m.exportUrl(filters),'/api/ai/usage/export?'+m.filterQuery(filters));

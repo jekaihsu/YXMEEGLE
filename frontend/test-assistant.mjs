@@ -13,6 +13,7 @@ const event=data=>'data: '+JSON.stringify(data)+'\r\n\r\n';
 const collect=async iterable=>{const values=[];for await(const value of iterable)values.push(value);return values};
 for(const scope of ['global','project'])assert.deepEqual(await collect(ui.readEvents(stream(event({type:'start',scope})),new AbortController().signal)),[{type:'start',scope}]);
 await assert.rejects(()=>collect(ui.readEvents(stream(event({type:'start',scope:'invalid'})),new AbortController().signal)));
+const detailEvent={type:'error',code:'ai_upstream',detail:'OpenAI 401 invalid_api_key'};assert.deepEqual(await collect(ui.readEvents(stream(event(detailEvent)),new AbortController().signal)),[detailEvent]);await assert.rejects(()=>collect(ui.readEvents(stream(event({...detailEvent,detail:123})),new AbortController().signal)));
 const events=[{type:'text',delta:'今天王小明遲到。'},{type:'done'}];
 for(const width of [1,2,7,1024])assert.deepEqual(await collect(ui.readEvents(stream(': keepalive\r\n\r\n'+events.map(event).join('').trimEnd(),width),new AbortController().signal)),events);
 assert.deepEqual(await collect(ui.readEvents(stream('event: text\ndata: {"type":"text",\ndata: "delta":"跨行"}\n\n'),new AbortController().signal)),[{type:'text',delta:'跨行'}]);
@@ -99,6 +100,14 @@ globalThis.fetch=async()=>json({code:'ai_forbidden'},403);
 await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='重試').click(),60);
 assert.match(document.body.textContent,/你沒有權限查詢這項資料/);assert.equal(document.querySelector('textarea').disabled,true,'chat 403 disables composer');assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent==='送出').disabled,true,'chat 403 disables send');
 assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent==='重試'),false,'forbidden chat cannot retry');
+for(const detail of [undefined,'OpenAI 401 invalid_api_key <script>']){
+ globalThis.fetch=async url=>url==='/api/ai/models'?json(catalog):new Response(stream(event({type:'error',code:'ai_upstream',...(detail?{detail}:{})})));
+ await flush(()=>root.render(React.createElement(ui.Assistant,{key:detail||'no-detail'})),40);
+ await flush(()=>document.querySelector('.assistant-suggestions button').click(),60);
+ assert.match(document.querySelector('.assistant-error').textContent,/AI 服務暫時無法回應/);
+ assert.equal(document.querySelector('.assistant-error-detail')?.textContent,detail);
+ assert.equal(document.querySelector('.assistant-error script'),null);
+}
 const both={default:'claude',models:[{id:'claude',label:'Claude',available:true},{id:'gpt',label:'GPT',available:true}]};
 let chatRequests=[];
 globalThis.fetch=async(url,init)=>{
