@@ -12,11 +12,21 @@ def cookie(client):
 
 
 def test_status_only_real_demo(app, client):
+    from .test_backend import WorkspaceRow, BusinessRow, storage
+    wid = app.state.signer.loads(client.cookies.get('meegle_session'))['wid']
+    with app.state.sessions.begin() as db:
+        row = db.get(WorkspaceRow, wid)
+        state = storage.load(db, BusinessRow, row)
+        for project, status in zip(state['projects'][-2:], ['completed', 'pending']):
+            for node in project['nodes']:
+                node['status'] = status
+        row.data = storage.save(db, BusinessRow, wid, state)
     result, error = asyncio.run(execute(app, cookie(client), 'search_cases',
         dict(query='', status='in_progress', owner='anyone', overdue=False, offset=0)))
     assert not error, result
     data = json.loads(result)
-    assert data['matched_total'] == data['total'] == 7
+    assert data['population_total'] == 7
+    assert data['matched_total'] == data['status_counts']['in_progress'] == 5
     assert all(p['state'] == '進行中' for p in data['cases'])
 
 
@@ -64,7 +74,7 @@ def test_portfolio_visibility_and_composed_filters(tmp_path):
                 expected.sort(key=lambda p: (p.get('due_date') or '9999', p['id']))
                 assert data['matched_total'] == len(expected)
                 assert [p['id'] for p in data['cases']] == [p['id'] for p in expected[:8]]
-                assert sum(data['status_counts'].values()) == data['total']
+                assert sum(data['status_counts'].values()) == data['population_total']
 
         from .test_backend import WorkspaceRow, BusinessRow, storage
         wid = a.state.signer.loads(c.cookies.get('meegle_session'))['wid']
@@ -86,7 +96,7 @@ def test_portfolio_visibility_and_composed_filters(tmp_path):
                 dict(query='', status='all', owner='anyone', overdue=False, offset=0)))
             assert not error, result
             data = json.loads(result)
-            assert data['total'] == ui['total'] == 4
+            assert data['population_total'] == ui['total'] == 4
             assert {p['id'] for p in data['cases']} == {p['id'] for p in ui['items']} == {'p1', 'p3', 'p4', 'p6'}
             legacy = c.get('/api/projects?limit=100').json()
             assert legacy['total'] == 6

@@ -60,7 +60,7 @@ def test_skipped_denominator_real_workflow(app, client, status):
 def test_schema_field_errors(app):
     from .ai.tools import execute
     base = dict(query='', status='all', owner='anyone', overdue=False, offset=0)
-    for key, value in [('query', 'x'*241), ('offset', -1), ('overdue', None), ('owner', 'stranger')]:
+    for key, value in [('query', None), ('status', None), ('offset', True), ('offset', '0'), ('query', 'x'*241), ('offset', -1), ('overdue', None), ('owner', 'stranger')]:
         raw, error = asyncio.run(execute(app, '', 'search_cases', {**base, key: value}))
         assert error and key in json.loads(raw)['error']
         assert key == 'status' or 'status' not in json.loads(raw)['error']
@@ -96,7 +96,7 @@ def test_paging_and_counts_real_workspace(app, client):
     third = tool(app, client, 'search_cases', {**base, 'offset': 16})
     assert [len(p['cases']) for p in [first, second, third]] == [8, 8, 3]
     assert len({p['id'] for page in [first, second, third] for p in page['cases']}) == 19
-    assert first['total'] == sum(first['status_counts'].values()) == 19
+    assert first['population_total'] == sum(first['status_counts'].values()) == 19
     filtered = tool(app, client, 'search_cases', {**base, 'status': 'completed'})
     assert filtered['matched_total'] == 0 and sum(filtered['status_counts'].values()) == 19
 
@@ -119,6 +119,17 @@ def test_portfolio_frontend_parity(app, client, tmp_path):
         p['portfolio_nodes'] = [dict(key=key, status=status, owner_id=None, collaborator_ids=[]) for key in keys]
         p.update(overdue_tasks=1, execution_status='engineering_complete')
         projects.append(p)
+    for changes in [dict(field='mystery'), dict(sales='completed', pm='paused', field='pending_review'),
+                    dict(sales='completed', pm='completed', control='mystery')]:
+        overlay = [dict(key=k, status=changes.get(k, 'pending')) for k in keys]
+        projects.append({**copy.deepcopy(projects[0]), 'portfolio_nodes': list(reversed(overlay))})
+    projects.append({**copy.deepcopy(projects[0]), 'portfolio_nodes': [dict(status='completed'),
+        dict(key='pm', status='paused'), dict(key='pm', status='completed')]})
+    task_due = copy.deepcopy(projects[0])
+    task_due.pop('overdue_tasks', None)
+    task_due.update(due_date=None, execution_status='in_progress')
+    task_due['nodes'][0]['tasks'] = [dict(id='due', status='pending', due_date='2026-10-01')]
+    projects.append(task_due)
     projects += [{**copy.deepcopy(projects[0]), 'portfolio_nodes': []},
                  {**copy.deepcopy(projects[0]), 'due_date': '2026-10-12T23:00:00Z', 'overdue_tasks': 0}]
     root = Path(__file__).resolve().parents[1]
