@@ -29,7 +29,6 @@ const weekly=m.chartSeries([{day:'2026-01-01',questions:2,input_tokens:10,output
 assert.equal(weekly.length,9,'63 days aggregate into nine weeks');
 assert.deepEqual(weekly[0],{day:'2026-01-01',questions:5,input_tokens:40,output_tokens:60,cost_usd:.1+.2,up:0,down:0});assert.equal(weekly.at(-1).questions,4);
 assert.equal(m.chartSeries([],{from:'2024-01-01',to:'2024-12-31'}).length,53,'year renders at most 53 bars');
-console.log('Token dashboard model passed');
 
 for(const rating of ['', 'down', 'up', 'none']) {
  const value={...filters,rating};
@@ -52,3 +51,4 @@ assert.deepEqual(m.sortProviders([{provider:'claude',up:10},{provider:'gpt'}],'u
 assert.equal(m.chartSeries([],{from:'2026-10-01',to:'2026-10-01'})[0].down,0);
 const feedbackWeeks=m.chartSeries([{day:'2026-01-01',questions:5,input_tokens:0,output_tokens:0,cost_usd:0,up:1,down:2},{day:'2026-01-02',questions:3,input_tokens:0,output_tokens:0,cost_usd:0,down:3}],{from:'2026-01-01',to:'2026-03-04'});
 assert.equal(feedbackWeeks[0].down,5);assert.equal(feedbackWeeks[0].up,1);
+console.log('Token dashboard model, feedback query, percentages, reasons, sorting and weekly feedback passed');
