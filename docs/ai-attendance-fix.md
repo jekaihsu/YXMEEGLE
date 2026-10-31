@@ -1,6 +1,6 @@
 # Attendance semantics and weekly queries
 
-The attendance tool keeps its public name `attendance_today`. Both arguments are required. `range` is `today` for a single day or `week` for its containing Monday through Sunday. `date` is a strict `YYYY-MM-DD` string or null for the current Taipei date. Last week uses an explicit date in that week. Queries outside the route's current week plus or minus 26 weeks return an explanatory error. Existing 1 to 240 character validation remains in force.
+The attendance tool keeps its public name `attendance_today`. Both arguments are required. `range` is `today` for a single day or `week` for its containing Monday through Sunday. `date` is a strict `YYYY-MM-DD` string or an empty string for the current Taipei date. Last week uses an explicit date in that week. Queries outside the route's current week plus or minus 26 weeks return an explanatory error. Existing 1 to 240 character validation remains in force.
 
 The old handler always requested today's week, and its projector discarded six columns. A real-route reproduction before the fix returned the following counts.
 

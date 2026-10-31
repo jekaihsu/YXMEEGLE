@@ -1,0 +1,102 @@
+{
+  "search_cases": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "案號、案名或客戶關鍵字，最多 240 字；空字串不篩關鍵字。"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "all",
+          "pending",
+          "in_progress",
+          "pending_review",
+          "paused",
+          "completed",
+          "source_conflict",
+          "尚未開始",
+          "進行中",
+          "待審核",
+          "暫停",
+          "已完成",
+          "待核對"
+        ],
+        "description": "all 不篩狀態；依案件總覽流程節點判定。"
+      },
+      "owner": {
+        "type": "string",
+        "enum": [
+          "anyone",
+          "me"
+        ],
+        "description": "anyone 不篩 PM；me 表示目前使用者是 PM。"
+      },
+      "overdue": {
+        "type": "boolean",
+        "description": "false 不篩逾期；true 使用案件總覽的期限、逾期任務數與任務期限判定。"
+      },
+      "offset": {
+        "type": "integer",
+        "description": "從第幾筆開始，非負整數，0 為第一頁，每頁 8 筆。"
+      }
+    },
+    "required": [
+      "query",
+      "status",
+      "owner",
+      "overdue",
+      "offset"
+    ],
+    "additionalProperties": false
+  },
+  "case_progress": {
+    "type": "object",
+    "properties": {
+      "case_id": {
+        "type": "string",
+        "description": "1-200 ASCII letters, digits, underscore, dot, colon or hyphen; never . or .."
+      }
+    },
+    "required": [
+      "case_id"
+    ],
+    "additionalProperties": false
+  },
+  "case_owners": {
+    "type": "object",
+    "properties": {
+      "case_id": {
+        "type": "string",
+        "description": "1-200 ASCII letters, digits, underscore, dot, colon or hyphen; never . or .."
+      }
+    },
+    "required": [
+      "case_id"
+    ],
+    "additionalProperties": false
+  },
+  "attendance_today": {
+    "type": "object",
+    "properties": {
+      "range": {
+        "type": "string",
+        "enum": [
+          "today",
+          "week"
+        ],
+        "description": "today 查詢單日；week 查詢包含 date 的週一至週日。"
+      },
+      "date": {
+        "type": "string",
+        "description": "YYYY-MM-DD 台北日期；空字串代表今天。上週請填上週日期。"
+      }
+    },
+    "required": [
+      "range",
+      "date"
+    ],
+    "additionalProperties": false
+  }
+}
