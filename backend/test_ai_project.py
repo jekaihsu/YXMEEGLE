@@ -109,18 +109,18 @@ def test_context_cache_real_routes_ttl_users_workspaces_and_coalescing(app, clie
         cache = pc.ProjectContextCache(maxsize=2)
         args = (app, first_cookie, 'w', 'u-agent', pid)
         results = await asyncio.gather(*(cache.get(*args) for _ in range(5)))
-        assert len(reads) == 2
+        assert len(reads) == 3
         assert all(r is results[0] for r in results)
         clock[0] = 189.9
         assert await cache.get(*args) is results[0]
-        assert len(reads) == 2
+        assert len(reads) == 3
         clock[0] = 190.1
         await cache.get(*args)
-        assert len(reads) == 4
+        assert len(reads) == 6
         await cache.get(app, second_cookie, 'w', 'u-control', pid)
-        assert len(reads) == 6 and reads[-1][1] == second_cookie
+        assert len(reads) == 9 and reads[-1][1] == second_cookie
         await cache.get(app, first_cookie, 'different-workspace', 'u-agent', pid)
-        assert len(reads) == 8 and len(cache.entries) == 2
+        assert len(reads) == 12 and len(cache.entries) == 2
     asyncio.run(run())
 
 
@@ -136,6 +136,8 @@ def test_context_unavailable_parts_and_amount_projection(app, client, monkeypatc
         if path.endswith(('/progress', '/node-assignments')):
             raise httpx.HTTPStatusError('failed', request=httpx.Request('GET', 'http://test'), response=httpx.Response(503))
         result = await original(self, path, **params)
+        if not path.startswith('/api/case-detail/'):
+            return result
         result['header']['contract_amounts'] = {'amount': 987654321, 'state': 'withheld'}
         result['sections']['secret_amount'] = {'value': 987654321}
         for part in ('dates', 'blockers', 'current_stage'):
@@ -258,7 +260,7 @@ def test_context_shared_build_survives_waiter_cancellation(app, client, monkeypa
         release.set()
         context = await cache.get(*args)
         assert json.loads(context.json)['project']['id'] == pid
-        assert len(reads) == 2
+        assert len(reads) == 3
     asyncio.run(run())
 
 

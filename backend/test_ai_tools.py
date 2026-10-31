@@ -33,11 +33,12 @@ def test_real_search_and_owners_without_shell(app, client, monkeypatch):
     assert page['items']
     query = page['items'][0]['code']
     source = client.get('/api/projects', params={'q': query, 'limit': 8}).json()
-    result = tool(app, client, 'search_cases', {'query': query})
-    assert requests == ['/api/projects']
+    result = tool(app, client, 'search_cases', {'query': query, 'status': None, 'owner': None, 'overdue': None})
+    assert requests == ['/api/workspace']
     requests.clear()
     assert result['total'] == source['total']
-    assert result['cases'] == [{k: p[k] for k in ('id', 'code', 'name', 'status', 'pm_id', 'due_date')} for p in source['items']]
+    assert [p['id'] for p in result['cases']] == [p['id'] for p in source['items']]
+    assert all(p['status_label'] == '進行中' for p in result['cases'])
     pid = source['items'][0]['id']
     assert client.get('/api/projects/' + pid).status_code == 404
     detail = client.get('/api/case-detail/' + pid).json()
@@ -198,7 +199,7 @@ def test_search_real_routes_do_not_claim_timestamp(app, client):
     query = page['items'][0]['code']
     assert 'as_of' not in page
     assert 'as_of' not in client.get('/api/projects', params={'q': query}).json()
-    assert 'as_of' not in tool(app, client, 'search_cases', {'query': query})
+    assert 'as_of' not in tool(app, client, 'search_cases', {'query': query, 'status': None, 'owner': None, 'overdue': None})
     prompt = system_prompt()
     assert '查詢當下資料' in prompt
     assert 'case_progress' in prompt and 'attendance_today' in prompt

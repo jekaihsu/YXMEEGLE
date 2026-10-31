@@ -16,9 +16,10 @@ class ReadDenied(Exception):
 
 
 class Reader:
-    def __init__(self, client, assignments_enabled=False):
+    def __init__(self, client, assignments_enabled=False, portfolio_enabled=False):
         self.client = client
         self.assignments_enabled = assignments_enabled
+        self.portfolio_enabled = portfolio_enabled
 
     async def get(self, path, **params):
         response = await self.client.get(path, params=params)
@@ -41,12 +42,42 @@ def case_path(args):
     return '/api/projects/' + quote(args['case_id'], safe='')
 
 
+CASE_STATUS = {'pending': '尚未開始', 'in_progress': '進行中', 'completed': '已完成',
+    'paused': '暫停中', 'engineering_complete': '工程完成、財務待結', 'source_conflict': '來源待核對',
+    'internal': '內部案', 'active': '進行中', 'ongoing': '進行中'}
+
+
 async def search(reader, args):
-    return await reader.get('/api/projects', q=args['query'], limit=8)
+    if reader.portfolio_enabled:
+        value = await reader.get('/api/projects', view='portfolio')
+        items = value['items']
+    else:
+        value = await reader.get('/api/workspace')
+        items = value['projects']
+    owner = None
+    if args['owner'] == 'me':
+        owner = (await reader.get('/api/session'))['user']['id']
+    q = (args['query'] or '').casefold()
+    items = [p for p in items if
+        (not q or q in ' '.join(str(p.get(k, '')) for k in ('code', 'name', 'client')).casefold()) and
+        (not args['status'] or p['status'] == args['status']) and
+        (not owner or p.get('pm_id') == owner) and
+        (args['overdue'] is not True or bool(p.get('due_date') and p['due_date'][:10] < today()
+            and p['status'] not in ('completed', 'engineering_complete')))]
+    counts = {key: sum(p['status'] == key for p in items) for key in CASE_STATUS}
+    items.sort(key=lambda p: (p.get('due_date') or '9999', p['id']))
+    return dict(total=len(items), items=items[:8], status_counts=counts)
+
 
 
 async def progress(reader, args):
-    return await reader.get(case_path(args) + '/progress')
+    value = await reader.get(case_path(args) + '/progress')
+    detail = await reader.get('/api/case-detail/' + args['case_id'])
+    assignment_data = (await owners(reader, args, detail=detail))['assignments']
+    from .work_summary import summarize, add_sop
+    value['workflow_summary'] = summarize(detail, assignment_data if reader.assignments_enabled else None)
+    await add_sop(reader, args['case_id'], value['workflow_summary'])
+    return value
 
 
 async def owners(reader, args, *, detail=None):
@@ -76,7 +107,13 @@ def search_notice(data):
 def project_search(value):
     data = {**pick(value, 'as_of'), 'total': value['total'], 'cases': [pick(p, 'id', 'code', 'name', 'status', 'pm_id', 'due_date')
                                               for p in value['items']]}
+    data['status_counts'] = value.get('status_counts', {})
+    for p in data['cases']:
+        p['status_label'] = CASE_STATUS.get(p.get('status'), '狀態待確認')
     return {**data, **search_notice(data)}
+
+
+STAGE_STATES = {'done': '完成（依 basis 判斷是否為規則推導）', 'verified': '已確認', 'active': '有進行訊號', 'waiting': '等待前置條件', 'unknown': '無法確認', 'none': '無資料'}
 
 
 PRODUCTION = ('field', 'control', 'mapping', 'report')
@@ -87,7 +124,8 @@ GAPS = {'no_confirmation', 'confirmation_status_conflict', 'fill_items_unknown',
 
 def project_progress(value):
     return dict(project_id=value['project_id'], as_of=value.get('as_of'),
-                stages=[pick(s, 'key', 'label', 'state', 'basis') for s in value['stages']
+                workflow_summary=value.get('workflow_summary'),
+                stages=[dict(**pick(s, 'key', 'label', 'state', 'basis'), state_label=STAGE_STATES.get(s['state'], '狀態待確認')) for s in value['stages']
                         if s.get('key') in ('sales', 'pm', 'confirmation', *PRODUCTION)],
                 nodes={k: pick(value['production'][k].get('progress') or {},
                                'items_done', 'items_total', 'percent', 'unknown_items', 'basis')
@@ -153,6 +191,14 @@ def schema(properties):
                 required=list(properties), additionalProperties=False)
 
 
+SEARCH_SCHEMA = dict(type='object', properties={
+    'query': dict(type=['string', 'null'], description='Optional keyword in case code, name or client, at most 240 characters. Use null for list questions.'),
+    'status': dict(type=['string', 'null'], enum=[None, *CASE_STATUS], description='Case status filter. ' + '；'.join(f'{k}={v}' for k, v in CASE_STATUS.items())),
+    'owner': dict(type=['string', 'null'], enum=[None, 'me'], description='me means the current user is PM, not task owner.'),
+    'overdue': dict(type=['boolean', 'null'], description='true filters overdue workspace due dates, excluding completed and engineering_complete. Unknown deadlines cannot establish lateness.')},
+    required=['query', 'status', 'owner', 'overdue'], additionalProperties=False)
+
+
 @dataclass(frozen=True)
 class ToolSpec:
     schema: dict
@@ -162,7 +208,7 @@ class ToolSpec:
 
 
 TOOLS = {
-    'search_cases': ToolSpec(schema(['query']), '搜尋案件', search, project_search),
+    'search_cases': ToolSpec(SEARCH_SCHEMA, '搜尋案件', search, project_search),
     'case_progress': ToolSpec(schema(['case_id']), '查詢案件進度', progress, project_progress),
     'case_owners': ToolSpec(schema(['case_id']), '查詢案件負責人', owners, project_owners),
     'attendance_today': ToolSpec(schema([]), '查詢今天出勤', attendance, project_attendance),
@@ -173,21 +219,35 @@ async def execute(app, cookie, name, args):
     spec = TOOLS.get(name)
     if spec is None or not isinstance(args, dict) or set(args) != set(spec.schema['required']):
         return json.dumps({'error': '工具參數錯誤'}, ensure_ascii=False), True
-    if any(not isinstance(v, str) or not 1 <= len(v) <= 240 for v in args.values()):
+    if name == 'search_cases':
+        for key, value in args.items():
+            prop = spec.schema['properties'][key]
+            if value is None:
+                continue
+            if ('enum' in prop and value not in prop['enum']) or (key == 'overdue' and type(value) is not bool) or (key != 'overdue' and (not isinstance(value, str) or len(value) > 240)):
+                return json.dumps({'error': '工具參數錯誤：status 請使用 ' + '、'.join(CASE_STATUS) + '；owner 僅支援 me'}, ensure_ascii=False), True
+    elif any(not isinstance(v, str) or not 1 <= len(v) <= 240 for v in args.values()):
         return json.dumps({'error': '工具參數錯誤'}, ensure_ascii=False), True
     if 'case_id' in args and not valid_case_id(args['case_id']):
         return json.dumps({'error': '工具參數錯誤'}, ensure_ascii=False), True
     try:
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://ai.internal',
                                      headers={'cookie': cookie}, timeout=15) as client:
-            data = spec.projector(await spec.handler(Reader(client, str(app.state.cfg.get('NODE_ASSIGNMENT_ENABLED', 'false')).lower() == 'true'), args))
+            data = spec.projector(await spec.handler(Reader(client, str(app.state.cfg.get('NODE_ASSIGNMENT_ENABLED', 'false')).lower() == 'true',
+                str(app.state.cfg.get('WORKSPACE_SHELL_ENABLED', 'false')).lower() == 'true'), args))
         result = json.dumps(data, ensure_ascii=False)
         while len(result) > 6000:
             data['truncated'] = True
             lists = [v for v in data.values() if isinstance(v, list) and v]
+            summary = data.get('workflow_summary')
+            if summary and summary.get('rows'):
+                lists.append(summary['rows'])
             if not lists:
                 return json.dumps({'error': '資料過長', 'truncated': True}, ensure_ascii=False), True
-            max(lists, key=lambda v: len(json.dumps(v, ensure_ascii=False))).pop()
+            longest = max(lists, key=lambda v: len(json.dumps(v, ensure_ascii=False)))
+            longest.pop()
+            if summary and longest is summary.get('rows'):
+                summary['truncated'] = True
             if name == 'search_cases':
                 data.update(search_notice(data))
             result = json.dumps(data, ensure_ascii=False)
@@ -223,7 +283,7 @@ def display_chart(title, points, data, **extra):
 def display_search(data):
     data = {**data, **search_notice(data)}
     extra = {'note': data['note']} if data.get('note') else {}
-    return [display_table('案件搜尋結果', [('code', '案號'), ('name', '案名'), ('status', '狀態'),
+    return [display_table('案件搜尋結果', [('code', '案號'), ('name', '案名'), ('status_label', '案件狀態'),
         ('pm_id', 'PM'), ('due_date', '交期')], data.get('cases', []), data, **extra)]
 
 
@@ -253,8 +313,12 @@ def display_progress(data):
     headline = dict(label=f'整體（已知階段平均；{basis or "無資料基礎"}；另有 {unknown} 個階段進度未知）',
                     value=f'{sum(p["value"] for p in points) / len(points):.1f}' if points else '未知')
     note = '；'.join(g['message_zh'] for g in data.get('gaps', []) if g.get('message_zh'))
-    return [display_chart('案件階段完成百分比', points, data, unit='%', headline=headline,
+    charts = [display_chart('案件階段完成百分比', points, data, unit='%', headline=headline,
                           **({'note': note} if note else {}))]
+    summary = data.get('workflow_summary')
+    if summary:
+        charts.append(display_table('全部流程節點', [('label', '節點'), ('status', '狀態'), ('tasks_done', '完成任務'), ('tasks_total', '全部任務'), ('sop_tasks_done', 'SOP 完成'), ('sop_tasks_total', 'SOP 全部'), ('basis', '依據')], summary.get('rows', []), data, note=summary.get('unavailable', '')))
+    return charts
 
 
 ATTENDANCE_LABELS = {'late': '遲到', 'missing_punch': '缺卡', 'leave': '請假', 'trip': '出差',

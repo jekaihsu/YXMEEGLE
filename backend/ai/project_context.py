@@ -10,7 +10,7 @@ from time import monotonic, perf_counter
 
 import httpx
 
-from ..home_queues import CLOSED_NODES, CLOSED_TASKS
+from .work_summary import summarize, add_sop, CLOSED
 from .tools import Reader, ReadDenied, owners, pick, project_owners, project_progress
 
 
@@ -85,7 +85,7 @@ def compact(data, limit=12000):
             for child in value.values():
                 yield from lists(child)
     result = encode()
-    for key in ('recent_changes', 'blockers', 'dates', 'progress', 'unfinished_tasks', 'owners', 'project'):
+    for key in ('recent_changes', 'blockers', 'dates', 'progress', 'nodes', 'unfinished_tasks', 'owners', 'project'):
         while len(result) > limit:
             data['truncated'] = True
             candidates = list(lists(data[key]))
@@ -112,10 +112,10 @@ def workflow(detail):
         return unavailable({}, '工作流程無法讀取')
     rows = []
     for node in section.get('rows', []):
-        if node.get('status') in CLOSED_NODES:
+        if node.get('status') in CLOSED:
             continue
         for task in node.get('tasks', []):
-            if task.get('status') not in CLOSED_TASKS:
+            if task.get('status') not in CLOSED:
                 rows.append(dict(**pick(task, 'key', 'task_id', 'label', 'status'), node=pick(node, 'key', 'node_id', 'label')))
     rows.sort(key=lambda t: 0 if t.get('status') == 'overdue' else 1 if t.get('status') == 'blocked' else 2)
     return normalize(dict(**pick(section, 'states', 'reason'), rows=rows[:15], truncated=len(rows) > 15,
@@ -134,7 +134,10 @@ async def build(app, cookie, project_id):
                 header = detail['header']
                 if not header:
                     raise ReadDenied('找不到或沒有權限查看這個案件')
-                owner_data = project_owners(await owners(reader, {'case_id': project_id}, detail=detail))
+                owner_sources = await owners(reader, {'case_id': project_id}, detail=detail)
+                node_summary = summarize(detail, owner_sources['assignments'] if enabled else None)
+                await add_sop(reader, project_id, node_summary)
+                owner_data = project_owners(owner_sources)
                 owner_data.pop('node_assignments_as_of', None)
                 owner_data['responsible_person'] = header.get('responsible_person', unavailable({}, '負責人未提供'))
                 try:
@@ -167,7 +170,7 @@ async def build(app, cookie, project_id):
                     blocker_data['task_attribution'] = unavailable({}, '來源未提供阻礙所屬任務或節點')
                 data = dict(project=dict(id=project_id, **pick(header, 'project_name', 'case_number'),
                     current_stage=pick(header.get('current_stage', {}), 'state', 'node_id', 'label', 'reason')),
-                    owners=owner_data, progress=progress, dates=date_data, unfinished_tasks=workflow(detail),
+                    owners=owner_data, progress=progress, nodes=node_summary, dates=date_data, unfinished_tasks=workflow(detail),
                     blockers=blocker_data, recent_changes=changes)
                 return ProjectContext(compact(normalize(data)), monotonic() + 90)
     except ReadDenied:

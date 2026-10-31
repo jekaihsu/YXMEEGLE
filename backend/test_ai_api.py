@@ -161,7 +161,7 @@ def test_hr_and_case_permissions_apply_to_tools_and_sse(app, client):
     assert client.get('/api/projects/' + hidden_id + '/progress').status_code == 404
     result, error = asyncio.run(execute(app, cookie, 'case_progress', {'case_id': hidden_id}))
     assert error and '機密隱藏案件' not in result
-    result, _ = asyncio.run(execute(app, cookie, 'search_cases', {'query': '機密隱藏案件'}))
+    result, _ = asyncio.run(execute(app, cookie, 'search_cases', {'query': '機密隱藏案件', 'status': None, 'owner': None, 'overdue': None}))
     assert json.loads(result)['cases'] == []
     app.state.ai_providers = {'claude': Fake(calls=[ToolCall('a', 'attendance_today', {}),
         ToolCall('b', 'case_progress', {'case_id': hidden_id})])}
@@ -183,7 +183,7 @@ def test_tool_deduplication_and_multistep_accounting(app, client, monkeypatch):
         return '{"ok":true}', False
     monkeypatch.setattr('backend.ai.agent.execute', tool)
     app.state.ai_providers = {'claude': Fake(calls=[ToolCall('a', 'attendance_today', {}),
-        ToolCall('b', 'attendance_today', {}), ToolCall('c', 'search_cases', {'query': 'a'})])}
+        ToolCall('b', 'attendance_today', {}), ToolCall('c', 'search_cases', {'query': 'a', 'status': None, 'owner': None, 'overdue': None})])}
     result = events(client.post('/api/ai/chat', json=BODY))
     assert count == ['attendance_today', 'search_cases']
     assert result[-1]['usage'] == {'input_tokens': 120, 'output_tokens': 80}
