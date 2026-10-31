@@ -1,6 +1,11 @@
 """Bounded tool loop and cancellation-safe question accounting."""
 import asyncio
 import json
+import logging
+import math
+
+import anyio
+from starlette.concurrency import run_in_threadpool
 from time import perf_counter
 
 from . import ledger
@@ -8,6 +13,16 @@ from .catalog import Usage, cost_micro_usd
 from .prompts import system_prompt
 from .providers import ProviderError
 from .tools import TOOLS, execute
+
+
+QUESTION_TIMEOUT_SECONDS = 120
+logger = logging.getLogger(__name__)
+
+
+def log_failure(provider, step, exc):
+    logger.warning('ai_upstream provider=%s step=%s exception=%s status_code=%s request_id=%s',
+                   provider, step, type(exc).__name__, getattr(exc, 'status_code', None),
+                   getattr(exc, 'request_id', None))
 
 
 def sse(value):
@@ -28,6 +43,8 @@ class ChatRun:
         self.unpriced = False
         self.finished = False
         self.cookie = ''
+        self.step_final_usage = False
+        self.streamed_chars = self.input_floor = 0
 
     def elapsed(self):
         return int((perf_counter() - self.started) * 1000)
@@ -35,12 +52,18 @@ class ChatRun:
     def cost(self):
         return None if self.unpriced else cost_micro_usd(self.spec, self.usage + self.step_usage)
 
-    def finish(self):
+    async def finish(self):
         if self.finished:
             return
         self.finished = True
+        if self.status != 'ok' and self.steps and not self.step_final_usage:
+            self.step_usage = Usage(max(self.input_floor, self.step_usage.input_tokens), 0, 0,
+                                    max(self.streamed_chars, self.step_usage.output))
+            self.error_code = 'usage_estimated'
         usage = self.usage + self.step_usage
-        ledger.record(self.app.state.sessions, workspace_id=self.data['wid'], actor_id=self.user['id'],
+        try:
+            with anyio.CancelScope(shield=True):
+                await run_in_threadpool(ledger.record, self.app.state.sessions, workspace_id=self.data['wid'], actor_id=self.user['id'],
                       actor_name=self.user.get('name') or '', conversation_id=self.body.conversation_id,
                       provider=self.spec.id, model=self.model, effort=self.spec.effort,
                       input_tokens=usage.input_tokens, cache_read_tokens=usage.cache_read,
@@ -48,10 +71,23 @@ class ChatRun:
                       cost_micro_usd=self.cost(), price_version=self.spec.price_version,
                       steps=self.steps, tool_calls=self.tool_calls, latency_ms=self.elapsed(),
                       first_token_ms=self.first_token_ms, status=self.status, error_code=self.error_code)
-        self.release()
+        finally:
+            self.release()
 
     async def stream(self):
-        messages = [m.model_dump() for m in self.body.messages[-20:]]
+        try:
+            async with asyncio.timeout(float(self.app.state.cfg.get('AI_QUESTION_TIMEOUT_SECONDS', QUESTION_TIMEOUT_SECONDS))):
+                async for event in self._stream():
+                    yield event
+        except TimeoutError as exc:
+            self.status, self.error_code = 'error', 'ai_upstream'
+            log_failure(self.spec.id, self.steps, exc)
+            yield sse(dict(type='error', code='ai_upstream', message='助理回答逾時，請稍後重試'))
+        finally:
+            await self.finish()
+
+    async def _stream(self):
+        messages = [m.model_dump() for m in self.body.messages]
         cache = {}
         try:
             yield sse(dict(type='start', conversation_id=self.body.conversation_id, provider=self.spec.id))
@@ -59,20 +95,29 @@ class ChatRun:
             for _ in range(5):
                 self.steps += 1
                 self.step_usage = Usage()
+                self.step_final_usage = False
+                self.streamed_chars = 0
+                self.input_floor = math.ceil(len(json.dumps(dict(system=system,
+                    tools={k: dict(description=t.label, schema=t.schema) for k, t in TOOLS.items()},
+                    messages=messages), ensure_ascii=False)) / 2)
                 calls, content = [], None
                 async for event in self.adapter.stream(self.spec, system, messages, TOOLS):
                     if event.kind == 'text':
+                        self.streamed_chars += len(event.value)
                         if self.first_token_ms is None:
                             self.first_token_ms = self.elapsed()
                         yield sse(dict(type='text', delta=event.value))
                     elif event.kind == 'usage':
                         self.step_usage = event.value
+                        self.step_final_usage = event.final_usage
                         self.model = event.model or self.model
                         self.unpriced |= event.unpriced or self.model != self.spec.model
                     elif event.kind == 'tool':
                         calls.append(event.value)
                     elif event.kind == 'stop':
                         content = event.value
+                        if event.truncated:
+                            calls.clear()
                 self.usage += self.step_usage
                 self.step_usage = Usage()
                 if content is None:
@@ -116,8 +161,7 @@ class ChatRun:
             self.status = 'aborted'
             raise
         except Exception as exc:
+            log_failure(self.spec.id, self.steps, exc)
             self.status = 'error'
             self.error_code = exc.code if isinstance(exc, ProviderError) else 'ai_upstream'
             yield sse(dict(type='error', code=self.error_code, message='助理暫時無法回答，請稍後重試'))
-        finally:
-            self.finish()

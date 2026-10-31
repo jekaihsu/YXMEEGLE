@@ -192,6 +192,8 @@ def create_app(overrides=None,*,dispatch_transport=None):
                   'authorization_denied' if '使用者拒絕授權' in detail else 'expired')
             response=RedirectResponse('/?auth_error='+code,status_code=303)
             response.delete_cookie('lark_oauth_state'); return response
+        if request.url.path.startswith('/api/ai/') and exc.status_code == 403:
+            return JSONResponse({'code': 'ai_forbidden', 'message': '你沒有權限使用此 AI 功能'}, status_code=403)
         body = {'detail': exc.detail}
         if isinstance(exc.detail,dict) and exc.detail.get('code')=='feature_disabled': body=exc.detail
         if getattr(exc,'code',None) in ('user_token_expired','workspace_cas_conflict'): body['code']=exc.code

@@ -16,7 +16,13 @@ from .providers import ADAPTERS
 class Message(BaseModel):
     model_config = ConfigDict(extra='forbid')
     role: Literal['user', 'assistant']
-    content: str = Field(min_length=1, max_length=4000)
+    content: str = Field(min_length=1, max_length=20000)
+
+    @model_validator(mode='after')
+    def role_limit(self):
+        if self.role == 'user' and len(self.content) > 4000:
+            raise ValueError('user content exceeds 4000 characters')
+        return self
 
 
 class ChatRequest(BaseModel):
@@ -43,7 +49,7 @@ class ChatResponse(StreamingResponse):
             await super().__call__(scope, receive, send)
         finally:
             await self.body_iterator.aclose()
-            self.run.finish()
+            await self.run.finish()
 
 
 def register(app, *, identity, sessions, cfg):
@@ -95,6 +101,6 @@ def register(app, *, identity, sessions, cfg):
             raise HTTPException(403, '僅主管可查看 AI 用量')
         end = to or date.fromisoformat(ledger.today())
         start = from_ or end - timedelta(days=29)
-        if start > end:
+        if start > end or (end - start).days >= 366:
             raise HTTPException(422, '日期範圍錯誤')
         return ledger.query(sessions, data['wid'], start.isoformat(), end.isoformat(), actor, provider)

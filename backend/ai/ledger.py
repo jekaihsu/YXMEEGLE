@@ -42,13 +42,17 @@ def today():
 
 
 def record(sessions, **values):
-    try:
-        created = datetime.now(timezone.utc)
-        with sessions.begin() as db:
-            db.add(AiUsageRow(created_at=created, day=created.astimezone(TAIPEI).date().isoformat(), **values))
-    except Exception:
-        # Exception strings can contain SQL parameters; only report the failure type.
-        logger.error('ai_usage_write_failed')
+    created = datetime.now(timezone.utc)
+    values = dict(id=str(uuid4()), created_at=created, day=created.astimezone(TAIPEI).date().isoformat(), **values)
+    for attempt in range(2):
+        try:
+            with sessions.begin() as db:
+                if db.get(AiUsageRow, values['id']) is None:
+                    db.add(AiUsageRow(**values))
+            return
+        except Exception:
+            if attempt == 1:
+                logger.error('ai_usage_write_failed')
 
 
 def daily_tokens(sessions, workspace_id, actor_id):
@@ -68,7 +72,8 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None):
         filters.append(row.actor_id == actor)
     metrics = [func.count().label('questions'), func.coalesce(func.sum(row.input_tokens), 0).label('input_tokens'),
                func.coalesce(func.sum(row.output_tokens), 0).label('output_tokens'),
-               func.coalesce(func.sum(row.cost_micro_usd), 0).label('cost_micro_usd')]
+               func.coalesce(func.sum(row.cost_micro_usd), 0).label('cost_micro_usd'),
+               func.coalesce(func.sum(case((row.cost_micro_usd.is_(None), 1), else_=0)), 0).label('unpriced_calls')]
 
     def public(result):
         value = dict(result)
@@ -79,20 +84,24 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None):
             value['last_at'] = iso(value['last_at'])
         return value
 
+    latest = select(row.actor_id, row.actor_name, func.row_number().over(
+        partition_by=row.actor_id, order_by=(row.created_at.desc(), row.id.desc())).label('rank')
+    ).where(*people_filters).subquery()
     with sessions() as db:
-        totals = public(db.execute(select(*metrics, func.sum(case((row.cost_micro_usd.is_(None), 1), else_=0))
-                                          .label('unpriced_calls')).where(*filters)).mappings().one())
+        names = dict(db.execute(select(latest.c.actor_id, latest.c.actor_name).where(latest.c.rank == 1)).all())
+        totals = public(db.execute(select(*metrics).where(*filters)).mappings().one())
         totals['unpriced_calls'] = totals['unpriced_calls'] or 0
         groups = {}
         for name, columns in (
-            ('by_person', [row.actor_id, func.max(row.actor_name).label('name'), func.max(row.created_at).label('last_at')]),
+            ('by_person', [row.actor_id, func.max(row.created_at).label('last_at')]),
             ('by_day', [row.day]), ('by_provider', [row.provider]),
         ):
             key = columns[0]
             groups[name] = [public(r) for r in db.execute(select(*columns, *metrics).where(*filters)
                                                          .group_by(key).order_by(key)).mappings()]
-        people = [dict(r) for r in db.execute(select(row.actor_id, func.max(row.actor_name).label('name'))
-                  .where(*people_filters).group_by(row.actor_id).order_by(row.actor_id)).mappings()]
+        for person in groups['by_person']:
+            person['name'] = names[person['actor_id']]
+        people = [dict(actor_id=k, name=v) for k, v in sorted(names.items())]
         recent = [dict(created_at=iso(r.created_at), actor_id=r.actor_id, name=r.actor_name, provider=r.provider,
                        input_tokens=r.input_tokens, output_tokens=r.output_tokens,
                        cost_usd=None if r.cost_micro_usd is None else r.cost_micro_usd / 1_000_000,
