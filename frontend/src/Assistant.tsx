@@ -69,7 +69,6 @@ function Conversation({catalog,model,onModel,newConversation}:{catalog:ModelCata
      <ThreadPrimitive.If running><p className="assistant-working" role="status">正在查詢與整理資料…</p></ThreadPrimitive.If>
      <ThreadPrimitive.ScrollToBottom asChild><Button className="assistant-bottom">回到最新回答</Button></ThreadPrimitive.ScrollToBottom>
     </ThreadPrimitive.Viewport>
-    {forbidden&&<p role="alert" className="assistant-error">{errorText('ai_forbidden')}</p>}
     <ComposerPrimitive.Root className="assistant-composer">
      <ComposerPrimitive.Input ref={input} aria-label="詢問 AI 助理" placeholder="輸入出勤或案件問題…" maxLength={4000} disabled={!available} rows={2}/>
      <div className="assistant-composer-bar">

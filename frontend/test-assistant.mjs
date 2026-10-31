@@ -77,7 +77,7 @@ const links=[...document.querySelectorAll('.assistant-message a')];assert.equal(
 await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='新對話').click());assert.equal(document.querySelectorAll('.assistant-suggestions button').length,4);
 globalThis.fetch=async()=>json({},403);
 await flush(()=>document.querySelectorAll('.assistant-suggestions button')[0].click(),60);
-assert.match(document.body.textContent,/你沒有權限查詢這項資料/);assert.equal(document.querySelector('textarea').disabled,true,'chat 403 disables composer');
+assert.match(document.body.textContent,/你沒有權限查詢這項資料/);assert.equal(document.querySelector('textarea').disabled,true,'chat 403 disables composer');assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent==='送出').disabled,true,'chat 403 disables send');
 assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent==='重試'),false,'forbidden chat cannot retry');
 await flush(()=>root.unmount());
 for(const body of [{code:'ai_forbidden'},{}]){
