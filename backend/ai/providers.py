@@ -62,6 +62,9 @@ class Claude:
                 async for event in stream:
                     if event.type == 'message_start':
                         yield claude_usage_event(event.message.usage, event.message.model, spec.model)
+                    elif event.type == 'content_block_start' and event.content_block.type == 'fallback':
+                        snapshot = stream.current_message_snapshot
+                        yield claude_usage_event(snapshot.usage, snapshot.model, spec.model)
                     elif event.type == 'message_delta':
                         snapshot = stream.current_message_snapshot
                         yield claude_usage_event(snapshot.usage, snapshot.model, spec.model)

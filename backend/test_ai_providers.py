@@ -68,6 +68,10 @@ def test_claude_request_usage_fallback_and_stream(monkeypatch, fallback):
     assert all(t['strict'] and t['input_schema']['additionalProperties'] is False for t in request['tools'])
     assert events[0].kind == 'usage' and events[0].value == Usage(10, 20, 30, 0)
     assert [e.value for e in events if e.kind == 'text'] == (['查詢', '完成'] if fallback else ['查詢'])
+    if fallback:
+        switched = next(e for e in events if e.kind == 'usage' and e.unpriced)
+        assert switched.model == 'claude-opus-4-8'
+        assert switched.value == Usage(10, 20, 30, 0)
     usage = [e for e in events if e.kind == 'usage'][-1]
     assert usage.value == (Usage(110, 20, 30, 45) if fallback else Usage(10, 20, 30, 40))
     assert usage.unpriced is fallback
