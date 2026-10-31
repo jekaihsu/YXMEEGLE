@@ -13,7 +13,7 @@ export function Chart({title,unit='',headline,points}:ChartDisplay){
   {headline&&<div className="assistant-chart-headline"><span>{headline.label}</span><strong>{headline.value}<small>{unit}</small></strong></div>}
   <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={summary} preserveAspectRatio="none">
    <line x1={pad} x2={width-pad} y1={baseline} y2={baseline} className="assistant-chart-axis"/>
-   {points.map((point,index)=><rect key={index} x={pad+index*step+step*.18} y={Math.min(y(point.value),baseline)} width={step*.64} height={Math.max(1,Math.abs(baseline-y(point.value)))} rx="3" className="assistant-chart-bar" data-active={active===index||undefined}/>) }
+   {points.map((point,index)=><rect key={index} x={pad+index*step+step*.18} y={Math.min(y(point.value),baseline)} width={step*.64} height={Math.max(1,Math.abs(baseline-y(point.value)))} rx="3" className="assistant-chart-bar" data-active={active===index||undefined} onMouseEnter={()=>setActive(index)} onMouseLeave={()=>setActive(null)}/>) }
   </svg>
   <div className="assistant-chart-labels" style={{gridTemplateColumns:`repeat(${Math.max(points.length,1)},minmax(0,1fr))`}}>
    {points.map((point,index)=><div key={index} className="assistant-chart-point">

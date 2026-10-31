@@ -32,6 +32,12 @@ export function DataTable({title,caption,columns,rows,rowKey,truncated,note}:Tab
    </th>)}</tr></thead>
    <tbody>{ordered.map(({row,index})=><tr key={keyFor(row,index)}>{columns.map(column=><td key={column.key} data-numeric={numeric(column.key)||undefined}>{value(row[column.key])}</td>)}</tr>)}</tbody>
   </table></div>
+  {columns.some(column=>comparable(column.key))&&<label className="assistant-data-sort">排序
+   <select aria-label={`${title}排序`} value={sort?JSON.stringify(sort):''} onChange={event=>{
+    const next=event.target.value?JSON.parse(event.target.value) as {key:string;direction:'asc'|'desc'}:null;
+    setSort(next);setAnnouncement(next?`${columns.find(column=>column.key===next.key)?.label}，${next.direction==='asc'?'遞增':'遞減'}排序`:'已清除排序');
+   }}><option value="">原始順序</option>{columns.filter(column=>comparable(column.key)).flatMap(column=>(['asc','desc'] as const).map(direction=><option key={`${column.key}-${direction}`} value={JSON.stringify({key:column.key,direction})}>{column.label} · {direction==='asc'?'遞增':'遞減'}</option>))}</select>
+  </label>}
   <div className="assistant-data-cards" role="list" aria-label={title}>{ordered.map(({row,index})=><div role="listitem" key={keyFor(row,index)}>
    <strong>{primary.label} · {value(row[primary.key])}</strong><dl>{columns.slice(1).map(column=><div key={column.key}><dt>{column.label}</dt><dd data-numeric={numeric(column.key)||undefined}>{value(row[column.key])}</dd></div>)}</dl>
   </div>)}</div>
