@@ -4,7 +4,8 @@ import json
 
 import pytest
 
-from .test_backend import app, client, WorkspaceRow, BusinessRow, storage
+from .test_ai_database import app, client, ai_database_url
+from .test_backend import WorkspaceRow, BusinessRow, storage
 from .test_ai_tools import tool
 from .test_ai_attendance import attendance_route, call
 from .ai.tools import project_state, displays

@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from .test_backend import app, client
+from .test_ai_database import app, client, ai_database_url
 from .ai.tools import execute
 
 

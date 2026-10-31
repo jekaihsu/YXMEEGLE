@@ -1,4 +1,5 @@
-from .test_backend import app, client, role
+from .test_ai_database import app, client, ai_database_url
+from .test_backend import role
 from .test_ai_api import BODY, Fake, events, rows, live_server
 
 
@@ -195,7 +196,8 @@ def test_usage_feedback_change_between_reads_keeps_snapshot(app, client, monkeyp
     uid = question(app, client)
     role(client, 'u-manager')
     with app.state.sessions() as db:
-        db.connection().exec_driver_sql('PRAGMA journal_mode=WAL')
+        if db.get_bind().dialect.name == 'sqlite':
+            db.connection().exec_driver_sql('PRAGMA journal_mode=WAL')
         usage = db.get(ledger.AiUsageRow, uid)
         actor = usage.actor_id
     original = Session.execute

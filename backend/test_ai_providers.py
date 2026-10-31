@@ -7,7 +7,7 @@ import pytest
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI
 
-from .test_backend import app, client
+from .test_ai_database import app, client, ai_database_url
 from .ai import providers
 from .ai.catalog import MODELS, Usage
 from .ai.tools import TOOLS

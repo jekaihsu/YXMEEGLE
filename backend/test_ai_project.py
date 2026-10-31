@@ -3,7 +3,8 @@ import json
 
 import pytest
 
-from .test_backend import app, client, role, WorkspaceRow, BusinessRow, storage
+from .test_ai_database import app, client, ai_database_url
+from .test_backend import role, WorkspaceRow, BusinessRow, storage
 from .test_ai_api import BODY, Fake, events, rows, wid, live_server
 
 
