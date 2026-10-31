@@ -33,7 +33,7 @@ def test_real_search_and_owners_without_shell(app, client, monkeypatch):
     assert page['items']
     query = page['items'][0]['code']
     source = client.get('/api/projects', params={'q': query, 'limit': 8}).json()
-    result = tool(app, client, 'search_cases', {'query': query, 'status': None, 'owner': None, 'overdue': None})
+    result = tool(app, client, 'search_cases', {'query': query, 'status': 'all', 'owner': 'anyone', 'overdue': False, 'offset': 0})
     assert requests == ['/api/workspace']
     requests.clear()
     assert result['total'] == source['total']
@@ -99,7 +99,7 @@ def test_attendance_real_producer_route_and_structural_truncation(tmp_path, monk
     monkeypatch.setattr('backend.ai.tools.today', lambda: '2026-10-12')
     source = client.get('/api/people/attendance?week=2026-10-12').json()
     assert source['people'] and source['as_of']
-    result = tool(app, client, 'attendance_today', {'range': 'today', 'date': None})
+    result = tool(app, client, 'attendance_today', {'range': 'today', 'date': ''})
     assert result['as_of'] == source['as_of'] and result['incomplete'] is True
     assert result['counts']['arrived'] == (80 if large else 1)
     if large:
@@ -111,7 +111,7 @@ def test_attendance_real_producer_route_and_structural_truncation(tmp_path, monk
             assert result[group] == [{'id': f'ou_{i}', 'name': f'同事{i}'}]
     assert '缺席' not in json.dumps(result, ensure_ascii=False)
     from .test_ai_displays import sdk_tool
-    displays, projected = sdk_tool(app, client, monkeypatch, 'attendance_today', {'range': 'today', 'date': None})
+    displays, projected = sdk_tool(app, client, monkeypatch, 'attendance_today', {'range': 'today', 'date': ''})
     assert displays[0]['kind'] == 'chart' and displays[1]['kind'] == 'table'
     assert len(displays[1]['rows']) <= 50
     assert len({row['name'] for row in displays[1]['rows']}) == len(displays[1]['rows'])
@@ -192,7 +192,7 @@ def test_search_real_routes_do_not_claim_timestamp(app, client):
     query = page['items'][0]['code']
     assert 'as_of' not in page
     assert 'as_of' not in client.get('/api/projects', params={'q': query}).json()
-    assert 'as_of' not in tool(app, client, 'search_cases', {'query': query, 'status': None, 'owner': None, 'overdue': None})
+    assert 'as_of' not in tool(app, client, 'search_cases', {'query': query, 'status': 'all', 'owner': 'anyone', 'overdue': False, 'offset': 0})
     prompt = system_prompt()
     assert '查詢當下資料' in prompt
     assert 'case_progress' in prompt and 'attendance_today' in prompt

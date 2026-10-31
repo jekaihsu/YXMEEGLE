@@ -65,7 +65,7 @@ def call(pair, args):
 
 
 def test_semantic_day(attendance_route):
-    result = call(attendance_route, {'range': 'today', 'date': None})
+    result = call(attendance_route, {'range': 'today', 'date': ''})
     assert result['counts']['unaccounted'] == 52
     assert result['counts']['on_leave'] == 2
     assert result['counts']['exempt'] == 4
@@ -117,9 +117,9 @@ def test_week_and_weekends(attendance_route, monkeypatch):
 
 @pytest.mark.parametrize('args', [
     {'range': 'week', 'date': '2026-02-30'}, {'range': 'today', 'date': 'yesterday'},
-    {'range': 'today', 'date': '20261012'}, {'range': 'month', 'date': None},
+    {'range': 'today', 'date': '20261012'}, {'range': 'month', 'date': ''},
     {'range': 'today', 'date': '2000-01-01'}, {'range': 'week', 'date': '2026-1-2'},
-    {'range': 'today', 'date': ''}, {'range': 'today', 'date': 'x' * 241}, {'range': 'today', 'date': 123}, {},
+    {'range': 'today', 'date': 'x' * 241}, {'range': 'today', 'date': 123}, {},
 ])
 def test_invalid_dates_before_http(attendance_route, monkeypatch, args):
     async def forbidden(*a, **kw):
@@ -141,7 +141,7 @@ def test_prompt_and_strict_schema():
     schema = TOOLS['attendance_today'].schema
     assert set(schema['required']) == set(schema['properties']) == {'range', 'date'}
     assert schema['additionalProperties'] is False
-    assert schema['properties']['date']['type'] == ['string', 'null']
+    assert schema['properties']['date']['type'] == 'string'
 
 
 @pytest.mark.parametrize('attendance_route', ['mixed'], indirect=True)
@@ -164,13 +164,13 @@ def test_monday_friday_labels(attendance_route, monkeypatch):
 
 
 def test_future_days_do_not_infer_no_record(attendance_route):
-    result = call(attendance_route, {'range': 'week', 'date': None})
+    result = call(attendance_route, {'range': 'week', 'date': ''})
     assert [item['counts']['unaccounted'] for item in result['days']] == [52, 0, 0, 0, 0, 0, 0]
 
 
 def test_refresh_changes_count_only_when_evidence_changes(attendance_route):
     app, _ = attendance_route
-    args = {'range': 'today', 'date': None}
+    args = {'range': 'today', 'date': ''}
     assert call(attendance_route, args)['counts']['unaccounted'] == 52
     assert call(attendance_route, args)['counts']['unaccounted'] == 52
     app.state.attendance_fixture_punches.append(dict(user_id='employee-6', day=20261012,
@@ -184,7 +184,7 @@ def test_refresh_changes_count_only_when_evidence_changes(attendance_route):
 
 @pytest.mark.parametrize('attendance_route', ['approvals'], indirect=True)
 def test_approval_explanations_exclude_no_record(attendance_route):
-    result = call(attendance_route, {'range': 'today', 'date': None})
+    result = call(attendance_route, {'range': 'today', 'date': ''})
     assert result['counts']['unaccounted'] == 50
     assert result['trip'] == [{'id': 'ou_6', 'name': '同事6'}]
     assert result['out'] == [{'id': 'ou_7', 'name': '同事7'}]

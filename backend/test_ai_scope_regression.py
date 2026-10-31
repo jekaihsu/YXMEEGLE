@@ -13,11 +13,11 @@ def cookie(client):
 
 def test_status_only_real_demo(app, client):
     result, error = asyncio.run(execute(app, cookie(client), 'search_cases',
-        dict(query=None, status='in_progress', owner=None, overdue=None)))
+        dict(query='', status='in_progress', owner='anyone', overdue=False, offset=0)))
     assert not error, result
     data = json.loads(result)
-    assert data['total'] == 6
-    assert all(p['status'] == 'in_progress' for p in data['cases'])
+    assert data['matched_total'] == data['total'] == 7
+    assert all(p['state'] == '進行中' for p in data['cases'])
 
 
 def test_completed_work_real_demo(app, client):
@@ -29,17 +29,17 @@ def test_completed_work_real_demo(app, client):
 
 
 def test_unknown_status_and_foreign_owner_are_rejected(app, client):
-    for key, value in [('status', '進行中'), ('owner', 'u-manager')]:
-        args = dict(query=None, status=None, owner=None, overdue=None)
+    for key, value in [('status', 'invented'), ('owner', 'u-manager')]:
+        args = dict(query='', status='all', owner='anyone', overdue=False, offset=0)
         args[key] = value
         result, error = asyncio.run(execute(app, cookie(client), 'search_cases', args))
-        assert error and 'status' in json.loads(result)['error']
+        assert error and key in json.loads(result)['error']
 
 
 def test_portfolio_visibility_and_composed_filters(tmp_path):
     from fastapi.testclient import TestClient
     from .app import create_app
-    from .ai.tools import today
+    from .ai.tools import today, project_state, CASE_STATUS
     a = create_app(dict(DATABASE_URL=f'sqlite:///{tmp_path}/portfolio.db', UPLOAD_DIR=str(tmp_path),
         SESSION_SECRET='test-secret' * 5, APP_ENV='development', DEMO_MODE='true',
         WORKSPACE_SHELL_ENABLED='true', INDEX_TABLES_ENABLED='true'))
@@ -53,17 +53,16 @@ def test_portfolio_visibility_and_composed_filters(tmp_path):
             for status, query, owner, late in [(None, None, None, None), ('in_progress', None, None, None),
                     (None, '進行中', None, None), ('in_progress', '捷運', None, None),
                     ('in_progress', None, 'me', None), (None, None, None, True)]:
-                args = dict(query=query, status=status, owner=owner, overdue=late)
+                args = dict(query=query or '', status=status or 'all', owner=owner or 'anyone', overdue=bool(late), offset=0)
                 result, error = asyncio.run(execute(a, cookie(c), 'search_cases', args))
                 assert not error, result
                 data = json.loads(result)
-                expected = [p for p in ui if (not status or p['status'] == status)
+                expected = [p for p in ui if (not status or project_state(p, today())['state'] == CASE_STATUS[status])
                     and (not query or query in ' '.join(p.get(k, '') for k in ('code', 'name', 'client')))
                     and (not owner or p['pm_id'] == user)
-                    and (not late or (p.get('due_date') and p['due_date'][:10] < today()
-                        and p['status'] not in ('completed', 'engineering_complete')))]
+                    and (not late or project_state(p, today())['overdue'])]
                 expected.sort(key=lambda p: (p.get('due_date') or '9999', p['id']))
-                assert data['total'] == len(expected)
+                assert data['matched_total'] == len(expected)
                 assert [p['id'] for p in data['cases']] == [p['id'] for p in expected[:8]]
                 assert sum(data['status_counts'].values()) == data['total']
 
@@ -84,7 +83,7 @@ def test_portfolio_visibility_and_composed_filters(tmp_path):
             role(c, user)
             ui = c.get('/api/projects?view=portfolio&page=1').json()
             result, error = asyncio.run(execute(a, cookie(c), 'search_cases',
-                dict(query=None, status=None, owner=None, overdue=None)))
+                dict(query='', status='all', owner='anyone', overdue=False, offset=0)))
             assert not error, result
             data = json.loads(result)
             assert data['total'] == ui['total'] == 4
@@ -127,7 +126,7 @@ def test_status_question_real_socket(app, client, live_server):
     import subprocess
     from .test_ai_api import Fake, BODY
     from .ai.providers import ToolCall
-    args = dict(query=None, status='in_progress', owner=None, overdue=None)
+    args = dict(query='', status='in_progress', owner='anyone', overdue=False, offset=0)
     app.state.ai_providers = {'claude': Fake(calls=[ToolCall('status', 'search_cases', args)])}
     response = subprocess.run(['curl', '-sS', '-N', '--max-time', '10', '-b', cookie(client),
         '-H', 'Content-Type: application/json', '--data', json.dumps(dict(BODY, messages=[dict(role='user', content='哪些案件進行中？')])),
@@ -135,7 +134,7 @@ def test_status_question_real_socket(app, client, live_server):
     events = [json.loads(line[6:]) for line in response.stdout.splitlines() if line.startswith('data: ')]
     assert events[-1]['type'] == 'done', events
     table = next(e['displays'][0] for e in events if e['type'] == 'tool' and e['status'] == 'done')
-    assert len(table['rows']) == 6
+    assert len(table['rows']) == 7
     assert all(row['status_label'] == '進行中' for row in table['rows'])
 
 

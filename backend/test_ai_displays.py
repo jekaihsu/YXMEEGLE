@@ -16,7 +16,7 @@ from .ai.tools import display_table, display_chart
 def sdk_tool(app, client, monkeypatch, name, args):
     requests = []
     if name == 'search_cases':
-        args = dict(status=None, owner=None, overdue=None, **args)
+        args = dict(status='all', owner='anyone', overdue=False, offset=0, **args)
     call = dict(type='function_call', id='fc_1', call_id='call_1', name=name,
                 arguments=json.dumps(args), status='completed')
     def handler(request):
@@ -142,7 +142,7 @@ def test_search_partial_real_route_sdk_sse(app, client, monkeypatch):
     assert source['total'] == 12 and len(source['items']) == 8
     displays, projected = sdk_tool(app, client, monkeypatch, 'search_cases', dict(query='AI-PARTIAL'))
     assert projected['truncated'] is True
-    assert projected['note'] == '共 12 筆，僅列出 8 筆'
+    assert projected['note'] == '符合 12 筆，本頁列出 8 筆，起點 0'
     assert displays[0]['truncated'] is True
     assert displays[0]['note'] == projected['note']
     assert len(displays[0]['rows']) == 8

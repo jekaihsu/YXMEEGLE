@@ -42,9 +42,54 @@ def case_path(args):
     return '/api/projects/' + quote(args['case_id'], safe='')
 
 
-CASE_STATUS = {'pending': '尚未開始', 'in_progress': '進行中', 'completed': '已完成',
-    'paused': '暫停中', 'engineering_complete': '工程完成、財務待結', 'source_conflict': '來源待核對',
-    'internal': '內部案', 'active': '進行中', 'ongoing': '進行中'}
+CASE_STATUS = {'pending': '尚未開始', 'in_progress': '進行中', 'pending_review': '待審核',
+               'paused': '暫停', 'completed': '已完成', 'source_conflict': '待核對'}
+NODE_ORDER = ('sales', 'pm', 'confirmation', 'field', 'control', 'mapping', 'report', 'pricing', 'settlement')
+NODE_STATES = {'not_started': '未開始', 'pending': '待處理', 'in_progress': '進行中',
+               'pending_review': '待審核', 'awaiting_review': '待審核', 'completed': '已完成',
+               'skipped': '略過', 'approved_skipped': '略過', 'paused': '暫停',
+               **{s: s for s in ('未開始', '待處理', '進行中', '待審核', '已完成', '略過')}}
+
+
+def calendar_day(value):
+    from datetime import datetime, timedelta, timezone
+    if value is None or value == '':
+        return None
+    try:
+        if isinstance(value, (int, float)) or re.fullmatch(r'\d{13}', value.strip()):
+            stamp = datetime.fromtimestamp(float(value) / 1000, timezone.utc)
+        else:
+            if not re.fullmatch(r'\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?\s*(?:[Zz]|[+-]\d{2}:?\d{2})?', value.strip()):
+                return None
+            stamp = datetime.fromisoformat(value.strip().upper().replace('Z', '+00:00'))
+            if stamp.tzinfo is None:
+                stamp = stamp.replace(tzinfo=timezone(timedelta(hours=8)))
+        return stamp.astimezone(timezone(timedelta(hours=8))).date().isoformat()
+    except (ValueError, TypeError, OverflowError):
+        return None
+
+
+def project_state(project, day):
+    source = project.get('portfolio_nodes', project.get('nodes', []))
+    by_key = {n['key']: n for n in reversed(source)}
+    states = [NODE_STATES.get(by_key.get(key, {}).get('status'), '狀態待確認') for key in NODE_ORDER]
+    finished = {'已完成', '略過'}
+    current = next((s for s in states if s not in finished), None)
+    if all(s in finished for s in states):
+        state = '已完成'
+    elif any(s not in finished | {'未開始', '待處理', '進行中', '待審核', '暫停'} for s in states):
+        state = '待核對'
+    elif all(s in {'未開始', '待處理'} for s in states):
+        state = '尚未開始'
+    else:
+        state = current if current in {'待審核', '暫停'} else '進行中'
+    tasks = [t for n in project.get('nodes', []) for t in n.get('tasks', [])
+             if t['status'] not in {'completed', 'superseded', 'approved_skipped'}]
+    due = calendar_day(project.get('due_date'))
+    closed = (project.get('execution_status') or project.get('status')) == 'completed'
+    overdue = not closed and (float(project.get('overdue_tasks') or 0) > 0 or
+        bool(due and due < calendar_day(day)) or any(t.get('due_date') and t['due_date'][:10] < day[:10] for t in tasks))
+    return dict(state=state, overdue=bool(overdue))
 
 
 async def search(reader, args):
@@ -57,16 +102,21 @@ async def search(reader, args):
     owner = None
     if args['owner'] == 'me':
         owner = (await reader.get('/api/session'))['user']['id']
-    q = (args['query'] or '').casefold()
+    q = args['query'].strip().casefold()
+    items = [{**p, **project_state(p, today())} for p in items]
     items = [p for p in items if
         (not q or q in ' '.join(str(p.get(k, '')) for k in ('code', 'name', 'client')).casefold()) and
-        (not args['status'] or p['status'] == args['status']) and
-        (not owner or p.get('pm_id') == owner) and
-        (args['overdue'] is not True or bool(p.get('due_date') and p['due_date'][:10] < today()
-            and p['status'] not in ('completed', 'engineering_complete')))]
-    counts = {key: sum(p['status'] == key for p in items) for key in CASE_STATUS}
+        (not owner or p.get('pm_id') == owner) and (not args['overdue'] or p['overdue'])]
+    counts = {key: sum(p['state'] == label for p in items) for key, label in CASE_STATUS.items()}
+    counts['other'] = len(items) - sum(counts.values())
+    total = len(items)
+    status = CASE_STATUS.get(args['status'], args['status'])
+    items = [p for p in items if status == 'all' or p['state'] == status]
     items.sort(key=lambda p: (p.get('due_date') or '9999', p['id']))
-    return dict(total=len(items), items=items[:8], status_counts=counts)
+    offset = args['offset']
+    return dict(total=total, matched_total=len(items), offset=offset,
+                next_offset=offset+8 if offset+8 < len(items) else None,
+                items=items[offset:offset+8], status_counts=counts)
 
 
 
@@ -102,23 +152,24 @@ async def attendance(reader, args):
         if abs((target.toordinal() - target.weekday()) - (current.toordinal() - current.weekday())) > 182:
             raise ValueError()
     except (ValueError, TypeError):
-        raise ReadDenied('請提供 range=today 或 week，date 為有效 YYYY-MM-DD 或 null（台北日期，限目前週前後26週）') from None
+        raise ReadDenied('date 請使用有效 YYYY-MM-DD 或空字串（台北日期，限目前週前後26週）') from None
     return {'range': args['range'], 'day': day, 'view': await reader.get('/api/people/attendance', week=day)}
 
 
 def search_notice(data):
     count = len(data.get('cases', []))
-    if data.get('total', count) > count:
-        return dict(truncated=True, note=f'共 {data["total"]} 筆，僅列出 {count} 筆')
+    total = data.get('matched_total', data.get('total', count))
+    if total > count:
+        return dict(truncated=True, note=f'符合 {total} 筆，本頁列出 {count} 筆，起點 {data.get("offset", 0)}')
     return {}
 
 
 def project_search(value):
-    data = {**pick(value, 'as_of'), 'total': value['total'], 'cases': [pick(p, 'id', 'code', 'name', 'status', 'pm_id', 'due_date')
+    data = {**pick(value, 'as_of', 'matched_total', 'offset', 'next_offset'), 'total': value['total'], 'cases': [pick(p, 'id', 'code', 'name', 'status', 'state', 'overdue', 'pm_id', 'due_date')
                                               for p in value['items']]}
     data['status_counts'] = value.get('status_counts', {})
     for p in data['cases']:
-        p['status_label'] = CASE_STATUS.get(p.get('status'), '狀態待確認')
+        p['status_label'] = p['state']
     return {**data, **search_notice(data)}
 
 
@@ -244,23 +295,36 @@ def project_attendance(value):
 
 ATTENDANCE_SCHEMA = dict(type='object', properties={
     'range': dict(type='string', enum=['today', 'week'], description='today 查詢單日；week 查詢包含 date 的週一至週日。'),
-    'date': dict(type=['string', 'null'], description='YYYY-MM-DD 台北日期；null 代表今天。上週請填上週日期。')},
+    'date': dict(type='string', description='YYYY-MM-DD 台北日期；空字串代表今天。上週請填上週日期。')},
     required=['range', 'date'], additionalProperties=False)
 
 
 def schema(properties):
-    descriptions = dict(query='Nonempty search query, at most 240 characters.',
-                        case_id='1-200 ASCII letters, digits, underscore, dot, colon or hyphen; never . or ..')
+    descriptions = dict(case_id='1-200 ASCII letters, digits, underscore, dot, colon or hyphen; never . or ..')
     return dict(type='object', properties={k: dict(type='string', description=descriptions[k]) for k in properties},
                 required=list(properties), additionalProperties=False)
 
 
 SEARCH_SCHEMA = dict(type='object', properties={
-    'query': dict(type=['string', 'null'], description='Optional keyword in case code, name or client, at most 240 characters. Use null for list questions.'),
-    'status': dict(type=['string', 'null'], enum=[None, *CASE_STATUS], description='Case status filter. ' + '；'.join(f'{k}={v}' for k, v in CASE_STATUS.items())),
-    'owner': dict(type=['string', 'null'], enum=[None, 'me'], description='me means the current user is PM, not task owner.'),
-    'overdue': dict(type=['boolean', 'null'], description='true filters overdue workspace due dates, excluding completed and engineering_complete. Unknown deadlines cannot establish lateness.')},
-    required=['query', 'status', 'owner', 'overdue'], additionalProperties=False)
+    'query': dict(type='string', description='案號、案名或客戶關鍵字，最多 240 字；空字串不篩關鍵字。'),
+    'status': dict(type='string', enum=['all', *CASE_STATUS, *CASE_STATUS.values()], description='all 不篩狀態；依案件總覽流程節點判定。'),
+    'owner': dict(type='string', enum=['anyone', 'me'], description='anyone 不篩 PM；me 表示目前使用者是 PM。'),
+    'overdue': dict(type='boolean', description='false 不篩逾期；true 使用案件總覽的期限、逾期任務數與任務期限判定。'),
+    'offset': dict(type='integer', description='從第幾筆開始，非負整數，0 為第一頁，每頁 8 筆。')},
+    required=['query', 'status', 'owner', 'overdue', 'offset'], additionalProperties=False)
+
+
+def argument_error(key, value, prop):
+    expected = {'string': str, 'boolean': bool, 'integer': int}[prop['type']]
+    if type(value) is not expected:
+        return f"{key} 必須是 {prop['type']}"
+    if 'enum' in prop and value not in prop['enum']:
+        return f"{key} 請使用 " + '、'.join(str(v) for v in prop['enum'])
+    if expected is str and len(value) > 240:
+        return f'{key} 最多 240 字'
+    if expected is int and value < 0:
+        return f'{key} 必須是非負整數'
+    return None
 
 
 @dataclass(frozen=True)
@@ -283,16 +347,10 @@ async def execute(app, cookie, name, args):
     spec = TOOLS.get(name)
     if spec is None or not isinstance(args, dict) or set(args) != set(spec.schema['required']):
         return json.dumps({'error': '工具參數錯誤'}, ensure_ascii=False), True
-    if name == 'search_cases':
-        for key, value in args.items():
-            prop = spec.schema['properties'][key]
-            if value is None:
-                continue
-            if ('enum' in prop and value not in prop['enum']) or (key == 'overdue' and type(value) is not bool) or (key != 'overdue' and (not isinstance(value, str) or len(value) > 240)):
-                return json.dumps({'error': '工具參數錯誤：status 請使用 ' + '、'.join(CASE_STATUS) + '；owner 僅支援 me'}, ensure_ascii=False), True
-    elif any(not isinstance(v, str) or not 1 <= len(v) <= 240
-             for k, v in args.items() if not (name == 'attendance_today' and k == 'date' and v is None)):
-        return json.dumps({'error': '工具參數錯誤'}, ensure_ascii=False), True
+    for key, prop in spec.schema['properties'].items():
+        error = argument_error(key, args[key], prop)
+        if error:
+            return json.dumps({'error': '工具參數錯誤：' + error}, ensure_ascii=False), True
     if 'case_id' in args and not valid_case_id(args['case_id']):
         return json.dumps({'error': '工具參數錯誤'}, ensure_ascii=False), True
     try:

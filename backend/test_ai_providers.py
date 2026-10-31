@@ -14,17 +14,16 @@ from .ai.tools import TOOLS
 
 
 def assert_strict_schema(value):
-    if isinstance(value, dict):
-        assert not set(value) & {'minLength', 'maxLength', 'pattern', 'format', 'minimum', 'maximum',
-                                 'exclusiveMinimum', 'exclusiveMaximum', 'minItems', 'maxItems', 'uniqueItems'}
-        if value.get('type') == 'object':
-            assert value['additionalProperties'] is False
-            assert set(value['required']) == set(value['properties'])
-        for child in value.values():
-            assert_strict_schema(child)
-    elif isinstance(value, list):
-        for child in value:
-            assert_strict_schema(child)
+    assert set(value) <= {'type', 'properties', 'required', 'additionalProperties', 'enum', 'description', 'items'}
+    assert isinstance(value['type'], str)
+    assert None not in value.get('enum', [])
+    if value['type'] == 'object':
+        assert value['additionalProperties'] is False
+        assert set(value['required']) == set(value['properties'])
+        for prop in value['properties'].values():
+            assert_strict_schema(prop)
+    if 'items' in value:
+        assert_strict_schema(value['items'])
 
 
 def wire(events):
