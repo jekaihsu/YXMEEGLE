@@ -21,6 +21,8 @@ class Event:
     value: Any = None
     model: str | None = None
     unpriced: bool = False
+    final_usage: bool = True
+    truncated: bool = False
 
 
 class ProviderError(Exception):
@@ -34,14 +36,14 @@ def claude_usage(value):
                  value.cache_creation_input_tokens or 0, value.output_tokens)
 
 
-def claude_usage_event(value, model, requested):
+def claude_usage_event(value, model, requested, *, final_usage=True):
     iterations = getattr(value, 'iterations', None)
     if iterations:
         total = Usage()
         for entry in iterations:
             total += claude_usage(entry)
-        return Event('usage', total, model, any((getattr(e, 'model', None) or model) != requested for e in iterations))
-    return Event('usage', claude_usage(value), model, model != requested)
+        return Event('usage', total, model, any((getattr(e, 'model', None) or model) != requested for e in iterations), final_usage)
+    return Event('usage', claude_usage(value), model, model != requested, final_usage)
 
 
 class Claude:
@@ -54,17 +56,17 @@ class Claude:
         definitions[-1]['cache_control'] = {'type': 'ephemeral'}
         async with AsyncAnthropic(api_key=self.key, max_retries=0, timeout=60) as client:
             async with client.beta.messages.stream(
-                model=spec.model, max_tokens=4096, output_config={'effort': spec.effort},
+                model=spec.model, max_tokens=16000, output_config={'effort': spec.effort},
                 system=[{'type': 'text', 'text': system, 'cache_control': {'type': 'ephemeral'}}],
                 tools=definitions, messages=messages,
                 betas=['server-side-fallback-2026-07-01'], fallbacks='default',
             ) as stream:
                 async for event in stream:
                     if event.type == 'message_start':
-                        yield claude_usage_event(event.message.usage, event.message.model, spec.model)
+                        yield claude_usage_event(event.message.usage, event.message.model, spec.model, final_usage=False)
                     elif event.type == 'content_block_start' and event.content_block.type == 'fallback':
                         snapshot = stream.current_message_snapshot
-                        yield claude_usage_event(snapshot.usage, snapshot.model, spec.model)
+                        yield claude_usage_event(snapshot.usage, snapshot.model, spec.model, final_usage=False)
                     elif event.type == 'message_delta':
                         snapshot = stream.current_message_snapshot
                         yield claude_usage_event(snapshot.usage, snapshot.model, spec.model)
@@ -82,6 +84,10 @@ class Claude:
                 for block in content:
                     if block['type'] == 'tool_use':
                         yield Event('tool', ToolCall(block['id'], block['name'], block['input']))
+                if message.stop_reason == 'max_tokens':
+                    yield Event('text', '（回答太長，已截斷）')
+                    yield Event('stop', content, truncated=True)
+                    return
                 if message.stop_reason not in ('end_turn', 'tool_use'):
                     raise ProviderError()
                 yield Event('stop', content)
@@ -109,7 +115,7 @@ class GPT:
             stream = await client.responses.create(
                 model=spec.model, reasoning={'effort': spec.effort}, instructions=system,
                 input=messages, tools=definitions, stream=True, store=False,
-                include=['reasoning.encrypted_content'], max_output_tokens=4096,
+                include=['reasoning.encrypted_content'], max_output_tokens=16000,
             )
             async with stream:
                 async for event in stream:
@@ -122,9 +128,12 @@ class GPT:
                         response = event.response
                         if response.usage is not None:
                             yield Event('usage', openai_usage(response.usage), response.model)
-                        if event.type != 'response.completed':
+                        if event.type == 'response.incomplete' and getattr(response.incomplete_details, 'reason', None) == 'max_output_tokens':
+                            yield Event('text', '（回答太長，已截斷）')
+                        elif event.type != 'response.completed':
                             raise ProviderError()
-                        yield Event('stop', [item.model_dump(exclude_none=True) for item in response.output])
+                        yield Event('stop', [item.model_dump(exclude_none=True) for item in response.output],
+                                    truncated=event.type == 'response.incomplete')
                     elif event.type == 'error':
                         raise ProviderError()
 
