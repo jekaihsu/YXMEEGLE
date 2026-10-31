@@ -207,6 +207,8 @@ def test_usage_feedback_change_between_reads_keeps_snapshot(app, client, monkeyp
         nonlocal changed
         result = original(self, statement, *args, **kwargs)
         if not changed and 'anon_1.rank' in str(statement):
+            if self.get_bind().dialect.name == 'postgresql':
+                assert self.connection().get_isolation_level() == 'REPEATABLE READ'
             changed = True
             ledger.feedback(app.state.sessions, uid, actor, 'down', None)
         return result

@@ -1,4 +1,4 @@
-"""Run audit regression tests with a disposable local PostgreSQL cluster."""
+"""Run audit or AI regression tests with a disposable local PostgreSQL cluster."""
 import os
 from pathlib import Path
 import shutil
@@ -20,7 +20,12 @@ def main():
         if not shutil.which(binary):
             raise SystemExit(f'{binary} must be on PATH (install PostgreSQL server tools)')
     root = Path(__file__).resolve().parents[1]
-    args = sys.argv[1:] or ([str(p.relative_to(root)) for p in sorted((root / 'backend').glob('test_ai_*.py'))] + ['-q', '-ra'] if ai else ['backend/test_action_audit_database.py', '-q', '-ra'])
+    if ai:
+        defaults = [str(p.relative_to(root)) for p in sorted((root / 'backend').glob('test_ai_*.py'))]
+        defaults += ['-q', '-ra']
+    else:
+        defaults = ['backend/test_action_audit_database.py', '-q', '-ra']
+    args = sys.argv[1:] or defaults
     # Use a short path for PostgreSQL's Unix socket length limit on macOS.
     with tempfile.TemporaryDirectory(prefix='yx-audit-', dir='/tmp') as temporary:
         data = str(Path(temporary) / 'data')

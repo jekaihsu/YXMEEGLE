@@ -4,6 +4,7 @@ from threading import Barrier
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, inspect, select
+from sqlalchemy.engine import Engine
 
 from .app import create_app
 from .ai import ledger
@@ -45,11 +46,19 @@ def test_legacy_boot_upgrade_and_concurrent_apps(ai_database_url, tmp_path):
         for uid in ('old-1', 'old-2'):
             db.exec_driver_sql("INSERT INTO ai_usage (id, created_at, day, workspace_id, actor_id, actor_name, conversation_id, provider, model, effort, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, price_version, steps, tool_calls, latency_ms, status) VALUES ('" + uid + "', '2026-10-30 15:30:00', '2026-10-30', 'w', 'a', 'Name', 'c', 'claude', 'm', 'medium', 1, 0, 0, 1, 'v', 1, 0, 1, 'ok')")
     barrier = Barrier(2)
+    ddl_barrier = Barrier(2)
+    def overlap_scope_upgrade(conn, cursor, statement, *args):
+        if statement.startswith('ALTER TABLE ai_usage ADD COLUMN scope'):
+            ddl_barrier.wait(timeout=10)
+    event.listen(Engine, 'before_cursor_execute', overlap_scope_upgrade)
     def boot(_):
         barrier.wait(timeout=10)
         return create_app(app_config(ai_database_url, tmp_path))
-    with ThreadPoolExecutor(2) as pool:
-        applications = list(pool.map(boot, range(2)))
+    try:
+        with ThreadPoolExecutor(2) as pool:
+            applications = list(pool.map(boot, range(2)))
+    finally:
+        event.remove(Engine, 'before_cursor_execute', overlap_scope_upgrade)
     try:
         assert {'scope', 'project_id'} <= {c['name'] for c in inspect(engine).get_columns('ai_usage')}
         with applications[0].state.sessions() as db:
@@ -91,6 +100,16 @@ def test_concurrent_record_and_feedback(app, monkeypatch):
         assert {r.day for r in saved} == {'2026-10-31'}
         assert len(ratings) == 1 and ratings[0].rating in (-1, 1)
     assert ledger.daily_tokens(sessions, 'w', 'a') == 25 * 3_000_000_007
+    boundary = values()
+    boundary['workspace_id'] = 'boundary'
+    clock = datetime(2026, 10, 30, 15, 30, tzinfo=timezone.utc)
+    ledger.record(sessions, id='before-midnight', **boundary)
+    clock = datetime(2026, 10, 30, 16, 30, tzinfo=timezone.utc)
+    ledger.record(sessions, id='after-midnight', **boundary)
+    with sessions() as db:
+        assert db.get(ledger.AiUsageRow, 'before-midnight').day == '2026-10-30'
+        assert db.get(ledger.AiUsageRow, 'after-midnight').day == '2026-10-31'
+    assert ledger.daily_tokens(sessions, 'boundary', 'a') == 3_000_000_007
     ledger.feedback(sessions, 'same', 'a', 'down', 'wrong')
     assert ledger.query(sessions, 'w', '2026-10-31', '2026-10-31')['reasons']['wrong'] == 1
 
