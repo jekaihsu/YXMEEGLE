@@ -158,16 +158,16 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
 
 ## 問答內容與提示詞調整
 
-`AI_STORE_CONTENT` 預設為 `true`。`ai_exchange` 以 `usage_id` 對應每題用量，只保存最後一則使用者訊息，最多 4000 字元，以及實際串流給使用者的助理文字，最多 20000 字元。失敗或中止時保存已送出的部分回答。另保存 workspace、actor、時間、工具名稱清單，以及主管可見的已清理上游錯誤摘要，例如 `OpenAI 401 invalid_api_key`。不保存工具參數、工具結果、system prompt、案件脈絡 JSON、較早對話、cookie、金鑰或 displays。回答若引用工具資料，引用文字會是回答的一部分。
+`AI_STORE_CONTENT` 預設為 `true`，在啟動時解析並保存於 app.state。去除前後空白並轉為小寫後，`true/1/yes/on` 啟用，`false/0/no/off` 停用。其他值一律停用並記錄啟動 warning，設定修改後需重新啟動。`ai_exchange` 以 `usage_id` 對應每題用量，只保存最後一則使用者訊息，最多 4000 字元，以及串流處理時累積的助理文字，最多 20000 字元。最後一個 delta 會先累積再嘗試送出，因此失敗或中止時，保存的部分回答可能包含尚未送達使用者的最後一段。另保存 workspace、actor、時間、工具名稱清單，以及主管可見的已清理上游錯誤摘要，例如 `OpenAI 401 invalid_api_key`。不保存工具參數、工具結果、system prompt、案件脈絡 JSON、較早對話、cookie、金鑰或 displays。回答若引用工具資料，引用文字會是回答的一部分。
 
-保存前會遮蔽 `sk-` 金鑰、Bearer token、至少 9 位的連續數字及四組四位數卡號。短數字保留。此規則不保證識別所有個人資料格式。
+保存前會移除 NUL 與其他控制字元，保留換行與 tab。請求訊息含 NUL 時直接回傳 422。遮蔽規則涵蓋有單字邊界且後綴至少 16 字元的 `sk-` 金鑰、JWT (`eyJ...`)、Google (`AIza...`)、GitHub (`ghp_...`)、Slack (`xox[bapr]-...`)、`password=`、`token=`、`secret=` 的值、Bearer token、台灣手機號碼（可含空白或連字號）、身分證字號形狀（`[A-Z][12]\d{8}`）、至少 13 位連續數字及四組四位數卡號。9 至 12 位訂單號與 PO 號保留，但符合手機或身分證形狀者仍遮蔽。`risk-based`、`task-force`、`disk-usage` 等一般文字保留。這些規則只比對文字形狀，不驗證證號或卡號，也無法辨識所有秘密與個資。格式不同可能漏遮，符合形狀的普通文字也可能誤遮。
 
 只有同一 workspace 的主管可透過 usage API 讀取內容。一般成員收到 403。明細對不存在或其他 workspace 的 usage_id 一律回傳相同 404。`AI_STORE_CONTENT=false` 停止新增內容，且所有 usage API 隱藏既有內容，文字欄位為 null，工具清單為空。
 
-`AI_CONTENT_RETENTION_DAYS` 預設 90 天，依 UTC created_at 計算期限。過期內容立即從讀取結果隱藏。帳本寫入時順便清除過期內容，每個 process 最多每小時一次。用量及評分仍保留。啟動時 `ledger.ensure_schema` 自動建立 `ai_exchange`，既有資料庫不需手動遷移。帳本與內容在同一完成路徑的執行緒交易中寫入，失敗重試一次且不影響串流結束。
+`AI_CONTENT_RETENTION_DAYS` 在啟動時驗證為非負整數並保存於 app.state，預設 90 天。無效、空白或負值會退回 90 並記錄 warning。依 UTC created_at 計算期限，過期內容立即從讀取結果隱藏。寫入完成並通知 feedback 等候者之後，背景執行緒清除過期內容；讀取 usage（含 export）時也觸發清理。每個 process 成功清理後一小時內不再執行，失敗可重試。每批最多刪除 500 筆，各批獨立交易，刪除期間不持有排程鎖。停用內容保存時，以 0 天期限清除所有既有內容，仍受每小時限制。用量及評分仍保留。啟動時 `ledger.ensure_schema` 自動建立 `ai_exchange`，既有資料庫不需手動遷移。用量先以獨立交易寫入，失敗重試一次；內容再用另一個交易寫入並獨立捕捉失敗，因此內容問題不會回滾用量。
 
 `GET /api/ai/usage` 的 recent 新增 `usage_id`、`question_preview`、`answer_preview`、`tools`、`error_detail`。preview 最多 120 字元，沒有內容或關閉保存時為 null。新增 `q` 查詢參數，最多 200 字元，以不區分大小寫的文字子字串比對問題或回答。`%`、`_`、反斜線都當作一般文字。`q` 與 actor、provider、rating、scope、from、to 可同時使用，也套用到聚合。
 
 `GET /api/ai/usage/{usage_id}/exchange` 回傳 `usage_id, created_at, actor_id, name, provider, scope, project_id, status, rating, reason, question, answer, tools, error_detail, latency_ms, input_tokens, output_tokens, cost_usd`。
 
-`GET /api/ai/usage/export` 使用相同篩選，依時間新到舊回傳最多 500 筆 JSON lines。每列只有 `usage_id, created_at, name, provider, scope, rating, reason, question, answer, tools`。內容類型為 `application/x-ndjson`，供主管挑選好壞回答並調整提示詞。
+`GET /api/ai/usage/export` 使用相同篩選，依時間新到舊回傳最多 500 筆 JSON lines。每列只有 `usage_id, created_at, name, provider, scope, rating, reason, question, answer, tools`。內容類型為 `application/x-ndjson`，供主管挑選好壞回答並調整提示詞。匯出不計算 totals 或 by_* 聚合。`X-Export-Truncated` 回應標頭為 `true` 或 `false`，`X-Export-Row-Count` 為實際匯出的資料列數（不含 metadata）。結果超過 500 筆時，最後額外附上一行 `{"truncated":true,"limit":500,"row_count":500}`；消費端需辨識這一行 metadata，整份回應仍為有效 JSONL。

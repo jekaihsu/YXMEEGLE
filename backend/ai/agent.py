@@ -88,9 +88,10 @@ class ChatRun:
                       first_token_ms=self.first_token_ms, status=self.status, error_code=self.error_code,
                       exchange=dict(question=self.body.messages[-1].content, answer=self.answer,
                           tools=self.tool_names, error_detail=self.error_detail)
-                          if ledger.stores_content(self.app.state.cfg) else None,
-                      retention_days=int(self.app.state.cfg.get('AI_CONTENT_RETENTION_DAYS', 90)))
+                          if self.app.state.ai_store_content else None)
                 self.recorded()
+                ledger.schedule_cleanup(self.app.state.sessions,
+                    self.app.state.ai_content_retention_days if self.app.state.ai_store_content else 0)
         except Exception:
             logger.error('ai_finish_write_failed')
         finally:

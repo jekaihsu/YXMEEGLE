@@ -127,10 +127,12 @@ def test_ledger_transient_retry(app, client, monkeypatch, caplog):
             raise RuntimeError('private SQL parameters')
         with original() as db:
             yield db
+    from .ai import ledger
+    monkeypatch.setattr(ledger, 'schedule_cleanup', lambda *args: None)
     monkeypatch.setattr(app.state.sessions, 'begin', flaky)
     app.state.ai_providers = {'claude': Fake()}
     events(client.post('/api/ai/chat', json=BODY))
-    assert len(attempts) == 2 and len(rows(app)) == 1
+    assert len(attempts) == 3 and len(rows(app)) == 1
     assert 'ai_usage_write_failed' not in caplog.text and 'private SQL' not in caplog.text
 
 

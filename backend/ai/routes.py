@@ -27,6 +27,8 @@ class Message(BaseModel):
 
     @model_validator(mode='after')
     def role_limit(self):
+        if '\x00' in self.content:
+            raise ValueError('content contains NUL')
         if self.role == 'user' and len(self.content) > 4000:
             raise ValueError('user content exceeds 4000 characters')
         return self
@@ -91,6 +93,8 @@ RUN_REGISTRATION_SECONDS = QUESTION_TIMEOUT_SECONDS + 60
 
 
 def register(app, *, identity, sessions, cfg):
+    app.state.ai_store_content = ledger.stores_content(cfg)
+    app.state.ai_content_retention_days = ledger.content_retention(cfg)
     models = registry(cfg.get('AI_PRICE_TABLE_JSON'))
     app.state.ai_providers = {key: ADAPTERS[spec.provider](cfg[spec.key_env])
                               for key, spec in models.items() if cfg.get(spec.key_env)}
@@ -219,12 +223,22 @@ def register(app, *, identity, sessions, cfg):
         start = from_ or end - timedelta(days=29)
         if start > end or (end - start).days >= 366:
             raise HTTPException(422, '日期範圍錯誤')
+        try:
+            ledger.cleanup_content(sessions, app.state.ai_content_retention_days if app.state.ai_store_content else 0)
+        except Exception:
+            ledger.logger.error('ai_content_cleanup_failed')
         exporting = request.url.path.endswith('/export')
         result = ledger.query(sessions, data['wid'], start.isoformat(), end.isoformat(), actor, provider, rating, scope, q,
-            content_enabled=ledger.stores_content(cfg), retention_days=int(cfg.get('AI_CONTENT_RETENTION_DAYS', 90)), export=exporting)
+            content_enabled=app.state.ai_store_content, retention_days=app.state.ai_content_retention_days, export=exporting)
         if exporting:
-            return Response(''.join(json.dumps(row, ensure_ascii=False) + '\n' for row in result),
-                            media_type='application/x-ndjson', headers={'Cache-Control': 'no-store'})
+            rows = result['rows']
+            truncated = result['truncated']
+            count = len(rows)
+            if truncated:
+                rows.append(dict(truncated=True, limit=500, row_count=count))
+            return Response(''.join(json.dumps(row, ensure_ascii=False) + '\n' for row in rows),
+                            media_type='application/x-ndjson', headers={'Cache-Control': 'no-store',
+                                'X-Export-Truncated': str(truncated).lower(), 'X-Export-Row-Count': str(count)})
         return result
 
     @app.get('/api/ai/usage/{usage_id}/exchange')
@@ -232,8 +246,8 @@ def register(app, *, identity, sessions, cfg):
         data, user = auth
         if user['role'] != 'manager':
             raise HTTPException(403, '僅主管可查看 AI 用量')
-        result = ledger.exchange(sessions, data['wid'], usage_id, content_enabled=ledger.stores_content(cfg),
-                                 retention_days=int(cfg.get('AI_CONTENT_RETENTION_DAYS', 90)))
+        result = ledger.exchange(sessions, data['wid'], usage_id, content_enabled=app.state.ai_store_content,
+                                 retention_days=app.state.ai_content_retention_days)
         if result is None:
             raise HTTPException(404, '找不到提問')
         return result

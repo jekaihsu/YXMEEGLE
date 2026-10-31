@@ -2,7 +2,7 @@
 from datetime import datetime, timezone, timedelta
 import json
 import re
-from threading import Lock
+from threading import Lock, Thread
 from time import monotonic
 import logging
 from uuid import uuid4
@@ -58,29 +58,70 @@ class AiExchangeRow(Base):
 
 
 def stores_content(cfg):
-    return str(cfg.get('AI_STORE_CONTENT', 'true')).lower() != 'false'
+    value = str(cfg.get('AI_STORE_CONTENT', 'true')).strip().lower()
+    if value not in ('true', '1', 'yes', 'on', 'false', '0', 'no', 'off'):
+        logger.warning('Invalid AI_STORE_CONTENT; content storage disabled')
+    return value in ('true', '1', 'yes', 'on')
+
+
+def content_retention(cfg):
+    try:
+        days = int(cfg.get('AI_CONTENT_RETENTION_DAYS', 90))
+        if days < 0:
+            raise ValueError
+        return days
+    except (TypeError, ValueError):
+        logger.warning('Invalid AI_CONTENT_RETENTION_DAYS; using 90 days')
+        return 90
+
+
+_SECRET = re.compile(
+    r'\bsk-[A-Za-z0-9_-]{16,}|\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+'
+    r'|\bAIza[A-Za-z0-9_-]{20,}|\bghp_[A-Za-z0-9]+|\bxox[bapr]-[A-Za-z0-9-]+'
+    r'|(?i:bearer\s+[^\s,;]+|\b(?:password|token|secret)\s*=\s*(?:"[^"\n]*"|\'[^\'\n]*\'|[^\s,;&]+))'
+    r'|(?<!\d)09\d{2}[ -]?\d{3}[ -]?\d{3}(?!\d)|\b[A-Z][12]\d{8}\b'
+    r'|(?<!\d)(?:\d{4}[ -]){3}\d{4}(?!\d)|\d{13,}')
 
 
 def redact(text, limit):
-    text = re.sub(r'(?i)bearer\s+[^\s,;]+|sk-[\w-]+', '[redacted]', text)
-    text = re.sub(r'(?<!\d)(?:\d{4}[ -]){3}\d{4}(?!\d)|\d{9,}', '[redacted]', text)
-    return text[:limit]
+    text = re.sub(r'[\x00-\x08\x0b-\x1f\x7f-\x9f]', '', text)
+    return _SECRET.sub('[redacted]', text)[:limit]
 
 
 _cleanup_lock = Lock()
 _last_cleanup = None
+_cleanup_running = False
 
 
 def cleanup_content(sessions, retention_days):
-    global _last_cleanup
+    global _last_cleanup, _cleanup_running
     with _cleanup_lock:
-        now = monotonic()
-        if _last_cleanup is not None and now - _last_cleanup < 3600:
+        if _cleanup_running or (_last_cleanup is not None and monotonic() - _last_cleanup < 3600):
             return
-        _last_cleanup = now
-        with sessions.begin() as db:
-            db.execute(delete(AiExchangeRow).where(
-                AiExchangeRow.created_at < datetime.now(timezone.utc) - timedelta(days=retention_days)))
+        _cleanup_running = True
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+        while True:
+            with sessions.begin() as db:
+                ids = db.scalars(select(AiExchangeRow.usage_id).where(
+                    AiExchangeRow.created_at < cutoff).limit(500)).all()
+                if not ids:
+                    break
+                db.execute(delete(AiExchangeRow).where(AiExchangeRow.usage_id.in_(ids)))
+        with _cleanup_lock:
+            _last_cleanup = monotonic()
+    finally:
+        with _cleanup_lock:
+            _cleanup_running = False
+
+
+def schedule_cleanup(sessions, retention_days):
+    def clean():
+        try:
+            cleanup_content(sessions, retention_days)
+        except Exception:
+            logger.error('ai_content_cleanup_failed')
+    Thread(target=clean, daemon=True).start()
 
 
 class AiFeedbackRow(Base):
@@ -127,7 +168,7 @@ def today():
     return datetime.now(TAIPEI).date().isoformat()
 
 
-def record(sessions, *, exchange=None, retention_days=90, **values):
+def record(sessions, *, exchange=None, **values):
     created = datetime.now(timezone.utc)
     values = dict(created_at=created, day=created.astimezone(TAIPEI).date().isoformat(), **values)
     values.setdefault('id', str(uuid4()))
@@ -136,20 +177,23 @@ def record(sessions, *, exchange=None, retention_days=90, **values):
             with sessions.begin() as db:
                 if db.get(AiUsageRow, values['id']) is None:
                     db.add(AiUsageRow(**values))
-                if exchange is not None and db.get(AiExchangeRow, values['id']) is None:
-                    db.add(AiExchangeRow(usage_id=values['id'], workspace_id=values['workspace_id'],
-                        actor_id=values['actor_id'], created_at=created,
-                        question=redact(exchange['question'], 4000), answer=redact(exchange['answer'], 20000),
-                        tool_names=json.dumps(exchange['tools'], ensure_ascii=False),
-                        error_detail=redact(exchange['error_detail'], 200) if exchange['error_detail'] else None))
-            try:
-                cleanup_content(sessions, retention_days)
-            except Exception:
-                logger.error('ai_content_cleanup_failed')
-            return
+            break
         except Exception:
             if attempt == 1:
                 logger.error('ai_usage_write_failed')
+                return
+    if exchange is None:
+        return
+    try:
+        with sessions.begin() as db:
+            if db.get(AiExchangeRow, values['id']) is None:
+                db.add(AiExchangeRow(usage_id=values['id'], workspace_id=values['workspace_id'],
+                    actor_id=values['actor_id'], created_at=created,
+                    question=redact(exchange['question'], 4000), answer=redact(exchange['answer'], 20000),
+                    tool_names=json.dumps(exchange['tools'], ensure_ascii=False),
+                    error_detail=redact(exchange['error_detail'], 200) if exchange['error_detail'] else None))
+    except Exception:
+        logger.error('ai_exchange_write_failed')
 
 
 def daily_tokens(sessions, workspace_id, actor_id):
@@ -205,6 +249,12 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
         else:
             # SQLite SELECT alone does not start a snapshot with the legacy driver.
             db.connection().exec_driver_sql('BEGIN')
+        if export:
+            entries = [exchange_json(r, f, e if content_enabled else None)
+                       for r, f, e in db.execute(select(row, rating_row, AiExchangeRow).select_from(joined)
+                           .where(*filters).order_by(row.created_at.desc(), row.id.desc()).limit(501))]
+            keys = ('usage_id', 'created_at', 'name', 'provider', 'scope', 'rating', 'reason', 'question', 'answer', 'tools')
+            return dict(rows=[{k: entry[k] for k in keys} for entry in entries[:500]], truncated=len(entries) > 500)
         names = dict(db.execute(select(latest.c.actor_id, latest.c.actor_name).where(latest.c.rank == 1)).all())
         totals = public(db.execute(select(*metrics).select_from(joined).where(*filters)).mappings().one())
         up, down = totals.pop('up'), totals.pop('down')
@@ -223,10 +273,7 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
         people = [dict(actor_id=k, name=v) for k, v in sorted(names.items())]
         entries = [exchange_json(r, f, e if content_enabled else None)
                    for r, f, e in db.execute(select(row, rating_row, AiExchangeRow).select_from(joined)
-                       .where(*filters).order_by(row.created_at.desc(), row.id.desc()).limit(500 if export else 50))]
-        if export:
-            keys = ('usage_id', 'created_at', 'name', 'provider', 'scope', 'rating', 'reason', 'question', 'answer', 'tools')
-            return [{k: entry[k] for k in keys} for entry in entries]
+                       .where(*filters).order_by(row.created_at.desc(), row.id.desc()).limit(50))]
         recent = [{k: v for k, v in entry.items() if k not in ('question', 'answer', 'project_id')} for entry in entries]
         reasons = dict.fromkeys(('wrong', 'incomplete', 'slow', 'other', 'unspecified'), 0)
         reasons.update(dict(db.execute(select(func.coalesce(rating_row.reason, 'unspecified'), func.count()).select_from(joined)

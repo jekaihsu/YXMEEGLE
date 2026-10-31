@@ -45,11 +45,11 @@ def test_redaction_last_turn_and_caps(app, client):
     from .ai.providers import Event
     class LongAnswer(Fake):
         async def stream(self, *args):
-            yield Event('text', 'Bearer abc.secret sk-testKEY 1234567890 42 ' + '答' * 21000)
+            yield Event('text', 'Bearer abc.secret sk-aaaaaaaaaaaaaaaa 1234567890123 42 ' + '答' * 21000)
             yield Event('stop', [])
-    uid = ask(app, client, 'sk-privateKEY Bearer xyz.secret A123456789 1234 ' + '問' * 3900, LongAnswer())
+    uid = ask(app, client, 'sk-bbbbbbbbbbbbbbbb Bearer xyz.secret A123456789 1234 ' + '問' * 3900, LongAnswer())
     value = detail(client, uid)
-    assert value['question'].startswith('[redacted] [redacted] A[redacted] 1234 ')
+    assert value['question'].startswith('[redacted] [redacted] [redacted] 1234 ')
     assert 'earlier' not in value['question']
     assert value['answer'].startswith('[redacted] [redacted] [redacted] 42 ')
     assert len(value['question']) <= 4000 and len(value['answer']) <= 20000
@@ -84,7 +84,7 @@ def test_off_switch_hides_existing_content_and_disables_writes(app, client):
     from .ai.ledger import AiExchangeRow
     from sqlalchemy import select
     uid = ask(app, client, 'stored')
-    app.state.cfg['AI_STORE_CONTENT'] = 'false'
+    app.state.ai_store_content = False
     value = detail(client, uid)
     assert (value['question'], value['answer'], value['tools'], value['error_detail']) == (None, None, [], None)
     recent = client.get('/api/ai/usage').json()['recent'][0]
@@ -94,7 +94,7 @@ def test_off_switch_hides_existing_content_and_disables_writes(app, client):
     second = ask(app, client, 'not stored')
     with app.state.sessions() as db:
         assert db.get(AiExchangeRow, second) is None
-        assert len(db.scalars(select(AiExchangeRow)).all()) == 1
+        assert {row.usage_id for row in db.scalars(select(AiExchangeRow))} <= {uid}
 
 
 def test_workspace_isolation(app, client):
@@ -131,6 +131,7 @@ def test_error_partial_answer_and_detail(app, client):
 def test_retention_cleanup_and_hourly_gate(app, client, monkeypatch):
     from datetime import datetime, timedelta, timezone
     from .ai import ledger
+    monkeypatch.setattr(ledger, 'schedule_cleanup', ledger.cleanup_content)
     uid = ask(app, client, 'expired')
     with app.state.sessions.begin() as db:
         db.get(ledger.AiExchangeRow, uid).created_at = datetime.now(timezone.utc) - timedelta(days=91)
@@ -181,7 +182,7 @@ def test_record_retry_and_idempotence(app, client, monkeypatch):
     sessions = Flaky()
     values['id'] = 'retried'
     ledger.record(sessions, exchange=dict(question='retry', answer='saved', tools=[], error_detail=None), **values)
-    assert sessions.calls == 2
+    assert sessions.calls == 3
     assert detail(client, 'retried')['answer'] == 'saved'
 
 
@@ -323,7 +324,9 @@ def test_export_limit_and_question_answer_caps(app, client):
             data = values()
             data.update(id=f'bulk-{i}', workspace_id=wid(app, client), created_at=datetime.now(timezone.utc), day=ledger.today())
             db.add(ledger.AiUsageRow(**data))
-    assert len(client.get('/api/ai/usage/export').text.splitlines()) == 500
+    response = client.get('/api/ai/usage/export')
+    assert len(response.text.splitlines()) == 501
+    assert json.loads(response.text.splitlines()[-1]) == dict(truncated=True, limit=500, row_count=500)
     assert len(client.get('/api/ai/usage').json()['recent']) == 50
 
 
