@@ -21,12 +21,12 @@ assert.equal(document.querySelector('meta[name=robots]').content,'noindex, nofol
 assert.deepEqual(requests.map(row=>row.url),['/api/session']);assert.equal(location.hash,'');
 assert.equal(document.querySelector('header a').getAttribute('href'),'/');
 await flush(()=>root.unmount());assert.equal(document.querySelector('meta[name=robots]'),null);
-const fixture={range:{from:'2026-10-01',to:'2026-10-31'},totals:{questions:1,input_tokens:1234,output_tokens:50,cost_usd:.02,unpriced_calls:1},by_person:[{actor_id:'a',name:'王小明',questions:1,input_tokens:1234,output_tokens:50,cost_usd:.02,last_at:'2026-10-31T00:00:00Z'}],by_day:[],by_provider:[],people:[{actor_id:'a',name:'王小明'}],recent:[]};
+const fixture={range:{from:'2026-10-01',to:'2026-10-31'},totals:{questions:1,input_tokens:1234,output_tokens:50,cost_usd:.02,unpriced_calls:1},by_person:[{actor_id:'a',name:'王小明',questions:1,input_tokens:1234,output_tokens:50,cost_usd:.02,unpriced_calls:2,last_at:'2026-10-31T00:00:00Z'}],by_day:[],by_provider:[{provider:"gpt",questions:1,input_tokens:1234,output_tokens:50,cost_usd:.02,unpriced_calls:3}],people:[{actor_id:'a',name:'王小明'}],recent:[]};
 requests=[];globalThis.fetch=(url,init)=>new Promise(resolve=>requests.push({url,init,resolve}));
 history.replaceState(null,'','/token_dashboard?from=2026-10-01&to=2026-10-31');root=createRoot(document.getElementById('root'));
 await flush(()=>root.render(React.createElement(ui.Dashboard)));
 assert.equal(requests.length,1);await flush(()=>requests[0].resolve(json(fixture)));
-assert.match(document.body.textContent,/未計價 1 次/);assert.match(document.body.textContent,/1,234/);
+assert.match(document.body.textContent,/未計價 1 次/);assert.match(document.querySelector('.td-person').closest('tbody').textContent,/未計價 2 次/);assert.match(document.querySelector('.td-providers').textContent,/未計價 3 次/);assert.match(document.body.textContent,/1,234/);
 await flush(()=>document.querySelector('.td-person').click());assert.equal(new URLSearchParams(location.search).get('actor'),'a');
 assert.equal(requests.length,2);const stale=requests[1];
 await flush(()=>{const select=document.querySelectorAll('select')[1];select.value='gpt';select.dispatchEvent(new Event('change',{bubbles:true}))});
@@ -38,6 +38,9 @@ await flush(()=>{window.history.pushState(null,'','?from=2026-10-01&to=2026-10-3
 await flush(()=>requests[3].resolve(json({detail:'offline'},503)));assert.match(document.body.textContent,/用量讀取失敗/);
 await flush(()=>[...document.querySelectorAll('button')].find(el=>el.textContent==='重新嘗試').click());
 await flush(()=>requests[4].resolve(json({...fixture,totals:{...fixture.totals,questions:0}})));assert.match(document.body.textContent,/這段期間尚無提問/);
+const countBeforeRange=requests.length;
+await flush(()=>{history.pushState(null,'','?from=2025-01-01&to=2026-10-31');window.dispatchEvent(new Event('popstate'))});
+assert.match(document.body.textContent,/日期範圍最多 366 天/);assert.equal(requests.length,countBeforeRange,'oversized custom range does not fetch');
 await flush(()=>root.unmount());dom.window.close();
 assert.doesNotMatch(await fs.readFile(new URL('./src/AppShell.tsx',import.meta.url),'utf8'),/token_dashboard|TokenDashboard/);
 const manifest=JSON.parse(await fs.readFile(new URL('./dist/.vite/manifest.json',import.meta.url),'utf8'));

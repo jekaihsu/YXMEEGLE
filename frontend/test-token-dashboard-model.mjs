@@ -20,4 +20,13 @@ assert.equal(m.readFilters('?from=2026-02-30&provider=other',new Date('2026-10-3
 assert.deepEqual(m.chartSeries([],{from:'2026-10-30',to:'2026-10-31'}).map(row=>[row.day,row.questions]),[['2026-10-30',0],['2026-10-31',0]]);
 const rows=[{actor_id:'a',cost_usd:.1,name:'A'},{actor_id:'b',cost_usd:2,name:'B'}];
 assert.deepEqual(m.sortPeople(rows).map(row=>row.actor_id),['b','a']);assert.equal(rows[0].actor_id,'a');
+assert.equal(m.rangeError({from:'2026-01-01',to:'2027-01-02'}),'日期範圍最多 366 天。');
+assert.equal(m.rangeError({from:'2026-01-01',to:'2027-01-01'}),null,'366 day limit is inclusive');
+assert.equal(m.rangeError({from:'2024-01-01',to:'2024-12-31'}),null,'leap year allows exactly 366 days');
+assert.equal(m.rangeError({from:'2026-10-31',to:'2026-10-01'}),'開始日期不能晚於結束日期。');
+assert.equal(m.chartSeries([],{from:'2026-01-01',to:'2026-03-03'}).length,62,'62 days stay daily');
+const weekly=m.chartSeries([{day:'2026-01-01',questions:2,input_tokens:10,output_tokens:20,cost_usd:.1},{day:'2026-01-07',questions:3,input_tokens:30,output_tokens:40,cost_usd:.2},{day:'2026-03-04',questions:4,input_tokens:1,output_tokens:2,cost_usd:.5}],{from:'2026-01-01',to:'2026-03-04'});
+assert.equal(weekly.length,9,'63 days aggregate into nine weeks');
+assert.deepEqual(weekly[0],{day:'2026-01-01',questions:5,input_tokens:40,output_tokens:60,cost_usd:.1+.2});assert.equal(weekly.at(-1).questions,4);
+assert.equal(m.chartSeries([],{from:'2024-01-01',to:'2024-12-31'}).length,53,'year renders at most 53 bars');
 console.log('Token dashboard model passed');

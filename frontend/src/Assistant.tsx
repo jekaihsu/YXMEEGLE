@@ -3,14 +3,16 @@ import {AssistantRuntimeProvider,useLocalRuntime,ThreadPrimitive,ComposerPrimiti
 import {MarkdownTextPrimitive} from '@assistant-ui/react-markdown';
 import remarkGfm from 'remark-gfm';
 import {Button,Page} from './design';
-import {api} from './api';
-import {createChatAdapter,type ModelId} from './assistant/runtime';
+import {api,ApiError} from './api';
+import {createChatAdapter,errorText,type ModelId} from './assistant/runtime';
 import {ModelPicker,rememberedModel,type ModelCatalog} from './assistant/ModelPicker';
 import {ToolChip} from './assistant/ToolChip';
 import './Assistant.css';
 
 const suggestions=['今天誰遲到？','今天誰還沒打卡？','某案件進度（請輸入案名或編號）','某案件負責人是誰？'];
 const Markdown=()=> <MarkdownTextPrimitive smooth={false} remarkPlugins={[remarkGfm]} components={{
+ img:({alt})=><>{alt}</>,
+ a:({href,children})=>href&&/^https?:\/\//i.test(href)?<a href={href} target="_blank" rel="noopener noreferrer nofollow">{children}</a>:<>{children}</>,
  table:({children})=><div className="assistant-table" tabIndex={0} role="region" aria-label="回答表格"><table>{children}</table></div>,
 }}/>;
 
@@ -25,7 +27,7 @@ function UserMessage(){
  </MessagePrimitive.Root>;
 }
 
-function AssistantMessage(){
+function AssistantMessage({forbidden=false}:{forbidden?:boolean}){
  return <MessagePrimitive.Root className="assistant-message">
   <span className="assistant-speaker">AI 助理</span>
   <MessagePrimitive.Parts components={{Text:Markdown,tools:{Fallback:ToolChip}}}/>
@@ -34,19 +36,21 @@ function AssistantMessage(){
    <ActionBarPrimitive.Copy asChild><Button variant="plain">
     <MessagePrimitive.If copied={false}>複製回答</MessagePrimitive.If><MessagePrimitive.If copied>已複製</MessagePrimitive.If>
    </Button></ActionBarPrimitive.Copy>
-   <ActionBarPrimitive.Reload asChild><Button variant="plain">重試</Button></ActionBarPrimitive.Reload>
+   {!forbidden&&<ActionBarPrimitive.Reload asChild><Button variant="plain">重試</Button></ActionBarPrimitive.Reload>}
   </ActionBarPrimitive.Root>
  </MessagePrimitive.Root>;
 }
 
 function Conversation({catalog,model,onModel,newConversation}:{catalog:ModelCatalog;model:ModelId;onModel:(id:ModelId)=>void;newConversation:()=>void}){
+ const [forbidden,setForbidden]=useState(false);
  const conversation=useRef(crypto.randomUUID()),selected=useRef(model);
  selected.current=model;
- const adapter=useMemo(()=>createChatAdapter(()=>selected.current,()=>conversation.current),[]);
+ const adapter=useMemo(()=>createChatAdapter(()=>selected.current,()=>conversation.current,()=>setForbidden(true)),[]);
  const runtime=useLocalRuntime(adapter);
  useEffect(()=>()=>{runtime.thread.cancelRun()},[runtime]);
- const available=catalog.models.some(m=>m.id===model&&m.available);
+ const available=!forbidden&&catalog.models.some(m=>m.id===model&&m.available);
  const input=useRef<HTMLTextAreaElement>(null);
+ const ForbiddenAssistantMessage=useMemo(()=>()=> <AssistantMessage forbidden={forbidden}/>,[forbidden]);
  return <AssistantRuntimeProvider runtime={runtime}>
   <Page title="AI 助理" subtitle="查詢出勤與案件，掌握今天的工作。" actions={<Button onClick={()=>{runtime.thread.cancelRun();newConversation()}}>新對話</Button>}>
    <ThreadPrimitive.Root className="assistant-thread">
@@ -61,7 +65,7 @@ function Conversation({catalog,model,onModel,newConversation}:{catalog:ModelCata
        }}>{text}</Button>)}</div>
       </div>
      </ThreadPrimitive.Empty>
-     <ThreadPrimitive.Messages components={{UserMessage,AssistantMessage}}/>
+     <ThreadPrimitive.Messages components={{UserMessage,AssistantMessage:ForbiddenAssistantMessage}}/>
      <ThreadPrimitive.If running><p className="assistant-working" role="status">正在查詢與整理資料…</p></ThreadPrimitive.If>
      <ThreadPrimitive.ScrollToBottom asChild><Button className="assistant-bottom">回到最新回答</Button></ThreadPrimitive.ScrollToBottom>
     </ThreadPrimitive.Viewport>
@@ -82,17 +86,17 @@ function Conversation({catalog,model,onModel,newConversation}:{catalog:ModelCata
 
 export default function Assistant(){
  const [catalog,setCatalog]=useState<ModelCatalog>(),[model,setModel]=useState<ModelId>('claude');
- const [error,setError]=useState(false),[attempt,setAttempt]=useState(0),[conversation,setConversation]=useState(0);
+ const [error,setError]=useState<'load'|'forbidden'|null>(null),[attempt,setAttempt]=useState(0),[conversation,setConversation]=useState(0);
  useEffect(()=>{
-  const controller=new AbortController();setError(false);
+  const controller=new AbortController();setError(null);
   api<ModelCatalog>('/api/ai/models',{signal:controller.signal}).then(data=>{
    if(controller.signal.aborted)return;
    setModel(rememberedModel(data));setCatalog(data);
-  }).catch(()=>{if(!controller.signal.aborted)setError(true)});
+  }).catch(error=>{if(!controller.signal.aborted)setError(error instanceof ApiError&&(error.status===403||error.code==='ai_forbidden')?'forbidden':'load')});
   return()=>controller.abort();
  },[attempt]);
  if(!catalog)return <Page title="AI 助理">{error
-  ?<p role="alert">無法載入 AI 助理。<Button onClick={()=>setAttempt(n=>n+1)}>重試</Button></p>
+  ?error==='forbidden'?<p role="alert">{errorText('ai_forbidden')}</p>:<p role="alert">無法載入 AI 助理。<Button onClick={()=>setAttempt(n=>n+1)}>重試</Button></p>
   :<p role="status">正在載入 AI 助理…</p>}
  </Page>;
  return <Conversation key={conversation} catalog={catalog} model={model} onModel={setModel} newConversation={()=>setConversation(n=>n+1)}/>;

@@ -1,11 +1,11 @@
 export type Provider = '' | 'claude' | 'gpt';
 export type Filters = {from:string; to:string; actor:string; provider:Provider};
 export type Metrics = {questions:number; input_tokens:number; output_tokens:number; cost_usd:number};
-export type PersonUsage = Metrics & {actor_id:string; name:string; last_at:string};
+export type PersonUsage = Metrics & {unpriced_calls?:number;actor_id:string; name:string; last_at:string};
 export type DayUsage = Metrics & {day:string};
 export type Usage = {
  range:{from:string; to:string}; totals:Metrics & {unpriced_calls:number};
- by_person:PersonUsage[]; by_day:DayUsage[]; by_provider:(Metrics & {provider:string})[];
+ by_person:PersonUsage[]; by_day:DayUsage[]; by_provider:(Metrics & {provider:string;unpriced_calls?:number})[];
  people:{actor_id:string; name:string}[];
  recent:{created_at:string; actor_id:string; name:string; provider:string; input_tokens:number; output_tokens:number; cost_usd:number|null; latency_ms:number; status:string}[];
 };
@@ -35,8 +35,21 @@ export const formatTime = (value:string) => value?new Intl.DateTimeFormat('zh-TW
 export function sortPeople(rows:PersonUsage[],key:SortKey='cost_usd',direction:'asc'|'desc'='desc') {
  return [...rows].sort((a,b)=>{const av=a[key],bv=b[key];const comparison=typeof av==='number'&&typeof bv==='number'?av-bv:String(av).localeCompare(String(bv),'zh-TW');return (direction==='desc'?-comparison:comparison)||a.actor_id.localeCompare(b.actor_id)});
 }
+export function rangeError(range:{from:string;to:string}):string|null {
+ if(range.from>range.to)return '開始日期不能晚於結束日期。';
+ return (Date.parse(range.to)-Date.parse(range.from))/86400000+1>366?'日期範圍最多 366 天。':null;
+}
 export function chartSeries(rows:DayUsage[],range:{from:string;to:string}) {
  const days=new Map(rows.map(row=>[row.day,row]));const result:DayUsage[]=[];
  for(let day=range.from;day<=range.to;day=shift(day,1))result.push(days.get(day)||{day,questions:0,input_tokens:0,output_tokens:0,cost_usd:0});
- return result;
+ if(result.length<=62)return result;
+ const weeks:DayUsage[]=[];
+ for(let index=0;index<result.length;index+=7){
+  const bucket={day:result[index].day,questions:0,input_tokens:0,output_tokens:0,cost_usd:0};
+  for(const row of result.slice(index,index+7)){
+   bucket.questions+=row.questions;bucket.input_tokens+=row.input_tokens;bucket.output_tokens+=row.output_tokens;bucket.cost_usd+=row.cost_usd;
+  }
+  weeks.push(bucket);
+ }
+ return weeks;
 }
