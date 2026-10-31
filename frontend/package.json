@@ -72,7 +72,9 @@
     "test:detail-loading": "node test-project-detail-loading.mjs && node test-detail-refresh.mjs && node test-home-panels.mjs && node test-detail-skeleton.mjs",
     "test:stage-model": "node test-stage-model.mjs && node test-assign-drawer-model.mjs && node test-stage-workspace.mjs && node test-stage-sop-merge.mjs && node test-library-memory.mjs && node test-sop-action-reasons.mjs && node test-stage-fixture.mjs",
     "test:picker-browser": "node test-picker-browser.mjs",
-    "test:picker-sweep": "node scripts/verify-pickers.mjs"
+    "test:picker-sweep": "node scripts/verify-pickers.mjs",
+    "test:assistant": "node test-assistant.mjs",
+    "test:assistant:bundle": "node test-assistant-bundle.mjs"
   },
   "dependencies": {
     "@assistant-ui/react": "0.15.32",
