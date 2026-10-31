@@ -481,3 +481,29 @@ def test_prompt_byte_stable_across_uncached_real_reads(app, client, monkeypatch)
     monkeypatch.setattr(case_detail, 'build_case_detail', advancing_request_time)
     prompts = [project_system_prompt(asyncio.run(build(app, cookie(client), pid))) for _ in range(2)]
     assert prompts[0].encode() == prompts[1].encode()
+
+
+def test_closed_tasks_are_not_listed_and_missing_task_fields_are_declared(app, client):
+    from copy import deepcopy
+    from .ai.project_context import build
+    pid = project(client)
+    with app.state.sessions.begin() as db:
+        root = db.get(WorkspaceRow, wid(app, client))
+        state = storage.load(db, BusinessRow, root)
+        p = next(p for p in state['projects'] if p['id'] == pid)
+        node = next(n for n in p['nodes'] if n['status'] == 'in_progress')
+        template = node['tasks'][0]
+        node['tasks'] = [dict(deepcopy(template), id=f'task-{status}', title=f'任務 {status}', status=status)
+                         for status in ('pending', 'skipped', 'not_applicable', 'canceled', 'completed')]
+        root.data = storage.save(db, BusinessRow, root.id, state)
+    data = json.loads(asyncio.run(build(app, cookie(client), pid)).json)
+    labels = [t['label'] for t in data['unfinished_tasks']['rows'] if t['label'].startswith('任務 ')]
+    assert labels == ['任務 pending']
+    assert '不可推測' in data['unfinished_tasks']['fields_unavailable']
+    assert all('due_date' not in t and 'assignee_name' not in t for t in data['unfinished_tasks']['rows'])
+
+
+def test_project_prompt_does_not_cite_a_timestamp_the_context_lacks():
+    from types import SimpleNamespace
+    from .ai.prompts import project_system_prompt
+    assert 'as_of' not in project_system_prompt(SimpleNamespace(json='{}'))

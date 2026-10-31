@@ -10,6 +10,7 @@ from time import monotonic, perf_counter
 
 import httpx
 
+from ..home_queues import CLOSED_NODES, CLOSED_TASKS
 from .tools import Reader, ReadDenied, owners, pick, project_owners, project_progress
 
 
@@ -111,15 +112,14 @@ def workflow(detail):
         return unavailable({}, '工作流程無法讀取')
     rows = []
     for node in section.get('rows', []):
-        if node.get('status') in ('completed', 'superseded', 'cancelled'):
+        if node.get('status') in CLOSED_NODES:
             continue
         for task in node.get('tasks', []):
-            if task.get('status') not in ('completed', 'superseded', 'cancelled'):
-                rows.append(dict(**pick(task, 'key', 'task_id', 'label', 'status', 'due_date', 'assignee_name'),
-                                 node=pick(node, 'key', 'node_id', 'label')))
-    rows.sort(key=lambda t: (0 if t.get('status') == 'overdue' else 1 if t.get('status') == 'blocked' else 2,
-                             t.get('due_date') or '9999', t.get('key', '')))
-    return normalize(dict(**pick(section, 'states', 'reason'), rows=rows[:15], truncated=len(rows) > 15))
+            if task.get('status') not in CLOSED_TASKS:
+                rows.append(dict(**pick(task, 'key', 'task_id', 'label', 'status'), node=pick(node, 'key', 'node_id', 'label')))
+    rows.sort(key=lambda t: 0 if t.get('status') == 'overdue' else 1 if t.get('status') == 'blocked' else 2)
+    return normalize(dict(**pick(section, 'states', 'reason'), rows=rows[:15], truncated=len(rows) > 15,
+                          fields_unavailable='任務的期限與負責人來源未提供，不可推測'))
 
 
 async def build(app, cookie, project_id):
