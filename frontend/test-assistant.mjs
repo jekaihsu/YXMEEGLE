@@ -82,6 +82,8 @@ for(const [distance,hidden] of [[0,true],[12,true],[80,true],[81,false],[300,fal
 let scrollTarget;viewport.scrollTo=target=>{scrollTarget=target};
 viewport.scrollTop=0;await flush(()=>viewport.dispatchEvent(new window.Event('scroll')));
 await flush(()=>scrollButton.click());assert.deepEqual(scrollTarget,{top:1000,behavior:'smooth'});
+assert.equal(document.activeElement,viewport,'focus moves to the thread before the button hides');
+window.matchMedia=()=>({matches:true});viewport.scrollTop=0;await flush(()=>viewport.dispatchEvent(new window.Event('scroll')));await flush(()=>scrollButton.click());assert.equal(scrollTarget.behavior,'auto','reduced motion scrolls without animation');delete window.matchMedia;
 assert.equal(document.querySelectorAll('.assistant-message img').length,0,'markdown images render no image element');
 assert.match(document.body.textContent,/private alt/);
 assert.equal(document.querySelector('.assistant-message iframe'),null,'raw HTML stays escaped');

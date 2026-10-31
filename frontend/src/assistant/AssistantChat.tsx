@@ -71,10 +71,10 @@ function MessageLog({children}:{children:ReactNode}){
  },[]);
  return <>
   <div className="assistant-scroll-region">
-  <ThreadPrimitive.Viewport ref={viewport} data-slot="aui_thread-viewport" className="assistant-viewport" autoScroll role="log" aria-live="off" aria-busy={running}>
+  <ThreadPrimitive.Viewport ref={viewport} data-slot="aui_thread-viewport" className="assistant-viewport" tabIndex={-1} autoScroll role="log" aria-live="off" aria-busy={running}>
    <div ref={messages}>{children}<ThreadPrimitive.Messages components={{UserMessage,AssistantMessage}}/></div>
   </ThreadPrimitive.Viewport>
-  <Button hidden={!away} data-slot="scroll-anchor" className="assistant-bottom" onClick={()=>viewport.current!.scrollTo({top:viewport.current!.scrollHeight,behavior:'smooth'})}>回到最新回答</Button>
+  <Button hidden={!away} data-slot="scroll-anchor" className="assistant-bottom" onClick={()=>{const element=viewport.current!;element.focus({preventScroll:true});element.scrollTo({top:element.scrollHeight,behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}}>回到最新回答</Button>
   </div>
   <div className="assistant-completion" role="status">{!running&&outcomeText&&<span key={outcomeId}>{outcomeText}</span>}</div>
  </>;
