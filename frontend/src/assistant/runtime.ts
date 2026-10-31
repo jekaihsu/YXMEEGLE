@@ -18,6 +18,8 @@ export function createChatAdapter(model:()=>ModelId,conversation:()=>string,onFo
  return {async *run({messages,abortSignal}){
   const epoch=getSessionEpoch();
   const content:ThreadAssistantMessagePart[]=[];
+  let usageId:string|undefined;
+  const metadata=()=>({custom:{usage_id:usageId}});
   try {
    const all=messages.filter(m=>m.role==='user'||(m.role==='assistant'&&m.status?.type!=='incomplete')).map(m=>({role:m.role,content:m.content.filter(p=>p.type==='text').map(p=>p.text).join('')})).filter(m=>m.content);
    if(all.at(-1)?.role==='user'&&all.at(-1)!.content.length>4000)throw new Error('message_limit');
@@ -31,26 +33,27 @@ export function createChatAdapter(model:()=>ModelId,conversation:()=>string,onFo
    if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.code||'ai_upstream')}
    if(!response.body)throw new Error('network');
    for await(const event of readEvents(response.body,abortSignal)){
+    if(event.type==='start')usageId=event.usage_id;
     if(event.type==='error')throw new Error(event.code);
-    if(event.type==='done'){yield {content:[...content],status:{type:'complete',reason:'stop'}};return}
+    if(event.type==='done'){yield {metadata:metadata(),content:[...content],status:{type:'complete',reason:'stop'}};return}
     if(event.type==='text'){
      const last=content.at(-1);
      if(last?.type==='text')content[content.length-1]={type:'text',text:last.text+event.delta};
      else content.push({type:'text',text:event.delta});
     }
     if(event.type==='tool'){
-     const part:ToolCallMessagePart={type:'tool-call',toolCallId:event.id,toolName:event.name,args:{label:event.label},argsText:JSON.stringify({label:event.label}),...(event.status==='running'?{}:{result:event.status,isError:event.status==='error'})};
+     const part:ToolCallMessagePart={type:'tool-call',toolCallId:event.id,toolName:event.name,args:{label:event.label},argsText:JSON.stringify({label:event.label}),...(event.status==='running'?{}:{result:event.displays?{status:event.status,displays:event.displays}:event.status,isError:event.status==='error'})};
      const index=content.findIndex(p=>p.type==='tool-call'&&p.toolCallId===event.id);
      if(index<0)content.push(part);else content[index]=part;
     }
-    yield {content:[...content]};
+    yield {metadata:metadata(),content:[...content]};
    }
    throw new Error('network');
   }catch(error){
    if(abortSignal.aborted)throw error;
    const code=error instanceof Error?error.message:'network';
    if(code==='ai_forbidden')onForbidden();
-   yield {content:[...content],status:{type:'incomplete',reason:'error',error:errorText(code in ERROR_TEXT?code:error instanceof TypeError?'network':'ai_upstream')}};
+   yield {metadata:metadata(),content:[...content],status:{type:'incomplete',reason:'error',error:errorText(code in ERROR_TEXT?code:error instanceof TypeError?'network':'ai_upstream')}};
   }
  }};
 }

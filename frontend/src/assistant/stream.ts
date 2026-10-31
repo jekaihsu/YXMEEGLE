@@ -1,6 +1,7 @@
+import {isDisplay,type Display} from './elements/types';
 export type StreamEvent =
- | {type:'start';conversation_id:string;provider:string}
- | {type:'tool';id:string;name:string;label:string;status:'running'|'done'|'error'}
+ | {type:'start';conversation_id:string;provider:string;usage_id?:string}
+ | {type:'tool';id:string;name:string;label:string;status:'running'|'done'|'error';displays?:Display[]}
  | {type:'text';delta:string}
  | {type:'done'}
  | {type:'error';code:string;message?:string};
@@ -17,6 +18,8 @@ export async function* readEvents(body:ReadableStream<Uint8Array>, signal:AbortS
   if(!event||!['start','tool','text','done','error'].includes(event.type))throw new Error('invalid_event');
   if(event.type==='text'&&typeof event.delta!=='string')throw new Error('invalid_event');
   if(event.type==='tool'&&(!['running','done','error'].includes(event.status)||!['id','name','label'].every(key=>typeof event[key]==='string')))throw new Error('invalid_event');
+  if(event.type==='start'&&event.usage_id!==undefined&&typeof event.usage_id!=='string')throw new Error('invalid_event');
+  if(event.type==='tool'&&event.displays!==undefined&&(!Array.isArray(event.displays)||!event.displays.every(isDisplay)))throw new Error('invalid_display');
   if(event.type==='error'&&typeof event.code!=='string')throw new Error('invalid_event');
   return event;
  }

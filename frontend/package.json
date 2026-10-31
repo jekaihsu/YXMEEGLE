@@ -75,7 +75,8 @@
     "test:picker-sweep": "node scripts/verify-pickers.mjs",
     "test:assistant": "node test-assistant.mjs",
     "test:assistant:bundle": "node test-assistant-bundle.mjs",
-    "test:token-dashboard": "node test-token-dashboard-model.mjs && node test-token-dashboard.mjs"
+    "test:token-dashboard": "node test-token-dashboard-model.mjs && node test-token-dashboard.mjs",
+    "test:assistant:elements": "node test-assistant-elements.mjs"
   },
   "dependencies": {
     "@assistant-ui/react": "0.15.32",

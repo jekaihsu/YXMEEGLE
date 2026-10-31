@@ -6,8 +6,11 @@ import {Button,Page} from './design';
 import {api,ApiError} from './api';
 import {createChatAdapter,errorText,type ModelId} from './assistant/runtime';
 import {ModelPicker,rememberedModel,type ModelCatalog} from './assistant/ModelPicker';
-import {ToolChip} from './assistant/ToolChip';
+import {createFeedbackController,FeedbackActions,FeedbackContext} from './assistant/feedback';
+import {toolUIs,ToolResult} from './assistant/ToolResult';
+import {ThinkingIndicator} from './assistant/elements/ThinkingIndicator';
 import './Assistant.css';
+import './assistant/elements/elements.css';
 
 const suggestions=['今天誰遲到？','今天誰還沒打卡？','某案件進度（請輸入案名或編號）','某案件負責人是誰？'];
 const Markdown=()=> <MarkdownTextPrimitive smooth={false} remarkPlugins={[remarkGfm]} components={{
@@ -30,13 +33,14 @@ function UserMessage(){
 function AssistantMessage({forbidden=false}:{forbidden?:boolean}){
  return <MessagePrimitive.Root className="assistant-message">
   <span className="assistant-speaker">AI 助理</span>
-  <MessagePrimitive.Parts components={{Text:Markdown,tools:{Fallback:ToolChip}}}/>
+  <MessagePrimitive.Parts components={{Text:Markdown,tools:{by_name:toolUIs,Fallback:ToolResult}}}/>
   <AnswerError/>
-  <ActionBarPrimitive.Root hideWhenRunning className="assistant-actions">
+  <ActionBarPrimitive.Root hideWhenRunning data-slot="message-actions" className="assistant-actions">
    <ActionBarPrimitive.Copy asChild><Button variant="plain">
     <MessagePrimitive.If copied={false}>複製回答</MessagePrimitive.If><MessagePrimitive.If copied>已複製</MessagePrimitive.If>
    </Button></ActionBarPrimitive.Copy>
    {!forbidden&&<ActionBarPrimitive.Reload asChild><Button variant="plain">重試</Button></ActionBarPrimitive.Reload>}
+   <FeedbackActions/>
   </ActionBarPrimitive.Root>
  </MessagePrimitive.Root>;
 }
@@ -46,12 +50,15 @@ function Conversation({catalog,model,onModel,newConversation}:{catalog:ModelCata
  const conversation=useRef(crypto.randomUUID()),selected=useRef(model);
  selected.current=model;
  const adapter=useMemo(()=>createChatAdapter(()=>selected.current,()=>conversation.current,()=>setForbidden(true)),[]);
- const runtime=useLocalRuntime(adapter);
- useEffect(()=>()=>{runtime.thread.cancelRun()},[runtime]);
+ const runtimeRef=useRef<ReturnType<typeof useLocalRuntime>>();
+ const feedback=useMemo(()=>createFeedbackController(()=>runtimeRef.current!),[]);
+ const runtime=useLocalRuntime(adapter,{adapters:{feedback:feedback.adapter}});
+ runtimeRef.current=runtime;
+ useEffect(()=>{feedback.activate();return()=>{feedback.dispose();runtime.thread.cancelRun()}},[runtime,feedback]);
  const available=!forbidden&&catalog.models.some(m=>m.id===model&&m.available);
  const input=useRef<HTMLTextAreaElement>(null);
  const ForbiddenAssistantMessage=useMemo(()=>()=> <AssistantMessage forbidden={forbidden}/>,[forbidden]);
- return <AssistantRuntimeProvider runtime={runtime}>
+ return <AssistantRuntimeProvider runtime={runtime}><FeedbackContext.Provider value={feedback}>
   <Page title="AI 助理" subtitle="查詢出勤與案件，掌握今天的工作。" actions={<Button onClick={()=>{runtime.thread.cancelRun();newConversation()}}>新對話</Button>}>
    <ThreadPrimitive.Root className="assistant-thread">
     <ThreadPrimitive.Viewport className="assistant-viewport" autoScroll>
@@ -66,7 +73,7 @@ function Conversation({catalog,model,onModel,newConversation}:{catalog:ModelCata
       </div>
      </ThreadPrimitive.Empty>
      <ThreadPrimitive.Messages components={{UserMessage,AssistantMessage:ForbiddenAssistantMessage}}/>
-     <ThreadPrimitive.If running><p className="assistant-working" role="status">正在查詢與整理資料…</p></ThreadPrimitive.If>
+     <ThreadPrimitive.If running><ThinkingIndicator/></ThreadPrimitive.If>
      <ThreadPrimitive.ScrollToBottom asChild><Button className="assistant-bottom">回到最新回答</Button></ThreadPrimitive.ScrollToBottom>
     </ThreadPrimitive.Viewport>
     <ComposerPrimitive.Root className="assistant-composer">
@@ -81,7 +88,7 @@ function Conversation({catalog,model,onModel,newConversation}:{catalog:ModelCata
     <p className="assistant-note">回答依你可查看的資料整理。重要資訊請再核對原始紀錄。</p>
    </ThreadPrimitive.Root>
   </Page>
- </AssistantRuntimeProvider>;
+ </FeedbackContext.Provider></AssistantRuntimeProvider>;
 }
 
 export default function Assistant(){
