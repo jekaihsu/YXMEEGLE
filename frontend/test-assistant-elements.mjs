@@ -13,9 +13,20 @@ const collect=async iterator=>{const values=[];for await(const value of iterator
 for(const name of Object.keys(ui.fixtureDisplays))for(const width of [1,2,13,4096]){
  assert.deepEqual(await collect(ui.readEvents(stream(ui.fixtureSSE(name),width),new AbortController().signal)),ui.fixtureEvents(name));
 }
-for(const display of [{...ui.fixtureDisplays.search_cases[0],rows:[{x:{private:true}}]},{...ui.fixtureDisplays.case_progress[0],points:Array(13).fill({label:'x',value:1})}]){
- await assert.rejects(()=>collect(ui.readEvents(stream(`data: ${JSON.stringify({type:'tool',id:'t',name:'case_progress',label:'查詢',status:'done',displays:[display]})}\n\n`),new AbortController().signal)),/invalid_display/);
+const chartCaveats={...ui.fixtureDisplays.case_progress[0],caption:'截至 09:30',truncated:true,note:'未知階段不計入進度'};
+const tool=displays=>({type:'tool',id:'t',name:'case_progress',label:'查詢',status:'done',displays});
+const sse=events=>events.map(event=>`data: ${JSON.stringify(event)}\n\n`).join('');
+assert.deepEqual(await collect(ui.readEvents(stream(sse([tool([chartCaveats])])),new AbortController().signal)),[tool([chartCaveats])]);
+for(const display of [{...ui.fixtureDisplays.search_cases[0],rows:[{x:{private:true}}]},{...chartCaveats,points:Array(13).fill({label:'x',value:1})},...['caption','note','truncated'].map(key=>({...chartCaveats,[key]:123}))]){
+ const events=[{type:'text',delta:'已收到的回答'},tool([display,chartCaveats]),{type:'text',delta:'繼續回答'},{type:'done'}];
+ assert.deepEqual(await collect(ui.readEvents(stream(sse(events)),new AbortController().signal)),[events[0],tool([chartCaveats]),events[2],events[3]]);
 }
+assert.deepEqual(await collect(ui.readEvents(stream(sse([tool('bad')])),new AbortController().signal)),[tool([])]);
+globalThis.fetch=async()=>new Response(stream(sse([{type:'text',delta:'保留回答'},tool([{kind:'bad'}]),{type:'text',delta:'，繼續回答'},{type:'done'}])));
+const preserved=await collect(ui.createChatAdapter(()=>'claude',()=>'c').run({messages:[{role:'user',content:[{type:'text',text:'查詢'}]}],abortSignal:new AbortController().signal}));
+assert.equal(preserved.at(-1).content.filter(part=>part.type==='text').map(part=>part.text).join(''),'保留回答，繼續回答');
+assert.equal(preserved.at(-1).content.find(part=>part.type==='tool-call').result.status,'done');
+assert.deepEqual(preserved.at(-1).status,{type:'complete',reason:'stop'});
 globalThis.fetch=async()=>new Response(stream(ui.fixtureSSE('attendance_today')));
 const updates=await collect(ui.createChatAdapter(()=>'claude',()=>'c').run({messages:[{role:'user',content:[{type:'text',text:'出勤'}]}],abortSignal:new AbortController().signal}));
 assert.equal(updates.at(-1).metadata.custom.usage_id,'fixture-attendance_today');
@@ -43,8 +54,12 @@ assert.equal(document.querySelector('tbody tr td[data-numeric]').textContent,'12
 assert.equal(document.querySelector('.assistant-data-cards [role=listitem] strong').textContent,'姓名 · 甲');
 assert.match(document.body.textContent,/僅列出部分/);assert.match(document.body.textContent,/資料尚未完整/);
 assert.equal(document.querySelector('tbody td[data-numeric]').textContent,'12');
-await flush(()=>root.render(React.createElement(ui.Chart,ui.fixtureDisplays.case_progress[0])));
-assert.match(document.querySelector('svg[role=img]').getAttribute('aria-label'),/規劃 100%/);
+await flush(()=>root.render(React.createElement(ui.Chart,chartCaveats)));
+assert.equal(document.querySelector('svg[role=img]').getAttribute('aria-label'),`${chartCaveats.title}。整體進度 · 規則推算 62%`);
+assert.match(document.querySelector('.assistant-element-heading p').textContent,/截至 09:30/);
+assert.match(document.querySelector('.assistant-chart footer').textContent,/僅列出部分.*未知階段不計入進度/);
+assert.match(document.querySelector('table.assistant-sr-only caption').textContent,/截至 09:30.*僅列出部分.*未知階段不計入進度/);
+assert.equal(document.querySelector('.assistant-chart-point button').getAttribute('aria-label'),'查看規劃的圖表提示');
 assert.equal(document.querySelectorAll('table.assistant-sr-only tbody tr').length,4);
 assert.match(document.querySelector('.assistant-chart-headline').textContent,/規則推算62%/);
 await flush(()=>document.querySelector('.assistant-chart-point button').focus());assert.match(document.querySelector('[role=tooltip]').textContent,/規劃 · 100%/);
