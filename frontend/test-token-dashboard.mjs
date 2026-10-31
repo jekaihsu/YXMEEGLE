@@ -29,6 +29,7 @@ await flush(()=>root.render(React.createElement(ui.Dashboard)));
 assert.equal(requests.length,1);await flush(()=>requests[0].resolve(json(fixture)));
 assert.match(document.body.textContent,/尚無評分/);assert.equal(document.querySelector('.td-reasons'),null);assert.doesNotMatch(document.querySelector('.td-satisfaction').textContent,/%/);
 assert.match(document.body.textContent,/未計價 1 次/);assert.match(document.querySelector('.td-person').closest('tbody').textContent,/未計價 2 次/);assert.match(document.querySelector('.td-providers').textContent,/未計價 3 次/);assert.match(document.body.textContent,/1,234/);
+assert.equal(document.querySelector('input[type=search]').maxLength,200,'the search box cannot exceed the length the API accepts');
 await flush(()=>document.querySelector('.td-person').click());assert.equal(new URLSearchParams(location.search).get('actor'),'a');
 assert.equal(requests.length,2);const stale=requests[1];
 await flush(()=>{const select=document.querySelectorAll('select')[1];select.value='gpt';select.dispatchEvent(new Event('change',{bubbles:true}))});
