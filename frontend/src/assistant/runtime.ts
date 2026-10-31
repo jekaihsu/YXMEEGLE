@@ -14,15 +14,19 @@ export const ERROR_TEXT:Record<string,string>={
  message_limit:'問題或對話過長，請縮短問題或開始新對話。',
 };
 export const errorText=(code:string)=>ERROR_TEXT[code]||ERROR_TEXT.ai_upstream;
-export function createChatAdapter(model:()=>ModelId,conversation:()=>string):ChatModelAdapter {
+export function createChatAdapter(model:()=>ModelId,conversation:()=>string,onForbidden:()=>void=()=>{}):ChatModelAdapter {
  return {async *run({messages,abortSignal}){
   const epoch=getSessionEpoch();
   const content:ThreadAssistantMessagePart[]=[];
   try {
-   const history=messages.filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content.filter(p=>p.type==='text').map(p=>p.text).join('')})).filter(m=>m.content);
-   if(history.length>20||history.some(m=>m.content.length>4000))throw new Error('message_limit');
-   const response=await fetch('/api/ai/chat',{method:'POST',credentials:'same-origin',signal:abortSignal,headers:{'Content-Type':'application/json'},body:JSON.stringify({model:model(),conversation_id:conversation(),messages:history})});
+   const history=messages.filter(m=>m.role==='user'||(m.role==='assistant'&&m.status?.type!=='incomplete')).map(m=>({role:m.role,content:m.content.filter(p=>p.type==='text').map(p=>p.text).join('')})).filter(m=>m.content);
+   if(history.some(m=>m.role==='user'&&m.content.length>4000))throw new Error('message_limit');
+   while(history.at(-1)?.role==='assistant')history.pop();
+   const recent=history.slice(-20).map(m=>({...m,content:m.role==='assistant'?m.content.slice(0,20000):m.content}));
+   if(recent[0]?.role==='assistant')recent.shift();
+   const response=await fetch('/api/ai/chat',{method:'POST',credentials:'same-origin',signal:abortSignal,headers:{'Content-Type':'application/json'},body:JSON.stringify({model:model(),conversation_id:conversation(),messages:recent})});
    if(response.status===401){if(epoch===getSessionEpoch()&&!abortSignal.aborted)window.dispatchEvent(new Event('yx:session-expired'));throw new Error('session_expired')}
+   if(response.status===403)throw new Error('ai_forbidden');
    if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.code||'ai_upstream')}
    if(!response.body)throw new Error('network');
    for await(const event of readEvents(response.body,abortSignal)){
@@ -44,6 +48,7 @@ export function createChatAdapter(model:()=>ModelId,conversation:()=>string):Cha
   }catch(error){
    if(abortSignal.aborted)throw error;
    const code=error instanceof Error?error.message:'network';
+   if(code==='ai_forbidden')onForbidden();
    yield {content:[...content],status:{type:'incomplete',reason:'error',error:errorText(code in ERROR_TEXT?code:error instanceof TypeError?'network':'ai_upstream')}};
   }
  }};
