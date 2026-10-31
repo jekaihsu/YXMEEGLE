@@ -57,10 +57,14 @@ class ChatRun:
             return
         self.finished = True
         if self.status != 'ok' and self.steps and not self.step_final_usage:
-            self.step_usage = Usage(max(self.input_floor, self.step_usage.input_tokens), 0, 0,
-                                    max(self.streamed_chars, self.step_usage.output))
-            self.error_code = 'usage_estimated'
+            self.step_usage = Usage(
+                self.step_usage.uncached_input + max(0, self.input_floor - self.step_usage.input_tokens),
+                self.step_usage.cache_read, self.step_usage.cache_write,
+                max(self.streamed_chars, self.step_usage.output))
+            if self.status == 'aborted' or not self.error_code:
+                self.error_code = 'usage_estimated'
         usage = self.usage + self.step_usage
+        self.release()
         try:
             with anyio.CancelScope(shield=True):
                 await run_in_threadpool(ledger.record, self.app.state.sessions, workspace_id=self.data['wid'], actor_id=self.user['id'],
