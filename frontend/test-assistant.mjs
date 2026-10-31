@@ -84,6 +84,7 @@ viewport.scrollTop=0;await flush(()=>viewport.dispatchEvent(new window.Event('sc
 await flush(()=>scrollButton.click());assert.deepEqual(scrollTarget,{top:1000,behavior:'smooth'});
 assert.equal(document.activeElement,viewport,'focus moves to the thread before the button hides');
 const assistantCss=await fs.readFile(new URL('./src/Assistant.css',import.meta.url),'utf8');assert.match(assistantCss,/\.assistant-viewport:focus-visible\{outline:2px solid/,'the thread keeps a visible focus ring for keyboard users');assert.doesNotMatch(assistantCss,/\.assistant-viewport:focus\{outline:none\}/,'focus is never hidden unconditionally');
+assert.match(assistantCss,/\.assistant-composer:focus-within\{border-color:var\(--focus-ring\)\}/,'the composer is one frame whose border takes the accent on focus');assert.doesNotMatch(assistantCss,/\.assistant-composer:focus-within\{[^}]*outline/,'no second ring around the composer');assert.match(assistantCss,/\.assistant-composer textarea:focus-visible[^{]*\{border:0;outline:none/,'the inner input draws no frame of its own');
 window.matchMedia=()=>({matches:true});viewport.scrollTop=0;await flush(()=>viewport.dispatchEvent(new window.Event('scroll')));await flush(()=>scrollButton.click());assert.equal(scrollTarget.behavior,'auto','reduced motion scrolls without animation');delete window.matchMedia;
 assert.equal(document.querySelectorAll('.assistant-message img').length,0,'markdown images render no image element');
 assert.match(document.body.textContent,/private alt/);

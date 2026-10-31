@@ -10,7 +10,8 @@
 .assistant-actions{display:flex;gap:var(--space-2);flex-wrap:wrap;margin-top:var(--space-2)}
 .assistant-working{color:var(--label-2);font-size:var(--fs-subhead);padding:var(--space-2) 0}
 .assistant-bottom[hidden]{display:none}
-.assistant-composer:focus-within{outline:2px solid var(--focus-ring);outline-offset:2px}
+.assistant-composer:focus-within{border-color:var(--focus-ring)}
+.assistant-composer textarea,.assistant-composer textarea:hover,.assistant-composer textarea:focus,.assistant-composer textarea:focus-visible,.assistant-composer textarea:disabled{border:0;outline:none;box-shadow:none;background:transparent}
 .assistant-composer textarea{display:block;width:100%;resize:none;max-height:12rem;min-height:3rem;border:0;background:transparent;color:var(--label);font:inherit;line-height:1.6;padding:var(--space-2);box-shadow:none;outline:none}
 .assistant-composer-bar{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);flex-wrap:wrap;margin-top:var(--space-2)}
 .assistant-model small{color:var(--label-2);font-size:var(--fs-footnote)}
