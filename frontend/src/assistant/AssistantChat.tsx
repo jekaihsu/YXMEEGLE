@@ -2,7 +2,7 @@
 import {createContext,useContext,useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
 import {AssistantRuntimeProvider,useLocalRuntime,ThreadPrimitive,ComposerPrimitive,MessagePrimitive,ActionBarPrimitive,ErrorPrimitive,useAuiState} from '@assistant-ui/react';
 import {MarkdownTextPrimitive} from '@assistant-ui/react-markdown';
-import remarkGfm from 'remark-gfm';
+import {assistantRemarkPlugins} from './markdown';
 import {Button} from '../design';
 import {api,ApiError} from '../api';
 import {createChatAdapter,errorText} from './runtime';
@@ -14,7 +14,7 @@ import '../Assistant.css';
 import './elements/elements.css';
 
 const suggestions=['今天誰遲到？','今天誰還沒打卡？','某案件進度（請輸入案名或編號）','某案件負責人是誰？'];
-const Markdown=()=> <MarkdownTextPrimitive smooth={false} remarkPlugins={[remarkGfm]} components={{
+const Markdown=()=> <MarkdownTextPrimitive smooth={false} remarkPlugins={assistantRemarkPlugins} components={{
  img:({alt})=><>{alt}</>,
  a:({href,children})=>href&&/^https?:\/\//i.test(href)?<a href={href} target="_blank" rel="noopener noreferrer nofollow">{children}</a>:<>{children}</>,
  table:({children})=><div className="assistant-table" tabIndex={0} role="region" aria-label="回答表格"><table>{children}</table></div>,
