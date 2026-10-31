@@ -163,12 +163,16 @@ class ChatRun:
                     outputs.append(result)
                     label = TOOLS[call.name].label if call.name in TOOLS else '查詢資料'
                     event = dict(type='tool', id=call.id, name=call.name, label=label, status='error' if error else 'done')
+                    display_failed = False
                     if not error:
                         try:
                             event['displays'] = displays(call.name, result)
                         except Exception as exc:
+                            display_failed = True
                             logger.warning('ai_display tool=%s exception=%s', call.name, type(exc).__name__)
                     yield sse(event)
+                    if display_failed:
+                        yield sse(dict(type='text', delta='（此結果無法以表格或圖表顯示，以下以文字說明。）\n\n'))
                 self.adapter.continue_with(messages, content, calls, outputs)
             raise ProviderError()
         except (asyncio.CancelledError, GeneratorExit):

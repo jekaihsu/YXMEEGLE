@@ -31,6 +31,7 @@ def sdk_tool(app, client, monkeypatch, name, args):
     app.state.ai_providers = {'gpt': providers.GPT('fictional')}
     result = events(client.post('/api/ai/chat', json=dict(BODY, model='gpt')))
     assert result[-1]['type'] == 'done', result
+    sdk_tool.events = result
     done, = [e for e in result if e['type'] == 'tool' and e['status'] == 'done']
     projected = json.loads(requests[1]['input'][-1]['output'])
     return done.get('displays'), projected
@@ -117,6 +118,8 @@ def test_display_projector_failure_keeps_answer(app, client, monkeypatch, caplog
     displays, projected = sdk_tool(app, client, monkeypatch, 'case_owners', dict(case_id=pid))
     assert displays is None
     assert projected['pm']
+    texts = [e['delta'] for e in sdk_tool.events if e['type'] == 'text']
+    assert any('無法以表格或圖表顯示' in text for text in texts), 'the user is told when a display is missing'
     warnings = [r.getMessage() for r in caplog.records if 'ai_display' in r.getMessage()]
     assert warnings == ['ai_display tool=case_owners exception=ValueError']
 

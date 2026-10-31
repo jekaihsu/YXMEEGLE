@@ -24,7 +24,7 @@ export default function TokenDashboard(){
  const update=(next:Partial<Filters>)=>{const value={...filters,...next};setFilters(value);history.pushState(null,'',location.pathname+'?'+filterQuery(value))};
  const data=state.kind==='ready'?state.data:undefined;
  const feedback=data?.totals.feedback;
- const reasons=reasonSeries(data?.reasons);
+ const reasons=reasonSeries(data?.reasons,feedback?.down);
  return <main className="token-dashboard">
   <div className="td-heading"><div><p className="td-eyebrow">AI ASSISTANT / USAGE</p><h1>AI 助理用量</h1><p>查看同事的提問與 token 費用。時間以台北時區顯示。</p></div><span className="td-private">僅主管可見</span></div>
   <section className="td-filters" aria-label="用量篩選">

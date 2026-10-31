@@ -46,6 +46,8 @@ assert.deepEqual(m.reasonSeries({slow:2,wrong:3}),[
  {key:'slow',label:'太慢',value:2},{key:'other',label:'其他',value:0},{key:'unspecified',label:'未填寫',value:0}
 ]);
 assert.deepEqual(m.reasonSeries(undefined).map(row=>row.value),[0,0,0,0,0]);
+assert.equal(m.reasonSeries({slow:2,wrong:3},7).at(-1).value,2,'a legacy response without unspecified reconciles with the downvote total');
+assert.equal(m.reasonSeries({slow:2,unspecified:0},7).at(-1).value,0,'an explicit zero is kept');
 assert.deepEqual(m.sortPeople([{actor_id:'a',down:2},{actor_id:'b'},{actor_id:'c',down:10}],'down').map(row=>row.actor_id),['c','a','b']);
 assert.deepEqual(m.sortProviders([{provider:'claude',up:10},{provider:'gpt'}],'up','asc').map(row=>row.provider),['gpt','claude']);
 assert.equal(m.chartSeries([],{from:'2026-10-01',to:'2026-10-01'})[0].down,0);

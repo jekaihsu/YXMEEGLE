@@ -62,6 +62,9 @@ assert.match(document.querySelector('table.assistant-sr-only caption').textConte
 assert.equal(document.querySelector('.assistant-chart-point button').getAttribute('aria-label'),'查看規劃的圖表提示');
 assert.equal(document.querySelectorAll('table.assistant-sr-only tbody tr').length,4);
 assert.match(document.querySelector('.assistant-chart-headline').textContent,/規則推算62%/);
+await flush(()=>root.render(React.createElement(ui.Chart,{title:'進度',unit:'%',headline:{label:'整體進度',value:'未知'},points:[]})));
+assert.equal(document.querySelector('.assistant-chart-headline').textContent,'整體進度未知','a non-numeric headline does not get a percent sign');
+await flush(()=>root.render(React.createElement(ui.Chart,chartCaveats)));
 await flush(()=>document.querySelector('.assistant-chart-point button').focus());assert.match(document.querySelector('[role=tooltip]').textContent,/規劃 · 100%/);
 await flush(()=>document.querySelector('.assistant-chart-point button').dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.equal(document.querySelector('[role=tooltip]'),null);
 const css=await fs.readFile(new URL('./src/assistant/elements/elements.css',import.meta.url),'utf8');assert.match(css,/@container assistant-data/);

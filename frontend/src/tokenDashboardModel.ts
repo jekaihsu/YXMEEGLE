@@ -38,7 +38,11 @@ export const formatNumber = (value:number) => new Intl.NumberFormat('zh-TW',{max
 export const formatPercent = (value:number|null|undefined) => value==null?'尚無評分':new Intl.NumberFormat('zh-TW',{style:'percent',minimumFractionDigits:1,maximumFractionDigits:1}).format(value);
 export const satisfaction = (row:FeedbackCounts) => {const rated=(row.up??0)+(row.down??0);return formatPercent(rated?(row.up??0)/rated:null)};
 export const reasonLabels:Record<FeedbackReason,string> = {wrong:'答錯',incomplete:'不完整',slow:'太慢',other:'其他'};
-export function reasonSeries(reasons:Usage['reasons']) {return [...(Object.keys(reasonLabels) as FeedbackReason[]).map(key=>({key,label:reasonLabels[key],value:reasons?.[key]??0})),{key:'unspecified',label:'未填寫',value:reasons?.unspecified??0}]}
+export function reasonSeries(reasons:Usage['reasons'],down=0) {
+ const named=(Object.keys(reasonLabels) as FeedbackReason[]).map(key=>({key,label:reasonLabels[key],value:reasons?.[key]??0}));
+ const unspecified=reasons?.unspecified??Math.max(0,down-named.reduce((sum,item)=>sum+item.value,0));
+ return [...named,{key:'unspecified',label:'未填寫',value:unspecified}];
+}
 export function sortProviders(rows:Usage['by_provider'],key:'up'|'down',direction:'asc'|'desc') {return [...rows].sort((a,b)=>((a[key]??0)-(b[key]??0))*(direction==='asc'?1:-1)||a.provider.localeCompare(b.provider))}
 export const formatCost = (value:number|null) => value===null?'未計價':new Intl.NumberFormat('zh-TW',{style:'currency',currency:'USD',minimumFractionDigits:Math.abs(value)<1?4:2,maximumFractionDigits:Math.abs(value)<1?4:2}).format(value);
 export const formatTime = (value:string) => value?new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value)):'尚無紀錄';

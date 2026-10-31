@@ -105,6 +105,37 @@ def test_feedback_wait_for_ledger_off_loop(app, client, live_server, monkeypatch
     assert lookups == [uid, uid]
 
 
+def test_feedback_registration_outlives_a_slow_answer(app, client, live_server, monkeypatch):
+    import httpx
+    import json
+    import threading
+    from .ai import ledger, routes
+    entered, release = threading.Event(), threading.Event()
+    original = ledger.record
+    offset = [0]
+    real = routes.monotonic
+    monkeypatch.setattr(routes, 'monotonic', lambda: real() + offset[0])
+
+    def delayed(*args, **kwargs):
+        entered.set()
+        assert release.wait(5)
+        original(*args, **kwargs)
+    monkeypatch.setattr(ledger, 'record', delayed)
+    app.state.ai_providers = {'claude': Fake()}
+    with httpx.Client(base_url=live_server, cookies=dict(client.cookies.items())) as connection:
+        with connection.stream('POST', '/api/ai/chat', json=BODY) as response:
+            uid = next(json.loads(line[6:])['usage_id'] for line in response.iter_lines() if line.startswith('data: '))
+            assert entered.wait(2)
+            offset[0] = 45
+            timer = threading.Timer(.15, release.set)
+            timer.start()
+            try:
+                assert connection.post('/api/ai/feedback', json=dict(usage_id=uid, rating='up')).status_code == 200
+            finally:
+                release.set()
+                timer.join()
+
+
 def test_feedback_aggregation_and_rating_filters(app, client):
     from .ai.ledger import AiFeedbackRow
     from sqlalchemy import select

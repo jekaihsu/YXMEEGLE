@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.concurrency import run_in_threadpool
 
 from . import ledger
-from .agent import ChatRun
+from .agent import QUESTION_TIMEOUT_SECONDS, ChatRun
 from .catalog import ModelId, registry
 from .providers import ADAPTERS
 
@@ -75,6 +75,8 @@ class ChatResponse(StreamingResponse):
             await self.body_iterator.aclose()
             await self.run.finish()
 
+RUN_REGISTRATION_SECONDS = QUESTION_TIMEOUT_SECONDS + 60
+
 
 def register(app, *, identity, sessions, cfg):
     models = registry(cfg.get('AI_PRICE_TABLE_JSON'))
@@ -85,15 +87,15 @@ def register(app, *, identity, sessions, cfg):
     feedback_lock = asyncio.Lock()
     pending = {}
 
-    def remember(usage_id, entry):
-        entry.expires = monotonic() + 30
+    def remember(usage_id, entry, ttl):
+        entry.expires = monotonic() + ttl
         pending[usage_id] = entry
 
         def expire():
             if pending.get(usage_id) is entry and entry.expires <= monotonic():
                 del pending[usage_id]
 
-        asyncio.get_running_loop().call_later(30, expire)
+        asyncio.get_running_loop().call_later(ttl, expire)
     limit = int(cfg.get('AI_DAILY_TOKEN_LIMIT_PER_USER', '400000'))
 
     def authenticated(request: Request):
@@ -133,10 +135,10 @@ def register(app, *, identity, sessions, cfg):
 
         run = ChatRun(app, body, data, user, models[body.model], adapter, release)
         entry = PendingRun(key)
-        remember(run.usage_id, entry)
+        remember(run.usage_id, entry, RUN_REGISTRATION_SECONDS)
 
         def recorded():
-            remember(run.usage_id, entry)
+            remember(run.usage_id, entry, 30)
             entry.ready.set()
 
         run.recorded = recorded

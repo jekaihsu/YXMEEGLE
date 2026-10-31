@@ -84,7 +84,7 @@ for(const reasons of [{unspecified:3},undefined]){
  await flush(()=>{history.pushState(null,'',`?from=2026-10-01&to=2026-10-31&rating=${reasons?'up':'down'}`);window.dispatchEvent(new Event('popstate'))});
  await flush(()=>requests.at(-1).resolve(json({...feedbackFixture,reasons})));
  assert.match(document.querySelector('.td-reasons').textContent,/倒讚原因/);
- assert.equal(document.querySelector('.td-reasons li:last-child').textContent,`未填寫${reasons?3:0} 次`);
+ assert.equal(document.querySelector('.td-reasons li:last-child').textContent,`未填寫3 次`);
 }
 const countBeforeRange=requests.length;
 await flush(()=>{history.pushState(null,'','?from=2025-01-01&to=2026-10-31');window.dispatchEvent(new Event('popstate'))});

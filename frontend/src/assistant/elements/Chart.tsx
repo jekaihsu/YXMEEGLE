@@ -7,10 +7,11 @@ export function Chart({title,caption,truncated,note,unit='',headline,points}:Cha
  const max=Math.max(...points.map(p=>p.value),1),min=Math.min(...points.map(p=>p.value),0);
  const y=(value:number)=>height-pad-(value-min)/(max-min)*(height-pad*2);
  const step=(width-pad*2)/Math.max(points.length,1),baseline=y(0);
- const summary=`${title}${headline?`。${headline.label} ${headline.value}${unit}`:''}`;
+ const headlineUnit=headline&&/^-?\d+(\.\d+)?$/.test(String(headline.value))?unit:'';
+ const summary=`${title}${headline?`。${headline.label} ${headline.value}${headlineUnit}`:''}`;
  return <section data-slot="chart" className="assistant-chart" aria-labelledby={id}>
   <header className="assistant-element-heading"><h3 id={id}>{title}</h3>{caption&&<p>{caption}</p>}</header>
-  {headline&&<div className="assistant-chart-headline"><span>{headline.label}</span><strong>{headline.value}<small>{unit}</small></strong></div>}
+  {headline&&<div className="assistant-chart-headline"><span>{headline.label}</span><strong>{headline.value}<small>{headlineUnit}</small></strong></div>}
   <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={summary} preserveAspectRatio="none">
    <line x1={pad} x2={width-pad} y1={baseline} y2={baseline} className="assistant-chart-axis"/>
    {points.map((point,index)=><rect key={index} x={pad+index*step+step*.18} y={Math.min(y(point.value),baseline)} width={step*.64} height={Math.max(1,Math.abs(baseline-y(point.value)))} rx="3" className="assistant-chart-bar" data-active={active===index||undefined} onMouseEnter={()=>setActive(index)} onMouseLeave={()=>setActive(null)}/>) }
