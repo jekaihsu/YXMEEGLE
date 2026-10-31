@@ -145,7 +145,7 @@ def test_hr_and_case_permissions_apply_to_tools_and_sse(app, client):
     app.state.cfg['HR_VIEWERS'] = 'u-manager'
     cookie = '; '.join(f'{k}={v}' for k, v in client.cookies.items())
     assert client.get('/api/people/attendance').status_code == 403
-    result, error = asyncio.run(execute(app, cookie, 'attendance_today', {}))
+    result, error = asyncio.run(execute(app, cookie, 'attendance_today', {'range': 'today', 'date': None}))
     assert error and json.loads(result) == {'error': '你沒有權限查看出勤資料'}
     with app.state.sessions.begin() as db:
         root = db.get(WorkspaceRow, wid(app, client))
@@ -163,7 +163,7 @@ def test_hr_and_case_permissions_apply_to_tools_and_sse(app, client):
     assert error and '機密隱藏案件' not in result
     result, _ = asyncio.run(execute(app, cookie, 'search_cases', {'query': '機密隱藏案件'}))
     assert json.loads(result)['cases'] == []
-    app.state.ai_providers = {'claude': Fake(calls=[ToolCall('a', 'attendance_today', {}),
+    app.state.ai_providers = {'claude': Fake(calls=[ToolCall('a', 'attendance_today', {'range': 'today', 'date': None}),
         ToolCall('b', 'case_progress', {'case_id': hidden_id})])}
     response = client.post('/api/ai/chat', json=BODY)
     result = events(response)
@@ -182,8 +182,8 @@ def test_tool_deduplication_and_multistep_accounting(app, client, monkeypatch):
         await asyncio.sleep(.01)
         return '{"ok":true}', False
     monkeypatch.setattr('backend.ai.agent.execute', tool)
-    app.state.ai_providers = {'claude': Fake(calls=[ToolCall('a', 'attendance_today', {}),
-        ToolCall('b', 'attendance_today', {}), ToolCall('c', 'search_cases', {'query': 'a'})])}
+    app.state.ai_providers = {'claude': Fake(calls=[ToolCall('a', 'attendance_today', {'range': 'today', 'date': None}),
+        ToolCall('b', 'attendance_today', {'range': 'today', 'date': None}), ToolCall('c', 'search_cases', {'query': 'a'})])}
     result = events(client.post('/api/ai/chat', json=BODY))
     assert count == ['attendance_today', 'search_cases']
     assert result[-1]['usage'] == {'input_tokens': 120, 'output_tokens': 80}
@@ -268,7 +268,7 @@ def test_five_model_step_bound_and_cross_step_deduplication(app, client, monkeyp
     class Loop(Fake):
         async def stream(self, spec, system, messages, tools):
             yield Event('usage', Usage(1, 0, 0, 2))
-            yield Event('tool', ToolCall('a', 'attendance_today', {}))
+            yield Event('tool', ToolCall('a', 'attendance_today', {'range': 'today', 'date': None}))
             yield Event('stop', [{'type': 'tool_use', 'id': 'a', 'name': 'attendance_today', 'input': {}}])
     monkeypatch.setattr('backend.ai.agent.execute', tool)
     app.state.ai_providers = {'claude': Loop()}
@@ -288,7 +288,7 @@ def test_tool_timeout_becomes_safe_result(app, client, monkeypatch):
         await asyncio.sleep(1)
     monkeypatch.setattr('backend.ai.agent.asyncio.wait_for', short_timeout)
     monkeypatch.setattr('backend.ai.agent.execute', slow)
-    app.state.ai_providers = {'claude': Fake(calls=[ToolCall('a', 'attendance_today', {})])}
+    app.state.ai_providers = {'claude': Fake(calls=[ToolCall('a', 'attendance_today', {'range': 'today', 'date': None})])}
     result = events(client.post('/api/ai/chat', json=BODY))
     assert any(e['type'] == 'tool' and e['status'] == 'error' for e in result)
     assert '查詢逾時' in ''.join(e['delta'] for e in result if e['type'] == 'text')
