@@ -4,7 +4,7 @@ import httpx2
 import pytest
 from openai import AsyncOpenAI
 
-from .test_backend import app, client
+from .test_ai_database import app, client, ai_database_url
 from .test_ai_api import BODY, events, live_server
 from .test_ai_providers import wire
 from .test_p2_int_routes import http

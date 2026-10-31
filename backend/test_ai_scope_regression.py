@@ -1,7 +1,8 @@
 import asyncio
 import json
 
-from .test_backend import app, client, role
+from .test_ai_database import app, client, ai_database_url
+from .test_backend import role
 from .test_ai_api import live_server
 from .ai.tools import execute
 from .ai.project_context import build

@@ -10,7 +10,8 @@ import pytest
 import uvicorn
 from sqlalchemy import select
 
-from .test_backend import app, client, role, WorkspaceRow, BusinessRow, storage
+from .test_ai_database import app, client, ai_database_url
+from .test_backend import role, WorkspaceRow, BusinessRow, storage
 from .ai.catalog import Usage
 from .ai.ledger import AiUsageRow, today
 from .ai.providers import Claude, Event, ProviderError, ToolCall

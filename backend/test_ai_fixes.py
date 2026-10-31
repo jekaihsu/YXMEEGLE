@@ -1,6 +1,7 @@
 import asyncio
 
-from .test_backend import app, client, role
+from .test_ai_database import app, client, ai_database_url
+from .test_backend import role
 from .test_ai_api import BODY, Fake, events, rows, live_server
 from .ai.providers import Event
 from .test_tenant_read_views import tenant_views

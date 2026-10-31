@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from .test_backend import app, client
+from .test_ai_database import app, client, ai_database_url
 from .test_ai_attendance import attendance_route, call
 from .test_ai_tools import tool
 from .ai.tools import ATTENDANCE_LABELS

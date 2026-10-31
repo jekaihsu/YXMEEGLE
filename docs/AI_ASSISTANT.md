@@ -148,3 +148,9 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
 | 基本案件路由 5xx、逾時或非預期例外 | 503 | ai_upstream | 可重試，顯示「助理暫時無法回答，請稍後重試」 |
 
 兩種建置失敗都發生在模型呼叫及帳本註冊之前，因此沒有模型呼叫與 ledger 列。503 產生結構化 warning `ai_context_failed`，只含案件 id 雜湊、狀態碼、例外類別與耗時，不含 cookie 或內容。次要區段不可讀時仍以 unavailable 交代缺口。
+
+## 部署
+
+啟動時會自動補齊 `ai_usage` 在首次部署後新增的 `scope` 與 `project_id` 欄位。既有資料的 `scope` 預設為 `global`，`project_id` 為 `NULL`。`scripts/migrate_ai_usage.py` 仍可作為選用的手動遷移工具。
+
+執行真實 PostgreSQL 回歸測試（需非 root 帳號及 PostgreSQL 工具）使用 `PATH=/opt/homebrew/bin:$PATH /tmp/ai-backend-venv/bin/python scripts/test_action_audit_postgres.py --ai`。runner 建立暫存 cluster、私有 Unix socket 與隨機 port，結束時清除。測試逐一隔離 schema，同時執行 SQLite 與 PostgreSQL，並比較相同資料的用量 JSON。整個後端測試使用相同命令加上 `backend -q -ra`。未設 `AI_TEST_POSTGRES_URL` 的一般 pytest 會明確跳過 PostgreSQL 案例。
