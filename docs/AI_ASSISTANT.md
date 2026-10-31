@@ -71,7 +71,7 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
   "messages": [ { "role": "user", "content": "今天誰遲到？" } ] }
 ```
 
-限制：`model` 必須是 `claude` 或 `gpt`；最多 20 則訊息，每則最多 4000 字；最後一則必須是 `user`。多餘欄位一律 422。
+限制：`model` 必須是 `claude` 或 `gpt`；最多 20 則訊息，`user` 每則最多 4000 字，`assistant` 每則最多 20000 字；最後一則必須是 `user`。多餘欄位一律 422。
 
 回應 `text/event-stream`，每個事件一行 `data: <json>` 加空行。型別如下。
 
@@ -87,14 +87,14 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
 
 ### `GET /api/ai/usage`（僅 `manager`，其他人 403）
 
-查詢參數：`from`、`to`（`YYYY-MM-DD`，含頭尾，預設近 30 天）、`actor`（`actor_id`，可省略）、`provider`（可省略）。
+查詢參數：`from`、`to`（`YYYY-MM-DD`，含頭尾，預設近 30 天，含頭尾最多 366 天，超過回傳 422）、`actor`（`actor_id`，可省略）、`provider`（可省略）。
 
 ```json
 { "range": { "from": "2026-10-01", "to": "2026-10-31" },
   "totals": { "questions": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "unpriced_calls": 0 },
-  "by_person": [ { "actor_id": "", "name": "", "questions": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "last_at": "ISO" } ],
+  "by_person": [ { "actor_id": "", "name": "", "questions": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "unpriced_calls": 0, "last_at": "ISO" } ],
   "by_day": [ { "day": "2026-10-31", "questions": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0 } ],
-  "by_provider": [ { "provider": "claude", "questions": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0 } ],
+  "by_provider": [ { "provider": "claude", "questions": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "unpriced_calls": 0 } ],
   "people": [ { "actor_id": "", "name": "" } ],
   "recent": [ { "created_at": "ISO", "actor_id": "", "name": "", "provider": "claude", "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "latency_ms": 0, "status": "ok" } ] }
 ```
@@ -109,9 +109,23 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
 
 | 工具 | 底層既有 API | 回傳重點 |
 | --- | --- | --- |
-| `search_cases` | `GET /api/projects?q=` | 案件 id、編號、名稱、客戶、階段、PM |
-| `case_progress` | `GET /api/projects/{id}/progress` | 階段、節點完成數與百分比、`as_of`、缺口 |
-| `case_owners` | 專案 PM 與節點指派 API | PM、各節點負責人 |
-| `attendance_today` | `GET /api/people/attendance` | 今天（Asia/Taipei）的遲到、缺卡、請假／出差／外出、無紀錄名單，加 `as_of` 與資料是否完整 |
+| `search_cases` | `GET /api/projects?q=` | 最多 8 筆案件 id、編號、名稱、狀態、PM id、到期日及總筆數；來源有 `as_of` 時保留 |
+| `case_progress` | `GET /api/projects/{id}/progress` | 階段與 `basis` 證據強度、節點完成數與百分比、`as_of`、缺口 |
+| `case_owners` | `GET /api/case-detail/{id}` 與啟用時的節點指派 API | PM id 與姓名；無姓名為 `name_unavailable`；節點未啟用或無權限時 `nodes:null` 並明示 `node assignment data unavailable` |
+| `attendance_today` | `GET /api/people/attendance` | 今天（Asia/Taipei）的遲到、早退、缺卡、免打卡、補卡／修正、請假／出差／外出、無紀錄名單，加 `as_of` 與資料是否完整 |
 
 出勤只有「遲到、缺卡、請假、出差、外出、到班」等證據標籤，沒有明確的缺勤判定。助理必須說「尚無打卡紀錄」，不可斷定「缺席」。
+
+## 執行與資料限制
+
+每日配額與每人同時兩個提問是軟限制。併發限制只在單一 web process 內有效；每日用量讀取 ledger，但檢查與寫入不保留額度，多個 process 或同時請求可能超額。
+
+整題期限預設 120 秒，可用 `AI_QUESTION_TIMEOUT_SECONDS` 設定。逾時回傳 `ai_upstream` 並說明逾時。中止、錯誤或逾時且該步無最終用量時，以序列化 system、tools、messages 字數除二向上取整估算輸入，以已串流文字字數估算輸出；不低於已有用量。ledger 的 `error_code` 為 `usage_estimated`，費用照估算量計算。ledger 在背景執行緒寫入，失敗重試一次，每題僅一列。
+
+兩個模型輸出上限皆為 16000 token，含推理。因長度截斷時仍是 `ok`，最後追加「（回答太長，已截斷）」。
+
+所有 `/api/ai/*` 權限拒絕均為 HTTP 403 的 `{code:"ai_forbidden", message}`。不擴大 tenant 讀取 allowlist。
+
+`by_person`、`by_provider` 亦回傳 `unpriced_calls`。姓名取查詢範圍內該人最新一列，不取字典排序最大值。
+
+`attendance_today` 的 `labelled_arrival_count` 只計算標籤「到班」，不代表實際在場人數。`early_leave`、`exempt`、`supplemented` 分別為早退、免打卡、補卡／修正。任何人無紀錄均為 `incomplete:true`。工具過長時刪除完整項目並回傳 `truncated:true`，助理必須說明名單僅部分資料。`basis=rule` 是規則推導，不代表經查證完成。
