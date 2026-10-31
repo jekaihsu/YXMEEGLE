@@ -61,9 +61,17 @@ async def attendance(reader, args):
     return {'day': day, 'view': await reader.get('/api/people/attendance', week=day)}
 
 
+def search_notice(data):
+    count = len(data.get('cases', []))
+    if data.get('total', count) > count:
+        return dict(truncated=True, note=f'共 {data["total"]} 筆，僅列出 {count} 筆')
+    return {}
+
+
 def project_search(value):
-    return {**pick(value, 'as_of'), 'total': value['total'], 'cases': [pick(p, 'id', 'code', 'name', 'status', 'pm_id', 'due_date')
+    data = {**pick(value, 'as_of'), 'total': value['total'], 'cases': [pick(p, 'id', 'code', 'name', 'status', 'pm_id', 'due_date')
                                               for p in value['items']]}
+    return {**data, **search_notice(data)}
 
 
 PRODUCTION = ('field', 'control', 'mapping', 'report')
@@ -175,6 +183,8 @@ async def execute(app, cookie, name, args):
             if not lists:
                 return json.dumps({'error': '資料過長', 'truncated': True}, ensure_ascii=False), True
             max(lists, key=lambda v: len(json.dumps(v, ensure_ascii=False))).pop()
+            if name == 'search_cases':
+                data.update(search_notice(data))
             result = json.dumps(data, ensure_ascii=False)
         return result, False
     except ReadDenied as exc:
@@ -206,8 +216,10 @@ def display_chart(title, points, data, **extra):
 
 
 def display_search(data):
+    data = {**data, **search_notice(data)}
+    extra = {'note': data['note']} if data.get('note') else {}
     return [display_table('案件搜尋結果', [('code', '案號'), ('name', '案名'), ('status', '狀態'),
-        ('pm_id', 'PM'), ('due_date', '交期')], data.get('cases', []), data)]
+        ('pm_id', 'PM'), ('due_date', '交期')], data.get('cases', []), data, **extra)]
 
 
 def display_owners(data):
@@ -226,18 +238,18 @@ def display_progress(data):
     unknown = 0
     for stage in data.get('stages', []):
         node = data.get('nodes', {}).get(stage['key'], {})
-        percent = node.get('percent')
-        if percent is None:
-            percent = 100 if stage['state'] == 'done' else 0 if stage['state'] in ('active', 'waiting') and stage['basis'] != 'none' else None
+        percent = 100 if stage['state'] == 'done' else node.get('percent')
         if percent is None:
             unknown += 1
             continue
         points.append(dict(label=stage['label'][:240], value=float(percent)))
         bases.add(stage['basis'])
     basis = '、'.join(text for key, text in [('rule', '規則推算'), ('source', '來源證據')] if key in bases)
-    headline = dict(label=f'整體（已知階段平均；{basis or "無資料基礎"}；{unknown} 階段未知）',
-                    value=f'{sum(p["value"] for p in points) / len(points):.1f}%' if points else '未知')
-    return [display_chart('案件階段完成百分比', points, data, unit='%', headline=headline)]
+    headline = dict(label=f'整體（已知階段平均；{basis or "無資料基礎"}；另有 {unknown} 個階段進度未知）',
+                    value=f'{sum(p["value"] for p in points) / len(points):.1f}' if points else '未知')
+    note = '；'.join(g['message_zh'] for g in data.get('gaps', []) if g.get('message_zh'))
+    return [display_chart('案件階段完成百分比', points, data, unit='%', headline=headline,
+                          **({'note': note} if note else {}))]
 
 
 ATTENDANCE_LABELS = {'late': '遲到', 'missing_punch': '缺卡', 'leave': '請假', 'trip': '出差',

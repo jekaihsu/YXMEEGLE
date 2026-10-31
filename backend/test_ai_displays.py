@@ -7,6 +7,8 @@ from openai import AsyncOpenAI
 from .test_backend import app, client
 from .test_ai_api import BODY, events, live_server
 from .test_ai_providers import wire
+from .test_p2_int_routes import http
+from .test_project_progress import progress
 from .ai import providers
 from .ai.tools import display_table, display_chart
 
@@ -31,7 +33,7 @@ def sdk_tool(app, client, monkeypatch, name, args):
     assert result[-1]['type'] == 'done', result
     done, = [e for e in result if e['type'] == 'tool' and e['status'] == 'done']
     projected = json.loads(requests[1]['input'][-1]['output'])
-    return done['displays'], projected
+    return done.get('displays'), projected
 
 
 def test_search_real_route_sdk_sse(app, client, monkeypatch):
@@ -58,10 +60,12 @@ def test_progress_real_route_sdk_sse(app, client, monkeypatch):
     displays, projected = sdk_tool(app, client, monkeypatch, 'case_progress', dict(case_id=pid))
     assert projected['as_of'] == source['as_of']
     assert displays == [dict(kind='chart', title='案件階段完成百分比', variant='bars', unit='%',
-        points=[dict(label='業務', value=100.0), dict(label='PM', value=0.0), dict(label='確認單', value=0.0),
-                dict(label='外業', value=0.0), dict(label='控制', value=0.0), dict(label='圖資', value=0.0), dict(label='報告', value=0.0)],
+        points=[dict(label='業務', value=100.0)],
         truncated=False, caption='截至 ' + source['as_of'],
-        headline=dict(label='整體（已知階段平均；規則推算；0 階段未知）', value='14.3%'))]
+        headline=dict(label='整體（已知階段平均；規則推算；另有 6 個階段進度未知）', value='100.0'),
+        note='；'.join(g['message_zh'] for g in projected['gaps']))]
+    assert projected['gaps']
+    assert all(stage['state'] in ('active', 'waiting') for stage in projected['stages'][1:])
 
 
 def test_display_caps_and_scalar_cells():
@@ -100,3 +104,75 @@ def test_curl_real_app_sse_feedback(app, client, live_server):
     print('data: ' + json.dumps(done, ensure_ascii=False))
     print('$ curl -b "$SESSION" -H "Content-Type: application/json" --data \'{"usage_id":"' + uid + '","rating":"up"}\' ' + live_server + '/api/ai/feedback')
     print(feedback)
+
+
+def test_display_projector_failure_keeps_answer(app, client, monkeypatch, caplog):
+    from .ai import tools
+
+    def broken(data):
+        raise ValueError('private source content')
+
+    monkeypatch.setitem(tools.DISPLAY_PROJECTORS, 'case_owners', broken)
+    pid = client.get('/api/projects').json()['items'][0]['id']
+    displays, projected = sdk_tool(app, client, monkeypatch, 'case_owners', dict(case_id=pid))
+    assert displays is None
+    assert projected['pm']
+    warnings = [r.getMessage() for r in caplog.records if 'ai_display' in r.getMessage()]
+    assert warnings == ['ai_display tool=case_owners exception=ValueError']
+
+
+def test_search_partial_real_route_sdk_sse(app, client, monkeypatch):
+    from copy import deepcopy
+    from .test_backend import WorkspaceRow, BusinessRow, storage
+    wid = app.state.signer.loads(client.cookies.get('meegle_session'))['wid']
+    with app.state.sessions.begin() as db:
+        row = db.get(WorkspaceRow, wid)
+        state = storage.load(db, BusinessRow, row)
+        template = state['projects'][0]
+        for i in range(12):
+            state['projects'].append(dict(deepcopy(template), id=f'ai-partial-{i}', code=f'AI-PARTIAL-{i}',
+                                          nodes=[], quotes=[], daily_reports=[], changes=[]))
+        row.data = storage.save(db, BusinessRow, wid, state)
+    source = client.get('/api/projects?q=AI-PARTIAL&limit=8').json()
+    assert source['total'] == 12 and len(source['items']) == 8
+    displays, projected = sdk_tool(app, client, monkeypatch, 'search_cases', dict(query='AI-PARTIAL'))
+    assert projected['truncated'] is True
+    assert projected['note'] == '共 12 筆，僅列出 8 筆'
+    assert displays[0]['truncated'] is True
+    assert displays[0]['note'] == projected['note']
+    assert len(displays[0]['rows']) == 8
+
+
+def test_prompt_repeats_display_caveats():
+    from .ai.prompts import system_prompt
+    prompt = system_prompt()
+    assert 'note' in prompt and '自己的話' in prompt
+    assert '部分資料' in prompt and 'truncated=true' in prompt
+    assert 'as_of' in prompt and '不可捏造時間' in prompt
+    assert 'gaps' in prompt and '摘要' in prompt
+
+
+@pytest.mark.parametrize('truncated', [False, True])
+def test_progress_known_percent_and_gaps_real_route(progress, monkeypatch, truncated):
+    from .test_project_progress import chain_state, set_points
+    run, client, app = progress
+    state, pid, _ = chain_state()
+    set_points(state, pid, '外業', [('10', '0'), ('20', '5'), ('4', '4')])
+    state['derived_plan'][pid]['truncated'] = truncated
+    assert run(state, pid).status_code == 200
+    app.state.reports._refresh_error = True
+    source = client.get('/api/projects/' + pid + '/progress').json()
+    assert 'reports_stale' in {g['id'] for g in source['gaps']}
+    displays, projected = sdk_tool(app, client, monkeypatch, 'case_progress', dict(case_id=pid))
+    chart, = displays
+    expected = [dict(label='業務', value=100.0), dict(label='PM', value=100.0), dict(label='確認單', value=100.0)]
+    if not truncated:
+        expected.append(dict(label='外業', value=73.5))
+    assert chart['points'] == expected
+    assert chart['headline'] == dict(
+        label='整體（已知階段平均；規則推算' + ('；另有 4' if truncated else '、來源證據；另有 3') + ' 個階段進度未知）',
+        value='100.0' if truncated else '93.4')
+    assert chart['note'] == '；'.join(g['message_zh'] for g in projected['gaps'])
+    assert '週報快照已過期，等待重新讀取' in chart['note']
+    if truncated:
+        assert '合約規劃項目過多，清單已截斷' in chart['note']

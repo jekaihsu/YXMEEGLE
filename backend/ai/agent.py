@@ -164,7 +164,10 @@ class ChatRun:
                     label = TOOLS[call.name].label if call.name in TOOLS else '查詢資料'
                     event = dict(type='tool', id=call.id, name=call.name, label=label, status='error' if error else 'done')
                     if not error:
-                        event['displays'] = displays(call.name, result)
+                        try:
+                            event['displays'] = displays(call.name, result)
+                        except Exception as exc:
+                            logger.warning('ai_display tool=%s exception=%s', call.name, type(exc).__name__)
                     yield sse(event)
                 self.adapter.continue_with(messages, content, calls, outputs)
             raise ProviderError()
