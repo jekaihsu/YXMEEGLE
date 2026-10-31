@@ -72,6 +72,16 @@ assert.equal(document.querySelectorAll('.assistant-suggestions button').length,4
 await flush(()=>document.querySelectorAll('.assistant-suggestions button')[2].click());assert.equal(document.querySelector('textarea').value,'請查詢案件進度：');
 await flush(()=>document.querySelectorAll('.assistant-suggestions button')[0].click(),80);assert.match(document.body.textContent,/今天尚無遲到紀錄/);assert.equal(document.querySelectorAll('.assistant-table table tbody tr').length,1);
 assert.equal(document.querySelector('[role=log]').getAttribute('aria-live'),'off');assert.equal(document.querySelector('[role=log]').contains(document.querySelector('.assistant-completion')),false,'the completion status sits outside the log so it is not announced twice');assert.equal(document.querySelector('[role=log]').contains(document.querySelector('[data-slot=scroll-anchor]')),false);assert.match(document.querySelector('.assistant-completion').textContent,/回答完成/);
+const viewport=document.querySelector('[role=log]'),scrollButton=document.querySelector('[data-slot=scroll-anchor]');
+Object.defineProperties(viewport,{scrollHeight:{value:1000,configurable:true},clientHeight:{value:400,configurable:true}});
+for(const [distance,hidden] of [[0,true],[12,true],[80,true],[81,false],[300,false],[0,true]]){
+ viewport.scrollTop=600-distance;
+ await flush(()=>viewport.dispatchEvent(new window.Event('scroll')));
+ assert.equal(scrollButton.hidden,hidden,`scroll control at ${distance}px from bottom`);
+}
+let scrollTarget;viewport.scrollTo=target=>{scrollTarget=target};
+viewport.scrollTop=0;await flush(()=>viewport.dispatchEvent(new window.Event('scroll')));
+await flush(()=>scrollButton.click());assert.deepEqual(scrollTarget,{top:1000,behavior:'smooth'});
 assert.equal(document.querySelectorAll('.assistant-message img').length,0,'markdown images render no image element');
 assert.match(document.body.textContent,/private alt/);
 assert.equal(document.querySelector('.assistant-message iframe'),null,'raw HTML stays escaped');

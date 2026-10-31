@@ -59,11 +59,23 @@ function MessageLog({children}:{children:ReactNode}){
   return '';
  });
  const [outcomeId,outcomeText]=outcome.split('|');
+ const viewport=useRef<HTMLDivElement>(null),messages=useRef<HTMLDivElement>(null);
+ const [away,setAway]=useState(false);
+ useEffect(()=>{
+  const element=viewport.current!;
+  const update=()=>setAway(element.scrollHeight-element.clientHeight-element.scrollTop>80);
+  element.addEventListener('scroll',update,{passive:true});
+  const observer=new ResizeObserver(update);
+  observer.observe(element);observer.observe(messages.current!);update();
+  return()=>{element.removeEventListener('scroll',update);observer.disconnect()};
+ },[]);
  return <>
-  <ThreadPrimitive.Viewport data-slot="aui_thread-viewport" className="assistant-viewport" autoScroll role="log" aria-live="off" aria-busy={running}>
-   {children}<ThreadPrimitive.Messages components={{UserMessage,AssistantMessage}}/>
-   <ThreadPrimitive.ScrollToBottom asChild><Button data-slot="scroll-anchor" className="assistant-bottom">回到最新回答</Button></ThreadPrimitive.ScrollToBottom>
+  <div className="assistant-scroll-region">
+  <ThreadPrimitive.Viewport ref={viewport} data-slot="aui_thread-viewport" className="assistant-viewport" autoScroll role="log" aria-live="off" aria-busy={running}>
+   <div ref={messages}>{children}<ThreadPrimitive.Messages components={{UserMessage,AssistantMessage}}/></div>
   </ThreadPrimitive.Viewport>
+  <Button hidden={!away} data-slot="scroll-anchor" className="assistant-bottom" onClick={()=>viewport.current!.scrollTo({top:viewport.current!.scrollHeight,behavior:'smooth'})}>回到最新回答</Button>
+  </div>
   <div className="assistant-completion" role="status">{!running&&outcomeText&&<span key={outcomeId}>{outcomeText}</span>}</div>
  </>;
 }
