@@ -24,7 +24,8 @@ def test_staged_app_and_catalog_work_without_repository_fallback(tmp_path, monke
     app=create_app({'DATABASE_URL':f'sqlite:///{tmp_path}/identity.db','UPLOAD_DIR':str(tmp_path/'uploads'),'APP_ENV':'development','DEMO_MODE':'true'})
     assert TestClient(app).get('/api/health').json()['build']==identity
     assert (stage / 'backend' / 'sop_import' / 'catalog.json').is_file()
-    for script in ('migrate_index_tables.py', 'backfill_index.py'):
+    assert (stage / 'backend' / 'ai' / 'routes.py').is_file()
+    for script in ('migrate_index_tables.py', 'backfill_index.py', 'migrate_ai_usage.py'):
         import subprocess, sys
         result = subprocess.run([sys.executable, '-B', str(stage / 'scripts' / script), '--help'],
                                 cwd=tmp_path, capture_output=True, text=True)

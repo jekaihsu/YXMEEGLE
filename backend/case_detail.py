@@ -382,7 +382,7 @@ def build_case_detail(state, project_id, *, confirmation_key=None, as_of=None, s
         'other_versions': [{'key': f"confirmation:{c['id']}", 'code': _text(c.get('code'))}
                            for c in versions if c is not selected],
         'admission': {**admission, 'explanation': admission.get('execution_readonly_reason') or 'admitted'},
-        'pm': _person(state, project.get('pm_id')), 'responsible_person': responsible,
+        'pm': {'id': project.get('pm_id'), **_person(state, project.get('pm_id'))}, 'responsible_person': responsible,
         'current_stage': stage,
         'dates': {
             'effective_approved': {'state': 'unknown', 'reason': 'VCC-123 deadline provenance unresolved'},
