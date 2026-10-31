@@ -56,7 +56,7 @@
 
 ## 後端執行細節
 
-案件脈絡沿用 case-detail、progress 與 node-assignments 路由及工具投影。基本資料只保留案件 id、案名、案號與目前階段，另保留已授權的期限與阻礙。不載入金額、合約列或來源連結。現有路由沒有最近變更清單，因此以 `recent_changes.unavailable` 明示無法取得。
+案件脈絡沿用 case-detail、progress 與 node-assignments 路由及工具投影。基本資料只保留案件 id、案名、案號與目前階段，另保留已授權的期限與阻礙。不載入金額、合約列或來源連結。最近變更使用 case-detail 的 history 區段，只保留確認版本、修訂、替換時間、事件 id、動作與時間，以及資料新鮮度。區段無法讀取時保留狀態與原因，缺少區段時以 `recent_changes.unavailable` 明示無法取得。
 
 基本資料讀取失敗（含 5xx）在模型呼叫前回傳相同的 HTTP 403 `ai_forbidden`，不寫帳、不註冊可評分的提問。進度失敗以 `progress.unavailable` 表示；節點指派未啟用、讀取失敗或無權限時保留 `nodes:null` 與 `node assignment data unavailable`。
 

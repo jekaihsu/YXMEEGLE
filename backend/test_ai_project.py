@@ -255,3 +255,53 @@ def test_context_shared_build_survives_waiter_cancellation(app, client, monkeypa
         assert json.loads(context.json)['project']['id'] == pid
         assert len(reads) == 2
     asyncio.run(run())
+
+
+def test_context_includes_available_recent_history_from_real_route(app, client):
+    from .ai.project_context import build
+    pid = project(client)
+    with app.state.sessions.begin() as db:
+        root = db.get(WorkspaceRow, wid(app, client))
+        state = storage.load(db, BusinessRow, root)
+        state['events'].append(dict(id='recent-event', project_id=pid, action='task_complete',
+            created_at='2026-10-31T08:00:00+08:00', amount=987654321))
+        root.data = storage.save(db, BusinessRow, root.id, state)
+    detail = client.get('/api/case-detail/' + pid).json()
+    source = detail['sections']['history']
+    assert any(r.get('event_id') == 'recent-event' for r in source['rows'])
+    context = asyncio.run(build(app, cookie(client), pid))
+    history = json.loads(context.json)['recent_changes']
+    assert history['rows'] == source['rows']
+    assert history['source_time'] == source['source_time']
+    assert '987654321' not in context.json
+
+
+def test_context_node_unavailable_from_real_503_route(app, client, monkeypatch):
+    from fastapi.testclient import TestClient
+    from .app import create_app
+    from .node_assignment.errors import Failure
+    from .ai.project_context import build
+    enabled = create_app({**app.state.cfg, 'NODE_ASSIGNMENT_ENABLED': 'true'})
+    connection = TestClient(enabled, cookies=dict(client.cookies.items()))
+    def unavailable(ctx):
+        raise Failure('lark_unavailable', 'Lark unavailable')
+    monkeypatch.setattr(enabled.state.node_assignment, 'overview', unavailable)
+    assert connection.get('/api/projects/p1/node-assignments').status_code == 503
+    context = asyncio.run(build(enabled, cookie(connection), 'p1'))
+    owners = json.loads(context.json)['owners']
+    assert owners['pm']['id'] and owners['nodes'] is None
+    assert owners['node_assignment_status'] == 'node assignment data unavailable'
+
+
+def test_context_history_read_failed_is_explicitly_unavailable(app, client, monkeypatch):
+    from .ai.project_context import build
+    from .ai.tools import Reader
+    original = Reader.get
+    async def read(self, path, **params):
+        result = await original(self, path, **params)
+        if path.startswith('/api/case-detail/'):
+            result['sections']['history'].update(states=['read_failed'], rows=[], reason='section_build_failed')
+        return result
+    monkeypatch.setattr(Reader, 'get', read)
+    context = asyncio.run(build(app, cookie(client), project(client)))
+    assert json.loads(context.json)['recent_changes']['unavailable'] == 'recent changes unavailable'

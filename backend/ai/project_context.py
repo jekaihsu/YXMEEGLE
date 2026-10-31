@@ -66,11 +66,19 @@ async def build(app, cookie, project_id):
                        for key in ('effective_approved', 'estimated') if key in dates},
                     'pending_requested': [pick(d, 'approval_id', 'requested_due_date', 'task_key', 'status')
                                           for d in dates.get('pending_requested', [])]}
+                history = detail.get('sections', {}).get('history')
+                changes = {'unavailable': 'recent changes unavailable'} if history is None else {
+                    **pick(history, 'states', 'freshness', 'reason'),
+                    'source_time': pick(history.get('source_time', {}), 'value', 'basis', 'fetched_at'),
+                    'rows': [pick(row, 'confirmation_key', 'revision', 'replaced_at', 'event_id', 'action', 'created_at')
+                             for row in history.get('rows', [])]}
+                if history and 'read_failed' in history.get('states', []):
+                    changes['unavailable'] = 'recent changes unavailable'
                 data = dict(project=dict(id=project_id, **pick(header, 'project_name', 'case_number'),
                     current_stage=pick(header.get('current_stage', {}), 'state', 'node_id', 'label', 'reason')),
                     owners=owner_data, progress=progress, dates=date_data,
                     blockers=pick(header['blockers'], 'items', 'states') if 'blockers' in header else {'unavailable': 'blockers unavailable'},
-                    recent_changes={'unavailable': 'recent changes unavailable'})
+                    recent_changes=changes)
                 return ProjectContext(compact(data), monotonic() + 90)
     except TimeoutError:
         raise ReadDenied('找不到或沒有權限查看這個案件') from None
