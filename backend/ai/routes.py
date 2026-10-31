@@ -15,7 +15,7 @@ from . import ledger
 from .agent import QUESTION_TIMEOUT_SECONDS, ChatRun
 from .catalog import ModelId, registry
 from .providers import ADAPTERS
-from .project_context import ProjectContextCache
+from .project_context import ProjectContextCache, ContextUnavailable
 from .tools import ReadDenied, valid_case_id
 
 
@@ -154,6 +154,9 @@ def register(app, *, identity, sessions, cfg):
             except ReadDenied:
                 release()
                 return JSONResponse({'code': 'ai_forbidden', 'message': '找不到或沒有權限查看這個案件'}, status_code=403)
+            except ContextUnavailable:
+                release()
+                return JSONResponse({'code': 'ai_upstream', 'message': '助理暫時無法回答，請稍後重試'}, status_code=503)
             except BaseException:
                 release()
                 raise
