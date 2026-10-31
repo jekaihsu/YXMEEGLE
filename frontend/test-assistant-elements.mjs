@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
+import {Simulate} from 'react-dom/test-utils';
 import {createRoot} from 'react-dom/client';
 import {useLocalRuntime,AssistantRuntimeProvider} from '@assistant-ui/react';
 const bundle=await build({stdin:{contents:"export {createFeedbackController} from './src/assistant/feedback';export {readEvents} from './src/assistant/stream';export {createChatAdapter} from './src/assistant/runtime';export {fixtureSSE,fixtureDisplays,fixtureEvents} from './src/assistant/fixtures';export {DataTable} from './src/assistant/elements/DataTable';export {Chart} from './src/assistant/elements/Chart';export {default as Assistant} from './src/Assistant';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
@@ -107,6 +108,8 @@ await flush(()=>resolveFeedback(json({rating:'none'})));assert.equal(down().getA
 await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='新對話').click(),40);
 failed=true;await flush(()=>document.querySelector('.assistant-suggestions button').click(),80);
 assert.equal(up(),null);assert.equal(down(),null);assert.match(document.body.textContent,/AI 服務暫時無法回應/);
+await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='新對話').click(),40);failed=false;await flush(()=>document.querySelector('.assistant-suggestions button').click(),80);await flush(()=>down().click());await flush(()=>resolveFeedback(json({rating:'down'})));const answer=document.querySelector('[data-role=assistant]');const reasons=document.querySelector('.assistant-feedback-reasons');assert.ok(reasons);globalThis.fetch=async()=>json({code:'ai_forbidden'},403);await flush(()=>{const input=document.querySelector('textarea');Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set.call(input,'下一題');Simulate.change(input)});
+await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='送出').click(),80);assert.equal(document.querySelector('textarea').disabled,true);assert.equal(document.querySelector('[data-role=assistant]')===answer,true,'forbidden flag keeps previous message mounted');assert.equal(document.querySelector('.assistant-feedback-reasons')===reasons,true,'open feedback stays mounted');
 await flush(()=>root.unmount());
 let runtime,feedback,finishRun;
 function Harness(){

@@ -2,12 +2,13 @@ import {useEffect,useId,useRef,useState,type ComponentType} from 'react';
 import {createPortal} from 'react-dom';
 import {MessageCircle,X} from 'lucide-react';
 import {api} from '../api';
-import {Button} from '../design';
+import {Button,DisabledActionReasons} from '../design';
+import type {ModelCatalog} from './ModelSelector';
 import type {AssistantChatProps} from './AssistantChat';
 import './ProjectChatLauncher.css';
 
 type Props={projectId:string;projectCode:string;projectName:string};
-type ChatState={status:'idle'|'loading'|'unavailable'|'error'}|{status:'ready';Chat:ComponentType<AssistantChatProps>};
+type ChatState={status:'idle'|'loading'|'unavailable'|'error'}|{status:'ready';Chat:ComponentType<AssistantChatProps>;catalog:ModelCatalog};
 const focusable='button:not(:disabled),textarea:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],[tabindex="0"]';
 
 export function ProjectChatLauncher(props:Props){
@@ -30,11 +31,11 @@ function ProjectChat({projectId,projectCode,projectName}:Props){
  const load=async()=>{
   request.current?.abort();const controller=new AbortController();request.current=controller;setState({status:'loading'});
   try{
-   const catalog=await api<{models:{available:boolean}[]}>('/api/ai/models',{signal:controller.signal});
+   const catalog=await api<ModelCatalog>('/api/ai/models',{signal:controller.signal});
    if(controller.signal.aborted)return;
    if(!catalog.models.some(model=>model.available)){setState({status:'unavailable'});return}
    const {AssistantChat}=await import('./AssistantChat');
-   if(!controller.signal.aborted)setState({status:'ready',Chat:AssistantChat});
+   if(!controller.signal.aborted)setState({status:'ready',Chat:AssistantChat,catalog});
   }catch{if(!controller.signal.aborted)setState({status:'error'})}
  };
  useEffect(()=>{
@@ -47,6 +48,10 @@ function ProjectChat({projectId,projectCode,projectName}:Props){
   const observer=new MutationObserver(()=>{if(focusComposer())observer.disconnect()});
   if(!focusComposer())observer.observe(element,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled']});
   const keydown=(event:KeyboardEvent)=>{
+   if(event.defaultPrevented||event.isComposing||event.keyCode===229)return;
+   const target=event.target;
+   if(!(target instanceof Node)||(!element.contains(target)&&target!==launcher.current))return;
+   if(target instanceof Element&&target.closest('[role=dialog]')!==element&&target!==launcher.current)return;
    if(event.key==='Escape'){event.preventDefault();setOpen(false)}
    if(!mobile||event.key!=='Tab')return;
    const items=Array.from(element.querySelectorAll<HTMLElement>(focusable)).filter(item=>!item.closest('[hidden]'));
@@ -69,13 +74,13 @@ function ProjectChat({projectId,projectCode,projectName}:Props){
  },[open,mobile]);
  return <>
   <button ref={launcher} type="button" className="project-chat-launcher" hidden={state.status==='unavailable'} data-open={open} aria-label="AI 助理，詢問這個案件" aria-expanded={open} aria-controls={id} title="AI 助理，詢問這個案件" onClick={()=>{if(open){close();return}setOpen(true);if(state.status==='idle')void load()}}><MessageCircle size={24} aria-hidden="true"/></button>
-  {state.status!=='idle'&&createPortal(<div ref={portal} className="project-chat-portal" hidden={!open}>
+  {state.status!=='idle'&&createPortal(<DisabledActionReasons.Provider value={false}><div ref={portal} className="project-chat-portal" hidden={!open}>
    <section ref={panel} id={id} className="project-chat-panel" role="dialog" aria-modal={mobile} aria-labelledby={`${id}-title`} tabIndex={-1}>
     <header className="project-chat-header"><div><p>{projectCode}</p><h2 id={`${id}-title`}>{projectName}</h2></div><Button variant="plain" onClick={close} aria-label="關閉案件 AI 助理"><X size={20} aria-hidden="true"/></Button></header>
     <div className="project-chat-content">
-     {state.status==='ready'?<state.Chat projectId={projectId} projectLabel={label} compact/>:state.status==='loading'?<p role="status">正在載入 AI 助理…</p>:state.status==='unavailable'?<p role="status">AI 助理尚未開放，請稍後再試。</p>:<p role="alert">無法載入 AI 助理。<Button onClick={()=>void load()}>重試</Button></p>}
+     {state.status==='ready'?<state.Chat catalog={state.catalog} projectId={projectId} projectLabel={label} compact/>:state.status==='loading'?<p role="status">正在載入 AI 助理…</p>:state.status==='unavailable'?<p role="status">AI 助理尚未開放，請稍後再試。</p>:<p role="alert">無法載入 AI 助理。<Button onClick={()=>void load()}>重試</Button></p>}
     </div>
    </section>
-  </div>,document.body)}
+  </div></DisabledActionReasons.Provider>,document.body)}
  </>;
 }
