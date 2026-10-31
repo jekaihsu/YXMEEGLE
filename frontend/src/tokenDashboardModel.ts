@@ -37,6 +37,6 @@ export function sortPeople(rows:PersonUsage[],key:SortKey='cost_usd',direction:'
 }
 export function chartSeries(rows:DayUsage[],range:{from:string;to:string}) {
  const days=new Map(rows.map(row=>[row.day,row]));const result:DayUsage[]=[];
- for(let day=range.from;day<=range.to&&result.length<3660;day=shift(day,1))result.push(days.get(day)||{day,questions:0,input_tokens:0,output_tokens:0,cost_usd:0});
+ for(let day=range.from;day<=range.to;day=shift(day,1))result.push(days.get(day)||{day,questions:0,input_tokens:0,output_tokens:0,cost_usd:0});
  return result;
 }
