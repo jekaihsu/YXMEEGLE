@@ -50,7 +50,7 @@ async def owners(reader, args):
     if reader.assignments_enabled:
         try:
             assignments = await reader.get(case_path(args) + '/node-assignments')
-        except ReadDenied:
+        except (ReadDenied, httpx.HTTPStatusError, httpx.TimeoutException):
             pass
     return {'detail': detail, 'assignments': assignments}
 
@@ -85,14 +85,19 @@ def project_owners(value):
     detail, assignments = value['detail'], value['assignments']
     pm = detail['header']['pm']
     unavailable = assignments.get('unavailable', False)
-    return dict(project_id=detail['header']['details']['case_identity'],
+    result = dict(project_id=detail['header']['details']['case_identity'],
                 pm=dict(id=pm.get('id'), name=pm['name'] or 'name_unavailable'),
-                as_of=assignments.get('fetched_at') or detail.get('as_of'),
                 node_assignment_status='node assignment data unavailable' if unavailable else 'available',
                 nodes=None if unavailable else [dict(key=n['key'], label=n['label'],
                     owners=[pick(p, 'id', 'open_id', 'name') for p in n['owners']])
                     for n in assignments.get('nodes', [])],
                 incomplete=unavailable or assignments.get('stale', False))
+    case_time = detail.get('sections', {}).get('overview', {}).get('source_time', {}).get('value')
+    if case_time:
+        result['as_of'] = case_time
+    if assignments.get('fetched_at'):
+        result['node_assignments_as_of'] = assignments['fetched_at']
+    return result
 
 
 def project_attendance(value):
