@@ -1,6 +1,6 @@
 # Assistant elements research and decisions
 
-Source snapshot `ff654d8156680b839774296ef644b57ab1078425`, cloned into `/tmp/ai-feat-chat-ui-research` on 2026-10-31.
+Source snapshot `ff654d8156680b839774296ef644b57ab1078425`, cloned into `/tmp/ai-pc-chat-research` on 2026-10-31.
 
 Read the [documentation index](https://www.assistant-ui.com/llms.txt), [data-table docs](https://www.assistant-ui.com/elements/data-table), and [chart docs](https://www.assistant-ui.com/elements/chart).
 Source files under `packages/ui/src/components/react/assistant-ui/elements/` supplied the ports. Registry components are source distribution, not standalone npm packages. No dependencies were added.
@@ -11,6 +11,12 @@ Docs demonstrate ToolCallMessagePartComponent renderers registered through defin
 Pinned 0.15.32 source was checked in node_modules. ActionBarPrimitive.Copy/Reload/FeedbackPositive/FeedbackNegative exist. useLocalRuntime accepts adapters.feedback. The adapter receives message, type, and comment and returns void. The runtime immediately writes message.metadata.submittedFeedback. It has no cancellation or async rollback setter.
 The feedback bridge posts the contract rating and updates submittedFeedback via the public thread export/import API while idle. A pending save that finishes during a new run defers its metadata patch until the run stops. Feedback controls are disabled during a run or pending save. Per-message usage_id stays in metadata.custom. StrictMode cleanup aborts stale saves.
 
+The chat rebuild rechecked this snapshot and the documentation index. `AssistantChat` ports the branch-free runtime anatomy from `thread.aui.tsx`, the bubble layout from `message-pair.tsx`, the greeting/suggestion slots from `empty-state.tsx`, the message actions, and the short alert from `error-state.tsx`. Runtime primitives retain viewport auto-scroll, input submission, cancellation, suggestions, errors, and copy/reload behavior. React 18 uses the pinned primitive APIs rather than newer GroupedParts APIs. No packages were added.
+
+`ModelSelector.tsx` ports the two-option subset of `model-selector.tsx` and its `model-selector.aui.tsx` bridge. It retains combobox/listbox/option semantics, arrow navigation, Escape dismissal, trigger focus restoration, disabled descriptions, and model-selector data slots. Plain buttons replace the registry's shadcn Popover/Command dependencies. Search, groups, logos, effort selection, and custom provider metadata are omitted because the API allows only Claude and GPT. The selected ID registers `config.modelName` through `useAui().modelContext.register`, and `ChatModelAdapter.run` reads only that context. localStorage remembers the selected available provider. No external picker state or model callback reaches the adapter.
+
+The conversation key combines project ID and a local reset counter. A key change disposes feedback and cancels the old run before creating new history and a new conversation ID. Compact mode uses the same frame with no page heading. Tables, charts, and feedback retain their earlier ports.
+
 The catalog contains 129 registry entries and 22 generative templates, 151 total. Each decision follows.
 
 - Loader (`loading-state`), skip. The ported thinking indicator covers query work.
@@ -19,19 +25,19 @@ The catalog contains 129 registry entries and 22 generative templates, 151 total
 - Typing indicator (`typing-indicator`), skip. The ported thinking indicator supplies the same status.
 - Reasoning effort (`reasoning-effort`), skip. Effort is fixed by the backend.
 - Guardrail notice (`guardrail-notice`), skip. Existing permission and error messages already explain refusals.
-- Message pair (`message-pair`), use. MessagePrimitive already separates user and assistant turns.
+- Message pair (`message-pair`), port. Branch-free user bubble and assistant response anatomy are implemented with MessagePrimitive roots and preserved aui role/content hooks.
 - Message branches (`message-branches`), skip. Reload retains runtime branch history, but this task does not need a branch picker.
-- Message actions (`message-actions`), use. ActionBarPrimitive provides copy, reload, and the two feedback actions.
-- Error state (`error-state`), use. The existing inline alert explains incomplete replies.
+- Message actions (`message-actions`), port. ActionBarPrimitive owns copy/reload and the existing feedback bridge owns reason persistence. No extra menu.
+- Error state (`error-state`), port. MessagePrimitive.Error and ErrorPrimitive render a short human alert with the error-state hook. Retry remains in the action bar.
 - Message queue (`message-queue`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Edit a sent message (`edit-message`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Feedback dialog (`feedback-dialog`), skip. Inline dismissable reason chips fit the four-code contract without a modal.
-- Stopped run (`stopped-run`), use. The existing stop control and ToolChip show interruption.
+- Stopped run (`stopped-run`), use. ComposerPrimitive.Cancel stops the stream; no visible tool status is rendered.
 - Timestamps (`day-separator`), skip. Message creation time is not the source as-of time; the table caption already carries source time.
-- Speaker identity (`speaker-identity`), use. The existing speaker label identifies each turn.
+- Speaker identity (`speaker-identity`), skip. Bubble alignment and data-role identify turns without repeated speaker labels.
 - Regenerate with (`regenerate-menu`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Confidence (`confidence-marker`), skip. No calibrated confidence is available.
-- Tool call (`tool-call`), use. ToolChip shows tool progress above completed displays.
+- Tool call (`tool-call`), skip. Tool labels are hidden. Only the thinking indicator precedes the answer; completed tables/charts remain visible.
 - Run activity (`run-activity`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Tool timeline (`tool-timeline`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Terminal block (`terminal-block`), skip. The read-only attendance and case contract has no matching payload or user operation.
@@ -40,7 +46,7 @@ The catalog contains 129 registry entries and 22 generative templates, 151 total
 - File tree (`file-tree`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Elicitation form (`elicitation-form`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Server panel (`mcp-server-panel`), skip. The read-only attendance and case contract has no matching payload or user operation.
-- Tool failure (`tool-error`), use. ToolChip retains the error state.
+- Tool failure (`tool-error`), skip. Tool status is internal. A stream failure uses the short reply alert.
 - Permission grant (`permission-grant`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Computer use (`computer-use`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Code runner (`code-runner`), skip. The read-only attendance and case contract has no matching payload or user operation.
@@ -87,11 +93,11 @@ The catalog contains 129 registry entries and 22 generative templates, 151 total
 - Trace waterfall (`trace-waterfall`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Cost meter (`cost-meter`), skip. Usage reporting belongs to the separately owned dashboard.
 - Quota banner (`quota-banner`), skip. The server already returns a quota error without remaining-quota data.
-- Composer (`composer`), use. ComposerPrimitive already handles send, stop, and keyboard input.
+- Composer (`composer`), port. Runtime composer shell, input and action row follow thread.aui; send/cancel use ComposerPrimitive. Attachments and voice controls are outside scope.
 - Slash commands (`composer-slash-commands`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Mentions (`composer-mentions`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Attachments (`composer-attachments`), skip. The read-only attendance and case contract has no matching payload or user operation.
-- Models (`composer-model-picker`), use. The existing two-choice ModelPicker follows the server catalog.
+- Models (`composer-model-picker`), port. ModelSelector replaces ModelPicker and registers the selected ID in assistant-ui model context.
 - Dictation (`composer-voice`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Context (`composer-context`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Draft restore (`draft-restore`), skip. The read-only attendance and case contract has no matching payload or user operation.
@@ -100,9 +106,9 @@ The catalog contains 129 registry entries and 22 generative templates, 151 total
 - Command palette (`command-palette`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Voice conversation (`voice-conversation`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Read aloud (`read-aloud`), skip. The read-only attendance and case contract has no matching payload or user operation.
-- Chat panel (`chat-panel`), skip. The existing Page and thread already fit the application shell.
-- Empty state (`empty-state`), use. Existing starter prompts make the first query concrete.
-- Scroll anchor (`scroll-anchor`), use. ThreadPrimitive.ScrollToBottom already respects viewport state.
+- Chat panel (`chat-panel`), use. AssistantChat is reusable in a full page or a compact 420px host. The host owns its panel header and dialog.
+- Empty state (`empty-state`), port. Preserve greeting and suggestion hooks; show only a title and four global or five project questions.
+- Scroll anchor (`scroll-anchor`), port. ThreadPrimitive.ScrollToBottom follows viewport state and hides while already at bottom.
 - Canvas (`canvas-split`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Connection state (`connection-state`), skip. Transport failures already produce an inline reply error.
 - Shared conversation (`shared-conversation`), skip. The read-only attendance and case contract has no matching payload or user operation.
@@ -111,8 +117,8 @@ The catalog contains 129 registry entries and 22 generative templates, 151 total
 - Launcher (`launcher-bubble`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Settings (`settings-panel`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Onboarding (`onboarding`), skip. The read-only attendance and case contract has no matching payload or user operation.
-- Mobile composer (`mobile-composer`), skip. The existing responsive composer keeps touch targets and model choice.
-- Thread (`thread`), use. Existing ThreadPrimitive and MessagePrimitive own runtime state.
+- Mobile composer (`mobile-composer`), use. The same ported composer responds to container width; no separate implementation.
+- Thread (`thread`), port. Runtime root, viewport, user/assistant messages, empty state and composer follow thread.aui with token CSS and no branch picker.
 - Assistant modal (`assistant-modal`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Assistant sidebar (`assistant-sidebar`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Thread list (`thread-list`), skip. The read-only attendance and case contract has no matching payload or user operation.
@@ -125,13 +131,13 @@ The catalog contains 129 registry entries and 22 generative templates, 151 total
 - MCP config dialog (`mcp-config`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Attachment (`attachment`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Follow-up suggestions (`follow-up-suggestions`), skip. The contract supplies no generated follow-ups; existing starter prompts remain.
-- Tool fallback (`tool-fallback`), use. Unknown tool names retain ToolChip status and use the same display renderer.
-- Tool group (`tool-group`), skip. Four compact tool summaries do not need an extra disclosure layer.
+- Tool fallback (`tool-fallback`), use. Unknown tools render validated tables/charts only. Status labels never appear.
+- Tool group (`tool-group`), skip. Tool statuses are hidden, so no disclosure or summary is needed.
 - Quote (`quote`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Sources (`sources`), skip. The contract provides no source URLs or citation IDs; retain source as-of captions without inventing links.
 - Image (`image`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - File (`file`), skip. The read-only attendance and case contract has no matching payload or user operation.
-- Model selector (`model-selector`), use. The existing ModelPicker limits choices to the contract.
+- Model selector (`model-selector`), port. Two-option combobox and runtime model-context bridge, with persistence and server availability. No independent parent model state.
 - Composer trigger popover (`composer-trigger-popover`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Directive text (`directive-text`), skip. The read-only attendance and case contract has no matching payload or user operation.
 - Markdown text (`markdown-text`), use. The exact-pinned renderer retains GFM table fallback.
@@ -164,3 +170,13 @@ The catalog contains 129 registry entries and 22 generative templates, 151 total
 - Weekly active users, skip. This template has no payload in the read-only attendance and case contract.
 - Response time, skip. This template has no payload in the read-only attendance and case contract.
 - Support tickets, skip. This template has no payload in the read-only attendance and case contract.
+
+## Verification of the reusable chat
+
+`node test-assistant.mjs` covers runtime model context reaching the request body, disabled provider descriptions, localStorage, project suggestions and IDs, conversation reset, compact heading removal, hidden tool labels, thinking-to-text transitions, stop, sanitization, history limits, stream parsing, errors, session expiry, and global suggestions.
+`node test-assistant-elements.mjs` retains the structured display and feedback regressions.
+`node scripts/verify-assistant-chat.mjs` uses the built full page with a demo server at `ASSISTANT_DEMO_URL`. Its scratch compact harness compiles the same AssistantChat source for production and loads the built app's styles. It checks 420px panel width, 390px mobile overflow, first text, hidden tool labels, model options, table/chart/error fixtures, and a real scroll-to-bottom interaction. Screenshots go to `ASSISTANT_SCREENSHOTS`, default `/tmp/ai-pc-chat-screenshots`. The script expects the external fixture server to recognize 表格, 圖表, 錯誤, and 長文. No fixture route ships in the app.
+
+The 2026-10-31 run used the real demo backend with SQLite and uploads under `/tmp`, and `/tmp/ai-pc-chat-demo.py` middleware supplied the AI streams. The repository's pinned provider SDK versions were unavailable from the local package index. Only the temporary Python environment used available SDK releases; no provider call was made. No backend dependency or application file was edited.
+
+The checked production chat chunk is 757,228 bytes raw and 224,985 bytes gzip. Its CSS is 10,705 bytes raw. Initial JavaScript remains 437,366 bytes across three chunks. `test-build-loading.mjs` and all six `test-dev-tooling.mjs` checks pass. The large-chunk Vite warning is expected for the deferred assistant-ui and markdown runtime.
