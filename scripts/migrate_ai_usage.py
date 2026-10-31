@@ -5,29 +5,12 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from sqlalchemy import create_engine, inspect
-from sqlalchemy.schema import CreateColumn
+from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
-from backend.models import Base
-from backend.ai.ledger import AiUsageRow, AiFeedbackRow
+from backend.ai.ledger import column_ddl, ensure_schema
 
-TABLES = [AiUsageRow.__table__, AiFeedbackRow.__table__]
-
-
-def scope_column_ddl(name, dialect):
-    column = AiUsageRow.__table__.c[name]
-    return 'ALTER TABLE ai_usage ADD COLUMN ' + str(CreateColumn(column).compile(dialect=dialect))
-
-
-def migrate(engine):
-    Base.metadata.create_all(engine, tables=TABLES, checkfirst=True)
-    with engine.begin() as connection:
-        columns = {c['name'] for c in inspect(connection).get_columns('ai_usage')}
-        for name in ('scope', 'project_id'):
-            if name not in columns:
-                connection.exec_driver_sql(scope_column_ddl(name, connection.dialect))
-    for index in AiUsageRow.__table__.indexes:
-        index.create(engine, checkfirst=True)
+migrate = ensure_schema
+scope_column_ddl = column_ddl
 
 
 def main():

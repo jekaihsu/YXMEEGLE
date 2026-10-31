@@ -87,3 +87,23 @@ def test_scope_migration_postgres_ddl():
     dialect = postgresql.dialect()
     assert scope_column_ddl('scope', dialect) == "ALTER TABLE ai_usage ADD COLUMN scope VARCHAR(16) DEFAULT 'global' NOT NULL"
     assert scope_column_ddl('project_id', dialect) == 'ALTER TABLE ai_usage ADD COLUMN project_id VARCHAR(200)'
+
+
+def test_app_startup_adds_missing_columns_to_an_existing_usage_table(tmp_path):
+    """Staging failed with 'column ai_usage.scope does not exist' because create_all never alters an existing table."""
+    from datetime import datetime, timezone
+    from .app import create_app
+    db = tmp_path / 'legacy.db'
+    engine = create_engine('sqlite:///' + str(db))
+    with engine.begin() as connection:
+        AiUsageRow.__table__.create(connection)
+        connection.exec_driver_sql('ALTER TABLE ai_usage DROP COLUMN scope')
+        connection.exec_driver_sql('ALTER TABLE ai_usage DROP COLUMN project_id')
+        connection.exec_driver_sql("INSERT INTO ai_usage (id, created_at, day, workspace_id, actor_id, actor_name, conversation_id, provider, model, effort, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, price_version, steps, tool_calls, latency_ms, status) VALUES ('old', ?, '2026-10-30', 'w', 'a', 'Name', 'c', 'claude', 'm', 'medium', 1, 0, 0, 1, 'v', 1, 0, 1, 'ok')", (datetime(2026, 10, 30, tzinfo=timezone.utc).isoformat(),))
+    engine.dispose()
+    app = create_app(dict(APP_ENV='development', DEMO_MODE='true', DATABASE_URL='sqlite:///' + str(db), SESSION_SECRET='x' * 40,
+                          UPLOAD_DIR=str(tmp_path / 'uploads')))
+    columns = {c['name'] for c in inspect(app.state.sessions.kw['bind']).get_columns('ai_usage')}
+    assert {'scope', 'project_id'} <= columns
+    with app.state.sessions() as session:
+        assert session.execute(AiUsageRow.__table__.select()).first().scope == 'global'

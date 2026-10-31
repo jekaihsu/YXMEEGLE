@@ -4,7 +4,9 @@ import logging
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import BigInteger, Column, DateTime, Integer, String, CheckConstraint, func, select, case, and_, delete
+from sqlalchemy import BigInteger, Column, DateTime, Integer, String, CheckConstraint, func, select, case, and_, delete, inspect
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.schema import CreateColumn
 from ..models import Base
 
 TAIPEI = ZoneInfo('Asia/Taipei')
@@ -174,3 +176,28 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
 
 def iso(value):
     return value.replace(tzinfo=timezone.utc).isoformat() if value.tzinfo is None else value.isoformat()
+
+
+ADDED_USAGE_COLUMNS = ('scope', 'project_id')
+
+
+def column_ddl(name, dialect):
+    column = AiUsageRow.__table__.c[name]
+    return 'ALTER TABLE ai_usage ADD COLUMN ' + str(CreateColumn(column).compile(dialect=dialect))
+
+
+def ensure_schema(engine):
+    """Create the AI tables and add columns introduced after a table first shipped; create_all never alters existing tables."""
+    Base.metadata.create_all(engine, tables=[AiUsageRow.__table__, AiFeedbackRow.__table__], checkfirst=True)
+    for name in ADDED_USAGE_COLUMNS:
+        with engine.begin() as connection:
+            if name in {c['name'] for c in inspect(connection).get_columns('ai_usage')}:
+                continue
+            try:
+                connection.exec_driver_sql(column_ddl(name, connection.dialect))
+            except DBAPIError:
+                if name not in {c['name'] for c in inspect(engine).get_columns('ai_usage')}:
+                    raise
+    for index in AiUsageRow.__table__.indexes:
+        index.create(engine, checkfirst=True)
+
