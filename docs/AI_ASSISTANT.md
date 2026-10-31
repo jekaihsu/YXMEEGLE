@@ -37,6 +37,8 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
 | `provider` | str | `claude` / `gpt` |
 | `model` | str | 實際型號 |
 | `effort` | str | |
+| `scope` | str | `global` / `project`，既有列預設 `global` |
+| `project_id` | str NULL | 案件範圍的案件 id |
 | `input_tokens` | int | 含快取在內的輸入總量 |
 | `cache_read_tokens` | int | `input_tokens` 的子集 |
 | `cache_write_tokens` | int | `input_tokens` 的子集 |
@@ -77,7 +79,7 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
 
 | type | 欄位 | 說明 |
 | --- | --- | --- |
-| `start` | `conversation_id`, `provider` | |
+| `start` | `conversation_id`, `provider`, `usage_id`, `scope` | |
 | `tool` | `id`, `name`, `label`, `status` = `running` / `done` / `error` | `label` 為給使用者看的繁體中文，如「查詢今天出勤」 |
 | `text` | `delta` | 答案文字片段 |
 | `done` | `usage: {input_tokens, output_tokens}`；`manager` 另含 `cost_usd` | 結束 |
@@ -87,7 +89,7 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
 
 ### `GET /api/ai/usage`（僅 `manager`，其他人 403）
 
-查詢參數：`from`、`to`（`YYYY-MM-DD`，含頭尾，預設近 30 天，含頭尾最多 366 天，超過回傳 422）、`actor`（`actor_id`，可省略）、`provider`（可省略）。
+查詢參數：`from`、`to`（`YYYY-MM-DD`，含頭尾，預設近 30 天，含頭尾最多 366 天，超過回傳 422）、`actor`（`actor_id`，可省略）、`provider`（可省略）、`scope`（`global` 或 `project`，省略為全部）。
 
 ```json
 { "range": { "from": "2026-10-01", "to": "2026-10-31" },
@@ -99,7 +101,7 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
   "recent": [ { "created_at": "ISO", "actor_id": "", "name": "", "provider": "claude", "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "latency_ms": 0, "status": "ok" } ] }
 ```
 
-`people` 不受 `actor` 篩選影響，供下拉選單使用。`recent` 最多 50 筆，依時間新到舊。`cost_usd` 是各列 `cost_micro_usd` 加總除以 1,000,000；`NULL` 列不計入並累加到 `unpriced_calls`。
+`scope` 篩選套用於所有聚合、評分原因、people 與 recent；recent 每列含 scope。`people` 不受 `actor` 篩選影響，供下拉選單使用。`recent` 最多 50 筆，依時間新到舊。`cost_usd` 是各列 `cost_micro_usd` 加總除以 1,000,000；`NULL` 列不計入並累加到 `unpriced_calls`。
 
 ## 權限原則
 

@@ -13,7 +13,7 @@ def test_startup_creates_usage_table(tmp_path):
     assert {c['name'] for c in inspect(engine).get_columns('ai_usage')} == {
         'id', 'created_at', 'day', 'workspace_id', 'actor_id', 'actor_name', 'conversation_id', 'provider',
         'model', 'effort', 'input_tokens', 'cache_read_tokens', 'cache_write_tokens', 'output_tokens',
-        'cost_micro_usd', 'price_version', 'steps', 'tool_calls', 'latency_ms', 'first_token_ms', 'status', 'error_code'}
+        'cost_micro_usd', 'price_version', 'steps', 'tool_calls', 'latency_ms', 'first_token_ms', 'status', 'error_code', 'scope', 'project_id'}
     engine.dispose()
 
 
@@ -60,3 +60,30 @@ def test_feedback_additive_migration(tmp_path):
     with engine.connect() as db:
         assert db.exec_driver_sql('SELECT value FROM sentinel').scalar() == 'preserve'
     engine.dispose()
+
+
+def test_scope_migration_preserves_old_rows_and_is_noop_on_repeat(tmp_path):
+    from sqlalchemy import event
+    from datetime import datetime, timezone
+    engine = create_engine('sqlite:///' + str(tmp_path / 'scope.db'))
+    with engine.begin() as db:
+        AiUsageRow.__table__.create(db)
+        db.exec_driver_sql('ALTER TABLE ai_usage DROP COLUMN scope')
+        db.exec_driver_sql('ALTER TABLE ai_usage DROP COLUMN project_id')
+        db.exec_driver_sql("INSERT INTO ai_usage (id, created_at, day, workspace_id, actor_id, actor_name, conversation_id, provider, model, effort, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, cost_micro_usd, price_version, steps, tool_calls, latency_ms, status) VALUES ('old', ?, '2026-10-31', 'w', 'actor', 'Name', 'c', 'claude', 'model', 'medium', 10, 0, 0, 5, 1, 'v1', 1, 0, 20, 'ok')", (datetime.now(timezone.utc),))
+    migrate(engine)
+    with engine.connect() as db:
+        assert db.exec_driver_sql('SELECT id, scope, project_id, input_tokens, output_tokens, actor_name FROM ai_usage').all() == [('old', 'global', None, 10, 5, 'Name')]
+    statements = []
+    event.listen(engine, 'before_cursor_execute', lambda conn, cursor, statement, *args: statements.append(statement))
+    migrate(engine)
+    assert not any(s.startswith(('ALTER', 'CREATE', 'UPDATE')) for s in statements)
+    engine.dispose()
+
+
+def test_scope_migration_postgres_ddl():
+    from sqlalchemy.dialects import postgresql
+    from scripts.migrate_ai_usage import scope_column_ddl
+    dialect = postgresql.dialect()
+    assert scope_column_ddl('scope', dialect) == "ALTER TABLE ai_usage ADD COLUMN scope VARCHAR(16) DEFAULT 'global' NOT NULL"
+    assert scope_column_ddl('project_id', dialect) == 'ALTER TABLE ai_usage ADD COLUMN project_id VARCHAR(200)'

@@ -21,6 +21,8 @@ class AiUsageRow(Base):
     actor_name = Column(String(240), nullable=False)
     conversation_id = Column(String(120), nullable=False)
     provider = Column(String(16), nullable=False)
+    scope = Column(String(16), nullable=False, default='global', server_default='global')
+    project_id = Column(String(200), nullable=True)
     model = Column(String(120), nullable=False)
     effort = Column(String(24), nullable=False)
     input_tokens = Column(BigInteger, nullable=False)
@@ -103,11 +105,13 @@ def daily_tokens(sessions, workspace_id, actor_id):
                                 AiUsageRow.day == today()))
 
 
-def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=None):
+def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=None, scope=None):
     row = AiUsageRow
     rating_row = AiFeedbackRow
     joined = row.__table__.outerjoin(rating_row, and_(row.id == rating_row.usage_id, row.actor_id == rating_row.actor_id))
     filters = [row.workspace_id == workspace_id, row.day >= start, row.day <= end]
+    if scope:
+        filters.append(row.scope == scope)
     if provider:
         filters.append(row.provider == provider)
     if rating:
@@ -156,7 +160,7 @@ def query(sessions, workspace_id, start, end, actor=None, provider=None, rating=
         for person in groups['by_person']:
             person['name'] = names.get(person['actor_id'], person['actor_id'])
         people = [dict(actor_id=k, name=v) for k, v in sorted(names.items())]
-        recent = [dict(created_at=iso(r.created_at), actor_id=r.actor_id, name=r.actor_name, provider=r.provider,
+        recent = [dict(created_at=iso(r.created_at), actor_id=r.actor_id, name=r.actor_name, provider=r.provider, scope=r.scope,
                        input_tokens=r.input_tokens, output_tokens=r.output_tokens,
                        cost_usd=None if r.cost_micro_usd is None else r.cost_micro_usd / 1_000_000,
                        latency_ms=r.latency_ms, status=r.status,
