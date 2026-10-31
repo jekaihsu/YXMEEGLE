@@ -49,7 +49,7 @@
 
 - `rating`：`up`、`down` 或 `none`（取消）。
 - `reason`：僅 `down` 可帶，選填，限 `wrong`（答錯）、`incomplete`（不完整）、`slow`（太慢）、`other`。
-- 只有該提問本人可以評分；其他人或不存在的 `usage_id` 回 404。帳列可能尚未寫入，伺服器最多等待 3 秒再判定不存在。
+- 只有該提問本人可以評分；其他人或不存在的 `usage_id` 回 404。先查驗帳列歸屬。僅同一 process 記錄的本人提問可在帳列尚未寫入時等待完成事件，最多 3 秒；未知或他人的 id 立即回相同 404。提問開始及寫帳完成時保留 30 秒的等待紀錄。
 - 對同一 `(usage_id, actor_id)` 重複送出是覆寫，不會累加。`none` 刪除該列。
 - 回應 200：`{ "usage_id": "…", "rating": "up", "reason": null }`。
 - 需要和 `/api/ai/chat` 相同的登入與准入規則。
@@ -86,7 +86,7 @@
 查詢在 PostgreSQL 使用 REPEATABLE READ，在 SQLite 明確 BEGIN，讓姓名、總計與分組共用同一份快照。
 `rating` 篩選先限制提問集合，再計算 totals、by_person、by_provider、by_day、recent 與 reasons。
 `none` 表示沒有評分列，包含功能上線前的帳列。people 仍不受 actor 篩選影響，但遵守日期、provider、rating 篩選。
-評分每個 workspace 與使用者每分鐘最多 60 次提交，超過回 429；此限制在單一 web process 內有效。
+評分每個 workspace 與使用者每分鐘最多 60 次成功寫入，404 不計入，超過回 429；此限制在單一 web process 內有效。
 
 進度圖使用已投影的階段與節點資料。節點有 percent 時使用該值；否則已完成為 100，已知且未完成為 0，未知階段不畫點。
 整體百分比為已知階段百分比的算術平均，是衍生摘要，不是來源提供的整案完成率。

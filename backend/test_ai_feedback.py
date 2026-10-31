@@ -41,12 +41,25 @@ def test_feedback_validation(app, client):
         assert client.post('/api/ai/feedback', json=body).status_code == 422
 
 
-def test_feedback_ownership_and_unknown(app, client):
+def test_feedback_ownership_and_unknown(app, client, monkeypatch):
+    from time import perf_counter
+    from .ai import ledger
+    original = ledger.owns_usage
+    lookups = []
+
+    def counted(*args):
+        lookups.append(args[-1])
+        return original(*args)
+
+    monkeypatch.setattr(ledger, 'owns_usage', counted)
     uid = question(app, client)
     role(client, 'u-control')
+    started = perf_counter()
     responses = [client.post('/api/ai/feedback', json=dict(usage_id=value, rating='up')) for value in (uid, 'missing')]
     assert [r.status_code for r in responses] == [404, 404]
     assert responses[0].json() == responses[1].json()
+    assert perf_counter() - started < 1
+    assert lookups == [uid, 'missing']
 
 
 def test_feedback_rate_limit(app, client):
@@ -62,6 +75,15 @@ def test_feedback_wait_for_ledger_off_loop(app, client, live_server, monkeypatch
     from .ai import ledger
     entered, release = threading.Event(), threading.Event()
     original = ledger.record
+    owns = ledger.owns_usage
+    lookups = []
+
+    def counted(*args):
+        lookups.append(args[-1])
+        return owns(*args)
+
+    monkeypatch.setattr(ledger, 'owns_usage', counted)
+
     def delayed(*args, **kwargs):
         entered.set()
         assert release.wait(5)
@@ -80,6 +102,7 @@ def test_feedback_wait_for_ledger_off_loop(app, client, live_server, monkeypatch
             finally:
                 release.set()
                 timer.join()
+    assert lookups == [uid, uid]
 
 
 def test_feedback_aggregation_and_rating_filters(app, client):
@@ -171,3 +194,26 @@ def test_usage_unspecified_down_reason_reconciles(app, client):
     result = client.get('/api/ai/usage').json()
     assert result['reasons'] == dict(wrong=0, incomplete=0, slow=0, other=0, unspecified=1)
     assert sum(result['reasons'].values()) == result['totals']['feedback']['down']
+
+
+def test_unknown_feedback_burst_has_one_lookup_per_id_and_no_write_budget(app, client, monkeypatch):
+    from .ai import ledger, routes
+    uid = question(app, client)
+    original = ledger.owns_usage
+    lookups = []
+
+    def counted(*args):
+        lookups.append(args[-1])
+        return original(*args)
+
+    async def no_polling(*args):
+        raise AssertionError('unknown feedback must not poll or wait')
+
+    monkeypatch.setattr(ledger, 'owns_usage', counted)
+    monkeypatch.setattr(routes.asyncio, 'sleep', no_polling)
+    for i in range(60):
+        response = client.post('/api/ai/feedback', json=dict(usage_id=f'unknown-{i}', rating='up'))
+        assert response.status_code == 404
+        assert response.json() == {'detail': '找不到提問'}
+    assert len(lookups) == 60
+    assert client.post('/api/ai/feedback', json=dict(usage_id=uid, rating='up')).status_code == 200

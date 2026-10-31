@@ -1,6 +1,7 @@
 """Authenticated AI endpoints; provider substitution lives on app.state."""
 import asyncio
 from collections import deque
+from dataclasses import dataclass, field
 from time import monotonic
 from datetime import date, timedelta
 from typing import Literal
@@ -54,6 +55,13 @@ class FeedbackRequest(BaseModel):
         return self
 
 
+@dataclass
+class PendingRun:
+    actor: tuple[str, str]
+    expires: float = 0
+    ready: asyncio.Event = field(default_factory=asyncio.Event)
+
+
 class ChatResponse(StreamingResponse):
     def __init__(self, run):
         self.run = run
@@ -74,6 +82,18 @@ def register(app, *, identity, sessions, cfg):
                               for key, spec in models.items() if cfg.get(spec.key_env)}
     active = {}
     feedback_writes = {}
+    feedback_lock = asyncio.Lock()
+    pending = {}
+
+    def remember(usage_id, entry):
+        entry.expires = monotonic() + 30
+        pending[usage_id] = entry
+
+        def expire():
+            if pending.get(usage_id) is entry and entry.expires <= monotonic():
+                del pending[usage_id]
+
+        asyncio.get_running_loop().call_later(30, expire)
     limit = int(cfg.get('AI_DAILY_TOKEN_LIMIT_PER_USER', '400000'))
 
     def authenticated(request: Request):
@@ -112,27 +132,44 @@ def register(app, *, identity, sessions, cfg):
                 del active[key]
 
         run = ChatRun(app, body, data, user, models[body.model], adapter, release)
+        entry = PendingRun(key)
+        remember(run.usage_id, entry)
+
+        def recorded():
+            remember(run.usage_id, entry)
+            entry.ready.set()
+
+        run.recorded = recorded
         run.cookie = request.headers.get('cookie', '')
         return ChatResponse(run)
 
     @app.post('/api/ai/feedback')
     async def feedback(body: FeedbackRequest, auth=Depends(authenticated)):
         data, user = auth
-        now = monotonic()
         key = (data['wid'], user['id'])
-        writes = feedback_writes.setdefault(key, deque())
-        while writes and writes[0] <= now - 60:
-            writes.popleft()
-        if len(writes) >= 60:
-            raise HTTPException(429, '評分過於頻繁')
-        writes.append(now)
-        deadline = now + 3
-        while not await run_in_threadpool(ledger.owns_usage, sessions, data['wid'], user['id'], body.usage_id):
-            remaining = deadline - monotonic()
-            if remaining <= 0:
+        owned = await run_in_threadpool(ledger.owns_usage, sessions, *key, body.usage_id)
+        if not owned:
+            entry = pending.get(body.usage_id)
+            if entry is None or entry.actor != key or entry.expires <= monotonic():
                 raise HTTPException(404, '找不到提問')
-            await asyncio.sleep(min(.05, remaining))
-        await run_in_threadpool(ledger.feedback, sessions, body.usage_id, user['id'], body.rating, body.reason)
+            try:
+                await asyncio.wait_for(entry.ready.wait(), timeout=3)
+            except TimeoutError:
+                raise HTTPException(404, '找不到提問') from None
+            if not await run_in_threadpool(ledger.owns_usage, sessions, *key, body.usage_id):
+                raise HTTPException(404, '找不到提問')
+        async with feedback_lock:
+            now = monotonic()
+            for actor_key, writes in list(feedback_writes.items()):
+                while writes and writes[0] <= now - 60:
+                    writes.popleft()
+                if not writes:
+                    del feedback_writes[actor_key]
+            writes = feedback_writes.get(key)
+            if writes is not None and len(writes) >= 60:
+                raise HTTPException(429, '評分過於頻繁')
+            await run_in_threadpool(ledger.feedback, sessions, body.usage_id, user['id'], body.rating, body.reason)
+            feedback_writes.setdefault(key, deque()).append(monotonic())
         return body.model_dump()
 
     @app.get('/api/ai/usage')

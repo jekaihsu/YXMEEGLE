@@ -45,6 +45,7 @@ class ChatRun:
         self.unpriced = False
         self.finished = False
         self.cookie = ''
+        self.recorded = lambda: None
         self.step_final_usage = False
         self.streamed_chars = self.input_floor = 0
 
@@ -77,6 +78,7 @@ class ChatRun:
                       cost_micro_usd=self.cost(), price_version=self.spec.price_version,
                       steps=self.steps, tool_calls=self.tool_calls, latency_ms=self.elapsed(),
                       first_token_ms=self.first_token_ms, status=self.status, error_code=self.error_code)
+                self.recorded()
         finally:
             self.release()
 
