@@ -124,14 +124,24 @@ def test_pm_name_unavailable_preserves_real_id(app, client):
 @pytest.mark.parametrize('failure', ['503', 'timeout'])
 def test_owners_assignment_failure_keeps_pm(app, client, monkeypatch, failure):
     import httpx
-    from fastapi.responses import JSONResponse
-    app.state.cfg['NODE_ASSIGNMENT_ENABLED'] = 'true'
-    route = next(r for r in app.router.routes if getattr(r, 'path', None) == '/api/projects/{project_id}/node-assignments' and 'GET' in r.methods)
-    async def unavailable(scope, receive, send):
-        if failure == 'timeout':
-            raise httpx.ReadTimeout('node read timed out')
-        await JSONResponse({'detail': 'unavailable'}, status_code=503)(scope, receive, send)
-    monkeypatch.setattr(route, 'app', unavailable)
+    from fastapi.testclient import TestClient
+    from .app import create_app
+    from .node_assignment.errors import Failure
+    app = create_app({**app.state.cfg, 'NODE_ASSIGNMENT_ENABLED': 'true'})
+    client = TestClient(app, cookies=dict(client.cookies.items()))
+    if failure == '503':
+        def unavailable(ctx):
+            raise Failure('lark_unavailable', 'Lark unavailable')
+        monkeypatch.setattr(app.state.node_assignment, 'overview', unavailable)
+        response = client.get('/api/projects/p1/node-assignments')
+        assert response.status_code == 503 and response.json()['code'] == 'lark_unavailable'
+    else:
+        class TimeoutTransport(httpx.ASGITransport):
+            async def handle_async_request(self, request):
+                if request.url.path.endswith('/node-assignments'):
+                    raise httpx.ReadTimeout('node read timed out', request=request)
+                return await super().handle_async_request(request)
+        monkeypatch.setattr('backend.ai.tools.httpx.ASGITransport', TimeoutTransport)
     pid = client.get('/api/projects').json()['items'][0]['id']
     detail = client.get('/api/case-detail/' + pid).json()
     result = tool(app, client, 'case_owners', {'case_id': pid})

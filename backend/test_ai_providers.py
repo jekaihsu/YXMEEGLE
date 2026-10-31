@@ -157,9 +157,10 @@ def test_gpt_partial_tool_reads_terminal_usage(app, client, monkeypatch, status,
     from .test_ai_api import BODY, events, rows
     call = ResponseFunctionToolCall(type='function_call', id='fc_partial', call_id='call_partial',
         name='case_owners', status=status, arguments=arguments)
-    response = Response.model_construct(id='resp_partial', object='response', model=MODELS['gpt'].model,
+    response = Response(id='resp_partial', object='response', model=MODELS['gpt'].model,
+        created_at=1793404800, parallel_tool_calls=True, tool_choice='auto', tools=[],
         status='incomplete', output=[call], incomplete_details={'reason': 'max_output_tokens'},
-        usage={'input_tokens': 150, 'input_tokens_details': {'cached_tokens': 100},
+        usage={'input_tokens': 150, 'input_tokens_details': {'cached_tokens': 100, 'cache_write_tokens': 0},
                'output_tokens': 16000, 'output_tokens_details': {'reasoning_tokens': 50}, 'total_tokens': 16150})
     values = [ResponseOutputItemDoneEvent(type='response.output_item.done', item=call, output_index=0, sequence_number=1),
               ResponseIncompleteEvent(type='response.incomplete', response=response, sequence_number=2)]
