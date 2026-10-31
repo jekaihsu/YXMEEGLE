@@ -111,6 +111,8 @@ def test_forbidden_body(tmp_path):
         assert response.status_code == 403
         assert response.json() == {'code': 'ai_forbidden', 'message': '你沒有權限使用此 AI 功能'}
     assert client.post('/api/ai/chat', json=BODY).json()['code'] == 'ai_forbidden'
+    response = client.post('/api/ai/feedback', json=dict(usage_id='missing', rating='up'))
+    assert response.status_code == 403 and response.json()['code'] == 'ai_forbidden'
 
 
 def test_ledger_transient_retry(app, client, monkeypatch, caplog):
@@ -138,6 +140,8 @@ def test_tenant_without_ai_admission_has_clear_body(tenant_views):
         response = client.get(path)
         assert response.status_code == 403 and response.json()['code'] == 'ai_forbidden'
     assert client.post('/api/ai/chat', json=BODY).json()['code'] == 'ai_forbidden'
+    response = client.post('/api/ai/feedback', json=dict(usage_id='missing', rating='up'))
+    assert response.status_code == 403 and response.json()['code'] == 'ai_forbidden'
 
 
 def test_usage_uses_latest_name_and_group_unpriced_counts(app, client):

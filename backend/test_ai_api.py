@@ -124,6 +124,8 @@ def test_usage_filters_and_unpriced(app, client):
     dashboard = client.get('/api/ai/usage', params={'from': '2020-01-01', 'to': '2020-01-01'}).json()
     assert dashboard['totals']['questions'] == dashboard['totals']['unpriced_calls'] == 1
     assert dashboard['recent'][0]['cost_usd'] is None
+    assert dashboard['recent'][0]['rating'] is None and dashboard['recent'][0]['reason'] is None
+    assert dashboard['totals']['feedback'] == dict(up=0, down=0, rated=0, up_rate=None)
     assert client.get('/api/ai/usage', params={'from': 'bad'}).status_code == 422
     assert client.get('/api/ai/usage', params={'from': '2030-01-01', 'to': '2020-01-01'}).status_code == 422
 

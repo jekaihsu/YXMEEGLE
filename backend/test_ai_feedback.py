@@ -10,12 +10,24 @@ def question(app, client):
 
 
 def test_feedback_round_trip(app, client):
+    from sqlalchemy import select
+    from .ai.ledger import AiFeedbackRow
     uid = question(app, client)
+    created = None
     for rating, reason in [('up', None), ('up', None), ('down', 'wrong'), ('none', None)]:
         body = dict(usage_id=uid, rating=rating, reason=reason)
         response = client.post('/api/ai/feedback', json=body)
         assert response.status_code == 200
         assert response.json() == body
+        with app.state.sessions() as db:
+            feedback = db.scalars(select(AiFeedbackRow)).all()
+            if rating == 'none':
+                assert feedback == []
+            else:
+                row, = feedback
+                assert (row.rating, row.reason) == (1 if rating == 'up' else -1, reason)
+                created = created or row.created_at
+                assert row.created_at == created and row.updated_at >= row.created_at
     role(client, 'u-manager')
     assert client.get('/api/ai/usage').json()['totals']['feedback'] == dict(up=0, down=0, rated=0, up_rate=None)
 
