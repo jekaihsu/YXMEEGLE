@@ -43,12 +43,14 @@ assert.equal(m.satisfaction({down:3}),'0.0%');
 assert.equal(m.satisfaction({}),'尚無評分');
 assert.deepEqual(m.reasonSeries({slow:2,wrong:3}),[
  {key:'wrong',label:'答錯',value:3},{key:'incomplete',label:'不完整',value:0},
- {key:'slow',label:'太慢',value:2},{key:'other',label:'其他',value:0}
+ {key:'slow',label:'太慢',value:2},{key:'other',label:'其他',value:0},{key:'unspecified',label:'未填寫',value:0}
 ]);
-assert.deepEqual(m.reasonSeries(undefined).map(row=>row.value),[0,0,0,0]);
+assert.deepEqual(m.reasonSeries(undefined).map(row=>row.value),[0,0,0,0,0]);
 assert.deepEqual(m.sortPeople([{actor_id:'a',down:2},{actor_id:'b'},{actor_id:'c',down:10}],'down').map(row=>row.actor_id),['c','a','b']);
 assert.deepEqual(m.sortProviders([{provider:'claude',up:10},{provider:'gpt'}],'up','asc').map(row=>row.provider),['gpt','claude']);
 assert.equal(m.chartSeries([],{from:'2026-10-01',to:'2026-10-01'})[0].down,0);
 const feedbackWeeks=m.chartSeries([{day:'2026-01-01',questions:5,input_tokens:0,output_tokens:0,cost_usd:0,up:1,down:2},{day:'2026-01-02',questions:3,input_tokens:0,output_tokens:0,cost_usd:0,down:3}],{from:'2026-01-01',to:'2026-03-04'});
 assert.equal(feedbackWeeks[0].down,5);assert.equal(feedbackWeeks[0].up,1);
 console.log('Token dashboard model, feedback query, percentages, reasons, sorting and weekly feedback passed');
+
+assert.deepEqual(m.reasonSeries({unspecified:3}).at(-1),{key:'unspecified',label:'未填寫',value:3});
