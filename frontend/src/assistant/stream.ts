@@ -1,10 +1,10 @@
 import {isDisplay,type Display} from './elements/types';
 export type StreamEvent =
- | {type:'start';conversation_id:string;provider:string;usage_id?:string}
+ | {type:'start';conversation_id:string;provider:string;usage_id?:string;scope?:'global'|'project'}
  | {type:'tool';id:string;name:string;label:string;status:'running'|'done'|'error';displays?:Display[]}
  | {type:'text';delta:string}
  | {type:'done'}
- | {type:'error';code:string;message?:string};
+ | {type:'error';code:string;message?:string;detail?:string};
 
 export async function* readEvents(body:ReadableStream<Uint8Array>, signal:AbortSignal):AsyncGenerator<StreamEvent> {
  const reader=body.getReader(),decoder=new TextDecoder();
@@ -18,9 +18,11 @@ export async function* readEvents(body:ReadableStream<Uint8Array>, signal:AbortS
   if(!event||!['start','tool','text','done','error'].includes(event.type))throw new Error('invalid_event');
   if(event.type==='text'&&typeof event.delta!=='string')throw new Error('invalid_event');
   if(event.type==='tool'&&(!['running','done','error'].includes(event.status)||!['id','name','label'].every(key=>typeof event[key]==='string')))throw new Error('invalid_event');
+  if(event.type==='start'&&event.scope!==undefined&&!['global','project'].includes(event.scope))throw new Error('invalid_event');
   if(event.type==='start'&&event.usage_id!==undefined&&typeof event.usage_id!=='string')throw new Error('invalid_event');
   if(event.type==='tool'&&event.displays!==undefined)event.displays=Array.isArray(event.displays)?event.displays.filter(isDisplay):[];
   if(event.type==='error'&&typeof event.code!=='string')throw new Error('invalid_event');
+  if(event.type==='error'&&event.detail!==undefined&&typeof event.detail!=='string')throw new Error('invalid_event');
   return event;
  }
  try {

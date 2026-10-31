@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
+import {Simulate} from 'react-dom/test-utils';
 import {createRoot} from 'react-dom/client';
 import {useLocalRuntime,AssistantRuntimeProvider} from '@assistant-ui/react';
 const bundle=await build({stdin:{contents:"export {createFeedbackController} from './src/assistant/feedback';export {readEvents} from './src/assistant/stream';export {createChatAdapter} from './src/assistant/runtime';export {fixtureSSE,fixtureDisplays,fixtureEvents} from './src/assistant/fixtures';export {DataTable} from './src/assistant/elements/DataTable';export {Chart} from './src/assistant/elements/Chart';export {default as Assistant} from './src/Assistant';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
@@ -23,12 +24,12 @@ for(const display of [{...ui.fixtureDisplays.search_cases[0],rows:[{x:{private:t
 }
 assert.deepEqual(await collect(ui.readEvents(stream(sse([tool('bad')])),new AbortController().signal)),[tool([])]);
 globalThis.fetch=async()=>new Response(stream(sse([{type:'text',delta:'保留回答'},tool([{kind:'bad'}]),{type:'text',delta:'，繼續回答'},{type:'done'}])));
-const preserved=await collect(ui.createChatAdapter(()=>'claude',()=>'c').run({messages:[{role:'user',content:[{type:'text',text:'查詢'}]}],abortSignal:new AbortController().signal}));
+const preserved=await collect(ui.createChatAdapter(()=>'c').run({messages:[{role:'user',content:[{type:'text',text:'查詢'}]}],abortSignal:new AbortController().signal,context:{config:{modelName:'gpt'}}}));
 assert.equal(preserved.at(-1).content.filter(part=>part.type==='text').map(part=>part.text).join(''),'保留回答，繼續回答');
 assert.equal(preserved.at(-1).content.find(part=>part.type==='tool-call').result.status,'done');
 assert.deepEqual(preserved.at(-1).status,{type:'complete',reason:'stop'});
 globalThis.fetch=async()=>new Response(stream(ui.fixtureSSE('attendance_today')));
-const updates=await collect(ui.createChatAdapter(()=>'claude',()=>'c').run({messages:[{role:'user',content:[{type:'text',text:'出勤'}]}],abortSignal:new AbortController().signal}));
+const updates=await collect(ui.createChatAdapter(()=>'c').run({messages:[{role:'user',content:[{type:'text',text:'出勤'}]}],abortSignal:new AbortController().signal,context:{config:{modelName:'gpt'}}}));
 assert.equal(updates.at(-1).metadata.custom.usage_id,'fixture-attendance_today');
 assert.deepEqual(updates.at(-1).content[0].result.displays,ui.fixtureDisplays.attendance_today);
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=assistant',pretendToBeVisual:true});
@@ -107,6 +108,8 @@ await flush(()=>resolveFeedback(json({rating:'none'})));assert.equal(down().getA
 await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='新對話').click(),40);
 failed=true;await flush(()=>document.querySelector('.assistant-suggestions button').click(),80);
 assert.equal(up(),null);assert.equal(down(),null);assert.match(document.body.textContent,/AI 服務暫時無法回應/);
+await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='新對話').click(),40);failed=false;await flush(()=>document.querySelector('.assistant-suggestions button').click(),80);await flush(()=>down().click());await flush(()=>resolveFeedback(json({rating:'down'})));const answer=document.querySelector('[data-role=assistant]');const reasons=document.querySelector('.assistant-feedback-reasons');assert.ok(reasons);globalThis.fetch=async()=>json({code:'ai_forbidden'},403);await flush(()=>{const input=document.querySelector('textarea');Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set.call(input,'下一題');Simulate.change(input)});
+await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='送出').click(),80);assert.equal(document.querySelector('textarea').disabled,true);assert.equal(document.querySelector('[data-role=assistant]')===answer,true,'forbidden flag keeps previous message mounted');assert.equal(document.querySelector('.assistant-feedback-reasons')===reasons,true,'open feedback stays mounted');
 await flush(()=>root.unmount());
 let runtime,feedback,finishRun;
 function Harness(){

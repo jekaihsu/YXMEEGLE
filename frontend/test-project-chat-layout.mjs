@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {JSDOM} from 'jsdom';
+
+const css=await fs.readFile(new URL('./src/assistant/ProjectChatLauncher.css',import.meta.url),'utf8');
+const scope='.project-detail:has(.project-chat-launcher[data-open=true])';
+const rules=[...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([,selector,body])=>({selector:selector.trim(),body}));
+const layout=rules.filter(({selector})=>selector.includes('.project-detail'));
+assert.ok(layout.length>=15,'exercise every reserved-column layout rule');
+for(const {selector} of layout)assert.ok(selector.startsWith(scope),`layout must require open chat: ${selector}`);
+assert.match(css,/@media\(min-width:1280px\)/);
+assert.match(css,/@container project-chat-flow \(max-width:900px\)/);
+assert.ok(!css.includes('container-type:'),'reuse existing flow containment without changing fixed/sticky containing blocks');
+assert.match(css,/\.project-flow\{container-name:project-chat-flow\}/);
+for(const {selector,body} of layout.filter(({selector})=>selector.endsWith('.pf-chain')))assert.ok(!body.includes('flex-wrap:wrap'),'the stage chain scrolls instead of wrapping');
+
+const dom=new JSDOM(`<style>.pf-stage-workspace{display:grid;grid-template-columns:176px minmax(0,1fr)}.pf-panel{grid-template-columns:1.2fr 1fr}.pf-chain{flex-wrap:nowrap}.po-stage-scroll{display:none}</style><div class="project-detail project-detail-calm"><button class="project-chat-launcher" data-open="false"></button><div class="work-items-tab"><div class="wi-toolbar"><label></label></div><table class="wi-table"></table><p class="wi-table-hint"></p></div><div class="project-overview"></div><div class="cs-band"><div class="cs-next"></div></div><div class="project-flow"><div class="pf-stage-workspace"><nav class="pf-stage-nav pf-diagram-compact"><ol class="pf-chain"><li></li></ol><div class="po-stage-scroll"></div></nav><div class="pf-panel"><div class="pf-stage-tasks"></div><div class="pf-stage-detail"></div></div></div></div></div>`);
+const {document}=dom.window;
+const launcher=document.querySelector('.project-chat-launcher');
+for(const {selector} of layout)assert.equal(document.querySelector(selector),null,`closed chat must not match ${selector}`);
+// jsdom cannot evaluate media/container queries. Apply their contents to model the narrow desktop condition.
+const style=document.createElement('style');
+style.textContent=layout.map(({selector,body})=>`${selector}{${body}}`).join('\n');
+document.head.append(style);
+const computed=selector=>dom.window.getComputedStyle(document.querySelector(selector));
+assert.equal(computed('.pf-stage-workspace').gridTemplateColumns,'176px minmax(0,1fr)');
+launcher.dataset.open='true';
+for(const {selector} of layout)assert.ok(document.querySelector(selector),`open chat must match ${selector}`);
+assert.equal(computed('.pf-stage-workspace').gridTemplateColumns,'minmax(0,1fr)');
+assert.equal(computed('.pf-panel').gridTemplateColumns,'minmax(0,1fr)');
+assert.equal(computed('.pf-stage-detail').gridRow,'2');
+assert.equal(computed('.pf-chain').flexWrap,'nowrap');
+assert.equal(computed('.wi-table').minWidth,'760px');
+assert.equal(computed('.wi-toolbar label').minWidth,'160px');
+assert.equal(computed('.po-stage-scroll').display,'flex');
+launcher.dataset.open='false';
+assert.equal(computed('.pf-stage-workspace').gridTemplateColumns,'176px minmax(0,1fr)');
+assert.equal(computed('.pf-panel').gridTemplateColumns,'1.2fr 1fr');
+assert.equal(computed('.po-stage-scroll').display,'none');
+dom.window.close();
+console.log('Project chat layout selectors and computed open/closed styles passed.');

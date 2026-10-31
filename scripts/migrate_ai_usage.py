@@ -7,16 +7,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
-from backend.models import Base
-from backend.ai.ledger import AiUsageRow, AiFeedbackRow
+from backend.ai.ledger import column_ddl, ensure_schema
 
-TABLES = [AiUsageRow.__table__, AiFeedbackRow.__table__]
-
-
-def migrate(engine):
-    Base.metadata.create_all(engine, tables=TABLES, checkfirst=True)
-    for index in AiUsageRow.__table__.indexes:
-        index.create(engine, checkfirst=True)
+migrate = ensure_schema
+scope_column_ddl = column_ddl
 
 
 def main():

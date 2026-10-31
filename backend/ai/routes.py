@@ -1,20 +1,23 @@
 """Authenticated AI endpoints; provider substitution lives on app.state."""
 import asyncio
+import json
 from collections import deque
 from dataclasses import dataclass, field
-from time import monotonic
+from time import monotonic, perf_counter
 from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import Depends, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from fastapi.responses import JSONResponse, StreamingResponse, Response
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from starlette.concurrency import run_in_threadpool
 
 from . import ledger
 from .agent import QUESTION_TIMEOUT_SECONDS, ChatRun
 from .catalog import ModelId, registry
 from .providers import ADAPTERS
+from .project_context import ProjectContextCache, ContextUnavailable
+from .tools import ReadDenied, valid_case_id
 
 
 class Message(BaseModel):
@@ -24,6 +27,8 @@ class Message(BaseModel):
 
     @model_validator(mode='after')
     def role_limit(self):
+        if '\x00' in self.content:
+            raise ValueError('content contains NUL')
         if self.role == 'user' and len(self.content) > 4000:
             raise ValueError('user content exceeds 4000 characters')
         return self
@@ -33,6 +38,15 @@ class ChatRequest(BaseModel):
     model_config = ConfigDict(extra='forbid')
     model: ModelId
     conversation_id: str = Field(min_length=1, max_length=120)
+    project_id: str | None = None
+
+    @field_validator('project_id')
+    @classmethod
+    def project_id_valid(cls, value):
+        if value is not None and not valid_case_id(value):
+            raise ValueError('invalid project id')
+        return value
+
     messages: list[Message] = Field(min_length=1, max_length=20)
 
     @model_validator(mode='after')
@@ -79,9 +93,13 @@ RUN_REGISTRATION_SECONDS = QUESTION_TIMEOUT_SECONDS + 60
 
 
 def register(app, *, identity, sessions, cfg):
+    app.state.ai_store_content = ledger.stores_content(cfg)
+    app.state.ai_content_retention_days = ledger.content_retention(cfg)
     models = registry(cfg.get('AI_PRICE_TABLE_JSON'))
     app.state.ai_providers = {key: ADAPTERS[spec.provider](cfg[spec.key_env])
                               for key, spec in models.items() if cfg.get(spec.key_env)}
+    contexts = ProjectContextCache()
+    app.state.ai_project_contexts = contexts
     active = {}
     feedback_writes = {}
     feedback_lock = asyncio.Lock()
@@ -133,7 +151,23 @@ def register(app, *, identity, sessions, cfg):
             else:
                 del active[key]
 
+        started = perf_counter()
+        context = None
+        if body.project_id is not None:
+            try:
+                context = await contexts.get(app, request.headers.get('cookie', ''), data['wid'], user['id'], body.project_id)
+            except ReadDenied:
+                release()
+                return JSONResponse({'code': 'ai_forbidden', 'message': '找不到或沒有權限查看這個案件'}, status_code=403)
+            except ContextUnavailable:
+                release()
+                return JSONResponse({'code': 'ai_upstream', 'message': '助理暫時無法回答，請稍後重試'}, status_code=503)
+            except BaseException:
+                release()
+                raise
         run = ChatRun(app, body, data, user, models[body.model], adapter, release)
+        run.started = started
+        run.project_context = context
         entry = PendingRun(key)
         remember(run.usage_id, entry, RUN_REGISTRATION_SECONDS)
 
@@ -174,10 +208,13 @@ def register(app, *, identity, sessions, cfg):
             feedback_writes.setdefault(key, deque()).append(monotonic())
         return body.model_dump()
 
+    @app.get('/api/ai/usage/export')
     @app.get('/api/ai/usage')
     def usage(request: Request, from_: date | None = Query(None, alias='from'), to: date | None = None,
               rating: Literal['up', 'down', 'none'] | None = None,
+              scope: Literal['global', 'project'] | None = None,
               actor: str | None = Query(None, max_length=120), provider: ModelId | None = None,
+              q: str | None = Query(None, max_length=200),
               auth=Depends(authenticated)):
         data, user = auth
         if user['role'] != 'manager':
@@ -186,4 +223,31 @@ def register(app, *, identity, sessions, cfg):
         start = from_ or end - timedelta(days=29)
         if start > end or (end - start).days >= 366:
             raise HTTPException(422, '日期範圍錯誤')
-        return ledger.query(sessions, data['wid'], start.isoformat(), end.isoformat(), actor, provider, rating)
+        try:
+            ledger.cleanup_content(sessions, app.state.ai_content_retention_days if app.state.ai_store_content else 0)
+        except Exception:
+            ledger.logger.error('ai_content_cleanup_failed')
+        exporting = request.url.path.endswith('/export')
+        result = ledger.query(sessions, data['wid'], start.isoformat(), end.isoformat(), actor, provider, rating, scope, q,
+            content_enabled=app.state.ai_store_content, retention_days=app.state.ai_content_retention_days, export=exporting)
+        if exporting:
+            rows = result['rows']
+            truncated = result['truncated']
+            count = len(rows)
+            if truncated:
+                rows.append(dict(truncated=True, limit=500, row_count=count))
+            return Response(''.join(json.dumps(row, ensure_ascii=False) + '\n' for row in rows),
+                            media_type='application/x-ndjson', headers={'Cache-Control': 'no-store',
+                                'X-Export-Truncated': str(truncated).lower(), 'X-Export-Row-Count': str(count)})
+        return result
+
+    @app.get('/api/ai/usage/{usage_id}/exchange')
+    def get_exchange(usage_id: str, auth=Depends(authenticated)):
+        data, user = auth
+        if user['role'] != 'manager':
+            raise HTTPException(403, '僅主管可查看 AI 用量')
+        result = ledger.exchange(sessions, data['wid'], usage_id, content_enabled=app.state.ai_store_content,
+                                 retention_days=app.state.ai_content_retention_days)
+        if result is None:
+            raise HTTPException(404, '找不到提問')
+        return result

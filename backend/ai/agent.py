@@ -11,7 +11,7 @@ from time import perf_counter
 
 from . import ledger
 from .catalog import Usage, cost_micro_usd
-from .prompts import system_prompt
+from .prompts import system_prompt, project_system_prompt
 from .providers import ProviderError, failure_diagnostics
 from .tools import TOOLS, execute, displays
 
@@ -46,7 +46,12 @@ class ChatRun:
         self.model = spec.model
         self.unpriced = False
         self.finished = False
+        self.answer = ''
+        self.tool_names = []
+        self.error_detail = None
         self.cookie = ''
+        self.project_context = None
+        self.scope = 'project' if body.project_id is not None else 'global'
         self.recorded = lambda: None
         self.step_final_usage = False
         self.streamed_chars = self.input_floor = 0
@@ -75,44 +80,52 @@ class ChatRun:
                 await run_in_threadpool(ledger.record, self.app.state.sessions, id=self.usage_id, workspace_id=self.data['wid'], actor_id=self.user['id'],
                       actor_name=self.user.get('name') or '', conversation_id=self.body.conversation_id,
                       provider=self.spec.id, model=self.model, effort=self.spec.effort,
+                      scope=self.scope, project_id=self.body.project_id,
                       input_tokens=usage.input_tokens, cache_read_tokens=usage.cache_read,
                       cache_write_tokens=usage.cache_write, output_tokens=usage.output,
                       cost_micro_usd=self.cost(), price_version=self.spec.price_version,
                       steps=self.steps, tool_calls=self.tool_calls, latency_ms=self.elapsed(),
-                      first_token_ms=self.first_token_ms, status=self.status, error_code=self.error_code)
+                      first_token_ms=self.first_token_ms, status=self.status, error_code=self.error_code,
+                      exchange=dict(question=self.body.messages[-1].content, answer=self.answer,
+                          tools=self.tool_names, error_detail=self.error_detail)
+                          if self.app.state.ai_store_content else None)
                 self.recorded()
+                ledger.schedule_cleanup(self.app.state.sessions,
+                    self.app.state.ai_content_retention_days if self.app.state.ai_store_content else 0)
+        except Exception:
+            logger.error('ai_finish_write_failed')
         finally:
             self.release()
 
     async def stream(self):
         try:
-            async with asyncio.timeout(float(self.app.state.cfg.get('AI_QUESTION_TIMEOUT_SECONDS', QUESTION_TIMEOUT_SECONDS))):
+            async with asyncio.timeout(max(0, float(self.app.state.cfg.get('AI_QUESTION_TIMEOUT_SECONDS', QUESTION_TIMEOUT_SECONDS)) - self.elapsed() / 1000)):
                 async for event in self._stream():
                     yield event
         except TimeoutError as exc:
             self.status, self.error_code = 'error', 'ai_upstream'
             log_failure(self.spec.provider, self.steps, exc, model=self.model, elapsed_ms=self.elapsed())
             yield sse(dict(type='error', code='ai_upstream', message='助理回答逾時，請稍後重試'))
-        finally:
-            await self.finish()
 
     async def _stream(self):
         messages = [m.model_dump() for m in self.body.messages]
         cache = {}
         try:
-            yield sse(dict(type='start', usage_id=self.usage_id, conversation_id=self.body.conversation_id, provider=self.spec.id))
-            system = system_prompt()
+            yield sse(dict(type='start', usage_id=self.usage_id, conversation_id=self.body.conversation_id, provider=self.spec.id, scope=self.scope))
+            system = project_system_prompt(self.project_context) if self.project_context else system_prompt()
+            tools = {} if self.project_context else TOOLS
             for _ in range(5):
                 self.steps += 1
                 self.step_usage = Usage()
                 self.step_final_usage = False
                 self.streamed_chars = 0
                 self.input_floor = math.ceil(len(json.dumps(dict(system=system,
-                    tools={k: dict(description=t.label, schema=t.schema) for k, t in TOOLS.items()},
+                    tools={k: dict(description=t.label, schema=t.schema) for k, t in tools.items()},
                     messages=messages), ensure_ascii=False)) / 2)
                 calls, content = [], None
-                async for event in self.adapter.stream(self.spec, system, messages, TOOLS):
+                async for event in self.adapter.stream(self.spec, system, messages, tools):
                     if event.kind == 'text':
+                        self.answer = (self.answer + event.value)[:20000]
                         self.streamed_chars += len(event.value)
                         if self.first_token_ms is None:
                             self.first_token_ms = self.elapsed()
@@ -140,11 +153,13 @@ class ChatRun:
                         done['cost_usd'] = None if cost is None else cost / 1_000_000
                     yield sse(done)
                     return
-                if self.steps == 5:
+                if self.project_context or self.steps == 5:
                     raise ProviderError()
                 keys = [(c.name, json.dumps(c.args, sort_keys=True, ensure_ascii=False)) for c in calls]
                 pending = {}
                 for call, key in zip(calls, keys):
+                    if call.name not in self.tool_names:
+                        self.tool_names.append(call.name)
                     label = TOOLS[call.name].label if call.name in TOOLS else '查詢資料'
                     yield sse(dict(type='tool', id=call.id, name=call.name, label=label, status='running'))
                     if key not in cache:
@@ -174,7 +189,9 @@ class ChatRun:
                             logger.warning('ai_display tool=%s exception=%s', call.name, type(exc).__name__)
                     yield sse(event)
                     if display_failed:
-                        yield sse(dict(type='text', delta='（此結果無法以表格或圖表顯示，以下以文字說明。）\n\n'))
+                        fallback = '（此結果無法以表格或圖表顯示，以下以文字說明。）\n\n'
+                        self.answer = (self.answer + fallback)[:20000]
+                        yield sse(dict(type='text', delta=fallback))
                 self.adapter.continue_with(messages, content, calls, outputs)
             raise ProviderError()
         except (asyncio.CancelledError, GeneratorExit):
@@ -185,10 +202,11 @@ class ChatRun:
             self.status = 'error'
             self.error_code = exc.code if isinstance(exc, ProviderError) else 'ai_upstream'
             error = dict(type='error', code=self.error_code, message='助理暫時無法回答，請稍後重試')
-            if self.user['role'] == 'manager':
-                diagnostic = failure_diagnostics(exc)
-                parts = [diagnostic['status_code'], diagnostic['upstream_code'] or diagnostic['upstream_type']]
-                if any(parts):
-                    name = 'OpenAI' if self.spec.provider == 'openai' else 'Anthropic'
-                    error['detail'] = ' '.join([name, *(str(p) for p in parts if p)])[:200]
+            diagnostic = failure_diagnostics(exc)
+            parts = [diagnostic['status_code'], diagnostic['upstream_code'] or diagnostic['upstream_type']]
+            if any(parts):
+                name = 'OpenAI' if self.spec.provider == 'openai' else 'Anthropic'
+                self.error_detail = ledger.redact(' '.join([name, *(str(p) for p in parts if p)]), 200)
+                if self.user['role'] == 'manager':
+                    error['detail'] = self.error_detail
             yield sse(error)

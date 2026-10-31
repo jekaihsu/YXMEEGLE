@@ -4,7 +4,7 @@ import httpx2
 import pytest
 from openai import AsyncOpenAI
 
-from .test_backend import app, client
+from .test_ai_database import app, client, ai_database_url
 from .test_ai_api import BODY, events, live_server
 from .test_ai_providers import wire
 from .test_p2_int_routes import http
@@ -15,6 +15,8 @@ from .ai.tools import display_table, display_chart
 
 def sdk_tool(app, client, monkeypatch, name, args):
     requests = []
+    if name == 'search_cases':
+        args = dict(status='all', owner='anyone', overdue=False, offset=0, **args)
     call = dict(type='function_call', id='fc_1', call_id='call_1', name=name,
                 arguments=json.dumps(args), status='completed')
     def handler(request):
@@ -41,8 +43,8 @@ def test_search_real_route_sdk_sse(app, client, monkeypatch):
     source = client.get('/api/projects').json()['items'][0]
     displays, projected = sdk_tool(app, client, monkeypatch, 'search_cases', dict(query=source['code']))
     assert displays == [dict(kind='table', title='案件搜尋結果', columns=[dict(key=k, label=v) for k, v in
-        [('code', '案號'), ('name', '案名'), ('status', '狀態'), ('pm_id', 'PM'), ('due_date', '交期')]],
-        rows=[{k: row.get(k) for k in ('code', 'name', 'status', 'pm_id', 'due_date')} for row in projected['cases']], truncated=False)]
+        [('code', '案號'), ('name', '案名'), ('status_label', '案件狀態'), ('pm_id', 'PM'), ('due_date', '交期')]],
+        rows=[{k: row.get(k) for k in ('code', 'name', 'status_label', 'pm_id', 'due_date')} for row in projected['cases']], truncated=False)]
     assert displays[0]['rows'][0]['name'] == source['name']
 
 
@@ -60,7 +62,7 @@ def test_progress_real_route_sdk_sse(app, client, monkeypatch):
     source = client.get('/api/projects/' + pid + '/progress').json()
     displays, projected = sdk_tool(app, client, monkeypatch, 'case_progress', dict(case_id=pid))
     assert projected['as_of'] == source['as_of']
-    assert displays == [dict(kind='chart', title='案件階段完成百分比', variant='bars', unit='%',
+    assert displays[:1] == [dict(kind='chart', title='案件階段完成百分比', variant='bars', unit='%',
         points=[dict(label='業務', value=100.0)],
         truncated=False, caption='截至 ' + source['as_of'],
         headline=dict(label='整體（已知階段平均；規則推算；另有 6 個階段進度未知）', value='100.0'),
@@ -140,7 +142,7 @@ def test_search_partial_real_route_sdk_sse(app, client, monkeypatch):
     assert source['total'] == 12 and len(source['items']) == 8
     displays, projected = sdk_tool(app, client, monkeypatch, 'search_cases', dict(query='AI-PARTIAL'))
     assert projected['truncated'] is True
-    assert projected['note'] == '共 12 筆，僅列出 8 筆'
+    assert projected['note'] == '符合 12 筆，本頁列出 8 筆，起點 0'
     assert displays[0]['truncated'] is True
     assert displays[0]['note'] == projected['note']
     assert len(displays[0]['rows']) == 8
@@ -167,7 +169,7 @@ def test_progress_known_percent_and_gaps_real_route(progress, monkeypatch, trunc
     source = client.get('/api/projects/' + pid + '/progress').json()
     assert 'reports_stale' in {g['id'] for g in source['gaps']}
     displays, projected = sdk_tool(app, client, monkeypatch, 'case_progress', dict(case_id=pid))
-    chart, = displays
+    chart = displays[0]
     expected = [dict(label='業務', value=100.0), dict(label='PM', value=100.0), dict(label='確認單', value=100.0)]
     if not truncated:
         expected.append(dict(label='外業', value=73.5))
@@ -179,3 +181,13 @@ def test_progress_known_percent_and_gaps_real_route(progress, monkeypatch, trunc
     assert '週報快照已過期，等待重新讀取' in chart['note']
     if truncated:
         assert '合約規劃項目過多，清單已截斷' in chart['note']
+
+
+def test_prompt_has_no_banned_narration():
+    from .ai.prompts import system_prompt
+    prompt = system_prompt()
+    assert '直接回答' in prompt
+    assert '一句自然的話' in prompt
+    assert '即使表格或圖表已顯示' not in prompt
+    for phrase in ('已整理', '詳見上方結果', '依你可查看的資料'):
+        assert phrase not in prompt
