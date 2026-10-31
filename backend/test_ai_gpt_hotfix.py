@@ -14,6 +14,7 @@ from .ai import providers
 from .ai.catalog import MODELS, Usage, prices
 from .ai.tools import TOOLS
 from .test_ai_providers import wire
+from .test_backend import app, client
 
 FIXTURES = {'tool-async-field': [{'type': 'response.created',
                        'response': {'id': 'resp_1',
@@ -459,3 +460,102 @@ def test_gpt_function_call_without_status_is_complete(monkeypatch):
     result = collect()
     assert [e.value.id for e in result if e.kind == 'tool'] == ['call_1']
     assert not result[-1].truncated
+
+
+@pytest.mark.parametrize('source,code,message', [
+    ('failed', 'server_error', 'Synthetic backend error'),
+    ('error-flat', 'server_error', 'Synthetic stream error'),
+    ('error-nested', 'server_error', 'Synthetic stream error'),
+    ('incomplete-filter', 'content_filter', None),
+])
+def test_stream_failure_diagnostics(monkeypatch, caplog, source, code, message):
+    from .ai.agent import log_failure
+    install(monkeypatch, FIXTURES[source])
+    with pytest.raises(providers.ProviderError) as failure:
+        collect()
+    log_failure('openai', 2, failure.value, model=MODELS['gpt'].model, elapsed_ms=123)
+    assert 'provider=openai model=gpt-6.1-terra step=2 elapsed_ms=123' in caplog.text
+    assert 'upstream_code=' + code in caplog.text
+    assert 'last_event_type=' + ('error' if source.startswith('error') else 'response.' + ('failed' if source == 'failed' else 'incomplete')) in caplog.text
+    if message:
+        assert message in caplog.text
+
+
+@pytest.mark.parametrize('provider', ['openai', 'anthropic'])
+def test_sdk_status_diagnostics_and_redaction(monkeypatch, caplog, provider):
+    from anthropic import AsyncAnthropic
+    from .ai.agent import log_failure
+    message = 'Access denied SYSTEM_SENTINEL PROMPT_SENTINEL TOOL_SENTINEL sk-secret Bearer token-secret cookie: COOKIE_SENTINEL'
+    def handler(request):
+        return httpx2.Response(404, headers={'x-request-id': 'req_test', 'request-id': 'req_test'},
+            json={'error': {'message': message, 'type': 'invalid_request_error', 'code': 'model_not_found', 'param': 'model'}})
+    cls = AsyncOpenAI if provider == 'openai' else AsyncAnthropic
+    monkeypatch.setattr(providers, 'AsyncOpenAI' if provider == 'openai' else 'AsyncAnthropic',
+        lambda **kw: cls(**kw, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler))))
+    async def run():
+        adapter = providers.GPT('fictional') if provider == 'openai' else providers.Claude('fictional')
+        return [e async for e in adapter.stream(MODELS['gpt' if provider == 'openai' else 'claude'],
+            'SYSTEM_SENTINEL', [{'role': 'user', 'content': 'PROMPT_SENTINEL'},
+            {'type': 'function_call_output', 'call_id': 'x', 'output': 'TOOL_SENTINEL'}], TOOLS)]
+    with pytest.raises(providers.ProviderError) as failure:
+        asyncio.run(run())
+    log_failure(provider, 1, failure.value, model='model', elapsed_ms=10)
+    assert 'status_code=404' in caplog.text and 'request_id=req_test' in caplog.text
+    assert 'upstream_type=invalid_request_error' in caplog.text
+    for secret in ['SYSTEM_SENTINEL', 'PROMPT_SENTINEL', 'TOOL_SENTINEL', 'sk-secret', 'token-secret', 'COOKIE_SENTINEL']:
+        assert secret not in caplog.text
+    assert len(failure.value.diagnostics['message']) <= 200
+
+
+@pytest.mark.parametrize('user,visible', [('u-manager', True), ('u-control', False)])
+def test_upstream_detail_only_visible_to_manager(app, client, user, visible):
+    from .test_backend import role
+    from .test_ai_api import Fake, BODY, events
+    class Failed(Fake):
+        async def stream(self, *args):
+            raise providers.ProviderError(source={'status_code': 404, 'code': 'model_not_found'})
+            yield
+    role(client, user)
+    app.state.ai_providers = {'gpt': Failed()}
+    result = events(client.post('/api/ai/chat', json=dict(BODY, model='gpt')))[-1]
+    assert result['code'] == 'ai_upstream'
+    if visible:
+        assert result['detail'] == 'OpenAI 404 model_not_found'
+    else:
+        assert 'detail' not in result
+
+
+@pytest.mark.parametrize('source', ['failed', 'error-flat', 'error-nested'])
+def test_stream_diagnostics_redact_echoed_private_input_before_bounding(monkeypatch, caplog, source):
+    from .ai.agent import log_failure
+    values = copy.deepcopy(FIXTURES[source])
+    secret = 'PROMPT_SENTINEL_' + 'x' * 250
+    error = values[-1].get('response', values[-1])
+    error = error.get('error', error)
+    error['message'] = 'failure\n  SYSTEM_SENTINEL ' + secret + ' sk-secret Bearer token-secret'
+    install(monkeypatch, values)
+    with pytest.raises(providers.ProviderError) as failure:
+        collect(messages=[{'role': 'user', 'content': secret}])
+    log_failure('openai', 1, failure.value)
+    assert 'failure' in caplog.text and 'PROMPT_SENTINEL' not in caplog.text
+    assert 'SYSTEM_SENTINEL' not in caplog.text and 'sk-secret' not in caplog.text
+    assert 'token-secret' not in caplog.text and len(caplog.records) == 1
+    assert len(failure.value.diagnostics['message']) <= 200
+
+
+@pytest.mark.parametrize('source', ['failed', 'error-flat', 'error-nested'])
+def test_diagnostics_redact_tool_json_values_and_encrypted_reasoning(monkeypatch, caplog, source):
+    from .ai.agent import log_failure
+    values = copy.deepcopy(FIXTURES[source])
+    error = values[-1].get('response', values[-1])
+    error = error.get('error', error)
+    error['message'] = 'failure ARG_SENTINEL RESULT_SENTINEL ENCRYPTED_SENTINEL'
+    install(monkeypatch, values)
+    messages = [dict(type='function_call', call_id='c', name='search_cases', arguments='{"query":"ARG_SENTINEL"}'),
+                dict(type='function_call_output', call_id='c', output='{"result":"RESULT_SENTINEL"}'),
+                dict(type='reasoning', id='r', summary=[], encrypted_content='ENCRYPTED_SENTINEL')]
+    with pytest.raises(providers.ProviderError) as failure:
+        collect(messages=messages)
+    log_failure('openai', 1, failure.value)
+    for value in ['ARG_SENTINEL', 'RESULT_SENTINEL', 'ENCRYPTED_SENTINEL']:
+        assert value not in caplog.text
