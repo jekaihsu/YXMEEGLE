@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import {useRestoreEditFocus} from './taskSheetFocus';
 import {Badge} from './design';
 import {TaskDrawer,DrawerFacts} from './TaskDrawer';
 import {TASK_STATUS_OPTIONS,type AssignmentTask,type AssignmentMutation,type AssignablePerson} from './nodeAssignmentApi';
@@ -19,13 +20,13 @@ export function AssignmentTaskInspector({assignment:task,people=[],plan,nodeLabe
   if(value.status!==draft.status)patch.status=value.status;
   return mutate({action:'update_task',nodeKey,taskId:task.id,expected_revision:task.revision,patch});
  };
- const [editing,setEditing]=useState(false);
+ const [editing,setEditing]=useState(false),editRef=useRestoreEditFocus(editing);
  const canEdit=task.can.edit_details||task.can.assign||task.can.edit_status||task.can.cancel;
  const done=async(value:TaskDraft)=>{const ok=await save(value);if(ok)setEditing(false);return ok};
  const facts=[{label:'負責人',value:task.assignee?.name || '尚未指派'},...(task.deadline?[{label:'期限',value:task.deadline}]:[]),...(task.assigned_by?.name?[{label:'指派人',value:task.assigned_by.name}]:[]),...(task.done_at?[{label:'完成時間',value:task.done_at}]:[])];
  return <TaskDrawer kind="lark" label={task.title} trail={[nodeLabel]} title={task.title} status={<Badge>{task.status}</Badge>} onClose={onClose}><div className="assignment-edit">
   {editing?<AssigneeTaskEditor hideLocked onCancel={()=>setEditing(false)} nodeKey={nodeKey} busy={busy} model={{draft,fields:editorFields({title:task.can.edit_details,assignee:task.can.assign,due:task.can.edit_details,notes:task.can.edit_details,status:task.can.edit_status || task.can.cancel},reason || '需有此任務的編輯權限'),people:people.map(p=>({id:p.open_id,name:p.name})),statuses:TASK_STATUS_OPTIONS.filter(([value])=>value===task.status || (value==='取消' ? task.can.cancel : task.can.edit_status)).map(([id,label])=>({id,label})),maxTitle:200,maxNotes:2000,dueReason:false}} onSave={done}/>
-  :<><section className="task-drawer-section"><div className="task-drawer-section-head"><h3>任務資訊</h3>{canEdit&&<button type="button" className="text-button" onClick={()=>setEditing(true)}>編輯</button>}</div><DrawerFacts facts={facts}/></section>
+  :<><section className="task-drawer-section"><div className="task-drawer-section-head"><h3>任務資訊</h3>{canEdit&&<button ref={editRef} type="button" className="text-button" onClick={()=>setEditing(true)}>編輯</button>}</div><DrawerFacts facts={facts}/></section>
   {notes&&<section className="task-drawer-section"><h3>任務說明</h3><p className="task-drawer-text">{notes}</p></section>}</>}
   {plan && <ProductionPlanFacts plan={plan}/>}</div></TaskDrawer>;
 }

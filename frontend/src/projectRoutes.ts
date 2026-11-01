@@ -3,7 +3,7 @@ type ProjectRoute={tab?:string;section?:string;node?:string;task?:string;focus?:
 export function projectFlowRoute(route:ProjectRoute){
  const original=route.tab || (route.node || route.task || route.focus ? 'flow' : route.approval ? 'data' : route.comment ? 'data' : 'overview');
  const aliases:Record<string,string>={tasks:'flow',progress:'items',daily:'items',logs:'data'};
- const tab=original==='data' && route.section==='files' ? 'files' : aliases[original] || original;
+ const tab=original==='data' && route.section==='files' ? 'files' : original==='data' && route.section==='participants' ? 'people' : aliases[original] || original;
  const section=route.section || (original==='tasks' ? 'all-tasks' : original==='daily' ? 'reports' : original==='logs' || !route.tab && route.comment ? 'activity' : !route.tab && route.approval ? 'approvals' : undefined);
  const allTasks=original==='tasks' || section==='all-tasks' || route.all_tasks==='1';
  return {tab,focus:allTasks ? 'tasks' : 'node',allTasks,...(section ? {section} : {})};
