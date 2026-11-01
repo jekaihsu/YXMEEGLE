@@ -240,3 +240,7 @@ show_display 的 SSE tool done 事件附 displays。表格沿用 `{kind:"table",
 本分支驗證紀錄（2026-11-01）。一般 AI suite 為 322 passed、181 skipped。使用 `PATH=/opt/homebrew/bin:$PATH /tmp/ai-backend-venv/bin/python scripts/test_action_audit_postgres.py --ai` 後，SQLite 與 PostgreSQL 合計 501 passed、2 skipped；各資料庫 179 passed，其他單元測試 143 passed。兩個跳過項目都是 frontend parity 缺 esbuild，沒有修改前端安裝。離線 question eval 為 20 passed、18 skipped（未設定 PostgreSQL URL 的單獨執行）；PostgreSQL runner 已包含這些案例。正式供應商與正式 Lark 資料未連線驗證。
 
 資料集參數修正（2026-11-01）。`daily_reports` 不接受 actor_id，人名使用 `q`。`search_cases` 提供 `id`，供案件明細的 `case_id` 與日報 `project_id` 使用。`contract_detail` 以 `case_id` 查授權案件明細的合約項目名稱與項次，不再要求模型填不透明的合約 key。節點參數使用 enum，不能自行編造 ID。進度週報僅提供預排、出工、符合預排與未預排的天數，不提供任何營業額點數或衍生比率。
+
+資料集查詢合約。`query_dataset` 的 `limit` 預設 20，`offset` 預設 0。整個回傳 JSON 以約 6000 字元為上限，超出時裁切 rows，更新 truncated 與 next_offset。舊的重複 summary 不再回傳。每次查詢回傳 applied_params，包含實際採用的預設週一、日期範圍、分頁與篩選條件。describe_dataset 提供參數限制、非空查詢範例及欄位說明。路由 4xx 驗證失敗回傳 `{"error":"參數錯誤","detail":"路由訊息"}`；401/403/404 維持 ai_forbidden，5xx 與逾時標記 retryable。模型只能呼叫當前 scope 提供的工具。
+
+本輪驗證（2026-11-01）。`/tmp/ai-backend-venv/bin/python -m pytest backend/test_ai_*.py -q` 為 341 passed、192 skipped。獨立離線 question eval 為 20 passed、18 skipped。新增 19 個通過的回歸案例，涵蓋真實週報計算的財務欄位阻擋、資料集欄名守衛、延後寫入與刪除、done 可見性、最新 200 則訊息、路由錯誤、實際參數、描述與 opaque ID、長度與分頁、未開放工具、各種顯示標題及 PM 標籤。未設定測試 PostgreSQL URL，未宣稱本輪執行 PostgreSQL 案例。
