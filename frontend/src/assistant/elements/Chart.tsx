@@ -53,7 +53,7 @@ export function Chart({kind,title,caption,truncated,note,unit='',headline,points
    }) }
 
   </svg>}
-  {grouped&&kind!=='pie'&&<p className="assistant-chart-legend">{series.map(group=><span key={group.name}>{group.key}　</span>)}</p>}
+  {grouped&&kind!=='pie'&&<p className="assistant-chart-legend">{series.map(group=><span key={group.name}>{group.key}</span>)}</p>}
   <div className="assistant-chart-labels" style={{gridTemplateColumns:`repeat(${Math.min(Math.max(points.length,1),6)},minmax(0,1fr))`}}>
    {points.map((point,index)=><div key={index} className="assistant-chart-point">
     <button type="button" aria-label={`查看${point.label}的圖表提示`} aria-describedby={active===index?`${id}-tooltip-${index}`:undefined} onClick={()=>setActive(index)} onFocus={()=>setActive(index)} onBlur={()=>setActive(null)} onMouseEnter={()=>setActive(index)} onMouseLeave={()=>setActive(null)} onKeyDown={event=>{if(event.key==='Escape')setActive(null)}}><span>{kind==='pie'&&`${index+1}. `}{point.label}{point.series!=null&&` · ${point.series}`}</span><strong>{point.value}{unit}</strong></button>

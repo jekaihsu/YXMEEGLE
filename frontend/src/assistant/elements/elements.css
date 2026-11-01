@@ -36,6 +36,8 @@
 .assistant-chart-axis{stroke:var(--sep);stroke-width:1;vector-effect:non-scaling-stroke}
 .assistant-chart-bar{fill:var(--accent)}
 .assistant-chart-bar[data-active]{opacity:1;stroke:var(--label);stroke-width:1;vector-effect:non-scaling-stroke}
+.assistant-chart-legend{display:flex;flex-wrap:wrap;gap:var(--space-2) var(--space-4);margin:0;padding:var(--space-3) var(--space-4);font-size:var(--fs-footnote);line-height:1.5;color:var(--label-2)}
+.assistant-chart-legend span{min-width:0;overflow-wrap:anywhere}
 .assistant-chart-labels{display:grid;gap:var(--space-1);padding:0 var(--space-4);align-items:start}
 .assistant-chart-point{position:relative;min-width:0}
 .assistant-chart-point button{display:flex;flex-direction:column;align-items:center;width:100%;min-height:44px;padding:var(--space-2) 0;gap:var(--space-1);border:0;border-radius:var(--radius-s);background:transparent;color:var(--label-2);font:inherit;font-size:var(--fs-footnote);cursor:help;overflow-wrap:anywhere}

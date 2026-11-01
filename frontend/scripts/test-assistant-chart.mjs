@@ -44,6 +44,17 @@ try{
  }
  await page.evaluate(()=>document.documentElement.dataset.theme='light');
  await mount('line',[{label:'一月',value:12,series:'甲組'},{label:'二月',value:7,series:'甲組'},{label:'一月',value:5,series:'乙組'},{label:'二月',value:10,series:'乙組'}]);
+ const legend=page.locator('.assistant-chart-legend');
+ const legendStyles=await legend.evaluate(el=>{const s=getComputedStyle(el);return {padding:parseFloat(s.paddingLeft),gap:parseFloat(s.columnGap),wrap:s.flexWrap,font:s.fontSize,color:s.color}});
+ assert.ok(legendStyles.padding>=16,'legend is inset from the card border');
+ assert.ok(legendStyles.gap>0,'legend entries have spacing');
+ assert.equal(legendStyles.wrap,'wrap','legend wraps on small cards');
+ assert.equal(legendStyles.font,await page.locator('.assistant-chart-point button').first().evaluate(el=>getComputedStyle(el).fontSize),'legend uses card typography');
  if(evidence)await page.screenshot({path:`${evidence}/multi-series-line.png`});
+ await page.setViewportSize({width:320,height:700});
+ await mount('line',Array.from({length:6},(_,i)=>({label:'一月',value:i+1,series:`車輛使用統計第${i+1}組`})));
+ const rows=await legend.locator('span').evaluateAll(items=>items.map(el=>el.getBoundingClientRect().top));
+ assert.ok(new Set(rows).size>1,'legend entries actually wrap in a narrow card');
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'legend does not overflow the page');
  console.log('Chart browser tests passed for token colors and all 24 series in both themes.');
 }finally{await browser.close()}
