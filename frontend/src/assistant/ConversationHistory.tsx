@@ -11,6 +11,7 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
  const [retry,setRetry]=useState<(()=>void)>();
  const listGeneration=useRef(0);
  const action=useRef<AbortController>(),list=useRef<AbortController>();
+ const userOpened=useRef(false),focusAfterDelete=useRef<string>();
  const trigger=useRef<HTMLButtonElement>(null),dialog=useRef<HTMLDialogElement>(null),panel=useRef<HTMLElement>(null);
  const id=useId(),overlay=!!compact||mobile;
  const scope:HistoryScope=projectId?{scope:'project',project_id:projectId}:{scope:'global'};
@@ -39,10 +40,16 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
  useEffect(()=>{
   if(!expanded||unavailable)return;
   if(overlay)dialog.current?.showModal();
-  else panel.current?.querySelector<HTMLButtonElement>('button')?.focus();
-  return()=>{dialog.current?.close();trigger.current?.focus()};
+  else if(userOpened.current)panel.current?.querySelector<HTMLButtonElement>('button')?.focus();
+  return()=>{dialog.current?.close();if(overlay||userOpened.current)trigger.current?.focus()};
  },[expanded,overlay,unavailable]);
- const close=()=>{setExpanded(false);setConfirm(undefined)};
+ useEffect(()=>{
+  if(busy||focusAfterDelete.current===undefined)return;
+  const target=focusAfterDelete.current;focusAfterDelete.current=undefined;
+  const container=overlay?dialog.current:panel.current;
+  (Array.from(container?.querySelectorAll<HTMLButtonElement>('[data-history-id]')||[]).find(button=>button.dataset.historyId===target)||container?.querySelector<HTMLButtonElement>('[data-history-new]'))?.focus();
+ },[state,busy]);
+ const close=()=>{trigger.current?.focus();setExpanded(false);setConfirm(undefined)};
  const fresh=()=>{action.current?.abort();setBusy(false);setActionError('');setRetry(undefined);setConfirm(undefined);onNew();if(overlay)close()};
  const perform=useCallback(async(work:(signal:AbortSignal)=>Promise<void>,again:()=>void)=>{
   action.current?.abort();const controller=new AbortController();action.current=controller;setBusy(true);setActionError('');setRetry(undefined);
@@ -57,6 +64,7 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
   if(activeId===conversationId)await beforeDelete?.();
   if(signal.aborted)return;
   await deleteConversation(conversationId,signal);if(signal.aborted)return;
+  if(state.status==='ready'){const ids=state.page.items.map(item=>item.id),index=ids.indexOf(conversationId);focusAfterDelete.current=ids[index+1]||ids[index-1]||''}
   setState(previous=>previous.status==='ready'?{status:'ready',page:{...previous.page,items:previous.page.items.filter(item=>item.id!==conversationId)}}:previous);
   setConfirm(undefined);if(activeId===conversationId)onNew();setAttempt(n=>n+1);
  },()=>remove(conversationId));
@@ -69,10 +77,10 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
  };
  const content=<>
   <div className="assistant-history-heading"><h2 id={`${id}-title`}>對話紀錄</h2><Button variant="plain" onClick={close} aria-label="關閉對話紀錄">關閉</Button></div>
-  <Button onClick={fresh}>新對話</Button>
+  <Button data-history-new onClick={fresh}>新對話</Button>
   {state.status==='loading'?<p role="status">正在載入對話…</p>:state.status==='error'?<p role="alert">無法載入對話紀錄。<Button onClick={()=>setAttempt(n=>n+1)}>重新載入紀錄</Button></p>:<>
    {state.page.items.length===0?<p>尚無對話紀錄</p>:<ul className="assistant-history-list">{state.page.items.map(item=><li key={item.id}>
-    <div className="assistant-history-row"><Button variant="plain" className="assistant-history-open" disabled={busy} aria-current={activeId===item.id?'true':undefined} onClick={()=>open(item.id)}><span>{item.title||'未命名對話'}</span><time dateTime={item.updated_at} title={new Date(item.updated_at).toLocaleString('zh-TW')}>{relativeTime(item.updated_at)}</time></Button><Button variant="plain" disabled={busy} aria-label={`刪除對話：${item.title}`} onClick={()=>setConfirm(item.id)}>刪除</Button></div>
+    <div className="assistant-history-row"><Button variant="plain" className="assistant-history-open" data-history-id={item.id} disabled={busy} aria-current={activeId===item.id?'true':undefined} onClick={()=>open(item.id)}><span>{item.title||'未命名對話'}</span><time dateTime={item.updated_at} title={new Date(item.updated_at).toLocaleString('zh-TW')}>{relativeTime(item.updated_at)}</time></Button><Button variant="plain" disabled={busy} aria-label={`刪除對話：${item.title}`} onClick={()=>setConfirm(item.id)}>刪除</Button></div>
     {confirm===item.id&&<div className="assistant-history-confirm"><span>確定刪除此對話？</span><Button disabled={busy} variant="destructive" onClick={()=>remove(item.id)}>確定刪除</Button><Button disabled={busy} onClick={()=>setConfirm(undefined)}>取消</Button></div>}
    </li>)}</ul>}
    {state.page.next_cursor&&<Button disabled={busy} onClick={more}>載入更多</Button>}
@@ -82,7 +90,7 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
  </>;
  return <div className={`assistant-workspace${compact?' assistant-workspace-compact':''}${unavailable?' assistant-history-unavailable':''}`}>
   {!unavailable&&<>
-   <button type="button" ref={trigger} data-variant="plain" className="ds-button assistant-history-toggle" aria-expanded={expanded} aria-controls={id} onClick={()=>setExpanded(value=>!value)}>對話紀錄</button>
+   <button type="button" ref={trigger} data-variant="plain" className="ds-button assistant-history-toggle" aria-expanded={expanded} aria-controls={id} onClick={()=>{userOpened.current=true;setExpanded(value=>!value)}}>對話紀錄</button>
    {overlay?<dialog role="dialog" aria-modal="true" ref={dialog} id={id} className="assistant-history-dialog" aria-labelledby={`${id}-title`} onKeyDown={event=>{
     if(event.key==='Escape')event.stopPropagation();
     if(event.key!=='Tab')return;
