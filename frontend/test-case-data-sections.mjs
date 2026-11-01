@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import {build} from 'esbuild';
 import {writeFile,unlink} from 'node:fs/promises';
 import {projectFixture} from './fixtures/node-assignments.mjs';
-const bundled=await build({stdin:{contents:"export {caseDataSections} from './src/caseDataSections'; export {projectFlowRoute} from './src/projectRoutes'; export {participantRows} from './src/ProjectDestinations';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'},jsx:'automatic'});
+const bundled=await build({stdin:{contents:"export {caseDataSections,sourceKindLabel} from './src/caseDataSections'; export {projectFlowRoute} from './src/projectRoutes'; export {participantRows} from './src/ProjectDestinations';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'},jsx:'automatic'});
 const temp=new URL('./.case-data-sections.mjs',import.meta.url);await writeFile(temp,bundled.outputFiles[0].text);const m=await import(temp.href);await unlink(temp);
 const labels=sections=>sections.map(([,label])=>label);
 const world=(patch={},status='ready')=>{const base=projectFixture();Object.assign(base.project,{source_kind:'v4'},patch);return {w:{...base.workspace,source_status:{...base.workspace.source_status,status},projects:[base.project],source_confirmations:[],contract_items:[]},p:base.project}};
@@ -50,5 +50,28 @@ test('Lark assignment and 本地流程 stay separate identities in the same tabl
  const data={nodes:[{key:'sales',label:'業務',owners:[{open_id:'ou_wei',name:'陳威廷'}],assignment_method:'手動指派',assigned_by:{name:'林安娜'}}],node_details:{sales:{tasks:[{assignee:{name:'陳威廷'}},{assignee:null}]}}};
  const rows=m.participantRows({w},p,{state:{kind:'ready',data}},[{key:'sales',finalDeadline:'2026-10-09'}]);
  assert.deepEqual(rows.map(r=>r.source),['Lark 指派 · 手動指派 · 林安娜指派','本地流程'],'empty local nodes are not repeated next to Lark rows');
- assert.equal(rows[0].others,'陳威廷、尚未指派');assert.equal(rows[0].deadline,'2026-10-09');assert.equal(rows[1].owners[0].name,'林安娜');assert.equal(rows[1].deadline,'未排定');
+ assert.equal(rows[0].others,'陳威廷、尚未指派');assert.equal(rows[0].deadline,'2026-10-09');assert.equal(rows[1].owners[0].name,'林安娜');
+ assert.equal(rows[1].deadline,'未排定','a local node with no due date of its own stays 未排定');
+});
+test('a local row keeps its own due date next to a different Lark date',()=>{
+ const {w,p}=world();
+ for(const n of p.nodes){n.owner_id='';n.collaborator_ids=[];n.tasks=[]}
+ p.nodes[0].owner_id='ou_anna';p.nodes[0].due_date='2026-09-24T00:00:00Z';
+ const data={nodes:[{key:'sales',label:'業務',owners:[],assignment_method:'',assigned_by:null}],node_details:{}};
+ const rows=m.participantRows({w},p,{state:{kind:'ready',data}},[{key:p.nodes[0].key,finalDeadline:'2026-10-20'}]);
+ assert.equal(rows.find(r=>r.source==='本地流程').deadline,'2026-09-24','the local row shows the local node due date, not the Lark one and not 未排定');
+});
+test('repeated Lark assignee names are listed once',()=>{
+ const {w,p}=world();for(const n of p.nodes){n.owner_id='';n.collaborator_ids=[];n.tasks=[]}
+ const same={assignee:{name:'陳柏翰'}};
+ const data={nodes:[{key:'sales',label:'業務',owners:[],assignment_method:'',assigned_by:null}],node_details:{sales:{tasks:[same,same,same,{assignee:null},{assignee:null}]}}};
+ const rows=m.participantRows({w},p,{state:{kind:'ready',data}},[]);
+ assert.equal(rows[0].others,'陳柏翰、尚未指派');
+});
+test('資料來源 names only recognised kinds and flags the rest for review',()=>{
+ assert.equal(m.sourceKindLabel('demo'),'獨立示範資料');
+ assert.equal(m.sourceKindLabel('v4'),'報價總表／V4');
+ assert.equal(m.sourceKindLabel('lark'),'Lark');
+ assert.equal(m.sourceKindLabel('csv_import'),'來源類型待核對（csv_import）','an unrecognised kind is never passed off as 報價總表／V4');
+ assert.equal(m.sourceKindLabel(''),'來源類型待核對');assert.equal(m.sourceKindLabel(undefined),'來源類型待核對');
 });

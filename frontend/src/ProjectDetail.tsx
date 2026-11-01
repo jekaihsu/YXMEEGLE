@@ -10,10 +10,11 @@ import {ProjectDetailShell,ProjectExecutionDetails} from './ProjectDetailShell';
 const ProjectPeople=lazy(()=>import('./ProjectDestinations').then(m=>({default:m.ProjectPeople})));
 const WorkItemsTab=lazy(()=>import('./WorkItemsTab').then(m=>({default:m.WorkItemsTab})));
 import {useSopTasks,canReadSop,prefetchSopTasks,prefetchSopAssignees} from './useSopTasks';
-import {prefetchProjectProgress,useProjectProgress} from './useProjectProgress';
+import {peekProjectProgress,prefetchProjectProgress,useProjectProgress} from './useProjectProgress';
+import type {ProjectProgress} from './projectProgressApi';
 import {ProjectFlow} from './ProjectFlow';
 import {TaskDrawer,DrawerFacts} from './TaskDrawer';
-import {caseDataSections} from './caseDataSections';
+import {caseDataSections,sourceKindLabel} from './caseDataSections';
 import {SheetActions,SheetPrimary,type SheetMenuItem} from './TaskSheetParts';
 import {useRestoreEditFocus} from './taskSheetFocus';
 import {FlowWorkspaceSkeleton} from './FlowDiagram';
@@ -150,9 +151,9 @@ export function ProjectDetail({c}:{c:Ctx}){
  ['專案經理',basicValue(p.pm_id,()=>nameOf(c.w,p.pm_id))],['案件版本',basicValue(p.revision,()=>`v${p.revision}`)],
  ['合約金額',amountWithheld(p)?'未核准顯示':basicValue(p.contract_amount,()=>money(p.contract_amount))],['預估營業額',basicValue(p.estimated_points,()=>`${points(p.estimated_points)} 點`)],
  ['目前有效期限',basicValue(p.due_date,()=>date(p.due_date))],['原始期限',basicValue(p.original_due_date,()=>date(p.original_due_date))],
- ['開始日期',basicValue(p.started_at,()=>date(p.started_at))],['資料來源',basicValue(p.source_kind,()=>p.source_kind==='demo'?'獨立示範資料':'報價總表／V4')]
+ ['開始日期',basicValue(p.started_at,()=>date(p.started_at))],['資料來源',sourceKindLabel(p.source_kind)]
  ].map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</div><details className="description-block"><summary>案件說明與來源關係</summary><p>{basicValue(p.description)}</p><p>報價總表 → 工程確認單 → 合約明細工項 → 合約填報工項 → 工作單 → 成本單。節點指派與任務另有 Lark record 關聯，日報不自動完成任務。</p></details><div className="info-callout"><Network size={19}/><div><strong>金額、成本與點數分開追蹤</strong><p>合約金額為案件層資料。子任務點數依來源或指派設定，不重複累加為合約營收。</p></div></div></div></>}
- {dataSection==='activity'&&<div className="detail-page-content"><h2>討論與紀錄</h2><Comments c={c} p={p}/><EventList c={c} project={p.id}/><AuditTrail key={p.id} w={c.w} p={p}/></div>}{dataSection==='sources'&&<div className="detail-page-content"><h2>資料來源與同步</h2><p>最後成功來源同步 {c.w.source_status.last_sync||'尚未提供'} · {c.w.source_status.message||'狀態尚未提供'}</p><ItemsSourceSync projectId={p.id}/>{safeUrl(p.source_url)&&<a href={p.source_url} target="_blank" rel="noreferrer">查看案件來源</a>}</div>}{(tab==='flow'&&c.route.section==='approvals'||dataSection==='approvals')&&<div className="detail-page-content"><div className="section-heading"><div><h2>關聯審批</h2><p>審批通過後，由負責人明確套用新版本或新期限。</p></div><div className="heading-actions">{changeEnabled?<><button className="button" onClick={()=>{setApprovalType('extension');setModal('approval')}}><Clock3 size={16}/>申請展延</button><Primary onClick={()=>{setApprovalType('change');setModal('approval')}}><GitBranch size={16}/>設計變更</Primary></>:<span>變更與展延尚未開放</span>}</div></div>{changeEnabled?<ApprovalList c={c} approvals={approvals}/>:<details><summary>變更與展延歷史，只讀</summary>{approvals.slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))||a.id.localeCompare(b.id)).map(a=><p key={a.id}>{a.title} · {a.status}</p>)}</details>}<FinancialApprovalRequests c={c} p={p}/></div>}
+ {dataSection==='activity'&&<div className="detail-page-content"><h2>討論與紀錄</h2><Comments c={c} p={p}/><EventList c={c} project={p.id}/><AuditTrail key={p.id} w={c.w} p={p}/></div>}{dataSection==='sources'&&<div className="detail-page-content"><h2>資料來源與同步</h2>{sourceKindLabel(p.source_kind).startsWith('來源類型待核對')&&<p role="status">{sourceKindLabel(p.source_kind)}：此案件的來源類型未被辨識，請向系統管理者確認。</p>}<p>最後成功來源同步 {c.w.source_status.last_sync||'尚未提供'} · {c.w.source_status.message||'狀態尚未提供'}</p><ItemsSourceSync projectId={p.id}/>{safeUrl(p.source_url)&&<a href={p.source_url} target="_blank" rel="noreferrer">查看案件來源</a>}</div>}{(tab==='flow'&&c.route.section==='approvals'||dataSection==='approvals')&&<div className="detail-page-content"><div className="section-heading"><div><h2>關聯審批</h2><p>審批通過後，由負責人明確套用新版本或新期限。</p></div><div className="heading-actions">{changeEnabled?<><button className="button" onClick={()=>{setApprovalType('extension');setModal('approval')}}><Clock3 size={16}/>申請展延</button><Primary onClick={()=>{setApprovalType('change');setModal('approval')}}><GitBranch size={16}/>設計變更</Primary></>:<span>變更與展延尚未開放</span>}</div></div>{changeEnabled?<ApprovalList c={c} approvals={approvals}/>:<details><summary>變更與展延歷史，只讀</summary>{approvals.slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))||a.id.localeCompare(b.id)).map(a=><p key={a.id}>{a.title} · {a.status}</p>)}</details>}<FinancialApprovalRequests c={c} p={p}/></div>}
  {selectedTask&&<TaskInspector key={selectedTask.t.id} c={c} row={selectedTask} onClose={closeTask} onExtension={()=>{closeTask();setApprovalType('extension');setModal('approval')}}/>}
  {c.route.task&&c.route.task_source!=='sop_local'&&!selectedTask&&!target&&<div className="error-banner"><TriangleAlert size={17}/>找不到此任務，請從列表重新選擇。</div>}
  {modal==='participants'&&<ParticipantsModal c={c} p={p} onClose={()=>setModal('')}/>}{modal==='addtask'&&selected&&<AddTaskModal c={c} p={p} node={selected} onClose={()=>setModal('')}/>}{modal==='approval'&&changeEnabled&&<ApprovalForm c={c} p={p} node={selected} type={approvalType} onClose={()=>setModal('')}/>}{selected&&<NodeCompletion key={`${p.id}-${selected.id}-${c.s.user?.id}`} c={c} p={p} node={selected} open={modal==='complete-node'} onClose={()=>setModal('')} onNavigate={(nextTab,section,task)=>{setModal('');c.go({view:'project',project:p.id,node:selected.id,tab:nextTab,section,task,completion:selected.id})}}/>}
@@ -218,22 +219,27 @@ export function NodeSkipPanel({c,p,node,onNavigate,draft,setDraft}:{c:Ctx;p:Proj
 }
 
 const SCHEDULE_ACTIVATION='已依排程啟用';
-/** 工項 fact for the sheet: resolved titles only (never guessed); 「來源工項待核對」 when a link exists that cannot be resolved; empty when truly unlinked. */
-export function taskWorkFact(t:{work_item_id?:string;contract_item_ids?:unknown},items:unknown):string{
- const list=Array.isArray(items)?items as {id?:string;title?:string}[]:[];
+/** Work items already loaded with the progress read, as the same {id,title} shape as contract items. */
+export function progressWorkItems(progress?:Pick<ProjectProgress,'production'>|null):{id:string;title:string}[]{
+ return (['field','control','mapping','report'] as const).flatMap(key=>progress?.production?.[key]?.items||[]).flatMap(item=>{const title=item.name||item.code;return item.item_id&&title?[{id:item.item_id,title}]:[]});
+}
+/** 工項 fact for the sheet. Titles resolve against whichever loaded list holds the id (never guessed). An id that cannot be resolved shows 「來源工項待核對」 only while the task is still open, so finished sheets carry no noise; empty when truly unlinked. */
+export function taskWorkFact(t:{work_item_id?:string;contract_item_ids?:unknown},items:unknown,progressItems:{id:string;title:string}[]=[],finished=false):string{
+ const list=[...(Array.isArray(items)?items as {id?:string;title?:string}[]:[]),...progressItems];
  const ids=Array.isArray(t.contract_item_ids)?t.contract_item_ids.map(String):[];
  const titleOf=(id:string)=>list.find(item=>item.id===id)?.title;
  const titles=ids.map(titleOf).filter((title):title is string=>!!title);
+ const unresolved=finished?[]:['來源工項待核對'];
  if(!titles.length&&t.work_item_id){const own=titleOf(t.work_item_id);if(own)return own}
- if(titles.length)return [...new Set(titles),...(titles.length<ids.length?['來源工項待核對']:[])].join('、');
- return ids.length||t.work_item_id?'來源工項待核對':'';
+ if(titles.length)return [...new Set(titles),...(titles.length<ids.length?unresolved:[])].join('、');
+ return ids.length||t.work_item_id?unresolved.join('、'):'';
 }
 export function TaskInspector({c,row,onClose,onExtension}:{c:Ctx;row:TaskRow;onClose:()=>void;onExtension:()=>void}){
  const{p,n,t}=row;const relatedChanges=c.w.approvals.filter(a=>a.project_id===p.id&&a.type==='change'&&((a as Approval&{affected_task_ids?:string[]}).affected_task_ids||a.task_ids).includes(t.id));const[output,setOutput]=useDraft(draftKey(c.s,c.w,`task:${p.id}:${t.id}:v${t.revision}`),t.output||'');const[reason,setReason]=useState('');const[returning,setReturning]=useState(false);const[editing,setEditing]=useState(false);const[tab,setTab]=useState(c.route.comment?'comments':'details');useEffect(()=>{if(c.route.comment)setTab('comments')},[c.route.comment]);const scope={project_id:p.id,node_id:n.id,task_id:t.id};const canAssign=executionAllowed(p,c.w)&&(c.s.user?.can_business_override===true||p.pm_id===c.s.user?.id||n.owner_id===c.s.user?.id);const canAct=isTaskActor(t,c);
  const fields=editorFields({title:canAssign,assignee:canAssign,due:canAssign&&!t.due_date,notes:canAssign,status:false},'無編輯權限');
  const save=async(draft:TaskDraft)=>{const payload:Record<string,unknown>={};if(draft.title!==t.title)payload.title=draft.title.trim();if(draft.assignee!==t.owner_id)payload.owner_id=draft.assignee;if(draft.notes!==t.description)payload.description=draft.notes;if(!t.due_date&&draft.due)payload.due_date=draft.due;if(draft.start_date!==(t.start_date?.slice(0,10)||'')&&draft.start_date!==undefined)payload.start_date=draft.start_date;if(draft.points!==undefined&&draft.points!==(t.points==null?'':String(t.points)))payload.points=draft.points===''?null:Number(draft.points);const ok=Boolean(await c.run('task_update',payload,scope));if(ok)setEditing(false);return ok};
  const editRef=useRestoreEditFocus(editing);const history=c.w.events.filter(e=>e.task_id===t.id);const unrecordedActivation=t.activation_source==='schedule'&&!!t.activated_at&&!history.some(e=>e.action==='task_activate');const finished=t.status==='completed'||t.status==='superseded';const canEdit=canAssign&&!finished;
- const works=taskWorkFact(t,c.w.contract_items);
+ const works=taskWorkFact(t,c.w.contract_items,progressWorkItems(peekProjectProgress(p.id)),finished);
  const schedule=t.start_date&&t.due_date?{label:'開始 → 期限',value:<>{date(t.start_date)}<ArrowRight size={13} aria-label="至"/>{date(t.due_date)}</>}:t.due_date?{label:'期限',value:date(t.due_date)}:t.start_date?{label:'開始',value:date(t.start_date)}:null;
  const facts=[{label:'負責人',value:<><Avatar small user={c.w.users.find(u=>u.id===t.owner_id)}/>{nameOf(c.w,t.owner_id)}</>},...(schedule?[schedule]:[]),...(works?[{label:'工項',value:works}]:[]),...(t.points==null?[]:[{label:'營業額點數',value:`${points(t.points)} 點`}])];
  const tabs=<div className="tabbar inspector-tabs" aria-label="任務內容"><button aria-pressed={tab==='details'} className={tab==='details'?'active':''} onClick={()=>setTab('details')}>任務詳情</button><button aria-pressed={tab==='comments'} className={tab==='comments'?'active':''} onClick={()=>setTab('comments')}>評論{(t.comments?.length||0)>0&&<span>{t.comments?.length}</span>}</button><button aria-pressed={tab==='history'} className={tab==='history'?'active':''} onClick={()=>setTab('history')}>歷程</button></div>;

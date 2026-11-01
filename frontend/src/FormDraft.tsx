@@ -5,7 +5,7 @@ export const DraftNamespace=createContext('');
 type Saved=Record<string,string[]>;
 type Concurrency=Record<string,string>;
 type SavedDraft={value:Saved;at:number;concurrency?:Concurrency;initial?:Saved};
-type DraftFormProps={title:string;draftId:string;onSubmit:(values:Record<string,FormDataEntryValue>,e:FormEvent<HTMLFormElement>)=>void|Promise<unknown>;children:ReactNode;busy:boolean;concurrency?:Concurrency};
+type DraftFormProps={title:string;draftId:string;onSubmit:(values:Record<string,FormDataEntryValue>,e:FormEvent<HTMLFormElement>)=>void|Promise<unknown>;children:ReactNode;busy:boolean;concurrency?:Concurrency;flat?:boolean};
 function fields(form:HTMLFormElement){
  return Array.from(form.elements).filter((element):element is HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement=>(element instanceof HTMLInputElement||element instanceof HTMLTextAreaElement||element instanceof HTMLSelectElement)&&!!element.name&&!['password','file','hidden'].includes(element.type));
 }
@@ -38,7 +38,7 @@ export function DraftForm(props:DraftFormProps){
  // Field defaults and their revision must advance together.
  return <ScopedDraftForm key={`${key}:${savedTick}`} {...props} storageKey={key} namespace={namespace} onSaved={()=>{if(activeKey.current===key)setSavedTick(t=>t+1)}}/>;
 }
-function ScopedDraftForm({title,draftId,onSubmit,children,busy,concurrency,storageKey:key,namespace,onSaved}:DraftFormProps&{storageKey:string;namespace:string;onSaved:()=>void}){
+function ScopedDraftForm({title,draftId,onSubmit,children,busy,concurrency,flat,storageKey:key,namespace,onSaved}:DraftFormProps&{storageKey:string;namespace:string;onSaved:()=>void}){
  const ref=useRef<HTMLFormElement>(null);
  const[stored,setStored]=useState<SavedDraft|null>(()=>{try{const entry=JSON.parse(sessionStorage.getItem(key)||'null');return entry&&Date.now()-entry.at<86400000?entry:null}catch{return null}});
  const[notice,setNotice]=useState(stored?'有未送出的暫存文字，可核對後恢復。':'');
@@ -73,12 +73,13 @@ function ScopedDraftForm({title,draftId,onSubmit,children,busy,concurrency,stora
   if(!stored)return;
   pending.current=stored;baseline.current=concurrency;setConflict(false);setFieldTick(t=>t+1);
  };
- return <details className="ops-form"><summary>{title}</summary>{stored&&<div className="draft-recovery"><p>{notice||'文字已暫存於本分頁，尚未送出。'}</p>{conflict?<button className="button" type="button" disabled={busy} onClick={rebase}>以最新資料重新套用</button>:<button className="button" type="button" onClick={restore}>恢復暫存文字</button>}<button className="text-button" type="button" onClick={()=>{sessionStorage.removeItem(key);setStored(null);setNotice('');setConflict(false);baseline.current=concurrency;setFieldTick(t=>t+1)}}>捨棄暫存</button></div>}<form key={fieldTick} ref={ref} onChange={capture} onSubmit={e=>{
+ const body=<>{stored&&<div className="draft-recovery"><p>{notice||'文字已暫存於本分頁，尚未送出。'}</p>{conflict?<button className="button" type="button" disabled={busy} onClick={rebase}>以最新資料重新套用</button>:<button className="button" type="button" onClick={restore}>恢復暫存文字</button>}<button className="text-button" type="button" onClick={()=>{sessionStorage.removeItem(key);setStored(null);setNotice('');setConflict(false);baseline.current=concurrency;setFieldTick(t=>t+1)}}>捨棄暫存</button></div>}<form key={fieldTick} ref={ref} onChange={capture} onSubmit={e=>{
   e.preventDefault();if(conflict)return;capture();const submittedKey=key;
   const values=Object.fromEntries(new FormData(e.currentTarget).entries());if(baseline.current)values._entity_versions=JSON.stringify(baseline.current);
   const result=onSubmit(values,e);
   if(result&&typeof (result as Promise<unknown>).then==='function')void Promise.resolve(result).then(saved=>{
    if(!saved)return;try{sessionStorage.removeItem(submittedKey)}catch{}onSaved();
   }).catch(error=>{if(error&&typeof error==='object'&&'status' in error&&error.status===409)setConflict(true)});
- }}><div className="ops-fields">{children}</div><Button variant="primary" className="button primary" disabled={busy||conflict} type="submit">儲存</Button></form></details>;
+ }}><div className="ops-fields">{children}</div><Button variant="primary" className="button primary" disabled={busy||conflict} type="submit">儲存</Button></form></>;
+ return flat?<section className="ops-form"><h4>{title}</h4>{body}</section>:<details className="ops-form"><summary>{title}</summary>{body}</details>;
 }
