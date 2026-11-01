@@ -10,7 +10,8 @@ import {ProjectDetailShell,ProjectExecutionDetails} from './ProjectDetailShell';
 const ProjectPeople=lazy(()=>import('./ProjectDestinations').then(m=>({default:m.ProjectPeople})));
 const WorkItemsTab=lazy(()=>import('./WorkItemsTab').then(m=>({default:m.WorkItemsTab})));
 import {useSopTasks,canReadSop,prefetchSopTasks,prefetchSopAssignees} from './useSopTasks';
-import {prefetchProjectProgress,useProjectProgress} from './useProjectProgress';
+import {peekProjectProgress,prefetchProjectProgress,useProjectProgress} from './useProjectProgress';
+import type {ProjectProgress} from './projectProgressApi';
 import {ProjectFlow} from './ProjectFlow';
 import {TaskDrawer,DrawerFacts} from './TaskDrawer';
 import {caseDataSections,sourceKindLabel} from './caseDataSections';
@@ -218,22 +219,27 @@ export function NodeSkipPanel({c,p,node,onNavigate,draft,setDraft}:{c:Ctx;p:Proj
 }
 
 const SCHEDULE_ACTIVATION='已依排程啟用';
-/** 工項 fact for the sheet: resolved titles only (never guessed); 「來源工項待核對」 when a link exists that cannot be resolved; empty when truly unlinked. */
-export function taskWorkFact(t:{work_item_id?:string;contract_item_ids?:unknown},items:unknown):string{
- const list=Array.isArray(items)?items as {id?:string;title?:string}[]:[];
+/** Work items already loaded with the progress read, as the same {id,title} shape as contract items. */
+export function progressWorkItems(progress?:Pick<ProjectProgress,'production'>|null):{id:string;title:string}[]{
+ return (['field','control','mapping','report'] as const).flatMap(key=>progress?.production?.[key]?.items||[]).flatMap(item=>{const title=item.name||item.code;return item.item_id&&title?[{id:item.item_id,title}]:[]});
+}
+/** 工項 fact for the sheet. Titles resolve against whichever loaded list holds the id (never guessed). An id that cannot be resolved shows 「來源工項待核對」 only while the task is still open, so finished sheets carry no noise; empty when truly unlinked. */
+export function taskWorkFact(t:{work_item_id?:string;contract_item_ids?:unknown},items:unknown,progressItems:{id:string;title:string}[]=[],finished=false):string{
+ const list=[...(Array.isArray(items)?items as {id?:string;title?:string}[]:[]),...progressItems];
  const ids=Array.isArray(t.contract_item_ids)?t.contract_item_ids.map(String):[];
  const titleOf=(id:string)=>list.find(item=>item.id===id)?.title;
  const titles=ids.map(titleOf).filter((title):title is string=>!!title);
+ const unresolved=finished?[]:['來源工項待核對'];
  if(!titles.length&&t.work_item_id){const own=titleOf(t.work_item_id);if(own)return own}
- if(titles.length)return [...new Set(titles),...(titles.length<ids.length?['來源工項待核對']:[])].join('、');
- return ids.length||t.work_item_id?'來源工項待核對':'';
+ if(titles.length)return [...new Set(titles),...(titles.length<ids.length?unresolved:[])].join('、');
+ return ids.length||t.work_item_id?unresolved.join('、'):'';
 }
 export function TaskInspector({c,row,onClose,onExtension}:{c:Ctx;row:TaskRow;onClose:()=>void;onExtension:()=>void}){
  const{p,n,t}=row;const relatedChanges=c.w.approvals.filter(a=>a.project_id===p.id&&a.type==='change'&&((a as Approval&{affected_task_ids?:string[]}).affected_task_ids||a.task_ids).includes(t.id));const[output,setOutput]=useDraft(draftKey(c.s,c.w,`task:${p.id}:${t.id}:v${t.revision}`),t.output||'');const[reason,setReason]=useState('');const[returning,setReturning]=useState(false);const[editing,setEditing]=useState(false);const[tab,setTab]=useState(c.route.comment?'comments':'details');useEffect(()=>{if(c.route.comment)setTab('comments')},[c.route.comment]);const scope={project_id:p.id,node_id:n.id,task_id:t.id};const canAssign=executionAllowed(p,c.w)&&(c.s.user?.can_business_override===true||p.pm_id===c.s.user?.id||n.owner_id===c.s.user?.id);const canAct=isTaskActor(t,c);
  const fields=editorFields({title:canAssign,assignee:canAssign,due:canAssign&&!t.due_date,notes:canAssign,status:false},'無編輯權限');
  const save=async(draft:TaskDraft)=>{const payload:Record<string,unknown>={};if(draft.title!==t.title)payload.title=draft.title.trim();if(draft.assignee!==t.owner_id)payload.owner_id=draft.assignee;if(draft.notes!==t.description)payload.description=draft.notes;if(!t.due_date&&draft.due)payload.due_date=draft.due;if(draft.start_date!==(t.start_date?.slice(0,10)||'')&&draft.start_date!==undefined)payload.start_date=draft.start_date;if(draft.points!==undefined&&draft.points!==(t.points==null?'':String(t.points)))payload.points=draft.points===''?null:Number(draft.points);const ok=Boolean(await c.run('task_update',payload,scope));if(ok)setEditing(false);return ok};
  const editRef=useRestoreEditFocus(editing);const history=c.w.events.filter(e=>e.task_id===t.id);const unrecordedActivation=t.activation_source==='schedule'&&!!t.activated_at&&!history.some(e=>e.action==='task_activate');const finished=t.status==='completed'||t.status==='superseded';const canEdit=canAssign&&!finished;
- const works=taskWorkFact(t,c.w.contract_items);
+ const works=taskWorkFact(t,c.w.contract_items,progressWorkItems(peekProjectProgress(p.id)),finished);
  const schedule=t.start_date&&t.due_date?{label:'開始 → 期限',value:<>{date(t.start_date)}<ArrowRight size={13} aria-label="至"/>{date(t.due_date)}</>}:t.due_date?{label:'期限',value:date(t.due_date)}:t.start_date?{label:'開始',value:date(t.start_date)}:null;
  const facts=[{label:'負責人',value:<><Avatar small user={c.w.users.find(u=>u.id===t.owner_id)}/>{nameOf(c.w,t.owner_id)}</>},...(schedule?[schedule]:[]),...(works?[{label:'工項',value:works}]:[]),...(t.points==null?[]:[{label:'營業額點數',value:`${points(t.points)} 點`}])];
  const tabs=<div className="tabbar inspector-tabs" aria-label="任務內容"><button aria-pressed={tab==='details'} className={tab==='details'?'active':''} onClick={()=>setTab('details')}>任務詳情</button><button aria-pressed={tab==='comments'} className={tab==='comments'?'active':''} onClick={()=>setTab('comments')}>評論{(t.comments?.length||0)>0&&<span>{t.comments?.length}</span>}</button><button aria-pressed={tab==='history'} className={tab==='history'?'active':''} onClick={()=>setTab('history')}>歷程</button></div>;

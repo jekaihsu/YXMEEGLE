@@ -2,13 +2,15 @@ import assert from 'node:assert/strict';
 import {writeFile,unlink} from 'node:fs/promises';
 import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
+import {readFileSync} from 'node:fs';
 import {projectFixture} from './fixtures/node-assignments.mjs';
+const progressFixture=JSON.parse(readFileSync(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=project&project=p1&tab=flow&node=node_sales',pretendToBeVisual:true});
 for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','Element','Node','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.getComputedStyle=dom.window.getComputedStyle;
 HTMLElement.prototype.scrollIntoView=function(){};globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
-const bundle=await build({stdin:{contents:"export {ProjectDetail} from './src/ProjectDetail'; export {normalizeRoute,parseRoute,invalidateSessionEpoch} from './src/api';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {ProjectDetail} from './src/ProjectDetail'; export {normalizeRoute,parseRoute,invalidateSessionEpoch} from './src/api'; export {taskWorkFact,progressWorkItems} from './src/ProjectDetail'; export {seedProjectProgress} from './src/useProjectProgress';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
 const temp=new URL('./.task-sheet.mjs',import.meta.url);await writeFile(temp,bundle.outputFiles[0].text);const ui=await import(temp.href);await unlink(temp);
 const tick=()=>new Promise(r=>setTimeout(r,15));
 const guest={id:'ou_guest',name:'訪客',role:'member',department:'',avatar:'',capabilities:[]};
@@ -17,8 +19,8 @@ const render=()=>root.render(React.createElement(ui.ProjectDetail,{c}));
 const go=(next,replace=false)=>{const r=ui.normalizeRoute(next);const q=new URLSearchParams();Object.entries(r).forEach(([k,v])=>{if(v)q.set(k,v)});if(replace)history.replaceState(null,'',location.pathname+location.search+'#'+q.toString());else location.hash=q.toString();c={...c,route:r};render()};
 window.addEventListener('hashchange',()=>{if(!root)return;c={...c,route:ui.parseRoute(location.hash)};render()});
 const task=(id,patch={})=>({id,title:`任務 ${id}`,owner_id:'',status:'in_progress',required:true,start_date:null,due_date:null,original_due_date:null,started_at:null,completed_at:null,points:null,work_item_id:'',description:'',input:'',output:'',comments:[],revision:1,can_execute:true,...patch});
-async function mount(id,patch,{actor,features={},items,events}={}){
- if(root){await act(async()=>root.unmount());root=null}ui.invalidateSessionEpoch();calls=[];
+async function mount(id,patch,{actor,features={},items,events,progress}={}){
+ if(root){await act(async()=>root.unmount());root=null}ui.invalidateSessionEpoch();calls=[];if(progress)ui.seedProjectProgress('p1',progress);
  const base=projectFixture();
  const node=base.project.nodes.find(n=>n.key==='sales');node.tasks=[task(id,{owner_id:base.user.id,...patch})];
  if(items)base.workspace.contract_items=items;if(events)base.workspace.events=events;
@@ -131,6 +133,21 @@ await check('工項 fact: resolved titles only, 「來源工項待核對」 for 
  assert.equal(facts()['工項'],'來源工項待核對','the title is never guessed from an unrelated item');
  await mount('t1');
  assert.equal(facts()['工項'],undefined,'truly unlinked: omitted');
+});
+await check('工項 fact resolves against the loaded progress work items and stays quiet on finished tasks',async()=>{
+ const progress=structuredClone(progressFixture);progress.production.field.items[0]={...progress.production.field.items[0],item_id:'p1-survey',name:'現況測量'};
+ await mount('t1',{work_item_id:'p1-survey'},{progress});
+ assert.equal(facts()['工項'],'現況測量','a work_item_id found in the progress work items shows its real title');
+ await mount('t1',{work_item_id:'p1-survey',status:'completed'},{progress});
+ assert.equal(facts()['工項'],'現況測量','a resolvable id still shows its title on a finished task');
+ await mount('t1',{work_item_id:'p1-survey',status:'completed'});
+ assert.equal(facts()['工項'],undefined,'completed task whose work item cannot be resolved: no 來源工項待核對 row');
+ await mount('t1',{work_item_id:'p1-survey',status:'superseded'});
+ assert.equal(facts()['工項'],undefined,'cancelled task: no 來源工項待核對 row');
+ await mount('t1',{work_item_id:'p1-survey'});
+ assert.equal(facts()['工項'],'來源工項待核對','an open task keeps the flag');
+ assert.deepEqual(ui.progressWorkItems({production:{field:{items:[{item_id:'a',name:null,code:'C1'},{item_id:'b',name:null,code:null}]}}}),[{id:'a',title:'C1'}]);
+ assert.equal(ui.taskWorkFact({contract_item_ids:['x','y']},[{id:'x',title:'控制點'}],[],true),'控制點','finished: resolved titles only');
 });
 await check('keyboard: 編輯 moves focus to the first field; cancel and save return it to 編輯',async()=>{
  await mount('t1',{description:'依確認單施作'});

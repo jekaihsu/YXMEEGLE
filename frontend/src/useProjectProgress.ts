@@ -20,6 +20,8 @@ export function prefetchProjectProgress(id: string, force = false, signal?:Abort
  pending.set(id, {request,signal,batch});
  return request;
 }
+/** The progress read for `id` if some tab already loaded it. Never fetches. */
+export function peekProjectProgress(id:string):ProjectProgress|undefined{return epoch===getSessionEpoch()?cache.get(id)?.data:undefined}
 export function seedProjectProgress(id:string,data:ProjectProgress) {if(epoch!==getSessionEpoch()){cache.clear();pending.clear();epoch=getSessionEpoch()}cache.set(id,{data,at:Date.now()})}
 export function useProjectProgress(id: string, enabled = true) {
  const [state, setState] = useState<State>({kind: 'loading'});
