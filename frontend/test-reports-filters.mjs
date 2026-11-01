@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import {mkdir} from 'node:fs/promises';
+import {join} from 'node:path';
+const screenshotDir=process.env.REPORTS_FILTERS_SCREENSHOTS;
+if(screenshotDir)await mkdir(screenshotDir,{recursive:true});
 import {build} from 'esbuild';
 import {chromium} from 'playwright-core';
 const bundle=await build({stdin:{contents:`import './src/styles.css';import './src/reports/preview';`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,outdir:'out',format:'iife',jsx:'automatic'});
@@ -11,7 +15,11 @@ try{
   for(const [tab,count] of [['業主聯繫紀錄',7],['業務數據',2],['檢查報告',4],['儀器車輛',4],['工作進度',1]]){
    await page.getByRole('button',{name:tab,exact:true}).click();
    await page.locator('.reports-filters .ds-picker>button').first().waitFor();
-   await page.waitForFunction(count=>document.querySelectorAll('.reports-filters .ds-picker>button').length===count&&[...document.querySelectorAll('.reports-filters .ds-picker>button')].every(b=>b.textContent.trim()),count);
+   await page.waitForFunction(count=>document.querySelectorAll('.reports-filters .ds-picker>button').length===count&&[...document.querySelectorAll('.reports-filters .ds-select')].every(select=>select.querySelector('.ds-picker>button span')?.textContent===select.querySelector('select').selectedOptions[0]?.textContent),count);
+   if(tab==='業主聯繫紀錄'&&screenshotDir&&!hasTouch){
+    await page.evaluate(async()=>{await document.fonts.ready;const filters=document.querySelector('.reports-filters');window.scrollTo(0,filters.getBoundingClientRect().top+scrollY-100);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))});
+    await page.screenshot({path:join(screenshotDir,`after-${width}.png`),animations:'disabled'});
+   }
    const failures=await page.evaluate(()=>{
     const failures=[];
     const controlHeight=matchMedia('(max-width:700px),(pointer:coarse)').matches?44:40;
