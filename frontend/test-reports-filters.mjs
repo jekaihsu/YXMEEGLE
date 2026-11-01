@@ -37,11 +37,27 @@ try{
     if(document.documentElement.scrollWidth>innerWidth)failures.push('page overflow');
     const search=document.querySelector('.contacts-screen input[type=search]');
     if(search){const ctx=document.createElement('canvas').getContext('2d');ctx.font=getComputedStyle(search).font;if(ctx.measureText(search.placeholder).width>search.clientWidth-24)failures.push('truncated search placeholder');
-     const sort=document.querySelector('.reports-sort');if(Math.abs(sort.querySelector('button').getBoundingClientRect().bottom-sort.querySelector('label').getBoundingClientRect().bottom)>1)failures.push('sort misalignment');
+     const sort=document.querySelector('.reports-sort');const toggle=sort.querySelector(':scope > button');const toggleRect=toggle.getBoundingClientRect();
+     if(Math.abs(toggleRect.height-controlHeight)>1)failures.push('sort toggle height');
+     if(Math.abs(toggleRect.bottom-sort.querySelector('label').getBoundingClientRect().bottom)>1)failures.push('sort misalignment');
+     const style=getComputedStyle(toggle);const transparent=color=>color==='transparent'||/rgba\([^)]*,\s*0\)$/.test(color);
+     const borderVisible=['Top','Right','Bottom','Left'].some(side=>parseFloat(style[`border${side}Width`])>0&&style[`border${side}Style`]!=='none'&&!transparent(style[`border${side}Color`]));
+     if(!borderVisible&&transparent(style.backgroundColor)&&style.backgroundImage==='none')failures.push('sort toggle has no chrome');
+     for(const neighbour of document.querySelectorAll('.reports-filters input,.reports-filters .ds-picker>button')){
+      const rect=neighbour.getBoundingClientRect();if(Math.abs(rect.top-toggleRect.top)<=1&&Math.abs(rect.bottom-toggleRect.bottom)>1)failures.push('sort not bottom-aligned with neighbours');
+     }
+     if(innerWidth===1440&&new Set([...sort.parentElement.children].map(field=>field.getBoundingClientRect().bottom)).size!==2)failures.push('Contacts toolbar must have two rows at 1440px');
      const filters=search.closest('.reports-filters');if(filters.getBoundingClientRect().top-filters.previousElementSibling.getBoundingClientRect().bottom>24)failures.push('gap above filters');}
     return failures;
    });
    assert.deepEqual(failures,[],`${tab} at ${width}px, touch=${hasTouch}`);
+   if(tab==='業主聯繫紀錄'){
+    const toggle=page.locator('.reports-sort > button');
+    await page.locator('.reports-sort .ds-picker>button').focus();await page.keyboard.press('Tab');
+    assert(await toggle.evaluate(button=>button===document.activeElement&&button.matches(':focus-visible')&&parseFloat(getComputedStyle(button).outlineWidth)>0),'sort toggle keyboard focus is visible');
+    await page.keyboard.press('Enter');assert.equal(await toggle.textContent(),'升冪');
+    await page.keyboard.press('Enter');assert.equal(await toggle.textContent(),'降冪');
+   }
   }
   await page.close();console.log(`Report filter layout passed at ${width}px across five tabs, touch=${hasTouch}.`);
  }
