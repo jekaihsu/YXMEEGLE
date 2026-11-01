@@ -1,0 +1,166 @@
+# Assistant elements research and decisions
+
+Source snapshot `ff654d8156680b839774296ef644b57ab1078425`, cloned into `/tmp/ai-feat-chat-ui-research` on 2026-10-31.
+
+Read the [documentation index](https://www.assistant-ui.com/llms.txt), [data-table docs](https://www.assistant-ui.com/elements/data-table), and [chart docs](https://www.assistant-ui.com/elements/chart).
+Source files under `packages/ui/src/components/react/assistant-ui/elements/` supplied the ports. Registry components are source distribution, not standalone npm packages. No dependencies were added.
+The upstream table supports format rules, controlled or default sorting, row identity, captions, and a locale. This port accepts the contract subset of strings, numbers, and nulls. Numeric columns are inferred. The upstream narrow card list and wide table use Tailwind container breakpoints. This port uses a named CSS container at 36rem.
+The upstream chart accepts label, headline value, delta, numeric points, visibleCount, and area/line/bars variants. This port uses contract-provided labeled points and the bars variant. Server tool results arrive atomically, so point-by-point reveal and delta are omitted. The SVG baseline also supports negative values and a single point.
+Both root data-slot hooks are preserved. The MIT copyright and permission notice are retained in `src/assistant/elements/LICENSE.assistant-ui`, with attribution headers in ported components.
+Docs demonstrate ToolCallMessagePartComponent renderers registered through defineToolkit. This app already has a server-owned model adapter, so the four tools are registered through the pinned MessagePrimitive.Parts `tools.by_name` API. Tool results carry displays, not model-authored tool arguments.
+Pinned 0.15.32 source was checked in node_modules. ActionBarPrimitive.Copy/Reload/FeedbackPositive/FeedbackNegative exist. useLocalRuntime accepts adapters.feedback. The adapter receives message, type, and comment and returns void. The runtime immediately writes message.metadata.submittedFeedback. It has no cancellation or async rollback setter.
+The feedback bridge posts the contract rating and updates submittedFeedback via the public thread export/import API while idle. A pending save that finishes during a new run defers its metadata patch until the run stops. Feedback controls are disabled during a run or pending save. Per-message usage_id stays in metadata.custom. StrictMode cleanup aborts stale saves.
+
+The catalog contains 129 registry entries and 22 generative templates, 151 total. Each decision follows.
+
+- Loader (`loading-state`), skip. The ported thinking indicator covers query work.
+- Thinking indicator (`thinking-indicator`), port. Preserve dot and label anatomy with data-slot, status semantics, token colors, and reduced-motion support.
+- Streaming text (`streaming-text`), skip. MarkdownTextPrimitive already streams real deltas.
+- Typing indicator (`typing-indicator`), skip. The ported thinking indicator supplies the same status.
+- Reasoning effort (`reasoning-effort`), skip. Effort is fixed by the backend.
+- Guardrail notice (`guardrail-notice`), skip. Existing permission and error messages already explain refusals.
+- Message pair (`message-pair`), use. MessagePrimitive already separates user and assistant turns.
+- Message branches (`message-branches`), skip. Reload retains runtime branch history, but this task does not need a branch picker.
+- Message actions (`message-actions`), use. ActionBarPrimitive provides copy, reload, and the two feedback actions.
+- Error state (`error-state`), use. The existing inline alert explains incomplete replies.
+- Message queue (`message-queue`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Edit a sent message (`edit-message`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Feedback dialog (`feedback-dialog`), skip. Inline dismissable reason chips fit the four-code contract without a modal.
+- Stopped run (`stopped-run`), use. The existing stop control and ToolChip show interruption.
+- Timestamps (`day-separator`), skip. Message creation time is not the source as-of time; the table caption already carries source time.
+- Speaker identity (`speaker-identity`), use. The existing speaker label identifies each turn.
+- Regenerate with (`regenerate-menu`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Confidence (`confidence-marker`), skip. No calibrated confidence is available.
+- Tool call (`tool-call`), use. ToolChip shows tool progress above completed displays.
+- Run activity (`run-activity`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Tool timeline (`tool-timeline`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Terminal block (`terminal-block`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Code diff (`code-diff`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Reviewable diff (`reviewable-diff`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- File tree (`file-tree`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Elicitation form (`elicitation-form`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Server panel (`mcp-server-panel`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Tool failure (`tool-error`), use. ToolChip retains the error state.
+- Permission grant (`permission-grant`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Computer use (`computer-use`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Code runner (`code-runner`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Web search (`web-search`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Inline citation (`inline-citation`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Link preview (`link-preview`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Image generation (`image-generation`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Image gallery (`image-gallery`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Retrieval chunks (`retrieval-chunks`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Document reference (`document-reference`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Memory (`memory-chips`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Research report (`research-report`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Map (`map-answer`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Geo map (`geo-map`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Data table (`data-table`), port. Preserve semantic table, card list, three-state stable sorting, aria-sort, live announcements, and data-slot; add a narrow-layout sort selector and use plain CSS container queries.
+- Number ticker (`number-ticker`), skip. Animating business counts adds motion without information.
+- Chart (`chart`), port. Preserve headline and SVG bars with data-slot; add labeled values, focus and hover tooltips, and a hidden data table.
+- Media player (`media-player`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Web preview (`web-preview`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Diagram (`diagram`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Flow graph (`flow-graph`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Activity graph (`activity-graph`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Math (`math-block`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Spec sheet (`spec-sheet`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Comparison (`comparison-card`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Timeline (`timeline`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Job progress (`job-progress`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Score breakdown (`score-breakdown`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Agent plan (`agent-plan`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Subagent list (`subagent-list`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Task card (`task-card`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Agent status (`agent-status`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Approval card (`approval-card`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Option list (`option-list`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Question flow (`question-flow`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Recommendation card (`recommendation-card`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Artifact card (`artifact-card`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Todo list (`todo-list`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Agent card (`agent-card`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Handoff (`agent-handoff`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Background runs (`background-inbox`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Checkpoints (`checkpoint-history`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Schedule (`schedule-card`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Trace waterfall (`trace-waterfall`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Cost meter (`cost-meter`), skip. Usage reporting belongs to the separately owned dashboard.
+- Quota banner (`quota-banner`), skip. The server already returns a quota error without remaining-quota data.
+- Composer (`composer`), use. ComposerPrimitive already handles send, stop, and keyboard input.
+- Slash commands (`composer-slash-commands`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Mentions (`composer-mentions`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Attachments (`composer-attachments`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Models (`composer-model-picker`), use. The existing two-choice ModelPicker follows the server catalog.
+- Dictation (`composer-voice`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Context (`composer-context`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Draft restore (`draft-restore`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Context breakdown (`context-breakdown`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Prompt library (`prompt-library`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Command palette (`command-palette`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Voice conversation (`voice-conversation`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Read aloud (`read-aloud`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Chat panel (`chat-panel`), skip. The existing Page and thread already fit the application shell.
+- Empty state (`empty-state`), use. Existing starter prompts make the first query concrete.
+- Scroll anchor (`scroll-anchor`), use. ThreadPrimitive.ScrollToBottom already respects viewport state.
+- Canvas (`canvas-split`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Connection state (`connection-state`), skip. Transport failures already produce an inline reply error.
+- Shared conversation (`shared-conversation`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Search in conversation (`conversation-search`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Thread search (`thread-search`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Launcher (`launcher-bubble`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Settings (`settings-panel`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Onboarding (`onboarding`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Mobile composer (`mobile-composer`), skip. The existing responsive composer keeps touch targets and model choice.
+- Thread (`thread`), use. Existing ThreadPrimitive and MessagePrimitive own runtime state.
+- Assistant modal (`assistant-modal`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Assistant sidebar (`assistant-sidebar`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Thread list (`thread-list`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Thread list sidebar (`thread-list-sidebar`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Orb (`orb`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Reasoning (`reasoning`), skip. The server does not emit reasoning.
+- Message timing (`message-timing`), skip. The contract does not stream timing data.
+- Conversation map (`conversation-map`), skip. A short local conversation needs no graph navigation.
+- Context display (`context-display`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- MCP config dialog (`mcp-config`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Attachment (`attachment`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Follow-up suggestions (`follow-up-suggestions`), skip. The contract supplies no generated follow-ups; existing starter prompts remain.
+- Tool fallback (`tool-fallback`), use. Unknown tool names retain ToolChip status and use the same display renderer.
+- Tool group (`tool-group`), skip. Four compact tool summaries do not need an extra disclosure layer.
+- Quote (`quote`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Sources (`sources`), skip. The contract provides no source URLs or citation IDs; retain source as-of captions without inventing links.
+- Image (`image`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- File (`file`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Model selector (`model-selector`), use. The existing ModelPicker limits choices to the contract.
+- Composer trigger popover (`composer-trigger-popover`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Directive text (`directive-text`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Markdown text (`markdown-text`), use. The exact-pinned renderer retains GFM table fallback.
+- Syntax highlighter (`syntax-highlighter`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Shiki highlighter (`shiki-highlighter`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Mermaid diagram (`mermaid-diagram`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Generative UI (`generative-ui`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Tooltip icon button (`tooltip-icon-button`), skip. Actions have visible text and accessible labels.
+- Model logos (`logos`), skip. Provider names are sufficient and avoid decorative dependencies.
+- Heat graph (`heat-graph`), skip. The read-only attendance and case contract has no matching payload or user operation.
+- Table reservation, skip. This template has no payload in the read-only attendance and case contract.
+- Order tracking, skip. This template has no payload in the read-only attendance and case contract.
+- Portfolio overview, skip. This template has no payload in the read-only attendance and case contract.
+- Riverside Loft, skip. This template has no payload in the read-only attendance and case contract.
+- Flight tracker, skip. This template has no payload in the read-only attendance and case contract.
+- Create event, skip. This template has no payload in the read-only attendance and case contract.
+- View event, skip. This template has no payload in the read-only attendance and case contract.
+- Playlist, skip. This template has no payload in the read-only attendance and case contract.
+- Ride status, skip. This template has no payload in the read-only attendance and case contract.
+- Draft email, skip. This template has no payload in the read-only attendance and case contract.
+- Shopping cart, skip. This template has no payload in the read-only attendance and case contract.
+- Channel message, skip. This template has no payload in the read-only attendance and case contract.
+- Purchase receipt, skip. This template has no payload in the read-only attendance and case contract.
+- Player card, skip. This template has no payload in the read-only attendance and case contract.
+- Conference session, skip. This template has no payload in the read-only attendance and case contract.
+- Confirm dialog, skip. This template has no payload in the read-only attendance and case contract.
+- Create task, skip. This template has no payload in the read-only attendance and case contract.
+- Current weather, skip. This template has no payload in the read-only attendance and case contract.
+- Software purchase, skip. This template has no payload in the read-only attendance and case contract.
+- Weekly active users, skip. This template has no payload in the read-only attendance and case contract.
+- Response time, skip. This template has no payload in the read-only attendance and case contract.
+- Support tickets, skip. This template has no payload in the read-only attendance and case contract.

