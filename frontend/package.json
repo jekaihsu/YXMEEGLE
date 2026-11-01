@@ -68,6 +68,7 @@
     "test:sop-tasks": "node test-sop-tasks.mjs",
     "test:quotes": "node test-quotes.mjs && node test-quotes-ui.mjs",
     "test:task-list-context": "node test-task-list-context.mjs",
+    "test:task-sheet": "node test-task-sheet.mjs",
     "test:route-loading": "node test-route-loading.mjs",
     "test:detail-loading": "node test-project-detail-loading.mjs && node test-detail-refresh.mjs && node test-home-panels.mjs && node test-detail-skeleton.mjs",
     "test:stage-model": "node test-stage-model.mjs && node test-assign-drawer-model.mjs && node test-stage-workspace.mjs && node test-stage-sop-merge.mjs && node test-library-memory.mjs && node test-sop-action-reasons.mjs && node test-stage-fixture.mjs",
