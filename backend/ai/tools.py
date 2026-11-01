@@ -343,7 +343,7 @@ def display_table(title, columns, rows, data, **extra):
     def cell(value):
         if isinstance(value, str):
             return value[:240]
-        if value is None or type(value) is int or (type(value) is float and math.isfinite(value)):
+        if value is None or type(value) in (bool, int) or (type(value) is float and math.isfinite(value)):
             return value
         return None
     return dict(kind='table', title=title, columns=[dict(key=k, label=v) for k, v in columns[:8]],

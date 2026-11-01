@@ -56,7 +56,7 @@ def test_search_real_route_sdk_sse(app, client, monkeypatch):
     source = client.get('/api/projects').json()['items'][0]
     displays, projected = sdk_tool(app, client, monkeypatch, 'search_cases', dict(query=source['code']))
     assert displays[0]['kind']=='table' and displays[0]['title']=='案件總覽'
-    assert displays[0]['rows']==[{**r,'overdue':None} for r in projected['rows']]
+    assert displays[0]['rows']==projected['rows']
     assert displays[0]['rows'][0]['name'] == source['name']
 
 
