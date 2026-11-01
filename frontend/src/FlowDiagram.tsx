@@ -1,17 +1,19 @@
-import {useEffect,useRef, type KeyboardEvent} from 'react';
+import {useEffect,useRef,useState, type KeyboardEvent} from 'react';
 import {Check, Circle, CircleDot, Clock3, Minus, TriangleAlert} from 'lucide-react';
 import {isProductionNode,NODE_ASSIGNMENT_ORDER} from './nodeAssignmentApi';
 import {Skeleton} from './design';
 import type {FlowNode, FlowProgress} from './flowModel';
 const stateIcons: Record<string, typeof Check> = {'未開始':Circle,'待處理':Clock3,'進行中':CircleDot,'待審核':TriangleAlert,'已完成':Check,'略過':Minus};
 export function FlowDiagram({nodes,overall,selected,loading,onSelect,compact=false,selectionFollowsFocus=false,stageNavigation=false,currentIds=[]}:{nodes:FlowNode[];overall:FlowProgress;selected:string;loading:boolean;onSelect:(key:string,keyboard?:boolean)=>void;compact?:boolean;selectionFollowsFocus?:boolean;stageNavigation?:boolean;currentIds?:string[]}) {
+ const [overflow,setOverflow]=useState(false);
  const buttons = useRef(new Map<string,HTMLButtonElement>());
  const chain=useRef<HTMLOListElement>(null);
  useEffect(()=>{
-  if(!stageNavigation||!chain.current)return;
+  if(!chain.current)return;
   const button=buttons.current.get(selected)?.getBoundingClientRect(),viewport=chain.current.getBoundingClientRect();
   if(button&&(button.left<viewport.left||button.right>viewport.right))chain.current.scrollLeft+=button.left-viewport.left;
- },[stageNavigation,selected]);
+ },[stageNavigation,selected,loading]);
+ useEffect(()=>{const el=chain.current;if(!el)return;const measure=()=>setOverflow(el.scrollWidth>el.clientWidth+1);measure();if(typeof ResizeObserver==='undefined')return;const observer=new ResizeObserver(measure);observer.observe(el);return()=>observer.disconnect()},[nodes.length,loading]);
  const navigate = (event:KeyboardEvent, index:number) => {
   const next = event.key === 'Home' ? 0 : event.key === 'End' ? nodes.length-1 : ['ArrowRight','ArrowDown'].includes(event.key) ? (index+1)%nodes.length : ['ArrowLeft','ArrowUp'].includes(event.key) ? (index+nodes.length-1)%nodes.length : -1;
   if(next<0)return;event.preventDefault();const node=nodes[next];if(!compact || selectionFollowsFocus)onSelect(node.key,true);buttons.current.get(node.key)?.focus({preventScroll:true});if(compact && chain.current){const button=buttons.current.get(node.key)?.getBoundingClientRect(),viewport=chain.current.getBoundingClientRect();if(button && button.left<viewport.left)chain.current.scrollLeft-=viewport.left-button.left;else if(button && button.right>viewport.right)chain.current.scrollLeft+=button.right-viewport.right;}
@@ -29,7 +31,7 @@ export function FlowDiagram({nodes,overall,selected,loading,onSelect,compact=fal
      {node.needs && <span className="pf-needs">{node.needs}</span>}
     </>}
    </button>
-  </li>})}</ol>{compact && <div className="po-stage-scroll" role="group" aria-label="捲動流程節點"><button aria-label="向前捲動流程節點" onClick={()=>chain.current?.scrollBy({left:-288})}>←</button><button aria-label="向後捲動流程節點" onClick={()=>chain.current?.scrollBy({left:288})}>→</button></div>}
+  </li>})}</ol>{compact && overflow && <div className="po-stage-scroll" role="group" aria-label="捲動流程節點"><button aria-label="向前捲動流程節點" onClick={()=>chain.current?.scrollBy({left:-288})}>←</button><button aria-label="向後捲動流程節點" onClick={()=>chain.current?.scrollBy({left:288})}>→</button></div>}
  </section>;
 }
 export function FlowPanelSkeleton(){return <section className="pf-panel glass--card" aria-label="節點明細載入中" aria-busy="true"><Skeleton width="40%" height="2rem"/><div className="pf-facts"><Skeleton lines={2}/><Skeleton lines={2}/><Skeleton lines={2}/></div><Skeleton height="10rem"/><Skeleton height="3rem" lines={3}/></section>}

@@ -44,7 +44,7 @@ function CreateTask({projectId,node,sop,onClose,testOperator}:{projectId:string;
  }}>{testOperator && <label className="na-wide"><input type="checkbox" role="switch" checked={isTest} onChange={e=>setIsTest(e.target.checked)}/>測試任務<small>僅供驗收，不會同步至 Lark。建立後可填寫原因清除。</small></label>}</TaskCreateForm>;
 }
 
-export function SopTasks({c, p, nodeKey, sop, importing, setImporting,remote=false}: {remote?:boolean;c: Ctx; p: Pick<Project,'id'>; nodeKey: string; sop: Sop; importing: SopImportTarget; setImporting: (target: SopImportTarget) => void}) {
+export function SopTasks({c, p, nodeKey, sop, importing, setImporting,remote=false,overview=false,emptyOverview=true,setupNotice=true}: {setupNotice?:boolean;emptyOverview?:boolean;overview?:boolean;remote?:boolean;c: Ctx; p: Pick<Project,'id'>; nodeKey: string; sop: Sop; importing: SopImportTarget; setImporting: (target: SopImportTarget) => void}) {
  const [wholeCase, setWholeCase] = useState(false);
  const [filters, setFilters] = useState<SopFilter[]>([]);
  const [history, setHistory] = useState(false);
@@ -93,6 +93,16 @@ const assign = async (t: SopTask, id: string) => {
   finally {if (sop.current()) setClosing(false)}
  };
  const selectTask=(id:string)=>setSelected(old=>{const next=new Set(old);if(next.has(id))next.delete(id);else next.add(id);return next});
+ if(overview)return <>
+  {emptyOverview&&data&&!data.tasks.some(t=>t.nodes.some(n=>n.node_key===nodeKey))&&<div className="pf-actions">
+   {allowed?.import&&canManageNode&&!localNode?.disabledReason&&<Button onClick={()=>setImporting(node!)}>匯入預設任務</Button>}
+   {allowed?.manage&&createNode&&<Button onClick={()=>setCreating(true)}>新增任務</Button>}
+  </div>}
+  {creating&&createNode&&<CreateTask testOperator={canOperateTestTasks(c.s.user)} projectId={p.id} node={createNode} sop={sop} onClose={()=>setCreating(false)}/>}
+  {openTask&&data&&<SopTaskInspector key={openTask.id} task={openTask} project={p} users={c.w.users} sop={sop} testOperator={canOperateTestTasks(c.s.user)} onCleaned={()=>openRoute()} onClose={()=>openRoute()}/>}
+  {routeTask&&data&&!openTask&&state.kind==='ready'&&!state.refreshing&&<p role="alert">找不到此 SOP 任務<Button onClick={()=>openRoute()}>關閉</Button></p>}
+  {importing&&data&&<SopImportSheet projectId={p.id} startNode={data.startNode} allowedNodes={managedNodes} only={importing==='case'?undefined:importing} onApplied={sop.reload} onClose={()=>setImporting(null)} onOpenImported={()=>setImporting(null)}/>}
+ </>;
  if (state.kind === 'forbidden') return !['sop_task_read','sop_task_import','sop_task_work'].some(cap => c.s.user?.capabilities?.includes(cap)) ? null
   : <section id="sop-tasks" className="pf-tasks sop-tasks" aria-label="SOP 任務"><header><h3>SOP 任務</h3><span className="sop-muted">需由管理員授予 sop_task_read（查看 SOP 任務）權限；完整原始程序另需 sop_task_read_source。</span></header></section>;
  const Container=remote?'div':'section';
@@ -106,7 +116,7 @@ const assign = async (t: SopTask, id: string) => {
     <Button variant="plain" onClick={() => {void sop.reload()}} disabled={state.kind === 'loading' || state.kind === 'ready' && state.refreshing}>重新整理</Button></div>
   </header>
 
-  {data && defaultChecklistState(data)==='not-applied' && <p role="status">預設清單尚未套用。實際 SOP 任務 {data.tasks.length} 項。{DEFAULT_CHECKLIST_NEXT_STEP}</p>}
+  {setupNotice && data && allowed?.import && defaultChecklistState(data)==='not-applied' && <p role="status">預設清單尚未套用。實際 SOP 任務 {data.tasks.length} 項。{DEFAULT_CHECKLIST_NEXT_STEP}</p>}
   {creating && createNode && <CreateTask testOperator={canOperateTestTasks(c.s.user)} projectId={p.id} node={createNode} sop={sop} onClose={() => setCreating(false)}/>}
   {!remote && data?.enrollment && <SopEnrollmentStatus projectId={p.id} enrollment={data.enrollment} current={sop.current} reload={sop.reload}/>}
   {(!remote || rows.length>0) && (!data || !counts || filtered || history || rows.length>0) && <div className="pf-filters sop-filters">
