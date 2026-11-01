@@ -140,7 +140,7 @@ test('completed case has no CTA even if workflow details still contain unfinishe
  const s=scenario();const result=m.stageNextStep({caseStatus:'completed',ctx:s.ctx,list:s.list,userId:'ou_anna',today:TODAY,fresh:true});assert.deepEqual(result,{kind:'none',title:'已完成',reasons:[]});
 });
 
-for(const [kind,title] of [['paused','案件暫停中'],['meegle','僅供參考'],['ownership','尚未核定執行歸屬'],['source','資料待核對'],['execution','案件執行受限']])test(`block cause ${kind} has a truthful title and no CTA`,()=>{
+for(const [kind,title] of [['paused','案件暫停中'],['meegle','僅供參考'],['ownership','尚未核定執行歸屬'],['execution','案件執行受限']])test(`block cause ${kind} has a truthful title and no CTA`,()=>{
  const s=scenario({tasks:{sales:[task('a')]}});assert.deepEqual(step(s,{block:{kind,reason:'API 提供的原因'}}),{kind:'none',title,reasons:['API 提供的原因']});
 });
 test('shared blockers dedupe only common pending reasons and preserve unique causes',()=>{

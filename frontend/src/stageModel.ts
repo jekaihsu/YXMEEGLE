@@ -74,8 +74,8 @@ export function groupTasks({ctx,filters,userId,today,loaded}:{ctx:StageContext;f
  return {selected:all.find(g=>g.node.key===ctx.selectedId),others:all.filter(g=>g.node.key!==ctx.selectedId&&(g.total>0||g.rows.length>0))};
 }
 
-export type StageBlock={kind:'paused'|'meegle'|'ownership'|'execution'|'source';reason:string};
-const BLOCK_TITLES:Record<StageBlock['kind'],string>={paused:'案件暫停中',meegle:'僅供參考',ownership:'尚未核定執行歸屬',execution:'案件執行受限',source:'資料待核對'};
+export type StageBlock={kind:'paused'|'meegle'|'ownership'|'execution';reason:string};
+const BLOCK_TITLES:Record<StageBlock['kind'],string>={paused:'案件暫停中',meegle:'僅供參考',ownership:'尚未核定執行歸屬',execution:'案件執行受限'};
 
 
 export function sharedBlockerReasons(rows:TaskView[]):string[] {
