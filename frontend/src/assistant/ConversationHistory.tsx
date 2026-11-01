@@ -20,9 +20,19 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
  },[]);
  useEffect(()=>{
   ++listGeneration.current;list.current?.abort();const controller=new AbortController();list.current=controller;
-  listConversations(scope,undefined,controller.signal).then(page=>{if(!controller.signal.aborted)setState({status:'ready',page})}).catch(()=>{if(!controller.signal.aborted)setState({status:'error'})});
-  return()=>controller.abort();
- },[projectId,revision,attempt]);
+  let timer:ReturnType<typeof setTimeout>|undefined;
+  const load=async(retried=false)=>{
+   try{
+    const page=await listConversations(scope,undefined,controller.signal);
+    if(controller.signal.aborted)return;
+    setState({status:'ready',page});
+    if(revision>0&&page.history_available&&!retried&&!page.items.some(item=>item.id===activeId))
+     timer=setTimeout(()=>{++listGeneration.current;void load(true)},500);
+   }catch{if(!controller.signal.aborted)setState({status:'error'})}
+  };
+  void load();
+  return()=>{controller.abort();clearTimeout(timer)};
+ },[projectId,revision,attempt,activeId]);
  useEffect(()=>()=>action.current?.abort(),[]);
  useEffect(()=>{action.current?.abort();setBusy(false);setActionError('');setRetry(undefined)},[activeId]);
  const unavailable=state.status==='ready'&&!state.page.history_available;
