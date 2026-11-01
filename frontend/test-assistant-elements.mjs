@@ -67,6 +67,12 @@ assert.match(document.querySelector('circle title').textContent,/甲.*一月.*2/
 await flush(()=>root.render(React.createElement(ui.Chart,{kind:'bar',title:'分組',points:seriesPoints})));
 assert.deepEqual([...document.querySelectorAll('rect title')].map(el=>el.textContent),['1. 甲 · 一月 · 2','2. 乙 · 一月 · 8','1. 甲 · 二月 · 4','2. 乙 · 二月 · 6']);
 assert.deepEqual([...document.querySelectorAll('svg text')].map(el=>el.textContent),['1','2','1','2']);
+const booleanTable={kind:'table',title:'布林值',columns:[{key:'name',label:'姓名'},{key:'active',label:'啟用'}],rows:[{name:'甲',active:true},{name:'乙',active:false}]};
+assert.equal(ui.isDisplay(booleanTable),true,'boolean cells do not discard a display');
+await flush(()=>root.render(React.createElement(ui.ToolResult,{result:{displays:[booleanTable]}})));
+assert.deepEqual([...document.querySelectorAll('tbody tr')].map(row=>row.cells[1].textContent),['是','否']);
+assert.deepEqual([...document.querySelectorAll('.assistant-data-cards dd')].map(cell=>cell.textContent),['是','否']);
+assert.deepEqual(await collect(ui.readEvents(stream(sse([tool([booleanTable])])),new AbortController().signal)),[tool([booleanTable])]);
 const table={kind:'table',title:'測試表格',caption:'截至 09:30',columns:[{key:'name',label:'姓名'},{key:'count',label:'件數'}],rows:[{name:'甲',count:12},{name:'乙',count:2},{name:'丙',count:null}],truncated:true,note:'資料尚未完整'};
 await flush(()=>root.render(React.createElement(ui.DataTable,table)));
 const countSort=()=>document.querySelector('[aria-label="依件數排序"]');

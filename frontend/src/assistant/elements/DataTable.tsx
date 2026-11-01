@@ -2,7 +2,7 @@
 import {useId,useState} from 'react';
 import type {Cell,TableDisplay} from './types';
 const collator=new Intl.Collator('zh-TW',{numeric:true,sensitivity:'base'});
-const value=(cell:Cell|undefined)=>cell==null?'未提供':typeof cell==='number'?cell.toLocaleString('zh-TW'):cell;
+const value=(cell:Cell|undefined)=>cell==null?'未提供':typeof cell==='boolean'?(cell?'是':'否'):typeof cell==='number'?cell.toLocaleString('zh-TW'):cell;
 export function DataTable({title,caption,columns,rows,rowKey,truncated,note}:TableDisplay){
  const id=useId();
  const [sort,setSort]=useState<{key:string;direction:'asc'|'desc'}|null>(null);
