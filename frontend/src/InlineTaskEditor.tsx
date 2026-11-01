@@ -2,10 +2,12 @@ import {Select as FormSelect} from './design/Select';
 import {useState} from 'react';
 import {Button} from './design';
 import {draftChanged,type TaskDraft,type TaskEditorModel} from './nodeWorkbenchModel';
+import {useFocusFirstField} from './taskSheetFocus';
 import './NodeWorkbench.css';
 
-/** `hideLocked` drops fields the user cannot change instead of rendering them disabled; `onCancel` adds a 取消 button for sheets that mount the editor on demand. */
+/** `hideLocked` drops fields the user cannot change instead of rendering them disabled; `onCancel` adds a 取消 button and focuses the first field on mount, for sheets that mount the editor on demand. */
 export function InlineTaskEditor({model,busy=false,onSave,onCancel,hideLocked=false}:{model:TaskEditorModel;busy?:boolean;onSave:(draft:TaskDraft)=>Promise<boolean>;onCancel?:()=>void;hideLocked?:boolean}) {
+ const formRef=useFocusFirstField<HTMLFormElement>(!!onCancel);
  const [draft,setDraft]=useState(model.draft),[saving,setSaving]=useState(false),[message,setMessage]=useState('');
  const changed=draftChanged(model.draft,draft),dueChanged=draft.due!==model.draft.due;
  const blocked=busy || saving;
@@ -19,7 +21,7 @@ export function InlineTaskEditor({model,busy=false,onSave,onCancel,hideLocked=fa
  const field=(key:keyof TaskEditorModel['fields'])=>({disabled:blocked || !!locked || !model.fields[key].enabled,'aria-describedby':readOnlyReason ? 'task-editor-readonly' : !model.fields[key].enabled ? `task-editor-${key}-reason` : undefined});
  const reason=(key:keyof TaskEditorModel['fields'])=>!readOnlyReason && !model.fields[key].enabled && <small id={`task-editor-${key}-reason`}>{model.fields[key].reason}</small>;
  const submit=async()=>{if(blocked || saveReason)return;setSaving(true);setMessage('');try{const ok=await onSave(draft);setMessage(ok?'已儲存任務':'尚未儲存，請核對錯誤後重試')}finally{setSaving(false)}};
- return <form className="nw-task-editor" aria-label="編輯任務" onSubmit={e=>{e.preventDefault();void submit()}}>
+ return <form ref={formRef} className="nw-task-editor" aria-label="編輯任務" onSubmit={e=>{e.preventDefault();void submit()}}>
   {readOnlyReason && <p className="nw-editor-wide" id="task-editor-readonly">{readOnlyReason}</p>}
   {shows(model.fields.title.enabled)&&<label>任務名稱<input aria-label="任務名稱" value={draft.title} maxLength={model.maxTitle} required {...field('title')} onChange={e=>update('title',e.target.value)}/>{reason('title')}</label>}
   {shows(model.fields.assignee.enabled)&&<label>負責人<FormSelect aria-label="任務負責人" value={draft.assignee} {...field('assignee')} onChange={e=>update('assignee',e.target.value)}><option value="">未指派</option>{draft.assignee && !model.people.some(p=>p.id===draft.assignee) && <option value={draft.assignee}>目前負責人</option>}{model.people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</FormSelect>{reason('assignee')}</label>}

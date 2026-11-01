@@ -75,6 +75,19 @@ test('Lark assignment editor searches only its eligible node roster without SOP 
  assert.equal(chosen[0].patch.assignee_open_id,'eligible');
 });
 
+test('Lark editor takes focus on 編輯 and returns it to 編輯 on cancel',async()=>{
+ globalThis.fetch=async()=>response([]);
+ root=createRoot(document.getElementById('root'));
+ const task=assignmentFixture().detail.tasks[0];
+ await act(async()=>root.render(React.createElement(ui.AssignmentTaskInspector,{assignment:task,people:[],nodeLabel:'控制',nodeKey:'control',busy:false,reason:'',mutate:async()=>true,onClose:()=>{}})));
+ const edit=()=>[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='編輯');
+ await click(edit());
+ assert.ok(document.activeElement===document.querySelector('form [aria-label="任務名稱"]'),'the first editable field is focused');
+ await click([...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='取消'));
+ assert.equal(document.querySelector('form'),null);
+ assert.ok(document.activeElement===edit(),'focus is back on 編輯');
+});
+
 test('Lark task sheet is view-first with real title, known facts only and no source jargon',async()=>{
  globalThis.fetch=async()=>response([]);
  root=createRoot(document.getElementById('root'));

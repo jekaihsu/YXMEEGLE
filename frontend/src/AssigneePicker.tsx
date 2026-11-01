@@ -4,6 +4,7 @@ import {api,getSessionEpoch,onSessionEpochChange} from './api';
 import {Button} from './design';
 import {PickerPopover} from './design/PickerPopover';
 import {draftChanged,type TaskDraft,type TaskEditorModel} from './nodeWorkbenchModel';
+import {useFocusFirstField} from './taskSheetFocus';
 import './AssigneePicker.css';
 
 type Person={id:string;name:string;teams?:string[]};
@@ -67,6 +68,7 @@ export function AssigneePicker({projectId,nodeKey,title,value,valueLabel,disable
 }
 
 export function AssigneeTaskEditor({model,busy=false,onSave,onCancel,hideLocked=false,projectId,nodeKey}:{model:TaskEditorModel;busy?:boolean;onSave:(draft:TaskDraft)=>Promise<boolean>;onCancel?:()=>void;hideLocked?:boolean;projectId?:string;nodeKey?:string}) {
+ const formRef=useFocusFirstField<HTMLFormElement>(!!onCancel);
  const [draft,setDraft]=useState(model.draft),[saving,setSaving]=useState(false),[message,setMessage]=useState('');
  const changed=draftChanged(model.draft,draft),dueChanged=draft.due!==model.draft.due;
  const blocked=busy || saving;
@@ -80,7 +82,7 @@ export function AssigneeTaskEditor({model,busy=false,onSave,onCancel,hideLocked=
  const field=(key:keyof TaskEditorModel['fields'])=>({disabled:blocked || !!locked || !model.fields[key].enabled,'aria-describedby':readOnlyReason ? 'task-editor-readonly' : !model.fields[key].enabled ? `task-editor-${key}-reason` : undefined});
  const reason=(key:keyof TaskEditorModel['fields'])=>!readOnlyReason && !model.fields[key].enabled && <small id={`task-editor-${key}-reason`}>{model.fields[key].reason}</small>;
  const submit=async()=>{if(blocked || saveReason)return;setSaving(true);setMessage('');try{const ok=await onSave(draft);setMessage(ok?'已儲存任務':'尚未儲存，請核對錯誤後重試')}finally{setSaving(false)}};
- return <form className="nw-task-editor" aria-label="編輯任務" onSubmit={e=>{e.preventDefault();void submit()}}>
+ return <form ref={formRef} className="nw-task-editor" aria-label="編輯任務" onSubmit={e=>{e.preventDefault();void submit()}}>
   {readOnlyReason && <p className="nw-editor-wide" id="task-editor-readonly">{readOnlyReason}</p>}
   {shows('title')&&<label>任務名稱<input aria-label="任務名稱" value={draft.title} maxLength={model.maxTitle} required {...field('title')} onChange={e=>update('title',e.target.value)}/>{reason('title')}</label>}
   {shows('assignee')&&<div>負責人<AssigneePicker projectId={projectId} nodeKey={nodeKey} title={model.draft.title} value={draft.assignee} people={model.people} disabled={field('assignee').disabled} onChange={id=>update('assignee',id)}/>{reason('assignee')}</div>}
