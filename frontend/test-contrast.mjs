@@ -60,3 +60,5 @@ for(const [name,t] of [['light',light],['dark',dark]]){
  assert.ok(contrast>=3,`${name} composer ring: ${contrast.toFixed(2)}:1`);
  console.log(`${name} composer ring ${contrast.toFixed(2)}:1`);
 }
+
+export {ratio};

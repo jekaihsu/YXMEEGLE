@@ -12,7 +12,7 @@ export function Chart({kind,title,caption,truncated,note,unit='',headline,points
  const grouped=series.length>1;
  const step=(width-pad*2)/Math.max(labels.length,1),baseline=y(0);
  const x=(label:string)=>pad+(labels.indexOf(label)+.5)*step;
- const color=(index:number)=>`hsl(${index*137.5} 45% 40%)`;
+ const color=(index:number)=>`hsl(${index*137.5} 45% var(--assistant-chart-lightness))`;
  const stat=kind==='stat'?points[0]:undefined;
  headline=stat?{label:stat.label||title,value:String(stat.value)}:headline;
  const total=points.reduce((sum,p)=>sum+p.value,0);
@@ -25,8 +25,8 @@ export function Chart({kind,title,caption,truncated,note,unit='',headline,points
   {kind!=='stat'&&<svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={summary} preserveAspectRatio={kind==='pie'?'xMidYMid meet':'none'}>
    <line x1={pad} x2={width-pad} y1={baseline} y2={baseline} className="assistant-chart-axis"/>
    {kind==='line'?series.map((group,index)=><g key={group.name}>
-    <polyline points={group.points.map(point=>`${x(point.label)},${y(point.value)}`).join(' ')} fill="none" stroke={color(index)} strokeWidth="3" strokeDasharray={index%2?'6 4':undefined}><title>{group.key}</title></polyline>
-    {group.points.length===1&&<circle cx={x(group.points[0].label)} cy={y(group.points[0].value)} r="4" fill={color(index)}><title>{group.key} · {group.points[0].label} · {group.points[0].value}{unit}</title></circle>}
+    <polyline points={group.points.map(point=>`${x(point.label)},${y(point.value)}`).join(' ')} fill="none" stroke={grouped?color(index):'currentColor'} strokeWidth="3" strokeDasharray={index%2?'6 4':undefined}><title>{group.key}</title></polyline>
+    {group.points.length===1&&<circle cx={x(group.points[0].label)} cy={y(group.points[0].value)} r="4" fill={grouped?color(index):'currentColor'}><title>{group.key} · {group.points[0].label} · {group.points[0].value}{unit}</title></circle>}
     {grouped&&<text x={x(group.points.at(-1)!.label)} y={Math.max(12,y(group.points.at(-1)!.value)-8)} textAnchor="middle" fill="currentColor" fontSize="12">{index+1}</text>}
    </g>):kind==='pie'?points.map((point,index)=>{
     const start=angle;angle+=total?point.value/total*Math.PI*2:0;
@@ -36,7 +36,7 @@ export function Chart({kind,title,caption,truncated,note,unit='',headline,points
     const seriesIndex=seriesNames.indexOf(String(point.series??'資料'));
     const barWidth=step/series.length;
     const barX=x(point.label)-step/2+seriesIndex*barWidth+barWidth*.18;
-    return <g key={index}><rect x={barX} y={Math.min(y(point.value),baseline)} width={barWidth*.64} height={Math.max(1,Math.abs(baseline-y(point.value)))} rx="3" className="assistant-chart-bar" style={{fill:color(seriesIndex)}} data-active={active===index||undefined} onMouseEnter={()=>setActive(index)} onMouseLeave={()=>setActive(null)}><title>{series[seriesIndex].key} · {point.label} · {point.value}{unit}</title></rect>
+    return <g key={index}><rect x={barX} y={Math.min(y(point.value),baseline)} width={barWidth*.64} height={Math.max(1,Math.abs(baseline-y(point.value)))} rx="3" className="assistant-chart-bar" style={{fill:grouped?color(seriesIndex):'var(--accent)'}} data-active={active===index||undefined} onMouseEnter={()=>setActive(index)} onMouseLeave={()=>setActive(null)}><title>{series[seriesIndex].key} · {point.label} · {point.value}{unit}</title></rect>
      {grouped&&<text x={barX+barWidth*.32} y={Math.max(12,Math.min(y(point.value),baseline)-5)} textAnchor="middle" fill="currentColor" fontSize="12">{seriesIndex+1}</text>}
     </g>;
    }) }
