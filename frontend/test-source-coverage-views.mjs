@@ -130,14 +130,14 @@ const context={w:fixture.full_zero,s:{},busy:false,error:'',refresh:async()=>{},
 await act(async()=>root.render(React.createElement(FilePanel,{c:context,p:zero})));
 let content=document.querySelector('.file-workspace').textContent;
 assert.match(content,/本案已配對的 Lark 來源附件索引 0 筆/);
-assert.match(content,/本案尚無可列出的來源附件索引/);
+assert.match(content,/尚無工作台檔案/);assert.doesNotMatch(content,/快照時間|分開記錄/);assert.equal(document.querySelector('.file-workspace .daily-filters'),null,'no filters over zero files');
 assert.match(content,/來源附件欄位覆蓋未回報/);
 assert.match(content,/附件內容存取權限未核實/);
 assert.ok(!content.includes('42'));
 assert.ok(!document.querySelector('.source-attachment-index'));
 await act(async()=>root.render(React.createElement(FilePanel,{c:{...context,w:fixture.full_metadata},p:metadata})));
 content=document.querySelector('.file-workspace').textContent;
-assert.match(content,/本案工作台 1 筆版本/);
+assert.match(content,/本案工作台 1 筆版本/);assert.ok(document.querySelector('.file-workspace .daily-filters'));
 assert.match(content,/本案已配對的 Lark 來源附件索引 3 筆/);
 assert.match(content,/CASE_METADATA_ONE/);
 assert.match(content,/來源已移除，保留索引/);
