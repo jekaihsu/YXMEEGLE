@@ -9,7 +9,8 @@ const browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'/A
 try{
  for(const drawer of [false,true]){
   const page=await browser.newPage({viewport:{width:1280,height:800}});
-  await page.setContent(`<html lang="zh-Hant" data-theme="light"><head><style>${css}</style></head><body><div id="root"></div></body></html>`);
+  await page.route('http://localhost/focus',route=>route.fulfill({contentType:'text/html',body:`<html lang="zh-Hant" data-theme="light"><head><style>${css}</style></head><body><div id="root"></div></body></html>`}));
+  await page.goto('http://localhost/focus');
   await page.evaluate(()=>{window.fetch=async url=>new Response(JSON.stringify(String(url).includes('models')?{default:'claude',models:[{id:'claude',label:'Claude',available:true}]}:{history_available:true,items:[],next_cursor:null}))});
   await page.addScriptTag({content:compiled.outputFiles[0].text});
   await page.evaluate(drawer=>window.mount(drawer),drawer);
