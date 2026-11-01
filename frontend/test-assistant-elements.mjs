@@ -49,7 +49,7 @@ for(const kind of ['bar','line','pie','stat','table']){
  assert.match(document.body.textContent,kind==='stat'?/項目 0.*1/:/24/);
  if(['bar','line','pie'].includes(kind))assert.equal(document.querySelectorAll('table tbody tr').length,24);
  if(kind==='line')assert.ok(document.querySelector('polyline'));
- if(kind==='pie')assert.ok(document.querySelector('circle, path'));
+ if(kind==='pie'){assert.ok(document.querySelector('path'));assert.equal(document.querySelectorAll('svg text').length,24,'pie slices have visible numeric keys matching the labels')}
  if(kind==='stat')assert.equal(document.querySelector('.assistant-chart-headline strong').textContent,'1');
 }
 const table={kind:'table',title:'測試表格',caption:'截至 09:30',columns:[{key:'name',label:'姓名'},{key:'count',label:'件數'}],rows:[{name:'甲',count:12},{name:'乙',count:2},{name:'丙',count:null}],truncated:true,note:'資料尚未完整'};
