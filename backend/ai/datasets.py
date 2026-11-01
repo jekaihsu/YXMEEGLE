@@ -5,7 +5,7 @@ from typing import Callable, Literal
 import hashlib
 import json
 import math
-from datetime import date
+from datetime import date, timedelta
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
@@ -113,7 +113,7 @@ def add(ident, title, description, params, read, projector, cols, example=None):
 
 for ident, title, description, params, read, projector, cols in [
     ('search_cases', '案件總覽', '按案號、案名、PM、狀態或逾期查案件', Search, t.search, t.project_search,
-     columns(('code','案號'),('name','案名'),('state','狀態','status'),('overdue','逾期','status'),('pm_id','PM'),('due_date','交期','date'))),
+     columns(('id','案件ID'),('code','案號'),('name','案名'),('state','狀態','status'),('overdue','逾期','status'),('pm_id','PM'),('due_date','交期','date'))),
     ('case_progress', '案件進度', '查案件完成、剩餘工作與證據缺口', Case, t.progress, t.project_progress,
      columns(('label','節點'),('status','狀態','status'),('tasks_done','完成任務','number'),('tasks_total','全部任務','number'))),
     ('case_owners', '案件負責人', '查 PM 與各節點負責人', Case, t.owners, t.project_owners,
@@ -142,11 +142,11 @@ for ident, title, description, endpoint, defs, cols in REPORTS:
         partial(rows_at, 'items', [c.name for c in cols]), cols)
 
 for ident, title, description, path, defs, key, cols in [
-    ('daily_reports','日報紀錄','查人員、案件、日期的日報', '/api/daily-reports',
-     dict(project_id=text_param(),actor_id=text_param(),date_from=text_param(),date_to=text_param(),q=text_param()), 'items',
+    ('daily_reports','日報紀錄','查人員、案件、日期的日報；用 q 搜尋姓名', '/api/daily-reports',
+     dict(project_id=text_param(),date_from=text_param(),date_to=text_param(),q=text_param()), 'items',
      columns(('id','ID'),('date','日期','date'),('person','人員'),('project_code','案號'),('department','部門'),('description','工作'))),
     ('sop_tasks','SOP 任務','查案件或節點 SOP 任務狀態與逾期', '/api/projects/{case_id}/sop-tasks',
-     {'case_id':(str, Field(pattern=r'^[A-Za-z0-9_:-][A-Za-z0-9_.:-]{0,199}$')), 'node_key':text_param()}, 'tasks',
+     {'case_id':(str, Field(pattern=r'^[A-Za-z0-9_:-][A-Za-z0-9_.:-]{0,199}$')), 'node_key':(Literal['', *t.NODE_ORDER], '')}, 'tasks',
      columns(('id','ID'),('title','任務'),('state','狀態','status'),('overdue','逾期','status'),('applicability','適用','status'))),
     ('node_detail','節點指派明細','查案件指定節點的任務與負責人', '/api/projects/{case_id}/node-assignments/nodes/{node_key}',
      {'case_id':(str, Field(pattern=r'^[A-Za-z0-9_:-][A-Za-z0-9_.:-]{0,199}$')), 'node_key':(Literal[*t.NODE_ORDER], ...)}, 'tasks',
@@ -166,13 +166,46 @@ def index():
 
 def describe(ident):
     d = REGISTRY[ident]
-    return dict(id=d.id,title=d.title,description=d.description,params=d.params.model_json_schema(),
-        columns=[c.model_dump() for c in d.columns],example=dict(id=d.id,params=d.example,limit=20,offset=0))
+    schema = d.params.model_json_schema()
+    guidance = {
+        'week':'YYYY-MM-DD，必須為週一，年份限目前年前30年至後10年；預設上週週一',
+        'q':'姓名、案號或工作文字搜尋', 'query':'案號或案名搜尋文字',
+        'case_id':'先從 search_cases 的 id 取得案件ID，不可猜測',
+        'project_id':'先從 search_cases 的 id 取得案件ID，空字串不篩選',
+        'key':'僅使用使用者提供的合約項目 key；無 lookup 時不可猜測',
+        'node_key':'節點代碼，使用列出的 enum 值',
+        'date':'YYYY-MM-DD，空字串代表台北今天，限目前週前後26週',
+        'from':'起日 YYYY-MM-DD', 'to':'迄日 YYYY-MM-DD，不早於起日',
+        'date_from':'日報起日 YYYY-MM-DD', 'date_to':'日報迄日 YYYY-MM-DD',
+    }
+    for name, field in schema['properties'].items():
+        field['description'] = guidance.get(name, field.get('title', name) + ' 篩選條件；使用 enum 或來源的人類可讀名稱，空字串不篩選')
+    examples = {'search_cases':{'query':'C01'},'attendance_today':{'range':'week','date':'2026-10-26'},
+        'report_review':{'week':'2026-10-26'},'report_progress':{'week':'2026-10-26'},
+        'report_sales':{'pm':'王小明'},'report_assets':{'kind':'vehicle','from':'2026-10-01','to':'2026-10-31'},
+        'report_contacts':{'from':'2026-10-01','to':'2026-10-31'},'daily_reports':{'q':'王小明'},
+        'dispatch_board':{'from':'2026-10-26','to':'2026-11-01'}}
+    return dict(id=d.id,title=d.title,description=d.description,params=schema,
+        columns=[dict(**c.model_dump(), description=c.label + '（授權來源欄位；null 表示來源未提供）') for c in d.columns],
+        example=dict(id=d.id,params=d.example or examples.get(ident),limit=20,offset=0))
 
 
 async def query(reader, ident, params, limit, offset):
     d = REGISTRY[ident]
     args = d.params.model_validate(params).model_dump()
+    for key, value in args.items():
+        if value and key in ('date','week','from','to','date_from','date_to'):
+            if date.fromisoformat(value).isoformat() != value:
+                raise ValueError('invalid date')
+    if ident.startswith('report_'):
+        from ..reports.routes import parameters as report_parameters
+        args = report_parameters('review/rows' if ident == 'report_review' else ident.removeprefix('report_'), {**args, 'limit':limit, 'offset':offset})
+    elif ident == 'attendance_today':
+        args['date'] = args['date'] or t.today()
+    elif ident == 'dispatch_board':
+        start = args['from'] or t.today()
+        args.update({'from':start, 'to':args['to'] or (date.fromisoformat(start)+timedelta(days=6)).isoformat()})
+    applied = dict(args, limit=limit, offset=offset)
     for k, v in args.items():
         if v and (k in ('date','week','from','to','date_from','date_to')):
             if date.fromisoformat(v).isoformat() != v:
@@ -191,42 +224,24 @@ async def query(reader, ident, params, limit, offset):
     cols = d.columns
     if ident == 'attendance_today' and args['range'] == 'week':
         cols = columns(('date','日期','date'), *[(k,v,'number') for k,v in t.ATTENDANCE_LABELS.items()])
-    result = dict(dataset_id=ident,columns=[c.model_dump() for c in cols],
+    result = dict(dataset_id=ident,applied_params=applied,columns=[c.model_dump() for c in cols],
         rows=[{c.name:scalar(r.get(c.name)) for c in cols} for r in selected],total=total,
         next_offset=offset+len(selected) if selected and offset+len(selected)<total else None,
         as_of=(projected.get('as_of') if legacy else None) or raw.get('as_of') or raw.get('last_sync') or raw.get('meta',{}).get('fetched_at') or raw.get('source',{}).get('fetched_at'),
         truncated=bool(raw.get('truncated') or offset+len(selected)<total),
         limitations=['金額與財務欄位不提供', '無來源時間時 as_of 為 null'])
     result['totals'] = {'rows':total}
-    if legacy:
-        while len(json.dumps(projected,ensure_ascii=False)) > 6000:
-            lists = []
-            def collect(value):
-                if isinstance(value, dict):
-                    for child in value.values():
-                        collect(child)
-                elif isinstance(value, list) and value:
-                    lists.append(value)
-            collect(projected)
-            if not lists:
-                projected = {'unavailable':'資料過長，無法完整列出','truncated':True}
-                break
-            max(lists,key=lambda v:len(json.dumps(v,ensure_ascii=False))).pop()
-            projected['truncated'] = True
-        result['truncated'] |= bool(projected.get('truncated'))
     meta = raw.get('meta', {})
     if meta.get('stale'):
         result['limitations'].append('來源快照已過期')
     for gap in meta.get('gaps', [])[:8]:
         if isinstance(gap, dict):
             result['limitations'].append(str(gap.get('message_zh') or gap.get('code') or '來源資料缺口')[:160])
-    if legacy:
-        result['summary'] = projected
-    else:
+    if not legacy:
         result['limitations'].append('僅列已授權來源提供的欄位；空值不是沒有')
         if raw.get('meta') or raw.get('gaps') or raw.get('page_state') or raw.get('source'):
             result['limitations'].append('來源可能不完整，無法據空結果推論沒有資料')
-    while len(json.dumps(result,ensure_ascii=False)) > 14000 and result['rows']:
+    while len(json.dumps(result,ensure_ascii=False)) > 5900 and result['rows']:
         result['rows'].pop()
         result['truncated'] = True
         result['next_offset'] = offset+len(result['rows'])

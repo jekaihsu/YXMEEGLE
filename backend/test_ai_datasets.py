@@ -133,3 +133,54 @@ def test_dataset_finance_name_guard():
     for dataset in REGISTRY.values():
         for column in dataset.columns:
             assert not forbidden.search(column.name + column.label), dataset.id
+
+
+def test_route_validation_error_detail(app, monkeypatch):
+    import httpx
+    async def get(self, path, **kwargs):
+        return httpx.Response(422, json={'detail':'week 必須為週一'}, request=httpx.Request('GET','http://ai.internal'+path))
+    monkeypatch.setattr(httpx.AsyncClient, 'get', get)
+    data, error = asyncio.run(execute(app, '', 'query_dataset', dict(id='report_review', params={}, limit=20, offset=0)))
+    assert error and json.loads(data) == {'error':'參數錯誤','detail':'week 必須為週一'}
+
+
+def test_catalog_parameter_guidance_and_opaque_ids():
+    assert 'actor_id' not in REGISTRY['daily_reports'].params.model_fields
+    assert 'q' in REGISTRY['daily_reports'].description
+    for dataset in REGISTRY.values():
+        description = describe(dataset.id)
+        assert description['example']['params']
+        assert all(p.get('description') for p in description['params']['properties'].values())
+        assert all(c.get('description') for c in description['columns'])
+    assert '週一' in describe('report_review')['params']['properties']['week']['description']
+
+
+def test_query_budget_defaults_and_applied_params(app, monkeypatch):
+    from .ai.tools import Reader
+    async def get(self, path, **params):
+        assert params['limit'] == 20
+        return {'items':[dict(name='車'*240, category='車'*240, status='a'*240, owner='甲'*240, uses=i, idle_days=2) for i in range(20)], 'total':40}
+    monkeypatch.setattr(Reader, 'get', get)
+    text, error = asyncio.run(execute(app, '', 'query_dataset', dict(id='report_assets',params={})))
+    assert not error
+    result = json.loads(text)
+    assert len(text) <= 6000 and 'summary' not in result
+    assert result['truncated'] and result['next_offset'] == len(result['rows'])
+    assert result['applied_params']['from'] and result['applied_params']['to']
+
+
+def test_display_human_title_all_kinds():
+    data=dict(dataset_id='report_assets',columns=[dict(name='name',label='名稱',type='text'),dict(name='uses',label='次數',type='number')],
+        rows=[dict(name='車1',uses=4)],truncated=False,as_of=None,limitations=[])
+    for kind in ('table','bar','line','pie','stat'):
+        result, error = result_display({'r1':data}, dict(result_id='r1', kind=kind, columns=[], mapping={'x':'name','y':'uses'}, max_rows=20))
+        assert error is None and result['title']=='資產使用'
+        assert result['rows'] if kind=='table' else result['points']==[dict(label='車1',value=4)]
+
+
+def test_search_pm_names_and_id_label():
+    from .ai.tools import project_search
+    raw = dict(population_total=2, matched_total=2, items=[dict(id='p1',state='進行中',pm_id='u1',pm_name='王小明'),dict(id='p2',state='進行中',pm_id='u2')])
+    rows = project_search(raw)['cases']
+    assert rows[0]['pm_id']=='王小明'
+    assert rows[1]['pm_id']=='ID: u2'

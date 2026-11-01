@@ -22,7 +22,7 @@ QUESTIONS = [
  ('車輛使用次數比較','report_assets',{'kind':'vehicle'}),
  ('儀器最近使用情形','report_assets',{'kind':'instrument'}),
  ('甲這週聯繫哪些案件','report_contacts',{'person':'甲','from':'2026-10-26','to':'2026-11-01'}),
- ('甲十月底的日報','daily_reports',{'actor_id':'甲','date_from':'2026-10-26','date_to':'2026-10-31'}),
+ ('甲十月底的日報','daily_reports',{'q':'甲','date_from':'2026-10-26','date_to':'2026-10-31'}),
  ('本週外業派工','dispatch_board',{'from':'2026-10-26','to':'2026-11-01','group':'外業'}),
  ('p1 外業 SOP 任務狀態','sop_tasks',{'case_id':'p1','node_key':'field'}),
  ('p1 外業節點任務由誰負責','node_detail',{'case_id':'p1','node_key':'field'}),

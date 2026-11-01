@@ -7,12 +7,18 @@ from urllib.parse import quote
 import json
 
 import httpx
+from fastapi import HTTPException
 from .ledger import today
 
 
 class ReadDenied(Exception):
     def __init__(self, message):
         self.message = message
+
+
+class ReadValidation(Exception):
+    def __init__(self, detail):
+        self.detail = detail
 
 
 class Reader:
@@ -26,6 +32,12 @@ class Reader:
         if response.status_code in (401, 403, 404):
             message = '你沒有權限查看出勤資料' if path == '/api/people/attendance' else '找不到或沒有權限查看這個案件'
             raise ReadDenied(message)
+        if 400 <= response.status_code < 500:
+            try:
+                detail = response.json().get('detail', '查詢參數無效')
+            except (ValueError, AttributeError):
+                detail = '查詢參數無效'
+            raise ReadValidation(detail)
         response.raise_for_status()
         return response.json()
 
@@ -174,7 +186,8 @@ def project_search(value):
     data = {**pick(value, 'as_of', 'matched_total', 'offset', 'next_offset'), 'population_total': value['population_total'], 'cases': [pick(p, 'id', 'code', 'name', 'state', 'overdue', 'pm_id', 'due_date')
                                               for p in value['items']]}
     data['status_counts'] = value.get('status_counts', {})
-    for p in data['cases']:
+    for p, source in zip(data['cases'], value['items']):
+        p['pm_id'] = source.get('pm_name') or (source.get('pm') if isinstance(source.get('pm'), str) else None) or ('ID: ' + str(source['pm_id']) if source.get('pm_id') else None)
         p['status_label'] = p['state']
     return {**data, **search_notice(data)}
 
@@ -573,7 +586,7 @@ TOOLS = {
     'describe_dataset': ToolSpec(dict(type='object',properties={'id':dict(type='string')},required=['id'],additionalProperties=False), '查看資料參數與欄位', None, None),
     'query_dataset': ToolSpec(dict(type='object',properties={'id':dict(type='string'),'params':dict(type='object',additionalProperties=True),
         'limit':dict(type='integer',minimum=1,maximum=50),'offset':dict(type='integer',minimum=0,maximum=100000)},
-        required=['id','params','limit','offset'],additionalProperties=False), '查詢資料', None, None),
+        required=['id','params'],additionalProperties=False), '查詢資料', None, None),
     'show_display': ToolSpec(dict(type='object',properties={'result_id':dict(type='string'),
         'kind':dict(type='string',enum=['table','bar','line','pie','stat']), 'columns':dict(type='array',items=dict(type='string')),
         'mapping':dict(type='object',properties={k:dict(type='string') for k in ('x','y','series','label','value')},additionalProperties=False),
@@ -587,8 +600,10 @@ async def execute_dataset(app, cookie, name, args):
     from pydantic import ValidationError
     try:
         spec = TOOLS[name]
-        if not isinstance(args, dict) or set(args) != set(spec.schema['required']):
+        if not isinstance(args, dict) or not set(spec.schema['required']) <= set(args) or set(args) - set(spec.schema['properties']):
             raise ValueError()
+        if name == 'query_dataset':
+            args = {'limit':20, 'offset':0, **args}
         if name == 'list_datasets':
             return json.dumps(dict(datasets=index()),ensure_ascii=False), False
         if not isinstance(args['id'], str) or args['id'] not in REGISTRY:
@@ -602,6 +617,10 @@ async def execute_dataset(app, cookie, name, args):
             result = await query(Reader(client,str(app.state.cfg.get('NODE_ASSIGNMENT_ENABLED','false')).lower()=='true',
                 str(app.state.cfg.get('WORKSPACE_SHELL_ENABLED','false')).lower()=='true'),args['id'],args['params'],args['limit'],args['offset'])
         return json.dumps(result,ensure_ascii=False),False
+    except HTTPException as exc:
+        return json.dumps(dict(error='參數錯誤',detail=exc.detail),ensure_ascii=False),True
+    except ReadValidation as exc:
+        return json.dumps(dict(error='參數錯誤',detail=exc.detail),ensure_ascii=False),True
     except ReadDenied:
         return json.dumps(dict(error='找不到或沒有權限查看資料',code='ai_forbidden'),ensure_ascii=False),True
     except (ValueError, TypeError, KeyError, ValidationError):
@@ -629,7 +648,9 @@ def result_display(results, args):
         cols = request.columns or list(known)[:8]
         if any(c not in known for c in cols):
             raise ValueError()
-        title = data['dataset_id']
+        from .datasets import REGISTRY
+        dataset = REGISTRY.get(data['dataset_id'])
+        title = dataset.title if dataset else data['dataset_id']
         if request.kind == 'table':
             return display_table(title,[(k,known[k]['label']) for k in cols],data['rows'][:request.max_rows],
                 {**data,'truncated':data['truncated'] or len(data['rows'])>request.max_rows}),None
