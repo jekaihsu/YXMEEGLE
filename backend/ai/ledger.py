@@ -16,6 +16,8 @@ from ..models import Base
 TAIPEI = ZoneInfo('Asia/Taipei')
 logger = logging.getLogger(__name__)
 
+STALE_ACTIVE_RUN_SECONDS = 24 * 60 * 60
+
 
 class AiUsageRow(Base):
     __tablename__ = 'ai_usage'
@@ -64,6 +66,7 @@ class AiConversationGeneration(Base):
     conversation_id = Column(String(120), primary_key=True)
     generation = Column(Integer, nullable=False, default=0)
     active_runs = Column(Integer, nullable=False, default=0, server_default='0')
+    last_activity_at = Column(DateTime(timezone=True), nullable=True, default=lambda: datetime.now(timezone.utc))
 
 
 def lock_generation(db, workspace_id, actor_id, conversation_id, *, starting=False):
@@ -73,10 +76,12 @@ def lock_generation(db, workspace_id, actor_id, conversation_id, *, starting=Fal
         from sqlalchemy.dialects.sqlite import insert
     table = AiConversationGeneration
     statement = insert(table).values(workspace_id=workspace_id, actor_id=actor_id,
-        conversation_id=conversation_id, generation=0, active_runs=1 if starting else 0)
+        conversation_id=conversation_id, generation=0, active_runs=1 if starting else 0,
+        last_activity_at=datetime.now(timezone.utc))
     statement = statement.on_conflict_do_update(
         index_elements=['workspace_id', 'actor_id', 'conversation_id'],
-        set_={'active_runs': table.active_runs + (1 if starting else 0)})
+        set_={'active_runs': table.active_runs + (1 if starting else 0),
+              'last_activity_at': statement.excluded.last_activity_at})
     return db.scalar(statement.returning(table.generation))
 
 
@@ -89,7 +94,8 @@ def release_conversation(sessions, workspace_id, actor_id, conversation_id):
     with sessions.begin() as db:
         table = AiConversationGeneration
         db.execute(update(table).where(table.workspace_id == workspace_id, table.actor_id == actor_id,
-            table.conversation_id == conversation_id, table.active_runs > 0).values(active_runs=table.active_runs - 1))
+            table.conversation_id == conversation_id, table.active_runs > 0).values(active_runs=table.active_runs - 1,
+                last_activity_at=datetime.now(timezone.utc)))
 
 
 def stores_content(cfg):
@@ -148,7 +154,10 @@ def cleanup_content(sessions, retention_days):
             retained = select(u.id).join(e, e.usage_id == u.id).where(
                 u.workspace_id == g.workspace_id, u.actor_id == g.actor_id,
                 u.conversation_id == g.conversation_id).exists()
-            db.execute(delete(g).where(g.active_runs == 0, ~retained))
+            now = datetime.now(timezone.utc)
+            db.execute(update(g).where(g.last_activity_at.is_(None)).values(last_activity_at=now))
+            db.execute(delete(g).where(or_(g.active_runs == 0,
+                g.last_activity_at < now - timedelta(seconds=STALE_ACTIVE_RUN_SECONDS)), ~retained))
         with _cleanup_lock:
             _last_cleanup = monotonic()
     finally:
@@ -374,6 +383,12 @@ def ensure_schema(engine):
     with engine.begin() as connection:
         if 'active_runs' not in {c['name'] for c in inspect(connection).get_columns('ai_conversation_generation')}:
             connection.exec_driver_sql('ALTER TABLE ai_conversation_generation ADD COLUMN active_runs INTEGER NOT NULL DEFAULT 0')
+        if 'last_activity_at' not in {c['name'] for c in inspect(connection).get_columns('ai_conversation_generation')}:
+            column = AiConversationGeneration.__table__.c.last_activity_at
+            connection.exec_driver_sql('ALTER TABLE ai_conversation_generation ADD COLUMN ' + str(CreateColumn(column).compile(dialect=connection.dialect)))
+        missing = select(AiConversationGeneration).where(AiConversationGeneration.last_activity_at.is_(None)).exists()
+        if connection.scalar(select(missing)):
+            connection.execute(update(AiConversationGeneration).where(AiConversationGeneration.last_activity_at.is_(None)).values(last_activity_at=datetime.now(timezone.utc)))
     for name in ADDED_USAGE_COLUMNS:
         with engine.begin() as connection:
             if name in {c['name'] for c in inspect(connection).get_columns('ai_usage')}:

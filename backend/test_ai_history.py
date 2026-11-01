@@ -170,3 +170,33 @@ def test_cleanup_preserves_active_fence_then_prunes(app, client, monkeypatch):
     ledger.cleanup_content(app.state.sessions, 0)
     with app.state.sessions() as db:
         assert db.get(ledger.AiConversationGeneration, key) is None
+
+
+def test_cleanup_reclaims_crashed_run_but_preserves_live_fence(app, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from .ai import ledger
+    sessions = app.state.sessions
+    crashed = ('w', 'a', 'crashed')
+    live = ('w', 'a', 'live')
+    old = datetime.now(timezone.utc) - timedelta(hours=25)
+    ledger.conversation_generation(sessions, *crashed)
+    ledger.conversation_generation(sessions, *live)
+    with sessions.begin() as db:
+        row = db.get(ledger.AiConversationGeneration, crashed)
+        row.last_activity_at = old
+    ledger.delete_conversation(sessions, *live)
+    monkeypatch.setattr(ledger, '_last_cleanup', None)
+    ledger.cleanup_content(sessions, 0)
+    with sessions() as db:
+        assert db.get(ledger.AiConversationGeneration, crashed) is None
+        row = db.get(ledger.AiConversationGeneration, live)
+        assert (row.generation, row.active_runs) == (1, 1)
+    with sessions.begin() as db:
+        db.get(ledger.AiConversationGeneration, live).last_activity_at = old
+    ledger.conversation_generation(sessions, *live)
+    ledger.release_conversation(sessions, *live)
+    monkeypatch.setattr(ledger, '_last_cleanup', None)
+    ledger.cleanup_content(sessions, 0)
+    with sessions() as db:
+        row = db.get(ledger.AiConversationGeneration, live)
+        assert (row.generation, row.active_runs) == (1, 1)

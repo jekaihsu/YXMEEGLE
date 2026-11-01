@@ -107,3 +107,20 @@ def test_app_startup_adds_missing_columns_to_an_existing_usage_table(tmp_path):
     assert {'scope', 'project_id'} <= columns
     with app.state.sessions() as session:
         assert session.execute(AiUsageRow.__table__.select()).first().scope == 'global'
+
+
+def test_generation_activity_migration_preserves_fence_and_backfills(tmp_path):
+    from datetime import datetime, timezone
+    from .ai import ledger
+    engine = create_engine('sqlite:///' + str(tmp_path / 'generation.db'))
+    with engine.begin() as db:
+        db.exec_driver_sql('CREATE TABLE ai_conversation_generation (workspace_id VARCHAR(120), actor_id VARCHAR(120), conversation_id VARCHAR(120), generation INTEGER NOT NULL, PRIMARY KEY (workspace_id, actor_id, conversation_id))')
+        db.exec_driver_sql("INSERT INTO ai_conversation_generation VALUES ('w', 'a', 'c', 3)")
+    before = datetime.now(timezone.utc).replace(tzinfo=None)
+    ledger.ensure_schema(engine)
+    ledger.ensure_schema(engine)
+    with engine.connect() as db:
+        row = db.execute(ledger.AiConversationGeneration.__table__.select()).one()
+        assert (row.workspace_id, row.actor_id, row.conversation_id, row.generation, row.active_runs) == ('w', 'a', 'c', 3, 0)
+        assert row.last_activity_at >= before
+    engine.dispose()
