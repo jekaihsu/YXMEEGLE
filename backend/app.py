@@ -803,8 +803,10 @@ def create_app(overrides=None,*,dispatch_transport=None):
                     def build_portfolio():
                         with sessions() as snapshot_db:
                             root = snapshot_db.get(WorkspaceRow, data['wid'])
-                            return EncodedSnapshot.encode(JSONResponse(portfolio(snapshot_db, BusinessRow, root, load(snapshot_db, root, collections=()), today,
-                                assignments=app.state.home_panels, data=data, user=user)).body)
+                            result = portfolio(snapshot_db, BusinessRow, root, load(snapshot_db, root, collections=()), today,
+                                assignments=app.state.home_panels, data=data, user=user)
+                            # A cold or failed Lark overlay must not be pinned for the snapshot window.
+                            return EncodedSnapshot.encode(JSONResponse(result).body, volatile=bool(result.get('node_status_degraded')))
                     with phase(request, 'snapshot'):
                         generation = read_snapshots.generation
                         if snapshot:
