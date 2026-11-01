@@ -22,7 +22,7 @@ Disabled storage returns `{"history_available":false,"items":[],"next_cursor":nu
 {"id":"chat-1","title":"這週誰遲到？","scope":"global","project_id":null,"messages":[{"role":"user","content":"這週誰遲到？","at":"2026-11-01T03:00:00+00:00","usage_id":"usage-1"},{"role":"assistant","content":"王小明有一次遲到。","at":"2026-11-01T03:00:00+00:00","usage_id":"usage-1"}]}
 ```
 
-Messages sort by exchange time then usage ID, user before assistant. Empty assistant messages are omitted. Missing, expired, deleted, disabled-content and other-caller IDs return identical HTTP 404 `{"detail":"找不到對話"}`.
+At most the latest 200 messages are returned, with `truncated: true` when older messages were cut (otherwise false). Messages sort by exchange time then usage ID, user before assistant. Empty assistant messages are omitted. Missing, expired, deleted, disabled-content and other-caller IDs return identical HTTP 404 `{"detail":"找不到對話"}`.
 
 ## Delete
 

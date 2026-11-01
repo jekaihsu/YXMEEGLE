@@ -432,15 +432,16 @@ def conversation(sessions, workspace_id, actor_id, conversation_id, *, content_e
         return None
     u = AiUsageRow
     with sessions() as db:
-        rows = db.execute(history_statement(workspace_id, actor_id, retention_days).where(
-            u.conversation_id == conversation_id).order_by(u.created_at, u.id)).all()
+        stmt = history_statement(workspace_id, actor_id, retention_days).where(u.conversation_id == conversation_id)
+        rows = db.execute(stmt.order_by(u.created_at.desc(), u.id.desc()).limit(201)).all()
+        rows.reverse()
         if not rows:
             return None
-        first, content = rows[0]
+        first, content = db.execute(stmt.order_by(u.created_at, u.id).limit(1)).first()
         messages = [dict(role=role, content=text, at=iso(exchange.created_at), usage_id=usage.id)
             for usage, exchange in rows for role, text in [('user', exchange.question), ('assistant', exchange.answer)] if text]
         return dict(id=conversation_id, title=conversation_title(content.question), scope=first.scope,
-            project_id=first.project_id, messages=messages)
+            project_id=first.project_id, messages=messages[-200:], truncated=len(messages)>200 or len(rows)>200)
 
 
 def delete_conversation(sessions, workspace_id, actor_id, conversation_id):

@@ -97,3 +97,21 @@ def test_done_follows_delayed_queryable_write(app, client, monkeypatch):
             yield event
     monkeypatch.setattr(ChatRun, 'stream', checked)
     ask(app, client, 'done-visible')
+
+
+def test_history_latest_200_messages(app, client):
+    from datetime import timedelta
+    uid = ask(app, client, 'long')
+    with app.state.sessions.begin() as db:
+        usage = db.get(AiUsageRow, uid)
+        content = db.get(AiExchangeRow, uid)
+        for i in range(1, 105):
+            values = {c.name:getattr(usage, c.name) for c in AiUsageRow.__table__.columns}
+            values.update(id=f'long-{i:03}', created_at=usage.created_at+timedelta(seconds=i))
+            db.add(AiUsageRow(**values))
+            db.add(AiExchangeRow(usage_id=values['id'], workspace_id=usage.workspace_id,
+                actor_id=usage.actor_id, question=f'q{i}', answer=f'a{i}', tool_names='[]', created_at=values['created_at']))
+    result = client.get('/api/ai/conversations/long').json()
+    assert len(result['messages']) == 200 and result['truncated']
+    assert result['messages'][0]['content'] == 'q5'
+    assert result['messages'][-1]['content'] == 'a104'
