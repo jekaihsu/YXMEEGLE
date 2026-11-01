@@ -139,8 +139,9 @@ def test_prompt_and_strict_schema():
                  'unaccounted 非空時不得回答「沒有人」', '沒有打卡紀錄 N 人',
                  'as_of 只提一次', '依 week summary', '不要評論先前回覆', '不得使用「缺席」'):
         assert rule in prompt
-    schema = TOOLS['attendance_today'].schema
-    assert set(schema['required']) == set(schema['properties']) == {'range', 'date'}
+    from .ai.datasets import REGISTRY
+    schema = REGISTRY['attendance_today'].params.model_json_schema()
+    assert set(schema['properties']) == {'range', 'date'}
     assert schema['additionalProperties'] is False
     assert schema['properties']['date']['type'] == 'string'
 

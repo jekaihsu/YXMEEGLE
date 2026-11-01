@@ -75,7 +75,10 @@ def test_claude_request_usage_fallback_and_stream(monkeypatch, fallback, reason)
     request, headers = requests[0]
     assert request['max_tokens'] == 16000
     for tool in request['tools']:
-        assert_strict_schema(tool['input_schema'])
+        if tool['strict']:
+            assert_strict_schema(tool['input_schema'])
+        else:
+            assert tool['name'] in ('query_dataset', 'show_display')
     assert request['model'] == 'claude-sonnet-5-5'
     assert request['output_config'] == {'effort': 'medium'}
     assert not {'thinking', 'temperature', 'top_p', 'tool_choice'} & request.keys()
@@ -83,7 +86,7 @@ def test_claude_request_usage_fallback_and_stream(monkeypatch, fallback, reason)
     assert 'server-side-fallback-2026-07-01' in headers['anthropic-beta']
     assert request['system'][0]['cache_control'] == {'type': 'ephemeral'}
     assert request['tools'][-1]['cache_control'] == {'type': 'ephemeral'}
-    assert all(t['strict'] and t['input_schema']['additionalProperties'] is False for t in request['tools'])
+    assert all(t['strict'] == (t['name'] not in ('query_dataset', 'show_display')) for t in request['tools'])
     assert events[0].kind == 'usage' and events[0].value == Usage(10, 20, 30, 0)
     assert [e.value for e in events if e.kind == 'text'] == (['查詢', '完成'] if fallback else ['查詢']) + (['（回答太長，已截斷）'] if reason == 'max_tokens' else [])
     if fallback:
@@ -134,7 +137,11 @@ def test_gpt_responses_request_events_usage_and_tool_call(monkeypatch, length):
     request = requests[0]
     assert request['max_output_tokens'] == 16000
     for tool in request['tools']:
-        assert_strict_schema(tool['parameters'])
+        if tool['strict']:
+            assert_strict_schema(tool['parameters'])
+        else:
+            assert tool['name'] in ('query_dataset', 'show_display')
+            assert tool['parameters']['additionalProperties'] is False
     if length:
         assert events[-2].value == '（回答太長，已截斷）'
     assert request['model'] == 'gpt-6.1-terra'

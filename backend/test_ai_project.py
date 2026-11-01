@@ -203,7 +203,7 @@ def test_curl_project_stream_and_forbidden_real_socket(app, client, live_server)
     pid = project(client)
     app.state.ai_providers = {'claude': Capture()}
     for value in (pid, 'unknown'):
-        body = dict(BODY, project_id=value)
+        body = dict(BODY, project_id=value, conversation_id='project-'+value)
         response = subprocess.run(['curl', '--silent', '--show-error', '--no-buffer', '--max-time', '10',
             '--write-out', '\nHTTP %{http_code}\n', '--header', 'Content-Type: application/json',
             '--cookie', cookie(client), '--data', json.dumps(body), live_server + '/api/ai/chat'],

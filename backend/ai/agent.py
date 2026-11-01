@@ -13,7 +13,7 @@ from . import ledger
 from .catalog import Usage, cost_micro_usd
 from .prompts import system_prompt, project_system_prompt
 from .providers import ProviderError, failure_diagnostics
-from .tools import TOOLS, execute, displays, describe_options, select_display
+from .tools import TOOLS, execute, displays, describe_options, select_display, result_display, LEGACY_SCHEMAS
 
 
 QUESTION_TIMEOUT_SECONDS = 120
@@ -111,12 +111,13 @@ class ChatRun:
         messages = [m.model_dump() for m in self.body.messages]
         cache = {}
         display_pool = {}
+        result_pool = {}
         shown_displays = {}
         try:
             yield sse(dict(type='start', usage_id=self.usage_id, conversation_id=self.body.conversation_id, provider=self.spec.id, scope=self.scope))
             system = project_system_prompt(self.project_context) if self.project_context else system_prompt()
             tools = {} if self.project_context else TOOLS
-            for _ in range(5):
+            for _ in range(7):
                 self.steps += 1
                 self.step_usage = Usage()
                 self.step_final_usage = False
@@ -155,7 +156,7 @@ class ChatRun:
                         done['cost_usd'] = None if cost is None else cost / 1_000_000
                     yield sse(done)
                     return
-                if self.project_context or self.steps == 5:
+                if self.project_context or self.steps == 7:
                     raise ProviderError()
                 keys = [(c.name, json.dumps(c.args, sort_keys=True, ensure_ascii=False)) for c in calls]
                 pending = {}
@@ -176,7 +177,7 @@ class ChatRun:
                 self.tool_calls += len(pending)
                 async def run_any(call):
                     if call.name == 'show_display':
-                        shown, problem = select_display(display_pool, call.args)
+                        shown, problem = (result_display(result_pool, call.args) if 'result_id' in call.args else select_display(display_pool, call.args))
                         if problem:
                             return json.dumps({'error': problem}, ensure_ascii=False), True
                         shown_displays[call.id] = shown
@@ -184,7 +185,10 @@ class ChatRun:
                     return await run_tool(call)
                 results = await asyncio.gather(*(run_any(c) for c in pending.values()))
                 for (key, call), (result, error) in zip(pending.items(), results):
-                    if call.name != 'show_display' and not error:
+                    if call.name == 'query_dataset' and not error:
+                        queried = json.loads(result)
+                        result_pool[queried['result_id']] = queried
+                    if call.name in LEGACY_SCHEMAS and call.name != 'show_display' and not error:
                         try:
                             options = displays(call.name, result)
                             described = describe_options(options, len(display_pool) + 1)

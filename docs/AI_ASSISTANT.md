@@ -171,3 +171,68 @@ GPT 單價來自第三方報導（2026-10-31 查詢），尚未對照 OpenAI 官
 `GET /api/ai/usage/{usage_id}/exchange` 回傳 `usage_id, created_at, actor_id, name, provider, scope, project_id, status, rating, reason, question, answer, tools, error_detail, latency_ms, input_tokens, output_tokens, cost_usd`。
 
 `GET /api/ai/usage/export` 使用相同篩選，依時間新到舊回傳最多 500 筆 JSON lines。每列只有 `usage_id, created_at, name, provider, scope, rating, reason, question, answer, tools`。內容類型為 `application/x-ndjson`，供主管挑選好壞回答並調整提示詞。匯出不計算 totals 或 by_* 聚合。`X-Export-Truncated` 回應標頭為 `true` 或 `false`，`X-Export-Row-Count` 為實際匯出的資料列數（不含 metadata）。結果超過 500 筆時，最後額外附上一行 `{"truncated":true,"limit":500,"row_count":500}`；消費端需辨識這一行 metadata，整份回應仍為有效 JSONL。
+
+## Dataset registry 與依問題選擇呈現
+
+全域對話模型現在只收到四個工具。舊有四個查詢名稱成為 dataset id，原來的讀取與投影沿用，不重複註冊模型工具。舊 execute 入口僅保留既有測試及內部相容用途。案件對話保持一次模型呼叫、零工具，以及原有預建脈絡。
+
+`backend/ai/datasets.py` 的 Dataset registry 定義 id、標題、用途、Pydantic 嚴格參數模型、既有路由讀取函數、欄位白名單投影、欄位 metadata 與範例。模型提示詞只加入短用途索引，不放資料。所有資料讀取透過行程內 ASGI HTTP，傳入發問者 cookie。既有路由的權限、公司 workspace 與功能開關仍生效。401/403/404 一律回傳工具錯誤 `{"code":"ai_forbidden","error":"找不到或沒有權限查看資料"}`。不直接讀業務資料庫，不呼叫寫入路由。
+
+| dataset id | 既有讀取路由 | 可回答 |
+| --- | --- | --- |
+| search_cases | /api/workspace 或 /api/projects?view=portfolio | 案件關鍵字、PM、狀態、逾期與分頁 |
+| case_progress | /api/projects/{id}/progress、case-detail、既有指派與 SOP 讀取 | 完成／剩餘工作、階段證據、缺口 |
+| case_owners | /api/case-detail/{id}、啟用時 node-assignments | PM 與節點負責人 |
+| attendance_today | /api/people/attendance | 單日、指定週出勤標籤與排名 |
+| report_review | /api/reports/review/rows | 日期、人員、案件與審核狀態 |
+| report_sales | /api/reports/sales | 案件、業主、PM、狀態，不含金額 |
+| report_progress | /api/reports/progress | 計畫量、完成量、剩餘量 |
+| report_assets | /api/reports/assets | 車輛、儀器、使用次數、閒置天數，不含租金 |
+| report_contacts | /api/reports/contacts | 人員聯繫日期、案件、跟進日與狀態 |
+| contract_detail | /api/contract-detail?key= | 合約項目名稱、項次，不含財務與原始欄位 |
+| dispatch_board | /api/v2/dispatch/board | 日期區間、組別、案名與派工狀態 |
+| daily_reports | /api/daily-reports | 人員、日期、案件的日報紀錄 |
+| sop_tasks | /api/projects/{id}/sop-tasks | 案件／節點 SOP 任務、適用性與逾期 |
+| node_detail | /api/projects/{id}/node-assignments/nodes/{key} | 節點任務、負責人與期限 |
+
+模型工具合約如下。
+
+```json
+{"name":"list_datasets","arguments":{}}
+{"name":"describe_dataset","arguments":{"id":"report_assets"}}
+{"name":"query_dataset","arguments":{"id":"report_assets","params":{"kind":"vehicle"},"limit":20,"offset":0}}
+```
+
+list 回傳 datasets 的 id、title、description 與參數名稱。describe 回傳完整 JSON schema、columns、example。query 的 params 是物件，拒絕額外欄位、錯誤型別與無效日期。limit 為 1–50，offset 為 0–100000。describe 的 schema 為各資料集唯一參數依據。
+
+```json
+{"dataset_id":"report_assets","result_id":"r0123456789abcdefabcd","columns":[{"name":"name","label":"名稱","type":"text"},{"name":"uses","label":"使用次數","type":"number"}],"rows":[{"name":"車1","uses":4}],"total":1,"totals":{"rows":1},"next_offset":null,"as_of":null,"truncated":false,"limitations":["金額與財務欄位不提供"]}
+```
+
+欄位 type 為 text|number|date|status。既有四個資料集另有 summary，保留原來的出勤人數、分母、流程證據與不可用狀態。result_id 由查詢與結果內容決定，同一題可重用。查詢結果只在該題的結果池中可用，不跨使用者共用。來源時間不可得時 as_of=null，不以請求時間冒充來源時間。報表快照的 stale 與缺口保留於 limitations。來源空值與部分資料不可解讀為沒有。
+
+```json
+{"name":"show_display","arguments":{"result_id":"r0123456789abcdefabcd","kind":"bar","columns":[],"mapping":{"x":"name","y":"uses"},"max_rows":24}}
+```
+
+kind 為 table|bar|line|pie|stat。columns 僅選表格欄位，最多 8 欄；空陣列使用前 8 欄。mapping 可用 x/y/series/label/value，所有值必須存在於該結果的欄位。圖表數值軸必須為 number 且為有限數值，pie 不接受負數。表格最多 50 列，bar/line 最多 24 點，pie 最多 12 點，stat 最多 1 點。不隱式聚合或補零。
+
+show_display 的 SSE tool done 事件附 displays。表格沿用 `{kind:"table", title, columns:[{key,label}], rows, truncated}`。其他呈現回傳 `{kind:"bar"|"line"|"pie"|"stat", title, result_id, points:[{label,value,series?}], truncated, as_of, limitations}`。模型自己選擇呈現方式，不自動顯示預設圖表。前端不得顯示工具狀態晶片，工具事件只用於思考狀態及回傳的 displays。
+
+每題最多 7 次模型呼叫，足夠 discover → describe → query → 第二次 query → display → answer。相同工具與參數在題內快取，不同讀取維持併發，讀取仍有 15 秒上限。params 與 mapping 有動態結構，因此 query_dataset/show_display 的供應商 strict=false；伺服器仍嚴格驗證所有參數與呈現欄位。其餘工具沿用 strict=true。
+
+不支援月營收趨勢，既有業務路由沒有可用月份維度，且金額與財務禁止輸出。不支援合約即將到期清單，現有合約項目路由沒有合約到期日。日報只使用既有索引，沒有新增逐筆來源全文讀取。沒有新增 SOP 寫入、ensure、preview 或匯入路由。回答缺少資料時直接說沒有這項資料。
+
+## 個人對話歷史
+
+完整 HTTP request/response 範例見 [AI_HISTORY_API.md](AI_HISTORY_API.md)。每個已登入使用者可列出、讀取及刪除自己的全域／案件對話，不需主管權限。actor 與 workspace 都限制查詢與刪除。主管用量及 exchange API 的原有權限不變。
+
+以 ai_usage.conversation_id 分組並 join ai_exchange，無 schema 變更。標題使用第一則保留問題，壓縮空白、最多 60 字；活動時間倒序，游標使用時間與 ID。停用內容保存時 list 的 history_available=false 且 items=[]，detail 為 404。保留期外內容立即隱藏。刪除僅移除 ai_exchange，不動用量及評分。
+
+續聊沿用 conversation_id，client 傳入之前的 messages；server 不另外注入歷史。同一 caller 的 conversation_id 不可變更 scope/project，衝突為 422。不同 caller 的同名 ID 分開處理。
+
+## 離線驗證
+
+`python -m pytest backend/test_ai_*.py -q` 包含 registry 驗證、新資料集來源形狀投影、403/404、SSE discover/describe/query/bar，以及 history 分頁、續聊、刪除、actor/workspace、停用內容與保留期測試。
+
+`python -m pytest backend/test_ai_question_eval.py -q` 的 18 個繁體中文問題逐題走 scripted provider 的 list → describe → query → answer，涵蓋逾期案件、我的案件、案號搜尋、負責人、未完成工作、今天出勤、週排名、退回審核、業務 PM、週進度、車輛、儀器、聯繫、日報、派工、SOP、節點明細及合約項目。另有月營收及合約到期兩個明示不支援的檢查。這驗證工具與目錄合約，不測量真實模型的自然語言選擇準確率，也不聲稱連線至正式 Lark 資料。

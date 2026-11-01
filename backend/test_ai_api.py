@@ -266,7 +266,7 @@ def test_two_concurrent_chats_limit(app, client, live_server):
                 assert response.status_code == 429 and response.json()['code'] == 'ai_busy'
 
 
-def test_five_model_step_bound_and_cross_step_deduplication(app, client, monkeypatch):
+def test_seven_model_step_bound_and_cross_step_deduplication(app, client, monkeypatch):
     count = []
     async def tool(*args):
         count.append(args[2])
@@ -281,7 +281,7 @@ def test_five_model_step_bound_and_cross_step_deduplication(app, client, monkeyp
     result = events(client.post('/api/ai/chat', json=BODY))
     assert result[-1]['code'] == 'ai_upstream'
     row = rows(app)[0]
-    assert (row.steps, row.tool_calls, row.input_tokens, row.output_tokens, row.status) == (5, 1, 5, 10, 'error')
+    assert (row.steps, row.tool_calls, row.input_tokens, row.output_tokens, row.status) == (7, 1, 7, 14, 'error')
     assert count == ['attendance_today']
 
 

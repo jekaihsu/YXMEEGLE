@@ -359,17 +359,23 @@ SHOW_DISPLAY_SCHEMA = dict(type='object', properties={
     'max_rows': dict(type='integer', description='表格或圖表最多顯示幾筆；0 代表全部（上限 50）。')},
     required=['display_id', 'columns', 'max_rows'], additionalProperties=False)
 
-TOOLS = {
-    'search_cases': ToolSpec(SEARCH_SCHEMA, '搜尋案件', search, project_search),
-    'case_progress': ToolSpec(schema(['case_id']), '查詢案件進度', progress, project_progress),
-    'case_owners': ToolSpec(schema(['case_id']), '查詢案件負責人', owners, project_owners),
-    'attendance_today': ToolSpec(ATTENDANCE_SCHEMA, '查詢單日或每週出勤', attendance, project_attendance),
-    'show_display': ToolSpec(SHOW_DISPLAY_SCHEMA, '只在表格或圖表比文字更清楚時，顯示先前工具結果中的一個表格或圖表', None, None),
-}
+LEGACY_SCHEMAS = {'search_cases': SEARCH_SCHEMA, 'case_progress': schema(['case_id']),
+                  'case_owners': schema(['case_id']), 'attendance_today': ATTENDANCE_SCHEMA}
+
+
+def legacy_spec(name):
+    from .datasets import REGISTRY
+    if name not in LEGACY_SCHEMAS:
+        return None
+    dataset = REGISTRY[name]
+    return ToolSpec(LEGACY_SCHEMAS[name], dataset.title, dataset.read, dataset.projector)
+
 
 
 async def execute(app, cookie, name, args):
-    spec = TOOLS.get(name)
+    if name in TOOLS and name != 'show_display':
+        return await execute_dataset(app, cookie, name, args)
+    spec = legacy_spec(name)
     if spec is None or not isinstance(args, dict) or set(args) != set(spec.schema['required']):
         return json.dumps({'error': '工具參數錯誤'}, ensure_ascii=False), True
     for key, prop in spec.schema['properties'].items():
@@ -560,3 +566,87 @@ def select_display(options, args):
         item['points'] = item['points'][:limit]
         item['truncated'] = True
     return item, None
+
+
+TOOLS = {
+    'list_datasets': ToolSpec(dict(type='object',properties={},required=[],additionalProperties=False), '列出可查資料', None, None),
+    'describe_dataset': ToolSpec(dict(type='object',properties={'id':dict(type='string')},required=['id'],additionalProperties=False), '查看資料參數與欄位', None, None),
+    'query_dataset': ToolSpec(dict(type='object',properties={'id':dict(type='string'),'params':dict(type='object',additionalProperties=True),
+        'limit':dict(type='integer',minimum=1,maximum=50),'offset':dict(type='integer',minimum=0,maximum=100000)},
+        required=['id','params','limit','offset'],additionalProperties=False), '查詢資料', None, None),
+    'show_display': ToolSpec(dict(type='object',properties={'result_id':dict(type='string'),
+        'kind':dict(type='string',enum=['table','bar','line','pie','stat']), 'columns':dict(type='array',items=dict(type='string')),
+        'mapping':dict(type='object',properties={k:dict(type='string') for k in ('x','y','series','label','value')},additionalProperties=False),
+        'max_rows':dict(type='integer',minimum=1,maximum=50)},required=['result_id','kind','columns','mapping','max_rows'],additionalProperties=False),
+        '依問題選表格、比較圖、趨勢圖或單值', None, None),
+}
+
+
+async def execute_dataset(app, cookie, name, args):
+    from .datasets import index, describe, query, REGISTRY
+    from pydantic import ValidationError
+    try:
+        spec = TOOLS[name]
+        if not isinstance(args, dict) or set(args) != set(spec.schema['required']):
+            raise ValueError()
+        if name == 'list_datasets':
+            return json.dumps(dict(datasets=index()),ensure_ascii=False), False
+        if not isinstance(args['id'], str) or args['id'] not in REGISTRY:
+            raise ValueError()
+        if name == 'describe_dataset':
+            return json.dumps(describe(args['id']),ensure_ascii=False), False
+        if type(args['limit']) is not int or not 1 <= args['limit'] <= 50 or type(args['offset']) is not int or not 0 <= args['offset'] <= 100000:
+            raise ValueError()
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://ai.internal',
+            headers={'cookie':cookie},timeout=15) as client:
+            result = await query(Reader(client,str(app.state.cfg.get('NODE_ASSIGNMENT_ENABLED','false')).lower()=='true',
+                str(app.state.cfg.get('WORKSPACE_SHELL_ENABLED','false')).lower()=='true'),args['id'],args['params'],args['limit'],args['offset'])
+        return json.dumps(result,ensure_ascii=False),False
+    except ReadDenied:
+        return json.dumps(dict(error='找不到或沒有權限查看資料',code='ai_forbidden'),ensure_ascii=False),True
+    except (ValueError, TypeError, KeyError, ValidationError):
+        return json.dumps(dict(error='工具參數錯誤'),ensure_ascii=False),True
+    except Exception:
+        return json.dumps(dict(error='資料暫時無法讀取，請稍後重試'),ensure_ascii=False),True
+
+
+def result_display(results, args):
+    from pydantic import BaseModel, ConfigDict, Field, ValidationError
+    from typing import Literal
+    class Display(BaseModel):
+        model_config = ConfigDict(extra='forbid',strict=True)
+        result_id: str
+        kind: Literal['table','bar','line','pie','stat']
+        columns: list[str] = Field(max_length=8)
+        mapping: dict[str,str]
+        max_rows: int = Field(ge=1,le=50)
+    try:
+        request = Display.model_validate(args)
+        data = results[request.result_id]
+        known = {c['name']: c for c in data['columns']}
+        if set(request.mapping)-{'x','y','series','label','value'} or any(v not in known for v in request.mapping.values()):
+            raise ValueError()
+        cols = request.columns or list(known)[:8]
+        if any(c not in known for c in cols):
+            raise ValueError()
+        title = data['dataset_id']
+        if request.kind == 'table':
+            return display_table(title,[(k,known[k]['label']) for k in cols],data['rows'][:request.max_rows],
+                {**data,'truncated':data['truncated'] or len(data['rows'])>request.max_rows}),None
+        label = request.mapping.get('x') or request.mapping.get('label')
+        value = request.mapping.get('y') or request.mapping.get('value')
+        if value is None or known[value]['type'] != 'number' or request.kind != 'stat' and label is None:
+            raise ValueError()
+        cap = min(request.max_rows, 1 if request.kind == 'stat' else 12 if request.kind == 'pie' else 24)
+        rows = data['rows'][:cap]
+        if any(type(r.get(value)) not in (int,float) or not math.isfinite(r[value]) for r in rows):
+            raise ValueError()
+        if request.kind == 'pie' and any(r[value]<0 for r in rows):
+            raise ValueError()
+        result = dict(kind=request.kind,title=title,result_id=request.result_id,
+            points=[dict(label=str(r.get(label,'')),value=r[value],
+                **({'series':r.get(request.mapping['series'])} if 'series' in request.mapping else {})) for r in rows],
+            truncated=data['truncated'] or len(data['rows'])>cap,as_of=data['as_of'],limitations=data['limitations'])
+        return result,None
+    except (ValueError,TypeError,KeyError,ValidationError):
+        return None,'顯示參數或欄位錯誤'

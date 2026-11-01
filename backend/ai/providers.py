@@ -118,7 +118,7 @@ class Claude:
 
     @provider_failures
     async def stream(self, spec, system, messages, tools):
-        definitions = [dict(name=name, description=t.label, input_schema=t.schema, strict=True)
+        definitions = [dict(name=name, description=t.label, input_schema=t.schema, strict=name not in ('query_dataset', 'show_display'))
                        for name, t in tools.items()]
         if definitions:
             definitions[-1]['cache_control'] = {'type': 'ephemeral'}
@@ -181,7 +181,7 @@ class GPT:
 
     @provider_failures
     async def stream(self, spec, system, messages, tools):
-        definitions = [dict(type='function', name=name, description=t.label, parameters=t.schema, strict=True)
+        definitions = [dict(type='function', name=name, description=t.label, parameters=t.schema, strict=name not in ('query_dataset', 'show_display'))
                        for name, t in tools.items()]
         last_event_type = None
         sensitive = [self.key, system, *private_strings(messages)]

@@ -339,3 +339,83 @@ def ensure_schema(engine):
     for index in AiUsageRow.__table__.indexes:
         index.create(engine, checkfirst=True)
 
+
+def conversation_scope(sessions, workspace_id, actor_id, conversation_id):
+    with sessions() as db:
+        row = db.execute(select(AiUsageRow.scope, AiUsageRow.project_id).where(
+            AiUsageRow.workspace_id == workspace_id, AiUsageRow.actor_id == actor_id,
+            AiUsageRow.conversation_id == conversation_id).limit(1)).first()
+        return tuple(row) if row else None
+
+
+def history_statement(workspace_id, actor_id, retention_days):
+    u, e = AiUsageRow, AiExchangeRow
+    return select(u, e).join(e, and_(e.usage_id == u.id, e.workspace_id == u.workspace_id,
+        e.actor_id == u.actor_id)).where(u.workspace_id == workspace_id, u.actor_id == actor_id,
+        e.created_at >= datetime.now(timezone.utc) - timedelta(days=retention_days))
+
+
+def conversation_title(question):
+    return ' '.join(question.split())[:60]
+
+
+def conversations(sessions, workspace_id, actor_id, scope, project_id, limit, before, *, content_enabled, retention_days):
+    import base64
+    cursor = None
+    if before:
+        try:
+            stamp, ident = json.loads(base64.urlsafe_b64decode(before.encode()))
+            cursor = (datetime.fromisoformat(stamp), ident)
+            if cursor[0].tzinfo is None or not isinstance(ident, str):
+                raise ValueError
+        except Exception:
+            raise ValueError('invalid cursor') from None
+    result = dict(history_available=content_enabled, items=[], next_cursor=None)
+    if not content_enabled:
+        return result
+    u = AiUsageRow
+    stmt = history_statement(workspace_id, actor_id, retention_days).where(u.scope == scope)
+    if project_id is not None:
+        stmt = stmt.where(u.project_id == project_id)
+    source = stmt.subquery()
+    grouped = select(source.c.conversation_id.label('id'), func.max(source.c.created_at).label('updated_at'),
+        func.count().label('turns')).group_by(source.c.conversation_id).subquery()
+    page = select(grouped).order_by(grouped.c.updated_at.desc(), grouped.c.id.desc())
+    if cursor:
+        page = page.where(or_(grouped.c.updated_at < cursor[0], and_(
+            grouped.c.updated_at == cursor[0], grouped.c.id < cursor[1])))
+    with sessions() as db:
+        rows = db.execute(page.limit(limit + 1)).mappings().all()
+        for row in rows[:limit]:
+            first = db.execute(stmt.where(u.conversation_id == row['id']).order_by(u.created_at, u.id).limit(1)).first()
+            usage, exchange = first
+            result['items'].append(dict(id=row['id'], title=conversation_title(exchange.question), scope=usage.scope,
+                project_id=usage.project_id, updated_at=iso(row['updated_at']), turns=row['turns']))
+    if len(rows) > limit:
+        last = result['items'][-1]
+        result['next_cursor'] = base64.urlsafe_b64encode(json.dumps([last['updated_at'], last['id']]).encode()).decode()
+    return result
+
+
+def conversation(sessions, workspace_id, actor_id, conversation_id, *, content_enabled, retention_days):
+    if not content_enabled:
+        return None
+    u = AiUsageRow
+    with sessions() as db:
+        rows = db.execute(history_statement(workspace_id, actor_id, retention_days).where(
+            u.conversation_id == conversation_id).order_by(u.created_at, u.id)).all()
+        if not rows:
+            return None
+        first, content = rows[0]
+        messages = [dict(role=role, content=text, at=iso(exchange.created_at), usage_id=usage.id)
+            for usage, exchange in rows for role, text in [('user', exchange.question), ('assistant', exchange.answer)] if text]
+        return dict(id=conversation_id, title=conversation_title(content.question), scope=first.scope,
+            project_id=first.project_id, messages=messages)
+
+
+def delete_conversation(sessions, workspace_id, actor_id, conversation_id):
+    with sessions.begin() as db:
+        ids = select(AiUsageRow.id).where(AiUsageRow.workspace_id == workspace_id,
+            AiUsageRow.actor_id == actor_id, AiUsageRow.conversation_id == conversation_id)
+        db.execute(delete(AiExchangeRow).where(AiExchangeRow.usage_id.in_(ids),
+            AiExchangeRow.workspace_id == workspace_id, AiExchangeRow.actor_id == actor_id))

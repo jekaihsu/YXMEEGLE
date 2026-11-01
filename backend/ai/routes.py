@@ -124,9 +124,40 @@ def register(app, *, identity, sessions, cfg):
         return {'default': 'claude', 'models': [dict(id=key, label=spec.label,
                 available=key in app.state.ai_providers) for key, spec in models.items()]}
 
+    def history_options():
+        return dict(content_enabled=app.state.ai_store_content, retention_days=app.state.ai_content_retention_days)
+
+    @app.get('/api/ai/conversations')
+    def list_conversations(scope: Literal['global', 'project'] = 'global', project_id: str | None = Query(None, max_length=200),
+                           limit: int = Query(30, ge=1, le=100), before: str | None = Query(None, max_length=1000),
+                           auth=Depends(authenticated)):
+        data, user = auth
+        try:
+            result = ledger.conversations(sessions, data['wid'], user['id'], scope, project_id, limit, before, **history_options())
+        except ValueError:
+            raise HTTPException(422, '分頁游標錯誤') from None
+        return JSONResponse(result, headers={'Cache-Control': 'no-store'})
+
+    @app.get('/api/ai/conversations/{conversation_id}')
+    def get_conversation(conversation_id: str, auth=Depends(authenticated)):
+        data, user = auth
+        result = ledger.conversation(sessions, data['wid'], user['id'], conversation_id, **history_options())
+        if result is None:
+            raise HTTPException(404, '找不到對話')
+        return JSONResponse(result, headers={'Cache-Control': 'no-store'})
+
+    @app.delete('/api/ai/conversations/{conversation_id}', status_code=204)
+    def delete_conversation(conversation_id: str, auth=Depends(authenticated)):
+        data, user = auth
+        ledger.delete_conversation(sessions, data['wid'], user['id'], conversation_id)
+        return Response(status_code=204, headers={'Cache-Control': 'no-store'})
+
     @app.post('/api/ai/chat')
     async def chat(request: Request, body: ChatRequest, auth=Depends(authenticated)):
         data, user = auth
+        existing = await run_in_threadpool(ledger.conversation_scope, sessions, data['wid'], user['id'], body.conversation_id)
+        if existing is not None and existing != ('project' if body.project_id else 'global', body.project_id):
+            raise HTTPException(422, '對話範圍不可變更')
         adapter = app.state.ai_providers.get(body.model)
         if adapter is None:
             return JSONResponse({'code': 'ai_unconfigured', 'message': '此模型尚未設定金鑰'}, status_code=503)
