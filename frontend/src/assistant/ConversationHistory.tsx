@@ -3,8 +3,8 @@ import {Button} from '../design';
 import {listConversations,openConversation,deleteConversation,relativeTime,type ConversationDetail,type HistoryPage,type HistoryScope} from './history';
 
 type HistoryState={status:'loading'}|{status:'error'}|{status:'ready';page:HistoryPage};
-type Props={projectId?:string;compact?:boolean;revision:number;activeId:string;onOpen:(detail:ConversationDetail)=>void;onNew:()=>void;children:ReactNode};
-export function ConversationHistory({projectId,compact,revision,activeId,onOpen,onNew,children}:Props){
+type Props={projectId?:string;compact?:boolean;revision:number;activeId:string;onOpen:(detail:ConversationDetail)=>void;onNew:()=>void;beforeDelete?:()=>Promise<void>;children:ReactNode};
+export function ConversationHistory({projectId,compact,revision,activeId,onOpen,onNew,beforeDelete,children}:Props){
  const [state,setState]=useState<HistoryState>({status:'loading'}),[attempt,setAttempt]=useState(0);
  const [mobile,setMobile]=useState(()=>window.matchMedia?.('(max-width: 760px)').matches??false);
  const [expanded,setExpanded]=useState(!compact&&!mobile),[confirm,setConfirm]=useState<string>(),[busy,setBusy]=useState(false),[actionError,setActionError]=useState('');
@@ -44,6 +44,8 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
   onOpen(detail);setConfirm(undefined);if(overlay)close();
  },()=>open(conversationId));
  const remove=(conversationId:string)=>void perform(async signal=>{
+  if(activeId===conversationId)await beforeDelete?.();
+  if(signal.aborted)return;
   await deleteConversation(conversationId,signal);if(signal.aborted)return;
   setState(previous=>previous.status==='ready'?{status:'ready',page:{...previous.page,items:previous.page.items.filter(item=>item.id!==conversationId)}}:previous);
   setConfirm(undefined);if(activeId===conversationId)onNew();setAttempt(n=>n+1);

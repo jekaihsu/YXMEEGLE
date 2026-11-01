@@ -78,6 +78,26 @@ globalThis.fetch=(url,init)=>url.includes('/chat%2Fa')?new Promise(resolve=>{res
 await flush(()=>document.querySelector('.assistant-history-open').click());
 await flush(()=>[...document.querySelectorAll('button')].filter(button=>button.textContent==='新對話').at(-1).click());
 await flush(()=>resolveOpen(json(detail)));assert.equal(document.querySelectorAll('.assistant-message').length,0,'late open cannot override new chat');
+let settleResponse,answerAborted=false,deleteSent=false;
+globalThis.fetch=async(url,init={})=>{
+ if(url==='/api/ai/chat'){
+  init.signal.addEventListener('abort',()=>{answerAborted=true});
+  return new Response(new ReadableStream({start(c){c.enqueue(new TextEncoder().encode('data: {"type":"text","delta":"回答中"}\n\n'))},cancel(){return new Promise(resolve=>{settleResponse=resolve})}}));
+ }
+ if(init.method==='DELETE'){deleteSent=true;return new Response(null,{status:204})}
+ return server(url,init);
+};
+await mount();await flush(()=>document.querySelector('.assistant-history-open').click());
+await flush(()=>document.querySelector('textarea').focus());
+await flush(()=>{const input=document.querySelector('textarea');Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set.call(input,'繼續');input.dispatchEvent(new window.Event('input',{bubbles:true}));input.dispatchEvent(new window.KeyboardEvent('keyup',{key:'續',bubbles:true}))});
+await flush(()=>button('送出').click());
+await flush(()=>document.querySelector('[aria-label="刪除對話：案件進度"]').click());
+await flush(()=>button('確定刪除').click());
+assert.equal(answerAborted,true,'delete first cancels the open answer');
+assert.equal(deleteSent,false,'DELETE waits for response stream settlement');
+await flush(()=>settleResponse());await flush();
+assert.equal(deleteSent,true,'DELETE follows settlement');
+assert.equal(document.querySelectorAll('.assistant-message').length,0,'delete switches to a new conversation');
 let resolveMore;
 const page=(items,cursor=null)=>json({history_available:true,items,next_cursor:cursor});
 let freshPage=false;
