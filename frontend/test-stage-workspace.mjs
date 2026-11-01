@@ -179,7 +179,7 @@ await check('T20 a late response for node A never overwrites the newer selection
  tasksByNode.field=[mk('f1',{title:'外業任務 B'})];
  await click(document.querySelector('.pf-node[aria-label^="外業"]'));await act(async()=>{await tick(60)});
  release();await act(async()=>{await tick(60)});
- assert.match(document.querySelector('#flow-selected h2').textContent,/外業/);assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/PM 舊回應任務/);
+ assert.match(document.querySelector('#flow-selected').getAttribute('aria-label'),/外業/);assert.doesNotMatch(document.querySelector('#flow-tasks').textContent,/PM 舊回應任務/);
 });
 await check('T21 failure, zero tasks and an empty filter use three different messages',async()=>{
  await mount({embedded:false,node:'control',detailStatus:500});await act(async()=>{await tick(60)});
@@ -204,7 +204,7 @@ await check('other stages use only the flow selector and case status is only in 
  assert.equal(document.querySelector('.st-others'),null);assert.equal(document.querySelector('.cs-levels'),null);
  assert.match(document.querySelector('.pds-case-status').textContent,/案件狀態暫停中/);
  assert.doesNotMatch(document.querySelector('.po-sidebar').textContent,/來源紀錄狀態|外業組別|指派主管/);
- assert.match(document.querySelector('#flow-tasks .st-note').textContent,/案件暫停中/);
+ assert.match(document.querySelector('.cs-next').textContent,/案件暫停中/);
 });
 
 await act(async()=>root.unmount());

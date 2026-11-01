@@ -5,13 +5,19 @@ import {JSDOM} from 'jsdom';
 import {assignmentFixture} from './fixtures/node-assignments.mjs';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=work&tab=assigned',pretendToBeVisual:true});
 for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','HTMLElement','HTMLInputElement','HTMLTextAreaElement','HTMLSelectElement','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
-globalThis.IS_REACT_ACT_ENVIRONMENT=true;window.scrollTo=()=>{};
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;window.scrollTo=()=>{};globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;
 const React=await import('react'),{act}=React,{createRoot}=await import('react-dom/client');
 const bundle=await build({stdin:{contents:"export {WorkPage} from './src/IntegratedPages';export {AssignmentTaskInspector} from './src/AssignmentTaskInspector';export {SopTaskInspector} from './src/SopTaskInspector';export {parseOverview} from './src/sopTaskApi';export {mutateNodeAssignment} from './src/nodeAssignmentApi';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
 const path=new URL('./.work-nonempty-test.mjs',import.meta.url);await writeFile(path,bundle.outputFiles[0].text);const ui=await import(path.href);await unlink(path);
 const examples=JSON.parse(await readFile(new URL('../backend/sop_import/api-examples.json',import.meta.url),'utf8'));
 const tick=()=>new Promise(resolve=>setTimeout(resolve,20));
-const edit=async(label,value)=>act(async()=>{const element=document.querySelector(`[aria-label="${label}"]`);assert.ok(element,label);Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element),'value').set.call(element,value);element.dispatchEvent(new Event(element.tagName==='SELECT'?'change':'input',{bubbles:true}));});
+const edit=async(label,value)=>{
+ if(label==='任務負責人'){
+  await act(async()=>{document.querySelector('.assignee-picker button').click();await tick()});
+  await act(async()=>{const person=[...document.querySelectorAll('[role=option]')].find(el=>el.textContent==='乙');assert.ok(person);person.click();await tick()});return;
+ }
+ await act(async()=>{const element=document.querySelector(`[aria-label="${label}"]`);assert.ok(element,label);Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element),'value').set.call(element,value);element.dispatchEvent(new Event(element.tagName==='SELECT'?'change':'input',{bubbles:true}));});
+};
 for(const panel of ['assigned','delegated','local']){
  history.replaceState(null,'',`#view=work&tab=${panel}`);
  const root=createRoot(document.getElementById('root'));
@@ -24,6 +30,7 @@ for(const panel of ['assigned','delegated','local']){
  const body=()=>({panel,scope:'mine',readState:'ready',snapshot_version:String(version),as_of:null,freshness:{status:'fresh',last_success_at:null,refreshing:false},counts:{node_assignments:0,tasks:panel==='local'?0:1,local_workflow:0,sop_tasks:panel==='local'?1:0,complete:true},items:[{id:'work-task',kind:panel==='local'?'sop_task':'task',origin:panel==='local'?'sop_local':'lark',title:title(),status:'todo',source_status:null,case:{id:'p1',code:'C001',name:'QA 案件',relation_state:'verified'},assignees:[person],assigned_by:person,assignment_state:'assigned',deadline:'2026-11-01',next_due:null,original_deadline:null,deadline_basis:'task',can_execute:true,blocked_reasons:[],target,detail:'原備註',overdue:false,due_today:false}],next_cursor:null,has_more:false,complete:true,total_count:1,manager_view_available:false});
  const json=body=>new Response(JSON.stringify(body),{headers:{'content-type':'application/json'}});
  globalThis.fetch=async(url,init={})=>{
+  if(url.includes('/sop-assignees?'))return json({people:[{id:'u1',name:'甲'},{id:'u2',name:'乙'}],next_cursor:null});
   if(!init.method||init.method==='GET'){reads.push(url);return json(body())}
   const payload=JSON.parse(init.body);writes.push({url,payload});
   if(panel==='local'){

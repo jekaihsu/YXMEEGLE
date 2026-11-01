@@ -81,7 +81,9 @@
     "test:assistant:elements": "node test-assistant-elements.mjs && node scripts/test-assistant-chart.mjs",
     "test:assistant:project": "node test-project-chat.mjs && node test-project-chat-layout.mjs",
     "test:assistant:markdown": "node test-assistant-markdown.mjs",
-    "test:case-simplify-ui": "node scripts/verify-case-simplify.mjs"
+    "test:case-simplify-ui": "node scripts/verify-case-simplify.mjs",
+    "test:project-flow": "node test-project-flow-model.mjs && node test-project-flow-ui.mjs && node test-project-flow-round2.mjs",
+    "test:work-nonempty": "node test-work-nonempty.mjs"
   },
   "dependencies": {
     "@assistant-ui/react": "0.15.32",
