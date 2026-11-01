@@ -9,6 +9,7 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
  const [mobile,setMobile]=useState(()=>window.matchMedia?.('(max-width: 760px)').matches??false);
  const [expanded,setExpanded]=useState(!compact&&!mobile),[confirm,setConfirm]=useState<string>(),[busy,setBusy]=useState(false),[actionError,setActionError]=useState('');
  const [retry,setRetry]=useState<(()=>void)>();
+ const listGeneration=useRef(0);
  const action=useRef<AbortController>(),list=useRef<AbortController>();
  const trigger=useRef<HTMLButtonElement>(null),dialog=useRef<HTMLDialogElement>(null),panel=useRef<HTMLElement>(null);
  const id=useId(),overlay=!!compact||mobile;
@@ -18,7 +19,7 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
   const change=()=>setMobile(media.matches);media.addEventListener('change',change);return()=>media.removeEventListener('change',change);
  },[]);
  useEffect(()=>{
-  list.current?.abort();const controller=new AbortController();list.current=controller;
+  ++listGeneration.current;list.current?.abort();const controller=new AbortController();list.current=controller;
   listConversations(scope,undefined,controller.signal).then(page=>{if(!controller.signal.aborted)setState({status:'ready',page})}).catch(()=>{if(!controller.signal.aborted)setState({status:'error'})});
   return()=>controller.abort();
  },[projectId,revision,attempt]);
@@ -49,9 +50,9 @@ export function ConversationHistory({projectId,compact,revision,activeId,onOpen,
  },()=>remove(conversationId));
  const more=()=>{
   if(state.status!=='ready'||!state.page.next_cursor)return;
-  const page=state.page;
-  void perform(async signal=>{const next=await listConversations(scope,page.next_cursor!,signal);if(signal.aborted)return;
-   setState({status:'ready',page:{...next,items:[...page.items,...next.items.filter(item=>!page.items.some(existing=>existing.id===item.id))]}});
+  const page=state.page,generation=listGeneration.current;
+  void perform(async signal=>{const next=await listConversations(scope,page.next_cursor!,signal);if(signal.aborted||generation!==listGeneration.current)return;
+   setState(previous=>previous.status!=='ready'?previous:{status:'ready',page:{...next,items:[...new Map([...previous.page.items,...next.items].map(item=>[item.id,item])).values()]}});
   },more);
  };
  const content=<>

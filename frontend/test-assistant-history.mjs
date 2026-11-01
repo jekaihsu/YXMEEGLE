@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
-const bundle=await build({stdin:{contents:"export * from './src/assistant/history';export {AssistantChat} from './src/assistant/AssistantChat';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',packages:'external',jsx:'automatic',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {ConversationHistory} from './src/assistant/ConversationHistory';export * from './src/assistant/history';export {AssistantChat} from './src/assistant/AssistantChat';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',packages:'external',jsx:'automatic',loader:{'.css':'empty'}});
 const file=new URL('./.history-test.mjs',import.meta.url);await fs.writeFile(file,bundle.outputFiles[0].text);
 let ui;try{ui=await import(file.href)}finally{await fs.unlink(file)}
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
@@ -78,6 +78,19 @@ globalThis.fetch=(url,init)=>url.includes('/chat%2Fa')?new Promise(resolve=>{res
 await flush(()=>document.querySelector('.assistant-history-open').click());
 await flush(()=>[...document.querySelectorAll('button')].filter(button=>button.textContent==='新對話').at(-1).click());
 await flush(()=>resolveOpen(json(detail)));assert.equal(document.querySelectorAll('.assistant-message').length,0,'late open cannot override new chat');
+let resolveMore;
+const page=(items,cursor=null)=>json({history_available:true,items,next_cursor:cursor});
+let freshPage=false;
+globalThis.fetch=async url=>url.includes('before=')?new Promise(resolve=>{resolveMore=resolve}):page([{...summary,title:freshPage?'最新標題':'原始標題'}],freshPage?null:'older');
+const historyProps={activeId:'other',revision:0,onNew(){},onOpen(){}};
+await flush(()=>root.render(React.createElement(ui.ConversationHistory,historyProps)));
+await flush(()=>button('載入更多').click());
+freshPage=true;
+await flush(()=>root.render(React.createElement(ui.ConversationHistory,{...historyProps,revision:1})));
+assert.match(document.body.textContent,/最新標題/);
+await flush(()=>resolveMore(page([{...summary,id:'old',title:'過時分頁'}])));
+assert.match(document.body.textContent,/最新標題/,'pagination cannot overwrite a fresh first page');
+assert.doesNotMatch(document.body.textContent,/過時分頁/);
 globalThis.fetch=server;
 await flush(()=>root.unmount());dom.window.close();
 console.log('History passed. List, project/cursor encoding, open, text seeding, reused UUID, continuation payload, completion refresh, 204 delete, inline cancel, empty, unavailable, error, retry, loading, pagination and stale-open cancellation.');
