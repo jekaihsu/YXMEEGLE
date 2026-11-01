@@ -1,4 +1,4 @@
-export type Cell=string|number|null;
+export type Cell=string|number|boolean|null;
 export type TableDisplay={kind:'table';title:string;caption?:string;columns:{key:string;label:string}[];rows:Record<string,Cell>[];rowKey?:string;truncated?:boolean;note?:string};
 export type ChartDisplay={kind:'chart'|'bar'|'line'|'pie'|'stat';title:string;caption?:string;truncated?:boolean;note?:string;variant?:'bars';unit?:string;headline?:{label:string;value:string};points:{label:string;value:number;series?:Cell}[]};
 export type Display=TableDisplay|ChartDisplay;
@@ -9,7 +9,7 @@ export function isDisplay(value:unknown):value is Display {
  if(value.kind==='table')return Array.isArray(value.columns)&&value.columns.length>0&&value.columns.length<=8
   &&value.columns.every(c=>record(c)&&typeof c.key==='string'&&typeof c.label==='string')
   &&new Set(value.columns.map(c=>c.key)).size===value.columns.length
-  &&Array.isArray(value.rows)&&value.rows.length<=50&&value.rows.every(row=>record(row)&&Object.values(row).every(v=>v===null||typeof v==='string'||typeof v==='number'&&Number.isFinite(v)))
+  &&Array.isArray(value.rows)&&value.rows.length<=50&&value.rows.every(row=>record(row)&&Object.values(row).every(v=>v===null||typeof v==='string'||typeof v==='boolean'||typeof v==='number'&&Number.isFinite(v)))
   &&optionalText(value.caption)&&optionalText(value.rowKey)&&optionalText(value.note)&&(value.truncated===undefined||typeof value.truncated==='boolean');
  if(['chart','bar','line','pie','stat'].includes(String(value.kind)))return (value.kind!=='chart'||value.variant==='bars')&&optionalText(value.unit)
   &&optionalText(value.caption)&&optionalText(value.note)&&(value.truncated===undefined||typeof value.truncated==='boolean')

@@ -2,6 +2,7 @@
 import {createContext,useContext,useCallback,useEffect,useMemo,useRef,useState,type ReactNode,type MutableRefObject} from 'react';
 import {AssistantRuntimeProvider,useLocalRuntime,ThreadPrimitive,ComposerPrimitive,MessagePrimitive,ActionBarPrimitive,ErrorPrimitive,useAuiState} from '@assistant-ui/react';
 import {MarkdownTextPrimitive} from '@assistant-ui/react-markdown';
+import {useInputModality} from './useInputModality';
 import {ConversationHistory} from './ConversationHistory';
 import {historyMessages,type ConversationDetail} from './history';
 import {assistantRemarkPlugins} from './markdown';
@@ -84,6 +85,7 @@ function MessageLog({children}:{children:ReactNode}){
 }
 
 function Conversation({catalog,newConversation,projectId,projectLabel,compact,selected,onComplete,cancelResponse}:AssistantChatProps&{catalog:ModelCatalog;newConversation:()=>void;selected:{id:string;detail?:ConversationDetail};onComplete:()=>void;cancelResponse:MutableRefObject<()=>Promise<void>>}){
+ const modalityRoot=useInputModality();
  const [forbidden,setForbidden]=useState(false);
  const conversation=useRef(selected.id);
  const settled=useRef<Promise<void>>(Promise.resolve());
@@ -108,7 +110,7 @@ function Conversation({catalog,newConversation,projectId,projectLabel,compact,se
  const available=!forbidden&&catalog.models.some(m=>m.available);
  const input=useRef<HTMLTextAreaElement>(null);
  return <AssistantRuntimeProvider runtime={runtime}><FeedbackContext.Provider value={feedback}><ForbiddenContext.Provider value={forbidden}>
-  <div className={`assistant-chat${compact?' assistant-chat-compact':''}`}>
+  <div ref={modalityRoot} className={`assistant-chat${compact?' assistant-chat-compact':''}`}>
    <ThreadPrimitive.Root data-slot="aui_thread-root" className="assistant-thread">
     <Button variant="plain" className="assistant-new" onClick={()=>{runtime.thread.cancelRun();newConversation()}}>新對話</Button>
     <MessageLog>
