@@ -37,3 +37,28 @@ HTTP 204, no body, including nonexistent and other-caller IDs. Deletes only call
 ```json
 {"model":"gpt","conversation_id":"chat-1","messages":[{"role":"user","content":"這週誰遲到？"},{"role":"assistant","content":"王小明有一次遲到。"},{"role":"user","content":"上週呢？"}]}
 ```
+
+## Display payload
+
+A `tool` SSE event with `status: "done"` may contain `displays`, an array of display objects. The title is the dataset's human title. Tables use `columns` and `rows`, with an optional `caption` containing the source time. Charts and stats use `points`; a stat has at most one point. Optional `series` on a point groups chart values. `as_of` is a source timestamp or null. `limitations` are source caveats. `truncated` includes source pagination and display caps. Bar and line cap at 24 points, pie at 12, table at 50.
+
+Table example.
+```json
+{"kind":"table","title":"資產使用","columns":[{"key":"name","label":"名稱"},{"key":"uses","label":"使用次數"}],"rows":[{"name":"車1","uses":4}],"truncated":false}
+```
+Bar example.
+```json
+{"kind":"bar","title":"資產使用","result_id":"r123","points":[{"label":"車1","value":4}],"truncated":false,"as_of":null,"limitations":[]}
+```
+Line example.
+```json
+{"kind":"line","title":"資產使用","result_id":"r123","points":[{"label":"車1","value":4,"series":"外業"}],"truncated":false,"as_of":null,"limitations":[]}
+```
+Pie example.
+```json
+{"kind":"pie","title":"資產使用","result_id":"r123","points":[{"label":"車1","value":4}],"truncated":false,"as_of":null,"limitations":[]}
+```
+Stat example.
+```json
+{"kind":"stat","title":"資產使用","result_id":"r123","points":[{"label":"車1","value":4}],"truncated":false,"as_of":null,"limitations":[]}
+```
