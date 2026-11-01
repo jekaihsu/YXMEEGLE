@@ -1,3 +1,5 @@
+import pytest
+
 from sqlalchemy import create_engine, inspect
 from .models import Base
 from .ai.ledger import AiUsageRow
@@ -123,4 +125,42 @@ def test_generation_activity_migration_preserves_fence_and_backfills(tmp_path):
         row = db.execute(ledger.AiConversationGeneration.__table__.select()).one()
         assert (row.workspace_id, row.actor_id, row.conversation_id, row.generation, row.active_runs) == ('w', 'a', 'c', 3, 0)
         assert row.last_activity_at >= before
+    engine.dispose()
+
+
+@pytest.mark.parametrize('table_name,column_name', [
+    ('ai_conversation_generation', 'active_runs'),
+    ('ai_conversation_generation', 'last_activity_at'),
+    ('ai_usage', 'scope'),
+    ('ai_usage', 'project_id'),
+])
+def test_schema_upgrade_tolerates_concurrent_column_add(tmp_path, monkeypatch, table_name, column_name):
+    from sqlalchemy import event
+    from sqlalchemy.engine import Connection
+    from .ai import ledger
+    engine = create_engine('sqlite:///' + str(tmp_path / 'race.db'))
+    ledger.ensure_schema(engine)
+    original = ledger.inspect
+
+    def inspect_schema(bind):
+        inspector = original(bind)
+        if isinstance(bind, Connection):
+            get_columns = inspector.get_columns
+
+            def columns(table, *args, **kwargs):
+                result = get_columns(table, *args, **kwargs)
+                if table == table_name:
+                    return [c for c in result if c['name'] != column_name]
+                return result
+
+            inspector.get_columns = columns
+        return inspector
+
+    statements = []
+    event.listen(engine, 'before_cursor_execute', lambda conn, cursor, statement, *args: statements.append(statement))
+    monkeypatch.setattr(ledger, 'inspect', inspect_schema)
+    ledger.ensure_schema(engine)
+    assert any(s.startswith(f'ALTER TABLE {table_name} ADD COLUMN {column_name} ') for s in statements)
+    assert column_name in {c['name'] for c in original(engine).get_columns(table_name)}
+    ledger.ensure_schema(engine)
     engine.dispose()

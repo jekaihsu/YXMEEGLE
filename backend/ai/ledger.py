@@ -380,24 +380,22 @@ def column_ddl(name, dialect):
 def ensure_schema(engine):
     """Create the AI tables and add columns introduced after a table first shipped; create_all never alters existing tables."""
     Base.metadata.create_all(engine, tables=[AiConversationGeneration.__table__, AiUsageRow.__table__, AiFeedbackRow.__table__, AiExchangeRow.__table__], checkfirst=True)
+    for table, names in ((AiConversationGeneration.__table__, ('active_runs', 'last_activity_at')),
+                         (AiUsageRow.__table__, ADDED_USAGE_COLUMNS)):
+        for name in names:
+            try:
+                with engine.begin() as connection:
+                    if name in {c['name'] for c in inspect(connection).get_columns(table.name)}:
+                        continue
+                    ddl = str(CreateColumn(table.c[name]).compile(dialect=connection.dialect))
+                    connection.exec_driver_sql(f'ALTER TABLE {table.name} ADD COLUMN {ddl}')
+            except DBAPIError:
+                if name not in {c['name'] for c in inspect(engine).get_columns(table.name)}:
+                    raise
     with engine.begin() as connection:
-        if 'active_runs' not in {c['name'] for c in inspect(connection).get_columns('ai_conversation_generation')}:
-            connection.exec_driver_sql('ALTER TABLE ai_conversation_generation ADD COLUMN active_runs INTEGER NOT NULL DEFAULT 0')
-        if 'last_activity_at' not in {c['name'] for c in inspect(connection).get_columns('ai_conversation_generation')}:
-            column = AiConversationGeneration.__table__.c.last_activity_at
-            connection.exec_driver_sql('ALTER TABLE ai_conversation_generation ADD COLUMN ' + str(CreateColumn(column).compile(dialect=connection.dialect)))
         missing = select(AiConversationGeneration).where(AiConversationGeneration.last_activity_at.is_(None)).exists()
         if connection.scalar(select(missing)):
             connection.execute(update(AiConversationGeneration).where(AiConversationGeneration.last_activity_at.is_(None)).values(last_activity_at=datetime.now(timezone.utc)))
-    for name in ADDED_USAGE_COLUMNS:
-        with engine.begin() as connection:
-            if name in {c['name'] for c in inspect(connection).get_columns('ai_usage')}:
-                continue
-            try:
-                connection.exec_driver_sql(column_ddl(name, connection.dialect))
-            except DBAPIError:
-                if name not in {c['name'] for c in inspect(engine).get_columns('ai_usage')}:
-                    raise
     for index in AiUsageRow.__table__.indexes:
         index.create(engine, checkfirst=True)
 
