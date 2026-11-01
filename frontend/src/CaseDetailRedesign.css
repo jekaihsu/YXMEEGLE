@@ -10,4 +10,6 @@
 
 .pf-stage-context{font-size:14px;color:var(--label);padding:0 6px 12px}
 @media(max-width:640px){#flow-selected .pf-stage-detail>header{flex-wrap:wrap;gap:8px}}
-.cs-summary .cs-next dd>strong,.cs-summary .cs-next dd>small{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;overflow:hidden}
+
+
+.st-meta .badge{border-radius:6px;background:var(--surface-2);color:var(--label-2)}.st-task-blocker{display:block;color:var(--label-2);margin-top:6px}.project-detail{padding-bottom:100px}.po-stage-scroll button{min-width:44px;min-height:44px}

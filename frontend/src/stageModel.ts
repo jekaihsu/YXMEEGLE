@@ -20,7 +20,7 @@ export function blockerOf(row:FlowTask,node:FlowNode):Blocker {
  if(row.source==='Lark 任務')return {state:'unknown'};
  const local=node.legacy?.tasks.find(t=>t.id===row.id);
  if(!local)return {state:'unknown'};
- const reasons=uniqueReasons([...(local.execution_blockers||[]),...(local.activation_blockers||[]),...(local.status==='paused'?['任務暫停中']:[])]);
+ const reasons=uniqueReasons([...(local.execution_blockers||[]),...(local.status==='pending'?(local.activation_blockers||[]):[]),...(local.status==='paused'?['任務暫停中']:[])]);
  return reasons.length?{state:'blocked',reasons}:{state:'clear'};
 }
 export function taskView(row:FlowTask,node:FlowNode,today:string):TaskView {
@@ -30,7 +30,7 @@ export function taskView(row:FlowTask,node:FlowNode,today:string):TaskView {
 
 export const STAGE_FILTERS=['pending','unassigned','blocked','mine','overdue'] as const;
 export type StageFilterKey=typeof STAGE_FILTERS[number];
-export const STAGE_FILTER_LABELS:Record<StageFilterKey,string>={pending:'待處理',unassigned:'未指派',blocked:'受阻',mine:'我的任務',overdue:'逾期'};
+export const STAGE_FILTER_LABELS:Record<StageFilterKey,string>={pending:'未完成',unassigned:'未指派',blocked:'受阻',mine:'我的任務',overdue:'逾期'};
 export type StageFilters=Record<StageFilterKey,boolean>;
 export const activeFilters=(filters:StageFilters)=>STAGE_FILTERS.filter(k=>filters[k]);
 export function matchesFilters(task:TaskView,filters:StageFilters,userId:string) {
@@ -79,14 +79,16 @@ export type NextStep=
  |{kind:'view';title:string;reason:string;nodeKey:string;taskId?:string;button:string}
  |{kind:'none';title:string;reasons:string[]}
  |{kind:'unknown';title:string;reasons:string[]};
-type StepInput={ctx:StageContext;list?:NodeAssignmentList;userId:string;today:string;fresh:boolean;blockedReason?:string;crossStageAllowed?:(from:string,to:string)=>string|null};
-export function stageNextStep({ctx,list,userId,today,fresh,blockedReason,crossStageAllowed}:StepInput):NextStep {
+type StepInput={caseStatus?:string;ctx:StageContext;list?:NodeAssignmentList;userId:string;today:string;fresh:boolean;blockedReason?:string;crossStageAllowed?:(from:string,to:string)=>string|null};
+export function stageNextStep({caseStatus,ctx,list,userId,today,fresh,blockedReason,crossStageAllowed}:StepInput):NextStep {
+ if(caseStatus==='completed')return {kind:'none',title:'已完成',reasons:[]};
  if(ctx.workflow==='missing')return {kind:'unknown',title:'流程尚未設定',reasons:['此案件目前沒有可顯示的流程節點，不會自動建立或啟動流程。']};
  if(!ctx.currentKnown)return {kind:'unknown',title:'目前階段待確認',reasons:['來源未提供目前階段，無法推薦下一步。請重新整理後再試。']};
- if(ctx.finished)return {kind:'none',title:'目前沒有你可執行的動作',reasons:['所有節點皆已完成或略過。']};
+ if(ctx.finished)return {kind:'none',title:'已完成',reasons:[]};
  const reasons:string[]=[];
+ if(blockedReason)return {kind:'none',title:blockedReason.includes('暫停')?'案件暫停中':'資料待核對',reasons:[blockedReason]};
  if(blockedReason)reasons.push(blockedReason);
- if(!fresh)reasons.push('資料可能已過期或寫入尚未開放，請先重新整理。');
+ if(!fresh)reasons.push('等待來源核對，暫無可執行的動作。');
  const candidates=(keys:string[])=>keys.flatMap(key=>{
   const node=ctx.nodes.find(n=>n.key===key);if(!node)return [];
   const rows=node.taskRows.filter(r=>!cancelledTask(r.status)&&!r.done).map(r=>taskView(r,node,today));
@@ -107,7 +109,7 @@ export function stageNextStep({ctx,list,userId,today,fresh,blockedReason,crossSt
    const runnable=(t:TaskView)=>t.source==='SOP 任務'?t.sopTask.allowedActions.some(a=>['start','complete','resume'].includes(a)):t.task?t.task.can.edit_status:node.legacy?.tasks.find(x=>x.id===t.id)?.can_execute===true;
    const exec=free.filter(t=>runnable(t)&&!t.flags.unassigned).sort((a,b)=>Number(b.flags.overdue)-Number(a.flags.overdue)||rank(a,b))[0];
    if(exec&&fresh&&!blockedReason)return {kind:'action',title:`${exec.flags.overdue?'處理逾期任務':'接續'}${label(exec)}`,reason:`${node.label} · ${exec.deadline?`期限 ${exec.deadline.slice(0,10)}`:'期限未排定'}`,stage,scope:'stage',nodeKey:node.key,taskId:exec.id,button:'開啟任務',needs:'edit_status'};
-   if(blocked)return {kind:'view',title:`${label(blocked)}受阻，先查看前置條件`,reason:blocked.flags.blocker.state==='blocked'?blocked.flags.blocker.reasons.join('、'):'',nodeKey:node.key,taskId:blocked.id,button:'查看前置任務'};
+   if(blocked)return {kind:'view',title:`受阻：${label(blocked)}`,reason:blocked.flags.blocker.state==='blocked'?blocked.flags.blocker.reasons[0]:'',nodeKey:node.key,taskId:blocked.id,button:'查看受阻原因'};
   }
  };
  const stageKeys=ctx.currentIds;
@@ -122,7 +124,8 @@ export function stageNextStep({ctx,list,userId,today,fresh,blockedReason,crossSt
    if(there&&there.kind==='action')return {...there,reason:`目前階段無可執行項；依流程允許先處理${next.label}（${allowed}）。`};
   }
  }
- return {kind:'none',title:'目前沒有你可執行的動作',reasons};
+ const current=ctx.nodes.find(n=>n.key===ctx.currentIds[0]);
+ return {kind:'none',title:current?.state==='待審核'?'等待核准':!current?.owners.length?'等待指派':`等待${current.owners.map(o=>o.name).join('、')}處理`,reasons};
 }
 
 export function blockerSummary(ctx:StageContext,tasksByNode:(key:string)=>TaskView[]):string[] {

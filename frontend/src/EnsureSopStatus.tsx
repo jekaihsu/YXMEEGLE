@@ -1,8 +1,7 @@
-import {Badge, Skeleton} from './design';
+import {Skeleton} from './design';
 import {localCase} from './nodeWorkbenchModel';
 import {useStartSop} from './useStartSop';
 import {useEnsureSop} from './useEnsureSop';
-import {defaultChecklistState, DEFAULT_CHECKLIST_NEXT_STEP} from './sopTaskModel';
 import {useSopTasks} from './useSopTasks';
 import type {useNodeAssignments} from './useNodeAssignments';
 import type {Ctx} from './appCommon';
@@ -19,17 +18,7 @@ export function EnsureSopStatus({c, p, sop, assignments}: {c: Ctx; p: Project; s
  const exists = remote ? !!preview?.already_started : !!data?.tasks.some(task => !task.manual);
  const mayStart = local.state.kind !== 'loading' && !legacy && (remote ? !!preview?.can_start : !!data?.allowed.startAllNodes);
  const flow = useEnsureSop(p.id, mayStart, exists, async () => {await Promise.all([local.reload(), assignments.reload()])});
- if (legacy) {
-  const state = defaultChecklistState(data);
-  if (state === 'applied') return <Badge>SOP 已啟動</Badge>;
-  if (state === 'not-applied') return <div role="status"><Badge>預設清單尚未套用</Badge><p>{DEFAULT_CHECKLIST_NEXT_STEP}</p></div>;
-  return <p role="status">預設清單狀態待確認</p>;
- }
- if (exists || flow.state.kind === 'started') return <Badge>SOP 已啟動</Badge>;
  if (flow.state.kind === 'preparing') return <div role="status">SOP 準備中<Skeleton lines={2}/></div>;
- if (flow.state.kind === 'failed' && flow.state.reason === 'no_startable_nodes') return null;
- if (flow.state.kind === 'failed' && !localCase(p) && !remote && ['writes_disabled', 'not_ready'].includes(flow.state.reason)) return null;
- if (flow.state.kind === 'failed') return <p role="status">SOP 尚未就緒<button className="text-button" onClick={flow.retry}>重試</button></p>;
- if (flow.state.kind === 'not_permitted' || (remote ? start.state.kind === 'forbidden' || !!preview && !preview.can_start : local.state.kind === 'forbidden' || !!data && !data.allowed.startAllNodes)) return <p role="status">需由有權限的人員準備 SOP</p>;
+ if (flow.state.kind === 'failed' && !['no_startable_nodes','writes_disabled','not_ready'].includes(flow.state.reason)) return <p role="status">SOP 尚未就緒<button className="text-button" onClick={flow.retry}>重試</button></p>;
  return null;
 }

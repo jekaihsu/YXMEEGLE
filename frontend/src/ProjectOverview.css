@@ -40,3 +40,5 @@
 
 .project-detail:has(.project-overview)>div[role=status]{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px;line-height:1.5}.project-detail:has(.project-overview)>div[role=status]>p{margin:0;min-width:0}
 .project-overview #flow-selected>.pf-stage-tasks .pf-tasks{border-top:0;padding-top:0}.project-overview #flow-selected>.pf-diagram{margin:16px 0}.project-overview #flow-selected>.pf-stage-detail{margin-top:16px}
+
+.cs-summary .cs-band{grid-template-columns:repeat(3,minmax(0,1fr))}.cs-summary .cs-next{grid-column:1/-1;border-left:0;padding-left:0}.cs-summary .cs-next dd{display:flex;flex-direction:column;align-items:flex-start;gap:8px}.cs-summary .cs-next dd>strong,.cs-summary .cs-next dd>small{display:block;overflow:visible;-webkit-line-clamp:unset;white-space:normal}.cs-summary .cs-next dd>.ds-button{min-height:44px}.project-overview .pf-panel{padding:16px}.project-overview .project-flow{margin:0}@media(max-width:600px){.cs-summary .cs-band{grid-template-columns:repeat(2,minmax(0,1fr))}}

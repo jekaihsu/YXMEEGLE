@@ -38,3 +38,5 @@
   .project-detail:has(.project-chat-launcher[data-open=true]) .pf-stage-workspace .pf-stage-nav .po-stage-scroll{display:flex}
  }
 }
+
+.project-chat-launcher{position:relative;float:right;right:auto;bottom:auto;margin:0 0 12px 16px}

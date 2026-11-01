@@ -4,3 +4,5 @@
 @media(max-width:767px){.pds-header{gap:8px;padding-bottom:14px}.project-detail .pds-heading h1{font-size:24px}.pds-meta{font-size:12px}.pds-meta>span{display:block}.pds-tabs{gap:0}.pds-tabs>button{padding-inline:12px}.project-detail-shell{margin-bottom:16px}}
 
 .pds-back{margin:0 0 .5rem -.5rem}
+
+.project-detail-shell{display:flow-root}
