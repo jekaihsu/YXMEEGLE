@@ -3,7 +3,7 @@ import type {Project,Workspace} from './types';
 
 const rows=(value:unknown):{id?:string;project_id?:string;confirmation_ids?:string[];task_refs?:{project_id?:string}[]}[]=>Array.isArray(value)?value.filter(row=>!!row&&typeof row==='object'):[];
 
-const SOURCE_KINDS:Record<string,string>={demo:'獨立示範資料',lark:'Lark',v4:'報價總表／V4'};
+const SOURCE_KINDS:Record<string,string>={demo:'獨立示範資料',lark:'Lark',v4:'報價總表／V4',meegle:'Meegle'};
 /** 資料來源 shown in 案件資料. Only kinds this app knows get a name; anything else is flagged for review instead of being passed off as a known source. */
 export function sourceKindLabel(kind:unknown):string{
  const key=typeof kind==='string'?kind.trim():'';

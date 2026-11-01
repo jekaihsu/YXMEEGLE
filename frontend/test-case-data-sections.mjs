@@ -71,6 +71,7 @@ test('repeated Lark assignee names are listed once',()=>{
 test('資料來源 names only recognised kinds and flags the rest for review',()=>{
  assert.equal(m.sourceKindLabel('demo'),'獨立示範資料');
  assert.equal(m.sourceKindLabel('v4'),'報價總表／V4');
+ assert.equal(m.sourceKindLabel('meegle'),'Meegle');
  assert.equal(m.sourceKindLabel('lark'),'Lark');
  assert.equal(m.sourceKindLabel('csv_import'),'來源類型待核對（csv_import）','an unrecognised kind is never passed off as 報價總表／V4');
  assert.equal(m.sourceKindLabel(''),'來源類型待核對');assert.equal(m.sourceKindLabel(undefined),'來源類型待核對');
