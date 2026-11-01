@@ -97,9 +97,12 @@ class ChatRun:
         except Exception:
             logger.error('ai_finish_write_failed')
         finally:
-            with anyio.CancelScope(shield=True):
-                await run_in_threadpool(ledger.release_conversation, self.app.state.sessions,
-                    self.data['wid'], self.user['id'], self.body.conversation_id)
+            try:
+                with anyio.CancelScope(shield=True):
+                    await run_in_threadpool(ledger.release_conversation, self.app.state.sessions,
+                        self.data['wid'], self.user['id'], self.body.conversation_id)
+            except Exception:
+                logger.error('ai_finish_write_failed')
             self.release()
 
     async def stream(self):

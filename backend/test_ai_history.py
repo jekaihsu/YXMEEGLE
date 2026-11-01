@@ -200,3 +200,25 @@ def test_cleanup_reclaims_crashed_run_but_preserves_live_fence(app, monkeypatch)
     with sessions() as db:
         row = db.get(ledger.AiConversationGeneration, live)
         assert (row.generation, row.active_runs) == (1, 1)
+
+
+def test_release_failure_does_not_change_completed_answer(app, client, monkeypatch, caplog):
+    from .ai import ledger
+
+    def fail_release(*args):
+        raise RuntimeError('private database details')
+
+    monkeypatch.setattr(ledger, 'release_conversation', fail_release)
+    monkeypatch.setattr(ledger, 'schedule_cleanup', lambda *args: None)
+    app.state.ai_providers = {'claude': Fake()}
+    result = events(client.post('/api/ai/chat', json=BODY))
+    assert [e['type'] for e in result] == ['start', 'text', 'text', 'done']
+    uid = result[0]['usage_id']
+    with app.state.sessions() as db:
+        usage = db.get(AiUsageRow, uid)
+        assert usage.status == 'ok'
+        assert db.get(AiExchangeRow, uid).answer == '截至目前，查詢完成'
+    assert 'ai_finish_write_failed' in caplog.text
+    assert 'private database details' not in caplog.text
+    result = events(client.post('/api/ai/chat', json={**BODY, 'conversation_id': 'next'}))
+    assert result[-1]['type'] == 'done'
