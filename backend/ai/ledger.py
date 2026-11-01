@@ -17,6 +17,7 @@ TAIPEI = ZoneInfo('Asia/Taipei')
 logger = logging.getLogger(__name__)
 
 STALE_ACTIVE_RUN_SECONDS = 24 * 60 * 60
+GENERATION_PRUNE_GRACE_SECONDS = 10 * 60
 
 
 class AiUsageRow(Base):
@@ -156,7 +157,9 @@ def cleanup_content(sessions, retention_days):
                 u.conversation_id == g.conversation_id).exists()
             now = datetime.now(timezone.utc)
             db.execute(update(g).where(g.last_activity_at.is_(None)).values(last_activity_at=now))
-            db.execute(delete(g).where(or_(g.active_runs == 0,
+            db.execute(delete(g).where(
+                g.last_activity_at < now - timedelta(seconds=GENERATION_PRUNE_GRACE_SECONDS),
+                or_(g.active_runs == 0,
                 g.last_activity_at < now - timedelta(seconds=STALE_ACTIVE_RUN_SECONDS)), ~retained))
         with _cleanup_lock:
             _last_cleanup = monotonic()

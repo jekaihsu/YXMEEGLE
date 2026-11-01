@@ -166,6 +166,9 @@ def test_cleanup_preserves_active_fence_then_prunes(app, client, monkeypatch):
         row = db.get(ledger.AiConversationGeneration, key)
         assert row.generation != generation and row.active_runs == 1
     ledger.release_conversation(app.state.sessions, *key)
+    from datetime import datetime, timedelta, timezone
+    with app.state.sessions.begin() as db:
+        db.get(ledger.AiConversationGeneration, key).last_activity_at = datetime.now(timezone.utc) - timedelta(minutes=11)
     monkeypatch.setattr(ledger, '_last_cleanup', None)
     ledger.cleanup_content(app.state.sessions, 0)
     with app.state.sessions() as db:
@@ -222,3 +225,23 @@ def test_release_failure_does_not_change_completed_answer(app, client, monkeypat
     assert 'private database details' not in caplog.text
     result = events(client.post('/api/ai/chat', json={**BODY, 'conversation_id': 'next'}))
     assert result[-1]['type'] == 'done'
+
+
+def test_cleanup_grace_protects_recent_and_legacy_worker_rows(app, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from .ai import ledger
+    sessions = app.state.sessions
+    recent, idle, legacy = [('w', 'a', name) for name in ('recent', 'idle', 'legacy')]
+    for key in (recent, idle):
+        ledger.conversation_generation(sessions, *key)
+        ledger.release_conversation(sessions, *key)
+    with sessions.begin() as db:
+        db.get(ledger.AiConversationGeneration, recent).last_activity_at = datetime.now(timezone.utc) - timedelta(minutes=9)
+        db.get(ledger.AiConversationGeneration, idle).last_activity_at = datetime.now(timezone.utc) - timedelta(minutes=11)
+        db.connection().exec_driver_sql("INSERT INTO ai_conversation_generation (workspace_id, actor_id, conversation_id, generation, active_runs) VALUES ('w', 'a', 'legacy', 2, 0)")
+    monkeypatch.setattr(ledger, '_last_cleanup', None)
+    ledger.cleanup_content(sessions, 0)
+    with sessions() as db:
+        assert db.get(ledger.AiConversationGeneration, idle) is None
+        assert db.get(ledger.AiConversationGeneration, recent).active_runs == 0
+        assert db.get(ledger.AiConversationGeneration, legacy).generation == 2

@@ -6,6 +6,8 @@ Both operations refresh `last_activity_at` in the same transaction.
 Content writes also refresh activity when they lock the generation row.
 
 Cleanup retains rows with retained exchanges.
+`GENERATION_PRUNE_GRACE_SECONDS` protects every row for 10 minutes after its last activity, including rows with no counted active run.
+This grace period protects recent fences during a rolling deploy with older workers that do not increment `active_runs`.
 For other rows, `STALE_ACTIVE_RUN_SECONDS` allows cleanup to reclaim a stranded positive count after 24 hours without activity.
 This exceeds the default 120-second question deadline and provider request timeouts of 10 seconds to connect, 60 seconds to read, 10 seconds to write, and 10 seconds for the pool.
 Deployments that override `AI_QUESTION_TIMEOUT_SECONDS` must keep that deadline plus request timeouts below the stale-run bound.
