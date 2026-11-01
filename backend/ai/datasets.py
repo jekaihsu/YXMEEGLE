@@ -76,8 +76,8 @@ def scalar(value):
 
 
 def contract_rows(value):
-    main = value.get('main', {})
-    return [{k: scalar(main.get(k)) for k in ('line_number', 'name')}]
+    section = value.get('sections', {}).get('contract_lines', {})
+    return [dict(line_number=scalar(r.get('item_number')), name=scalar(r.get('label'))) for r in section.get('rows', [])]
 
 
 def node_rows(value):
@@ -154,8 +154,8 @@ for ident, title, description, path, defs, key, cols in [
 ]:
     add(ident,title,description,parameters(ident+'Params',defs),partial(route,path),node_rows if ident=='node_detail' else partial(rows_at,key,[c.name for c in cols]),cols,
         {'case_id':'p1','node_key':'field'} if ident=='node_detail' else {'case_id':'p1'} if ident=='sop_tasks' else {})
-add('contract_detail','合約項目','依合約項目 key 查名稱與項次；無到期日資料', parameters('ContractParams',{'key':(str,Field(min_length=1,max_length=240))}),
-    partial(route,'/api/contract-detail'),contract_rows,columns(('line_number','項次'),('name','名稱')),{'key':'contract-key'})
+add('contract_detail','合約項目','依案件查合約項目名稱與項次；無到期日資料', Case,
+    partial(route,'/api/case-detail/{case_id}'),contract_rows,columns(('line_number','項次'),('name','名稱')),{'case_id':'p1'})
 add('dispatch_board','派工看板','查日期區間、組別的派工與未指派狀態',parameters('DispatchParams',{'from':text_param(),'to':text_param(),'group':text_param()}),
     partial(route,'/api/v2/dispatch/board'),dispatch_rows,columns(('id','ID'),('start','開始','date'),('group','組別'),('case_name','案名'),('work_content','工作'),('status','狀態','status')))
 
@@ -172,7 +172,6 @@ def describe(ident):
         'q':'姓名、案號或工作文字搜尋', 'query':'案號或案名搜尋文字',
         'case_id':'先從 search_cases 的 id 取得案件ID，不可猜測',
         'project_id':'先從 search_cases 的 id 取得案件ID，空字串不篩選',
-        'key':'僅使用使用者提供的合約項目 key；無 lookup 時不可猜測',
         'node_key':'節點代碼，使用列出的 enum 值',
         'date':'YYYY-MM-DD，空字串代表台北今天，限目前週前後26週',
         'from':'起日 YYYY-MM-DD', 'to':'迄日 YYYY-MM-DD，不早於起日',

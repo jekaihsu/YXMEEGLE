@@ -238,3 +238,5 @@ show_display 的 SSE tool done 事件附 displays。表格沿用 `{kind:"table",
 `python -m pytest backend/test_ai_question_eval.py -q` 的 18 個繁體中文問題逐題走 scripted provider 的 list → describe → query → answer，涵蓋逾期案件、我的案件、案號搜尋、負責人、未完成工作、今天出勤、週排名、退回審核、業務 PM、週進度、車輛、儀器、聯繫、日報、派工、SOP、節點明細及合約項目。另有月營收及合約到期兩個明示不支援的檢查。這驗證工具與目錄合約，不測量真實模型的自然語言選擇準確率，也不聲稱連線至正式 Lark 資料。
 
 本分支驗證紀錄（2026-11-01）。一般 AI suite 為 322 passed、181 skipped。使用 `PATH=/opt/homebrew/bin:$PATH /tmp/ai-backend-venv/bin/python scripts/test_action_audit_postgres.py --ai` 後，SQLite 與 PostgreSQL 合計 501 passed、2 skipped；各資料庫 179 passed，其他單元測試 143 passed。兩個跳過項目都是 frontend parity 缺 esbuild，沒有修改前端安裝。離線 question eval 為 20 passed、18 skipped（未設定 PostgreSQL URL 的單獨執行）；PostgreSQL runner 已包含這些案例。正式供應商與正式 Lark 資料未連線驗證。
+
+資料集參數修正（2026-11-01）。`daily_reports` 不接受 actor_id，人名使用 `q`。`search_cases` 提供 `id`，供案件明細的 `case_id` 與日報 `project_id` 使用。`contract_detail` 以 `case_id` 查授權案件明細的合約項目名稱與項次，不再要求模型填不透明的合約 key。節點參數使用 enum，不能自行編造 ID。進度週報僅提供預排、出工、符合預排與未預排的天數，不提供任何營業額點數或衍生比率。

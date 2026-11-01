@@ -26,7 +26,7 @@ QUESTIONS = [
  ('本週外業派工','dispatch_board',{'from':'2026-10-26','to':'2026-11-01','group':'外業'}),
  ('p1 外業 SOP 任務狀態','sop_tasks',{'case_id':'p1','node_key':'field'}),
  ('p1 外業節點任務由誰負責','node_detail',{'case_id':'p1','node_key':'field'}),
- ('合約項目 contract1 的名稱','contract_detail',{'key':'contract1'}),
+ ('案件 p1 的合約項目名稱','contract_detail',{'case_id':'p1'}),
 ]
 
 

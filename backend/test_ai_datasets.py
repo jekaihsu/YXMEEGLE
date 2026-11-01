@@ -17,7 +17,7 @@ PAYLOADS = {
  'daily_reports':{'items':[dict(id='d1',date='2026-10-26',person='甲',project_code='C1',department='field',description='測量')],'total':1},
  'sop_tasks':{'tasks':[dict(id='t1',title='測量',state='in_progress',overdue=True,applicability='applicable')]},
  'node_detail':{'tasks':[dict(id='t1',title='測量',status='pending',assignee={'name':'甲'},deadline='2026-11-02')]},
- 'contract_detail':{'main':dict(line_number={'value':'1'},name={'value':'測量'},original_amount={'value':999})},
+ 'contract_detail':{'sections':{'contract_lines':{'rows':[dict(item_number='1',label='測量',amount=999)]}}},
  'dispatch_board':{'slots':[dict(slot_id='s1',interval={'start':'2026-11-02'},group='外業',case={'name':'工程'},work_content='測量',planning_status='confirmed')]},
 }
 
@@ -30,7 +30,7 @@ def test_projectors(ident):
             if ident=='node_detail':
                 assert params=={}
             return PAYLOADS[ident]
-    params={'case_id':'p1'} if ident=='sop_tasks' else {'case_id':'p1','node_key':'field'} if ident=='node_detail' else {'key':'contract1'} if ident=='contract_detail' else {}
+    params={'case_id':'p1'} if ident=='sop_tasks' else {'case_id':'p1','node_key':'field'} if ident=='node_detail' else {'case_id':'p1'} if ident=='contract_detail' else {}
     data=asyncio.run(query(Reader(),ident,params,20,0))
     assert len(data['rows'])==1
     assert set(data['rows'][0])=={c['name'] for c in data['columns']}
@@ -194,3 +194,15 @@ def test_unoffered_tools_never_execute(app, client, monkeypatch, name):
     app.state.ai_providers={'claude':Fake(calls=[ToolCall('bad',name,{})])}
     output=events(client.post('/api/ai/chat',json=BODY))
     assert any(e.get('status')=='error' or e['type']=='error' for e in output)
+
+
+def test_opaque_contract_key_replaced_with_discoverable_case_id():
+    dataset = REGISTRY['contract_detail']
+    assert set(dataset.params.model_fields) == {'case_id'}
+    assert 'id' in {c.name for c in REGISTRY['search_cases'].columns}
+    class Reader:
+        async def get(self, path, **params):
+            assert path == '/api/case-detail/p1' and params == {}
+            return {'sections':{'contract_lines':{'rows':[dict(key='opaque-contract-key',label='測量',item_number='1',amount=999)]}}}
+    result=asyncio.run(query(Reader(),'contract_detail',{'case_id':'p1'},20,0))
+    assert result['rows']==[dict(line_number='1',name='測量')]
