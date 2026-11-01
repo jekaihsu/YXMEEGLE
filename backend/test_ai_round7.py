@@ -59,7 +59,7 @@ def test_skipped_denominator_real_workflow(app, client, status):
 
 
 def test_schema_field_errors(app):
-    from .ai.tools import execute
+    from .ai_projection_test_support import execute
     base = dict(query='', status='all', owner='anyone', overdue=False, offset=0)
     for key, value in [('query', None), ('status', None), ('offset', True), ('offset', '0'), ('query', 'x'*241), ('offset', -1), ('overdue', None), ('owner', 'stranger')]:
         raw, error = asyncio.run(execute(app, '', 'search_cases', {**base, key: value}))

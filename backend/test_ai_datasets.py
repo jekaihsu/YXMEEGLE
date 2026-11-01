@@ -184,3 +184,13 @@ def test_search_pm_names_and_id_label():
     rows = project_search(raw)['cases']
     assert rows[0]['pm_id']=='王小明'
     assert rows[1]['pm_id']=='ID: u2'
+
+
+@pytest.mark.parametrize('name',['search_cases','attendance_today','invented_tool'])
+def test_unoffered_tools_never_execute(app, client, monkeypatch, name):
+    async def forbidden(*args):
+        pytest.fail('unoffered tool executed')
+    monkeypatch.setattr('backend.ai.agent.execute', forbidden)
+    app.state.ai_providers={'claude':Fake(calls=[ToolCall('bad',name,{})])}
+    output=events(client.post('/api/ai/chat',json=BODY))
+    assert any(e.get('status')=='error' or e['type']=='error' for e in output)

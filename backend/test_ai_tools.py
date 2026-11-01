@@ -4,7 +4,7 @@ import json
 import pytest
 
 from .test_ai_database import app, client, ai_database_url
-from .ai.tools import execute
+from .ai_projection_test_support import execute
 
 
 def test_tool_rejects_unknown_and_extra_arguments(app):
@@ -112,12 +112,11 @@ def test_attendance_real_producer_route_and_structural_truncation(tmp_path, monk
     assert '缺席' not in json.dumps(result, ensure_ascii=False)
     from .test_ai_displays import sdk_tool
     displays, projected = sdk_tool(app, client, monkeypatch, 'attendance_today', {'range': 'today', 'date': ''}, ids=('d1', 'd2'))
-    assert displays[0]['kind'] == 'chart' and displays[1]['kind'] == 'table'
+    assert displays[0]['kind'] == 'bar' and displays[1]['kind'] == 'table'
     assert len(displays[1]['rows']) <= 50
-    assert len({row['name'] for row in displays[1]['rows']}) == len(displays[1]['rows'])
+    assert len({row['label'] for row in displays[1]['rows']}) == len(displays[1]['rows'])
     assert displays[0]['points'][0]['value'] == (80 if large else 1)
-    if large:
-        assert all(display['truncated'] for display in displays)
+    assert projected['rows']==displays[1]['rows']
 
 
 

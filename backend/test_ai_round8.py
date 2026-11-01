@@ -155,6 +155,6 @@ def test_25_node_caps_real_routes(app, client):
 
 
 def test_null_attendance_date_rejected(app):
-    from .ai.tools import execute
+    from .ai_projection_test_support import execute
     raw, error = asyncio.run(execute(app, '', 'attendance_today', dict(range='today', date=None)))
     assert error and 'date' in json.loads(raw)['error']

@@ -13,7 +13,7 @@ from . import ledger
 from .catalog import Usage, cost_micro_usd
 from .prompts import system_prompt, project_system_prompt
 from .providers import ProviderError, failure_diagnostics
-from .tools import TOOLS, execute, displays, describe_options, select_display, result_display, LEGACY_SCHEMAS
+from .tools import TOOLS, execute, result_display
 
 
 QUESTION_TIMEOUT_SECONDS = 120
@@ -112,7 +112,6 @@ class ChatRun:
     async def _stream(self):
         messages = [m.model_dump() for m in self.body.messages]
         cache = {}
-        display_pool = {}
         result_pool = {}
         shown_displays = {}
         try:
@@ -179,8 +178,10 @@ class ChatRun:
 
                 self.tool_calls += len(pending)
                 async def run_any(call):
+                    if call.name not in tools:
+                        return json.dumps({'error':'工具未開放', 'code':'ai_forbidden'}, ensure_ascii=False), True
                     if call.name == 'show_display':
-                        shown, problem = (result_display(result_pool, call.args) if 'result_id' in call.args else select_display(display_pool, call.args))
+                        shown, problem = result_display(result_pool, call.args)
                         if problem:
                             return json.dumps({'error': problem}, ensure_ascii=False), True
                         shown_displays[call.id] = shown
@@ -191,15 +192,6 @@ class ChatRun:
                     if call.name == 'query_dataset' and not error:
                         queried = json.loads(result)
                         result_pool[queried['result_id']] = queried
-                    if call.name in LEGACY_SCHEMAS and call.name != 'show_display' and not error:
-                        try:
-                            options = displays(call.name, result)
-                            described = describe_options(options, len(display_pool) + 1)
-                            for entry, option in zip(described, options):
-                                display_pool[entry['id']] = option
-                            result = json.dumps({**json.loads(result), 'display_options': described}, ensure_ascii=False)
-                        except Exception as exc:
-                            logger.warning('ai_display tool=%s exception=%s', call.name, type(exc).__name__)
                     cache[key] = (result, error)
                 outputs = []
                 for call, key in zip(calls, keys):

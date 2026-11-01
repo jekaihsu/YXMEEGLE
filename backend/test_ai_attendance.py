@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from .ai.tools import execute
+from .ai_projection_test_support import execute
 from .live_read.datasets.weekly_attendance import fetch_week, week_window
 from .test_live_read_coordinator import SynchronousExecutor
 from .test_live_read_routes import production_client

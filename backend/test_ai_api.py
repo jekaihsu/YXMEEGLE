@@ -15,10 +15,16 @@ from .test_backend import role, WorkspaceRow, BusinessRow, storage
 from .ai.catalog import Usage
 from .ai.ledger import AiUsageRow, today
 from .ai.providers import Claude, Event, ProviderError, ToolCall
-from .ai.tools import execute
+from .ai_projection_test_support import execute
 
 
 BODY = {'model': 'claude', 'conversation_id': 'c-123', 'messages': [{'role': 'user', 'content': '查詢公司資料'}]}
+
+
+def dataset_call(ident, name, params):
+    params = dict(params)
+    offset = params.pop('offset', 0)
+    return ToolCall(ident, 'query_dataset', dict(id=name, params=params, limit=20, offset=offset))
 
 
 class Fake(Claude):
@@ -37,6 +43,8 @@ class Fake(Claude):
             yield Event('stop', [{'type': 'tool_use', 'id': c.id, 'name': c.name, 'input': c.args} for c in self.calls])
             return
         if self.shows and len(self.inputs) == 2:
+            data = json.loads(messages[-1]['content'][0]['content'])
+            self.shows = [ToolCall(c.id, 'show_display', dict(result_id=data['result_id'], kind='table', columns=[], mapping={}, max_rows=50)) for c in self.shows]
             for call in self.shows:
                 yield Event('tool', call)
             yield Event('stop', [{'type': 'tool_use', 'id': c.id, 'name': c.name, 'input': c.args} for c in self.shows])
@@ -169,12 +177,12 @@ def test_hr_and_case_permissions_apply_to_tools_and_sse(app, client):
     assert error and '機密隱藏案件' not in result
     result, _ = asyncio.run(execute(app, cookie, 'search_cases', {'query': '機密隱藏案件', 'status': 'all', 'owner': 'anyone', 'overdue': False, 'offset': 0}))
     assert json.loads(result)['cases'] == []
-    app.state.ai_providers = {'claude': Fake(calls=[ToolCall('a', 'attendance_today', {'range': 'today', 'date': ''}),
-        ToolCall('b', 'case_progress', {'case_id': hidden_id})])}
+    app.state.ai_providers = {'claude': Fake(calls=[dataset_call('a', 'attendance_today', {'range': 'today', 'date': ''}),
+        dataset_call('b', 'case_progress', {'case_id': hidden_id})])}
     response = client.post('/api/ai/chat', json=BODY)
     result = events(response)
     text = ''.join(e['delta'] for e in result if e['type'] == 'text')
-    assert '你沒有權限查看出勤資料' in text
+    assert '找不到或沒有權限查看資料' in text
     assert '機密隱藏案件' not in text
     assert 'late' not in text and 'production' not in text
     assert all('displays' not in e for e in result if e['type'] == 'tool')
@@ -186,12 +194,12 @@ def test_tool_deduplication_and_multistep_accounting(app, client, monkeypatch):
     async def tool(*args):
         count.append(args[2])
         await asyncio.sleep(.01)
-        return '{"ok":true}', False
+        return '{"result_id":"r-test"}', False
     monkeypatch.setattr('backend.ai.agent.execute', tool)
-    app.state.ai_providers = {'claude': Fake(calls=[ToolCall('a', 'attendance_today', {'range': 'today', 'date': ''}),
-        ToolCall('b', 'attendance_today', {'range': 'today', 'date': ''}), ToolCall('c', 'search_cases', {'query': 'a', 'status': 'all', 'owner': 'anyone', 'overdue': False, 'offset': 0})])}
+    app.state.ai_providers = {'claude': Fake(calls=[dataset_call('a', 'attendance_today', {'range': 'today', 'date': ''}),
+        dataset_call('b', 'attendance_today', {'range': 'today', 'date': ''}), dataset_call('c', 'search_cases', {'query': 'a', 'status': 'all', 'owner': 'anyone', 'overdue': False, 'offset': 0})])}
     result = events(client.post('/api/ai/chat', json=BODY))
-    assert count == ['attendance_today', 'search_cases']
+    assert count == ['query_dataset', 'query_dataset']
     assert result[-1]['usage'] == {'input_tokens': 120, 'output_tokens': 80}
     assert rows(app)[0].tool_calls == 2 and rows(app)[0].steps == 2
 
@@ -270,11 +278,11 @@ def test_seven_model_step_bound_and_cross_step_deduplication(app, client, monkey
     count = []
     async def tool(*args):
         count.append(args[2])
-        return '{"ok":true}', False
+        return '{"result_id":"r-test"}', False
     class Loop(Fake):
         async def stream(self, spec, system, messages, tools):
             yield Event('usage', Usage(1, 0, 0, 2))
-            yield Event('tool', ToolCall('a', 'attendance_today', {'range': 'today', 'date': ''}))
+            yield Event('tool', dataset_call('a', 'attendance_today', {'range': 'today', 'date': ''}))
             yield Event('stop', [{'type': 'tool_use', 'id': 'a', 'name': 'attendance_today', 'input': {}}])
     monkeypatch.setattr('backend.ai.agent.execute', tool)
     app.state.ai_providers = {'claude': Loop()}
@@ -282,7 +290,7 @@ def test_seven_model_step_bound_and_cross_step_deduplication(app, client, monkey
     assert result[-1]['code'] == 'ai_upstream'
     row = rows(app)[0]
     assert (row.steps, row.tool_calls, row.input_tokens, row.output_tokens, row.status) == (7, 1, 7, 14, 'error')
-    assert count == ['attendance_today']
+    assert count == ['query_dataset']
 
 
 def test_tool_timeout_becomes_safe_result(app, client, monkeypatch):
@@ -294,7 +302,7 @@ def test_tool_timeout_becomes_safe_result(app, client, monkeypatch):
         await asyncio.sleep(1)
     monkeypatch.setattr('backend.ai.agent.asyncio.wait_for', short_timeout)
     monkeypatch.setattr('backend.ai.agent.execute', slow)
-    app.state.ai_providers = {'claude': Fake(calls=[ToolCall('a', 'attendance_today', {'range': 'today', 'date': ''})])}
+    app.state.ai_providers = {'claude': Fake(calls=[dataset_call('a', 'attendance_today', {'range': 'today', 'date': ''})])}
     result = events(client.post('/api/ai/chat', json=BODY))
     assert any(e['type'] == 'tool' and e['status'] == 'error' for e in result)
     assert '查詢逾時' in ''.join(e['delta'] for e in result if e['type'] == 'text')
