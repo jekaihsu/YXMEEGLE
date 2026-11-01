@@ -174,3 +174,5 @@ for(const body of [{code:'ai_forbidden'}]){
 }
 dom.window.close();
 console.log('Assistant passed: UTF-8/chunk boundaries, CRLF/multiline/trailing SSE, abort, tools, errors, session expiry, persistence, disabled models, suggestions and lazy route.');
+
+await import('./scripts/test-assistant-focus.mjs');
