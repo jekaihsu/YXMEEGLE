@@ -67,6 +67,22 @@ assert.match(document.querySelector('circle title').textContent,/甲.*一月.*2/
 await flush(()=>root.render(React.createElement(ui.Chart,{kind:'bar',title:'分組',points:seriesPoints})));
 assert.deepEqual([...document.querySelectorAll('rect title')].map(el=>el.textContent),['1. 甲 · 一月 · 2','2. 乙 · 一月 · 8','1. 甲 · 二月 · 4','2. 乙 · 二月 · 6']);
 assert.deepEqual([...document.querySelectorAll('svg text')].map(el=>el.textContent),['1','2','1','2']);
+const repeatedPoints=[{label:'車1',value:2,series:'甲'},{label:'車1',value:8,series:'乙'},{label:'車1',value:4,series:'甲'},{label:'車1',value:6,series:'乙'},{label:'車2',value:3,series:'甲'},{label:'車2',value:5,series:'乙'}];
+for(const kind of ['line','bar']){
+ for(const points of [repeatedPoints,repeatedPoints.filter(point=>point.series==='甲')]){
+  await flush(()=>root.render(React.createElement(ui.Chart,{kind,title:'同名車輛',points})));
+  if(kind==='bar'){
+   const positions=[...document.querySelectorAll('rect')].map(el=>Number(el.getAttribute('x')));
+   assert.equal(new Set(positions).size,points.length,'each duplicate bar has a distinct position');
+   assert.ok(positions.every((x,i)=>i===0||x>positions[i-1]),'bar occurrences preserve order');
+  }else{
+   const positions=[...document.querySelectorAll('polyline')].map(el=>el.getAttribute('points').split(' ').map(pair=>Number(pair.split(',')[0])));
+   assert.deepEqual(positions[0],[108,300,492],'repeated labels have independent line coordinates');
+   if(positions.length>1)assert.deepEqual(positions[0],positions[1],'occurrence index aligns across series');
+  }
+  assert.equal(document.querySelectorAll('tbody tr').length,points.length,'all repeated rows stay accessible');
+ }
+}
 const booleanTable={kind:'table',title:'布林值',columns:[{key:'name',label:'姓名'},{key:'active',label:'啟用'}],rows:[{name:'甲',active:true},{name:'乙',active:false}]};
 assert.equal(ui.isDisplay(booleanTable),true,'boolean cells do not discard a display');
 await flush(()=>root.render(React.createElement(ui.ToolResult,{result:{displays:[booleanTable]}})));
