@@ -73,6 +73,7 @@
     "test:stage-model": "node test-stage-model.mjs && node test-assign-drawer-model.mjs && node test-stage-workspace.mjs && node test-stage-sop-merge.mjs && node test-library-memory.mjs && node test-sop-action-reasons.mjs && node test-stage-fixture.mjs",
     "test:picker-browser": "node test-picker-browser.mjs",
     "test:picker-sweep": "node scripts/verify-pickers.mjs",
+    "test:assistant:history": "node test-assistant-history.mjs",
     "test:assistant": "node test-assistant.mjs",
     "test:assistant:bundle": "node test-assistant-bundle.mjs",
     "test:token-dashboard": "node test-token-dashboard-model.mjs && node test-token-dashboard.mjs",

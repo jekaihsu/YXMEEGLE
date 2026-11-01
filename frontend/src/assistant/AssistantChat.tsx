@@ -1,7 +1,9 @@
 // Ported from assistant-ui thread.aui and message-pair (MIT). See elements/LICENSE.assistant-ui.
-import {createContext,useContext,useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
+import {createContext,useContext,useCallback,useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
 import {AssistantRuntimeProvider,useLocalRuntime,ThreadPrimitive,ComposerPrimitive,MessagePrimitive,ActionBarPrimitive,ErrorPrimitive,useAuiState} from '@assistant-ui/react';
 import {MarkdownTextPrimitive} from '@assistant-ui/react-markdown';
+import {ConversationHistory} from './ConversationHistory';
+import {historyMessages,type ConversationDetail} from './history';
 import {assistantRemarkPlugins} from './markdown';
 import {Button} from '../design';
 import {api,ApiError} from '../api';
@@ -81,13 +83,13 @@ function MessageLog({children}:{children:ReactNode}){
  </>;
 }
 
-function Conversation({catalog,newConversation,projectId,projectLabel,compact}:AssistantChatProps&{catalog:ModelCatalog;newConversation:()=>void}){
+function Conversation({catalog,newConversation,projectId,projectLabel,compact,selected,onComplete}:AssistantChatProps&{catalog:ModelCatalog;newConversation:()=>void;selected:{id:string;detail?:ConversationDetail};onComplete:()=>void}){
  const [forbidden,setForbidden]=useState(false);
- const conversation=useRef(crypto.randomUUID());
- const adapter=useMemo(()=>createChatAdapter(()=>conversation.current,()=>setForbidden(true),projectId),[]);
+ const conversation=useRef(selected.id);
+ const adapter=useMemo(()=>createChatAdapter(()=>conversation.current,()=>setForbidden(true),projectId,onComplete),[]);
  const runtimeRef=useRef<ReturnType<typeof useLocalRuntime>>();
  const feedback=useMemo(()=>createFeedbackController(()=>runtimeRef.current!),[]);
- const runtime=useLocalRuntime(adapter,{adapters:{feedback:feedback.adapter}});
+ const runtime=useLocalRuntime(adapter,{initialMessages:selected.detail?historyMessages(selected.detail):[],adapters:{feedback:feedback.adapter}});
  runtimeRef.current=runtime;
  useEffect(()=>{feedback.activate();return()=>{feedback.dispose();runtime.thread.cancelRun()}},[runtime,feedback]);
  const available=!forbidden&&catalog.models.some(m=>m.available);
@@ -120,8 +122,14 @@ function Conversation({catalog,newConversation,projectId,projectLabel,compact}:A
 export type AssistantChatProps={projectId?:string;projectLabel?:string;compact?:boolean;catalog?:ModelCatalog};
 const projectSuggestions=['進度如何？','卡在哪裡？','誰負責？','下一步是什麼？','最近有什麼變更？'];
 export function AssistantChat(props:AssistantChatProps){
+ return <AssistantChatWorkspace key={props.projectId||'global'} {...props}/>;
+}
+function AssistantChatWorkspace(props:AssistantChatProps){
+ const [selected,setSelected]=useState<{id:string;detail?:ConversationDetail}>(()=>({id:crypto.randomUUID()}));
+ const [revision,setRevision]=useState(0),[generation,setGeneration]=useState(0);
+ const completed=useCallback(()=>setRevision(n=>n+1),[]);
  const [catalog,setCatalog]=useState<ModelCatalog|undefined>(props.catalog);
- const [error,setError]=useState<'load'|'forbidden'|null>(null),[attempt,setAttempt]=useState(0),[conversation,setConversation]=useState(0);
+ const [error,setError]=useState<'load'|'forbidden'|null>(null),[attempt,setAttempt]=useState(0);
  useEffect(()=>{
   if(props.catalog){setCatalog(props.catalog);return}
   const controller=new AbortController();setError(null);
@@ -135,5 +143,8 @@ export function AssistantChat(props:AssistantChatProps){
   ?error==='forbidden'?<p role="alert">{errorText('ai_forbidden')}</p>:<p role="alert">無法載入 AI 助理。<Button onClick={()=>setAttempt(n=>n+1)}>重試</Button></p>
   :<p role="status">正在載入 AI 助理…</p>}
  </div>;
- return <Conversation key={`${props.projectId||'global'}:${conversation}`} {...props} catalog={catalog} newConversation={()=>setConversation(n=>n+1)}/>;
+ const fresh=()=>{setGeneration(n=>n+1);setSelected({id:crypto.randomUUID()})};
+ return <ConversationHistory projectId={props.projectId} compact={props.compact} revision={revision} activeId={selected.id} onNew={fresh} onOpen={detail=>{setGeneration(n=>n+1);setSelected({id:detail.id,detail})}}>
+  <Conversation key={`${selected.id}:${generation}`} {...props} catalog={catalog} selected={selected} onComplete={completed} newConversation={fresh}/>
+ </ConversationHistory>;
 }

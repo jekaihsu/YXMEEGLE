@@ -14,7 +14,7 @@ export const ERROR_TEXT:Record<string,string>={
  message_limit:'問題或對話過長，請縮短問題或開始新對話。',
 };
 export const errorText=(code:string)=>ERROR_TEXT[code]||ERROR_TEXT.ai_upstream;
-export function createChatAdapter(conversation:()=>string,onForbidden:()=>void=()=>{},projectId?:string):ChatModelAdapter {
+export function createChatAdapter(conversation:()=>string,onForbidden:()=>void=()=>{},projectId?:string,onComplete:()=>void=()=>{}):ChatModelAdapter {
  return {async *run({messages,abortSignal,context}){
   const epoch=getSessionEpoch();
   const content:ThreadAssistantMessagePart[]=[];
@@ -36,7 +36,7 @@ export function createChatAdapter(conversation:()=>string,onForbidden:()=>void=(
    for await(const event of readEvents(response.body,abortSignal)){
     if(event.type==='start')usageId=event.usage_id;
     if(event.type==='error'){errorDetail=event.detail;throw new Error(event.code)}
-    if(event.type==='done'){yield {metadata:metadata(),content:[...content],status:{type:'complete',reason:'stop'}};return}
+    if(event.type==='done'){onComplete();yield {metadata:metadata(),content:[...content],status:{type:'complete',reason:'stop'}};return}
     if(event.type==='text'){
      const last=content.at(-1);
      if(last?.type==='text')content[content.length-1]={type:'text',text:last.text+event.delta};
