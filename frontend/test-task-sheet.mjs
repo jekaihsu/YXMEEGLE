@@ -17,10 +17,11 @@ const render=()=>root.render(React.createElement(ui.ProjectDetail,{c}));
 const go=(next,replace=false)=>{const r=ui.normalizeRoute(next);const q=new URLSearchParams();Object.entries(r).forEach(([k,v])=>{if(v)q.set(k,v)});if(replace)history.replaceState(null,'',location.pathname+location.search+'#'+q.toString());else location.hash=q.toString();c={...c,route:r};render()};
 window.addEventListener('hashchange',()=>{if(!root)return;c={...c,route:ui.parseRoute(location.hash)};render()});
 const task=(id,patch={})=>({id,title:`任務 ${id}`,owner_id:'',status:'in_progress',required:true,start_date:null,due_date:null,original_due_date:null,started_at:null,completed_at:null,points:null,work_item_id:'',description:'',input:'',output:'',comments:[],revision:1,can_execute:true,...patch});
-async function mount(id,patch,{actor,features={}}={}){
+async function mount(id,patch,{actor,features={},items,events}={}){
  if(root){await act(async()=>root.unmount());root=null}ui.invalidateSessionEpoch();calls=[];
  const base=projectFixture();
  const node=base.project.nodes.find(n=>n.key==='sales');node.tasks=[task(id,{owner_id:base.user.id,...patch})];
+ if(items)base.workspace.contract_items=items;if(events)base.workspace.events=events;
  location.hash=`view=project&project=p1&tab=flow&node=${node.id}&task=${id}`;await tick();
  c={w:base.workspace,s:{user:actor||base.user,mode:'demo',workspace_id:'local-company',features:{node_assignment:false,...features}},route:ui.parseRoute(location.hash),busy:false,error:'',run:async(action,payload)=>{calls.push([action,payload]);return {}},notify(){},registerDrafts(){},refresh:async()=>{},go};
  globalThis.fetch=async()=>new Response(JSON.stringify({detail:'disabled'}),{status:404,headers:{'Content-Type':'application/json'}});
@@ -115,5 +116,52 @@ await check('known facts only: schedule range, work item and points appear when 
  assert.deepEqual(dts,['負責人','開始 → 期限','營業額點數']);
  await mount('t1');
  assert.deepEqual([...drawer().querySelectorAll('.task-drawer-facts dt')].map(d=>d.textContent),['負責人']);
+});
+const facts=()=>Object.fromEntries([...drawer().querySelectorAll('.task-drawer-facts > div')].map(d=>[d.querySelector('dt').textContent,d.querySelector('dd').textContent]));
+await check('工項 fact: resolved titles only, 「來源工項待核對」 for unresolved links, omitted when unlinked',async()=>{
+ await mount('t1',{work_item_id:'p1-survey'});
+ assert.equal(facts()['工項'],'來源工項待核對','a work_item_id link that cannot be resolved still shows');
+ await mount('t1',{contract_item_ids:['ci-gone']});
+ assert.equal(facts()['工項'],'來源工項待核對','an unresolved contract-item link still shows');
+ await mount('t1',{contract_item_ids:['ci-1','ci-gone']},{items:[{id:'ci-1',title:'控制點測量'}]});
+ assert.equal(facts()['工項'],'控制點測量、來源工項待核對','resolved titles are shown, the unresolved rest is flagged');
+ await mount('t1',{work_item_id:'wi-9'},{items:[{id:'wi-9',title:'水準測量'}]});
+ assert.equal(facts()['工項'],'水準測量','a work item that resolves shows its real title');
+ await mount('t1',{work_item_id:'p1-survey'},{items:[{id:'other',title:'不相干工項'}]});
+ assert.equal(facts()['工項'],'來源工項待核對','the title is never guessed from an unrelated item');
+ await mount('t1');
+ assert.equal(facts()['工項'],undefined,'truly unlinked: omitted');
+});
+await check('keyboard: 編輯 moves focus to the first field; cancel and save return it to 編輯',async()=>{
+ await mount('t1',{description:'依確認單施作'});
+ await click(button('編輯'));
+ assert.ok(document.activeElement===drawer().querySelector('.nw-task-editor [aria-label="任務名稱"]'),'first editable field has focus');
+ await click(button('取消'));
+ assert.ok(document.activeElement===button('編輯'),'cancel restores focus to 編輯');
+ await click(button('編輯'));
+ await type(drawer().querySelector('[aria-label="任務名稱"]'),'改過的任務名稱');
+ await click(button('儲存任務'));
+ assert.equal(calls.at(-1)[0],'task_update');
+ assert.equal(drawer().querySelector('.nw-task-editor'),null);
+ assert.ok(document.activeElement===button('編輯'),'save restores focus to 編輯');
+});
+await check('展延 keeps its earlier rule: any viewer sees it in the overflow when the feature is on, never when off',async()=>{
+ await mount('t1',{owner_id:'ou_someone',can_execute:false},{actor:guest,features:{change_extension:true}});
+ assert.ok(footer(),'a viewer who is neither actor nor assigner still gets the overflow');
+ assert.equal(footer().querySelector('.task-drawer-primary'),null,'but no primary');
+ await click(footer().querySelector('.task-drawer-more>summary'));
+ assert.deepEqual([...document.querySelectorAll('.task-drawer-more-list button')].map(b=>b.textContent),['展延']);
+ await mount('t1',{owner_id:'ou_someone',can_execute:false},{actor:guest});
+ assert.equal(drawer().querySelector('.task-drawer-footer'),null,'feature off: no footer at all');
+});
+await check('歷程 carries 已依排程啟用 whether or not the activation event is in the feed',async()=>{
+ const patch={status:'in_progress',activation_source:'schedule',activated_at:'2026-10-01T09:00:00+08:00'};
+ await mount('t1',patch);await tab('歷程');
+ assert.match(drawer().querySelector('.event-list').textContent,/已依排程啟用 · 尚未記錄實際開始/);
+ await mount('t1',patch,{events:[{id:'e1',project_id:'p1',task_id:'t1',actor_id:'system',action:'task_activate',message:'排程日已到且前置條件齊備；未記錄實際作業開始',created_at:'2026-10-01T01:00:00Z'}]});await tab('歷程');
+ const text=drawer().querySelector('.event-list').textContent;
+ assert.match(text,/已依排程啟用 · 排程日已到/);assert.equal(text.split('已依排程啟用').length-1,1,'shown once, not duplicated');
+ await mount('t1');await tab('歷程');
+ assert.doesNotMatch(drawer().querySelector('.event-list').textContent,/已依排程啟用/);
 });
 console.log(process.exitCode?'Task sheet checks FAILED':'Task sheet checks passed');
