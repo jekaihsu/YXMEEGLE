@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import {build} from 'esbuild';
 import {writeFile,unlink} from 'node:fs/promises';
 import {projectFixture} from './fixtures/node-assignments.mjs';
-const bundled=await build({stdin:{contents:"export {caseDataSections} from './src/caseDataSections'; export {projectFlowRoute} from './src/projectRoutes'; export {participantRows} from './src/ProjectDestinations';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'},jsx:'automatic'});
+const bundled=await build({stdin:{contents:"export {caseDataSections,sourceKindLabel} from './src/caseDataSections'; export {projectFlowRoute} from './src/projectRoutes'; export {participantRows} from './src/ProjectDestinations';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'},jsx:'automatic'});
 const temp=new URL('./.case-data-sections.mjs',import.meta.url);await writeFile(temp,bundled.outputFiles[0].text);const m=await import(temp.href);await unlink(temp);
 const labels=sections=>sections.map(([,label])=>label);
 const world=(patch={},status='ready')=>{const base=projectFixture();Object.assign(base.project,{source_kind:'v4'},patch);return {w:{...base.workspace,source_status:{...base.workspace.source_status,status},projects:[base.project],source_confirmations:[],contract_items:[]},p:base.project}};
@@ -67,4 +67,11 @@ test('repeated Lark assignee names are listed once',()=>{
  const data={nodes:[{key:'sales',label:'業務',owners:[],assignment_method:'',assigned_by:null}],node_details:{sales:{tasks:[same,same,same,{assignee:null},{assignee:null}]}}};
  const rows=m.participantRows({w},p,{state:{kind:'ready',data}},[]);
  assert.equal(rows[0].others,'陳柏翰、尚未指派');
+});
+test('資料來源 names only recognised kinds and flags the rest for review',()=>{
+ assert.equal(m.sourceKindLabel('demo'),'獨立示範資料');
+ assert.equal(m.sourceKindLabel('v4'),'報價總表／V4');
+ assert.equal(m.sourceKindLabel('lark'),'Lark');
+ assert.equal(m.sourceKindLabel('csv_import'),'來源類型待核對（csv_import）','an unrecognised kind is never passed off as 報價總表／V4');
+ assert.equal(m.sourceKindLabel(''),'來源類型待核對');assert.equal(m.sourceKindLabel(undefined),'來源類型待核對');
 });
