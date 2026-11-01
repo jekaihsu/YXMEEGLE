@@ -26,15 +26,19 @@ try{
   await input.click();assert.deepEqual(await styles(),baseline,`${drawer?'drawer':'page'} click preserves composer styles`);
   assert.deepEqual(await inputStyles(),inputBaseline,'click preserves textarea styles');
   if(evidence)await page.screenshot({path:`${evidence}/${drawer?'drawer':'page'}-click.png`});
+  await page.keyboard.press('ArrowLeft');assert.deepEqual(await styles(),baseline,'click then ArrowLeft in the field preserves pointer modality');
+  assert.equal(await page.locator('.assistant-chat').getAttribute('data-input'),null);
   await page.keyboard.press('Tab');await page.keyboard.press('Shift+Tab');
   assert.equal(await input.evaluate(el=>el===document.activeElement&&el.matches(':focus-visible')),true);
   assert.notEqual((await styles()).shadow,baseline.shadow,`${drawer?'drawer':'page'} keyboard focus shows composer ring`);
   assert.equal((await styles()).border,baseline.border,'keyboard ring does not change the border');
   assert.equal(await page.locator('.assistant-chat').getAttribute('data-input'),'keyboard');
   if(evidence)await page.screenshot({path:`${evidence}/${drawer?'drawer':'page'}-tab.png`});
-  await input.click();assert.deepEqual(await styles(),baseline,'pointer clears keyboard ring');
-  await page.keyboard.press('ArrowLeft');assert.notEqual((await styles()).shadow,baseline.shadow,'arrow keys enable keyboard ring');
-  await page.mouse.move(1,1);assert.deepEqual(await styles(),baseline,'mouse movement clears keyboard ring');
+  const keyboardStyles=await styles();
+  await page.mouse.move(1,1);assert.deepEqual(await styles(),keyboardStyles,'mouse movement preserves keyboard ring');
+  await page.keyboard.press('ArrowLeft');assert.deepEqual(await styles(),keyboardStyles,'arrow keys preserve keyboard modality');
+  await input.click();assert.deepEqual(await styles(),baseline,'pointerdown clears keyboard ring');
+  await page.keyboard.press('ArrowLeft');assert.deepEqual(await styles(),baseline,'arrow keys do not enable keyboard ring');
   await page.close();
  }
 }finally{await browser.close()}
