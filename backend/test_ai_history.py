@@ -115,3 +115,30 @@ def test_history_latest_200_messages(app, client):
     assert len(result['messages']) == 200 and result['truncated']
     assert result['messages'][0]['content'] == 'q5'
     assert result['messages'][-1]['content'] == 'a104'
+
+
+def test_generation_failure_releases_slot_and_runs_in_worker(app, client, monkeypatch):
+    import threading
+    from .ai import ledger
+    from .ai.agent import ChatRun
+    original = ledger.conversation_generation
+    event_threads = []
+    async def stream(run):
+        event_threads.append(threading.get_ident())
+        async for item in original_stream(run):
+            yield item
+    original_stream = ChatRun.stream
+    monkeypatch.setattr(ChatRun, 'stream', stream)
+    workers = []
+    def failing(*args):
+        workers.append(threading.get_ident())
+        if len(workers) <= 2:
+            raise RuntimeError('database locked')
+        return original(*args)
+    monkeypatch.setattr(ledger, 'conversation_generation', failing)
+    app.state.ai_providers = {'claude': Fake()}
+    for _ in range(2):
+        with __import__('pytest').raises(RuntimeError, match='database locked'):
+            client.post('/api/ai/chat', json=BODY)
+    assert events(client.post('/api/ai/chat', json=BODY))[-1]['type'] == 'done'
+    assert event_threads[0] not in workers

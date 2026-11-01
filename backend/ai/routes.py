@@ -196,7 +196,12 @@ def register(app, *, identity, sessions, cfg):
             except BaseException:
                 release()
                 raise
-        run = ChatRun(app, body, data, user, models[body.model], adapter, release)
+        try:
+            generation = await run_in_threadpool(ledger.conversation_generation, sessions, data['wid'], user['id'], body.conversation_id)
+            run = ChatRun(app, body, data, user, models[body.model], adapter, release, generation)
+        except BaseException:
+            release()
+            raise
         run.started = started
         run.project_context = context
         entry = PendingRun(key)

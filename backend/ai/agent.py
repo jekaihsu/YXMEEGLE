@@ -33,10 +33,10 @@ def sse(value):
 
 
 class ChatRun:
-    def __init__(self, app, body, data, user, spec, adapter, release):
+    def __init__(self, app, body, data, user, spec, adapter, release, conversation_generation):
         self.app, self.body, self.data, self.user = app, body, data, user
         self.spec, self.adapter, self.release = spec, adapter, release
-        self.conversation_generation = ledger.conversation_generation(app.state.sessions, data['wid'], user['id'], body.conversation_id)
+        self.conversation_generation = conversation_generation
         self.usage_id = str(uuid4())
         self.started = perf_counter()
         self.usage = Usage()
