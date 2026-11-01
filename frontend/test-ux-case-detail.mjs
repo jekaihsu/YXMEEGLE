@@ -49,7 +49,7 @@ test('home deep link expands the real node and focuses the task without a legacy
   await mount(React.createElement(ui.ProjectDetail, {c: context({tab: 'flow', node: 'control', task: 'recTask1'})}));
   assert.equal(document.querySelector('#flow-selected').getAttribute('aria-label'),'控制節點明細');
   assert.ok(document.querySelector('[data-assignment-task="recTask1"]'));
-  assert.equal(document.querySelector('[aria-label="任務名稱"]').value,'控制點成果核對');
+  assert.equal(document.querySelector('.task-drawer[data-kind=lark] h2').textContent,'控制點成果核對');assert.equal(document.querySelector('[aria-label="任務名稱"]'),null,'the editor opens only behind 編輯');
   assert.equal(document.querySelector('.task-inspector'), null);
   assert.ok(!document.body.textContent.includes('找不到此任務'));
   assert.match(document.querySelector('.pf-source').textContent,/Lark 節點與任務/);
@@ -59,7 +59,7 @@ test('a task-only link discovers its node from authorized embedded tasks', async
   globalThis.fetch = async () => reply(fixture.list);
   await mount(React.createElement(ui.ProjectDetail, {c: context({tab: 'tasks', task: 'recTask1'})}));
   assert.equal(document.querySelector('#flow-selected').getAttribute('aria-label'),'控制節點明細');
-  assert.equal(document.querySelector('[aria-label="任務名稱"]').value,'控制點成果核對');
+  assert.equal(document.querySelector('.task-drawer[data-kind=lark] h2').textContent,'控制點成果核對');assert.equal(document.querySelector('[aria-label="任務名稱"]'),null,'the editor opens only behind 編輯');
 });
 test('unknown remote tasks have a readable scoped error', async () => {
   ui.invalidateSessionEpoch(); const fixture = sourceFixture();
