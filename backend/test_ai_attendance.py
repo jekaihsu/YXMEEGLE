@@ -61,7 +61,9 @@ def call(pair, args):
     cookie = '; '.join(f'{k}={v}' for k, v in client.cookies.items())
     raw, error = asyncio.run(execute(app, cookie, 'attendance_today', args))
     assert not error, raw
-    return json.loads(raw)
+    data = json.loads(raw)
+    assert len(raw) <= 6000
+    return data['totals']
 
 
 def test_semantic_day(attendance_route):
@@ -71,7 +73,8 @@ def test_semantic_day(attendance_route):
     assert result['counts']['exempt'] == 4
     assert not result['missing_punch']
     ids = [p['id'] for key in result['counts'] if key != 'arrived' for p in result[key]]
-    assert len(ids) == len(set(ids)) == 58
+    assert len(ids) == len(set(ids)) == 56
+    assert result['truncated']
     print('NEW DAY', json.dumps({k: result[k] for k in ('range', 'date', 'counts')}, ensure_ascii=False))
     from .ai.tools import display_attendance
     displays = display_attendance(result)
@@ -120,7 +123,7 @@ def test_week_and_weekends(attendance_route, monkeypatch):
     {'range': 'week', 'date': '2026-02-30'}, {'range': 'today', 'date': 'yesterday'},
     {'range': 'today', 'date': '20261012'}, {'range': 'month', 'date': ''},
     {'range': 'today', 'date': '2000-01-01'}, {'range': 'week', 'date': '2026-1-2'},
-    {'range': 'today', 'date': 'x' * 241}, {'range': 'today', 'date': 123}, {},
+    {'range': 'today', 'date': 'x' * 241}, {'range': 'today', 'date': 123},
 ])
 def test_invalid_dates_before_http(attendance_route, monkeypatch, args):
     async def forbidden(*a, **kw):

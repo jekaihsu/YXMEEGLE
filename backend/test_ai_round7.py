@@ -63,7 +63,7 @@ def test_schema_field_errors(app):
     base = dict(query='', status='all', owner='anyone', overdue=False, offset=0)
     for key, value in [('query', None), ('status', None), ('offset', True), ('offset', '0'), ('query', 'x'*241), ('offset', -1), ('overdue', None), ('owner', 'stranger')]:
         raw, error = asyncio.run(execute(app, '', 'search_cases', {**base, key: value}))
-        assert error and key in json.loads(raw)['error']
+        assert error and key in json.loads(raw).get('field', [])
         assert key == 'status' or 'status' not in json.loads(raw)['error']
 
 
@@ -95,11 +95,11 @@ def test_paging_and_counts_real_workspace(app, client):
     first = tool(app, client, 'search_cases', base)
     second = tool(app, client, 'search_cases', {**base, 'offset': 8})
     third = tool(app, client, 'search_cases', {**base, 'offset': 16})
-    assert [len(p['cases']) for p in [first, second, third]] == [8, 8, 3]
-    assert len({p['id'] for page in [first, second, third] for p in page['cases']}) == 19
-    assert first['population_total'] == sum(first['status_counts'].values()) == 19
+    assert [len(p['rows']) for p in [first, second, third]] == [8, 8, 3]
+    assert len({p['id'] for page in [first, second, third] for p in page['rows']}) == 19
+    assert first['totals']['population_total'] == sum(first['totals']['status_counts'].values()) == 19
     filtered = tool(app, client, 'search_cases', {**base, 'status': 'completed'})
-    assert filtered['matched_total'] == 0 and sum(filtered['status_counts'].values()) == 19
+    assert filtered['totals']['matched_total'] == 0 and sum(filtered['totals']['status_counts'].values()) == 19
 
 
 def test_portfolio_frontend_parity(app, client, tmp_path):

@@ -160,7 +160,7 @@ def test_hr_and_case_permissions_apply_to_tools_and_sse(app, client):
     cookie = '; '.join(f'{k}={v}' for k, v in client.cookies.items())
     assert client.get('/api/people/attendance').status_code == 403
     result, error = asyncio.run(execute(app, cookie, 'attendance_today', {'range': 'today', 'date': ''}))
-    assert error and json.loads(result) == {'error': '你沒有權限查看出勤資料'}
+    assert error and json.loads(result) == {'error':'找不到或沒有權限查看資料','code':'ai_forbidden'}
     with app.state.sessions.begin() as db:
         root = db.get(WorkspaceRow, wid(app, client))
         state = storage.load(db, BusinessRow, root)
@@ -176,7 +176,7 @@ def test_hr_and_case_permissions_apply_to_tools_and_sse(app, client):
     result, error = asyncio.run(execute(app, cookie, 'case_progress', {'case_id': hidden_id}))
     assert error and '機密隱藏案件' not in result
     result, _ = asyncio.run(execute(app, cookie, 'search_cases', {'query': '機密隱藏案件', 'status': 'all', 'owner': 'anyone', 'overdue': False, 'offset': 0}))
-    assert json.loads(result)['cases'] == []
+    assert json.loads(result)['rows'] == []
     app.state.ai_providers = {'claude': Fake(calls=[dataset_call('a', 'attendance_today', {'range': 'today', 'date': ''}),
         dataset_call('b', 'case_progress', {'case_id': hidden_id})])}
     response = client.post('/api/ai/chat', json=BODY)

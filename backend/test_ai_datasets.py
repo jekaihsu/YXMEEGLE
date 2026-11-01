@@ -292,3 +292,55 @@ def test_search_boolean_display_cells(app, client, monkeypatch):
     assert error is None
     assert {row['overdue'] for row in display['rows']} == {'是','否'}
     assert all(type(v) in (str,int,float,type(None)) for row in display['rows'] for v in row.values())
+
+
+@pytest.mark.parametrize('ident,params', [
+    ('search_cases', {}), ('case_progress', {'case_id':'p1'}), ('case_owners', {'case_id':'p1'}),
+])
+def test_legacy_evidence_through_production_query(app, client, ident, params):
+    cookie = '; '.join(f'{k}={v}' for k,v in client.cookies.items())
+    text,error = asyncio.run(execute(app,cookie,'query_dataset',dict(id=ident,params=params)))
+    assert not error and len(text) <= 6000
+    result = json.loads(text)
+    totals = result['totals']
+    if ident == 'search_cases':
+        assert sum(totals['status_counts'].values()) == totals['population_total']
+        assert totals['matched_total'] == result['total']
+    elif ident == 'case_progress':
+        source = client.get('/api/projects/p1/progress').json()
+        assert source['gaps'] and totals['gaps']
+        assert all(g['message_zh'] in result['limitations'] for g in totals['gaps'])
+        assert totals['workflow_summary']['completed_nodes']['total'] > 0
+    else:
+        assert totals['pm']['name'] == client.get('/api/case-detail/p1').json()['header']['pm']['name']
+        assert totals['incomplete'] and any('不完整' in v for v in result['limitations'])
+
+
+@pytest.mark.parametrize('period', ['today','week'])
+def test_attendance_names_totals_caveats_production(app, monkeypatch, period):
+    from .ai.tools import Reader
+    monkeypatch.setattr('backend.ai.tools.today', lambda:'2026-10-16')
+    async def get(self,path,**params):
+        assert path == '/api/people/attendance'
+        return dict(status='ok', incomplete=True, as_of='2026-10-16T12:00:00+08:00',
+            days=['2026-10-12','2026-10-13','2026-10-14','2026-10-15','2026-10-16','2026-10-17','2026-10-18'],
+            people=[dict(id='late',name='遲到同事',in_service=True,attendance=['遲到']*7),
+                dict(id='missing',name='缺卡同事',in_service=True,attendance=['缺卡']*7),
+                dict(id='none',name='未打卡同事',in_service=True,attendance=[None]*7)], amount=999999)
+    monkeypatch.setattr(Reader,'get',get)
+    text,error = asyncio.run(execute(app,'','query_dataset',dict(id='attendance_today',params={'range':period,'date':'2026-10-12'})))
+    assert not error and len(text) <= 6000 and '999999' not in text
+    data = json.loads(text)
+    totals = data['totals']
+    assert totals['incomplete'] and totals['unaccounted_meaning'] in data['limitations']
+    if period == 'today':
+        assert totals['evaluated']
+        assert totals['late'] == [dict(id='late',name='遲到同事')]
+        assert totals['missing_punch'] == [dict(id='missing',name='缺卡同事')]
+    else:
+        assert totals['summary']['late'] == dict(people=1,person_days=5)
+        assert totals['summary']['missing_punch'] == dict(people=1,person_days=5)
+        assert totals['top_unaccounted'] == [dict(id='none',name='未打卡同事',unaccounted_days=5)]
+        assert len(totals['people']) == 3 and not totals['days'][-1]['evaluated']
+        assert totals['top_late'] == [dict(id='late',name='遲到同事',days=5)]
+        assert totals['top_missing_punch'] == [dict(id='missing',name='缺卡同事',days=5)]

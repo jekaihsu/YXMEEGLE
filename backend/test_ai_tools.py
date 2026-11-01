@@ -17,7 +17,8 @@ def tool(app, client, name, args):
     cookie = '; '.join(f'{k}={v}' for k, v in client.cookies.items())
     result, error = asyncio.run(execute(app, cookie, name, args))
     assert not error, result
-    return json.loads(result)
+    data = json.loads(result)
+    return data if name == 'search_cases' else data['totals']
 
 
 
@@ -36,9 +37,9 @@ def test_real_search_and_owners_without_shell(app, client, monkeypatch):
     result = tool(app, client, 'search_cases', {'query': query, 'status': 'all', 'owner': 'anyone', 'overdue': False, 'offset': 0})
     assert requests == ['/api/workspace']
     requests.clear()
-    assert result['population_total'] == source['total']
-    assert [p['id'] for p in result['cases']] == [p['id'] for p in source['items']]
-    assert all(p['status_label'] == '進行中' for p in result['cases'])
+    assert result['totals']['population_total'] == source['total']
+    assert [p['id'] for p in result['rows']] == [p['id'] for p in source['items']]
+    assert all(p['state'] == '進行中' for p in result['rows'])
     pid = source['items'][0]['id']
     assert client.get('/api/projects/' + pid).status_code == 404
     detail = client.get('/api/case-detail/' + pid).json()
@@ -191,7 +192,7 @@ def test_search_real_routes_do_not_claim_timestamp(app, client):
     query = page['items'][0]['code']
     assert 'as_of' not in page
     assert 'as_of' not in client.get('/api/projects', params={'q': query}).json()
-    assert 'as_of' not in tool(app, client, 'search_cases', {'query': query, 'status': 'all', 'owner': 'anyone', 'overdue': False, 'offset': 0})
+    assert tool(app, client, 'search_cases', {'query': query, 'status': 'all', 'owner': 'anyone', 'overdue': False, 'offset': 0})['as_of'] is None
     prompt = system_prompt()
     assert '查詢當下資料' in prompt
     assert 'case_progress' in prompt and 'attendance_today' in prompt

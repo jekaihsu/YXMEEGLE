@@ -41,8 +41,8 @@ def test_last_search_page(app, client):
     result = tool(app, client, 'search_cases', {**BASE, 'offset': 16})
     assert result['next_offset'] is None
     assert not result.get('truncated', False)
-    assert result['population_total'] == result['matched_total'] == 19
-    assert all('status' not in p for p in result['cases'])
+    assert result['totals']['population_total'] == result['totals']['matched_total'] == 19
+    assert all('status' not in p for p in result['rows'])
     print('Final 19-case last page ' + json.dumps(result, ensure_ascii=False))
 
 
@@ -52,10 +52,10 @@ def test_size_trim_contiguous_search(app, client):
     while offset is not None:
         page = tool(app, client, 'search_cases', {**BASE, 'offset': offset})
         assert len(json.dumps(page, ensure_ascii=False)) <= 6000
-        assert page['cases']
-        ids += [p['id'] for p in page['cases']]
+        assert page['rows']
+        ids += [p['id'] for p in page['rows']]
         following = page['next_offset']
-        assert following is None or following == offset + len(page['cases'])
+        assert following is None or following == offset + len(page['rows'])
         offset = following
     assert ids == [f'r8-{i:02}' for i in range(19)]
 
@@ -157,4 +157,4 @@ def test_25_node_caps_real_routes(app, client):
 def test_null_attendance_date_rejected(app):
     from .ai_projection_test_support import execute
     raw, error = asyncio.run(execute(app, '', 'attendance_today', dict(range='today', date=None)))
-    assert error and 'date' in json.loads(raw)['error']
+    assert error and 'date' in json.loads(raw)['field']

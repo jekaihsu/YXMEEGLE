@@ -293,6 +293,10 @@ def project_attendance(value):
         arrived_meaning='arrived 只計到班標籤，不代表實際在場人數')
     if period == 'today':
         result.update(daily[0])
+        for key in ATTENDANCE_LABELS:
+            if len(result[key]) > 50:
+                result[key] = result[key][:50]
+                result['truncated'] = True
     else:
         people = {}
         for item in daily:
@@ -312,7 +316,12 @@ def project_attendance(value):
                             people=len({p['id'] for item in daily if counted(item, k) for p in item[k]})) for k in ATTENDANCE_LABELS},
             top_unaccounted=ranking[:10], people=ranked[:50],
             labelled_arrival_count=sum(item['counts']['arrived'] for item in daily if item['evaluated']))
-        result['truncated'] = len(ranked) > 50 or len(ranking) > 10
+        for key in ('late', 'missing_punch'):
+            candidates = sorted((p for p in people.values() if p['days'].get(key)),
+                key=lambda p: (-len(p['days'][key]), p['id']))
+            result['top_' + key] = [dict(**pick(p, 'id', 'name'), days=len(p['days'][key])) for p in candidates[:10]]
+        result['truncated'] = len(ranked) > 50 or len(ranking) > 10 or any(
+            sum(bool(p['days'].get(key)) for p in people.values()) > 10 for key in ('late','missing_punch'))
     # Preserve counts before trimming lists so partial names never change the headline.
     while len(json.dumps(result, ensure_ascii=False)) > 6000:
         result['truncated'] = True

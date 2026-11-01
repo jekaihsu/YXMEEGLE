@@ -35,9 +35,9 @@ def test_status_only_real_demo(app, client):
         dict(query='', status='in_progress', owner='anyone', overdue=False, offset=0)))
     assert not error, result
     data = json.loads(result)
-    assert data['population_total'] == 9
-    assert data['matched_total'] == data['status_counts']['in_progress'] == 7
-    assert all(p['state'] == '進行中' for p in data['cases'])
+    assert data['totals']['population_total'] == 9
+    assert data['totals']['matched_total'] == data['totals']['status_counts']['in_progress'] == 7
+    assert all(p['state'] == '進行中' for p in data['rows'])
 
 
 def test_completed_work_real_demo(app, client):
@@ -53,7 +53,7 @@ def test_unknown_status_and_foreign_owner_are_rejected(app, client):
         args = dict(query='', status='all', owner='anyone', overdue=False, offset=0)
         args[key] = value
         result, error = asyncio.run(execute(app, cookie(client), 'search_cases', args))
-        assert error and key in json.loads(result)['error']
+        assert error and key in json.loads(result).get('field', [])
 
 
 def test_portfolio_visibility_and_composed_filters(tmp_path):
@@ -82,9 +82,9 @@ def test_portfolio_visibility_and_composed_filters(tmp_path):
                     and (not owner or p['pm_id'] == user)
                     and (not late or project_state(p, today())['overdue'])]
                 expected.sort(key=lambda p: (p.get('due_date') or '9999', p['id']))
-                assert data['matched_total'] == len(expected)
-                assert [p['id'] for p in data['cases']] == [p['id'] for p in expected[:8]]
-                assert sum(data['status_counts'].values()) == data['population_total']
+                assert data['totals']['matched_total'] == len(expected)
+                assert [p['id'] for p in data['rows']] == [p['id'] for p in expected[:8]]
+                assert sum(data['totals']['status_counts'].values()) == data['totals']['population_total']
 
         from .test_backend import WorkspaceRow, BusinessRow, storage
         wid = a.state.signer.loads(c.cookies.get('meegle_session'))['wid']
@@ -106,8 +106,8 @@ def test_portfolio_visibility_and_composed_filters(tmp_path):
                 dict(query='', status='all', owner='anyone', overdue=False, offset=0)))
             assert not error, result
             data = json.loads(result)
-            assert data['population_total'] == ui['total'] == 4
-            assert {p['id'] for p in data['cases']} == {p['id'] for p in ui['items']} == {'p1', 'p3', 'p4', 'p6'}
+            assert data['totals']['population_total'] == ui['total'] == 4
+            assert {p['id'] for p in data['rows']} == {p['id'] for p in ui['items']} == {'p1', 'p3', 'p4', 'p6'}
             legacy = c.get('/api/projects?limit=100').json()
             assert legacy['total'] == 6
 
@@ -131,12 +131,13 @@ def test_zero_completed_real_demo_case(app, client):
 
 
 def test_global_progress_includes_completed_nodes_and_display(app, client):
-    from .ai.tools import displays
+    from .ai.tools import result_display
     result, error = asyncio.run(execute(app, cookie(client), 'case_progress', dict(case_id='p1')))
     assert not error, result
     data = json.loads(result)
-    assert data['workflow_summary']['completed_nodes'] == dict(done=4, total=9)
-    table = displays('case_progress', result)[1]
+    assert data['totals']['workflow_summary']['completed_nodes'] == dict(done=4, total=9)
+    table, error = result_display({data['result_id']:data}, dict(result_id=data['result_id'],kind='table',columns=[],mapping={},max_rows=50))
+    assert error is None
     field = next(n for n in table['rows'] if n['label'] == '外業')
     assert field['status'] == '已完成' and field['tasks_done'] == 3
     assert len(table['rows']) == 9
@@ -173,4 +174,4 @@ def test_completed_sop_work_from_real_demo_routes(app, client):
     assert control['sop_tasks_done'] == control['sop_tasks_total'] == 1
     result, error = asyncio.run(execute(app, cookie(client), 'case_progress', dict(case_id='p1')))
     assert not error, result
-    assert json.loads(result)['workflow_summary']['sop_tasks']['case_counts']['done'] == 1
+    assert json.loads(result)['totals']['workflow_summary']['sop_tasks']['case_counts']['done'] == 1

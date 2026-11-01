@@ -189,6 +189,41 @@ def describe(ident):
         example=dict(id=d.id,params=d.example or examples.get(ident),limit=20,offset=0))
 
 
+def legacy_totals(ident, projected):
+    fields = {
+        'search_cases': ('population_total','matched_total','status_counts'),
+        'case_progress': ('project_id','stages','nodes','gaps','workflow_summary'),
+        'case_owners': ('project_id','pm','nodes','node_assignment_status','incomplete','node_assignments_as_of'),
+        'attendance_today': ('range','date','week_start','week_end','counts','evaluated','days','summary',
+            'people','top_unaccounted','top_late','top_missing_punch','labelled_arrival_count','incomplete','basis',
+            'unaccounted_meaning','arrived_meaning', *t.ATTENDANCE_LABELS),
+    }
+    return t.pick(projected, 'as_of', *fields[ident])
+
+
+def bound_result(result):
+    def lists(value):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if isinstance(child, list) and child and key not in ('columns','limitations','days'):
+                    yield child
+                elif isinstance(child, dict):
+                    yield from lists(child)
+    while len(json.dumps(result, ensure_ascii=False)) > 5900:
+        candidates = list(lists(result))
+        if not candidates:
+            raise t.ReadValidation('查詢條件或來源摘要過長，請縮小查詢範圍')
+        longest = max(candidates, key=lambda rows: len(json.dumps(rows,ensure_ascii=False)))
+        longest.pop()
+        result['truncated'] = True
+        result['totals']['truncated'] = True
+        summary = result['totals'].get('workflow_summary')
+        if summary and longest is summary.get('rows'):
+            summary['truncated'] = True
+        if longest is result['rows']:
+            result['next_offset'] = result['applied_params']['offset'] + len(longest)
+
+
 async def query(reader, ident, params, limit, offset):
     d = REGISTRY[ident]
     args = d.params.model_validate(params).model_dump()
@@ -229,13 +264,24 @@ async def query(reader, ident, params, limit, offset):
     cols = d.columns
     if ident == 'attendance_today' and args['range'] == 'week':
         cols = columns(('date','日期','date'), *[(k,v,'number') for k,v in t.ATTENDANCE_LABELS.items()])
+    cells_clipped = any(isinstance(r.get(c.name), str) and len(r[c.name]) > 240 for r in selected for c in cols)
     result = dict(dataset_id=ident,applied_params=applied,columns=[c.model_dump() for c in cols],
         rows=[{c.name:scalar(r.get(c.name)) for c in cols} for r in selected],total=total,
         next_offset=offset+len(selected) if selected and offset+len(selected)<total else None,
         as_of=(projected.get('as_of') if legacy else None) or raw.get('as_of') or raw.get('last_sync') or raw.get('meta',{}).get('fetched_at') or raw.get('source',{}).get('fetched_at'),
-        truncated=bool(raw.get('truncated') or offset+len(selected)<total),
+        truncated=bool(cells_clipped or raw.get('truncated') or offset+len(selected)<total),
         limitations=['金額與財務欄位不提供', '無來源時間時 as_of 為 null'])
-    result['totals'] = {'rows':total}
+    result['totals'] = dict(rows=total, **(legacy_totals(ident, projected) if legacy else {}))
+    if legacy:
+        result['truncated'] = result['truncated'] or projected.get('truncated', False)
+        result['totals']['truncated'] = result['truncated']
+        if projected.get('incomplete'):
+            result['limitations'].append('來源資料不完整')
+        for key in ('basis','unaccounted_meaning','arrived_meaning','node_assignment_status'):
+            if projected.get(key):
+                result['limitations'].append(str(projected[key])[:240])
+        for gap in projected.get('gaps', [])[:8]:
+            result['limitations'].append(str(gap.get('message_zh') or gap['id'])[:160])
     meta = raw.get('meta', {})
     if meta.get('stale'):
         result['limitations'].append('來源快照已過期')
@@ -246,9 +292,6 @@ async def query(reader, ident, params, limit, offset):
         result['limitations'].append('僅列已授權來源提供的欄位；空值不是沒有')
         if raw.get('meta') or raw.get('gaps') or raw.get('page_state') or raw.get('source'):
             result['limitations'].append('來源可能不完整，無法據空結果推論沒有資料')
-    while len(json.dumps(result,ensure_ascii=False)) > 5900 and result['rows']:
-        result['rows'].pop()
-        result['truncated'] = True
-        result['next_offset'] = offset+len(result['rows'])
+    bound_result(result)
     result['result_id'] = 'r'+hashlib.sha256(json.dumps([ident,params,limit,offset,result],sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:20]
     return result
