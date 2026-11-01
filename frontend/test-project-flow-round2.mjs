@@ -5,11 +5,11 @@ import {JSDOM} from 'jsdom';
 import {response as dispatchExample} from './qa/dispatch-api-examples.mjs';
 import {projectFixture,embeddedAssignmentFixture} from './fixtures/node-assignments.mjs';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/#view=project&project=p1',pretendToBeVisual:true});
-for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','HTMLDetailsElement','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+for(const key of ['window','document','location','history','sessionStorage','localStorage','Event','KeyboardEvent','Element','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','HTMLDetailsElement','navigator'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.getComputedStyle=dom.window.getComputedStyle;
 HTMLElement.prototype.scrollIntoView=function(){globalThis.lastScroll=this.id};globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');
-const bundle=await build({stdin:{contents:"export {ProjectDetail} from './src/ProjectDetail'; export {AppShell} from './src/AppShell'; export {invalidateSessionEpoch} from './src/api'; export {prefetchNodeAssignmentDetail} from './src/useNodeAssignments';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {ProjectDetail} from './src/ProjectDetail'; export {AppShell} from './src/AppShell'; export {LocalNodeActions} from './src/LocalNodeActions'; export {invalidateSessionEpoch} from './src/api'; export {prefetchNodeAssignmentDetail} from './src/useNodeAssignments';",resolveDir:import.meta.dirname},bundle:true,write:false,format:'esm',platform:'node',packages:'external',loader:{'.css':'empty'}});
 const temp=new URL('./.project-flow-round2-bundle.mjs',import.meta.url);await writeFile(temp,bundle.outputFiles[0].text);const ui=await import(temp.href);await unlink(temp);
 const progress=JSON.parse(await readFile(new URL('./fixtures/project-progress.json',import.meta.url),'utf8'));progress.project_id='p1';
 let root,c,fixture,calls,hold,evidenceStatus=200,nodeStatus=200,detailStatus=200,mutationStatus=200;
@@ -194,12 +194,41 @@ await check('legacy direct completion stays enabled when ordinary SOP writes are
 });
 await check('legacy overflow is secondary, closes on select, explains role blocks, and hides when empty',async()=>{
  await mount({enabled:false,node:'node_control'});assert.equal(document.querySelectorAll('.nw-actions>.button.primary').length,1);await more();assert.equal(document.querySelectorAll('.pf-more .primary').length,0);await click(button('指派負責人'));assert.equal(document.querySelector('.pf-more').open,false);assert.ok(document.querySelector('[role=dialog]'));await click(document.querySelector('[role=dialog] [aria-label=關閉]'));
- await mount({enabled:false,node:'node_control',role:'viewer',configure(base){base.project.pm_id='someone-else';base.project.supervisor_id='someone-else';base.project.nodes[4].owner_id='other'}});await more();const assign=button('指派負責人'),complete=button('完成節點');assert.equal(assign.disabled,true);assert.equal(complete.disabled,true);assert.match(document.getElementById(assign.getAttribute('aria-describedby')).textContent,/專案經理或主管/);assert.match(document.getElementById(complete.getAttribute('aria-describedby')).textContent,/專案經理或節點負責人/);
+ await mount({enabled:false,node:'node_control',role:'viewer',configure(base){base.project.pm_id='someone-else';base.project.supervisor_id='someone-else';base.project.nodes[4].owner_id='other'}});await more();const assign=button('指派負責人'),complete=button('完成節點');assert.equal(assign.disabled,true);assert.equal(complete.disabled,false);assert.match(document.getElementById(assign.getAttribute('aria-describedby')).textContent,/專案經理或主管/);assert.equal(complete.getAttribute('aria-describedby'),null);
  await mount({enabled:false,node:'node_pricing',role:'viewer',configure(base){base.project.pm_id='someone-else';base.project.supervisor_id='someone-else'}});assert.equal(document.querySelector('.pf-more'),null);
 });
 await check('common blockers appear once while unique task blockers stay in their row',async()=>{
  const configure=base=>{base.project.nodes[4].status='in_progress';base.project.nodes[4].tasks=[{id:'a',title:'甲工作',status:'in_progress',owner_id:'ou_anna',execution_blockers:['行政公務證明尚未齊備','甲工作待核對']},{id:'b',title:'乙工作',status:'pending',owner_id:'ou_anna',execution_blockers:['行政公務證明尚未齊備']}];};
  for(const tab of ['overview','flow']){await mount({enabled:false,tab,node:'node_control',configure});const text=document.querySelector('.project-detail').textContent;assert.equal(text.split('行政公務證明尚未齊備').length-1,1);assert.match(document.querySelector('[data-assignment-task=a]').textContent,/甲工作待核對/);}
  await mount({enabled:false,tab:'overview',node:'node_control',configure(base){base.project.status='paused'}});assert.equal(document.querySelector('.project-overview').textContent.split('案件暫停中，等待林安娜處理。').length-1,1);
+});
+await check('overflow keyboard Escape and modal cancellation return focus to the live summary',async()=>{
+ await mount({enabled:false,node:'node_control'});await more();const summary=document.querySelector('.pf-more>summary');button('指派負責人').focus();await click(button('指派負責人'));await act(async()=>{document.querySelector('[role=dialog]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});assert.equal(document.activeElement,summary);
+ await mount({node:'control'});await more();const remoteSummary=document.querySelector('.pf-more>summary');button('指派負責人').focus();await click(button('指派負責人'));await click(button('取消'));assert.equal(document.activeElement,remoteSummary);
+ await more();button('新增任務').focus();await click(button('新增任務'));await act(async()=>{document.querySelector('.ne-form').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});assert.equal(document.querySelector('.ne-form'),null);assert.equal(document.activeElement,remoteSummary);
+});
+await check('empty blocked stages explain the disabled action once inside the empty state',async()=>{
+ for(const tab of ['overview','flow'])for(const system of ['meegle','pending','workbench']){
+  await mount({enabled:false,tab,node:'node_control',configure(base){base.workspace.environment='staging';base.project.execution_allowed=false;base.project.execution_system=system;base.project.execution_readonly_reason='測試：本案暫不可執行。';base.project.nodes[4].tasks=[];}});
+  const empty=document.querySelector('#flow-tasks .pf-empty');assert.ok(empty.querySelector('button:disabled'));assert.match(empty.textContent,/測試：本案暫不可執行/);assert.equal(document.querySelectorAll('#flow-tasks>.st-note').length,0);assert.equal(document.querySelector('.project-detail').textContent.split('測試：本案暫不可執行。').length-1,1);
+ }
+});
+await check('populated legacy flow does not repeat the disabled primary execution reason in a banner',async()=>{
+ for(const system of ['meegle','pending']){
+  await mount({enabled:false,node:'node_control',configure(base){base.workspace.environment='staging';base.project.execution_allowed=false;base.project.execution_system=system;base.project.execution_readonly_reason='測試執行限制';base.project.nodes[4].tasks=[{id:'a',title:'甲',status:'pending',owner_id:'ou_anna',comments:[]}];}});
+  assert.equal(document.querySelector('.project-detail').textContent.split('測試執行限制').length-1,1);assert.equal(document.querySelector('#flow-tasks>.st-note'),null);
+ }
+});
+await check('sidebar executors include current and started stages only, with whole-name elements',async()=>{
+ await mount({enabled:false,tab:'overview',node:'node_control',configure(base){base.workspace.users.push({id:'current',name:'目前執行者'},{id:'past',name:'已啟動執行者'},{id:'future',name:'未啟動執行者'});for(const [index,id,status] of [[3,'past','completed'],[4,'current','in_progress'],[5,'future','pending']])base.project.nodes[index].tasks=[{id,owner_id:id,title:id,status,comments:[]}];}});
+ assert.deepEqual([...document.querySelectorAll('.po-executors>span')].map(e=>e.textContent),['已啟動執行者','目前執行者']);
+});
+await check('local SOP node forms return focus to the overflow summary on Escape and cancel',async()=>{
+ await act(async()=>root.unmount());root=createRoot(document.getElementById('root'));
+ const actions={assign:{visible:true,enabled:true,disabledReason:''},complete:{visible:false},reject:{visible:true,enabled:true,disabledReason:''}};
+ for(const id of ['claim','create_task','approve','legacy_complete'])actions[id]={visible:false};
+ const props={workbench:{local:{key:'control',revision:1,ownerId:'ou_anna'},actions},sop:{assignees:[{id:'ou_anna',name:'林安娜'}],current:()=>true},projectId:'p1'};
+ await act(async()=>{root.render(React.createElement(ui.LocalNodeActions,props));await tick()});await more();const summary=document.querySelector('.pf-more>summary');button('指派負責人').focus();await click(button('指派負責人'));await click(button('取消'));assert.equal(document.activeElement,summary);
+ await more();button('退回節點').focus();await click(button('退回節點'));await act(async()=>{document.querySelector('.nw-local-form').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await tick()});assert.equal(document.querySelector('.nw-local-form'),null);assert.equal(document.activeElement,summary);
 });
 await act(async()=>root.unmount());assert.deepEqual(failures,[]);

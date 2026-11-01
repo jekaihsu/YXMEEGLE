@@ -6,7 +6,7 @@ import {canWriteDispatch} from './dispatchAccess';
 import {DetailsMenu} from './design/DetailsMenu';
 import {withLocalChecklist,buildNodeWorkbench,localCase} from './nodeWorkbenchModel';
 import {LocalNodeActions} from './LocalNodeActions';
-import {safeUrl} from './appCommon';
+import {safeUrl,isProjectLead} from './appCommon';
 import {createPortal} from 'react-dom';
 import {lazy,Suspense,useEffect,useRef,useState,type MutableRefObject,type ReactNode} from 'react';
 import {Button,Skeleton} from './design';
@@ -93,12 +93,13 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
     {read.state.kind!=='ready' && !plan && selected.assignment?.evidence && <NodeWorkItems node={selected.assignment} projectId={p.id} onRetryEvidence={read.state.kind==='error' ? read.retry : undefined}/>}
     {!category && selected.gaps.filter(g=>g!==selected.quantity.reason).length>0 && <div className="pf-node-gaps"><h3>此節點待補</h3>{selected.gaps.filter(g=>g!==selected.quantity.reason).map((g,i)=><p key={i}>{g}</p>)}</div>}
    </div></details>;
+ const nodeActions=workbench.local ? <LocalNodeActions workbench={workbench} sop={sopTasks} projectId={p.id}/> : detail ? <FlowNodeActions key={selected.key} detail={detail} busy={nodeBusy} reason={nodeBusy||!list?.writes_enabled?reason:''} error={assignments.error} mutate={assignments.mutate} registry={workbench.actions} /> : !isLegacy && !!selected.assignment && assignments.state.kind==='ready' && !details.errors[selected.key] ? <Skeleton height="3rem"/> : null;
  const nodeDetail=<div className="pf-stage-detail">
    <header><div className="pf-panel-tools">{safeUrl(p.source_url)&&<a className="button" href={p.source_url} target="_blank" rel="noreferrer">開啟案件來源</a>}{inline&&enabled&&<SopControls sop={sop}/>} {!nodeLoading&&category&&canWriteDispatch(c.s)&&<Suspense fallback={<Skeleton width="4rem"/>}><FlowSchedule key={selected.key} project={p} node={selected} session={c.s} onPublished={()=>{void assignments.reload()}}/></Suspense>}{list && <DetailsMenu className="pf-attention-menu" label="需要我處理"><div className="pf-attention" aria-label="需要我處理">{model.nodes.filter(n=>needsViewerAction(n,list,c.s.user?.id || '')).map(n=><Button key={n.key} onClick={()=>select(n.key)}>{n.label} · {n.state==='待審核' ? '待審核' : !n.owners.length ? '待認領' : '待處理'}</Button>)}</div></DetailsMenu>}</div></header>
    {(selected.assignment?.approver||selected.assignment?.legacy_completion)&&<dl className="pf-facts">{selected.assignment.approver&&<div><dt>核准人</dt><dd>{selected.assignment.approver.name}</dd></div>}{selected.assignment.legacy_completion&&<div><dt>舊案直接完成</dt><dd>{selected.assignment.legacy_completion.actor.name} · {taipeiTime(selected.assignment.legacy_completion.at)}<small>{selected.assignment.legacy_completion.reason}</small></dd></div>}</dl>}
    {selected.assignment?.auto_done && <p className="pg-callout">自動判定 · {selected.assignment.auto_done.reason}</p>}
-   {isLegacy&&!workbench.local&&legacyActions}
-   {workbench.local ? <LocalNodeActions workbench={workbench} sop={sopTasks} projectId={p.id}/> : detail ? <FlowNodeActions key={selected.key} detail={detail} busy={nodeBusy} reason={nodeBusy||!list?.writes_enabled?reason:''} error={assignments.error} mutate={assignments.mutate} registry={workbench.actions} /> : !isLegacy && !!selected.assignment && assignments.state.kind==='ready' && !details.errors[selected.key] ? <Skeleton height="3rem"/> : null}
+   {isLegacy&&!workbench.local&&selected.taskRows.length>0&&legacyActions}
+   {selected.taskRows.length>0&&nodeActions}
    {!loading && !workbench.local && !isLegacy && !selected.assignment && <p className="pf-empty">尚無節點指派</p>}
 
    </div>;
@@ -106,12 +107,10 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
  const canSetup=!!sopData?.allowed.import&&managedNodes.some(key=>key===selected.key);
  const showSetup=!inline&&sopData?.allowed.import&&isSopNode(selected.key)&&managedNodes.includes(selected.key)&&!workbench.local?.disabledReason&&defaultChecklistState(sopData)==='not-applied';
  const tasks=<div className="pf-stage-tasks">
-   {inline&&!taskLoading&&!selected.taskRows.length&&detail?.can.create_task&&<Button disabled={busy} disabledReason={reason} onClick={()=>setCreating(true)}>新增任務</Button>}
    {creating&&detail&&<TaskCreator detail={detail} busy={busy} error={assignments.error} onCancel={()=>setCreating(false)} onSubmit={async task=>{const ok=await assignments.mutate({action:'create_task',nodeKey:selected.key,task});if(ok)setCreating(false)}}/>}
    {showSetup&&<p role="status">預設清單尚未套用<Button onClick={()=>{if(isSopNode(selected.key))setSopImport(selected.key)}}>匯入預設任務</Button></p>}
-   {inline&&!selected.taskRows.length&&!selected.assignment&&!workbench.local&&emptyActions}
    {Object.entries(details.errors).map(([key,error])=><p role="alert" key={key}>{model.nodes.find(n=>n.key===key)?.label}任務明細讀取失敗。{error}<Button onClick={details.retry}>重試任務明細</Button></p>)}
-   {<FlowTasks c={c} p={p} ctx={stage} details={details.details} assignments={assignments} busy={busy} reason={reason} loading={taskLoading} incomplete={taskIncomplete} retryDetails={details.retry} evidence={inline?null:evidence} reopened={reopened}>{inline?<SopTasks overview emptyOverview={!selected.taskRows.length} c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>:canSetup&&selected.assignment&&<SopTools open={sopOpen}><SopTasks setupNotice={false} remote c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/></SopTools>}</FlowTasks>}
+   {<FlowTasks c={c} p={p} ctx={stage} details={details.details} assignments={assignments} busy={busy} reason={reason} loading={taskLoading} incomplete={taskIncomplete} retryDetails={details.retry} evidence={inline?null:evidence} reopened={reopened} caseReasonShown={!inline&&isLegacy&&!workbench.local&&(isProjectLead(c.s,p)||selected.legacy?.owner_id===c.s.user?.id)} emptyActions={inline ? detail?.can.create_task ? <div className="nw-actions"><Button variant="primary" disabled={busy} disabledReason={reason} onClick={()=>setCreating(true)}>新增任務</Button></div> : !selected.assignment&&!workbench.local ? emptyActions : null : isLegacy&&!workbench.local ? legacyActions : nodeActions}>{inline?<SopTasks overview emptyOverview={!selected.taskRows.length} c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/>:canSetup&&selected.assignment&&<SopTools open={sopOpen}><SopTasks setupNotice={false} remote c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/></SopTools>}</FlowTasks>}
    {!inline&&canSetup&&!selected.assignment&&<SopTools open={sopOpen}><SopTasks setupNotice={false} c={c} p={p} nodeKey={selected.key} sop={sopTasks} importing={sopImport} setImporting={setSopImport}/></SopTools>}
    </div>;
  return <div id="flow-top" className="project-flow">
@@ -126,8 +125,8 @@ export function ProjectFlow({c,p,assignments,selectedKey,secondary,legacyActions
   <section id="flow-selected" className="pf-panel glass--card nw-selected" aria-label={`${selected.label}節點明細`} aria-busy={loading} tabIndex={-1}>
    {inline?tasks:<>{nodeDetail}{tasks}</>}
   </section>
+  {!inline&&<div className="pf-stage-secondary">{secondary}</div>}
   </div>
-  {!inline&&secondary}
 
   {report && createPortal(<ProgressDetail caseKey={report.case_key} dept={report.dept} week={report.week} onClose={()=>setReport(null)}/>,document.body)}
  </div>;

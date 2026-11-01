@@ -20,3 +20,5 @@
 .project-flow .pf-actions button,.project-flow .pf-filters button,.project-flow .pf-node-actions button,.project-overview .button,.project-overview .ds-button{min-height:44px}
 .project-overview a{display:inline-flex;align-items:center;min-height:44px}
 .project-overview .po-kpi,.project-overview .po-documents a{display:flex}
+
+.nw-actions .disabled-action-reason{white-space:normal;overflow:visible;text-overflow:clip}

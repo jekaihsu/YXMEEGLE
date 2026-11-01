@@ -17,12 +17,12 @@ import {sharedBlockerReasons,STAGE_FILTERS,STAGE_FILTER_LABELS,activeFilters,blo
 import {prefetchNodeAssignmentDetail,type useNodeAssignments} from './useNodeAssignments';
 import {assignRequests} from './assignRequests';
 
-type Props={c:Ctx;p:Project;ctx:StageContext;details:Record<string,NodeAssignmentDetail>;assignments:ReturnType<typeof useNodeAssignments>;busy:boolean;reason:string;loading:boolean;incomplete:boolean;retryDetails:()=>void;evidence:ReactNode;reopened?:MutableRefObject<string>;children?:ReactNode};
+type Props={c:Ctx;p:Project;ctx:StageContext;details:Record<string,NodeAssignmentDetail>;assignments:ReturnType<typeof useNodeAssignments>;busy:boolean;reason:string;loading:boolean;incomplete:boolean;retryDetails:()=>void;evidence:ReactNode;emptyActions?:ReactNode;caseReasonShown?:boolean;reopened?:MutableRefObject<string>;children?:ReactNode};
 
 function Executor({row}:{row:TaskView}){
  return row.flags.unassigned ? <span className="st-unassigned"><TriangleAlert size={14} aria-hidden="true"/>尚未指派</span> : <span>{row.owner}</span>;
 }
-export function FlowTasks({c,p,ctx,details,assignments,busy,reason,loading,incomplete,retryDetails,evidence,reopened,children}:Props){
+export function FlowTasks({c,p,ctx,details,assignments,busy,reason,loading,incomplete,retryDetails,evidence,emptyActions,caseReasonShown,reopened,children}:Props){
  const filters=taskFilters(c.route),applied=activeFilters(filters),userId=c.s.user?.id||'';
  const hasFilters=(ctx.nodes.find(n=>n.key===ctx.selectedId)?.taskRows.length||0)>4||applied.length>0;
  const [assigning,setAssigning]=useState<{nodeKey:string;taskId:string}|null>(null);
@@ -67,7 +67,7 @@ export function FlowTasks({c,p,ctx,details,assignments,busy,reason,loading,incom
  const drawerTask=drawerDetail?.tasks.find(t=>t.id===assigning?.taskId);
  return <section id="flow-tasks" className="pf-tasks st-tasks" aria-label="流程任務列表" tabIndex={-1}>
   <header><h3>本階段任務</h3>{!!selected?.total&&<span className="st-count" role="status">{incomplete?`${selected.rows.length} 項已載入，來源未完整`:`已完成 ${selected.done} / ${selected.total} 項`}</span>}</header>
-  {c.route.tab!=='overview'&&(!executionAllowed(p,c.w)||p.status==='paused')&&<p className="st-note" role="status">{p.status==='paused'?`案件暫停中，等待${p.pm_id?nameOf(c.w,p.pm_id):'PM'}處理。`:executionReason(p)}</p>}
+  {!emptyActions&&!(caseReasonShown&&!executionAllowed(p,c.w))&&c.route.tab!=='overview'&&(!executionAllowed(p,c.w)||p.status==='paused')&&<p className="st-note" role="status">{p.status==='paused'?`案件暫停中，等待${p.pm_id?nameOf(c.w,p.pm_id):'PM'}處理。`:executionReason(p)}</p>}
   {sharedReasons.filter(r=>!caseReason||(!r.includes(caseReason)&&!caseReason.includes(r))).map(reason=><p key={reason} className="st-note" role="status">{reason}</p>)}
   {selected&&selected.loaded&&!incomplete&&selected.rows.length!==selected.total&&<p className="st-note" role="status">列表載入 {selected.rows.length} 項，與節點總數 {selected.total} 項不一致，請重新整理後再確認。</p>}
   {hasFilters&&<div className="pf-filters" role="group" aria-label="任務篩選"><Button aria-pressed={applied.length===0} onClick={clear}>全部</Button><Button aria-pressed={filters.mine} onClick={()=>filterRoute('mine')}>我的任務</Button><DetailsMenu className="st-filter-menu" label="篩選"><div>{STAGE_FILTERS.filter(k=>k!=='mine').map(key=><Button key={key} aria-pressed={filters[key]} onClick={()=>filterRoute(key)}>{STAGE_FILTER_LABELS[key]}</Button>)}</div></DetailsMenu></div>}
@@ -76,7 +76,7 @@ export function FlowTasks({c,p,ctx,details,assignments,busy,reason,loading,incom
   {incomplete&&<p role="alert">任務來源暫不可用，請重試明細後再確認完整清單。<Button onClick={retryDetails}>重試任務明細</Button></p>}
   {loading&&<div aria-label="任務載入中" aria-busy="true"><Skeleton lines={3} height="3.5rem"/></div>}
   <ul className="pf-task-list">{shown.map(row=>rowView(row,selected!))}</ul>
-  {!loading&&!incomplete&&selected&&selected.loaded&&!shown.length&&<p className="pf-empty">{selected.rows.length?'沒有符合條件的任務':`此階段尚無任務${!isProjectLead(c.s,p)&&p.pm_id?' · PM：'+nameOf(c.w,p.pm_id):''}`}{selected.rows.length>0&&<Button variant="plain" onClick={clear}>清除篩選</Button>}</p>}
+  {!loading&&!incomplete&&selected&&selected.loaded&&!shown.length&&<div className="pf-empty">{selected.rows.length?'沒有符合條件的任務':`此階段尚無任務${!isProjectLead(c.s,p)&&p.pm_id?' · PM：'+nameOf(c.w,p.pm_id):''}`}{selected.rows.length>0&&<Button variant="plain" onClick={clear}>清除篩選</Button>}{!selected.rows.length&&emptyActions}</div>}
   {targetRow&&!ctx.currentIds.includes(targetRow.nodeKey)&&ctx.currentIds.length>0&&<p className="st-note" role="status">此任務屬於「{ctx.nodes.find(n=>n.key===targetRow.nodeKey)?.label}」階段，不是目前階段「{ctx.nodes.find(n=>n.key===ctx.currentIds[0])?.label}」；開啟連結不會變更活動階段。</p>}
   {pinned&&<p className="st-note" role="status">這項任務不符合目前的篩選條件，因連結指向它而保留顯示。</p>}
   {!seed&&evidence}

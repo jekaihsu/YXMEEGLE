@@ -10,3 +10,5 @@
 
 
 .st-meta .ds-badge{border-radius:6px;background:var(--surface-2);color:var(--label-2)}.st-task-blocker{display:block;color:var(--label-2);margin-top:6px}.project-detail{padding-bottom:100px}.po-stage-scroll button{min-width:44px;min-height:44px}
+
+@media(min-width:821px){.pf-stage-workspace{grid-template-rows:auto 1fr}.pf-stage-workspace>.pf-stage-nav{grid-column:1;grid-row:1 / 3}.pf-stage-workspace>.pf-panel{grid-column:2;grid-row:1}.pf-stage-secondary{grid-column:2;grid-row:2;min-width:0}}
