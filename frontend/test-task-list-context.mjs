@@ -75,10 +75,19 @@ assert.equal(stage().value,'all','bare Files keeps every stage');
 
 
 await mount('view=project&project=p1&tab=flow&node=node_sales&task=sales-0',{actor:{id:'ou_guest',name:'訪客',role:'member',department:'',avatar:'',capabilities:[]}});
-assert.equal(document.getElementById('task-editor-readonly').textContent,'需由案件 PM 或節點負責人編輯','read-only actor sees the permission reason');
+assert.equal(document.querySelector('.nw-task-editor'),null,'a viewer without assign rights never gets an editor');
+assert.equal(button('編輯'),undefined,'a viewer without assign rights gets no 編輯 button');
+assert.doesNotMatch(document.querySelector('.task-drawer').textContent,/需由案件 PM 或節點負責人編輯|已排定期限須申請展延/);
 await mount('view=project&project=p1&tab=flow&node=node_sales&task=sales-0');
+assert.equal(document.querySelector('.nw-task-editor'),null,'the editor is not mounted until 編輯 is pressed');
+await click(button('編輯'));
 assert.equal(document.querySelector('[aria-label="任務名稱"]').disabled,false);
-assert.equal(document.getElementById('task-editor-due-reason').textContent,'已排定期限須申請展延');
+assert.equal(document.querySelector('[aria-label="任務期限"]'),null,'a scheduled deadline is shown, not offered as a locked input');
+assert.equal(document.getElementById('task-editor-due-reason'),null);
+assert.doesNotMatch(document.querySelector('.task-drawer').textContent,/已排定期限須申請展延|需由案件 PM 或節點負責人編輯/);
+assert.equal(document.querySelector('select[aria-label="任務狀態"]'),null,'the single-option status select is gone');
+await click(button('取消'));
+assert.equal(document.querySelector('.nw-task-editor'),null,'取消 returns to the view');
 
 await mount('view=project&project=p1&tab=flow&section=all-tasks&task_filters=overdue&node=node_sales&task=sales-0');
 await click(document.querySelector('[aria-label="關閉"]'));
