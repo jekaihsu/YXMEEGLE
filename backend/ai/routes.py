@@ -1,3 +1,4 @@
+import anyio
 """Authenticated AI endpoints; provider substitution lives on app.state."""
 import asyncio
 import json
@@ -196,11 +197,15 @@ def register(app, *, identity, sessions, cfg):
             except BaseException:
                 release()
                 raise
+        generation = None
         try:
             generation = await run_in_threadpool(ledger.conversation_generation, sessions, data['wid'], user['id'], body.conversation_id)
             run = ChatRun(app, body, data, user, models[body.model], adapter, release, generation)
         except BaseException:
             release()
+            if generation is not None:
+                with anyio.CancelScope(shield=True):
+                    await run_in_threadpool(ledger.release_conversation, sessions, data['wid'], user['id'], body.conversation_id)
             raise
         run.started = started
         run.project_context = context

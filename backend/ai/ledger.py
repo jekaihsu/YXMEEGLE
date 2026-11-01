@@ -8,7 +8,7 @@ import logging
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text, CheckConstraint, func, select, case, and_, or_, delete, inspect
+from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text, CheckConstraint, func, select, case, and_, or_, delete, update, inspect
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.schema import CreateColumn
 from ..models import Base
@@ -63,25 +63,33 @@ class AiConversationGeneration(Base):
     actor_id = Column(String(120), primary_key=True)
     conversation_id = Column(String(120), primary_key=True)
     generation = Column(Integer, nullable=False, default=0)
+    active_runs = Column(Integer, nullable=False, default=0, server_default='0')
 
 
-def lock_generation(db, workspace_id, actor_id, conversation_id, *, deleted=False):
+def lock_generation(db, workspace_id, actor_id, conversation_id, *, starting=False):
     if db.get_bind().dialect.name == 'postgresql':
         from sqlalchemy.dialects.postgresql import insert
     else:
         from sqlalchemy.dialects.sqlite import insert
     table = AiConversationGeneration
     statement = insert(table).values(workspace_id=workspace_id, actor_id=actor_id,
-        conversation_id=conversation_id, generation=1 if deleted else 0)
+        conversation_id=conversation_id, generation=0, active_runs=1 if starting else 0)
     statement = statement.on_conflict_do_update(
         index_elements=['workspace_id', 'actor_id', 'conversation_id'],
-        set_={'generation': table.generation + (1 if deleted else 0)})
+        set_={'active_runs': table.active_runs + (1 if starting else 0)})
     return db.scalar(statement.returning(table.generation))
 
 
 def conversation_generation(sessions, workspace_id, actor_id, conversation_id):
     with sessions.begin() as db:
-        return lock_generation(db, workspace_id, actor_id, conversation_id)
+        return lock_generation(db, workspace_id, actor_id, conversation_id, starting=True)
+
+
+def release_conversation(sessions, workspace_id, actor_id, conversation_id):
+    with sessions.begin() as db:
+        table = AiConversationGeneration
+        db.execute(update(table).where(table.workspace_id == workspace_id, table.actor_id == actor_id,
+            table.conversation_id == conversation_id, table.active_runs > 0).values(active_runs=table.active_runs - 1))
 
 
 def stores_content(cfg):
@@ -135,6 +143,12 @@ def cleanup_content(sessions, retention_days):
                 if not ids:
                     break
                 db.execute(delete(AiExchangeRow).where(AiExchangeRow.usage_id.in_(ids)))
+        with sessions.begin() as db:
+            g, u, e = AiConversationGeneration, AiUsageRow, AiExchangeRow
+            retained = select(u.id).join(e, e.usage_id == u.id).where(
+                u.workspace_id == g.workspace_id, u.actor_id == g.actor_id,
+                u.conversation_id == g.conversation_id).exists()
+            db.execute(delete(g).where(g.active_runs == 0, ~retained))
         with _cleanup_lock:
             _last_cleanup = monotonic()
     finally:
@@ -357,6 +371,9 @@ def column_ddl(name, dialect):
 def ensure_schema(engine):
     """Create the AI tables and add columns introduced after a table first shipped; create_all never alters existing tables."""
     Base.metadata.create_all(engine, tables=[AiConversationGeneration.__table__, AiUsageRow.__table__, AiFeedbackRow.__table__, AiExchangeRow.__table__], checkfirst=True)
+    with engine.begin() as connection:
+        if 'active_runs' not in {c['name'] for c in inspect(connection).get_columns('ai_conversation_generation')}:
+            connection.exec_driver_sql('ALTER TABLE ai_conversation_generation ADD COLUMN active_runs INTEGER NOT NULL DEFAULT 0')
     for name in ADDED_USAGE_COLUMNS:
         with engine.begin() as connection:
             if name in {c['name'] for c in inspect(connection).get_columns('ai_usage')}:
@@ -446,7 +463,9 @@ def conversation(sessions, workspace_id, actor_id, conversation_id, *, content_e
 
 def delete_conversation(sessions, workspace_id, actor_id, conversation_id):
     with sessions.begin() as db:
-        lock_generation(db, workspace_id, actor_id, conversation_id, deleted=True)
+        g = AiConversationGeneration
+        db.execute(update(g).where(g.workspace_id == workspace_id, g.actor_id == actor_id,
+            g.conversation_id == conversation_id).values(generation=g.generation + 1))
         ids = select(AiUsageRow.id).where(AiUsageRow.workspace_id == workspace_id,
             AiUsageRow.actor_id == actor_id, AiUsageRow.conversation_id == conversation_id)
         db.execute(delete(AiExchangeRow).where(AiExchangeRow.usage_id.in_(ids),

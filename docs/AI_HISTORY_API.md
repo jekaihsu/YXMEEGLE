@@ -66,3 +66,5 @@ Stat example.
 ## Completion visibility
 
 The server finishes the ledger write before emitting SSE `done`. With content storage enabled and a successful write, the exchange is committed and queryable when the client receives `done`; clients may refresh history immediately. Disabled storage, retention, deletion, or a database write failure can leave no content. A deletion increments a server-side generation for this caller and conversation. Runs started before that deletion retain usage accounting but cannot restore content, including after cancellation. A newly started run may reuse the ID.
+
+Conversation deletion updates existing generation rows and returns 204 for unknown IDs without inserting rows. Generation rows count active runs across workers. Retention cleanup removes rows with no active runs and no retained exchanges. A process crash can leave an active-run count behind; cleanup keeps that fence rather than risk restoring deleted content.

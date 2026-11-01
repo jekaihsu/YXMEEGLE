@@ -142,3 +142,31 @@ def test_generation_failure_releases_slot_and_runs_in_worker(app, client, monkey
             client.post('/api/ai/chat', json=BODY)
     assert events(client.post('/api/ai/chat', json=BODY))[-1]['type'] == 'done'
     assert event_threads[0] not in workers
+
+
+def test_unknown_delete_does_not_create_generations(app, client):
+    from .ai.ledger import AiConversationGeneration
+    for i in range(5):
+        assert client.delete(f'/api/ai/conversations/unknown-{i}').status_code == 204
+    with app.state.sessions() as db:
+        assert db.scalars(select(AiConversationGeneration)).all() == []
+
+
+def test_cleanup_preserves_active_fence_then_prunes(app, client, monkeypatch):
+    from .ai import ledger
+    uid = ask(app, client, 'expired')
+    with app.state.sessions() as db:
+        usage = db.get(AiUsageRow, uid)
+        key = (usage.workspace_id, usage.actor_id, usage.conversation_id)
+    generation = ledger.conversation_generation(app.state.sessions, *key)
+    ledger.delete_conversation(app.state.sessions, *key)
+    monkeypatch.setattr(ledger, '_last_cleanup', None)
+    ledger.cleanup_content(app.state.sessions, 0)
+    with app.state.sessions() as db:
+        row = db.get(ledger.AiConversationGeneration, key)
+        assert row.generation != generation and row.active_runs == 1
+    ledger.release_conversation(app.state.sessions, *key)
+    monkeypatch.setattr(ledger, '_last_cleanup', None)
+    ledger.cleanup_content(app.state.sessions, 0)
+    with app.state.sessions() as db:
+        assert db.get(ledger.AiConversationGeneration, key) is None
