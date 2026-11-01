@@ -88,6 +88,19 @@ test('Lark editor takes focus on 編輯 and returns it to 編輯 on cancel',asyn
  assert.ok(document.activeElement===edit(),'focus is back on 編輯');
 });
 
+test('Lark editor with only the assign right focuses the assignee picker on 編輯',async()=>{
+ globalThis.fetch=async()=>response([]);
+ root=createRoot(document.getElementById('root'));
+ const task=assignmentFixture().detail.tasks[0];
+ await act(async()=>root.render(React.createElement(ui.AssignmentTaskInspector,{assignment:{...task,can:{edit_status:false,cancel:false,assign:true,claim:false,edit_details:false}},people:[],nodeLabel:'控制',nodeKey:'control',busy:false,reason:'',mutate:async()=>true,onClose:()=>{}})));
+ const edit=()=>[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='編輯');
+ await click(edit());
+ assert.equal(document.querySelector('form [aria-label="任務名稱"]'),null,'the locked title field is hidden');
+ assert.ok(document.activeElement===document.querySelector(`form [aria-label="task: ${task.title}"]`),'the assignee picker button has focus, not BODY');
+ await click([...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='取消'));
+ assert.ok(document.activeElement===edit(),'cancel returns focus to 編輯');
+});
+
 test('Lark task sheet is view-first with real title, known facts only and no source jargon',async()=>{
  globalThis.fetch=async()=>response([]);
  root=createRoot(document.getElementById('root'));

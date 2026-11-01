@@ -1,8 +1,8 @@
 import {useEffect,useRef} from 'react';
 
-const FIELDS='input:not([disabled]):not([type="hidden"]),textarea:not([disabled]),select:not([disabled])';
+const FIELDS='input:not([disabled]):not([type="hidden"]),textarea:not([disabled]),select:not([disabled]),button:not([disabled])';
 
-/** Moves focus to the first editable field once, when an editor that replaced the read-only view mounts. */
+/** Moves focus to the first enabled control (field, or the assignee picker button when it is the only one) once, when an editor that replaced the read-only view mounts. */
 export function useFocusFirstField<T extends HTMLElement>(enabled:boolean){
  const ref=useRef<T>(null);
  useEffect(()=>{if(enabled)ref.current?.querySelector<HTMLElement>(FIELDS)?.focus()},[]);
