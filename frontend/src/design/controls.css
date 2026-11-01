@@ -154,5 +154,4 @@ input::-webkit-calendar-picker-indicator:hover{opacity:1}
 
 @layer controls{
 .assistant-composer textarea:is(:enabled,:disabled,:hover,:focus,:focus-visible){border:0;outline:none;box-shadow:none;background:transparent;min-height:0}
-.assistant-composer:has(textarea:focus-visible){box-shadow:0 0 0 2px color-mix(in srgb,var(--focus-ring) 18%,transparent)}
 }

@@ -88,7 +88,14 @@ const assistantCss=await fs.readFile(new URL('./src/Assistant.css',import.meta.u
 const controlsCss=await fs.readFile(new URL('./src/design/controls.css',import.meta.url),'utf8');
 assert.doesNotMatch(assistantCss,/\.assistant-composer:focus-within\{border-color/,'composer does not gain a heavy focus border');
 assert.match(controlsCss,/\.assistant-composer textarea:is\(:enabled,:disabled,:hover,:focus,:focus-visible\)\{border:0;outline:none;box-shadow:none/,'controls layer keeps the textarea frameless');
-assert.match(controlsCss,/\.assistant-composer:has\(textarea:focus-visible\)\{box-shadow:0 0 0 2px color-mix/,'keyboard focus has a subtle outer cue');
+for(const css of [assistantCss,controlsCss]){
+ for(const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)){
+  for(const selector of [rule[1]]){
+   if(/\.assistant-composer(?=[:\s.#>+~]|$)/.test(selector)&&/:focus/.test(selector)&&!/\.assistant-composer\s+textarea/.test(selector))
+    assert.doesNotMatch(rule[2],/(?:border(?:-[a-z-]+)?|box-shadow)\s*:/,'composer focus rules must not change border or shadow');
+  }
+ }
+}
 window.matchMedia=()=>({matches:true});viewport.scrollTop=0;await flush(()=>viewport.dispatchEvent(new window.Event('scroll')));await flush(()=>scrollButton.click());assert.equal(scrollTarget.behavior,'auto','reduced motion scrolls without animation');delete window.matchMedia;
 assert.equal(document.querySelectorAll('.assistant-message img').length,0,'markdown images render no image element');
 assert.match(document.body.textContent,/private alt/);
@@ -167,3 +174,5 @@ for(const body of [{code:'ai_forbidden'}]){
 }
 dom.window.close();
 console.log('Assistant passed: UTF-8/chunk boundaries, CRLF/multiline/trailing SSE, abort, tools, errors, session expiry, persistence, disabled models, suggestions and lazy route.');
+
+await import('./scripts/test-assistant-focus.mjs');

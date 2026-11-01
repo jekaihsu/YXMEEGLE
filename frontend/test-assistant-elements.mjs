@@ -6,7 +6,7 @@ import React,{act} from 'react';
 import {Simulate} from 'react-dom/test-utils';
 import {createRoot} from 'react-dom/client';
 import {useLocalRuntime,AssistantRuntimeProvider} from '@assistant-ui/react';
-const bundle=await build({stdin:{contents:"export {createFeedbackController} from './src/assistant/feedback';export {readEvents} from './src/assistant/stream';export {createChatAdapter} from './src/assistant/runtime';export {fixtureSSE,fixtureDisplays,fixtureEvents} from './src/assistant/fixtures';export {DataTable} from './src/assistant/elements/DataTable';export {Chart} from './src/assistant/elements/Chart';export {default as Assistant} from './src/Assistant';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
+const bundle=await build({stdin:{contents:"export {createFeedbackController} from './src/assistant/feedback';export {readEvents} from './src/assistant/stream';export {createChatAdapter} from './src/assistant/runtime';export {fixtureSSE,fixtureDisplays,fixtureEvents} from './src/assistant/fixtures';export {DataTable} from './src/assistant/elements/DataTable';export {Chart} from './src/assistant/elements/Chart';export {isDisplay} from './src/assistant/elements/types';export {ToolResult} from './src/assistant/ToolResult';export {default as Assistant} from './src/Assistant';",resolveDir:import.meta.dirname},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',packages:'external',loader:{'.css':'empty'}});
 const path=new URL('./.assistant-elements-test.mjs',import.meta.url);await fs.writeFile(path,bundle.outputFiles[0].text);
 let ui;try{ui=await import(path.href)}finally{await fs.unlink(path)}
 const stream=(text,width=7)=>new ReadableStream({start(c){const b=new TextEncoder().encode(text);for(let i=0;i<b.length;i+=width)c.enqueue(b.slice(i,i+width));c.close()}});
@@ -18,7 +18,7 @@ const chartCaveats={...ui.fixtureDisplays.case_progress[0],caption:'截至 09:30
 const tool=displays=>({type:'tool',id:'t',name:'case_progress',label:'查詢',status:'done',displays});
 const sse=events=>events.map(event=>`data: ${JSON.stringify(event)}\n\n`).join('');
 assert.deepEqual(await collect(ui.readEvents(stream(sse([tool([chartCaveats])])),new AbortController().signal)),[tool([chartCaveats])]);
-for(const display of [{...ui.fixtureDisplays.search_cases[0],rows:[{x:{private:true}}]},{...chartCaveats,points:Array(13).fill({label:'x',value:1})},...['caption','note','truncated'].map(key=>({...chartCaveats,[key]:123}))]){
+for(const display of [{...ui.fixtureDisplays.search_cases[0],rows:[{x:{private:true}}]},{...chartCaveats,points:Array(25).fill({label:'x',value:1})},...['caption','note','truncated'].map(key=>({...chartCaveats,[key]:123}))]){
  const events=[{type:'text',delta:'已收到的回答'},tool([display,chartCaveats]),{type:'text',delta:'繼續回答'},{type:'done'}];
  assert.deepEqual(await collect(ui.readEvents(stream(sse(events)),new AbortController().signal)),[events[0],tool([chartCaveats]),events[2],events[3]]);
 }
@@ -40,6 +40,18 @@ for(const method of ['attachEvent','detachEvent','scrollIntoView','scrollTo'])wi
 globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);globalThis.cancelAnimationFrame=clearTimeout;globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 const root=createRoot(document.getElementById('root'));
 const flush=async(fn=()=>{},delay=15)=>act(async()=>{await fn();await new Promise(resolve=>setTimeout(resolve,delay))});
+const backendPoints=Array.from({length:24},(_,i)=>({label:`項目 ${i}`,value:i+1,series:'總數'}));
+for(const kind of ['bar','line','pie','stat','table']){
+ const display={kind,title:`後端 ${kind}`,result_id:'r1',as_of:'2026-11-01',limitations:[],truncated:false,...(kind==='table'?{columns:[{key:'count',label:'總數'}],rows:[{count:24}]}:{points:kind==='stat'?backendPoints.slice(0,1):backendPoints})};
+ assert.equal(ui.isDisplay(display),true,`${kind} backend display is accepted`);
+ await flush(()=>root.render(React.createElement(ui.ToolResult,{result:{displays:[display]}})));
+ assert.equal(document.querySelector('h3').textContent,display.title);
+ assert.match(document.body.textContent,kind==='stat'?/項目 0.*1/:/24/);
+ if(['bar','line','pie'].includes(kind))assert.equal(document.querySelectorAll('table tbody tr').length,24);
+ if(kind==='line')assert.ok(document.querySelector('polyline'));
+ if(kind==='pie'){assert.ok(document.querySelector('path'));assert.equal(document.querySelectorAll('svg text').length,24,'pie slices have visible numeric keys matching the labels')}
+ if(kind==='stat')assert.equal(document.querySelector('.assistant-chart-headline strong').textContent,'1');
+}
 const table={kind:'table',title:'測試表格',caption:'截至 09:30',columns:[{key:'name',label:'姓名'},{key:'count',label:'件數'}],rows:[{name:'甲',count:12},{name:'乙',count:2},{name:'丙',count:null}],truncated:true,note:'資料尚未完整'};
 await flush(()=>root.render(React.createElement(ui.DataTable,table)));
 const countSort=()=>document.querySelector('[aria-label="依件數排序"]');

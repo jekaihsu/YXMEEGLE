@@ -1,5 +1,5 @@
 // Ported from assistant-ui thread.aui and message-pair (MIT). See elements/LICENSE.assistant-ui.
-import {createContext,useContext,useCallback,useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
+import {createContext,useContext,useCallback,useEffect,useMemo,useRef,useState,type ReactNode,type MutableRefObject} from 'react';
 import {AssistantRuntimeProvider,useLocalRuntime,ThreadPrimitive,ComposerPrimitive,MessagePrimitive,ActionBarPrimitive,ErrorPrimitive,useAuiState} from '@assistant-ui/react';
 import {MarkdownTextPrimitive} from '@assistant-ui/react-markdown';
 import {ConversationHistory} from './ConversationHistory';
@@ -83,14 +83,27 @@ function MessageLog({children}:{children:ReactNode}){
  </>;
 }
 
-function Conversation({catalog,newConversation,projectId,projectLabel,compact,selected,onComplete}:AssistantChatProps&{catalog:ModelCatalog;newConversation:()=>void;selected:{id:string;detail?:ConversationDetail};onComplete:()=>void}){
+function Conversation({catalog,newConversation,projectId,projectLabel,compact,selected,onComplete,cancelResponse}:AssistantChatProps&{catalog:ModelCatalog;newConversation:()=>void;selected:{id:string;detail?:ConversationDetail};onComplete:()=>void;cancelResponse:MutableRefObject<()=>Promise<void>>}){
  const [forbidden,setForbidden]=useState(false);
  const conversation=useRef(selected.id);
- const adapter=useMemo(()=>createChatAdapter(()=>conversation.current,()=>setForbidden(true),projectId,onComplete),[]);
+ const settled=useRef<Promise<void>>(Promise.resolve());
+ const adapter=useMemo(()=>{
+  const base=createChatAdapter(()=>conversation.current,()=>setForbidden(true),projectId,onComplete);
+  return {async *run(...args:Parameters<typeof base.run>){
+   let finish!:()=>void;
+   settled.current=new Promise<void>(resolve=>{finish=resolve});
+   try{const result=base.run(...args);if(Symbol.asyncIterator in result)yield* result;else yield await result}finally{finish()}
+  }};
+ },[]);
  const runtimeRef=useRef<ReturnType<typeof useLocalRuntime>>();
  const feedback=useMemo(()=>createFeedbackController(()=>runtimeRef.current!),[]);
  const runtime=useLocalRuntime(adapter,{initialMessages:selected.detail?historyMessages(selected.detail):[],adapters:{feedback:feedback.adapter}});
  runtimeRef.current=runtime;
+ useEffect(()=>{
+  const cancel=async()=>{runtime.thread.cancelRun();await settled.current};
+  cancelResponse.current=cancel;
+  return()=>{if(cancelResponse.current===cancel)cancelResponse.current=async()=>{}};
+ },[runtime,cancelResponse]);
  useEffect(()=>{feedback.activate();return()=>{feedback.dispose();runtime.thread.cancelRun()}},[runtime,feedback]);
  const available=!forbidden&&catalog.models.some(m=>m.available);
  const input=useRef<HTMLTextAreaElement>(null);
@@ -126,6 +139,7 @@ export function AssistantChat(props:AssistantChatProps){
 }
 function AssistantChatWorkspace(props:AssistantChatProps){
  const [selected,setSelected]=useState<{id:string;detail?:ConversationDetail}>(()=>({id:crypto.randomUUID()}));
+ const cancelResponse=useRef<()=>Promise<void>>(async()=>{});
  const [revision,setRevision]=useState(0),[generation,setGeneration]=useState(0);
  const completed=useCallback(()=>setRevision(n=>n+1),[]);
  const [catalog,setCatalog]=useState<ModelCatalog|undefined>(props.catalog);
@@ -144,7 +158,7 @@ function AssistantChatWorkspace(props:AssistantChatProps){
   :<p role="status">正在載入 AI 助理…</p>}
  </div>;
  const fresh=()=>{setGeneration(n=>n+1);setSelected({id:crypto.randomUUID()})};
- return <ConversationHistory projectId={props.projectId} compact={props.compact} revision={revision} activeId={selected.id} onNew={fresh} onOpen={detail=>{setGeneration(n=>n+1);setSelected({id:detail.id,detail})}}>
-  <Conversation key={`${selected.id}:${generation}`} {...props} catalog={catalog} selected={selected} onComplete={completed} newConversation={fresh}/>
+ return <ConversationHistory projectId={props.projectId} compact={props.compact} revision={revision} activeId={selected.id} beforeDelete={()=>cancelResponse.current()} onNew={fresh} onOpen={detail=>{setGeneration(n=>n+1);setSelected({id:detail.id,detail})}}>
+  <Conversation key={`${selected.id}:${generation}`} {...props} catalog={catalog} cancelResponse={cancelResponse} selected={selected} onComplete={completed} newConversation={fresh}/>
  </ConversationHistory>;
 }

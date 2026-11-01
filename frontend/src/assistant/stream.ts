@@ -9,7 +9,9 @@ export type StreamEvent =
 export async function* readEvents(body:ReadableStream<Uint8Array>, signal:AbortSignal):AsyncGenerator<StreamEvent> {
  const reader=body.getReader(),decoder=new TextDecoder();
  let buffer='';
- const abort=()=>{void reader.cancel().catch(()=>{})};
+ let cancellation:Promise<void>|undefined;
+ const cancel=()=>cancellation??=reader.cancel().catch(()=>{});
+ const abort=()=>{void cancel()};
  signal.addEventListener('abort',abort,{once:true});
  function parse(block:string):StreamEvent|undefined {
   const data=block.split(/\r?\n/).filter(line=>line.startsWith('data:')).map(line=>line.slice(5).trimStart()).join('\n');
@@ -38,5 +40,5 @@ export async function* readEvents(body:ReadableStream<Uint8Array>, signal:AbortS
    }
    if(done){if(buffer.trim()){const event=parse(buffer);if(event)yield event}break}
   }
- }finally{signal.removeEventListener('abort',abort);await reader.cancel().catch(()=>{});reader.releaseLock()}
+ }finally{signal.removeEventListener('abort',abort);await cancel();reader.releaseLock()}
 }
