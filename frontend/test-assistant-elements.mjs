@@ -52,6 +52,21 @@ for(const kind of ['bar','line','pie','stat','table']){
  if(kind==='pie'){assert.ok(document.querySelector('path'));assert.equal(document.querySelectorAll('svg text').length,24,'pie slices have visible numeric keys matching the labels')}
  if(kind==='stat')assert.equal(document.querySelector('.assistant-chart-headline strong').textContent,'1');
 }
+const seriesPoints=[{label:'一月',value:2,series:'甲'},{label:'一月',value:8,series:'乙'},{label:'二月',value:4,series:'甲'},{label:'二月',value:6,series:'乙'}];
+await flush(()=>root.render(React.createElement(ui.Chart,{kind:'line',title:'分組',points:seriesPoints})));
+const lines=[...document.querySelectorAll('polyline')];
+assert.equal(lines.length,2,'each series has its own line');
+assert.deepEqual(lines.map(line=>line.querySelector('title').textContent),['1. 甲','2. 乙']);
+assert.deepEqual(lines.map(line=>line.getAttribute('points').split(' ').length),[2,2]);
+assert.equal(lines[0].getAttribute('points').split(',')[0],lines[1].getAttribute('points').split(',')[0],'shared labels align across series');
+assert.match(document.querySelector('.assistant-chart-legend').textContent,/1\. 甲.*2\. 乙/);
+assert.deepEqual([...document.querySelectorAll('svg text')].map(el=>el.textContent),['1','2'],'line identities are visible without color');
+await flush(()=>root.render(React.createElement(ui.Chart,{kind:'line',title:'單點',points:[seriesPoints[0]]})));
+assert.equal(document.querySelectorAll('circle').length,1,'single-point lines have a visible marker');
+assert.match(document.querySelector('circle title').textContent,/甲.*一月.*2/);
+await flush(()=>root.render(React.createElement(ui.Chart,{kind:'bar',title:'分組',points:seriesPoints})));
+assert.deepEqual([...document.querySelectorAll('rect title')].map(el=>el.textContent),['1. 甲 · 一月 · 2','2. 乙 · 一月 · 8','1. 甲 · 二月 · 4','2. 乙 · 二月 · 6']);
+assert.deepEqual([...document.querySelectorAll('svg text')].map(el=>el.textContent),['1','2','1','2']);
 const table={kind:'table',title:'測試表格',caption:'截至 09:30',columns:[{key:'name',label:'姓名'},{key:'count',label:'件數'}],rows:[{name:'甲',count:12},{name:'乙',count:2},{name:'丙',count:null}],truncated:true,note:'資料尚未完整'};
 await flush(()=>root.render(React.createElement(ui.DataTable,table)));
 const countSort=()=>document.querySelector('[aria-label="依件數排序"]');
