@@ -75,3 +75,5 @@
 .assistant-workspace:not(.assistant-workspace-compact) .assistant-thread{height:calc(100dvh - 194px)}
 @media(max-width:760px){.assistant-history-dialog{margin:auto auto 16px;max-height:80dvh}.assistant-workspace:not(.assistant-workspace-compact) .assistant-thread{min-height:340px}}
 }
+
+.assistant-chat[data-input=keyboard] .assistant-composer:focus-within{box-shadow:0 0 0 2px var(--accent)}

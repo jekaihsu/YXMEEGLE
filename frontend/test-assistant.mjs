@@ -91,8 +91,10 @@ assert.match(controlsCss,/\.assistant-composer textarea:is\(:enabled,:disabled,:
 for(const css of [assistantCss,controlsCss]){
  for(const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)){
   for(const selector of [rule[1]]){
-   if(/\.assistant-composer(?=[:\s.#>+~]|$)/.test(selector)&&/:focus/.test(selector)&&!/\.assistant-composer\s+textarea/.test(selector))
-    assert.doesNotMatch(rule[2],/(?:border(?:-[a-z-]+)?|box-shadow)\s*:/,'composer focus rules must not change border or shadow');
+   if(/\.assistant-composer(?=[:\s.#>+~]|$)/.test(selector)&&/:focus/.test(selector)&&!/\.assistant-composer\s+textarea/.test(selector)){
+    assert.doesNotMatch(rule[2],/border(?:-[a-z-]+)?\s*:/,'composer focus rules must not change border');
+    if(!selector.includes('.assistant-chat[data-input=keyboard]'))assert.doesNotMatch(rule[2],/box-shadow\s*:/,'pointer focus must preserve composer shadow');
+   }
   }
  }
 }

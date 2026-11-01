@@ -51,3 +51,12 @@ for(const[name,t]of[['light',light],['dark',dark]]){
 }
 assert.ok(Number(declaration('.ds-button:disabled','opacity'))>=.55);
 assert.equal(declaration('.ds-button:disabled','cursor'),'not-allowed');
+
+const assistant=fs.readFileSync(new URL('./src/Assistant.css',import.meta.url),'utf8');
+const ring=assistant.match(/\.assistant-chat\[data-input=keyboard\] \.assistant-composer:focus-within\{box-shadow:0 0 0 2px var\(--([a-z-]+)\)\}/);
+assert.ok(ring,'keyboard-only composer ring uses an opaque token');
+for(const [name,t] of [['light',light],['dark',dark]]){
+ const contrast=ratio(t[ring[1]],t.surface);
+ assert.ok(contrast>=3,`${name} composer ring: ${contrast.toFixed(2)}:1`);
+ console.log(`${name} composer ring ${contrast.toFixed(2)}:1`);
+}
