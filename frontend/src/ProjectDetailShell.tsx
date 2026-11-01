@@ -9,7 +9,7 @@ import {Button} from './design';
 import {STATUS_LEVEL_NOTE,caseStatusLabel} from './stageModel';
 import type {Project} from './types';
 import './ProjectDetailShell.css';
-export function ProjectDetailShell({c,p,tab,onPeople,onPrefetch,onCancelPrefetch}:{c:Ctx;p:Project;tab:string;onPeople:()=>void;onPrefetch:()=>void;onCancelPrefetch:()=>void}){
+export function ProjectDetailShell({c,p,tab,onPrefetch,onCancelPrefetch}:{c:Ctx;p:Project;tab:string;onPrefetch:()=>void;onCancelPrefetch:()=>void}){
  const tabs=useRef<HTMLElement>(null);
  useEffect(()=>{const nav=tabs.current,active=nav?.querySelector<HTMLButtonElement>('[aria-current=page]');if(nav&&active)nav.scrollLeft=Math.max(0,active.offsetLeft-(nav.clientWidth-active.offsetWidth)/2)},[tab]);
  const share=async()=>{try{await navigator.clipboard.writeText(location.href);c.notify('已複製此頁直達連結')}catch{c.notify('請複製瀏覽器網址列中的直達連結')}};

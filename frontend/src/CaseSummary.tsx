@@ -10,7 +10,7 @@ export function CaseSummary({ctx,step,loading,error,onStep,onCurrent,onRetry}:{c
  const deadline=node?.deadline?node.deadline.slice(0,10):'未排定';
  const actionable=step.kind==='action'||step.kind==='view';
  return <section className="po-card cs-summary" aria-label="案件摘要" aria-busy={loading}>
-  {error ? <p role="alert">流程來源暫不可用，無法確認目前階段。<Button onClick={onRetry}>重試</Button></p> : loading ? <div role="status"><p>正在核對節點與任務…</p><Skeleton lines={3}/></div> : <>
+  {error ? <p role="alert">流程來源暫不可用，無法確認目前階段。{error}<Button onClick={onRetry}>重試</Button></p> : loading ? <div role="status"><p>正在核對節點與任務…</p><Skeleton lines={3}/></div> : <>
    <dl className="cs-band">
     <div className="cs-stage"><dt>目前階段</dt><dd>{ctx.workflow==='missing' ? '流程尚未設定' : current.length ? <><strong>{current[0]} · {nodeStatusText(node?.state||'')}</strong>{current.length>1 && <small>另有進行中：{current.slice(1).join('、')}</small>}</> : ctx.finished ? '所有節點已完成或略過' : '目前階段待確認'}</dd></div>
     <div><dt>負責人</dt><dd><strong>{node?owners:'未知'}</strong></dd></div>

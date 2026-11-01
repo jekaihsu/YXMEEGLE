@@ -1,3 +1,4 @@
+import {FlowAction} from './FlowActions';
 import {DetailsMenu} from './design/DetailsMenu';
 import {Select as FormSelect} from './design/Select';
 import {DetailRefreshProvider, useDetailRefresh} from './detailRefresh';
@@ -19,7 +20,7 @@ import {executionAllowed, executionReason} from './ProjectExecution';
 import {projectQuotes} from './sourceQuotes';
 import {SourceContractIndex} from './ProjectReadiness';
 import {lazy, useEffect, useState, useRef, useCallback, type FormEvent} from 'react';
-import {ArrowRight, ArrowUpRight, Check, ChevronLeft, ChevronRight, CircleCheck, Clock3, Download, ExternalLink, FileCheck2, FilePlus2, GitBranch, Link2, Network, Pause, Play, Plus, Send, ShieldCheck, SlidersHorizontal, TriangleAlert, Upload, Users, X} from 'lucide-react';
+import {ArrowRight, ArrowUpRight, Check, ChevronLeft, CircleCheck, Clock3, Download, ExternalLink, FileCheck2, FilePlus2, GitBranch, Link2, Network, Pause, Play, Plus, Send, ShieldCheck, TriangleAlert, Upload, Users} from 'lucide-react';
 import {useViewData} from './viewData';
 import {api, ApiError, getSessionEpoch, perfMark} from './api';
 const ProjectOperations=lazy(()=>import('./Operations').then(m=>({default:m.ProjectOperations})));
@@ -30,11 +31,10 @@ import {Avatar} from './AppShell';
 import {NativeApprovalControls, FinancialApprovalRequests} from './NativeApprovalControls';
 import {AuditTrail} from './AuditTrail';
 import {FilePanel, FileModal} from './FileWorkspace';
-import {TaskBatchCompletion} from './TaskBatchCompletion';
 import {draftKey, useDraft} from './drafts';
 import {lifecycleGate} from './sourceLifecycle';
 import {type Approval, type Node, type Project, type Task, type Workspace} from './types';
-import {Ctx,active,progress,date,nameOf,money,amountWithheld,amountLabel,points,isLate,Empty,EventList,ProjectSlice,Badge,NODE_NAMES,elapsed,isProjectLead,Primary,safeUrl,num,taskReadiness,isTaskActor,allTasks,Modal,STATUS,Field,TaskRow,TaskTable,OwnerSelect,eventMessage,stamp,unmatchedDaily} from './appCommon';
+import {Ctx,active,progress,date,nameOf,money,amountWithheld,amountLabel,points,isLate,Empty,EventList,ProjectSlice,Badge,NODE_NAMES,elapsed,isProjectLead,Primary,safeUrl,num,taskReadiness,isTaskActor,allTasks,Modal,STATUS,Field,TaskRow,OwnerSelect,eventMessage,stamp,unmatchedDaily} from './appCommon';
 import {DisabledActionReasons,Button,Skeleton} from './design';
 import './ProjectDetail.css';
 import './ProjectCalm.css';
@@ -122,14 +122,16 @@ export function ProjectDetail({c}:{c:Ctx}){
  const target=assignmentTarget(c.route,p.nodes,workflowKeys('data' in assignments.state ? assignments.state.data : undefined));const changeEnabled=c.s.features?.change_extension===true;
  const route=projectFlowRoute(c.route),tab=route.tab;const dataSection=tab==='data'?(route.section||'basic'):'';const selectedTask=target&&c.s.features?.node_assignment?undefined:p.nodes.flatMap(n=>n.tasks.map(t=>({p,n,t}))).find(r=>r.t.id===c.route.task);const approvals=c.w.approvals.filter(a=>a.project_id===p.id);
  const closeTask=()=>c.go({...c.route,node:c.route.node||selectedTask?.n.id,task:undefined,task_source:undefined,comment:undefined});
+ const localCanManage=!!selected&&(isProjectLead(c.s,p)||selected.owner_id===c.s.user?.id);
+ const localMore=!!selected&&(isProjectLead(c.s,p)||!['pricing','settlement'].includes(selected.key));
  const localActions=selected&&<div className="nw-actions">
- {(isProjectLead(c.s,p)||selected.owner_id===c.s.user?.id)&&<Primary busy={c.busy} disabled={!executionAllowed(p,c.w)} disabledReason={executionReason(p)} onClick={()=>setModal('addtask')}>新增任務</Primary>}
- <DetailsMenu className="pf-more" label="⋯" ariaLabel="更多節點操作"><div>
- {isProjectLead(c.s,p)&&<Primary busy={c.busy} disabled={!executionAllowed(p,c.w)} disabledReason={executionReason(p)} onClick={()=>setModal('participants')}>指派負責人</Primary>}
- {!['pricing','settlement'].includes(selected.key)&&selected.status!=='completed'&&<Primary busy={c.busy} disabled={!executionAllowed(p,c.w)} disabledReason={executionReason(p)} onClick={()=>setModal('complete-node')}>完成節點</Primary>}
- </div></DetailsMenu></div>;
+ {localCanManage&&<Primary busy={c.busy} disabled={!executionAllowed(p,c.w)} disabledReason={executionReason(p)} onClick={()=>setModal('addtask')}>新增任務</Primary>}
+ {localMore&&<DetailsMenu className="pf-more" label="⋯" ariaLabel="更多節點操作">{close=><div>
+ <FlowAction allowed={!c.busy&&isProjectLead(c.s,p)&&executionAllowed(p,c.w)} reason={c.busy?'正在儲存，請稍候。':!isProjectLead(c.s,p)?'需由本案專案經理或主管指派':executionReason(p)} onClick={()=>{close();setModal('participants')}}>指派負責人</FlowAction>
+ {!['pricing','settlement'].includes(selected.key)&&<FlowAction allowed={!c.busy&&localCanManage&&selected.status!=='completed'&&executionAllowed(p,c.w)} reason={c.busy?'正在儲存，請稍候。':!localCanManage?'需由本案專案經理或節點負責人完成':selected.status==='completed'?'節點已完成。':executionReason(p)} onClick={()=>{close();setModal('complete-node')}}>完成節點</FlowAction>}
+ </div>}</DetailsMenu>}</div>;
 
- return <DisabledActionReasons.Provider value={true}><div id="project-page-top" className="project-detail project-detail-calm"><ProjectDetailShell c={c} p={p} tab={tab} onPeople={()=>setModal('participants')} onPrefetch={()=>prefetchFlow(p.id)} onCancelPrefetch={()=>clearTimeout(tabPrefetch.current)}/>
+ return <DisabledActionReasons.Provider value={true}><div id="project-page-top" className="project-detail project-detail-calm"><ProjectDetailShell c={c} p={p} tab={tab} onPrefetch={()=>prefetchFlow(p.id)} onCancelPrefetch={()=>clearTimeout(tabPrefetch.current)}/>
  {(tab==='overview'||tab==='flow')&&<EnsureSopStatus c={c} p={p} sop={sopTasks} assignments={assignments}/>}
  {tab==='overview'&&<ProjectOverview c={c} p={p} assignments={assignments} selectedKey={selectedKey} sopTasks={sopTasks} workbench={()=><ProjectFlow c={c} p={p} assignments={assignments} selectedKey={selectedKey} sopTasks={sopTasks} reopened={reopenedTask} inline emptyActions={selected&&isProjectLead(c.s,p)&&!localCase(p)?<Button disabled={c.busy||!executionAllowed(p,c.w)} disabledReason={executionReason(p)} onClick={()=>setModal('addtask')}>新增任務</Button>:null} secondary={null} legacyActions={localActions}/>}/>}
  {tab==='items'&&<WorkItemsTab key={p.id} c={c} p={p} assignments={assignments} selectedKey={c.route.node ? selectedKey : 'field'}/>}
@@ -140,7 +142,7 @@ export function ProjectDetail({c}:{c:Ctx}){
  {dataSection==='contracts'&&<CaseSourceRelations c={c} p={p}/>} {dataSection==='quotes'&&<QuotePanel c={c} p={p}/>} {dataSection==='family'&&<FamilyPanel c={c} p={p}/>}
 
 
- {tab==='flow'&&<ProjectFlow key={`${p.id}:${c.s.features?.node_assignment===true}`} c={c} p={p} assignments={assignments} selectedKey={selectedKey} sopTasks={sopTasks} reopened={reopenedTask} secondary={<><Button onClick={()=>c.go({view:'project',project:p.id,tab:'data',section:'approvals'})}>待處理審批（{approvals.filter(a=>a.status==='pending').length}）</Button>{selected&&<section aria-label="本階段交付與確認"><h3>本階段交付與確認</h3><ProjectOperations key={`${selected.id}-${c.route.section||'review'}`} c={c} p={p} n={selected} initialSection={c.route.section}/></section>}</>} legacyActions={localActions}/>}
+ {tab==='flow'&&<ProjectFlow key={`${p.id}:${c.s.features?.node_assignment===true}`} c={c} p={p} assignments={assignments} selectedKey={selectedKey} sopTasks={sopTasks} reopened={reopenedTask} secondary={<>{approvals.some(a=>a.status==='pending')&&<Button onClick={()=>c.go({view:'project',project:p.id,tab:'data',section:'approvals'})}>待處理審批（{approvals.filter(a=>a.status==='pending').length}）</Button>}{selected&&<section aria-label="本階段交付與確認"><ProjectOperations key={`${selected.id}-${c.route.section||'review'}`} c={c} p={p} n={selected} initialSection={c.route.section}/></section>}</>} legacyActions={localActions}/>}
  {dataSection==='basic'&&<><ProjectExecutionDetails c={c} p={p}/><div className="detail-page-content"><div className="section-heading"><div><h2>基本資料</h2><p>保留來源關係，不重複填寫已知資訊</p></div>{safeUrl(p.source_url)&&<a className="button" href={p.source_url} target="_blank" rel="noreferrer">開啟來源<ExternalLink size={15}/></a>}</div><div className="definition-grid">{[
  ['案件編號',basicValue(p.code)],['業主',basicValue(p.client)],
  ['專案經理',basicValue(p.pm_id,()=>nameOf(c.w,p.pm_id))],['案件版本',basicValue(p.revision,()=>`v${p.revision}`)],

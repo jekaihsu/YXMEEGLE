@@ -13,18 +13,18 @@ import {AssignDrawer} from './AssignDrawer';
 import {AssignmentTaskInspector} from './AssignmentTaskInspector';
 import {isProductionSeedTask,productionPlanFacts} from './productionPlan';
 import {ProductionPlanFacts} from './FlowEvidence';
-import {STAGE_FILTERS,STAGE_FILTER_LABELS,activeFilters,blockedKnown,groupTasks,type StageContext,type TaskGroup,type TaskView} from './stageModel';
+import {sharedBlockerReasons,STAGE_FILTERS,STAGE_FILTER_LABELS,activeFilters,blockedKnown,groupTasks,type StageContext,type TaskGroup,type TaskView} from './stageModel';
 import {prefetchNodeAssignmentDetail,type useNodeAssignments} from './useNodeAssignments';
 import {assignRequests} from './assignRequests';
 
-type Props={selectedOnly?:boolean;c:Ctx;p:Project;ctx:StageContext;details:Record<string,NodeAssignmentDetail>;detailErrors:Record<string,string>;assignments:ReturnType<typeof useNodeAssignments>;busy:boolean;reason:string;loading:boolean;incomplete:boolean;retryDetails:()=>void;expanded:string[];setExpanded:(keys:string[])=>void;evidence:ReactNode;reopened?:MutableRefObject<string>;children?:ReactNode};
+type Props={c:Ctx;p:Project;ctx:StageContext;details:Record<string,NodeAssignmentDetail>;assignments:ReturnType<typeof useNodeAssignments>;busy:boolean;reason:string;loading:boolean;incomplete:boolean;retryDetails:()=>void;evidence:ReactNode;reopened?:MutableRefObject<string>;children?:ReactNode};
 
 function Executor({row}:{row:TaskView}){
  return row.flags.unassigned ? <span className="st-unassigned"><TriangleAlert size={14} aria-hidden="true"/>尚未指派</span> : <span>{row.owner}</span>;
 }
-export function FlowTasks({selectedOnly=false,c,p,ctx,details,detailErrors,assignments,busy,reason,loading,incomplete,retryDetails,expanded,setExpanded,evidence,reopened,children}:Props){
- const hasFilters=(ctx.nodes.find(n=>n.key===ctx.selectedId)?.taskRows.length||0)>4;
- const filters=taskFilters(hasFilters?c.route:{...c.route,task_filters:undefined}),applied=activeFilters(filters),userId=c.s.user?.id||'';
+export function FlowTasks({c,p,ctx,details,assignments,busy,reason,loading,incomplete,retryDetails,evidence,reopened,children}:Props){
+ const filters=taskFilters(c.route),applied=activeFilters(filters),userId=c.s.user?.id||'';
+ const hasFilters=(ctx.nodes.find(n=>n.key===ctx.selectedId)?.taskRows.length||0)>4||applied.length>0;
  const [assigning,setAssigning]=useState<{nodeKey:string;taskId:string}|null>(null);
  const [restore,setRestore]=useState('');
  const groups=groupTasks({ctx,filters,userId,today:c.w.as_of,loaded:key=>!!details[key]||!ctx.nodes.find(n=>n.key===key)?.assignment});
@@ -48,8 +48,9 @@ export function FlowTasks({selectedOnly=false,c,p,ctx,details,detailErrors,assig
  const clear=()=>c.go({...c.route,task_filters:undefined},true);
  const assignButton=(row:TaskView)=>!row.ownerId&&row.task?.can.assign&&<FlowAction allowed={!busy&&row.task.can.assign} reason={busy?reason:'你可查看此任務，但目前無指派權限。'} onClick={()=>open(row.nodeKey,row.id)}>指派</FlowAction>;
  const caseReason=!executionAllowed(p,c.w)?executionReason(p):p.status==='paused'?'案件暫停中':'';
+ const sharedReasons=sharedBlockerReasons(selected?.rows||[]);
  const rowView=(row:TaskView,group:TaskGroup)=>{
-  const rowReasons=row.flags.blocker.state==='blocked'?row.flags.blocker.reasons.filter(r=>!caseReason||(!r.includes(caseReason)&&!caseReason.includes(r))):[];
+  const rowReasons=row.flags.blocker.state==='blocked'?row.flags.blocker.reasons.filter(r=>!sharedReasons.includes(r)&&(!caseReason||(!r.includes(caseReason)&&!caseReason.includes(r)))):[];
   const plan=row.task?productionPlanFacts(row.task,row.nodeKey,group.node.production):null;
   return <li key={row.id} data-assignment-task={row.id} className="st-row">
    <div className="pf-task-line"><button className="pf-task-open" onClick={()=>c.go({...c.route,...(row.source==='SOP 任務'?flowTaskTarget(row):{node:row.task?row.nodeKey:group.node.legacy?.id,task:row.id,task_source:undefined}),tab:c.route.tab==='overview'?'overview':'flow'})}><strong>{row.title}</strong>
@@ -66,7 +67,8 @@ export function FlowTasks({selectedOnly=false,c,p,ctx,details,detailErrors,assig
  const drawerTask=drawerDetail?.tasks.find(t=>t.id===assigning?.taskId);
  return <section id="flow-tasks" className="pf-tasks st-tasks" aria-label="流程任務列表" tabIndex={-1}>
   <header><h3>本階段任務</h3>{!!selected?.total&&<span className="st-count" role="status">{incomplete?`${selected.rows.length} 項已載入，來源未完整`:`已完成 ${selected.done} / ${selected.total} 項`}</span>}</header>
-  {(!executionAllowed(p,c.w)||p.status==='paused')&&<p className="st-note" role="status">{p.status==='paused'?`案件暫停中，等待${p.pm_id?nameOf(c.w,p.pm_id):'PM'}處理。`:executionReason(p)}</p>}
+  {c.route.tab!=='overview'&&(!executionAllowed(p,c.w)||p.status==='paused')&&<p className="st-note" role="status">{p.status==='paused'?`案件暫停中，等待${p.pm_id?nameOf(c.w,p.pm_id):'PM'}處理。`:executionReason(p)}</p>}
+  {sharedReasons.filter(r=>!caseReason||(!r.includes(caseReason)&&!caseReason.includes(r))).map(reason=><p key={reason} className="st-note" role="status">{reason}</p>)}
   {selected&&selected.loaded&&!incomplete&&selected.rows.length!==selected.total&&<p className="st-note" role="status">列表載入 {selected.rows.length} 項，與節點總數 {selected.total} 項不一致，請重新整理後再確認。</p>}
   {hasFilters&&<div className="pf-filters" role="group" aria-label="任務篩選"><Button aria-pressed={applied.length===0} onClick={clear}>全部</Button><Button aria-pressed={filters.mine} onClick={()=>filterRoute('mine')}>我的任務</Button><DetailsMenu className="st-filter-menu" label="篩選"><div>{STAGE_FILTERS.filter(k=>k!=='mine').map(key=><Button key={key} aria-pressed={filters[key]} onClick={()=>filterRoute(key)}>{STAGE_FILTER_LABELS[key]}</Button>)}</div></DetailsMenu></div>}
   {applied.length>0&&<p className="st-applied">已套用條件（需同時符合）：{applied.map(k=>STAGE_FILTER_LABELS[k]).join(' ＋ ')}<Button variant="plain" onClick={clear}>清除篩選</Button></p>}

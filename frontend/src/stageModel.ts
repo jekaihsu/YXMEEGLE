@@ -74,20 +74,30 @@ export function groupTasks({ctx,filters,userId,today,loaded}:{ctx:StageContext;f
  return {selected:all.find(g=>g.node.key===ctx.selectedId),others:all.filter(g=>g.node.key!==ctx.selectedId&&(g.total>0||g.rows.length>0))};
 }
 
+export type StageBlock={kind:'paused'|'meegle'|'ownership'|'execution'|'source';reason:string};
+const BLOCK_TITLES:Record<StageBlock['kind'],string>={paused:'案件暫停中',meegle:'僅供參考',ownership:'尚未核定執行歸屬',execution:'案件執行受限',source:'資料待核對'};
+
+
+export function sharedBlockerReasons(rows:TaskView[]):string[] {
+ const pending=rows.filter(row=>row.flags.pending);
+ if(!pending.length)return [];
+ const first=pending[0].flags.blocker;
+ return first.state==='blocked'?first.reasons.filter(reason=>pending.every(row=>row.flags.blocker.state==='blocked'&&row.flags.blocker.reasons.includes(reason))):[];
+}
+
 export type NextStep=
  |{kind:'action';title:string;reason:string;stage:string;scope:'stage';taskId?:string;nodeKey:string;button:string;needs:'assign'|'approve'|'edit_status'|'view'}
  |{kind:'view';title:string;reason:string;nodeKey:string;taskId?:string;button:string}
  |{kind:'none';title:string;reasons:string[]}
  |{kind:'unknown';title:string;reasons:string[]};
-type StepInput={caseStatus?:string;ctx:StageContext;list?:NodeAssignmentList;userId:string;today:string;fresh:boolean;blockedReason?:string;crossStageAllowed?:(from:string,to:string)=>string|null};
-export function stageNextStep({caseStatus,ctx,list,userId,today,fresh,blockedReason,crossStageAllowed}:StepInput):NextStep {
+type StepInput={caseStatus?:string;ctx:StageContext;list?:NodeAssignmentList;today:string;fresh:boolean;block?:StageBlock;crossStageAllowed?:(from:string,to:string)=>string|null};
+export function stageNextStep({caseStatus,ctx,list,today,fresh,block,crossStageAllowed}:StepInput):NextStep {
  if(caseStatus==='completed')return {kind:'none',title:'已完成',reasons:[]};
  if(ctx.workflow==='missing')return {kind:'unknown',title:'流程尚未設定',reasons:['此案件目前沒有可顯示的流程節點，不會自動建立或啟動流程。']};
  if(!ctx.currentKnown)return {kind:'unknown',title:'目前階段待確認',reasons:['來源未提供目前階段，無法推薦下一步。請重新整理後再試。']};
  if(ctx.finished)return {kind:'none',title:'已完成',reasons:[]};
  const reasons:string[]=[];
- if(blockedReason)return {kind:'none',title:blockedReason.includes('暫停')?'案件暫停中':'資料待核對',reasons:[blockedReason]};
- if(blockedReason)reasons.push(blockedReason);
+ if(block)return {kind:'none',title:BLOCK_TITLES[block.kind],reasons:[block.reason]};
  if(!fresh)reasons.push('等待來源核對，暫無可執行的動作。');
  const candidates=(keys:string[])=>keys.flatMap(key=>{
   const node=ctx.nodes.find(n=>n.key===key);if(!node)return [];
@@ -105,10 +115,10 @@ export function stageNextStep({caseStatus,ctx,list,userId,today,fresh,blockedRea
    const free=rows.filter(t=>t.flags.blocker.state!=='blocked');
    const canAssign=(t:TaskView)=>t.source==='SOP 任務'?t.sopTask.allowedActions.includes('edit'):!!t.task?.can.assign;
    const unassigned=free.filter(t=>t.flags.unassigned&&canAssign(t)).sort(rank)[0];
-   if(unassigned&&fresh&&!blockedReason)return {kind:'action',title:`${label(unassigned)}尚未指派，你可指派執行人`,reason:`${node.label} · ${unassigned.deadline?`期限 ${unassigned.deadline.slice(0,10)}`:'期限未排定'}`,stage,scope:'stage',nodeKey:node.key,taskId:unassigned.id,button:'指派執行人',needs:'assign'};
+   if(unassigned&&fresh)return {kind:'action',title:`${label(unassigned)}尚未指派，你可指派執行人`,reason:`${node.label} · ${unassigned.deadline?`期限 ${unassigned.deadline.slice(0,10)}`:'期限未排定'}`,stage,scope:'stage',nodeKey:node.key,taskId:unassigned.id,button:'指派執行人',needs:'assign'};
    const runnable=(t:TaskView)=>t.source==='SOP 任務'?t.sopTask.allowedActions.some(a=>['start','complete','resume'].includes(a)):t.task?t.task.can.edit_status:node.legacy?.tasks.find(x=>x.id===t.id)?.can_execute===true;
    const exec=free.filter(t=>runnable(t)&&!t.flags.unassigned).sort((a,b)=>Number(b.flags.overdue)-Number(a.flags.overdue)||rank(a,b))[0];
-   if(exec&&fresh&&!blockedReason)return {kind:'action',title:`${exec.flags.overdue?'處理逾期任務':'接續'}${label(exec)}`,reason:`${node.label} · ${exec.deadline?`期限 ${exec.deadline.slice(0,10)}`:'期限未排定'}`,stage,scope:'stage',nodeKey:node.key,taskId:exec.id,button:'開啟任務',needs:'edit_status'};
+   if(exec&&fresh)return {kind:'action',title:`${exec.flags.overdue?'處理逾期任務':'接續'}${label(exec)}`,reason:`${node.label} · ${exec.deadline?`期限 ${exec.deadline.slice(0,10)}`:'期限未排定'}`,stage,scope:'stage',nodeKey:node.key,taskId:exec.id,button:'開啟任務',needs:'edit_status'};
    if(blocked)return {kind:'view',title:`受阻：${label(blocked)}`,reason:blocked.flags.blocker.state==='blocked'?blocked.flags.blocker.reasons[0]:'',nodeKey:node.key,taskId:blocked.id,button:'查看受阻原因'};
   }
  };
@@ -126,22 +136,4 @@ export function stageNextStep({caseStatus,ctx,list,userId,today,fresh,blockedRea
  }
  const current=ctx.nodes.find(n=>n.key===ctx.currentIds[0]);
  return {kind:'none',title:current?.state==='待審核'?'等待核准':!current?.owners.length?'等待指派':`等待${current.owners.map(o=>o.name).join('、')}處理`,reasons};
-}
-
-export function blockerSummary(ctx:StageContext,tasksByNode:(key:string)=>TaskView[]):string[] {
- const out:string[]=[];
- for(const key of ctx.currentIds){
-  const node=ctx.nodes.find(n=>n.key===key);if(!node)continue;
-  if(!node.owners.length)out.push(`${node.label}節點尚未指派負責人`);
-  if(node.state==='待審核')out.push(`${node.label}節點等待核准`);
-  const rows=tasksByNode(key);
-  const blocked=rows.filter(t=>t.flags.blocker.state==='blocked').length;
-  if(blocked)out.push(`${blocked} 項任務受阻`);
-  const unassigned=rows.filter(t=>t.flags.pending&&t.flags.unassigned).length;
-  if(unassigned)out.push(`${unassigned} 項任務尚未指派`);
-  const late=rows.filter(t=>t.flags.overdue).length;
-  if(late)out.push(`${late} 項任務已逾期`);
-  for(const warning of node.gaps)out.push(warning);
- }
- return uniqueReasons(out);
 }
