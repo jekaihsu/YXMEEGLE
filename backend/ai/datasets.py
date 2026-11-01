@@ -131,7 +131,7 @@ REPORTS = [
     ('sales', '業務案件', '查業務案件與 PM 狀態；不含金額，無月營收資料', 'sales', {'pm':text_param(),'status':text_param()},
      columns(('code','案號'),('name','案名'),('client','業主'),('pm','PM'),('status','狀態','status'))),
     ('progress', '進度週報', '查各案件計畫、實際與完成數量', 'progress', {'dept':(Literal['field','office'],'field'),'week':text_param(),'q':text_param()},
-     columns(('case_code','案號'),('case_name','案名'),('expected_total','預計數','number'),('done_total','完成數','number'),('remaining','剩餘數','number'),('status','狀態','status'))),
+     columns(('case_code','案號'),('case_name','案名'),('planned_days','預排天數','number'),('actual_days','出工天數','number'),('matched_days','符合預排天數','number'),('unplanned_days','未預排出工天數','number'),('status','狀態','status'))),
     ('assets', '資產使用', '查車輛或儀器使用與閒置天數；不含租金', 'assets', {'kind':(Literal['vehicle','instrument'],'vehicle'),'from':text_param(),'to':text_param(),'owner':text_param(),'q':text_param()},
      columns(('name','名稱'),('category','類別'),('status','狀態','status'),('owner','負責人'),('uses','使用次數','number'),('idle_days','閒置天數','number'))),
     ('contacts', '聯繫週報', '查人員、案件聯繫日期與跟進狀態', 'contacts', {'from':text_param(),'to':text_param(),'person':text_param(),'q':text_param()},

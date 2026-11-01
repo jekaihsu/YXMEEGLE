@@ -112,3 +112,24 @@ def test_generic_queries_reuse_real_authorized_routes(app,client):
     for ident,params in [('report_sales',{}),('node_detail',dict(case_id='p1',node_key='field'))]:
         data,error=asyncio.run(execute(app,cookie,'query_dataset',dict(id=ident,params=params,limit=20,offset=0)))
         assert error and json.loads(data)['code']=='ai_forbidden'
+
+
+def test_real_report_progress_excludes_financial_points():
+    from .test_reports_compute import dataset
+    from .reports.compute import progress
+    raw = progress(dataset(), dept='field', week='2026-10-12')
+    assert raw['items'][0]['remaining'] == 12
+    class Reader:
+        async def get(self, path, **params):
+            return raw
+    result = asyncio.run(query(Reader(), 'report_progress', {'week':'2026-10-12'}, 20, 0))
+    assert not {'expected_total','done_total','remaining','planned','actual','matched_points','achievement','diff'} & set(result['rows'][0])
+    assert result['rows'][0]['planned_days'] == raw['items'][0]['planned_days']
+
+
+def test_dataset_finance_name_guard():
+    import re
+    forbidden = re.compile(r'revenue|amount|營業額|金額|expected_total|done_total|remaining|points', re.I)
+    for dataset in REGISTRY.values():
+        for column in dataset.columns:
+            assert not forbidden.search(column.name + column.label), dataset.id
