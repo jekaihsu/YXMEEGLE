@@ -52,7 +52,7 @@ test('home deep link expands the real node and focuses the task without a legacy
   assert.equal(document.querySelector('.task-drawer[data-kind=lark] h2').textContent,'控制點成果核對');assert.equal(document.querySelector('[aria-label="任務名稱"]'),null,'the editor opens only behind 編輯');
   assert.equal(document.querySelector('.task-inspector'), null);
   assert.ok(!document.body.textContent.includes('找不到此任務'));
-  assert.match(document.querySelector('.pf-source').textContent,/Lark 節點與任務/);
+  assert.equal(document.querySelector('.pf-source'),null,'read-time toolbar text is gone');
 });
 test('a task-only link discovers its node from authorized embedded tasks', async () => {
   ui.invalidateSessionEpoch(); const fixture = sourceFixture();
@@ -76,7 +76,7 @@ test('zero Lark tasks remain separate from expandable local templates', async ()
   globalThis.fetch = async () => reply(fixture.list);
   await mount(React.createElement(ui.ProjectDetail, {c:context({tab:'flow',node:'sales'})}));
   assert.equal(document.querySelectorAll('#flow-tasks .pf-task-open').length,0);
-  assert.equal(document.querySelector('.pf-legacy').open,false);
+  assert.equal(document.querySelector('.pf-legacy'),null,'the local-template accordion is gone');
   assert.match(document.querySelector('#flow-tasks').textContent,/此節點尚無可顯示任務/);
 });
 test('an unavailable remote link does not pretend to focus local workflow', async () => {
